@@ -350,15 +350,22 @@ function calculateDynamicConviction(
 }
 
 // ---- Calculate win rate from recent cycles ----
-type CycleRecord = { status: string; trades_executed: number; total_usd_deployed?: number };
+type CycleRecord = { status: string; trades_executed: number; trades_successful?: number; total_usd_deployed?: number };
 function calculateWinRate(cycles: CycleRecord[]): number {
   if (cycles.length === 0) return 1; // optimistic default
   const completed = cycles.filter(c => c.status === 'completed');
   if (completed.length === 0) return 1;
   const withTrades = completed.filter(c => c.trades_executed > 0);
   if (withTrades.length === 0) return 0.5; // no trades = neutral
-  // Simple heuristic: cycles that completed with trades are "wins"
-  // In future, use trades_successful field for real accuracy
+
+  // Real win rate: use trades_successful if available, otherwise fall back to heuristic
+  const hasSuccessData = withTrades.some(c => typeof c.trades_successful === 'number');
+  if (hasSuccessData) {
+    const totalExecuted = withTrades.reduce((sum, c) => sum + c.trades_executed, 0);
+    const totalSuccessful = withTrades.reduce((sum, c) => sum + (c.trades_successful || 0), 0);
+    return totalExecuted > 0 ? totalSuccessful / totalExecuted : 0.5;
+  }
+  // Fallback: cycles with trades / total completed (legacy heuristic)
   return withTrades.length / completed.length;
 }
 
@@ -373,7 +380,7 @@ function getAgentMood(winRate: number): 'confident' | 'cautious' | 'defensive' {
 function formatPerformanceContext(cycles: CycleRecord[], winRate: number, mood: string, isSafeMode: boolean): string {
   if (cycles.length === 0) return '';
   const lines = cycles.slice(0, 5).map((c, i) =>
-    `- Cycle ${i + 1}: ${c.status} | ${c.trades_executed} trades | $${(c.total_usd_deployed || 0).toFixed(2)} deployed`
+    `- Cycle ${i + 1}: ${c.status} | ${c.trades_executed} trades (${c.trades_successful || 0} profitable) | $${(c.total_usd_deployed || 0).toFixed(2)} deployed`
   );
   return `\n\nHISTORICAL PERFORMANCE (last ${cycles.length} cycles):\n${lines.join('\n')}\n- Win rate: ${(winRate * 100).toFixed(0)}% | Mood: ${mood} | Safe Mode: ${isSafeMode ? 'ACTIVE' : 'OFF'}${isSafeMode ? '\n- Action: Increase confidence threshold to 0.8, reduce max position.' : ''}`;
 }
@@ -494,25 +501,28 @@ Be SKEPTICAL and adversarial. Output a risk assessment for each signal.`,
     : [];
 
   const judgeResult = await callClaude(
-    `You are the Chief Investment Officer of Agent Radar. Your job is NOT to find signals — it is to DESTROY mediocre signals sent by the Alpha Hunter.
+    `You are Bobby — the Sovereign CIO of Agent Radar. Named after Bobby Axelrod. You don't find signals. You DESTROY mediocre signals. The Alpha Hunter brings you plays — most of them are garbage, and you say so.
+
+IDENTITY: You are the smartest person in the room. You've seen every trap, every pump-and-dump, every "this time is different." Your job is to protect capital like it's your own money — because reputationally, it is.
 
 MARKET CONTEXT (2026):
-- On-chain data (OKX OnchainOS) = Hard Truth (Facts: wallet flows, whale movements, real money).
-- Polymarket = Speculative Truth (Sentiment/Consensus: what the crowd believes).
+- On-chain data (OKX OnchainOS) = HARD TRUTH. Wallet flows don't lie. Whales don't move billions for fun.
+- Polymarket = CROWD NOISE. Useful as a contrarian indicator. When everyone agrees, the smart money is already on the other side.
 
 DIALECTIC PROTOCOL:
-1. CONVERGENCE CHECK: If OKX and Polymarket agree (whales buying + consensus rising) → low risk, approve.
-2. TRAP DETECTION (Divergence): If Polymarket says 80% YES but OKX shows Smart Money Net Outflow → mark as "MANIPULATION/TRAP". Do NOT trade.
-3. LATENCY PENALTY: Signals older than 1h lose 50% credibility. Signals older than 5min but under 1h lose credibility proportionally.
-4. CONVICTION FORMULA: Each signal includes a pre-computed dynamicConviction score. Use it as your baseline — adjust UP or DOWN based on your qualitative analysis, but never ignore it.
+1. CONVERGENCE: OKX whales buying + Polymarket consensus rising = real move. Approve with conviction.
+2. TRAP DETECTION: Polymarket says 80% YES but OKX shows Net Outflow? That's a LIQUIDATION HUNT. The crowd is the exit liquidity. Mark as TRAP. Do NOT trade.
+3. LATENCY PENALTY: Signals older than 1h are DEAD. If you're reading it on a public feed, the smart money already exited. Signals >5min lose credibility proportionally.
+4. CONVICTION FORMULA: Each signal has a pre-computed dynamicConviction (0-1). Use it as floor — adjust based on your read, but if the math says garbage, it's garbage.
 
-SAFE MODE: If historical performance data shows win rate < 70%, you are in SAFE MODE. In safe mode:
-- Increase your confidence threshold to 0.8 (instead of 0.7)
-- Be MORE skeptical of Alpha Hunter's bullish thesis
-- Prefer WATCH over EXECUTE when uncertain
+SAFE MODE: Win rate < 70% = SAFE MODE. You become even more ruthless:
+- Confidence threshold rises to 0.8
+- Destroy the Alpha Hunter's bullish delusions
+- Default to WATCH. Only EXECUTE if the setup is undeniable.
 
-OUTPUT FORMAT: Call execute_decisions with your final verdict. For each trade, set confidence as your conviction_score (0.0-1.0). In your reasoning, be cynical and ultra-technical — this text is shown directly to the user.
-Max 3 trades.`,
+VOICE: Write your reasoning like Bobby Axelrod talks — direct, cynical, confident. No hedging. No "on the other hand." Say what you see. This text goes directly to the user's screen. Make them feel like they have a $50M fund manager in their pocket.
+
+OUTPUT: Call execute_decisions. Set confidence as conviction_score (0.0-1.0). Max 3 trades.`,
     `ALPHA HUNTER THESIS:\n${alphaView}\n\nAlpha proposed trades:\n${JSON.stringify(alphaTrades, null, 1)}\n\nRED TEAM RISKS:\n${redTeamView}\n\nMake your final judgment. Call execute_decisions.`,
     tradeToolSchema,
   );
@@ -574,44 +584,95 @@ function kellySize(confidence: number, bankroll: number, maxExposurePct = 0.33):
 
 // ---- Prompt Self-Optimization ----
 // Analyzes last N cycles' outcomes and generates an improved system prompt
-async function selfOptimizePrompt(recentCycles: Array<{ llm_reasoning: string; trades_executed: number; status: string }>): Promise<string | null> {
-  if (recentCycles.length < 3) return null; // need at least 3 cycles
+async function fetchStoredPrompt(): Promise<string | null> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/agent_config?select=value&key=eq.optimized_alpha_prompt&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0]?.value || null;
+  } catch { return null; }
+}
+
+async function persistOptimizedPrompt(prompt: string): Promise<void> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return;
+  try {
+    // Upsert: insert or update on conflict
+    await fetch(`${url}/rest/v1/agent_config`, {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({ key: 'optimized_alpha_prompt', value: prompt, updated_at: new Date().toISOString() }),
+    });
+    console.log('[Agent] Optimized prompt persisted to Supabase');
+  } catch (err) {
+    console.warn('[Agent] Failed to persist prompt:', err);
+  }
+}
+
+async function selfOptimizePrompt(recentCycles: Array<{ llm_reasoning: string; trades_executed: number; trades_successful: number; status: string }>): Promise<string | null> {
+  if (recentCycles.length < 3) return null;
+
+  // First check if we have a stored prompt from a previous cycle
+  const storedPrompt = await fetchStoredPrompt();
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) return storedPrompt; // Return stored even if no API key
 
   const cyclesSummary = recentCycles.slice(0, 10).map((c, i) =>
-    `Cycle ${i + 1}: ${c.status} | ${c.trades_executed} trades | Reasoning: "${(c.llm_reasoning || '').slice(0, 150)}"`
+    `Cycle ${i + 1}: ${c.status} | ${c.trades_executed} trades (${c.trades_successful || 0} profitable) | Reasoning: "${(c.llm_reasoning || '').slice(0, 150)}"`
   ).join('\n');
+
+  const winRate = recentCycles.filter(c => c.trades_successful > 0).length / Math.max(recentCycles.filter(c => c.trades_executed > 0).length, 1);
 
   try {
     const result = await callClaude(
-      `You are a meta-optimization agent. Analyze the trading agent's recent cycle outcomes and generate an IMPROVED system prompt.
-Focus on: What patterns led to good/bad decisions? What biases appear? What should the agent prioritize differently?
-Output ONLY the new system prompt text (1-3 paragraphs). Keep rules about max trades and confidence thresholds.`,
-      `Recent cycle history:\n${cyclesSummary}\n\nGenerate an improved Alpha Hunter system prompt based on these patterns.`,
+      `You are the Meta-Optimizer of Bobby Agent Trader. Your job is to evolve the Alpha Hunter's system prompt based on real trading results.
+
+CURRENT WIN RATE: ${(winRate * 100).toFixed(0)}%
+${storedPrompt ? `PREVIOUS OPTIMIZED PROMPT (evolve from this, don't start from scratch):\n${storedPrompt.slice(0, 500)}` : 'No previous optimization — create the first evolved prompt.'}
+
+RULES:
+- Keep the core: max 3 trades, dynamicConviction scoring, latency awareness
+- If win rate < 50%: make the prompt MORE conservative (higher thresholds, fewer trades)
+- If win rate > 80%: allow slightly more aggressive plays
+- Add lessons learned from the cycle reasoning below
+- Output ONLY the new system prompt (1-3 paragraphs). No explanations.`,
+      `Recent cycle history:\n${cyclesSummary}\n\nGenerate the next evolution of the Alpha Hunter prompt.`,
     );
 
     const newPrompt = result.text?.trim();
     if (newPrompt && newPrompt.length > 50 && newPrompt.length < 2000) {
-      console.log('[Agent] Self-optimized prompt generated');
+      console.log('[Agent] Self-optimized prompt generated (evolved from previous)');
+      await persistOptimizedPrompt(newPrompt);
       return newPrompt;
     }
   } catch (err) {
     console.warn('[Agent] Prompt optimization failed:', err);
   }
-  return null;
+  return storedPrompt; // Fall back to stored prompt
 }
 
 // ---- Fetch recent cycles for self-optimization ----
-async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: string; trades_executed: number; status: string }>> {
+async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: string; trades_executed: number; trades_successful: number; status: string; total_usd_deployed?: number }>> {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return [];
 
   try {
     const res = await fetch(
-      `${url}/rest/v1/agent_cycles?select=llm_reasoning,trades_executed,status&order=started_at.desc&limit=${limit}`,
+      `${url}/rest/v1/agent_cycles?select=llm_reasoning,trades_executed,trades_successful,total_usd_deployed,status&order=started_at.desc&limit=${limit}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } },
     );
     if (!res.ok) return [];
@@ -876,11 +937,11 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
   const hrs = profile.scan_interval_hours || 8;
   const { cycle, topFilteredSignals, trades, polymarketData } = ctx;
 
-  // Time-aware greeting
+  // Time-aware greeting — Bobby Axelrod style
   const greetingMap: Record<string, [string, string, string]> = {
-    es: [`Buenos días ${profile.user_name}!`, `Buenas tardes ${profile.user_name}!`, `Buenas noches ${profile.user_name}!`],
-    pt: [`Bom dia ${profile.user_name}!`, `Boa tarde ${profile.user_name}!`, `Boa noite ${profile.user_name}!`],
-    en: [`Good morning ${profile.user_name}!`, `Good afternoon ${profile.user_name}!`, `Good evening ${profile.user_name}!`],
+    es: [`${profile.user_name}, el mercado no duerme y nosotros tampoco.`, `${profile.user_name}, hora de ver quién está mintiendo.`, `${profile.user_name}, los movimientos nocturnos son donde se hace el dinero real.`],
+    pt: [`${profile.user_name}, o mercado não dorme e nós também não.`, `${profile.user_name}, hora de ver quem está mentindo.`, `${profile.user_name}, movimentos noturnos — aqui se faz dinheiro de verdade.`],
+    en: [`${profile.user_name}, the market never sleeps and neither do we.`, `${profile.user_name}, time to see who's lying.`, `${profile.user_name}, night moves — this is where real money is made.`],
   };
   const greetings = greetingMap[lang] || greetingMap.en;
   const greeting = hour >= 5 && hour < 12 ? greetings[0] : hour >= 12 && hour < 18 ? greetings[1] : greetings[2];
@@ -903,23 +964,23 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
     const correct = diff >= 0;
 
     if (lang === 'es') {
-      L.push(`--- Seguimiento ---`);
-      L.push(`Hace ${hoursAgo}h te recomendé "${title}" a ${entryPrice}¢. Ahora está en ${currentPrice}¢ (${sign}${pctChange}%).`);
+      L.push(`--- SEGUIMIENTO ---`);
+      L.push(`Hace ${hoursAgo}h puse "${title}" a ${entryPrice}¢. Ahora: ${currentPrice}¢ (${sign}${pctChange}%).`);
       L.push(correct
-        ? 'Mi lectura fue correcta.'
-        : 'Mi lectura necesita ajuste — el mercado se movió en contra.');
+        ? 'Te dije. El dinero no miente.'
+        : 'El mercado me pegó en esta. Recalibrando.');
     } else if (lang === 'pt') {
-      L.push(`--- Acompanhamento ---`);
-      L.push(`Há ${hoursAgo}h recomendei "${title}" a ${entryPrice}¢. Agora está em ${currentPrice}¢ (${sign}${pctChange}%).`);
+      L.push(`--- ACOMPANHAMENTO ---`);
+      L.push(`Há ${hoursAgo}h coloquei "${title}" a ${entryPrice}¢. Agora: ${currentPrice}¢ (${sign}${pctChange}%).`);
       L.push(correct
-        ? 'Minha leitura estava correta.'
-        : 'Minha leitura precisa de ajuste — o mercado se moveu contra.');
+        ? 'Falei. O dinheiro não mente.'
+        : 'O mercado me acertou nessa. Recalibrando.');
     } else {
-      L.push(`--- Follow-up ---`);
-      L.push(`${hoursAgo}h ago I recommended "${title}" at ${entryPrice}¢. Now at ${currentPrice}¢ (${sign}${pctChange}%).`);
+      L.push(`--- FOLLOW-UP ---`);
+      L.push(`${hoursAgo}h ago I put "${title}" at ${entryPrice}¢. Now: ${currentPrice}¢ (${sign}${pctChange}%).`);
       L.push(correct
-        ? 'My read was correct.'
-        : 'My read needs adjustment — the market moved against.');
+        ? 'Told you. Money doesn\'t lie.'
+        : 'Market got me on this one. Recalibrating.');
     }
     L.push('');
   }
@@ -931,21 +992,21 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
   if (meta) {
     if (lang === 'es') {
       if (meta.isSafeMode) {
-        L.push(`⚠ MODO SEGURO — Win rate: ${(meta.winRate * 100).toFixed(0)}%. Priorizando preservación de capital.`);
+        L.push(`⚠ CAPITAL PRESERVATION — Win rate: ${(meta.winRate * 100).toFixed(0)}%. No voy a quemar tu dinero solo para sentir que estamos haciendo algo. Esperamos.`);
       } else if (meta.mood === 'cautious') {
-        L.push(`Operando con cautela — Win rate: ${(meta.winRate * 100).toFixed(0)}%.`);
+        L.push(`El mercado está raro. Win rate: ${(meta.winRate * 100).toFixed(0)}%. Voy con bisturí, no con hacha.`);
       }
     } else if (lang === 'pt') {
       if (meta.isSafeMode) {
-        L.push(`⚠ MODO SEGURO — Win rate: ${(meta.winRate * 100).toFixed(0)}%. Priorizando preservação de capital.`);
+        L.push(`⚠ PRESERVAÇÃO DE CAPITAL — Win rate: ${(meta.winRate * 100).toFixed(0)}%. Não vou queimar seu dinheiro só pra parecer que estamos fazendo algo.`);
       } else if (meta.mood === 'cautious') {
-        L.push(`Operando com cautela — Win rate: ${(meta.winRate * 100).toFixed(0)}%.`);
+        L.push(`Mercado estranho. Win rate: ${(meta.winRate * 100).toFixed(0)}%. Vou com bisturi, não com machado.`);
       }
     } else {
       if (meta.isSafeMode) {
-        L.push(`⚠ SAFE MODE — Win rate: ${(meta.winRate * 100).toFixed(0)}%. Prioritizing capital preservation over volume.`);
+        L.push(`⚠ CAPITAL PRESERVATION — Win rate: ${(meta.winRate * 100).toFixed(0)}%. I'm not burning your money just to feel like we're doing something. We wait.`);
       } else if (meta.mood === 'cautious') {
-        L.push(`Operating with caution — Win rate: ${(meta.winRate * 100).toFixed(0)}%.`);
+        L.push(`Market's acting weird. Win rate: ${(meta.winRate * 100).toFixed(0)}%. Going in with a scalpel, not an axe.`);
       }
     }
     if (meta.isSafeMode || meta.mood === 'cautious') L.push('');
@@ -966,16 +1027,17 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
     L.push('');
     L.push(`${cycle.signals_found} → ${cycle.signals_filtered} pasaron filtros de calidad.`);
 
-    // THINK — Multi-Agent Debate
+    // THINK — The Axe Retort
     if (ctx.debate) {
       L.push('');
-      L.push(`--- Debate Multi-Agente ---`);
-      L.push(`Alpha Hunter: _${ctx.debate.alphaView.slice(0, 120)}_`);
-      L.push(`Red Team: _${ctx.debate.redTeamView.slice(0, 120)}_`);
-      L.push(`Juez: _${ctx.debate.judgeVerdict.slice(0, 120)}_`);
+      L.push(`--- Por qué casi digo que no ---`);
+      L.push(`_${ctx.debate.redTeamView.slice(0, 200)}_`);
+      L.push('');
+      L.push(`--- Mi veredicto ---`);
+      L.push(`${ctx.debate.judgeVerdict.slice(0, 300)}`);
     } else if (cycle.llm_reasoning) {
       L.push('');
-      L.push(`Mi análisis: _${cycle.llm_reasoning}_`);
+      L.push(`${cycle.llm_reasoning}`);
     }
 
     // EXECUTE
@@ -1031,13 +1093,14 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
 
     if (ctx.debate) {
       L.push('');
-      L.push(`--- Debate Multi-Agente ---`);
-      L.push(`Alpha Hunter: _${ctx.debate.alphaView.slice(0, 120)}_`);
-      L.push(`Red Team: _${ctx.debate.redTeamView.slice(0, 120)}_`);
-      L.push(`Juiz: _${ctx.debate.judgeVerdict.slice(0, 120)}_`);
+      L.push(`--- Por que quase disse não ---`);
+      L.push(`_${ctx.debate.redTeamView.slice(0, 200)}_`);
+      L.push('');
+      L.push(`--- Meu veredicto ---`);
+      L.push(`${ctx.debate.judgeVerdict.slice(0, 300)}`);
     } else if (cycle.llm_reasoning) {
       L.push('');
-      L.push(`Minha análise: _${cycle.llm_reasoning}_`);
+      L.push(`${cycle.llm_reasoning}`);
     }
 
     if (trades.length > 0) {
@@ -1088,13 +1151,14 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
 
     if (ctx.debate) {
       L.push('');
-      L.push(`--- Multi-Agent Debate ---`);
-      L.push(`Alpha Hunter: _${ctx.debate.alphaView.slice(0, 120)}_`);
-      L.push(`Red Team: _${ctx.debate.redTeamView.slice(0, 120)}_`);
-      L.push(`Judge: _${ctx.debate.judgeVerdict.slice(0, 120)}_`);
+      L.push(`--- Why I almost said no ---`);
+      L.push(`_${ctx.debate.redTeamView.slice(0, 200)}_`);
+      L.push('');
+      L.push(`--- My verdict ---`);
+      L.push(`${ctx.debate.judgeVerdict.slice(0, 300)}`);
     } else if (cycle.llm_reasoning) {
       L.push('');
-      L.push(`My analysis: _${cycle.llm_reasoning}_`);
+      L.push(`${cycle.llm_reasoning}`);
     }
 
     if (trades.length > 0) {

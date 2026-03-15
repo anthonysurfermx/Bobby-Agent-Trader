@@ -12,3 +12,12 @@ COMMENT ON COLUMN agent_cycles.trades_successful IS 'Number of profitable trades
 COMMENT ON COLUMN agent_cycles.mood IS 'Agent mood: confident (>70% win), cautious (50-70%), defensive (<50%)';
 COMMENT ON COLUMN agent_cycles.dynamic_conviction IS 'Average dynamic conviction score for this cycle';
 COMMENT ON COLUMN agent_cycles.safe_mode_active IS 'Whether Safe Mode was active during this cycle';
+
+-- Key-value config table for agent state persistence (optimized prompts, etc.)
+CREATE TABLE IF NOT EXISTS agent_config (
+  key text PRIMARY KEY,
+  value text NOT NULL,
+  updated_at timestamptz DEFAULT now()
+);
+
+COMMENT ON TABLE agent_config IS 'Key-value store for persistent agent state (self-optimized prompts, feature flags, etc.)';
