@@ -1,5 +1,5 @@
 // ============================================================
-// AdamsChat — Trading advisor chat with real market data
+// BobbyChat — Bobby Axelrod-style trading CIO with real market data
 // Price queries, inline charts, smart NLP, on-chain execution
 // ============================================================
 
@@ -331,7 +331,7 @@ export function AdamsChat() {
   // Cache tickers locally for quick re-use
   const tickerCacheRef = useRef<OKXTicker[]>([]);
 
-  const advisorName = profile?.advisorName || 'Adams';
+  const advisorName = profile?.advisorName || 'Bobby';
 
   useEffect(() => {
     if (needsSetup) setShowSetup(true);
@@ -360,7 +360,7 @@ export function AdamsChat() {
           setMessages([{
             id: 'welcome',
             role: 'advisor',
-            text: `Hey! I'm ${advisorName}, your AI trading advisor.\n\nI scan OKX + Polymarket every ${profile.scanIntervalHours || 8}h looking for opportunities. Here's the market right now:`,
+            text: `${advisorName} here. I scan OKX whale flows + Polymarket smart money every ${profile.scanIntervalHours || 8}h. When I find a divergence between what the crowd believes and what the money does — that's where we strike.\n\nHere's what the market looks like right now:`,
             timestamp: Date.now(),
             prices: priceCards,
           }]);
@@ -368,7 +368,7 @@ export function AdamsChat() {
           setMessages([{
             id: 'welcome',
             role: 'advisor',
-            text: `Hey! I'm ${advisorName}, your AI trading advisor.\n\nAsk me anything — try "BTC", "ETH", "All Prices", or hit "Analyze Market" for a full scan.`,
+            text: `${advisorName} here. OKX data feed is warming up — ask me anything. Try a token name, "Analyze Market" for a full scan, or just talk to me. I don't bite. Much.`,
             timestamp: Date.now(),
           }]);
         });
@@ -639,11 +639,22 @@ export function AdamsChat() {
             } catch {}
           }
 
-          setMessages(prev => [...prev, {
+          const newMsgs: ChatMsg[] = [{
             id: uid(), role: 'advisor', timestamp: Date.now(),
             text: greetingText, isLive: true,
             trades: trades.length > 0 ? trades : undefined,
-          }]);
+          }];
+
+          // The Axe Retort — show why Bobby almost said no
+          if (data.debate?.redTeamView && data.debate?.judgeVerdict) {
+            newMsgs.push({
+              id: uid(), role: 'advisor', timestamp: Date.now() + 1,
+              text: `--- Why I almost said no ---\n${data.debate.redTeamView}\n\n--- My verdict ---\n${data.debate.judgeVerdict}`,
+              isLive: false,
+            });
+          }
+
+          setMessages(prev => [...prev, ...newMsgs]);
         } else {
           // API returned ok:false — still show what we got
           const reason = data.cycle?.llm_reasoning || data.error || 'No actionable signals this cycle.';

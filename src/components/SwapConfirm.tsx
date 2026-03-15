@@ -114,7 +114,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
   return (
     <div className="border border-green-500/20 bg-green-500/[0.03] rounded-lg p-3 font-mono text-[11px]">
       {/* Header */}
-      <div className="text-green-400/60 mb-2">Adams recommends:</div>
+      <div className="text-green-400/60 mb-2">Bobby recommends:</div>
 
       {/* Trade details */}
       <div className="space-y-1 mb-3">
