@@ -4,10 +4,11 @@
 // ============================================================
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowUp, ArrowLeft, ChevronRight, Activity, Settings, Bot } from 'lucide-react';
+import { ArrowUp, ArrowLeft, ChevronRight, Activity, Settings, Bot, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount } from 'wagmi';
+import { useAppKit } from '@reown/appkit/react';
 import { AdvisorSetup, useAdvisorProfile } from './AdvisorSetup';
 import type { AdvisorProfile } from './AdvisorSetup';
 import { SwapConfirm, type TradeExecution } from './SwapConfirm';
@@ -105,7 +106,7 @@ function uid(): string {
 
 // ---- Chat Bubble ----
 
-function ChatBubble({ msg, advisorName, isLatest }: { msg: ChatMsg; advisorName: string; isLatest: boolean }) {
+function ChatBubble({ msg, advisorName, isLatest, walletAddress }: { msg: ChatMsg; advisorName: string; isLatest: boolean; walletAddress?: string }) {
   const isUser = msg.role === 'user';
   const initial = advisorName.charAt(0).toUpperCase();
 
@@ -143,7 +144,7 @@ function ChatBubble({ msg, advisorName, isLatest }: { msg: ChatMsg; advisorName:
         {msg.trades && msg.trades.length > 0 && (
           <div className="mt-2 space-y-2 w-full">
             {msg.trades.map((trade, i) => (
-              <SwapConfirm key={i} trade={trade} />
+              <SwapConfirm key={i} trade={trade} walletAddress={walletAddress} />
             ))}
           </div>
         )}
@@ -233,6 +234,7 @@ function QuickActions({ onAction, disabled }: { onAction: (text: string) => void
 export function AdamsChat() {
   const { profile, needsSetup, saveNewProfile, isConnected } = useAdvisorProfile();
   const { address } = useAccount();
+  const { open: openWallet } = useAppKit();
   const [showSetup, setShowSetup] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [inputText, setInputText] = useState('');
@@ -436,6 +438,24 @@ export function AdamsChat() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Wallet connect / address */}
+            {address ? (
+              <button
+                onClick={() => openWallet()}
+                className="flex items-center gap-1.5 text-[11px] text-green-400/70 border border-green-500/20 px-2.5 py-1.5 hover:bg-green-500/10 transition-colors font-mono"
+              >
+                <Wallet className="w-3 h-3" />
+                {address.slice(0, 6)}...{address.slice(-4)}
+              </button>
+            ) : (
+              <button
+                onClick={() => openWallet()}
+                className="flex items-center gap-1.5 text-[11px] text-green-400 border border-green-500/30 px-2.5 py-1.5 hover:bg-green-500/10 transition-colors"
+              >
+                <Wallet className="w-3 h-3" />
+                Connect
+              </button>
+            )}
             {isConnected && profile && (
               <button
                 onClick={() => setShowSetup(true)}
@@ -465,6 +485,7 @@ export function AdamsChat() {
               msg={msg}
               advisorName={advisorName}
               isLatest={i === messages.length - 1 && msg.role === 'advisor'}
+              walletAddress={address}
             />
           ))}
 

@@ -35,7 +35,7 @@ function getChainName(chain: string): string {
   return 'Ethereum';
 }
 
-export function SwapConfirm({ trade }: { trade: TradeExecution }) {
+export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; walletAddress?: string }) {
   const [state, setState] = useState<SwapState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -94,7 +94,7 @@ export function SwapConfirm({ trade }: { trade: TradeExecution }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            walletAddress: '',
+            walletAddress: walletAddress || '',
             txHash: hash,
             status: 'confirmed',
             chain: trade.chain,
