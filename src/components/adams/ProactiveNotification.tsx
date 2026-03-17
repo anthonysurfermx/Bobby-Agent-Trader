@@ -15,10 +15,17 @@ interface ProactiveAlert {
   advisor_name: string;
 }
 
+const OPEN_CHAT_LABEL: Record<string, string> = { es: 'Abrir chat', en: 'Open chat', pt: 'Abrir chat' };
+
 export function ProactiveNotification({ walletAddress }: { walletAddress?: string }) {
   const [alerts, setAlerts] = useState<ProactiveAlert[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
+
+  // Read user language preference
+  const lang = (() => {
+    try { const p = JSON.parse(localStorage.getItem('bobby_profile') || '{}'); return p.language || 'en'; } catch { return 'en'; }
+  })();
 
   const fetchUnread = useCallback(async () => {
     if (!walletAddress) return;
@@ -97,7 +104,7 @@ export function ProactiveNotification({ walletAddress }: { walletAddress?: strin
               onClick={() => goToChat(alert.id)}
               className="flex items-center gap-1.5 text-[10px] text-green-400/70 hover:text-green-400 transition-colors font-mono"
             >
-              Open chat <ArrowRight className="w-3 h-3" />
+              {OPEN_CHAT_LABEL[lang] || OPEN_CHAT_LABEL.en} <ArrowRight className="w-3 h-3" />
             </button>
           </motion.div>
         ))}

@@ -1,0 +1,1299 @@
+{
+  "nav": {
+    "home": "Home",
+    "ecosystem": "Ecosystem",
+    "learn": "Learn",
+    "more": "More",
+    "startups": "Startups",
+    "communities": "Communities",
+    "events": "Events",
+    "blog": "Blog",
+    "advocates": "Advocates",
+    "jobs": "Web3 Jobs",
+    "metrics": "Metrics",
+    "nftCollection": "NFT Collection",
+    "agenticWorld": "Agentic World",
+    "agenticWorldDesc": "AI agents for DeFi",
+    "contribute": "Contribute",
+    "admin": "Admin"
+  },
+  "footer": {
+    "tagline": "Driving the DeFi ecosystem in Mexico through innovation and collaboration.",
+    "quickLinks": "Quick Links",
+    "newsletter": "Newsletter",
+    "newsletterDesc": "Receive the latest news from the Mexican DeFi ecosystem.",
+    "subscribe": "Subscribe",
+    "copyright": "© {{year}} DeFi México Hub. All rights reserved.",
+    "terms": "Terms",
+    "privacy": "Privacy",
+    "contact": "Contact"
+  },
+  "auth": {
+    "connecting": "Connecting to DeFi México Hub",
+    "profileError": "Error loading user profile",
+    "signupSuccess": "Registration successful! Check your email to activate your account.",
+    "signupCreated": "Account created successfully!",
+    "signupError": "Error creating account",
+    "signupEmailExists": "This email is already registered",
+    "signupPasswordWeak": "Password must be at least 6 characters",
+    "signupEmailInvalid": "Invalid email",
+    "signinSuccess": "Welcome back!",
+    "signinError": "Error signing in",
+    "signinInvalid": "Incorrect email or password",
+    "signinNotConfirmed": "You must verify your email before signing in",
+    "signinTooMany": "Too many attempts. Try again later",
+    "oauthError": "Error signing in with {{provider}}",
+    "oauthUnauthorized": "You are not authorized to use {{provider}}",
+    "magicLinkSent": "Link sent! Check your email to sign in.",
+    "magicLinkError": "Error sending magic link",
+    "magicLinkRateLimit": "Too many attempts. Wait a moment before trying again",
+    "magicLinkEmailInvalid": "Invalid email",
+    "signoutSuccess": "Signed out successfully",
+    "signoutError": "Error signing out",
+    "profileUpdated": "Profile updated successfully",
+    "profileUpdateError": "Error updating profile",
+    "passwordUpdated": "Password updated successfully",
+    "passwordUpdateError": "Error updating password",
+    "passwordWeak": "Password must be at least 6 characters",
+    "emailUpdated": "Email updated. Check your new email to confirm it.",
+    "emailUpdateError": "Error updating email",
+    "emailExists": "This email is already in use",
+    "emailInvalid": "Invalid email",
+    "resetSent": "Recovery link sent. Check your email.",
+    "resetError": "Error sending recovery link",
+    "refreshError": "Error refreshing profile",
+    "noPermission": "You don't have permission to access this page"
+  },
+  "home": {
+    "badge": "Mexico's DeFi Hub 🇲🇽",
+    "hero": {
+      "title": "Connect with Mexico's",
+      "titleGradient": "DeFi Ecosystem",
+      "description": "The platform that brings together startups, communities, events, and opportunities from the Mexican DeFi ecosystem in one place",
+      "exploreButton": "Explore Ecosystem",
+      "contributeButton": "Contribute"
+    },
+    "features": {
+      "title": "The entire Mexican DeFi ecosystem in one place",
+      "startups": {
+        "title": "DeFi Startups",
+        "description": "Discover the most innovative projects"
+      },
+      "communities": {
+        "title": "Communities",
+        "description": "Join local builder groups"
+      },
+      "events": {
+        "title": "Events",
+        "description": "Stay updated with hackathons and meetups"
+      },
+      "advocates": {
+        "title": "Advocates",
+        "description": "Connect with ecosystem experts"
+      }
+    },
+    "startups": {
+      "title": "Featured Startups",
+      "viewAll": "View all startups"
+    },
+    "communities": {
+      "title": "Active Communities",
+      "members": "members",
+      "viewAll": "View all communities"
+    },
+    "events": {
+      "title": "Upcoming Events",
+      "viewAll": "View all events"
+    },
+    "newsletter": {
+      "badge": "Newsletter",
+      "title": "Stay Updated",
+      "description": "Receive the latest news from the Mexican DeFi ecosystem",
+      "placeholder": "your@email.com",
+      "button": "Subscribe",
+      "success": "Thanks for subscribing!",
+      "error": "Error subscribing"
+    },
+    "jobs": {
+      "title": "Web3 Jobs",
+      "description": "Crypto and blockchain job openings in Mexico and remote LATAM.",
+      "viewJobs": "View jobs",
+      "comingSoon": "More openings coming soon",
+      "comingSoonDesc": "We're constantly adding new opportunities."
+    },
+    "blog": {
+      "title": "Blog",
+      "description": "Analysis, guides and news from the DeFi and crypto ecosystem.",
+      "readArticles": "Read articles",
+      "comingSoon": "More articles coming soon",
+      "comingSoonDesc": "We're preparing content for the community."
+    },
+    "hackathon": {
+      "title": "MVPs Hackathon",
+      "description": "Prototypes built by the LATAM crypto community at hackathons.",
+      "viewProjects": "View MVP projects",
+      "projectsRegistered": "{{count}} projects registered."
+    },
+    "advocates": {
+      "title": "Advocates",
+      "description": "Leaders and influential voices of the DeFi and crypto ecosystem in Mexico and LATAM.",
+      "comingSoon": "Ecosystem advocates",
+      "comingSoonDesc": "Meet the leaders driving DeFi in LATAM."
+    },
+    "metrics": {
+      "title": "Ecosystem Metrics",
+      "description": "Real-time data on exchanges, DeFi and crypto adoption in Mexico and LATAM."
+    },
+    "agenticHero": {
+      "title1": "Stop Following Humans.",
+      "title2": "Follow the AI Agents.",
+      "description": "AI agents are reshaping DeFi. Track their on-chain moves, detect trading patterns, and find alpha before the crowd.",
+      "totalTVL": "Total TVL",
+      "protocols": "Protocols",
+      "activeTVL": "Active TVL",
+      "chartTitle": "AI Agent TVL (90d)",
+      "loading": "Loading AI agent data...",
+      "cta": "ENTER AGENTIC WORLD"
+    }
+  },
+  "startups": {
+    "title": "DeFi Startups",
+    "description": "Discover the most innovative projects from the Mexican DeFi ecosystem",
+    "all": "All",
+    "noResults": "No startups found",
+    "categories": {
+      "all": "All",
+      "defi": "DeFi",
+      "wallet": "Wallets",
+      "infrastructure": "Infrastructure",
+      "nft": "NFT",
+      "dao": "DAO",
+      "other": "Other"
+    }
+  },
+  "communities": {
+    "title": "Communities",
+    "description": "Join the most active communities in the Mexican DeFi ecosystem",
+    "members": "members",
+    "noResults": "No communities found",
+    "filters": {
+      "all": "All",
+      "verified": "Verified",
+      "location": "By location"
+    }
+  },
+  "events": {
+    "title": "Events",
+    "description": "Discover upcoming events from the Mexican DeFi ecosystem",
+    "noResults": "No events found",
+    "tabs": {
+      "upcoming": "Upcoming",
+      "past": "Past"
+    },
+    "types": {
+      "all": "All",
+      "hackathon": "Hackathon",
+      "meetup": "Meetup",
+      "conference": "Conference",
+      "workshop": "Workshop",
+      "online": "Online"
+    }
+  },
+  "blog": {
+    "title": "Blog",
+    "description": "Articles about DeFi, Web3, and blockchain in Mexico",
+    "readMore": "Read more",
+    "minRead": "min read",
+    "noResults": "No articles found",
+    "categories": {
+      "all": "All",
+      "defi": "DeFi",
+      "web3": "Web3",
+      "nft": "NFT",
+      "blockchain": "Blockchain",
+      "tutorial": "Tutorial",
+      "news": "News",
+      "analysis": "Analysis",
+      "other": "Other"
+    },
+    "comments": {
+      "title": "Comments",
+      "placeholder": "Write a comment...",
+      "submit": "Comment",
+      "reply": "Reply",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "replyPlaceholder": "Write a reply...",
+      "loginToComment": "Log in to comment",
+      "empty": "Be the first to comment",
+      "posted": "Comment posted",
+      "edited": "Comment edited",
+      "deleted": "Comment deleted",
+      "errorPosting": "Error posting comment",
+      "errorEditing": "Error editing comment",
+      "errorDeleting": "Error deleting comment",
+      "deletedComment": "[comment deleted]",
+      "anonymous": "Anonymous",
+      "editedLabel": "edited"
+    }
+  },
+  "advocates": {
+    "title": "DeFi Advocates",
+    "description": "Connect with experts and leaders from the Mexican DeFi ecosystem",
+    "noResults": "No advocates found",
+    "featured": "Featured",
+    "filterByTrack": "Filter by track",
+    "noResultsHint": "Try selecting another category or check back later.",
+    "ctaTitle": "Want to be part of the advocates?",
+    "ctaDescription": "If you're a DeFi expert, educator, developer or community leader in Mexico, we'd love to meet you and highlight your contribution to the ecosystem.",
+    "ctaButton": "Apply Now",
+    "errorLoading": "Error loading advocates",
+    "tracks": {
+      "all": "All",
+      "developer": "Developer",
+      "financial": "Financial",
+      "lawyer": "Lawyer",
+      "designer": "Designer",
+      "marketer": "Marketer",
+      "other": "Other"
+    },
+    "card": {
+      "viewMore": "View more",
+      "specialty": "Specialty",
+      "biography": "Biography",
+      "specializations": "Specializations",
+      "achievements": "Achievements",
+      "links": "Links",
+      "website": "Website"
+    },
+    "categories": {
+      "all": "All",
+      "developer": "Developer",
+      "founder": "Founder",
+      "investor": "Investor",
+      "educator": "Educator",
+      "researcher": "Researcher",
+      "community": "Community Manager",
+      "other": "Other"
+    }
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "logout": "Logout",
+    "sections": {
+      "startups": "Startups",
+      "communities": "Communities",
+      "events": "Events",
+      "blog": "Blog",
+      "advocates": "Advocates",
+      "jobs": "Jobs"
+    },
+    "actions": {
+      "add": "Add",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel",
+      "import": "Import JSON",
+      "export": "Export",
+      "selectAll": "Select all",
+      "bulkDelete": "Delete selected"
+    },
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive",
+      "published": "Published",
+      "draft": "Drafts"
+    },
+    "messages": {
+      "success": "Operation successful",
+      "error": "Operation error",
+      "confirmDelete": "Are you sure you want to delete this item?",
+      "confirmBulkDelete": "Are you sure you want to delete the selected items?"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "search": "Search...",
+    "filter": "Filter",
+    "noResults": "No results found",
+    "error": "Error",
+    "success": "Success",
+    "viewMore": "View more",
+    "learnMore": "Learn more",
+    "website": "Website",
+    "twitter": "Twitter",
+    "github": "GitHub",
+    "linkedin": "LinkedIn",
+    "telegram": "Telegram",
+    "discord": "Discord",
+    "presencial": "In-person",
+    "online": "Online",
+    "hibrido": "Hybrid",
+    "dateTBD": "Date TBD",
+    "viewDetails": "View details",
+    "noCommunities": "No official communities available",
+    "upcomingEvents": "Upcoming events on the way",
+    "upcomingEventsDesc": "We're preparing amazing events for the community",
+    "all": "All",
+    "category": "Category",
+    "moreFilters": "More filters",
+    "featured": "Featured",
+    "users": "users",
+    "backTo": "Back to",
+    "foundedIn": "Founded in",
+    "registeredOn": "Registered"
+  },
+  "search": {
+    "search": "Search",
+    "placeholder": "Search startups, communities, events, blog...",
+    "searching": "Searching...",
+    "noResults": "No results found",
+    "recentSearches": "Recent searches"
+  },
+  "jobs": {
+    "title": "Web3 Jobs Mexico",
+    "description": "Find your next job in the blockchain ecosystem",
+    "noResults": "No jobs found",
+    "stats": {
+      "total": "Jobs",
+      "remote": "Remote",
+      "companies": "Companies",
+      "salary": "Est. Salary"
+    },
+    "filters": {
+      "search": "Search by title, company or technology...",
+      "category": "Category",
+      "type": "Type",
+      "all": "All"
+    },
+    "types": {
+      "remote": "Remote",
+      "hybrid": "Hybrid",
+      "onsite": "On-site"
+    },
+    "categories": {
+      "engineering": "Engineering",
+      "product": "Product",
+      "marketing": "Marketing",
+      "security": "Security",
+      "legal": "Legal & Compliance",
+      "design": "Design",
+      "operations": "Operations",
+      "finance": "Finance"
+    },
+    "card": {
+      "featured": "Featured",
+      "apply": "Apply",
+      "viewDetails": "View details",
+      "postedAgo": "Posted {{time}} ago",
+      "salaryRange": "{{min}} - {{max}} {{currency}}"
+    },
+    "cta": {
+      "title": "Have a Web3 vacancy?",
+      "description": "Post your job offer and connect with Mexico's best blockchain talent. We reach thousands of developers, designers and crypto professionals.",
+      "button": "Post Job"
+    },
+    "propose": {
+      "title": "Propose Web3 Job",
+      "description": "Complete the form to propose a new job offer. It will be reviewed by our team before publishing.",
+      "form": {
+        "title": "Job title",
+        "company": "Company",
+        "companyLogo": "Logo URL (optional)",
+        "description": "Job description",
+        "location": "Location",
+        "jobType": "Job type",
+        "category": "Category",
+        "experienceLevel": "Experience level",
+        "salaryMin": "Minimum salary",
+        "salaryMax": "Maximum salary",
+        "salaryCurrency": "Currency",
+        "requirements": "Requirements",
+        "benefits": "Benefits",
+        "applyUrl": "Apply URL",
+        "applyEmail": "Apply email",
+        "tags": "Tags"
+      },
+      "experienceLevels": {
+        "junior": "Junior (0-2 years)",
+        "mid": "Mid (2-4 years)",
+        "senior": "Senior (5+ years)",
+        "lead": "Lead/Manager"
+      },
+      "submit": "Submit proposal",
+      "success": "Proposal submitted! It will be reviewed by our team.",
+      "error": "Error submitting proposal"
+    }
+  },
+  "metrics": {
+    "pageTitle": "DeFi Dashboard",
+    "pageDescription": "Real-time DeFi ecosystem metrics powered by DefiLlama",
+    "badge": "Live Dashboard",
+    "title": "DeFi Global Dashboard",
+    "subtitle": "Real-time metrics from the DeFi ecosystem, powered by DefiLlama API",
+    "globalTVL": "Global DeFi TVL",
+    "dexVolume": "24h DEX Volume",
+    "totalFees": "24h Protocol Fees",
+    "stablecoinsMcap": "Stablecoins Market Cap",
+    "dataSource": "Data from DefiLlama API",
+    "change24h": "24h",
+    "topChains": "Top Chains by TVL",
+    "topChainsDescription": "Largest blockchain networks by Total Value Locked",
+    "topProtocols": "Top DeFi Protocols",
+    "topProtocolsDescription": "Largest DeFi protocols by Total Value Locked (excluding CEX)",
+    "rank": "#",
+    "chain": "Chain",
+    "protocol": "Protocol",
+    "category": "Category",
+    "tvl": "TVL",
+    "change1d": "24h",
+    "change7d": "7d",
+    "mxnTVL": "MXN Stablecoins TVL",
+    "activeStablecoins": "4 active stablecoins",
+    "breakdown": "MXN Stablecoins Breakdown",
+    "breakdownDescription": "TVL distribution among major Mexican stablecoins (manually tracked)",
+    "historicalTVL": "Historical Global TVL",
+    "historicalDescription": "Evolution of Total Value Locked in DeFi",
+    "dataNote": "About the data",
+    "globalTVLNote": "Real-time data from DefiLlama API.",
+    "mxnNote": "MXN stablecoin data is manually curated as these assets are not tracked on DefiLlama.",
+    "lastUpdate": "Last update",
+    "poweredBy": "Powered by DefiLlama API",
+    "table": {
+      "stablecoin": "Stablecoin",
+      "issuer": "Issuer",
+      "chain": "Chain"
+    },
+    "tabs": {
+      "global": "DeFi Global",
+      "latam": "Exchanges LATAM"
+    },
+    "latam": {
+      "title": "Crypto Exchange Presence in LATAM",
+      "subtitle": "Mapping every local currency trading pair across exchanges in Latin America",
+      "badge": "CoinGecko Data",
+      "scanning": "Scanning exchanges...",
+      "scanProgress": "{{current}} of {{total}} exchanges",
+      "totalPairs": "Total LATAM Fiat Pairs",
+      "totalExchanges": "Exchanges with LATAM Pairs",
+      "topCurrency": "Most Listed Currency",
+      "totalVolume": "24h LATAM Fiat Volume",
+      "heatmap": "Exchange Presence by Currency",
+      "heatmapDescription": "Number of trading pairs each exchange offers per LATAM currency",
+      "exchange": "Exchange",
+      "totalPairsCol": "Total",
+      "volume24h": "24h Volume",
+      "pairsByCountry": "Trading Pairs by Country",
+      "pairsByCountryDescription": "How many exchanges and trading pairs serve each LATAM currency",
+      "exchanges": "exchanges",
+      "pairs": "pairs",
+      "topPairs": "Top LATAM Fiat Pairs by Volume",
+      "topPairsDescription": "Most traded local currency pairs across all exchanges",
+      "pair": "Pair",
+      "spread": "Spread",
+      "trust": "Trust",
+      "latamStablecoins": "LATAM-Pegged Stablecoins",
+      "latamStablecoinsDescription": "Stablecoins pegged to Latin American currencies tracked on-chain",
+      "peg": "Peg",
+      "chains": "Chains",
+      "circulating": "Circulating",
+      "noData": "No LATAM fiat pairs found",
+      "dataNote": "Data from CoinGecko free API. Volume is 24h converted to USD. Last scan"
+    }
+  },
+  "mercadoLP": {
+    "header": {
+      "title": "MERCADO LP",
+      "map": "Map",
+      "leaderboard": "Leaderboard",
+      "education": "Tutorial",
+      "xpTotal": "Total XP",
+      "progress": "Progress",
+      "level": "Lvl {{level}}",
+      "range": "{{min}} / {{max}}",
+      "xpToNext": "{{xp}} XP to {{next}}",
+      "streak": "🔥 Streak: {{days}} day{{s}}",
+      "bestStreak": "Best: {{best}}",
+      "levels": {
+        "n1": "Swapper",
+        "n2": "Provider",
+        "n3": "Farmer",
+        "n4": "Auctioneer"
+      },
+      "toastXp": "+{{gained}} XP"
+    },
+    "start": {
+      "title": "MERCADO LP",
+      "subtitle": "Learn DeFi by playing in a Mexican market",
+      "hintChange": "You can switch levels anytime from the top menu",
+      "hintXP": "Complete challenges to earn XP, badges and unlock new tokens",
+      "select": "Select Player",
+      "roles": {
+        "swapper": {
+          "name": "Don Vitalik «El Truequero»",
+          "description": "Quiet observer, does mental math and swaps without nerves. Tests small, measures, then scales. Explains complex stuff simply."
+        },
+        "provider": {
+          "name": "Don Hayden «El Puestero»",
+          "description": "Arrives early, sets the stand neatly and keeps the scale ready. Adjusts and rebalances so baskets don't empty unevenly. Works finely without showing off."
+        },
+        "creator": {
+          "name": "Doña Fabiana «La Semillera»",
+          "description": "Creative and methodical. Invents names, labels and stories, and launches with a plan: how much fruit, how to split it, and how to start strong."
+        },
+        "auctioneer": {
+          "name": "Doña Lupe «La Martillera»",
+          "description": "Shows up when the market is packed. Speaks little, moves fast and plays with time and urgency. Gets ahead and closes before others react."
+        }
+      }
+    },
+    "onboarding": {
+      "header": {
+        "title": "Quick tutorial",
+        "subtitle": "Mercado LP"
+      },
+      "note": "Note",
+      "mission": "Your mission:",
+      "progress": "Step {{current}} of {{total}}",
+      "buttons": {
+        "previous": "Previous",
+        "skip": "Skip tutorial",
+        "next": "Next",
+        "start": "Start!"
+      },
+      "steps": {
+        "welcome": {
+          "title": "Welcome to Mercado LP",
+          "description": "Think of an automatic stand: there’s always a price and no intermediaries. Here you see it with fruit—simple and not intimidating.",
+          "tip": "In a CEX you buy from a market maker, not your friend. Here you see open prices without middlemen."
+        },
+        "inventory": {
+          "title": "Your fruit (tokens)",
+          "description": "You have pesos as base money and fruit as tokens. You’ll swap between them and see how prices move.",
+          "tip": "Each fruit is available liquidity. If you buy too much of one, the basket empties and price goes up."
+        },
+        "pools": {
+          "title": "Automatic stands (pools)",
+          "description": "Each pool has two fruits. The price changes based on how much there is of each. If one gets scarce, price rises.",
+          "tip": "The pool replaces the order book: the AMM formula always gives you a price even if no buyer is in front."
+        },
+        "swap": {
+          "title": "Do your first swap",
+          "description": "Pick a fruit, set an amount, and see what you get. You’ll notice price impact if the order is big.",
+          "action": "Try with a small amount to see the change.",
+          "tip": "If you buy a lot at once, you empty the basket and price climbs. Start small to see real impact."
+        },
+        "fees": {
+          "title": "Fees (tips)",
+          "description": "Every swap pays a small fee to whoever supplied fruit to the pool.",
+          "tip": "The tip incentivizes someone to keep the stand stocked. Without it, nobody would leave fruit there."
+        },
+        "mission": {
+          "title": "Your first mission",
+          "description": "Complete your first swap. Trade some pesos for fruit and earn XP.",
+          "action": "Make a swap from pesos to any fruit.",
+          "tip": "A swap shows price, fee, and change live. Here you practice risk-free and earn XP."
+        }
+      }
+    },
+    "missions": {
+      "current": "Current mission",
+      "progress": "Your progress",
+      "totalProgress": "Total progress",
+      "levelsDone": "{{done}}/4 levels",
+      "status": {
+        "completed": "Done",
+        "inProgress": "In progress"
+      },
+      "levelLabel": "Level {{level}}",
+      "help": "💡 {{text}}",
+      "items": {
+        "swap": {
+          "title": "N1: Swapper",
+          "description": "Make your first swap in the market.",
+          "help": "Pick two fruits, use a small amount, and confirm the swap."
+        },
+        "lp": {
+          "title": "N2: Provider",
+          "description": "Open a stand and supply liquidity to a pool.",
+          "help": "Select a pair, add similar amounts, and confirm liquidity."
+        },
+        "token": {
+          "title": "N3: Token Creator",
+          "description": "Create your own token and open its garden.",
+          "help": "Set name, symbol, and the PESO pair; add initial liquidity and launch."
+        },
+        "auction": {
+          "title": "N4: Auctioneer",
+          "description": "Join a continuous auction (CCA).",
+          "help": "Pick a block, set max price and max spend, and place your bid."
+        }
+      }
+    },
+    "player": {
+      "xpTotal": "Total XP",
+      "level": "Level {{level}}",
+      "progress": "Progress",
+      "xpRange": "{{current}} / {{max}}",
+      "xpToNext": "{{remaining}} XP to {{next}}",
+      "streak": "🔥 Streak: {{days}} day{{s}}",
+      "bestStreak": "Best: {{best}}",
+      "inventory": "Market bag",
+      "perks": {
+        "title": "Active perks",
+        "xpBonus": "+{{percent}}% XP",
+        "feeDiscount": "-{{percent}}% fees",
+        "none": "No bonus yet",
+        "unlockAt": "Unlock at level {{level}}"
+      },
+      "dailyXP": {
+        "title": "Daily XP",
+        "progress": "{{current}} / {{max}}",
+        "remaining": "{{remaining}} remaining today",
+        "complete": "Cap reached! Come back tomorrow",
+        "capReached": "Daily cap reached ({{cap}} XP). Come back tomorrow!"
+      }
+    },
+    "activity": {
+      "title": "Market Activity",
+      "loading": "Loading activity...",
+      "quiet": "The market is quiet...",
+      "beFirst": "Be the first to play!",
+      "time": {
+        "now": "Now",
+        "minutes": "{{m}}m ago",
+        "hours": "{{h}}h ago",
+        "days": "{{d}}d ago"
+      },
+      "description": {
+        "swaps": "Reached {{count}} swaps as {{level}}",
+        "levelUp": "Leveled up to {{level}} with {{xp}} XP",
+        "playing": "Playing as {{level}}"
+      }
+    },
+    "swap": {
+      "title": "Mercado LP - Swaps",
+      "spot": "Today: 1 {{base}} ≈ {{quote}} {{quoteSym}}",
+      "errors": {
+        "missing": "Pick a stand, a fruit, and enter an amount greater than 0.",
+        "amount": "Enter a number greater than 0.",
+        "balance": "You don't have enough in your bag for this swap."
+      },
+      "toasts": {
+        "first": "First swap done! 🎉 You used an automatic AMM without intermediaries.",
+        "impact": "{{amount}} {{symbol}} → ~{{out}} {{outSymbol}}. The x·y=k formula adjusted the price!",
+        "done": "Done: {{amount}} {{symbol}} for ~{{out}} {{outSymbol}}."
+      },
+      "priceMood": {
+        "empty": "Enter an amount to see the price",
+        "good": "Good price 👍",
+        "ok": "Regular price 😐",
+        "meh": "Getting pricey 😬",
+        "bad": "Very expensive, buy less 🛑"
+      },
+      "depth": {
+        "none": "No stand",
+        "big": "Big stand (price moves little)",
+        "mid": "Medium stand",
+        "small": "Small stand (big order moves price)"
+      },
+      "tips": [
+        "The more you take from the stand, the pricier the next one.",
+        "A small tip goes to whoever stocked the stand.",
+        "Split big orders to improve price."
+      ],
+      "labels": {
+        "priceImpact": "Price impact",
+        "depth": "Depth",
+        "preview": "Reserve preview",
+        "slippage": "Impact",
+        "swap": "Swap",
+        "help": "How it works?"
+      }
+    },
+    "liquidity": {
+      "banner": {
+        "title": "Level 2: Provider - Add Liquidity",
+        "body": "Remember the swaps from N1? Now you’ll learn where that fruit comes from. You supply the pool and earn a fee every time someone swaps.",
+        "concept": "DeFi concept: Liquidity Providing + Fee Earnings + Impermanent Loss"
+      },
+      "errors": {
+        "missing": "Enter how many fruits of the first type you will add.",
+        "amount": "Enter a number greater than 0.",
+        "balanceA": "You don't have enough {{symbol}}.",
+        "balanceB": "You don't have enough {{symbol}}.",
+        "noPosition": "You have no position in this pool."
+      },
+      "toasts": {
+        "first": "First liquidity added! 🎉 Now you earn fees on every swap in this pool.",
+        "opened": "Stand opened! Now you earn tips. 🏪",
+        "closedFees": "Stand closed! You earned {{fees}} in tips. 💰",
+        "closed": "Stand closed. 💰"
+      },
+      "labels": {
+        "title": "Mercado LP",
+        "subtitle": "Open stand",
+        "subtitleHint": "Add fruits and earn tips.",
+        "selectPool": "Pick pool",
+        "selectPlaceholder": "Select a pool",
+        "inputA": "How many {{emoji}} {{symbol}} you add",
+        "have": "You have: {{amount}}",
+        "needB": "You need to add {{emoji}} {{symbol}}",
+        "needHint": "Enter an amount above to see the second token needed.",
+        "how": "How it works?",
+        "howList": [
+          "You add both fruits in the pool ratio.",
+          "Every swap in this pool sends you a tip automatically.",
+          "You can close your stand anytime and withdraw everything."
+        ],
+        "open": "Open stand 🏪",
+        "fillAmounts": "Fill the amounts",
+        "positionTitle": "Your stand in this pool",
+        "share": "Share:",
+        "feesA": "Tips earned {{emoji}}:",
+        "feesB": "Tips earned {{emoji}}:",
+        "feesTotal": "Total tips:",
+        "close": "Close stand and withdraw 💰",
+        "tipTitle": "Quick tip",
+        "tipBody": "More swaps in your pool = more tips. Large, active pools usually yield more fees.",
+        "modal": {
+          "title": "What is an LP?",
+          "body1": "LP = Liquidity Provider. You add two fruits to the pool and every swap sends a small fee to you.",
+          "list": [
+            "You add in the correct pool ratio.",
+            "Tips accumulate automatically.",
+            "You can close your stand anytime."
+          ],
+          "note": "Note: In real Uniswap v4 you can use hooks and price ranges to optimize gains.",
+          "ok": "Got it"
+        }
+      }
+    },
+    "token": {
+      "banner": {
+        "title": "Level 3: Token Creator - Launch a Token",
+        "body": "Use liquidity to launch your own token. Set the initial ratio (how many fruits per pesos) and let the market discover its price.",
+        "concept": "DeFi concept: Token Deployment + Initial Liquidity + Price Discovery"
+      },
+      "errors": {
+        "missing": "Fill all fields to plant your crop.",
+        "amount": "Enter numbers greater than 0.",
+        "balance": "You don't have enough {{symbol}} to water your crop."
+      },
+      "toasts": {
+        "first": "First token created! 🎉 It now has initial liquidity and a price of {{price}} {{symbol}}.",
+        "created": "{{name}} planted successfully! 🌱 Your garden is open."
+      },
+      "labels": {
+        "title": "Mercado LP",
+        "subtitle": "Plant a crop",
+        "subtitleHint": "Create your fruit and open your garden.",
+        "step1": "Step 1: Pick your fruit",
+        "name": "Fruit name",
+        "namePh": "E.g. Golden Apple",
+        "symbol": "Symbol (3-5 letters)",
+        "symbolPh": "E.g. GOLD",
+        "emoji": "Fruit emoji",
+        "step2": "Step 2: Water your crop",
+        "pair": "Pair with",
+        "pairPh": "Choose base coin",
+        "amountNew": "How many {{emoji}} {{symbol}} you add",
+        "mintHint": "You will mint 1000 {{symbol}} when creating",
+        "amountPair": "How many {{emoji}} you add",
+        "have": "You have: {{amount}}",
+        "price": "Initial price:",
+        "action": {
+          "go": "Plant and open garden 🌱",
+          "fill": "Complete all fields"
+        },
+        "tipTitle": "Farmer tip",
+        "tipBody": "When planting you set the initial price. If you add more pesos than fruit, your token starts pricier.",
+        "gallery": "Your active crops",
+        "modal": {
+          "title": "How to plant a crop?",
+          "body1": "As a farmer you create fruits (tokens) and open a garden (pool) so others can buy them.",
+          "list": [
+            "Give your fruit a name and symbol",
+            "Choose which coin to pair it with (e.g. PESO)",
+            "Set how much you add on each side = initial price",
+            "Done, your garden is open and you earn fees"
+          ],
+          "note": "The initial ratio defines price. If you add 100 GOLD and 50 PESO, then 1 GOLD = 0.5 PESO.",
+          "ok": "Got it"
+        }
+      }
+    },
+    "cca": {
+      "banner": {
+        "title": "Level 4: The Auctioneer",
+        "body": "Learn to distribute fruits with fair auctions. Everyone bids and the market decides the final price - you might pay less than you offered!",
+        "concept": "DeFi concept: Fair Price Discovery",
+        "realLife": "Go to real life"
+      },
+      "noAuction": {
+        "title": "No active auctions",
+        "body": "Start a new auction to learn how price discovery works.",
+        "start": "Start Auction",
+        "note": "Note: You need at least one token created in Level 3"
+      },
+      "practiceMode": {
+        "title": "Practice Mode",
+        "description": "Experiment without spending your real tokens",
+        "activate": "Activate",
+        "active": "✓ Active",
+        "badge": "Practice",
+        "hint": "Results won't affect your real inventory. Perfect for learning!"
+      },
+      "bidForm": {
+        "title": "Place your bid",
+        "maxPriceLabel": "Max price per token ($/token)",
+        "maxPricePlaceholder": "Ex: 10",
+        "maxPriceHint": "You'll only pay the clearing price, not necessarily your max.",
+        "spendLabel": "Total spend (PESO)",
+        "spendPlaceholder": "Ex: 100",
+        "budgetHint": "Your budget:",
+        "estimate": "Estimate:",
+        "couldWin": "You could win",
+        "dependsOn": "(Depends on final clearing price)",
+        "blockExecuted": "Block already executed",
+        "placeBid": "Bid on this block! 🔨"
+      },
+      "tooltips": {
+        "maxPrice": {
+          "title": "What is max price?",
+          "body": "It's the maximum you're willing to pay. If the clearing price is lower, you'll pay less!",
+          "tip": "Example: If you bid $10 but the final price is $7, you only pay $7"
+        },
+        "spend": {
+          "title": "How much to spend?",
+          "body": "It's your budget for this round. It will be used to calculate how many tokens you can win.",
+          "tip": "If you spend $50 and the price is $5, you'd win 10 tokens"
+        }
+      },
+      "clearing": {
+        "title": "How Clearing Works",
+        "steps": [
+          "Sorting bids from highest to lowest...",
+          "Calculating the clearing price...",
+          "Fair price: ${{price}} for EVERYONE",
+          "Allocating fruits to winners...",
+          "Done! See who won and how much they paid"
+        ],
+        "bidder": "Bidder",
+        "maxPrice": "Max Price",
+        "spend": "Spend",
+        "result": "Result",
+        "lost": "Lost",
+        "everyonePays": "Everyone pays the same:",
+        "evenIfHigher": "Even if you bid higher!",
+        "youWon": "You won!",
+        "savings": "You bid ${{bid}} but only paid ${{paid}}. You saved ${{saved}}!",
+        "nextTime": "Next time...",
+        "clearingWas": "The clearing price was ${{price}}. Bid at least that to win!",
+        "roundComplete": "Round complete!",
+        "placeBidNext": "Place a bid in the next round to participate.",
+        "continue": "Continue",
+        "processing": "Processing..."
+      },
+      "diagram": {
+        "everyoneBids": "Everyone bids",
+        "onePrice": "One price",
+        "winnersPay": "Winners pay same"
+      },
+      "bidsInBlock": {
+        "title": "Bids in this block:",
+        "max": "Max",
+        "spend": "Spend"
+      },
+      "yourBids": {
+        "title": "Your active bids",
+        "block": "Block",
+        "won": "Won {{amount}} tokens",
+        "empty": "No bids yet. Place your first bid above!"
+      },
+      "strategy": {
+        "title": "Auctioneer Strategy",
+        "tipLabel": "Tip:",
+        "tipBody": "Bidding on early blocks usually gives you a better average price. Later blocks become more competitive and expensive. Distribute your budget intelligently across multiple blocks."
+      },
+      "helpModal": {
+        "title": "What is a Continuous Clearing Auction (CCA)?",
+        "intro": "Continuous Clearing Auctions distribute tokens in blocks over time. This incentivizes early participation and fair price discovery.",
+        "point1": "Each block sells a portion of tokens",
+        "point2": "You set max price and total spend",
+        "point3": "When executed, you pay the clearing price (not your max)",
+        "point4": "Early blocks = lower prices",
+        "footer": "Inspired by Uniswap v4 CCA hooks for fair token launches.",
+        "ok": "Got it"
+      },
+      "errors": {
+        "missing": "Fill max price and total spend.",
+        "amount": "Enter numbers greater than 0.",
+        "balance": "You don't have enough PESO.",
+        "minPrice": "Price must be at least ${{price}}"
+      },
+      "toasts": {
+        "firstBid": "First bid placed! 🎉 At round end, a single price will be calculated for everyone.",
+        "bidPlaced": "Bid placed on Round {{block}}! 🔨",
+        "started": "Auction started! Buyers are arriving... 🔨",
+        "ended": "Auction already ended.",
+        "blockRun": "Round {{block}} finished! Let's see the results...",
+        "reset": "Auction reset. You can start a new one."
+      },
+      "labels": {
+        "title": "Mercado LP",
+        "subtitle": "The Auctioneer",
+        "token": "Auction: {{emoji}} {{symbol}}",
+        "budget": "Fruits available: {{amount}}",
+        "selectBlock": "Pick the round",
+        "maxPrice": "Your max price per fruit",
+        "totalSpend": "How much to spend",
+        "have": "You have: {{amount}} PESO",
+        "estReceive": "Estimated fruits: ~{{amount}}",
+        "ctaBid": "Bid",
+        "ctaAdvance": "Close round",
+        "ctaResults": "See results",
+        "ctaReset": "New auction",
+        "helpTitle": "How does it work?",
+        "helpBody": [
+          "1. You make a bid: define the max you'd pay and how much to spend.",
+          "2. Other buyers (NPCs) also bid secretly.",
+          "3. When the round closes, ONE single price is calculated for everyone.",
+          "4. If your bid is equal or higher than the single price, you win! And you pay the single price, not yours.",
+          "💡 Tip: Bid your real price. If you win, you might pay much less."
+        ],
+        "modalResults": {
+          "title": "Auction results",
+          "won": "Fruits won:",
+          "avg": "Final price:",
+          "new": "🔄 New Auction",
+          "ok": "Great!"
+        }
+      }
+    },
+    "enhancements": {
+      "dailyChallenges": {
+        "title": "Daily Challenges",
+        "resetsIn": "Resets in",
+        "completed": "completed",
+        "claimBonus": "Claim Bonus",
+        "allCompleted": "Complete All 3!",
+        "bonusReward": "Bonus reward!",
+        "difficulty": {
+          "easy": "Easy",
+          "medium": "Medium",
+          "hard": "Hard"
+        }
+      },
+      "marketEvents": {
+        "active": "Active event",
+        "endsIn": "Ends in"
+      },
+      "streak": {
+        "title": "Daily Streak",
+        "days": "days",
+        "best": "Best",
+        "claimDaily": "Daily bonus",
+        "claimed": "Claimed today!",
+        "nextReward": "Next reward",
+        "daysLeft": "days left",
+        "rewardsToClaim": "Rewards to claim!",
+        "claim": "Claim",
+        "milestones": "Upcoming milestones"
+      },
+      "league": {
+        "title": "Trading League",
+        "weekEnds": "Week ends in",
+        "yourRank": "Your rank",
+        "weekReward": "Week reward",
+        "leaderboard": "Leaderboard",
+        "volume": "Volume",
+        "swaps": "Swaps",
+        "nextTier": "Next tier",
+        "climbPositions": "Climb {{count}} positions to reach {{tier}}",
+        "boostRank": "Boost Your Rank",
+        "tradeMore": "Trade More",
+        "provideLP": "Provide LP",
+        "tierRewards": "Tier Rewards",
+        "tiers": {
+          "bronze": "Bronze",
+          "silver": "Silver",
+          "gold": "Gold",
+          "platinum": "Platinum",
+          "diamond": "Diamond"
+        }
+      },
+      "marketMaker": {
+        "title": "Market Maker Mode",
+        "locked": "Market Maker Mode Locked",
+        "lockedDesc": "Reach Level 6 (4000 XP) to unlock advanced pool hooks and become a Market Maker.",
+        "yourStats": "Your Stats",
+        "createPool": "Create Advanced Pool",
+        "createPoolDesc": "Select tokens and an advanced hook for your pool",
+        "selectToken": "Select token",
+        "amount": "Amount",
+        "advancedHooks": "Advanced Hooks",
+        "createWithHook": "Create Pool with Advanced Hook",
+        "utilization": "Utilization"
+      },
+      "auctionTutorial": {
+        "title": "Auction Tutorial",
+        "step": "Step",
+        "continue": "Continue",
+        "finish": "Finish",
+        "placeBid": "Place Bid",
+        "executeBlock": "Execute Block",
+        "startTrading": "Start Trading!",
+        "tryBid": "Try this bid:",
+        "suggested": "Suggested:",
+        "maxPrice": "Max Price",
+        "totalSpend": "Total Spend",
+        "reviewTutorial": "Review Tutorial",
+        "learnAuctions": "Learn Auctions"
+      },
+      "levels": {
+        "n5": {
+          "name": "Master",
+          "title": "Trading Leagues",
+          "desc": "Compete with other traders weekly. Climb the ranks and earn exclusive rewards!"
+        },
+        "n6": {
+          "name": "Legend",
+          "title": "Market Maker",
+          "desc": "Create pools with advanced hooks. Customize your strategy and maximize returns."
+        }
+      }
+    },
+    "education": {
+      "title": "The Market School",
+      "units": {
+        "mangos": "mangoes"
+      },
+      "labels": {
+        "before": "Before",
+        "after": "After",
+        "price": "Price",
+        "same": "same"
+      },
+      "magicPot": {
+        "title": "The magic pot (x·y=k)",
+        "description": "Move the slider: remove mangoes from the pot and watch the price rise.",
+        "explanation": "With fewer mangoes, each mango is \"worth\" more lemons. That's the x·y=k formula in action."
+      },
+      "slippage": {
+        "title": "Price impact (slippage)",
+        "description": "If you buy a lot at once, you push the price up yourself. Adjust the mango purchase size:",
+        "avgPrice": "Average price",
+        "impact": "Impact",
+        "receive": "You receive ~{{amount}} lemons.",
+        "tip": "Tip: in the real market, whales split their orders to reduce impact."
+      },
+      "liquidity": {
+        "title": "Liquidity and tips",
+        "description": "You put two fruits in the pot and earn a share of each tip. Your percentage defines how much tip you receive.",
+        "point1": "Deposit both fruits at the current ratio",
+        "point2": "Earn fees from each swap based on your share",
+        "point3": "If the price moves, your mix changes (IL)"
+      },
+      "createToken": {
+        "title": "Create your fruit and its market",
+        "description": "Inventing fruit isn't enough: you must open its pot with initial liquidity. You set the starting price; then the market takes over.",
+        "point1": "Define icon, symbol and color",
+        "point2": "Pair it with another fruit and deposit both",
+        "point3": "The initial deposit sets the starting price"
+      },
+      "quickTips": {
+        "title": "Quick tips",
+        "tip1": "Always check the impact before confirming",
+        "tip2": "Split large swaps into several smaller ones",
+        "tip3": "LP: choose ranges and hooks based on your risk",
+        "tip4": "Create token + pool; without a pot, nobody can buy",
+        "more": "More: v4.uniswap.org · v4-core audits on GitHub"
+      }
+    },
+    "map": {
+      "dialog": {
+        "1": {
+          "title": "Doña Jose",
+          "subtitle": "Challenge 1/4: Swaps",
+          "message": "Hey there! I'm Doña Jose. Let's jump right into your first swap—step by step, no drama."
+        },
+        "2": {
+          "title": "Don Fede",
+          "subtitle": "Challenge 2/4: Liquidity",
+          "message": "Welcome! I'm Don Fede. You'll quickly learn how to provide liquidity and start earning fees."
+        },
+        "3": {
+          "title": "Doña Mari",
+          "subtitle": "Challenge 3/4: Create",
+          "message": "Hi! I'm Doña Mari. I'll teach you how to create your own token and launch a pool in just a few steps."
+        },
+        "4": {
+          "title": "Don Luis",
+          "subtitle": "Challenge 4/4: Continuous Auctions (CCA)",
+          "message": "Alright! I'm Don Luis. I'll teach you about continuous clearing auctions—fair token distribution by blocks. Bid early for better prices!"
+        }
+      },
+      "loading": "Loading map...",
+      "enter": "Enter",
+      "close": "Close"
+    }
+  },
+  "hackathonProjects": {
+    "badge": "MVP Projects",
+    "title": "MVPs Hackathon",
+    "notStartups": "This is NOT a startup directory",
+    "description": "MVP projects created by the LATAM crypto community at hackathons around the world",
+    "registerMVP": "Register your MVP",
+    "infoBannerTitle": "Hackathon Ideas Registry",
+    "infoBannerDescription": "These are prototypes and MVPs created at hackathons, not established startups. Here you'll find ideas that members of LATAM crypto communities have participated in. When registering your MVP, select \"MVP (Hackathon)\" in the Stage field.",
+    "searchPlaceholder": "Search projects by name, description or tags...",
+    "totalProjects": "Total MVP Projects",
+    "noResults": "No MVP projects found",
+    "noResultsFilterHint": "Try adjusting the filters or searching with other terms",
+    "noResultsEmptyHint": "Be the first to register your hackathon project",
+    "hackathonWinner": "Hackathon winning project"
+  },
+  "startupDetail": {
+    "notFound": "Startup not found",
+    "notFoundDescription": "The startup you're looking for doesn't exist or has been removed.",
+    "backToStartups": "Back to Startups",
+    "backToMVPs": "Back to MVPs Hackathon",
+    "mvpBannerTitle": "Hackathon MVP Project",
+    "mvpBannerDescription": "— This is a prototype created at a hackathon, not an established startup.",
+    "defaultDescription": "Innovating in Mexico's DeFi ecosystem",
+    "website": "Website",
+    "mainMetrics": "Main Metrics",
+    "totalUsers": "Total Users",
+    "stage": "Stage",
+    "fundingRound": "Funding Round",
+    "employees": "Employees",
+    "additionalInfo": "Additional Information",
+    "status": "Status",
+    "verification": "Verification",
+    "companyInfo": "Company Information",
+    "foundedYear": "Founded Year",
+    "city": "City",
+    "country": "Country",
+    "categories": "Categories",
+    "tags": "Tags",
+    "quickActions": "Quick Actions",
+    "visitWebsite": "Visit Website",
+    "followTwitter": "Follow on Twitter",
+    "viewLinkedIn": "View on LinkedIn",
+    "viewGitHub": "View on GitHub"
+  },
+  "nftGallery": {
+    "badge": "Exclusive Collection on Base",
+    "title": "NFT Collection",
+    "description": "Celebrating DeFi masters who completed Mercado LP and earned their on-chain certification",
+    "playAndGet": "Play and Get NFT",
+    "viewOnOpenSea": "View on OpenSea",
+    "collectionName": "Mercado LP Master",
+    "collectionSubtitle": "DeFi México Collection",
+    "onBase": "On Base",
+    "stats": {
+      "minted": "NFTs Minted",
+      "verified": "Verified On-chain",
+      "avgXP": "Average XP",
+      "avgLevel": "Average Level"
+    },
+    "gallery": {
+      "title": "DeFi Masters",
+      "playersCompleted": "{{count}} players have completed the challenge",
+      "verified": "Verified",
+      "level": "Level {{level}}",
+      "minted": "Minted: {{date}}"
+    },
+    "empty": {
+      "title": "Be the first!",
+      "description": "No NFTs minted yet. Complete Mercado LP and become the first DeFi Master in the collection.",
+      "cta": "Start Now"
+    },
+    "cta": {
+      "title": "Ready to get your NFT?",
+      "description": "Complete all 4 levels of Mercado LP, master DeFi concepts and claim your free educational NFT on Base.",
+      "play": "Play Mercado LP",
+      "viewContract": "View Contract"
+    },
+    "features": {
+      "free": "100% Free",
+      "freeDesc": "Only pay gas",
+      "certification": "Certification",
+      "certificationDesc": "Prove your knowledge",
+      "exclusive": "Exclusive",
+      "exclusiveDesc": "Completers only"
+    },
+    "footer": "NFT Collection by",
+    "deployedOn": "Deployed on"
+  },
+  "agenticWorld": {
+    "title": "Agentic World",
+    "description": "Directory of autonomous AI agents applied to decentralized finance",
+    "badge": "NEW",
+    "navDirectorio": "Directory",
+    "navDirectorioDesc": "Explore AI agents for finance",
+    "navPolymarket": "Polymarket Agent Radar",
+    "navPolymarketDesc": "Detect AI agents in prediction markets",
+    "navLeaderboard": "Leaderboard",
+    "navLeaderboardDesc": "Live AI agent rankings",
+    "infoBannerTitle": "What are AI financial agents?",
+    "infoBannerDescription": "Autonomous agents that execute financial operations: trading, yield farming, market prediction and more. Inspired by the OpenClaw ecosystem.",
+    "searchPlaceholder": "Search agents...",
+    "totalProjects": "Total agents",
+    "noResults": "No agents found",
+    "noResultsFilterHint": "Try changing the filters or search",
+    "noResultsEmptyHint": "No agents registered yet",
+    "categories": {
+      "all": "All",
+      "trading": "Trading",
+      "prediction": "Prediction",
+      "yield": "Yield",
+      "infrastructure": "Infrastructure",
+      "privacy": "Privacy",
+      "analytics": "Analytics"
+    },
+    "status": {
+      "active": "Active",
+      "beta": "Beta",
+      "development": "In development"
+    },
+    "riskLevel": {
+      "label": "Risk",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "card": {
+      "viewMore": "View more",
+      "highlights": "Features",
+      "links": "Links",
+      "website": "Website"
+    },
+    "leaderboard": {
+      "title": "AI Agents Leaderboard",
+      "description": "Live rankings of AI agent protocols by TVL, fees and market cap",
+      "badge": "LIVE",
+      "totalTVL": "Total TVL",
+      "totalFees": "Total Fees (All-time)",
+      "totalProtocols": "Protocols",
+      "sortBy": "Sort by",
+      "rank": "#",
+      "name": "Protocol",
+      "tvl": "TVL",
+      "fees": "Fees All-time",
+      "fees24h": "Fees 24h",
+      "mcap": "Market Cap",
+      "change1d": "1d",
+      "change7d": "7d",
+      "chains": "Chains",
+      "noData": "Could not load data",
+      "retry": "Retry",
+      "dataSource": "Data from DefiLlama API",
+      "updatedEvery": "Updates every 10 minutes"
+    }
+  }
+}

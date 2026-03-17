@@ -1,0 +1,37 @@
+# DeFi México Robots.txt
+# https://defimexico.org
+
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://defimexico.org/sitemap.xml
+
+# Host
+Host: https://defimexico.org

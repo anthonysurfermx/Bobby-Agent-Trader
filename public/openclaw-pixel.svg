@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 32 32" style="image-rendering:pixelated">
+  <!-- OpenClaw — DeFi México Pixel Lobster Mascot -->
+  <!-- 32x32 grid, each rect = 1 pixel unit -->
+  <!-- Palette: shell=#e53e3e, dark=#9b2c2c, claw=#c53030, eye=#00ff88, screen=#0d0d0d, amber=#f59e0b -->
+
+  <!-- Background transparent -->
+
+  <!-- === ANTENNAE === -->
+  <rect x="12" y="0" width="1" height="1" fill="#c53030"/>
+  <rect x="13" y="1" width="1" height="1" fill="#c53030"/>
+  <rect x="18" y="0" width="1" height="1" fill="#c53030"/>
+  <rect x="17" y="1" width="1" height="1" fill="#c53030"/>
+  <rect x="14" y="2" width="1" height="1" fill="#9b2c2c"/>
+  <rect x="15" y="2" width="1" height="1" fill="#9b2c2c"/>
+  <rect x="16" y="2" width="1" height="1" fill="#9b2c2c"/>
+
+  <!-- === HEAD === -->
+  <rect x="11" y="3" width="10" height="1" fill="#e53e3e"/>
+  <rect x="10" y="4" width="12" height="1" fill="#e53e3e"/>
+  <rect x="10" y="5" width="12" height="1" fill="#e53e3e"/>
+  <rect x="10" y="6" width="12" height="1" fill="#e53e3e"/>
+
+  <!-- Eyes (glowing green) -->
+  <rect x="12" y="4" width="2" height="2" fill="#00ff88"/>
+  <rect x="18" y="4" width="2" height="2" fill="#00ff88"/>
+  <!-- Eye glow -->
+  <rect x="13" y="4" width="1" height="1" fill="#00ffaa"/>
+  <rect x="19" y="4" width="1" height="1" fill="#00ffaa"/>
+
+  <!-- === BODY === -->
+  <rect x="9" y="7" width="14" height="1" fill="#e53e3e"/>
+  <rect x="9" y="8" width="14" height="1" fill="#e53e3e"/>
+  <rect x="9" y="9" width="14" height="1" fill="#c53030"/>
+  <rect x="9" y="10" width="14" height="1" fill="#e53e3e"/>
+  <rect x="9" y="11" width="14" height="1" fill="#e53e3e"/>
+  <rect x="9" y="12" width="14" height="1" fill="#c53030"/>
+  <rect x="9" y="13" width="14" height="1" fill="#e53e3e"/>
+  <rect x="9" y="14" width="14" height="1" fill="#e53e3e"/>
+
+  <!-- Shell segments (dark lines) -->
+  <rect x="10" y="9" width="12" height="1" fill="#9b2c2c"/>
+  <rect x="10" y="12" width="12" height="1" fill="#9b2c2c"/>
+
+  <!-- Belly / screen panel -->
+  <rect x="12" y="8" width="8" height="6" fill="#0d0d0d"/>
+  <!-- Amber glow on screen -->
+  <rect x="13" y="9" width="6" height="1" fill="#f59e0b"/>
+  <rect x="13" y="10" width="4" height="1" fill="#f59e0b" opacity="0.6"/>
+  <rect x="13" y="11" width="5" height="1" fill="#00ff88" opacity="0.8"/>
+  <rect x="14" y="12" width="3" height="1" fill="#f59e0b" opacity="0.4"/>
+
+  <!-- === BIG CLAWS (left) === -->
+  <!-- Upper arm -->
+  <rect x="3" y="7" width="6" height="2" fill="#e53e3e"/>
+  <rect x="3" y="9" width="2" height="2" fill="#e53e3e"/>
+  <!-- Claw open -->
+  <rect x="1" y="7" width="3" height="1" fill="#9b2c2c"/>
+  <rect x="1" y="9" width="3" height="1" fill="#9b2c2c"/>
+  <rect x="1" y="8" width="1" height="1" fill="#0d0d0d"/>
+  <!-- Claw tips -->
+  <rect x="0" y="7" width="1" height="1" fill="#c53030"/>
+  <rect x="0" y="9" width="1" height="1" fill="#c53030"/>
+
+  <!-- === BIG CLAWS (right) === -->
+  <!-- Upper arm -->
+  <rect x="23" y="7" width="6" height="2" fill="#e53e3e"/>
+  <rect x="27" y="9" width="2" height="2" fill="#e53e3e"/>
+  <!-- Claw open -->
+  <rect x="28" y="7" width="3" height="1" fill="#9b2c2c"/>
+  <rect x="28" y="9" width="3" height="1" fill="#9b2c2c"/>
+  <rect x="31" y="8" width="1" height="1" fill="#0d0d0d"/>
+  <!-- Claw tips -->
+  <rect x="31" y="7" width="1" height="1" fill="#c53030"/>
+  <rect x="31" y="9" width="1" height="1" fill="#c53030"/>
+
+  <!-- === WALKING LEGS === -->
+  <!-- Left legs -->
+  <rect x="7" y="13" width="2" height="1" fill="#c53030"/>
+  <rect x="6" y="14" width="2" height="1" fill="#9b2c2c"/>
+  <rect x="5" y="15" width="2" height="1" fill="#9b2c2c"/>
+
+  <rect x="7" y="15" width="2" height="1" fill="#c53030"/>
+  <rect x="6" y="16" width="2" height="1" fill="#9b2c2c"/>
+  <rect x="5" y="17" width="2" height="1" fill="#9b2c2c"/>
+
+  <rect x="7" y="17" width="2" height="1" fill="#c53030"/>
+  <rect x="6" y="18" width="2" height="1" fill="#9b2c2c"/>
+  <rect x="5" y="19" width="2" height="1" fill="#9b2c2c"/>
+
+  <!-- Right legs -->
+  <rect x="23" y="13" width="2" height="1" fill="#c53030"/>
+  <rect x="24" y="14" width="2" height="1" fill="#9b2c2c"/>
+  <rect x="25" y="15" width="2" height="1" fill="#9b2c2c"/>
+
+  <rect x="23" y="15" width="2" height="1" fill="#c53030"/>
+  <rect x="24" y="16" width="2" height="1" fill="#9b2c2c"/>
+  <rect x="25" y="17" width="2" height="1" fill="#9b2c2c"/>
+
+  <rect x="23" y="17" width="2" height="1" fill="#c53030"/>
+  <rect x="24" y="18" width="2" height="1" fill="#9b2c2c"/>
+  <rect x="25" y="19" width="2" height="1" fill="#9b2c2c"/>
+
+  <!-- === TAIL / ABDOMEN === -->
+  <rect x="10" y="15" width="12" height="1" fill="#e53e3e"/>
+  <rect x="11" y="16" width="10" height="1" fill="#e53e3e"/>
+  <rect x="11" y="17" width="10" height="1" fill="#c53030"/>
+  <rect x="12" y="18" width="8" height="1" fill="#e53e3e"/>
+  <rect x="12" y="19" width="8" height="1" fill="#c53030"/>
+  <rect x="13" y="20" width="6" height="1" fill="#e53e3e"/>
+  <rect x="13" y="21" width="6" height="1" fill="#c53030"/>
+
+  <!-- Tail fan -->
+  <rect x="10" y="22" width="2" height="2" fill="#9b2c2c"/>
+  <rect x="13" y="22" width="2" height="2" fill="#9b2c2c"/>
+  <rect x="15" y="22" width="2" height="2" fill="#9b2c2c"/>
+  <rect x="17" y="22" width="2" height="2" fill="#9b2c2c"/>
+  <rect x="20" y="22" width="2" height="2" fill="#9b2c2c"/>
+
+  <rect x="9" y="23" width="2" height="1" fill="#c53030"/>
+  <rect x="12" y="23" width="2" height="1" fill="#c53030"/>
+  <rect x="15" y="23" width="2" height="1" fill="#c53030"/>
+  <rect x="18" y="23" width="2" height="1" fill="#c53030"/>
+  <rect x="21" y="23" width="2" height="1" fill="#c53030"/>
+
+</svg>

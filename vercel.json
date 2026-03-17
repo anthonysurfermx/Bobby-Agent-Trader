@@ -1,6 +1,41 @@
 {
   "rewrites": [
+    { "source": "/api/polymarket-gamma/:path*", "destination": "https://gamma-api.polymarket.com/:path*" },
+    { "source": "/api/polymarket-data/:path*", "destination": "https://data-api.polymarket.com/:path*" },
+    { "source": "/api/polymarket-clob/:path*", "destination": "https://clob.polymarket.com/:path*" },
     { "source": "/((?!api/).*)", "destination": "/" }
+  ],
+  "headers": [
+    {
+      "source": "/api/polymarket-data/v1/leaderboard",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=300, stale-while-revalidate=60" }
+      ]
+    },
+    {
+      "source": "/api/polymarket-data/positions",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=120, stale-while-revalidate=60" }
+      ]
+    },
+    {
+      "source": "/api/polymarket-gamma/:path*",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=300, stale-while-revalidate=60" }
+      ]
+    },
+    {
+      "source": "/api/discover-markets",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=60, stale-while-revalidate=30" }
+      ]
+    },
+    {
+      "source": "/api/scan-traders",
+      "headers": [
+        { "key": "Cache-Control", "value": "s-maxage=120, stale-while-revalidate=60" }
+      ]
+    }
   ],
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
@@ -12,9 +47,77 @@
     }
   ],
   "functions": {
+    "api/content-machine.ts": {
+      "maxDuration": 120,
+      "memory": 1024
+    },
     "api/agent-run.ts": {
       "maxDuration": 120,
       "memory": 1024
+    },
+    "api/openclaw-chat.ts": {
+      "maxDuration": 60,
+      "memory": 256
+    },
+    "api/bobby-voice.ts": {
+      "maxDuration": 30,
+      "memory": 256
+    },
+    "api/bobby-intel.ts": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "api/stock-price.ts": {
+      "maxDuration": 10,
+      "memory": 256
+    },
+    "api/okx-candles.ts": {
+      "maxDuration": 10,
+      "memory": 256
+    },
+    "api/stock-candles.ts": {
+      "maxDuration": 10,
+      "memory": 256
+    },
+    "api/forum-generate.ts": {
+      "maxDuration": 120,
+      "memory": 512
+    },
+    "api/technical-analysis.ts": {
+      "maxDuration": 15,
+      "memory": 256
+    },
+    "api/bobby-voice-free.ts": {
+      "maxDuration": 30,
+      "memory": 256
+    },
+    "api/forum-resolve.ts": {
+      "maxDuration": 30,
+      "memory": 256
+    },
+    "api/forum-morning.ts": {
+      "maxDuration": 120,
+      "memory": 512
+    },
+    "api/ghost-wallet.ts": {
+      "maxDuration": 15,
+      "memory": 256
+    },
+    "api/forum-agent-register.ts": {
+      "maxDuration": 10,
+      "memory": 256
+    },
+    "api/xlayer-trade.ts": {
+      "maxDuration": 35,
+      "memory": 256
+    },
+    "api/xlayer-record.ts": {
+      "maxDuration": 30,
+      "memory": 256
+    },
+    "api/mcp-bobby.ts": {
+      "maxDuration": 60,
+      "memory": 512
     }
   }
 }

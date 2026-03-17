@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" shape-rendering="crispEdges">
+  <defs>
+    <!-- Grid pattern for pixel/tech feel -->
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <rect width="30" height="30" fill="none"/>
+      <rect x="0" y="0" width="30" height="1" fill="#22c55e" opacity="0.04"/>
+      <rect x="0" y="0" width="1" height="30" fill="#22c55e" opacity="0.04"/>
+    </pattern>
+    <!-- Radial glow -->
+    <radialGradient id="glow" cx="50%" cy="50%" r="35%">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0.12"/>
+      <stop offset="60%" stop-color="#22c55e" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="500" fill="#0a0a0a"/>
+
+  <!-- Grid overlay -->
+  <rect width="1500" height="500" fill="url(#grid)"/>
+
+  <!-- Glow effect -->
+  <rect width="1500" height="500" fill="url(#glow)"/>
+
+  <!-- Decorative pixel blocks - left side -->
+  <rect x="60" y="80" width="8" height="8" fill="#22c55e" opacity="0.3"/>
+  <rect x="90" y="120" width="6" height="6" fill="#4ade80" opacity="0.2"/>
+  <rect x="40" y="200" width="10" height="10" fill="#22c55e" opacity="0.15"/>
+  <rect x="110" y="350" width="8" height="8" fill="#86efac" opacity="0.2"/>
+  <rect x="70" y="400" width="6" height="6" fill="#22c55e" opacity="0.25"/>
+
+  <!-- Decorative pixel blocks - right side -->
+  <rect x="1420" y="100" width="8" height="8" fill="#22c55e" opacity="0.25"/>
+  <rect x="1380" y="160" width="6" height="6" fill="#4ade80" opacity="0.2"/>
+  <rect x="1440" y="300" width="10" height="10" fill="#22c55e" opacity="0.15"/>
+  <rect x="1400" y="380" width="8" height="8" fill="#86efac" opacity="0.2"/>
+  <rect x="1350" y="420" width="6" height="6" fill="#22c55e" opacity="0.3"/>
+
+  <!-- Horizontal accent lines -->
+  <rect x="200" y="168" width="120" height="2" fill="#22c55e" opacity="0.15"/>
+  <rect x="1180" y="168" width="120" height="2" fill="#22c55e" opacity="0.15"/>
+  <rect x="200" y="332" width="120" height="2" fill="#22c55e" opacity="0.15"/>
+  <rect x="1180" y="332" width="120" height="2" fill="#22c55e" opacity="0.15"/>
+
+  <!-- More scattered pixel accents for visual interest -->
+  <rect x="300" y="140" width="5" height="5" fill="#22c55e" opacity="0.2"/>
+  <rect x="450" y="90" width="7" height="7" fill="#4ade80" opacity="0.15"/>
+  <rect x="550" y="380" width="6" height="6" fill="#22c55e" opacity="0.2"/>
+  <rect x="650" y="110" width="8" height="8" fill="#86efac" opacity="0.12"/>
+  <rect x="800" y="400" width="5" height="5" fill="#4ade80" opacity="0.2"/>
+  <rect x="950" y="80" width="7" height="7" fill="#22c55e" opacity="0.18"/>
+  <rect x="1050" y="390" width="6" height="6" fill="#86efac" opacity="0.15"/>
+  <rect x="1150" y="130" width="8" height="8" fill="#22c55e" opacity="0.2"/>
+  <rect x="1250" y="360" width="5" height="5" fill="#4ade80" opacity="0.18"/>
+
+  <!-- Center cluster of pixels -->
+  <rect x="680" y="200" width="10" height="10" fill="#22c55e" opacity="0.18"/>
+  <rect x="720" y="230" width="8" height="8" fill="#4ade80" opacity="0.15"/>
+  <rect x="760" y="210" width="6" height="6" fill="#86efac" opacity="0.2"/>
+  <rect x="800" y="250" width="10" height="10" fill="#22c55e" opacity="0.12"/>
+  <rect x="740" y="270" width="7" height="7" fill="#4ade80" opacity="0.18"/>
+
+  <!-- Additional horizontal accent lines -->
+  <rect x="400" y="250" width="80" height="1" fill="#22c55e" opacity="0.1"/>
+  <rect x="1020" y="250" width="80" height="1" fill="#22c55e" opacity="0.1"/>
+
+  <!-- Bottom decorative bar -->
+  <rect x="500" y="370" width="500" height="2" fill="#22c55e" opacity="0.2"/>
+
+  <!-- Pixel dot accents along bottom -->
+  <rect x="620" y="390" width="4" height="4" fill="#22c55e" opacity="0.3"/>
+  <rect x="700" y="395" width="4" height="4" fill="#4ade80" opacity="0.2"/>
+  <rect x="780" y="390" width="4" height="4" fill="#22c55e" opacity="0.3"/>
+  <rect x="860" y="393" width="4" height="4" fill="#86efac" opacity="0.2"/>
+</svg>
