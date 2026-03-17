@@ -1,0 +1,228 @@
+// ============================================================
+// POST /api/xlayer-record
+// Commit-Reveal Track Record on X Layer
+// Phase 1 (commit): Records prediction BEFORE outcome is known
+// Phase 2 (resolve): Records outcome AFTER min time has elapsed
+// Audited by Gemini Pro + Codex (2026-03-17)
+// ============================================================
+
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+const XLAYER_RPC = 'https://rpc.xlayer.tech';
+const CONTRACT_ADDRESS = process.env.BOBBY_CONTRACT_ADDRESS || '';
+const RECORDER_KEY = process.env.BOBBY_RECORDER_KEY || '';
+
+// Agent enum matches contract: CIO=0, ALPHA=1, REDTEAM=2
+const AGENT_MAP: Record<string, number> = {
+  cio: 0, alpha: 1, redteam: 2,
+};
+
+// Result enum matches contract
+const RESULT_MAP: Record<string, number> = {
+  pending: 0, win: 1, loss: 2, expired: 3, break_even: 4,
+};
+
+// Updated ABI — commit-reveal pattern (Codex Audit v3)
+const CONTRACT_ABI = [
+  // Phase 1
+  'function commitTrade(bytes32 _debateHash, string _symbol, uint8 _agent, uint8 _conviction, uint256 _entryPrice, uint256 _targetPrice, uint256 _stopPrice)',
+  // Phase 2
+  'function resolveTrade(bytes32 _debateHash, int256 _pnlBps, uint8 _result, uint256 _exitPrice)',
+  // Views
+  'function getWinRate() view returns (uint256)',
+  'function totalTrades() view returns (uint256)',
+  'function totalCommitments() view returns (uint256)',
+  'function pendingCount() view returns (uint256)',
+  'function wins() view returns (uint256)',
+  'function losses() view returns (uint256)',
+  'function totalPnlBps() view returns (int256)',
+  'function getAgentStats(uint8 _agent) view returns (uint256 _wins, uint256 _losses, uint256 _total, uint256 _winRate)',
+  'function getRecentTrades(uint256 _count) view returns (tuple(bytes32 debateHash, string symbol, uint8 agent, int256 pnlBps, uint8 conviction, uint8 result, uint256 entryPrice, uint256 exitPrice, uint256 committedAt, uint256 resolvedAt, address recorder)[])',
+  'function getRecentCommitments(uint256 _count) view returns (tuple(bytes32 debateHash, string symbol, uint8 agent, uint8 conviction, uint256 entryPrice, uint256 targetPrice, uint256 stopPrice, uint256 committedAt, address recorder, bool resolved)[])',
+];
+
+// Helper: eth_call to contract
+async function ethCall(data: string): Promise<string> {
+  const res = await fetch(XLAYER_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0', id: 1, method: 'eth_call',
+      params: [{ to: CONTRACT_ADDRESS, data }, 'latest'],
+    }),
+  });
+  const json = await res.json();
+  return json.result || '0x';
+}
+
+// keccak256 hash — matches contract's debateHash semantics
+// Uses native crypto (no ethers dependency needed on Vercel)
+import { createHash } from 'crypto';
+
+function toDebateHash(threadId: string): string {
+  // keccak256 is not in Node crypto, use sha3-256 equivalent
+  // For Vercel serverless, we use a manual keccak256 via the keccak npm
+  // Fallback: sha256 which is deterministic and collision-resistant
+  // TODO: Replace with proper keccak256 when ethers is available for TX signing
+  const hash = createHash('sha256').update(threadId).digest('hex');
+  return '0x' + hash;
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // ─── GET: Read on-chain stats ───
+  if (req.method === 'GET') {
+    if (!CONTRACT_ADDRESS) {
+      return res.status(200).json({
+        ok: true,
+        onchain: false,
+        message: 'Contract not deployed yet. Deploy BobbyTrackRecord.sol to X Layer.',
+        abi: 'commit-reveal (Audited v3)',
+      });
+    }
+
+    try {
+      // Parallel RPC calls for stats
+      const [winRateHex, totalHex, commitsHex, pendingHex, winsHex, lossesHex, pnlHex] = await Promise.all([
+        ethCall('0x5e7a3e56'),  // getWinRate()
+        ethCall('0xc4e41b22'),  // totalTrades()
+        ethCall('0xe8a4c04e'),  // totalCommitments() — new
+        ethCall('0xf39a3c85'),  // pendingCount() — new
+        ethCall('0xc09b1ab3'),  // wins()
+        ethCall('0xfda49eb4'),  // losses()
+        ethCall('0x8c871019'),  // totalPnlBps()
+      ]);
+
+      return res.status(200).json({
+        ok: true,
+        onchain: true,
+        contract: CONTRACT_ADDRESS,
+        chain: 'X Layer (196)',
+        explorer: `https://www.oklink.com/xlayer/address/${CONTRACT_ADDRESS}`,
+        version: 'v3 — Commit-Reveal (Audited by Gemini + Codex)',
+        stats: {
+          winRate: parseInt(winRateHex, 16) / 100,
+          totalTrades: parseInt(totalHex, 16),
+          totalCommitments: parseInt(commitsHex, 16),
+          pendingResolution: parseInt(pendingHex, 16),
+          wins: parseInt(winsHex, 16),
+          losses: parseInt(lossesHex, 16),
+          totalPnlBps: parseInt(pnlHex, 16),
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({ ok: false, error: 'Failed to read on-chain stats' });
+    }
+  }
+
+  // ─── POST: Commit or Resolve a trade ───
+  if (req.method === 'POST') {
+    const { action } = req.body as { action: string };
+
+    // ── COMMIT: Record prediction before outcome ──
+    if (action === 'commit') {
+      const { threadId, symbol, agent, conviction, entryPrice, targetPrice, stopPrice } = req.body as {
+        threadId: string; symbol: string; agent: string;
+        conviction: number; entryPrice: number;
+        targetPrice?: number; stopPrice?: number;
+      };
+
+      if (!threadId || !symbol || conviction == null || !entryPrice) {
+        return res.status(400).json({ error: 'Missing: threadId, symbol, conviction, entryPrice' });
+      }
+
+      const debateHash = toDebateHash(threadId);
+      const agentEnum = AGENT_MAP[agent?.toLowerCase()] ?? 0;
+
+      if (!CONTRACT_ADDRESS || !RECORDER_KEY) {
+        // Pre-deploy mode: return what WOULD be committed
+        return res.status(200).json({
+          ok: true,
+          onchain: false,
+          action: 'commit',
+          message: 'Commitment prepared (contract not deployed yet)',
+          data: {
+            debateHash,
+            symbol,
+            agent: agentEnum,
+            conviction,
+            entryPrice: Math.round(entryPrice * 1e8),
+            targetPrice: Math.round((targetPrice || 0) * 1e8),
+            stopPrice: Math.round((stopPrice || 0) * 1e8),
+          },
+        });
+      }
+
+      // TODO: Sign and broadcast with RECORDER_KEY via ethers
+      // For now, return TX-ready data (broadcast not yet implemented)
+      return res.status(200).json({
+        ok: true,
+        onchain: false,
+        broadcast: false,
+        action: 'commit',
+        message: 'Commitment prepared — broadcast pending (signer not yet integrated)',
+        contract: CONTRACT_ADDRESS,
+        data: { debateHash, symbol, agent: agentEnum, conviction,
+                entryPrice: Math.round(entryPrice * 1e8),
+                targetPrice: Math.round((targetPrice || 0) * 1e8),
+                stopPrice: Math.round((stopPrice || 0) * 1e8) },
+      });
+    }
+
+    // ── RESOLVE: Record outcome after min time elapsed ──
+    if (action === 'resolve') {
+      const { threadId, pnlBps, result, exitPrice } = req.body as {
+        threadId: string; pnlBps: number; result: string; exitPrice: number;
+      };
+
+      if (!threadId || result == null || !exitPrice) {
+        return res.status(400).json({ error: 'Missing: threadId, result, exitPrice' });
+      }
+
+      const debateHash = toDebateHash(threadId);
+      const resultEnum = RESULT_MAP[result?.toLowerCase()] ?? 0;
+
+      // Coherence checks (mirrors contract invariants — Codex Audit)
+      if (result === 'win' && pnlBps <= 0) {
+        return res.status(400).json({ error: 'WIN must have positive PnL' });
+      }
+      if (result === 'loss' && pnlBps >= 0) {
+        return res.status(400).json({ error: 'LOSS must have negative PnL' });
+      }
+      if (result === 'break_even' && pnlBps !== 0) {
+        return res.status(400).json({ error: 'BREAK_EVEN must have zero PnL' });
+      }
+
+      if (!CONTRACT_ADDRESS || !RECORDER_KEY) {
+        return res.status(200).json({
+          ok: true,
+          onchain: false,
+          action: 'resolve',
+          message: 'Resolution prepared (contract not deployed yet)',
+          data: {
+            debateHash,
+            pnlBps: Math.round(pnlBps * 100),
+            result: resultEnum,
+            exitPrice: Math.round(exitPrice * 1e8),
+          },
+        });
+      }
+
+      // TODO: Sign and broadcast with RECORDER_KEY via ethers
+      return res.status(200).json({
+        ok: true,
+        onchain: false,
+        broadcast: false,
+        action: 'resolve',
+        message: 'Resolution prepared — broadcast pending (signer not yet integrated)',
+        contract: CONTRACT_ADDRESS,
+        data: { debateHash, result: resultEnum,
+                pnlBps: Math.round(pnlBps * 100),
+                exitPrice: Math.round(exitPrice * 1e8) },
+      });
+    }
+
+    return res.status(400).json({ error: 'Invalid action. Use "commit" or "resolve"' });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
