@@ -1,0 +1,14 @@
+[profile.default]
+src = "."
+test = "test"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.19"
+
+[profile.default.fuzz]
+runs = 256
+
+# X Layer deployment
+[rpc_endpoints]
+xlayer = "https://rpc.xlayer.tech"
+xlayer_testnet = "https://testrpc.xlayer.tech"
