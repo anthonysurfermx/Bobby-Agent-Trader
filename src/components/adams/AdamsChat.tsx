@@ -2112,8 +2112,7 @@ export function AdamsChat() {
               const convM = cioContent.match(/(\d+)\s*\/\s*10/);
               const convScore = convM ? parseInt(convM[1]) / 10 : null;
 
-              // Extract trading parameters from Bobby's CIO text (flexible regex)
-              // Bobby says things like: "short ETH en $2,340-2,350", "stop loss ajustado en $2,375", "target inicial en $2,250"
+              // Extract trading parameters from Bobby's CIO text
               const entryMatch = cioContent.match(/(?:entry|entr[ao]|buy(?:ing)?|short(?:ear)?|comprar?)\s+(?:\w+\s+)*?(?:en|at|a)\s*\$?([\d,]+(?:\.\d+)?)/i)
                 || cioContent.match(/(?:en|at)\s*\$?([\d,]+(?:\.\d+)?)\s*[-–]\s*\$?([\d,]+)/i);
               const stopMatch = cioContent.match(/stop\s*(?:loss)?\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
@@ -2123,17 +2122,21 @@ export function AdamsChat() {
               const symMatch = msg.match(/\b(BTC|ETH|SOL|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|DOT|ADA|ATOM|ARB|OP)\b/i)
                 || cioContent.match(/\b(BTC|ETH|SOL|HYPE|XRP)\b/);
 
-              // For range entries like "$2,340-2,350", take the first number
               const entryPrice = entryMatch ? parseFloat((entryMatch[2] || entryMatch[1]).replace(/,/g, '')) : null;
               const stopPrice = stopMatch ? parseFloat(stopMatch[1].replace(/,/g, '')) : null;
               const targetPrice = targetMatch ? parseFloat(targetMatch[1].replace(/,/g, '')) : null;
-              const direction = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
-              const symbol = symMatch ? symMatch[1].toUpperCase() : (taSymbol || 'BTC');
+              const direction = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : null;
+              const symbol = symMatch ? symMatch[1].toUpperCase() : null;
 
-              // Expires in 48h for swing trades
+              // Codex P1: FAIL-CLOSED — only persist if ALL structured fields are present
+              // Malformed or creative LLM responses should NOT poison forum history
+              if (!convScore || !symbol || !entryPrice || !direction) {
+                console.warn('[Bobby] ⚠️ Debate not published — missing structured fields:', {
+                  convScore, symbol, entryPrice, direction,
+                });
+              } else {
               const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-              // Insert thread with trading params
               const threadRes = await fetch(`${SB_URL}/rest/v1/forum_threads`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=representation' },
@@ -2159,6 +2162,7 @@ export function AdamsChat() {
                   console.log('[Bobby] ✅ Debate published to forum:', threadId);
                 }
               }
+              } // end of fail-closed else block
             }
           } catch (forumErr) { console.warn('[Bobby] Forum publish failed:', forumErr); }
         }

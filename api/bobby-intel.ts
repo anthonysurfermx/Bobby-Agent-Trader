@@ -565,18 +565,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchTopTradersLSRatio(),
       fetchFearGreed(),
       fetchDXY(),
-      // X Layer on-chain signals via OnchainOS
-      fetch('http://143.110.194.171:8788/api/xlayer', {
+      // X Layer on-chain signals via OnchainOS (Codex P2: use HTTPS proxy)
+      fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-trade`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'signals' }),
       }).then(r => r.ok ? r.json() : null).catch(() => null),
     ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : (r.status === 'rejected' ? (console.warn('[Bobby Intel] pipeline failed:', r.reason), null) : null))) as [any, any, any, any, FundingRate[], OpenInterestData[], LongShortRatio[], FearGreedData | null, { dxy: number } | null, any];
 
     const filtered = filterSignals(rawSignals);
-    const signalAgeMs = 0; // Fresh signals, just collected
+    // Codex P2: use actual signal age from timestamp, not hardcoded 0
+    const newestSignal = filtered[0];
+    const signalAgeMs = newestSignal?.timestamp
+      ? Date.now() - Number(newestSignal.timestamp)
+      : 5 * 60 * 1000; // default 5min if no timestamp
     const winRate = calculateWinRate(recentCycles);
     const mood = getAgentMood(winRate);
-    const isSafeMode = winRate < 0.7;
+    // Gemini: Laplace smoothing — don't trigger safe mode with < 5 trades
+    const totalResolved = recentCycles.filter((c: any) => c.status === 'resolved').length;
+    const isSafeMode = totalResolved >= 5 && winRate < 0.5;
 
     // Regime detection — BTC 24h volatility drives conviction weights
     const btcPrice = livePrices.find(p => p.symbol === 'BTC');
@@ -614,11 +620,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalCapital: parseFloat(m.totalCapital.toFixed(2)),
     }));
 
+    // Compute Dynamic Conviction Score (deterministic, regime-aware)
+    const okxScore = filtered.length > 0
+      ? Math.min(1, filtered.reduce((sum: number, s: any) => sum + (s.score || 0), 0) / (filtered.length * 100))
+      : 0;
+    const polyScore = topMarkets.length > 0
+      ? Math.min(1, topMarkets.reduce((sum: number, m: any) => sum + (m.consensus || 0), 0) / (topMarkets.length * 100))
+      : 0;
+    const dynamicConviction = calculateDynamicConviction(okxScore, polyScore, signalAgeMs, btcVol);
+
     // Performance context
     const performance = {
       winRate: parseFloat((winRate * 100).toFixed(0)),
       mood,
       isSafeMode,
+      dynamicConviction,
       recentCycles: recentCycles.slice(0, 3).map(c => ({
         status: c.status,
         trades: c.trades_executed,
@@ -782,6 +798,12 @@ function buildBriefing(
     latency_s: parseFloat((latencyMs / 1000).toFixed(1)),
   };
   blocks.push(`<AGENT_META>\n${JSON.stringify(metaData)}\n</AGENT_META>`);
+
+  // Gemini+Codex: inject BASE_CONVICTION as anchor for LLM
+  // This is the deterministic score from backend math — LLM can adjust +/- 0.15 max
+  if (performance.dynamicConviction != null) {
+    blocks.push(`<BASE_CONVICTION>${performance.dynamicConviction.toFixed(2)}</BASE_CONVICTION>`);
+  }
 
   return blocks.join('\n\n');
 }
