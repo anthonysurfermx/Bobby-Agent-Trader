@@ -2255,16 +2255,15 @@ export function AdamsChat() {
             const conv = convMatch ? parseInt(convMatch[1]) : 0;
             const symMatch = fullText.match(/\b(BTC|ETH|SOL|OKB|XRP|AVAX|LINK|DOGE)\b/i);
             const dirMatch = fullText.match(/\b(long|short|comprar?|vender?)\b/i);
+            // Check if user specified leverage/amount in their message
+            const leverageMatch = msg.match(/(\d+)\s*[xX]/);
+            const amountMatch = msg.match(/(\d+)\s*(?:usdt|usd|dólares|dollars)/i);
 
             console.log(`[Bobby] Auto-execute parse: conv=${conv}, symbol=${symMatch?.[1]}, direction=${dirMatch?.[1]}, leverage=${leverageMatch?.[1]}, amount=${amountMatch?.[1]}`);
             if (conv >= 5 && symMatch && dirMatch) {
               const symbol = symMatch[1].toUpperCase();
               const direction = /short|vender/i.test(dirMatch[1]) ? 'short' : 'long';
-              // Check if user specified leverage in their message
-              const leverageMatch = msg.match(/(\d+)\s*[xX]/);
               const leverage = leverageMatch ? parseInt(leverageMatch[1]) : (conv >= 8 ? 10 : conv >= 6 ? 5 : 3);
-              // Check if user specified amount
-              const amountMatch = msg.match(/(\d+)\s*(?:usdt|usd|dólares|dollars)/i);
               const amount = amountMatch ? parseFloat(amountMatch[1]) : (leverage >= 10 ? 3 : leverage >= 5 ? 5 : 8);
 
               console.log(`[Bobby] 🤖 AUTO-EXECUTE: ${direction.toUpperCase()} ${symbol} ${leverage}x — conviction ${conv}/10`);

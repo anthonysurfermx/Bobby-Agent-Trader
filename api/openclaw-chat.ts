@@ -123,8 +123,12 @@ function isDebateRequest(message: string): boolean {
     /\[MANDATORY\s+TRADING\s+ROOM/i,
     /debate/i, /sala/i, /trading\s*room/i,
     /argue/i, /destroy/i, /stress.?test/i,
-    /debería.*comprar/i, /should.*buy/i, /should.*long/i, /should.*short/i,
-    /¿.*comprar/i, /¿.*vender/i,
+    /debería/i, /should.*buy/i, /should.*long/i, /should.*short/i,
+    /should.*enter/i, /should.*trade/i,
+    /¿.*comprar/i, /¿.*vender/i, /¿.*entrar/i, /¿.*long/i, /¿.*short/i,
+    /meter.*long/i, /meter.*short/i, /hacer.*long/i, /hacer.*short/i,
+    /opinas.*de/i, /qué.*opinas/i, /what.*think/i,
+    /entrar.*en/i, /abrir.*posici/i, /open.*position/i,
     /full\s+analysis/i, /análisis\s+completo/i,
   ];
   return debatePatterns.some(p => p.test(message));
