@@ -251,27 +251,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const priceData = await priceRes.json();
       const markPrice = parseFloat(priceData.data?.[0]?.last || '0');
 
-      // Step 4: Calculate contract quantity
-      // With cross margin: notional = amount * leverage
-      // Contracts = notional / (ctVal * markPrice)
-      const notional = amountUSDT * leverage;
-      const contracts = Math.floor(notional / (ctVal * markPrice));
+      // Step 4: Calculate size in ETH units (OKX SWAP uses base currency, not contracts)
+      // margin = size * price / leverage → size = margin * leverage / price
+      const sizeInEth = (amountUSDT * leverage) / markPrice;
+      const sizeRounded = Math.floor(sizeInEth * 100) / 100; // Round down to 0.01 (min contract)
 
-      if (contracts < 1) {
+      if (sizeRounded < 0.01) {
         return res.status(400).json({
           ok: false,
-          error: `Amount too small. Minimum ${(ctVal * markPrice / leverage).toFixed(2)} USDT needed for 1 contract.`,
+          error: `Amount too small. Minimum ${(0.01 * markPrice / leverage).toFixed(2)} USDT needed.`,
         });
       }
 
-      // Step 5: Place market order
+      // Step 5: Place market order (sz in ETH units for SWAP)
       const orderResult = await okxRequest('POST', '/api/v5/trade/order', {
         instId,
-        tdMode: 'cross',
+        tdMode: 'isolated',
         side: direction === 'long' ? 'buy' : 'sell',
-        posSide: direction === 'long' ? 'long' : 'short',
+        posSide: 'net',
         ordType: 'market',
-        sz: String(contracts),
+        sz: String(sizeRounded),
       }, creds);
 
       if (orderResult.code !== '0') {
@@ -385,7 +384,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (takeProfit) {
         const tpResult = await okxRequest('POST', '/api/v5/trade/order-algo', {
           instId,
-          tdMode: 'cross',
+          tdMode: 'isolated',
           side: closeSide,
           posSide: direction === 'long' ? 'long' : 'short',
           ordType: 'conditional',
@@ -401,7 +400,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (stopLoss) {
         const slResult = await okxRequest('POST', '/api/v5/trade/order-algo', {
           instId,
-          tdMode: 'cross',
+          tdMode: 'isolated',
           side: closeSide,
           posSide: direction === 'long' ? 'long' : 'short',
           ordType: 'conditional',
