@@ -1829,14 +1829,17 @@ export function AdamsChat() {
 
     // Detect stocks in the message
     const stocks = detectStocks(msg);
-    const hasStocks = stocks.length > 0;
+    // For general market questions, also scan top stocks
+    const isGeneralQuestion = /which.*asset|recommend|best.*trade|qué.*recomiend|mejor.*oportunidad|what.*should.*trade|mercado/i.test(msg);
+    const hasStocks = stocks.length > 0 || isGeneralQuestion;
 
     // Bobby ALWAYS fetches intel for anything beyond casual chat
     const fetchIntel = needsOKX || needsPoly || isGeneralOpinion || hasTokens || hasStocks;
     // For general market questions, fetch ALL major tokens so Bobby can scan the full market
     const allTokens = ['BTC', 'ETH', 'SOL', 'OKB', 'XRP', 'DOGE', 'AVAX', 'LINK', 'ADA', 'ATOM', 'ARB', 'OP'];
     const contextPricesPromise = (hasTokens || isGeneralMarket || isGeneralOpinion) ? getPriceCards(hasTokens ? tokens : allTokens).catch(() => []) : Promise.resolve([]);
-    const stockPricesPromise = hasStocks ? fetchStockPrices(stocks).catch(() => []) : Promise.resolve([]);
+    const defaultStocks = ['NVDA', 'AAPL', 'TSLA', 'META', 'XOM', 'SPY', 'COIN'];
+    const stockPricesPromise = hasStocks ? fetchStockPrices(stocks.length > 0 ? stocks : defaultStocks).catch(() => []) : Promise.resolve([]);
     const intelPromise = fetchIntel
       ? fetch('/api/bobby-intel').then(r => r.ok ? r.json() : null).catch(() => null)
       : Promise.resolve(null);
