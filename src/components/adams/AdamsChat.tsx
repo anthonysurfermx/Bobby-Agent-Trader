@@ -1522,17 +1522,17 @@ export function AdamsChat() {
         if (pnlData.ok) {
           const s = pnlData.summary;
           const positions = pnlData.openPositions || [];
-          const modeLabel = tradingMode === 'auto' ? '🤖 AI Execution' : tradingMode === 'confirm' ? '🤝 Human Confirms' : '📝 Paper Trading';
+          const modeLabel = tradingMode === 'auto' ? 'AI Execution' : tradingMode === 'confirm' ? 'Human Confirms' : 'Paper Trading';
           let balanceText = lang === 'es'
-            ? `Tu cuenta de trading:\n\n💰 **Equity total:** $${s.currentEquity.toFixed(2)} USDT\n📊 **Modo:** ${modeLabel}\n📈 **Retorno total:** ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n🏆 **Win rate:** ${s.winRate}% (${s.wins}W / ${s.losses}L)`
-            : `Your trading account:\n\n💰 **Total equity:** $${s.currentEquity.toFixed(2)} USDT\n📊 **Mode:** ${modeLabel}\n📈 **Total return:** ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n🏆 **Win rate:** ${s.winRate}% (${s.wins}W / ${s.losses}L)`;
+            ? `**Equity:** $${s.currentEquity.toFixed(2)} USDT\n**Modo:** ${modeLabel}\n**Retorno:** ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n**Win rate:** ${s.winRate}% (${s.wins}W / ${s.losses}L)`
+            : `**Equity:** $${s.currentEquity.toFixed(2)} USDT\n**Mode:** ${modeLabel}\n**Return:** ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n**Win rate:** ${s.winRate}% (${s.wins}W / ${s.losses}L)`;
           if (positions.length > 0) {
             balanceText += lang === 'es' ? '\n\n**Posiciones abiertas:**' : '\n\n**Open positions:**';
             for (const p of positions) {
-              balanceText += `\n• ${p.symbol} ${p.direction.toUpperCase()} ${p.leverage} — PnL: $${p.unrealizedPnl.toFixed(4)} (${p.unrealizedPnlPct.toFixed(2)}%)`;
+              balanceText += `\n${p.symbol} ${p.direction.toUpperCase()} ${p.leverage} — PnL: $${p.unrealizedPnl.toFixed(4)} (${p.unrealizedPnlPct.toFixed(2)}%)`;
             }
           } else {
-            balanceText += lang === 'es' ? '\n\nNo hay posiciones abiertas. Listo para operar.' : '\n\nNo open positions. Ready to trade.';
+            balanceText += lang === 'es' ? '\n\nSin posiciones abiertas.' : '\n\nNo open positions.';
           }
           setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: balanceText, timestamp: Date.now() }]);
         } else {
@@ -1833,7 +1833,9 @@ export function AdamsChat() {
 
     // Bobby ALWAYS fetches intel for anything beyond casual chat
     const fetchIntel = needsOKX || needsPoly || isGeneralOpinion || hasTokens || hasStocks;
-    const contextPricesPromise = (hasTokens || isGeneralMarket) ? getPriceCards(hasTokens ? tokens : ['BTC', 'ETH', 'SOL']).catch(() => []) : Promise.resolve([]);
+    // For general market questions, fetch ALL major tokens so Bobby can scan the full market
+    const allTokens = ['BTC', 'ETH', 'SOL', 'OKB', 'XRP', 'DOGE', 'AVAX', 'LINK', 'ADA', 'ATOM', 'ARB', 'OP'];
+    const contextPricesPromise = (hasTokens || isGeneralMarket || isGeneralOpinion) ? getPriceCards(hasTokens ? tokens : allTokens).catch(() => []) : Promise.resolve([]);
     const stockPricesPromise = hasStocks ? fetchStockPrices(stocks).catch(() => []) : Promise.resolve([]);
     const intelPromise = fetchIntel
       ? fetch('/api/bobby-intel').then(r => r.ok ? r.json() : null).catch(() => null)
