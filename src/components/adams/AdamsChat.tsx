@@ -2343,12 +2343,14 @@ export function AdamsChat() {
                 }]);
               }
             } else if (conv > 0 && conv < 5) {
-              setMessages(prev => [...prev, {
-                id: uid(), role: 'advisor', timestamp: Date.now(),
-                text: lang === 'es'
-                  ? `🛑 **No ejecuto.** Convicción ${conv}/10 — demasiado baja para auto-ejecutar. Mínimo 5/10.`
-                  : `🛑 **Not executing.** Conviction ${conv}/10 — too low for auto-execution. Minimum 5/10.`,
-              }]);
+              // Append "not executing" to Bobby's debate text instead of separate message
+              setMessages(prev => prev.map(m =>
+                m.id === replyId
+                  ? { ...m, text: m.text + (lang === 'es'
+                      ? `\n\n🛑 **No ejecuto.** Convicción ${conv}/10 — demasiado baja. Mínimo 5/10 para auto-ejecución.`
+                      : `\n\n🛑 **Not executing.** Conviction ${conv}/10 — too low. Minimum 5/10 for auto-execution.`) }
+                  : m
+              ));
             }
           } catch (autoErr) { console.warn('[Bobby] Auto-execute failed:', autoErr); }
         }
@@ -2756,6 +2758,7 @@ export function AdamsChat() {
                         targetPrice={targetMatch ? parseFloat(targetMatch[1].replace(/,/g, '')) : undefined}
                         stopPrice={stopMatch ? parseFloat(stopMatch[1].replace(/,/g, '')) : undefined}
                         language={lang}
+                        tradingMode={tradingMode || 'paper'}
                       />
                     );
                   }
