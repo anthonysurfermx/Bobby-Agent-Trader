@@ -32,8 +32,13 @@ export default function PerpsTradeCard({
   symbol, direction, conviction, entryPrice, targetPrice, stopPrice, language = 'en',
   tradingMode: initialMode = 'paper',
 }: PerpsTradeCardProps) {
-  const [leverage, setLeverage] = useState(10);
-  const [amount, setAmount] = useState('50');
+  const [leverage, setLeverage] = useState(5);
+  // Smart default: ETH/SOL need ~$5, BTC needs ~$15 with 5x
+  const getDefaultAmount = (sym: string) => {
+    if (sym === 'BTC') return '8';
+    return '5';
+  };
+  const [amount, setAmount] = useState(getDefaultAmount(symbol));
   const [mode, setMode] = useState<TradingMode>(initialMode);
   const [market, setMarket] = useState<MarketInfo | null>(null);
   const [executing, setExecuting] = useState(false);
