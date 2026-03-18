@@ -1668,9 +1668,17 @@ export function AdamsChat() {
     // ANALYZE MARKET — full agent cycle
     // ========================
     if (intent === 'analyze') {
+      // Redirect to multi-call debate with full market scan
+      // Instead of agent-run, use Bobby's debate engine with all assets
+      const analyzePrompt = lang === 'es'
+        ? 'Analiza todo el mercado — crypto y stocks. ¿Cuál es la mejor oportunidad ahora mismo?'
+        : 'Analyze the full market — crypto and stocks. What is the best opportunity right now?';
+      return sendMessage(analyzePrompt);
+      // OLD agent-run cycle below — bypassed in favor of multi-call debate
+      // eslint-disable-next-line no-unreachable
       setIsProcessing(true);
       setAnalysisPhases([]);
-      startThinkingSound(); // ambient hum while analyzing
+      startThinkingSound();
 
       // Bobby announces the full scan — ElevenLabs voice for consistency
       if (voiceEnabled) {
