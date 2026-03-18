@@ -14,6 +14,7 @@ import type { AdvisorProfile } from '@/components/agent-radar/AdvisorSetup';
 import { fetchTickers, fetchMarketDetail, formatVolume, type OKXTicker } from '@/services/okx-market.service';
 import { SwapConfirm, type TradeExecution } from './SwapConfirm';
 import { XLayerSwapCard } from './XLayerSwapCard';
+import PerpsTradeCard from './PerpsTradeCard';
 import { VoiceOrb, type OrbState, type OrbMood } from './VoiceOrb';
 import { IntelligenceFeed, type DebateData, type MetacognitionData, type SignalData, type PolyData } from './IntelligenceFeed';
 import { useBobbyVoice } from '@/hooks/useBobbyVoice';
@@ -2579,7 +2580,34 @@ export function AdamsChat() {
                   </motion.div>
                 )}
 
-                {/* X Layer Swap — execute Bobby's trade on-chain */}
+                {/* Perps Trade Card — execute leveraged perpetuals via OKX CEX */}
+                {!isProcessing && latestAdvisor.text.length > 100 && (() => {
+                  const text = latestAdvisor.text;
+                  const convMatch = text.match(/(\d+)\s*\/\s*10/);
+                  const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
+                  const symMatch = text.match(/\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK)\b/i);
+                  const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
+                  const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
+                  const targetMatch = text.match(/target\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
+                  const stopMatch = text.match(/stop\s*(?:loss)?\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
+                  if (symMatch) {
+                    const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
+                    return (
+                      <PerpsTradeCard
+                        symbol={symMatch[1].toUpperCase()}
+                        direction={dir as 'long' | 'short'}
+                        conviction={conv}
+                        entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
+                        targetPrice={targetMatch ? parseFloat(targetMatch[1].replace(/,/g, '')) : undefined}
+                        stopPrice={stopMatch ? parseFloat(stopMatch[1].replace(/,/g, '')) : undefined}
+                        language={lang}
+                      />
+                    );
+                  }
+                  return null;
+                })()}
+
+                {/* X Layer Swap — spot swap on-chain (secondary option) */}
                 {!isProcessing && latestAdvisor.text.length > 100 && (() => {
                   const text = latestAdvisor.text;
                   const convMatch = text.match(/(\d+)\s*\/\s*10/);
