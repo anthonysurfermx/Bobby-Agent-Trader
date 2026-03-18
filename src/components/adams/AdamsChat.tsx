@@ -2267,6 +2267,27 @@ export function AdamsChat() {
 
               console.log(`[Bobby] 🤖 AUTO-EXECUTE: ${direction.toUpperCase()} ${symbol} ${leverage}x — conviction ${conv}/10`);
 
+              // Play execution sound
+              try {
+                const audioCtx = new AudioContext();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+              } catch {}
+
+              // Bobby announces the execution with his voice
+              const execAnnouncement = lang === 'es'
+                ? `Ejecutando ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${leverage}x. Convicción ${conv} de diez.`
+                : `Executing ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${leverage}x. Conviction ${conv} out of ten.`;
+              queueSentence(execAnnouncement, 'cio', lang);
+
               setMessages(prev => [...prev, {
                 id: uid(), role: 'advisor', timestamp: Date.now(),
                 text: lang === 'es'
@@ -2285,11 +2306,32 @@ export function AdamsChat() {
               const execData = await execRes.json();
 
               if (execData.ok) {
+                // Success sound — ascending tone
+                try {
+                  const audioCtx = new AudioContext();
+                  const osc = audioCtx.createOscillator();
+                  const gain = audioCtx.createGain();
+                  osc.connect(gain);
+                  gain.connect(audioCtx.destination);
+                  osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+                  osc.frequency.exponentialRampToValueAtTime(1047, audioCtx.currentTime + 0.15);
+                  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                  osc.start();
+                  osc.stop(audioCtx.currentTime + 0.4);
+                } catch {}
+
+                // Bobby confirms with voice
+                const confirmText = lang === 'es'
+                  ? `Operación confirmada. ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${execData.leverage} a ${execData.markPrice?.toLocaleString()} dólares. El trade está vivo.`
+                  : `Trade confirmed. ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${execData.leverage} at ${execData.markPrice?.toLocaleString()} dollars. The trade is live.`;
+                queueSentence(confirmText, 'cio', lang);
+
                 setMessages(prev => [...prev, {
                   id: uid(), role: 'advisor', timestamp: Date.now(),
                   text: lang === 'es'
-                    ? `✅ **Posición abierta:** ${direction.toUpperCase()} ${symbol} ${execData.leverage}\n📍 Entry: $${execData.markPrice?.toLocaleString()}\n💰 Margin: ${execData.margin}\n📊 Notional: ${execData.notional}\n🔗 Order ID: ${execData.orderId}`
-                    : `✅ **Position opened:** ${direction.toUpperCase()} ${symbol} ${execData.leverage}\n📍 Entry: $${execData.markPrice?.toLocaleString()}\n💰 Margin: ${execData.margin}\n📊 Notional: ${execData.notional}\n🔗 Order ID: ${execData.orderId}`,
+                    ? `✅ **Operación confirmada: ${direction.toUpperCase()} ${symbol} ${execData.leverage}**\n\n📍 Entry: $${execData.markPrice?.toLocaleString()}\n💰 Margin: ${execData.margin}\n📊 Exposición: ${execData.notional}\n📐 Tamaño: ${execData.size}\n🔗 Order: ${execData.orderId}\n\n_Registrado on-chain en X Layer_`
+                    : `✅ **Trade confirmed: ${direction.toUpperCase()} ${symbol} ${execData.leverage}**\n\n📍 Entry: $${execData.markPrice?.toLocaleString()}\n💰 Margin: ${execData.margin}\n📊 Notional: ${execData.notional}\n📐 Size: ${execData.size}\n🔗 Order: ${execData.orderId}\n\n_Recorded on-chain on X Layer_`,
                 }]);
               } else {
                 setMessages(prev => [...prev, {
