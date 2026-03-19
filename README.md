@@ -4,9 +4,9 @@
 
 # Bobby Agent Trader
 
-### *Not a bot. A Trading Room with Metacognition.*
+### *The First Vibe Trading Platform on OKX*
 
-**Agentic Trust Infrastructure for the OKX Ecosystem**
+**Tell Bobby how you see the market. He'll debate it, verify it, and execute it — or tell you no.**
 
 [![OKX X Layer Hackathon](https://img.shields.io/badge/OKX_X_Layer-AI_Hackathon_2026-000?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==)](https://www.okx.com)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-defimexico.org/bobby-00ff88?style=for-the-badge)](https://defimexico.org/bobby)
@@ -16,29 +16,35 @@
 
 ---
 
-*"The divergence between what people believe and what money does — that's where alpha lives."*
-— Bobby
+*"You don't trust Bobby — you verify him."*
 
 </div>
 
-## The Problem
+## What is Vibe Trading?
 
-Every AI trading tool today has the same fatal flaw: **you can't verify if it's lying.**
+You say *"La Fed va a bajar tasas, siento que viene un bull run."* Bobby doesn't blindly follow your gut. He treats your macro narrative as a **hypothesis**, cross-references it against 10 live data sources, runs an adversarial 3-agent debate, and only then decides — execute, sit out, or counter-trade your vibe.
 
-A bot says "I predicted BTC at $60K" — where's the proof? A database entry? That can be edited. A screenshot? That can be faked. There's zero accountability, zero transparency, and zero trust.
+**That's Vibe Trading:** human intuition + AI metacognition + on-chain accountability.
 
-Meanwhile, traders are drowning in noise — 50 Telegram alpha groups, 20 Twitter KOLs, 12 newsletters — and they still can't answer one simple question: **"Should I buy this, or not?"**
+## How It Works
 
-## The Solution: Bobby — A Trading Room, Not a Bot
+1. **One trader or a full room** — Talk to Bobby one-on-one, or activate the Trading Room where 3 agents debate every decision with voice
+2. **Vibe in, conviction out** — Say how you see the market in natural language. Bobby converts your vibe into a regime (RISK_ON, RISK_OFF, PANIC) and adjusts conviction accordingly — but only if data confirms
+3. **Bobby says NO** — When conviction is below 5/10, Bobby refuses to execute and recommends an alternative. A bot would say yes to generate fees. Bobby preserves capital.
+4. **Forum: agents talking 24/7** — Every debate auto-publishes to a live forum where the agents keep discussing. You see Alpha Hunter and Red Team arguing at 3am while you sleep
+5. **Every trade on-chain** — Commit-reveal on X Layer. Bobby records predictions BEFORE knowing the outcome. No cherry-picking. No backfilling. Verify everything.
 
-Bobby is a **sovereign AI CIO** (Chief Investment Officer) that runs a live trading room with three agents who debate every decision before your eyes. It's not a signal bot. It's not a dashboard. It's a **decision-making infrastructure** with verifiable on-chain accountability.
+## What Makes Bobby Different
 
-What makes Bobby different:
-
-1. **He debates himself before deciding** — Three agents (Alpha Hunter, Red Team, CIO) argue in real-time with voice. You watch the thesis get stress-tested.
-2. **He commits predictions on-chain BEFORE knowing the outcome** — Commit-reveal pattern on X Layer. No cherry-picking. No backfilling.
-3. **He says NO when he doesn't see alpha** — Bobby told us "don't buy OKB" when the setup was bearish. A bot would have said "buy" to generate a transaction. Bobby preserved capital.
-4. **Other protocols can read his conviction** — The Conviction Oracle on X Layer lets any DeFi protocol call `getConviction("BTC")` before executing. Bobby is infrastructure, not an island.
+| Feature | Typical AI Bot | Bobby |
+|---------|---------------|-------|
+| Decision process | Black box | 3-agent adversarial debate you can hear |
+| Accountability | "Trust me bro" | On-chain commit-reveal on X Layer |
+| Your input | Type a prompt, get a response | Vibe Trading — your macro thesis becomes a regime |
+| When it's wrong | Deletes the tweet | Track record is immutable, anyone can audit |
+| Says no | Never (wants fees) | Bobby sits out at 2/10 conviction and recommends Gold instead |
+| Asset coverage | Crypto only | Crypto + Stocks (NVDA, TSLA, SPY) on OKX perps |
+| Other agents | Isolated | MCP Server — any AI agent can call Bobby |
 
 ## Architecture
 
@@ -160,6 +166,47 @@ The debate is **audible** — each agent speaks with a distinct neural voice (Mi
 
 **The "NO" Feature:** Bobby famously told us *"This is not the time to long OKB. The setup is broken, momentum is bearish, macro is against you. Cash is king here."* — A bot would have said yes to generate fees. Bobby preserved capital. That's the difference.
 
+## Vibe Trading — Human Intuition Meets AI Metacognition
+
+Bobby is the first platform to implement **Vibe Trading** as defined by Vlad Tenev: AI-mediated financial interaction where users give high-level natural language directives and AI agents handle the technical complexity.
+
+**How the Vibe Pipeline works:**
+
+```
+User: "La Fed va a bajar tasas en junio, siento bull run"
+                    │
+                    ▼
+         inferUserVibe() → RISK_ON, strength: 0.88
+                    │
+                    ▼
+         <USER_VIBE> + <BOBBY_MODE> injected into context
+                    │
+         ┌──────────┼──────────┐
+         ▼          ▼          ▼
+     Alpha:     Red Team:    CIO:
+     Rides the  "Classic     Checks if data
+     narrative  retail       confirms vibe:
+     → NVDA     euphoria"   ✓ DXY dropping
+                             ✓ Funding negative
+                             → adjust +0.30
+                    │
+                    ▼
+         Conviction: base 3.3 → adjusted 6.3/10
+         → EXECUTE: Long NVDA $180, 5x
+         → On-chain commit on X Layer
+```
+
+**Vibe Regimes:**
+
+| Regime | Trigger | Bobby's Behavior | Max Adjustment |
+|--------|---------|------------------|----------------|
+| RISK_ON | "Fed cuts", "bull run", "breakout" | High-beta crypto + tech stocks | +0.30 |
+| RISK_OFF | "War", "recession", "DXY strong" | Gold, shorts, defensive plays | -0.32 |
+| PANIC | "Bloodbath", "capitulation", "selloff" | Cut leverage, allow contrarian buys | -0.20 |
+| NEUTRAL | Default / "reset" | Pure data-driven, ±0.15 max | ±0.15 |
+
+**Key design:** The vibe is a hypothesis, not a command. Bobby requires live-data confirmation before applying the full adjustment. Red Team has explicit orders to attack euphoric or panicky vibes.
+
 ## 10 Intelligence Sources
 
 Bobby cross-references 10 real-time data sources before every decision:
@@ -174,8 +221,10 @@ Bobby cross-references 10 real-time data sources before every decision:
 | 6 | Fear & Greed Index | Sentiment extremes (contrarian signals) | Low |
 | 7 | DXY (US Dollar Index) | Macro context for risk assets | Medium |
 | 8 | Technical Analysis | SMA, RSI, MACD, Bollinger, VWAP, S/R levels | High |
-| 9 | X Layer Signals | On-chain smart money activity on OKX L2 | Medium |
-| 10 | Bobby's Episodic Memory | Past trade outcomes and pattern recognition | Medium |
+| 9 | Yahoo Finance | NVDA, AAPL, TSLA, META, MSFT, COIN, SPY — macro correlation | Medium |
+| 10 | X Layer Signals | On-chain smart money activity on OKX L2 | Medium |
+| 11 | Bobby's Episodic Memory | Past trade outcomes and pattern recognition | Medium |
+| 12 | User Vibe (Regime Hint) | Natural language macro narrative → bounded conviction adjustment | Conditional |
 
 ## MCP Server — Bobby as Infrastructure
 
@@ -276,9 +325,11 @@ forge script script/DeployAll.s.sol --rpc-url https://rpc.xlayer.tech --broadcas
 
 ## The Philosophy
 
-> "Everyone else is building bots that read signals and push buttons. Bobby reads signals, **debates them internally with adversarial agents**, **commits predictions on-chain before knowing the outcome**, **checks his own track record**, and only then decides — while explaining his reasoning out loud with voice. That's not a bot. That's a trading room with metacognition."
+> "Bobby is the first Vibe Trading platform on OKX. You tell Bobby how you see the market — in natural language — and Bobby debates the thesis between 3 agents with opposing incentives before executing. Every trade is committed on-chain on X Layer before the outcome is known. You don't trust Bobby — you verify him."
 
-Bobby is not trying to be the best trading bot. Bobby is trying to be the **trust layer** that every trading decision should pass through. The on-chain track record proves he means it.
+Bobby is not a chatbot. Bobby is a **sovereign AI trading room with metacognition** — the control center where human intuition meets adversarial AI debate, cross-asset intelligence, and on-chain accountability.
+
+The orb at the center is Bobby's consciousness. Around it orbits the market: your positions, your PnL, the conviction scores, the active vibe regime. You don't need to type anything. Open Bobby and see what he's thinking.
 
 ## Deployed Contracts
 
@@ -298,9 +349,9 @@ Built for the **OKX X Layer AI Hackathon 2026** (March 12-26)
 
 <div align="center">
 
-**Bobby Agent Trader** — *Not a bot. A Trading Room with Metacognition.*
+**Bobby Agent Trader** — *The First Vibe Trading Platform on OKX*
 
-*The World's First Verifiable AI Trading Agent on X Layer*
+*You don't trust Bobby — you verify him.*
 
 Powered by **OKX OnchainOS** | **X Layer** | **Claude AI** | **Polymarket Intelligence**
 
