@@ -294,7 +294,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               threadId: `perp-${symbol}-${orderId}-${Date.now()}`,
               symbol,
               agent: 'cio',
-              conviction: 7, // TODO: pass from Bobby's debate
+              conviction: params?.conviction || 7,
               entryPrice: markPrice,
               targetPrice: direction === 'long' ? markPrice * 1.05 : markPrice * 0.95,
               stopPrice: direction === 'long' ? markPrice * 0.97 : markPrice * 1.03,

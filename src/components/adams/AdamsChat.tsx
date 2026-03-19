@@ -2268,15 +2268,23 @@ export function AdamsChat() {
         console.log(`[Bobby] Auto-execute check: tradingMode=${tradingMode}, tradingRoom=${tradingRoom}, hasText=${!!fullText}, textLen=${fullText.length}`);
         if (tradingMode === 'auto' && tradingRoom && fullText) {
           try {
-            const convMatch = fullText.match(/(\d+)\s*\/\s*10/);
+            // Codex P1: Parse ONLY the CIO verdict section, not Alpha/Red Team
+            // This prevents executing Alpha's trade when CIO said NO
+            const verdictMatch = fullText.match(/\*\*\s*(?:MY\s*VERDICT|MI\s*VEREDICTO)\s*:?\s*\*\*:?\s*([\s\S]*?)$/i);
+            const verdictText = verdictMatch ? verdictMatch[1] : fullText;
+
+            const convMatch = verdictText.match(/(\d+)\s*\/\s*10/);
             const conv = convMatch ? parseInt(convMatch[1]) : 0;
-            const symMatch = fullText.match(/\b(BTC|ETH|SOL|OKB|XRP|AVAX|LINK|DOGE)\b/i);
-            const dirMatch = fullText.match(/\b(long|short|comprar?|vender?)\b/i);
+            // For symbol/direction: prefer CIO verdict, fallback to full text
+            const symMatch = verdictText.match(/\b(BTC|ETH|SOL|OKB|XRP|AVAX|LINK|DOGE)\b/i)
+              || fullText.match(/\b(BTC|ETH|SOL|OKB|XRP|AVAX|LINK|DOGE)\b/i);
+            const dirMatch = verdictText.match(/\b(long|short|comprar?|vender?)\b/i)
+              || fullText.match(/\b(long|short|comprar?|vender?)\b/i);
             // Check if user specified leverage/amount in their message
             const leverageMatch = msg.match(/(\d+)\s*[xX]/);
             const amountMatch = msg.match(/(\d+)\s*(?:usdt|usd|dólares|dollars)/i);
 
-            console.log(`[Bobby] Auto-execute parse: conv=${conv}, symbol=${symMatch?.[1]}, direction=${dirMatch?.[1]}, leverage=${leverageMatch?.[1]}, amount=${amountMatch?.[1]}`);
+            console.log(`[Bobby] Auto-execute parse (CIO only): conv=${conv}, symbol=${symMatch?.[1]}, direction=${dirMatch?.[1]}, verdict="${verdictText.slice(0, 100)}"`);
             if (conv >= 5 && symMatch && dirMatch) {
               const symbol = symMatch[1].toUpperCase();
               const direction = /short|vender/i.test(dirMatch[1]) ? 'short' : 'long';
@@ -2315,20 +2323,25 @@ export function AdamsChat() {
 
               let execData: any = {};
               try {
+                // Codex P1: 15s timeout to prevent UI stuck on "Ejecutando..."
+                const execAbort = new AbortController();
+                const execTimeout = setTimeout(() => execAbort.abort(), 15000);
                 const execRes = await fetch('/api/okx-perps', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
+                  signal: execAbort.signal,
                   body: JSON.stringify({
                     action: 'open_position',
-                    params: { symbol, direction, leverage, amount, mode: 'live' },
+                    params: { symbol, direction, leverage, amount, mode: 'live', conviction: conv },
                   }),
                 });
+                clearTimeout(execTimeout);
                 if (!execRes.ok) {
-                  throw new Error(`Timeout or API error (${execRes.status})`);
+                  throw new Error(`API error (${execRes.status})`);
                 }
                 execData = await execRes.json();
               } catch (err: any) {
-                execData = { ok: false, error: err.message || 'API request failed' };
+                execData = { ok: false, error: err.name === 'AbortError' ? 'Timeout (15s)' : (err.message || 'API request failed') };
               }
 
               if (execData.ok) {

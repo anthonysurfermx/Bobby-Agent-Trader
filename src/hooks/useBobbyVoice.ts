@@ -76,8 +76,9 @@ async function fetchAudio(text: string, voice?: string, lang?: string): Promise<
   const cached = await getCachedAudio(cacheKey);
   if (cached) return cached;
 
-  // Try ElevenLabs first (unless we already know it's down)
-  if (!useFreeTTS) {
+  // Codex P1: Skip ElevenLabs for Spanish — ElevenLabs voices are English only
+  // Edge TTS has native Mexican voices (Jorge, Dalia) that sound much better
+  if (!useFreeTTS && lang !== 'es') {
     try {
       const res = await fetch('/api/bobby-voice', {
         method: 'POST',
@@ -89,7 +90,6 @@ async function fetchAudio(text: string, voice?: string, lang?: string): Promise<
         await setCachedAudio(cacheKey, data);
         return data;
       }
-      // ElevenLabs failed (401/402/502) — switch to free TTS for this session
       console.warn('[Voice] ElevenLabs unavailable, switching to free TTS');
       useFreeTTS = true;
     } catch {
@@ -358,16 +358,12 @@ export function useBobbyVoice(): BobbyVoiceState {
     setIsSpeaking(false);
   }, [stop, playAudioData]);
 
-  // Local speak — Web Speech API for fillers
+  // Local speak — changed to use regular voice queue for Hackathon Demo to guarantee Edge TTS
   const speakLocal = useCallback(async (text: string, lang: string = 'en') => {
     if (!text.trim()) return;
     stop();
-    setIsSpeaking(true);
-    try {
-      await speakWithBrowserTTS(text, lang);
-    } catch { /* silent */ }
-    setIsSpeaking(false);
-  }, [stop]);
+    queueSentence(text, 'cio', lang);
+  }, [stop, queueSentence]);
 
   return { speak, speakLocal, queueSentence, flushQueue, stop, getLastResponseAudio, clearResponseAudio, hasResponseAudio, isSpeaking, analyser, audioElement };
 }
