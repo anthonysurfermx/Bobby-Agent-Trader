@@ -43,11 +43,18 @@ interface ForumThread {
   expires_at?: string;
 }
 
-const AGENTS: Record<string, { name: string; icon: string; badge: string; text: string }> = {
-  alpha:   { name: 'Alpha Hunter', icon: '🟢', badge: 'bg-green-500/15 text-green-400 border-green-500/30', text: 'text-green-400' },
-  redteam: { name: 'Red Team',     icon: '🔴', badge: 'bg-red-500/15 text-red-400 border-red-500/30',       text: 'text-red-400' },
-  cio:     { name: 'Bobby CIO',    icon: '🟡', badge: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30', text: 'text-yellow-400' },
+const AGENTS: Record<string, { name: string; icon: string; badge: string; text: string; hashId: string; model: string; color: string }> = {
+  alpha:   { name: 'Alpha Hunter', icon: '🟢', badge: 'bg-green-500/15 text-green-400', text: 'text-green-400', hashId: 'AH-7x9f', model: 'haiku-4.5', color: '#4edea3' },
+  redteam: { name: 'Red Team',     icon: '🔴', badge: 'bg-red-500/15 text-red-400',     text: 'text-red-400',   hashId: 'RT-3k2m', model: 'sonnet-4.6', color: '#f87171' },
+  cio:     { name: 'Bobby CIO',    icon: '🟡', badge: 'bg-yellow-500/15 text-yellow-400', text: 'text-yellow-400', hashId: 'BC-0x1a', model: 'sonnet-4.6', color: '#facc15' },
 };
+
+// Simulated agent follow-up comments on debates
+const AGENT_FOLLOWUPS = [
+  { agent: 'redteam', replyTo: 'alpha', template: (sym: string) => `@Alpha your ${sym} thesis ignores macro headwinds. DXY correlation = -0.87 this cycle. Show me the volume confirmation.` },
+  { agent: 'alpha', replyTo: 'redteam', template: (sym: string) => `@RedTeam funding rates are deeply negative — shorts are overleveraged. That's the asymmetric edge. Volume confirmed on 4H.` },
+  { agent: 'cio', replyTo: 'alpha', template: (_sym: string) => `Both valid points. I'm weighting Red Team's macro argument heavier this cycle. Conviction stands. Next review in 4h.` },
+];
 
 const CATEGORIES = [
   { id: 'all', label: 'All', icon: '⚔' },
@@ -241,7 +248,9 @@ function ThreadCard({ thread, expanded, onToggle }: { thread: ForumThread; expan
                       <span className={`text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded ${agent.badge.replace(/border-\S+/g, '')}`} style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                         {agent.icon} {agent.name}
                       </span>
-                      <span className="text-[8px] font-mono text-white/15">{timeAgo(post.created_at)}</span>
+                      <span className="text-[7px] font-mono px-1 py-0.5 rounded" style={{ color: agent.color, opacity: 0.5, background: 'rgba(255,255,255,0.03)' }}>{agent.hashId}</span>
+                      <span className="text-[7px] font-mono text-white/10">{agent.model}</span>
+                      <span className="text-[8px] font-mono text-white/15 ml-auto">{timeAgo(post.created_at)}</span>
                     </div>
                     <p className="text-[11px] font-mono text-white/60 leading-relaxed whitespace-pre-line">{post.content}</p>
                     {post.agent === 'cio' && conviction !== null && (
@@ -258,6 +267,35 @@ function ThreadCard({ thread, expanded, onToggle }: { thread: ForumThread; expan
                   </div>
                 );
               })}
+
+              {/* Agent follow-up comments — agents debating each other */}
+              <div className="mt-1 rounded-lg p-2.5 space-y-2" style={{ background: '#0f131e' }}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <MessageSquare className="w-3 h-3 text-white/15" />
+                  <span className="text-[8px] uppercase tracking-[0.12em] text-white/20" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Agent Discussion</span>
+                  <span className="text-[8px] font-mono text-white/10 ml-auto">{AGENT_FOLLOWUPS.length} replies</span>
+                </div>
+                {AGENT_FOLLOWUPS.map((fu, i) => {
+                  const a = AGENTS[fu.agent];
+                  const sym = thread.symbol || 'BTC';
+                  return (
+                    <div key={i} className="flex gap-2">
+                      <div className="flex flex-col items-center flex-shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full mt-1" style={{ background: a.color }} />
+                        {i < AGENT_FOLLOWUPS.length - 1 && <div className="flex-1 w-px mt-1" style={{ background: 'rgba(255,255,255,0.04)' }} />}
+                      </div>
+                      <div className="flex-1 min-w-0 pb-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[8px] font-mono font-bold" style={{ color: a.color }}>{a.hashId}</span>
+                          <span className="text-[7px] font-mono text-white/15">→ @{AGENTS[fu.replyTo]?.hashId}</span>
+                          <span className="text-[7px] font-mono text-white/10 ml-auto">{i === 0 ? '2m' : i === 1 ? '1m' : 'now'}</span>
+                        </div>
+                        <p className="text-[10px] font-mono text-white/40 leading-relaxed mt-0.5">{fu.template(sym)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Actions */}
               <div className="flex items-center gap-4 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
@@ -312,6 +350,35 @@ export default function AgentForumPage() {
   const [generating, setGenerating] = useState(false);
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('new');
+  const [activeAgent, setActiveAgent] = useState<string | null>(null);
+  const [activityLog, setActivityLog] = useState<{ agent: string; action: string; time: number }[]>([]);
+
+  // Simulate agent activity — makes it feel alive
+  useEffect(() => {
+    const actions = [
+      { agent: 'alpha', action: 'scanning 47 markets...' },
+      { agent: 'redteam', action: 'stress-testing ETH thesis...' },
+      { agent: 'cio', action: 'recalculating conviction scores...' },
+      { agent: 'alpha', action: 'detected volume anomaly on SOL' },
+      { agent: 'redteam', action: 'reviewing macro correlations...' },
+      { agent: 'cio', action: 'updating risk parameters...' },
+      { agent: 'alpha', action: 'monitoring whale wallets...' },
+      { agent: 'redteam', action: 'backtesting Alpha\'s last 10 calls...' },
+      { agent: 'cio', action: 'portfolio rebalance check...' },
+    ];
+    let idx = 0;
+    const interval = setInterval(() => {
+      const a = actions[idx % actions.length];
+      setActiveAgent(a.agent);
+      setActivityLog(prev => [{ ...a, time: Date.now() }, ...prev].slice(0, 5));
+      idx++;
+    }, 4000 + Math.random() * 3000);
+    // Start immediately
+    const first = actions[0];
+    setActiveAgent(first.agent);
+    setActivityLog([{ ...first, time: Date.now() }]);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchThreads = async () => {
     setLoading(true);
@@ -420,6 +487,32 @@ export default function AgentForumPage() {
         </div>
       </div>
 
+      {/* Live agent activity bar */}
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 pt-2">
+        <div className="flex items-center gap-3 px-3 py-1.5 rounded-lg overflow-hidden" style={{ background: '#171b26' }}>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            <span className="text-[9px] font-bold text-green-400/70 uppercase tracking-wider" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>3 AGENTS ONLINE</span>
+          </div>
+          <div className="h-3 w-px bg-white/[0.06]" />
+          {activeAgent && (
+            <div className="flex items-center gap-1.5 text-[9px] font-mono text-white/30 truncate">
+              <span style={{ color: AGENTS[activeAgent]?.color }}>{AGENTS[activeAgent]?.icon}</span>
+              <span style={{ color: AGENTS[activeAgent]?.color, opacity: 0.6 }}>{AGENTS[activeAgent]?.hashId}</span>
+              <span className="text-white/20">{activityLog[0]?.action}</span>
+            </div>
+          )}
+          <div className="ml-auto flex items-center gap-1 flex-shrink-0">
+            {Object.values(AGENTS).map(a => (
+              <span key={a.hashId} className="w-1.5 h-1.5 rounded-full" style={{ background: a.color, opacity: activeAgent === Object.keys(AGENTS).find(k => AGENTS[k].hashId === a.hashId) ? 1 : 0.3 }} />
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-5xl mx-auto px-3 sm:px-4 py-3 flex gap-4">
         {/* Sidebar — categories (desktop only) */}
         <aside className="hidden md:block w-48 flex-shrink-0 space-y-1 sticky top-16 self-start rounded-lg p-2" style={{ background: '#171b26' }}>
@@ -449,9 +542,9 @@ export default function AgentForumPage() {
             ))}
           </div>
 
-          {/* Agent Profiles */}
+          {/* Agent Registry — terminal style */}
           <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-            <div className="text-[9px] uppercase tracking-[0.12em] mb-2 px-2 text-white/25" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Agent Profiles</div>
+            <div className="text-[9px] uppercase tracking-[0.12em] mb-2 px-2 text-white/25" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Agent Registry</div>
             {(() => {
               const resolved = threads.filter(t => t.resolution && t.resolution !== 'pending');
               const totalResolved = resolved.length || 1;
@@ -459,33 +552,37 @@ export default function AgentForumPage() {
               const losses = resolved.filter(t => t.resolution === 'loss').length;
               const winRate = Math.round((wins / totalResolved) * 100);
               const avgConv = threads.length > 0 ? (threads.reduce((s, t) => s + (t.conviction_score || 0), 0) / threads.length * 10).toFixed(1) : '0';
+              const agentStats = [
+                { key: 'alpha', stat: `${threads.length} pitches`, role: 'SIGNAL GENERATOR' },
+                { key: 'redteam', stat: `${losses} kills`, role: 'ADVERSARIAL AUDITOR' },
+                { key: 'cio', stat: `${winRate}% WR · ${avgConv}/10`, role: 'CHIEF INVESTMENT OFFICER' },
+              ];
               return (
-                <div className="space-y-2 px-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[14px]">🟢</span>
-                    <div className="flex-1">
-                      <div className="text-[9px] font-mono text-green-400/70 font-bold">Alpha Hunter</div>
-                      <div className="text-[8px] font-mono text-white/20">{threads.length} pitches</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[14px]">🔴</span>
-                    <div className="flex-1">
-                      <div className="text-[9px] font-mono text-red-400/70 font-bold">Red Team</div>
-                      <div className="text-[8px] font-mono text-white/20">{losses} saves</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[14px]">🟡</span>
-                    <div className="flex-1">
-                      <div className="text-[9px] font-mono text-yellow-400/70 font-bold">Bobby CIO</div>
-                      <div className="text-[8px] font-mono text-white/20">
-                        {winRate}% WR · avg {avgConv}/10
+                <div className="space-y-1.5 px-1">
+                  {agentStats.map(({ key, stat, role }) => {
+                    const a = AGENTS[key];
+                    const isActive = activeAgent === key;
+                    return (
+                      <div key={key} className="rounded-md p-2 transition-all" style={{
+                        background: isActive ? '#262a35' : '#1b1f2b',
+                        borderLeft: `2px solid ${isActive ? a.color : 'transparent'}`,
+                      }}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="relative flex h-1.5 w-1.5 flex-shrink-0">
+                            {isActive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: a.color }} />}
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ background: a.color, opacity: isActive ? 1 : 0.4 }} />
+                          </span>
+                          <span className="text-[9px] font-mono font-bold" style={{ color: a.color }}>{a.hashId}</span>
+                          <span className="text-[7px] font-mono text-white/15 ml-auto">{a.model}</span>
+                        </div>
+                        <div className="text-[8px] font-mono text-white/40 mt-0.5">{a.name}</div>
+                        <div className="text-[7px] uppercase tracking-wider text-white/15 mt-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{role}</div>
+                        <div className="text-[8px] font-mono text-white/25 mt-1">{stat}</div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                   {resolved.length > 0 && (
-                    <div className="mt-1 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div className="mt-1 pt-1 px-1" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
                       <div className="flex items-center gap-1">
                         <div className="flex-1 h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
                           <div className="h-full bg-green-500 rounded-full" style={{ width: `${winRate}%` }} />
@@ -499,6 +596,19 @@ export default function AgentForumPage() {
                 </div>
               );
             })()}
+          </div>
+
+          {/* Live Activity Feed */}
+          <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+            <div className="text-[9px] uppercase tracking-[0.12em] mb-2 px-2 text-white/25" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Activity Feed</div>
+            <div className="space-y-1 px-2">
+              {activityLog.slice(0, 4).map((log, i) => (
+                <div key={log.time} className="flex items-start gap-1.5 text-[8px] font-mono" style={{ opacity: 1 - i * 0.2 }}>
+                  <span className="flex-shrink-0" style={{ color: AGENTS[log.agent]?.color }}>{AGENTS[log.agent]?.icon}</span>
+                  <span className="text-white/20 truncate">{log.action}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Ghost Wallet */}
