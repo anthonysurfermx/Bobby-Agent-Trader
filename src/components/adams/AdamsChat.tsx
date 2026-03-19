@@ -2288,8 +2288,16 @@ export function AdamsChat() {
             const convMatch = verdictText.match(/(\d+)\s*\/\s*10/);
             const conv = convMatch ? parseInt(convMatch[1]) : 0;
             // For symbol/direction: prefer CIO verdict, fallback to full text
-            const allAssets = /\b(BTC|ETH|SOL|OKB|XRP|AVAX|LINK|DOGE|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i;
-            const symMatch = verdictText.match(allAssets) || fullText.match(allAssets);
+            const allAssets = /\b(BTC|ETH|SOL|OKB|XRP|AVAX|LINK|DOGE|ADA|ATOM|ARB|OP|NVDA|NVIDIA|AAPL|APPLE|TSLA|TESLA|META|GOOGL|GOOGLE|MSFT|MICROSOFT|AMD|COIN|COINBASE|MSTR|SPY|QQQ|XOM|EXXON|JPM|GS|CVX|CHEVRON)\b/i;
+            const rawSymMatch = verdictText.match(allAssets) || fullText.match(allAssets);
+            // Normalize company names to tickers
+            const nameToTicker: Record<string, string> = {
+              nvidia: 'NVDA', apple: 'AAPL', tesla: 'TSLA', google: 'GOOGL',
+              microsoft: 'MSFT', coinbase: 'COIN', exxon: 'XOM', chevron: 'CVX',
+            };
+            const symMatch = rawSymMatch
+              ? [rawSymMatch[0], nameToTicker[rawSymMatch[1].toLowerCase()] || rawSymMatch[1]]
+              : null;
             const dirMatch = verdictText.match(/\b(long|short|comprar?|vender?)\b/i)
               || fullText.match(/\b(long|short|comprar?|vender?)\b/i);
             // Check if user specified leverage/amount in their message
