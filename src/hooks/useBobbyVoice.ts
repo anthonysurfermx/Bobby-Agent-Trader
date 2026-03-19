@@ -69,33 +69,14 @@ async function setCachedAudio(key: string, data: ArrayBuffer): Promise<void> {
 
 // ---- Fetch audio: ElevenLabs → Edge TTS (free) fallback chain ----
 
-let useFreeTTS = false; // Once ElevenLabs fails, switch to free for the session
+// All voices use Edge TTS (Microsoft Neural) — free forever, native Mexican Spanish
 
 async function fetchAudio(text: string, voice?: string, lang?: string): Promise<ArrayBuffer | null> {
   const cacheKey = hashText(text + (voice || 'cio') + (lang || 'en'));
   const cached = await getCachedAudio(cacheKey);
   if (cached) return cached;
 
-  // Codex P1: Skip ElevenLabs for Spanish — ElevenLabs voices are English only
-  // Edge TTS has native Mexican voices (Jorge, Dalia) that sound much better
-  if (!useFreeTTS && lang !== 'es') {
-    try {
-      const res = await fetch('/api/bobby-voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice: voice || 'cio' }),
-      });
-      if (res.ok) {
-        const data = await res.arrayBuffer();
-        await setCachedAudio(cacheKey, data);
-        return data;
-      }
-      console.warn('[Voice] ElevenLabs unavailable, switching to free TTS');
-      useFreeTTS = true;
-    } catch {
-      useFreeTTS = true;
-    }
-  }
+  // Edge TTS only — ElevenLabs removed (too expensive, Edge TTS is free + better for Spanish)
 
   // Fallback: Edge TTS (Microsoft Neural, free forever) via Vercel proxy → DO droplet
   try {
