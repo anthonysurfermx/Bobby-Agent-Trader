@@ -2635,6 +2635,34 @@ export function AdamsChat() {
   const orbState: OrbState = isListening ? 'listening' : isSpeaking ? 'speaking' : isProcessing ? 'thinking' : 'idle';
   const orbMood = activeAgent || 'confident';
 
+  // ---- HUD: Orbital data ring around the orb ----
+  const [hudPositions, setHudPositions] = useState<Array<{ symbol: string; direction: string; pnl: number; pnlPct: number }>>([]);
+  const [hudEquity, setHudEquity] = useState<number | null>(null);
+  const currentVibe = getStoredVibe();
+
+  // Fetch positions + equity for HUD (every 30s when idle)
+  useEffect(() => {
+    const fetchHud = async () => {
+      try {
+        const res = await fetch('/api/bobby-pnl');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.ok) {
+          setHudEquity(data.summary?.totalEquity || null);
+          setHudPositions((data.openPositions || []).map((p: any) => ({
+            symbol: p.instId?.replace('-USDT-SWAP', '') || '?',
+            direction: p.posSide === 'short' ? 'SHORT' : 'LONG',
+            pnl: parseFloat(p.upl || '0'),
+            pnlPct: parseFloat(p.uplRatio || '0') * 100,
+          })));
+        }
+      } catch {}
+    };
+    fetchHud();
+    const iv = setInterval(fetchHud, 30000);
+    return () => clearInterval(iv);
+  }, []);
+
   // Get the latest advisor message for the "stage" display
   const latestAdvisor = [...messages].reverse().find(m => m.role === 'advisor');
   const latestUser = [...messages].reverse().find(m => m.role === 'user');
@@ -2785,41 +2813,86 @@ export function AdamsChat() {
         </div>
       </div>
 
-      {/* ===== ORB — tap to talk, always visible ===== */}
-      <div
-        className="flex-shrink-0 flex flex-col items-center py-1.5 sm:py-4 border-b border-white/[0.02] cursor-pointer select-none"
-        style={{ background: '#050505' }}
-        onClick={() => {
-          if (orbState === 'speaking') { stopVoice(); return; }
-          if (orbState !== 'thinking') toggleListening();
-        }}
-      >
-        <div className="sm:hidden"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={60} /></div>
-        <div className="hidden sm:block"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={100} /></div>
-        <span className={`text-[8px] sm:text-[9px] font-mono mt-1 sm:mt-1.5 tracking-[2px] ${
-          activeAgent === 'alpha' ? 'text-green-400/60' : activeAgent === 'redteam' ? 'text-red-400/60' : activeAgent === 'cio' ? 'text-yellow-400/60' : 'text-green-400/40'
-        }`}>
-          {orbState === 'listening' ? (lang === 'es' ? 'TOCA PARA PARAR · ESCUCHANDO...' : 'TAP TO STOP · LISTENING...') : orbState === 'thinking' ? (lang === 'es' ? 'PROCESANDO...' : 'PROCESSING...') : orbState === 'speaking' ? (activeAgent === 'alpha' ? '🟢 ALPHA HUNTER' : activeAgent === 'redteam' ? '🔴 RED TEAM' : activeAgent === 'cio' ? '🟡 BOBBY CIO' : (lang === 'es' ? 'TOCA PARA INTERRUMPIR' : 'TAP TO INTERRUPT')) : (lang === 'es' ? 'TOCA PARA HABLAR' : 'TAP TO TALK')}
-        </span>
-        {/* Live market sentiment badges */}
-        {marketBadge && orbState === 'idle' && (
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full border ${
-              marketBadge.fgi <= 25 ? 'text-red-400/80 border-red-500/20 bg-red-500/5' :
-              marketBadge.fgi >= 75 ? 'text-green-400/80 border-green-500/20 bg-green-500/5' :
-              'text-amber-400/80 border-amber-500/20 bg-amber-500/5'
-            }`}>
-              FGI {marketBadge.fgi} · {marketBadge.fgiLabel}
+      {/* ===== COMMAND CENTER: ORB + HUD ===== */}
+      <div className="flex-shrink-0 relative" style={{ background: '#050505' }}>
+        {/* Top status bar — mode, vibe, regime */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-1" style={{ background: 'rgba(255,255,255,0.015)' }}>
+          <div className="flex items-center gap-2">
+            <span className="text-[7px] font-mono text-white/20 uppercase tracking-wider" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              {tradingMode === 'auto' ? '🤖 AUTO' : tradingMode === 'confirm' ? '👤 CONFIRM' : '📄 PAPER'}
             </span>
-            <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full border ${
-              marketBadge.dxy > 104 ? 'text-red-400/60 border-red-500/15 bg-red-500/5' :
-              marketBadge.dxy < 100 ? 'text-green-400/60 border-green-500/15 bg-green-500/5' :
-              'text-white/30 border-white/10 bg-white/[0.02]'
-            }`}>
-              DXY {marketBadge.dxy}
-            </span>
+            {tradingRoom && <span className="text-[7px] font-mono text-green-400/40 uppercase">ROOM</span>}
+            {currentVibe && (
+              <span className={`text-[7px] font-mono px-1 py-0.5 rounded ${
+                currentVibe.regimeBias === 'RISK_ON' ? 'text-green-400/60 bg-green-500/10' :
+                currentVibe.regimeBias === 'RISK_OFF' ? 'text-red-400/60 bg-red-500/10' :
+                currentVibe.regimeBias === 'PANIC' ? 'text-red-400/80 bg-red-500/15' :
+                'text-white/30 bg-white/5'
+              }`}>
+                VIBE: {currentVibe.regimeBias}
+              </span>
+            )}
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            {hudEquity !== null && (
+              <span className="text-[8px] font-mono text-white/30">
+                ${hudEquity.toFixed(2)}
+              </span>
+            )}
+            {hudPositions.length > 0 && (
+              <span className="text-[7px] font-mono text-white/20">{hudPositions.length} pos</span>
+            )}
+          </div>
+        </div>
+
+        {/* Orb center + orbital data */}
+        <div
+          className="flex flex-col items-center py-1.5 sm:py-3 cursor-pointer select-none"
+          onClick={() => {
+            if (orbState === 'speaking') { stopVoice(); return; }
+            if (orbState !== 'thinking') toggleListening();
+          }}
+        >
+          {/* Orbital position chips — float around the orb */}
+          {hudPositions.length > 0 && orbState === 'idle' && (
+            <div className="flex items-center gap-1.5 mb-1">
+              {hudPositions.slice(0, 3).map((pos, i) => (
+                <span key={i} className={`text-[7px] font-mono px-1.5 py-0.5 rounded ${
+                  pos.pnl >= 0 ? 'text-green-400/60 bg-green-500/8' : 'text-red-400/60 bg-red-500/8'
+                }`}>
+                  {pos.direction === 'SHORT' ? '↓' : '↑'} {pos.symbol} {pos.pnl >= 0 ? '+' : ''}{pos.pnlPct.toFixed(1)}%
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="sm:hidden"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={60} /></div>
+          <div className="hidden sm:block"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={100} /></div>
+          <span className={`text-[8px] sm:text-[9px] font-mono mt-1 sm:mt-1.5 tracking-[2px] ${
+            activeAgent === 'alpha' ? 'text-green-400/60' : activeAgent === 'redteam' ? 'text-red-400/60' : activeAgent === 'cio' ? 'text-yellow-400/60' : 'text-green-400/40'
+          }`}>
+            {orbState === 'listening' ? (lang === 'es' ? 'TOCA PARA PARAR · ESCUCHANDO...' : 'TAP TO STOP · LISTENING...') : orbState === 'thinking' ? (lang === 'es' ? 'PROCESANDO...' : 'PROCESSING...') : orbState === 'speaking' ? (activeAgent === 'alpha' ? '🟢 ALPHA HUNTER' : activeAgent === 'redteam' ? '🔴 RED TEAM' : activeAgent === 'cio' ? '🟡 BOBBY CIO' : (lang === 'es' ? 'TOCA PARA INTERRUMPIR' : 'TAP TO INTERRUPT')) : (lang === 'es' ? 'TOCA PARA HABLAR' : 'TAP TO TALK')}
+          </span>
+          {/* Live market sentiment badges */}
+          {marketBadge && orbState === 'idle' && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full ${
+                marketBadge.fgi <= 25 ? 'text-red-400/80 bg-red-500/8' :
+                marketBadge.fgi >= 75 ? 'text-green-400/80 bg-green-500/8' :
+                'text-amber-400/80 bg-amber-500/8'
+              }`}>
+                FGI {marketBadge.fgi} · {marketBadge.fgiLabel}
+              </span>
+              <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full ${
+                marketBadge.dxy > 104 ? 'text-red-400/60 bg-red-500/8' :
+                marketBadge.dxy < 100 ? 'text-green-400/60 bg-green-500/8' :
+                'text-white/30 bg-white/5'
+              }`}>
+                DXY {marketBadge.dxy}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ===== COMMAND CENTER: STAGE ===== */}
