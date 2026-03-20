@@ -3269,7 +3269,7 @@ export function AdamsChat() {
 
       {/* Feedback Widget — floating button */}
       <FeedbackWidget
-        userEmail={user?.email}
+        userEmail={undefined}
         walletAddress={address}
         page="bobby-chat"
         context={{ tradingMode, tradingRoom, lang, lastMessage: messages[messages.length - 1]?.text?.slice(0, 200) }}
