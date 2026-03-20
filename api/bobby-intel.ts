@@ -687,8 +687,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const winRate = calculateWinRate(recentCycles);
     const mood = getAgentMood(winRate);
     // Gemini: Laplace smoothing — don't trigger safe mode with < 5 trades
-    const totalResolved = recentCycles.filter((c: any) => c.status === 'resolved').length;
-    const isSafeMode = totalResolved >= 5 && winRate < 0.5;
+    // Codex: cycles use 'completed' status, not 'resolved'
+    const totalCompleted = recentCycles.filter((c: any) => c.status === 'completed' || c.status === 'resolved').length;
+    const isSafeMode = totalCompleted >= 5 && winRate < 0.5;
 
     // Regime detection — BTC 24h volatility drives conviction weights
     const btcPrice = livePrices.find(p => p.symbol === 'BTC');
@@ -728,7 +729,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Compute Dynamic Conviction Score (deterministic, regime-aware)
     const okxScore = filtered.length > 0
-      ? Math.min(1, filtered.reduce((sum: number, s: any) => sum + (s.score || 0), 0) / (filtered.length * 100))
+      ? Math.min(1, filtered.reduce((sum: number, s: any) => sum + (s.filterScore || 0), 0) / (filtered.length * 100))
       : 0;
     const polyScore = polyFormatted.length > 0
       ? Math.min(1, polyFormatted.reduce((sum: number, m: any) => sum + ((m.topOutcomePct || 0) / 100), 0) / polyFormatted.length)
