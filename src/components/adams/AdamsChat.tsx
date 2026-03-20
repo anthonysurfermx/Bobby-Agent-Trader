@@ -1406,13 +1406,13 @@ export function AdamsChat() {
             text: introText,
             timestamp: Date.now(),
             isLive: true,
-            prices: priceCards, // Show prices immediately with intro
+            // No prices here — Bobby's Radar (ConvictionBoard) shows them above
           }]);
 
-          // Auto-speak with small delay (needs user gesture from disclaimer click)
+          // Auto-speak with small delay — use queueSentence to guarantee Edge TTS MX voice
           setTimeout(() => {
             const cleanIntro = introText.replace(/[-*_#>]/g, '').replace(/\n+/g, '. ').trim();
-            speak(cleanIntro);
+            queueSentence(cleanIntro, 'cio', lang);
           }, 500);
         }).catch(() => {
           setMessages([{
