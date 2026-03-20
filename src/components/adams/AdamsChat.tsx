@@ -3104,8 +3104,8 @@ export function AdamsChat() {
               />
             )}
 
-            {/* DATA PANELS — price cards emerge from darkness */}
-            {latestAdvisor?.prices && latestAdvisor.prices.length > 0 && (
+            {/* DATA PANELS — price cards (hidden during onboarding to avoid duplicating Bobby's Radar) */}
+            {latestAdvisor?.prices && latestAdvisor.prices.length > 0 && messages.filter(m => m.role === 'user').length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
