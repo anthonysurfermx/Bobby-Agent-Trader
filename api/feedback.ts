@@ -9,7 +9,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const NOTIFY_EMAIL = 'anthochavez.ra@gmail.com';
-const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 
 async function sendEmailNotification(feedback: Record<string, unknown>): Promise<void> {
   const type = String(feedback.type || 'bug').toUpperCase();
@@ -24,33 +24,26 @@ async function sendEmailNotification(feedback: Record<string, unknown>): Promise
 <blockquote style="border-left:3px solid #10b981;padding-left:12px;color:#333">${feedback.message}</blockquote>
 <p style="color:#999;font-size:12px">${new Date().toLocaleString('es-MX')}</p>`;
 
-  // Try Resend first (free 100 emails/day)
-  if (RESEND_API_KEY) {
-    try {
-      await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
-        body: JSON.stringify({
-          from: 'Bobby Feedback <feedback@defimexico.org>',
-          to: NOTIFY_EMAIL,
-          subject,
-          html: body,
-        }),
-      });
-      return;
-    } catch { /* fallback below */ }
-  }
-
-  // Fallback: use droplet SMTP relay
   try {
-    await fetch('http://143.110.194.171:8787/api/tts', {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: `Feedback received: ${type} from ${from}`, voice: 'cio', lang: 'en' }),
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: 'Bobby Feedback', email: 'anthochavez.ra@gmail.com' },
+        to: [{ email: NOTIFY_EMAIL, name: 'Anthony' }],
+        subject,
+        htmlContent: body,
+      }),
     });
-    // At minimum, log it — the Supabase insert is the real persistence
-    console.log(`[Feedback] Email would go to ${NOTIFY_EMAIL}: ${subject}`);
-  } catch { /* non-critical */ }
+    if (!res.ok) {
+      console.error('[Feedback] Brevo error:', res.status, await res.text().catch(() => ''));
+    }
+  } catch (e) {
+    console.error('[Feedback] Email send failed:', e);
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
