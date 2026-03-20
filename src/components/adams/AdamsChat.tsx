@@ -19,6 +19,7 @@ import TradingModeSelector, { type TradingMode } from './TradingModeSelector';
 import { VoiceOrb, type OrbState, type OrbMood } from './VoiceOrb';
 import { IntelligenceFeed, type DebateData, type MetacognitionData, type SignalData, type PolyData } from './IntelligenceFeed';
 import { ConvictionBoard } from './ConvictionBoard';
+import { FeedbackWidget } from './FeedbackWidget';
 import { ExecutionTimeline } from './ExecutionTimeline';
 import { useBobbyVoice } from '@/hooks/useBobbyVoice';
 import { useAuth } from '@/hooks/useAuth';
@@ -3265,6 +3266,14 @@ export function AdamsChat() {
           </div>
         )}
       </div>
+
+      {/* Feedback Widget — floating button */}
+      <FeedbackWidget
+        userEmail={user?.email}
+        walletAddress={address}
+        page="bobby-chat"
+        context={{ tradingMode, tradingRoom, lang, lastMessage: messages[messages.length - 1]?.text?.slice(0, 200) }}
+      />
     </div>
   );
 }
