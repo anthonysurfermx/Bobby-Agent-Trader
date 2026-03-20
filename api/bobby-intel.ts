@@ -620,6 +620,91 @@ async function fetchTrendingTokens(): Promise<TrendingToken[]> {
   } catch { return []; }
 }
 
+// ---- OKX Security Token Scan (Honeypot / Rug Detection) ----
+interface TokenSecurity {
+  symbol: string;
+  address: string;
+  chain: string;
+  isHoneypot: boolean;
+  riskLevel: 'safe' | 'caution' | 'danger' | 'unknown';
+  risks: string[];
+}
+
+async function scanTokenSecurity(tokens: Array<{ symbol: string; address: string; chain: string }>): Promise<TokenSecurity[]> {
+  const apiKey = process.env.OKX_API_KEY;
+  const secretKey = process.env.OKX_SECRET_KEY;
+  const passphrase = process.env.OKX_PASSPHRASE;
+  const projectId = process.env.OKX_PROJECT_ID;
+  if (!apiKey || !secretKey || !passphrase || !projectId) return [];
+
+  const results: TokenSecurity[] = [];
+  // Scan max 3 tokens to stay within latency budget (5s timeout each)
+  const toScan = tokens.slice(0, 3).filter(t => t.address && t.address.length > 10);
+
+  for (const token of toScan) {
+    try {
+      const path = '/api/v5/dex/security/token-scan';
+      const qs = `?chainIndex=${token.chain}&tokenAddress=${token.address}`;
+      const timestamp = new Date().toISOString();
+      const signature = await hmacSign(timestamp + 'GET' + path + qs, secretKey);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      const res = await fetch(`https://web3.okx.com${path}${qs}`, {
+        headers: {
+          'OK-ACCESS-KEY': apiKey, 'OK-ACCESS-SIGN': signature,
+          'OK-ACCESS-TIMESTAMP': timestamp, 'OK-ACCESS-PASSPHRASE': passphrase,
+          'OK-ACCESS-PROJECT': projectId,
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        results.push({ symbol: token.symbol, address: token.address, chain: token.chain, isHoneypot: false, riskLevel: 'unknown', risks: ['API unavailable'] });
+        continue;
+      }
+
+      const json = await res.json() as { code: string; data: unknown };
+      if (json.code !== '0' || !Array.isArray(json.data) || json.data.length === 0) {
+        results.push({ symbol: token.symbol, address: token.address, chain: token.chain, isHoneypot: false, riskLevel: 'unknown', risks: ['No security data'] });
+        continue;
+      }
+
+      const d = json.data[0] as Record<string, unknown>;
+      const risks: string[] = [];
+      const isHoneypot = d.isHoneypot === true || d.isHoneypot === 'true';
+      if (isHoneypot) risks.push('HONEYPOT — cannot sell');
+      if (d.isMintable === true || d.isMintable === 'true') risks.push('Mintable supply');
+      if (d.isProxy === true || d.isProxy === 'true') risks.push('Proxy contract (upgradeable)');
+      if (d.canTakeBackOwnership === true) risks.push('Owner can reclaim');
+      if (d.hasBlacklist === true || d.hasBlacklist === 'true') risks.push('Has blacklist function');
+      if (d.hasTradingCooldown === true) risks.push('Trading cooldown');
+      const buyTax = parseFloat(String(d.buyTax || '0'));
+      const sellTax = parseFloat(String(d.sellTax || '0'));
+      if (buyTax > 5) risks.push(`High buy tax: ${buyTax}%`);
+      if (sellTax > 10) risks.push(`High sell tax: ${sellTax}%`);
+
+      let riskLevel: 'safe' | 'caution' | 'danger' | 'unknown' = 'safe';
+      if (isHoneypot || sellTax > 50) riskLevel = 'danger';
+      else if (risks.length >= 3 || sellTax > 10 || buyTax > 10) riskLevel = 'caution';
+      else if (risks.length === 0) riskLevel = 'safe';
+
+      results.push({ symbol: token.symbol, address: token.address, chain: token.chain, isHoneypot, riskLevel, risks });
+    } catch (err: any) {
+      // Timeout or network error — fail open with warning (Gemini mitigation)
+      results.push({
+        symbol: token.symbol, address: token.address, chain: token.chain,
+        isHoneypot: false, riskLevel: 'unknown',
+        risks: [err.name === 'AbortError' ? 'Security scan timeout (5s)' : 'Scan failed'],
+      });
+    }
+  }
+
+  return results;
+}
+
 // ---- Yahoo Finance (Top Stocks Integration) ----
 async function fetchTopStocks(): Promise<Array<{ symbol: string; price: number; change24h: number }>> {
   try {
@@ -771,8 +856,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const leaderFormatted = (dexLeaderboard || []).slice(0, 5);
     const trendingFormatted = (trendingTokens || []).slice(0, 5);
 
+    // Security scan: check top trending tokens + any whale signal tokens for honeypots
+    const tokensToScan = [
+      ...(trendingFormatted || []).filter((t: any) => t.symbol && t.chain).map((t: any) => ({
+        symbol: t.symbol, address: t.address || '', chain: t.chain === 'ETH' ? '1' : t.chain === 'SOL' ? '501' : '1',
+      })),
+      ...filtered.slice(0, 2).filter(s => s.tokenAddress).map(s => ({
+        symbol: s.tokenSymbol, address: s.tokenAddress, chain: s.chain,
+      })),
+    ];
+    const securityResults = tokensToScan.length > 0 ? await scanTokenSecurity(tokensToScan) : [];
+
     // Build the intelligence briefing text for Bobby's brain
-    const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, xlayerFormatted, leaderFormatted, trendingFormatted);
+    const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, xlayerFormatted, leaderFormatted, trendingFormatted, securityResults);
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
 
@@ -790,6 +886,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       xlayer: xlayerFormatted,
       dexLeaderboard: leaderFormatted,
       trending: trendingFormatted,
+      security: securityResults,
       performance,
       regime: regime.label,
       meta: {
@@ -825,6 +922,7 @@ function buildBriefing(
   xlayerSignals?: Array<{ token: string; amount_usd: number; wallets: number; market_cap: number }>,
   dexLeaderboard?: DexLeaderEntry[],
   trendingTokens?: TrendingToken[],
+  securityResults?: TokenSecurity[],
 ): string {
   const blocks: string[] = [];
 
@@ -933,6 +1031,16 @@ function buildBriefing(
     blocks.push(`<TRENDING_TOKENS>\n${JSON.stringify(trendingTokens.map(t => ({
       symbol: t.symbol, price: t.price, change_24h: t.change24h, volume: t.volume24h,
     })))}\n</TRENDING_TOKENS>`);
+  }
+
+  // Token security scan results — hard gate for Bobby
+  if (securityResults && securityResults.length > 0) {
+    const secData = securityResults.map(s => ({
+      symbol: s.symbol, risk: s.riskLevel, honeypot: s.isHoneypot,
+      issues: s.risks.length > 0 ? s.risks : ['Clean'],
+    }));
+    const dangerous = securityResults.filter(s => s.riskLevel === 'danger');
+    blocks.push(`<TOKEN_SECURITY scanned="${securityResults.length}" dangerous="${dangerous.length}">\n${JSON.stringify(secData)}\nIMPORTANT: If any token has risk=danger or honeypot=true, Bobby MUST refuse to recommend it. Say: "Security scan flagged [symbol] as [risk]. I won't touch this."\n</TOKEN_SECURITY>`);
   }
 
   // Gemini+Codex: inject BASE_CONVICTION as anchor for LLM
