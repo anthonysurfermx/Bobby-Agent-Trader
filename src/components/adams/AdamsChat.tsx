@@ -439,7 +439,7 @@ function InlinePriceCard({ price, highlighted, labels }: { price: PriceCard; hig
       className={`border rounded-lg p-3 font-mono text-[11px] transition-all duration-500 cursor-pointer ${
         highlighted
           ? 'border-green-500/40 bg-green-500/[0.06] shadow-[0_0_20px_rgba(34,197,94,0.15)]'
-          : 'border-neutral-700/50 bg-neutral-900/50 hover:border-neutral-600/60'
+          : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]'
       }`}
       onClick={() => setExpanded(prev => !prev)}
     >

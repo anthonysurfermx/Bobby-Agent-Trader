@@ -26,7 +26,7 @@ function AssetCell({ asset }: { asset: AssetData }) {
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="relative p-3 rounded bg-[#1a1e28] hover:bg-[#202532] transition-colors flex flex-col justify-between overflow-hidden"
+      className="relative p-3 rounded border border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-sm transition-colors flex flex-col justify-between overflow-hidden"
     >
       {/* Left accent bar colored by 24h performance */}
       <div className={`absolute top-0 left-0 w-1 h-full ${isUp ? 'bg-green-500/40' : 'bg-red-500/40'}`} />
@@ -77,7 +77,7 @@ export function ConvictionBoard({ isVisible, bobbyThinking, marketData }: Convic
           exit={{ opacity: 0, height: 0, marginBottom: 0, transition: { duration: 0.2 } }}
           className="w-full overflow-hidden"
         >
-          <div className="bg-[#171b26] rounded-lg p-4">
+          <div className="border border-white/[0.04] bg-white/[0.02] backdrop-blur-sm rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-mono text-[10px] uppercase tracking-[2px] text-white/50 flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />

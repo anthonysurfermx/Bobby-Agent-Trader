@@ -108,13 +108,13 @@ export function ExecutionTimeline({ messages }: { messages: ChatMsg[] }) {
   if (events.length === 0) return null;
 
   return (
-    <div className="hidden lg:block w-64 xl:w-72 flex-shrink-0 border-l border-[#262a35] bg-[#1a1e28]/50 p-4 pt-6 h-full overflow-y-auto">
+    <div className="hidden lg:block w-64 xl:w-72 flex-shrink-0 border-l border-white/[0.04] bg-white/[0.01] backdrop-blur-sm p-4 pt-6 h-full overflow-y-auto">
       <div className="flex items-center gap-2 mb-6 text-white/50 px-2">
         <Activity className="w-4 h-4" />
         <h2 className="font-mono text-[11px] uppercase tracking-[2px]">Execution Timeline</h2>
       </div>
       
-      <div className="relative pl-4 space-y-6 before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-[1px] before:bg-gradient-to-b before:from-transparent before:via-[#262a35] before:to-transparent">
+      <div className="relative pl-4 space-y-6 before:absolute before:inset-0 before:ml-4 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-[1px] before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
         {events.map((event, i) => (
           <motion.div
             key={event.id}
@@ -129,7 +129,7 @@ export function ExecutionTimeline({ messages }: { messages: ChatMsg[] }) {
             </div>
             
             {/* Content card */}
-            <div className={`w-[calc(100%-2rem)] bg-[#171b26] border border-[#262a35] p-3 rounded shadow-sm flex flex-col gap-1 ml-6 hover:border-white/20 transition-colors`}>
+            <div className={`w-[calc(100%-2rem)] bg-white/[0.02] border border-white/[0.06] p-3 rounded shadow-sm flex flex-col gap-1 ml-6 hover:border-white/20 transition-colors`}>
               <div className="flex justify-between items-center">
                 <span className="font-mono text-[10px] uppercase font-bold text-white/70">{event.type}</span>
                 <time className="font-mono text-[9px] text-white/30">{new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>

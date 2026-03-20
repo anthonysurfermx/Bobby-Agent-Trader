@@ -159,14 +159,11 @@ export default function PerpsTradeCard({
   const isLong = direction === 'long';
 
   return (
-    <div style={{
-      background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
-      border: `1px solid ${isLong ? '#00ff8855' : '#ff444455'}`,
-      borderRadius: 12,
-      padding: 16,
-      marginTop: 12,
-      fontFamily: 'monospace',
-    }}>
+    <div className={`mt-3 p-4 rounded-lg font-mono border backdrop-blur-sm ${
+      isLong
+        ? 'border-green-500/20 bg-green-500/[0.03]'
+        : 'border-red-500/20 bg-red-500/[0.03]'
+    }`}>
       {/* Mode Toggle */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
         {(['paper', 'live'] as TradingMode[]).map(m => (
