@@ -50,10 +50,9 @@ export default function PerpsTradeCard({
   const convPct = Math.round(conviction * 100);
   const convColor = conviction >= 0.7 ? '#00ff88' : conviction >= 0.4 ? '#ffaa00' : '#ff4444';
 
-  // Load trading mode preference from localStorage
+  // Force paper mode for all public users — live only for demo/owner
   useEffect(() => {
-    const saved = localStorage.getItem('bobby_trading_mode');
-    if (saved === 'live' || saved === 'paper') setMode(saved);
+    setMode('paper');
   }, []);
 
   // Fetch market info

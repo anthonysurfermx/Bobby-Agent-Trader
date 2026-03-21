@@ -192,7 +192,7 @@ function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 'trendi
   // "¿Crees que el mercado va a subir?", "How do you see ETH this week?"
   // Key: if the sentence is a QUESTION with opinion markers, it's always chat — even if it
   // contains words like "análisis" or token names.
-  const isOpinionQuestion = /\b(opin|piens|crees|think|deberi|should|recomiend|recommend|tell me|dime|explica|explain|por ?qu[eé]|why|como ves|how do you see|que onda|what.?s your|cual es tu|an[aá]lisis|analysis|outlook|perspectiv|pronos|predict|forecast|va a (subir|bajar)|will .* (go|rise|fall|drop|pump|dump)|esta semana|this week|este mes|this month|próxim[oa]|next|futuro|future|qué har[ií]as|what would you|cómo est[aá]|how.?s the|sentiment|sentimiento|mercado va|market going|afectar[aá]?|impact|affect|benefici|perjudic|compar[ae]|versus|vs\.?|entre|between|conviene|mejor|worse|better|riesg|risk|oportunid|opportunity|estrategi|strategy|jugada|play|movida|move)\b/i.test(l);
+  const isOpinionQuestion = /\b(opina[sr]?|piensa[sr]?|crees?|thinks?|deber[ií]a|should|recomiend[ao]?|recommend|tell me|dime|explica|explain|por ?qu[eé]|why|como ves|how do you see|que onda|what.?s your|cual es tu|an[aá]lisis|analysis|outlook|perspectiv|pronos|predict|forecast|va a (subir|bajar)|will .* (go|rise|fall|drop|pump|dump)|esta semana|this week|este mes|this month|próxim[oa]|next|futuro|future|qu[eé] har[ií]as|what would you|c[oó]mo est[aá]|how.?s the|sentiment|sentimiento|mercado va|market going|afectar[aá]?|impact|affect|benefici|perjudic|compar[ae]|versus|vs\.?|entre|between|conviene|mejor|worse|better|riesg|risk|oportunid|opportunity|estrategi|strategy|jugada|play|movida|move|qu[eé] opinas|what do you think)\b/i.test(l);
 
   // Also route to chat if stocks are detected (any stock question needs Bobby's brain)
   if ((isOpinionQuestion && wordCount > 3) || (detectStocks(text).length > 0 && wordCount > 2)) return 'chat';
@@ -2590,9 +2590,12 @@ export function AdamsChat() {
           } catch (forumErr) { console.warn('[Bobby] Forum publish failed:', forumErr); }
         }
 
-        // ── AUTO-EXECUTE: If mode is 'auto' and Bobby recommended a trade with conviction >= 5/10 ──
-        console.log(`[Bobby] Auto-execute check: tradingMode=${tradingMode}, tradingRoom=${tradingRoom}, hasText=${!!fullText}, textLen=${fullText.length}`);
-        if (tradingMode === 'auto' && tradingRoom && fullText) {
+        // ── AUTO-EXECUTE: ONLY for authenticated owner, never for guests ──
+        // This prevents random users from opening positions with Bobby's OKX account
+        const OWNER_WALLET = '0xC3F836EC06A2202af23e59997A613CA0722F35d1'.toLowerCase();
+        const isOwner = isAuthenticated && address?.toLowerCase() === OWNER_WALLET;
+        console.log(`[Bobby] Auto-execute check: tradingMode=${tradingMode}, isOwner=${isOwner}, hasText=${!!fullText}`);
+        if (tradingMode === 'auto' && tradingRoom && fullText && isOwner) {
           try {
             // Codex P1: Parse ONLY the CIO verdict section, not Alpha/Red Team
             // This prevents executing Alpha's trade when CIO said NO
@@ -3491,243 +3494,5 @@ export function AdamsChat() {
         context={{ tradingMode, tradingRoom, lang, lastMessage: messages[messages.length - 1]?.text?.slice(0, 200) }}
       />
     </div>
-  );
-}
-const symMatch = userMsg.match(assetRegex) || text.match(assetRegex);
-const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
-const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-if (symMatch) {
-  const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
-  return (
-    <XLayerSwapCard
-      symbol={symMatch[1].toUpperCase()}
-      direction={dir}
-      conviction={conv}
-      entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
-    />
-  );
-}
-return null;
-                }) ()}
-
-{/* Trade execution cards */ }
-{
-  latestAdvisor.trades && latestAdvisor.trades.length > 0 && (
-    <div className="mt-3 space-y-2">
-      {latestAdvisor.trades.map((trade, i) => (
-        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-          <SwapConfirm trade={trade} walletAddress={address} />
-        </motion.div>
-      ))}
-    </div>
-  )
-}
-              </motion.div >
-            )}
-
-{/* INTELLIGENCE FEED — visible metacognition (debate Alpha vs Red Team vs Bobby CIO) */ }
-{
-  latestAdvisor?.debate && (
-    <IntelligenceFeed
-      debate={latestAdvisor.debate}
-      metacognition={latestAdvisor.metacognition}
-      topSignals={latestAdvisor.topSignals}
-      polymarket={latestAdvisor.polymarket}
-      isLive={latestAdvisor === messages[messages.length - 1]}
-    />
-  )
-}
-
-{/* DATA PANELS — price cards appear after Bobby's analysis (not during onboarding) */ }
-{
-  latestAdvisor?.prices && latestAdvisor.prices.length > 0 && messages.filter(m => m.role === 'user').length > 0 && (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-      className="w-full max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3"
-    >
-      {latestAdvisor.prices.map((p, i) => (
-        <motion.div
-          key={p.symbol}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.3 + i * 0.1 }}
-        >
-          <InlinePriceCard price={p} highlighted={highlightedSymbols.has(p.symbol)} labels={t('priceLabels') as { high: string; low: string; volume: string; funding: string }} />
-        </motion.div>
-      ))}
-    </motion.div>
-  )
-}
-
-{/* CONTINUE PROMPT — block-by-block analysis */ }
-<AnimatePresence>
-  {awaitingContinue && pendingBlocks.length > 0 && (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -5 }}
-      className="w-full max-w-2xl mx-auto"
-    >
-      <div className="border border-green-500/15 bg-green-500/[0.03] backdrop-blur-sm p-3 flex items-center justify-between gap-3">
-        <span className="text-[10px] font-mono text-green-400/50">
-          {pendingBlocks.length} {lang === 'es' ? (pendingBlocks.length === 1 ? 'bloque restante' : 'bloques restantes')
-            : lang === 'pt' ? (pendingBlocks.length === 1 ? 'bloco restante' : 'blocos restantes')
-              : (pendingBlocks.length === 1 ? 'block remaining' : 'blocks remaining')}
-        </span>
-        <button
-          onClick={() => { setAwaitingContinue(false); revealNextBlock(); }}
-          className="text-[11px] px-4 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors font-mono tracking-wider animate-pulse">
-          {lang === 'es' ? 'CONTINUAR ▸' : lang === 'pt' ? 'CONTINUAR ▸' : 'CONTINUE ▸'}
-        </button>
-      </div>
-    </motion.div>
-  )}
-</AnimatePresence>
-
-{/* CONVERSATION HISTORY — only user prompts, ultra-compact */ }
-{
-  messages.filter(m => m.role === 'user').length > 0 && (
-    <div className="w-full max-w-2xl mx-auto pt-4">
-      <div className="flex flex-wrap gap-2">
-        {messages.filter(m => m.role === 'user').slice(-5).map((msg) => (
-          <span key={msg.id} className="px-2.5 py-1 text-[9px] font-mono text-white/25 bg-white/[0.03] rounded-full">
-            {msg.text.length > 60 ? msg.text.slice(0, 60) + '…' : msg.text}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-<div ref={messagesEndRef} />
-          </div >
-        </div >
-      </div >
-
-  {/* Right Sidebar: Execution Timeline */ }
-  < ExecutionTimeline messages = { messages } />
-    </div >
-
-  {/* ===== INPUT BAR — Bottom ===== */ }
-  < div className = "flex-shrink-0 border-t border-white/[0.04]" style = {{ background: '#080808', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-  {
-    canChat?(
-          <>
-    {/* Guest badge — shows remaining free messages (Clean Glass Style) */ }
-{
-  isGuest && (
-    <div className="max-w-4xl mx-auto px-4 py-2 flex justify-end">
-      <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 backdrop-blur-md shadow-[0_0_15px_rgba(245,158,11,0.05)]">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-        <span className="text-[9px] font-mono font-bold text-amber-400/90 tracking-wide uppercase">
-          {lang === 'es' ? 'GUEST PASS • ' : 'GUEST PASS • '}
-          {GUEST_MAX_MESSAGES - guestMessageCount} {lang === 'es' ? 'RESTANTES' : 'LEFT'}
-        </span>
-      </div>
-    </div>
-  )
-}
-            <div className="max-w-4xl mx-auto px-2 sm:px-4 pt-1.5 sm:pt-2 pb-0.5 sm:pb-1">
-              <div className="flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar justify-start sm:justify-center sm:flex-wrap">
-                {(() => {
-                  const qa = t('quickActions') as { gold: string; silver: string; allPrices: string; analyze: string };
-                  return [
-                    { label: 'BTC', display: 'BTC', icon: '₿' },
-                    { label: 'ETH', display: 'ETH', icon: 'Ξ' },
-                    { label: 'NVDA', display: 'NVDA', icon: '◈' },
-                    { label: 'SPY', display: 'S&P 500', icon: '◉' },
-                    { label: 'Gold', display: qa.gold, icon: '◆' },
-                    { label: 'All Prices', display: qa.allPrices, icon: '$' },
-                    { label: 'Analyze Market', display: qa.analyze, icon: '>' },
-                    { label: lang === 'es' ? '¿Cómo ves el mercado hoy? Dame el debate completo.' : "What's your read on the market right now? Give me the full debate.", display: 'Debate', icon: '⚔' },
-                  ];
-                })().map(a => (
-                  <button key={a.label} onClick={() => sendMessage(a.label)} disabled={isProcessing}
-                    className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-white/[0.05] bg-white/[0.01] text-white/30 hover:bg-white/[0.04] hover:text-white/60 hover:border-white/10 transition-all disabled:opacity-20 font-mono whitespace-nowrap flex-shrink-0">
-                    <span className="text-green-400/60">{a.icon}</span>
-                    {a.display}
-                  </button>
-                ))}
-                <Link to="/agentic-world/forum"
-                  className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-yellow-500/10 bg-yellow-500/[0.03] text-yellow-400/50 hover:bg-yellow-500/[0.08] hover:text-yellow-400/80 hover:border-yellow-500/20 transition-all font-mono whitespace-nowrap flex-shrink-0">
-                  <span>⚔</span> Forum
-                </Link>
-                <Link to="/agentic-world/polymarket"
-                  className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-cyan-500/10 bg-cyan-500/[0.03] text-cyan-400/50 hover:bg-cyan-500/[0.08] hover:text-cyan-400/80 hover:border-cyan-500/20 transition-all font-mono whitespace-nowrap flex-shrink-0">
-                  <span>◉</span> Dashboard
-                </Link>
-              </div>
-            </div>
-            <div className="max-w-4xl mx-auto px-2 sm:px-4 py-1.5 sm:py-2.5 flex items-center gap-1.5 sm:gap-2">
-              <button onClick={toggleListening} disabled={isProcessing}
-                className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border transition-all active:scale-[0.95] flex-shrink-0 rounded-full ${
-                  isListening
-                    ? 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse'
-                    : 'border-white/[0.06] text-white/20 hover:border-green-500/20 hover:text-green-400/60'
-                }`}>
-                {isListening ? <Mic className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <MicOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-              </button>
-              <input type="text" value={inputText}
-                onChange={e => setInputText(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                onFocus={() => {
-                  // Mobile keyboard: scroll input into view
-                  setTimeout(() => {
-                    const el = document.activeElement as HTMLElement;
-                    el?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                  }, 300);
-                }}
-                placeholder={isListening ? t('listening') as string : `${lang === 'es' ? 'Habla con' : lang === 'pt' ? 'Fale com' : 'Talk to'} ${advisorName}...`}
-                className={`flex-1 bg-transparent border-0 border-b px-2 sm:px-3 py-1.5 sm:py-2 text-[12px] sm:text-[13px] text-white/90 placeholder:text-white/15 outline-none transition-colors font-mono ${
-                  isListening ? 'border-red-500/20' : 'border-white/[0.06] focus:border-white/10'
-                }`}
-                disabled={isProcessing} />
-              <button onClick={() => sendMessage()} disabled={!inputText.trim() || isProcessing}
-                className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-all active:scale-[0.95] rounded-full ${
-                  inputText.trim() && !isProcessing ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'text-white/10 cursor-not-allowed'
-                }`}>
-                {isProcessing ? <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin" /> : <ArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-              </button>
-            </div>
-          </>
-        ) : (
-  /* ===== AUTH GATE — Login prompt for unauthenticated users ===== */
-  <div className="max-w-4xl mx-auto px-4 py-4">
-    <div className="border border-amber-500/20 bg-amber-500/[0.03] backdrop-blur-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <div className="flex items-center gap-2.5">
-        <Lock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
-        <span className="text-amber-400/80 text-[11px] font-mono">
-          {guestMessageCount >= GUEST_MAX_MESSAGES
-            ? (lang === 'es' ? '¿Te gustó? Crea una cuenta para seguir debatiendo con Bobby' : 'Like what you saw? Sign up to keep debating with Bobby')
-            : (lang === 'es' ? 'Inicia sesión para hablar con Bobby' : 'Sign in to talk to Bobby')}
-        </span>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
-          className="text-[10px] px-4 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition-colors font-mono tracking-wider">
-          {lang === 'es' ? 'INICIAR SESIÓN' : lang === 'pt' ? 'ENTRAR' : 'SIGN IN'}
-        </button>
-        <button
-          onClick={() => navigate('/register?redirect=' + encodeURIComponent(window.location.pathname))}
-          className="text-[10px] px-4 py-1.5 border border-green-500/30 text-green-400/60 hover:text-green-400 hover:border-green-500/50 transition-colors font-mono tracking-wider">
-          {lang === 'es' ? 'CREAR CUENTA' : lang === 'pt' ? 'CRIAR CONTA' : 'SIGN UP'}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-      </div >
-
-  {/* Feedback Widget — floating button */ }
-  < FeedbackWidget
-userEmail = { undefined }
-walletAddress = { address }
-page = "bobby-chat"
-context = {{ tradingMode, tradingRoom, lang, lastMessage: messages[messages.length - 1]?.text?.slice(0, 200) }}
-      />
-    </div >
   );
 }
