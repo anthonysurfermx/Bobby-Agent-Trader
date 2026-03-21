@@ -139,6 +139,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     params?: Record<string, any>;
   };
 
+  // ── Auth for mutant actions: require internal secret or user credentials ──
+  const mutantActions = ['open_position', 'close_position', 'set_tpsl'];
+  if (mutantActions.includes(action)) {
+    const internalSecret = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET;
+    const hasUserCreds = credentials?.apiKey && credentials?.secret;
+    const hasInternalAuth = params?.internalSecret === internalSecret;
+    const isFromVercel = req.headers['x-vercel-id']; // Internal Vercel-to-Vercel calls have this
+    if (!hasUserCreds && !hasInternalAuth && !isFromVercel) {
+      return res.status(401).json({ error: 'Unauthorized — credentials or internal auth required for trading' });
+    }
+  }
+
   // ── PUBLIC: Get mark price + funding (no credentials needed) ──
   if (action === 'market_info') {
     const symbol = params?.symbol || 'BTC';
@@ -429,6 +441,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           slTriggerPxType: 'mark',
         }, creds);
         results.push({ type: 'sl', ...slResult });
+      }
+
+      // Validate that OKX actually accepted the orders
+      const failedOrders = results.filter((r: any) => {
+        const code = r.code || r.data?.[0]?.sCode;
+        return code && code !== '0';
+      });
+      if (failedOrders.length > 0) {
+        const failMsgs = failedOrders.map((r: any) => `${r.type}: ${r.data?.[0]?.sMsg || r.msg || 'unknown'}`).join('; ');
+        return res.status(400).json({
+          ok: false,
+          error: `TP/SL rejected by OKX: ${failMsgs}`,
+          results,
+        });
       }
 
       return res.status(200).json({
