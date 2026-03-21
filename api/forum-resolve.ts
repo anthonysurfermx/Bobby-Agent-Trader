@@ -21,6 +21,7 @@ interface PendingThread {
   conviction_score: number | null;
   expires_at: string;
   created_at: string;
+  status?: string;
 }
 
 async function getCurrentPrice(symbol: string): Promise<number | null> {
@@ -126,6 +127,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           resolved_at: new Date().toISOString(),
           status: 'resolved',
         });
+
+        // Resolve on-chain X Layer
+        try {
+          const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://defi-mexico-hub.vercel.app';
+          await fetch(`${host}/api/xlayer-record`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+               action: 'resolve',
+               threadId: thread.id,
+               result: resolution === 'break_even' ? 'break_even' : resolution,
+               exitPrice: currentPrice,
+               pnlBps: pnlPct ? parseFloat(pnlPct.toFixed(2)) : 0
+             })
+          });
+        } catch(e) { console.error('Failed to resolve on-chain', e); }
 
         results.push({ id: thread.id, symbol: thread.symbol, resolution, pnl: pnlPct ? parseFloat(pnlPct.toFixed(2)) : null });
       } else {

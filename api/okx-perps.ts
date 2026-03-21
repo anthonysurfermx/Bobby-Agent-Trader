@@ -298,29 +298,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const orderId = orderResult.data?.[0]?.ordId;
 
       // On-chain commit: register this trade prediction on X Layer
-      // This creates an immutable record BEFORE the outcome is known
-      try {
-        const commitRes = await fetch(
-          `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-record`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'commit',
-              threadId: `perp-${symbol}-${orderId}-${Date.now()}`,
-              symbol,
-              agent: 'cio',
-              conviction: params?.conviction || 7,
-              entryPrice: markPrice,
-              targetPrice: direction === 'long' ? markPrice * 1.05 : markPrice * 0.95,
-              stopPrice: direction === 'long' ? markPrice * 0.97 : markPrice * 1.03,
-            }),
-          }
-        );
-        const commitData = await commitRes.json();
-        console.log('[Perps] On-chain commit:', commitData.ok ? 'success' : 'pending');
-      } catch (err) {
-        console.warn('[Perps] On-chain commit failed (non-blocking):', err);
+      // Skip if caller will handle commit separately (e.g. bobby-cycle)
+      if (!params?.skipOnchainCommit) {
+        try {
+          const commitRes = await fetch(
+            `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-record`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'commit',
+                threadId: `perp-${symbol}-${orderId}-${Date.now()}`,
+                symbol,
+                agent: 'cio',
+                conviction: params?.conviction || 7,
+                entryPrice: markPrice,
+                targetPrice: direction === 'long' ? markPrice * 1.05 : markPrice * 0.95,
+                stopPrice: direction === 'long' ? markPrice * 0.97 : markPrice * 1.03,
+              }),
+            }
+          );
+          const commitData = await commitRes.json();
+          console.log('[Perps] On-chain commit:', commitData.ok ? 'success' : 'pending');
+        } catch (err) {
+          console.warn('[Perps] On-chain commit failed (non-blocking):', err);
+        }
+      } else {
+        console.log('[Perps] Skipping on-chain commit (caller handles it)');
       }
 
       return res.status(200).json({
@@ -385,7 +389,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
       // Get current position size
-      const posRes = await okxRequest('GET', `/api/v5/account/positions?instId=${instId}`, null, credentials);
+      const posRes = await okxRequest('GET', `/api/v5/account/positions?instId=${instId}`, null, creds);
       const pos = posRes.data?.find((p: any) => p.posSide === (direction === 'long' ? 'long' : 'short'));
 
       if (!pos || parseFloat(pos.pos) === 0) {
@@ -444,7 +448,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── GET POSITIONS ──
   if (action === 'positions') {
     try {
-      const result = await okxRequest('GET', '/api/v5/account/positions?instType=SWAP', null, credentials);
+      const result = await okxRequest('GET', '/api/v5/account/positions?instType=SWAP', null, creds);
 
       const positions = (result.data || [])
         .filter((p: any) => parseFloat(p.pos) !== 0)
@@ -471,7 +475,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ── GET ACCOUNT BALANCE ──
   if (action === 'balance') {
     try {
-      const result = await okxRequest('GET', '/api/v5/account/balance', null, credentials);
+      const result = await okxRequest('GET', '/api/v5/account/balance', null, creds);
       const details = result.data?.[0]?.details || [];
 
       return res.status(200).json({
