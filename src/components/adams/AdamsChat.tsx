@@ -3067,6 +3067,30 @@ export function AdamsChat() {
                   </div>
                 </div>
 
+                {/* Action Chips for Morning Briefing / Welcome Message */}
+                {latestAdvisor.id === 'welcome' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 }}
+                    className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start"
+                  >
+                    {[
+                      { label: 'Debatir BTC', action: 'Debatir BTC', icon: '⚡' },
+                      { label: 'Escanear Mercado', action: 'Escanear Mercado', icon: '🔍' },
+                      { label: 'Mi Balance', action: 'Mi Balance', icon: '💼' }
+                    ].map(chip => (
+                      <button
+                        key={chip.label}
+                        onClick={() => sendMessage(chip.action)}
+                        className="px-3.5 py-1.5 text-[10px] font-mono border border-green-500/30 text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-full transition-all active:scale-[0.98] flex items-center gap-1.5"
+                      >
+                        <span>{chip.icon}</span> {chip.label}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+
                 {/* Technical Analysis Chart — appears with candles, SMA, S/R */}
                 {latestAdvisor.technicalAnalysis && (
                   <div className="mt-3">
@@ -3260,14 +3284,16 @@ export function AdamsChat() {
       <div className="flex-shrink-0 border-t border-white/[0.04]" style={{ background: '#080808', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {canChat ? (
           <>
-            {/* Guest badge — shows remaining free messages */}
+            {/* Guest badge — shows remaining free messages (Clean Glass Style) */}
             {isGuest && (
-              <div className="max-w-4xl mx-auto px-4 py-1">
-                <span className="text-[9px] font-mono text-amber-400/50">
-                  {lang === 'es'
-                    ? `${GUEST_MAX_MESSAGES - guestMessageCount} mensaje${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'} gratis restante${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'}`
-                    : `${GUEST_MAX_MESSAGES - guestMessageCount} free message${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'} remaining`}
-                </span>
+              <div className="max-w-4xl mx-auto px-4 py-2 flex justify-end">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 backdrop-blur-md shadow-[0_0_15px_rgba(245,158,11,0.05)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-[9px] font-mono font-bold text-amber-400/90 tracking-wide uppercase">
+                    {lang === 'es' ? 'GUEST PASS • ' : 'GUEST PASS • '} 
+                    {GUEST_MAX_MESSAGES - guestMessageCount} {lang === 'es' ? 'RESTANTES' : 'LEFT'}
+                  </span>
+                </div>
               </div>
             )}
             <div className="max-w-4xl mx-auto px-2 sm:px-4 pt-1.5 sm:pt-2 pb-0.5 sm:pb-1">
