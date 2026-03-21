@@ -194,8 +194,13 @@ function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 'trendi
   // contains words like "análisis" or token names.
   const isOpinionQuestion = /\b(opin|piens|crees|think|deberi|should|recomiend|recommend|tell me|dime|explica|explain|por ?qu[eé]|why|como ves|how do you see|que onda|what.?s your|cual es tu|an[aá]lisis|analysis|outlook|perspectiv|pronos|predict|forecast|va a (subir|bajar)|will .* (go|rise|fall|drop|pump|dump)|esta semana|this week|este mes|this month|próxim[oa]|next|futuro|future|qué har[ií]as|what would you|cómo est[aá]|how.?s the|sentiment|sentimiento|mercado va|market going|afectar[aá]?|impact|affect|benefici|perjudic|compar[ae]|versus|vs\.?|entre|between|conviene|mejor|worse|better|riesg|risk|oportunid|opportunity|estrategi|strategy|jugada|play|movida|move)\b/i.test(l);
 
-  // Also route to chat if stocks are detected (any stock question needs Bobby's brain)
-  if ((isOpinionQuestion && wordCount > 3) || (detectStocks(text).length > 0 && wordCount > 2)) return 'chat';
+  // Stocks detected: short = price card, long = Bobby's brain
+  const detectedStocks = detectStocks(text);
+  if (detectedStocks.length > 0) {
+    return wordCount <= 2 ? 'chat' : 'chat'; // Always route stocks to Bobby (needs Yahoo Finance context)
+  }
+  // Opinion questions with enough context
+  if (isOpinionQuestion && wordCount > 3) return 'chat';
 
   // RULE 2: Short, direct commands → specific handlers
   if (/\b(pric|precio|coti|cuanto|how much|what.?s .* at|dame .* precio)\b/i.test(l) && wordCount <= 5) return 'price';
