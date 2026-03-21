@@ -177,63 +177,69 @@ async function saveInterestTags(wallet: string, tokens: string[], context: strin
   }
 }
 
-function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 'trending' | 'prices_all' | 'help' | 'chat' | 'greeting' | 'ambiguous' {
+// ============================================================
+// SEMANTIC ROUTER — Codex-designed intent matrix
+// Order matters: cheaper intents evaluated BEFORE expensive ones
+// price/chart/market_data MUST win before trade_chat to save tokens
+// ============================================================
+type Intent = 'greeting' | 'identity' | 'portfolio' | 'price' | 'chart' | 'market_data' | 'analyze' | 'chat' | 'onboarding' | 'safety' | 'follow_up' | 'help' | 'prices_all' | 'trending' | 'ambiguous';
+
+function detectIntent(text: string): Intent {
   const l = text.toLowerCase().trim();
   const wordCount = l.split(/\s+/).length;
+  const hasTokens = detectTokens(text).length > 0;
+  const hasStocks = detectStocks(text).length > 0;
+  const hasAsset = hasTokens || hasStocks;
 
-  // RULE 0: Casual greetings & small talk → quick response, no analysis, ZERO tokens
-  if (wordCount <= 4 && /^(hola|hey|hi|hello|sup|yo|buenas?|buenos? [dnt]|good (morning|evening|night)|what.?s up|que tal|qu[ée] onda|saludos|gracias|thanks|thank you|de nada|adiós|bye|chao|ok|okay|cool|nice|genial|perfecto|vale|orale|ya)\b/i.test(l)) return 'greeting';
+  // 1. GREETING — 0 tokens
+  if (wordCount <= 4 && /^(hola|hey|hi|hello|sup|yo|buenas?|buenos? [dnt]|good (morning|evening|night)|what.?s up|que tal|qu[ée] onda|saludos|gracias|thanks|thank you|de nada|adi[oó]s|bye|chao|ok|okay|cool|nice|genial|perfecto|vale|[oó]rale|ya)\b/i.test(l)) return 'greeting';
 
-  // RULE 0b: Identity questions → quick response, ZERO tokens
-  if (/^(qui[eé]n eres|who are you|what are you|qu[eé] eres|qu[eé] haces|what do you do|c[oó]mo te llamas|what.?s your name)\b/i.test(l)) return 'greeting';
+  // 2. IDENTITY — 0 tokens
+  if (/\b(qui[eé]n eres|who are you|what are you|qu[eé] eres|qu[eé] haces|what do you do|c[oó]mo te llamas|what.?s your name)\b/i.test(l)) return 'identity';
 
-  // RULE 1: Opinion / analysis / outlook questions → ALWAYS Bobby's brain (chat)
-  // This catches: "¿Cuál es tu análisis del oro esta semana?", "What do you think about BTC?",
-  // "¿Crees que el mercado va a subir?", "How do you see ETH this week?"
-  // Key: if the sentence is a QUESTION with opinion markers, it's always chat — even if it
-  // contains words like "análisis" or token names.
-  const isOpinionQuestion = /\b(opin|piens|crees|think|deberi|should|recomiend|recommend|tell me|dime|explica|explain|por ?qu[eé]|why|como ves|how do you see|que onda|what.?s your|cual es tu|an[aá]lisis|analysis|outlook|perspectiv|pronos|predict|forecast|va a (subir|bajar)|will .* (go|rise|fall|drop|pump|dump)|esta semana|this week|este mes|this month|próxim[oa]|next|futuro|future|qué har[ií]as|what would you|cómo est[aá]|how.?s the|sentiment|sentimiento|mercado va|market going|afectar[aá]?|impact|affect|benefici|perjudic|compar[ae]|versus|vs\.?|entre|between|conviene|mejor|worse|better|riesg|risk|oportunid|opportunity|estrategi|strategy|jugada|play|movida|move)\b/i.test(l);
+  // 3. PORTFOLIO — direct data, no LLM
+  if (/\b(portfolio|position|posicion|balance|cartera|wallet|mis posiciones|my positions|cu[aá]nto tengo|how much do i have|mi cuenta|my account|disponible|available|saldo)\b/i.test(l)) return 'portfolio';
 
-  // Stocks detected: short = price card, long = Bobby's brain
-  const detectedStocks = detectStocks(text);
-  if (detectedStocks.length > 0) {
-    return wordCount <= 2 ? 'chat' : 'chat'; // Always route stocks to Bobby (needs Yahoo Finance context)
-  }
-  // Opinion questions with enough context
-  if (isOpinionQuestion && wordCount > 3) return 'chat';
+  // 4. PRICE — direct data, no LLM (short asset queries)
+  if (hasAsset && wordCount <= 2) return 'price';
+  if (/\b(preci|price|coti|cu[aá]nto vale|how much is|what.?s .* at|dame .* precio|quote)\b/i.test(l) && wordCount <= 6) return 'price';
 
-  // RULE 2: Short, direct commands → specific handlers
-  if (/\b(pric|precio|coti|cuanto|how much|what.?s .* at|dame .* precio)\b/i.test(l) && wordCount <= 5) return 'price';
+  // 5. CHART — visual TA, no LLM needed
+  if (/\b(chart|gr[aá]fico|vela|candle|RSI|MACD|SMA|soporte|resistencia|support|resistance|t[eé]cnico|technical)\b/i.test(l)) return 'chart';
 
-  // "Analyze Market" or "Run scan" — explicit full-cycle command (short, imperative)
-  if (/\b(analyz|analiz|scan|escan|run|ejecut)\b/i.test(l) && wordCount <= 4) return 'analyze';
+  // 6. MARKET_DATA — funding, OI, sentiment, whales — data handler, not LLM
+  if (/\b(funding|open interest|OI|fear.?and.?greed|FGI|whale|ballena|polymarket|smart money|probabilidad|odds|sentimiento|sentiment)\b/i.test(l)) return 'market_data';
 
-  if (/\b(portfolio|position|posicion|balance|cartera|wallet)\b/i.test(l)) return 'portfolio';
-  if (/\b(trend|trending|hot|popular|whats up|que hay)\b/i.test(l) && wordCount <= 5) return 'trending';
+  // 7. ANALYZE — explicit full scan/debate command
+  if (/\b(analyz|analiz|scan|escan|run|ejecut|debate completo|full debate)\b/i.test(l) && wordCount <= 6) return 'analyze';
+
+  // 8. PRICES_ALL — all prices overview
   if (/\b(prices|precios|all|todos|overview|resumen)\b/i.test(l) && wordCount <= 4) return 'prices_all';
-  if (/\b(help|ayuda|command)\b/i.test(l)) return 'help';
 
-  // RULE 3: Token mentioned in a longer sentence → Bobby's brain analyzes it
-  // Short inputs like "BTC" or "ETH SOL" → price card; anything longer → Bobby thinks
-  if (detectTokens(text).length > 0) {
-    return wordCount <= 2 ? 'price' : 'chat';
-  }
+  // 9. TRENDING
+  if (/\b(trend|trending|hot|popular|whats up|que hay|movers)\b/i.test(l) && wordCount <= 5) return 'trending';
 
-  // POSITIVE TRIGGERS: only these go to Bobby's brain (Claude tokens)
-  // Vibe/macro intent — user giving market narrative
-  if (/\b(fed|tasas|rates|inflaci|recession|recesi|bull ?run|bear|crash|guerra|war|tariff|arancel|dxy|d[oó]lar|dollar|macro|geopolit|elecciones|election|risk.?on|risk.?off|panic|eufori|miedo|fear|greed)\b/i.test(l)) return 'chat';
+  // 10. ONBOARDING — beginner questions, NEVER ambiguous
+  if (/\b(tengo.*d[oó]lares|qu[eé] hago con|what should i|where do i start|c[oó]mo empiezo|how do i start|principiante|beginner|primer.*vez|first time|soy nuevo|i.?m new|por d[oó]nde empiezo)\b/i.test(l)) return 'onboarding';
 
-  // Trade intent without specific ticker
-  if (/\b(trade|trad(e|ing|ear)|operar|invertir|invest|apalanca|leverag|margin|posici[oó]n|position)\b/i.test(l)) return 'chat';
+  // 11. SAFETY — scam/risk/honeypot questions
+  if (/\b(seguro|safe|scam|honeypot|rug|fraude|fraud|riesgo|risk|es confiable|is it legit|puedo confiar|can i trust)\b/i.test(l)) return 'safety';
 
-  // Onboarding/beginner questions that need Bobby's brain
-  if (/\b(tengo.*d[oó]lares|qu[eé] hago|what should i|where do i start|es seguro|is it safe|c[oó]mo empiezo|how do i start|principiante|beginner|primer.*vez|first time)\b/i.test(l)) return 'chat';
+  // 12. TRADE_CHAT — opinion, thesis, comparison (requires LLM)
+  if (hasAsset && wordCount > 2) return 'chat';
+  if (/\b(opin|piens|crees|think|deberi|should|recomiend|recommend|conviene|mejor|better|worse|vs\.?|versus|entre|between|como ves|how do you see|qu[eé] har[ií]as|what would you|estrategi|strategy|jugada|play)\b/i.test(l)) return 'chat';
+  if (/\b(long|short|comprar?|vender?|buy|sell|trade|trad(e|ing|ear)|operar|invertir|invest|apalanca|leverag)\b/i.test(l)) return 'chat';
 
-  // FOLLOW-UP detection: short messages that reference a prior conversation
-  // "why?", "y el stop?", "profundiza", "explain more", "and the target?"
-  if (wordCount <= 5 && /\b(why|por ?qu[eé]|explain|explica|profundiz|more|m[aá]s|y el|and the|pero|but|how|c[oó]mo|cu[aá]ndo|when|stop|target|entry|riesgo|risk)\b/i.test(l)) return 'chat';
+  // 13. VIBE/MACRO — market narrative
+  if (/\b(fed|tasas|rates|inflaci|recession|recesi|bull ?run|bear|crash|guerra|war|tariff|arancel|dxy|d[oó]lar|dollar|macro|geopolit|elecciones|election|risk.?on|risk.?off|panic|eufori|miedo|greed)\b/i.test(l)) return 'chat';
 
-  // Default: ambiguous — show menu instead of burning tokens
+  // 14. FOLLOW-UP — contextual continuation
+  if (wordCount <= 5 && /\b(why|por ?qu[eé]|explain|explica|profundiz|more|m[aá]s|y el|and the|pero|but|how|c[oó]mo|cu[aá]ndo|when|stop|target|entry)\b/i.test(l)) return 'follow_up';
+
+  // 15. HELP
+  if (/\b(help|ayuda|command|qu[eé] puedo|what can)\b/i.test(l)) return 'help';
+
+  // DEFAULT: ambiguous — show menu, NEVER burn tokens
   return 'ambiguous';
 }
 
@@ -1675,6 +1681,60 @@ export function AdamsChat() {
       setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true }]);
       speakIfEnabled(reply);
       return;
+    }
+
+    // ========================
+    // IDENTITY — who is Bobby, ZERO tokens
+    // ========================
+    if (intent === 'identity') {
+      const reply = lang === 'es'
+        ? 'Soy Bobby — un CIO de IA con metacognición. Tres agentes debaten cada decisión antes de que yo hable: Alpha Hunter busca oportunidades, Red Team intenta destruirlas, y yo decido. 15 fuentes de datos. Cada trade se registra on-chain. Dame un ticker o un vibe.'
+        : 'I\'m Bobby — an AI CIO with metacognition. Three agents debate every decision before I speak: Alpha Hunter finds opportunities, Red Team tries to destroy them, and I decide. 15 data sources. Every trade recorded on-chain. Give me a ticker or a vibe.';
+      setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true }]);
+      speakIfEnabled(reply);
+      return;
+    }
+
+    // ========================
+    // ONBOARDING — beginner questions, Bobby's brain but guided
+    // ========================
+    if (intent === 'onboarding') {
+      // Route to chat — Bobby handles beginners with full context
+      // (falls through to the chat handler below)
+    }
+
+    // ========================
+    // SAFETY — scam/risk questions
+    // ========================
+    if (intent === 'safety' && !hasTokens && !hasStocks) {
+      // No specific asset — guide the user
+      const reply = lang === 'es'
+        ? 'Depende del activo. Mándame un ticker o un contrato y te digo si lo tocaría. También puedo escanear tokens por honeypots y rug pulls.'
+        : 'Depends on the asset. Give me a ticker or contract and I\'ll tell you if I\'d touch it. I can also scan tokens for honeypots and rug pulls.';
+      setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true }]);
+      speakIfEnabled(reply);
+      return;
+    }
+
+    // ========================
+    // CHART — visual TA (route to chat with chart flag)
+    // ========================
+    if (intent === 'chart') {
+      // Falls through to chat handler — the response will include technicalAnalysis
+    }
+
+    // ========================
+    // MARKET_DATA — funding, OI, sentiment (data handler, cheaper than full LLM)
+    // ========================
+    if (intent === 'market_data') {
+      // Falls through to chat handler for now — future: direct data endpoint
+    }
+
+    // ========================
+    // FOLLOW_UP — contextual continuation
+    // ========================
+    if (intent === 'follow_up') {
+      // Falls through to chat handler with conversation context
     }
 
     // ========================
