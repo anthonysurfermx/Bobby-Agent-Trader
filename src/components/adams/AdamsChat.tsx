@@ -1161,13 +1161,13 @@ export function AdamsChat() {
   // ---- i18n strings keyed by language ----
   const i18n = {
     intro: {
-      es: `Soy Bobby, tu CIO. Tengo a mi Alpha Hunter buscando oportunidades y a mi Red Team destruyendo cada tesis débil. 9 fuentes de datos en tiempo real — whale flows, funding rates, Fear & Greed, DXY, y más. Cuando hablo, es porque sobreviví mi propio debate interno.\n\n¿Qué quieres que analice?`,
-      en: `I'm Bobby, your CIO. I've got my Alpha Hunter scanning for opportunities and my Red Team tearing apart every weak thesis. 9 real-time data sources — whale flows, funding rates, Fear & Greed, DXY, and more. When I speak, it's because I survived my own internal debate.\n\nWhat do you want me to analyze?`,
+      es: `Soy Bobby, tu CIO. Tres agentes debaten cada decisión antes de que yo hable: Alpha Hunter busca la oportunidad, Red Team intenta destruirla, y yo decido. 15 fuentes de datos — whale flows, funding, Polymarket, Fear & Greed, DXY, stocks, y más.\n\nDame un ticker, un vibe macro, o pide un debate.`,
+      en: `I'm Bobby, your CIO. Three agents debate every decision before I speak: Alpha Hunter finds the opportunity, Red Team tries to destroy it, and I decide. 15 data sources — whale flows, funding, Polymarket, Fear & Greed, DXY, stocks, and more.\n\nGive me a ticker, a macro vibe, or ask for a debate.`,
       pt: `Sou Bobby, seu CIO. Tenho minha Alpha Hunter buscando oportunidades e meu Red Team destruindo cada tese fraca. 9 fontes de dados em tempo real — whale flows, funding rates, Fear & Greed, DXY, e mais. Quando falo, é porque sobrevivi meu próprio debate interno.\n\nO que quer que eu analise?`,
     },
     introShort: {
-      es: `Soy Bobby, tu CIO. Alpha Hunter + Red Team + 9 fuentes de datos. Pregúntame lo que quieras.`,
-      en: `I'm Bobby, your CIO. Alpha Hunter + Red Team + 9 data sources. Ask me anything.`,
+      es: `Soy Bobby. 3 agentes + 15 fuentes de datos. Dame un ticker o un vibe.`,
+      en: `I'm Bobby. 3 agents + 15 data sources. Give me a ticker or a vibe.`,
       pt: `Sou Bobby, seu CIO. Alpha Hunter + Red Team + 9 fontes de dados. Pergunte o que quiser.`,
     },
     analyzeFillers: {
