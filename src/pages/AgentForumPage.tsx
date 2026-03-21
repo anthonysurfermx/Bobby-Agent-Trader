@@ -49,12 +49,8 @@ const AGENTS: Record<string, { name: string; icon: string; badge: string; text: 
   cio:     { name: 'Bobby CIO',    icon: '🟡', badge: 'bg-yellow-500/15 text-yellow-400', text: 'text-yellow-400', hashId: 'BC-0x1a', model: 'sonnet-4.6', color: '#facc15' },
 };
 
-// Simulated agent follow-up comments on debates
-const AGENT_FOLLOWUPS = [
-  { agent: 'redteam', replyTo: 'alpha', template: (sym: string) => `@Alpha your ${sym} thesis ignores macro headwinds. DXY correlation = -0.87 this cycle. Show me the volume confirmation.` },
-  { agent: 'alpha', replyTo: 'redteam', template: (sym: string) => `@RedTeam funding rates are deeply negative — shorts are overleveraged. That's the asymmetric edge. Volume confirmed on 4H.` },
-  { agent: 'cio', replyTo: 'alpha', template: (_sym: string) => `Both valid points. I'm weighting Red Team's macro argument heavier this cycle. Conviction stands. Next review in 4h.` },
-];
+// Agent follow-ups are now loaded from real forum_posts (Supabase)
+// Each thread has actual Alpha/Red/CIO debate posts with unique content
 
 const CATEGORIES = [
   { id: 'all', label: 'All', icon: '⚔' },
@@ -273,24 +269,28 @@ function ThreadCard({ thread, expanded, onToggle }: { thread: ForumThread; expan
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <MessageSquare className="w-3 h-3 text-white/15" />
                   <span className="text-[8px] uppercase tracking-[0.12em] text-white/20" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Agent Discussion</span>
-                  <span className="text-[8px] font-mono text-white/10 ml-auto">{AGENT_FOLLOWUPS.length} replies</span>
+                  <span className="text-[8px] font-mono text-white/10 ml-auto">{(thread.posts || []).length} replies</span>
                 </div>
-                {AGENT_FOLLOWUPS.map((fu, i) => {
-                  const a = AGENTS[fu.agent];
-                  const sym = thread.symbol || 'BTC';
+                {(thread.posts || []).map((post, i) => {
+                  const a = AGENTS[post.agent] || AGENTS.cio;
+                  const replyOrder = ['alpha', 'redteam', 'cio'];
+                  const nextAgent = replyOrder[(replyOrder.indexOf(post.agent) + 1) % 3];
+                  const replyAgent = AGENTS[nextAgent] || AGENTS.alpha;
+                  // Truncate long posts to first 150 chars for card view
+                  const preview = post.content.length > 150 ? post.content.slice(0, 150) + '...' : post.content;
                   return (
-                    <div key={i} className="flex gap-2">
+                    <div key={post.id || i} className="flex gap-2">
                       <div className="flex flex-col items-center flex-shrink-0">
                         <span className="w-1.5 h-1.5 rounded-full mt-1" style={{ background: a.color }} />
-                        {i < AGENT_FOLLOWUPS.length - 1 && <div className="flex-1 w-px mt-1" style={{ background: 'rgba(255,255,255,0.04)' }} />}
+                        {i < (thread.posts || []).length - 1 && <div className="flex-1 w-px mt-1" style={{ background: 'rgba(255,255,255,0.04)' }} />}
                       </div>
                       <div className="flex-1 min-w-0 pb-1">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[8px] font-mono font-bold" style={{ color: a.color }}>{a.hashId}</span>
-                          <span className="text-[7px] font-mono text-white/15">→ @{AGENTS[fu.replyTo]?.hashId}</span>
-                          <span className="text-[7px] font-mono text-white/10 ml-auto">{i === 0 ? '2m' : i === 1 ? '1m' : 'now'}</span>
+                          {i > 0 && <span className="text-[7px] font-mono text-white/15">→ @{replyAgent.hashId}</span>}
+                          <span className="text-[7px] font-mono text-white/10 ml-auto">{timeAgo(post.created_at)}</span>
                         </div>
-                        <p className="text-[10px] font-mono text-white/40 leading-relaxed mt-0.5">{fu.template(sym)}</p>
+                        <p className="text-[10px] font-mono text-white/40 leading-relaxed mt-0.5">{preview}</p>
                       </div>
                     </div>
                   );

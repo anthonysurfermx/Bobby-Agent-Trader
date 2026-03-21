@@ -25,14 +25,31 @@ interface PendingThread {
 }
 
 async function getCurrentPrice(symbol: string): Promise<number | null> {
+  // Try multiple formats — stocks use SWAP, crypto uses spot
+  const candidates = [
+    `${symbol}-USDT`,
+    `${symbol}-USDT-SWAP`,
+  ];
+  for (const instId of candidates) {
+    try {
+      const res = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`);
+      if (!res.ok) continue;
+      const json = await res.json() as { code: string; data: Array<{ last: string }> };
+      if (json.code !== '0' || !json.data?.[0]) continue;
+      const price = parseFloat(json.data[0].last);
+      if (price > 0) return price;
+    } catch { continue; }
+  }
+  // Fallback: try Yahoo Finance for stocks
   try {
-    const instId = `${symbol}-USDT`;
-    const res = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`);
-    if (!res.ok) return null;
-    const json = await res.json() as { code: string; data: Array<{ last: string }> };
-    if (json.code !== '0' || !json.data?.[0]) return null;
-    return parseFloat(json.data[0].last);
-  } catch { return null; }
+    const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`);
+    if (res.ok) {
+      const data = await res.json();
+      const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if (price && price > 0) return price;
+    }
+  } catch { /* silent */ }
+  return null;
 }
 
 async function updateThread(id: string, update: Record<string, unknown>): Promise<boolean> {
