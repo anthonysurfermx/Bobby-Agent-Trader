@@ -1695,37 +1695,7 @@ export function AdamsChat() {
     }
 
     // ========================
-    // BALANCE QUERY — "cuál es mi balance" / "how much do I have"
-    // ========================
-    const isBalanceQuery = /balance|saldo|cuánto tengo|how much|mi cuenta|my account|disponible|available/i.test(msg);
-    if (isBalanceQuery) {
-      setIsProcessing(true);
-      try {
-        const pnlRes = await fetch('/api/bobby-pnl');
-        const pnlData = await pnlRes.json();
-        if (pnlData.ok) {
-          const s = pnlData.summary;
-          const positions = pnlData.openPositions || [];
-          const modeLabel = tradingMode === 'auto' ? 'AI Execution' : tradingMode === 'confirm' ? 'Human Confirms' : 'Paper Trading';
-          let balanceText = lang === 'es'
-            ? `**Equity:** $${s.currentEquity.toFixed(2)} USDT\n**Modo:** ${modeLabel}\n**Retorno:** ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n**Win rate:** ${s.winRate}% (${s.wins}W / ${s.losses}L)`
-            : `**Equity:** $${s.currentEquity.toFixed(2)} USDT\n**Mode:** ${modeLabel}\n**Return:** ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n**Win rate:** ${s.winRate}% (${s.wins}W / ${s.losses}L)`;
-          if (positions.length > 0) {
-            balanceText += lang === 'es' ? '\n\n**Posiciones abiertas:**' : '\n\n**Open positions:**';
-            for (const p of positions) {
-              balanceText += `\n${p.symbol} ${p.direction.toUpperCase()} ${p.leverage} — PnL: $${p.unrealizedPnl.toFixed(4)} (${p.unrealizedPnlPct.toFixed(2)}%)`;
-            }
-          } else {
-            balanceText += lang === 'es' ? '\n\nSin posiciones abiertas.' : '\n\nNo open positions.';
-          }
-          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: balanceText, timestamp: Date.now() }]);
-        } else {
-          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude conectar con tu cuenta de OKX. Verifica la configuración.' : 'Could not connect to your OKX account. Check configuration.', timestamp: Date.now() }]);
-        }
-      } catch { setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: 'Error fetching balance', timestamp: Date.now() }]); }
-      setIsProcessing(false);
-      return;
-    }
+    // BALANCE QUERY — now handled by 'portfolio' intent above (semantic router catches it)
 
     // ========================
     // PRICE QUERY — specific token(s) (short direct commands only)
@@ -1822,18 +1792,53 @@ export function AdamsChat() {
     // PORTFOLIO
     // ========================
     if (intent === 'portfolio') {
-      if (!address) {
-        setMessages(prev => [...prev, {
-          id: uid(), role: 'advisor', timestamp: Date.now(),
-          text: t('connectWallet') as string,
-        }]);
-      } else {
-        const walletFn = t('walletConnected') as (addr: string) => string;
-        setMessages(prev => [...prev, {
-          id: uid(), role: 'advisor', timestamp: Date.now(),
-          text: walletFn(`${address.slice(0, 6)}...${address.slice(-4)}`),
-        }]);
+      setIsProcessing(true);
+      try {
+        const pnlRes = await fetch('/api/bobby-pnl');
+        const pnl = await pnlRes.json();
+        if (pnl.ok) {
+          const s = pnl.summary;
+          const positions = pnl.openPositions || [];
+          const closed = (pnl.closedPositions || []).slice(0, 5);
+
+          let text = `**PERFORMANCE_ANALYTICS**\n\n`;
+          text += `TOTAL_RETURN: ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n`;
+          text += `EQUITY: $${s.currentEquity.toFixed(2)} USDT\n`;
+          text += `WIN_RATE: ${s.winRate.toFixed(0)}% (${s.wins}W / ${s.losses}L)\n`;
+          text += `TRADES: ${s.totalTrades}\n`;
+
+          if (positions.length > 0) {
+            text += `\n**ACTIVE_SIGNALS:**\n`;
+            for (const p of positions) {
+              text += `${p.direction.toUpperCase()} ${p.symbol} ${p.leverage} — PnL: ${p.unrealizedPnl >= 0 ? '+' : ''}$${p.unrealizedPnl.toFixed(2)} (${p.unrealizedPnlPct.toFixed(1)}%)\n`;
+            }
+          } else {
+            text += `\nNo open positions. Bobby is fully cash.`;
+          }
+
+          if (closed.length > 0) {
+            text += `\n\n**EXECUTION_LEDGER (last ${closed.length}):**\n`;
+            for (const c of closed) {
+              const time = new Date(c.closeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              text += `${time} ${c.symbol} ${c.direction.toUpperCase()} → ${c.result} (${c.pnlPct >= 0 ? '+' : ''}${c.pnlPct.toFixed(1)}%)\n`;
+            }
+          }
+
+          if (address) {
+            text += `\n_Wallet: ${address.slice(0, 6)}...${address.slice(-4)}_`;
+          }
+
+          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text, timestamp: Date.now(), isLive: true }]);
+          speakIfEnabled(lang === 'es'
+            ? `Tu equity es ${s.currentEquity.toFixed(2)} dólares. Win rate ${s.winRate.toFixed(0)} por ciento. ${positions.length} posiciones abiertas.`
+            : `Your equity is ${s.currentEquity.toFixed(2)} dollars. Win rate ${s.winRate.toFixed(0)} percent. ${positions.length} open positions.`);
+        } else {
+          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude conectar con OKX.' : 'Could not connect to OKX.', timestamp: Date.now() }]);
+        }
+      } catch {
+        setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: 'Error fetching performance data.', timestamp: Date.now() }]);
       }
+      setIsProcessing(false);
       return;
     }
 
