@@ -71,10 +71,14 @@ async function callClaude(model: string, system: string, userMsg: string, maxTok
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
   const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://defi-mexico-hub.vercel.app';
+  const internalAuth = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
   try {
     const res = await fetch(`${host}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(internalAuth ? { 'x-internal-secret': internalAuth } : {}),
+      },
       body: JSON.stringify(body)
     });
     if (res.ok) return await res.json();
@@ -217,6 +221,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       getTrackRecord(),
     ]);
 
+    const testState = body.testState as {
+      balanceOverride?: number;
+      availableBalanceOverride?: number;
+      positionsOverride?: Array<Record<string, unknown>>;
+    } | undefined;
+    const useTestState = challengeMode === 'paper' && !!testState;
+    const effectivePositions = useTestState && Array.isArray(testState?.positionsOverride)
+      ? testState.positionsOverride
+      : positions;
+    const overriddenBalance = useTestState && typeof testState?.balanceOverride === 'number'
+      ? testState.balanceOverride
+      : null;
+    const overriddenAvailableBalance = useTestState && typeof testState?.availableBalanceOverride === 'number'
+      ? testState.availableBalanceOverride
+      : overriddenBalance;
+
     if (!intel?.briefing) {
       return res.status(503).json({ error: 'Could not fetch market data' });
     }
@@ -263,8 +283,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       track.winRate < 60 ? '\nWARNING: Accuracy below 60%. Be extra cautious.' : ''
     }`;
 
-    const positionsBlock = positions.length > 0
-      ? `\nOPEN POSITIONS:\n${positions.map((p: any) =>
+    const positionsBlock = effectivePositions.length > 0
+      ? `\nOPEN POSITIONS:\n${effectivePositions.map((p: any) =>
           `${p.symbol} ${p.direction?.toUpperCase()} ${p.leverage} | PnL: ${p.unrealizedPnl >= 0 ? '+' : ''}$${p.unrealizedPnl?.toFixed(2)} (${p.unrealizedPnlPct?.toFixed(1)}%)`
         ).join('\n')}`
       : '\nNO OPEN POSITIONS — Bobby is fully cash. Free to recommend fresh setups.';
@@ -323,6 +343,7 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
     let stopPrice: number | null = null;
     let targetPrice: number | null = null;
     let cioSaysExecute = false; // CRITICAL: only execute if CIO explicitly says so
+    let structuredVerdictRejectReason: string | null = null;
 
     const verdictMatch = cioPost.match(/VERDICT:\s*(\{[^}]+\})/);
     if (verdictMatch) {
@@ -337,9 +358,17 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
         // execute:true requires ALL fields to be present in JSON — no regex backfill
         if (v.execute === true && symbol && direction && conviction !== null && stopPrice) {
           cioSaysExecute = true;
+        } else if (v.execute === true) {
+          const missing: string[] = [];
+          if (!symbol) missing.push('symbol');
+          if (!direction) missing.push('direction');
+          if (conviction === null) missing.push('conviction');
+          if (!stopPrice) missing.push('stop');
+          structuredVerdictRejectReason = `Structured VERDICT invalid for execution: missing ${missing.join(', ')}`;
         }
       } catch (e) {
         console.warn('[Cycle] Failed to parse CIO VERDICT JSON:', e);
+        structuredVerdictRejectReason = 'Structured VERDICT JSON parse failed';
       }
     }
 
@@ -411,19 +440,33 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
     let tradeRejectedReason: string | null = null;
     let txHash: string | null = null;
     let finalBalanceStr: string | null = null;
+    let effectiveBalanceForExecution: number | null = overriddenBalance;
 
     // Always fetch balance from the selected execution venue (live or paper)
-    try {
-      const balCheck = await fetchLocalApi('/api/okx-perps', { action: 'balance', params: { mode: okxMode } });
-      if (balCheck.ok) finalBalanceStr = String(balCheck.totalEquity || '???');
-    } catch { /* non-blocking */ }
+    if (overriddenBalance !== null) {
+      finalBalanceStr = String(overriddenBalance);
+    } else {
+      try {
+        const balCheck = await fetchLocalApi('/api/okx-perps', { action: 'balance', params: { mode: okxMode } });
+        if (balCheck.ok) {
+          finalBalanceStr = String(balCheck.totalEquity || '???');
+          effectiveBalanceForExecution = balCheck.totalEquity || null;
+        }
+      } catch { /* non-blocking */ }
+    }
 
     if (!isDryRun && cioSaysExecute && symbol && direction && conviction !== null && conviction >= 0.6) {
       try {
         const currentPrice = intel.prices?.find((p: any) => p.symbol === symbol)?.price || entryPrice;
         
         // 1. Fetch balance via OKX Perps API
-        const balRes = await fetchLocalApi('/api/okx-perps', { action: 'balance', params: { mode: okxMode } });
+        const balRes = overriddenBalance !== null
+          ? {
+              ok: true,
+              totalEquity: overriddenBalance,
+              availableBalance: overriddenAvailableBalance ?? overriddenBalance,
+            }
+          : await fetchLocalApi('/api/okx-perps', { action: 'balance', params: { mode: okxMode } });
         
         if (balRes.ok) {
           const totalEq = balRes.totalEquity || 100;
@@ -445,13 +488,13 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
             };
 
             // 2. Risk Manager Validation
-            const riskValidation = canOpenPosition(tradeParams, balanceObj, conviction, positions.length, currentPrice);
+            const riskValidation = canOpenPosition(tradeParams, balanceObj, conviction, effectivePositions.length, currentPrice);
 
             if (riskValidation.valid) {
               // 3. Execute Trade on OKX
               const openRes = await fetchLocalApi('/api/okx-perps', {
                 action: 'open_position',
-                params: { symbol, direction, leverage, amount: positionSizeUsd, conviction, mode: okxMode, skipOnchainCommit: true },
+                params: { symbol, direction, leverage, amount: positionSizeUsd, conviction, mode: okxMode, skipOnchainCommit: true, internalSecret: cycleSecret },
               }, true);
 
               if (openRes.ok) {
@@ -461,14 +504,14 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
                 if (stopPrice || targetPrice) {
                   tpslResult = await fetchLocalApi('/api/okx-perps', {
                     action: 'set_tpsl',
-                    params: { symbol, direction, stopLoss: stopPrice, takeProfit: targetPrice, mode: okxMode }
+                    params: { symbol, direction, stopLoss: stopPrice, takeProfit: targetPrice, mode: okxMode, internalSecret: cycleSecret }
                   }, true /* noFallback */);
                   // If TP/SL failed and we have a stop, this is dangerous — close position
                   if (!tpslResult?.ok && stopPrice) {
                     console.error('[Cycle] TP/SL FAILED — closing unprotected position');
                     const closeRes = await fetchLocalApi('/api/okx-perps', {
                       action: 'close_position',
-                      params: { symbol, direction, mode: okxMode }
+                      params: { symbol, direction, mode: okxMode, internalSecret: cycleSecret }
                     }, true /* noFallback */);
                     // Verify the close actually worked
                     executionResult = null;
@@ -522,6 +565,8 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
       }
     } else if (conviction !== null && conviction < 0.6) {
       tradeRejectedReason = 'Conviction below 6/10 threshold';
+    } else if (!isDryRun && structuredVerdictRejectReason) {
+      tradeRejectedReason = structuredVerdictRejectReason;
     }
 
     // ============================================================
@@ -556,7 +601,7 @@ CONTEXT:
 - Direction: ${digestDirection}
 - Conviction: ${convNum}/10
 - Market regime: ${intel.regime || 'unknown'}
-- Open positions: ${positions.length > 0 ? positions.map((p: any) => `${p.symbol} ${p.direction} ${p.unrealizedPnlPct?.toFixed(1)}%`).join(', ') : 'none'}
+- Open positions: ${effectivePositions.length > 0 ? effectivePositions.map((p: any) => `${p.symbol} ${p.direction} ${p.unrealizedPnlPct?.toFixed(1)}%`).join(', ') : 'none'}
 - Win rate: ${track.winRate}%
 
 CIO VERDICT:
@@ -590,7 +635,7 @@ ${lang === 'es' ? 'Responde en español mexicano, casual pero inteligente. Como 
       wallet_address: null, // Global digest
       summary: digestSummary,
       highlights: JSON.stringify(highlights),
-      positions_snapshot: positions.length > 0 ? JSON.stringify(positions) : null,
+      positions_snapshot: effectivePositions.length > 0 ? JSON.stringify(effectivePositions) : null,
       market_snapshot: JSON.stringify(marketSnapshot),
       language: lang,
       kind,
@@ -667,7 +712,14 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
       direction: digestDirection,
       highlights,
       summary: digestSummary,
-      positions: positions.length,
+      positions: effectivePositions.length,
+      executed: !!executionResult,
+      tradeRejectedReason,
+      txHash,
+      tpslOk: tpslResult?.ok ?? null,
+      usedTestVerdict: !!useTestVerdict,
+      usedTestState: !!useTestState,
+      effectiveBalance: effectiveBalanceForExecution,
       tweet: tweetText,
       latencyMs: Date.now() - startTime,
     });
