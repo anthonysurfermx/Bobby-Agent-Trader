@@ -55,12 +55,41 @@ async function fetchDBMessages(wallet: string): Promise<DBMessage[]> {
 // ---- Token symbol detection ----
 
 const TOKEN_MAP: Record<string, string> = {
+  // Major crypto
   btc: 'BTC-USDT', bitcoin: 'BTC-USDT',
   eth: 'ETH-USDT', ethereum: 'ETH-USDT', ether: 'ETH-USDT',
   sol: 'SOL-USDT', solana: 'SOL-USDT',
   okb: 'OKB-USDT',
   matic: 'MATIC-USDT', polygon: 'MATIC-USDT',
-  // Commodities — Bobby is a Macro-Sovereign Agent
+  // Top alts (asked by real users + most traded)
+  doge: 'DOGE-USDT', dogecoin: 'DOGE-USDT',
+  xrp: 'XRP-USDT', ripple: 'XRP-USDT',
+  avax: 'AVAX-USDT', avalanche: 'AVAX-USDT',
+  link: 'LINK-USDT', chainlink: 'LINK-USDT',
+  ada: 'ADA-USDT', cardano: 'ADA-USDT',
+  atom: 'ATOM-USDT', cosmos: 'ATOM-USDT',
+  arb: 'ARB-USDT', arbitrum: 'ARB-USDT',
+  op: 'OP-USDT', optimism: 'OP-USDT',
+  uni: 'UNI-USDT', uniswap: 'UNI-USDT',
+  hype: 'HYPE-USDT', hyperliquid: 'HYPE-USDT',
+  dot: 'DOT-USDT', polkadot: 'DOT-USDT',
+  // Tokens asked by our real users
+  ach: 'ACH-USDT', 'alchemy pay': 'ACH-USDT',
+  theta: 'THETA-USDT',
+  // Trending mid-caps (TradingView popular)
+  pepe: 'PEPE-USDT',
+  wif: 'WIF-USDT',
+  ondo: 'ONDO-USDT',
+  tia: 'TIA-USDT', celestia: 'TIA-USDT',
+  sui: 'SUI-USDT',
+  sei: 'SEI-USDT',
+  jup: 'JUP-USDT', jupiter: 'JUP-USDT',
+  inj: 'INJ-USDT', injective: 'INJ-USDT',
+  render: 'RENDER-USDT', rndr: 'RENDER-USDT',
+  fet: 'FET-USDT', 'fetch ai': 'FET-USDT',
+  near: 'NEAR-USDT',
+  apt: 'APT-USDT', aptos: 'APT-USDT',
+  // Commodities
   gold: 'XAUT-USDT', oro: 'XAUT-USDT', xaut: 'XAUT-USDT', xau: 'XAUT-USDT',
   paxg: 'PAXG-USDT', 'pax gold': 'PAXG-USDT',
   silver: 'XAG-USDT-SWAP', plata: 'XAG-USDT-SWAP', xag: 'XAG-USDT-SWAP',
@@ -1762,15 +1791,61 @@ export function AdamsChat() {
         const intel = intelRes.ok ? await intelRes.json() : null;
         if (!intel) throw new Error('intel unavailable');
 
-        const blocks: string[] = [lang === 'es' ? 'Datos de mercado confirmados:' : 'Confirmed market data:'];
-        if (intel.fearGreed) blocks.push(`Fear & Greed: ${intel.fearGreed.value} (${intel.fearGreed.classification})`);
-        if (intel.dxy) blocks.push(`DXY: ${intel.dxy.dxy}`);
-        if (intel.regime) blocks.push(`Regime: ${intel.regime}`);
-        if (intel.briefing) blocks.push(intel.briefing.slice(0, 300));
+        const blocks: string[] = [];
+        const askedAbout = msg.toLowerCase();
 
-        const reply = blocks.join('\n');
+        // Contextual response based on what they asked
+        if (/funding/i.test(askedAbout) && intel.fundingRates) {
+          const header = lang === 'es' ? '**Funding Rates (últimas 8h):**' : '**Funding Rates (last 8h):**';
+          const rates = (intel.fundingRates || []).slice(0, 5).map((f: any) =>
+            `${f.symbol}: ${f.rate > 0 ? '+' : ''}${(f.rate * 100).toFixed(4)}% (${(f.annualized).toFixed(1)}% APR)`
+          ).join('\n');
+          blocks.push(`${header}\n${rates || (lang === 'es' ? 'Sin datos' : 'No data')}`);
+          if (lang === 'es') blocks.push('_Funding negativo = shorts pagando longs. Positivo = longs pagando shorts._');
+          else blocks.push('_Negative funding = shorts paying longs. Positive = longs paying shorts._');
+        }
+
+        if (/fear|greed|miedo|sentimiento/i.test(askedAbout) && intel.fearGreed) {
+          const fgi = intel.fearGreed;
+          blocks.push(`**Fear & Greed Index:** ${fgi.value}/100 — ${fgi.classification}`);
+          if (fgi.value < 25) blocks.push(lang === 'es' ? '_Miedo extremo — históricamente zona de compra contrarian._' : '_Extreme fear — historically a contrarian buy zone._');
+          else if (fgi.value > 75) blocks.push(lang === 'es' ? '_Codicia extrema — cuidado con la euforia._' : '_Extreme greed — watch for euphoria._');
+        }
+
+        if (/polymarket|probabili|odds|elecciones|election/i.test(askedAbout)) {
+          blocks.push(lang === 'es'
+            ? '**Polymarket:** Datos de prediction markets disponibles en el debate completo. Pide "Analyze Market" para que Bobby cruce Polymarket con datos on-chain.'
+            : '**Polymarket:** Prediction market data available in full debate. Ask for "Analyze Market" so Bobby cross-references Polymarket with on-chain data.');
+        }
+
+        if (/whale|ballena|smart money/i.test(askedAbout)) {
+          blocks.push(lang === 'es'
+            ? '**Whale Signals:** Las señales de ballenas están integradas en el análisis completo. Pide "Analyze Market" o "Debate" para verlas.'
+            : '**Whale Signals:** Whale signals are integrated into the full analysis. Ask for "Analyze Market" or "Debate" to see them.');
+        }
+
+        if (/open interest|oi\b/i.test(askedAbout)) {
+          blocks.push(lang === 'es'
+            ? '**Open Interest:** Los datos de OI están integrados en el briefing de Bobby. Para interpretación, pide un debate.'
+            : '**Open Interest:** OI data is integrated into Bobby\'s briefing. For interpretation, ask for a debate.');
+        }
+
+        // Always add regime + FGI + DXY as context footer
+        const footer = [];
+        if (intel.regime) footer.push(`Regime: ${intel.regime}`);
+        if (intel.fearGreed) footer.push(`FGI: ${intel.fearGreed.value} (${intel.fearGreed.classification})`);
+        if (intel.dxy?.dxy) footer.push(`DXY: ${intel.dxy.dxy}`);
+        if (footer.length) blocks.push(`\n_${footer.join(' · ')}_`);
+
+        // Fallback if nothing specific matched
+        if (blocks.length <= 1) {
+          blocks.unshift(lang === 'es' ? 'Datos de mercado confirmados:' : 'Confirmed market data:');
+          if (intel.briefing) blocks.push(intel.briefing.slice(0, 400));
+        }
+
+        const reply = blocks.join('\n\n');
         setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true }]);
-        speakIfEnabled(blocks[0]);
+        speakIfEnabled(blocks[0].replace(/\*\*/g, '').replace(/_/g, ''));
       } catch {
         setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude cargar datos de mercado.' : 'Could not load market data.', timestamp: Date.now() }]);
       }
