@@ -24,6 +24,7 @@ import { ExecutionTimeline } from './ExecutionTimeline';
 import { useBobbyVoice } from '@/hooks/useBobbyVoice';
 import { useAuth } from '@/hooks/useAuth';
 import { clearStoredVibe, getStoredVibe, inferUserVibe, saveStoredVibe, shouldClearStoredVibe } from '@/lib/bobby-vibe';
+import { checkLocalBypass, isTechnicalAnalysisIntent, INTENT_MAPPING } from '@/lib/onchainos/tradingDictionary';
 import { ResponsiveContainer, AreaChart, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 
 // ---- Supabase ----
@@ -266,7 +267,14 @@ function detectIntent(text: string): Intent {
   // 13. VIBE/MACRO — market narrative
   if (/\b(fed|tasas|rates|inflaci|recession|recesi|bull ?run|bear|crash|guerra|war|tariff|arancel|dxy|d[oó]lar|dollar|macro|geopolit|elecciones|election|risk.?on|risk.?off|panic|eufori|miedo|greed)\b/i.test(l)) return 'chat';
 
-  // 14. FOLLOW-UP — contextual continuation (raised word limit + corrections + "profundiza más")
+  // 14. TRADING SLANG — TradingView community language
+  const allSlang = [...INTENT_MAPPING.LONG, ...INTENT_MAPPING.SHORT, ...INTENT_MAPPING.HOLD];
+  if (allSlang.some(s => l.includes(s.toLowerCase()))) return 'chat';
+
+  // 14b. TECHNICAL ANALYSIS JARGON — SMC, order blocks, FVG, etc.
+  if (isTechnicalAnalysisIntent(l)) return 'chart';
+
+  // 15. FOLLOW-UP — contextual continuation (raised word limit + corrections + "profundiza más")
   if (wordCount <= 12 && /\b(why|por ?qu[eé]|explain|explica|profundiz|more|m[aá]s|y el|and the|pero|but|how|c[oó]mo|cu[aá]ndo|when|stop|target|entry|actual price|precio real|mi entrada|my entry|no es|it.?s not|correc)\b/i.test(l)) return 'follow_up';
 
   // 15. HELP
@@ -1672,7 +1680,19 @@ export function AdamsChat() {
     const userMsg: ChatMsg = { id: uid(), role: 'user', text: msg, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
 
-    const intent = detectIntent(msg);
+    // 0-TOKEN LOCAL BYPASS — intercept before burning any tokens
+    const localBypass = checkLocalBypass(msg, lang);
+    if (localBypass) {
+      if (localBypass.action === 'TRIGGER_WALLET_UI') {
+        // Fall through to portfolio handler below
+      } else if (localBypass.text) {
+        setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: localBypass.text, timestamp: Date.now(), isLive: true }]);
+        speakIfEnabled(localBypass.text.replace(/\[.*?\]/g, '').replace(/\*\*/g, ''));
+        return;
+      }
+    }
+
+    const intent = localBypass?.action === 'TRIGGER_WALLET_UI' ? 'portfolio' as Intent : detectIntent(msg);
     const tokens = detectTokens(msg);
     const now = Date.now();
 
@@ -2252,6 +2272,10 @@ export function AdamsChat() {
         enrichedMessage += lang === 'es'
           ? '\n\n[SAFETY_PRIORITY: Evalúa riesgo, scam, honeypot, rug risk. Di explícitamente si NO lo tocarías.]'
           : '\n\n[SAFETY_PRIORITY: Evaluate scam, honeypot, rug risk. State explicitly if you would NOT touch it.]';
+      }
+      // Inject TA jargon context when user speaks Smart Money Concepts language
+      if (isTechnicalAnalysisIntent(msg)) {
+        enrichedMessage += '\n\n[TA_CONTEXT: User is speaking Smart Money Concepts / Technical Analysis language. Respond with chart-level analysis: order blocks, liquidity sweeps, market structure. Do NOT give fundamental/macro analysis unless asked.]';
       }
       let taData: any = null;
       try {
