@@ -323,7 +323,6 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
       target_price: targetPrice,
       expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
       kind,
-      execution_status: 'pending',
     });
     const threadId = thread?.id as string | undefined;
 
@@ -352,6 +351,12 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
     let tradeRejectedReason: string | null = null;
     let txHash: string | null = null;
     let finalBalanceStr: string | null = null;
+
+    // Always fetch balance (for tweet and risk checks)
+    try {
+      const balCheck = await fetchLocalApi('/api/okx-perps', { action: 'balance', params: { mode: 'live' } });
+      if (balCheck.ok) finalBalanceStr = String(balCheck.totalEquity || '???');
+    } catch { /* non-blocking */ }
 
     if (symbol && direction && conviction !== null && conviction >= 0.6) {
       try {
@@ -455,15 +460,18 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
     // PHASE 5: Update thread with execution results
     // ============================================================
     if (threadId) {
-      await fetch(`${SB_URL}/rest/v1/forum_threads?id=eq.${threadId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-        body: JSON.stringify({
-          execution_status: executionResult && txHash ? 'executed' : executionResult && !txHash ? 'executed_uncommitted' : (tradeRejectedReason ? 'rejected' : 'no_signal'),
-          execution_reason: tradeRejectedReason,
-          resolution_tx_hash: txHash,
-        }),
+      try {
+        // Update status — columns may not exist yet, so non-blocking
+        await fetch(`${SB_URL}/rest/v1/forum_threads?id=eq.${threadId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+          body: JSON.stringify({
+            status: executionResult ? 'executed' : (tradeRejectedReason ? 'rejected' : 'active'),
+          }),
       });
+      } catch (patchErr) {
+        console.warn('[Cycle] Thread status update failed (non-blocking):', patchErr);
+      }
     }
 
     // ============================================================
