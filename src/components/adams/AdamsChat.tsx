@@ -24,7 +24,6 @@ import { ExecutionTimeline } from './ExecutionTimeline';
 import { useBobbyVoice } from '@/hooks/useBobbyVoice';
 import { useAuth } from '@/hooks/useAuth';
 import { clearStoredVibe, getStoredVibe, inferUserVibe, saveStoredVibe, shouldClearStoredVibe } from '@/lib/bobby-vibe';
-import { checkLocalBypass, isTechnicalAnalysisIntent, INTENT_MAPPING } from '@/lib/onchainos/tradingDictionary';
 import { ResponsiveContainer, AreaChart, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 
 // ---- Supabase ----
@@ -56,41 +55,12 @@ async function fetchDBMessages(wallet: string): Promise<DBMessage[]> {
 // ---- Token symbol detection ----
 
 const TOKEN_MAP: Record<string, string> = {
-  // Major crypto
   btc: 'BTC-USDT', bitcoin: 'BTC-USDT',
   eth: 'ETH-USDT', ethereum: 'ETH-USDT', ether: 'ETH-USDT',
   sol: 'SOL-USDT', solana: 'SOL-USDT',
   okb: 'OKB-USDT',
   matic: 'MATIC-USDT', polygon: 'MATIC-USDT',
-  // Top alts (asked by real users + most traded)
-  doge: 'DOGE-USDT', dogecoin: 'DOGE-USDT',
-  xrp: 'XRP-USDT', ripple: 'XRP-USDT',
-  avax: 'AVAX-USDT', avalanche: 'AVAX-USDT',
-  link: 'LINK-USDT', chainlink: 'LINK-USDT',
-  ada: 'ADA-USDT', cardano: 'ADA-USDT',
-  atom: 'ATOM-USDT', cosmos: 'ATOM-USDT',
-  arb: 'ARB-USDT', arbitrum: 'ARB-USDT',
-  op: 'OP-USDT', optimism: 'OP-USDT',
-  uni: 'UNI-USDT', uniswap: 'UNI-USDT',
-  hype: 'HYPE-USDT', hyperliquid: 'HYPE-USDT',
-  dot: 'DOT-USDT', polkadot: 'DOT-USDT',
-  // Tokens asked by our real users
-  ach: 'ACH-USDT', 'alchemy pay': 'ACH-USDT',
-  theta: 'THETA-USDT',
-  // Trending mid-caps (TradingView popular)
-  pepe: 'PEPE-USDT',
-  wif: 'WIF-USDT',
-  ondo: 'ONDO-USDT',
-  tia: 'TIA-USDT', celestia: 'TIA-USDT',
-  sui: 'SUI-USDT',
-  sei: 'SEI-USDT',
-  jup: 'JUP-USDT', jupiter: 'JUP-USDT',
-  inj: 'INJ-USDT', injective: 'INJ-USDT',
-  render: 'RENDER-USDT', rndr: 'RENDER-USDT',
-  fet: 'FET-USDT', 'fetch ai': 'FET-USDT',
-  near: 'NEAR-USDT',
-  apt: 'APT-USDT', aptos: 'APT-USDT',
-  // Commodities
+  // Commodities — Bobby is a Macro-Sovereign Agent
   gold: 'XAUT-USDT', oro: 'XAUT-USDT', xaut: 'XAUT-USDT', xau: 'XAUT-USDT',
   paxg: 'PAXG-USDT', 'pax gold': 'PAXG-USDT',
   silver: 'XAG-USDT-SWAP', plata: 'XAG-USDT-SWAP', xag: 'XAG-USDT-SWAP',
@@ -207,80 +177,61 @@ async function saveInterestTags(wallet: string, tokens: string[], context: strin
   }
 }
 
-// ============================================================
-// SEMANTIC ROUTER — Codex-designed intent matrix
-// Order matters: cheaper intents evaluated BEFORE expensive ones
-// price/chart/market_data MUST win before trade_chat to save tokens
-// ============================================================
-type Intent = 'greeting' | 'identity' | 'portfolio' | 'price' | 'chart' | 'market_data' | 'analyze' | 'chat' | 'onboarding' | 'safety' | 'follow_up' | 'help' | 'prices_all' | 'trending' | 'ambiguous';
-
-function detectIntent(text: string): Intent {
+function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 'trending' | 'prices_all' | 'help' | 'chat' | 'greeting' | 'ambiguous' {
   const l = text.toLowerCase().trim();
   const wordCount = l.split(/\s+/).length;
-  const hasTokens = detectTokens(text).length > 0;
-  const hasStocks = detectStocks(text).length > 0;
-  const hasAsset = hasTokens || hasStocks;
 
-  // 1. GREETING — 0 tokens
-  if (wordCount <= 4 && /^(hola|hey|hi|hello|sup|yo|buenas?|buenos? [dnt]|good (morning|evening|night)|what.?s up|que tal|qu[ée] onda|saludos|gracias|thanks|thank you|de nada|adi[oó]s|bye|chao|ok|okay|cool|nice|genial|perfecto|vale|[oó]rale|ya)\b/i.test(l)) return 'greeting';
+  // RULE 0: Casual greetings & small talk → quick response, no analysis, ZERO tokens
+  if (wordCount <= 4 && /^(hola|hey|hi|hello|sup|yo|buenas?|buenos? [dnt]|good (morning|evening|night)|what.?s up|que tal|qu[ée] onda|saludos|gracias|thanks|thank you|de nada|adiós|bye|chao|ok|okay|cool|nice|genial|perfecto|vale|orale|ya)\b/i.test(l)) return 'greeting';
 
-  // 2. IDENTITY — 0 tokens
-  if (/\b(qui[eé]n eres|who are you|what are you|qu[eé] eres|qu[eé] haces|what do you do|c[oó]mo te llamas|what.?s your name)\b/i.test(l)) return 'identity';
+  // RULE 0b: Identity questions → quick response, ZERO tokens
+  if (/^(qui[eé]n eres|who are you|what are you|qu[eé] eres|qu[eé] haces|what do you do|c[oó]mo te llamas|what.?s your name)\b/i.test(l)) return 'greeting';
 
-  // 3. PORTFOLIO — direct data, no LLM
-  if (/\b(portfolio|position|posicion|balance|cartera|wallet|mis posiciones|my positions|cu[aá]nto tengo|how much do i have|mi cuenta|my account|disponible|available|saldo)\b/i.test(l)) return 'portfolio';
+  // RULE 1: Opinion / analysis / outlook questions → ALWAYS Bobby's brain (chat)
+  // This catches: "¿Cuál es tu análisis del oro esta semana?", "What do you think about BTC?",
+  // "¿Crees que el mercado va a subir?", "How do you see ETH this week?"
+  // Key: if the sentence is a QUESTION with opinion markers, it's always chat — even if it
+  // contains words like "análisis" or token names.
+  const isOpinionQuestion = /\b(opin|piens|crees|think|deberi|should|recomiend|recommend|tell me|dime|explica|explain|por ?qu[eé]|why|como ves|how do you see|que onda|what.?s your|cual es tu|an[aá]lisis|analysis|outlook|perspectiv|pronos|predict|forecast|va a (subir|bajar)|will .* (go|rise|fall|drop|pump|dump)|esta semana|this week|este mes|this month|próxim[oa]|next|futuro|future|qué har[ií]as|what would you|cómo est[aá]|how.?s the|sentiment|sentimiento|mercado va|market going|afectar[aá]?|impact|affect|benefici|perjudic|compar[ae]|versus|vs\.?|entre|between|conviene|mejor|worse|better|riesg|risk|oportunid|opportunity|estrategi|strategy|jugada|play|movida|move)\b/i.test(l);
 
-  // 4. PRICE — direct data, no LLM (short asset queries)
-  if (hasAsset && wordCount <= 2) return 'price';
-  if (/\b(preci|price|coti|cu[aá]nto vale|how much is|what.?s .* at|dame .* precio|quote)\b/i.test(l) && wordCount <= 6) return 'price';
+  // Also route to chat if stocks are detected (any stock question needs Bobby's brain)
+  if ((isOpinionQuestion && wordCount > 3) || (detectStocks(text).length > 0 && wordCount > 2)) return 'chat';
 
-  // 5. CHART — visual TA, no LLM needed
-  if (/\b(chart|gr[aá]fico|vela|candle|RSI|MACD|SMA|soporte|resistencia|support|resistance|t[eé]cnico|technical)\b/i.test(l)) return 'chart';
+  // RULE 2: Short, direct commands → specific handlers
+  if (/\b(pric|precio|coti|cuanto|how much|what.?s .* at|dame .* precio)\b/i.test(l) && wordCount <= 5) return 'price';
 
-  // 6. MARKET_DATA — funding, OI, sentiment, whales — data handler, not LLM
-  if (/\b(funding|open interest|OI|fear.?and.?greed|FGI|whale|ballena|polymarket|smart money|probabilidad|odds|sentimiento|sentiment)\b/i.test(l)) return 'market_data';
+  // "Analyze Market" or "Run scan" — explicit full-cycle command (short, imperative)
+  if (/\b(analyz|analiz|scan|escan|run|ejecut)\b/i.test(l) && wordCount <= 4) return 'analyze';
 
-  // 7. ANALYZE — explicit full scan/debate command (no word limit — users write long requests)
-  if (/\b(analy[zs]e?|analiz[ae]|scan|escan[ea]|run\b|ejecut|debate completo|full debate|dame el debate|give me the .* debate)\b/i.test(l)) return 'analyze';
-
-  // 8. PRICES_ALL — all prices overview
+  if (/\b(portfolio|position|posicion|balance|cartera|wallet)\b/i.test(l)) return 'portfolio';
+  if (/\b(trend|trending|hot|popular|whats up|que hay)\b/i.test(l) && wordCount <= 5) return 'trending';
   if (/\b(prices|precios|all|todos|overview|resumen)\b/i.test(l) && wordCount <= 4) return 'prices_all';
+  if (/\b(help|ayuda|command)\b/i.test(l)) return 'help';
 
-  // 9. TRENDING
-  if (/\b(trend|trending|hot|popular|whats up|que hay|movers)\b/i.test(l) && wordCount <= 5) return 'trending';
+  // RULE 3: Token mentioned in a longer sentence → Bobby's brain analyzes it
+  // Short inputs like "BTC" or "ETH SOL" → price card; anything longer → Bobby thinks
+  if (detectTokens(text).length > 0) {
+    return wordCount <= 2 ? 'price' : 'chat';
+  }
 
-  // 10. ONBOARDING — beginner questions, NEVER ambiguous
-  if (/\b(tengo.*d[oó]lares|qu[eé] hago con|what should i|where do i start|c[oó]mo empiezo|how do i start|principiante|beginner|primer.*vez|first time|soy nuevo|i.?m new|por d[oó]nde empiezo)\b/i.test(l)) return 'onboarding';
+  // POSITIVE TRIGGERS: only these go to Bobby's brain (Claude tokens)
+  // Vibe/macro intent — user giving market narrative
+  if (/\b(fed|tasas|rates|inflaci|recession|recesi|bull ?run|bear|crash|guerra|war|tariff|arancel|dxy|d[oó]lar|dollar|macro|geopolit|elecciones|election|risk.?on|risk.?off|panic|eufori|miedo|fear|greed)\b/i.test(l)) return 'chat';
 
-  // 11. SAFETY — scam/risk/honeypot questions
-  if (/\b(seguro|safe|scam|honeypot|rug|fraude|fraud|riesgo|risk|es confiable|is it legit|puedo confiar|can i trust)\b/i.test(l)) return 'safety';
+  // Trade intent without specific ticker
+  if (/\b(trade|trad(e|ing|ear)|operar|invertir|invest|apalanca|leverag|margin|posici[oó]n|position)\b/i.test(l)) return 'chat';
 
-  // 12. TRADE_CHAT — opinion, thesis, comparison (requires LLM)
-  if (hasAsset && wordCount > 2) return 'chat';
-  if (/\b(opin|piens|crees|think|deberi|should|recomiend|recommend|conviene|mejor|better|worse|vs\.?|versus|entre|between|como ves|how do you see|what.?s your read|qu[eé] har[ií]as|what would you|estrategi|strategy|jugada|play)\b/i.test(l)) return 'chat';
-  if (/\b(long|short|comprar?|vender?|buy|sell|trade|trad(e|ing|ear)|operar|invertir|invest|apalanca|leverag)\b/i.test(l)) return 'chat';
-  // Direction questions without ticker — "va para arriba o para abajo?"
-  if (/\b(para arriba|para abajo|goes up|goes down|subir[aá]?|bajar[aá]?|pump|dump|bull|bear|alcista|bajista)\b/i.test(l)) return 'chat';
-  // User mentions having a position or capital — personal portfolio context
-  if (/\b(tengo una posici[oó]n|i have a position|tengo \d|i have \d|mi posici[oó]n|my position|mi entrada|my entry)\b/i.test(l)) return 'chat';
+  // FOLLOW-UP detection: short messages that reference a prior conversation
+  // "why?", "y el stop?", "profundiza", "explain more", "and the target?"
+  if (wordCount <= 5 && /\b(why|por ?qu[eé]|explain|explica|profundiz|more|m[aá]s|y el|and the|pero|but|how|c[oó]mo|cu[aá]ndo|when|stop|target|entry|riesgo|risk)\b/i.test(l)) return 'chat';
 
-  // 13. VIBE/MACRO — market narrative
-  if (/\b(fed|tasas|rates|inflaci|recession|recesi|bull ?run|bear|crash|guerra|war|tariff|arancel|dxy|d[oó]lar|dollar|macro|geopolit|elecciones|election|risk.?on|risk.?off|panic|eufori|miedo|greed)\b/i.test(l)) return 'chat';
+  // WEAK TRADING SIGNALS — market-adjacent language, route to chat if enough context
+  if (wordCount >= 3 && /\b(market|mercado|price|bottom|top|dip|rally|correction|breakout|breakdown|reversal|squeeze|accumul|distribut|volume|candle|trend|momentum|signal|setup|pattern|level|zone|demand|supply|move|action|cycle|wave|peak|knife|liq|pump|rekt|whale|fakeout|trapped|sweep)\b/i.test(l)) return 'chat';
 
-  // 14. TRADING SLANG — TradingView community language
-  const allSlang = [...INTENT_MAPPING.LONG, ...INTENT_MAPPING.SHORT, ...INTENT_MAPPING.HOLD];
-  if (allSlang.some(s => l.includes(s.toLowerCase()))) return 'chat';
+  // CRYPTO/EXCHANGE CONTEXT — timeframes, exchanges
+  if (/\b(binance|okx|coinbase|bybit|kraken|1h|4h|1d|1w|daily|weekly|monthly|timeframe|defi|nft|airdrop|staking|yield|apr|apy)\b/i.test(l)) return 'chat';
 
-  // 14b. TECHNICAL ANALYSIS JARGON — SMC, order blocks, FVG, etc.
-  if (isTechnicalAnalysisIntent(l)) return 'chart';
-
-  // 15. FOLLOW-UP — contextual continuation (raised word limit + corrections + "profundiza más")
-  if (wordCount <= 12 && /\b(why|por ?qu[eé]|explain|explica|profundiz|more|m[aá]s|y el|and the|pero|but|how|c[oó]mo|cu[aá]ndo|when|stop|target|entry|actual price|precio real|mi entrada|my entry|no es|it.?s not|correc)\b/i.test(l)) return 'follow_up';
-
-  // 15. HELP
-  if (/\b(help|ayuda|command|qu[eé] puedo|what can)\b/i.test(l)) return 'help';
-
-  // DEFAULT: ambiguous — show menu, NEVER burn tokens
+  // Default: ambiguous — show menu instead of burning tokens
   return 'ambiguous';
 }
 
@@ -508,19 +459,17 @@ function InlinePriceCard({ price, highlighted, labels }: { price: PriceCard; hig
 
   return (
     <div
-      className={`border rounded-lg p-3 font-mono text-[11px] transition-all duration-500 cursor-pointer ${
-        highlighted
+      className={`border rounded-lg p-3 font-mono text-[11px] transition-all duration-500 cursor-pointer ${highlighted
           ? 'border-green-500/40 bg-green-500/[0.06] shadow-[0_0_20px_rgba(34,197,94,0.15)]'
           : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]'
-      }`}
+        }`}
       onClick={() => setExpanded(prev => !prev)}
     >
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-bold text-white">{price.symbol}</span>
-          <span className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${
-            isUp ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
-          }`}>
+          <span className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${isUp ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
+            }`}>
             {isUp ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
             {isUp ? '+' : ''}{price.change24h.toFixed(2)}%
           </span>
@@ -570,9 +519,9 @@ function InlinePriceCard({ price, highlighted, labels }: { price: PriceCard; hig
 // Splits text by agent markers and renders each section with distinct visual style
 
 const AGENT_STYLES: Record<string, { border: string; name: string; nameColor: string; icon: string }> = {
-  alpha:   { border: 'border-l-green-500/60', name: 'ALPHA HUNTER', nameColor: 'text-green-400', icon: '🟢' },
-  redteam: { border: 'border-l-red-500/60',   name: 'RED TEAM',     nameColor: 'text-red-400',   icon: '🔴' },
-  cio:     { border: 'border-l-yellow-500/60', name: 'BOBBY CIO',   nameColor: 'text-yellow-400', icon: '🟡' },
+  alpha: { border: 'border-l-green-500/60', name: 'ALPHA HUNTER', nameColor: 'text-green-400', icon: '🟢' },
+  redteam: { border: 'border-l-red-500/60', name: 'RED TEAM', nameColor: 'text-red-400', icon: '🔴' },
+  cio: { border: 'border-l-yellow-500/60', name: 'BOBBY CIO', nameColor: 'text-yellow-400', icon: '🟡' },
 };
 
 function DebateText({ text }: { text: string }) {
@@ -638,15 +587,13 @@ function DebateText({ text }: { text: string }) {
                 <span className="text-[9px] font-mono text-yellow-400/70">CONVICTION</span>
                 <div className="flex-1 h-1.5 bg-white/[0.05] rounded-full overflow-hidden max-w-[150px]">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      conviction >= 0.7 ? 'bg-green-500' : conviction >= 0.4 ? 'bg-yellow-500' : 'bg-red-500'
-                    }`}
+                    className={`h-full rounded-full transition-all duration-500 ${conviction >= 0.7 ? 'bg-green-500' : conviction >= 0.4 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
                     style={{ width: `${conviction * 100}%` }}
                   />
                 </div>
-                <span className={`text-[10px] font-mono font-bold ${
-                  conviction >= 0.7 ? 'text-green-400' : conviction >= 0.4 ? 'text-yellow-400' : 'text-red-400'
-                }`}>
+                <span className={`text-[10px] font-mono font-bold ${conviction >= 0.7 ? 'text-green-400' : conviction >= 0.4 ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
                   {(conviction * 10).toFixed(0)}/10
                 </span>
               </div>
@@ -699,9 +646,8 @@ function TechnicalChart({ data }: { data: ChatMsg['technicalAnalysis'] }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-mono font-bold text-white/70">{data.symbol}</span>
-          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
-            trend === 'BULLISH' ? 'bg-green-500/10 text-green-400' : trend === 'BEARISH' ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/30'
-          }`}>
+          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${trend === 'BULLISH' ? 'bg-green-500/10 text-green-400' : trend === 'BEARISH' ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/30'
+            }`}>
             {trend}
           </span>
           {rsiValue !== undefined && (
@@ -796,11 +742,10 @@ function ChatBubble({ msg, advisorName, isLatest, walletAddress }: { msg: ChatMs
           {isUser ? 'YOU' : advisorName.toUpperCase()}
         </span>
 
-        <div className={`px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-line ${
-          isUser
+        <div className={`px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-line ${isUser
             ? 'bg-white text-black'
             : 'border border-green-500/15 bg-green-500/[0.04] text-green-200/90 font-mono text-[12px]'
-        }`}>
+          }`}>
           {!isUser && isLatest && msg.isLive !== false ? (
             <Typewriter text={msg.text} speed={6} />
           ) : (
@@ -914,7 +859,7 @@ export function AdamsChat() {
           return parsed.map(m => ({ ...m, isLive: false }));
         }
       }
-    } catch {}
+    } catch { }
     return [];
   });
   const [inputText, setInputText] = useState('');
@@ -947,7 +892,7 @@ export function AdamsChat() {
   const advisorName = profile?.advisorName || 'Bobby';
 
   // ---- Bobby's Voice ----
-  const { speak, speakLocal, queueSentence, flushQueue, stop: stopVoice, initVoiceContext, getLastResponseAudio, clearResponseAudio, hasResponseAudio, voiceBlocked, isSpeaking, analyser } = useBobbyVoice();
+  const { speak, speakLocal, queueSentence, flushQueue, stop: stopVoice, getLastResponseAudio, clearResponseAudio, hasResponseAudio, isSpeaking, analyser } = useBobbyVoice();
   const [voiceEnabled, setVoiceEnabled] = useState(() => {
     try {
       const stored = localStorage.getItem('bobby_voice_enabled');
@@ -957,7 +902,7 @@ export function AdamsChat() {
   const toggleVoice = useCallback(() => {
     const next = !voiceEnabled;
     setVoiceEnabled(next);
-    try { localStorage.setItem('bobby_voice_enabled', String(next)); } catch {}
+    try { localStorage.setItem('bobby_voice_enabled', String(next)); } catch { }
     if (!next) stopVoice();
   }, [voiceEnabled, stopVoice]);
 
@@ -968,7 +913,7 @@ export function AdamsChat() {
       if (d?.fearGreed && d?.dxy) {
         setMarketBadge({ fgi: d.fearGreed.value, fgiLabel: d.fearGreed.classification, dxy: d.dxy.dxy });
       }
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   // ---- Trading Mode (onboarding selection) ----
@@ -983,7 +928,7 @@ export function AdamsChat() {
   const toggleTradingRoom = useCallback(() => {
     const next = !tradingRoom;
     setTradingRoom(next);
-    try { localStorage.setItem('bobby_trading_room', String(next)); } catch {}
+    try { localStorage.setItem('bobby_trading_room', String(next)); } catch { }
   }, [tradingRoom]);
 
   // Auto-speak new advisor messages when voice is enabled
@@ -1041,9 +986,9 @@ export function AdamsChat() {
     try {
       ref.gain.gain.linearRampToValueAtTime(0, ref.ctx.currentTime + 0.3);
       setTimeout(() => {
-        try { ref.osc.stop(); ref.ctx.close(); } catch {}
+        try { ref.osc.stop(); ref.ctx.close(); } catch { }
       }, 400);
-    } catch {}
+    } catch { }
     thinkingAudioRef.current = null;
   }, []);
 
@@ -1085,7 +1030,7 @@ export function AdamsChat() {
   // ---- Clear chat history (localStorage + Supabase) ----
   const clearChats = useCallback(async () => {
     // Clear localStorage
-    try { localStorage.removeItem('bobby_chat_history'); } catch {}
+    try { localStorage.removeItem('bobby_chat_history'); } catch { }
     // Clear Supabase messages for this wallet
     if (profile?.walletAddress) {
       try {
@@ -1093,7 +1038,7 @@ export function AdamsChat() {
           `${SB_URL}/rest/v1/agent_messages?wallet_address=eq.${profile.walletAddress}`,
           { method: 'DELETE', headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=minimal' } }
         );
-      } catch {}
+      } catch { }
     }
     // Reset UI
     setMessages([]);
@@ -1106,7 +1051,7 @@ export function AdamsChat() {
   const handleLogout = useCallback(async () => {
     stopAll();
     setShowMenu(false);
-    try { localStorage.removeItem('bobby_chat_history'); } catch {}
+    try { localStorage.removeItem('bobby_chat_history'); } catch { }
     await signOut();
     navigate('/login');
   }, [signOut, navigate, stopAll]);
@@ -1183,11 +1128,9 @@ export function AdamsChat() {
   // ---- Speech Recognition (user talks back to Bobby) ----
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const sendMessageRef = useRef<(text?: string) => void>(() => {});
+  const sendMessageRef = useRef<(text?: string) => void>(() => { });
 
   const toggleListening = useCallback(() => {
-    // Warm up audio context on user gesture
-    initVoiceContext();
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
@@ -1527,7 +1470,7 @@ export function AdamsChat() {
       }
       setMessages(chatMsgs);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.walletAddress, advisorName]);
 
   // ---- Morning Digest: "Mientras dormías..." ----
@@ -1561,8 +1504,8 @@ export function AdamsChat() {
 
         const highlights = (digest.highlights || []).map((h: any) => {
           const icon = h.verdict === 'execute' ? (lang === 'es' ? 'EJECUTAR' : 'EXECUTE') :
-                       h.verdict === 'watch' ? (lang === 'es' ? 'VIGILAR' : 'WATCH') :
-                       (lang === 'es' ? 'RECHAZADO' : 'REJECTED');
+            h.verdict === 'watch' ? (lang === 'es' ? 'VIGILAR' : 'WATCH') :
+              (lang === 'es' ? 'RECHAZADO' : 'REJECTED');
           return `${h.symbol} ${h.direction?.toUpperCase() || ''} — ${icon} (${h.conviction}/10)`;
         }).join('\n');
 
@@ -1590,7 +1533,7 @@ export function AdamsChat() {
       }
     };
     fetchDigest();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, lang, profile?.walletAddress]);
 
   // Persist conversation to localStorage (keep last 30 messages)
@@ -1601,7 +1544,7 @@ export function AdamsChat() {
         ...m, isLive: false, // don't replay typewriter on restore
       }));
       localStorage.setItem('bobby_chat_history', JSON.stringify(toSave));
-    } catch {}
+    } catch { }
   }, [messages]);
 
   // Auto-scroll — but only scroll the internal container, not the page
@@ -1655,8 +1598,6 @@ export function AdamsChat() {
   const sendMessage = useCallback(async (text?: string) => {
     const msg = (text || inputText).trim();
     if (!msg || isProcessing) return;
-    // Warm up audio on first user interaction (browser autoplay policy)
-    initVoiceContext();
     // Voice interruption: stop Bobby speaking when user sends new message
     stopVoice();
     setActiveAgent(null);
@@ -1669,7 +1610,7 @@ export function AdamsChat() {
     if (!isAuthenticated) {
       const newCount = guestMessageCount + 1;
       setGuestMessageCount(newCount);
-      try { localStorage.setItem('bobby_guest_count', String(newCount)); } catch {}
+      try { localStorage.setItem('bobby_guest_count', String(newCount)); } catch { }
 
       // If this is the last free message, Bobby will respond + show signup prompt
       if (newCount >= GUEST_MAX_MESSAGES) {
@@ -1680,19 +1621,7 @@ export function AdamsChat() {
     const userMsg: ChatMsg = { id: uid(), role: 'user', text: msg, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
 
-    // 0-TOKEN LOCAL BYPASS — intercept before burning any tokens
-    const localBypass = checkLocalBypass(msg, lang);
-    if (localBypass) {
-      if (localBypass.action === 'TRIGGER_WALLET_UI') {
-        // Fall through to portfolio handler below
-      } else if (localBypass.text) {
-        setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: localBypass.text, timestamp: Date.now(), isLive: true }]);
-        speakIfEnabled(localBypass.text.replace(/\[.*?\]/g, '').replace(/\*\*/g, ''));
-        return;
-      }
-    }
-
-    const intent = localBypass?.action === 'TRIGGER_WALLET_UI' ? 'portfolio' as Intent : detectIntent(msg);
+    const intent = detectIntent(msg);
     const tokens = detectTokens(msg);
     const now = Date.now();
 
@@ -1733,143 +1662,6 @@ export function AdamsChat() {
       const reply = pool[Math.floor(Math.random() * pool.length)];
       setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true }]);
       speakIfEnabled(reply);
-      return;
-    }
-
-    // ========================
-    // IDENTITY — who is Bobby, ZERO tokens
-    // ========================
-    if (intent === 'identity') {
-      const reply = lang === 'es'
-        ? 'Soy Bobby — un CIO de IA con metacognición. Tres agentes debaten cada decisión antes de que yo hable: Alpha Hunter busca oportunidades, Red Team intenta destruirlas, y yo decido. 15 fuentes de datos. Cada trade se registra on-chain. Dame un ticker o un vibe.'
-        : 'I\'m Bobby — an AI CIO with metacognition. Three agents debate every decision before I speak: Alpha Hunter finds opportunities, Red Team tries to destroy them, and I decide. 15 data sources. Every trade recorded on-chain. Give me a ticker or a vibe.';
-      setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true }]);
-      speakIfEnabled(reply);
-      return;
-    }
-
-    // ========================
-    // ONBOARDING — beginner questions, Bobby's brain with guided context
-    // ========================
-    if (intent === 'onboarding') {
-      // Falls through to chat handler — enrichedMessage will get beginner context appended
-    }
-
-    // ========================
-    // SAFETY — scam/risk questions
-    // ========================
-    if (intent === 'safety' && !tokens.length && !detectStocks(msg).length) {
-      // No specific asset — guide the user
-      const reply = lang === 'es'
-        ? 'Depende del activo. Mándame un ticker o un contrato y te digo si lo tocaría. También puedo escanear tokens por honeypots y rug pulls.'
-        : 'Depends on the asset. Give me a ticker or contract and I\'ll tell you if I\'d touch it. I can also scan tokens for honeypots and rug pulls.';
-      setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true }]);
-      speakIfEnabled(reply);
-      return;
-    }
-
-    // ========================
-    // CHART — visual TA, no LLM for crypto; honest fallback for stocks
-    // ========================
-    if (intent === 'chart') {
-      const stocks = detectStocks(msg);
-      setIsProcessing(true);
-      try {
-        if (stocks.length > 0) {
-          const quotes = await fetchStockPrices(stocks);
-          const reply = lang === 'es'
-            ? `Todavía no tengo chart técnico para stocks. Pero aquí está la cotización de ${stocks.join(', ')}.`
-            : `I don't have technical charts for stocks yet. But here's the live quote for ${stocks.join(', ')}.`;
-          setMessages(prev => [...prev, {
-            id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true,
-            prices: quotes.map(q => ({ symbol: q.symbol, price: q.price, change24h: q.change24h, high24h: q.dayHigh, low24h: q.dayLow, vol24h: q.volume, funding: null })),
-          }]);
-          speakIfEnabled(reply);
-        } else {
-          // Crypto chart — use TA endpoint
-          const chartSymbol = tokens[0]?.split('-')[0] || 'BTC';
-          const reply = lang === 'es' ? `Chart de ${chartSymbol}. Estructura, momentum y niveles clave.` : `${chartSymbol} chart. Structure, momentum, and key levels.`;
-          // Falls through to chat which will attach technicalAnalysis
-          setIsProcessing(false);
-          sendMessage(lang === 'es' ? `Dame el chart técnico de ${chartSymbol}` : `Show me the technical chart for ${chartSymbol}`);
-          return;
-        }
-      } catch {
-        setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude cargar el chart.' : 'Could not load the chart.', timestamp: Date.now() }]);
-      }
-      setIsProcessing(false);
-      return;
-    }
-
-    // ========================
-    // MARKET_DATA — funding, OI, sentiment — data first, LLM only if interpretation needed
-    // ========================
-    if (intent === 'market_data') {
-      setIsProcessing(true);
-      try {
-        const intelRes = await fetch('/api/bobby-intel');
-        const intel = intelRes.ok ? await intelRes.json() : null;
-        if (!intel) throw new Error('intel unavailable');
-
-        const blocks: string[] = [];
-        const askedAbout = msg.toLowerCase();
-
-        // Contextual response based on what they asked
-        if (/funding/i.test(askedAbout) && intel.fundingRates) {
-          const header = lang === 'es' ? '**Funding Rates (últimas 8h):**' : '**Funding Rates (last 8h):**';
-          const rates = (intel.fundingRates || []).slice(0, 5).map((f: any) =>
-            `${f.symbol}: ${f.rate > 0 ? '+' : ''}${(f.rate * 100).toFixed(4)}% (${(f.annualized).toFixed(1)}% APR)`
-          ).join('\n');
-          blocks.push(`${header}\n${rates || (lang === 'es' ? 'Sin datos' : 'No data')}`);
-          if (lang === 'es') blocks.push('_Funding negativo = shorts pagando longs. Positivo = longs pagando shorts._');
-          else blocks.push('_Negative funding = shorts paying longs. Positive = longs paying shorts._');
-        }
-
-        if (/fear|greed|miedo|sentimiento/i.test(askedAbout) && intel.fearGreed) {
-          const fgi = intel.fearGreed;
-          blocks.push(`**Fear & Greed Index:** ${fgi.value}/100 — ${fgi.classification}`);
-          if (fgi.value < 25) blocks.push(lang === 'es' ? '_Miedo extremo — históricamente zona de compra contrarian._' : '_Extreme fear — historically a contrarian buy zone._');
-          else if (fgi.value > 75) blocks.push(lang === 'es' ? '_Codicia extrema — cuidado con la euforia._' : '_Extreme greed — watch for euphoria._');
-        }
-
-        if (/polymarket|probabili|odds|elecciones|election/i.test(askedAbout)) {
-          blocks.push(lang === 'es'
-            ? '**Polymarket:** Datos de prediction markets disponibles en el debate completo. Pide "Analyze Market" para que Bobby cruce Polymarket con datos on-chain.'
-            : '**Polymarket:** Prediction market data available in full debate. Ask for "Analyze Market" so Bobby cross-references Polymarket with on-chain data.');
-        }
-
-        if (/whale|ballena|smart money/i.test(askedAbout)) {
-          blocks.push(lang === 'es'
-            ? '**Whale Signals:** Las señales de ballenas están integradas en el análisis completo. Pide "Analyze Market" o "Debate" para verlas.'
-            : '**Whale Signals:** Whale signals are integrated into the full analysis. Ask for "Analyze Market" or "Debate" to see them.');
-        }
-
-        if (/open interest|oi\b/i.test(askedAbout)) {
-          blocks.push(lang === 'es'
-            ? '**Open Interest:** Los datos de OI están integrados en el briefing de Bobby. Para interpretación, pide un debate.'
-            : '**Open Interest:** OI data is integrated into Bobby\'s briefing. For interpretation, ask for a debate.');
-        }
-
-        // Always add regime + FGI + DXY as context footer
-        const footer = [];
-        if (intel.regime) footer.push(`Regime: ${intel.regime}`);
-        if (intel.fearGreed) footer.push(`FGI: ${intel.fearGreed.value} (${intel.fearGreed.classification})`);
-        if (intel.dxy?.dxy) footer.push(`DXY: ${intel.dxy.dxy}`);
-        if (footer.length) blocks.push(`\n_${footer.join(' · ')}_`);
-
-        // Fallback if nothing specific matched
-        if (blocks.length <= 1) {
-          blocks.unshift(lang === 'es' ? 'Datos de mercado confirmados:' : 'Confirmed market data:');
-          if (intel.briefing) blocks.push(intel.briefing.slice(0, 400));
-        }
-
-        const reply = blocks.join('\n\n');
-        setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: reply, timestamp: Date.now(), isLive: true }]);
-        speakIfEnabled(blocks[0].replace(/\*\*/g, '').replace(/_/g, ''));
-      } catch {
-        setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude cargar datos de mercado.' : 'Could not load market data.', timestamp: Date.now() }]);
-      }
-      setIsProcessing(false);
       return;
     }
 
@@ -2128,7 +1920,7 @@ export function AdamsChat() {
                 const latest = dbMsgs[dbMsgs.length - 1];
                 greetingText = latest.message.replace(/\*/g, '').replace(/_/g, '');
               }
-            } catch {}
+            } catch { }
           }
 
           const msgId = uid();
@@ -2252,8 +2044,7 @@ export function AdamsChat() {
       ? fetch('/api/bobby-intel').then(r => r.ok ? r.json() : null).catch(() => null)
       : Promise.resolve(null);
     // Technical analysis for the primary token mentioned
-    // Don't show BTC chart when user asked about stocks — only show chart for crypto tokens
-    const taSymbol = hasTokens ? tokens[0].split('-')[0] : (!stocks.length && (isGeneralMarket || tradingRoom || needsOKX || isGeneralOpinion || hasVibeContext) ? 'BTC' : null);
+    const taSymbol = hasTokens ? tokens[0].split('-')[0] : (isGeneralMarket || tradingRoom || needsOKX || isGeneralOpinion || hasVibeContext ? 'BTC' : null);
     const taPromise = taSymbol
       ? fetch(`/api/technical-analysis?symbol=${taSymbol}`).then(r => r.ok ? r.json() : null).catch(() => null)
       : Promise.resolve(null);
@@ -2261,22 +2052,6 @@ export function AdamsChat() {
     try {
       // Enrich the message with intelligence context — Bobby reasons about what data to include
       let enrichedMessage = msg;
-      // Inject beginner context for onboarding intent
-      if (intent === 'onboarding') {
-        enrichedMessage += lang === 'es'
-          ? '\n\n[BEGINNER_CONTEXT: Usuario nuevo con poco capital. Responde simple, accionable. Prioriza preservación de capital. No uses jerga técnica sin explicarla.]'
-          : '\n\n[BEGINNER_CONTEXT: New user with small capital. Respond simply, actionably. Prioritize capital preservation. Don\'t use jargon without explaining it.]';
-      }
-      // Inject safety priority for safety intent with asset
-      if (intent === 'safety') {
-        enrichedMessage += lang === 'es'
-          ? '\n\n[SAFETY_PRIORITY: Evalúa riesgo, scam, honeypot, rug risk. Di explícitamente si NO lo tocarías.]'
-          : '\n\n[SAFETY_PRIORITY: Evaluate scam, honeypot, rug risk. State explicitly if you would NOT touch it.]';
-      }
-      // Inject TA jargon context when user speaks Smart Money Concepts language
-      if (isTechnicalAnalysisIntent(msg)) {
-        enrichedMessage += '\n\n[TA_CONTEXT: User is speaking Smart Money Concepts / Technical Analysis language. Respond with chart-level analysis: order blocks, liquidity sweeps, market structure. Do NOT give fundamental/macro analysis unless asked.]';
-      }
       let taData: any = null;
       try {
         // Promise.allSettled: partial failures don't kill the entire context
@@ -2677,33 +2452,33 @@ export function AdamsChat() {
                   convScore, symbol, entryPrice, direction,
                 });
               } else {
-              const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+                const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-              const threadRes = await fetch(`${SB_URL}/rest/v1/forum_threads`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=representation' },
-                body: JSON.stringify({
-                  topic, trigger_reason: 'User debate in Bobby Chat', language: lang,
-                  conviction_score: convScore, price_at_creation: {},
-                  symbol, direction, entry_price: entryPrice, stop_price: stopPrice,
-                  target_price: targetPrice, expires_at: expiresAt,
-                }),
-              });
-              if (threadRes.ok) {
-                const threadData = await threadRes.json();
-                const threadId = threadData[0]?.id;
-                if (threadId) {
-                  // Insert posts
-                  for (const post of posts) {
-                    await fetch(`${SB_URL}/rest/v1/forum_posts`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-                      body: JSON.stringify({ thread_id: threadId, agent: post.agent, content: post.content, data_snapshot: {} }),
-                    });
+                const threadRes = await fetch(`${SB_URL}/rest/v1/forum_threads`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=representation' },
+                  body: JSON.stringify({
+                    topic, trigger_reason: 'User debate in Bobby Chat', language: lang,
+                    conviction_score: convScore, price_at_creation: {},
+                    symbol, direction, entry_price: entryPrice, stop_price: stopPrice,
+                    target_price: targetPrice, expires_at: expiresAt,
+                  }),
+                });
+                if (threadRes.ok) {
+                  const threadData = await threadRes.json();
+                  const threadId = threadData[0]?.id;
+                  if (threadId) {
+                    // Insert posts
+                    for (const post of posts) {
+                      await fetch(`${SB_URL}/rest/v1/forum_posts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+                        body: JSON.stringify({ thread_id: threadId, agent: post.agent, content: post.content, data_snapshot: {} }),
+                      });
+                    }
+                    console.log('[Bobby] ✅ Debate published to forum:', threadId);
                   }
-                  console.log('[Bobby] ✅ Debate published to forum:', threadId);
                 }
-              }
               } // end of fail-closed else block
             }
           } catch (forumErr) { console.warn('[Bobby] Forum publish failed:', forumErr); }
@@ -2766,7 +2541,7 @@ export function AdamsChat() {
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.3);
-              } catch {}
+              } catch { }
 
               // Bobby announces the execution with his voice
               const execAnnouncement = lang === 'es'
@@ -2835,7 +2610,7 @@ export function AdamsChat() {
                   gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
                   osc.start();
                   osc.stop(audioCtx.currentTime + 0.4);
-                } catch {}
+                } catch { }
 
                 // Bobby confirms with voice
                 const confirmText = lang === 'es'
@@ -2860,18 +2635,22 @@ export function AdamsChat() {
             } else if (conv >= 5) {
               setMessages(prev => prev.map(m =>
                 m.id === replyId
-                  ? { ...m, text: m.text + (lang === 'es'
+                  ? {
+                    ...m, text: m.text + (lang === 'es'
                       ? `\n\n🛑 **No se pudo ejecutar:** Faltó token o dirección en el análisis de Bobby.`
-                      : `\n\n🛑 **Auto-execute failed:** Missing token or direction in Bobby's analysis.`) }
+                      : `\n\n🛑 **Auto-execute failed:** Missing token or direction in Bobby's analysis.`)
+                  }
                   : m
               ));
             } else if (conv > 0 && conv < 5) {
               // Append "not executing" to Bobby's debate text instead of separate message
               setMessages(prev => prev.map(m =>
                 m.id === replyId
-                  ? { ...m, text: m.text + (lang === 'es'
+                  ? {
+                    ...m, text: m.text + (lang === 'es'
                       ? `\n\n🛑 **No ejecuto.** Convicción ${conv}/10 — demasiado baja. Mínimo 5/10 para auto-ejecución.`
-                      : `\n\n🛑 **Not executing.** Conviction ${conv}/10 — too low. Minimum 5/10 for auto-execution.`) }
+                      : `\n\n🛑 **Not executing.** Conviction ${conv}/10 — too low. Minimum 5/10 for auto-execution.`)
+                  }
                   : m
               ));
             }
@@ -2982,7 +2761,7 @@ export function AdamsChat() {
             pnlPct: parseFloat(p.uplRatio || '0') * 100,
           })));
         }
-      } catch {}
+      } catch { }
     };
     fetchHud();
     const iv = setInterval(fetchHud, 30000);
@@ -2997,7 +2776,6 @@ export function AdamsChat() {
     <div className="h-full text-white flex flex-col overflow-hidden" style={{ background: '#050505' }}>
       {/* Step 1: Trading Mode Selection (first thing user sees) */}
       {!tradingMode && <TradingModeSelector onSelect={(mode) => {
-        initVoiceContext();
         setTradingMode(mode);
         // Skip AdvisorSetup for the demo — go straight to chat
         setShowSetup(false);
@@ -3032,7 +2810,7 @@ export function AdamsChat() {
               <p className="text-[11px] font-mono text-white/40 leading-relaxed">
                 {lang === 'es' ? 'Esto eliminará todos los mensajes de la conversación. Esta acción no se puede deshacer.'
                   : lang === 'pt' ? 'Isso excluirá todas as mensagens da conversa. Esta ação não pode ser desfeita.'
-                  : 'This will delete all conversation messages. This action cannot be undone.'}
+                    : 'This will delete all conversation messages. This action cannot be undone.'}
               </p>
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setConfirmClear(false)}
@@ -3075,9 +2853,9 @@ export function AdamsChat() {
                 <Square className="w-3.5 h-3.5 fill-current" />
               </button>
             )}
-            <button onClick={() => { toggleVoice(); initVoiceContext(); }}
-              className={`p-1.5 transition-colors ${voiceBlocked ? 'text-red-400/70 animate-pulse' : voiceEnabled ? 'text-green-400/70 hover:text-green-400' : 'text-white/15 hover:text-white/30'}`}
-              title={voiceBlocked ? 'Voice blocked — click to enable' : voiceEnabled ? 'Voice ON' : 'Voice OFF'}>
+            <button onClick={toggleVoice}
+              className={`p-1.5 transition-colors ${voiceEnabled ? 'text-green-400/70 hover:text-green-400' : 'text-white/15 hover:text-white/30'}`}
+              title={voiceEnabled ? 'Voice ON' : 'Voice OFF'}>
               {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             </button>
             <button onClick={toggleTradingRoom}
@@ -3150,12 +2928,11 @@ export function AdamsChat() {
             </span>
             {tradingRoom && <span className="text-[7px] font-mono text-green-400/40 uppercase">ROOM</span>}
             {currentVibe && (
-              <span className={`text-[7px] font-mono px-1 py-0.5 rounded ${
-                currentVibe.regimeBias === 'RISK_ON' ? 'text-green-400/60 bg-green-500/10' :
-                currentVibe.regimeBias === 'RISK_OFF' ? 'text-red-400/60 bg-red-500/10' :
-                currentVibe.regimeBias === 'PANIC' ? 'text-red-400/80 bg-red-500/15' :
-                'text-white/30 bg-white/5'
-              }`}>
+              <span className={`text-[7px] font-mono px-1 py-0.5 rounded ${currentVibe.regimeBias === 'RISK_ON' ? 'text-green-400/60 bg-green-500/10' :
+                  currentVibe.regimeBias === 'RISK_OFF' ? 'text-red-400/60 bg-red-500/10' :
+                    currentVibe.regimeBias === 'PANIC' ? 'text-red-400/80 bg-red-500/15' :
+                      'text-white/30 bg-white/5'
+                }`}>
                 VIBE: {currentVibe.regimeBias}
               </span>
             )}
@@ -3184,9 +2961,8 @@ export function AdamsChat() {
           {hudPositions.length > 0 && orbState === 'idle' && (
             <div className="flex items-center gap-1.5 mb-1">
               {hudPositions.slice(0, 3).map((pos, i) => (
-                <span key={i} className={`text-[7px] font-mono px-1.5 py-0.5 rounded ${
-                  pos.pnl >= 0 ? 'text-green-400/60 bg-green-500/8' : 'text-red-400/60 bg-red-500/8'
-                }`}>
+                <span key={i} className={`text-[7px] font-mono px-1.5 py-0.5 rounded ${pos.pnl >= 0 ? 'text-green-400/60 bg-green-500/8' : 'text-red-400/60 bg-red-500/8'
+                  }`}>
                   {pos.direction === 'SHORT' ? '↓' : '↑'} {pos.symbol} {pos.pnl >= 0 ? '+' : ''}{pos.pnlPct.toFixed(1)}%
                 </span>
               ))}
@@ -3195,26 +2971,23 @@ export function AdamsChat() {
 
           <div className="sm:hidden"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={60} /></div>
           <div className="hidden sm:block"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={100} /></div>
-          <span className={`text-[8px] sm:text-[9px] font-mono mt-1 sm:mt-1.5 tracking-[2px] ${
-            activeAgent === 'alpha' ? 'text-green-400/60' : activeAgent === 'redteam' ? 'text-red-400/60' : activeAgent === 'cio' ? 'text-yellow-400/60' : 'text-green-400/40'
-          }`}>
+          <span className={`text-[8px] sm:text-[9px] font-mono mt-1 sm:mt-1.5 tracking-[2px] ${activeAgent === 'alpha' ? 'text-green-400/60' : activeAgent === 'redteam' ? 'text-red-400/60' : activeAgent === 'cio' ? 'text-yellow-400/60' : 'text-green-400/40'
+            }`}>
             {orbState === 'listening' ? (lang === 'es' ? 'TOCA PARA PARAR · ESCUCHANDO...' : 'TAP TO STOP · LISTENING...') : orbState === 'thinking' ? (lang === 'es' ? 'PROCESANDO...' : 'PROCESSING...') : orbState === 'speaking' ? (activeAgent === 'alpha' ? '🟢 ALPHA HUNTER' : activeAgent === 'redteam' ? '🔴 RED TEAM' : activeAgent === 'cio' ? '🟡 BOBBY CIO' : (lang === 'es' ? 'TOCA PARA INTERRUMPIR' : 'TAP TO INTERRUPT')) : (lang === 'es' ? 'TOCA PARA HABLAR' : 'TAP TO TALK')}
           </span>
           {/* Live market sentiment badges */}
           {marketBadge && orbState === 'idle' && (
             <div className="flex items-center gap-2 mt-1.5">
-              <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full ${
-                marketBadge.fgi <= 25 ? 'text-red-400/80 bg-red-500/8' :
-                marketBadge.fgi >= 75 ? 'text-green-400/80 bg-green-500/8' :
-                'text-amber-400/80 bg-amber-500/8'
-              }`}>
+              <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full ${marketBadge.fgi <= 25 ? 'text-red-400/80 bg-red-500/8' :
+                  marketBadge.fgi >= 75 ? 'text-green-400/80 bg-green-500/8' :
+                    'text-amber-400/80 bg-amber-500/8'
+                }`}>
                 FGI {marketBadge.fgi} · {marketBadge.fgiLabel}
               </span>
-              <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full ${
-                marketBadge.dxy > 104 ? 'text-red-400/60 bg-red-500/8' :
-                marketBadge.dxy < 100 ? 'text-green-400/60 bg-green-500/8' :
-                'text-white/30 bg-white/5'
-              }`}>
+              <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full ${marketBadge.dxy > 104 ? 'text-red-400/60 bg-red-500/8' :
+                  marketBadge.dxy < 100 ? 'text-green-400/60 bg-green-500/8' :
+                    'text-white/30 bg-white/5'
+                }`}>
                 DXY {marketBadge.dxy}
               </span>
             </div>
@@ -3224,7 +2997,7 @@ export function AdamsChat() {
 
       {/* ===== COMMAND CENTER: MIDDLE AREA (STAGE + TIMELINE) ===== */}
       <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
-        
+
         {/* Main Stage */}
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" ref={scrollRef}>
           <div className="max-w-4xl mx-auto w-full px-2 sm:px-4 flex flex-col items-center flex-1 pt-2">
@@ -3233,299 +3006,507 @@ export function AdamsChat() {
                 Price data now lives in the price cards that appear after Bobby's analysis. */}
 
             {/* THINKING INDICATOR — conversational queries (no phases) */}
-          <AnimatePresence>
-            {isProcessing && analysisPhases.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                className="w-full max-w-md mb-3"
-              >
-                <div className="border border-green-500/10 bg-green-500/[0.03] backdrop-blur-sm px-4 py-3 flex items-center gap-3">
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
-                  <span className="text-[10px] font-mono text-green-400/60">
-                    {t('thinkingLabel') as string}
-                  </span>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ANALYSIS PHASES — full agent-run thinking state */}
-          <AnimatePresence>
-            {isProcessing && analysisPhases.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="w-full max-w-md mb-4"
-              >
-                <div className="border border-white/[0.04] bg-white/[0.02] backdrop-blur-sm p-4 space-y-1.5">
-                  {analysisPhases.map((phase, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-start gap-2 font-mono text-[10px]">
-                      <span className={i === analysisPhases.length - 1 ? 'text-green-400' : 'text-white/15'}>{i === analysisPhases.length - 1 ? '>' : '+'}</span>
-                      <span className={i === analysisPhases.length - 1 ? 'text-green-300/80' : 'text-white/25'}>{phase}</span>
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* THE STAGE — Bobby's latest response + data panels */}
-          <div className="w-full flex-1 space-y-3 pb-4">
-            {/* Latest Bobby message — the main "stage" text */}
-            {latestAdvisor && (
-              <motion.div
-                key={latestAdvisor.id}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
-                className="w-full max-w-2xl mx-auto"
-              >
-                <div className="border border-white/[0.04] bg-white/[0.02] backdrop-blur-sm p-3 sm:p-5">
-                  <div className="text-[12px] sm:text-[13px] leading-relaxed text-white/80 font-mono">
-                    <DebateText text={latestAdvisor.text} />
-                  </div>
-                </div>
-
-                {/* Action Chips for Morning Briefing / Welcome Message */}
-                {messages.filter(m => m.role === 'user').length === 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8 }}
-                    className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start"
-                  >
-                    {[
-                      { label: 'Debatir BTC', action: 'Debatir BTC', icon: '⚡' },
-                      { label: 'Escanear Mercado', action: 'Escanear Mercado', icon: '🔍' },
-                      { label: 'Mi Balance', action: 'Mi Balance', icon: '💼' }
-                    ].map(chip => (
-                      <button
-                        key={chip.label}
-                        onClick={() => sendMessage(chip.action)}
-                        className="px-3.5 py-1.5 text-[10px] font-mono border border-green-500/30 text-green-400 bg-green-500/10 hover:bg-green-500/20 rounded-full transition-all active:scale-[0.98] flex items-center gap-1.5"
-                      >
-                        <span>{chip.icon}</span> {chip.label}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-
-                {/* Technical Analysis Chart — appears with candles, SMA, S/R */}
-                {latestAdvisor.technicalAnalysis && (
-                  <div className="mt-3">
-                    <TechnicalChart data={latestAdvisor.technicalAnalysis} />
-                  </div>
-                )}
-
-                {/* Action buttons — appear when Bobby finishes */}
-                {!isProcessing && !isSpeaking && latestAdvisor.text.length > 50 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-2 flex items-center gap-2 flex-wrap"
-                  >
-                    {/* Deep dive — expand the argument */}
-                    <button
-                      onClick={() => sendMessage(lang === 'es'
-                        ? 'Profundiza más en el análisis. ¿Por qué exactamente? Dame los datos específicos, los precedentes históricos, y los escenarios de riesgo que no mencionaste.'
-                        : 'Deep dive. Why exactly? Give me the specific data, historical precedents, and risk scenarios you didn\'t mention.'
-                      )}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-yellow-400/70 hover:border-yellow-500/20 hover:bg-yellow-500/[0.05] transition-all active:scale-[0.97]"
-                    >
-                      🔍 {lang === 'es' ? 'Profundizar' : 'Deep Dive'}
-                    </button>
-                    {/* Challenge — argue against Bobby */}
-                    <button
-                      onClick={() => sendMessage(lang === 'es'
-                        ? 'No estoy de acuerdo. Arguye en contra de tu propia posición. ¿Qué podría salir mal?'
-                        : 'I disagree. Argue against your own position. What could go wrong?'
-                      )}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-red-400/70 hover:border-red-500/20 hover:bg-red-500/[0.05] transition-all active:scale-[0.97]"
-                    >
-                      ⚡ {lang === 'es' ? 'Desafiar' : 'Challenge'}
-                    </button>
-                    {/* Share voice note */}
-                    {hasResponseAudio && (
-                      <button
-                        onClick={shareVoiceNote}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-green-400/70 hover:border-green-500/20 hover:bg-green-500/[0.05] transition-all active:scale-[0.97]"
-                      >
-                        <Share2 className="w-3 h-3" />
-                        {lang === 'es' ? 'Compartir' : 'Share'}
-                      </button>
-                    )}
-                  </motion.div>
-                )}
-
-                {/* Perps Trade Card — execute leveraged perpetuals via OKX CEX */}
-                {!isProcessing && latestAdvisor.text.length > 100 && (() => {
-                  const text = latestAdvisor.text;
-                  const userMsg = messages.slice().reverse().find(m => m.role === 'user')?.text || '';
-                  const convMatch = text.match(/(\d+)\s*\/\s*10/);
-                  const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
-                  const assetRegex = /\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i;
-                  const symMatch = userMsg.match(assetRegex) || text.match(assetRegex);
-                  const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
-                  const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                  const targetMatch = text.match(/target\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                  const stopMatch = text.match(/stop\s*(?:loss)?\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                  if (symMatch) {
-                    const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
-                    return (
-                      <PerpsTradeCard
-                        symbol={symMatch[1].toUpperCase()}
-                        direction={dir as 'long' | 'short'}
-                        conviction={conv}
-                        entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
-                        targetPrice={targetMatch ? parseFloat(targetMatch[1].replace(/,/g, '')) : undefined}
-                        stopPrice={stopMatch ? parseFloat(stopMatch[1].replace(/,/g, '')) : undefined}
-                        language={lang}
-                        tradingMode={(tradingMode === 'auto' || tradingMode === 'confirm') ? 'live' : 'paper'}
-                      />
-                    );
-                  }
-                  return null;
-                })()}
-
-                {/* X Layer Swap — spot swap on-chain (secondary option) */}
-                {!isProcessing && latestAdvisor.text.length > 100 && (() => {
-                  const text = latestAdvisor.text;
-                  const userMsg = messages.slice().reverse().find(m => m.role === 'user')?.text || '';
-                  const convMatch = text.match(/(\d+)\s*\/\s*10/);
-                  const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
-                  const assetRegex = /\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i;
-                  const symMatch = userMsg.match(assetRegex) || text.match(assetRegex);
-                  const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
-                  const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                  if (symMatch) {
-                    const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
-                    return (
-                      <XLayerSwapCard
-                        symbol={symMatch[1].toUpperCase()}
-                        direction={dir}
-                        conviction={conv}
-                        entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
-                      />
-                    );
-                  }
-                  return null;
-                })()}
-
-                {/* Trade execution cards */}
-                {latestAdvisor.trades && latestAdvisor.trades.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {latestAdvisor.trades.map((trade, i) => (
-                      <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
-                        <SwapConfirm trade={trade} walletAddress={address} />
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {/* INTELLIGENCE FEED — visible metacognition (debate Alpha vs Red Team vs Bobby CIO) */}
-            {latestAdvisor?.debate && (
-              <IntelligenceFeed
-                debate={latestAdvisor.debate}
-                metacognition={latestAdvisor.metacognition}
-                topSignals={latestAdvisor.topSignals}
-                polymarket={latestAdvisor.polymarket}
-                isLive={latestAdvisor === messages[messages.length - 1]}
-              />
-            )}
-
-            {/* DATA PANELS — price cards appear after Bobby's analysis (not during onboarding) */}
-            {latestAdvisor?.prices && latestAdvisor.prices.length > 0 && messages.filter(m => m.role === 'user').length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="w-full max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3"
-              >
-                {latestAdvisor.prices.map((p, i) => (
-                  <motion.div
-                    key={p.symbol}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3 + i * 0.1 }}
-                  >
-                    <InlinePriceCard price={p} highlighted={highlightedSymbols.has(p.symbol)} labels={t('priceLabels') as { high: string; low: string; volume: string; funding: string }} />
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
-
-            {/* CONTINUE PROMPT — block-by-block analysis */}
             <AnimatePresence>
-              {awaitingContinue && pendingBlocks.length > 0 && (
+              {isProcessing && analysisPhases.length === 0 && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  className="w-full max-w-2xl mx-auto"
+                  className="w-full max-w-md mb-3"
                 >
-                  <div className="border border-green-500/15 bg-green-500/[0.03] backdrop-blur-sm p-3 flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-mono text-green-400/50">
-                      {pendingBlocks.length} {lang === 'es' ? (pendingBlocks.length === 1 ? 'bloque restante' : 'bloques restantes')
-                        : lang === 'pt' ? (pendingBlocks.length === 1 ? 'bloco restante' : 'blocos restantes')
-                        : (pendingBlocks.length === 1 ? 'block remaining' : 'blocks remaining')}
+                  <div className="border border-green-500/10 bg-green-500/[0.03] backdrop-blur-sm px-4 py-3 flex items-center gap-3">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-[10px] font-mono text-green-400/60">
+                      {t('thinkingLabel') as string}
                     </span>
-                    <button
-                      onClick={() => { setAwaitingContinue(false); revealNextBlock(); }}
-                      className="text-[11px] px-4 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors font-mono tracking-wider animate-pulse">
-                      {lang === 'es' ? 'CONTINUAR ▸' : lang === 'pt' ? 'CONTINUAR ▸' : 'CONTINUE ▸'}
-                    </button>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* CONVERSATION HISTORY — only user prompts, ultra-compact */}
-            {messages.filter(m => m.role === 'user').length > 0 && (
-              <div className="w-full max-w-2xl mx-auto pt-4">
-                <div className="flex flex-wrap gap-2">
-                  {messages.filter(m => m.role === 'user').slice(-5).map((msg) => (
-                    <span key={msg.id} className="px-2.5 py-1 text-[9px] font-mono text-white/25 bg-white/[0.03] rounded-full">
-                      {msg.text.length > 60 ? msg.text.slice(0, 60) + '…' : msg.text}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* ANALYSIS PHASES — full agent-run thinking state */}
+            <AnimatePresence>
+              {isProcessing && analysisPhases.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="w-full max-w-md mb-4"
+                >
+                  <div className="border border-white/[0.04] bg-white/[0.02] backdrop-blur-sm p-4 space-y-1.5">
+                    {analysisPhases.map((phase, i) => (
+                      <motion.div key={i} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-start gap-2 font-mono text-[10px]">
+                        <span className={i === analysisPhases.length - 1 ? 'text-green-400' : 'text-white/15'}>{i === analysisPhases.length - 1 ? '>' : '+'}</span>
+                        <span className={i === analysisPhases.length - 1 ? 'text-green-300/80' : 'text-white/25'}>{phase}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            <div ref={messagesEndRef} />
+            {/* THE STAGE — Bobby's latest response + data panels */}
+            <div className="w-full flex-1 space-y-3 pb-4">
+              {/* Latest Bobby message — the main "stage" text */}
+              {latestAdvisor && (
+                <motion.div
+                  key={latestAdvisor.id}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                  className="w-full max-w-2xl mx-auto"
+                >
+                  <div className="border border-white/[0.04] bg-white/[0.02] backdrop-blur-sm p-3 sm:p-5">
+                    <div className="text-[12px] sm:text-[13px] leading-relaxed text-white/80 font-mono">
+                      <DebateText text={latestAdvisor.text} />
+                    </div>
+                  </div>
+
+                  {/* Technical Analysis Chart — appears with candles, SMA, S/R */}
+                  {latestAdvisor.technicalAnalysis && (
+                    <div className="mt-3">
+                      <TechnicalChart data={latestAdvisor.technicalAnalysis} />
+                    </div>
+                  )}
+
+                  {/* Action buttons — appear when Bobby finishes */}
+                  {!isProcessing && !isSpeaking && latestAdvisor.text.length > 50 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-2 flex items-center gap-2 flex-wrap"
+                    >
+                      {/* Deep dive — expand the argument */}
+                      <button
+                        onClick={() => sendMessage(lang === 'es'
+                          ? 'Profundiza más en el análisis. ¿Por qué exactamente? Dame los datos específicos, los precedentes históricos, y los escenarios de riesgo que no mencionaste.'
+                          : 'Deep dive. Why exactly? Give me the specific data, historical precedents, and risk scenarios you didn\'t mention.'
+                        )}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-yellow-400/70 hover:border-yellow-500/20 hover:bg-yellow-500/[0.05] transition-all active:scale-[0.97]"
+                      >
+                        🔍 {lang === 'es' ? 'Profundizar' : 'Deep Dive'}
+                      </button>
+                      {/* Challenge — argue against Bobby */}
+                      <button
+                        onClick={() => sendMessage(lang === 'es'
+                          ? 'No estoy de acuerdo. Arguye en contra de tu propia posición. ¿Qué podría salir mal?'
+                          : 'I disagree. Argue against your own position. What could go wrong?'
+                        )}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-red-400/70 hover:border-red-500/20 hover:bg-red-500/[0.05] transition-all active:scale-[0.97]"
+                      >
+                        ⚡ {lang === 'es' ? 'Desafiar' : 'Challenge'}
+                      </button>
+                      {/* Share voice note */}
+                      {hasResponseAudio && (
+                        <button
+                          onClick={shareVoiceNote}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-green-400/70 hover:border-green-500/20 hover:bg-green-500/[0.05] transition-all active:scale-[0.97]"
+                        >
+                          <Share2 className="w-3 h-3" />
+                          {lang === 'es' ? 'Compartir' : 'Share'}
+                        </button>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* Perps Trade Card — execute leveraged perpetuals via OKX CEX */}
+                  {!isProcessing && latestAdvisor.text.length > 100 && (() => {
+                    const text = latestAdvisor.text;
+                    const convMatch = text.match(/(\d+)\s*\/\s*10/);
+                    const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
+                    const symMatch = text.match(/\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i);
+                    const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
+                    const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
+                    const targetMatch = text.match(/target\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
+                    const stopMatch = text.match(/stop\s*(?:loss)?\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
+                    if (symMatch) {
+                      const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
+                      return (
+                        <PerpsTradeCard
+                          symbol={symMatch[1].toUpperCase()}
+                          direction={dir as 'long' | 'short'}
+                          conviction={conv}
+                          entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
+                          targetPrice={targetMatch ? parseFloat(targetMatch[1].replace(/,/g, '')) : undefined}
+                          stopPrice={stopMatch ? parseFloat(stopMatch[1].replace(/,/g, '')) : undefined}
+                          language={lang}
+                          tradingMode={(tradingMode === 'auto' || tradingMode === 'confirm') ? 'live' : 'paper'}
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* X Layer Swap — spot swap on-chain (secondary option) */}
+                  {!isProcessing && latestAdvisor.text.length > 100 && (() => {
+                    const text = latestAdvisor.text;
+                    const convMatch = text.match(/(\d+)\s*\/\s*10/);
+                    const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
+                    const symMatch = text.match(/\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i);
+                    const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
+                    const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
+                    if (symMatch) {
+                      const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
+                      return (
+                        <XLayerSwapCard
+                          symbol={symMatch[1].toUpperCase()}
+                          direction={dir}
+                          conviction={conv}
+                          entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
+                        />
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Trade execution cards */}
+                  {latestAdvisor.trades && latestAdvisor.trades.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {latestAdvisor.trades.map((trade, i) => (
+                        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
+                          <SwapConfirm trade={trade} walletAddress={address} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* INTELLIGENCE FEED — visible metacognition (debate Alpha vs Red Team vs Bobby CIO) */}
+              {latestAdvisor?.debate && (
+                <IntelligenceFeed
+                  debate={latestAdvisor.debate}
+                  metacognition={latestAdvisor.metacognition}
+                  topSignals={latestAdvisor.topSignals}
+                  polymarket={latestAdvisor.polymarket}
+                  isLive={latestAdvisor === messages[messages.length - 1]}
+                />
+              )}
+
+              {/* DATA PANELS — price cards appear after Bobby's analysis (not during onboarding) */}
+              {latestAdvisor?.prices && latestAdvisor.prices.length > 0 && messages.filter(m => m.role === 'user').length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="w-full max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3"
+                >
+                  {latestAdvisor.prices.map((p, i) => (
+                    <motion.div
+                      key={p.symbol}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.3 + i * 0.1 }}
+                    >
+                      <InlinePriceCard price={p} highlighted={highlightedSymbols.has(p.symbol)} labels={t('priceLabels') as { high: string; low: string; volume: string; funding: string }} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+
+              {/* CONTINUE PROMPT — block-by-block analysis */}
+              <AnimatePresence>
+                {awaitingContinue && pendingBlocks.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="w-full max-w-2xl mx-auto"
+                  >
+                    <div className="border border-green-500/15 bg-green-500/[0.03] backdrop-blur-sm p-3 flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-mono text-green-400/50">
+                        {pendingBlocks.length} {lang === 'es' ? (pendingBlocks.length === 1 ? 'bloque restante' : 'bloques restantes')
+                          : lang === 'pt' ? (pendingBlocks.length === 1 ? 'bloco restante' : 'blocos restantes')
+                            : (pendingBlocks.length === 1 ? 'block remaining' : 'blocks remaining')}
+                      </span>
+                      <button
+                        onClick={() => { setAwaitingContinue(false); revealNextBlock(); }}
+                        className="text-[11px] px-4 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors font-mono tracking-wider animate-pulse">
+                        {lang === 'es' ? 'CONTINUAR ▸' : lang === 'pt' ? 'CONTINUAR ▸' : 'CONTINUE ▸'}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* CONVERSATION HISTORY — only user prompts, ultra-compact */}
+              {messages.filter(m => m.role === 'user').length > 0 && (
+                <div className="w-full max-w-2xl mx-auto pt-4">
+                  <div className="flex flex-wrap gap-2">
+                    {messages.filter(m => m.role === 'user').slice(-5).map((msg) => (
+                      <span key={msg.id} className="px-2.5 py-1 text-[9px] font-mono text-white/25 bg-white/[0.03] rounded-full">
+                        {msg.text.length > 60 ? msg.text.slice(0, 60) + '…' : msg.text}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Right Sidebar: Execution Timeline */}
-      <ExecutionTimeline messages={messages} />
-    </div>
+        {/* Right Sidebar: Execution Timeline */}
+        <ExecutionTimeline messages={messages} />
+      </div>
 
       {/* ===== INPUT BAR — Bottom ===== */}
       <div className="flex-shrink-0 border-t border-white/[0.04]" style={{ background: '#080808', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {canChat ? (
           <>
-            {/* Guest badge — shows remaining free messages (Clean Glass Style) */}
+            {/* Guest badge — shows remaining free messages */}
             {isGuest && (
-              <div className="max-w-4xl mx-auto px-4 py-2 flex justify-end">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 backdrop-blur-md shadow-[0_0_15px_rgba(245,158,11,0.05)]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  <span className="text-[9px] font-mono font-bold text-amber-400/90 tracking-wide uppercase">
-                    {lang === 'es' ? 'GUEST PASS • ' : 'GUEST PASS • '} 
-                    {GUEST_MAX_MESSAGES - guestMessageCount} {lang === 'es' ? 'RESTANTES' : 'LEFT'}
-                  </span>
-                </div>
+              <div className="max-w-4xl mx-auto px-4 py-1">
+                <span className="text-[9px] font-mono text-amber-400/50">
+                  {lang === 'es'
+                    ? `${GUEST_MAX_MESSAGES - guestMessageCount} mensaje${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'} gratis restante${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'}`
+                    : `${GUEST_MAX_MESSAGES - guestMessageCount} free message${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'} remaining`}
+                </span>
               </div>
             )}
+            <div className="max-w-4xl mx-auto px-2 sm:px-4 pt-1.5 sm:pt-2 pb-0.5 sm:pb-1">
+              <div className="flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar justify-start sm:justify-center sm:flex-wrap">
+                {(() => {
+                  const qa = t('quickActions') as { gold: string; silver: string; allPrices: string; analyze: string };
+                  return [
+                    { label: 'BTC', display: 'BTC', icon: '₿' },
+                    { label: 'ETH', display: 'ETH', icon: 'Ξ' },
+                    { label: 'NVDA', display: 'NVDA', icon: '◈' },
+                    { label: 'SPY', display: 'S&P 500', icon: '◉' },
+                    { label: 'Gold', display: qa.gold, icon: '◆' },
+                    { label: 'All Prices', display: qa.allPrices, icon: '$' },
+                    { label: 'Analyze Market', display: qa.analyze, icon: '>' },
+                    { label: lang === 'es' ? '¿Cómo ves el mercado hoy? Dame el debate completo.' : "What's your read on the market right now? Give me the full debate.", display: 'Debate', icon: '⚔' },
+                  ];
+                })().map(a => (
+                  <button key={a.label} onClick={() => sendMessage(a.label)} disabled={isProcessing}
+                    className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-white/[0.05] bg-white/[0.01] text-white/30 hover:bg-white/[0.04] hover:text-white/60 hover:border-white/10 transition-all disabled:opacity-20 font-mono whitespace-nowrap flex-shrink-0">
+                    <span className="text-green-400/60">{a.icon}</span>
+                    {a.display}
+                  </button>
+                ))}
+                <Link to="/agentic-world/forum"
+                  className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-yellow-500/10 bg-yellow-500/[0.03] text-yellow-400/50 hover:bg-yellow-500/[0.08] hover:text-yellow-400/80 hover:border-yellow-500/20 transition-all font-mono whitespace-nowrap flex-shrink-0">
+                  <span>⚔</span> Forum
+                </Link>
+                <Link to="/agentic-world/polymarket"
+                  className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-cyan-500/10 bg-cyan-500/[0.03] text-cyan-400/50 hover:bg-cyan-500/[0.08] hover:text-cyan-400/80 hover:border-cyan-500/20 transition-all font-mono whitespace-nowrap flex-shrink-0">
+                  <span>◉</span> Dashboard
+                </Link>
+              </div>
+            </div>
+            <div className="max-w-4xl mx-auto px-2 sm:px-4 py-1.5 sm:py-2.5 flex items-center gap-1.5 sm:gap-2">
+              <button onClick={toggleListening} disabled={isProcessing}
+                className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border transition-all active:scale-[0.95] flex-shrink-0 rounded-full ${isListening
+                    ? 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse'
+                    : 'border-white/[0.06] text-white/20 hover:border-green-500/20 hover:text-green-400/60'
+                  }`}>
+                {isListening ? <Mic className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <MicOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+              </button>
+              <input type="text" value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                onFocus={() => {
+                  // Mobile keyboard: scroll input into view
+                  setTimeout(() => {
+                    const el = document.activeElement as HTMLElement;
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                  }, 300);
+                }}
+                placeholder={isListening ? t('listening') as string : `${lang === 'es' ? 'Habla con' : lang === 'pt' ? 'Fale com' : 'Talk to'} ${advisorName}...`}
+                className={`flex-1 bg-transparent border-0 border-b px-2 sm:px-3 py-1.5 sm:py-2 text-[12px] sm:text-[13px] text-white/90 placeholder:text-white/15 outline-none transition-colors font-mono ${isListening ? 'border-red-500/20' : 'border-white/[0.06] focus:border-white/10'
+                  }`}
+                disabled={isProcessing} />
+              <button onClick={() => sendMessage()} disabled={!inputText.trim() || isProcessing}
+                className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-all active:scale-[0.95] rounded-full ${inputText.trim() && !isProcessing ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'text-white/10 cursor-not-allowed'
+                  }`}>
+                {isProcessing ? <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin" /> : <ArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+              </button>
+            </div>
+          </>
+        ) : (
+          /* ===== AUTH GATE — Login prompt for unauthenticated users ===== */
+          <div className="max-w-4xl mx-auto px-4 py-4">
+            <div className="border border-amber-500/20 bg-amber-500/[0.03] backdrop-blur-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <Lock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
+                <span className="text-amber-400/80 text-[11px] font-mono">
+                  {guestMessageCount >= GUEST_MAX_MESSAGES
+                    ? (lang === 'es' ? '¿Te gustó? Crea una cuenta para seguir debatiendo con Bobby' : 'Like what you saw? Sign up to keep debating with Bobby')
+                    : (lang === 'es' ? 'Inicia sesión para hablar con Bobby' : 'Sign in to talk to Bobby')}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
+                  className="text-[10px] px-4 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition-colors font-mono tracking-wider">
+                  {lang === 'es' ? 'INICIAR SESIÓN' : lang === 'pt' ? 'ENTRAR' : 'SIGN IN'}
+                </button>
+                <button
+                  onClick={() => navigate('/register?redirect=' + encodeURIComponent(window.location.pathname))}
+                  className="text-[10px] px-4 py-1.5 border border-green-500/30 text-green-400/60 hover:text-green-400 hover:border-green-500/50 transition-colors font-mono tracking-wider">
+                  {lang === 'es' ? 'CREAR CUENTA' : lang === 'pt' ? 'CRIAR CONTA' : 'SIGN UP'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Feedback Widget — floating button */}
+      <FeedbackWidget
+        userEmail={undefined}
+        walletAddress={address}
+        page="bobby-chat"
+        context={{ tradingMode, tradingRoom, lang, lastMessage: messages[messages.length - 1]?.text?.slice(0, 200) }}
+      />
+    </div>
+  );
+}
+const convMatch = text.match(/(\d+)\s*\/\s*10/);
+const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
+const assetRegex = /\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i;
+const symMatch = userMsg.match(assetRegex) || text.match(assetRegex);
+const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
+const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
+if (symMatch) {
+  const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
+  return (
+    <XLayerSwapCard
+      symbol={symMatch[1].toUpperCase()}
+      direction={dir}
+      conviction={conv}
+      entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
+    />
+  );
+}
+return null;
+                }) ()}
+
+{/* Trade execution cards */ }
+{
+  latestAdvisor.trades && latestAdvisor.trades.length > 0 && (
+    <div className="mt-3 space-y-2">
+      {latestAdvisor.trades.map((trade, i) => (
+        <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
+          <SwapConfirm trade={trade} walletAddress={address} />
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+              </motion.div >
+            )}
+
+{/* INTELLIGENCE FEED — visible metacognition (debate Alpha vs Red Team vs Bobby CIO) */ }
+{
+  latestAdvisor?.debate && (
+    <IntelligenceFeed
+      debate={latestAdvisor.debate}
+      metacognition={latestAdvisor.metacognition}
+      topSignals={latestAdvisor.topSignals}
+      polymarket={latestAdvisor.polymarket}
+      isLive={latestAdvisor === messages[messages.length - 1]}
+    />
+  )
+}
+
+{/* DATA PANELS — price cards appear after Bobby's analysis (not during onboarding) */ }
+{
+  latestAdvisor?.prices && latestAdvisor.prices.length > 0 && messages.filter(m => m.role === 'user').length > 0 && (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.2 }}
+      className="w-full max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3"
+    >
+      {latestAdvisor.prices.map((p, i) => (
+        <motion.div
+          key={p.symbol}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3 + i * 0.1 }}
+        >
+          <InlinePriceCard price={p} highlighted={highlightedSymbols.has(p.symbol)} labels={t('priceLabels') as { high: string; low: string; volume: string; funding: string }} />
+        </motion.div>
+      ))}
+    </motion.div>
+  )
+}
+
+{/* CONTINUE PROMPT — block-by-block analysis */ }
+<AnimatePresence>
+  {awaitingContinue && pendingBlocks.length > 0 && (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -5 }}
+      className="w-full max-w-2xl mx-auto"
+    >
+      <div className="border border-green-500/15 bg-green-500/[0.03] backdrop-blur-sm p-3 flex items-center justify-between gap-3">
+        <span className="text-[10px] font-mono text-green-400/50">
+          {pendingBlocks.length} {lang === 'es' ? (pendingBlocks.length === 1 ? 'bloque restante' : 'bloques restantes')
+            : lang === 'pt' ? (pendingBlocks.length === 1 ? 'bloco restante' : 'blocos restantes')
+              : (pendingBlocks.length === 1 ? 'block remaining' : 'blocks remaining')}
+        </span>
+        <button
+          onClick={() => { setAwaitingContinue(false); revealNextBlock(); }}
+          className="text-[11px] px-4 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors font-mono tracking-wider animate-pulse">
+          {lang === 'es' ? 'CONTINUAR ▸' : lang === 'pt' ? 'CONTINUAR ▸' : 'CONTINUE ▸'}
+        </button>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
+{/* CONVERSATION HISTORY — only user prompts, ultra-compact */ }
+{
+  messages.filter(m => m.role === 'user').length > 0 && (
+    <div className="w-full max-w-2xl mx-auto pt-4">
+      <div className="flex flex-wrap gap-2">
+        {messages.filter(m => m.role === 'user').slice(-5).map((msg) => (
+          <span key={msg.id} className="px-2.5 py-1 text-[9px] font-mono text-white/25 bg-white/[0.03] rounded-full">
+            {msg.text.length > 60 ? msg.text.slice(0, 60) + '…' : msg.text}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+<div ref={messagesEndRef} />
+          </div >
+        </div >
+      </div >
+
+  {/* Right Sidebar: Execution Timeline */ }
+  < ExecutionTimeline messages = { messages } />
+    </div >
+
+  {/* ===== INPUT BAR — Bottom ===== */ }
+  < div className = "flex-shrink-0 border-t border-white/[0.04]" style = {{ background: '#080808', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+  {
+    canChat?(
+          <>
+    {/* Guest badge — shows remaining free messages (Clean Glass Style) */ }
+{
+  isGuest && (
+    <div className="max-w-4xl mx-auto px-4 py-2 flex justify-end">
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 backdrop-blur-md shadow-[0_0_15px_rgba(245,158,11,0.05)]">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+        <span className="text-[9px] font-mono font-bold text-amber-400/90 tracking-wide uppercase">
+          {lang === 'es' ? 'GUEST PASS • ' : 'GUEST PASS • '}
+          {GUEST_MAX_MESSAGES - guestMessageCount} {lang === 'es' ? 'RESTANTES' : 'LEFT'}
+        </span>
+      </div>
+    </div>
+  )
+}
             <div className="max-w-4xl mx-auto px-2 sm:px-4 pt-1.5 sm:pt-2 pb-0.5 sm:pb-1">
               <div className="flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar justify-start sm:justify-center sm:flex-wrap">
                 {(() => {
@@ -3590,41 +3571,41 @@ export function AdamsChat() {
             </div>
           </>
         ) : (
-          /* ===== AUTH GATE — Login prompt for unauthenticated users ===== */
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <div className="border border-amber-500/20 bg-amber-500/[0.03] backdrop-blur-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <Lock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
-                <span className="text-amber-400/80 text-[11px] font-mono">
-                  {guestMessageCount >= GUEST_MAX_MESSAGES
-                    ? (lang === 'es' ? '¿Te gustó? Crea una cuenta para seguir debatiendo con Bobby' : 'Like what you saw? Sign up to keep debating with Bobby')
-                    : (lang === 'es' ? 'Inicia sesión para hablar con Bobby' : 'Sign in to talk to Bobby')}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
-                  className="text-[10px] px-4 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition-colors font-mono tracking-wider">
-                  {lang === 'es' ? 'INICIAR SESIÓN' : lang === 'pt' ? 'ENTRAR' : 'SIGN IN'}
-                </button>
-                <button
-                  onClick={() => navigate('/register?redirect=' + encodeURIComponent(window.location.pathname))}
-                  className="text-[10px] px-4 py-1.5 border border-green-500/30 text-green-400/60 hover:text-green-400 hover:border-green-500/50 transition-colors font-mono tracking-wider">
-                  {lang === 'es' ? 'CREAR CUENTA' : lang === 'pt' ? 'CRIAR CONTA' : 'SIGN UP'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+  /* ===== AUTH GATE — Login prompt for unauthenticated users ===== */
+  <div className="max-w-4xl mx-auto px-4 py-4">
+    <div className="border border-amber-500/20 bg-amber-500/[0.03] backdrop-blur-sm p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="flex items-center gap-2.5">
+        <Lock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
+        <span className="text-amber-400/80 text-[11px] font-mono">
+          {guestMessageCount >= GUEST_MAX_MESSAGES
+            ? (lang === 'es' ? '¿Te gustó? Crea una cuenta para seguir debatiendo con Bobby' : 'Like what you saw? Sign up to keep debating with Bobby')
+            : (lang === 'es' ? 'Inicia sesión para hablar con Bobby' : 'Sign in to talk to Bobby')}
+        </span>
       </div>
-
-      {/* Feedback Widget — floating button */}
-      <FeedbackWidget
-        userEmail={undefined}
-        walletAddress={address}
-        page="bobby-chat"
-        context={{ tradingMode, tradingRoom, lang, lastMessage: messages[messages.length - 1]?.text?.slice(0, 200) }}
-      />
+      <div className="flex gap-2">
+        <button
+          onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
+          className="text-[10px] px-4 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition-colors font-mono tracking-wider">
+          {lang === 'es' ? 'INICIAR SESIÓN' : lang === 'pt' ? 'ENTRAR' : 'SIGN IN'}
+        </button>
+        <button
+          onClick={() => navigate('/register?redirect=' + encodeURIComponent(window.location.pathname))}
+          className="text-[10px] px-4 py-1.5 border border-green-500/30 text-green-400/60 hover:text-green-400 hover:border-green-500/50 transition-colors font-mono tracking-wider">
+          {lang === 'es' ? 'CREAR CUENTA' : lang === 'pt' ? 'CRIAR CONTA' : 'SIGN UP'}
+        </button>
+      </div>
     </div>
+  </div>
+)}
+      </div >
+
+  {/* Feedback Widget — floating button */ }
+  < FeedbackWidget
+userEmail = { undefined }
+walletAddress = { address }
+page = "bobby-chat"
+context = {{ tradingMode, tradingRoom, lang, lastMessage: messages[messages.length - 1]?.text?.slice(0, 200) }}
+      />
+    </div >
   );
 }
