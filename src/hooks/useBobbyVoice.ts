@@ -120,14 +120,14 @@ export interface BobbyVoiceState {
   queueSentence: (sentence: string, voice?: string, lang?: string) => void;
   flushQueue: () => void;
   stop: () => void;
+  initVoiceContext: () => void;
   getLastResponseAudio: () => Blob | null;
   clearResponseAudio: () => void;
   hasResponseAudio: boolean;
+  voiceBlocked: boolean;
   isSpeaking: boolean;
   analyser: AnalyserNode | null;
   audioElement: HTMLAudioElement | null;
-  initVoiceContext: () => void;
-  voiceBlocked: boolean;
 }
 
 // Tiny silent MP3 (0.1s) — used to "warm up" the Audio element on user gesture
@@ -170,36 +170,34 @@ export function useBobbyVoice(): BobbyVoiceState {
   }, []);
 
   // ---- Init voice context: MUST be called on user gesture (click/tap) ----
-  // Codex fix: only mark initialized on SUCCESS — allows retry if first call fails
+  // This "warms up" the AudioContext and Audio element so future play() calls work
   const voiceInitializedRef = useRef(false);
-  const initInFlightRef = useRef<Promise<void> | null>(null);
   const initVoiceContext = useCallback(() => {
     if (voiceInitializedRef.current) return;
-    if (initInFlightRef.current) return;
+    voiceInitializedRef.current = true;
 
-    initInFlightRef.current = (async () => {
-      try {
-        if (!audioRef.current) audioRef.current = new Audio();
-        audioRef.current.src = SILENT_MP3;
-        await audioRef.current.play();
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+    // 1. Create and warm up Audio element with silent MP3
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+    audioRef.current.src = SILENT_MP3;
+    audioRef.current.play().then(() => {
+      audioRef.current!.pause();
+      audioRef.current!.currentTime = 0;
+      setVoiceBlocked(false);
+    }).catch(() => {
+      setVoiceBlocked(true);
+    });
 
-        if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
-        if (audioContextRef.current.state === 'suspended') {
-          await audioContextRef.current.resume();
-        }
-
-        voiceInitializedRef.current = true;
-        setVoiceBlocked(false);
-      } catch {
-        setVoiceBlocked(true);
-      } finally {
-        initInFlightRef.current = null;
+    // 2. Create and resume AudioContext
+    try {
+      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
-    })();
+      if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+    } catch { /* non-critical */ }
   }, []);
 
   // ---- Shared audio playback (used by speak + queue) ----
@@ -327,7 +325,7 @@ export function useBobbyVoice(): BobbyVoiceState {
   }, []);
 
   // ---- Queue a single sentence for streaming TTS ----
-  // Fetches audio immediately (non-blocking) — voice selects Alpha/Red/CIO
+  // Fetches audio immediately (parallel with other sentences)
   // Plays in order as audio becomes available
 
   const queueSentence = useCallback((sentence: string, voice?: string, lang?: string) => {
