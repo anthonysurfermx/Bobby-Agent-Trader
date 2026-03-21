@@ -226,6 +226,9 @@ function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 'trendi
   // Trade intent without specific ticker
   if (/\b(trade|trad(e|ing|ear)|operar|invertir|invest|apalanca|leverag|margin|posici[oó]n|position)\b/i.test(l)) return 'chat';
 
+  // Onboarding/beginner questions that need Bobby's brain
+  if (/\b(tengo.*d[oó]lares|qu[eé] hago|what should i|where do i start|es seguro|is it safe|c[oó]mo empiezo|how do i start|principiante|beginner|primer.*vez|first time)\b/i.test(l)) return 'chat';
+
   // FOLLOW-UP detection: short messages that reference a prior conversation
   // "why?", "y el stop?", "profundiza", "explain more", "and the target?"
   if (wordCount <= 5 && /\b(why|por ?qu[eé]|explain|explica|profundiz|more|m[aá]s|y el|and the|pero|but|how|c[oó]mo|cu[aá]ndo|when|stop|target|entry|riesgo|risk)\b/i.test(l)) return 'chat';
@@ -897,7 +900,7 @@ export function AdamsChat() {
   const advisorName = profile?.advisorName || 'Bobby';
 
   // ---- Bobby's Voice ----
-  const { speak, speakLocal, queueSentence, flushQueue, stop: stopVoice, getLastResponseAudio, clearResponseAudio, hasResponseAudio, isSpeaking, analyser } = useBobbyVoice();
+  const { speak, speakLocal, queueSentence, flushQueue, stop: stopVoice, initVoiceContext, getLastResponseAudio, clearResponseAudio, hasResponseAudio, voiceBlocked, isSpeaking, analyser } = useBobbyVoice();
   const [voiceEnabled, setVoiceEnabled] = useState(() => {
     try {
       const stored = localStorage.getItem('bobby_voice_enabled');
@@ -1136,6 +1139,8 @@ export function AdamsChat() {
   const sendMessageRef = useRef<(text?: string) => void>(() => {});
 
   const toggleListening = useCallback(() => {
+    // Warm up audio context on user gesture
+    initVoiceContext();
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
@@ -1603,6 +1608,8 @@ export function AdamsChat() {
   const sendMessage = useCallback(async (text?: string) => {
     const msg = (text || inputText).trim();
     if (!msg || isProcessing) return;
+    // Warm up audio on first user interaction (browser autoplay policy)
+    initVoiceContext();
     // Voice interruption: stop Bobby speaking when user sends new message
     stopVoice();
     setActiveAgent(null);
@@ -2854,9 +2861,9 @@ export function AdamsChat() {
                 <Square className="w-3.5 h-3.5 fill-current" />
               </button>
             )}
-            <button onClick={toggleVoice}
-              className={`p-1.5 transition-colors ${voiceEnabled ? 'text-green-400/70 hover:text-green-400' : 'text-white/15 hover:text-white/30'}`}
-              title={voiceEnabled ? 'Voice ON' : 'Voice OFF'}>
+            <button onClick={() => { toggleVoice(); initVoiceContext(); }}
+              className={`p-1.5 transition-colors ${voiceBlocked ? 'text-red-400/70 animate-pulse' : voiceEnabled ? 'text-green-400/70 hover:text-green-400' : 'text-white/15 hover:text-white/30'}`}
+              title={voiceBlocked ? 'Voice blocked — click to enable' : voiceEnabled ? 'Voice ON' : 'Voice OFF'}>
               {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             </button>
             <button onClick={toggleTradingRoom}

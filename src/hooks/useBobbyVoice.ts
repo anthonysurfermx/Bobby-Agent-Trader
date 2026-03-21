@@ -80,11 +80,15 @@ async function fetchAudio(text: string, voice?: string, lang?: string): Promise<
 
   // Fallback: Edge TTS (Microsoft Neural, free forever) via Vercel proxy → DO droplet
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
     const res = await fetch('/api/bobby-voice-free', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, voice: voice || 'cio', lang: lang || 'en' }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!res.ok) return null;
     const data = await res.arrayBuffer();
     await setCachedAudio(cacheKey, data);
@@ -116,16 +120,22 @@ export interface BobbyVoiceState {
   queueSentence: (sentence: string, voice?: string, lang?: string) => void;
   flushQueue: () => void;
   stop: () => void;
+  initVoiceContext: () => void;
   getLastResponseAudio: () => Blob | null;
   clearResponseAudio: () => void;
   hasResponseAudio: boolean;
+  voiceBlocked: boolean;
   isSpeaking: boolean;
   analyser: AnalyserNode | null;
   audioElement: HTMLAudioElement | null;
 }
 
+// Tiny silent MP3 (0.1s) — used to "warm up" the Audio element on user gesture
+const SILENT_MP3 = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAABhgAAAAAAAAAAAAAAAAD/+0DEAAAAAANIAAAAAAAADSAKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/7QMQAAAAADQAAAAAAAAAA';
+
 export function useBobbyVoice(): BobbyVoiceState {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceBlocked, setVoiceBlocked] = useState(false);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
@@ -157,6 +167,37 @@ export function useBobbyVoice(): BobbyVoiceState {
         audioContextRef.current?.close();
       }
     };
+  }, []);
+
+  // ---- Init voice context: MUST be called on user gesture (click/tap) ----
+  // This "warms up" the AudioContext and Audio element so future play() calls work
+  const voiceInitializedRef = useRef(false);
+  const initVoiceContext = useCallback(() => {
+    if (voiceInitializedRef.current) return;
+    voiceInitializedRef.current = true;
+
+    // 1. Create and warm up Audio element with silent MP3
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+    audioRef.current.src = SILENT_MP3;
+    audioRef.current.play().then(() => {
+      audioRef.current!.pause();
+      audioRef.current!.currentTime = 0;
+      setVoiceBlocked(false);
+    }).catch(() => {
+      setVoiceBlocked(true);
+    });
+
+    // 2. Create and resume AudioContext
+    try {
+      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+    } catch { /* non-critical */ }
   }, []);
 
   // ---- Shared audio playback (used by speak + queue) ----
@@ -212,7 +253,8 @@ export function useBobbyVoice(): BobbyVoiceState {
 
       audio.play().catch(() => {
         setIsSpeaking(false);
-        reject(new Error('Audio play failed'));
+        setVoiceBlocked(true);
+        reject(new Error('Audio play failed — browser blocked autoplay'));
       });
     });
   }, []);
@@ -346,5 +388,5 @@ export function useBobbyVoice(): BobbyVoiceState {
     queueSentence(text, 'cio', lang);
   }, [stop, queueSentence]);
 
-  return { speak, speakLocal, queueSentence, flushQueue, stop, getLastResponseAudio, clearResponseAudio, hasResponseAudio, isSpeaking, analyser, audioElement };
+  return { speak, speakLocal, queueSentence, flushQueue, stop, initVoiceContext, getLastResponseAudio, clearResponseAudio, hasResponseAudio, voiceBlocked, isSpeaking, analyser, audioElement };
 }
