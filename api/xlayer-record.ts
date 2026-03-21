@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { ethers } from 'ethers';
 
 const XLAYER_RPC = 'https://rpc.xlayer.tech';
 const CONTRACT_ADDRESS = process.env.BOBBY_CONTRACT_ADDRESS || '';
@@ -152,20 +153,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // TODO: Sign and broadcast with RECORDER_KEY via ethers
-      // For now, return TX-ready data (broadcast not yet implemented)
-      return res.status(200).json({
-        ok: true,
-        onchain: false,
-        broadcast: false,
-        action: 'commit',
-        message: 'Commitment prepared — broadcast pending (signer not yet integrated)',
-        contract: CONTRACT_ADDRESS,
-        data: { debateHash, symbol, agent: agentEnum, conviction,
-                entryPrice: Math.round(entryPrice * 1e8),
-                targetPrice: Math.round((targetPrice || 0) * 1e8),
-                stopPrice: Math.round((stopPrice || 0) * 1e8) },
-      });
+      try {
+        const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+        const wallet = new ethers.Wallet(RECORDER_KEY, provider);
+        const iface = new ethers.Interface(CONTRACT_ABI);
+        // Normalize conviction: if float (0.0-1.0), convert to uint8 (0-10)
+        const convUint8 = conviction < 2 ? Math.round(conviction * 10) : Math.round(conviction);
+        const txData = iface.encodeFunctionData('commitTrade', [
+          debateHash, symbol, agentEnum, convUint8,
+          Math.round(entryPrice * 1e8), 
+          Math.round((targetPrice || 0) * 1e8), 
+          Math.round((stopPrice || 0) * 1e8)
+        ]);
+
+        const tx = await wallet.sendTransaction({
+          to: CONTRACT_ADDRESS,
+          data: txData,
+        });
+
+        return res.status(200).json({
+          ok: true,
+          onchain: true,
+          broadcast: true,
+          action: 'commit',
+          message: 'Commitment broadcast to X Layer',
+          txHash: tx.hash,
+          explorer: `https://www.oklink.com/xlayer/tx/${tx.hash}`,
+          data: { debateHash, symbol, agent: agentEnum, conviction },
+        });
+      } catch (err: any) {
+        console.error('[X Layer] Emit Error:', err);
+        return res.status(500).json({ error: 'Failed to broadcast tx: ' + err.message });
+      }
     }
 
     // ── RESOLVE: Record outcome after min time elapsed ──
@@ -207,18 +226,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // TODO: Sign and broadcast with RECORDER_KEY via ethers
-      return res.status(200).json({
-        ok: true,
-        onchain: false,
-        broadcast: false,
-        action: 'resolve',
-        message: 'Resolution prepared — broadcast pending (signer not yet integrated)',
-        contract: CONTRACT_ADDRESS,
-        data: { debateHash, result: resultEnum,
-                pnlBps: Math.round(pnlBps * 100),
-                exitPrice: Math.round(exitPrice * 1e8) },
-      });
+      try {
+        const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+        const wallet = new ethers.Wallet(RECORDER_KEY, provider);
+        const iface = new ethers.Interface(CONTRACT_ABI);
+        const txData = iface.encodeFunctionData('resolveTrade', [
+          debateHash, Math.round(pnlBps * 100), resultEnum, Math.round(exitPrice * 1e8)
+        ]);
+        const tx = await wallet.sendTransaction({
+          to: CONTRACT_ADDRESS,
+          data: txData
+        });
+
+        return res.status(200).json({
+          ok: true,
+          onchain: true,
+          broadcast: true,
+          action: 'resolve',
+          message: 'Resolution broadcast to X Layer',
+          txHash: tx.hash,
+          explorer: `https://www.oklink.com/xlayer/tx/${tx.hash}`,
+          data: { debateHash, result: resultEnum },
+        });
+      } catch (err: any) {
+        console.error('[X Layer] Emit Error:', err);
+        return res.status(500).json({ error: 'Failed to broadcast resolve tx: ' + err.message });
+      }
     }
 
     return res.status(400).json({ error: 'Invalid action. Use "commit" or "resolve"' });

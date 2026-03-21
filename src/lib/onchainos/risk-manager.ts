@@ -76,9 +76,26 @@ export function canOpenPosition(
   currentPrice?: number
 ): ValidationResult {
 
-  const totalEq = parseFloat(balance.totalEq || '100'); // Usar $100 como default base
-  const tradeSizeUsd = parseFloat(params.size); // Asumiremos size in USD o Contracts dependiendo la config
+  const totalEq = parseFloat(balance.totalEq || '0');
+  const tradeSizeUsd = parseFloat(params.size);
   const leverage = parseFloat(params.lever);
+
+  // GATE 0: Reject non-finite inputs — prevents NaN from bypassing all checks
+  if (!Number.isFinite(totalEq) || totalEq <= 0) {
+    return { valid: false, reason: `Invalid balance: ${balance.totalEq}` };
+  }
+  if (!Number.isFinite(tradeSizeUsd) || tradeSizeUsd <= 0) {
+    return { valid: false, reason: `Invalid trade size: ${params.size}` };
+  }
+  if (!Number.isFinite(leverage) || leverage <= 0) {
+    return { valid: false, reason: `Invalid leverage: ${params.lever}` };
+  }
+  if (!Number.isFinite(conviction) || conviction < 0) {
+    return { valid: false, reason: `Invalid conviction: ${conviction}` };
+  }
+  if (currentPrice !== undefined && (!Number.isFinite(currentPrice) || currentPrice <= 0)) {
+    return { valid: false, reason: `Invalid currentPrice: ${currentPrice}` };
+  }
 
   // 1. Min Conviction
   if (conviction < CHALLENGE_RULES.MIN_CONVICTION) {

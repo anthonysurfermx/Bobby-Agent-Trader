@@ -68,7 +68,8 @@ async function callClaude(model: string, system: string, userMsg: string, maxTok
 }
 
 // ---- Fetch local internal API ----
-async function fetchLocalApi(path: string, body: any): Promise<any> {
+// noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
+async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
   const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://defi-mexico-hub.vercel.app';
   try {
     const res = await fetch(`${host}${path}`, {
@@ -77,9 +78,14 @@ async function fetchLocalApi(path: string, body: any): Promise<any> {
       body: JSON.stringify(body)
     });
     if (res.ok) return await res.json();
-  } catch (e) { console.error(`Failed to fetch ${path}`, e); }
-  
-  // Fallback to prod domain if Vercel URL fails (sometimes happens in cron)
+    // For mutant actions, return the error — do NOT fallback
+    if (noFallback) return { ok: false, error: `${path}: ${res.status}` };
+  } catch (e) {
+    console.error(`Failed to fetch ${path}`, e);
+    if (noFallback) return { ok: false, error: `${path}: network error` };
+  }
+
+  // Fallback to prod domain ONLY for read-only endpoints
   try {
     const res2 = await fetch(`https://defimexico.org${path}`, {
       method: 'POST',
@@ -88,7 +94,7 @@ async function fetchLocalApi(path: string, body: any): Promise<any> {
     });
     if (res2.ok) return await res2.json();
   } catch (e) { console.error(`Fallback failed for ${path}`, e); }
-  
+
   return { ok: false, error: 'API unreachable' };
 }
 
@@ -159,12 +165,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(503).json({ error: 'Anthropic API key not configured' });
   }
 
-  // Cron protection: Vercel crons send GET — verify with CRON_SECRET or allow POST (manual)
+  // Auth: Vercel crons send GET with CRON_SECRET, manual POST requires BOBBY_CYCLE_SECRET
   const cronSecret = process.env.CRON_SECRET;
+  const cycleSecret = process.env.BOBBY_CYCLE_SECRET || cronSecret;
   if (req.method === 'GET' && cronSecret) {
     const authHeader = req.headers.authorization;
     if (authHeader !== `Bearer ${cronSecret}`) {
       return res.status(401).json({ error: 'Unauthorized cron call' });
+    }
+  }
+  if (req.method === 'POST' && cycleSecret) {
+    const authHeader = req.headers.authorization;
+    const bodySecret = (req.body as any)?.secret;
+    if (authHeader !== `Bearer ${cycleSecret}` && bodySecret !== cycleSecret) {
+      return res.status(401).json({ error: 'Unauthorized — set BOBBY_CYCLE_SECRET' });
     }
   }
 
@@ -268,6 +282,7 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
     let entryPrice: number | null = null;
     let stopPrice: number | null = null;
     let targetPrice: number | null = null;
+    let cioSaysExecute = false; // CRITICAL: only execute if CIO explicitly says so
 
     const verdictMatch = cioPost.match(/VERDICT:\s*(\{[^}]+\})/);
     if (verdictMatch) {
@@ -279,12 +294,13 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
         entryPrice = typeof v.entry === 'number' ? v.entry : null;
         stopPrice = typeof v.stop === 'number' ? v.stop : null;
         targetPrice = typeof v.target === 'number' ? v.target : null;
+        cioSaysExecute = v.execute === true; // MUST be explicitly true
       } catch (e) {
         console.warn('[Cycle] Failed to parse CIO VERDICT JSON:', e);
       }
     }
 
-    // Fallback: regex extraction if VERDICT line missing (defensive)
+    // Fallback: regex extraction ONLY for forum/digest — NEVER for execution decisions
     if (conviction === null) {
       const convMatch = cioPost.match(/(\d+)\s*\/\s*10/);
       conviction = convMatch ? parseInt(convMatch[1]) / 10 : null;
@@ -297,6 +313,8 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
       const dirMatch = cioPost.match(/\b(long|short)\b/i);
       direction = dirMatch ? dirMatch[1].toLowerCase() : null;
     }
+    // Regex fallback NEVER enables execution — only structured VERDICT can
+    // This prevents the LLM from accidentally triggering trades via free text
 
     // ============================================================
     // PHASE 4a: Create forum thread FIRST (canonical ID for everything)
@@ -358,7 +376,7 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
       if (balCheck.ok) finalBalanceStr = String(balCheck.totalEquity || '???');
     } catch { /* non-blocking */ }
 
-    if (symbol && direction && conviction !== null && conviction >= 0.6) {
+    if (cioSaysExecute && symbol && direction && conviction !== null && conviction >= 0.6) {
       try {
         const currentPrice = intel.prices?.find((p: any) => p.symbol === symbol)?.price || entryPrice;
         
@@ -392,6 +410,7 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
               const openRes = await fetchLocalApi('/api/okx-perps', {
                 action: 'open_position',
                 params: { symbol, direction, leverage, amount: positionSizeUsd, conviction, mode: 'live', skipOnchainCommit: true }
+              }, true /* noFallback — NEVER retry open_position */
               });
 
               if (openRes.ok) {
@@ -402,14 +421,19 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
                   tpslResult = await fetchLocalApi('/api/okx-perps', {
                     action: 'set_tpsl',
                     params: { symbol, direction, stopLoss: stopPrice, takeProfit: targetPrice, mode: 'live' }
-                  });
+                  }, true /* noFallback */);
                   // If TP/SL failed and we have a stop, this is dangerous — close position
                   if (!tpslResult?.ok && stopPrice) {
                     console.error('[Cycle] TP/SL FAILED — closing unprotected position');
-                    await fetchLocalApi('/api/okx-perps', {
+                    const closeRes = await fetchLocalApi('/api/okx-perps', {
                       action: 'close_position',
                       params: { symbol, direction, mode: 'live' }
-                    });
+                    }, true /* noFallback */);
+                    // Verify the close actually worked
+                    if (!closeRes?.ok) {
+                      console.error('[Cycle] EMERGENCY: close_position FAILED — position may still be open without SL!');
+                      tradeRejectedReason = 'EMERGENCY: TP/SL failed AND close failed — manual intervention required';
+                    }
                     executionResult = null;
                     tradeRejectedReason = 'TP/SL failed — position closed for safety';
                   }
