@@ -3357,6 +3357,26 @@ export function AdamsChat() {
         )}
       </div>
 
+      {/* Mobile Bottom Nav — Stitch "Kinetic Terminal" style */}
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 border-t border-white/[0.06] bg-[#0a0a0a]/95 backdrop-blur-md z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="flex items-center justify-around py-2">
+          {[
+            { icon: '◈', label: lang === 'es' ? 'TERMINAL' : 'TERMINAL', active: true, action: () => {} },
+            { icon: '◉', label: lang === 'es' ? 'MERCADO' : 'MARKET', active: false, action: () => sendMessage('All Prices') },
+            { icon: '⚔', label: 'FORUM', active: false, action: () => navigate('/agentic-world/forum') },
+            { icon: '◆', label: 'COMMAND', active: false, action: () => sendMessage('Analyze Market') },
+          ].map(item => (
+            <button key={item.label} onClick={item.action}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1 transition-colors ${
+                item.active ? 'text-green-400' : 'text-white/25 hover:text-white/50'
+              }`}>
+              <span className="text-sm">{item.icon}</span>
+              <span className="text-[7px] font-mono tracking-[1px]">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Feedback Widget — floating button */}
       <FeedbackWidget
         userEmail={undefined}
@@ -3367,9 +3387,6 @@ export function AdamsChat() {
     </div>
   );
 }
-const convMatch = text.match(/(\d+)\s*\/\s*10/);
-const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
-const assetRegex = /\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i;
 const symMatch = userMsg.match(assetRegex) || text.match(assetRegex);
 const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
 const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
