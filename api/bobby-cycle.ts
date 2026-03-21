@@ -469,8 +469,8 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
     // ============================================================
     // PHASE 5: Generate digest summary (for "mientras dormías...")
     // ============================================================
-    const digestSymbol = symbol || (symMatch ? symMatch[1].toUpperCase() : 'market');
-    const digestDirection = direction || (dirMatch ? dirMatch[1].toLowerCase() : 'neutral');
+    const digestSymbol = symbol || 'market';
+    const digestDirection = direction || 'neutral';
     const convNum = conviction !== null ? Math.round(conviction * 10) : 0;
 
     const digestPrompt = `Summarize this trading cycle in 2-3 sentences for someone who just woke up. Be direct and conversational — like a morning text from a smart friend.
