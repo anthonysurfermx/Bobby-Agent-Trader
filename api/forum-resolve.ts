@@ -147,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Resolve on-chain X Layer
         try {
-          const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://defi-mexico-hub.vercel.app';
+          const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://defimexico.org';
           await fetch(`${host}/api/xlayer-record`, {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },

@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { canOpenPosition, getPositionSize } from '../src/lib/onchainos/risk-manager.js';
 import type { TradeParams } from '../src/lib/onchainos/types.js';
+import { ethers } from 'ethers';
 
 export const config = { maxDuration: 120 };
 
@@ -525,6 +526,36 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
           content: post.content,
           data_snapshot: snapshot,
         });
+      }
+
+      // On-chain commit: EVERY debate gets recorded on X Layer
+      // Direct ethers call — no HTTP self-call (avoids timeout in Vercel)
+      const xlayerContract = process.env.BOBBY_CONTRACT_ADDRESS || '';
+      const xlayerKey = process.env.BOBBY_RECORDER_KEY || '';
+      const currentPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price || 0;
+      const commitEntry = entryPrice || currentPrice;
+      if (symbol && conviction !== null && commitEntry > 0 && xlayerContract && xlayerKey) {
+        try {
+          const provider = new ethers.JsonRpcProvider('https://rpc.xlayer.tech');
+          const wallet = new ethers.Wallet(xlayerKey, provider);
+          const iface = new ethers.Interface([
+            'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96)',
+          ]);
+          const debateHash = ethers.keccak256(ethers.toUtf8Bytes(threadId));
+          const convInt = Math.round((conviction ?? 0) * 10);
+          const txData = iface.encodeFunctionData('commitTrade', [
+            debateHash, symbol, 0, convInt,
+            BigInt(Math.round(commitEntry * 1e8)),
+            BigInt(Math.round((targetPrice || commitEntry * 1.05) * 1e8)),
+            BigInt(Math.round((stopPrice || commitEntry * 0.95) * 1e8)),
+          ]);
+          const txPromise = wallet.sendTransaction({ to: xlayerContract, data: txData, gasLimit: 300000n });
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TX timeout 10s')), 10000));
+          const tx = await Promise.race([txPromise, timeoutPromise]) as any;
+          console.log(`[Cycle] On-chain commit: ${tx.hash}`);
+        } catch (e: any) {
+          console.warn('[Cycle] On-chain commit failed (non-critical):', e.message);
+        }
       }
     }
 

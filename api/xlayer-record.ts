@@ -11,6 +11,7 @@ import { ethers } from 'ethers';
 
 const XLAYER_RPC = 'https://rpc.xlayer.tech';
 const CONTRACT_ADDRESS = process.env.BOBBY_CONTRACT_ADDRESS || '';
+const ORACLE_ADDRESS = process.env.BOBBY_ORACLE_ADDRESS || '';
 const RECORDER_KEY = process.env.BOBBY_RECORDER_KEY || '';
 
 // Agent enum matches contract: CIO=0, ALPHA=1, REDTEAM=2
@@ -23,12 +24,23 @@ const RESULT_MAP: Record<string, number> = {
   pending: 0, win: 1, loss: 2, expired: 3, break_even: 4,
 };
 
+// Direction enum matches oracle contract: NEUTRAL=0, LONG=1, SHORT=2
+const DIRECTION_MAP: Record<string, number> = {
+  long: 1, short: 2, none: 0, neutral: 0,
+};
+
+// Oracle ABI — conviction feed for other protocols
+const ORACLE_ABI = [
+  'function publishSignal((string symbol, uint8 direction, uint8 conviction, uint8 agent, uint96 entryPrice, uint96 targetPrice, uint96 stopPrice, bytes32 debateHash, uint256 ttl))',
+  'function getConviction(string _symbol) view returns (uint8 direction, uint8 conviction, uint96 entryPrice, bool isActive)',
+];
+
 // Updated ABI — commit-reveal pattern (Codex Audit v3)
 const CONTRACT_ABI = [
   // Phase 1
-  'function commitTrade(bytes32 _debateHash, string _symbol, uint8 _agent, uint8 _conviction, uint256 _entryPrice, uint256 _targetPrice, uint256 _stopPrice)',
+  'function commitTrade(bytes32 _debateHash, string _symbol, uint8 _agent, uint8 _conviction, uint96 _entryPrice, uint96 _targetPrice, uint96 _stopPrice)',
   // Phase 2
-  'function resolveTrade(bytes32 _debateHash, int256 _pnlBps, uint8 _result, uint256 _exitPrice)',
+  'function resolveTrade(bytes32 _debateHash, int256 _pnlBps, uint8 _result, uint96 _exitPrice)',
   // Views
   'function getWinRate() view returns (uint256)',
   'function totalTrades() view returns (uint256)',
@@ -154,23 +166,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const convUint8 = conviction < 2 ? Math.round(conviction * 10) : Math.round(conviction);
         const txData = iface.encodeFunctionData('commitTrade', [
           debateHash, symbol, agentEnum, convUint8,
-          Math.round(entryPrice * 1e8), 
-          Math.round((targetPrice || 0) * 1e8), 
-          Math.round((stopPrice || 0) * 1e8)
+          BigInt(Math.round(entryPrice * 1e8)),
+          BigInt(Math.round((targetPrice || 0) * 1e8)),
+          BigInt(Math.round((stopPrice || 0) * 1e8))
         ]);
 
         const tx = await wallet.sendTransaction({
           to: CONTRACT_ADDRESS,
           data: txData,
+          gasLimit: 300000n,
         });
+
+        // Also publish to ConvictionOracle (non-blocking)
+        let oracleTxHash: string | null = null;
+        if (ORACLE_ADDRESS) {
+          try {
+            const oracleIface = new ethers.Interface(ORACLE_ABI);
+            const dir = DIRECTION_MAP[String(req.body.direction || '').toLowerCase()] ?? 0;
+            const oracleTxData = oracleIface.encodeFunctionData('publishSignal', [{
+              symbol, direction: dir, conviction: convUint8, agent: agentEnum,
+              entryPrice: BigInt(Math.round(entryPrice * 1e8)),
+              targetPrice: BigInt(Math.round((targetPrice || 0) * 1e8)),
+              stopPrice: BigInt(Math.round((stopPrice || 0) * 1e8)),
+              debateHash, ttl: 86400n, // 24h
+            }]);
+            const oracleTx = await wallet.sendTransaction({
+              to: ORACLE_ADDRESS, data: oracleTxData, gasLimit: 200000n,
+            });
+            oracleTxHash = oracleTx.hash;
+            console.log(`[X Layer] Oracle published: ${oracleTx.hash}`);
+          } catch (oracleErr: any) {
+            console.warn('[X Layer] Oracle publish failed (non-critical):', oracleErr.message);
+          }
+        }
 
         return res.status(200).json({
           ok: true,
           onchain: true,
           broadcast: true,
           action: 'commit',
-          message: 'Commitment broadcast to X Layer',
+          message: 'Commitment broadcast to X Layer' + (oracleTxHash ? ' + Oracle updated' : ''),
           txHash: tx.hash,
+          oracleTxHash,
           explorer: `https://www.oklink.com/xlayer/tx/${tx.hash}`,
           data: { debateHash, symbol, agent: agentEnum, conviction },
         });
