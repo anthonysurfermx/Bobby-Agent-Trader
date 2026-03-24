@@ -383,6 +383,115 @@ function getAgentMood(winRate: number): 'confident' | 'cautious' | 'defensive' {
   return 'defensive';
 }
 
+// ---- Prediction Calibration Curve (Metacognition Upgrade A) ----
+// Answers: "When Bobby says X% conviction, does he actually win X% of the time?"
+interface CalibrationBucket {
+  bucket: string;       // e.g. "0.5-0.7"
+  midpoint: number;     // predicted win rate (center of bucket)
+  actual: number;       // actual win rate (break_even excluded from win count)
+  count: number;        // sample size (excluding break_even)
+  overconfident: boolean;
+  reliable: boolean;    // Codex P1: bucket has enough samples (>=5) to trust
+}
+interface CalibrationData {
+  curve: CalibrationBucket[];
+  calibrationError: number;  // weighted avg |predicted - actual| (Codex: weight by count)
+  isOverconfident: boolean;  // actual < predicted in high-conviction buckets WITH reliable data
+  adjustment: number;        // multiplier for high-conviction only (Codex: capped, min sample)
+  sampleSize: number;
+  breakEvenCount: number;    // Codex: tracked separately, not inflating/deflating win rate
+}
+
+async function fetchCalibrationCurve(): Promise<CalibrationData> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const defaultData: CalibrationData = {
+    curve: [], calibrationError: 0, isOverconfident: false, adjustment: 1.0, sampleSize: 0, breakEvenCount: 0,
+  };
+
+  if (!url || !key) return defaultData;
+
+  try {
+    const res = await fetch(
+      `${url}/rest/v1/forum_threads?resolution=neq.pending&resolution=not.is.null&conviction_score=not.is.null&select=conviction_score,resolution`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (!res.ok) return defaultData;
+    const rows = await res.json() as Array<{ conviction_score: number; resolution: string }>;
+    if (rows.length < 5) return { ...defaultData, sampleSize: rows.length };
+
+    // Codex P1: Separate break_even — don't count as win or loss
+    const breakEvenCount = rows.filter(r => r.resolution === 'break_even').length;
+    const decisive = rows.filter(r => r.resolution === 'win' || r.resolution === 'loss');
+
+    // Group into buckets (conviction is 0-1 scale, per bobby-cycle.ts line 353)
+    const bucketDefs = [
+      { label: '0.0-0.3', min: 0, max: 0.3, mid: 0.15 },
+      { label: '0.3-0.5', min: 0.3, max: 0.5, mid: 0.4 },
+      { label: '0.5-0.7', min: 0.5, max: 0.7, mid: 0.6 },
+      { label: '0.7-0.85', min: 0.7, max: 0.85, mid: 0.775 },
+      { label: '0.85-1.0', min: 0.85, max: 1.01, mid: 0.925 },
+    ];
+
+    const MIN_BUCKET_SIZE = 5; // Codex P1: minimum samples to trust a bucket
+    const curve: CalibrationBucket[] = [];
+    let weightedErrorSum = 0;
+    let totalWeightedCount = 0;
+
+    for (const b of bucketDefs) {
+      const inBucket = decisive.filter(r => r.conviction_score >= b.min && r.conviction_score < b.max);
+      if (inBucket.length === 0) continue;
+      const wins = inBucket.filter(r => r.resolution === 'win').length;
+      const actual = wins / inBucket.length;
+      const reliable = inBucket.length >= MIN_BUCKET_SIZE;
+      const error = Math.abs(b.mid - actual);
+
+      // Codex P1: weight calibration error by sample count
+      if (reliable) {
+        weightedErrorSum += error * inBucket.length;
+        totalWeightedCount += inBucket.length;
+      }
+
+      curve.push({
+        bucket: b.label,
+        midpoint: b.mid,
+        actual: parseFloat(actual.toFixed(3)),
+        count: inBucket.length,
+        overconfident: actual < b.mid,
+        reliable,
+      });
+    }
+
+    const calibrationError = totalWeightedCount > 0
+      ? parseFloat((weightedErrorSum / totalWeightedCount).toFixed(3))
+      : 0;
+
+    // Codex P1: only flag overconfident if RELIABLE high-conviction buckets show it
+    const highReliable = curve.filter(c => c.midpoint >= 0.5 && c.reliable);
+    const isOverconfident = highReliable.some(c => c.overconfident);
+
+    // Codex P1: adjustment multiplier ONLY from reliable high-conviction buckets
+    // Capped at 0.65-1.0 to prevent over-correction from noisy data
+    let adjustment = 1.0;
+    if (isOverconfident && highReliable.length > 0) {
+      const weightedActual = highReliable.reduce((s, c) => s + c.actual * c.count, 0);
+      const weightedPredicted = highReliable.reduce((s, c) => s + c.midpoint * c.count, 0);
+      if (weightedPredicted > 0) {
+        adjustment = parseFloat(Math.max(0.65, Math.min(1.0, weightedActual / weightedPredicted)).toFixed(3));
+      }
+    }
+
+    return {
+      curve,
+      calibrationError,
+      isOverconfident,
+      adjustment,
+      sampleSize: decisive.length,
+      breakEvenCount,
+    };
+  } catch { return defaultData; }
+}
+
 // ---- OKX CEX Prices (spot + commodities) ----
 async function fetchLivePrices(): Promise<Array<{ symbol: string; price: number; change24h: number }>> {
   const instruments = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'OKB-USDT', 'XAUT-USDT', 'PAXG-USDT'];
@@ -788,7 +897,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Run all intelligence sources in parallel
-    const [rawSignals, polyConsensus, recentCycles, cryptoPrices, fundingRates, openInterest, topTradersLS, fearGreed, dxyData, stockPrices, xlayerSignals, dexLeaderboard, trendingTokens, trenchTokens] = await Promise.allSettled([
+    const [rawSignals, polyConsensus, recentCycles, cryptoPrices, fundingRates, openInterest, topTradersLS, fearGreed, dxyData, stockPrices, xlayerSignals, dexLeaderboard, trendingTokens, trenchTokens, calibration] = await Promise.allSettled([
       collectDexSignals(),
       collectPolymarketIntelligence(),
       fetchRecentCycles(5),
@@ -807,7 +916,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchDexLeaderboard(),
       fetchTrendingTokens(),
       fetchTrenchTokens(),
-    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null)) as [any, any, any, any, FundingRate[], OpenInterestData[], LongShortRatio[], FearGreedData | null, { dxy: number } | null, any, any, DexLeaderEntry[], TrendingToken[], TrenchToken[]];
+      fetchCalibrationCurve(),
+    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null)) as [any, any, any, any, FundingRate[], OpenInterestData[], LongShortRatio[], FearGreedData | null, { dxy: number } | null, any, any, DexLeaderEntry[], TrendingToken[], TrenchToken[], CalibrationData | null];
 
     const livePrices = [...(cryptoPrices || []), ...(stockPrices || [])];
 
@@ -917,7 +1027,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Build the intelligence briefing text for Bobby's brain
     const trenchFormatted = (trenchTokens || []).slice(0, 5);
-    const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, xlayerFormatted, leaderFormatted, trendingFormatted, securityResults, trenchFormatted);
+    const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, xlayerFormatted, leaderFormatted, trendingFormatted, securityResults, trenchFormatted, calibration);
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
 
@@ -938,6 +1048,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       security: securityResults,
       trenches: trenchFormatted,
       performance,
+      calibration: calibration || { curve: [], calibrationError: 0, isOverconfident: false, adjustment: 1.0, sampleSize: 0, breakEvenCount: 0 },
       regime: regime.label,
       meta: {
         signalsRaw: rawSignals.length,
@@ -974,6 +1085,7 @@ function buildBriefing(
   trendingTokens?: TrendingToken[],
   securityResults?: TokenSecurity[],
   trenchTokens?: TrenchToken[],
+  calibrationData?: CalibrationData | null,
 ): string {
   const blocks: string[] = [];
 
@@ -1069,6 +1181,32 @@ function buildBriefing(
     latency_s: parseFloat((latencyMs / 1000).toFixed(1)),
   };
   blocks.push(`<AGENT_META>\n${JSON.stringify(metaData)}\n</AGENT_META>`);
+
+  // Prediction Calibration (Metacognition Upgrade A)
+  if (calibrationData && calibrationData.sampleSize >= 5) {
+    const calBlock: Record<string, unknown> = {
+      sample_size: calibrationData.sampleSize,
+      break_even_excluded: calibrationData.breakEvenCount,
+      calibration_error: calibrationData.calibrationError,
+      is_overconfident: calibrationData.isOverconfident,
+      conviction_adjustment: calibrationData.adjustment,
+      buckets: calibrationData.curve.map(c => ({
+        range: c.bucket,
+        predicted: c.midpoint,
+        actual_win_rate: c.actual,
+        n: c.count,
+        reliable: c.reliable,
+        verdict: c.reliable ? (c.overconfident ? 'OVERCONFIDENT' : 'CALIBRATED') : 'LOW_SAMPLE',
+      })),
+    };
+    let instruction = '';
+    if (calibrationData.isOverconfident) {
+      instruction = `\nWARNING: You are OVERCONFIDENT. When you say high conviction, you win less than expected. Apply ${calibrationData.adjustment.toFixed(2)}x multiplier to your raw conviction. Example: if you feel 8/10, report ${Math.round(8 * calibrationData.adjustment)}/10.`;
+    } else if (calibrationData.calibrationError < 0.1) {
+      instruction = '\nYour predictions are well-calibrated. Maintain current conviction levels.';
+    }
+    blocks.push(`<CALIBRATION>\n${JSON.stringify(calBlock)}${instruction}\n</CALIBRATION>`);
+  }
 
   // DEX Leaderboard — top on-chain traders by PnL
   if (dexLeaderboard && dexLeaderboard.length > 0) {

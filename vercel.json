@@ -44,6 +44,10 @@
     {
       "path": "/api/bobby-cycle",
       "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/user-cycle",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {

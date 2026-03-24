@@ -56,7 +56,16 @@ const ConsensusPage = lazy(() => import('@/pages/ConsensusPage'));
 const ClawTraderPage = lazy(() => import('@/pages/ClawTraderPage'));
 const ClawTraderChatPage = lazy(() => import('@/pages/ClawTraderChatPage'));
 const BobbyAgentTraderPage = lazy(() => import('@/pages/BobbyAgentTraderPage'));
+const BobbyChallengePage = lazy(() => import('@/pages/BobbyChallengePage'));
+const BobbyAnalyticsPage = lazy(() => import('@/pages/BobbyAnalyticsPage'));
+const BobbyHistoryPage = lazy(() => import('@/pages/BobbyHistoryPage'));
+const BobbyAgentsPage = lazy(() => import('@/pages/BobbyAgentsPage'));
+const BobbyPortfolioPage = lazy(() => import('@/pages/BobbyPortfolioPage'));
+const BobbyTelegramPage = lazy(() => import('@/pages/BobbyTelegramPage'));
 const AgentForumPage = lazy(() => import('@/pages/AgentForumPage'));
+const DeployAgentPage = lazy(() => import('@/pages/DeployAgentPage'));
+const BobbyB2BPage = lazy(() => import('@/pages/BobbyB2BPage'));
+const BobbyMetacognitionPage = lazy(() => import('@/pages/BobbyMetacognitionPage'));
 
 
 // Auth pages
@@ -498,6 +507,7 @@ const router = createBrowserRouter(
                 </Suspense>
               ),
             },
+            // Bobby Terminal route stays in MainLayout (it's full-screen with z-[100])
             {
               path: 'agentic-world/bobby',
               element: (
@@ -506,14 +516,7 @@ const router = createBrowserRouter(
                 </Suspense>
               ),
             },
-            {
-              path: 'agentic-world/forum',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AgentForumPage />
-                </Suspense>
-              ),
-            },
+            // Forum moved outside MainLayout — uses KineticShell
             {
               path: 'agentic-world/claw-trader',
               element: (
@@ -545,6 +548,96 @@ const router = createBrowserRouter(
               ),
             },
           ],
+        },
+
+        // ==========================================
+        // B2B LANDING PAGE (SIN LAYOUT)
+        {
+          path: 'agentic-world/bobby/b2b',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyB2BPage />
+            </Suspense>
+          ),
+        },
+
+        // DEPLOY AGENT WIZARD (SIN LAYOUT)
+        {
+          path: 'agentic-world/deploy',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <DeployAgentPage />
+            </Suspense>
+          ),
+        },
+
+        // BOBBY KINETIC SHELL ROUTES (SIN MAIN LAYOUT)
+        // These pages use their own KineticShell nav/sidebar
+        // ==========================================
+        {
+          path: 'agentic-world/bobby/challenge',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyChallengePage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'agentic-world/bobby/analytics',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAnalyticsPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'agentic-world/bobby/history',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyHistoryPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'agentic-world/bobby/agents',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAgentsPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'agentic-world/bobby/portfolio',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyPortfolioPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'agentic-world/bobby/telegram',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyTelegramPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'agentic-world/bobby/metacognition',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyMetacognitionPage />
+            </Suspense>
+          ),
+        },
+
+        {
+          path: 'agentic-world/forum',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <AgentForumPage />
+            </Suspense>
+          ),
         },
 
         // ==========================================

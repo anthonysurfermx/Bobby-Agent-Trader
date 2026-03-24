@@ -57,16 +57,9 @@ async function ethCall(data: string): Promise<string> {
 }
 
 // keccak256 hash — matches contract's debateHash semantics
-// Uses native crypto (no ethers dependency needed on Vercel)
-import { createHash } from 'crypto';
-
+// ethers is already imported at top — use its keccak256 directly
 function toDebateHash(threadId: string): string {
-  // keccak256 is not in Node crypto, use sha3-256 equivalent
-  // For Vercel serverless, we use a manual keccak256 via the keccak npm
-  // Fallback: sha256 which is deterministic and collision-resistant
-  // TODO: Replace with proper keccak256 when ethers is available for TX signing
-  const hash = createHash('sha256').update(threadId).digest('hex');
-  return '0x' + hash;
+  return ethers.keccak256(ethers.toUtf8Bytes(threadId));
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

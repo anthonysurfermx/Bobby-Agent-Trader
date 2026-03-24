@@ -5,20 +5,20 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Rate limiting: simple in-memory store (resets on cold start, good enough for MVP)
+// Rate limiting: 10 requests per day per IP (resets on cold start + 24h window)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 50;
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-function isRateLimited(ip: string): boolean {
+function isRateLimited(ip: string): { limited: boolean; remaining: number } {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return false;
+    return { limited: false, remaining: RATE_LIMIT - 1 };
   }
   entry.count++;
-  return entry.count > RATE_LIMIT;
+  return { limited: entry.count > RATE_LIMIT, remaining: Math.max(0, RATE_LIMIT - entry.count) };
 }
 
 // Prompt builders per context
@@ -432,6 +432,80 @@ Explain in 5-7 lines:
 Detect the user's language and respond accordingly.`;
 }
 
+function buildMetacognitionPrompt(data: any): string {
+  const cal = data.calibration;
+  const perf = data.performance;
+  const quality = data.debateQuality;
+  const corrections = data.corrections || [];
+  const userName = data.userName || null;
+  const regime = data.regime || 'unknown';
+  const fearGreed = data.fearGreed;
+  const scored = data.debatesScoredCount || 0;
+
+  return `Analyze this metacognition snapshot for ${userName || 'the user'}.
+
+Your job is NOT to explain each dashboard card.
+Your job is to identify the deepest pattern in Bobby's behavior right now.
+
+Focus on:
+1. The single most important diagnosis
+2. The strongest cross-connections between sections
+3. What operational adjustment follows from that diagnosis
+4. One non-obvious insight most people would miss
+
+Make at least 3 cross-references like these:
+- calibration error + debate quality → "I'm confidently repeating consensus"
+- mood + corrections → "cautious for the right reasons" or "cautious but still making the same mistakes"
+- regime + fear/greed + dynamic conviction → market context affecting decisions
+- debate quality weakness + overconfidence → systematic blind spot
+- sample size + trustworthiness → "this diagnosis is provisional"
+
+If evidence conflicts, say exactly where. If sample is thin, reduce confidence.
+Reference Alpha Hunter and Red Team by name when explaining debate dynamics.
+Address ${userName || 'the user'} by name at most once, in the opening.
+Give 1 operational adjustment only (process change, not trade pick).
+End with a provocative question.
+
+DATA
+
+CALIBRATION
+- calibrationError: ${cal?.calibrationError ?? 'N/A'}
+- isOverconfident: ${cal?.isOverconfident ? 'yes' : 'no'}
+- sampleSize: ${cal?.sampleSize ?? 0}
+${cal?.curve?.length ? `- curve:\n${cal.curve.map((b: any) => `  ${b.bucket}: predicted ${(b.midpoint * 100).toFixed(0)}%, actual ${(b.actual * 100).toFixed(0)}%, n=${b.count}, reliable=${b.reliable ? 'yes' : 'no'}`).join('\n')}` : '- curve: insufficient data'}
+
+PERFORMANCE
+- winRate: ${perf?.winRate ?? 'N/A'}%
+- mood: ${perf?.mood ?? 'unknown'}
+- safeMode: ${perf?.isSafeMode ? 'on' : 'off'}
+- dynamicConviction: ${perf?.dynamicConviction ?? 'N/A'}
+
+MARKET
+- regime: ${regime}
+- fearGreed: ${fearGreed ? `${fearGreed.value} (${fearGreed.classification})` : 'not available'}
+
+DEBATE QUALITY (scored by independent AI judge, Haiku)
+${quality ? `- specificity: ${quality.specificity}/5
+- data_citation: ${quality.data_citation}/5
+- actionability: ${quality.actionability}/5
+- novel_insight: ${quality.novel_insight}/5
+- red_team_rigor: ${quality.red_team_rigor}/5
+- weakness: "${quality.weakness || 'none'}"
+- debatesScored: ${scored}` : `- no debate quality data yet (scored: ${scored})`}
+
+SELF-CORRECTION LOG (recent losses)
+${corrections.length ? corrections.map((c: any) => `- ${c.symbol} ${c.direction}: conviction ${(c.conviction_score * 10).toFixed(0)}/10, result=${c.resolution}, pnl=${c.resolution_pnl_pct ?? 'N/A'}%`).join('\n') : '- no recent corrections'}
+
+Now produce the analysis. Remember:
+- Start with INITIATING METACOGNITION SEQUENCE and SYNCING for ${userName || 'user'}
+- Lead with insight, not summary
+- Cross-reference aggressively
+- Translate quant-speak into trader psychology
+- Be uncomfortable if the data warrants it
+- End with TAGS: line`;
+}
+
+
 const promptBuilders: Record<string, (data: any) => string> = {
   'wallet': buildWalletPrompt,
   'exchange-metrics': buildExchangeMetricsPrompt,
@@ -445,6 +519,7 @@ const promptBuilders: Record<string, (data: any) => string> = {
   'smartmoney-alpha': buildSmartMoneyAlphaPrompt,
   'chat-opportunity': buildChatOpportunityPrompt,
   'chat-deep-analysis': buildChatDeepAnalysisPrompt,
+  'metacognition': buildMetacognitionPrompt,
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -452,10 +527,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Rate limiting
+  // Rate limiting: 10 requests per day per IP
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
-  if (isRateLimited(ip)) {
-    return res.status(429).json({ error: 'Rate limit exceeded. Try again later.' });
+  const rateCheck = isRateLimited(ip);
+  if (rateCheck.limited) {
+    return res.status(429).json({ error: `Daily limit reached (${RATE_LIMIT}/day). Resets in 24h. Save your queries for the insights that matter most.` });
   }
 
   const { context, data, language = 'en' } = req.body || {};
@@ -469,7 +545,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: `Invalid context: ${context}. Valid: ${Object.keys(promptBuilders).join(', ')}` });
   }
 
-  const systemPrompt = `You are an on-chain analyst at DeFi Mexico.
+  // Metacognition gets its own system prompt — Bobby in post-mortem mode
+  const metacognitionSystemPrompt = `You are Bobby, a CIO-class AI trading agent, doing a brutally honest post-mortem review of your own decision engine.
+
+Write in short terminal-style lines, each starting with ">".
+${language === 'es' ? 'Respond in Spanish. Use crypto/trading slang natural in LatAm trading communities.' : 'Respond in English. Use trading floor jargon naturally.'}
+Keep it concise, high-signal, and personal. Sound like a veteran trader reviewing their own PnL in private — not a SaaS dashboard explainer.
+
+Rules:
+- Start with > INITIATING METACOGNITION SEQUENCE...
+- Then > SYNCING NEURAL WEIGHTS FOR USER: {userName} (if available)
+- Lead with your strongest non-obvious diagnosis, NOT a summary of panels.
+- Every claim MUST connect at least 2 different parts of the dashboard. No isolated stat readings.
+- Translate quant-speak into trader psychology ("calibration error 0.18" → "I'm being dangerously overconfident").
+- Reference your agents by name (Alpha Hunter, Red Team) when explaining debate dynamics.
+- If sample size is thin (<10), explicitly say the diagnosis is provisional.
+- Give ONE operational adjustment (process, not trade picks). No "buy X" or "sell Y".
+- Be willing to call yourself out. If you look sloppy, say it directly.
+- Use at most 1 analogy, only if it genuinely sharpens the point.
+- End with a provocative question that makes the user rethink something.
+- After your analysis, output TAGS: with 2-3 tags classifying the state (e.g. "Overconfident, Needs Recalibration, Red Team Strong").
+
+Output structure:
+> HEADLINE: one-sentence diagnosis (the single most important finding)
+> WHY THIS MATTERS: 3-5 lines with cross-referenced evidence
+> TRUST LEVEL NOW: 1-2 lines — should the user trust Bobby today?
+> ONE ADJUSTMENT: 1 specific operational change
+> ONE THING MOST PEOPLE MISS: 1 surprising insight from the data
+> QUESTION: 1 provocative question for the user
+
+Never hallucinate numbers. Never walk through panels mechanically.`;
+
+  const systemPrompt = context === 'metacognition' ? metacognitionSystemPrompt : `You are an on-chain analyst at DeFi Mexico.
 Write in short terminal-style lines, each starting with ">".
 Be direct, use data points, identify patterns.
 Write 4-6 paragraphs max. Keep each line under 100 characters.

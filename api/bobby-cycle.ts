@@ -169,6 +169,53 @@ async function getTrackRecord(): Promise<{ wins: number; losses: number; winRate
   return { wins, losses, winRate: Math.round((wins / total) * 100), lastCalls };
 }
 
+// ---- Self-Correction Loop (Metacognition Upgrade C) ----
+// Fetch recent contradictions — trades where Bobby was wrong
+// Codex: cap at 5 entries, 1 line each, don't bloat prompt
+
+interface Contradiction {
+  symbol: string;
+  direction: string;
+  conviction: number;
+  pnlPct: number;
+  resolvedAt: string;
+  hoursAgo: number;
+}
+
+async function getRecentContradictions(): Promise<{ contradictions: Contradiction[]; block: string }> {
+  const data = await sbQuery('forum_threads',
+    'resolution=in.(loss,break_even)&resolved_at=not.is.null&symbol=not.is.null&select=symbol,direction,conviction_score,resolution_pnl_pct,resolved_at&order=resolved_at.desc&limit=5'
+  );
+
+  if (!data.length) return { contradictions: [], block: '\nRECENT MISTAKES: None — record clean.' };
+
+  const now = Date.now();
+  const contradictions: Contradiction[] = data
+    .filter((d: any) => {
+      // Only last 72 hours
+      const resolvedTime = new Date(d.resolved_at).getTime();
+      return (now - resolvedTime) < 72 * 60 * 60 * 1000;
+    })
+    .map((d: any) => ({
+      symbol: d.symbol,
+      direction: d.direction || 'long',
+      conviction: d.conviction_score ? Math.round(d.conviction_score * 10) : 0,
+      pnlPct: d.resolution_pnl_pct || 0,
+      resolvedAt: d.resolved_at,
+      hoursAgo: Math.round((now - new Date(d.resolved_at).getTime()) / (60 * 60 * 1000)),
+    }));
+
+  if (!contradictions.length) return { contradictions: [], block: '\nRECENT MISTAKES: None in last 72h — record clean.' };
+
+  // Codex: 1 line per entry, capped at 5
+  const lines = contradictions.map(c =>
+    `- ${c.hoursAgo}h ago: ${c.direction.toUpperCase()} ${c.symbol} @ ${c.conviction}/10 → ${c.pnlPct > 0 ? '+' : ''}${c.pnlPct.toFixed(1)}%`
+  );
+  const block = `\nRECENT MISTAKES (${contradictions.length}):\n${lines.join('\n')}`;
+
+  return { contradictions, block };
+}
+
 // ---- Main handler ----
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -216,10 +263,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ============================================================
     // PHASE 1: Freeze market snapshot
     // ============================================================
-    const [intel, positions, track] = await Promise.all([
+    const [intel, positions, track, corrections] = await Promise.all([
       fetchIntel(),
       fetchPositions(okxMode),
       getTrackRecord(),
+      getRecentContradictions(),
     ]);
 
     const testState = body.testState as {
@@ -280,9 +328,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? 'Responde en español mexicano. Términos de trading en inglés están bien.'
       : 'Respond in English.';
 
+    // Calibration data from intel (Metacognition Upgrade A)
+    const calibration = intel.calibration as {
+      calibrationError?: number; isOverconfident?: boolean; adjustment?: number;
+      sampleSize?: number; curve?: Array<{ bucket: string; midpoint: number; actual: number; count: number; reliable: boolean }>;
+    } | undefined;
+
+    const calibrationBlock = calibration && calibration.sampleSize && calibration.sampleSize >= 5
+      ? `\nCALIBRATION: Error=${calibration.calibrationError?.toFixed(2)} | ${
+          calibration.isOverconfident
+            ? `OVERCONFIDENT — your high-conviction calls win ${Math.round((calibration.adjustment || 1) * 100)}% of what you predict. Adjust down.`
+            : 'Well-calibrated. Maintain levels.'
+        } | Sample: ${calibration.sampleSize} resolved trades`
+      : '';
+
     const memoryBlock = `\nBOBBY'S TRACK RECORD: Win Rate ${track.winRate}% | Last calls: ${track.lastCalls}${
       track.winRate < 60 ? '\nWARNING: Accuracy below 60%. Be extra cautious.' : ''
-    }`;
+    }${calibrationBlock}${corrections.block}`;
 
     const positionsBlock = effectivePositions.length > 0
       ? `\nOPEN POSITIONS:\n${effectivePositions.map((p: any) =>
@@ -304,9 +366,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`[Cycle] TEST VERDICT: ${testVerdict.direction} ${testVerdict.symbol} conviction ${testVerdict.conviction}/10`);
     } else {
 
+    // Contradiction-aware prompts (Metacognition Upgrade C)
+    const hasContradictions = corrections.contradictions.length > 0;
+    const contradictionNote = hasContradictions
+      ? ` Bobby recently failed on: ${corrections.contradictions.slice(0, 3).map(c => `${c.direction.toUpperCase()} ${c.symbol}`).join(', ')}. If your thesis resembles a recent failure, explain what changed.`
+      : '';
+
     // Alpha Hunter (Haiku — cheap, aggressive, scans full market)
     alphaPost = await callClaude('claude-haiku-4-5-20251001',
-      `You are Alpha Hunter — a young hungry female trader. Scan ALL assets (crypto + stocks). Find the single BEST trade. Be SPECIFIC: entry, target, stop, leverage. ${langRule} 2-3 short paragraphs.`,
+      `You are Alpha Hunter — a young hungry female trader. Scan ALL assets (crypto + stocks). Find the single BEST trade. Be SPECIFIC: entry, target, stop, leverage.${contradictionNote} ${langRule} 2-3 short paragraphs.`,
       `MARKET SCAN:\n${contextBlock}`, 350
     );
 
@@ -314,7 +382,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     redPost = await callClaude('claude-sonnet-4-20250514',
       `You are Red Team — 15-year risk veteran who lost $30M trusting "obvious" trades. Destroy Alpha's thesis. Attack data gaps, selection bias, timing. ${langRule} 2-3 short paragraphs. Every paragraph is a kill shot.${
         track.winRate < 60 ? ' Bobby has been WRONG recently. Be extra aggressive.' : ''
-      }`,
+      }${hasContradictions ? ` Use Bobby's recent failures as ammunition: ${corrections.block}` : ''}`,
       `MARKET DATA:\n${contextBlock}\n\nALPHA HUNTER'S THESIS:\n${alphaPost}`, 350
     );
 
@@ -324,15 +392,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 RULES:
 - 2 short paragraphs of reasoning in ${lang === 'es' ? 'Spanish' : 'English'}.
-- Then you MUST end with a JSON block exactly like this (no markdown fences):
+- Then you MUST end with EXACTLY these two lines (no markdown fences):
 VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry":70500,"stop":69200,"target":73900,"invalidation":"DXY breaks above 126"}
-- If sitting out: {"execute":false,"conviction":3,"symbol":"BTC","direction":"none","entry":null,"stop":null,"target":null,"invalidation":"Would enter if DXY drops below 124"}
+VIBE_PHRASE: BTC order flow stacking at 70.5k, whales loading quietly. Let's ride.
+- If sitting out:
+VERDICT: {"execute":false,"conviction":3,"symbol":"BTC","direction":"none","entry":null,"stop":null,"target":null,"invalidation":"Would enter if DXY drops below 124"}
+VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time.
 - conviction is 1-10 integer. symbol must be one of: BTC,ETH,SOL (only these 3 for now).
 - direction must be "long", "short", or "none".
-- NEVER omit the VERDICT line. It is mandatory.${
+- NEVER omit VERDICT or VIBE_PHRASE. Both are mandatory. VIBE_PHRASE must come right after VERDICT.
+- VIBE_PHRASE is a casual 1-2 sentence trading mood (max 200 chars). Write like texting a friend. Reference specific prices/conditions you analyzed.${
         track.winRate < 60 ? '\nYour recent calls have been poor. Acknowledge it.' : ''
-      }`,
-      `MARKET DATA:\n${contextBlock}\n\nALPHA:\n${alphaPost}\n\nRED TEAM:\n${redPost}`, 400
+      }${hasContradictions ? `\nSELF-CORRECTION: You recently failed on these calls. If your current thesis resembles one, explain what is DIFFERENT this time or sit out.` : ''}`,
+      `MARKET DATA:\n${contextBlock}\n\nALPHA:\n${alphaPost}\n\nRED TEAM:\n${redPost}`, 500
     );
     } // end else (non-test debate)
 
@@ -373,6 +445,10 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
       }
     }
 
+    // Parse VIBE_PHRASE from CIO output
+    const vibeMatch = cioPost.match(/VIBE_PHRASE:\s*(.+?)(?:\n|$)/);
+    const vibePhrase = vibeMatch ? vibeMatch[1].trim().slice(0, 220) : null;
+
     // Fallback: regex extraction ONLY for forum/digest — NEVER for execution decisions
     if (conviction === null) {
       const convMatch = cioPost.match(/(\d+)\s*\/\s*10/);
@@ -389,6 +465,21 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
     // Regex fallback NEVER enables execution — only structured VERDICT with complete fields can
 
     // ============================================================
+    // PHASE 3b: Apply calibration adjustment (Metacognition Upgrade A)
+    // Codex P1: Store BOTH raw and adjusted conviction separately
+    // ============================================================
+    const rawConviction = conviction;
+    const calAdj = calibration?.adjustment ?? 1.0;
+    const calActive = calibration?.isOverconfident && calAdj < 1.0;
+    if (conviction !== null && calActive) {
+      // Only adjust high conviction (>=0.5) per Codex recommendation
+      if (conviction >= 0.5) {
+        conviction = parseFloat(Math.max(0.1, conviction * calAdj).toFixed(2));
+        console.log(`[Cycle] Calibration adjustment: raw=${rawConviction} → adjusted=${conviction} (multiplier=${calAdj})`);
+      }
+    }
+
+    // ============================================================
     // PHASE 4a: Create forum thread FIRST (canonical ID for everything)
     // ============================================================
     const now = new Date();
@@ -402,9 +493,13 @@ VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry
     const thread = await sbInsert('forum_threads', {
       topic,
       trigger_reason: `Autonomous ${kind} cycle`,
-      trigger_data: { regime: intel.regime, fgi: intel.fearGreed, dxy: intel.dxy },
+      // Codex P1: store both raw and adjusted conviction + calibration metadata
+      trigger_data: {
+        regime: intel.regime, fgi: intel.fearGreed, dxy: intel.dxy,
+        ...(calActive ? { calibration: { raw_conviction: rawConviction, adjusted_conviction: conviction, multiplier: calAdj } } : {}),
+      },
       language: lang,
-      conviction_score: conviction,
+      conviction_score: conviction, // adjusted (what Bobby actually uses)
       price_at_creation: Object.fromEntries((intel.prices || []).map((p: any) => [p.symbol, p.price])),
       symbol,
       direction,
@@ -673,6 +768,7 @@ ${lang === 'es' ? 'Responde en español mexicano, casual pero inteligente. Como 
           status: 'completed',
           latency_ms: latencyMs,
           llm_reasoning: `Debate: ${digestSymbol} ${digestDirection} ${convNum}/10`,
+          vibe_phrase: vibePhrase,
         }),
       });
     }
@@ -712,6 +808,71 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
           body: JSON.stringify({ text: tweetText })
         });
       } catch (e) { console.error('Tweet failed', e); }
+    }
+
+    // Deliver Bobby's public debate to active Telegram groups
+    if (threadId) {
+      const cycleSecret = process.env.BOBBY_CYCLE_SECRET;
+      fetch('https://defimexico.org/api/telegram-deliver', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(cycleSecret ? { Authorization: `Bearer ${cycleSecret}` } : {}),
+        },
+        body: JSON.stringify({
+          thread_id: threadId,
+          conviction,
+          symbol: digestSymbol,
+        }),
+      }).catch(err => console.error('[bobby-cycle] Telegram delivery failed:', err));
+    }
+
+    // ============================================================
+    // PHASE 7: Debate Quality Scoring (Metacognition Upgrade D)
+    // AWAITED — fire-and-forget dies on Vercel when response is sent.
+    // Haiku takes ~2-3s, acceptable overhead for real data.
+    // ============================================================
+    if (threadId && !useTestVerdict) {
+      try {
+        const qualityRaw = await callClaude('claude-haiku-4-5-20251001',
+          `You are a trading debate evaluator. Score this 3-agent debate on each dimension using integers 1-5.
+Calibration anchors:
+- 1 = vague, no data, generic advice anyone could give
+- 3 = decent analysis with some specific references but missing key context
+- 5 = exceptional — cites 3+ specific prices/metrics, provides novel non-obvious insight, actionable with exact levels
+
+Return ONLY valid JSON, no markdown, no explanation:
+{"specificity":N,"data_citation":N,"actionability":N,"novel_insight":N,"red_team_rigor":N,"overall":N,"weakness":"one sentence identifying the biggest flaw"}`,
+          `ALPHA HUNTER:\n${alphaPost.slice(0, 600)}\n\nRED TEAM:\n${redPost.slice(0, 600)}\n\nCIO VERDICT:\n${cioPost.slice(0, 600)}`, 150
+        );
+        const jsonMatch = qualityRaw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const raw = JSON.parse(jsonMatch[0]);
+          const clamp = (v: unknown) => {
+            const n = typeof v === 'number' ? Math.round(v) : 3;
+            return Math.max(1, Math.min(5, n));
+          };
+          const quality = {
+            specificity: clamp(raw.specificity),
+            data_citation: clamp(raw.data_citation),
+            actionability: clamp(raw.actionability),
+            novel_insight: clamp(raw.novel_insight),
+            red_team_rigor: clamp(raw.red_team_rigor),
+            overall: clamp(raw.overall),
+            weakness: typeof raw.weakness === 'string' ? raw.weakness.slice(0, 300) : 'No weakness identified',
+          };
+          await fetch(`${SB_URL}/rest/v1/forum_threads?id=eq.${threadId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: SB_KEY,
+              Authorization: `Bearer ${SB_KEY}`,
+            },
+            body: JSON.stringify({ debate_quality: quality }),
+          });
+          console.log(`[Cycle] Debate quality scored: overall=${quality.overall}/5, weakness="${quality.weakness}"`);
+        }
+      } catch (e) { console.warn('[Cycle] Debate quality scoring failed (non-critical):', e); }
     }
 
     return res.status(200).json({
