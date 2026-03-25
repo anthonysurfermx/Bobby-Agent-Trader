@@ -181,13 +181,18 @@ export default function BobbyChallengePage() {
   const chartData = useMemo(() => {
     if (!pnl || !s) return [];
     let cumPnl = 0;
-    return [
+    const points = [
       { trade: 0, equity: s.startingCapital, label: 'START', result: 'START', symbol: '', pnl: undefined as number | undefined },
       ...pnl.closedPositions.map((t, i) => {
         cumPnl += t.realizedPnl;
         return { trade: i + 1, equity: s.startingCapital + cumPnl, label: `#${i + 1}`, result: t.result, symbol: t.symbol, pnl: t.realizedPnl };
       }),
     ];
+    // If no trades yet, show current equity as "NOW" point so chart renders
+    if (pnl.closedPositions.length === 0) {
+      points.push({ trade: 1, equity: s.currentEquity, label: 'NOW', result: 'START', symbol: '', pnl: undefined });
+    }
+    return points;
   }, [pnl, s]);
 
   return (
@@ -223,7 +228,7 @@ export default function BobbyChallengePage() {
             {/* Next Scan Countdown — Stitch amber card */}
             <div className="bg-white/[0.02] backdrop-blur-sm border border-amber-500/15 p-6 flex flex-col items-end rounded border-l-4 border-l-amber-500">
               <span className="font-mono text-[8px] text-amber-500 mb-2 tracking-widest">NEXT_SCAN_IN</span>
-              <div className="font-mono text-4xl font-bold text-amber-500 tracking-tighter">{nextScan}</div>
+              <div className="font-mono text-4xl font-bold text-amber-500 tracking-tighter" style={{ fontVariantNumeric: 'tabular-nums' }}>{nextScan}</div>
               <div className="mt-2 h-1 w-full bg-white/10 rounded-full overflow-hidden">
                 <div className="h-full bg-amber-500 transition-all" style={{ width: `${nextScanPct * 100}%`, boxShadow: '0 0 8px #F59E0B' }} />
               </div>
@@ -364,21 +369,21 @@ export default function BobbyChallengePage() {
                   </div>
                   <div className="font-mono text-xs text-white/40 mb-8 tracking-widest">NET_BALANCE_AVAILABLE</div>
                   <div>
-                    <div className="text-6xl md:text-7xl font-mono font-black text-green-400 tracking-tighter mb-2">
-                      ${s.currentEquity.toFixed(2)}
+                    <div className="text-6xl md:text-7xl font-mono font-black text-green-400 tracking-tighter mb-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      ${s.totalTrades === 0 ? s.startingCapital.toFixed(2) : s.currentEquity.toFixed(2)}
                     </div>
                     <div className="flex items-center gap-2 text-xs font-mono text-white/30">
                       <span className={s.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        {s.totalReturn >= 0 ? '+' : ''}{s.totalReturn}%
+                        {s.totalTrades === 0 ? '0.00' : `${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}`}%
                       </span>
                       <span>from ${s.startingCapital} initial</span>
                     </div>
                   </div>
                 </div>
                 {/* Total Return */}
-                <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-8 rounded">
+                <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-8 rounded hover:bg-white/[0.04] transition-all duration-300">
                   <div className="font-mono text-xs text-white/40 mb-8 tracking-widest">TOTAL_RETURN</div>
-                  <div className={`text-4xl md:text-5xl font-mono font-bold tracking-tighter ${s.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <div className={`text-4xl md:text-5xl font-mono font-bold tracking-tighter ${s.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
                     {s.totalReturn >= 0 ? '+' : ''}{s.totalReturn}%
                   </div>
                   <div className="mt-4 text-[10px] font-mono text-white/20 uppercase">
@@ -386,9 +391,9 @@ export default function BobbyChallengePage() {
                   </div>
                 </div>
                 {/* Win Rate */}
-                <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-8 rounded">
+                <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-8 rounded hover:bg-white/[0.04] transition-all duration-300">
                   <div className="font-mono text-xs text-white/40 mb-8 tracking-widest">WIN_RATE</div>
-                  <div className="text-4xl md:text-5xl font-mono font-bold tracking-tighter">{s.winRate.toFixed(1)}%</div>
+                  <div className="text-4xl md:text-5xl font-mono font-bold tracking-tighter" style={{ fontVariantNumeric: 'tabular-nums' }}>{s.winRate.toFixed(1)}%</div>
                   <div className="mt-4 text-[10px] font-mono text-white/20 uppercase">{s.wins}/{s.totalTrades} Successful cycles</div>
                 </div>
               </motion.section>

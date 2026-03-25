@@ -123,7 +123,7 @@ function CalibrationTooltip({ active, payload }: any) {
 }
 
 // ---- Quality bar component ----
-function QualityBar({ label, value, max = 5 }: { label: string; value: number; max?: number }) {
+function QualityBar({ label, value, max = 5, delay = 0 }: { label: string; value: number; max?: number; delay?: number }) {
   const pct = Math.min(100, (value / max) * 100);
   const color = pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500';
   return (
@@ -134,7 +134,7 @@ function QualityBar({ label, value, max = 5 }: { label: string; value: number; m
           className={`h-full rounded-full ${color}`}
           initial={{ width: 0 }}
           animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
+          transition={{ duration: 0.8, ease: 'easeOut', delay }}
         />
       </div>
       <span className="text-[10px] font-mono text-white/60 w-8 text-right">{value.toFixed(1)}</span>
@@ -267,13 +267,13 @@ export default function BobbyMetacognitionPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Calibration Error */}
           <motion.div {...fadeUp} transition={{ delay: 0.05 }}
-            className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
+            className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4 hover:bg-white/[0.04] transition-all duration-300">
             <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">CALIBRATION ERROR</p>
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <p className={`text-2xl font-black font-mono ${calibrationColor(cal?.calibrationError ?? 1)}`}>
+                <p className={`text-2xl font-black font-mono ${calibrationColor(cal?.calibrationError ?? 1)}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {cal?.calibrationError != null ? cal.calibrationError.toFixed(3) : '--'}
                 </p>
                 <p className="text-[8px] font-mono text-white/20 mt-1">
@@ -285,13 +285,13 @@ export default function BobbyMetacognitionPage() {
 
           {/* Win Rate */}
           <motion.div {...fadeUp} transition={{ delay: 0.1 }}
-            className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
+            className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4 hover:bg-white/[0.04] transition-all duration-300">
             <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">WIN RATE</p>
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <p className="text-2xl font-black text-white font-mono">
+                <p className="text-2xl font-black text-white font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {perf?.winRate != null ? `${perf.winRate}%` : '--'}
                 </p>
                 {perf?.mood && (
@@ -305,7 +305,7 @@ export default function BobbyMetacognitionPage() {
 
           {/* Regime */}
           <motion.div {...fadeUp} transition={{ delay: 0.15 }}
-            className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
+            className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4 hover:bg-white/[0.04] transition-all duration-300">
             <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">MARKET REGIME</p>
             {loading ? (
               <Skeleton className="h-8 w-28" />
@@ -328,13 +328,13 @@ export default function BobbyMetacognitionPage() {
 
           {/* Self-Corrections */}
           <motion.div {...fadeUp} transition={{ delay: 0.2 }}
-            className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
+            className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4 hover:bg-white/[0.04] transition-all duration-300">
             <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">SELF-CORRECTIONS</p>
             {loading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <p className="text-2xl font-black text-white font-mono">
+                <p className="text-2xl font-black text-white font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {contradictions.length}
                 </p>
                 <p className="text-[8px] font-mono text-white/20 mt-1">
@@ -463,11 +463,11 @@ export default function BobbyMetacognitionPage() {
                       : `PRELIMINARY_DATA • n=${debatesScoredCount}`}
                   </div>
                 )}
-                <QualityBar label="Specificity" value={quality.specificity} />
-                <QualityBar label="Data Citation" value={quality.data_citation} />
-                <QualityBar label="Actionability" value={quality.actionability} />
-                <QualityBar label="Novel Insight" value={quality.novel_insight} />
-                <QualityBar label="Red Team Rigor" value={quality.red_team_rigor} />
+                <QualityBar label="Specificity" value={quality.specificity} delay={0.1} />
+                <QualityBar label="Data Citation" value={quality.data_citation} delay={0.2} />
+                <QualityBar label="Actionability" value={quality.actionability} delay={0.3} />
+                <QualityBar label="Novel Insight" value={quality.novel_insight} delay={0.4} />
+                <QualityBar label="Red Team Rigor" value={quality.red_team_rigor} delay={0.5} />
               </div>
             ) : (
               <div className="space-y-4 opacity-30">
@@ -498,11 +498,11 @@ export default function BobbyMetacognitionPage() {
             <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-white/[0.04]">
               <div>
                 <p className="text-[8px] font-mono text-green-400/40 tracking-widest">TOTAL DEBATES</p>
-                <p className="text-lg font-black text-white font-mono">{totalDebates}</p>
+                <p className="text-lg font-black text-white font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>{totalDebates}</p>
               </div>
               <div>
                 <p className="text-[8px] font-mono text-green-400/40 tracking-widest">AGREEMENT RATE</p>
-                <p className="text-lg font-black text-white font-mono">
+                <p className="text-lg font-black text-white font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {agreementRate != null ? `${agreementRate}%` : '--'}
                 </p>
               </div>

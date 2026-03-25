@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/bobby", "destination": "/agentic-world/bobby/challenge" },
     { "source": "/api/polymarket-gamma/:path*", "destination": "https://gamma-api.polymarket.com/:path*" },
     { "source": "/api/polymarket-data/:path*", "destination": "https://data-api.polymarket.com/:path*" },
     { "source": "/api/polymarket-clob/:path*", "destination": "https://clob.polymarket.com/:path*" },
@@ -111,11 +112,7 @@
       "maxDuration": 10,
       "memory": 256
     },
-    "api/xlayer-trade.ts": {
-      "maxDuration": 35,
-      "memory": 256
-    },
-    "api/xlayer-record.ts": {
+"api/xlayer-record.ts": {
       "maxDuration": 30,
       "memory": 256
     },

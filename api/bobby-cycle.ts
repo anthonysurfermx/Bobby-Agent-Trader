@@ -628,6 +628,8 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
                 executionResult = openRes;
 
                 // 4. Set TP/SL — MANDATORY for challenge
+                // Wait 2s for OKX to register the position (Codex P0: TP/SL race condition)
+                await new Promise(r => setTimeout(r, 2000));
                 if (stopPrice || targetPrice) {
                   tpslResult = await fetchLocalApi('/api/okx-perps', {
                     action: 'set_tpsl',
@@ -665,8 +667,9 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
                   }
                 }
 
-                // 5. On-chain commit only for live challenge mode
-                if (executionResult && shouldCommitOnchain) {
+                // 5. On-chain commit — already handled during debate creation (line ~531)
+                // Skip duplicate commit here to avoid "Already committed" revert
+                if (executionResult && shouldCommitOnchain && false) {
                   try {
                     const commitRes = await fetchLocalApi('/api/xlayer-record', {
                       action: 'commit',
@@ -681,7 +684,6 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
                     if (commitRes.ok) {
                       txHash = commitRes.txHash;
                     } else {
-                      // Trade executed but commit failed — mark as uncommitted
                       console.warn('[Cycle] Trade executed but on-chain commit failed');
                     }
                   } catch (commitErr) {

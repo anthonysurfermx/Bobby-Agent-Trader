@@ -21,6 +21,7 @@ import { IntelligenceFeed, type DebateData, type MetacognitionData, type SignalD
 import { ConvictionBoard } from './ConvictionBoard';
 import { FeedbackWidget } from './FeedbackWidget';
 import { ExecutionTimeline } from './ExecutionTimeline';
+import { STOCK_MAP, TOKEN_MAP, detectIntent, detectStocks, detectTokens } from '@/lib/router/detectIntent';
 import { useBobbyVoice } from '@/hooks/useBobbyVoice';
 import { useAuth } from '@/hooks/useAuth';
 import { clearStoredVibe, getStoredVibe, inferUserVibe, saveStoredVibe, shouldClearStoredVibe } from '@/lib/bobby-vibe';
@@ -50,78 +51,6 @@ async function fetchDBMessages(wallet: string): Promise<DBMessage[]> {
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   } catch { return []; }
-}
-
-// ---- Token symbol detection ----
-
-const TOKEN_MAP: Record<string, string> = {
-  btc: 'BTC-USDT', bitcoin: 'BTC-USDT',
-  eth: 'ETH-USDT', ethereum: 'ETH-USDT', ether: 'ETH-USDT',
-  sol: 'SOL-USDT', solana: 'SOL-USDT',
-  okb: 'OKB-USDT',
-  matic: 'MATIC-USDT', polygon: 'MATIC-USDT',
-  // Commodities — Bobby is a Macro-Sovereign Agent
-  gold: 'XAUT-USDT', oro: 'XAUT-USDT', xaut: 'XAUT-USDT', xau: 'XAUT-USDT',
-  paxg: 'PAXG-USDT', 'pax gold': 'PAXG-USDT',
-  silver: 'XAG-USDT-SWAP', plata: 'XAG-USDT-SWAP', xag: 'XAG-USDT-SWAP',
-};
-
-function detectTokens(text: string): string[] {
-  const lower = text.toLowerCase();
-  const found: string[] = [];
-  for (const [key, instId] of Object.entries(TOKEN_MAP)) {
-    if (new RegExp(`\\b${key}\\b`).test(lower) && !found.includes(instId)) {
-      found.push(instId);
-    }
-  }
-  return found;
-}
-
-// ---- Stock symbol detection ----
-// Bobby also understands traditional finance — stocks, ETFs, indices
-
-const STOCK_MAP: Record<string, string> = {
-  // Tech
-  nvidia: 'NVDA', nvda: 'NVDA',
-  apple: 'AAPL', aapl: 'AAPL',
-  tesla: 'TSLA', tsla: 'TSLA',
-  meta: 'META', facebook: 'META',
-  google: 'GOOGL', googl: 'GOOGL', alphabet: 'GOOGL',
-  amazon: 'AMZN', amzn: 'AMZN',
-  microsoft: 'MSFT', msft: 'MSFT',
-  amd: 'AMD',
-  intel: 'INTC', intc: 'INTC',
-  palantir: 'PLTR', pltr: 'PLTR',
-  netflix: 'NFLX', nflx: 'NFLX',
-  // Crypto-adjacent
-  coinbase: 'COIN', coin: 'COIN',
-  microstrategy: 'MSTR', mstr: 'MSTR',
-  // Finance
-  jpmorgan: 'JPM', jpm: 'JPM', 'jp morgan': 'JPM',
-  goldman: 'GS', 'goldman sachs': 'GS',
-  'bank of america': 'BAC', bac: 'BAC',
-  // Energy
-  exxon: 'XOM', 'exxon mobil': 'XOM', 'exxonmobil': 'XOM', xom: 'XOM',
-  chevron: 'CVX', cvx: 'CVX',
-  // Consumer
-  disney: 'DIS', dis: 'DIS',
-  walmart: 'WMT', wmt: 'WMT',
-  'coca cola': 'KO', 'coca-cola': 'KO', ko: 'KO',
-  // Indices
-  'sp500': 'SPY', 'spy': 'SPY', 's&p': 'SPY', 's&p 500': 'SPY', 's&p500': 'SPY',
-  nasdaq: 'QQQ', qqq: 'QQQ',
-  dow: 'DIA', 'dow jones': 'DIA', dia: 'DIA',
-};
-
-function detectStocks(text: string): string[] {
-  const lower = text.toLowerCase();
-  const found: string[] = [];
-  for (const [key, ticker] of Object.entries(STOCK_MAP)) {
-    if (new RegExp(`\\b${key.replace('&', '\\&')}\\b`).test(lower) && !found.includes(ticker)) {
-      found.push(ticker);
-    }
-  }
-  return found;
 }
 
 async function fetchStockPrices(symbols: string[]): Promise<Array<{ symbol: string; name: string; price: number; change24h: number; dayHigh: number; dayLow: number; volume: number }>> {
@@ -175,64 +104,6 @@ async function saveInterestTags(wallet: string, tokens: string[], context: strin
       }
     } catch { /* silent — don't block chat for interest tracking */ }
   }
-}
-
-function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 'trending' | 'prices_all' | 'help' | 'chat' | 'greeting' | 'ambiguous' {
-  const l = text.toLowerCase().trim();
-  const wordCount = l.split(/\s+/).length;
-
-  // RULE 0: Casual greetings & small talk → quick response, no analysis, ZERO tokens
-  if (wordCount <= 4 && /^(hola|hey|hi|hello|sup|yo|buenas?|buenos? [dnt]|good (morning|evening|night)|what.?s up|que tal|qu[ée] onda|saludos|gracias|thanks|thank you|de nada|adiós|bye|chao|ok|okay|cool|nice|genial|perfecto|vale|orale|ya)\b/i.test(l)) return 'greeting';
-
-  // RULE 0b: Identity questions → quick response, ZERO tokens
-  if (/^(qui[eé]n eres|who are you|what are you|qu[eé] eres|qu[eé] haces|what do you do|c[oó]mo te llamas|what.?s your name)\b/i.test(l)) return 'greeting';
-
-  // RULE 1: Opinion / analysis / outlook questions → ALWAYS Bobby's brain (chat)
-  // This catches: "¿Cuál es tu análisis del oro esta semana?", "What do you think about BTC?",
-  // "¿Crees que el mercado va a subir?", "How do you see ETH this week?"
-  // Key: if the sentence is a QUESTION with opinion markers, it's always chat — even if it
-  // contains words like "análisis" or token names.
-  const isOpinionQuestion = /\b(opina[sr]?|piensa[sr]?|crees?|thinks?|deber[ií]a|should|recomiend[ao]?|recommend|tell me|dime|explica|explain|por ?qu[eé]|why|como ves|how do you see|que onda|what.?s your|cual es tu|an[aá]lisis|analysis|outlook|perspectiv|pronos|predict|forecast|va a (subir|bajar)|will .* (go|rise|fall|drop|pump|dump)|esta semana|this week|este mes|this month|próxim[oa]|next|futuro|future|qu[eé] har[ií]as|what would you|c[oó]mo est[aá]|how.?s the|sentiment|sentimiento|mercado va|market going|afectar[aá]?|impact|affect|benefici|perjudic|compar[ae]|versus|vs\.?|entre|between|conviene|mejor|worse|better|riesg|risk|oportunid|opportunity|estrategi|strategy|jugada|play|movida|move|qu[eé] opinas|what do you think)\b/i.test(l);
-
-  // Also route to chat if stocks are detected (any stock question needs Bobby's brain)
-  if ((isOpinionQuestion && wordCount > 3) || (detectStocks(text).length > 0 && wordCount > 2)) return 'chat';
-
-  // RULE 2: Short, direct commands → specific handlers
-  if (/\b(pric|precio|coti|cuanto|how much|what.?s .* at|dame .* precio)\b/i.test(l) && wordCount <= 5) return 'price';
-
-  // "Analyze Market" or "Run scan" — explicit full-cycle command (short, imperative)
-  if (/\b(analyz|analiz|scan|escan|run|ejecut)\b/i.test(l) && wordCount <= 4) return 'analyze';
-
-  if (/\b(portfolio|position|posicion|balance|cartera|wallet)\b/i.test(l)) return 'portfolio';
-  if (/\b(trend|trending|hot|popular|whats up|que hay)\b/i.test(l) && wordCount <= 5) return 'trending';
-  if (/\b(prices|precios|all|todos|overview|resumen)\b/i.test(l) && wordCount <= 4) return 'prices_all';
-  if (/\b(help|ayuda|command)\b/i.test(l)) return 'help';
-
-  // RULE 3: Token mentioned in a longer sentence → Bobby's brain analyzes it
-  // Short inputs like "BTC" or "ETH SOL" → price card; anything longer → Bobby thinks
-  if (detectTokens(text).length > 0) {
-    return wordCount <= 2 ? 'price' : 'chat';
-  }
-
-  // POSITIVE TRIGGERS: only these go to Bobby's brain (Claude tokens)
-  // Vibe/macro intent — user giving market narrative
-  if (/\b(fed|tasas|rates|inflaci|recession|recesi|bull ?run|bear|crash|guerra|war|tariff|arancel|dxy|d[oó]lar|dollar|macro|geopolit|elecciones|election|risk.?on|risk.?off|panic|eufori|miedo|fear|greed)\b/i.test(l)) return 'chat';
-
-  // Trade intent without specific ticker
-  if (/\b(trade|trad(e|ing|ear)|operar|invertir|invest|apalanca|leverag|margin|posici[oó]n|position)\b/i.test(l)) return 'chat';
-
-  // FOLLOW-UP detection: short messages that reference a prior conversation
-  // "why?", "y el stop?", "profundiza", "explain more", "and the target?"
-  if (wordCount <= 5 && /\b(why|por ?qu[eé]|explain|explica|profundiz|more|m[aá]s|y el|and the|pero|but|how|c[oó]mo|cu[aá]ndo|when|stop|target|entry|riesgo|risk)\b/i.test(l)) return 'chat';
-
-  // WEAK TRADING SIGNALS — market-adjacent language, route to chat if enough context
-  if (wordCount >= 3 && /\b(markets?|mercados?|prices?|bottom|top|dip|rally|correction|correcci[oó]n|breakout|breakdown|reversal|squeeze|accumul|distribut|volume|volumen|candle|trend|momentum|signal|se[ñn]al|setup|pattern|patr[oó]n|level|nivel|zone|zona|demand|supply|oferta|demanda|move|movimiento|action|acci[oó]n|cycle|ciclo|wave|onda|peak|pico|knife|liq|pump|rekt|whale|fakeout|trapped|sweep|semana|week|hoy|today|ayer|yesterday|esta semana|this week|qu[eé] pas[oó]|what happened)\b/i.test(l)) return 'chat';
-
-  // CRYPTO/EXCHANGE CONTEXT — timeframes, exchanges, crypto-adjacent
-  if (/\b(binance|okx|coinbase|bybit|kraken|1h|4h|1d|1w|daily|weekly|monthly|timeframe|defi|nft|airdrop|staking|yield|apr|apy|crypto|blockchain|web3|token|altcoin|memecoin|shitcoin|hodl|wagmi|ngmi|gm|wen|ser|fren|degen|rug|moon|lambo|diamond hands|paper hands|bags?|portfolio|gains|losses|pnl|roi)\b/i.test(l)) return 'chat';
-
-  // Default: ambiguous — show menu instead of burning tokens
-  return 'ambiguous';
 }
 
 // ---- Chat message types ----
@@ -879,6 +750,15 @@ export function AdamsChat() {
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // Cache tickers locally for quick re-use
   const tickerCacheRef = useRef<OKXTicker[]>([]);
+  const [tickerTape, setTickerTape] = useState<OKXTicker[]>([]);
+
+  // Load tickers on mount for ticker tape (independent of onboarding)
+  useEffect(() => {
+    fetchTickers().then(tickers => {
+      tickerCacheRef.current = tickers;
+      setTickerTape(tickers);
+    }).catch(() => {});
+  }, []);
 
   // Clear ticker cache every 5 minutes to ensure fresh data
   useEffect(() => {
@@ -888,23 +768,37 @@ export function AdamsChat() {
 
   // Language must be declared early — used by voice, i18n, and intent detection
   // Detect from profile, localStorage, or browser language
-  const lang = profile?.language || localStorage.getItem('bobby_lang') || (navigator.language.startsWith('es') ? 'es' : 'en');
-  const advisorName = profile?.advisorName || 'Bobby';
+  const [detectedLang, setDetectedLang] = useState<string | null>(null);
+  const lang = detectedLang || profile?.language || localStorage.getItem('bobby_lang') || (navigator.language.startsWith('es') ? 'es' : 'en');
+  const advisorName = profile?.advisorName || localStorage.getItem('bobby_agent_name') || 'Bobby';
 
   // ---- Bobby's Voice ----
-  const { speak, speakLocal, queueSentence, flushQueue, stop: stopVoice, getLastResponseAudio, clearResponseAudio, hasResponseAudio, isSpeaking, analyser } = useBobbyVoice();
+  const { speak, speakLocal, queueSentence, flushQueue, stop: stopVoice, initVoiceContext, getLastResponseAudio, clearResponseAudio, hasResponseAudio, voiceBlocked, isSpeaking, analyser } = useBobbyVoice();
   const [voiceEnabled, setVoiceEnabled] = useState(() => {
     try {
       const stored = localStorage.getItem('bobby_voice_enabled');
       return stored === null ? true : stored === 'true'; // ON by default for first-time users
     } catch { return true; }
   });
+  // Stable callback for TradingModeSelector — prevents re-render loop (Gemini P1 fix)
+  const handleModeSelect = useCallback((mode: TradingMode) => {
+    setTradingMode(mode);
+    setShowSetup(false);
+  }, []);
+
+  // Voice gate: Bobby only speaks AFTER the user's first real interaction
+  // This prevents autoplay blocks and makes voice feel consequential
+  const hasUserInteractedRef = useRef(false);
+
   const toggleVoice = useCallback(() => {
     const next = !voiceEnabled;
     setVoiceEnabled(next);
     try { localStorage.setItem('bobby_voice_enabled', String(next)); } catch { }
     if (!next) stopVoice();
-  }, [voiceEnabled, stopVoice]);
+    // Clicking voice toggle counts as interaction
+    hasUserInteractedRef.current = true;
+    initVoiceContext();
+  }, [voiceEnabled, stopVoice, initVoiceContext]);
 
   // ---- Live market sentiment badge (Fear & Greed + DXY) ----
   const [marketBadge, setMarketBadge] = useState<{ fgi: number; fgiLabel: string; dxy: number } | null>(null);
@@ -934,6 +828,8 @@ export function AdamsChat() {
   // Auto-speak new advisor messages when voice is enabled
   const lastSpokenRef = useRef<string>('');
   const speakIfEnabled = useCallback((text: string) => {
+    // Gate: don't speak until user has interacted (prevents autoplay block)
+    if (!hasUserInteractedRef.current) return;
     if (!voiceEnabled || !text || text === lastSpokenRef.current) return;
     const clean = text.replace(/[-*_#>]/g, '').replace(/\n+/g, '. ').trim();
     if (clean.length < 10) return;
@@ -1390,10 +1286,10 @@ export function AdamsChat() {
     return (entry as Record<string, unknown>)[lang] ?? (entry as Record<string, unknown>)['en'] as any;
   }
 
-  // Only show AdvisorSetup AFTER trading mode is selected (not competing)
-  useEffect(() => {
-    if (needsSetup && tradingMode) setShowSetup(true);
-  }, [needsSetup, tradingMode]);
+  // AdvisorSetup disabled — replaced by Deploy Agent wizard in KineticShell
+  // useEffect(() => {
+  //   if (needsSetup && tradingMode) setShowSetup(true);
+  // }, [needsSetup, tradingMode]);
 
   // Load conversation — prefer localStorage, fallback to DB, then onboarding
   const hasInitialized = useRef(false);
@@ -1411,7 +1307,7 @@ export function AdamsChat() {
         const introText = t('intro') as string;
 
         fetchTickers().then(tickers => {
-          tickerCacheRef.current = tickers;
+          tickerCacheRef.current = tickers; setTickerTape(tickers);
           const btc = tickers.find(t => t.symbol === 'BTC');
           const eth = tickers.find(t => t.symbol === 'ETH');
           const gold = tickers.find(t => t.symbol === 'XAUT');
@@ -1434,11 +1330,8 @@ export function AdamsChat() {
             // No prices here — Bobby's Radar (ConvictionBoard) shows them above
           }]);
 
-          // Auto-speak with small delay — use queueSentence to guarantee Edge TTS MX voice
-          setTimeout(() => {
-            const cleanIntro = introText.replace(/[-*_#>]/g, '').replace(/\n+/g, '. ').trim();
-            queueSentence(cleanIntro, 'cio', lang);
-          }, 500);
+          // Don't auto-speak on onboarding — browser blocks autoplay without user gesture
+          // Bobby will speak after the user's first message (initVoiceContext is called there)
         }).catch(() => {
           setMessages([{
             id: 'welcome',
@@ -1598,6 +1491,18 @@ export function AdamsChat() {
   const sendMessage = useCallback(async (text?: string) => {
     const msg = (text || inputText).trim();
     if (!msg || isProcessing) return;
+    // Auto-detect language from user message and persist
+    const hasSpanish = /[áéíóúñ¿¡]|(\b(que|qué|como|cómo|debería|mercado|comprar|vender)\b)/i.test(msg);
+    const msgLang = hasSpanish ? 'es' : 'en';
+    if (msgLang !== lang) {
+      setDetectedLang(msgLang);
+      localStorage.setItem('bobby_lang', msgLang);
+    }
+    // Mark user as interacted — unlocks Bobby's voice from this point on
+    if (!hasUserInteractedRef.current) {
+      hasUserInteractedRef.current = true;
+      initVoiceContext();
+    }
     // Voice interruption: stop Bobby speaking when user sends new message
     stopVoice();
     setActiveAgent(null);
@@ -1647,7 +1552,7 @@ export function AdamsChat() {
               analyze: 'analyze', help: 'help', greeting: 'greeting',
               off_topic: 'off_topic',
             };
-            intent = (intentMap[r.intent] || 'chat') as Intent;
+            intent = (intentMap[r.intent] || 'chat') as ReturnType<typeof detectIntent>;
           }
         }
       } catch (e) { console.warn('[Router] Haiku call failed:', e); }
@@ -2150,7 +2055,9 @@ export function AdamsChat() {
       ? fetch('/api/bobby-intel').then(r => r.ok ? r.json() : null).catch(() => null)
       : Promise.resolve(null);
     // Technical analysis for the primary token mentioned
-    const taSymbol = hasTokens ? tokens[0].split('-')[0] : (isGeneralMarket || tradingRoom || needsOKX || isGeneralOpinion || hasVibeContext ? 'BTC' : null);
+    // Only show BTC chart if user asked about crypto, not stocks or pure macro
+    const isMacroOnly = /\b(fed|tasas|rates|econom[ií]a|economy|recession|recesi|inflaci|geopolit|guerra|war|tariff|arancel)\b/i.test(msg) && !hasTokens;
+    const taSymbol = hasTokens ? tokens[0].split('-')[0] : (!stocks.length && !isMacroOnly && (isGeneralMarket || tradingRoom || needsOKX || isGeneralOpinion || hasVibeContext) ? 'BTC' : null);
     const taPromise = taSymbol
       ? fetch(`/api/technical-analysis?symbol=${taSymbol}`).then(r => r.ok ? r.json() : null).catch(() => null)
       : Promise.resolve(null);
@@ -2854,6 +2761,19 @@ export function AdamsChat() {
   const [hudEquity, setHudEquity] = useState<number | null>(null);
   const currentVibe = getStoredVibe();
 
+  // ---- Latest personal debate (for left panel) ----
+  const [latestPersonalDebate, setLatestPersonalDebate] = useState<{ topic: string; conviction: number; symbol: string } | null>(null);
+  useEffect(() => {
+    if (!address || advisorName === 'Bobby') return;
+    const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
+    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+    fetch(`${SB}/rest/v1/forum_threads?scope=eq.private&owner_wallet=eq.${address.toLowerCase()}&order=created_at.desc&limit=1&select=id,topic,conviction_score,symbol`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+    }).then(r => r.json()).then(d => {
+      if (Array.isArray(d) && d.length > 0) setLatestPersonalDebate({ topic: d[0].topic, conviction: d[0].conviction_score, symbol: d[0].symbol });
+    }).catch(() => {});
+  }, [address, advisorName]);
+
   // Fetch positions + equity for HUD (every 30s when idle)
   useEffect(() => {
     const fetchHud = async () => {
@@ -2884,10 +2804,7 @@ export function AdamsChat() {
   return (
     <div className="h-full text-white flex flex-col overflow-hidden" style={{ background: '#050505' }}>
       {/* Step 1: Trading Mode Selection (first thing user sees) */}
-      {!tradingMode && <TradingModeSelector onSelect={(mode) => {
-        setTradingMode(mode);
-        setShowSetup(false);
-      }} language={lang} onInitVoice={initVoiceContext} />}
+      {!tradingMode && <TradingModeSelector onSelect={handleModeSelect} language={lang} onInitVoice={initVoiceContext} />}
 
       {/* Step 2: Advisor Setup (only if trading mode already selected AND needed) */}
       {tradingMode && showSetup && <AdvisorSetup onComplete={handleSetupComplete} />}
@@ -3026,6 +2943,225 @@ export function AdamsChat() {
         </div>
       </div>
 
+      {/* ===== STITCH SPLIT LAYOUT: Left Panel (35%) + Right Panel (65%) ===== */}
+      <div className="flex flex-1 overflow-hidden">
+
+      {/* === Left Panel — Conviction Board + Agent Status + Macro Stream (desktop only) === */}
+      <aside className="hidden lg:flex w-[35%] border-r border-white/[0.06] flex-col p-5 space-y-6 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+        {/* Agent identity badge */}
+        {advisorName !== 'Bobby' && (
+          <div className="bg-green-500/[0.04] border border-green-500/15 rounded p-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded bg-green-500/10 border border-green-500/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-green-400 text-xs font-black font-mono">{advisorName.charAt(0)}</span>
+            </div>
+            <div>
+              <span className="text-[10px] font-mono font-bold text-green-400">{advisorName} CIO</span>
+              <span className="text-[8px] font-mono text-white/20 block">Personal Trading Room · ACTIVE</span>
+            </div>
+          </div>
+        )}
+
+        {/* Latest Personal Debate — shows if user has private debates */}
+        {latestPersonalDebate && (
+          <Link to="/agentic-world/forum" className="block bg-green-500/[0.04] border border-green-500/15 rounded p-3 hover:bg-green-500/[0.08] transition-all">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[8px] font-mono text-green-400/60 tracking-widest">LATEST DEBATE</span>
+              <span className={`text-[10px] font-mono font-bold ${(latestPersonalDebate.conviction || 0) >= 0.6 ? 'text-green-400' : 'text-amber-400'}`}>
+                {Math.round((latestPersonalDebate.conviction || 0) * 10)}/10
+              </span>
+            </div>
+            <p className="text-[10px] font-mono text-white/50 truncate">{latestPersonalDebate.topic}</p>
+            <span className="text-[8px] font-mono text-green-400/30 mt-1 block">VIEW IN FORUM →</span>
+          </Link>
+        )}
+
+        {/* Conviction Board */}
+        <div>
+          <div className="flex justify-between items-end mb-3">
+            <h2 className="font-bold text-sm tracking-tight uppercase">Conviction Board</h2>
+            <span className="font-mono text-[9px] text-green-400/60">LIVE</span>
+          </div>
+          <div className="space-y-3">
+            {hudPositions.length > 0 ? hudPositions.map((pos, i) => (
+              <div key={i} className="bg-white/[0.02] border border-white/[0.04] p-3 rounded relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-1.5">
+                  <div className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
+                </div>
+                <div className="flex justify-between items-start mb-1.5">
+                  <div>
+                    <span className={`font-mono text-sm ${pos.direction === 'SHORT' ? 'text-red-400' : 'text-green-400'}`}>
+                      {pos.direction === 'SHORT' ? 'SHORT' : 'LONG'} ${pos.symbol}/USDT
+                    </span>
+                    <p className="text-[9px] text-white/25 font-mono">
+                      PNL: {pos.pnl >= 0 ? '+' : ''}${pos.pnl.toFixed(4)} ({pos.pnlPct >= 0 ? '+' : ''}{pos.pnlPct.toFixed(1)}%)
+                    </p>
+                  </div>
+                  <span className={`font-mono text-lg font-bold ${pos.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {pos.pnlPct >= 0 ? '+' : ''}{pos.pnlPct.toFixed(0)}%
+                  </span>
+                </div>
+                <div className="h-1 w-full bg-white/[0.04] rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${pos.pnl >= 0 ? 'bg-green-500' : 'bg-red-500'}`}
+                    style={{ width: `${Math.min(100, Math.abs(pos.pnlPct) * 2)}%`, boxShadow: pos.pnl >= 0 ? '0 0 8px rgba(75,226,119,0.5)' : '0 0 8px rgba(239,68,68,0.5)' }} />
+                </div>
+              </div>
+            )) : (
+              <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded text-center">
+                <span className="text-[9px] font-mono text-white/20">NO ACTIVE POSITIONS</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Agent Status — Stitch "Active Neural Nodes" */}
+        <div className="space-y-3">
+          <h3 className="font-mono text-[9px] text-white/25 uppercase tracking-widest">Active Neural Nodes</h3>
+          <div className="grid grid-cols-1 gap-2">
+            {(() => {
+              // Personality-based CIO styling (Gemini design)
+              const personality = (() => { try { const p = JSON.parse(localStorage.getItem('agent_profile') || '{}'); return p.personality; } catch { return 'analytical'; } })();
+              const cioColor = personality === 'direct' ? { color: 'border-orange-500', bgColor: 'bg-orange-500', textColor: 'text-orange-400' }
+                : personality === 'wise' ? { color: 'border-indigo-500', bgColor: 'bg-indigo-500', textColor: 'text-indigo-400' }
+                : { color: 'border-yellow-500', bgColor: 'bg-yellow-500', textColor: 'text-yellow-400' };
+              return [
+                { name: `${advisorName.toUpperCase()} CIO`, initial: advisorName.charAt(0).toUpperCase(), idleText: 'Decision Engine', ...cioColor, agentKey: 'cio' },
+                { name: 'ALPHA HUNTER', initial: 'A', idleText: 'Scanning Markets', color: 'border-green-500', bgColor: 'bg-green-500', textColor: 'text-green-400', agentKey: 'alpha' },
+                { name: 'RED TEAM', initial: 'R', idleText: 'Risk Mitigation', color: 'border-red-500', bgColor: 'bg-red-500', textColor: 'text-red-400', agentKey: 'redteam' },
+              ];
+            })().map(agent => {
+              const isActive = activeAgent === agent.agentKey;
+              return (
+                <div key={agent.name} className={`flex items-center gap-3 p-3 rounded-md transition-all ${
+                  isActive ? `bg-white/[0.03] border-l-2 ${agent.color}` : 'bg-white/[0.015] opacity-50'
+                }`}>
+                  <div className="relative">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isActive ? 'bg-white/[0.06] brightness-125' : 'bg-white/[0.03] grayscale'}`}>
+                      <span className={`text-sm font-mono font-black ${agent.textColor}`}>{agent.initial}</span>
+                    </div>
+                    {isActive && (
+                      <div className={`absolute -bottom-1 -right-1 w-3 h-3 ${agent.bgColor} rounded-full border-2 border-[#050505] animate-ping`} />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-xs">{agent.name}</span>
+                      {isActive && <span className={`font-mono text-[9px] ${agent.textColor}`}>SPEAKING...</span>}
+                    </div>
+                    {isActive ? (
+                      <div className="flex gap-[3px] mt-1.5 h-3 items-end">
+                        {[2, 3, 1.5, 2.5, 3, 1, 2].map((h, i) => (
+                          <div key={i} className={`w-1 ${agent.bgColor} rounded-sm animate-pulse`}
+                            style={{ height: `${h * 4}px`, animationDelay: `${i * 80}ms` }} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="font-mono text-[8px] text-white/20 mt-0.5">IDLE: {agent.idleText}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Macro Stream */}
+        <div className="space-y-3">
+          <h3 className="font-mono text-[9px] text-white/25 uppercase tracking-widest">Macro Stream</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {marketBadge ? (
+              <>
+                <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded">
+                  <p className="font-mono text-[8px] text-white/25">FEAR & GREED</p>
+                  <p className={`font-mono text-lg font-bold ${marketBadge.fgi >= 60 ? 'text-green-400' : marketBadge.fgi <= 40 ? 'text-red-400' : 'text-amber-400'}`}>{marketBadge.fgi}</p>
+                  <p className="font-mono text-[7px] text-white/20">{marketBadge.fgiLabel}</p>
+                </div>
+                <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded">
+                  <p className="font-mono text-[8px] text-white/25">DXY INDEX</p>
+                  <p className="font-mono text-lg font-bold text-white/80">{marketBadge.dxy}</p>
+                  <p className={`font-mono text-[7px] ${marketBadge.dxy > 104 ? 'text-red-400/60' : 'text-green-400/60'}`}>{marketBadge.dxy > 104 ? 'STRONG' : 'WEAK'}</p>
+                </div>
+              </>
+            ) : (
+              <div className="col-span-2 text-center py-4">
+                <span className="text-[8px] font-mono text-white/15 animate-pulse">LOADING MACRO DATA...</span>
+              </div>
+            )}
+          </div>
+          {/* Sparkline tickers — Stitch style with mini bars */}
+          {tickerTape.length > 0 && (
+            <div className="space-y-1">
+              {tickerTape.slice(0, 4).map(t => {
+                const isUp = t.change24h >= 0;
+                const barColor = isUp ? 'bg-green-500' : 'bg-red-500';
+                // Generate deterministic bar heights from symbol hash
+                const sym = t.symbol || 'X';
+                const bars = [3, 4, 2, 5, 6].map((v, i) => Math.max(1, (v + sym.charCodeAt(i % sym.length) % 4)));
+                return (
+                  <div key={t.symbol} className="flex justify-between items-center py-2 border-b border-white/[0.03]">
+                    <span className="font-mono text-[10px] text-white/50">{t.symbol}/USD</span>
+                    <div className="flex items-end h-5 gap-[2px] mx-2">
+                      {bars.map((h, i) => (
+                        <div key={i} className={`w-1 rounded-sm ${barColor}`} style={{ height: `${h * 3}px`, opacity: 0.2 + (i / bars.length) * 0.8 }} />
+                      ))}
+                    </div>
+                    <span className={`font-mono text-[10px] font-bold ${isUp ? 'text-green-400' : 'text-red-400'}`}>
+                      ${t.last?.toLocaleString(undefined, { maximumFractionDigits: t.last < 1 ? 4 : 2 })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Telegram Delivery */}
+        <div className="mt-auto space-y-2">
+          {/* B2C: Get DM reports */}
+          <button onClick={async () => {
+            const token = crypto.randomUUID().slice(0, 12);
+            // Save pending connection to Supabase
+            try {
+              const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
+              const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+              const agentProfile = localStorage.getItem('agent_profile');
+              const profileId = agentProfile ? JSON.parse(agentProfile).id : null;
+              await fetch(`${SB}/rest/v1/telegram_connections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=minimal' },
+                body: JSON.stringify({
+                  wallet_address: address?.toLowerCase() || null,
+                  agent_profile_id: profileId,
+                  telegram_user_id: 0,
+                  telegram_chat_id: 0,
+                  connect_token: token,
+                  status: 'pending',
+                }),
+              });
+            } catch {}
+            window.open(`https://t.me/Bobbyagentraderbot?start=connect_${token}`, '_blank');
+          }}
+            className="block w-full bg-green-500/[0.06] border border-green-500/15 rounded p-3 hover:bg-green-500/[0.1] transition-all text-left">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm">✈️</span>
+              <span className="text-[9px] font-mono font-bold text-green-400">ROUTE INTEL TO TELEGRAM</span>
+            </div>
+            <p className="text-[8px] font-mono text-white/25">Get your debates as DM · 100 free reports</p>
+          </button>
+
+          {/* B2B: Group activation */}
+          <Link to="/agentic-world/bobby/b2b" className="block bg-blue-500/[0.06] border border-blue-500/15 rounded p-3 hover:bg-blue-500/[0.1] transition-all">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm">⚡</span>
+              <span className="text-[9px] font-mono font-bold text-blue-400">TELEGRAM GROUPS</span>
+            </div>
+            <p className="text-[8px] font-mono text-white/25">Add Bobby to your trading group · $8/mo</p>
+          </Link>
+        </div>
+      </aside>
+
+      {/* === Right Panel — Orb + Chat + Input === */}
+      <div className="flex-1 flex flex-col relative overflow-hidden">
+
       {/* ===== COMMAND CENTER: ORB + HUD ===== */}
       <div className="flex-shrink-0 relative" style={{ background: '#050505' }}>
         {/* Top status bar — mode, vibe, regime */}
@@ -3056,6 +3192,23 @@ export function AdamsChat() {
             )}
           </div>
         </div>
+
+        {/* Bloomberg-style ticker tape — live prices scrolling */}
+        {tickerTape.length > 0 && (
+          <div className="overflow-hidden border-b border-white/[0.03] bg-white/[0.01]">
+            <div className="flex animate-marquee whitespace-nowrap py-1">
+              {[...tickerTape, ...tickerTape].map((t, i) => (
+                <span key={`${t.symbol}-${i}`} className="inline-flex items-center gap-1.5 mx-4 text-[9px] font-mono">
+                  <span className="text-white/50">{t.symbol}</span>
+                  <span className="text-white/70">${t.last?.toLocaleString(undefined, { maximumFractionDigits: t.last < 1 ? 4 : 2 })}</span>
+                  <span className={t.change24h >= 0 ? 'text-green-400/60' : 'text-red-400/60'}>
+                    {t.change24h >= 0 ? '▲' : '▼'}{Math.abs(t.change24h).toFixed(2)}%
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Orb center + orbital data */}
         <div
@@ -3243,6 +3396,7 @@ export function AdamsChat() {
                           stopPrice={stopMatch ? parseFloat(stopMatch[1].replace(/,/g, '')) : undefined}
                           language={lang}
                           tradingMode={(tradingMode === 'auto' || tradingMode === 'confirm') ? 'live' : 'paper'}
+                          isOwner={isAuthenticated && address?.toLowerCase() === '0xc3f836ec06a2202af23e59997a613ca0722f35d1'}
                         />
                       );
                     }
@@ -3364,7 +3518,7 @@ export function AdamsChat() {
       </div>
 
       {/* ===== INPUT BAR — Bottom ===== */}
-      <div className="flex-shrink-0 border-t border-white/[0.04]" style={{ background: '#080808', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="flex-shrink-0 border-t border-white/[0.04] pb-14 sm:pb-0" style={{ background: '#080808' }}>
         {canChat ? (
           <>
             {/* Guest badge — shows remaining free messages */}
@@ -3466,25 +3620,10 @@ export function AdamsChat() {
         )}
       </div>
 
-      {/* Mobile Bottom Nav — Stitch "Kinetic Terminal" style */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 border-t border-white/[0.06] bg-[#0a0a0a]/95 backdrop-blur-md z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex items-center justify-around py-2">
-          {[
-            { icon: '◈', label: lang === 'es' ? 'TERMINAL' : 'TERMINAL', active: true, action: () => {} },
-            { icon: '◉', label: lang === 'es' ? 'MERCADO' : 'MARKET', active: false, action: () => sendMessage('All Prices') },
-            { icon: '⚔', label: 'FORUM', active: false, action: () => navigate('/agentic-world/forum') },
-            { icon: '◆', label: 'COMMAND', active: false, action: () => sendMessage('Analyze Market') },
-          ].map(item => (
-            <button key={item.label} onClick={item.action}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 transition-colors ${
-                item.active ? 'text-green-400' : 'text-white/25 hover:text-white/50'
-              }`}>
-              <span className="text-sm">{item.icon}</span>
-              <span className="text-[7px] font-mono tracking-[1px]">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      </div>{/* close Right Panel */}
+      </div>{/* close Split Layout */}
+
+      {/* Mobile bottom nav is now provided by BobbyAgentTraderPage parent */}
 
       {/* Feedback Widget — floating button */}
       <FeedbackWidget

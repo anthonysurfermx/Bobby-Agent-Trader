@@ -104,7 +104,10 @@ export default function BobbyAgentsPage() {
                   className={`bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] ${agent.bgColor} rounded p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:bg-white/[0.04] transition-all ${agent.glow}`}>
                   <div className="flex items-center gap-5">
                     <span className="text-2xl md:text-3xl font-mono font-black text-white/10">{agent.rank}</span>
-                    <div>
+                    <div className="relative">
+                      <div className={`absolute -z-10 w-20 h-20 rounded-full blur-3xl opacity-20 -left-4 -top-4 ${
+                        agent.rank === '01' ? 'bg-amber-500 animate-pulse' : agent.rank === '02' ? 'bg-green-500 animate-pulse' : 'bg-red-500 animate-pulse'
+                      }`} style={{ animationDuration: agent.rank === '01' ? '2s' : agent.rank === '02' ? '3s' : '4s' }} />
                       <div className="flex items-center gap-3">
                         <span className={`text-lg md:text-xl font-bold font-mono ${agent.color}`}>{agent.name}</span>
                         <span className={`text-[8px] font-mono px-2 py-0.5 rounded ${
@@ -175,7 +178,7 @@ export default function BobbyAgentsPage() {
             {/* System equity */}
             {s && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-                className="mt-8 bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] rounded p-6">
+                className="mt-8 bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] rounded p-6 hover:bg-white/[0.04] transition-all duration-300">
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-[9px] font-mono text-white/30 tracking-widest">SYSTEM_EQUITY</span>

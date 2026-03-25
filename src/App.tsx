@@ -1,6 +1,6 @@
 // src/App.tsx - CON VERCEL ANALYTICS
 import React, { lazy, Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react'; // ✅ PARA REACT (no Next.js)
@@ -574,6 +574,10 @@ const router = createBrowserRouter(
         // BOBBY KINETIC SHELL ROUTES (SIN MAIN LAYOUT)
         // These pages use their own KineticShell nav/sidebar
         // ==========================================
+        {
+          path: 'bobby',
+          element: <Navigate to="/agentic-world/bobby/challenge" replace />,
+        },
         {
           path: 'agentic-world/bobby/challenge',
           element: (

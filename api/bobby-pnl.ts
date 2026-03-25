@@ -8,9 +8,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
 
 const OKX_BASE = 'https://www.okx.com';
-const API_KEY = process.env.OKX_CEX_API_KEY || '';
-const SECRET = process.env.OKX_CEX_SECRET_KEY || '';
-const PASSPHRASE = process.env.OKX_CEX_PASSPHRASE || '';
+const API_KEY = process.env.OKX_CEX_API_KEY || process.env.OKX_API_KEY || '';
+const SECRET = process.env.OKX_CEX_SECRET_KEY || process.env.OKX_SECRET_KEY || '';
+const PASSPHRASE = process.env.OKX_CEX_PASSPHRASE || process.env.OKX_PASSPHRASE || '';
 
 function signOKX(ts: string, method: string, path: string, body: string): string {
   return createHmac('sha256', SECRET).update(ts + method.toUpperCase() + path + body).digest('base64');
@@ -104,15 +104,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }));
 
     // ── Stats ──
-    const wins = closedPositions.filter((p: any) => p.result === 'WIN').length;
-    const losses = closedPositions.filter((p: any) => p.result === 'LOSS').length;
-    const totalClosed = closedPositions.length;
-    const winRate = totalClosed > 0 ? (wins / totalClosed * 100) : 0;
-    const totalRealizedPnl = closedPositions.reduce((sum: number, p: any) => sum + p.realizedPnl, 0);
     const totalUnrealizedPnl = openPositions.reduce((sum: number, p: any) => sum + p.unrealizedPnl, 0);
 
     // ── Starting capital estimation ──
-    const startingCapital = 10; // $10 USDT initial deposit
+    // ── The $100 Challenge starts NOW — ignore pre-challenge test trades ──
+    const CHALLENGE_START = '2026-03-24T19:00:00.000Z'; // Challenge begins with $100 deposit
+    const startingCapital = 100;
+    const challengeTrades = closedPositions.filter((p: any) => p.closeTime && p.closeTime >= CHALLENGE_START);
+    const preChallengeTradeCount = closedPositions.length - challengeTrades.length;
+
+    // Stats only from challenge trades
+    const challengeWins = challengeTrades.filter((p: any) => p.result === 'WIN').length;
+    const challengeLosses = challengeTrades.filter((p: any) => p.result === 'LOSS').length;
+    const challengeRealizedPnl = challengeTrades.reduce((sum: number, p: any) => sum + p.realizedPnl, 0);
+
     const currentValue = totalEquity;
     const totalReturn = ((currentValue - startingCapital) / startingCapital) * 100;
 
@@ -126,19 +131,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         startingCapital,
         currentEquity: totalEquity,
         totalReturn: parseFloat(totalReturn.toFixed(2)),
-        realizedPnl: parseFloat(totalRealizedPnl.toFixed(4)),
+        realizedPnl: parseFloat(challengeRealizedPnl.toFixed(4)),
         unrealizedPnl: parseFloat(totalUnrealizedPnl.toFixed(4)),
-        totalTrades: totalClosed,
-        wins,
-        losses,
-        winRate: parseFloat(winRate.toFixed(1)),
+        totalTrades: challengeTrades.length,
+        wins: challengeWins,
+        losses: challengeLosses,
+        winRate: challengeTrades.length > 0 ? parseFloat((challengeWins / challengeTrades.length * 100).toFixed(1)) : 0,
+        challengeStartedAt: CHALLENGE_START,
+        preChallengeTradesExcluded: preChallengeTradeCount,
       },
 
       // Live positions
       openPositions,
 
-      // Historical trades
-      closedPositions,
+      // Historical trades (challenge only for equity curve)
+      closedPositions: challengeTrades,
+
+      // Pre-challenge trades (for reference, not counted in stats)
+      preChallengePositions: closedPositions.filter((p: any) => !p.closeTime || p.closeTime < CHALLENGE_START),
 
       // Recent fills
       recentFills: fills.slice(0, 20),
