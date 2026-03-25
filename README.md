@@ -152,6 +152,54 @@ if (active && conviction >= 7 && dir == Direction.LONG) {
 }
 ```
 
+## x402 Agentic Payments — Telegram Group Subscriptions
+
+Bobby implements **x402-compatible payment flows** for premium Telegram group access on X Layer.
+
+### How It Works
+
+```
+User adds Bobby bot to Telegram group
+  → Bobby sends activation link
+  → User connects wallet (OKX Wallet / WalletConnect)
+  → Pays 0.001 OKB or 0.01 USDT on X Layer (Chain 196)
+  → Backend verifies TX on-chain
+  → Bobby activates in the group for 30 days
+  → Agents start debating in the group 24/7
+```
+
+### Payment Flow Architecture
+
+| Component | Technology |
+|-----------|-----------|
+| **Payment Page** | `BobbyTelegramPage.tsx` — 6-state UI (IDLE → CONNECTED → SIGNING → VERIFYING → SUCCESS → ERROR) |
+| **Wallet Integration** | wagmi + Reown AppKit (WalletConnect v2) |
+| **Payment Rails** | OKB native transfer OR USDT ERC-20 on X Layer |
+| **Verification** | Server-side TX hash verification via X Layer RPC |
+| **Bot Webhook** | `api/telegram-webhook.ts` — handles group events + payment verification |
+| **Access Control** | `api/telegram-access.ts` — session management + subscription tracking |
+
+### x402 Payment Protocol
+
+Bobby's premium endpoints respond with **HTTP 402 Payment Required** when accessed without valid payment proof:
+
+```
+GET /api/premium-signal
+→ 402 { paymentRequired: true, amount: "0.001", token: "OKB", chain: 196 }
+
+GET /api/premium-signal -H "X-Payment: {tx_hash}"
+→ 200 { signal: {...}, conviction: 0.85 }
+```
+
+This enables **agent-to-agent commerce**: any AI agent can discover Bobby's pricing, pay on X Layer, and access premium intelligence programmatically.
+
+### Supported Assets on X Layer
+
+| Token | Address | Decimals |
+|-------|---------|----------|
+| OKB (native) | — | 18 |
+| USDT | `0x1E4a5963aBFD975d8c9021ce480b42188849D41d` | 6 |
+
 ## The Trading Room — 3 Agents, 1 Decision
 
 Bobby doesn't make decisions alone. Every question triggers an internal **adversarial debate** between three specialized agents:
