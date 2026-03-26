@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bobby Agent Trader — Developer Docs</title>
+<meta name="description" content="Connect your AI agent to Bobby in one command. 12 MCP tools, 4 smart contracts on X Layer, 70+ technical indicators.">
+</head>
+<body>
+<h1>Bobby Agent Trader — Developer Documentation</h1>
+<p>Connect your AI agent to Bobby in one command. 12 MCP tools, 4 smart contracts on X Layer, 70+ technical indicators, x402 payments.</p>
+
+<h2>Quick Start</h2>
+<pre>
+# Add Bobby to Claude Code
+claude mcp add bobby-trader https://defimexico.org/api/mcp-bobby
+
+# Call Bobby via API
+curl -X POST https://defimexico.org/api/mcp-bobby \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_ta","arguments":{"symbol":"BTC"}},"id":1}'
+</pre>
+
+<h2>MCP Tools (12 available)</h2>
+<h3>Free Tools</h3>
+<ul>
+<li><strong>bobby_stats</strong> — Track record: win rate, PnL, trades, $100 Challenge status</li>
+<li><strong>bobby_ta</strong> — Technical analysis: RSI, MACD, BB, SuperTrend, support/resistance (70+ indicators from OKX Agent Trade Kit)</li>
+<li><strong>bobby_intel</strong> — Full intelligence briefing from 12 real-time data sources</li>
+<li><strong>bobby_xlayer_signals</strong> — Smart money signals on X Layer</li>
+<li><strong>bobby_dex_trending</strong> — Hot trending tokens on-chain</li>
+<li><strong>bobby_dex_signals</strong> — Smart money / whale / KOL buy signals</li>
+<li><strong>bobby_wallet_balance</strong> — Check any wallet balance on any chain</li>
+</ul>
+
+<h3>Premium Tools (x402 payment on X Layer)</h3>
+<ul>
+<li><strong>bobby_analyze</strong> — Full market analysis with 12 data sources (0.01 USDC)</li>
+<li><strong>bobby_debate</strong> — Trigger 3-agent adversarial debate: Alpha Hunter vs Red Team vs CIO (0.01 USDC)</li>
+<li><strong>bobby_security_scan</strong> — Token contract safety scan (0.01 USDC)</li>
+<li><strong>bobby_wallet_portfolio</strong> — Multi-chain wallet analysis (0.01 USDC)</li>
+</ul>
+
+<h2>Smart Contracts on X Layer (Chain 196)</h2>
+<table border="1">
+<tr><th>Contract</th><th>Address</th><th>Purpose</th></tr>
+<tr><td>BobbyTrackRecord</td><td>0xf841b428e6d743187d7be2242eccc1078fde2395</td><td>Commit-reveal predictions — locked before outcomes</td></tr>
+<tr><td>BobbyConvictionOracle</td><td>0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a</td><td>Conviction feed — other protocols read Bobby's signal</td></tr>
+<tr><td>BobbyAgentEconomy</td><td>0xa4704E92E9d9eCA646716C14a124907C356C78D7</td><td>Agent-to-agent payments — CIO pays Alpha Hunter + Red Team per debate</td></tr>
+<tr><td>BobbyAgentRegistry</td><td>0x823a1670f521a35d4fafe4502bdcb3a8148bba8b</td><td>Agent Identity NFTs (ERC-721) — 3 agents with on-chain stats</td></tr>
+</table>
+
+<h2>Read ConvictionOracle (Solidity)</h2>
+<pre>
+interface IBobbyOracle {
+    function getConviction(string memory symbol) external view returns (
+        uint8 direction,    // 0=NEUTRAL, 1=LONG, 2=SHORT
+        uint8 conviction,   // 0-10
+        uint96 entryPrice,  // 8 decimal precision
+        bool isActive       // false if signal expired
+    );
+}
+
+IBobbyOracle oracle = IBobbyOracle(0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a);
+(uint8 dir, uint8 conv, uint96 entry, bool active) = oracle.getConviction("BTC");
+</pre>
+
+<h2>x402 Payment Flow</h2>
+<pre>
+# Step 1: Request premium signal (returns 402)
+GET /api/premium-signal
+→ 402 { paymentRequired: true, amount: "0.001 OKB", chain: 196 }
+
+# Step 2: Pay on X Layer, then retry with TX hash
+GET /api/premium-signal -H "x-payment: 0xYOUR_TX_HASH"
+→ 200 { signal: {...}, verification: { status: "verified", chain: "X Layer" } }
+</pre>
+
+<h2>Universal Asset Search</h2>
+<pre>
+GET /api/bobby-asset-search?q=PEPE
+→ { results: [{ instId: "PEPE-USDT", instType: "SPOT" }, ...] }
+
+GET /api/bobby-asset-search?q=NVDA
+→ { results: [{ instId: "NVDA-USDT-SWAP", instType: "SWAP" }] }
+</pre>
+
+<h2>Technical Indicators (OKX Agent Trade Kit)</h2>
+<p>Bobby integrates 70+ indicators: RSI, MACD, Bollinger Bands, MA, EMA, KDJ, ATR, SuperTrend, AHR999, BTC Rainbow.</p>
+<pre>
+GET /api/bobby-signals
+→ { indicators: [{ symbol: "BTC", compositeScore: -0.568, signal: "short", conviction: 0.535, agreement: 0.72 }] }
+</pre>
+
+<h2>Agent Commerce — 10 Use Cases</h2>
+<ol>
+<li><strong>AI Trading Fund</strong> — calls bobby_analyze → rebalances vault (x402 paid)</li>
+<li><strong>AI Risk Manager</strong> — reads ConvictionOracle on-chain → adjusts collateral (free)</li>
+<li><strong>AI Newsletter</strong> — calls bobby_debate → publishes analysis (x402 paid)</li>
+<li><strong>AI Portfolio Optimizer</strong> — calls bobby_ta → ranks assets (free)</li>
+<li><strong>AI Alert Service</strong> — polls oracle → sends Telegram alerts (free)</li>
+<li><strong>AI Academy Tutor</strong> — calls bobby_debate → grades students (x402 paid)</li>
+<li><strong>AI Hedge Bot</strong> — reads regime from bobby_intel → opens hedges (free)</li>
+<li><strong>AI Social Trader</strong> — calls bobby_debate → generates X threads (x402 paid)</li>
+<li><strong>AI Market Maker</strong> — reads ATR → adjusts spreads (free)</li>
+<li><strong>AI Insurance Protocol</strong> — reads calibration → prices risk (free)</li>
+</ol>
+
+<h2>Links</h2>
+<ul>
+<li>Live: <a href="https://defimexico.org/bobby">defimexico.org/bobby</a></li>
+<li>GitHub: <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader">github.com/anthonysurfermx/Bobby-Agent-Trader</a></li>
+<li>MCP Endpoint: <a href="https://defimexico.org/api/mcp-bobby">defimexico.org/api/mcp-bobby</a></li>
+<li>LLM Context: <a href="https://defimexico.org/llms.txt">defimexico.org/llms.txt</a></li>
+<li>Marketplace: <a href="https://defimexico.org/agentic-world/bobby/marketplace">defimexico.org/agentic-world/bobby/marketplace</a></li>
+</ul>
+</body>
+</html>

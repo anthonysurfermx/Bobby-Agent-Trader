@@ -52,7 +52,8 @@ const NAV_ITEMS = [
   { id: 'analytics', label: 'ANALYTICS', path: '/agentic-world/bobby/analytics' },
   { id: 'metacognition', label: 'META', path: '/agentic-world/bobby/metacognition' },
   { id: 'signals', label: 'SIGNALS', path: '/agentic-world/bobby/signals' },
-  { id: 'docs', label: 'DOCS', path: '/agentic-world/bobby/docs' },
+  { id: 'docs', label: 'AI DOCS', path: '/agentic-world/bobby/docs' },
+  { id: 'marketplace', label: 'AGENT COMMERCE', path: '/agentic-world/bobby/marketplace' },
 ] as const;
 
 const SIDE_ITEMS = [
@@ -163,41 +164,8 @@ function KineticShellInner({ children, activeTab, showSidebar = false }: Kinetic
 
       {/* === Content with optional sidebar === */}
       <div className="flex">
-        {/* Desktop Sidebar */}
-        {showSidebar && (
-          <aside className="hidden lg:flex fixed left-0 top-[calc(3.5rem+1.75rem)] h-[calc(100vh-3.5rem-1.75rem)] w-56 bg-[#050505] border-r border-white/5 flex-col pt-6 z-40">
-            <div className="px-5 mb-6">
-              <p className="font-mono text-[9px] text-green-400/60 tracking-widest">OPERATOR_01</p>
-              <p className="font-mono text-[8px] text-white/20">CLEARANCE_ACTIVE</p>
-            </div>
-            <div className="flex-grow flex flex-col gap-0.5">
-              {SIDE_ITEMS.map(item => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <Link key={item.label} to={item.path}
-                    className={`flex items-center gap-3 px-5 py-2.5 font-mono text-[10px] transition-all ${
-                      isActive
-                        ? 'bg-green-500/10 text-green-500 border-r-2 border-green-500'
-                        : 'text-white/25 hover:text-white/50 hover:bg-white/[0.02]'
-                    }`}>
-                    <span className="text-sm">{item.icon}</span>
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-            <div className="p-5">
-              <Link to="/agentic-world/bobby"
-                className="block w-full py-2.5 bg-green-500 text-black font-mono text-[9px] font-black tracking-widest text-center hover:opacity-90 transition-all active:scale-95 rounded"
-                style={{ boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
-                OPEN_TERMINAL
-              </Link>
-            </div>
-          </aside>
-        )}
-
         {/* Main content */}
-        <main className={`flex-1 ${showSidebar ? 'lg:ml-56' : ''}`}
+        <main className="flex-1"
           style={{ background: 'linear-gradient(to bottom, transparent 50%, rgba(34,197,94,0.006) 50%)', backgroundSize: '100% 4px' }}>
           {children}
         </main>

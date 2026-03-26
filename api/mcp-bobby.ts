@@ -7,6 +7,15 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
+import {
+  BOBBY_AGENT_ECONOMY,
+  PREMIUM_MCP_FEE_WEI,
+  XLAYER_CHAIN_ID,
+  extractPaymentTxHash,
+  verifyMcpPaymentTx,
+} from './_lib/xlayer-payments.js';
+
 const BASE_URL = 'https://defimexico.org';
 
 interface JsonRpcRequest {
@@ -182,19 +191,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 // Free tools: tools/list, bobby_intel, bobby_stats, bobby_ta
 // Premium tools: bobby_debate, bobby_analyze, bobby_security_scan
 const PREMIUM_TOOLS = new Set(['bobby_debate', 'bobby_analyze', 'bobby_security_scan', 'bobby_wallet_portfolio']);
-const X402_PRICE_USDC = '0.01'; // $0.01 per premium call
-
-function checkX402Payment(req: VercelRequest): { paid: boolean; receipt?: string } {
-  const paymentHeader = req.headers['x-402-payment'] || req.headers['authorization'];
-  if (!paymentHeader) return { paid: false };
-  // In production: verify EIP-3009 signature against USDC contract
-  // For now: accept any valid-looking payment proof
-  const proof = String(paymentHeader);
-  if (proof.startsWith('x402:') || proof.startsWith('Bearer x402:')) {
-    return { paid: true, receipt: proof.slice(0, 20) + '...' };
-  }
-  return { paid: false };
-}
+const X402_PRICE_OKB = '0.001';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -205,8 +202,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'mcp',
       endpoints: { tools: '/api/mcp-bobby' },
       pricing: {
-        free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_xlayer_signals', 'bobby_dex_trending', 'bobby_dex_signals'],
-        premium: { tools: Array.from(PREMIUM_TOOLS), price: `${X402_PRICE_USDC} USDC per call`, protocol: 'x402' },
+        free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_xlayer_signals', 'bobby_dex_trending', 'bobby_dex_signals', 'bobby_xlayer_quote', 'bobby_wallet_balance'],
+        premium: {
+          tools: Array.from(PREMIUM_TOOLS),
+          price: `${X402_PRICE_OKB} OKB per call`,
+          priceWei: PREMIUM_MCP_FEE_WEI.toString(),
+          protocol: 'x402',
+          chainId: XLAYER_CHAIN_ID,
+          settlementContract: BOBBY_AGENT_ECONOMY,
+          settlementMethod: 'payMCPCall(string toolName)',
+        },
       },
     });
   }
@@ -218,17 +223,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // x402 payment check for premium tools
+  let verifiedPayment: Awaited<ReturnType<typeof verifyMcpPaymentTx>> | null = null;
   if (body.method === 'tools/call') {
     const toolName = (body.params as Record<string, unknown>)?.name as string;
     if (PREMIUM_TOOLS.has(toolName)) {
-      const payment = checkX402Payment(req);
-      if (!payment.paid) {
+      const txHash = extractPaymentTxHash(
+        req.headers['x-402-payment']
+        || req.headers['x-payment']
+        || req.headers['authorization'],
+      );
+
+      if (!txHash) {
         return res.status(402).json({
           jsonrpc: '2.0',
           error: {
             code: -32402,
-            message: `Payment required. ${toolName} costs ${X402_PRICE_USDC} USDC. Send x402 payment header.`,
-            data: { price: X402_PRICE_USDC, currency: 'USDC', protocol: 'x402', chain: 'X Layer (196)' },
+            message: `Payment required. ${toolName} costs ${X402_PRICE_OKB} OKB on X Layer. Send the payMCPCall tx hash in x-402-payment.`,
+            data: {
+              price: X402_PRICE_OKB,
+              currency: 'OKB',
+              protocol: 'x402',
+              chain: `X Layer (${XLAYER_CHAIN_ID})`,
+              chainId: XLAYER_CHAIN_ID,
+              settlementContract: BOBBY_AGENT_ECONOMY,
+              settlementMethod: 'payMCPCall(string toolName)',
+            },
+          },
+          id: body.id,
+        });
+      }
+
+      try {
+        verifiedPayment = await verifyMcpPaymentTx(txHash, toolName);
+      } catch (error: any) {
+        return res.status(402).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32402,
+            message: error?.message || 'Payment verification failed',
+            data: {
+              protocol: 'x402',
+              txHash,
+              chain: `X Layer (${XLAYER_CHAIN_ID})`,
+              settlementContract: BOBBY_AGENT_ECONOMY,
+            },
           },
           id: body.id,
         });
@@ -238,6 +276,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const result = await handleMethod(body.method, body.params || {});
+
+    if (body.method === 'tools/call') {
+      const toolName = (body.params as Record<string, unknown>)?.name as string;
+      const args = ((body.params as Record<string, unknown>)?.arguments || {}) as Record<string, unknown>;
+      if (toolName && PREMIUM_TOOLS.has(toolName) && verifiedPayment) {
+        void logAgentCommerceEvent({
+          source: 'mcp',
+          tool_name: toolName,
+          payment_tx_hash: verifiedPayment.txHash,
+          payment_amount_wei: verifiedPayment.valueWei,
+          payer_address: verifiedPayment.payer,
+          external_agent: String(req.headers['x-agent-name'] || '').trim() || null,
+          request_ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null,
+          user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
+          metadata: {
+            arguments: args,
+            chainId: XLAYER_CHAIN_ID,
+            paymentContract: BOBBY_AGENT_ECONOMY,
+          },
+        });
+      }
+    }
+
     return res.status(200).json({ jsonrpc: '2.0', result, id: body.id });
   } catch (error) {
     return res.status(200).json({
