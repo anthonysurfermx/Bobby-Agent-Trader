@@ -10,7 +10,36 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useTradingRoom } from '@/hooks/useTradingRoom';
+import type { TechnicalAssetSignal, TechnicalMarketSummary } from '@/lib/bobby-technical';
 import KineticShell from '@/components/kinetic/KineticShell';
+
+const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+const headers = { apikey: KEY, Authorization: `Bearer ${KEY}` };
+
+// On-chain stat reader — calls X Layer RPC directly
+function OnChainStat({ label, selector }: { label: string; selector: string }) {
+  const [value, setValue] = useState<number | null>(null);
+  useEffect(() => {
+    fetch('https://rpc.xlayer.tech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'eth_call',
+        params: [{ to: '0xf841b428e6d743187d7be2242eccc1078fde2395', data: selector }, 'latest'],
+      }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d.result) setValue(parseInt(d.result, 16)); })
+      .catch(() => {});
+  }, [selector]);
+  return (
+    <div className="p-2 bg-black/40 rounded border border-white/5 text-center">
+      <div className="font-mono text-lg font-bold text-green-400" style={{ fontVariantNumeric: 'tabular-nums' }}>{value ?? '—'}</div>
+      <div className="font-mono text-[8px] text-white/30 tracking-widest">{label}</div>
+    </div>
+  );
+}
 
 interface PnlData {
   summary: {
@@ -49,6 +78,50 @@ interface UserConviction {
   latestDebate?: { symbol: string; direction: string; conviction_score: number; status: string };
 }
 
+interface StoredTriggerData {
+  technical?: TechnicalMarketSummary | null;
+}
+
+interface RecentDecision {
+  id: string;
+  topic?: string;
+  symbol: string;
+  direction: string;
+  conviction_score: number;
+  created_at: string;
+  status: string;
+  trigger_data?: StoredTriggerData | null;
+  posts: Array<{ agent: string; content: string }>;
+}
+
+function formatSignedScore(value: number | null | undefined): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 'n/a';
+  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+}
+
+function formatTechnicalPrice(value: number | null | undefined): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '—';
+  return value >= 1000 ? `$${value.toFixed(1)}` : `$${value.toFixed(2)}`;
+}
+
+function getTechnicalAsset(
+  technical: TechnicalMarketSummary | null | undefined,
+  symbol?: string | null,
+): TechnicalAssetSignal | null {
+  if (!technical?.assets?.length) return null;
+  if (symbol) {
+    const match = technical.assets.find((asset) => asset.symbol === symbol);
+    if (match) return match;
+  }
+  return technical.leader || technical.assets[0] || null;
+}
+
+function getBiasClasses(bias: string): string {
+  if (bias === 'bullish') return 'border-green-500/20 bg-green-500/10 text-green-400';
+  if (bias === 'bearish') return 'border-red-500/20 bg-red-500/10 text-red-400';
+  return 'border-white/10 bg-white/[0.03] text-white/40';
+}
+
 export default function BobbyChallengePage() {
   const { profile, profileId, hasAgent, roomMode, accentColor, accentBorder } = useTradingRoom();
   const [pnl, setPnl] = useState<PnlData | null>(null);
@@ -58,10 +131,7 @@ export default function BobbyChallengePage() {
   const [nextScanPct, setNextScanPct] = useState(0);
   const [lastRun, setLastRun] = useState<string | null>(null);
   const [latestDebate, setLatestDebate] = useState<{ id: string; topic: string; symbol: string } | null>(null);
-  const [recentDecisions, setRecentDecisions] = useState<Array<{
-    id: string; symbol: string; direction: string; conviction_score: number;
-    created_at: string; status: string; posts: Array<{ agent: string; content: string }>;
-  }>>([]);
+  const [recentDecisions, setRecentDecisions] = useState<RecentDecision[]>([]);
   const [vibe, setVibe] = useState<{
     mood: string; phrase: string; safeMode: boolean;
     signals: number; executed: number; freshness: 'fresh' | 'stable' | 'stale';
@@ -75,28 +145,24 @@ export default function BobbyChallengePage() {
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
-    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
-    const headers = { apikey: KEY, Authorization: `Bearer ${KEY}` };
-
-    fetch(`${SB}/rest/v1/forum_threads?order=created_at.desc&limit=5&select=id,topic,symbol,direction,conviction_score,created_at,status`, { headers })
+    fetch(`${SB}/rest/v1/forum_threads?order=created_at.desc&limit=5&select=id,topic,symbol,direction,conviction_score,created_at,status,trigger_data`, { headers })
       .then(r => r.json())
-      .then(async (threads: any[]) => {
+      .then(async (threads: RecentDecision[]) => {
         if (!Array.isArray(threads) || threads.length === 0) return;
-        setLatestDebate({ id: threads[0].id, topic: threads[0].topic, symbol: threads[0].symbol });
+        setLatestDebate({ id: threads[0].id, topic: threads[0].topic || 'Latest cycle', symbol: threads[0].symbol });
         setLastRun(threads[0].created_at);
 
         const ids = threads.map(t => t.id).join(',');
         const postsRes = await fetch(`${SB}/rest/v1/forum_posts?thread_id=in.(${ids})&order=created_at.asc&select=thread_id,agent,content`, { headers });
         const posts = await postsRes.json();
 
-        const decisions = threads.map(t => ({
+        const decisions = threads.map((t) => ({
           ...t,
           posts: (Array.isArray(posts) ? posts : []).filter((p: any) => p.thread_id === t.id).map((p: any) => ({
             agent: p.agent, content: p.content?.slice(0, 200) || '',
           })),
         }));
-        setRecentDecisions(decisions);
+        setRecentDecisions(decisions as RecentDecision[]);
       }).catch(() => {});
 
     // Fetch Bobby's vibe — real data from latest completed cycle
@@ -146,21 +212,18 @@ export default function BobbyChallengePage() {
       }).catch(() => {});
   }, [roomMode, profile, profileId]);
 
-  // Countdown to next 6h scan
+  // Countdown to next hourly scan
   useEffect(() => {
     const update = () => {
       const now = new Date();
-      const hours = now.getUTCHours();
-      const nextHour = Math.ceil(hours / 6) * 6;
       const next = new Date(now);
-      next.setUTCHours(nextHour, 10, 0, 0); // +10 min offset like OpenClaw
-      if (next <= now) next.setUTCHours(next.getUTCHours() + 6);
+      next.setUTCMinutes(0, 0, 0); // Next hour sharp
+      next.setUTCHours(next.getUTCHours() + 1);
       const diff = next.getTime() - now.getTime();
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
+      const m = Math.floor(diff / 60000);
       const sec = Math.floor((diff % 60000) / 1000);
-      setNextScan(`${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`);
-      setNextScanPct(1 - diff / (6 * 3600000));
+      setNextScan(`${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`);
+      setNextScanPct(1 - diff / 3600000);
     };
     update();
     const interval = setInterval(update, 1000);
@@ -194,6 +257,20 @@ export default function BobbyChallengePage() {
     }
     return points;
   }, [pnl, s]);
+
+  const latestTechnical = useMemo(() => {
+    const technical = recentDecisions[0]?.trigger_data?.technical;
+    return technical && typeof technical === 'object' ? technical as TechnicalMarketSummary : null;
+  }, [recentDecisions]);
+
+  const focusTechnical = useMemo(() => {
+    return getTechnicalAsset(latestTechnical, latestDebate?.symbol || recentDecisions[0]?.symbol);
+  }, [latestTechnical, latestDebate, recentDecisions]);
+
+  const focusTechnicalBreakdown = useMemo(() => {
+    if (!focusTechnical) return [];
+    return Object.entries(focusTechnical.breakdown).sort(([, a], [, b]) => b.weight - a.weight);
+  }, [focusTechnical]);
 
   return (
     <KineticShell activeTab="challenge">
@@ -538,6 +615,7 @@ export default function BobbyChallengePage() {
                           const alphaPost = d.posts.find(p => p.agent === 'alpha');
                           const convPct = Math.round((d.conviction_score || 0) * 100);
                           const isExecute = convPct >= 60;
+                          const technicalAsset = getTechnicalAsset(d.trigger_data?.technical, d.symbol);
 
                           return (
                             <div key={d.id} className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] rounded p-5 hover:bg-white/[0.04] transition-all">
@@ -559,6 +637,13 @@ export default function BobbyChallengePage() {
                                   }`}>
                                     {d.status === 'executed' ? 'EXECUTED' : d.status === 'rejected' ? 'REJECTED' : isExecute ? 'EXECUTE' : 'REJECT'}
                                   </span>
+                                  {technicalAsset && (
+                                    <span className={`text-[8px] font-mono px-2 py-0.5 rounded ${
+                                      technicalAsset.compositeScore >= 0 ? 'bg-cyan-500/10 text-cyan-300' : 'bg-fuchsia-500/10 text-fuchsia-300'
+                                    }`}>
+                                      T-PULSE {formatSignedScore(technicalAsset.compositeScore)}
+                                    </span>
+                                  )}
                                 </div>
                                 <span className="text-[10px] font-mono text-white/20">
                                   {new Date(d.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -584,6 +669,65 @@ export default function BobbyChallengePage() {
                 {/* === Right Sidebar === */}
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
                   className="space-y-6">
+
+                  {focusTechnical && latestTechnical && (
+                    <div className="bg-white/[0.02] backdrop-blur-sm border border-cyan-500/10 p-6 rounded relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-emerald-500/5" />
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="font-mono text-xs text-cyan-300 uppercase tracking-widest">Technical_Pulse</h3>
+                            <div className="mt-1 text-[10px] font-mono text-white/25">
+                              {focusTechnical.symbol}/USDT · {latestTechnical.regime.toUpperCase()}
+                            </div>
+                          </div>
+                          <div className={`text-right ${focusTechnical.compositeScore >= 0 ? 'text-cyan-300' : 'text-fuchsia-300'}`}>
+                            <div className="font-mono text-2xl font-bold">{formatSignedScore(focusTechnical.compositeScore)}</div>
+                            <div className="text-[9px] font-mono uppercase">{Math.round(focusTechnical.conviction * 100)}% conviction</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                          {[
+                            { label: 'SIGNAL', value: focusTechnical.signal.replace('_', ' ') },
+                            { label: 'AGREEMENT', value: `${Math.round(focusTechnical.agreement * 100)}%` },
+                            { label: 'ENTRY', value: formatTechnicalPrice(focusTechnical.tradePlan.entry) },
+                            { label: 'STOP', value: formatTechnicalPrice(focusTechnical.tradePlan.stop) },
+                            { label: 'TARGET', value: formatTechnicalPrice(focusTechnical.tradePlan.target) },
+                            { label: 'R/R', value: focusTechnical.tradePlan.rewardRisk ? `${focusTechnical.tradePlan.rewardRisk.toFixed(2)}x` : '—' },
+                          ].map((item) => (
+                            <div key={item.label} className="p-2 bg-black/30 rounded border border-white/5">
+                              <div className="text-[8px] font-mono text-white/25 tracking-widest">{item.label}</div>
+                              <div className="mt-1 text-[11px] font-mono text-white/85 uppercase">{item.value}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mb-4">
+                          {focusTechnicalBreakdown.map(([name, reading]) => (
+                            <div
+                              key={name}
+                              className={`rounded border px-2 py-2 ${getBiasClasses(reading.bias)}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[9px] font-mono font-bold">{name}</span>
+                                <span className="text-[8px] font-mono">{Math.round(reading.weight * 100)}%</span>
+                              </div>
+                              <div className="mt-1 text-[10px] font-mono">{reading.bias.toUpperCase()}</div>
+                              <div className="text-[9px] font-mono opacity-80">{formatSignedScore(reading.score)}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <p className="text-[10px] font-mono text-white/35 leading-relaxed mb-3">
+                          {focusTechnical.overview}
+                        </p>
+                        <p className="text-[9px] font-mono text-white/25 leading-relaxed">
+                          {focusTechnical.tradePlan.invalidation}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Operational Params — Stitch style */}
                   <div className="bg-[#1c1b1b] p-6 rounded">
@@ -616,11 +760,19 @@ export default function BobbyChallengePage() {
                     <h3 className="font-mono text-xs text-white/40 uppercase mb-4 relative z-10">Proof_of_Custody</h3>
                     <div className="relative z-10 space-y-3">
                       <div className="p-3 bg-black/40 rounded flex items-center justify-between border border-white/5">
-                        <span className="font-mono text-[10px] text-white/30">X_WALLET</span>
+                        <span className="font-mono text-[10px] text-white/30">CONTRACT</span>
                         <span className="font-mono text-[10px] text-green-400">0xF841...2395</span>
                       </div>
+                      <div className="p-3 bg-black/40 rounded flex items-center justify-between border border-white/5">
+                        <span className="font-mono text-[10px] text-white/30">TREASURY</span>
+                        <span className="font-mono text-[10px] text-green-400">0x09a8...dcea</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <OnChainStat label="COMMITS" selector="0x78bb86d3" />
+                        <OnChainStat label="PENDING" selector="0xea70b4af" />
+                      </div>
                       <p className="text-[10px] text-white/20 italic leading-relaxed font-mono">
-                        All trades are committed to X Layer before the outcome is known. Fully verifiable on-chain.
+                        Every debate committed on X Layer before the outcome. Verified via OKX Agent Trade Kit.
                       </p>
                       <a href="https://www.oklink.com/xlayer/address/0xf841b428e6d743187d7be2242eccc1078fde2395"
                         target="_blank" rel="noopener noreferrer"

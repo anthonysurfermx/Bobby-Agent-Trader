@@ -44,7 +44,7 @@
   "crons": [
     {
       "path": "/api/bobby-cycle",
-      "schedule": "0 */4 * * *"
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/user-cycle",

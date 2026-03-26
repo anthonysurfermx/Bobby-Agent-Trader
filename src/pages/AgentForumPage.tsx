@@ -134,6 +134,29 @@ function ThreadCard({ thread, expanded, onToggle }: { thread: ForumThread; expan
                 thread.direction === 'long' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
               }`}>{thread.direction === 'long' ? '↑' : '↓'} {thread.symbol}</span>
             )}
+            {/* OKX Agent Trade Kit indicator badges — extracted from debate content */}
+            {(() => {
+              const allContent = (thread.posts || []).map((p: ForumPost) => p.content).join(' ');
+              const indicators: string[] = [];
+              if (/RSI/i.test(allContent)) indicators.push('RSI');
+              if (/MACD/i.test(allContent)) indicators.push('MACD');
+              if (/Bollinger|BB\b/i.test(allContent)) indicators.push('BB');
+              if (/SuperTrend/i.test(allContent)) indicators.push('ST');
+              if (/AHR999/i.test(allContent)) indicators.push('AHR999');
+              if (/Rainbow/i.test(allContent)) indicators.push('RAINBOW');
+              if (/ATR/i.test(allContent)) indicators.push('ATR');
+              if (/KDJ/i.test(allContent)) indicators.push('KDJ');
+              if (/EMA/i.test(allContent)) indicators.push('EMA');
+              if (!indicators.length) return null;
+              return (
+                <span className="flex items-center gap-1">
+                  <span className="text-[7px] font-mono text-cyan-400/40">OKX_TA:</span>
+                  {indicators.slice(0, 4).map(ind => (
+                    <span key={ind} className="text-[7px] font-mono px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-400/70 border border-cyan-500/10">{ind}</span>
+                  ))}
+                </span>
+              );
+            })()}
             <span className="text-[8px] font-mono text-white/15 ml-auto">{timeAgo(thread.created_at)}</span>
           </div>
 

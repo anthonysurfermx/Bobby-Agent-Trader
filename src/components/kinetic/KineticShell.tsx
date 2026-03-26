@@ -11,7 +11,7 @@ import { Lock } from 'lucide-react';
 
 interface KineticShellProps {
   children: ReactNode;
-  activeTab?: 'terminal' | 'challenge' | 'history' | 'agents' | 'analytics' | 'metacognition';
+  activeTab?: 'terminal' | 'challenge' | 'history' | 'agents' | 'analytics' | 'metacognition' | 'signals';
   showSidebar?: boolean;
 }
 
@@ -51,6 +51,8 @@ const NAV_ITEMS = [
   { id: 'agents', label: 'AGENTS', path: '/agentic-world/bobby/agents' },
   { id: 'analytics', label: 'ANALYTICS', path: '/agentic-world/bobby/analytics' },
   { id: 'metacognition', label: 'META', path: '/agentic-world/bobby/metacognition' },
+  { id: 'signals', label: 'SIGNALS', path: '/agentic-world/bobby/signals' },
+  { id: 'docs', label: 'DOCS', path: '/agentic-world/bobby/docs' },
 ] as const;
 
 const SIDE_ITEMS = [
@@ -60,6 +62,7 @@ const SIDE_ITEMS = [
   { icon: '△', label: 'Agents', path: '/agentic-world/bobby/agents' },
   { icon: '◇', label: 'Debates', path: '/agentic-world/forum' },
   { icon: '◉', label: 'Meta', path: '/agentic-world/bobby/metacognition' },
+  { icon: '⚡', label: 'Signals', path: '/agentic-world/bobby/signals' },
 ];
 
 export default function KineticShell({ children, activeTab, showSidebar = false }: KineticShellProps) {

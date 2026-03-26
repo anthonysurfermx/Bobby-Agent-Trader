@@ -107,6 +107,74 @@ function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse bg-white/[0.04] rounded ${className}`} />;
 }
 
+// ---- Terminal Loading Screen ----
+function MetacognitionLoader() {
+  const [lines, setLines] = useState<string[]>([]);
+  const steps = [
+    '> INITIATING METACOGNITION SEQUENCE...',
+    '> CONNECTING TO OKX OnchainOS...',
+    '> LOADING OKX AGENT TRADE KIT — 70+ INDICATORS...',
+    '> FETCHING RSI, MACD, BOLLINGER, SUPERTREND, AHR999...',
+    '> LOADING WHALE SIGNALS + FUNDING RATES...',
+    '> FETCHING POLYMARKET SMART MONEY DATA...',
+    '> READING FEAR & GREED INDEX...',
+    '> COMPUTING CALIBRATION CURVE...',
+    '> EVALUATING DEBATE QUALITY SCORES [HAIKU_JUDGE]...',
+    '> CROSS-REFERENCING 12 DATA SOURCES...',
+    '> ANALYZING SELF-CORRECTION PATTERNS...',
+    '> SYNTHESIZING METACOGNITION REPORT...',
+  ];
+
+  useEffect(() => {
+    let i = 0;
+    const timer = setInterval(() => {
+      if (i < steps.length) {
+        setLines(prev => [...prev, steps[i]]);
+        i++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 1500);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="w-full max-w-lg">
+        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-ping" />
+            <span className="text-[10px] font-mono text-green-400/60 tracking-widest">BOBBY_METACOGNITION_ENGINE</span>
+          </div>
+          <div className="space-y-2 font-mono text-xs">
+            {lines.map((line, idx) => (
+              <motion.p
+                key={idx}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className={idx === lines.length - 1 ? 'text-green-400' : 'text-white/30'}
+              >
+                {line}
+              </motion.p>
+            ))}
+            {lines.length < steps.length && (
+              <span className="text-green-400 animate-pulse">▋</span>
+            )}
+          </div>
+          <div className="mt-4 h-1 bg-white/[0.04] rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-green-500 rounded-full"
+              initial={{ width: '0%' }}
+              animate={{ width: `${(lines.length / steps.length) * 100}%` }}
+              transition={{ duration: 0.5 }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- Chart custom tooltip ----
 function CalibrationTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
@@ -249,6 +317,9 @@ export default function BobbyMetacognitionPage() {
         <title>Metacognition | Bobby Agent Trader</title>
       </Helmet>
 
+      {loading ? (
+        <MetacognitionLoader />
+      ) : (
       <div className="max-w-6xl mx-auto px-4 py-8 pb-24 md:pb-8 space-y-6">
         {/* ========== HEADER ========== */}
         <motion.div {...fadeUp} className="flex items-center gap-3">
@@ -585,6 +656,7 @@ export default function BobbyMetacognitionPage() {
           </span>
         </motion.div>
       </div>
+      )}
     </KineticShell>
   );
 }

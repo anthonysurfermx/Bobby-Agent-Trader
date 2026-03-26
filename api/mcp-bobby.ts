@@ -7,9 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const BASE_URL = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'https://defi-mexico-hub.vercel.app';
+const BASE_URL = 'https://defimexico.org';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -125,9 +123,9 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
       }
 
       if (toolName === 'bobby_stats') {
-        const res = await fetch(`${BASE_URL}/api/ghost-wallet`);
+        const res = await fetch(`${BASE_URL}/api/bobby-pnl`);
         const data = await res.json();
-        return { content: [{ type: 'text', text: JSON.stringify(data.ghostWallet, null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(data.summary, null, 2) }] };
       }
 
       // Agentic Wallet tools (via droplet onchainos service)

@@ -12,6 +12,7 @@ import { ethers } from 'ethers';
 const XLAYER_RPC = 'https://rpc.xlayer.tech';
 const CONTRACT_ADDRESS = process.env.BOBBY_CONTRACT_ADDRESS || '';
 const ORACLE_ADDRESS = process.env.BOBBY_ORACLE_ADDRESS || '';
+const ECONOMY_ADDRESS = process.env.BOBBY_ECONOMY_ADDRESS || '';
 const RECORDER_KEY = process.env.BOBBY_RECORDER_KEY || '';
 
 // Agent enum matches contract: CIO=0, ALPHA=1, REDTEAM=2
@@ -28,6 +29,13 @@ const RESULT_MAP: Record<string, number> = {
 const DIRECTION_MAP: Record<string, number> = {
   long: 1, short: 2, none: 0, neutral: 0,
 };
+
+// Economy ABI — agent-to-agent payment protocol
+const ECONOMY_ABI = [
+  'function payDebateFee(bytes32 debateHash) payable',
+  'function getEconomyStats() view returns (uint256 _totalDebates, uint256 _totalMCPCalls, uint256 _totalSignalAccesses, uint256 _totalVolume, uint256 _totalPayments)',
+  'function debateFeePerAgent() view returns (uint256)',
+];
 
 // Oracle ABI — conviction feed for other protocols
 const ORACLE_ABI = [
@@ -89,22 +97,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       // Parallel RPC calls for stats
       const [winRateHex, totalHex, commitsHex, pendingHex, winsHex, lossesHex, pnlHex] = await Promise.all([
-        ethCall('0x5e7a3e56'),  // getWinRate()
-        ethCall('0xc4e41b22'),  // totalTrades()
-        ethCall('0xe8a4c04e'),  // totalCommitments() — new
-        ethCall('0xf39a3c85'),  // pendingCount() — new
-        ethCall('0xc09b1ab3'),  // wins()
-        ethCall('0xfda49eb4'),  // losses()
-        ethCall('0x8c871019'),  // totalPnlBps()
+        ethCall('0x6f61e432'),  // getWinRate()
+        ethCall('0xe275c997'),  // totalTrades()
+        ethCall('0x78bb86d3'),  // totalCommitments()
+        ethCall('0xea70b4af'),  // pendingCount()
+        ethCall('0x24de908d'),  // wins()
+        ethCall('0x6f22d6a5'),  // losses()
+        ethCall('0x4b9290b8'),  // totalPnlBps()
       ]);
+
+      // Economy stats (non-blocking)
+      let economyStats = null;
+      if (ECONOMY_ADDRESS) {
+        try {
+          const economyRes = await fetch(XLAYER_RPC, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0', id: 2, method: 'eth_call',
+              params: [{ to: ECONOMY_ADDRESS, data: '0x0afe1e28' }, 'latest'], // getEconomyStats()
+            }),
+          });
+          const economyJson = await economyRes.json();
+          if (economyJson.result && economyJson.result !== '0x') {
+            const decoded = ethers.AbiCoder.defaultAbiCoder().decode(
+              ['uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
+              economyJson.result
+            );
+            economyStats = {
+              totalDebates: Number(decoded[0]),
+              totalMCPCalls: Number(decoded[1]),
+              totalSignalAccesses: Number(decoded[2]),
+              totalVolume: ethers.formatEther(decoded[3]),
+              totalPayments: Number(decoded[4]),
+            };
+          }
+        } catch (e) {
+          console.warn('[X Layer] Economy stats read failed (non-critical)');
+        }
+      }
 
       return res.status(200).json({
         ok: true,
         onchain: true,
-        contract: CONTRACT_ADDRESS,
+        contracts: {
+          trackRecord: CONTRACT_ADDRESS,
+          convictionOracle: ORACLE_ADDRESS,
+          agentEconomy: ECONOMY_ADDRESS,
+        },
         chain: 'X Layer (196)',
         explorer: `https://www.oklink.com/xlayer/address/${CONTRACT_ADDRESS}`,
-        version: 'v3 — Commit-Reveal (Audited by Gemini + Codex)',
+        version: 'v3 — Commit-Reveal + Agent Economy (Audited by Gemini + Codex)',
         stats: {
           winRate: parseInt(winRateHex, 16) / 100,
           totalTrades: parseInt(totalHex, 16),
@@ -114,6 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           losses: parseInt(lossesHex, 16),
           totalPnlBps: parseInt(pnlHex, 16),
         },
+        economy: economyStats,
       });
     } catch (error) {
       return res.status(500).json({ ok: false, error: 'Failed to read on-chain stats' });
@@ -177,6 +221,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           gasLimit: 300000n,
         });
 
+        // Pay debate fee via AgentEconomy (non-blocking)
+        let economyTxHash: string | null = null;
+        if (ECONOMY_ADDRESS) {
+          try {
+            const economyIface = new ethers.Interface(ECONOMY_ABI);
+            const economyTxData = economyIface.encodeFunctionData('payDebateFee', [debateHash]);
+            const economyTx = await wallet.sendTransaction({
+              to: ECONOMY_ADDRESS,
+              data: economyTxData,
+              value: ethers.parseEther('0.0002'), // 0.0001 OKB × 2 agents
+              gasLimit: 200000n,
+            });
+            economyTxHash = economyTx.hash;
+            console.log(`[X Layer] Debate fee paid: ${economyTx.hash}`);
+          } catch (econErr: any) {
+            console.warn('[X Layer] Economy payment failed (non-critical):', econErr.message);
+          }
+        }
+
         // Also publish to ConvictionOracle (non-blocking)
         let oracleTxHash: string | null = null;
         if (ORACLE_ADDRESS) {
@@ -205,9 +268,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           onchain: true,
           broadcast: true,
           action: 'commit',
-          message: 'Commitment broadcast to X Layer' + (oracleTxHash ? ' + Oracle updated' : ''),
+          message: 'Commitment broadcast to X Layer' + (oracleTxHash ? ' + Oracle updated' : '') + (economyTxHash ? ' + Debate fee paid' : ''),
           txHash: tx.hash,
           oracleTxHash,
+          economyTxHash,
           explorer: `https://www.oklink.com/xlayer/tx/${tx.hash}`,
           data: { debateHash, symbol, agent: agentEnum, conviction },
         });

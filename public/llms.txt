@@ -1,0 +1,93 @@
+# Bobby Agent Trader — AI Integration Guide
+
+Bobby is a 3-agent adversarial AI trading system on OKX X Layer. Three agents debate every trade, predictions are committed on-chain before outcomes, and the system evaluates its own accuracy.
+
+## Quick Start
+
+```bash
+# Install Bobby as an MCP tool in Claude Code
+npx @anthropic-ai/claude-code mcp add bobby-trader https://defimexico.org/api/mcp-bobby
+
+# Or call Bobby directly via API
+curl -X POST https://defimexico.org/api/mcp-bobby \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_stats","arguments":{}},"id":1}'
+```
+
+## Available MCP Tools (12 tools)
+
+### Free Tools (no payment required)
+- `bobby_stats` — Track record: win rate, PnL, trades, $100 Challenge status
+- `bobby_ta` — Technical analysis: RSI, MACD, BB, SuperTrend, support/resistance
+- `bobby_intel` — Full intelligence briefing from 12 real-time data sources
+- `bobby_xlayer_signals` — Smart money signals on X Layer
+- `bobby_dex_trending` — Hot trending tokens on-chain
+- `bobby_dex_signals` — Smart money / whale / KOL buy signals
+
+### Premium Tools (x402 payment on X Layer)
+- `bobby_analyze` — Full market analysis with 12 data sources (0.01 USDC)
+- `bobby_debate` — Trigger 3-agent adversarial debate (0.01 USDC)
+- `bobby_security_scan` — Token contract safety scan (0.01 USDC)
+- `bobby_wallet_portfolio` — Multi-chain wallet analysis (0.01 USDC)
+
+### Other Tools
+- `bobby_wallet_balance` — Check any wallet balance
+- `bobby_xlayer_quote` — DEX swap quote on X Layer
+
+## Smart Contracts on X Layer (Chain 196)
+
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| BobbyTrackRecord | 0xf841b428e6d743187d7be2242eccc1078fde2395 | Commit-reveal predictions |
+| BobbyConvictionOracle | 0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a | Conviction feed for other protocols |
+| BobbyAgentEconomy | 0xa4704E92E9d9eCA646716C14a124907C356C78D7 | Agent-to-agent payments |
+| BobbyAgentRegistry | 0x823a1670f521a35d4fafe4502bdcb3a8148bba8b | Agent Identity NFTs (ERC-721) |
+
+## Read ConvictionOracle from your smart contract
+
+```solidity
+interface IBobbyOracle {
+    function getConviction(string memory symbol) external view returns (
+        uint8 direction,    // 0=NEUTRAL, 1=LONG, 2=SHORT
+        uint8 conviction,   // 0-10
+        uint96 entryPrice,  // 8 decimal precision
+        bool isActive       // false if signal expired
+    );
+}
+
+IBobbyOracle oracle = IBobbyOracle(0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a);
+(uint8 dir, uint8 conv, uint96 entry, bool active) = oracle.getConviction("BTC");
+```
+
+## x402 Payment Flow
+
+```
+GET /api/premium-signal
+→ 402 { paymentRequired: true, amount: "0.001 OKB", chain: 196 }
+
+# Pay on X Layer, then retry with TX hash
+GET /api/premium-signal -H "x-payment: 0xYOUR_TX_HASH"
+→ 200 { signal: {...}, verification: { status: "verified", chain: "X Layer" } }
+```
+
+## Technical Indicators (OKX Agent Trade Kit)
+
+Bobby integrates 70+ indicators: RSI, MACD, BB, MA, EMA, KDJ, ATR, SuperTrend, AHR999, BTC Rainbow.
+
+```
+GET /api/bobby-signals
+→ { indicators: [{ symbol: "BTC", compositeScore: -0.568, signal: "short", conviction: 0.535 }] }
+```
+
+## Universal Asset Search
+
+```
+GET /api/bobby-asset-search?q=PEPE
+→ { results: [{ instId: "PEPE-USDT", instType: "SPOT" }, ...] }
+```
+
+## Links
+- Live: https://defimexico.org/bobby
+- GitHub: https://github.com/anthonysurfermx/Bobby-Agent-Trader
+- MCP: https://defimexico.org/api/mcp-bobby
+- Explorer: https://www.oklink.com/xlayer/address/0xf841b428e6d743187d7be2242eccc1078fde2395

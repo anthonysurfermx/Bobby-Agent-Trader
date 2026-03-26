@@ -5,6 +5,13 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import {
+  buildTechnicalMarketSummary,
+  getConvictionSourceWeights,
+  type IndicatorSnapshot,
+  type TechnicalIndicatorBundle,
+  type TechnicalIndicatorName,
+} from '../src/lib/bobby-technical.js';
 
 export const config = { maxDuration: 30 };
 
@@ -57,6 +64,15 @@ interface CycleRecord {
   trades_successful?: number;
   total_usd_deployed?: number;
   llm_reasoning?: string;
+}
+
+interface ConvictionModel {
+  okxScore: number;
+  polyScore: number;
+  technicalScore: number;
+  latencyPenalty: number;
+  weights: ReturnType<typeof getConvictionSourceWeights>;
+  score: number;
 }
 
 // ---- HMAC for OKX ----
@@ -209,6 +225,35 @@ function detectRegime(btcChange24h: number): { regime: MarketRegime; label: stri
   if (abs > 5) return { regime: 'high_vol', label: `HIGH VOLATILITY (BTC ${btcChange24h > 0 ? '+' : ''}${btcChange24h.toFixed(1)}%)` };
   if (abs < 2) return { regime: 'low_vol', label: `LOW VOLATILITY (BTC ${btcChange24h > 0 ? '+' : ''}${btcChange24h.toFixed(1)}%)` };
   return { regime: 'normal', label: `NORMAL (BTC ${btcChange24h > 0 ? '+' : ''}${btcChange24h.toFixed(1)}%)` };
+}
+
+function calculateLatencyPenalty(latencyMs: number): number {
+  const minutes = latencyMs / 60000;
+  return minutes <= 5 ? 0 : Math.min(0.5, 0.02 * Math.exp(0.04 * minutes));
+}
+
+function calculateCompositeConviction(
+  okxScore: number,
+  polyScore: number,
+  technicalScore: number,
+  latencyMs: number,
+  regime: MarketRegime,
+): ConvictionModel {
+  const weights = getConvictionSourceWeights(regime);
+  const latencyPenalty = calculateLatencyPenalty(latencyMs);
+  const raw = (
+    (okxScore * weights.okx)
+    + (polyScore * weights.polymarket)
+    + (technicalScore * weights.technical)
+  ) - latencyPenalty;
+  return {
+    okxScore: parseFloat(okxScore.toFixed(3)),
+    polyScore: parseFloat(polyScore.toFixed(3)),
+    technicalScore: parseFloat(technicalScore.toFixed(3)),
+    latencyPenalty: parseFloat(latencyPenalty.toFixed(3)),
+    weights,
+    score: Math.max(0, Math.min(1, parseFloat(raw.toFixed(3)))),
+  };
 }
 
 // ---- Polymarket Intelligence ----
@@ -886,6 +931,93 @@ async function fetchTopStocks(): Promise<Array<{ symbol: string; price: number; 
 }
 
 // ============================================================
+// OKX Agent Trade Kit — Technical Indicators (70+ signals)
+// Uses OKX public API: /api/v5/aigc/mcp/indicators
+// No auth required — free for all
+// ============================================================
+const TECHNICAL_REQUESTS: Array<{ name: TechnicalIndicatorName; params?: number[] }> = [
+  { name: 'RSI', params: [14] },
+  { name: 'MACD', params: [12, 26, 9] },
+  { name: 'BB', params: [20, 2] },
+  { name: 'MA', params: [50, 200] },
+  { name: 'EMA', params: [12, 26] },
+  { name: 'KDJ', params: [9, 3, 3] },
+  { name: 'ATR', params: [14] },
+  { name: 'SUPERTREND', params: [10, 3] },
+  { name: 'AHR999' },
+  { name: 'BTCRAINBOW' },
+];
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < items.length) {
+      const current = cursor++;
+      results[current] = await mapper(items[current]);
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+function extractIndicatorSnapshot(payload: any, bar: string, indicator: TechnicalIndicatorName): IndicatorSnapshot | null {
+  const records = payload?.data?.[0]?.data?.[0]?.timeframes?.[bar]?.indicators?.[indicator];
+  if (!Array.isArray(records) || !records.length) return null;
+  const latest = records[0];
+  const rawValues = latest?.values && typeof latest.values === 'object' ? latest.values : {};
+  return {
+    ts: latest?.ts ? Number(latest.ts) : null,
+    values: Object.fromEntries(
+      Object.entries(rawValues).map(([key, value]) => [key, String(value)]),
+    ),
+  };
+}
+
+async function fetchIndicatorSnapshot(
+  instId: string,
+  bar: string,
+  request: { name: TechnicalIndicatorName; params?: number[] },
+): Promise<[TechnicalIndicatorName, IndicatorSnapshot | null]> {
+  try {
+    const body = {
+      instId,
+      timeframes: [bar],
+      indicators: {
+        [request.name]: request.params ? { paramList: request.params } : {},
+      },
+    };
+    const res = await fetch('https://www.okx.com/api/v5/aigc/mcp/indicators', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Bobby-Agent-Trader/1.0 (OKX-Hackathon)',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return [request.name, null];
+    const data = await res.json();
+    return [request.name, extractIndicatorSnapshot(data, bar, request.name)];
+  } catch {
+    return [request.name, null];
+  }
+}
+
+async function fetchTechnicalIndicators(instId = 'BTC-USDT', bar = '1H'): Promise<TechnicalIndicatorBundle | null> {
+  const pairs = await mapWithConcurrency(TECHNICAL_REQUESTS, 2, (request) => fetchIndicatorSnapshot(instId, bar, request));
+  const indicators = Object.fromEntries(pairs) as Partial<Record<TechnicalIndicatorName, IndicatorSnapshot | null>>;
+  const available = Object.values(indicators).some(Boolean);
+  return available ? { symbol: instId, timeframe: bar, indicators } : null;
+}
+
+// ============================================================
 // HANDLER — Runs all intelligence pipelines in parallel
 // ============================================================
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -897,7 +1029,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Run all intelligence sources in parallel
-    const [rawSignals, polyConsensus, recentCycles, cryptoPrices, fundingRates, openInterest, topTradersLS, fearGreed, dxyData, stockPrices, xlayerSignals, dexLeaderboard, trendingTokens, trenchTokens, calibration] = await Promise.allSettled([
+    const [rawSignals, polyConsensus, recentCycles, cryptoPrices, fundingRates, openInterest, topTradersLS, fearGreed, dxyData, stockPrices, xlayerSignals, dexLeaderboard, trendingTokens, trenchTokens, calibration, btcIndicators, ethIndicators, solIndicators] = await Promise.allSettled([
       collectDexSignals(),
       collectPolymarketIntelligence(),
       fetchRecentCycles(5),
@@ -917,7 +1049,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchTrendingTokens(),
       fetchTrenchTokens(),
       fetchCalibrationCurve(),
-    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null)) as [any, any, any, any, FundingRate[], OpenInterestData[], LongShortRatio[], FearGreedData | null, { dxy: number } | null, any, any, DexLeaderEntry[], TrendingToken[], TrenchToken[], CalibrationData | null];
+      fetchTechnicalIndicators('BTC-USDT', '1H'),
+      fetchTechnicalIndicators('ETH-USDT', '1H'),
+      fetchTechnicalIndicators('SOL-USDT', '1H'),
+    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null)) as [any, any, any, any, FundingRate[], OpenInterestData[], LongShortRatio[], FearGreedData | null, { dxy: number } | null, any, any, DexLeaderEntry[], TrendingToken[], TrenchToken[], CalibrationData | null, TechnicalIndicatorBundle | null, TechnicalIndicatorBundle | null, TechnicalIndicatorBundle | null];
 
     const livePrices = [...(cryptoPrices || []), ...(stockPrices || [])];
 
@@ -977,14 +1112,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const polyScore = polyFormatted.length > 0
       ? Math.min(1, polyFormatted.reduce((sum: number, m: any) => sum + ((m.topOutcomePct || 0) / 100), 0) / polyFormatted.length)
       : 0;
-    let dynamicConviction = calculateDynamicConviction(okxScore, polyScore, signalAgeMs, btcVol);
-
-    // Gemini: TA as binary multiplier — if squeeze + directional cross, boost conviction
-    // This is applied when TA data is available in the briefing context
-    // The actual TA multiplier is computed client-side since TA endpoint is separate
-    // Here we add the formula documentation for the CIO prompt
-    // TA boost: if Bollinger squeeze + MACD bullish cross + price > SMA50 → conviction * 1.10
-    // TA penalty: if RSI > 80 (extreme overbought) or RSI < 20 (extreme oversold against direction) → conviction * 0.90
+    const priceMap = Object.fromEntries((livePrices || []).map((price: any) => [String(price.symbol || '').toUpperCase(), Number(price.price || 0)]));
+    const technicalIndicators = [btcIndicators, ethIndicators, solIndicators].filter(Boolean) as TechnicalIndicatorBundle[];
+    const technicalPulse = buildTechnicalMarketSummary(technicalIndicators, priceMap, regime.regime);
+    const convictionModel = calculateCompositeConviction(
+      okxScore,
+      polyScore,
+      technicalPulse.leader?.conviction || 0,
+      signalAgeMs,
+      regime.regime,
+    );
+    const dynamicConviction = convictionModel.score;
 
     // Performance context
     const performance = {
@@ -992,6 +1130,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mood,
       isSafeMode,
       dynamicConviction,
+      convictionModel,
+      technicalLeader: technicalPulse.leader
+        ? {
+            symbol: technicalPulse.leader.symbol,
+            signal: technicalPulse.leader.signal,
+            direction: technicalPulse.leader.direction,
+            compositeScore: technicalPulse.leader.compositeScore,
+            conviction: technicalPulse.leader.conviction,
+            tradePlan: technicalPulse.leader.tradePlan,
+          }
+        : null,
       recentCycles: recentCycles.slice(0, 3).map((c: any) => ({
         status: c.status,
         trades: c.trades_executed,
@@ -1027,7 +1176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Build the intelligence briefing text for Bobby's brain
     const trenchFormatted = (trenchTokens || []).slice(0, 5);
-    const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, xlayerFormatted, leaderFormatted, trendingFormatted, securityResults, trenchFormatted, calibration);
+    const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, xlayerFormatted, leaderFormatted, trendingFormatted, securityResults, trenchFormatted, calibration, technicalPulse, convictionModel);
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
 
@@ -1049,6 +1198,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       trenches: trenchFormatted,
       performance,
       calibration: calibration || { curve: [], calibrationError: 0, isOverconfident: false, adjustment: 1.0, sampleSize: 0, breakEvenCount: 0 },
+      technicalIndicators,
+      technicalPulse,
       regime: regime.label,
       meta: {
         signalsRaw: rawSignals.length,
@@ -1073,7 +1224,15 @@ function buildBriefing(
   polymarket: Array<{ title: string; traderCount: number; topOutcome: string; topOutcomePct: number; currentPrice: number; entryPrice: number; edgePct: number }>,
   prices: Array<{ symbol: string; price: number; change24h: number }>,
   fundingRates: FundingRate[],
-  performance: { winRate: number; mood: string; isSafeMode: boolean; dynamicConviction: number; recentCycles: any[] },
+  performance: {
+    winRate: number;
+    mood: string;
+    isSafeMode: boolean;
+    dynamicConviction: number;
+    recentCycles: any[];
+    convictionModel?: ConvictionModel;
+    technicalLeader?: Record<string, unknown> | null;
+  },
   regime: { regime: MarketRegime; label: string },
   latencyMs: number,
   openInterest: OpenInterestData[],
@@ -1086,6 +1245,8 @@ function buildBriefing(
   securityResults?: TokenSecurity[],
   trenchTokens?: TrenchToken[],
   calibrationData?: CalibrationData | null,
+  technicalPulse?: ReturnType<typeof buildTechnicalMarketSummary>,
+  convictionModel?: ConvictionModel,
 ): string {
   const blocks: string[] = [];
 
@@ -1181,6 +1342,52 @@ function buildBriefing(
     latency_s: parseFloat((latencyMs / 1000).toFixed(1)),
   };
   blocks.push(`<AGENT_META>\n${JSON.stringify(metaData)}\n</AGENT_META>`);
+
+  if (technicalPulse && technicalPulse.assets.length > 0) {
+    const technicalData = {
+      regime: technicalPulse.regime,
+      leader: technicalPulse.leader
+        ? {
+            symbol: technicalPulse.leader.symbol,
+            signal: technicalPulse.leader.signal,
+            direction: technicalPulse.leader.direction,
+            composite_score: technicalPulse.leader.compositeScore,
+            conviction_pct: Math.round(technicalPulse.leader.conviction * 100),
+            agreement_pct: Math.round(technicalPulse.leader.agreement * 100),
+            trade_plan: technicalPulse.leader.tradePlan,
+          }
+        : null,
+      assets: technicalPulse.assets.map(asset => ({
+        symbol: asset.symbol,
+        signal: asset.signal,
+        direction: asset.direction,
+        composite_score: asset.compositeScore,
+        conviction_pct: Math.round(asset.conviction * 100),
+        agreement_pct: Math.round(asset.agreement * 100),
+        overview: asset.overview,
+        trade_plan: asset.tradePlan,
+        indicators: Object.entries(asset.breakdown).map(([name, reading]) => ({
+          name,
+          bias: reading.bias,
+          score: reading.score,
+          weight: reading.weight,
+          summary: reading.summary,
+        })),
+      })),
+    };
+    blocks.push(`<TECHNICAL_PULSE>\n${JSON.stringify(technicalData)}\nIMPORTANT: Treat composite_score as the deterministic technical anchor. Favor setups where CIO direction matches technical direction and conviction_pct exceeds 55.\n</TECHNICAL_PULSE>`);
+  }
+
+  if (convictionModel) {
+    blocks.push(`<CONVICTION_MODEL>\n${JSON.stringify({
+      okx_score: convictionModel.okxScore,
+      polymarket_score: convictionModel.polyScore,
+      technical_score: convictionModel.technicalScore,
+      latency_penalty: convictionModel.latencyPenalty,
+      weights: convictionModel.weights,
+      base_conviction: convictionModel.score,
+    })}\nIMPORTANT: base_conviction is the backend anchor before LLM judgment and calibration.\n</CONVICTION_MODEL>`);
+  }
 
   // Prediction Calibration (Metacognition Upgrade A)
   if (calibrationData && calibrationData.sampleSize >= 5) {

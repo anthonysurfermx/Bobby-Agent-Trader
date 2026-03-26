@@ -1,8 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
+const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: ANTHROPIC_KEY,
 });
 
 // Rate limiting: 10 requests per day per IP (resets on cold start + 24h window)
@@ -506,6 +509,44 @@ Now produce the analysis. Remember:
 }
 
 
+function buildSignalsPrompt(data: any): string {
+  const indicators = data.indicators || [];
+  const regime = data.regime || 'unknown';
+  const leader = data.leader;
+  const convictionModel = data.convictionModel;
+  const userName = data.userName || null;
+
+  const assetBlocks = indicators.map((asset: any) => {
+    const indLines = Object.entries(asset.indicators || {}).map(([name, reading]: [string, any]) =>
+      `  ${name}: ${reading.bias} | score: ${reading.score?.toFixed(2)} | weight: ${reading.weight?.toFixed(2)}`
+    ).join('\n');
+    return `${asset.symbol} — ${asset.signal?.toUpperCase()} | composite: ${asset.compositeScore?.toFixed(3)} | conviction: ${(asset.conviction * 100).toFixed(0)}% | agreement: ${(asset.agreement * 100).toFixed(0)}%
+${indLines}
+Trade Plan: entry=${asset.tradePlan?.entry ?? 'n/a'} | stop=${asset.tradePlan?.stop ?? 'n/a'} | target=${asset.tradePlan?.target ?? 'n/a'}`;
+  }).join('\n\n');
+
+  return `You are Bobby CIO analyzing technical indicators from OKX Agent Trade Kit for ${userName || 'the user'}.
+
+REGIME: ${regime}
+${leader ? `LEADER ASSET: ${leader.symbol} — ${leader.signal} (score ${leader.compositeScore?.toFixed(3)})` : 'No clear leader'}
+${convictionModel ? `CONVICTION MODEL: okx=${convictionModel.okxWeight} poly=${convictionModel.polyWeight} tech=${convictionModel.techWeight}` : ''}
+
+ASSETS:
+${assetBlocks || 'No indicator data available'}
+
+Explain what these indicators mean for a trader RIGHT NOW:
+1. Start with the most important signal — what should the user pay attention to?
+2. Explain which indicators agree and which conflict
+3. Translate the composite scores into plain language ("strong short means...")
+4. If there's a trade plan, explain the risk/reward
+5. Give ONE clear actionable recommendation
+6. Mention the regime and how it affects the weights
+
+Be direct, use trader language. Reference specific indicator values.
+Sound like Bobby CIO doing a morning briefing, not a textbook.
+Address ${userName || 'the user'} by name once.`;
+}
+
 const promptBuilders: Record<string, (data: any) => string> = {
   'wallet': buildWalletPrompt,
   'exchange-metrics': buildExchangeMetricsPrompt,
@@ -520,6 +561,7 @@ const promptBuilders: Record<string, (data: any) => string> = {
   'chat-opportunity': buildChatOpportunityPrompt,
   'chat-deep-analysis': buildChatDeepAnalysisPrompt,
   'metacognition': buildMetacognitionPrompt,
+  'signals': buildSignalsPrompt,
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -617,18 +659,67 @@ After your analysis, output a single line starting with "TAGS:" followed by 2-4 
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    const stream = await anthropic.messages.stream({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 800,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
+    let streamed = false;
 
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+    // Try OpenAI first (primary)
+    if (OPENAI_KEY) {
+      try {
+        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            max_tokens: 800,
+            stream: true,
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+          }),
+        });
+        const reader = openaiRes.body?.getReader();
+        const decoder = new TextDecoder();
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+            for (const line of lines) {
+              const jsonStr = line.slice(6);
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const text = parsed.choices?.[0]?.delta?.content;
+                if (text) res.write(`data: ${JSON.stringify({ text })}\n\n`);
+              } catch {}
+            }
+          }
+          streamed = true;
+        }
+      } catch (openaiErr: any) {
+        console.warn('[Explain] OpenAI failed, trying Anthropic:', openaiErr.message?.slice(0, 100));
       }
     }
+
+    // Fallback to Anthropic
+    if (!streamed && ANTHROPIC_KEY) {
+      try {
+        const stream = await anthropic.messages.stream({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 800,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        });
+        for await (const event of stream) {
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
+          }
+        }
+        streamed = true;
+      } catch (anthropicErr: any) {
+        console.warn('[Explain] Anthropic also failed:', anthropicErr.message?.slice(0, 100));
+      }
+    }
+
+    if (!streamed) throw new Error('Both OpenAI and Anthropic unavailable');
 
     res.write('data: [DONE]\n\n');
     res.end();
