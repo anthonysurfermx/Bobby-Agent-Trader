@@ -16,6 +16,7 @@ import AdminLayout from '@/pages/admin/AdminLayout';
 import UserLayout from '@/pages/user/UserLayout';
 
 // Lazy load todas las páginas para mejor performance
+const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
 const StartupDetailPage = lazy(() => import('@/pages/StartupDetailPage'));
@@ -267,6 +268,17 @@ const router = createBrowserRouter(
           ),
         },
         // ==========================================
+        // BOBBY PROTOCOL LANDING (sin layout)
+        // ==========================================
+        {
+          index: true,
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyLandingPage />
+            </Suspense>
+          ),
+        },
+        // ==========================================
         // RUTAS PÚBLICAS CON MAIN LAYOUT
         // ==========================================
         {
@@ -277,7 +289,7 @@ const router = createBrowserRouter(
           ),
           children: [
             {
-              index: true,
+              path: 'defi-mexico',
               element: (
                 <Suspense fallback={<PageLoader />}>
                   <HomePage />
