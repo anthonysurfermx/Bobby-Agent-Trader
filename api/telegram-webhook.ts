@@ -14,7 +14,7 @@ export const config = { maxDuration: 10 };
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const BASE_URL = 'https://defimexico.org';
+const BASE_URL = 'https://bobbyprotocol.xyz';
 
 async function sendTelegramMessage(chatId: number, text: string, parseMode = 'HTML') {
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -27,7 +27,7 @@ async function sendTelegramMessage(chatId: number, text: string, parseMode = 'HT
 async function sendVoiceNote(chatId: number, text: string, caption?: string) {
   try {
     // Generate TTS audio via Edge TTS server on Digital Ocean
-    const ttsRes = await fetch('https://defimexico.org/api/bobby-voice-free', {
+    const ttsRes = await fetch('https://bobbyprotocol.xyz/api/bobby-voice-free', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: text.slice(0, 2000), voice: 'cio', lang: 'en' }),

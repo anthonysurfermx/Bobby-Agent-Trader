@@ -6,10 +6,10 @@ Bobby is a 3-agent adversarial AI trading system on OKX X Layer. Three agents de
 
 ```bash
 # Install Bobby as an MCP tool in Claude Code
-npx @anthropic-ai/claude-code mcp add bobby-trader https://defimexico.org/api/mcp-bobby
+npx @anthropic-ai/claude-code mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby
 
 # Or call Bobby directly via API
-curl -X POST https://defimexico.org/api/mcp-bobby \
+curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_stats","arguments":{}},"id":1}'
 ```
@@ -25,10 +25,10 @@ curl -X POST https://defimexico.org/api/mcp-bobby \
 - `bobby_dex_signals` — Smart money / whale / KOL buy signals
 
 ### Premium Tools (x402 payment on X Layer)
-- `bobby_analyze` — Full market analysis with 12 data sources (0.01 USDC)
-- `bobby_debate` — Trigger 3-agent adversarial debate (0.01 USDC)
-- `bobby_security_scan` — Token contract safety scan (0.01 USDC)
-- `bobby_wallet_portfolio` — Multi-chain wallet analysis (0.01 USDC)
+- `bobby_analyze` — Full market analysis with 12 data sources (0.001 OKB)
+- `bobby_debate` — Trigger 3-agent adversarial debate (0.001 OKB)
+- `bobby_security_scan` — Token contract safety scan (0.001 OKB)
+- `bobby_wallet_portfolio` — Multi-chain wallet analysis (0.001 OKB)
 
 ### Other Tools
 - `bobby_wallet_balance` — Check any wallet balance
@@ -87,7 +87,7 @@ GET /api/bobby-asset-search?q=PEPE
 ```
 
 ## Links
-- Live: https://defimexico.org/bobby
+- Live: https://bobbyprotocol.xyz/bobby
 - GitHub: https://github.com/anthonysurfermx/Bobby-Agent-Trader
-- MCP: https://defimexico.org/api/mcp-bobby
+- MCP: https://bobbyprotocol.xyz/api/mcp-bobby
 - Explorer: https://www.oklink.com/xlayer/address/0xf841b428e6d743187d7be2242eccc1078fde2395

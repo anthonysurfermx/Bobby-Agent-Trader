@@ -115,11 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         verificationDetails.status = 'tx_failed_or_not_found';
       }
     } else {
-      // Not a valid TX hash — for demo, accept "demo-proof" as a freebie
-      if (txHash === 'demo-proof') {
-        verified = true;
-        verificationDetails = { ...verificationDetails, status: 'demo_mode', note: 'Demo proof accepted for hackathon' };
-      }
+      verificationDetails.status = 'invalid_tx_hash';
     }
 
     if (!verified) {
@@ -131,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Verified — return premium signal data
-    const intelRes = await fetch('https://defimexico.org/api/bobby-intel').catch(() => null);
+    const intelRes = await fetch('https://bobbyprotocol.xyz/api/bobby-intel').catch(() => null);
     const intel = intelRes?.ok ? await intelRes.json() : null;
 
     return res.status(200).json({

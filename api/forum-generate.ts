@@ -46,7 +46,7 @@ async function fetchBriefing(): Promise<{ briefing: string; prices: any[]; fearG
   try {
     // Fetch directly from production URL — always works
     const urls = [
-      'https://defimexico.org/api/bobby-intel',
+      'https://bobbyprotocol.xyz/api/bobby-intel',
       'https://defi-mexico-hub.vercel.app/api/bobby-intel',
     ];
     for (const url of urls) {

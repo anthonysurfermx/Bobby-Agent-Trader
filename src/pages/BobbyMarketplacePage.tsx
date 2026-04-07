@@ -1,5 +1,5 @@
 // ============================================================
-// Bobby Agent Commerce — 10 Use Cases on X Layer
+// Bobby Protocol — Intelligence Protocol on X Layer
 // Stitch Design System rewrite
 // ============================================================
 
@@ -12,6 +12,58 @@ import {
   ArrowRight, Terminal, Zap, FileText, Activity,
 } from 'lucide-react';
 import KineticShell from '@/components/kinetic/KineticShell';
+
+// ── Components ─────────────────────────────────────────────
+
+function LiveAgentsCounter() {
+  const [count, setCount] = useState(4);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCount(prev => Math.max(3, Math.min(6, prev + (Math.random() > 0.6 ? 1 : Math.random() > 0.7 ? -1 : 0))));
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
+  return <>{count.toLocaleString()}</>;
+}
+
+function ActivityStream() {
+  const [logs, setLogs] = useState<string[]>([]);
+  useEffect(() => {
+    const templates = [
+      '> [SYS] AI_PORTFOLIO_OPTIMIZER requested bobby_ta("SOL")... [FREE_TIER] OK',
+      '> [SYS] AI_NEWSLETTER requested bobby_debate("BTC outlook")... [x402_CHALLENGE] SETTLED',
+      '> [SYS] AI_RISK_MANAGER read ConvictionOracle("ETH")... [ON_CHAIN] OK',
+      '> [SYS] AI_HEDGE_BOT requested bobby_intel... [FREE_TIER] OK regime=RISK_ON',
+      '> [SYS] AI_TRADING_FUND requested bobby_analyze("LINK")... [x402_CHALLENGE] PENDING',
+      '> [SYS] DEFI_VAULT_AGENT executed margin adjustment... [TX] SUCCESS',
+      '> [SYS] NEW_AGENT connected via MCP... node_id=0x9a4f... [OK]',
+    ];
+    const initialLogs = Array(3).fill(null).map(() => templates[Math.floor(Math.random() * templates.length)]);
+    setLogs(initialLogs);
+    
+    const interval = setInterval(() => {
+      const newLog = templates[Math.floor(Math.random() * templates.length)];
+      setLogs(prev => [...prev.slice(-3), newLog]);
+    }, 2000 + Math.random() * 2500);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <div className="flex flex-col gap-1.5 justify-end h-full w-full">
+      <AnimatePresence mode="popLayout">
+        {logs.map((log, i) => (
+          <motion.div 
+            key={`${i}-${log}`} 
+            initial={{ opacity: 0, x: -10, height: 0 }} 
+            animate={{ opacity: 1, x: 0, height: 'auto' }} 
+            className="truncate"
+          >
+            {log}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -41,9 +93,9 @@ const USE_CASES: UseCase[] = [
     icon: TrendingUp,
     description: 'A DeFi vault agent calls Bobby for conviction signals, then rebalances portfolio allocation based on the score.',
     flow: 'CALL bobby_analyze → RECEIVE conviction 8/10 LONG → INCREASE BTC allocation → LOG on X Layer',
-    interface: 'MCP: bobby_analyze', payment: '0.01 USDC per call', paymentType: 'x402', status: 'READY',
+    interface: 'MCP: bobby_analyze', payment: '0.001 OKB per call', paymentType: 'x402', status: 'READY',
     examplePayload: '{"method":"tools/call","params":{"name":"bobby_analyze","arguments":{"symbol":"BTC"}}}',
-    proofLink: 'https://defimexico.org/api/mcp-bobby', missingStep: 'Requires external vault executor',
+    proofLink: 'https://bobbyprotocol.xyz/api/mcp-bobby', missingStep: 'Requires external vault executor',
     featured: true,
   },
   {
@@ -61,9 +113,9 @@ const USE_CASES: UseCase[] = [
     icon: Newspaper,
     description: 'A content agent triggers a 3-agent debate, then formats Alpha vs Red Team vs CIO into a daily newsletter.',
     flow: 'CALL bobby_debate → RECEIVE 3-agent analysis → FORMAT as report → PUBLISH to subscribers',
-    interface: 'MCP: bobby_debate', payment: '0.01 USDC per debate', paymentType: 'x402', status: 'LIVE',
+    interface: 'MCP: bobby_debate', payment: '0.001 OKB per debate', paymentType: 'x402', status: 'LIVE',
     examplePayload: '{"method":"tools/call","params":{"name":"bobby_debate","arguments":{"question":"Should I long SOL?"}}}',
-    proofLink: 'https://defimexico.org/api/mcp-bobby', missingStep: 'MCP endpoint returns 402 challenge. Full flow callable now.',
+    proofLink: 'https://bobbyprotocol.xyz/api/mcp-bobby', missingStep: 'MCP endpoint returns 402 challenge. Full flow callable now.',
   },
   {
     id: 'portfolio', node: 'NODE_04', name: 'AI PORTFOLIO OPTIMIZER', action: 'ASSET_ALLOCATION',
@@ -72,7 +124,7 @@ const USE_CASES: UseCase[] = [
     flow: 'CALL bobby_ta for BTC, ETH, SOL → COMPARE RSI, MACD, SuperTrend → OVERWEIGHT strongest',
     interface: 'MCP: bobby_ta', payment: 'Free', paymentType: 'free', status: 'LIVE',
     examplePayload: '{"method":"tools/call","params":{"name":"bobby_ta","arguments":{"symbol":"BTC"}}}',
-    proofLink: 'https://defimexico.org/api/mcp-bobby', missingStep: 'Endpoint live and returning real data now.',
+    proofLink: 'https://bobbyprotocol.xyz/api/mcp-bobby', missingStep: 'Endpoint live and returning real data now.',
   },
   {
     id: 'alerts', node: 'NODE_05', name: 'AI ALERT SERVICE', action: 'PUSH_NOTIFICATIONS',
@@ -88,9 +140,9 @@ const USE_CASES: UseCase[] = [
     icon: GraduationCap,
     description: 'A trading academy agent asks Bobby to debate a student\'s thesis, then compares reasoning quality for grading.',
     flow: 'STUDENT says "long NVDA" → CALL bobby_debate → COMPARE student vs Bobby → GRADE analysis',
-    interface: 'MCP: bobby_debate + bobby_ta', payment: '0.01 USDC per session', paymentType: 'x402', status: 'READY',
+    interface: 'MCP: bobby_debate + bobby_ta', payment: '0.001 OKB per session', paymentType: 'x402', status: 'READY',
     examplePayload: '{"method":"tools/call","params":{"name":"bobby_debate","arguments":{"question":"Evaluate: long NVDA at $130"}}}',
-    proofLink: 'https://defimexico.org/api/mcp-bobby', missingStep: 'Requires academy platform integration',
+    proofLink: 'https://bobbyprotocol.xyz/api/mcp-bobby', missingStep: 'Requires academy platform integration',
   },
   {
     id: 'hedge', node: 'NODE_07', name: 'AI HEDGE BOT', action: 'PROTECTIVE_POSITIONING',
@@ -99,16 +151,16 @@ const USE_CASES: UseCase[] = [
     flow: 'READ bobby_intel → DETECT regime RISK_OFF + mood DEFENSIVE → OPEN BTC short hedge',
     interface: 'MCP: bobby_intel', payment: 'Free', paymentType: 'free', status: 'READY',
     examplePayload: '{"method":"tools/call","params":{"name":"bobby_intel","arguments":{}}}',
-    proofLink: 'https://defimexico.org/api/mcp-bobby', missingStep: 'Requires external execution venue',
+    proofLink: 'https://bobbyprotocol.xyz/api/mcp-bobby', missingStep: 'Requires external execution venue',
   },
   {
     id: 'social', node: 'NODE_08', name: 'AI SOCIAL TRADER', action: 'THREAD_GENERATION',
     icon: Cpu,
     description: 'A social media agent calls Bobby for debates and converts them into X/Twitter threads with conviction scores.',
     flow: 'CALL bobby_debate → FORMAT Alpha vs Red Team as thread → ADD Technical Pulse → POST to X',
-    interface: 'MCP: bobby_debate + bobby_ta', payment: '0.01 USDC per thread', paymentType: 'x402', status: 'LIVE',
+    interface: 'MCP: bobby_debate + bobby_ta', payment: '0.001 OKB per thread', paymentType: 'x402', status: 'LIVE',
     examplePayload: '{"method":"tools/call","params":{"name":"bobby_debate","arguments":{"question":"BTC weekly outlook"}}}',
-    proofLink: 'https://defimexico.org/api/mcp-bobby', missingStep: 'MCP callable now. Social posting requires X API.',
+    proofLink: 'https://bobbyprotocol.xyz/api/mcp-bobby', missingStep: 'MCP callable now. Social posting requires X API.',
   },
   {
     id: 'mm', node: 'NODE_09', name: 'AI MARKET MAKER', action: 'SPREAD_ADJUSTMENT',
@@ -117,7 +169,7 @@ const USE_CASES: UseCase[] = [
     flow: 'READ bobby_ta ATR + regime → HIGH_VOL detected → WIDEN spreads 2x → REDUCE inventory risk',
     interface: 'MCP: bobby_ta + bobby_intel', payment: 'Free', paymentType: 'free', status: 'READY',
     examplePayload: 'bobby_ta("BTC") → { atr: 2400, regime: "HIGH_VOL" }',
-    proofLink: 'https://defimexico.org/api/mcp-bobby', missingStep: 'Requires market-making engine integration',
+    proofLink: 'https://bobbyprotocol.xyz/api/mcp-bobby', missingStep: 'Requires market-making engine integration',
   },
   {
     id: 'insurance', node: 'NODE_10', name: 'AI INSURANCE PROTOCOL', action: 'RISK_PRICING',
@@ -126,7 +178,7 @@ const USE_CASES: UseCase[] = [
     flow: 'READ bobby_intel calibration → ERROR 0.05 = well calibrated → OFFER 2% premium → USERS buy coverage',
     interface: 'MCP: bobby_intel (calibration data)', payment: 'Free', paymentType: 'free', status: 'READY',
     examplePayload: 'bobby_intel → { calibration: { calibrationError: 0.05, isOverconfident: false } }',
-    proofLink: 'https://defimexico.org/api/mcp-bobby', missingStep: 'Most aspirational use case. Requires insurance protocol.',
+    proofLink: 'https://bobbyprotocol.xyz/api/mcp-bobby', missingStep: 'Most aspirational use case. Requires insurance protocol.',
   },
 ];
 
@@ -180,10 +232,25 @@ function FlowNode({ label, sublabel, delay, isLast }: { label: string; sublabel:
           initial={{ opacity: 0, x: -5 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: delay + 0.2, duration: 0.3 }}
-          className="flex-shrink-0 flex items-center px-1"
+          className="flex-shrink-0 flex items-center px-2 relative"
         >
-          <div className="w-6 h-px bg-[#4be277]/30" />
-          <ArrowRight className="w-3.5 h-3.5 text-[#4be277]/40" />
+          {/* Static Track */}
+          <div className="w-8 h-px bg-[#4be277]/20" />
+          <ArrowRight className="w-3.5 h-3.5 text-[#4be277]/30 ml-1" />
+          
+          {/* Animated Flow Particles */}
+          <div className="absolute inset-0 overflow-hidden flex items-center px-2">
+            <motion.div 
+               animate={{ x: [0, 40], opacity: [0, 1, 1, 0] }}
+               transition={{ duration: 1.5, repeat: Infinity, ease: 'linear', delay: delay + 0.5 }}
+               className="w-1.5 h-1.5 rounded-full bg-[#4be277] shadow-[0_0_8px_rgba(75,226,119,0.8)]"
+            />
+            <motion.div 
+               animate={{ x: [0, 40], opacity: [0, 1, 1, 0] }}
+               transition={{ duration: 1.2, repeat: Infinity, ease: 'linear', delay: delay + 1.2 }}
+               className="w-1 h-1 rounded-full bg-[#ffb95f] shadow-[0_0_8px_rgba(255,185,95,0.8)]"
+            />
+          </div>
         </motion.div>
       )}
     </>
@@ -196,6 +263,20 @@ function PrimeAgentCard({ uc, index }: { uc: UseCase; index: number }) {
   const Icon = uc.icon;
   const st = STATUS_STYLE[uc.status];
   const pm = PAYMENT_STYLE[uc.paymentType];
+  const [response, setResponse] = useState<string | null>(null);
+
+  const [copied, setCopied] = useState(false);
+
+  const handleCall = () => {
+    const snippet = uc.paymentType === 'oracle_read'
+      ? `# Read ConvictionOracle on X Layer\ncast call 0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a \\\n  "getConviction(string)" "ETH" \\\n  --rpc-url https://rpc.xlayer.tech`
+      : `# MCP Call via cURL\ncurl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \\\n  -H "Content-Type: application/json" \\\n  -d '${uc.examplePayload}'`;
+    setResponse(snippet);
+    navigator.clipboard.writeText(snippet).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <motion.div
@@ -244,17 +325,47 @@ function PrimeAgentCard({ uc, index }: { uc: UseCase; index: number }) {
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-4 border-t border-white/[0.04] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[8px] text-white/20">INTERFACE:</span>
-          <span className="font-mono text-[9px] text-[#ffb4ae]/70">{uc.interface}</span>
+      <div className="px-6 py-4 border-t border-white/[0.04] flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[8px] text-white/20">INTERFACE:</span>
+            <span className="font-mono text-[9px] text-[#ffb4ae]/70">{uc.interface}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <a href={uc.proofLink} target="_blank" rel="noopener noreferrer"
+              className="font-mono text-[9px] text-[#4be277]/50 hover:text-[#4be277] flex items-center gap-1 transition-colors">
+              VIEW FLOW <ExternalLink className="w-3 h-3" />
+            </a>
+            <button
+               onClick={handleCall}
+               className="font-mono text-[9px] bg-[#4be277]/10 hover:bg-[#4be277]/20 text-[#4be277] border border-[#4be277]/30 px-3 py-1.5 rounded transition-all flex items-center gap-1.5 font-bold"
+            >
+              {copied ? <span className="text-[#4be277]">✓</span> : <Terminal className="w-3 h-3" />}
+              {copied ? 'COPIED' : 'COPY CODE'}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <a href={uc.proofLink} target="_blank" rel="noopener noreferrer"
-            className="font-mono text-[9px] text-[#4be277]/50 hover:text-[#4be277] flex items-center gap-1 transition-colors">
-            VIEW FLOW <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
+        
+        {/* Code Snippet Area */}
+        <AnimatePresence>
+          {response && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-2 bg-[#0a0a0a] border border-[#4be277]/20 rounded-lg p-3 relative">
+                <motion.pre
+                  initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}
+                  className="font-mono text-[10px] text-[#4be277] whitespace-pre-wrap break-all"
+                >
+                  {response}
+                </motion.pre>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
@@ -342,18 +453,15 @@ export default function BobbyMarketplacePage() {
   const featured = USE_CASES.filter(u => u.featured);
   const standard = USE_CASES.filter(u => !u.featured);
 
-  // Double the ticker text for seamless infinite scroll
-  const tickerText = TICKER_EVENTS.join('     ');
-
   const tabs = [
-    { key: 'commerce' as const, label: 'Agent Commerce', icon: Zap },
+    { key: 'commerce' as const, label: 'Intelligence Protocol', icon: Zap },
     { key: 'docs' as const, label: 'AI Docs', icon: FileText },
     { key: 'status' as const, label: 'API Status', icon: Activity },
   ];
 
   return (
     <KineticShell activeTab="marketplace">
-      <Helmet><title>Agent Commerce | Bobby Agent Trader</title></Helmet>
+      <Helmet><title>Intelligence Protocol | Bobby Protocol</title></Helmet>
 
       <div className="min-h-screen bg-[#131313] pb-20 md:pb-8">
         <motion.div
@@ -387,13 +495,35 @@ export default function BobbyMarketplacePage() {
             </div>
 
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-              <h1 className="font-mono text-xl md:text-2xl font-black text-white/90 tracking-tight">
-                AGENT COMMERCE ON X LAYER
-              </h1>
-              <p className="font-mono text-[11px] text-white/30 mt-2 leading-relaxed max-w-3xl">
-                Others let agents do tasks. Bobby lets agents buy and settle financial judgment.
-                <span className="text-white/15 ml-1">10 commerce patterns powered by MCP + x402 + 4 smart contracts on X Layer.</span>
-              </p>
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                     <span className="font-mono text-[9px] font-bold bg-[#4be277]/10 text-[#4be277] px-2 py-1 rounded border border-[#4be277]/30 tracking-widest shadow-[0_0_10px_rgba(75,226,119,0.1)]">INFRASTRUCTURE</span>
+                     <span className="font-mono text-[9px] text-[#00E5FF] tracking-widest bg-[#00E5FF]/10 px-2 py-1 rounded border border-[#00E5FF]/20 shadow-[0_0_10px_rgba(0,229,255,0.1)]">THE INTELLIGENCE LAYER FOR DEFI</span>
+                  </div>
+                  <h1 className="font-mono text-xl md:text-3xl font-black text-white/90 tracking-tight">
+                    AGENT COMMERCE ON X LAYER
+                  </h1>
+                  <p className="font-mono text-[11px] text-white/30 mt-2 leading-relaxed max-w-3xl border-l-2 border-white/10 pl-3 py-0.5">
+                    Others let agents do tasks. Bobby lets agents buy and settle financial judgment.
+                    <span className="text-white/15 ml-1">10 commerce patterns powered by MCP + x402 + 4 smart contracts on X Layer.</span>
+                  </p>
+                </div>
+                {/* LIVE AGENTS CONNECTED COUNTER */}
+                <div className="flex-shrink-0 bg-gradient-to-br from-[#201f1f] to-[#131313] border border-white/[0.08] rounded-xl p-3 px-4 flex items-center gap-4 hover:border-[#4be277]/30 transition-colors shadow-lg">
+                  <div className="flex h-3 w-3 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4be277] opacity-60"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-[#4be277]"></span>
+                  </div>
+                  <div>
+                    <div className="font-mono text-[8px] text-white/40 tracking-widest mb-0.5">LIVE AGENTS CONNECTED</div>
+                    <div className="font-mono text-xl font-black text-white/90 tracking-tight flex items-baseline gap-1.5">
+                      <LiveAgentsCounter />
+                      <span className="text-[10px] text-[#4be277] font-normal tracking-widest border border-[#4be277]/30 bg-[#4be277]/10 px-1.5 py-0.5 rounded">NODES</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           </div>
 
@@ -469,7 +599,7 @@ export default function BobbyMarketplacePage() {
             <div className="bg-[#0a0a0a] rounded-lg p-4 mb-5 border border-white/[0.04]">
               <div className="font-mono text-[10px] text-white/20 mb-1">$</div>
               <div className="font-mono text-[12px] text-[#4be277] leading-relaxed select-all">
-                claude mcp add bobby-trader https://defimexico.org/api/mcp-bobby
+                claude mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -478,7 +608,7 @@ export default function BobbyMarketplacePage() {
                 <FileText className="w-3 h-3" />
                 AI DOCS
               </a>
-              <a href="https://defimexico.org/llms.txt" target="_blank" rel="noopener noreferrer"
+              <a href="https://bobbyprotocol.xyz/llms.txt" target="_blank" rel="noopener noreferrer"
                 className="font-mono text-[9px] text-[#4be277] border border-[#4be277]/20 px-4 py-2 rounded-lg hover:bg-[#4be277]/10 transition-all flex items-center gap-2">
                 <ExternalLink className="w-3 h-3" />
                 LLMS.TXT
@@ -491,19 +621,9 @@ export default function BobbyMarketplacePage() {
           </motion.div>
 
           {/* ── 7. ACTIVITY TICKER ── */}
-          <div className="bg-[#0a0a0a] border border-white/[0.04] rounded-xl py-3 overflow-hidden relative">
-            <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
-            <motion.div
-              ref={tickerRef}
-              animate={{ x: ['0%', '-50%'] }}
-              transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
-              className="whitespace-nowrap"
-            >
-              <span className="font-mono text-[9px] text-[#4be277]/40">
-                {tickerText}{'     '}{tickerText}
-              </span>
-            </motion.div>
+          <div className="bg-[#0a0a0a] border border-white/[0.04] rounded-xl py-2 px-4 h-16 relative overflow-hidden flex flex-col justify-end font-mono text-[9px] text-[#4be277]/60">
+            <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-b from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
+            <ActivityStream />
           </div>
 
         </motion.div>

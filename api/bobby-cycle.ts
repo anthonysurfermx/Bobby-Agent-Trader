@@ -118,7 +118,7 @@ async function callClaude(model: string, system: string, userMsg: string, maxTok
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
   // Always use production domain — VERCEL_URL points to preview deployments that may have stale env vars
-  const host = 'https://defimexico.org';
+  const host = 'https://bobbyprotocol.xyz';
   const internalAuth = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
   try {
     const res = await fetch(`${host}${path}`, {
@@ -139,7 +139,7 @@ async function fetchLocalApi(path: string, body: any, noFallback = false): Promi
 
   // Fallback to prod domain ONLY for read-only endpoints
   try {
-    const res2 = await fetch(`https://defimexico.org${path}`, {
+    const res2 = await fetch(`https://bobbyprotocol.xyz${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -163,7 +163,7 @@ function resolveChallengeMode(reqMethod: string, requestedMode: string): Challen
 
 async function fetchIntel(): Promise<any | null> {
   const urls = [
-    'https://defimexico.org/api/bobby-intel',
+    'https://bobbyprotocol.xyz/api/bobby-intel',
     'https://defi-mexico-hub.vercel.app/api/bobby-intel',
   ];
   for (const url of urls) {
@@ -217,7 +217,7 @@ function directionMatchesTechnical(
 async function fetchPositions(mode: 'paper' | 'live' = 'live'): Promise<any[]> {
   try {
     const urls = [
-      'https://defimexico.org/api/okx-perps',
+      'https://bobbyprotocol.xyz/api/okx-perps',
       'https://defi-mexico-hub.vercel.app/api/okx-perps',
     ];
     for (const url of urls) {
@@ -989,7 +989,7 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
     // Deliver Bobby's public debate to active Telegram groups
     if (threadId) {
       const cycleSecret = process.env.BOBBY_CYCLE_SECRET;
-      fetch('https://defimexico.org/api/telegram-deliver', {
+      fetch('https://bobbyprotocol.xyz/api/telegram-deliver', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -15,8 +15,14 @@ import {
   extractPaymentTxHash,
   verifyMcpPaymentTx,
 } from './_lib/xlayer-payments.js';
+import {
+  createChallenge,
+  atomicConsumeChallenge,
+  storeReceipt,
+  getChallenge,
+} from './_lib/mcp-challenges.js';
 
-const BASE_URL = 'https://defimexico.org';
+const BASE_URL = 'https://bobbyprotocol.xyz';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -196,9 +202,9 @@ const X402_PRICE_OKB = '0.001';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(200).json({
-      name: 'Bobby Agent Trader',
-      description: 'AI Trading CIO with 15 data sources, 3-agent debate, on-chain accountability. x402 payment for premium tools.',
-      version: '2.0.0',
+      name: 'Bobby Protocol',
+      description: 'Intelligence Protocol on X Layer — 3-agent debate, conviction scoring, adversarial correction. x402 payment for premium tools.',
+      version: '3.0.0',
       protocol: 'mcp',
       endpoints: { tools: '/api/mcp-bobby' },
       pricing: {
@@ -210,7 +216,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           protocol: 'x402',
           chainId: XLAYER_CHAIN_ID,
           settlementContract: BOBBY_AGENT_ECONOMY,
-          settlementMethod: 'payMCPCall(string toolName)',
+          settlementMethod: 'payMCPCall(bytes32 challengeId, string toolName)',
         },
       },
     });
@@ -222,7 +228,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ jsonrpc: '2.0', error: { code: -32600, message: 'Invalid JSON-RPC request' }, id: null });
   }
 
-  // x402 payment check for premium tools
+  // x402 payment check for premium tools (V2: challenge-based, replay-resistant)
   let verifiedPayment: Awaited<ReturnType<typeof verifyMcpPaymentTx>> | null = null;
   if (body.method === 'tools/call') {
     const toolName = (body.params as Record<string, unknown>)?.name as string;
@@ -232,27 +238,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         || req.headers['x-payment']
         || req.headers['authorization'],
       );
+      const challengeIdHeader = String(req.headers['x-challenge-id'] || '').trim();
 
       if (!txHash) {
-        return res.status(402).json({
-          jsonrpc: '2.0',
-          error: {
-            code: -32402,
-            message: `Payment required. ${toolName} costs ${X402_PRICE_OKB} OKB on X Layer. Send the payMCPCall tx hash in x-402-payment.`,
-            data: {
-              price: X402_PRICE_OKB,
-              currency: 'OKB',
-              protocol: 'x402',
-              chain: `X Layer (${XLAYER_CHAIN_ID})`,
-              chainId: XLAYER_CHAIN_ID,
-              settlementContract: BOBBY_AGENT_ECONOMY,
-              settlementMethod: 'payMCPCall(string toolName)',
+        // No payment: create a new challenge and return 402
+        try {
+          const { challengeId, expiresAt } = await createChallenge(
+            toolName,
+            PREMIUM_MCP_FEE_WEI.toString(),
+            undefined,
+            String(req.headers['x-agent-name'] || '').trim() || undefined,
+          );
+          return res.status(402).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32402,
+              message: `Payment required. ${toolName} costs ${X402_PRICE_OKB} OKB on X Layer.`,
+              data: {
+                challengeId,
+                expiresAt,
+                price: X402_PRICE_OKB,
+                priceWei: PREMIUM_MCP_FEE_WEI.toString(),
+                currency: 'OKB',
+                protocol: 'x402',
+                chain: `X Layer (${XLAYER_CHAIN_ID})`,
+                chainId: XLAYER_CHAIN_ID,
+                settlementContract: BOBBY_AGENT_ECONOMY,
+                settlementMethod: 'payMCPCall(bytes32 challengeId, string toolName)',
+                instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${X402_PRICE_OKB} OKB. Then retry with x-402-payment: <txHash> and x-challenge-id: ${challengeId}`,
+              },
             },
-          },
-          id: body.id,
-        });
+            id: body.id,
+          });
+        } catch (err: any) {
+          console.error('[MCP] Failed to create challenge:', err);
+          return res.status(500).json({
+            jsonrpc: '2.0',
+            error: { code: -32603, message: 'Failed to create payment challenge' },
+            id: body.id,
+          });
+        }
       }
 
+      // Has payment: verify on-chain + atomic consume in DB
       try {
         verifiedPayment = await verifyMcpPaymentTx(txHash, toolName);
       } catch (error: any) {
@@ -261,15 +289,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           error: {
             code: -32402,
             message: error?.message || 'Payment verification failed',
-            data: {
-              protocol: 'x402',
-              txHash,
-              chain: `X Layer (${XLAYER_CHAIN_ID})`,
-              settlementContract: BOBBY_AGENT_ECONOMY,
-            },
+            data: { protocol: 'x402', txHash, chain: `X Layer (${XLAYER_CHAIN_ID})` },
           },
           id: body.id,
         });
+      }
+
+      // Atomic consume: only one request can consume the challenge (Codex R1 P0)
+      const effectiveChallengeId = challengeIdHeader || verifiedPayment.challengeId;
+      if (effectiveChallengeId) {
+        const { consumed } = await atomicConsumeChallenge(
+          effectiveChallengeId,
+          txHash,
+          verifiedPayment.payer,
+        );
+        if (!consumed) {
+          return res.status(402).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32402,
+              message: 'Challenge already consumed, expired, or not found. Request a new challenge.',
+              data: { challengeId: effectiveChallengeId, txHash },
+            },
+            id: body.id,
+          });
+        }
       }
     }
   }
@@ -281,6 +325,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const toolName = (body.params as Record<string, unknown>)?.name as string;
       const args = ((body.params as Record<string, unknown>)?.arguments || {}) as Record<string, unknown>;
       if (toolName && PREMIUM_TOOLS.has(toolName) && verifiedPayment) {
+        // Store verified receipt for Judge Mode + audit trail
+        void storeReceipt({
+          txHash: verifiedPayment.txHash,
+          challengeId: verifiedPayment.challengeId,
+          payerAddress: verifiedPayment.payer,
+          toolName,
+          blockNumber: verifiedPayment.blockNumber,
+          valueWei: verifiedPayment.valueWei,
+          valueOkb: verifiedPayment.valueOkb,
+        });
         void logAgentCommerceEvent({
           source: 'mcp',
           tool_name: toolName,
@@ -294,6 +348,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             arguments: args,
             chainId: XLAYER_CHAIN_ID,
             paymentContract: BOBBY_AGENT_ECONOMY,
+            challengeId: verifiedPayment.challengeId,
           },
         });
       }

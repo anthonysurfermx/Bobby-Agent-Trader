@@ -232,11 +232,11 @@ export default function BobbyDocsPage() {
               >
                 <div className="font-mono text-[9px] text-[#4be277]/40 tracking-widest mb-2">$ TERMINAL</div>
                 <div className="font-mono text-sm md:text-base text-[#4be277] break-all leading-relaxed">
-                  claude mcp add bobby-trader https://defimexico.org/api/mcp-bobby
+                  claude mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby
                 </div>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText('claude mcp add bobby-trader https://defimexico.org/api/mcp-bobby');
+                    navigator.clipboard.writeText('claude mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby');
                   }}
                   className="absolute top-3 right-3 p-2 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all"
                 >
@@ -248,12 +248,12 @@ export default function BobbyDocsPage() {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-4">
                 <span className="font-mono text-[10px] text-white/40">Or give this URL to any AI:</span>
                 <a
-                  href="https://defimexico.org/llms.txt"
+                  href="https://bobbyprotocol.xyz/llms.txt"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-mono text-[11px] text-[#4be277] hover:text-[#4be277]/80 underline underline-offset-2 decoration-[#4be277]/30 transition-colors"
                 >
-                  https://defimexico.org/llms.txt
+                  https://bobbyprotocol.xyz/llms.txt
                   <ExternalLink className="w-3 h-3 inline ml-1 -mt-0.5" />
                 </a>
               </div>
@@ -370,7 +370,7 @@ export default function BobbyDocsPage() {
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.03] font-bold leading-none">1</div>
                   <div className="font-mono text-[9px] text-[#ffb4ae] tracking-widest uppercase mb-3">Request</div>
                   <div className="bg-black/60 border border-white/[0.06] rounded-lg p-3 font-mono text-[10px] text-[#4be277] overflow-x-auto whitespace-pre leading-relaxed">
-{`curl defimexico.org/api/premium-signal
+{`curl bobbyprotocol.xyz/api/premium-signal
 
 → 402 {
   amount: "0.001 OKB",
@@ -385,7 +385,7 @@ export default function BobbyDocsPage() {
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.03] font-bold leading-none">2</div>
                   <div className="font-mono text-[9px] text-[#ffb95f] tracking-widest uppercase mb-3">Pay on X Layer</div>
                   <div className="bg-black/60 border border-white/[0.06] rounded-lg p-3 font-mono text-[10px] text-[#4be277] overflow-x-auto whitespace-pre leading-relaxed">
-{`curl defimexico.org/api/
+{`curl bobbyprotocol.xyz/api/
   premium-signal \\
   -H "x-payment:
     0xYOUR_TX_HASH"`}
@@ -444,7 +444,7 @@ IBobbyOracle oracle = IBobbyOracle(
               </p>
               <CopyBlock
                 label="SEARCH ENDPOINT"
-                code={`curl https://defimexico.org/api/bobby-asset-search?q=PEPE
+                code={`curl https://bobbyprotocol.xyz/api/bobby-asset-search?q=PEPE
 
 → 200 {
   results: [
@@ -465,12 +465,12 @@ IBobbyOracle oracle = IBobbyOracle(
                     <ShoppingCart className="w-5 h-5 text-[#4be277]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-mono text-[9px] text-[#4be277]/60 tracking-[0.2em] uppercase mb-1">Agent Commerce</div>
+                    <div className="font-mono text-[9px] text-[#4be277]/60 tracking-[0.2em] uppercase mb-1">Intelligence Protocol</div>
                     <div className="font-mono text-sm md:text-base text-white/80 font-bold mb-1">
-                      10 Agent Commerce Use Cases
+                      10 Intelligence Protocol Use Cases
                     </div>
                     <div className="font-mono text-[10px] text-white/30">
-                      How agents buy intelligence from Bobby -- AI Trading Fund, Risk Manager, Newsletter, Academy Tutor, and 6 more
+                      How agents buy and sell intelligence on X Layer — bidirectional agent economy
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-[#4be277]/40 group-hover:text-[#4be277] group-hover:translate-x-1 transition-all shrink-0" />
@@ -512,7 +512,7 @@ IBobbyOracle oracle = IBobbyOracle(
                   <ExternalLink className="w-2.5 h-2.5 inline ml-1" />
                 </a>
                 <a
-                  href="https://defimexico.org/llms.txt"
+                  href="https://bobbyprotocol.xyz/llms.txt"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-mono text-[9px] text-white/20 hover:text-white/40 tracking-widest transition-colors"
