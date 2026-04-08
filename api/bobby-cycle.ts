@@ -12,7 +12,7 @@ import type { TradeParams } from '../src/lib/onchainos/types.js';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bobby-technical.js';
 import { ethers } from 'ethers';
 
-export const config = { maxDuration: 120 };
+export const config = { maxDuration: 300 };
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
@@ -52,6 +52,29 @@ async function sbQuery(table: string, query: string): Promise<any[]> {
   } catch { return []; }
 }
 
+async function sbPatch(table: string, filters: string, data: Record<string, unknown>): Promise<boolean> {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/${table}?${filters}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      console.warn(`[Cycle] ${table} patch failed:`, res.status, errBody);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn(`[Cycle] ${table} patch error:`, e);
+    return false;
+  }
+}
+
 // ---- Claude helper ----
 
 // Model mapping: Anthropic → OpenAI equivalents
@@ -62,55 +85,159 @@ const OPENAI_FALLBACK: Record<string, string> = {
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
-async function callClaude(model: string, system: string, userMsg: string, maxTokens: number): Promise<string> {
+async function callClaude(model: string, system: string, userMsg: string, maxTokens: number, timeoutMs = 25000): Promise<string> {
   const openaiModel = OPENAI_FALLBACK[model] || 'gpt-4o-mini';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  // Try OpenAI first (primary)
-  if (OPENAI_API_KEY) {
-    try {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: openaiModel,
-          max_tokens: maxTokens,
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: userMsg },
-          ],
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-        return data.choices[0]?.message?.content || '';
+  try {
+    // Always try OpenAI first (primary) — Anthropic credits exhausted
+    if (OPENAI_API_KEY) {
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: openaiModel,
+            max_tokens: maxTokens,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: userMsg },
+            ],
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+          return data.choices[0]?.message?.content || '';
+        }
+        const errBody = await res.text().catch(() => '');
+        console.warn(`[Cycle] OpenAI ${openaiModel} failed (${res.status}), falling back to Anthropic. ${errBody.slice(0, 100)}`);
+      } catch (e: any) {
+        if (e.name === 'AbortError') throw new Error(`LLM call timed out after ${timeoutMs}ms (${openaiModel})`);
+        console.warn(`[Cycle] OpenAI error, falling back to Anthropic: ${e.message}`);
       }
-      const errBody = await res.text().catch(() => '');
-      console.warn(`[Cycle] OpenAI ${openaiModel} failed (${res.status}), falling back to Anthropic. ${errBody.slice(0, 100)}`);
-    } catch (e: any) {
-      console.warn(`[Cycle] OpenAI error, falling back to Anthropic: ${e.message}`);
     }
-  }
 
-  // Fallback to Anthropic
-  if (!ANTHROPIC_API_KEY) throw new Error('Both OpenAI and Anthropic API keys unavailable');
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: userMsg }] }),
-  });
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`Anthropic ${model}: ${res.status} ${errBody.slice(0, 200)}`);
+    // Fallback to Anthropic
+    if (!ANTHROPIC_API_KEY) throw new Error('Both OpenAI and Anthropic API keys unavailable');
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: userMsg }] }),
+    });
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new Error(`Anthropic ${model}: ${res.status} ${errBody.slice(0, 200)}`);
+    }
+    const data = await res.json() as { content: Array<{ text: string }> };
+    return data.content[0]?.text || '';
+  } finally {
+    clearTimeout(timer);
   }
-  const data = await res.json() as { content: Array<{ text: string }> };
-  return data.content[0]?.text || '';
+}
+
+// ---- Structured Verdict via OpenAI function calling ----
+
+interface StructuredVerdict {
+  action: 'open' | 'close' | 'none';
+  symbol: string;
+  direction: string;
+  conviction: number;
+  entry: number | null;
+  stop: number | null;
+  target: number | null;
+  invalidation: string;
+  vibe_phrase: string;
+  hook: string;
+  thesis: string;
+  risks: string[];
+}
+
+const VERDICT_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    action: { type: 'string' as const, enum: ['open', 'close', 'none'] },
+    symbol: { type: 'string' as const, description: 'Asset symbol: BTC, ETH, SOL, or none' },
+    direction: { type: 'string' as const, enum: ['long', 'short', 'none'] },
+    conviction: { type: 'number' as const, description: 'Conviction 1-10. 1-3=sit out, 4-5=small exploratory, 6-7=core position, 8-10=high conviction' },
+    entry: { type: ['number', 'null'] as any, description: 'Entry price or null' },
+    stop: { type: ['number', 'null'] as any, description: 'Stop loss price. MANDATORY when action=open — never null for trades. Use a tight technical level (support/resistance) or 3% from entry.' },
+    target: { type: ['number', 'null'] as any, description: 'Take profit price or null' },
+    invalidation: { type: 'string' as const, description: 'What invalidates this thesis' },
+    vibe_phrase: { type: 'string' as const, description: 'One punchy sentence capturing your mood. Like Bobby Axelrod on a phone call.' },
+    hook: { type: 'string' as const, description: 'One sharp opening sentence for the forum post' },
+    thesis: { type: 'string' as const, description: '2-3 sentences explaining your reasoning. Be assertive, use trading vocabulary: pain trade, liquidity sweep, leverage flush.' },
+    risks: { type: 'array' as const, items: { type: 'string' as const }, description: 'Top 2-3 risks to this trade' },
+  },
+  required: ['action', 'symbol', 'direction', 'conviction', 'entry', 'stop', 'target', 'invalidation', 'vibe_phrase', 'hook', 'thesis', 'risks'],
+  additionalProperties: false,
+};
+
+async function callStructuredVerdict(system: string, userMsg: string, timeoutMs = 30000): Promise<StructuredVerdict> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    if (!OPENAI_API_KEY) throw new Error('OpenAI API key required for structured verdict');
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 500,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userMsg },
+        ],
+        tools: [{
+          type: 'function',
+          function: {
+            name: 'submit_verdict',
+            description: 'Submit your trading verdict. This is MANDATORY — you must call this function.',
+            parameters: VERDICT_SCHEMA,
+          },
+        }],
+        tool_choice: { type: 'function', function: { name: 'submit_verdict' } },
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '');
+      throw new Error(`OpenAI structured verdict failed: ${res.status} ${errBody.slice(0, 200)}`);
+    }
+
+    const data = await res.json() as any;
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall?.function?.arguments) {
+      throw new Error('No tool call in structured verdict response');
+    }
+
+    const verdict: StructuredVerdict = JSON.parse(toolCall.function.arguments);
+
+    // Validate critical fields
+    if (!['open', 'close', 'none'].includes(verdict.action)) verdict.action = 'none';
+    if (typeof verdict.conviction !== 'number' || verdict.conviction < 1 || verdict.conviction > 10) verdict.conviction = 3;
+    if (verdict.action === 'open' && (!verdict.symbol || verdict.symbol === 'none')) verdict.action = 'none';
+    if (verdict.action === 'open' && (!verdict.direction || verdict.direction === 'none')) verdict.action = 'none';
+
+    return verdict;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 
@@ -118,7 +245,7 @@ async function callClaude(model: string, system: string, userMsg: string, maxTok
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
   // Always use production domain — VERCEL_URL points to preview deployments that may have stale env vars
-  const host = 'https://bobbyprotocol.xyz';
+  const host = 'https://defimexico.org';
   const internalAuth = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
   try {
     const res = await fetch(`${host}${path}`, {
@@ -139,7 +266,7 @@ async function fetchLocalApi(path: string, body: any, noFallback = false): Promi
 
   // Fallback to prod domain ONLY for read-only endpoints
   try {
-    const res2 = await fetch(`https://bobbyprotocol.xyz${path}`, {
+    const res2 = await fetch(`https://defimexico.org${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -159,20 +286,289 @@ function resolveChallengeMode(reqMethod: string, requestedMode: string): Challen
   return 'dryrun';
 }
 
+type YieldVenueType = 'defi_onchain' | 'okx_earn' | 'none';
+
+interface YieldCandidate {
+  investmentId: string | null;
+  platform: string;
+  chain: string;
+  token: string;
+  apy: number;
+  tvl?: number | null;
+  productGroup?: string | null;
+  venueType?: Exclude<YieldVenueType, 'none'>;
+  riskScore?: number | null;
+  maxExitSeconds?: number | null;
+  notes?: string | null;
+}
+
+interface YieldVerdict {
+  deploy: boolean;
+  keepCashPct: number;
+  allocationUsd: number;
+  platform: string | null;
+  chain: string | null;
+  token: string | null;
+  investmentId: string | null;
+  venueType: YieldVenueType;
+  expectedApy: number;
+  maxExitSeconds: number | null;
+  riskScore: number | null;
+  rationale: string;
+  whyNotTrade: string;
+}
+
+interface ActiveYieldPosition {
+  id: string;
+  status: string;
+  platform?: string | null;
+  chain?: string | null;
+  token?: string | null;
+  principal_usd?: number | string | null;
+  target_apy?: number | string | null;
+}
+
+const DEFAULT_YIELD_CANDIDATES: YieldCandidate[] = [
+  {
+    investmentId: '9502',
+    platform: 'Aave V3',
+    chain: 'ethereum',
+    token: 'USDC',
+    apy: 3.2,
+    tvl: 3520000000,
+    productGroup: 'LENDING',
+    venueType: 'defi_onchain',
+    riskScore: 2.5,
+    maxExitSeconds: 12,
+    notes: 'Deep liquidity, fastest conservative unwind on current list.',
+  },
+  {
+    investmentId: '9501',
+    platform: 'Aave V3',
+    chain: 'ethereum',
+    token: 'USDT',
+    apy: 2.8,
+    tvl: 2100000000,
+    productGroup: 'LENDING',
+    venueType: 'defi_onchain',
+    riskScore: 2.6,
+    maxExitSeconds: 12,
+    notes: 'Same-chain stable lending, avoids token conversion.',
+  },
+  {
+    investmentId: '7200',
+    platform: 'Compound V3',
+    chain: 'ethereum',
+    token: 'USDC',
+    apy: 2.5,
+    tvl: 1800000000,
+    productGroup: 'LENDING',
+    venueType: 'defi_onchain',
+    riskScore: 2.8,
+    maxExitSeconds: 12,
+    notes: 'Battle-tested but lower APY than Aave.',
+  },
+  {
+    investmentId: '5400',
+    platform: 'Kamino',
+    chain: 'solana',
+    token: 'USDC',
+    apy: 8.2,
+    tvl: 320000000,
+    productGroup: 'LENDING',
+    venueType: 'defi_onchain',
+    riskScore: 4.8,
+    maxExitSeconds: 2,
+    notes: 'Higher APY but adds chain and operational complexity.',
+  },
+  {
+    investmentId: '4500',
+    platform: 'NAVI',
+    chain: 'sui',
+    token: 'USDC',
+    apy: 6.1,
+    tvl: 180000000,
+    productGroup: 'LENDING',
+    venueType: 'defi_onchain',
+    riskScore: 4.5,
+    maxExitSeconds: 3,
+    notes: 'Strong yield, thinner liquidity and more chain risk.',
+  },
+];
+
+const MIN_YIELD_IDLE_USD = 25;
+const DEFAULT_YIELD_CASH_BUFFER_PCT = 20;
+
+function parseNumeric(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function formatUsd(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '$0';
+  return `$${value.toFixed(value >= 100 ? 0 : 2)}`;
+}
+
+function formatTvl(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 'n/a';
+  if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
+  if (value >= 1e6) return `$${(value / 1e6).toFixed(0)}M`;
+  if (value >= 1e3) return `$${(value / 1e3).toFixed(0)}K`;
+  return `$${value.toFixed(0)}`;
+}
+
+function normalizeYieldCandidate(raw: any): YieldCandidate | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const platform = typeof raw.platform === 'string' ? raw.platform.trim() : '';
+  const chain = typeof raw.chain === 'string' ? raw.chain.trim().toLowerCase() : '';
+  const token = typeof raw.token === 'string' ? raw.token.trim().toUpperCase() : '';
+  const apy = parseNumeric(raw.apy);
+  if (!platform || !chain || !token || apy === null) return null;
+  const venueType = raw.venueType === 'okx_earn' ? 'okx_earn' : 'defi_onchain';
+  return {
+    investmentId: raw.investmentId ? String(raw.investmentId) : null,
+    platform,
+    chain,
+    token,
+    apy,
+    tvl: parseNumeric(raw.tvl),
+    productGroup: typeof raw.productGroup === 'string' ? raw.productGroup : null,
+    venueType,
+    riskScore: parseNumeric(raw.riskScore),
+    maxExitSeconds: parseNumeric(raw.maxExitSeconds),
+    notes: typeof raw.notes === 'string' ? raw.notes : null,
+  };
+}
+
+function resolveYieldCandidates(raw: unknown): YieldCandidate[] {
+  if (!Array.isArray(raw)) return DEFAULT_YIELD_CANDIDATES;
+  const parsed = raw
+    .map((candidate) => normalizeYieldCandidate(candidate))
+    .filter((candidate): candidate is YieldCandidate => candidate !== null);
+  return parsed.length ? parsed : DEFAULT_YIELD_CANDIDATES;
+}
+
+function formatYieldCandidatesBlock(candidates: YieldCandidate[]): string {
+  if (!candidates.length) return 'No yield candidates available.';
+  return candidates
+    .slice()
+    .sort((a, b) => b.apy - a.apy)
+    .map((candidate, index) => {
+      const exit = typeof candidate.maxExitSeconds === 'number' ? `${candidate.maxExitSeconds}s exit` : 'exit n/a';
+      const risk = typeof candidate.riskScore === 'number' ? `risk ${candidate.riskScore.toFixed(1)}/10` : 'risk n/a';
+      const group = candidate.productGroup || 'UNKNOWN';
+      const notes = candidate.notes ? ` | ${candidate.notes}` : '';
+      return `${index + 1}. ${candidate.platform} | ${candidate.chain} | ${candidate.token} | APY ${candidate.apy.toFixed(2)}% | TVL ${formatTvl(candidate.tvl)} | ${group} | ${risk} | ${exit}${notes}`;
+    })
+    .join('\n');
+}
+
+function findYieldCandidate(candidates: YieldCandidate[], verdict: Partial<YieldVerdict>): YieldCandidate | null {
+  if (verdict.investmentId) {
+    const byId = candidates.find((candidate) => candidate.investmentId === verdict.investmentId);
+    if (byId) return byId;
+  }
+  if (!verdict.platform || !verdict.chain || !verdict.token) return null;
+  const platform = verdict.platform.toLowerCase();
+  const chain = verdict.chain.toLowerCase();
+  const token = verdict.token.toUpperCase();
+  return candidates.find((candidate) =>
+    candidate.platform.toLowerCase() === platform &&
+    candidate.chain.toLowerCase() === chain &&
+    candidate.token.toUpperCase() === token
+  ) || null;
+}
+
+function parseYieldVerdict(cioPost: string, candidates: YieldCandidate[], idleCashUsd: number): YieldVerdict | null {
+  const verdictMatch = cioPost.match(/VERDICT:\s*(\{[\s\S]*?\})/);
+  if (!verdictMatch) return null;
+
+  try {
+    const raw = JSON.parse(verdictMatch[1]);
+    const deploy = raw.deploy === true;
+    const keepCashPctRaw = parseNumeric(raw.keepCashPct);
+    const keepCashPct = Math.max(0, Math.min(100, keepCashPctRaw ?? (deploy ? DEFAULT_YIELD_CASH_BUFFER_PCT : 100)));
+    const candidate = deploy
+      ? findYieldCandidate(candidates, {
+          investmentId: raw.investmentId ? String(raw.investmentId) : null,
+          platform: typeof raw.platform === 'string' ? raw.platform : null,
+          chain: typeof raw.chain === 'string' ? raw.chain : null,
+          token: typeof raw.token === 'string' ? raw.token : null,
+        } as Partial<YieldVerdict>)
+      : null;
+
+    if (deploy && !candidate) return null;
+
+    const fallbackAllocation = Math.max(0, idleCashUsd * (1 - keepCashPct / 100));
+    const allocationUsdRaw = parseNumeric(raw.allocationUsd);
+    const allocationUsd = Math.max(0, Math.min(idleCashUsd, allocationUsdRaw ?? fallbackAllocation));
+
+    if (deploy && allocationUsd <= 0) return null;
+
+    const rationale = typeof raw.rationale === 'string' ? raw.rationale.slice(0, 500) : '';
+    const whyNotTrade = typeof raw.whyNotTrade === 'string' ? raw.whyNotTrade.slice(0, 300) : '';
+
+    return {
+      deploy,
+      keepCashPct: Number(keepCashPct.toFixed(2)),
+      allocationUsd: Number(allocationUsd.toFixed(2)),
+      platform: deploy ? candidate?.platform || null : null,
+      chain: deploy ? candidate?.chain || null : null,
+      token: deploy ? candidate?.token || null : null,
+      investmentId: deploy ? candidate?.investmentId || null : null,
+      venueType: deploy ? (candidate?.venueType || 'defi_onchain') : 'none',
+      expectedApy: deploy ? Number((parseNumeric(raw.expectedApy) ?? candidate?.apy ?? 0).toFixed(4)) : 0,
+      maxExitSeconds: deploy ? (parseNumeric(raw.maxExitSeconds) ?? candidate?.maxExitSeconds ?? null) : 0,
+      riskScore: deploy ? (parseNumeric(raw.riskScore) ?? candidate?.riskScore ?? null) : 0,
+      rationale,
+      whyNotTrade,
+    };
+  } catch (e) {
+    console.warn('[Cycle] Failed to parse yield VERDICT JSON:', e);
+    return null;
+  }
+}
+
+function yieldRecommendationStatus(
+  activeYieldPosition: ActiveYieldPosition | null,
+  yieldRecommendation: YieldVerdict | null,
+  yieldDebateTriggered: boolean,
+): 'none' | 'recommended' | 'active' | 'skipped' {
+  if (activeYieldPosition) {
+    return activeYieldPosition.status === 'recommended' ? 'recommended' : 'active';
+  }
+  if (yieldRecommendation?.deploy) return 'recommended';
+  if (yieldDebateTriggered) return 'skipped';
+  return 'none';
+}
+
 // ---- Fetch market intel (frozen snapshot) ----
 
 async function fetchIntel(): Promise<any | null> {
   const urls = [
-    'https://bobbyprotocol.xyz/api/bobby-intel',
+    'https://defimexico.org/api/bobby-intel',
     'https://defi-mexico-hub.vercel.app/api/bobby-intel',
   ];
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (res.ok) return await res.json();
-    } catch { continue; }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000); // 20s hard cap
+  try {
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: controller.signal });
+        if (res.ok) return await res.json();
+      } catch (e: any) {
+        if (e.name === 'AbortError') { console.warn('[Cycle] fetchIntel timed out'); return null; }
+        continue;
+      }
+    }
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
-  return null;
 }
 
 function formatSigned(value: number | null | undefined, decimals = 2): string {
@@ -217,7 +613,7 @@ function directionMatchesTechnical(
 async function fetchPositions(mode: 'paper' | 'live' = 'live'): Promise<any[]> {
   try {
     const urls = [
-      'https://bobbyprotocol.xyz/api/okx-perps',
+      'https://defimexico.org/api/okx-perps',
       'https://defi-mexico-hub.vercel.app/api/okx-perps',
     ];
     for (const url of urls) {
@@ -336,14 +732,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const lang = language === 'es' ? 'es' : 'en';
   const kind = req.method === 'GET' ? 'cron' : (body.kind || 'manual');
   const requestedMode = body.mode || kind;
+  const yieldCandidates = resolveYieldCandidates(body.yieldCandidates);
   const challengeMode = resolveChallengeMode(req.method, requestedMode);
   const okxMode = challengeMode === 'paper' ? 'paper' : 'live';
   const isDryRun = challengeMode === 'dryrun';
   const shouldCommitOnchain = challengeMode === 'live';
   const shouldPublishTwitter = challengeMode === 'live';
   const startTime = Date.now();
+  let cycleId: string | undefined;
 
   try {
+    // ============================================================
+    // PHASE 0: Clean up stale "running" cycles (Vercel hard-kill recovery)
+    // ============================================================
+    const staleThreshold = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10min ago
+    await fetch(`${SB_URL}/rest/v1/agent_cycles?status=eq.running&started_at=lt.${staleThreshold}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      body: JSON.stringify({ status: 'failed', completed_at: new Date().toISOString(), vibe_phrase: 'Timed out (cleaned by next cycle)' }),
+    }).catch(() => {});
+
     // ============================================================
     // PHASE 1: Freeze market snapshot
     // ============================================================
@@ -396,7 +804,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       safe_mode_active: intel.performance?.isSafeMode || false,
       mood: intel.performance?.mood || 'cautious',
     });
-    const cycleId = cycle?.id as string | undefined;
+    cycleId = cycle?.id as string | undefined;
 
     // ============================================================
     // PHASE 3: Multi-agent debate (frozen on the snapshot)
@@ -419,12 +827,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       sampleSize?: number; curve?: Array<{ bucket: string; midpoint: number; actual: number; count: number; reliable: boolean }>;
     } | undefined;
 
+    // Codex: calibration is enforced in code (Phase 3b), prompt should only provide awareness
     const calibrationBlock = calibration && calibration.sampleSize && calibration.sampleSize >= 5
-      ? `\nCALIBRATION: Error=${calibration.calibrationError?.toFixed(2)} | ${
+      ? `\nCALIBRATION: ${
           calibration.isOverconfident
-            ? `OVERCONFIDENT — your high-conviction calls win ${Math.round((calibration.adjustment || 1) * 100)}% of what you predict. Adjust down.`
-            : 'Well-calibrated. Maintain levels.'
-        } | Sample: ${calibration.sampleSize} resolved trades`
+            ? `Your recent high-conviction calls have underperformed. The system has already applied a correction. Focus on thesis quality, not conviction numbers.`
+            : 'Well-calibrated. Recent predictions align with outcomes.'
+        } (${calibration.sampleSize} resolved trades)`
       : '';
 
     const memoryBlock = `\nBOBBY'S TRACK RECORD: Win Rate ${track.winRate}% | Last calls: ${track.lastCalls}${
@@ -445,6 +854,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let alphaPost: string;
     let redPost: string;
     let cioPost: string;
+    let structuredVerdict: StructuredVerdict | undefined;
 
     if (useTestVerdict) {
       // TEST MODE: skip 3 LLM calls, inject manual verdict
@@ -454,11 +864,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`[Cycle] TEST VERDICT: ${testVerdict.direction} ${testVerdict.symbol} conviction ${testVerdict.conviction}/10`);
     } else {
 
+    // Compute hours since last executed trade (for dynamic drought bias)
+    const lastTradeRows = await sbQuery('forum_threads', 'direction=neq.none&direction=not.is.null&status=eq.executed&order=created_at.desc&limit=1');
+    const lastTradeAt = lastTradeRows[0]?.created_at ? new Date(lastTradeRows[0].created_at).getTime() : 0;
+    const hoursSinceLastTrade = lastTradeAt > 0 ? Math.round((Date.now() - lastTradeAt) / (1000 * 60 * 60)) : 999;
+
     // Contradiction-aware prompts (Metacognition Upgrade C)
     const hasContradictions = corrections.contradictions.length > 0;
     const contradictionNote = hasContradictions
       ? ` Bobby recently failed on: ${corrections.contradictions.slice(0, 3).map(c => `${c.direction.toUpperCase()} ${c.symbol}`).join(', ')}. If your thesis resembles a recent failure, explain what changed.`
       : '';
+
+    const backendConv = typeof intel.performance?.dynamicConviction === 'number' ? intel.performance.dynamicConviction : 0;
 
     // Alpha Hunter (Haiku — cheap, aggressive, scans full market)
     alphaPost = await callClaude('claude-haiku-4-5-20251001',
@@ -466,76 +883,137 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `MARKET SCAN:\n${contextBlock}`, 350
     );
 
-    // Red Team (Haiku — adversarial, cost-optimized)
+    // Red Team (Haiku — adversarial, 3-tier intensity per Gemini review)
+    // Codex Q4 circuit breaker: 3+ consecutive losses → restore full aggression regardless of backend score
+    const consecutiveLosses = corrections.contradictions.length;
+    const redTeamCircuitBreaker = consecutiveLosses >= 3 || (calibration?.isOverconfident && (calibration?.adjustment ?? 1) < 0.7);
+    let redTeamIntensity: string;
+    if (redTeamCircuitBreaker) {
+      redTeamIntensity = `You are Red Team — 15-year risk veteran. CIRCUIT BREAKER ACTIVE: Bobby has ${consecutiveLosses} recent losses. Be MAXIMALLY aggressive. Destroy Alpha's thesis. The system is bleeding and needs harsh truth, not encouragement. Every paragraph is a kill shot.`;
+    } else if (backendConv >= 0.7) {
+      redTeamIntensity = `You are Red Team — risk analyst. The backend signal is STRONG, so your job is NOT to kill the trade, but to optimize execution. Focus on sizing, entry timing, stop placement, and hidden traps. Be constructive — demand tight invalidation, not thesis destruction.${
+        hoursSinceLastTrade >= 72 ? `\nPORTFOLIO RISK: The system has been sitting out for ${Math.round(hoursSinceLastTrade / 24)} days. Challenge the bias toward inaction. If Alpha has a B+ setup, demand a small exploratory size instead of killing it. Opportunity cost is our highest threat.` : ''
+      }`;
+    } else if (backendConv >= 0.45) {
+      redTeamIntensity = `You are Red Team — risk analyst. Challenge Alpha's thesis aggressively but fairly. Expose the weakest link in their argument. If the trade is viable, demand a tighter stop or smaller size.${
+        hoursSinceLastTrade >= 72 ? `\nNOTE: System has been inactive for ${Math.round(hoursSinceLastTrade / 24)} days. Weigh opportunity cost alongside risk.` : ''
+      }`;
+    } else {
+      redTeamIntensity = `You are Red Team — 15-year risk veteran. Destroy Alpha's thesis. Attack data gaps, selection bias, timing. Every paragraph is a kill shot.`;
+    }
     redPost = await callClaude('claude-haiku-4-5-20251001',
-      `You are Red Team — 15-year risk veteran who lost $30M trusting "obvious" trades. Destroy Alpha's thesis. Attack data gaps, selection bias, timing. Reference the TECHNICAL_PULSE composite score — if it contradicts Alpha, use it as ammunition. Cite specific indicator readings (RSI overbought, MACD divergence, BB squeeze, death cross) from OKX Agent Trade Kit with exact numbers. ${langRule} 2-3 short paragraphs. Every paragraph is a kill shot.${
-        track.winRate < 60 ? ' Bobby has been WRONG recently. Be extra aggressive.' : ''
-      }${hasContradictions ? ` Use Bobby's recent failures as ammunition: ${corrections.block}` : ''}`,
+      `${redTeamIntensity} Reference the TECHNICAL_PULSE composite score — if it contradicts Alpha, use it as ammunition. Cite specific indicator readings (RSI, MACD, BB, SuperTrend) from OKX Agent Trade Kit with exact numbers. ${langRule} 2-3 short paragraphs.${
+        hasContradictions ? ` Recent failures: ${corrections.block}` : ''}`,
       `MARKET DATA:\n${contextBlock}\n\nALPHA HUNTER'S THESIS:\n${alphaPost}`, 350
     );
 
-    // Bobby CIO — Sonnet when conviction could be high, Haiku when market is clearly dead
-    // Cost optimization: ~70% of cycles are low conviction, save Sonnet for real decisions
-    const marketLooksWeak = track.winRate < 40 || (intel.fearGreed?.value ?? 50) < 15;
-    const cioModel = marketLooksWeak ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-20250514';
-    cioPost = await callClaude(cioModel,
-      `You are Bobby CIO. You heard Alpha and Red Team. Pick a side.
+    // Analyst — SKIP on cron to save ~30s (Codex P0: timeout fuel)
+    let analystPost = '';
+    if (kind !== 'cron') {
+      analystPost = await callClaude('claude-haiku-4-5-20251001',
+        `You are the Head Quantitative Analyst. Distill the <MORNING_BRIEFING> XML data and the Alpha/Red Team debates into a concise <EXECUTIVE_SUMMARY> plain-text report. Highlight market regime, conviction clusters, and major risks / points of friction. Keep it 3 bullet points exactly.`,
+        `DATA:\n${contextBlock}\n\nALPHA HUNTER:\n${alphaPost}\n\nRED TEAM:\n${redPost}`, 350
+      );
+    }
 
-RULES:
-- 2 short paragraphs of reasoning in ${lang === 'es' ? 'Spanish' : 'English'}.
-- Then you MUST end with EXACTLY these two lines (no markdown fences):
-VERDICT: {"execute":true,"conviction":7,"symbol":"BTC","direction":"long","entry":70500,"stop":69200,"target":73900,"invalidation":"DXY breaks above 126"}
-VIBE_PHRASE: BTC order flow stacking at 70.5k, whales loading quietly. Let's ride.
-- If sitting out:
-VERDICT: {"execute":false,"conviction":3,"symbol":"BTC","direction":"none","entry":null,"stop":null,"target":null,"invalidation":"Would enter if DXY drops below 124"}
-VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time.
-- conviction is 1-10 integer. symbol must be one of: BTC,ETH,SOL (only these 3 for now).
-- direction must be "long", "short", or "none".
-- NEVER omit VERDICT or VIBE_PHRASE. Both are mandatory. VIBE_PHRASE must come right after VERDICT.
-- VIBE_PHRASE is a casual 1-2 sentence trading mood (max 200 chars). Write like texting a friend. Reference specific prices/conditions you analyzed.${
-        track.winRate < 60 ? '\nYour recent calls have been poor. Acknowledge it.' : ''
-      }${hasContradictions ? `\nSELF-CORRECTION: You recently failed on these calls. If your current thesis resembles one, explain what is DIFFERENT this time or sit out.` : ''}`,
-      `MARKET DATA:\n${contextBlock}\n\nALPHA:\n${alphaPost}\n\nRED TEAM:\n${redPost}`, 500
-    );
+    // Extract Layer 1, 3, 4 for the CIO
+    const layer1 = contextBlock.match(/<LAYER_1_REGIME>[\s\S]*?<\/LAYER_1_REGIME>/)?.[0] || '';
+    const layer3 = contextBlock.match(/<LAYER_3_METACOGNITION>[\s\S]*?<\/LAYER_3_METACOGNITION>/)?.[0] || '';
+    const cioContext = analystPost
+      ? `${layer1}\n${layer3}\n\nOPEN POSITIONS:\n${positionsBlock}\n\nANALYST EXECUTIVE SUMMARY:\n${analystPost}`
+      : `${layer1}\n${layer3}\n\nOPEN POSITIONS:\n${positionsBlock}\n\nALPHA HUNTER:\n${alphaPost}\n\nRED TEAM:\n${redPost}`;
+
+    // Bobby CIO — Structured Output via OpenAI function calling (Codex P0 fix)
+    const droughtNote = hoursSinceLastTrade >= 72
+      ? `\nOPPORTUNITY COST WARNING: You have missed market moves for ${Math.round(hoursSinceLastTrade / 24)} days. Inaction is becoming a losing position. Unless the market is completely untradable, you must find a calculated entry to recalibrate our edge.`
+      : '';
+    // Suppress trade encouragement when circuit breaker is active (losing streak)
+    const backendBias = redTeamCircuitBreaker
+      ? `\nCIRCUIT BREAKER: ${consecutiveLosses} recent losses. Be EXTRA cautious. Only trade if the setup is exceptional and risk is minimal.`
+      : backendConv >= 0.6
+        ? `\nBACKEND SIGNAL BIAS: The quantitative model scores conviction at ${(backendConv * 10).toFixed(1)}/10. This is STRONG.${droughtNote} If a valid technical setup exists, you are ENCOURAGED to take a calculated, exploratory risk (small size, tight stop). Let the stop-loss do the risk management.`
+        : backendConv >= 0.45
+          ? `\nBACKEND SIGNAL BIAS: Quantitative model scores ${(backendConv * 10).toFixed(1)}/10. Moderate — look for setups with good risk/reward.`
+          : droughtNote; // Even without strong backend, show drought warning
+
+    const cioSystemPrompt = `You are Bobby CIO — a sovereign, ruthless CIO (think Bobby Axelrod meets a cynical quant). Impatient with noise but analytical.
+Never apologize. No "Not financial advice". No emojis. No "Hey guys".
+This is your 6AM Wall Street phone call. Lead with a gut feeling, back it up with math.
+${backendBias}
+CONVICTION GUIDE: 1-3 = sit out, 4-5 = small exploratory risk, 6-7 = core position, 8-10 = high conviction asymmetric upside.
+IMPORTANT: When action=open, you MUST provide entry, stop, and target prices — NEVER null. Use the nearest technical level for stop, or 3% from entry if no clear level exists.
+IMPORTANT: CLOSE existing positions FIRST if the thesis is broken.
+Use assertive vocabulary: pain trade, liquidity sweep, leverage flush, structural breakdown.
+Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
+      track.winRate < 60 ? '\nRecent calls have been poor. Be selective but don\'t freeze.' : ''
+    }${hasContradictions ? `\nSELF-CORRECTION: Recent failures — if thesis resembles one, sit out.` : ''}`;
+
+    // Use structured output (OpenAI function calling) — 100% reliable JSON extraction
+    const structuredVerdict = await callStructuredVerdict(cioSystemPrompt, `MARKET CONTEXT:\n${cioContext}`);
+
+    // Reconstruct CIO post for forum display (human-readable)
+    cioPost = `${structuredVerdict.hook}\n\n${structuredVerdict.thesis}${
+      structuredVerdict.risks?.length ? `\n\nRisks: ${structuredVerdict.risks.join('; ')}` : ''
+    }\n\nVERDICT: ${JSON.stringify({ action: structuredVerdict.action, conviction: structuredVerdict.conviction, symbol: structuredVerdict.symbol, direction: structuredVerdict.direction, entry: structuredVerdict.entry, stop: structuredVerdict.stop, target: structuredVerdict.target, invalidation: structuredVerdict.invalidation })}\nVIBE_PHRASE: ${structuredVerdict.vibe_phrase}`;
+
+    console.log(`[Cycle] Structured verdict: ${structuredVerdict.action} ${structuredVerdict.symbol} ${structuredVerdict.direction} conviction=${structuredVerdict.conviction}/10`);
     } // end else (non-test debate)
 
-    // Parse structured VERDICT from CIO output
+    // Parse verdict — use structuredVerdict if available, fall back to regex for test mode
     let symbol: string | null = null;
     let direction: string | null = null;
     let conviction: number | null = null;
     let entryPrice: number | null = null;
     let stopPrice: number | null = null;
     let targetPrice: number | null = null;
-    let cioSaysExecute = false; // CRITICAL: only execute if CIO explicitly says so
+    let cioSaysExecute = false;
+    let cioSaysClose = false;
     let structuredExecuteRequested = false;
+    let structuredCloseRequested = false;
     let structuredVerdictRejectReason: string | null = null;
     let technicalAlignment: 'aligned' | 'contrarian' | 'neutral' | 'unknown' = 'unknown';
     const convictionAnchor = typeof intel.performance?.dynamicConviction === 'number'
       ? intel.performance.dynamicConviction
       : null;
 
-    const verdictMatch = cioPost.match(/VERDICT:\s*(\{[^}]+\})/);
-    if (verdictMatch) {
-      try {
-        const v = JSON.parse(verdictMatch[1]);
-        structuredExecuteRequested = v.execute === true;
-        conviction = typeof v.conviction === 'number' ? v.conviction / 10 : null;
-        symbol = v.symbol && v.symbol !== 'none' ? v.symbol.toUpperCase() : null;
-        direction = v.direction && v.direction !== 'none' ? v.direction.toLowerCase() : null;
-        entryPrice = typeof v.entry === 'number' ? v.entry : null;
-        stopPrice = typeof v.stop === 'number' ? v.stop : null;
-        targetPrice = typeof v.target === 'number' ? v.target : null;
-      } catch (e) {
-        console.warn('[Cycle] Failed to parse CIO VERDICT JSON:', e);
-        structuredVerdictRejectReason = 'Structured VERDICT JSON parse failed';
+    // Use structured verdict directly (no regex needed — 100% reliable)
+    if (!useTestVerdict && typeof structuredVerdict !== 'undefined') {
+      structuredExecuteRequested = structuredVerdict.action === 'open';
+      structuredCloseRequested = structuredVerdict.action === 'close';
+      conviction = structuredVerdict.conviction / 10; // normalize to 0-1
+      symbol = structuredVerdict.symbol && structuredVerdict.symbol !== 'none' ? structuredVerdict.symbol.toUpperCase() : null;
+      direction = structuredVerdict.direction && structuredVerdict.direction !== 'none' ? structuredVerdict.direction.toLowerCase() : null;
+      entryPrice = typeof structuredVerdict.entry === 'number' ? structuredVerdict.entry : null;
+      stopPrice = typeof structuredVerdict.stop === 'number' ? structuredVerdict.stop : null;
+      targetPrice = typeof structuredVerdict.target === 'number' ? structuredVerdict.target : null;
+    } else {
+      // Fallback: regex parsing for testVerdict mode
+      const verdictMatch = cioPost.match(/VERDICT:\s*(\{[^}]+\})/);
+      if (verdictMatch) {
+        try {
+          const v = JSON.parse(verdictMatch[1]);
+          const action = v.action || (v.execute === true ? 'open' : 'none');
+          structuredExecuteRequested = action === 'open';
+          structuredCloseRequested = action === 'close';
+          conviction = typeof v.conviction === 'number' ? v.conviction / 10 : null;
+          symbol = v.symbol && v.symbol !== 'none' ? v.symbol.toUpperCase() : null;
+          direction = v.direction && v.direction !== 'none' ? v.direction.toLowerCase() : null;
+          entryPrice = typeof v.entry === 'number' ? v.entry : null;
+          stopPrice = typeof v.stop === 'number' ? v.stop : null;
+          targetPrice = typeof v.target === 'number' ? v.target : null;
+        } catch (e) {
+          console.warn('[Cycle] Failed to parse CIO VERDICT JSON:', e);
+          structuredVerdictRejectReason = 'Structured VERDICT JSON parse failed';
+        }
       }
     }
 
-    // Parse VIBE_PHRASE from CIO output
+    // Parse VIBE_PHRASE from CIO output (for both paths)
     const vibeMatch = cioPost.match(/VIBE_PHRASE:\s*(.+?)(?:\n|$)/);
-    const vibePhrase = vibeMatch ? vibeMatch[1].trim().slice(0, 220) : null;
+    const vibePhrase = vibeMatch ? vibeMatch[1].trim().slice(0, 220)
+      : (typeof structuredVerdict !== 'undefined' ? structuredVerdict.vibe_phrase?.slice(0, 220) : null);
 
-    // Fallback: regex extraction ONLY for forum/digest — NEVER for execution decisions
+    // Regex fallback for display only (forum/digest) — NEVER for execution
     if (conviction === null) {
       const convMatch = cioPost.match(/(\d+)\s*\/\s*10/);
       conviction = convMatch ? parseInt(convMatch[1]) / 10 : null;
@@ -548,7 +1026,6 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
       const dirMatch = cioPost.match(/\b(long|short)\b/i);
       direction = dirMatch ? dirMatch[1].toLowerCase() : null;
     }
-    // Regex fallback NEVER enables execution — only structured VERDICT with complete fields can
 
     const technicalAsset = getTechnicalAsset(technicalPulse, symbol);
     const technicalPlan = technicalAsset?.tradePlan && technicalAsset.tradePlan.direction === direction
@@ -569,7 +1046,22 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
       if (targetPrice === null && technicalPlan.target !== null) targetPrice = technicalPlan.target;
     }
 
-    if (structuredExecuteRequested && symbol && direction && conviction !== null && stopPrice) {
+    // Fallback stop price: if CIO wants to open but didn't provide stop (and no technical plan),
+    // calculate a default 3% stop from entry/current price to avoid rejecting valid trades
+    if (structuredExecuteRequested && symbol && direction && !stopPrice) {
+      const refPrice = entryPrice || (intel.prices || []).find((p: any) => p.symbol === symbol)?.price;
+      if (refPrice && refPrice > 0) {
+        stopPrice = direction === 'long'
+          ? parseFloat((refPrice * 0.97).toFixed(2))
+          : parseFloat((refPrice * 1.03).toFixed(2));
+        console.log(`[Cycle] Stop fallback: ${direction} ${symbol} stop=${stopPrice} (3% from ${refPrice})`);
+      }
+    }
+
+    if (structuredCloseRequested && symbol && direction) {
+      cioSaysClose = true;
+      console.log(`[Cycle] CIO says CLOSE ${direction} ${symbol} (conviction ${conviction})`);
+    } else if (structuredExecuteRequested && symbol && direction && conviction !== null && stopPrice) {
       cioSaysExecute = true;
     } else if (structuredExecuteRequested) {
       const missing: string[] = [];
@@ -585,15 +1077,13 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
     // PHASE 3b: Apply calibration adjustment (Metacognition Upgrade A)
     // Codex P1: Store BOTH raw and adjusted conviction separately
     // ============================================================
+    // Conviction gate: backend-owned (Codex synthesis)
+    // Backend model owns gate + sizing. CIO owns action + levels + invalidation.
+    // Formula: 0.7 * backend + 0.3 * llm (only when CIO wants to act)
     const llmConviction = conviction;
-    const backendBlendWeight = technicalAlignment === 'aligned'
-      ? 0.4
-      : technicalAlignment === 'contrarian'
-        ? 0.2
-        : 0.3;
     if (conviction !== null && convictionAnchor !== null && (structuredExecuteRequested || direction)) {
       conviction = parseFloat(Math.max(0.1, Math.min(0.95,
-        (conviction * (1 - backendBlendWeight)) + (convictionAnchor * backendBlendWeight)
+        (conviction * 0.3) + (convictionAnchor * 0.7)
       )).toFixed(2));
     }
 
@@ -622,6 +1112,7 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
     const thread = await sbInsert('forum_threads', {
       topic,
       trigger_reason: `Autonomous ${kind} cycle`,
+      cycle_id: cycleId || null,
       // Codex P1: store both raw and adjusted conviction + calibration metadata
       trigger_data: {
         regime: intel.regime, fgi: intel.fearGreed, dxy: intel.dxy,
@@ -630,7 +1121,7 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
         backend_blend: {
           llm_conviction: llmConviction,
           backend_anchor: convictionAnchor,
-          blend_weight: convictionAnchor !== null ? backendBlendWeight : null,
+          blend_weight: convictionAnchor !== null ? 0.7 : null,
           post_blend_conviction: rawConviction,
           technical_alignment: technicalAlignment,
         },
@@ -658,47 +1149,50 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
         trackRecord: track,
         technicalLeader: technicalPulse?.leader || null,
       };
-      for (const post of [
+      // Save debate posts in parallel (was sequential — saves ~2s)
+      await Promise.all([
         { agent: 'alpha', content: alphaPost },
         { agent: 'redteam', content: redPost },
         { agent: 'cio', content: cioPost },
-      ]) {
-        await sbInsert('forum_posts', {
-          thread_id: threadId,
-          agent: post.agent,
-          content: post.content,
-          data_snapshot: snapshot,
-        });
-      }
+      ].map(post => sbInsert('forum_posts', {
+        thread_id: threadId,
+        agent: post.agent,
+        content: post.content,
+        data_snapshot: snapshot,
+      })));
 
-      // On-chain commit: EVERY debate gets recorded on X Layer
-      // Direct ethers call — no HTTP self-call (avoids timeout in Vercel)
+      // On-chain commit: fire-and-forget to avoid blocking the cycle
+      // X Layer RPC can be slow — this should NEVER cause a timeout
       const xlayerContract = process.env.BOBBY_CONTRACT_ADDRESS || '';
       const xlayerKey = process.env.BOBBY_RECORDER_KEY || '';
       const currentPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price || 0;
       const commitEntry = entryPrice || currentPrice;
       if (symbol && conviction !== null && commitEntry > 0 && xlayerContract && xlayerKey) {
-        try {
-          const provider = new ethers.JsonRpcProvider('https://rpc.xlayer.tech');
-          const wallet = new ethers.Wallet(xlayerKey, provider);
-          const iface = new ethers.Interface([
-            'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96)',
-          ]);
-          const debateHash = ethers.keccak256(ethers.toUtf8Bytes(threadId));
-          const convInt = Math.round((conviction ?? 0) * 10);
-          const txData = iface.encodeFunctionData('commitTrade', [
-            debateHash, symbol, 0, convInt,
-            BigInt(Math.round(commitEntry * 1e8)),
-            BigInt(Math.round((targetPrice || commitEntry * 1.05) * 1e8)),
-            BigInt(Math.round((stopPrice || commitEntry * 0.95) * 1e8)),
-          ]);
-          const txPromise = wallet.sendTransaction({ to: xlayerContract, data: txData, gasLimit: 300000n });
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TX timeout 10s')), 10000));
-          const tx = await Promise.race([txPromise, timeoutPromise]) as any;
-          console.log(`[Cycle] On-chain commit: ${tx.hash}`);
-        } catch (e: any) {
-          console.warn('[Cycle] On-chain commit failed (non-critical):', e.message);
-        }
+        // Fire-and-forget — don't await
+        (async () => {
+          try {
+            const provider = new ethers.JsonRpcProvider('https://rpc.xlayer.tech');
+            const wallet = new ethers.Wallet(xlayerKey, provider);
+            const iface = new ethers.Interface([
+              'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96)',
+            ]);
+            const debateHash = ethers.keccak256(ethers.toUtf8Bytes(threadId));
+            const convInt = Math.round((conviction ?? 0) * 10);
+            const txData = iface.encodeFunctionData('commitTrade', [
+              debateHash, symbol, 0, convInt,
+              BigInt(Math.round(commitEntry * 1e8)),
+              BigInt(Math.round((targetPrice || commitEntry * 1.05) * 1e8)),
+              BigInt(Math.round((stopPrice || commitEntry * 0.95) * 1e8)),
+            ]);
+            const tx = await Promise.race([
+              wallet.sendTransaction({ to: xlayerContract, data: txData, gasLimit: 300000n }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('TX timeout 8s')), 8000)),
+            ]) as any;
+            console.log(`[Cycle] On-chain commit: ${tx.hash}`);
+          } catch (e: any) {
+            console.warn('[Cycle] On-chain commit failed (non-critical):', e.message);
+          }
+        })();
       }
     }
 
@@ -711,6 +1205,7 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
     let txHash: string | null = null;
     let finalBalanceStr: string | null = null;
     let effectiveBalanceForExecution: number | null = overriddenBalance;
+    let availableCashUsd: number | null = overriddenAvailableBalance;
 
     // Always fetch balance from the selected execution venue (live or paper)
     if (overriddenBalance !== null) {
@@ -721,11 +1216,12 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
         if (balCheck.ok) {
           finalBalanceStr = String(balCheck.totalEquity || '???');
           effectiveBalanceForExecution = balCheck.totalEquity || null;
+          availableCashUsd = balCheck.availableBalance || balCheck.totalEquity || null;
         }
       } catch { /* non-blocking */ }
     }
 
-    if (!isDryRun && cioSaysExecute && symbol && direction && conviction !== null && conviction >= 0.5) {
+    if (!isDryRun && cioSaysExecute && symbol && direction && conviction !== null && conviction >= 0.35) {
       try {
         const currentPrice = intel.prices?.find((p: any) => p.symbol === symbol)?.price || entryPrice;
         
@@ -742,9 +1238,11 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
           const totalEq = balRes.totalEquity || 100;
           finalBalanceStr = String(totalEq);
           const availBal = balRes.availableBalance || totalEq;
+          availableCashUsd = availBal;
           const balanceObj = { ccy: 'USDT', availBal: String(availBal), totalEq: String(totalEq), frozenBal: '0' };
           
-          const positionSizeUsd = getPositionSize(totalEq, conviction);
+          const isSafeMode = intel.performance?.isSafeMode === true;
+          const positionSizeUsd = getPositionSize(totalEq, conviction, isSafeMode);
           const leverage = 5; // Hardcoded for challenge
           
           if (positionSizeUsd > 0) {
@@ -769,6 +1267,22 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
 
               if (openRes.ok) {
                 executionResult = openRes;
+
+                // Insert into agent_trades (Codex P0: metrics were never recorded)
+                await sbInsert('agent_trades', {
+                  cycle_id: cycleId || null,
+                  chain: 'xlayer',
+                  token_symbol: symbol,
+                  token_address: `${symbol}-USDT-SWAP`,
+                  direction,
+                  amount_usd: positionSizeUsd,
+                  entry_price: currentPrice || entryPrice,
+                  tx_hash: openRes.ordId || openRes.orderId || null,
+                  status: 'open',
+                  llm_reasoning: cioPost.slice(0, 500),
+                  confidence: conviction,
+                  signal_sources: ['bobby-cycle', 'okx-perps'],
+                });
 
                 // 4. Set TP/SL — MANDATORY for challenge
                 // Wait 2s for OKX to register the position (Codex P0: TP/SL race condition)
@@ -849,10 +1363,270 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
       } catch (err) {
         tradeRejectedReason = `Execution exception: ${err instanceof Error ? err.message : String(err)}`;
       }
-    } else if (conviction !== null && conviction < 0.5) {
-      tradeRejectedReason = 'Conviction below 6/10 threshold';
+    } else if (!isDryRun && cioSaysClose && symbol && direction) {
+      // ── CLOSE EXISTING POSITION ──
+      try {
+        console.log(`[Cycle] Closing position: ${direction} ${symbol}`);
+        const closeRes = await fetchLocalApi('/api/okx-perps', {
+          action: 'close_position',
+          params: { symbol, direction, mode: okxMode, internalSecret: process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '' }
+        }, true);
+        if (closeRes?.ok) {
+          executionResult = { ...closeRes, action: 'close' };
+          tradeRejectedReason = null;
+          console.log(`[Cycle] Position closed: ${direction} ${symbol}`);
+          // Notify via Telegram
+          const TG_BOT = process.env.TELEGRAM_BOT_TOKEN;
+          const TG_CHAT = process.env.TELEGRAM_CHAT_ID || '1026323121';
+          if (TG_BOT) {
+            fetch(`https://api.telegram.org/bot${TG_BOT}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: TG_CHAT,
+                text: `📤 Bobby CLOSED ${direction.toUpperCase()} ${symbol}\n\nConviction: ${conviction ? (conviction * 10).toFixed(0) : '?'}/10\nReason: ${vibePhrase || 'Thesis invalidated'}`,
+              }),
+            }).catch(() => {});
+          }
+        } else {
+          tradeRejectedReason = `Close failed: ${closeRes?.error || 'unknown'}`;
+          console.error(`[Cycle] Close failed:`, closeRes?.error);
+        }
+      } catch (err) {
+        tradeRejectedReason = `Close exception: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    } else if (conviction !== null && conviction < 0.35) {
+      tradeRejectedReason = `Conviction ${(conviction * 10).toFixed(1)}/10 below 3.5/10 threshold`;
     } else if (!isDryRun && structuredVerdictRejectReason) {
       tradeRejectedReason = structuredVerdictRejectReason;
+    }
+
+    // ============================================================
+    // PHASE 4c: Yield debate + logging (idle cash parking)
+    // Debate only for now — execution wiring comes later.
+    // ============================================================
+    let yieldThreadId: string | null = null;
+    let yieldPositionId: string | null = null;
+    let yieldRecommendation: YieldVerdict | null = null;
+    let yieldDebateTriggered = false;
+    let yieldDebateSkipReason: string | null = null;
+
+    const activeYieldRows = await sbQuery(
+      'agent_yield_positions',
+      'status=in.(recommended,deployed,withdrawing)&order=created_at.desc&limit=1'
+    );
+    const activeYieldPosition = (activeYieldRows[0] as ActiveYieldPosition | undefined) || null;
+    const idleCashUsd = typeof availableCashUsd === 'number' && Number.isFinite(availableCashUsd)
+      ? availableCashUsd
+      : effectiveBalanceForExecution;
+
+    // Only consider yield if conviction is in the "no trade but not dead" range (0.15-0.35)
+    // Below 0.15 = market is dead, skip yield to save LLM calls and avoid timeout
+    // SKIP on cron to prevent timeout (Codex P0: yield debate adds 3 LLM calls = ~90s)
+    const shouldConsiderYield = kind !== 'cron' && !executionResult && conviction !== null && conviction >= 0.15 && conviction < 0.35 && effectivePositions.length === 0;
+    if (shouldConsiderYield) {
+      if (activeYieldPosition) {
+        yieldDebateSkipReason = `Existing yield state ${activeYieldPosition.status} on ${activeYieldPosition.platform || 'unknown'} ${activeYieldPosition.token || ''}`.trim();
+      } else if (typeof idleCashUsd !== 'number' || idleCashUsd < MIN_YIELD_IDLE_USD) {
+        yieldDebateSkipReason = `Idle cash below minimum threshold (${formatUsd(idleCashUsd)} < ${formatUsd(MIN_YIELD_IDLE_USD)})`;
+      } else if (!yieldCandidates.length) {
+        yieldDebateSkipReason = 'No yield candidate inventory available';
+      }
+    }
+
+    if (shouldConsiderYield && !yieldDebateSkipReason && typeof idleCashUsd === 'number') {
+      yieldDebateTriggered = true;
+      const yieldInventoryBlock = formatYieldCandidatesBlock(yieldCandidates);
+      const yieldContextBlock = `${contextBlock}
+
+IDLE CASH CONTEXT:
+- Trade rejected reason: ${tradeRejectedReason || 'No trade edge'}
+- Idle cash available: ${formatUsd(idleCashUsd)}
+- Trading venue: OKX ${challengeMode === 'paper' ? 'paper' : 'live'}
+- Current yield state: none active
+- Objective: park idle capital without blocking the next high-conviction trade
+
+YIELD CANDIDATES:
+${yieldInventoryBlock}`;
+
+      const yieldAlphaPost = await callClaude('claude-haiku-4-5-20251001',
+        `You are Alpha Hunter. The trade was rejected, so now you are Bobby's treasury offense. Pick the single best idle-cash parking trade from the YIELD CANDIDATES only.
+
+RULES:
+- Prefer stablecoin products, deep TVL, and fast exits.
+- You MUST state allocation USD, keep-cash percentage, APY, exit speed, and why this beats leaving cash idle.
+- Call out bridge or operational complexity explicitly.
+- Do not suggest LPs, lockups, or anything not listed.
+${langRule} Keep it to 2 short paragraphs.`,
+        `YIELD PARKING TASK:\n${yieldContextBlock}`, 350
+      );
+
+      const yieldRedPost = await callClaude('claude-haiku-4-5-20251001',
+        `You are Red Team. Destroy Alpha's yield idea.
+
+RULES:
+- Attack bridge risk, exit latency, smart contract risk, stablecoin conversion risk, and opportunity cost of not having instant cash.
+- If staying 100% cash is safer than every listed candidate, say it directly.
+- Use exact APY / TVL / exit speed details from the YIELD CANDIDATES block as ammunition.
+${langRule} Keep it to 2 short paragraphs.`,
+        `YIELD PARKING TASK:\n${yieldContextBlock}\n\nALPHA HUNTER'S YIELD THESIS:\n${yieldAlphaPost}`, 350
+      );
+
+      const yieldCioPost = await callClaude('claude-sonnet-4-20250514',
+        `You are Bobby CIO. The trade was rejected because conviction stayed below threshold. Decide whether Bobby should keep cash idle or park it in one yield product until the next trade.
+
+RULES:
+- 2 short paragraphs of reasoning in ${lang === 'es' ? 'Spanish' : 'English'}.
+- ONLY use products from YIELD CANDIDATES.
+- Favor liquid stablecoin lending or internal yield. Avoid LPs and lockups.
+- Keep at least 20% in cash unless there is a very strong reason not to.
+- If operational complexity is too high, set deploy:false.
+- Then you MUST end with EXACTLY these two lines (no markdown fences):
+VERDICT: {"deploy":true,"keepCashPct":20,"allocationUsd":80,"platform":"Aave V3","chain":"ethereum","token":"USDC","investmentId":"9502","venueType":"defi_onchain","expectedApy":3.2,"maxExitSeconds":12,"riskScore":2.5,"rationale":"Deep liquidity and fast unwind beat higher-yield but higher-friction options.","whyNotTrade":"Trade conviction stayed below threshold"}
+VIBE_PHRASE: No clean trade. Let the cash clock in on Aave and keep dry powder ready.
+- If staying in cash:
+VERDICT: {"deploy":false,"keepCashPct":100,"allocationUsd":0,"platform":"none","chain":"none","token":"USDT","investmentId":null,"venueType":"none","expectedApy":0,"maxExitSeconds":0,"riskScore":0,"rationale":"Operational and exit risk outweigh current yield.","whyNotTrade":"Trade conviction stayed below threshold"}
+VIBE_PHRASE: No edge in the market and no clean yield rail yet. Stay liquid.
+- NEVER invent a candidate that is not listed.
+- NEVER omit VERDICT or VIBE_PHRASE. VIBE_PHRASE must come immediately after VERDICT.`,
+        `YIELD PARKING TASK:\n${yieldContextBlock}\n\nALPHA:\n${yieldAlphaPost}\n\nRED TEAM:\n${yieldRedPost}`, 500
+      );
+
+      yieldRecommendation = parseYieldVerdict(yieldCioPost, yieldCandidates, idleCashUsd);
+      const yieldVibeMatch = yieldCioPost.match(/VIBE_PHRASE:\s*(.+?)(?:\n|$)/);
+      const yieldVibePhrase = yieldVibeMatch ? yieldVibeMatch[1].trim().slice(0, 220) : null;
+
+      const yieldTopic = `${lang === 'es' ? 'Yield Parking' : 'Yield Parking'} — ${topicDate}`;
+      const yieldThread = await sbInsert('forum_threads', {
+        topic: yieldTopic,
+        trigger_reason: 'Trade rejected → yield parking debate',
+        cycle_id: cycleId || null,
+        trigger_data: {
+          debate_type: 'yield',
+          rejected_trade_thread_id: threadId || null,
+          rejected_trade_reason: tradeRejectedReason || null,
+          idle_cash_usd: idleCashUsd,
+          candidate_inventory: yieldCandidates,
+          active_yield_position: activeYieldPosition || null,
+          phase: 'debate_only',
+          yield_verdict: yieldRecommendation,
+        },
+        language: lang,
+        conviction_score: null,
+        symbol: yieldRecommendation?.token || null,
+        direction: null,
+        entry_price: null,
+        stop_price: null,
+        target_price: null,
+        expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        kind: 'yield_idle',
+        price_at_creation: Object.fromEntries((intel.prices || []).map((p: any) => [p.symbol, p.price])),
+      });
+      yieldThreadId = (yieldThread?.id as string | undefined) || null;
+
+      if (yieldThreadId) {
+        const yieldSnapshot = {
+          idleCashUsd,
+          rejectedTradeReason: tradeRejectedReason,
+          candidates: yieldCandidates,
+          tradeThreadId: threadId || null,
+          phase: 'debate_only',
+        };
+        for (const post of [
+          { agent: 'alpha', content: yieldAlphaPost },
+          { agent: 'redteam', content: yieldRedPost },
+          { agent: 'cio', content: yieldCioPost },
+        ]) {
+          await sbInsert('forum_posts', {
+            thread_id: yieldThreadId,
+            agent: post.agent,
+            content: post.content,
+            data_snapshot: yieldSnapshot,
+          });
+        }
+      }
+
+      await sbInsert('agent_yield_events', {
+        cycle_id: cycleId || null,
+        thread_id: yieldThreadId,
+        event_type: 'debate_started',
+        actor: 'system',
+        status: 'logged',
+        amount_usd: idleCashUsd,
+        reason: 'Trade rejected below conviction threshold',
+        payload: {
+          challenge_mode: challengeMode,
+          rejected_trade_thread_id: threadId || null,
+          rejected_trade_reason: tradeRejectedReason || null,
+          candidates: yieldCandidates,
+        },
+      });
+
+      if (yieldRecommendation?.deploy) {
+        const cashBufferUsd = Math.max(0, Number((idleCashUsd - yieldRecommendation.allocationUsd).toFixed(2)));
+        const yieldPosition = await sbInsert('agent_yield_positions', {
+          cycle_id: cycleId || null,
+          thread_id: yieldThreadId,
+          status: 'recommended',
+          venue_type: yieldRecommendation.venueType === 'okx_earn' ? 'okx_earn' : 'defi_onchain',
+          funding_source: 'okx_cex',
+          investment_id: yieldRecommendation.investmentId,
+          platform: yieldRecommendation.platform,
+          chain: yieldRecommendation.chain,
+          token: yieldRecommendation.token,
+          principal_usd: yieldRecommendation.allocationUsd,
+          cash_buffer_usd: cashBufferUsd,
+          target_apy: yieldRecommendation.expectedApy,
+          risk_score: yieldRecommendation.riskScore,
+          max_exit_seconds: yieldRecommendation.maxExitSeconds,
+          selection_rationale: yieldRecommendation.rationale,
+          verdict_json: yieldRecommendation,
+          metadata: {
+            challenge_mode: challengeMode,
+            phase: 'debate_only',
+            why_not_trade: yieldRecommendation.whyNotTrade,
+            vibe_phrase: yieldVibePhrase,
+          },
+        });
+        yieldPositionId = (yieldPosition?.id as string | undefined) || null;
+
+        await sbInsert('agent_yield_events', {
+          cycle_id: cycleId || null,
+          position_id: yieldPositionId,
+          thread_id: yieldThreadId,
+          event_type: 'recommended',
+          actor: 'cio',
+          status: 'logged',
+          amount_usd: yieldRecommendation.allocationUsd,
+          apy: yieldRecommendation.expectedApy,
+          reason: yieldRecommendation.rationale || 'Yield recommendation approved',
+          payload: {
+            verdict: yieldRecommendation,
+            vibe_phrase: yieldVibePhrase,
+          },
+        });
+        if (yieldThreadId) {
+          await sbPatch('forum_threads', `id=eq.${yieldThreadId}`, { status: 'active' });
+        }
+      } else {
+        yieldDebateSkipReason = yieldRecommendation?.rationale || 'Yield debate ended with stay-in-cash verdict';
+        await sbInsert('agent_yield_events', {
+          cycle_id: cycleId || null,
+          thread_id: yieldThreadId,
+          event_type: yieldRecommendation ? 'skipped' : 'error',
+          actor: 'cio',
+          status: 'logged',
+          amount_usd: idleCashUsd,
+          reason: yieldDebateSkipReason || 'Structured yield verdict parse failed',
+          payload: {
+            verdict: yieldRecommendation,
+            phase: 'debate_only',
+          },
+        });
+        if (yieldThreadId) {
+          await sbPatch('forum_threads', `id=eq.${yieldThreadId}`, { status: 'rejected' });
+        }
+      }
     }
 
     // ============================================================
@@ -861,11 +1635,13 @@ VIBE_PHRASE: DXY at 126 is crushing everything. Cash is king today. Netflix time
     if (threadId) {
       try {
         // Update status — columns may not exist yet, so non-blocking
+        const threadStatus = executionResult ? 'executed' : (tradeRejectedReason ? 'rejected' : 'active');
         await fetch(`${SB_URL}/rest/v1/forum_threads?id=eq.${threadId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
           body: JSON.stringify({
-            status: executionResult ? 'executed' : (tradeRejectedReason ? 'rejected' : 'active'),
+            status: threadStatus,
+            execution_status: threadStatus,
           }),
       });
       } catch (patchErr) {
@@ -896,6 +1672,15 @@ ${cioPost}
 EXECUTION RESULT:
 ${executionResult ? `TRADE EXECUTED ON OKX ${challengeMode === 'paper' ? 'DEMO' : '& COMMITTED ON X LAYER'}` : `NO TRADE. Reason: ${tradeRejectedReason}`}
 
+YIELD RESULT:
+${yieldRecommendation?.deploy
+  ? `YIELD RECOMMENDED: Deploy ${formatUsd(yieldRecommendation.allocationUsd)} into ${yieldRecommendation.platform} ${yieldRecommendation.token} on ${yieldRecommendation.chain} at ${yieldRecommendation.expectedApy.toFixed(2)}% APY. Keep ${yieldRecommendation.keepCashPct}% cash.`
+  : yieldDebateTriggered
+    ? `YIELD DEBATED BUT SKIPPED. Reason: ${yieldDebateSkipReason || 'CIO chose to stay in cash.'}`
+    : activeYieldPosition
+      ? `YIELD ALREADY ACTIVE: ${activeYieldPosition.platform || 'unknown'} ${activeYieldPosition.token || ''} (${activeYieldPosition.status}).`
+      : 'No yield action this cycle.'}
+
 CHALLENGE MODE:
 ${challengeMode.toUpperCase()}
 
@@ -911,7 +1696,7 @@ ${lang === 'es' ? 'Responde en español mexicano, casual pero inteligente. Como 
       symbol: digestSymbol,
       direction: digestDirection,
       conviction: convNum,
-      verdict: conviction !== null && conviction >= 0.5 ? 'execute' : conviction !== null && conviction >= 0.4 ? 'watch' : 'reject',
+      verdict: executionResult ? 'executed' : conviction !== null && conviction >= 0.35 ? 'qualified' : conviction !== null && conviction >= 0.25 ? 'watch' : 'reject',
     }];
 
     // Save global digest (for anonymous users + anyone who opens Bobby)
@@ -926,6 +1711,8 @@ ${lang === 'es' ? 'Responde en español mexicano, casual pero inteligente. Como 
       language: lang,
       kind,
     });
+
+    const yieldStatusSnapshot = yieldRecommendationStatus(activeYieldPosition, yieldRecommendation, yieldDebateTriggered);
 
     // ============================================================
     // PHASE 6: Update cycle as completed
@@ -943,8 +1730,13 @@ ${lang === 'es' ? 'Responde en español mexicano, casual pero inteligente. Como 
           completed_at: new Date().toISOString(),
           status: 'completed',
           latency_ms: latencyMs,
+          trades_executed: executionResult ? 1 : 0,
           llm_reasoning: `Debate: ${digestSymbol} ${digestDirection} ${convNum}/10`,
           vibe_phrase: vibePhrase,
+          idle_cash_usd: idleCashUsd,
+          yield_debate_triggered: yieldDebateTriggered,
+          yield_recommendation_status: yieldStatusSnapshot,
+          yield_position_id: yieldPositionId || activeYieldPosition?.id || null,
         }),
       });
     }
@@ -989,7 +1781,7 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
     // Deliver Bobby's public debate to active Telegram groups
     if (threadId) {
       const cycleSecret = process.env.BOBBY_CYCLE_SECRET;
-      fetch('https://bobbyprotocol.xyz/api/telegram-deliver', {
+      fetch('https://defimexico.org/api/telegram-deliver', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1009,7 +1801,10 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
     // Haiku takes ~2-3s, acceptable overhead for real data.
     // ============================================================
     // Skip quality scoring on very low conviction — saves ~$0.001/cycle, 70% of cycles
-    const shouldScoreQuality = threadId && !useTestVerdict && (conviction === null || conviction >= 0.3);
+    // Only score quality on meaningful debates (conviction >= 0.35) to save LLM calls
+    // Skip quality scoring on cron cycles to save ~10s and prevent timeout
+    // Quality scoring runs async after resolution instead (Post-Mortem Oracle — Phase 5)
+    const shouldScoreQuality = threadId && !useTestVerdict && kind !== 'cron' && conviction !== null && conviction >= 0.35;
     if (shouldScoreQuality) {
       try {
         const qualityRaw = await callClaude('claude-haiku-4-5-20251001',
@@ -1071,6 +1866,11 @@ Return ONLY valid JSON, no markdown, no explanation:
       tradeRejectedReason,
       txHash,
       tpslOk: tpslResult?.ok ?? null,
+      yieldDebateTriggered,
+      yieldThreadId,
+      yieldPositionId,
+      yieldRecommendation,
+      yieldDebateSkipReason,
       usedTestVerdict: !!useTestVerdict,
       usedTestState: !!useTestState,
       effectiveBalance: effectiveBalanceForExecution,
@@ -1081,6 +1881,16 @@ Return ONLY valid JSON, no markdown, no explanation:
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Cycle] Error:', msg);
+
+    // Mark cycle as error so it doesn't stay "running" forever
+    if (cycleId) {
+      await fetch(`${SB_URL}/rest/v1/agent_cycles?id=eq.${cycleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        body: JSON.stringify({ status: 'failed', completed_at: new Date().toISOString(), vibe_phrase: `Error: ${msg.slice(0, 150)}` }),
+      }).catch(() => {});
+    }
+
     return res.status(500).json({ error: msg });
   }
 }

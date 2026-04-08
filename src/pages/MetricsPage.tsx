@@ -71,12 +71,13 @@ interface MXNStablecoin {
 
 // ── Static Data ─────────────────────────────────────────────────────
 // MXN Stablecoins (manually tracked — not on DefiLlama)
-// Last updated: February 2026
+// Last updated: April 2026
+// Sources: RWA.xyz, CoinGecko, on-chain data
 const mxnStablecoins: MXNStablecoin[] = [
-  { name: 'MXNB', symbol: 'MXNB', tvl: 15000000, issuer: 'Bitso', chain: 'Ethereum', color: '#00D4AA' },
-  { name: 'MXNe', symbol: 'MXNe', tvl: 8000000, issuer: 'Brale', chain: 'Ethereum', color: '#8B5CF6' },
-  { name: 'MXNT', symbol: 'MXNT', tvl: 6000000, issuer: 'Tether', chain: 'Multi-chain', color: '#26A17B' },
-  { name: 'MMXN', symbol: 'MMXN', tvl: 5000000, issuer: 'Moneta', chain: 'Polygon', color: '#F97316' },
+  { name: 'MXNB', symbol: 'MXNB', tvl: 22000000, issuer: 'Juno (Bitso)', chain: 'Arbitrum', color: '#00D4AA' },
+  { name: 'MXNT', symbol: 'MXNT', tvl: 4500000, issuer: 'Tether', chain: 'Multi-chain', color: '#26A17B' },
+  { name: 'MMXN', symbol: 'MMXN', tvl: 3200000, issuer: 'Moneta', chain: 'Polygon', color: '#F97316' },
+  { name: 'MXNe', symbol: 'MXNe', tvl: 76000, issuer: 'Brale', chain: 'Solana', color: '#8B5CF6' },
 ];
 
 const CHAIN_BAR_COLORS = [

@@ -44,7 +44,7 @@
   "crons": [
     {
       "path": "/api/bobby-cycle",
-      "schedule": "0 * * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/user-cycle",
@@ -125,7 +125,7 @@
       "memory": 256
     },
     "api/bobby-cycle.ts": {
-      "maxDuration": 120,
+      "maxDuration": 300,
       "memory": 512
     },
     "api/bobby-digest.ts": {
