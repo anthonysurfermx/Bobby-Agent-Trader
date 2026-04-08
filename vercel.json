@@ -52,6 +52,10 @@
     }
   ],
   "functions": {
+    "api/mcp-http.ts": {
+      "maxDuration": 60,
+      "memory": 512
+    },
     "api/agent-run.ts": {
       "maxDuration": 120,
       "memory": 1024
