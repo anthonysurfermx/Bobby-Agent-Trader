@@ -4,8 +4,8 @@
  * Uses Supabase with atomic UPDATE to prevent double fulfillment (Codex R1 P0).
  */
 
-const SB_URL = process.env.SB_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SB_URL = process.env.SB_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 interface Challenge {
   challenge_id: string;
