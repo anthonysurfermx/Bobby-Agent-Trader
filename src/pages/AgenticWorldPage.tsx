@@ -298,7 +298,7 @@ export default function AgenticWorldPage() {
             {[
               { name: 'TrackRecord', addr: '0xf841b428e6d743187d7be2242eccc1078fde2395', desc: 'Commit-reveal predictions' },
               { name: 'ConvictionOracle', addr: '0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a', desc: 'Conviction feed for protocols' },
-              { name: 'AgentEconomy', addr: '0xa4704E92E9d9eCA646716C14a124907C356C78D7', desc: 'Agent-to-agent payments' },
+              { name: 'AgentEconomy', addr: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871', desc: 'Agent-to-agent payments' },
               { name: 'AgentRegistry', addr: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', desc: 'Agent Identity NFTs' },
             ].map(c => (
               <a key={c.name} href={`https://www.oklink.com/xlayer/address/${c.addr}`} target="_blank" rel="noopener noreferrer"

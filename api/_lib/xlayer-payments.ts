@@ -2,7 +2,7 @@ import { Interface, formatEther } from 'ethers';
 
 export const XLAYER_RPC_URL = 'https://rpc.xlayer.tech';
 export const XLAYER_CHAIN_ID = 196;
-export const BOBBY_AGENT_ECONOMY = '0xa4704E92E9d9eCA646716C14a124907C356C78D7';
+export const BOBBY_AGENT_ECONOMY = '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871'; // V2 — replay-resistant with challengeId
 export const PREMIUM_MCP_FEE_WEI = 1000000000000000n; // 0.001 OKB
 
 const ECONOMY_INTERFACE = new Interface([
