@@ -25,18 +25,19 @@ contract BobbyAdversarialBounties {
     /// @dev Struct-packed bounty
     /// Slot 1: threadHash (32)
     /// Slot 2: poster (20) + reward (12 = uint96)
-    /// Slot 3: winner (20) + createdAt (8 = uint64) + expiresAt (4 = uint32 offset) = 32
-    /// Slot 4: dimension (1) + status (1) + challengeCount (2) = 4 bytes; rest padding
+    /// Slot 3: winner (20) + createdAt (8 = uint64) + claimWindowSecs (4 = uint32) = 32
+    /// Slot 4: dimension (1) + status (1) + challengeCount (2) + gracePeriodSnapshot (4) = 8 bytes; rest padding
     struct Bounty {
-        bytes32 threadHash;       // Slot 1: keccak256(threadId)
-        address poster;           // Slot 2
-        uint96 reward;            // Slot 2 (enough for 79B OKB)
-        address winner;           // Slot 3
-        uint64 createdAt;         // Slot 3
-        uint32 claimWindowSecs;   // Slot 3
-        Dimension dimension;      // Slot 4
-        BountyStatus status;      // Slot 4
-        uint16 challengeCount;    // Slot 4
+        bytes32 threadHash;            // Slot 1: keccak256(threadId)
+        address poster;                // Slot 2
+        uint96 reward;                 // Slot 2 (enough for 79B OKB)
+        address winner;                // Slot 3
+        uint64 createdAt;              // Slot 3
+        uint32 claimWindowSecs;        // Slot 3
+        Dimension dimension;           // Slot 4
+        BountyStatus status;           // Slot 4
+        uint16 challengeCount;         // Slot 4
+        uint32 gracePeriodSnapshot;    // Slot 4 — R3: immutable per-bounty grace
     }
 
     /// @dev Challenge submitted against a bounty
@@ -77,6 +78,9 @@ contract BobbyAdversarialBounties {
 
     /// @dev bountyId → challenges array
     mapping(uint256 => Challenge[]) internal _challenges;
+
+    /// @dev R3: one challenge per address per bounty (anti-spam + O(1) membership)
+    mapping(uint256 => mapping(address => bool)) public hasChallenged;
 
     /// @dev Monotonic counter (history via events, not arrays)
     uint256 public nextBountyId = 1;
@@ -174,10 +178,28 @@ contract BobbyAdversarialBounties {
             claimWindowSecs: window,
             dimension: _dimension,
             status: BountyStatus.OPEN,
-            challengeCount: 0
+            challengeCount: 0,
+            // R3: snapshot the grace period so owner cannot rewrite
+            // settlement terms of an existing bounty after deposit
+            gracePeriodSnapshot: challengeGracePeriod
         });
 
         emit BountyPosted(bountyId, msg.sender, tHash, _dimension, uint96(msg.value), window);
+    }
+
+    // ============================================================
+    //  INTERNAL
+    // ============================================================
+
+    /// @dev R3: single source of truth for the effective settlement
+    ///      deadline of a bounty. Used by resolve and withdraw so
+    ///      they can never disagree about when a bounty has matured.
+    function _effectiveExpiry(Bounty storage b) internal view returns (uint256) {
+        uint256 expiry = uint256(b.createdAt) + uint256(b.claimWindowSecs);
+        if (b.status == BountyStatus.CHALLENGED) {
+            expiry += uint256(b.gracePeriodSnapshot);
+        }
+        return expiry;
     }
 
     // ============================================================
@@ -200,10 +222,15 @@ contract BobbyAdversarialBounties {
         require(msg.sender != b.poster, "Poster cannot challenge own bounty");
         require(_evidenceHash != bytes32(0), "Evidence required");
         require(b.challengeCount < maxChallenges, "Max challenges reached");
+        // R3: one challenge per address per bounty — prevents a single
+        // account from spamming maxChallenges slots with junk evidence
+        require(!hasChallenged[_bountyId][msg.sender], "Already challenged");
         require(
             block.timestamp < b.createdAt + b.claimWindowSecs,
             "Claim window expired"
         );
+
+        hasChallenged[_bountyId][msg.sender] = true;
 
         uint16 idx = b.challengeCount;
         _challenges[_bountyId].push(Challenge({
@@ -235,16 +262,14 @@ contract BobbyAdversarialBounties {
         require(b.status == BountyStatus.CHALLENGED, "No challenges to resolve");
         require(_winner != address(0), "Invalid winner");
 
-        // Verify winner actually challenged this bounty
-        bool isValidChallenger = false;
-        Challenge[] storage chs = _challenges[_bountyId];
-        for (uint256 i = 0; i < chs.length; i++) {
-            if (chs[i].challenger == _winner) {
-                isValidChallenger = true;
-                break;
-            }
-        }
-        require(isValidChallenger, "Winner did not challenge");
+        // R3: resolver cannot settle after the effective expiry. Without
+        // this check, resolve and withdrawBounty could race once the
+        // grace period is over, letting the resolver front-run the
+        // poster's reclaim attempt.
+        require(block.timestamp < _effectiveExpiry(b), "Resolution window closed");
+
+        // R3: O(1) membership check via hasChallenged mapping (was O(n) loop)
+        require(hasChallenged[_bountyId][_winner], "Winner did not challenge");
 
         b.winner = _winner;
         b.status = BountyStatus.RESOLVED;
@@ -267,14 +292,7 @@ contract BobbyAdversarialBounties {
             b.status == BountyStatus.OPEN || b.status == BountyStatus.CHALLENGED,
             "Already finalized"
         );
-
-        // Challenged bounties get an automatic grace period so honest
-        // challengers aren't cheated by resolver inaction
-        uint256 effectiveExpiry = uint256(b.createdAt) + uint256(b.claimWindowSecs);
-        if (b.status == BountyStatus.CHALLENGED) {
-            effectiveExpiry += uint256(challengeGracePeriod);
-        }
-        require(block.timestamp >= effectiveExpiry, "Window still active");
+        require(block.timestamp >= _effectiveExpiry(b), "Window still active");
 
         uint96 amount = b.reward;
         b.status = BountyStatus.WITHDRAWN;
@@ -345,6 +363,9 @@ contract BobbyAdversarialBounties {
         minBounty = _min;
     }
 
+    /// @notice Update the default grace period applied to FUTURE bounties
+    /// @dev Existing bounties are unaffected — they snapshot the value at
+    ///      creation time (R3: immutable per-bounty settlement terms).
     function setChallengeGracePeriod(uint32 _grace) external onlyOwner {
         require(_grace <= 30 days, "Grace too long");
         challengeGracePeriod = _grace;

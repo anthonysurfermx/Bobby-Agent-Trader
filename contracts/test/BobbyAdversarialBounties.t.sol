@@ -428,4 +428,137 @@ contract BobbyAdversarialBountiesTest is Test {
         bounties.withdraw();
         assertEq(challenger1.balance - balBefore, 0.2 ether);
     }
+
+    // ============================================================
+    //  Security Round 3 (Codex) fixes
+    // ============================================================
+
+    // R3 P1a: resolveBounty must respect _effectiveExpiry
+    function test_resolveBounty_revertsAfterEffectiveExpiry() public {
+        vm.prank(poster);
+        uint256 id = bounties.postBounty{value: 0.1 ether}(
+            THREAD_ID,
+            BobbyAdversarialBounties.Dimension.ADVERSARIAL_QUALITY,
+            1 hours
+        );
+        vm.prank(challenger1);
+        bounties.submitChallenge(id, keccak256("evidence"));
+
+        // window=1h + grace=3d → expiry at createdAt + 3d + 1h
+        vm.warp(block.timestamp + 1 hours + 3 days + 1);
+
+        vm.prank(resolver);
+        vm.expectRevert("Resolution window closed");
+        bounties.resolveBounty(id, challenger1);
+    }
+
+    // R3 P1a: resolveBounty still works inside the window
+    function test_resolveBounty_worksInsideEffectiveExpiry() public {
+        vm.prank(poster);
+        uint256 id = bounties.postBounty{value: 0.1 ether}(
+            THREAD_ID,
+            BobbyAdversarialBounties.Dimension.ADVERSARIAL_QUALITY,
+            1 hours
+        );
+        vm.prank(challenger1);
+        bounties.submitChallenge(id, keccak256("evidence"));
+
+        // Past window, inside grace period
+        vm.warp(block.timestamp + 1 hours + 1 days);
+
+        vm.prank(resolver);
+        bounties.resolveBounty(id, challenger1);
+        assertEq(bounties.pendingWithdrawals(challenger1), 0.1 ether);
+    }
+
+    // R3 P1b: one address cannot submit two challenges to the same bounty
+    function test_submitChallenge_rejectsDuplicateAddress() public {
+        vm.prank(poster);
+        uint256 id = bounties.postBounty{value: 0.1 ether}(
+            THREAD_ID,
+            BobbyAdversarialBounties.Dimension.NOVELTY,
+            0
+        );
+        vm.prank(challenger1);
+        bounties.submitChallenge(id, keccak256("ev1"));
+
+        vm.prank(challenger1);
+        vm.expectRevert("Already challenged");
+        bounties.submitChallenge(id, keccak256("ev2"));
+    }
+
+    // R3 P1b: hasChallenged mapping is publicly readable
+    function test_hasChallenged_trueAfterSubmit() public {
+        vm.prank(poster);
+        uint256 id = bounties.postBounty{value: 0.1 ether}(
+            THREAD_ID,
+            BobbyAdversarialBounties.Dimension.DATA_INTEGRITY,
+            0
+        );
+        assertFalse(bounties.hasChallenged(id, challenger1));
+
+        vm.prank(challenger1);
+        bounties.submitChallenge(id, keccak256("evidence"));
+
+        assertTrue(bounties.hasChallenged(id, challenger1));
+        assertFalse(bounties.hasChallenged(id, challenger2));
+    }
+
+    // R3 P1b: a second distinct challenger still works (not broken by unicity)
+    function test_submitChallenge_differentAddressesStillWork() public {
+        vm.prank(poster);
+        uint256 id = bounties.postBounty{value: 0.1 ether}(
+            THREAD_ID,
+            BobbyAdversarialBounties.Dimension.CALIBRATION_ALIGNMENT,
+            0
+        );
+        vm.prank(challenger1);
+        bounties.submitChallenge(id, keccak256("ev1"));
+        vm.prank(challenger2);
+        bounties.submitChallenge(id, keccak256("ev2"));
+
+        assertEq(bounties.challengeCount(id), 2);
+        assertTrue(bounties.hasChallenged(id, challenger1));
+        assertTrue(bounties.hasChallenged(id, challenger2));
+    }
+
+    // R3 P2: owner changing challengeGracePeriod does NOT affect existing bounties
+    function test_graceSnapshot_existingBountiesUnaffectedByGraceChange() public {
+        vm.prank(poster);
+        uint256 id = bounties.postBounty{value: 0.1 ether}(
+            THREAD_ID,
+            BobbyAdversarialBounties.Dimension.RISK_MANAGEMENT,
+            1 hours
+        );
+        vm.prank(challenger1);
+        bounties.submitChallenge(id, keccak256("evidence"));
+
+        // Owner tries to rug by setting grace to 0 after deposit
+        bounties.setChallengeGracePeriod(0);
+
+        // Existing bounty still uses original 3-day snapshot
+        vm.warp(block.timestamp + 1 hours + 1 days);
+        vm.prank(poster);
+        vm.expectRevert("Window still active");
+        bounties.withdrawBounty(id);
+
+        // Also: resolver can still resolve inside original grace
+        vm.prank(resolver);
+        bounties.resolveBounty(id, challenger1);
+        assertEq(bounties.pendingWithdrawals(challenger1), 0.1 ether);
+    }
+
+    // R3 P2: new bounties created after the change use the new grace
+    function test_graceSnapshot_newBountyUsesUpdatedGrace() public {
+        bounties.setChallengeGracePeriod(1 days);
+
+        vm.prank(poster);
+        uint256 id = bounties.postBounty{value: 0.1 ether}(
+            THREAD_ID,
+            BobbyAdversarialBounties.Dimension.DECISION_LOGIC,
+            1 hours
+        );
+        BobbyAdversarialBounties.Bounty memory b = bounties.getBounty(id);
+        assertEq(b.gracePeriodSnapshot, 1 days);
+    }
 }
