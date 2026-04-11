@@ -7,10 +7,16 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
+  BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
   PREMIUM_MCP_FEE_WEI,
   XLAYER_CHAIN_ID,
+  buildPostBountyCalldata,
+  buildSubmitChallengeCalldata,
   extractPaymentTxHash,
+  listRecentBounties,
+  readBounty,
+  readMinBounty,
   verifyMcpPaymentTx,
 } from './_lib/xlayer-payments.js';
 import {
@@ -45,6 +51,10 @@ const TOOLS = [
   { name: 'bobby_dex_trending', description: 'Hot trending tokens on-chain right now.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' } } } },
   { name: 'bobby_dex_signals', description: 'Smart money / whale / KOL buy signals.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' }, type: { type: 'string', default: 'smart_money' } } } },
   { name: 'bobby_judge', description: 'Judge Mode — independent audit of a 3-agent debate. Scores quality, detects biases, recommends execute/pass/reduce. PAID: 0.001 OKB.', inputSchema: { type: 'object', properties: { thread_id: { type: 'string', description: 'Debate thread ID (omit for latest debate)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } } } },
+  { name: 'bobby_bounty_list', description: 'List recent adversarial bounties posted against Bobby debates on X Layer.', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 10, description: 'How many recent bounties to return (max 25)' } } } },
+  { name: 'bobby_bounty_get', description: 'Get a single adversarial bounty by id, including status, reward, dimension and effective expiry.', inputSchema: { type: 'object', properties: { bounty_id: { type: 'string', description: 'Bounty id (integer, 1-indexed)' } }, required: ['bounty_id'] } },
+  { name: 'bobby_bounty_post', description: 'Build unsigned calldata to post a new OKB bounty against a Bobby debate thread. Returns tx payload for the client to sign — never holds funds.', inputSchema: { type: 'object', properties: { thread_id: { type: 'string', description: 'Off-chain debate thread id' }, dimension: { type: 'string', enum: ['DATA_INTEGRITY', 'ADVERSARIAL_QUALITY', 'DECISION_LOGIC', 'RISK_MANAGEMENT', 'CALIBRATION_ALIGNMENT', 'NOVELTY'] }, reward_okb: { type: 'string', description: 'Bounty reward in OKB (e.g. "0.01")' }, claim_window_secs: { type: 'number', default: 0, description: 'Seconds until the poster can reclaim (0 = contract default, 7 days)' } }, required: ['thread_id', 'dimension', 'reward_okb'] } },
+  { name: 'bobby_bounty_challenge', description: 'Build unsigned calldata to submit a challenge (evidence hash) against an existing bounty.', inputSchema: { type: 'object', properties: { bounty_id: { type: 'string', description: 'Bounty id to challenge' }, evidence_hash: { type: 'string', description: '32-byte hex hash of the evidence blob (IPFS/Arweave CID hash)' } }, required: ['bounty_id', 'evidence_hash'] } },
 ];
 
 // ---- Tool Execution ----
@@ -189,6 +199,73 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
       v.rationale,
     ].filter(Boolean).join('\n');
     return { content: [{ type: 'text', text: summary }] };
+  }
+
+  if (name === 'bobby_bounty_list') {
+    const requested = Number(args.limit || 10);
+    const limit = Math.max(1, Math.min(25, Number.isFinite(requested) ? requested : 10));
+    const [bounties, minInfo] = await Promise.all([listRecentBounties(limit), readMinBounty()]);
+    return {
+      content: [{ type: 'text', text: JSON.stringify({
+        contract: BOBBY_ADVERSARIAL_BOUNTIES,
+        chainId: XLAYER_CHAIN_ID,
+        minBountyOkb: minInfo.minBountyOkb,
+        count: bounties.length,
+        bounties,
+      }, null, 2) }],
+    };
+  }
+
+  if (name === 'bobby_bounty_get') {
+    const id = String(args.bounty_id || '').trim();
+    if (!id) throw new Error('bounty_id is required');
+    const bounty = await readBounty(id);
+    return { content: [{ type: 'text', text: JSON.stringify(bounty, null, 2) }] };
+  }
+
+  if (name === 'bobby_bounty_post') {
+    const rewardOkb = String(args.reward_okb || '').trim();
+    if (!rewardOkb || !/^\d+(\.\d+)?$/.test(rewardOkb)) {
+      throw new Error('reward_okb must be a decimal string, e.g. "0.01"');
+    }
+    const claimWindow = Number(args.claim_window_secs || 0);
+    const built = buildPostBountyCalldata({
+      threadId: String(args.thread_id || ''),
+      dimension: String(args.dimension || ''),
+      claimWindowSecs: Number.isFinite(claimWindow) ? claimWindow : 0,
+    });
+    const valueWei = BigInt(Math.floor(parseFloat(rewardOkb) * 1e18));
+    return {
+      content: [{ type: 'text', text: JSON.stringify({
+        kind: 'unsigned_tx',
+        chainId: XLAYER_CHAIN_ID,
+        to: built.to,
+        data: built.data,
+        value: `0x${valueWei.toString(16)}`,
+        valueOkb: rewardOkb,
+        dimension: built.dimension,
+        note: 'Sign and send from your wallet. Bobby never custodies your funds.',
+      }, null, 2) }],
+    };
+  }
+
+  if (name === 'bobby_bounty_challenge') {
+    const bountyId = String(args.bounty_id || '').trim();
+    if (!bountyId) throw new Error('bounty_id is required');
+    const built = buildSubmitChallengeCalldata({
+      bountyId,
+      evidenceHash: String(args.evidence_hash || ''),
+    });
+    return {
+      content: [{ type: 'text', text: JSON.stringify({
+        kind: 'unsigned_tx',
+        chainId: XLAYER_CHAIN_ID,
+        to: built.to,
+        data: built.data,
+        value: '0x0',
+        note: 'Sign and send from your wallet. Evidence must already be pinned off-chain (IPFS/Arweave) before posting.',
+      }, null, 2) }],
+    };
   }
 
   throw new Error(`Unknown tool: ${name}`);
