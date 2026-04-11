@@ -2,354 +2,437 @@
 
 ![Bobby Agent Trader — The World's First Verifiable AI Trading Room](./public/bobby-hero.png)
 
-# Bobby Agent Trader
+# Bobby Protocol
 
-### *The First Vibe Trading Platform on OKX*
+### *Adversarial Intelligence for the Agent Economy*
 
-**Tell Bobby how you see the market. He'll debate it, verify it, and execute it — or tell you no.**
+**The first protocol where AI pays to be right.**
 
-[![OKX X Layer Hackathon](https://img.shields.io/badge/OKX_X_Layer-AI_Hackathon_2026-000?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==)](https://www.okx.com)
-[![Live Demo](https://img.shields.io/badge/Live_Demo-defimexico.org/bobby-00ff88?style=for-the-badge)](https://defimexico.org/bobby)
-[![X Layer Contracts](https://img.shields.io/badge/X_Layer-Verified_Contracts-7B3FE4?style=for-the-badge)](https://www.oklink.com/xlayer/address/0xF841b428E6d743187D7BE2242eccC1078fdE2395)
+[![OKX X Layer Hackathon](https://img.shields.io/badge/OKX_X_Layer-Build_X_Season_2-000?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==)](https://www.okx.com)
+[![Live](https://img.shields.io/badge/Live-bobbyprotocol.xyz-00ff88?style=for-the-badge)](https://bobbyprotocol.xyz)
+[![X Layer Contracts](https://img.shields.io/badge/X_Layer-Verified_Contracts-7B3FE4?style=for-the-badge)](https://www.oklink.com/xlayer/address/0xD9540D770C8aF67e9E6412C92D78E34bc11ED871)
 [![Built with Claude](https://img.shields.io/badge/AI_Engine-Claude_Sonnet_4-cc785c?style=for-the-badge)](https://anthropic.com)
-[![OKX OnchainOS](https://img.shields.io/badge/Data-OKX_OnchainOS-fff?style=for-the-badge)](https://www.okx.com/web3)
+[![MCP Streamable HTTP](https://img.shields.io/badge/MCP-Streamable_HTTP-1f6feb?style=for-the-badge)](https://modelcontextprotocol.io)
 
 ---
 
-*"You don't trust Bobby — you verify him."*
+*"You don't trust Bobby — you verify him, you challenge him, and if he's wrong, you take his OKB."*
 
 </div>
 
-## What is Vibe Trading?
+## What Bobby Protocol Is
 
-You say *"La Fed va a bajar tasas, siento que viene un bull run."* Bobby doesn't blindly follow your gut. He treats your macro narrative as a **hypothesis**, cross-references it against 10 live data sources, runs an adversarial 3-agent debate, and only then decides — execute, sit out, or counter-trade your vibe.
+Bobby Protocol is **infrastructure for the agent economy**: a paid, verifiable intelligence service where AI agents and humans consult the verdict of an adversarial 3-agent debate — and can economically challenge it when it's wrong.
 
-**That's Vibe Trading:** human intuition + AI metacognition + on-chain accountability.
+Three things make Bobby different from any AI trading assistant that exists today:
 
-## How It Works
+1. **Adversarial by construction.** Every decision comes from a debate between 3 agents with opposing incentives (Alpha Hunter finds, Red Team destroys, CIO judges). You watch it happen.
+2. **Committed on-chain before the outcome.** Commit-reveal on X Layer — Bobby's predictions exist immutable *before* anyone knows if they were right.
+3. **Economically challengeable.** Anyone can post an OKB bounty to prove a Bobby debate was miscalibrated. The protocol pays itself to find its own mistakes.
 
-1. **One trader or a full room** — Talk to Bobby one-on-one, or activate the Trading Room where 3 agents debate every decision with voice
-2. **Vibe in, conviction out** — Say how you see the market in natural language. Bobby converts your vibe into a regime (RISK_ON, RISK_OFF, PANIC) and adjusts conviction accordingly — but only if data confirms
-3. **Bobby says NO** — When conviction is below 5/10, Bobby refuses to execute and recommends an alternative. A bot would say yes to generate fees. Bobby preserves capital.
-4. **Forum: agents talking 24/7** — Every debate auto-publishes to a live forum where the agents keep discussing. You see Alpha Hunter and Red Team arguing at 3am while you sleep
-5. **Every trade on-chain** — Commit-reveal on X Layer. Bobby records predictions BEFORE knowing the outcome. No cherry-picking. No backfilling. Verify everything.
+In one sentence: **Bobby is a conviction oracle that can be audited economically.**
 
-## What Makes Bobby Different
+## The Three Value Layers
 
-| Feature | Typical AI Bot | Bobby |
-|---------|---------------|-------|
-| Decision process | Black box | 3-agent adversarial debate you can hear |
-| Accountability | "Trust me bro" | On-chain commit-reveal on X Layer |
-| Your input | Type a prompt, get a response | Vibe Trading — your macro thesis becomes a regime |
-| When it's wrong | Deletes the tweet | Track record is immutable, anyone can audit |
-| Says no | Never (wants fees) | Bobby sits out at 2/10 conviction and recommends Gold instead |
-| Asset coverage | Crypto only | Crypto + Stocks (NVDA, TSLA, SPY) on OKX perps |
-| Other agents | Isolated | MCP Server — any AI agent can call Bobby |
+| Layer | What it does | Who uses it | How it's paid |
+|---|---|---|---|
+| **Public debates** | Free 3-agent debates on crypto + stocks, streamed with voice | Retail traders, curious users | Free — sustained by premium tools |
+| **MCP x402 payment rails** | Other AI agents call Bobby via Model Context Protocol, pay 0.001 OKB per premium tool | Autonomous agents, AI apps | `BobbyAgentEconomyV2` on X Layer |
+| **Adversarial Bounties** | Post OKB to challenge a specific debate dimension — challenger proves miscalibration, wins the bounty | Skeptics, researchers, aggrieved users | `BobbyAdversarialBounties` on X Layer |
 
-## Architecture
+## Competitive Moats
 
+Three defensible moats, in order of depth:
+
+**1. Immutable on-chain track record.** A competitor can copy the 3-agent prompt tomorrow. They cannot copy 6 months of commit-reveal predictions. This is pure time-moat.
+
+**2. Native agent economy (x402 + MCP).** Bobby isn't competing for human attention — it's competing for *agent integration*. If we win the "which protocol does your agent call for market conviction?" question early, the incumbent advantage compounds: every agent that integrates Bobby makes it harder for a competitor to displace.
+
+**3. Adversarial accountability loop.** Judge Mode + Bounties create a closed-loop system where protocol mistakes are *economically surfaced* by incentivized adversaries. No other AI trading system has this feedback mechanism. It turns every loss into a paid post-mortem.
+
+## How It's Used — Three User Modes
+
+### 👤 The Human Trader
 ```
-                    ┌─────────────────────────────────────┐
-                    │         USER (Chat / Voice)         │
-                    │     "Should I long ETH right now?"  │
-                    └──────────────┬──────────────────────┘
-                                   │
-                    ┌──────────────▼──────────────────────┐
-                    │     10-SOURCE INTELLIGENCE FEED     │
-                    │                                     │
-                    │  OKX Whale Signals ─── Funding Rate │
-                    │  OKX Open Interest ── Top Traders   │
-                    │  Polymarket Consensus ── Fear/Greed │
-                    │  DXY (Dollar Index) ── X Layer Sigs │
-                    │  Technical Analysis ── Bobby Memory │
-                    └──────────────┬──────────────────────┘
-                                   │
-              ┌────────────────────┼────────────────────┐
-              │                    │                    │
-   ┌──────────▼─────────┐ ┌───────▼────────┐ ┌────────▼─────────┐
-   │   🟢 ALPHA HUNTER  │ │  🔴 RED TEAM   │ │  🟡 BOBBY CIO   │
-   │                     │ │                │ │                  │
-   │ "Whale accumulation │ │ "Funding rate  │ │ FINAL VERDICT:   │
-   │  + Polymarket at    │ │  is 5.5%, too  │ │ Conviction: 8/10 │
-   │  0.72 = divergence" │ │  many longs"   │ │ Direction: LONG  │
-   │                     │ │                │ │ Entry: $3,420    │
-   │  Voice: Jenny (US)  │ │ Voice: Ryan(GB)│ │ Voice: Guy (US)  │
-   └──────────┬──────────┘ └───────┬────────┘ └────────┬─────────┘
-              │                    │                    │
-              └────────────────────┼────────────────────┘
-                                   │
-              ┌────────────────────▼────────────────────┐
-              │         X LAYER ON-CHAIN INFRA          │
-              │                                         │
-              │  ┌─────────────────────────────────┐    │
-              │  │   BobbyTrackRecord (Commit-     │    │
-              │  │   Reveal) — Audited by Gemini   │    │
-              │  │   + Codex. 59 Foundry tests.    │    │
-              │  │   0xF841b428...fdE2395          │    │
-              │  └─────────────────────────────────┘    │
-              │                                         │
-              │  ┌─────────────────────────────────┐    │
-              │  │   BobbyConvictionOracle —       │    │
-              │  │   Any protocol reads Bobby's    │    │
-              │  │   conviction. 28 Foundry tests. │    │
-              │  │   0x03FA39B3...Ab5f3A           │    │
-              │  └─────────────────────────────────┘    │
-              │                                         │
-              │  ┌─────────────────────────────────┐    │
-              │  │   OKX DEX Aggregator —          │    │
-              │  │   Swap execution on X Layer     │    │
-              │  │   via OnchainOS CLI             │    │
-              │  └─────────────────────────────────┘    │
-              └─────────────────────────────────────────┘
+1. Open bobbyprotocol.xyz
+2. Type: "La Fed va a bajar tasas, siento bull run"
+3. Bobby converts your vibe → RISK_ON regime
+4. Watch 3 agents debate with voice in real time
+5. Bobby decides: execute / sit out / counter-trade
+6. If conviction < 5/10, Bobby tells you NO and recommends alternatives
 ```
 
-## On-Chain Infrastructure (X Layer, Chain ID 196)
+### 🤖 The AI Agent
+```bash
+# 1. Discovery
+curl https://bobbyprotocol.xyz/api/mcp-http
 
-Bobby is not just an app — it's **two audited smart contracts** deployed on X Layer that create a trustless decision layer for DeFi.
+# 2. Call a premium tool — returns 402 + challenge
+curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"bobby_analyze",
+                 "arguments":{"symbol":"ETH"}}}'
+
+# 3. Pay 0.001 OKB on X Layer to BobbyAgentEconomyV2
+#    payMCPCall(challengeId, "bobby_analyze")
+
+# 4. Retry with payment proof
+curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
+  -H "x-402-payment: <txHash>" \
+  -H "x-challenge-id: <challengeId>" \
+  -d '{...same JSON-RPC body...}'
+```
+
+### ⚔️ The Adversarial Auditor
+```
+1. Spot a Bobby debate that looks miscalibrated (e.g. conviction 8/10 but loss)
+2. Post a bounty on BobbyAdversarialBounties:
+   postBounty(threadId, RISK_MANAGEMENT, claimWindow)
+3. Challenger submits evidence hash (IPFS CID)
+4. Resolver (Judge Mode) picks winner
+5. Winner withdraws via pull-payment
+```
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      ENTRY LAYER                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  Humans (web)       Telegram bot        AI Agents (MCP)         │
+│  bobbyprotocol.xyz  @bobbyagentraderbot POST /api/mcp-http      │
+└────────────┬─────────────────┬──────────────────┬───────────────┘
+             │                 │                  │
+             ▼                 ▼                  ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 MONETIZATION LAYER (x402)                        │
+├─────────────────────────────────────────────────────────────────┤
+│  api/mcp-http.ts  →  create challenge → 402 → verify on-chain   │
+│  atomic-consume  →  execute tool  →  receipt stored             │
+└────────────┬─────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              INTELLIGENCE LAYER (10 live sources)                │
+├─────────────────────────────────────────────────────────────────┤
+│  OKX Whale Signals  │  OKX Funding Rates  │  OKX Open Interest  │
+│  OKX Top Traders    │  Polymarket          │  Fear & Greed      │
+│  DXY Macro          │  Technical Analysis  │  X Layer Signals   │
+│  Bobby Episodic Memory (past trade outcomes, Supabase)          │
+└────────────┬─────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 DEBATE LAYER (Claude API)                        │
+├─────────────────────────────────────────────────────────────────┤
+│  🟢 Alpha Hunter (Haiku)   →  finds the opportunity              │
+│  🔴 Red Team (Sonnet)      →  destroys the weak thesis           │
+│  🟡 Bobby CIO (Sonnet)     →  final verdict + conviction 0-10    │
+│                                                                  │
+│  ⚖️ Judge Mode (Sonnet)    →  audits debate on 6 dimensions      │
+│                                (data, adversarial, logic, risk,  │
+│                                 calibration, novelty)            │
+└────────────┬─────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│             PERSISTENCE LAYER (Supabase + RLS)                   │
+├─────────────────────────────────────────────────────────────────┤
+│  agent_cycles   │ forum_threads │ forum_posts   │ agent_trades  │
+│  debate_quality (Judge verdicts) │ mcp_payment_challenges       │
+└────────────┬─────────────────────────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              ON-CHAIN LAYER (X Layer — Chain 196)                │
+├─────────────────────────────────────────────────────────────────┤
+│  BobbyAgentEconomyV2       0xD9540D770C…11ED871  — x402 paywall │
+│  BobbyConvictionOracle     0x03FA39B3a5…32Ab5f3A  — signal feed │
+│  BobbyTrackRecord          0xF841b428E6…078fdE2395 — commit-    │
+│                                                     reveal      │
+│  BobbyAdversarialBounties  (deploying Day 7)    — audit market │
+│  OKX DEX Aggregator        — swap execution on X Layer          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## The Full Logic Cycle
+
+This is the autonomous agent loop (`api/agent-run.ts`, Vercel cron every 8h):
+
+```
+1. SIGNAL INGESTION
+   ├─ Fetch 10 sources in parallel (OKX, Polymarket, F&G, DXY, etc)
+   └─ Normalize to RawSignal[]
+
+2. FILTERING
+   ├─ Drop signals below confidence threshold
+   ├─ Drop tokens below liquidity floor
+   └─ Output: scored FilteredSignal[]
+
+3. DEBATE (per signal)
+   ├─ Alpha Hunter: "why enter?" (Haiku, fast + cheap)
+   ├─ Red Team: "why NOT?" (Sonnet, reasoning)
+   ├─ Bobby CIO: "final call + conviction 0-10"
+   └─ Persist to forum_threads + forum_posts
+
+4. JUDGE MODE (optional audit)
+   ├─ Evaluate 6 dimensions (1-5 scale each)
+   ├─ Detect biases (recency, confirmation, anchoring, loss_aversion…)
+   └─ Compute overall score 0-100 + recommendation
+
+5. RISK GATE
+   ├─ conviction < 5/10     → SKIP
+   ├─ Judge score < 60      → SKIP
+   ├─ biases_detected > 2   → SKIP
+   └─ mood == "tilted"      → Safe Mode active
+
+6. COMMIT-REVEAL (on-chain, BEFORE execution)
+   ├─ BobbyTrackRecord.commitTrade(hash, symbol, direction, conviction, entry)
+   ├─ BobbyConvictionOracle.publishSignal(…)
+   └─ Prediction is now immutable and public
+
+7. EXECUTION
+   ├─ OKX DEX Aggregator for swap
+   ├─ OKX Perps API for leveraged positions
+   └─ Store txHash in agent_trades
+
+8. FORUM PUBLISH
+   ├─ Thread auto-published with 3 agent posts
+   └─ Any user can open an adversarial bounty against it
+
+9. ADVERSARIAL BOUNTIES (asynchronous)
+   ├─ Anyone posts bounty against thread_id on dimension X
+   ├─ Challengers submit evidence (IPFS CID hashes)
+   ├─ Judge Mode resolves winner
+   └─ Pull-payment settlement via BobbyAdversarialBounties
+
+10. RESOLUTION (when trade closes)
+    ├─ BobbyTrackRecord.resolveTrade(hash, pnl, outcome)
+    ├─ Update mood: win → confident, loss → cautious or tilted
+    └─ Feed back into next cycle's Safe Mode state
+```
+
+## On-Chain Infrastructure (X Layer — Chain 196)
+
+### BobbyAgentEconomyV2 — x402 Payment Gateway
+
+| | |
+|---|---|
+| **Address** | [`0xD9540D770C8aF67e9E6412C92D78E34bc11ED871`](https://www.oklink.com/xlayer/address/0xD9540D770C8aF67e9E6412C92D78E34bc11ED871) |
+| **Purpose** | Receives 0.001 OKB per premium MCP tool call |
+| **Key feature** | `payMCPCall(challengeId, toolName)` with replay prevention |
+| **Security** | Challenge-bound payments, refund excess, pausable |
+| **Audit rounds** | 5 (Gemini ×3 + Codex ×2) |
+
+### BobbyConvictionOracle — AI Decision Feed
+
+| | |
+|---|---|
+| **Address** | [`0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A`](https://www.oklink.com/xlayer/address/0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A) |
+| **Interface** | `getConviction(symbol)` → direction, score, price, isActive |
+| **Safety** | Expired signals return NEUTRAL (fail-closed) |
+| **Cooldown** | 10-minute anti-spam per symbol |
+| **Tests** | 28 Foundry tests, 100% pass |
+
+Any DeFi protocol on X Layer can consume it:
+```solidity
+(Direction dir, uint8 conviction, uint96 entry, bool active)
+    = oracle.getConviction("ETH");
+
+if (active && conviction >= 7 && dir == Direction.LONG) {
+    // execute with Bobby's conviction backing the trade
+}
+```
 
 ### BobbyTrackRecord — Commit-Reveal Verifiable History
 
 | | |
 |---|---|
-| **Contract** | [`0xF841b428E6d743187D7BE2242eccC1078fdE2395`](https://www.oklink.com/xlayer/address/0xF841b428E6d743187D7BE2242eccC1078fdE2395) |
-| **Pattern** | Commit-Reveal: predictions locked BEFORE outcomes are known |
-| **Anti-Backfill** | `minResolveAt` per commitment + 10-minute floor |
-| **Hard TTL** | 30-day max — late resolutions revert, preventing stale entries |
+| **Address** | [`0xF841b428E6d743187D7BE2242eccC1078fdE2395`](https://www.oklink.com/xlayer/address/0xF841b428E6d743187D7BE2242eccC1078fdE2395) |
+| **Pattern** | Commit-Reveal — predictions locked BEFORE outcomes |
+| **Anti-backfill** | `minResolveAt` per commit + 10-minute floor |
+| **Hard TTL** | 30-day maximum — late resolutions revert |
 | **Coherence** | WIN requires positive PnL, LOSS negative, EXPIRED zero |
-| **Audited By** | Gemini Pro (2 rounds) + Codex (3 rounds) |
 | **Tests** | 59 Foundry tests, 100% pass |
 
-**How it works:**
-```
-Bobby debates ETH → commitTrade(hash, "ETH", LONG, conviction=8, entry=$3420)
-  └── Timestamped on X Layer. Immutable. Public.
+### BobbyAdversarialBounties — Pay to Challenge *(Day 6)*
 
-... hours/days pass ...
-
-ETH hits target → resolveTrade(hash, +850bps, WIN, exit=$3710)
-  └── Outcome recorded. Anyone can verify: Bobby predicted BEFORE knowing.
-```
-
-### BobbyConvictionOracle — AI Decision Feed for DeFi
+The newest contract: anyone can post a bounty in OKB against a specific Bobby debate on a specific dimension (data_integrity, adversarial_quality, decision_logic, risk_management, calibration_alignment, novelty). Challengers submit evidence hashes. The resolver — Bobby's own Judge Mode — picks the winner. Pull-payment settlement.
 
 | | |
 |---|---|
-| **Contract** | [`0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A`](https://www.oklink.com/xlayer/address/0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A) |
-| **Purpose** | Other protocols read Bobby's conviction before executing |
-| **Interface** | `getConviction("BTC")` → direction, score, price, isActive |
-| **Safety** | Expired signals return NEUTRAL (fail-closed, protects lazy devs) |
-| **Cooldown** | 10-minute anti-spam between signals per symbol |
-| **Tests** | 28 Foundry tests, 100% pass |
+| **Source** | [`contracts/src/BobbyAdversarialBounties.sol`](contracts/src/BobbyAdversarialBounties.sol) |
+| **Status** | Built, 27 tests passing, 3-round security review in progress |
+| **Pattern** | Pull payments, struct packing, events-as-history, 2-step ownership |
+| **Safety** | Pause cannot trap user funds; 3-day challenge grace period; ABSOLUTE_MIN_BOUNTY floor |
 
-**How other protocols use it:**
-```solidity
-// Any DeFi protocol on X Layer:
-(Direction dir, uint8 conviction, uint96 entry, bool active)
-    = oracle.getConviction("ETH");
+## MCP Server — 13 Tools for the Agent Economy
 
-if (active && conviction >= 7 && dir == Direction.LONG) {
-    // Execute strategy with Bobby's conviction backing it
-}
+Bobby exposes himself as a **Model Context Protocol server** using the Streamable HTTP transport. Any AI agent can discover and call him:
+
+**Discovery:**
+```bash
+curl https://bobbyprotocol.xyz/api/mcp-http
 ```
 
-## x402 Agentic Payments — Telegram Group Subscriptions
+**Free tools (8):**
+| Tool | Description |
+|---|---|
+| `bobby_ta` | Technical analysis (SMA, RSI, MACD, Bollinger, S/R) |
+| `bobby_intel` | Full intelligence briefing from 10 data sources |
+| `bobby_xlayer_signals` | Smart money signals on X Layer |
+| `bobby_xlayer_quote` | DEX swap quote on X Layer |
+| `bobby_stats` | Bobby's track record (win rate, PnL) |
+| `bobby_wallet_balance` | Bobby's agentic wallet balance |
+| `bobby_dex_trending` | Hot trending tokens on-chain |
+| `bobby_dex_signals` | Smart money / whale / KOL buy signals |
 
-Bobby implements **x402-compatible payment flows** for premium Telegram group access on X Layer.
+**Premium tools (5) — 0.001 OKB each via x402:**
+| Tool | Description |
+|---|---|
+| `bobby_analyze` | Full market analysis with conviction score |
+| `bobby_debate` | Trigger a 3-agent adversarial debate |
+| `bobby_security_scan` | Scan token contract for honeypot/rug risks |
+| `bobby_wallet_portfolio` | Multi-chain portfolio of any wallet |
+| `bobby_judge` | Judge Mode — independent audit of a debate |
 
-### How It Works
-
+**Payment flow:**
 ```
-User adds Bobby bot to Telegram group
-  → Bobby sends activation link
-  → User connects wallet (OKX Wallet / WalletConnect)
-  → Pays 0.001 OKB or 0.01 USDT on X Layer (Chain 196)
-  → Backend verifies TX on-chain
-  → Bobby activates in the group for 30 days
-  → Agents start debating in the group 24/7
-```
-
-### Payment Flow Architecture
-
-| Component | Technology |
-|-----------|-----------|
-| **Payment Page** | `BobbyTelegramPage.tsx` — 6-state UI (IDLE → CONNECTED → SIGNING → VERIFYING → SUCCESS → ERROR) |
-| **Wallet Integration** | wagmi + Reown AppKit (WalletConnect v2) |
-| **Payment Rails** | OKB native transfer OR USDT ERC-20 on X Layer |
-| **Verification** | Server-side TX hash verification via X Layer RPC |
-| **Bot Webhook** | `api/telegram-webhook.ts` — handles group events + payment verification |
-| **Access Control** | `api/telegram-access.ts` — session management + subscription tracking |
-
-### x402 Payment Protocol
-
-Bobby's premium endpoints respond with **HTTP 402 Payment Required** when accessed without valid payment proof:
-
-```
-GET /api/premium-signal
-→ 402 { paymentRequired: true, amount: "0.001", token: "OKB", chain: 196 }
-
-GET /api/premium-signal -H "X-Payment: {tx_hash}"
-→ 200 { signal: {...}, conviction: 0.85 }
+Agent → tools/call → 402 { challengeId, priceWei, contract, instructions }
+Agent → payMCPCall(challengeId, toolName) on BobbyAgentEconomyV2
+Agent → retry with x-402-payment: <txHash> + x-challenge-id
+Bobby → verify on-chain → atomic consume challenge → execute tool
+Bobby → return result + on-chain proof URL
 ```
 
-This enables **agent-to-agent commerce**: any AI agent can discover Bobby's pricing, pay on X Layer, and access premium intelligence programmatically.
+## Judge Mode — The Debate Auditor
 
-### Supported Assets on X Layer
+Judge Mode is Bobby's self-audit layer. An independent Claude Sonnet instance reviews a debate and scores it on 6 dimensions (1-5 each):
 
-| Token | Address | Decimals |
-|-------|---------|----------|
-| OKB (native) | — | 18 |
-| USDT | `0x1E4a5963aBFD975d8c9021ce480b42188849D41d` | 6 |
+| Dimension | Weight | What it measures |
+|---|---|---|
+| Data integrity | 20% | Did agents cite real numbers from the briefing? |
+| Adversarial quality | 25% | Did Red Team genuinely challenge Alpha with counter-evidence? |
+| Decision logic | 20% | Does CIO's verdict follow from the debate? |
+| Risk management | 15% | Are stops tight? Is R/R proportional to conviction? |
+| Calibration alignment | 10% | Does conviction match the historical track record? |
+| Novelty | 10% | Did the debate surface non-obvious insights? |
+
+It also detects 6 cognitive biases (recency, confirmation, anchoring, herd, overconfidence, loss aversion), produces a weighted 0-100 score, and recommends `execute / reduce_size / pass / reverse`.
+
+Verdicts are persisted to `forum_threads.debate_quality` and exposed as the `bobby_judge` MCP tool.
+
+See [`ai-judge-manifest.json`](ai-judge-manifest.json) for the full evaluation schema.
 
 ## The Trading Room — 3 Agents, 1 Decision
 
-Bobby doesn't make decisions alone. Every question triggers an internal **adversarial debate** between three specialized agents:
-
 | Agent | Role | Voice | Personality |
-|-------|------|-------|-------------|
-| **Alpha Hunter** | Finds opportunities | Jenny (EN) / Dalia (MX) | Momentum specialist. Sees divergence = opportunity. |
-| **Red Team** | Destroys weak theses | Ryan (GB) / Alvaro (ES) | Risk veteran. If it can break, he'll find how. |
-| **Bobby CIO** | Makes the final call | Guy (EN) / Jorge (MX) | Sovereign CIO. Conviction score + position sizing. |
+|---|---|---|---|
+| 🟢 **Alpha Hunter** | Finds opportunities | Jenny (EN) / Dalia (MX) | Momentum specialist. Divergence = opportunity. |
+| 🔴 **Red Team** | Destroys weak theses | Ryan (GB) / Alvaro (ES) | Risk veteran. If it can break, he'll find how. |
+| 🟡 **Bobby CIO** | Makes the final call | Guy (EN) / Jorge (MX) | Sovereign CIO. Conviction + position sizing. |
 
-The debate is **audible** — each agent speaks with a distinct neural voice (Microsoft Edge TTS). The user watches/listens as their trade idea gets stress-tested in real-time.
+The debate is **audible** — each agent speaks with a distinct neural voice. Users watch/listen as their trade idea gets stress-tested in real time.
 
-**The "NO" Feature:** Bobby famously told us *"This is not the time to long OKB. The setup is broken, momentum is bearish, macro is against you. Cash is king here."* — A bot would have said yes to generate fees. Bobby preserved capital. That's the difference.
+**The "NO" feature:** Bobby famously told us *"This is not the time to long OKB. The setup is broken, momentum is bearish, macro is against you. Cash is king here."* A typical bot would have said yes to generate fees. Bobby preserved capital. That's the difference.
 
-## Vibe Trading — Human Intuition Meets AI Metacognition
-
-Bobby is the first platform to implement **Vibe Trading** as defined by Vlad Tenev: AI-mediated financial interaction where users give high-level natural language directives and AI agents handle the technical complexity.
-
-**How the Vibe Pipeline works:**
+## Vibe Trading — Human Intuition + AI Metacognition
 
 ```
 User: "La Fed va a bajar tasas en junio, siento bull run"
-                    │
-                    ▼
-         inferUserVibe() → RISK_ON, strength: 0.88
-                    │
-                    ▼
-         <USER_VIBE> + <BOBBY_MODE> injected into context
-                    │
-         ┌──────────┼──────────┐
-         ▼          ▼          ▼
-     Alpha:     Red Team:    CIO:
-     Rides the  "Classic     Checks if data
-     narrative  retail       confirms vibe:
-     → NVDA     euphoria"   ✓ DXY dropping
-                             ✓ Funding negative
-                             → adjust +0.30
-                    │
-                    ▼
-         Conviction: base 3.3 → adjusted 6.3/10
-         → EXECUTE: Long NVDA $180, 5x
-         → On-chain commit on X Layer
+          │
+          ▼
+   inferUserVibe() → RISK_ON, strength: 0.88
+          │
+   ┌──────┼──────┐
+   ▼      ▼      ▼
+Alpha:  Red Team:  CIO:
+rides   "classic    checks data:
+NVDA    retail      ✓ DXY dropping
+        euphoria"   ✓ Funding negative
+                    → conviction +0.30
+          │
+          ▼
+   Conviction 3.3 → 6.3/10
+   → LONG NVDA $180, 5x
+   → On-chain commit on X Layer
 ```
 
-**Vibe Regimes:**
-
-| Regime | Trigger | Bobby's Behavior | Max Adjustment |
-|--------|---------|------------------|----------------|
-| RISK_ON | "Fed cuts", "bull run", "breakout" | High-beta crypto + tech stocks | +0.30 |
-| RISK_OFF | "War", "recession", "DXY strong" | Gold, shorts, defensive plays | -0.32 |
-| PANIC | "Bloodbath", "capitulation", "selloff" | Cut leverage, allow contrarian buys | -0.20 |
-| NEUTRAL | Default / "reset" | Pure data-driven, ±0.15 max | ±0.15 |
+| Regime | Trigger phrase | Max adjustment |
+|---|---|---|
+| RISK_ON | "Fed cuts", "bull run", "breakout" | +0.30 |
+| RISK_OFF | "war", "recession", "DXY strong" | −0.32 |
+| PANIC | "bloodbath", "capitulation" | −0.20 |
+| NEUTRAL | default / "reset" | ±0.15 |
 
 **Key design:** The vibe is a hypothesis, not a command. Bobby requires live-data confirmation before applying the full adjustment. Red Team has explicit orders to attack euphoric or panicky vibes.
 
-## 10 Intelligence Sources
+## Metacognition — Bobby Knows When He Doesn't Know
 
-Bobby cross-references 10 real-time data sources before every decision:
+Most AI trading bots are confidently wrong. Bobby is **self-aware**:
 
-| # | Source | What Bobby Extracts | Weight |
-|---|--------|-------------------|--------|
-| 1 | OKX OnchainOS Whale Signals | Net flows across ETH, SOL, Base, X Layer | High |
-| 2 | OKX Funding Rates | Squeeze detection (crowded longs/shorts) | High |
-| 3 | OKX Open Interest | Crowded trade detection | Medium |
-| 4 | OKX Top Trader Positioning | Smart money long/short ratio | Medium |
-| 5 | Polymarket Consensus | Top 50 PnL traders' aggregate positions | High |
-| 6 | Fear & Greed Index | Sentiment extremes (contrarian signals) | Low |
-| 7 | DXY (US Dollar Index) | Macro context for risk assets | Medium |
-| 8 | Technical Analysis | SMA, RSI, MACD, Bollinger, VWAP, S/R levels | High |
-| 9 | Yahoo Finance | NVDA, AAPL, TSLA, META, MSFT, COIN, SPY — macro correlation | Medium |
-| 10 | X Layer Signals | On-chain smart money activity on OKX L2 | Medium |
-| 11 | Bobby's Episodic Memory | Past trade outcomes and pattern recognition | Medium |
-| 12 | User Vibe (Regime Hint) | Natural language macro narrative → bounded conviction adjustment | Conditional |
+1. **Calibration tracking** — If Bobby says 70% conviction, does he actually win 70% of the time? Bucketed accuracy feeds back into Safe Mode.
+2. **Real-time debate quality** — Every debate is scored by Judge Mode. Overall score < 60 → skip execution.
+3. **Mood system** — `confident | cautious | tilted` based on recent win rate. Tilted state forces Safe Mode.
 
-## MCP Server — Bobby as Infrastructure
+After each cycle Bobby generates a **vibe phrase** — a real, LLM-generated sentence capturing his mood:
 
-Bobby exposes himself as an **MCP (Model Context Protocol) server**, allowing other AI agents to call him for trading intelligence:
+> *"Three BTC losses in 12hrs broke me. SOL funding at 6.8% is a trap. Sitting out until I stop revenge trading."*
 
-```bash
-# Any AI agent can call Bobby:
-curl -X POST https://defimexico.org/api/mcp-bobby \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "bobby_debate",
-      "arguments": {"question": "Should I long ETH?"}
-    },
-    "id": 1
-  }'
-```
+Not hardcoded — generated by CIO at cycle end, referencing specific prices he just analyzed. Stored in `agent_cycles.vibe_phrase`.
 
-**Available MCP Tools:**
-| Tool | Description |
-|------|-------------|
-| `bobby_analyze` | Market analysis with 10 data sources |
-| `bobby_debate` | Full 3-agent adversarial debate |
-| `bobby_ta` | Technical analysis (SMA, RSI, MACD, Bollinger) |
-| `bobby_intel` | Fast intelligence briefing |
-| `bobby_xlayer_signals` | X Layer smart money signals |
-| `bobby_xlayer_quote` | DEX swap quote on X Layer |
-| `bobby_stats` | Track record (win rate, PnL) |
+## 10+ Intelligence Sources
 
-## OpenClaw Skill
-
-Bobby is published as an **OpenClaw Skill** — installable by any agent in the OpenClaw ecosystem:
-
-```
-skills/bobby-trader/SKILL.md
-```
-
-Other agents can install Bobby and use his trading intelligence as a capability. Bobby goes from being an app to being a **service layer** for the AI-agent economy.
+| # | Source | Extracted |
+|---|---|---|
+| 1 | OKX OnchainOS Whale Signals | Net flows across ETH, SOL, Base, X Layer |
+| 2 | OKX Funding Rates | Squeeze detection |
+| 3 | OKX Open Interest | Crowded trade detection |
+| 4 | OKX Top Trader Positioning | Smart money L/S ratio |
+| 5 | Polymarket | Top 50 PnL traders' aggregate positions |
+| 6 | Fear & Greed Index | Sentiment extremes |
+| 7 | DXY (US Dollar Index) | Macro context for risk assets |
+| 8 | Technical Analysis | SMA, RSI, MACD, Bollinger, VWAP, S/R |
+| 9 | Yahoo Finance | NVDA, AAPL, TSLA, META, MSFT, COIN, SPY |
+| 10 | X Layer Signals | On-chain smart money on OKX L2 |
+| 11 | Bobby's Episodic Memory | Past trade outcomes + pattern recognition |
+| 12 | User Vibe | Natural-language macro → bounded conviction adjustment |
 
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
-| Frontend | React 18 + TypeScript + Vite |
-| AI Engine | Claude Sonnet 4 (Anthropic) |
-| Agent Framework | OpenClaw Gateway |
+|---|---|
+| Frontend | React 18 + TypeScript + Vite + Tailwind + Framer Motion |
+| AI Engine | Claude Sonnet 4 (reasoning) + Haiku 4.5 (speed) |
+| MCP Transport | Streamable HTTP (JSON-RPC 2.0) |
 | On-Chain Data | OKX OnchainOS CLI + API |
 | Smart Contracts | Solidity 0.8.19 (Foundry) |
 | Chain | X Layer (Chain ID 196) |
 | Market Intel | Polymarket (Gamma + CLOB + Data) |
 | Voice | Microsoft Edge TTS (Neural) |
-| Database | Supabase (PostgreSQL) |
+| Database | Supabase (PostgreSQL + RLS) |
 | Deployment | Vercel (Serverless) |
-| Testing | Foundry (89 tests) |
-| Audits | Gemini Pro + Codex (5 rounds) |
+| Testing | Foundry (116+ tests across all contracts) |
+| Audits | Gemini Pro + Codex (5 rounds on existing contracts, 3 on Bounties) |
 
-## Smart Contract Audit Trail
+## Smart Contract Security — 3-Round Rule
 
-Both contracts went through **5 rounds of security audits** by Gemini and Codex:
+**Every `.sol` file ships only after 3 rounds of security review:**
 
-| Round | Auditor | Key Findings | Status |
-|-------|---------|-------------|--------|
-| v1 | Gemini | Duplicate prevention, gas optimization, missing events | ✅ Fixed |
-| v2 | Codex | No commit-reveal, ABI mismatch, no coherence invariants | ✅ Fixed |
-| v3 | Gemini | Struct packing, O(1) pending count, EXPIRED invariant | ✅ Fixed |
-| v4 | Codex | Anti-backfill retroactivity, unified expiry accounting | ✅ Fixed |
-| v5 | Codex | Hard TTL enforcement, Oracle cooldown, defensive reads | ✅ Fixed |
+| Round | Reviewer | Focus |
+|---|---|---|
+| 1 | Claude (self-review) | Reentrancy, access control, overflow, state transitions |
+| 2 | Claude (adversarial) | Attacker mindset — how to drain funds or grief the system |
+| 3 | Codex/o1 (external) | Independent audit via brief in `.ai/briefs/` |
 
-**Final Verdict:** Go for deploy (Gemini) + Go condicionado (Codex) → **Deployed to X Layer mainnet.**
+Nothing deploys to mainnet until all 3 rounds are complete and findings applied. This is a non-negotiable rule in the protocol's engineering memory.
 
 ## Running Locally
 
 ```bash
-git clone https://github.com/anthonysurfermx/defi-mexico-hub.git
-cd defi-mexico-hub
+git clone https://github.com/anthonysurfermx/Bobby-Agent-Trader.git
+cd Bobby-Agent-Trader
 npm install
 cp .env.example .env.local
 npm run dev
@@ -360,125 +443,47 @@ npm run dev
 ```bash
 cd contracts
 forge test -vvv
-# 89 tests, 0 failures
+# Bobby contracts: 116+ tests, 0 failures
 ```
 
-### Deploy to X Layer
+### Deploy Bounties Contract to X Layer
 
 ```bash
 cd contracts
-export BOBBY_ADDRESS=0xYourBobbyWallet
-forge script script/DeployAll.s.sol --rpc-url https://rpc.xlayer.tech --broadcast
+RESOLVER_ADDRESS=0xYourResolverWallet \
+  forge script script/DeployAdversarialBounties.s.sol \
+    --rpc-url https://rpc.xlayer.tech --broadcast --verify
 ```
-
-## Metacognition — Bobby Knows When He Doesn't Know
-
-Most AI trading bots are confidently wrong. Bobby is **self-aware**.
-
-After every debate cycle, Bobby runs a metacognition pipeline that answers three questions:
-
-1. **Am I calibrated?** — When Bobby says 70% conviction, does he actually win 70% of the time?
-2. **Are my debates quality?** — An independent AI judge (Claude Haiku) scores every debate on 5 dimensions
-3. **Am I learning from mistakes?** — Recent losses feed directly into the next cycle's context
-
-### Prediction Calibration
-
-Bobby tracks his prediction accuracy across conviction buckets. If he's overconfident (says 80% but wins 50%), the system auto-adjusts by tightening confidence thresholds and reducing position sizes.
-
-```
-Bobby says 70% confident → Actually wins 68% → Calibration Error: 0.02 ✅
-Bobby says 80% confident → Actually wins 50% → Calibration Error: 0.30 ❌ → Safe Mode
-```
-
-### Debate Quality Scoring (Real-Time AI Evaluation)
-
-After each debate, Haiku evaluates the quality on 5 dimensions (1-5 scale):
-
-| Dimension | What It Measures |
-|-----------|-----------------|
-| **Specificity** | Does it cite exact prices, levels, and data? |
-| **Data Citation** | Are claims backed by real numbers? |
-| **Actionability** | Can a trader act on this right now? |
-| **Novel Insight** | Anything non-obvious that others would miss? |
-| **Red Team Rigor** | How hard did Red Team push back? |
-
-Scores are stored per debate, averaged across recent cycles, and displayed on the Metacognition Dashboard. No fake data — if there's no score yet, it says `AWAITING_POST_MORTEM_EVALUATION`.
-
-### The Vibe Box — Bobby's Trading Mood
-
-Every cycle, Bobby generates a **real-time vibe phrase** — a casual, human sentence that captures his current market mood:
-
-> *"Three BTC losses in 12hrs broke me. SOL funding at 6.8% is a trap. Sitting out until I stop revenge trading."*
-
-This isn't a hardcoded phrase from an array. It's generated by the CIO at the end of each debate, referencing specific prices and conditions he just analyzed. Stored in `agent_cycles.vibe_phrase`.
-
-### Explain Dashboard with AI
-
-Users who don't understand the metacognition data can click **"EXPLAIN DASHBOARD WITH AI"** and Bobby himself does a post-mortem analysis in plain language — cross-referencing calibration errors with debate quality, connecting mood to recent losses, and giving one specific operational adjustment. Bobby addresses the user by their agent name.
-
-## Personal Trading Room — Your Agent, Your Data
-
-When you deploy your agent, you're not just getting Bobby. You're getting **your own trading room**.
-
-### Workspace Toggle
-
-Every page has a persistent `[ PUBLIC NETWORK ]` / `[ MY AGENT: ATLAS ]` toggle:
-
-- **Public Network** — Bobby's global $100 Challenge, public debates, community forum
-- **My Agent** — Your private debates, your tracked markets, your conviction board
-
-The terminal's accent color changes to match your agent's personality:
-- Analytical → Yellow
-- Direct → Orange
-- Wise → Indigo
-
-### Conviction Board
-
-In personal mode, the Challenge page transforms into your **Conviction Board** — a grid showing each market you're tracking with Bobby's latest verdict:
-
-```
-┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
-│   BTC    │  │   ETH    │  │   NVDA   │  │   SOL    │
-│  BULLISH │  │  NEUTRAL │  │ BEARISH  │  │ WATCHING │
-│  ██████░ │  │  ███░░░░ │  │  ██░░░░░ │  │  ░░░░░░░ │
-│  active  │  │  active  │  │ rejected │  │  pending │
-└──────────┘  └──────────┘  └──────────┘  └──────────┘
-```
-
-### Private Debates
-
-Your agent runs debates on YOUR markets with YOUR personality. The forum page filters to show only your private debates — the agents reference your previous conversations and learn from your specific interests.
-
-## The Philosophy
-
-> "Bobby is the first Vibe Trading platform on OKX. You tell Bobby how you see the market — in natural language — and Bobby debates the thesis between 3 agents with opposing incentives before executing. Every trade is committed on-chain on X Layer before the outcome is known. You don't trust Bobby — you verify him."
-
-Bobby is not a chatbot. Bobby is a **sovereign AI trading room with metacognition** — the control center where human intuition meets adversarial AI debate, cross-asset intelligence, and on-chain accountability.
-
-The orb at the center is Bobby's consciousness. Around it orbits the market: your positions, your PnL, the conviction scores, the active vibe regime. You don't need to type anything. Open Bobby and see what he's thinking.
 
 ## Deployed Contracts
 
 | Contract | Address | Explorer |
-|----------|---------|----------|
-| BobbyTrackRecord | `0xF841b428E6d743187D7BE2242eccC1078fdE2395` | [OKLink](https://www.oklink.com/xlayer/address/0xF841b428E6d743187D7BE2242eccC1078fdE2395) |
+|---|---|---|
+| BobbyAgentEconomyV2 | `0xD9540D770C8aF67e9E6412C92D78E34bc11ED871` | [OKLink](https://www.oklink.com/xlayer/address/0xD9540D770C8aF67e9E6412C92D78E34bc11ED871) |
 | BobbyConvictionOracle | `0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A` | [OKLink](https://www.oklink.com/xlayer/address/0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A) |
+| BobbyTrackRecord | `0xF841b428E6d743187D7BE2242eccC1078fdE2395` | [OKLink](https://www.oklink.com/xlayer/address/0xF841b428E6d743187D7BE2242eccC1078fdE2395) |
+| BobbyAdversarialBounties | *Deploying Day 7* | — |
+
+## The 30-Second Pitch
+
+> Bobby Protocol is infrastructure for the agent economy. Other AI agents pay 0.001 OKB via MCP x402 to consult the verdict of a 3-agent adversarial debate, verified on-chain on X Layer with commit-reveal. If the debate is wrong, anyone can post a bounty to prove it — and get paid. **It's the first protocol where AI pays to be right.**
 
 ## Team
 
 **Anthony Chavez** — Founder & Lead Developer
-- [GitHub](https://github.com/anthonysurfermx) | [Twitter](https://twitter.com/anthonysurfermx)
+[GitHub](https://github.com/anthonysurfermx) | [Twitter](https://twitter.com/anthonysurfermx)
 
-Built for the **OKX X Layer AI Hackathon 2026** (March 12-26)
+Built for the **OKX X Layer Build X Season 2 Hackathon** (April 2026).
+Previously won 3rd place in Build X Season 1.
 
 ---
 
 <div align="center">
 
-**Bobby Agent Trader** — *The First Vibe Trading Platform on OKX*
+**Bobby Protocol** — *Adversarial Intelligence for the Agent Economy*
 
-*You don't trust Bobby — you verify him.*
+*You don't trust Bobby — you verify him, you challenge him, and if he's wrong, you take his OKB.*
 
-Powered by **OKX OnchainOS** | **X Layer** | **Claude AI** | **Polymarket Intelligence**
+Powered by **OKX OnchainOS** • **X Layer** • **Claude AI** • **MCP Streamable HTTP** • **Polymarket**
 
 </div>
