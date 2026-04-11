@@ -3,6 +3,7 @@ import { Interface, formatEther } from 'ethers';
 export const XLAYER_RPC_URL = 'https://rpc.xlayer.tech';
 export const XLAYER_CHAIN_ID = 196;
 export const BOBBY_AGENT_ECONOMY = '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871'; // V2 — replay-resistant with challengeId
+export const BOBBY_ADVERSARIAL_BOUNTIES = '0xa8005ab465a0e02cb14824cd0e7630391fba673d'; // Day 6 — pay-to-challenge debates
 export const PREMIUM_MCP_FEE_WEI = 1000000000000000n; // 0.001 OKB
 
 const ECONOMY_INTERFACE = new Interface([

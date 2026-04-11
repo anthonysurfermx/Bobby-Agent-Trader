@@ -151,7 +151,7 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
 │  BobbyConvictionOracle     0x03FA39B3a5…32Ab5f3A  — signal feed │
 │  BobbyTrackRecord          0xF841b428E6…078fdE2395 — commit-    │
 │                                                     reveal      │
-│  BobbyAdversarialBounties  (deploying Day 7)    — audit market │
+│  BobbyAdversarialBounties  0xa8005ab465…91fba673d — audit mkt  │
 │  OKX DEX Aggregator        — swap execution on X Layer          │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -258,14 +258,18 @@ if (active && conviction >= 7 && dir == Direction.LONG) {
 
 ### BobbyAdversarialBounties — Pay to Challenge *(Day 6)*
 
-The newest contract: anyone can post a bounty in OKB against a specific Bobby debate on a specific dimension (data_integrity, adversarial_quality, decision_logic, risk_management, calibration_alignment, novelty). Challengers submit evidence hashes. The resolver — Bobby's own Judge Mode — picks the winner. Pull-payment settlement.
+Anyone can post a bounty in OKB against a specific Bobby debate on a specific dimension (data_integrity, adversarial_quality, decision_logic, risk_management, calibration_alignment, novelty). Challengers submit evidence hashes. The resolver — Bobby's own Judge Mode — picks the winner. Pull-payment settlement.
 
 | | |
 |---|---|
+| **Address** | [`0xa8005ab465a0e02cb14824cd0e7630391fba673d`](https://www.oklink.com/xlayer/address/0xa8005ab465a0e02cb14824cd0e7630391fba673d) |
 | **Source** | [`contracts/src/BobbyAdversarialBounties.sol`](contracts/src/BobbyAdversarialBounties.sol) |
-| **Status** | Built, 27 tests passing, 3-round security review in progress |
+| **Owner** | Bobby treasury (`0x09a81f…cdceA`) |
+| **Resolver** | Separated hot-key (`0xc27Bf5…37e0`) |
 | **Pattern** | Pull payments, struct packing, events-as-history, 2-step ownership |
-| **Safety** | Pause cannot trap user funds; 3-day challenge grace period; ABSOLUTE_MIN_BOUNTY floor |
+| **Safety** | Pause cannot trap user funds; 3-day grace snapshot per bounty; per-address unicity; effective-expiry bounded resolver |
+| **Tests** | 34 Foundry tests, 100% pass |
+| **Audit rounds** | 3 (Claude self, Claude adversarial, Codex external) |
 
 ## MCP Server — 13 Tools for the Agent Economy
 
@@ -462,7 +466,7 @@ RESOLVER_ADDRESS=0xYourResolverWallet \
 | BobbyAgentEconomyV2 | `0xD9540D770C8aF67e9E6412C92D78E34bc11ED871` | [OKLink](https://www.oklink.com/xlayer/address/0xD9540D770C8aF67e9E6412C92D78E34bc11ED871) |
 | BobbyConvictionOracle | `0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A` | [OKLink](https://www.oklink.com/xlayer/address/0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A) |
 | BobbyTrackRecord | `0xF841b428E6d743187D7BE2242eccC1078fdE2395` | [OKLink](https://www.oklink.com/xlayer/address/0xF841b428E6d743187D7BE2242eccC1078fdE2395) |
-| BobbyAdversarialBounties | *Deploying Day 7* | — |
+| BobbyAdversarialBounties | `0xa8005ab465a0e02cb14824cd0e7630391fba673d` | [OKLink](https://www.oklink.com/xlayer/address/0xa8005ab465a0e02cb14824cd0e7630391fba673d) |
 
 ## The 30-Second Pitch
 
