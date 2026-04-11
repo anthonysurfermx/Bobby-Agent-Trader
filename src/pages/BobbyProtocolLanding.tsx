@@ -108,6 +108,20 @@ const fmtNum = (n: number | string, digits = 0) => {
   return v.toLocaleString('en-US', { maximumFractionDigits: digits, minimumFractionDigits: digits });
 };
 
+const safeFixed = (n: unknown, digits = 2): string => {
+  if (n === null || n === undefined) return '—';
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return '—';
+  return v.toFixed(digits);
+};
+
+const safeSignedFixed = (n: unknown, digits = 2): string => {
+  if (n === null || n === undefined) return '—';
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return '—';
+  return `${v > 0 ? '+' : ''}${v.toFixed(digits)}`;
+};
+
 const fmtOkb = (wei: string, digits = 4) => {
   try {
     const v = Number(wei) / 1e18;
@@ -210,14 +224,14 @@ function TopTicker({ stats }: { stats: ProtocolStats | null }) {
   const eth = stats?.market.prices.find((p) => p.symbol === 'ETH');
 
   const items = [
-    okb ? `OKB $${okb.price.toFixed(2)} (${okb.change_24h_pct > 0 ? '+' : ''}${okb.change_24h_pct.toFixed(2)}%)` : 'OKB —',
-    btc ? `BTC $${btc.price.toFixed(0)}` : 'BTC —',
-    eth ? `ETH $${eth.price.toFixed(0)}` : 'ETH —',
-    stats ? `XLAYER BLOCK #${stats.chain.blockNumber.toLocaleString()}` : 'XLAYER —',
-    stats ? `TREASURY ${Number(stats.treasury.balanceOkb).toFixed(4)} OKB` : 'TREASURY —',
-    stats ? `MCP CALLS SETTLED: ${stats.contracts.agentEconomy.stats.totalMcpCalls}` : 'MCP CALLS —',
-    stats ? `DEBATES: ${stats.contracts.agentEconomy.stats.totalDebates}` : 'DEBATES —',
-    stats ? `BOUNTIES POSTED: ${stats.contracts.adversarialBounties.totalPosted}` : 'BOUNTIES —',
+    okb ? `OKB $${safeFixed(okb.price, 2)} (${safeSignedFixed(okb.change_24h_pct, 2)}%)` : 'OKB —',
+    btc ? `BTC $${safeFixed(btc.price, 0)}` : 'BTC —',
+    eth ? `ETH $${safeFixed(eth.price, 0)}` : 'ETH —',
+    stats ? `XLAYER BLOCK #${(stats.chain.blockNumber ?? 0).toLocaleString()}` : 'XLAYER —',
+    stats ? `TREASURY ${safeFixed(stats.treasury.balanceOkb, 4)} OKB` : 'TREASURY —',
+    stats ? `MCP CALLS SETTLED: ${stats.contracts.agentEconomy.stats.totalMcpCalls ?? '—'}` : 'MCP CALLS —',
+    stats ? `DEBATES: ${stats.contracts.agentEconomy.stats.totalDebates ?? '—'}` : 'DEBATES —',
+    stats ? `BOUNTIES POSTED: ${stats.contracts.adversarialBounties.totalPosted ?? 0}` : 'BOUNTIES —',
   ];
   const loop = [...items, ...items];
   return (
@@ -338,7 +352,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
             <span className="text-[#6dfe9c] shrink-0">[ALPHA_HUNTER]:</span>
             <span className="text-[#6dfe9c]/80">
               {okb
-                ? `OKB at $${okb.price.toFixed(2)}, 24h change ${okb.change_24h_pct > 0 ? '+' : ''}${okb.change_24h_pct.toFixed(2)}%. Thesis: accumulate into support on X Layer.`
+                ? `OKB at $${safeFixed(okb.price, 2)}, 24h change ${safeSignedFixed(okb.change_24h_pct, 2)}%. Thesis: accumulate into support on X Layer.`
                 : 'Fetching OKB structure from X Layer order books...'}
             </span>
           </div>
@@ -429,8 +443,8 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
       color: '#ff716a',
       stance: 'FINAL_DECISION',
       tagline: 'Conviction without calibration is noise.',
-      metricA: { label: 'EQUITY', value: pnl ? `$${pnl.currentEquity.toFixed(2)}` : '—' },
-      metricB: { label: 'RETURN', value: pnl ? `${pnl.totalReturn.toFixed(2)}%` : '—' },
+      metricA: { label: 'EQUITY', value: pnl ? `$${safeFixed(pnl.currentEquity, 2)}` : '—' },
+      metricB: { label: 'RETURN', value: pnl ? `${safeFixed(pnl.totalReturn, 2)}%` : '—' },
     },
   ];
 
@@ -511,7 +525,7 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
         <div className="text-[#adaaaa]">
           <span className="text-[#777575]">[protocol]</span> Treasury balance:{' '}
           <span className="text-[#6dfe9c]">
-            {stats ? Number(stats.treasury.balanceOkb).toFixed(4) : '—'}
+            {stats ? safeFixed(stats.treasury.balanceOkb, 4) : '—'}
           </span>{' '}
           OKB @{' '}
           <a
@@ -591,7 +605,7 @@ function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
 
           <div className="flex items-baseline gap-4 mb-8">
             <span className="text-7xl font-black text-[#6dfe9c] font-mono tracking-tighter">
-              {accuracy !== null ? accuracy.toFixed(0) : '—'}
+              {accuracy !== null ? safeFixed(accuracy, 0) : '—'}
             </span>
             <span className="text-sm font-bold text-[#adaaaa] uppercase">
               / 100 ORACLE_CALIBRATION
@@ -721,7 +735,7 @@ function Bounties({ stats }: { stats: ProtocolStats | null }) {
                 <div className="flex justify-between">
                   <span className="text-[#adaaaa]">REWARD:</span>
                   <span className="text-[#6dfe9c] font-bold">
-                    {Number(b.rewardOkb).toFixed(4)} OKB
+                    {safeFixed(b.rewardOkb, 4)} OKB
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -778,7 +792,7 @@ function McpSection({
             <div className="bg-[#131313] p-4 border border-[#6dfe9c]/20 font-mono text-[10px]">
               <div className="text-[#adaaaa] uppercase mb-1">TOTAL_OKB_SETTLED</div>
               <div className="text-[#6dfe9c] text-3xl font-bold">
-                {Number(volume).toFixed(4)}
+                {safeFixed(volume, 4)}
               </div>
             </div>
           </div>
@@ -856,7 +870,7 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
           { k: 'MCP_CALLS', v: c.agentEconomy.stats.totalMcpCalls },
           {
             k: 'VOLUME_OKB',
-            v: Number(c.agentEconomy.stats.totalVolumeOkb).toFixed(4),
+            v: safeFixed(c.agentEconomy.stats.totalVolumeOkb, 4),
           },
         ],
         lastBlock: c.agentEconomy.lastActivityBlock,
