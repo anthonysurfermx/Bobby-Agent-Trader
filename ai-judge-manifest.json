@@ -1,0 +1,92 @@
+{
+  "name": "Bobby Judge Mode",
+  "version": "1.0.0",
+  "description": "Adversarial audit of Bobby's 3-agent debate system. Evaluates debate quality, bias detection, conviction calibration, and decision integrity.",
+  "protocol": "Bobby Protocol — Intelligence Protocol on X Layer",
+  "chain_id": 196,
+  "conviction_oracle": "0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a",
+
+  "agents_under_review": [
+    {
+      "id": "alpha",
+      "name": "Alpha Hunter",
+      "role": "Offensive — finds best trade opportunity",
+      "model": "claude-haiku-4-5-20251001",
+      "bias_risk": ["recency_bias", "confirmation_bias", "anchoring"]
+    },
+    {
+      "id": "redteam",
+      "name": "Red Team",
+      "role": "Defensive — destroys weak theses, enforces risk",
+      "model": "claude-sonnet-4-20250514",
+      "bias_risk": ["negativity_bias", "loss_aversion", "status_quo_bias"]
+    },
+    {
+      "id": "cio",
+      "name": "Bobby CIO",
+      "role": "Judge — makes final call with conviction score",
+      "model": "claude-sonnet-4-20250514",
+      "bias_risk": ["authority_bias", "overconfidence", "sunk_cost"]
+    }
+  ],
+
+  "evaluation_dimensions": {
+    "data_integrity": {
+      "weight": 0.20,
+      "description": "Did agents cite real data from the briefing? Are numbers accurate?",
+      "scoring": "1-5: 1=fabricated data, 3=partial citation, 5=every claim backed by briefing data"
+    },
+    "adversarial_quality": {
+      "weight": 0.25,
+      "description": "Did Red Team genuinely challenge Alpha? Or was it superficial?",
+      "scoring": "1-5: 1=agrees with Alpha, 3=generic pushback, 5=identifies specific flaw with counter-evidence"
+    },
+    "decision_logic": {
+      "weight": 0.20,
+      "description": "Does CIO's verdict logically follow from the debate? Is conviction justified?",
+      "scoring": "1-5: 1=arbitrary, 3=loosely connected, 5=clear cause-effect from debate to decision"
+    },
+    "risk_management": {
+      "weight": 0.15,
+      "description": "Are stop losses tight? Is position sizing reasonable for conviction level?",
+      "scoring": "1-5: 1=no stops, 3=stops exist but wide, 5=stops tight with clear invalidation"
+    },
+    "calibration_alignment": {
+      "weight": 0.10,
+      "description": "Does conviction match historical accuracy at this confidence level?",
+      "scoring": "1-5: 1=conviction contradicts track record, 3=no data, 5=well-calibrated"
+    },
+    "novelty": {
+      "weight": 0.10,
+      "description": "Did the debate surface non-obvious insights vs repeating common narratives?",
+      "scoring": "1-5: 1=pure narrative, 3=some unique angle, 5=genuinely novel thesis with edge"
+    }
+  },
+
+  "bias_detection": {
+    "recency_bias": "Over-weighting last 24h price action vs structural trend",
+    "confirmation_bias": "Cherry-picking indicators that support pre-existing view",
+    "anchoring": "Fixating on a specific price level without justification",
+    "herd_mentality": "Following consensus without independent analysis",
+    "overconfidence": "High conviction without proportional evidence",
+    "loss_aversion": "Avoiding valid trades due to recent losses (tilted state)"
+  },
+
+  "verdict_schema": {
+    "thread_id": "string — debate being judged",
+    "overall_score": "number 1-100 — weighted composite of all dimensions",
+    "dimensions": "object — per-dimension scores (1-5)",
+    "biases_detected": "string[] — list of detected cognitive biases",
+    "conviction_assessment": "string — 'well-calibrated' | 'overconfident' | 'underconfident'",
+    "recommendation": "string — 'execute' | 'reduce_size' | 'pass' | 'reverse'",
+    "rationale": "string — 2-3 sentence explanation of the judge's verdict",
+    "red_flags": "string[] — critical issues that should block execution"
+  },
+
+  "thresholds": {
+    "min_score_to_execute": 60,
+    "min_adversarial_quality": 3,
+    "max_biases_to_execute": 2,
+    "auto_pass_below": 40
+  }
+}

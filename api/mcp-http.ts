@@ -27,7 +27,7 @@ const SERVER_NAME = 'bobby-protocol';
 const SERVER_VERSION = '3.0.0';
 const BASE_URL = 'https://bobbyprotocol.xyz';
 
-const PREMIUM_TOOLS = new Set(['bobby_analyze', 'bobby_debate', 'bobby_security_scan', 'bobby_wallet_portfolio']);
+const PREMIUM_TOOLS = new Set(['bobby_analyze', 'bobby_debate', 'bobby_security_scan', 'bobby_wallet_portfolio', 'bobby_judge']);
 const X402_PRICE_OKB = '0.001';
 
 // ---- Tool Definitions ----
@@ -44,6 +44,7 @@ const TOOLS = [
   { name: 'bobby_security_scan', description: 'Scan token contract for honeypot/rug risks. PAID: 0.001 OKB.', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '1' } }, required: ['address'] } },
   { name: 'bobby_dex_trending', description: 'Hot trending tokens on-chain right now.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' } } } },
   { name: 'bobby_dex_signals', description: 'Smart money / whale / KOL buy signals.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' }, type: { type: 'string', default: 'smart_money' } } } },
+  { name: 'bobby_judge', description: 'Judge Mode — independent audit of a 3-agent debate. Scores quality, detects biases, recommends execute/pass/reduce. PAID: 0.001 OKB.', inputSchema: { type: 'object', properties: { thread_id: { type: 'string', description: 'Debate thread ID (omit for latest debate)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } } } },
 ];
 
 // ---- Tool Execution ----
@@ -165,6 +166,29 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
       body: JSON.stringify({ action: 'signals', params: { chain: args.chain || '1', type: args.type || 'smart_money' } }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
+  }
+
+  if (name === 'bobby_judge') {
+    const res = await fetch(`${BASE_URL}/api/judge-mode`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ thread_id: args.thread_id || undefined, language: args.language || 'en' }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Judge Mode failed');
+    const v = data.verdict;
+    const summary = [
+      `**Judge Mode Verdict** — Score: ${v.overall_score}/100`,
+      `Recommendation: ${v.recommendation.toUpperCase()}`,
+      `Conviction: ${v.conviction_assessment}`,
+      '',
+      `Dimensions: Data ${v.dimensions.data_integrity}/5 | Adversarial ${v.dimensions.adversarial_quality}/5 | Logic ${v.dimensions.decision_logic}/5 | Risk ${v.dimensions.risk_management}/5 | Calibration ${v.dimensions.calibration_alignment}/5 | Novelty ${v.dimensions.novelty}/5`,
+      '',
+      `Biases: ${v.biases_detected.length ? v.biases_detected.join(', ') : 'None detected'}`,
+      v.red_flags.length ? `Red Flags: ${v.red_flags.join('; ')}` : '',
+      '',
+      v.rationale,
+    ].filter(Boolean).join('\n');
+    return { content: [{ type: 'text', text: summary }] };
   }
 
   throw new Error(`Unknown tool: ${name}`);

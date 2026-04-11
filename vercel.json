@@ -131,6 +131,10 @@
     "api/bobby-digest.ts": {
       "maxDuration": 10,
       "memory": 256
+    },
+    "api/judge-mode.ts": {
+      "maxDuration": 60,
+      "memory": 512
     }
   }
 }
