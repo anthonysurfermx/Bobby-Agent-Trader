@@ -19,7 +19,7 @@ import {
 
 // ---- Types ----
 
-type Price = { symbol: string; price: number; change_24h_pct: number };
+type Price = { symbol: string; price: number; change24h: number };
 
 interface ProtocolStats {
   ok: boolean;
@@ -41,11 +41,11 @@ interface ProtocolStats {
     };
     convictionOracle: {
       address: string;
-      stats: { totalPredictions: string; totalResolved: string; totalCorrect: string };
+      stats: { symbolCount: string };
     };
     trackRecord: {
       address: string;
-      stats: { totalCommitted: string; totalRevealed: string; totalTrades: string };
+      stats: { totalTrades: string; totalCommitments: string; winRateBps: string };
     };
     adversarialBounties: {
       address: string;
@@ -224,7 +224,7 @@ function TopTicker({ stats }: { stats: ProtocolStats | null }) {
   const eth = stats?.market.prices.find((p) => p.symbol === 'ETH');
 
   const items = [
-    okb ? `OKB $${safeFixed(okb.price, 2)} (${safeSignedFixed(okb.change_24h_pct, 2)}%)` : 'OKB —',
+    okb ? `OKB $${safeFixed(okb.price, 2)} (${safeSignedFixed(okb.change24h, 2)}%)` : 'OKB —',
     btc ? `BTC $${safeFixed(btc.price, 0)}` : 'BTC —',
     eth ? `ETH $${safeFixed(eth.price, 0)}` : 'ETH —',
     stats ? `XLAYER BLOCK #${(stats.chain.blockNumber ?? 0).toLocaleString()}` : 'XLAYER —',
@@ -288,7 +288,9 @@ function Nav() {
 
 function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
   const okb = stats?.market.prices.find((p) => p.symbol === 'OKB');
-  const regime = typeof stats?.market.regime === 'string' ? (stats.market.regime as string) : 'LOADING...';
+  const btc = stats?.market.prices.find((p) => p.symbol === 'BTC');
+  const eth = stats?.market.prices.find((p) => p.symbol === 'ETH');
+  const regime = typeof stats?.market.regime === 'string' ? (stats.market.regime as string) : '…';
 
   return (
     <section className="relative min-h-[85vh] flex flex-col items-center justify-center pt-24 pb-16 px-6 overflow-hidden">
@@ -343,31 +345,49 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
             <div className="w-2 h-2 bg-[#6dfe9c]" />
           </div>
           <div className="font-mono text-[10px] text-[#adaaaa] tracking-widest uppercase">
-            LIVE_INTEL_STREAM // REGIME: {regime.slice(0, 40)}
+            LIVE_MARKET_FEED // {regime.slice(0, 50) || 'AWAITING_REGIME'}
           </div>
         </div>
 
         <div className="p-6 font-mono text-xs space-y-3">
-          <div className="flex gap-3">
-            <span className="text-[#6dfe9c] shrink-0">[ALPHA_HUNTER]:</span>
-            <span className="text-[#6dfe9c]/80">
+          <div className="flex gap-3 items-start">
+            <span className="text-[#6dfe9c] shrink-0 w-20">[OKB]</span>
+            <span className="text-[#6dfe9c]/90 flex-1">
               {okb
-                ? `OKB at $${safeFixed(okb.price, 2)}, 24h change ${safeSignedFixed(okb.change_24h_pct, 2)}%. Thesis: accumulate into support on X Layer.`
-                : 'Fetching OKB structure from X Layer order books...'}
+                ? `$${safeFixed(okb.price, 2)}  ${safeSignedFixed(okb.change24h, 2)}%`
+                : 'awaiting intel...'}
             </span>
           </div>
-          <div className="flex gap-3">
-            <span className="text-[#fcc025] shrink-0">[RED_TEAM]:</span>
-            <span className="text-[#fcc025]/80">
-              Counter: funding rates neutral, no squeeze setup. Momentum thesis is not confirmed by whale flows.
+          <div className="flex gap-3 items-start">
+            <span className="text-[#6dfe9c] shrink-0 w-20">[BTC]</span>
+            <span className="text-[#6dfe9c]/90 flex-1">
+              {btc
+                ? `$${safeFixed(btc.price, 0)}  ${safeSignedFixed(btc.change24h, 2)}%`
+                : 'awaiting intel...'}
             </span>
           </div>
-          <div className="flex gap-3">
-            <span className="text-white/80 shrink-0">[CIO]:</span>
-            <span className="text-white/70">
+          <div className="flex gap-3 items-start">
+            <span className="text-[#6dfe9c] shrink-0 w-20">[ETH]</span>
+            <span className="text-[#6dfe9c]/90 flex-1">
+              {eth
+                ? `$${safeFixed(eth.price, 0)}  ${safeSignedFixed(eth.change24h, 2)}%`
+                : 'awaiting intel...'}
+            </span>
+          </div>
+          <div className="flex gap-3 items-start">
+            <span className="text-[#fcc025] shrink-0 w-20">[XLAYER]</span>
+            <span className="text-[#fcc025]/90 flex-1">
               {stats
-                ? `${stats.contracts.agentEconomy.stats.totalDebates} debates settled on AgentEconomy V2. Judge grading active. Conviction required ≥ 70.`
-                : 'Awaiting economy stats...'}
+                ? `BLOCK #${stats.chain.blockNumber.toLocaleString()}  ·  TREASURY ${safeFixed(stats.treasury.balanceOkb, 4)} OKB`
+                : 'awaiting rpc...'}
+            </span>
+          </div>
+          <div className="flex gap-3 items-start">
+            <span className="text-white/70 shrink-0 w-20">[ECONOMY]</span>
+            <span className="text-white/70 flex-1">
+              {stats
+                ? `${stats.contracts.agentEconomy.stats.totalDebates} debates  ·  ${stats.contracts.agentEconomy.stats.totalMcpCalls} mcp calls  ·  ${safeFixed(stats.contracts.agentEconomy.stats.totalVolumeOkb, 4)} OKB settled`
+                : 'awaiting economy...'}
             </span>
           </div>
 
@@ -375,18 +395,19 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
             <div className="bg-[#6dfe9c]/5 p-4 border-l-2 border-[#6dfe9c]">
               <div className="flex items-center justify-between mb-1 font-mono text-[10px] tracking-widest uppercase">
                 <span className="font-bold text-[#6dfe9c]">
-                  STREAM_OPEN
+                  {stats ? 'FEED_LIVE' : 'CONNECTING'}
                 </span>
                 <span className="text-[#adaaaa]">
-                  BLOCK #{stats?.chain.blockNumber.toLocaleString() ?? '—'}
+                  {stats ? new Date(stats.fetchedAt).toLocaleTimeString() : '—'}
                 </span>
               </div>
-              <p className="text-white text-sm font-sans">
-                Full debate transcript lives at{' '}
+              <p className="text-white/80 text-xs font-mono">
+                This is the public protocol surface. The 3-agent debate
+                terminal lives at{' '}
                 <a className="underline text-[#6dfe9c]" href="/agentic-world/bobby">
                   /agentic-world/bobby
                 </a>
-                . This is the public protocol surface.
+                .
               </p>
             </div>
           </div>
@@ -421,30 +442,32 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
   const mcpCalls = stats?.contracts.agentEconomy.stats.totalMcpCalls ?? '—';
   const volume = stats?.contracts.agentEconomy.stats.totalVolumeOkb ?? '—';
 
+  // Role labels and one-line descriptors are static config — the identity
+  // of the three agents, not live data. Numeric metrics come from stats/pnl.
   const agents = [
     {
       name: 'ALPHA_HUNTER',
       color: '#6dfe9c',
-      stance: 'OPPORTUNITY_SEEKER',
-      tagline: 'Momentum is truth. Liquidity is the weapon.',
-      metricA: { label: 'DEBATES_JOINED', value: debates },
+      role: 'OPPORTUNITY_SCOUT',
+      descriptor: 'Proposes long/short theses from on-chain and market data.',
+      metricA: { label: 'PROTOCOL_DEBATES', value: debates },
       metricB: { label: 'MCP_CALLS', value: mcpCalls },
     },
     {
       name: 'RED_TEAM',
       color: '#fcc025',
-      stance: 'ADVERSARIAL_CRITIC',
-      tagline: 'I exist to destroy the Alpha Hunter\'s thesis.',
-      metricA: { label: 'WIN_RATE', value: pnl ? `${pnl.winRate}%` : '—' },
-      metricB: { label: 'FLAGS_RAISED', value: pnl ? `${pnl.losses}` : '—' },
+      role: 'ADVERSARIAL_CRITIC',
+      descriptor: 'Attacks every thesis before capital is committed.',
+      metricA: { label: 'AGENT_WIN_RATE', value: pnl ? `${pnl.winRate}%` : '—' },
+      metricB: { label: 'AGENT_LOSSES', value: pnl ? `${pnl.losses}` : '—' },
     },
     {
       name: 'CIO',
       color: '#ff716a',
-      stance: 'FINAL_DECISION',
-      tagline: 'Conviction without calibration is noise.',
-      metricA: { label: 'EQUITY', value: pnl ? `$${safeFixed(pnl.currentEquity, 2)}` : '—' },
-      metricB: { label: 'RETURN', value: pnl ? `${safeFixed(pnl.totalReturn, 2)}%` : '—' },
+      role: 'FINAL_DECISION',
+      descriptor: 'Weighs both sides and emits the final conviction score.',
+      metricA: { label: 'AGENT_EQUITY', value: pnl ? `$${safeFixed(pnl.currentEquity, 2)}` : '—' },
+      metricB: { label: 'TOTAL_RETURN', value: pnl ? `${safeFixed(pnl.totalReturn, 2)}%` : '—' },
     },
   ];
 
@@ -491,7 +514,7 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
                   className="text-[10px] font-mono inline-block px-2"
                   style={{ color: a.color, backgroundColor: `${a.color}15` }}
                 >
-                  STANCE: {a.stance}
+                  ROLE: {a.role}
                 </div>
               </div>
             </div>
@@ -507,7 +530,7 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
                 <div className="text-white text-xl">{a.metricB.value}</div>
               </div>
             </div>
-            <p className="text-xs text-[#adaaaa] italic">"{a.tagline}"</p>
+            <p className="text-xs text-[#adaaaa]">{a.descriptor}</p>
           </motion.div>
         ))}
       </div>
@@ -544,19 +567,19 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
 
 function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
   const oracle = stats?.contracts.convictionOracle.stats;
-  const resolved = oracle ? Number(oracle.totalResolved) : 0;
-  const correct = oracle ? Number(oracle.totalCorrect) : 0;
-  const accuracy = resolved > 0 ? (correct / resolved) * 100 : null;
+  const tr = stats?.contracts.trackRecord.stats;
 
-  // Map the 6 judge dimensions to radar. Until /api/judge-mode is stable,
-  // we render the axis structure with the oracle accuracy propagated
-  // across dimensions it affects. Real per-dimension scores require
-  // the judge endpoint to be fully online.
+  // Win rate is stored on-chain as basis points (0-10000). Oracle exposes
+  // symbol count; full per-dimension scoring requires the off-chain judge
+  // endpoint, which is not yet stable in prod. Until then we render the
+  // radar skeleton and show the live on-chain counts that DO exist.
+  const winRateBps = tr ? Number(tr.winRateBps) : 0;
+  const winRatePct = winRateBps / 100;
+  const hasAnyData = oracle && Number(oracle.symbolCount) > 0;
+
   const radarData = JUDGE_AXES.map((axis) => ({
     dim: axis.label,
-    // If oracle has no data yet, show the 6-axis shell with a floor value
-    // so the shape reads as "awaiting live verdict".
-    value: resolved > 0 ? Math.min(5, Math.max(1, correct / Math.max(1, resolved) * 5)) : 0,
+    value: hasAnyData ? Math.min(5, Math.max(1, (winRatePct / 100) * 5)) : 0,
   }));
 
   return (
@@ -605,30 +628,30 @@ function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
 
           <div className="flex items-baseline gap-4 mb-8">
             <span className="text-7xl font-black text-[#6dfe9c] font-mono tracking-tighter">
-              {accuracy !== null ? safeFixed(accuracy, 0) : '—'}
+              {tr ? safeFixed(winRatePct, 0) : '—'}
             </span>
             <span className="text-sm font-bold text-[#adaaaa] uppercase">
-              / 100 ORACLE_CALIBRATION
+              / 100 ON_CHAIN_WIN_RATE
             </span>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-8 font-mono text-[11px]">
             <div className="bg-black p-4 border border-[#494847]/15">
-              <div className="text-[#adaaaa] uppercase mb-1">Predictions</div>
+              <div className="text-[#adaaaa] uppercase mb-1">Commitments</div>
               <div className="text-[#6dfe9c] text-2xl">
-                {oracle?.totalPredictions ?? '—'}
+                {tr?.totalCommitments ?? '—'}
               </div>
             </div>
             <div className="bg-black p-4 border border-[#494847]/15">
-              <div className="text-[#adaaaa] uppercase mb-1">Resolved</div>
+              <div className="text-[#adaaaa] uppercase mb-1">Revealed_Trades</div>
               <div className="text-[#6dfe9c] text-2xl">
-                {oracle?.totalResolved ?? '—'}
+                {tr?.totalTrades ?? '—'}
               </div>
             </div>
             <div className="bg-black p-4 border border-[#494847]/15">
-              <div className="text-[#adaaaa] uppercase mb-1">Correct</div>
+              <div className="text-[#adaaaa] uppercase mb-1">Oracle_Symbols</div>
               <div className="text-[#6dfe9c] text-2xl">
-                {oracle?.totalCorrect ?? '—'}
+                {oracle?.symbolCount ?? '—'}
               </div>
             </div>
             <div className="bg-black p-4 border border-[#494847]/15">
@@ -879,9 +902,7 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
         label: 'CONVICTION_ORACLE',
         address: c.convictionOracle.address,
         rows: [
-          { k: 'PREDICTIONS', v: c.convictionOracle.stats.totalPredictions },
-          { k: 'RESOLVED', v: c.convictionOracle.stats.totalResolved },
-          { k: 'CORRECT', v: c.convictionOracle.stats.totalCorrect },
+          { k: 'SYMBOLS_TRACKED', v: c.convictionOracle.stats.symbolCount },
         ],
         lastBlock: null,
       },
@@ -889,9 +910,12 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
         label: 'TRACK_RECORD',
         address: c.trackRecord.address,
         rows: [
-          { k: 'COMMITTED', v: c.trackRecord.stats.totalCommitted },
-          { k: 'REVEALED', v: c.trackRecord.stats.totalRevealed },
-          { k: 'TRADES', v: c.trackRecord.stats.totalTrades },
+          { k: 'COMMITMENTS', v: c.trackRecord.stats.totalCommitments },
+          { k: 'REVEALED', v: c.trackRecord.stats.totalTrades },
+          {
+            k: 'WIN_RATE',
+            v: `${safeFixed(Number(c.trackRecord.stats.winRateBps) / 100, 1)}%`,
+          },
         ],
         lastBlock: null,
       },

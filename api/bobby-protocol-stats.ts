@@ -24,11 +24,13 @@ const CONVICTION_ORACLE = '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
 const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
 
 const ORACLE_INTERFACE = new Interface([
-  'function getStats() view returns (uint256,uint256,uint256)',
+  'function symbolCount() view returns (uint256)',
 ]);
 
 const TRACK_RECORD_INTERFACE = new Interface([
-  'function getStats() view returns (uint256,uint256,uint256)',
+  'function totalTrades() view returns (uint256)',
+  'function totalCommitments() view returns (uint256)',
+  'function getWinRate() view returns (uint256)',
 ]);
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
@@ -68,24 +70,34 @@ async function getContractLastActivity(address: string): Promise<number | null> 
 }
 
 async function getOracleStats() {
-  const data = ORACLE_INTERFACE.encodeFunctionData('getStats');
+  const data = ORACLE_INTERFACE.encodeFunctionData('symbolCount');
   const raw = await rpcCall<string>('eth_call', [{ to: CONVICTION_ORACLE, data }, 'latest']);
-  const decoded = ORACLE_INTERFACE.decodeFunctionResult('getStats', raw);
-  return {
-    totalPredictions: decoded[0].toString(),
-    totalResolved: decoded[1].toString(),
-    totalCorrect: decoded[2].toString(),
-  };
+  const [count] = ORACLE_INTERFACE.decodeFunctionResult('symbolCount', raw);
+  return { symbolCount: count.toString() };
 }
 
 async function getTrackRecordStats() {
-  const data = TRACK_RECORD_INTERFACE.encodeFunctionData('getStats');
-  const raw = await rpcCall<string>('eth_call', [{ to: TRACK_RECORD, data }, 'latest']);
-  const decoded = TRACK_RECORD_INTERFACE.decodeFunctionResult('getStats', raw);
+  const [totalTradesRaw, totalCommitmentsRaw, winRateRaw] = await Promise.all([
+    rpcCall<string>('eth_call', [
+      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData('totalTrades') },
+      'latest',
+    ]),
+    rpcCall<string>('eth_call', [
+      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData('totalCommitments') },
+      'latest',
+    ]),
+    rpcCall<string>('eth_call', [
+      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData('getWinRate') },
+      'latest',
+    ]),
+  ]);
+  const [totalTrades] = TRACK_RECORD_INTERFACE.decodeFunctionResult('totalTrades', totalTradesRaw);
+  const [totalCommitments] = TRACK_RECORD_INTERFACE.decodeFunctionResult('totalCommitments', totalCommitmentsRaw);
+  const [winRate] = TRACK_RECORD_INTERFACE.decodeFunctionResult('getWinRate', winRateRaw);
   return {
-    totalCommitted: decoded[0].toString(),
-    totalRevealed: decoded[1].toString(),
-    totalTrades: decoded[2].toString(),
+    totalTrades: totalTrades.toString(),
+    totalCommitments: totalCommitments.toString(),
+    winRateBps: winRate.toString(), // contract returns basis points (0-10000)
   };
 }
 
@@ -100,14 +112,34 @@ async function getPricesFromIntel(baseUrl: string) {
     xlayer?: unknown;
     regime?: unknown;
   };
-  let prices: Array<{ symbol: string; price: number; change_24h_pct: number }> = [];
+  type NormalizedPrice = { symbol: string; price: number; change24h: number };
+  let prices: NormalizedPrice[] = [];
+
+  const normalize = (arr: unknown[]): NormalizedPrice[] =>
+    arr
+      .map((p) => {
+        const obj = p as Record<string, unknown>;
+        const sym = typeof obj.symbol === 'string' ? obj.symbol : null;
+        const price = typeof obj.price === 'number' ? obj.price : Number(obj.price);
+        // Accept both field names because bobby-intel returns change24h in
+        // data.prices but change_24h_pct inside the briefing text block
+        const rawChange =
+          (obj as { change24h?: unknown }).change24h ??
+          (obj as { change_24h_pct?: unknown }).change_24h_pct ??
+          0;
+        const change = typeof rawChange === 'number' ? rawChange : Number(rawChange);
+        if (!sym || !Number.isFinite(price)) return null;
+        return { symbol: sym, price, change24h: Number.isFinite(change) ? change : 0 };
+      })
+      .filter((p): p is NormalizedPrice => p !== null);
+
   if (Array.isArray(data.prices)) {
-    prices = data.prices as typeof prices;
+    prices = normalize(data.prices);
   } else if (data.briefing) {
     const match = data.briefing.match(/<LIVE_PRICES>\n(\[[\s\S]*?\])\n<\/LIVE_PRICES>/);
     if (match) {
       try {
-        prices = JSON.parse(match[1]);
+        prices = normalize(JSON.parse(match[1]));
       } catch {}
     }
   }
@@ -153,8 +185,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalVolumeOkb: '0',
       totalPayments: '0',
     }),
-    safe(getOracleStats, { totalPredictions: '0', totalResolved: '0', totalCorrect: '0' }),
-    safe(getTrackRecordStats, { totalCommitted: '0', totalRevealed: '0', totalTrades: '0' }),
+    safe(getOracleStats, { symbolCount: '0' }),
+    safe(getTrackRecordStats, { totalTrades: '0', totalCommitments: '0', winRateBps: '0' }),
     safe(readMinBounty, { minBountyWei: '0', minBountyOkb: '0' }),
     safe(readNextBountyId, 1),
     safe(() => listRecentBounties(6), []),
