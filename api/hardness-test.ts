@@ -39,6 +39,14 @@ async function callJson<T>(system: string, prompt: string): Promise<T> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      endpoint: 'POST /api/hardness-test',
+      description: 'Hardness-as-a-Service. Submit a prediction for adversarial stress-testing. Returns hardness score, dimensions, biases, and on-chain proof.',
+      usage: 'POST with JSON body: { prediction: { symbol, direction, entry, target, stop, thesis }, commitOnchain: boolean }',
+      docs: 'https://bobbyprotocol.xyz/protocol/console',
+    });
+  }
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

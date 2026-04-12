@@ -65,6 +65,15 @@ function determineAction(score: number): 'execute' | 'reduce_size' | 'paper_only
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      endpoint: 'POST /api/orchestrate',
+      description: 'Financial orchestration for AI agents. Submit a structured prediction, get it stress-tested through adversarial debate, scored on 6 dimensions, and proven on-chain.',
+      usage: 'POST with JSON body: { agent, prediction: { symbol, direction, entry, target, stop, thesis }, options: { runDebate, runJudge, commitOnchain } }',
+      docs: 'https://bobbyprotocol.xyz/protocol/console',
+      registry: '0x95D045b1488F0776419a0E09de4fc0687AbbAFbf',
+    });
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   const body = req.body as OrchestrateBody;
