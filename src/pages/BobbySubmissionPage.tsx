@@ -101,6 +101,18 @@ const judgeRows = [
     kind: 'internal',
     status: 'check live',
   },
+  {
+    label: 'Agent registry (machine-readable catalog)',
+    href: '/api/registry',
+    kind: 'internal',
+    status: 'check live',
+  },
+  {
+    label: 'Live activity feed',
+    href: '/api/activity',
+    kind: 'internal',
+    status: 'check live',
+  },
 ];
 
 function Panel({

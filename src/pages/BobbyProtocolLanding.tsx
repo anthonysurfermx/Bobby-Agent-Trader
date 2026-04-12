@@ -201,6 +201,34 @@ function usePnl() {
   return summary;
 }
 
+interface ActivityItem {
+  agent: string;
+  tool: string;
+  paid: boolean;
+  amountOkb: string | null;
+  txHash: string | null;
+  agoSeconds: number | null;
+  timestamp: string;
+}
+
+function useActivity() {
+  const [feed, setFeed] = useState<ActivityItem[]>([]);
+  useEffect(() => {
+    fetch('/api/activity?limit=10', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setFeed((j as { feed?: ActivityItem[] }).feed ?? []))
+      .catch(() => setFeed([]));
+    const t = setInterval(() => {
+      fetch('/api/activity?limit=10', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((j) => setFeed((j as { feed?: ActivityItem[] }).feed ?? []))
+        .catch(() => {});
+    }, 20_000);
+    return () => clearInterval(t);
+  }, []);
+  return feed;
+}
+
 // ---- Components ----
 
 function TopTicker({ stats }: { stats: ProtocolStats | null }) {
@@ -955,7 +983,6 @@ function McpSection({
   stats: ProtocolStats | null;
 }) {
   const freeTools = mcp?.pricing.free ?? [];
-  const paidTools = mcp?.pricing.premium.tools ?? [];
   const calls = stats?.contracts.agentEconomy.stats.totalMcpCalls ?? '—';
   const volume = stats?.contracts.agentEconomy.stats.totalVolumeOkb ?? '—';
 
@@ -1004,15 +1031,23 @@ function McpSection({
               <div className="font-bold text-[#fcc025] mb-3 text-xs uppercase tracking-tighter">
                 PAID_TIER — {mcp?.pricing.premium.price ?? '0.001 OKB'} / call
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 font-mono text-[10px]">
-                {paidTools.map((t) => (
+              <div className="space-y-2 font-mono text-[10px]">
+                {[
+                  { tool: 'bobby_analyze', flow: 'Alpha (thesis) → Red Team (attack) → CIO (verdict)' },
+                  { tool: 'bobby_debate', flow: 'Alpha (bull) → Red Team (bear) → CIO (synthesis)' },
+                  { tool: 'bobby_judge', flow: 'Data → Adversarial → Logic → Risk → Calibration → Novelty' },
+                  { tool: 'bobby_security_scan', flow: 'Contract scan → Liquidity check → Risk score' },
+                  { tool: 'bobby_wallet_portfolio', flow: 'Balances → DeFi positions → Risk assessment' },
+                ].map((t) => (
                   <div
-                    key={t}
-                    className="bg-black border border-[#fcc025]/20 px-2 py-1 text-[#fcc025]/90 truncate flex items-center gap-1"
-                    title={t}
+                    key={t.tool}
+                    className="bg-black border border-[#fcc025]/20 px-3 py-2"
                   >
-                    <span className="text-[#fcc025]">◉</span>
-                    {t}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[#fcc025]">◉ {t.tool}</span>
+                      <span className="text-[#fcc025]/60">0.001 OKB</span>
+                    </div>
+                    <div className="text-[#adaaaa] text-[9px]">{t.flow}</div>
                   </div>
                 ))}
               </div>
@@ -1124,6 +1159,133 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-http \\
   -H "Content-Type: application/json" \\
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_intel","arguments":{}},"id":"1"}'`}
           </pre>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TrustBadge({ stats }: { stats: ProtocolStats | null }) {
+  const winRateBps = stats ? Number(stats.contracts.trackRecord.stats.winRateBps) : 0;
+  const winRate = winRateBps / 100;
+  const mcpCalls = stats ? Number(stats.contracts.agentEconomy.stats.totalMcpCalls) : 0;
+  const bounties = stats ? stats.contracts.adversarialBounties.totalPosted : 0;
+  const verified = stats ? stats.contracts.adversarialBounties.verified : false;
+
+  const level =
+    winRate >= 60 ? { label: 'HIGH', color: '#6dfe9c' } :
+    winRate >= 40 ? { label: 'MODERATE', color: '#fcc025' } :
+    winRate > 0 ? { label: 'LOW', color: '#ff716a' } :
+    { label: 'UNRATED', color: '#adaaaa' };
+
+  return (
+    <section className="py-12 px-6 max-w-7xl mx-auto">
+      <div className="bg-[#131313] border border-[#494847]/15 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div
+              className="w-14 h-14 flex items-center justify-center border-2 font-mono text-lg font-bold"
+              style={{ color: level.color, borderColor: level.color, backgroundColor: `${level.color}15` }}
+            >
+              {level.label === 'UNRATED' ? '?' : winRate > 0 ? `${safeFixed(winRate, 0)}` : '—'}
+            </div>
+            <div>
+              <div className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest">
+                PROTOCOL_TRUST
+              </div>
+              <div className="font-bold text-lg uppercase" style={{ color: level.color }}>
+                {level.label}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-6 font-mono text-[10px]">
+            <div className="text-center">
+              <div className="text-[#adaaaa]">WIN_RATE</div>
+              <div className="text-xl font-bold" style={{ color: level.color }}>
+                {winRate > 0 ? `${safeFixed(winRate, 1)}%` : '—'}
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-[#adaaaa]">MCP_CALLS</div>
+              <div className="text-xl font-bold text-white">{mcpCalls}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[#adaaaa]">BOUNTIES</div>
+              <div className="text-xl font-bold text-white">{bounties}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[#adaaaa]">CONTRACTS</div>
+              <div className="text-xl font-bold text-[#6dfe9c]">
+                {verified ? '4 ✓' : '4'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
+  const fmtAgo = (secs: number | null) => {
+    if (secs === null) return '—';
+    if (secs < 60) return `${secs}s ago`;
+    if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+    if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+    return `${Math.floor(secs / 86400)}d ago`;
+  };
+
+  if (feed.length === 0) {
+    return (
+      <section className="py-12 px-6 max-w-7xl mx-auto">
+        <div className="bg-black border border-[#494847]/20">
+          <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
+            <span>activity_feed.log</span>
+            <span className="text-[#6dfe9c]">LIVE</span>
+          </div>
+          <div className="p-4 font-mono text-[11px] text-[#adaaaa] text-center">
+            Awaiting first agent interaction...
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="py-12 px-6 max-w-7xl mx-auto">
+      <div className="bg-black border border-[#494847]/20">
+        <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
+          <span>activity_feed.log</span>
+          <span className="text-[#6dfe9c] flex items-center gap-1">
+            <span className="w-1.5 h-1.5 bg-[#6dfe9c] rounded-full animate-pulse" />
+            LIVE · {feed.length} events
+          </span>
+        </div>
+        <div className="divide-y divide-[#494847]/10 max-h-[240px] overflow-y-auto">
+          {feed.map((e, i) => (
+            <div key={i} className="px-4 py-2 font-mono text-[11px] flex items-center gap-3">
+              <span className="text-[#adaaaa] w-14 shrink-0 text-right">{fmtAgo(e.agoSeconds)}</span>
+              <span className={e.paid ? 'text-[#fcc025]' : 'text-[#6dfe9c]'}>
+                {e.paid ? '$' : '::'}
+              </span>
+              <span className="text-white/60 truncate">{e.agent}</span>
+              <span className="text-[#adaaaa]">→</span>
+              <span className="text-[#6dfe9c]">{e.tool}</span>
+              {e.paid && e.amountOkb && (
+                <span className="text-[#fcc025] ml-auto shrink-0">{e.amountOkb} OKB</span>
+              )}
+              {e.txHash && (
+                <a
+                  href={`https://www.oklink.com/xlayer/tx/${e.txHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#6dfe9c]/40 hover:text-[#6dfe9c] shrink-0"
+                >
+                  ↗
+                </a>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </section>
@@ -1315,6 +1477,7 @@ export default function BobbyProtocolLanding() {
   const { data: stats, error, loading } = useProtocolStats();
   const mcp = useMcpMeta();
   const pnl = usePnl();
+  const activity = useActivity();
 
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white font-sans relative overflow-x-hidden">
@@ -1360,6 +1523,7 @@ export default function BobbyProtocolLanding() {
       )}
 
       <HeroLiveDebate stats={stats} />
+      <TrustBadge stats={stats} />
       <TradingRoom stats={stats} pnl={pnl} />
       <ClosedLoop />
       <JudgeMode stats={stats} />
@@ -1367,6 +1531,7 @@ export default function BobbyProtocolLanding() {
       <Bounties stats={stats} />
       <McpSection mcp={mcp} stats={stats} />
       <AgentInterop stats={stats} />
+      <ActivityFeed feed={activity} />
       <LiveOnXLayer stats={stats} />
       <Footer stats={stats} />
     </div>
