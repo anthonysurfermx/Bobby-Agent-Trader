@@ -11,6 +11,7 @@ import { canOpenPosition, getPositionSize } from '../src/lib/onchainos/risk-mana
 import type { TradeParams } from '../src/lib/onchainos/types.js';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bobby-technical.js';
 import { ethers } from 'ethers';
+import { recordHardnessActivity } from './_lib/hardness-registry';
 
 export const config = { maxDuration: 300 };
 
@@ -1202,6 +1203,24 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
             ]) as any;
             console.log(`[Cycle] On-chain commit: ${tx.hash}`);
 
+            try {
+              const hardnessProof = await recordHardnessActivity({
+                threadId,
+                symbol,
+                direction: (direction as 'long' | 'short' | 'neutral' | 'none') || 'none',
+                conviction: conviction ?? 0,
+                entryPrice: commitEntry,
+                targetPrice: targetPrice || commitEntry * 1.05,
+                stopPrice: stopPrice || commitEntry * 0.95,
+                shouldCommitPrediction: true,
+              });
+              if (hardnessProof) {
+                console.log(`[Cycle] Hardness proof: ${hardnessProof.commitTxHash || 'no-commit'} / ${hardnessProof.signalTxHash || 'no-signal'}`);
+              }
+            } catch (e: any) {
+              console.warn('[Cycle] HardnessRegistry sync failed (non-critical):', e.message);
+            }
+
             // Additional on-chain txs for "Most Active Agent" prize density:
             // 1. Publish conviction signal to ConvictionOracle
             const oracleAddr = process.env.BOBBY_ORACLE_ADDRESS;
@@ -1290,6 +1309,24 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
               new Promise((_, reject) => setTimeout(() => reject(new Error('Oracle TX timeout')), 8000)),
             ]) as any;
             console.log(`[Cycle] Oracle signal (no-trade): ${tx.hash}`);
+
+            try {
+              const hardnessProof = await recordHardnessActivity({
+                threadId,
+                symbol,
+                direction: (direction as 'long' | 'short' | 'neutral' | 'none') || 'none',
+                conviction: conviction ?? 0,
+                entryPrice: currentPrice,
+                targetPrice: currentPrice,
+                stopPrice: currentPrice,
+                shouldCommitPrediction: false,
+              });
+              if (hardnessProof) {
+                console.log(`[Cycle] Hardness signal (no-trade): ${hardnessProof.signalTxHash || 'no-signal'}`);
+              }
+            } catch (hardnessError: any) {
+              console.warn('[Cycle] Hardness no-trade signal failed (non-critical):', hardnessError.message);
+            }
           } catch (e: any) {
             console.warn('[Cycle] Oracle no-trade signal failed (non-critical):', e.message);
           }
