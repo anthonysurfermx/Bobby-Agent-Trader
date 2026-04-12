@@ -29,6 +29,16 @@ interface RegisterBody {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      endpoint: 'POST /api/agents/register',
+      description: 'Register an AI agent with Bobby\'s financial orchestration layer. Provides identity, capabilities, and risk policy.',
+      usage: 'POST with JSON body: { agentId, owner, name, type?, capabilities?, riskPolicy?: { minHardnessScore, maxNotionalUsd, allowedSymbols, requireJudge } }',
+      registry: '0x95D045b1488F0776419a0E09de4fc0687AbbAFbf',
+      stakeRequired: '0.01 OKB',
+      docs: 'https://bobbyprotocol.xyz/protocol/console',
+    });
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const body = req.body as RegisterBody;
