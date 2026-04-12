@@ -2,7 +2,7 @@ import { ethers } from 'ethers';
 
 const XLAYER_RPC = 'https://rpc.xlayer.tech';
 export const HARDNESS_REGISTRY_ADDRESS =
-  process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
+  process.env.HARDNESS_REGISTRY_ADDRESS || '0x95D045b1488F0776419a0E09de4fc0687AbbAFbf';
 
 const HARDNESS_REGISTRY_ABI = [
   'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, string metadataURI)',

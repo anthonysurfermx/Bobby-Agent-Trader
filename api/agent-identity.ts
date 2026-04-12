@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export const config = { maxDuration: 5 };
 
-const HARDNESS_REGISTRY = process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
+const HARDNESS_REGISTRY = process.env.HARDNESS_REGISTRY_ADDRESS || '0x95D045b1488F0776419a0E09de4fc0687AbbAFbf';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {

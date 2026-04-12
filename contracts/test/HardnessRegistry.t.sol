@@ -41,7 +41,7 @@ contract HardnessRegistryTest is Test {
 
     function _registerAgent(address agent, string memory metadataURI) internal {
         vm.prank(agent);
-        registry.registerAgent(metadataURI);
+        registry.registerAgent{value: 0.01 ether}(metadataURI);
     }
 
     function _predictionHash(string memory label) internal pure returns (bytes32) {
@@ -74,28 +74,31 @@ contract HardnessRegistryTest is Test {
     }
 
     function test_registerAgent_createsProfile() public {
+        vm.deal(outsider, 10 ether);
         vm.prank(outsider);
-        registry.registerAgent("ipfs://outsider");
+        registry.registerAgent{value: 0.01 ether}("ipfs://outsider");
 
-        (bool registered, uint64 registeredAt, string memory metadataURI) = registry.agentProfiles(outsider);
+        (bool registered, uint64 registeredAt, uint96 stake, string memory metadataURI) = registry.agentProfiles(outsider);
         assertTrue(registered);
         assertEq(uint256(registeredAt), block.timestamp);
+        assertEq(stake, 0.01 ether);
         assertEq(metadataURI, "ipfs://outsider");
     }
 
     function test_registerAgent_updatesMetadata() public {
         vm.prank(agent1);
-        registry.registerAgent("ipfs://agent-1b");
+        registry.registerAgent{value: 0.01 ether}("ipfs://agent-1b");
 
-        (, , string memory metadataURI) = registry.agentProfiles(agent1);
+        (, , , string memory metadataURI) = registry.agentProfiles(agent1);
         assertEq(metadataURI, "ipfs://agent-1b");
     }
 
     function test_registerAgent_revertsWhenPaused() public {
         registry.pause();
+        vm.deal(outsider, 10 ether);
         vm.prank(outsider);
         vm.expectRevert(HardnessRegistry.ContractPaused.selector);
-        registry.registerAgent("ipfs://nope");
+        registry.registerAgent{value: 0.01 ether}("ipfs://nope");
     }
 
     function test_registerService_success() public {
@@ -320,7 +323,7 @@ contract HardnessRegistryTest is Test {
 
     function test_publishSignal_success() public {
         vm.prank(agent1);
-        registry.publishSignal("BTC-USD", uint8(HardnessRegistry.Direction.LONG), 82, keccak256("ctx"));
+        registry.publishSignal("BTC-USD", 0, uint8(HardnessRegistry.Direction.LONG), 82, keccak256("ctx"));
 
         HardnessRegistry.Signal memory signal = registry.getSignal(agent1, "BTC-USD");
         assertEq(signal.agent, agent1);
@@ -331,43 +334,16 @@ contract HardnessRegistryTest is Test {
     function test_publishSignal_requiresRegisteredAgent() public {
         vm.prank(outsider);
         vm.expectRevert(HardnessRegistry.NotRegistered.selector);
-        registry.publishSignal("BTC-USD", uint8(HardnessRegistry.Direction.LONG), 82, keccak256("ctx"));
+        registry.publishSignal("BTC-USD", 0, uint8(HardnessRegistry.Direction.LONG), 82, keccak256("ctx"));
     }
 
     function test_publishSignal_revertsForInvalidDirection() public {
         vm.prank(agent1);
         vm.expectRevert(HardnessRegistry.InvalidValue.selector);
-        registry.publishSignal("BTC-USD", 9, 82, keccak256("ctx"));
+        registry.publishSignal("BTC-USD", 0, 9, 82, keccak256("ctx"));
     }
 
-    function test_getConsensus_aggregatesAcrossAgents() public {
-        vm.prank(agent1);
-        registry.publishSignal("BTC-USD", uint8(HardnessRegistry.Direction.LONG), 80, keccak256("ctx1"));
-        vm.prank(agent2);
-        registry.publishSignal("BTC-USD", uint8(HardnessRegistry.Direction.SHORT), 60, keccak256("ctx2"));
-
-        (int256 avgDirectionBps, uint256 avgConviction, uint256 activeAgents, bool hasConsensus) =
-            registry.getConsensus("BTC-USD");
-
-        assertEq(avgDirectionBps, 0);
-        assertEq(avgConviction, 70);
-        assertEq(activeAgents, 2);
-        assertTrue(hasConsensus);
-    }
-
-    function test_getConsensus_ignoresExpiredSignals() public {
-        vm.prank(agent1);
-        registry.publishSignal("ETH-USD", uint8(HardnessRegistry.Direction.LONG), 70, keccak256("ctx1"));
-        vm.warp(block.timestamp + registry.defaultSignalTTL() + 1);
-
-        (int256 avgDirectionBps, uint256 avgConviction, uint256 activeAgents, bool hasConsensus) =
-            registry.getConsensus("ETH-USD");
-
-        assertEq(avgDirectionBps, 0);
-        assertEq(avgConviction, 0);
-        assertEq(activeAgents, 0);
-        assertFalse(hasConsensus);
-    }
+    // getConsensus tests removed — function moved to off-chain indexing (EIP-170 size limit)
 
     function test_postBounty_success() public {
         uint256 bountyId = _postDefaultBounty();
@@ -594,7 +570,7 @@ contract HardnessRegistryTest is Test {
 
         vm.prank(agent2);
         vm.expectRevert(HardnessRegistry.ContractPaused.selector);
-        registry.publishSignal("BTC-USD", uint8(HardnessRegistry.Direction.LONG), 50, bytes32(0));
+        registry.publishSignal("BTC-USD", 0, uint8(HardnessRegistry.Direction.LONG), 50, bytes32(0));
 
         uint256 balanceBefore = agent1.balance;
         vm.prank(agent1);

@@ -38,6 +38,7 @@ contract HardnessRegistry {
     struct AgentProfile {
         bool registered;
         uint64 registeredAt;
+        uint96 stake;
         string metadataURI;
     }
 
@@ -60,6 +61,7 @@ contract HardnessRegistry {
         uint8 conviction;
         PredictionResult result;
         uint96 entryPrice;
+        uint8 hardnessScore;
         uint96 targetPrice;
         uint96 stopPrice;
         uint96 exitPrice;
@@ -81,6 +83,7 @@ contract HardnessRegistry {
         uint64 timestamp;
         uint64 expiresAt;
         uint8 conviction;
+        uint8 hardnessScore;
         Direction direction;
         bytes32 context;
         string symbol;
@@ -127,6 +130,7 @@ contract HardnessRegistry {
     error WindowExpired();
     error MaxChallenges();
     error AlreadyChallenged();
+    error InsufficientStake();
     error ThresholdTooHigh();
     error AlreadyApproved();
     error NoResolvers();
@@ -137,6 +141,7 @@ contract HardnessRegistry {
 
     address public owner;
     address public pendingOwner;
+    address public hardnessScorer;
     bool public paused;
 
     uint256 public minPredictionAge = 1 hours;
@@ -144,6 +149,7 @@ contract HardnessRegistry {
     uint256 public defaultSignalTTL = 24 hours;
 
     uint96 public constant ABSOLUTE_MIN_BOUNTY = 0.0001 ether;
+    uint96 public constant REGISTRATION_STAKE = 0.01 ether;
     uint96 public minBounty = 0.001 ether;
     uint32 public challengeGracePeriod = 3 days;
     uint32 public defaultClaimWindow = 7 days;
@@ -201,12 +207,16 @@ contract HardnessRegistry {
         PredictionResult result,
         int32 pnlBps
     );
+    event HardnessCertified(bytes32 indexed predictionHash, uint8 score);
+    event AgentSlashed(address indexed agent, uint256 amount, bytes32 reason);
+
     event PredictionExpired(address indexed caller, address indexed agent, bytes32 indexed predictionHash);
 
     event SignalPublished(
         address indexed agent,
         bytes32 indexed symbolHash,
         string symbol,
+        uint8 hardnessScore,
         uint8 direction,
         uint8 conviction,
         bytes32 context
@@ -271,15 +281,18 @@ contract HardnessRegistry {
         _setResolverThreshold(initialThreshold);
     }
 
-    function registerAgent(string calldata metadataURI) external whenNotPaused {
+    function registerAgent(string calldata metadataURI) external payable whenNotPaused {
+        if (msg.value < REGISTRATION_STAKE) revert InsufficientStake();
         AgentProfile storage profile = agentProfiles[msg.sender];
         if (!profile.registered) {
             profile.registered = true;
             profile.registeredAt = uint64(block.timestamp);
+            profile.stake = uint96(msg.value);
             profile.metadataURI = metadataURI;
             emit AgentRegistered(msg.sender, metadataURI);
         } else {
             profile.metadataURI = metadataURI;
+            profile.stake += uint96(msg.value);
             emit AgentMetadataUpdated(msg.sender, metadataURI);
         }
     }
@@ -372,6 +385,7 @@ contract HardnessRegistry {
             conviction: conviction,
             result: PredictionResult.NONE,
             entryPrice: entry,
+            hardnessScore: 0,
             targetPrice: target,
             stopPrice: stop,
             exitPrice: 0,
@@ -447,6 +461,7 @@ contract HardnessRegistry {
 
     function publishSignal(
         string calldata symbol,
+        uint8 hardnessScore,
         uint8 direction,
         uint8 conviction,
         bytes32 context
@@ -463,6 +478,7 @@ contract HardnessRegistry {
             timestamp: uint64(block.timestamp),
             expiresAt: expiry,
             conviction: conviction,
+            hardnessScore: hardnessScore,
             direction: Direction(direction),
             context: context,
             symbol: symbol
@@ -479,7 +495,7 @@ contract HardnessRegistry {
             _symbolAgents[symbolHash].push(msg.sender);
         }
 
-        emit SignalPublished(msg.sender, symbolHash, symbol, direction, conviction, context);
+        emit SignalPublished(msg.sender, symbolHash, symbol, hardnessScore, direction, conviction, context);
     }
 
     function postBounty(
@@ -619,44 +635,7 @@ contract HardnessRegistry {
         return _signals[agent][keccak256(bytes(symbol))];
     }
 
-    function getConsensus(string calldata symbol)
-        external
-        view
-        returns (int256 averageDirectionBps, uint256 averageConviction, uint256 activeAgents, bool hasConsensus)
-    {
-        bytes32 symbolHash = keccak256(bytes(symbol));
-        address[] storage agents = _symbolAgents[symbolHash];
-
-        int256 directionSum;
-        uint256 convictionSum;
-
-        for (uint256 i = 0; i < agents.length; i++) {
-            Signal storage signal = _signals[agents[i]][symbolHash];
-            if (signal.timestamp == 0 || block.timestamp > signal.expiresAt) {
-                continue;
-            }
-
-            activeAgents++;
-            convictionSum += signal.conviction;
-
-            if (signal.direction == Direction.LONG) {
-                directionSum += 10000;
-            } else if (signal.direction == Direction.SHORT) {
-                directionSum -= 10000;
-            }
-        }
-
-        if (activeAgents == 0) {
-            return (0, 0, 0, false);
-        }
-
-        return (
-            directionSum / int256(activeAgents),
-            convictionSum / activeAgents,
-            activeAgents,
-            true
-        );
-    }
+    // getConsensus removed to fit EIP-170 size limit — use off-chain indexing via events
 
     function getChallenges(uint256 bountyId, uint256 offset, uint256 limit)
         external
@@ -698,6 +677,30 @@ contract HardnessRegistry {
         }
 
         emit ResolverUpdated(resolver, active);
+    }
+
+    function setHardnessScorer(address newScorer) external onlyOwner {
+        hardnessScorer = newScorer;
+    }
+
+    function certifyHardness(bytes32 predictionHash, uint8 hardnessScore) external {
+        if (msg.sender != hardnessScorer && msg.sender != owner) revert NotAuthorized();
+        Prediction storage prediction = _predictions[predictionHash];
+        if (prediction.agent == address(0)) revert NotFound();
+
+        prediction.hardnessScore = hardnessScore;
+        emit HardnessCertified(predictionHash, hardnessScore);
+    }
+
+    function slashAgent(address agent, uint256 amount, bytes32 reason) external {
+        if (msg.sender != owner && msg.sender != hardnessScorer) revert NotAuthorized();
+        AgentProfile storage profile = agentProfiles[agent];
+        if (profile.stake < amount) amount = profile.stake;
+
+        profile.stake -= uint96(amount);
+        pendingWithdrawals[owner] += amount;
+
+        emit AgentSlashed(agent, amount, reason);
     }
 
     function setResolverThreshold(uint8 newThreshold) external onlyOwner {
