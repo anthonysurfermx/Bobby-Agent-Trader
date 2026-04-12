@@ -1,12 +1,15 @@
 {
   "lastSettlement": {
-    "status": "pending",
-    "taskId": "pending",
+    "status": "confirmed",
+    "taskId": "5a91fc4d-9075-0920-2ad7-c60376296037",
     "tool": "bobby_analyze",
     "amountOkb": "0.001",
     "chainId": 196,
-    "timestamp": "Awaiting first settlement",
-    "txHash": "",
-    "oklinkUrl": ""
+    "timestamp": "2026-04-12T09:45:00Z",
+    "txHash": "0x6593041ea93a338916dffdb3b203d034c240ec34fb2d04cbad2acbc7e7688fdf",
+    "oklinkUrl": "https://www.oklink.com/xlayer/tx/0x6593041ea93a338916dffdb3b203d034c240ec34fb2d04cbad2acbc7e7688fdf",
+    "blockNumber": 57237403,
+    "payer": "0xc3f836ec06a2202af23e59997a613ca0722f35d1",
+    "contract": "0xD9540D770C8aF67e9E6412C92D78E34bc11ED871"
   }
 }

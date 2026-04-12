@@ -251,6 +251,12 @@ export default function BobbySubmissionPage() {
                 MCP tools expose the system to other agents, and settlement happens on X Layer. This page is the fast
                 review surface for judges.
               </p>
+              <Link
+                to="/"
+                className="mt-4 inline-flex items-center gap-2 font-mono text-xs text-[#8CFFB4]/60 hover:text-[#8CFFB4] transition-colors"
+              >
+                ← Back to Protocol Landing
+              </Link>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">

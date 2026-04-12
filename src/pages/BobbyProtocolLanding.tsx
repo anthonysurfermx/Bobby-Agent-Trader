@@ -276,12 +276,20 @@ function Nav() {
           GITHUB
         </a>
       </div>
-      <a
-        href="/agentic-world/bobby"
-        className="bg-[#6dfe9c]/10 text-[#6dfe9c] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#6dfe9c]/30 hover:bg-[#6dfe9c]/20 transition-all"
-      >
-        _OPEN_TERMINAL
-      </a>
+      <div className="flex gap-3">
+        <a
+          href="/submission"
+          className="bg-[#fcc025]/10 text-[#fcc025] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#fcc025]/30 hover:bg-[#fcc025]/20 transition-all"
+        >
+          _SUBMISSION
+        </a>
+        <a
+          href="/agentic-world/bobby"
+          className="bg-[#6dfe9c]/10 text-[#6dfe9c] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#6dfe9c]/30 hover:bg-[#6dfe9c]/20 transition-all"
+        >
+          _OPEN_TERMINAL
+        </a>
+      </div>
     </nav>
   );
 }
@@ -1240,6 +1248,12 @@ function Footer({ stats }: { stats: ProtocolStats | null }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-6">
+          <a
+            className="text-[#fcc025] hover:text-[#fcc025] font-mono text-[11px] uppercase font-bold"
+            href="/submission"
+          >
+            SUBMISSION
+          </a>
           <a
             className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] font-mono text-[11px] uppercase"
             href="https://github.com/anthonysurfermx/Bobby-Agent-Trader"
