@@ -18,6 +18,7 @@ import UserLayout from '@/pages/user/UserLayout';
 // Lazy load todas las páginas para mejor performance
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazy(() => import('@/pages/BobbyProtocolLanding'));
+const BobbySubmissionPage = lazy(() => import('@/pages/BobbySubmissionPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
 const StartupDetailPage = lazy(() => import('@/pages/StartupDetailPage'));
@@ -581,6 +582,15 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyB2BPage />
+            </Suspense>
+          ),
+        },
+
+        {
+          path: 'submission',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbySubmissionPage />
             </Suspense>
           ),
         },

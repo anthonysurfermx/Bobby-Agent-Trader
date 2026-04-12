@@ -251,7 +251,7 @@ function TopTicker({ stats }: { stats: ProtocolStats | null }) {
 }
 
 function Nav() {
-  const sections = ['DEBATE', 'JUDGE', 'BOUNTIES', 'MCP', 'CONTRACTS'];
+  const sections = ['DEBATE', 'LOOP', 'JUDGE', 'WHY', 'BOUNTIES', 'MCP', 'CONTRACTS'];
   return (
     <nav className="sticky top-8 w-full flex justify-between items-center px-6 py-4 bg-[#0e0e0e]/80 backdrop-blur-xl z-50 border-b border-[#494847]/15">
       <div className="text-xl font-black text-[#6dfe9c] tracking-tighter uppercase">
@@ -565,6 +565,83 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
   );
 }
 
+function ClosedLoop() {
+  const steps = [
+    {
+      title: 'THESIS',
+      desc: 'Alpha Hunter proposes the opportunity and frames the trade.',
+      color: '#6dfe9c',
+    },
+    {
+      title: 'DEBATE',
+      desc: 'Red Team attacks the thesis before trust compounds.',
+      color: '#fcc025',
+    },
+    {
+      title: 'JUDGE',
+      desc: 'Judge Mode scores data, adversarial quality, logic, risk, calibration, and novelty.',
+      color: '#ff716a',
+    },
+    {
+      title: 'EXECUTE_OR_PASS',
+      desc: 'CIO decides whether to execute, reduce, or reject the idea.',
+      color: '#6dfe9c',
+    },
+    {
+      title: 'BOUNTY_WINDOW',
+      desc: 'Any challenger can post an OKB bounty against the debate dimension that failed.',
+      color: '#fcc025',
+    },
+    {
+      title: 'SETTLE_ON_XLAYER',
+      desc: 'Track Record and protocol rails make the result public and auditable on chain 196.',
+      color: '#6dfe9c',
+    },
+  ];
+
+  return (
+    <section id="loop" className="py-24 px-6 max-w-7xl mx-auto">
+      <div className="mb-10">
+        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4 border-l-4 border-[#fcc025] pl-6">
+          Closed Loop Protocol
+        </h2>
+        <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest pl-6">
+          Thesis → Debate → Judge → Execute or Pass → Bounty Window → Settle on X Layer
+        </p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-6">
+        {steps.map((step, index) => (
+          <motion.div
+            key={step.title}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: index * 0.05 }}
+            className="relative bg-[#131313] border border-[#494847]/15 p-5 min-h-[190px] hover:border-[#6dfe9c]/30 transition-all"
+          >
+            <div
+              className="mb-4 inline-flex h-9 w-9 items-center justify-center border font-mono text-sm font-bold"
+              style={{ color: step.color, borderColor: `${step.color}55`, backgroundColor: `${step.color}14` }}
+            >
+              {index + 1}
+            </div>
+            <h3 className="font-mono text-[11px] uppercase tracking-widest mb-3" style={{ color: step.color }}>
+              {step.title}
+            </h3>
+            <p className="text-sm leading-6 text-[#adaaaa]">{step.desc}</p>
+            {index < steps.length - 1 && (
+              <div className="hidden lg:block absolute -right-2 top-9 text-[#6dfe9c]/45 font-mono text-lg">
+                →
+              </div>
+            )}
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
   const oracle = stats?.contracts.convictionOracle.stats;
   const tr = stats?.contracts.trackRecord.stats;
@@ -678,9 +755,105 @@ function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
   );
 }
 
+function WhyMatters() {
+  const cases = [
+    {
+      dimension: 'DATA_INTEGRITY',
+      risk: 'AI agents hallucinate on low-liquidity tokens and stale market reads.',
+      outcome: 'Bounty against data integrity if the thesis was built on broken inputs.',
+    },
+    {
+      dimension: 'CALIBRATION_ALIGNMENT',
+      risk: 'Cherry-picked backtests can make weak systems look invincible.',
+      outcome: 'Challenge the confidence score when conviction outruns actual edge.',
+    },
+    {
+      dimension: 'RISK_MANAGEMENT',
+      risk: 'Whale manipulation can slip through naive risk gates and nuke a strategy.',
+      outcome: 'Post a bounty when downside controls fail under stress.',
+    },
+    {
+      dimension: 'ADVERSARIAL_QUALITY',
+      risk: 'If no one attacks the thesis hard enough, the product becomes a hype machine.',
+      outcome: 'Reward challengers who prove the debate did not pressure-test the idea.',
+    },
+    {
+      dimension: 'NOVELTY',
+      risk: 'Copy-trading groupthink creates consensus without original insight.',
+      outcome: 'Use bounties to penalize recycled theses disguised as intelligence.',
+    },
+    {
+      dimension: 'DECISION_LOGIC',
+      risk: 'Overfit logic can sound persuasive while still being structurally wrong.',
+      outcome: 'Challenge the decision path itself, not just the final trade result.',
+    },
+  ];
+
+  return (
+    <section id="why" className="py-24 px-6 bg-[#131313] border-y border-[#494847]/15">
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-10">
+          <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4">
+            Why Adversarial Trading Matters
+          </h2>
+          <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest">
+            Bobby is not useful because it predicts. Bobby is useful because it can be challenged.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {cases.map((item, index) => (
+            <motion.div
+              key={item.dimension}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.05 }}
+              className="bg-black border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all"
+            >
+              <div className={`font-mono text-[10px] uppercase tracking-widest mb-3 ${DIMENSION_COLOR[item.dimension] ?? 'text-white'}`}>
+                {item.dimension}
+              </div>
+              <p className="text-sm leading-6 text-white/80 mb-4">{item.risk}</p>
+              <div className="border-t border-[#494847]/15 pt-4 font-mono text-[11px] leading-6 text-[#adaaaa]">
+                {item.outcome}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Bounties({ stats }: { stats: ProtocolStats | null }) {
   const bounties = stats?.bounties ?? [];
   const bountiesContract = stats?.contracts.adversarialBounties;
+  const dimensionCards = useMemo(() => {
+    const base = [
+      'DATA_INTEGRITY',
+      'ADVERSARIAL_QUALITY',
+      'DECISION_LOGIC',
+      'RISK_MANAGEMENT',
+      'CALIBRATION_ALIGNMENT',
+      'NOVELTY',
+    ];
+
+    return base.map((dimension) => {
+      const entries = bounties.filter((b) => b.dimension === dimension);
+      const total = entries.reduce((sum, b) => sum + Number(b.rewardOkb || 0), 0);
+      const avgReward = entries.length ? total / entries.length : null;
+      return {
+        dimension,
+        count: entries.length,
+        avgReward,
+        hardest:
+          entries.length > 0
+            ? `${Math.max(...entries.map((b) => Number(b.rewardOkb || 0))).toFixed(4)} OKB`
+            : 'Awaiting first challenger',
+      };
+    });
+  }, [bounties]);
 
   return (
     <section id="bounties" className="py-24 px-6 max-w-7xl mx-auto">
@@ -711,13 +884,61 @@ function Bounties({ stats }: { stats: ProtocolStats | null }) {
         </a>
       </div>
 
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
+        {dimensionCards.map((card) => (
+          <div
+            key={card.dimension}
+            className="bg-[#131313] border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all"
+          >
+            <div className={`font-mono text-[10px] uppercase tracking-widest mb-4 ${DIMENSION_COLOR[card.dimension] ?? 'text-white'}`}>
+              {card.dimension}
+            </div>
+            <div className="grid grid-cols-2 gap-4 font-mono text-[10px] mb-4">
+              <div>
+                <div className="text-[#adaaaa]">OPEN_BOUNTIES</div>
+                <div className="text-xl text-white">{card.count}</div>
+              </div>
+              <div>
+                <div className="text-[#adaaaa]">AVG_REWARD</div>
+                <div className="text-xl text-[#6dfe9c]">
+                  {card.avgReward === null ? '—' : `${card.avgReward.toFixed(4)} OKB`}
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-[#494847]/15 pt-4 font-mono text-[11px] leading-6">
+              <div className="flex justify-between">
+                <span className="text-[#adaaaa]">HARDEST_TO_WIN</span>
+                <span className="text-[#fcc025]">{card.hardest}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#adaaaa]">RESOLVER</span>
+                <span className="text-white">JUDGE_MODE</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {bounties.length === 0 ? (
         <div className="bg-[#131313] border border-[#494847]/20 p-8 text-center font-mono text-xs text-[#adaaaa]">
-          <div className="text-[#6dfe9c] mb-2">NO_OPEN_BOUNTIES</div>
-          <p className="max-w-md mx-auto">
-            The bounty contract is live and verified on X Layer. Be the first
-            to post an OKB bounty against a Bobby debate thread.
+          <div className="text-[#6dfe9c] mb-2 text-sm">Awaiting first challenger</div>
+          <p className="max-w-md mx-auto mb-4 leading-6">
+            The bounty contract is live and verified on X Layer. The next open
+            debate can become the first real challenge market.
           </p>
+          <div className="flex flex-col items-center gap-4">
+            <a
+              href={`https://www.oklink.com/xlayer/address/${bountiesContract?.address ?? ''}`}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-[#6dfe9c] text-[#005f2e] px-5 py-2 font-bold uppercase text-[11px] tracking-tighter hover:brightness-110"
+            >
+              Be the first to post a bounty
+            </a>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-[#fcc025]">
+              cycle_time ~ 12s · contract live · chain 196
+            </div>
+          </div>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1105,7 +1326,9 @@ export default function BobbyProtocolLanding() {
 
       <HeroLiveDebate stats={stats} />
       <TradingRoom stats={stats} pnl={pnl} />
+      <ClosedLoop />
       <JudgeMode stats={stats} />
+      <WhyMatters />
       <Bounties stats={stats} />
       <McpSection mcp={mcp} stats={stats} />
       <LiveOnXLayer stats={stats} />

@@ -1,0 +1,12 @@
+{
+  "lastSettlement": {
+    "status": "pending",
+    "taskId": "pending",
+    "tool": "bobby_analyze",
+    "amountOkb": "0.001",
+    "chainId": 196,
+    "timestamp": "Awaiting first settlement",
+    "txHash": "",
+    "oklinkUrl": ""
+  }
+}
