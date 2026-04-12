@@ -113,6 +113,12 @@ const judgeRows = [
     kind: 'internal',
     status: 'check live',
   },
+  {
+    label: 'Sentinel agent demo (agent-to-agent MCP)',
+    href: '/api/sentinel-demo',
+    kind: 'internal',
+    status: 'check live',
+  },
 ];
 
 function Panel({
