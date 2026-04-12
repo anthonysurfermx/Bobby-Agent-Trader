@@ -72,6 +72,7 @@ const BobbyMetacognitionPage = lazy(() => import('@/pages/BobbyMetacognitionPage
 const BobbySignalsPage = lazy(() => import('@/pages/BobbySignalsPage'));
 const BobbyDocsPage = lazy(() => import('@/pages/BobbyDocsPage'));
 const BobbyMarketplacePage = lazy(() => import('@/pages/BobbyMarketplacePage'));
+const BobbyHeartbeatPage = lazy(() => import('@/pages/BobbyHeartbeatPage'));
 
 
 // Auth pages
@@ -285,6 +286,14 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyProtocolLanding />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'protocol/heartbeat',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyHeartbeatPage />
             </Suspense>
           ),
         },

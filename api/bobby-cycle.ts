@@ -755,11 +755,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ============================================================
     // PHASE 1: Freeze market snapshot
     // ============================================================
-    const [intel, positions, track, corrections] = await Promise.all([
+    const [intel, positions, track, corrections, smartMoney] = await Promise.all([
       fetchIntel(),
       fetchPositions(okxMode),
       getTrackRecord(),
       getRecentContradictions(),
+      fetch('https://defimexico.org/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5')
+        .then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
 
     const testState = body.testState as {
@@ -849,7 +851,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const technicalPulse = intel.technicalPulse as TechnicalMarketSummary | undefined;
     const indicatorBlock = formatTechnicalPulseBlock(technicalPulse);
 
-    const contextBlock = `${intel.briefing}${indicatorBlock}${memoryBlock}${positionsBlock}`;
+    // Smart money leaderboard block (OKX OnchainOS address analysis)
+    const smartMoneyBlock = smartMoney?.ok && Array.isArray(smartMoney.leaderboard) && smartMoney.leaderboard.length > 0
+      ? `\n<SMART_MONEY_LEADERBOARD source="OKX OnchainOS">\n${
+          smartMoney.leaderboard.slice(0, 5).map((w: any, i: number) =>
+            `${i + 1}. ${w.walletType} | ${w.tokenSymbol} | $${(w.amountUsd / 1000).toFixed(0)}K${w.pnl ? ` | PnL $${w.pnl.toFixed(0)}` : ''}${w.winRate ? ` | WR ${(w.winRate * 100).toFixed(0)}%` : ''} | ${w.address.slice(0, 10)}...`
+          ).join('\n')
+        }\n</SMART_MONEY_LEADERBOARD>`
+      : '';
+
+    const contextBlock = `${intel.briefing}${indicatorBlock}${smartMoneyBlock}${memoryBlock}${positionsBlock}`;
 
     let alphaPost: string;
     let redPost: string;
@@ -1189,6 +1200,57 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
               new Promise((_, reject) => setTimeout(() => reject(new Error('TX timeout 8s')), 8000)),
             ]) as any;
             console.log(`[Cycle] On-chain commit: ${tx.hash}`);
+
+            // Additional on-chain txs for "Most Active Agent" prize density:
+            // 1. Publish conviction signal to ConvictionOracle
+            const oracleAddr = process.env.BOBBY_ORACLE_ADDRESS;
+            if (oracleAddr && direction) {
+              try {
+                const oracleIface = new ethers.Interface([
+                  'function publishSignal((string symbol, uint8 direction, uint8 conviction, uint8 agent, uint96 entryPrice, uint96 targetPrice, uint96 stopPrice, bytes32 debateHash, uint256 ttl))',
+                ]);
+                const dirNum = direction === 'long' ? 1 : direction === 'short' ? 2 : 0;
+                const oracleTx = await Promise.race([
+                  wallet.sendTransaction({
+                    to: oracleAddr,
+                    data: oracleIface.encodeFunctionData('publishSignal', [[
+                      symbol, dirNum, convInt, 0,
+                      BigInt(Math.round(commitEntry * 1e8)),
+                      BigInt(Math.round((targetPrice || commitEntry * 1.05) * 1e8)),
+                      BigInt(Math.round((stopPrice || commitEntry * 0.95) * 1e8)),
+                      debateHash, BigInt(86400),
+                    ]]),
+                    gasLimit: 200000n,
+                  }),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('Oracle TX timeout')), 8000)),
+                ]) as any;
+                console.log(`[Cycle] Oracle signal published: ${oracleTx.hash}`);
+              } catch (e: any) {
+                console.warn('[Cycle] Oracle publish failed (non-critical):', e.message);
+              }
+            }
+
+            // 2. Pay debate fee to AgentEconomy (Alpha + Red Team compensation)
+            const economyAddr = process.env.BOBBY_ECONOMY_ADDRESS;
+            if (economyAddr) {
+              try {
+                const econIface = new ethers.Interface([
+                  'function payDebateFee(bytes32 debateHash) payable',
+                ]);
+                const econTx = await Promise.race([
+                  wallet.sendTransaction({
+                    to: economyAddr,
+                    data: econIface.encodeFunctionData('payDebateFee', [debateHash]),
+                    value: ethers.parseEther('0.0002'), // 0.0001 per agent × 2
+                    gasLimit: 150000n,
+                  }),
+                  new Promise((_, reject) => setTimeout(() => reject(new Error('Economy TX timeout')), 8000)),
+                ]) as any;
+                console.log(`[Cycle] Debate fee paid: ${econTx.hash}`);
+              } catch (e: any) {
+                console.warn('[Cycle] Debate fee payment failed (non-critical):', e.message);
+              }
+            }
           } catch (e: any) {
             console.warn('[Cycle] On-chain commit failed (non-critical):', e.message);
           }

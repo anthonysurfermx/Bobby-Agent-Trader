@@ -1219,6 +1219,15 @@ function TrustBadge({ stats }: { stats: ProtocolStats | null }) {
                 {verified ? '4 ✓' : '4'}
               </div>
             </div>
+            <a
+              href="/protocol/heartbeat"
+              className="flex items-center gap-2 border border-[#6dfe9c]/30 px-4 py-2 hover:bg-[#6dfe9c]/10 transition-all"
+            >
+              <div className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse" />
+              <span className="font-mono text-[10px] text-[#6dfe9c] uppercase tracking-wider">
+                LIVE HEARTBEAT
+              </span>
+            </a>
           </div>
         </div>
       </div>
@@ -1436,6 +1445,12 @@ function Footer({ stats }: { stats: ProtocolStats | null }) {
             href="/submission"
           >
             SUBMISSION
+          </a>
+          <a
+            className="text-[#6dfe9c] hover:text-[#6dfe9c] font-mono text-[11px] uppercase font-bold animate-pulse"
+            href="/protocol/heartbeat"
+          >
+            HEARTBEAT
           </a>
           <a
             className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] font-mono text-[11px] uppercase"
