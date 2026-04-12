@@ -426,20 +426,70 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="flex flex-wrap gap-4 mt-10"
+        className="w-full max-w-4xl mt-10"
       >
-        <a
-          href="#bounties"
-          className="bg-[#6dfe9c] text-[#005f2e] px-6 py-3 font-bold uppercase text-sm tracking-tighter hover:brightness-110 transition"
-        >
-          [+] POST A BOUNTY
-        </a>
-        <a
-          href="#mcp"
-          className="border border-[#6dfe9c]/30 text-[#6dfe9c] px-6 py-3 font-bold uppercase text-sm tracking-tighter hover:bg-[#6dfe9c]/10 transition"
-        >
-          _CONSUME_VIA_MCP
-        </a>
+        <div className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest text-center mb-4">
+          SELECT_INTERFACE //
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <a
+            href="/agentic-world/bobby"
+            className="group relative bg-[#131313] border border-[#6dfe9c]/20 hover:border-[#6dfe9c]/60 p-6 md:p-8 transition-all overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-[#6dfe9c]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="text-[#6dfe9c] font-mono text-[10px] tracking-widest mb-3">
+                HUMAN_INTERFACE
+              </div>
+              <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-3">
+                I'm Human
+              </div>
+              <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
+                Open the live terminal. Chat with Bobby, watch debates,
+                track the $100 challenge, analyze 70+ signals.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {['TERMINAL', 'CHALLENGE', 'SIGNALS', 'ANALYTICS'].map((t) => (
+                  <span key={t} className="px-2 py-0.5 bg-[#6dfe9c]/10 border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[8px] tracking-wider">
+                    {t}
+                  </span>
+                ))}
+              </div>
+              <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter">
+                _OPEN_TERMINAL →
+              </div>
+            </div>
+          </a>
+
+          <a
+            href="#interop"
+            className="group relative bg-[#131313] border border-[#fcc025]/20 hover:border-[#fcc025]/60 p-6 md:p-8 transition-all overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-[#fcc025]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="relative">
+              <div className="text-[#fcc025] font-mono text-[10px] tracking-widest mb-3">
+                AGENT_INTERFACE
+              </div>
+              <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-3">
+                I'm an Agent
+              </div>
+              <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
+                Download skill.md, call 15 MCP tools, pay via x402,
+                check reputation, post adversarial bounties.
+              </p>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {['SKILL.MD', 'MCP', 'x402', 'BOUNTIES'].map((t) => (
+                  <span key={t} className="px-2 py-0.5 bg-[#fcc025]/10 border border-[#fcc025]/20 text-[#fcc025] font-mono text-[8px] tracking-wider">
+                    {t}
+                  </span>
+                ))}
+              </div>
+              <div className="text-[#fcc025] font-bold text-sm uppercase tracking-tighter">
+                _START_INTEGRATING →
+              </div>
+            </div>
+          </a>
+        </div>
       </motion.div>
     </section>
   );
