@@ -1897,6 +1897,142 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
     }
 
     // ============================================================
+    // PHASE 7b: Moltbook Auto-Post (Build X hackathon visibility)
+    // Fire-and-forget — posts cycle results to m/buildx
+    // ============================================================
+    const MOLTBOOK_KEY = process.env.MOLTBOOK_API_KEY;
+    if (MOLTBOOK_KEY && threadId && !isDryRun) {
+      (async () => {
+        try {
+          const convStr = conviction !== null ? Math.round(conviction * 10) : 0;
+          const actionStr = executionResult
+            ? `EXECUTED ${direction?.toUpperCase()} ${symbol} @ $${entryPrice}`
+            : `NO TRADE — ${tradeRejectedReason || 'conviction too low'}`;
+          const txStr = txHash
+            ? `On-chain: [${txHash.slice(0, 14)}...](https://www.oklink.com/xlayer/tx/${txHash})`
+            : 'No on-chain commit this cycle';
+
+          const moltContent = `Bobby Protocol — Cycle Update
+
+**${digestSymbol}** | ${digestDirection?.toUpperCase()} | Conviction: ${convStr}/10
+${actionStr}
+
+Regime: ${intel.regime || 'unknown'} | Win Rate: ${track.winRate}%
+${vibePhrase ? `> ${vibePhrase}` : ''}
+
+${txStr}
+Balance: $${finalBalanceStr || '?'} | Positions: ${effectivePositions.length}
+
+Wallet: 0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea
+MCP: https://bobbyprotocol.xyz/api/mcp-http
+Heartbeat: https://bobbyprotocol.xyz/protocol/heartbeat`;
+
+          const postRes = await fetch('https://www.moltbook.com/api/v1/posts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${MOLTBOOK_KEY}`,
+            },
+            body: JSON.stringify({
+              submolt_name: 'buildx',
+              title: `Bobby cycle: ${convStr}/10 ${digestSymbol} ${digestDirection} | ${executionResult ? 'EXECUTED' : 'SKIP'}`,
+              content: moltContent,
+            }),
+          });
+
+          if (postRes.ok) {
+            const postData = await postRes.json() as Record<string, unknown>;
+            const verification = (postData.post as Record<string, unknown>)?.verification as Record<string, unknown> | undefined;
+
+            // Auto-solve verification challenge if present
+            if (verification?.challenge_text && verification?.verification_code) {
+              const challengeText = String(verification.challenge_text);
+              // Extract numbers from obfuscated text
+              const cleaned = challengeText.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, ' ').toLowerCase();
+              // Try to parse basic math (addition/subtraction)
+              const numberWords: Record<string, number> = {
+                zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
+                six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+                eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+                sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+                thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+                hundred: 100, thousand: 1000,
+              };
+
+              // Simple number extraction from cleaned text
+              const words = cleaned.split(' ');
+              const numbers: number[] = [];
+              let currentNum = 0;
+              let hasNum = false;
+              for (const word of words) {
+                if (numberWords[word] !== undefined) {
+                  const val = numberWords[word];
+                  if (val === 100) {
+                    currentNum = (currentNum || 1) * 100;
+                  } else if (val === 1000) {
+                    currentNum = (currentNum || 1) * 1000;
+                  } else if (val >= 20 && val <= 90) {
+                    currentNum += val;
+                  } else {
+                    if (hasNum && currentNum > 0 && val < 10) {
+                      currentNum += val;
+                    } else if (currentNum > 0 && val >= 10) {
+                      numbers.push(currentNum);
+                      currentNum = val;
+                    } else {
+                      currentNum += val;
+                    }
+                  }
+                  hasNum = true;
+                } else if (hasNum && (word === 'and' || word === 'adds' || word === 'plus' || word === 'with')) {
+                  if (currentNum > 0) { numbers.push(currentNum); currentNum = 0; }
+                } else if (hasNum && (word === 'minus' || word === 'subtract' || word === 'less' || word === 'slows')) {
+                  if (currentNum > 0) { numbers.push(currentNum); currentNum = 0; }
+                  numbers.push(-1); // flag for subtraction
+                } else if (/^\d+$/.test(word)) {
+                  currentNum += parseInt(word);
+                  hasNum = true;
+                }
+              }
+              if (currentNum > 0) numbers.push(currentNum);
+
+              // Compute result — handle add/subtract flags
+              let result = 0;
+              let subtract = false;
+              for (const n of numbers) {
+                if (n === -1) { subtract = true; continue; }
+                if (subtract) { result -= n; subtract = false; }
+                else { result += n; }
+              }
+
+              if (numbers.length > 0 && numbers.some(n => n > 0)) {
+                const answer = result.toFixed(2);
+                await fetch('https://www.moltbook.com/api/v1/verify', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${MOLTBOOK_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    verification_code: String(verification.verification_code),
+                    answer,
+                  }),
+                });
+                console.log(`[Cycle] Moltbook post verified (answer: ${answer})`);
+              } else {
+                console.warn('[Cycle] Could not solve Moltbook verification challenge');
+              }
+            }
+
+            console.log(`[Cycle] Moltbook update posted to m/buildx`);
+          }
+        } catch (e: any) {
+          console.warn('[Cycle] Moltbook post failed (non-critical):', e.message);
+        }
+      })();
+    }
+
+    // ============================================================
     // PHASE 7: Debate Quality Scoring (Metacognition Upgrade D)
     // AWAITED — fire-and-forget dies on Vercel when response is sent.
     // Haiku takes ~2-3s, acceptable overhead for real data.

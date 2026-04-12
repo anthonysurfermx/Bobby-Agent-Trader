@@ -766,41 +766,73 @@ function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
 }
 
 function WhyMatters() {
-  const cases = [
-    { dimension: 'DATA_INTEGRITY', glyph: '{!}', risk: 'Hallucinated data on thin-liquidity tokens' },
-    { dimension: 'CALIBRATION_ALIGNMENT', glyph: '~=', risk: 'Cherry-picked backtests mask weak edge' },
-    { dimension: 'RISK_MANAGEMENT', glyph: '/!\\', risk: 'Whale manipulation slips through risk gates' },
-    { dimension: 'ADVERSARIAL_QUALITY', glyph: '><', risk: 'Unchallenged theses become hype machines' },
-    { dimension: 'NOVELTY', glyph: '[=]', risk: 'Copy-trading groupthink without original insight' },
-    { dimension: 'DECISION_LOGIC', glyph: '?->', risk: 'Overfit logic sounds right but breaks in prod' },
+  const pillars = [
+    {
+      glyph: '////',
+      label: 'WHAT IS HARDNESS',
+      color: 'text-[#6dfe9c]',
+      borderHover: 'hover:border-[#6dfe9c]/30',
+      body: 'In materials science, hardness is resistance to deformation under force. Bobby applies the same principle to trading: every thesis is stress-tested under adversarial pressure before execution.',
+    },
+    {
+      glyph: '!ERR',
+      label: 'THE PROBLEM',
+      color: 'text-[#fcc025]',
+      borderHover: 'hover:border-[#fcc025]/30',
+      body: 'AI agents execute billions in trades with zero accountability. No challenge. No debate. No record. Soft decisions produce hard losses.',
+    },
+    {
+      glyph: '>>>=',
+      label: 'HOW BOBBY HARDENS',
+      color: 'text-white',
+      borderHover: 'hover:border-white/20',
+      body: '3 agents attack from different angles. A Judge grades the debate. Anyone can stake OKB to prove the decision was wrong. What survives is conviction — tested, scored, and recorded on-chain.',
+    },
+    {
+      glyph: '[MCP]',
+      label: 'PLUG IN ANYWHERE',
+      color: 'text-[#6dfe9c]',
+      borderHover: 'hover:border-[#6dfe9c]/30',
+      body: 'Any DEX, CEX, protocol, or autonomous agent can plug into Bobby\'s MCP. One integration adds a hardness layer to every trade your system touches.',
+    },
   ];
 
   return (
     <section id="why" className="py-24 px-6 bg-[#131313] border-y border-[#494847]/15">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-10">
-          Why Adversarial Trading Matters
-        </h2>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mb-12"
+        >
+          <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4">
+            The Hardness Layer
+          </h2>
+          <p className="font-mono text-sm text-[#6dfe9c] tracking-wide max-w-3xl">
+            Bobby is the hardness layer for on-chain trading. Before any agent executes, Bobby subjects the thesis to adversarial pressure.
+          </p>
+        </motion.div>
 
-        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {cases.map((item, index) => (
+        <div className="grid md:grid-cols-2 gap-4">
+          {pillars.map((item, index) => (
             <motion.div
-              key={item.dimension}
+              key={item.label}
               initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: index * 0.05 }}
-              className="bg-black border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all"
+              transition={{ delay: index * 0.07 }}
+              className={`bg-black border border-[#494847]/15 p-6 ${item.borderHover} transition-all`}
             >
-              <div className="flex items-center gap-3 mb-3">
-                <span className={`font-mono text-xl font-bold ${DIMENSION_COLOR[item.dimension] ?? 'text-white'}`}>
+              <div className="flex items-center gap-3 mb-4">
+                <span className={`font-mono text-lg font-bold ${item.color}`}>
                   {item.glyph}
                 </span>
-                <span className={`font-mono text-[10px] uppercase tracking-widest ${DIMENSION_COLOR[item.dimension] ?? 'text-white'}`}>
-                  {item.dimension}
+                <span className={`font-mono text-[10px] uppercase tracking-widest ${item.color}`}>
+                  {item.label}
                 </span>
               </div>
-              <p className="text-sm leading-6 text-[#adaaaa]">{item.risk}</p>
+              <p className="text-sm leading-6 text-[#adaaaa]">{item.body}</p>
             </motion.div>
           ))}
         </div>
