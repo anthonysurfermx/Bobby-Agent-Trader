@@ -100,9 +100,30 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
   }
 
   if (name === 'bobby_intel') {
-    const res = await fetch(`${BASE_URL}/api/bobby-intel`);
-    const data = await res.json();
-    return { content: [{ type: 'text', text: data.briefing }] };
+    const [intelRes, leaderboardRes] = await Promise.all([
+      fetch(`${BASE_URL}/api/bobby-intel`),
+      fetch(`${BASE_URL}/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5`),
+    ]);
+    const intelData = await intelRes.json();
+    let text = intelData.briefing;
+
+    try {
+      const lbData = await leaderboardRes.json();
+      if (leaderboardRes.ok && lbData.leaderboard?.length) {
+        const rows = lbData.leaderboard.map((w: any, i: number) => {
+          const addr = w.address ? `${w.address.slice(0, 6)}...${w.address.slice(-4)}` : 'unknown';
+          const pnl = w.pnl != null ? `${w.pnl >= 0 ? '+' : ''}${Number(w.pnl).toFixed(2)}%` : 'N/A';
+          const vol = w.volume != null ? `$${Number(w.volume).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : 'N/A';
+          const chain = w.chain || '';
+          return `  ${i + 1}. ${addr} | PnL: ${pnl} | Vol: ${vol}${chain ? ` | ${chain}` : ''}`;
+        });
+        text += `\n\n--- Smart Money Leaderboard (X Layer + Ethereum) ---\n${rows.join('\n')}`;
+      }
+    } catch (e) {
+      console.error('[bobby_intel] smart-money-leaderboard fetch failed:', e);
+    }
+
+    return { content: [{ type: 'text', text }] };
   }
 
   if (name === 'bobby_xlayer_signals') {

@@ -3,6 +3,7 @@
 // Designed for the Protocol Heartbeat dashboard page
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Interface, formatEther } from 'ethers';
 
 export const config = { maxDuration: 15 };
 
@@ -16,6 +17,21 @@ const BOUNTIES = '0xa8005ab465a0e02cb14824cd0e7630391fba673d';
 const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
 const TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
 
+// ABI interfaces — source of truth for function selectors
+const economyIface = new Interface([
+  'function getEconomyStats() view returns (uint256, uint256, uint256, uint256, uint256)',
+]);
+
+const trackRecordIface = new Interface([
+  'function getWinRate() view returns (uint256)',
+  'function totalTrades() view returns (uint256)',
+]);
+
+const bountiesIface = new Interface([
+  'function nextBountyId() view returns (uint256)',
+  'function minBounty() view returns (uint96)',
+]);
+
 async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
   const res = await fetch(XLAYER_RPC, {
     method: 'POST',
@@ -28,19 +44,6 @@ async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
 
 async function ethCall(to: string, data: string): Promise<string> {
   return (await rpcCall('eth_call', [{ to, data }, 'latest'])) as string;
-}
-
-function decodeSingleUint(hex: string): string {
-  if (!hex || hex === '0x' || hex.length < 66) return '0';
-  return BigInt('0x' + hex.slice(2, 66)).toString();
-}
-
-function weiToOkb(wei: string): string {
-  const n = BigInt(wei);
-  const whole = n / BigInt(1e18);
-  const frac = n % BigInt(1e18);
-  const fracStr = frac.toString().padStart(18, '0').slice(0, 4);
-  return `${whole}.${fracStr}`;
 }
 
 async function sbQuery(table: string, query: string): Promise<unknown[]> {
@@ -57,35 +60,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    // Parallel fetch all data
+    // Parallel fetch all data — use ethers Interface for correct selector encoding
     const [
       blockHex,
       treasuryBalanceHex,
-      totalDebatesHex,
-      totalMcpCallsHex,
-      totalVolumeHex,
-      totalPaymentsHex,
+      economyStatsHex,
       winRateHex,
       totalTradesHex,
       nextBountyIdHex,
-      lastActivityHex,
       recentCycles,
       recentCommerce,
     ] = await Promise.all([
       // Chain state
       rpcCall('eth_blockNumber', []),
       rpcCall('eth_getBalance', [TREASURY, 'latest']),
-      // Agent Economy
-      ethCall(AGENT_ECONOMY, '0x' + 'e4aed057'.padEnd(8, '0')), // totalDebates()
-      ethCall(AGENT_ECONOMY, '0x' + 'c9b2e522'.padEnd(8, '0')), // totalMcpCalls()
-      ethCall(AGENT_ECONOMY, '0x' + '5e615a50'.padEnd(8, '0')), // totalVolumeWei()
-      ethCall(AGENT_ECONOMY, '0x' + '0ab143ab'.padEnd(8, '0')), // totalPayments()
+      // Agent Economy — single call returns all 5 stats
+      ethCall(AGENT_ECONOMY, economyIface.encodeFunctionData('getEconomyStats')),
       // Track Record
-      ethCall(TRACK_RECORD, '0x' + '7ec1e4f9'.padEnd(8, '0')), // winRateBps()
-      ethCall(TRACK_RECORD, '0x' + 'c4e41b22'.padEnd(8, '0')), // totalTrades()
+      ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData('getWinRate')),
+      ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData('totalTrades')),
       // Bounties
-      ethCall(BOUNTIES, '0x' + 'e7e0ee96'.padEnd(8, '0')), // nextBountyId()
-      ethCall(AGENT_ECONOMY, '0x' + 'bfd80e73'.padEnd(8, '0')), // lastActivityBlock()
+      ethCall(BOUNTIES, bountiesIface.encodeFunctionData('nextBountyId')),
       // Supabase: recent cycles
       sbQuery('agent_cycles', 'select=id,status,created_at,vibe_phrase,trades_executed&order=created_at.desc&limit=1'),
       // Supabase: recent commerce
@@ -94,17 +89,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const blockNumber = parseInt(String(blockHex), 16);
     const treasuryWei = BigInt(String(treasuryBalanceHex) || '0').toString();
-    const totalDebates = decodeSingleUint(String(totalDebatesHex));
-    const totalMcpCalls = decodeSingleUint(String(totalMcpCallsHex));
-    const totalVolumeWei = decodeSingleUint(String(totalVolumeHex));
-    const totalPayments = decodeSingleUint(String(totalPaymentsHex));
-    const winRateBps = decodeSingleUint(String(winRateHex));
-    const totalTrades = decodeSingleUint(String(totalTradesHex));
-    const nextBountyId = decodeSingleUint(String(nextBountyIdHex));
-    const lastActivityBlock = decodeSingleUint(String(lastActivityHex));
+
+    // Decode getEconomyStats() — returns (totalDebates, totalMcpCalls, totalSignalAccesses, totalVolume, totalPayments)
+    let totalDebates = '0';
+    let totalMcpCalls = '0';
+    let totalVolumeWei = '0';
+    let totalPayments = '0';
+    try {
+      const decoded = economyIface.decodeFunctionResult('getEconomyStats', String(economyStatsHex));
+      totalDebates = decoded[0].toString();
+      totalMcpCalls = decoded[1].toString();
+      // decoded[2] = totalSignalAccesses (not used in response but available)
+      totalVolumeWei = decoded[3].toString();
+      totalPayments = decoded[4].toString();
+    } catch {
+      console.error('[ProtocolHeartbeat] Failed to decode getEconomyStats');
+    }
+
+    // Decode single-value returns from TrackRecord
+    let winRateBps = '0';
+    let totalTrades = '0';
+    try {
+      const [wr] = trackRecordIface.decodeFunctionResult('getWinRate', String(winRateHex));
+      winRateBps = wr.toString();
+    } catch {
+      console.error('[ProtocolHeartbeat] Failed to decode getWinRate');
+    }
+    try {
+      const [tt] = trackRecordIface.decodeFunctionResult('totalTrades', String(totalTradesHex));
+      totalTrades = tt.toString();
+    } catch {
+      console.error('[ProtocolHeartbeat] Failed to decode totalTrades');
+    }
+
+    // Decode nextBountyId from Bounties contract
+    let nextBountyId = '0';
+    try {
+      const [nbi] = bountiesIface.decodeFunctionResult('nextBountyId', String(nextBountyIdHex));
+      nextBountyId = nbi.toString();
+    } catch {
+      console.error('[ProtocolHeartbeat] Failed to decode nextBountyId');
+    }
 
     // Calculate revenue
-    const volumeOkb = weiToOkb(totalVolumeWei);
+    const volumeOkb = formatEther(BigInt(totalVolumeWei));
     const winRate = parseInt(winRateBps) / 100;
     const totalBounties = Math.max(0, parseInt(nextBountyId) - 1);
 
@@ -140,7 +168,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       treasury: {
         address: TREASURY,
-        balanceOkb: weiToOkb(treasuryWei),
+        balanceOkb: formatEther(BigInt(treasuryWei)),
       },
       revenue: {
         totalVolumeOkb: volumeOkb,
@@ -168,7 +196,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         overall: blockAge === 'healthy' && contractHealth === 'active' ? 'operational' : 'degraded',
       },
       contracts: {
-        agentEconomy: { address: AGENT_ECONOMY, lastActivityBlock: parseInt(lastActivityBlock) },
+        agentEconomy: { address: AGENT_ECONOMY },
         bounties: { address: BOUNTIES, totalPosted: totalBounties },
         trackRecord: { address: TRACK_RECORD },
       },

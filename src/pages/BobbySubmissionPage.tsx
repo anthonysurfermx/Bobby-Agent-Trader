@@ -48,6 +48,8 @@ const reviewerActions = [
   },
   { label: 'Agent SKILL.MD', href: SKILL_MD, kind: 'internal', icon: FileCode2 },
   { label: 'Reputation API', href: REPUTATION_API, kind: 'internal', icon: ShieldCheck },
+  { label: 'Protocol Heartbeat', href: '/protocol/heartbeat', kind: 'internal', icon: Network },
+  { label: 'Plugin Store PR', href: 'https://github.com/okx/plugin-store/pull/161', kind: 'external', icon: Trophy },
 ];
 
 const SKILL_MD = '/skill.md';
@@ -116,6 +118,24 @@ const judgeRows = [
   {
     label: 'Sentinel agent demo (agent-to-agent MCP)',
     href: '/api/sentinel-demo',
+    kind: 'internal',
+    status: 'check live',
+  },
+  {
+    label: 'Protocol Heartbeat dashboard (real-time health)',
+    href: '/protocol/heartbeat',
+    kind: 'internal',
+    status: 'check live',
+  },
+  {
+    label: 'Smart money leaderboard (OKX OnchainOS)',
+    href: '/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5',
+    kind: 'internal',
+    status: 'check live',
+  },
+  {
+    label: 'Conviction-tier stratified performance',
+    href: '/api/conviction-tiers',
     kind: 'internal',
     status: 'check live',
   },
