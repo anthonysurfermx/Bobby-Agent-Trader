@@ -291,6 +291,13 @@ function Nav() {
       </div>
       <div className="flex gap-3">
         <a
+          href="/protocol/heartbeat"
+          className="flex items-center gap-2 bg-[#6dfe9c]/5 text-[#6dfe9c] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#6dfe9c]/20 hover:bg-[#6dfe9c]/15 transition-all"
+        >
+          <span className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse" />
+          _HEARTBEAT
+        </a>
+        <a
           href="/submission"
           className="bg-[#fcc025]/10 text-[#fcc025] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#fcc025]/30 hover:bg-[#fcc025]/20 transition-all"
         >
@@ -1235,6 +1242,86 @@ function TrustBadge({ stats }: { stats: ProtocolStats | null }) {
   );
 }
 
+function RevenueProof({ stats }: { stats: ProtocolStats | null }) {
+  const volumeOkb = stats ? safeFixed(stats.contracts.agentEconomy.stats.totalVolumeOkb, 4) : '—';
+  const mcpCalls = stats ? Number(stats.contracts.agentEconomy.stats.totalMcpCalls) : 0;
+  const payments = stats ? Number(stats.contracts.agentEconomy.stats.totalPayments) : 0;
+  const bounties = stats ? stats.contracts.adversarialBounties.totalPosted : 0;
+
+  const proofs = [
+    {
+      label: 'x402 MCP PAYMENT',
+      tx: '0x6593041ea93a338916dffdb3b203d034c240ec34fb2d04cbad2acbc7e7688fdf',
+      detail: 'bobby_analyze | 0.001 OKB | Block 57237403',
+    },
+    {
+      label: 'ADVERSARIAL BOUNTY #1',
+      tx: '0x68d4c3f69a01cc3983a1d6b0b9625f54c474a8e80df90685a5cc38f3a2355ad0',
+      detail: 'DATA_INTEGRITY | 0.001 OKB | Block 57243627',
+    },
+  ];
+
+  return (
+    <section className="py-12 px-6 max-w-7xl mx-auto">
+      <div className="bg-[#131313] border border-[#494847]/15 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <div className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest mb-1">
+              REVENUE_PROOF
+            </div>
+            <div className="text-lg font-bold text-white">
+              Autonomous Revenue on X Layer
+            </div>
+          </div>
+          <div className="flex gap-6 font-mono text-[10px]">
+            <div className="text-center">
+              <div className="text-[#adaaaa]">VOLUME_OKB</div>
+              <div className="text-xl font-bold text-[#6dfe9c]">{volumeOkb}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[#adaaaa]">PAYMENTS</div>
+              <div className="text-xl font-bold text-white">{payments}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[#adaaaa]">MCP_CALLS</div>
+              <div className="text-xl font-bold text-white">{mcpCalls}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[#adaaaa]">BOUNTIES</div>
+              <div className="text-xl font-bold text-white">{bounties}</div>
+            </div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {proofs.map((p) => (
+            <a
+              key={p.tx}
+              href={`https://www.oklink.com/xlayer/tx/${p.tx}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 px-4 py-3 bg-black/40 border border-[#494847]/10 hover:border-[#6dfe9c]/30 transition-all group"
+            >
+              <span className="w-2 h-2 bg-[#6dfe9c] rounded-full" />
+              <span className="font-mono text-[10px] text-[#6dfe9c] uppercase w-40 shrink-0">
+                {p.label}
+              </span>
+              <span className="font-mono text-[11px] text-white/40 truncate flex-1">
+                {p.tx.slice(0, 18)}...{p.tx.slice(-8)}
+              </span>
+              <span className="font-mono text-[10px] text-[#adaaaa] hidden md:block">
+                {p.detail}
+              </span>
+              <span className="text-[#6dfe9c] opacity-0 group-hover:opacity-100 transition-opacity text-xs">
+                ↗
+              </span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
   const fmtAgo = (secs: number | null) => {
     if (secs === null) return '—';
@@ -1539,6 +1626,7 @@ export default function BobbyProtocolLanding() {
 
       <HeroLiveDebate stats={stats} />
       <TrustBadge stats={stats} />
+      <RevenueProof stats={stats} />
       <TradingRoom stats={stats} pnl={pnl} />
       <ClosedLoop />
       <JudgeMode stats={stats} />
