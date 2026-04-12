@@ -841,6 +841,295 @@ function WhyMatters() {
   );
 }
 
+function HardnessArchitecture() {
+  const [activeNode, setActiveNode] = useState<string | null>(null);
+  const [flowStep, setFlowStep] = useState(0);
+
+  // Auto-cycle through flow steps
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFlowStep(prev => (prev + 1) % 5);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const nodes = [
+    {
+      id: 'tools',
+      label: 'TOOLS',
+      sub: '+ MCP / x402',
+      icon: '[ ]',
+      position: 'top',
+      description: '15 MCP tools over Streamable HTTP. Any agent calls Bobby via JSON-RPC. Premium tools gated by x402 on-chain payment.',
+      details: ['bobby_analyze', 'bobby_debate', 'bobby_judge', 'bobby_ta', 'bobby_intel', '+10 more'],
+      color: '#6dfe9c',
+    },
+    {
+      id: 'session',
+      label: 'SESSION',
+      sub: 'On-chain State',
+      icon: '>>',
+      position: 'left',
+      description: 'Persistent on-chain state. Every prediction, signal, payment, and bounty is immutable. The memory of the harness.',
+      details: ['TrackRecord', 'ConvictionOracle', 'AgentStats', 'Commerce Log'],
+      color: '#6dfe9c',
+    },
+    {
+      id: 'harness',
+      label: 'HARNESS',
+      sub: 'HardnessRegistry',
+      icon: '***',
+      position: 'center',
+      description: 'The coordinator. Registers agents, coordinates services, records predictions, publishes signals, manages bounties. Does not trade — ensures quality.',
+      details: ['0xD89c...1040', 'X Layer (196)', '5 modules', '2-of-3 resolvers'],
+      color: '#fcc025',
+    },
+    {
+      id: 'sandbox',
+      label: 'SANDBOX',
+      sub: 'Debate Chamber',
+      icon: '>_',
+      position: 'right',
+      description: 'Isolated adversarial testing. Three agents attack the thesis from different angles. Nothing leaves without being pressure-tested.',
+      details: ['Alpha Hunter', 'Red Team', 'CIO', 'Judge Mode'],
+      color: '#6dfe9c',
+    },
+    {
+      id: 'orchestration',
+      label: 'ORCHESTRATION',
+      sub: 'Cycle Engine',
+      icon: '<>',
+      position: 'bottom',
+      description: 'The autonomous loop. Every 8 hours: signal → debate → judge → commit → execute → prove. The heartbeat of hardness finance.',
+      details: ['Signal Ingest', 'Debate Cycle', 'Risk Gate', 'On-chain Prove'],
+      color: '#6dfe9c',
+    },
+  ];
+
+  const flowLabels = [
+    'Signal enters the harness',
+    'Thesis enters the sandbox for pressure testing',
+    'Hardened conviction stored in session',
+    'Tools expose conviction to external agents',
+    'Orchestration loops back for next cycle',
+  ];
+
+  // Flow connections: which nodes are highlighted per step
+  const flowConnections: Record<number, string[]> = {
+    0: ['orchestration', 'harness'],
+    1: ['harness', 'sandbox'],
+    2: ['sandbox', 'session'],
+    3: ['session', 'tools'],
+    4: ['tools', 'orchestration'],
+  };
+
+  const activeConnections = flowConnections[flowStep] || [];
+
+  return (
+    <section id="architecture" className="py-24 px-6 max-w-7xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+      >
+        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-2 text-center">
+          The Trading Harness
+        </h2>
+        <p className="text-center text-[#adaaaa] font-mono text-xs uppercase tracking-widest mb-4">
+          Inspired by Claude Code's architecture. Built for agent finance.
+        </p>
+
+        {/* Flow status bar */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#131313] border border-[#494847]/30">
+            <span className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse" />
+            <span className="font-mono text-[11px] text-[#6dfe9c]">
+              {flowLabels[flowStep]}
+            </span>
+          </div>
+          <div className="flex justify-center gap-1 mt-3">
+            {flowLabels.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setFlowStep(i)}
+                className={`w-8 h-1 transition-all ${i === flowStep ? 'bg-[#6dfe9c]' : 'bg-[#494847]/30'}`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Architecture diagram */}
+        <div className="relative max-w-3xl mx-auto">
+          {/* Connection lines (CSS) */}
+          <div className="hidden md:block absolute inset-0 pointer-events-none">
+            {/* Top to center */}
+            <div className={`absolute left-1/2 top-0 w-px h-[calc(50%-80px)] transition-all duration-700 ${
+              activeConnections.includes('tools') && activeConnections.includes('harness')
+                ? 'bg-[#6dfe9c] shadow-[0_0_8px_#6dfe9c]'
+                : activeConnections.includes('tools') || activeConnections.includes('harness')
+                ? 'bg-[#494847]/60'
+                : 'bg-[#494847]/20'
+            }`} style={{ transform: 'translateX(-50%)', top: '160px', height: '80px' }} />
+            {/* Center to bottom */}
+            <div className={`absolute left-1/2 w-px transition-all duration-700 ${
+              activeConnections.includes('orchestration') && activeConnections.includes('harness')
+                ? 'bg-[#6dfe9c] shadow-[0_0_8px_#6dfe9c]'
+                : activeConnections.includes('orchestration') || activeConnections.includes('harness')
+                ? 'bg-[#494847]/60'
+                : 'bg-[#494847]/20'
+            }`} style={{ transform: 'translateX(-50%)', bottom: '160px', height: '80px' }} />
+            {/* Left to center */}
+            <div className={`absolute top-1/2 h-px transition-all duration-700 ${
+              activeConnections.includes('session') && activeConnections.includes('harness')
+                ? 'bg-[#6dfe9c] shadow-[0_0_8px_#6dfe9c]'
+                : activeConnections.includes('session')
+                ? 'bg-[#494847]/60'
+                : 'bg-[#494847]/20'
+            }`} style={{ transform: 'translateY(-50%)', left: 'calc(16.67% + 80px)', width: 'calc(33.33% - 80px)' }} />
+            {/* Center to right */}
+            <div className={`absolute top-1/2 h-px transition-all duration-700 ${
+              activeConnections.includes('sandbox') && activeConnections.includes('harness')
+                ? 'bg-[#6dfe9c] shadow-[0_0_8px_#6dfe9c]'
+                : activeConnections.includes('sandbox')
+                ? 'bg-[#494847]/60'
+                : 'bg-[#494847]/20'
+            }`} style={{ transform: 'translateY(-50%)', right: 'calc(16.67% + 80px)', width: 'calc(33.33% - 80px)' }} />
+          </div>
+
+          {/* Grid layout matching Claude's diagram */}
+          <div className="grid grid-cols-3 gap-4 md:gap-6" style={{ gridTemplateRows: 'auto auto auto' }}>
+            {/* Row 1: Tools (center top) */}
+            <div className="col-start-2">
+              <NodeCard
+                node={nodes[0]}
+                isActive={activeConnections.includes('tools')}
+                isHovered={activeNode === 'tools'}
+                onHover={setActiveNode}
+              />
+            </div>
+
+            {/* Row 2: Session | Harness | Sandbox */}
+            <div>
+              <NodeCard
+                node={nodes[1]}
+                isActive={activeConnections.includes('session')}
+                isHovered={activeNode === 'session'}
+                onHover={setActiveNode}
+              />
+            </div>
+            <div>
+              <NodeCard
+                node={nodes[2]}
+                isActive={activeConnections.includes('harness')}
+                isHovered={activeNode === 'harness'}
+                onHover={setActiveNode}
+                isCenter
+              />
+            </div>
+            <div>
+              <NodeCard
+                node={nodes[3]}
+                isActive={activeConnections.includes('sandbox')}
+                isHovered={activeNode === 'sandbox'}
+                onHover={setActiveNode}
+              />
+            </div>
+
+            {/* Row 3: Orchestration (center bottom) */}
+            <div className="col-start-2">
+              <NodeCard
+                node={nodes[4]}
+                isActive={activeConnections.includes('orchestration')}
+                isHovered={activeNode === 'orchestration'}
+                onHover={setActiveNode}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Detail panel */}
+        <motion.div
+          key={activeNode || 'default'}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-8 max-w-2xl mx-auto"
+        >
+          {activeNode ? (
+            <div className="bg-[#131313] border border-[#494847]/30 p-5">
+              <div className="font-mono text-[10px] text-[#6dfe9c] uppercase tracking-widest mb-2">
+                {nodes.find(n => n.id === activeNode)?.label}
+              </div>
+              <p className="text-sm text-[#adaaaa] mb-3">
+                {nodes.find(n => n.id === activeNode)?.description}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {nodes.find(n => n.id === activeNode)?.details.map(d => (
+                  <span key={d} className="font-mono text-[10px] px-2 py-1 bg-[#6dfe9c]/10 text-[#6dfe9c] border border-[#6dfe9c]/20">
+                    {d}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center font-mono text-[11px] text-[#adaaaa]/40">
+              hover a node to see details
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
+    </section>
+  );
+}
+
+function NodeCard({
+  node,
+  isActive,
+  isHovered,
+  onHover,
+  isCenter = false,
+}: {
+  node: { id: string; label: string; sub: string; icon: string; color: string };
+  isActive: boolean;
+  isHovered: boolean;
+  onHover: (id: string | null) => void;
+  isCenter?: boolean;
+}) {
+  const borderColor = isActive
+    ? node.color
+    : isHovered
+    ? `${node.color}60`
+    : '#494847';
+  const bgOpacity = isCenter ? 'bg-white/[0.04]' : 'bg-white/[0.02]';
+
+  return (
+    <motion.div
+      onMouseEnter={() => onHover(node.id)}
+      onMouseLeave={() => onHover(null)}
+      animate={{
+        borderColor,
+        boxShadow: isActive ? `0 0 20px ${node.color}20` : 'none',
+      }}
+      className={`${bgOpacity} border p-4 md:p-5 cursor-pointer transition-all relative`}
+      style={{ borderColor }}
+    >
+      {isActive && (
+        <div className="absolute top-2 right-2">
+          <span className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse inline-block" />
+        </div>
+      )}
+      <div className={`font-mono text-lg mb-1 ${isCenter ? 'text-[#fcc025]' : 'text-[#adaaaa]/60'}`}>
+        {node.icon}
+      </div>
+      <div className="font-mono text-xs font-bold text-white uppercase tracking-wider">
+        {node.label}
+      </div>
+      <div className="font-mono text-[10px] text-[#adaaaa] mt-0.5">
+        {node.sub}
+      </div>
+    </motion.div>
+  );
+}
+
 function Bounties({ stats }: { stats: ProtocolStats | null }) {
   const bounties = stats?.bounties ?? [];
   const bountiesContract = stats?.contracts.adversarialBounties;
@@ -1671,6 +1960,7 @@ export default function BobbyProtocolLanding() {
       <ClosedLoop />
       <JudgeMode stats={stats} />
       <WhyMatters />
+      <HardnessArchitecture />
       <Bounties stats={stats} />
       <McpSection mcp={mcp} stats={stats} />
       <AgentInterop stats={stats} />
