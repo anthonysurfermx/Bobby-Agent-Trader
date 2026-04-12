@@ -102,12 +102,6 @@ interface PnlSummary {
 
 // ---- Helpers ----
 
-const fmtNum = (n: number | string, digits = 0) => {
-  const v = typeof n === 'string' ? Number(n) : n;
-  if (!Number.isFinite(v)) return '—';
-  return v.toLocaleString('en-US', { maximumFractionDigits: digits, minimumFractionDigits: digits });
-};
-
 const safeFixed = (n: unknown, digits = 2): string => {
   if (n === null || n === undefined) return '—';
   const v = typeof n === 'number' ? n : Number(n);
@@ -120,15 +114,6 @@ const safeSignedFixed = (n: unknown, digits = 2): string => {
   const v = typeof n === 'number' ? n : Number(n);
   if (!Number.isFinite(v)) return '—';
   return `${v > 0 ? '+' : ''}${v.toFixed(digits)}`;
-};
-
-const fmtOkb = (wei: string, digits = 4) => {
-  try {
-    const v = Number(wei) / 1e18;
-    return v.toLocaleString('en-US', { maximumFractionDigits: digits });
-  } catch {
-    return '—';
-  }
 };
 
 const truncate = (s: string, head = 6, tail = 4) =>
@@ -399,25 +384,13 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
             </span>
           </div>
 
-          <div className="mt-6 border-t border-[#494847]/15 pt-4">
-            <div className="bg-[#6dfe9c]/5 p-4 border-l-2 border-[#6dfe9c]">
-              <div className="flex items-center justify-between mb-1 font-mono text-[10px] tracking-widest uppercase">
-                <span className="font-bold text-[#6dfe9c]">
-                  {stats ? 'FEED_LIVE' : 'CONNECTING'}
-                </span>
-                <span className="text-[#adaaaa]">
-                  {stats ? new Date(stats.fetchedAt).toLocaleTimeString() : '—'}
-                </span>
-              </div>
-              <p className="text-white/80 text-xs font-mono">
-                This is the public protocol surface. The 3-agent debate
-                terminal lives at{' '}
-                <a className="underline text-[#6dfe9c]" href="/agentic-world/bobby">
-                  /agentic-world/bobby
-                </a>
-                .
-              </p>
-            </div>
+          <div className="mt-6 border-t border-[#494847]/15 pt-3 flex items-center justify-between font-mono text-[10px] tracking-widest uppercase">
+            <span className="font-bold text-[#6dfe9c]">
+              {stats ? 'FEED_LIVE' : 'CONNECTING'}
+            </span>
+            <span className="text-[#adaaaa]">
+              {stats ? new Date(stats.fetchedAt).toLocaleTimeString() : '—'}
+            </span>
           </div>
         </div>
       </motion.div>
@@ -498,7 +471,6 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
 function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSummary | null }) {
   const debates = stats?.contracts.agentEconomy.stats.totalDebates ?? '—';
   const mcpCalls = stats?.contracts.agentEconomy.stats.totalMcpCalls ?? '—';
-  const volume = stats?.contracts.agentEconomy.stats.totalVolumeOkb ?? '—';
 
   // Role labels and one-line descriptors are static config — the identity
   // of the three agents, not live data. Numeric metrics come from stats/pnl.
@@ -542,6 +514,7 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
       <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest pl-6 mb-12">
         Every trade gets argued. No trade goes unquestioned.
       </p>
+
 
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         {agents.map((a, i) => (
@@ -593,80 +566,25 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
         ))}
       </div>
 
-      <div className="bg-black border border-[#494847]/20 p-4 font-mono text-[11px] leading-relaxed">
-        <div className="text-[#adaaaa] mb-1">
-          <span className="text-[#777575]">[protocol]</span> AgentEconomy V2
-          settled <span className="text-[#6dfe9c]">{debates}</span> debates and{' '}
-          <span className="text-[#6dfe9c]">{mcpCalls}</span> MCP calls.
-        </div>
-        <div className="text-[#adaaaa]">
-          <span className="text-[#777575]">[protocol]</span> Total OKB volume through x402 paywall:{' '}
-          <span className="text-[#6dfe9c]">{volume}</span> OKB.
-        </div>
-        <div className="text-[#adaaaa]">
-          <span className="text-[#777575]">[protocol]</span> Treasury balance:{' '}
-          <span className="text-[#6dfe9c]">
-            {stats ? safeFixed(stats.treasury.balanceOkb, 4) : '—'}
-          </span>{' '}
-          OKB @{' '}
-          <a
-            href={`https://www.oklink.com/xlayer/address/${stats?.treasury.address}`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            {truncate(stats?.treasury.address ?? '')}
-          </a>
-        </div>
-      </div>
     </section>
   );
 }
 
 function ClosedLoop() {
   const steps = [
-    {
-      title: 'THESIS',
-      desc: 'Alpha Hunter proposes the opportunity and frames the trade.',
-      color: '#6dfe9c',
-    },
-    {
-      title: 'DEBATE',
-      desc: 'Red Team attacks the thesis before trust compounds.',
-      color: '#fcc025',
-    },
-    {
-      title: 'JUDGE',
-      desc: 'Judge Mode scores data, adversarial quality, logic, risk, calibration, and novelty.',
-      color: '#ff716a',
-    },
-    {
-      title: 'EXECUTE_OR_PASS',
-      desc: 'CIO decides whether to execute, reduce, or reject the idea.',
-      color: '#6dfe9c',
-    },
-    {
-      title: 'BOUNTY_WINDOW',
-      desc: 'Any challenger can post an OKB bounty against the debate dimension that failed.',
-      color: '#fcc025',
-    },
-    {
-      title: 'SETTLE_ON_XLAYER',
-      desc: 'Track Record and protocol rails make the result public and auditable on chain 196.',
-      color: '#6dfe9c',
-    },
+    { title: 'THESIS', glyph: '>', desc: 'Alpha proposes trade', color: '#6dfe9c' },
+    { title: 'DEBATE', glyph: '><', desc: 'Red Team attacks', color: '#fcc025' },
+    { title: 'JUDGE', glyph: ':::', desc: '6-dimension audit', color: '#ff716a' },
+    { title: 'EXECUTE', glyph: '[!]', desc: 'CIO decides', color: '#6dfe9c' },
+    { title: 'BOUNTY', glyph: '$?', desc: 'Challengers stake', color: '#fcc025' },
+    { title: 'SETTLE', glyph: '=X=', desc: 'On-chain proof', color: '#6dfe9c' },
   ];
 
   return (
     <section id="loop" className="py-24 px-6 max-w-7xl mx-auto">
-      <div className="mb-10">
-        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4 border-l-4 border-[#fcc025] pl-6">
-          Closed Loop Protocol
-        </h2>
-        <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest pl-6">
-          Thesis → Debate → Judge → Execute or Pass → Bounty Window → Settle on X Layer
-        </p>
-      </div>
+      <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-10 border-l-4 border-[#fcc025] pl-6">
+        Closed Loop
+      </h2>
 
       <div className="grid gap-4 lg:grid-cols-6">
         {steps.map((step, index) => (
@@ -676,20 +594,20 @@ function ClosedLoop() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: index * 0.05 }}
-            className="relative bg-[#131313] border border-[#494847]/15 p-5 min-h-[190px] hover:border-[#6dfe9c]/30 transition-all"
+            className="relative bg-[#131313] border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all"
           >
             <div
-              className="mb-4 inline-flex h-9 w-9 items-center justify-center border font-mono text-sm font-bold"
-              style={{ color: step.color, borderColor: `${step.color}55`, backgroundColor: `${step.color}14` }}
+              className="mb-3 font-mono text-2xl font-bold"
+              style={{ color: step.color }}
             >
-              {index + 1}
+              {step.glyph}
             </div>
-            <h3 className="font-mono text-[11px] uppercase tracking-widest mb-3" style={{ color: step.color }}>
+            <h3 className="font-mono text-[11px] uppercase tracking-widest mb-2" style={{ color: step.color }}>
               {step.title}
             </h3>
-            <p className="text-sm leading-6 text-[#adaaaa]">{step.desc}</p>
+            <p className="font-mono text-[10px] text-[#adaaaa]">{step.desc}</p>
             {index < steps.length - 1 && (
-              <div className="hidden lg:block absolute -right-2 top-9 text-[#6dfe9c]/45 font-mono text-lg">
+              <div className="hidden lg:block absolute -right-2 top-6 text-[#6dfe9c]/45 font-mono text-lg">
                 →
               </div>
             )}
@@ -757,8 +675,7 @@ function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
             Judge Mode: On-Chain Audit
           </motion.h2>
           <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest mb-8">
-            Every verdict scored on 6 dimensions. Data / Adversarial / Logic /
-            Risk / Calibration / Novelty.
+            Data / Adversarial / Logic / Risk / Calibration / Novelty
           </p>
 
           <div className="flex items-baseline gap-4 mb-8">
@@ -815,49 +732,20 @@ function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
 
 function WhyMatters() {
   const cases = [
-    {
-      dimension: 'DATA_INTEGRITY',
-      risk: 'AI agents hallucinate on low-liquidity tokens and stale market reads.',
-      outcome: 'Bounty against data integrity if the thesis was built on broken inputs.',
-    },
-    {
-      dimension: 'CALIBRATION_ALIGNMENT',
-      risk: 'Cherry-picked backtests can make weak systems look invincible.',
-      outcome: 'Challenge the confidence score when conviction outruns actual edge.',
-    },
-    {
-      dimension: 'RISK_MANAGEMENT',
-      risk: 'Whale manipulation can slip through naive risk gates and nuke a strategy.',
-      outcome: 'Post a bounty when downside controls fail under stress.',
-    },
-    {
-      dimension: 'ADVERSARIAL_QUALITY',
-      risk: 'If no one attacks the thesis hard enough, the product becomes a hype machine.',
-      outcome: 'Reward challengers who prove the debate did not pressure-test the idea.',
-    },
-    {
-      dimension: 'NOVELTY',
-      risk: 'Copy-trading groupthink creates consensus without original insight.',
-      outcome: 'Use bounties to penalize recycled theses disguised as intelligence.',
-    },
-    {
-      dimension: 'DECISION_LOGIC',
-      risk: 'Overfit logic can sound persuasive while still being structurally wrong.',
-      outcome: 'Challenge the decision path itself, not just the final trade result.',
-    },
+    { dimension: 'DATA_INTEGRITY', glyph: '{!}', risk: 'Hallucinated data on thin-liquidity tokens' },
+    { dimension: 'CALIBRATION_ALIGNMENT', glyph: '~=', risk: 'Cherry-picked backtests mask weak edge' },
+    { dimension: 'RISK_MANAGEMENT', glyph: '/!\\', risk: 'Whale manipulation slips through risk gates' },
+    { dimension: 'ADVERSARIAL_QUALITY', glyph: '><', risk: 'Unchallenged theses become hype machines' },
+    { dimension: 'NOVELTY', glyph: '[=]', risk: 'Copy-trading groupthink without original insight' },
+    { dimension: 'DECISION_LOGIC', glyph: '?->', risk: 'Overfit logic sounds right but breaks in prod' },
   ];
 
   return (
     <section id="why" className="py-24 px-6 bg-[#131313] border-y border-[#494847]/15">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-10">
-          <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4">
-            Why Adversarial Trading Matters
-          </h2>
-          <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest">
-            Bobby is not useful because it predicts. Bobby is useful because it can be challenged.
-          </p>
-        </div>
+        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-10">
+          Why Adversarial Trading Matters
+        </h2>
 
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
           {cases.map((item, index) => (
@@ -869,13 +757,15 @@ function WhyMatters() {
               transition={{ delay: index * 0.05 }}
               className="bg-black border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all"
             >
-              <div className={`font-mono text-[10px] uppercase tracking-widest mb-3 ${DIMENSION_COLOR[item.dimension] ?? 'text-white'}`}>
-                {item.dimension}
+              <div className="flex items-center gap-3 mb-3">
+                <span className={`font-mono text-xl font-bold ${DIMENSION_COLOR[item.dimension] ?? 'text-white'}`}>
+                  {item.glyph}
+                </span>
+                <span className={`font-mono text-[10px] uppercase tracking-widest ${DIMENSION_COLOR[item.dimension] ?? 'text-white'}`}>
+                  {item.dimension}
+                </span>
               </div>
-              <p className="text-sm leading-6 text-white/80 mb-4">{item.risk}</p>
-              <div className="border-t border-[#494847]/15 pt-4 font-mono text-[11px] leading-6 text-[#adaaaa]">
-                {item.outcome}
-              </div>
+              <p className="text-sm leading-6 text-[#adaaaa]">{item.risk}</p>
             </motion.div>
           ))}
         </div>
@@ -978,25 +868,19 @@ function Bounties({ stats }: { stats: ProtocolStats | null }) {
       </div>
 
       {bounties.length === 0 ? (
-        <div className="bg-[#131313] border border-[#494847]/20 p-8 text-center font-mono text-xs text-[#adaaaa]">
-          <div className="text-[#6dfe9c] mb-2 text-sm">Awaiting first challenger</div>
-          <p className="max-w-md mx-auto mb-4 leading-6">
-            The bounty contract is live and verified on X Layer. The next open
-            debate can become the first real challenge market.
-          </p>
-          <div className="flex flex-col items-center gap-4">
-            <a
-              href={`https://www.oklink.com/xlayer/address/${bountiesContract?.address ?? ''}`}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-[#6dfe9c] text-[#005f2e] px-5 py-2 font-bold uppercase text-[11px] tracking-tighter hover:brightness-110"
-            >
-              Be the first to post a bounty
-            </a>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-[#fcc025]">
-              cycle_time ~ 12s · contract live · chain 196
-            </div>
+        <div className="bg-[#131313] border border-[#494847]/20 p-6 flex items-center justify-between gap-6 font-mono text-xs">
+          <div>
+            <span className="text-[#6dfe9c]">Awaiting first challenger</span>
+            <span className="text-[#adaaaa] ml-3">contract live · chain 196</span>
           </div>
+          <a
+            href={`https://www.oklink.com/xlayer/address/${bountiesContract?.address ?? ''}`}
+            target="_blank"
+            rel="noreferrer"
+            className="bg-[#6dfe9c] text-[#005f2e] px-5 py-2 font-bold uppercase text-[11px] tracking-tighter hover:brightness-110 shrink-0"
+          >
+            [+] POST FIRST BOUNTY
+          </a>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1083,9 +967,8 @@ function McpSection({
             <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-6 leading-none">
               Bobby-As-A-Service
             </h2>
-            <p className="text-[#adaaaa] mb-8 uppercase text-xs tracking-widest leading-relaxed">
-              Any AI agent can consume Bobby. 17 MCP tools over Streamable HTTP.
-              Premium calls settle on X Layer via x402.
+            <p className="text-[#adaaaa] mb-8 uppercase font-mono text-xs tracking-widest">
+              15 MCP tools · Streamable HTTP · x402 settlement
             </p>
             <div className="bg-[#131313] p-4 border border-[#6dfe9c]/20 mb-4 font-mono text-[10px]">
               <div className="text-[#adaaaa] uppercase mb-1">MCP_CALLS_SETTLED</div>
@@ -1164,34 +1047,10 @@ function AgentInterop({ stats }: { stats: ProtocolStats | null }) {
   const volume = stats?.contracts.agentEconomy.stats.totalVolumeOkb ?? '0';
 
   const integrations = [
-    {
-      title: 'SKILL.MD',
-      desc: 'One file your agent downloads to consume Bobby via MCP. Zero-code integration — any Claude, GPT, or custom agent reads it and knows how to call every tool.',
-      href: '/skill.md',
-      cta: '_DOWNLOAD_SKILL',
-      color: '#6dfe9c',
-    },
-    {
-      title: 'REPUTATION_API',
-      desc: 'Public endpoint returning on-chain track record, win rate, economy stats, and bounty status. Your agent checks Bobby\'s credibility before paying for analysis.',
-      href: '/api/reputation',
-      cta: '_QUERY_REPUTATION',
-      color: '#fcc025',
-    },
-    {
-      title: 'JUDGE_MANIFEST',
-      desc: 'Machine-readable evaluation framework. Six dimensions, scoring rubrics, bias detection, and thresholds — so your agent can audit Bobby\'s debate quality programmatically.',
-      href: '/ai-judge-manifest.json',
-      cta: '_READ_MANIFEST',
-      color: '#ff716a',
-    },
-    {
-      title: 'x402_SETTLEMENT',
-      desc: 'Premium tools settle on X Layer via the x402 HTTP payment protocol. One contract call, one tx hash, and your agent gets the analysis. No accounts, no API keys for free tools.',
-      href: '/api/mcp-http',
-      cta: '_VIEW_ENDPOINT',
-      color: '#6dfe9c',
-    },
+    { title: 'SKILL.MD', glyph: '>_', desc: 'One file, zero-code MCP integration', href: '/skill.md', cta: '_DOWNLOAD', color: '#6dfe9c' },
+    { title: 'REPUTATION_API', glyph: '%', desc: 'On-chain track record + win rate', href: '/api/reputation', cta: '_QUERY', color: '#fcc025' },
+    { title: 'JUDGE_MANIFEST', glyph: ':::', desc: '6-dimension evaluation framework', href: '/ai-judge-manifest.json', cta: '_READ', color: '#ff716a' },
+    { title: 'x402_SETTLEMENT', glyph: '$=', desc: 'Pay per call, settle on X Layer', href: '/api/mcp-http', cta: '_VIEW', color: '#6dfe9c' },
   ];
 
   return (
@@ -1218,39 +1077,33 @@ function AgentInterop({ stats }: { stats: ProtocolStats | null }) {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {integrations.map((item, i) => (
-            <motion.div
+            <motion.a
               key={item.title}
+              href={item.href}
+              target={item.href.startsWith('/api') || item.href.endsWith('.json') || item.href.endsWith('.md') ? '_blank' : undefined}
+              rel="noreferrer"
               initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.05 }}
-              className="bg-black border border-[#494847]/15 p-6 hover:border-[#6dfe9c]/30 transition-all flex flex-col justify-between"
+              className="bg-black border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all group"
             >
-              <div>
-                <div
-                  className="font-mono text-[11px] uppercase tracking-widest mb-3"
-                  style={{ color: item.color }}
-                >
-                  {item.title}
-                </div>
-                <p className="text-sm leading-6 text-[#adaaaa] mb-6">{item.desc}</p>
+              <div className="font-mono text-2xl font-bold mb-3" style={{ color: item.color }}>
+                {item.glyph}
               </div>
-              <a
-                href={item.href}
-                target={item.href.startsWith('/api') || item.href.endsWith('.json') || item.href.endsWith('.md') ? '_blank' : undefined}
-                rel="noreferrer"
-                className="inline-block border text-xs font-bold uppercase tracking-tighter px-4 py-2 hover:brightness-110 transition-all"
-                style={{
-                  color: item.color,
-                  borderColor: `${item.color}50`,
-                  backgroundColor: `${item.color}10`,
-                }}
+              <div className="font-mono text-[10px] uppercase tracking-widest mb-2" style={{ color: item.color }}>
+                {item.title}
+              </div>
+              <p className="font-mono text-[10px] text-[#adaaaa] mb-3">{item.desc}</p>
+              <div
+                className="font-mono text-[10px] font-bold uppercase opacity-60 group-hover:opacity-100 transition-opacity"
+                style={{ color: item.color }}
               >
-                {item.cta}
-              </a>
-            </motion.div>
+                {item.cta} →
+              </div>
+            </motion.a>
           ))}
         </div>
 
