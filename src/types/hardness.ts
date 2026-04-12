@@ -1,4 +1,34 @@
 /**
+ * Hardness Finance — Type System
+ * The canonical types for the Financial Orchestration Layer.
+ */
+
+// ---- Agent Identity & Policy ----
+
+export interface RiskPolicy {
+  minHardnessScore: number;
+  maxNotionalUsd: number;
+  allowedSymbols: string[];
+  requireJudge: boolean;
+  autoSettle: boolean;
+}
+
+export interface AgentProfile {
+  agentId: string;
+  owner: string;
+  name: string;
+  type: 'trading-agent' | 'strategy-agent' | 'observer';
+  capabilities: string[];
+  mcpEndpoint?: string;
+  riskPolicy: RiskPolicy;
+  metadataURI?: string;
+  registeredAt?: number;
+  stake?: string;
+}
+
+// ---- HardnessSpec: The Intake Spec ----
+
+/**
  * HardnessSpec: The canonical "Spec Packet" for every trading decision.
  * Implements the Disciplined Harness pattern.
  * Every prediction must pass through this schema before entering the sandbox.
