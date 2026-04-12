@@ -7,6 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { HARDNESS_REGISTRY_ADDRESS } from '../_lib/hardness-registry';
 import { getAgent, upsertAgent } from '../_lib/hardness-control-plane';
+import { buildAuthChallenge, verifyAgentRequest } from '../_lib/agent-auth';
 
 export const config = { maxDuration: 15 };
 
@@ -38,6 +39,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       usage: 'POST with JSON body: { agentId, owner, name, type?, version?, capabilities?, mcpEndpoint?, webhookUrl?, metadata?, riskPolicy?: { minHardnessScore, maxNotionalUsd, allowedSymbols, requireJudge, requireOnchainProof, mode } }',
       registry: HARDNESS_REGISTRY_ADDRESS,
       docs: 'https://bobbyprotocol.xyz/agentic-world/bobby/console',
+      auth: {
+        headers: ['x-agent-address', 'x-agent-timestamp', 'x-agent-signature'],
+        challengeExample: buildAuthChallenge('register-agent', { agentId: 'your-agent', owner: '0x...', name: 'Your Agent' }, new Date().toISOString()),
+        fallback: 'If omitted, Bobby accepts demo-mode registration.',
+      },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -60,6 +66,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         riskPolicy: '{ minHardnessScore, maxNotionalUsd, allowedSymbols, requireJudge, requireOnchainProof, mode } (optional)',
       },
     });
+  }
+
+  const auth = await verifyAgentRequest(
+    req,
+    'register-agent',
+    { agentId: body.agentId, owner: body.owner, name: body.name },
+    body.owner
+  );
+  if (!auth.ok) {
+    return res.status(401).json({ error: auth.error });
   }
 
   const existing = await getAgent(body.agentId);
@@ -100,6 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         metadataURI,
         version: body.version || '1.0.0',
         stored: Boolean(profile),
+        authMode: auth.mode,
       },
       onchain: {
         registry: HARDNESS_REGISTRY_ADDRESS,

@@ -74,6 +74,7 @@ const BobbyDocsPage = lazy(() => import('@/pages/BobbyDocsPage'));
 const BobbyMarketplacePage = lazy(() => import('@/pages/BobbyMarketplacePage'));
 const BobbyHeartbeatPage = lazy(() => import('@/pages/BobbyHeartbeatPage'));
 const BobbyAgentConsolePage = lazy(() => import('@/pages/BobbyAgentConsolePage'));
+const BobbyNetworkConsolePage = lazy(() => import('@/pages/BobbyNetworkConsolePage'));
 
 
 // Auth pages
@@ -303,6 +304,14 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAgentConsolePage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'protocol/network',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyNetworkConsolePage />
             </Suspense>
           ),
         },
@@ -556,6 +565,22 @@ const router = createBrowserRouter(
               element: (
                 <Suspense fallback={<PageLoader />}>
                   <BobbyAgentTraderPage />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'agentic-world/bobby/console',
+              element: (
+                <Suspense fallback={<PageLoader />}>
+                  <BobbyAgentConsolePage />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'agentic-world/network',
+              element: (
+                <Suspense fallback={<PageLoader />}>
+                  <BobbyNetworkConsolePage />
                 </Suspense>
               ),
             },

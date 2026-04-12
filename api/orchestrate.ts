@@ -8,6 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { computeHardnessScore, isHardnessRegistryConfigured, recordHardnessActivity } from './_lib/hardness-registry';
 import { createProof, createSession, evaluatePolicy, getAgent, updateSession } from './_lib/hardness-control-plane';
+import { buildAuthChallenge, verifyAgentRequest } from './_lib/agent-auth';
 
 export const config = { maxDuration: 120 };
 
@@ -74,6 +75,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       usage: 'POST with JSON body: { agent, prediction: { symbol, direction, entry, target, stop, thesis }, options: { runDebate, runJudge, commitOnchain } }',
       docs: 'https://bobbyprotocol.xyz/protocol/console',
       registry: process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
+      auth: {
+        headers: ['x-agent-address', 'x-agent-timestamp', 'x-agent-signature'],
+        challengeExample: buildAuthChallenge(
+          'orchestrate',
+          { agentId: 'your-agent', symbol: 'BTC', direction: 'long', entry: 83000, target: 95000, stop: 78000 },
+          new Date().toISOString()
+        ),
+        fallback: 'If omitted, Bobby accepts demo-mode orchestration.',
+      },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -109,6 +119,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : (p.entry - p.target) / (p.stop - p.entry);
 
     const agent = agentId !== 'anonymous' ? await getAgent(agentId) : null;
+    const auth = await verifyAgentRequest(
+      req,
+      'orchestrate',
+      {
+        agentId,
+        symbol: p.symbol,
+        direction: p.direction,
+        entry: p.entry,
+        target: p.target,
+        stop: p.stop,
+      },
+      agent?.owner_address || null
+    );
+    if (!auth.ok) {
+      return res.status(401).json({ error: auth.error });
+    }
 
     // Build the HardnessSpec packet (what enters the harness)
     const specPacket = `HARDNESS SPEC PACKET
@@ -132,6 +158,7 @@ Invalidation: ${p.invalidation || 'not specified'}`;
         specPacket,
         riskReward: parseFloat(rr.toFixed(2)),
         policy: agent?.risk_policy_json || null,
+        authMode: auth.mode,
       },
       status: 'received',
     });
@@ -237,6 +264,7 @@ Invalidation: ${p.invalidation || 'not specified'}`;
       debateId,
       sessionId,
       agent: agentId,
+      authMode: auth.mode,
       decision: policy.result === 'blocked' ? 'reject' : action,
       policyResult: policy.result,
       policyReason: policy.reason,

@@ -54,7 +54,10 @@ export default function BobbyAgentConsolePage() {
           <a href="/protocol" className="text-white/40 hover:text-green-400 transition text-sm font-mono">&larr; PROTOCOL</a>
           <h1 className="text-lg font-mono text-green-400 tracking-wider">AGENT OPERATING CONSOLE</h1>
         </div>
-        <div className="text-xs font-mono text-white/20">Hardness Finance v1.1</div>
+        <div className="flex items-center gap-4">
+          <a href="/agentic-world/network" className="text-xs font-mono text-white/40 hover:text-green-400 transition">NETWORK</a>
+          <div className="text-xs font-mono text-white/20">Hardness Finance v1.1</div>
+        </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-10">

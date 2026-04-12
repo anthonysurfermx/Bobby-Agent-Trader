@@ -201,6 +201,32 @@ export async function getConsensusRows(symbol: string) {
   return Array.isArray(rows) ? rows : [];
 }
 
+export async function listAgents(limit = 50) {
+  if (!hasSupabase()) return [];
+  const query = new URLSearchParams({
+    select: 'agent_id,name,owner_address,agent_type,version,capabilities,status,created_at,updated_at',
+    order: 'created_at.desc',
+    limit: String(limit),
+  });
+  const res = await fetch(`${SB_URL}/rest/v1/hardness_agents?${query.toString()}`, { headers: headers() });
+  if (!res.ok) return [];
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function listRecentSessions(limit = 25) {
+  if (!hasSupabase()) return [];
+  const query = new URLSearchParams({
+    select: 'session_id,agent_id,symbol,direction,policy_result,hardness_score,status,decision_json,created_at',
+    order: 'created_at.desc',
+    limit: String(limit),
+  });
+  const res = await fetch(`${SB_URL}/rest/v1/hardness_agent_sessions?${query.toString()}`, { headers: headers() });
+  if (!res.ok) return [];
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows : [];
+}
+
 export async function getAgentOutcomeStats(agentId: string) {
   if (!hasSupabase()) {
     return { totalPredictions: 0, resolved: 0, winRateBps: 0, avgHardnessScore: 0 };
