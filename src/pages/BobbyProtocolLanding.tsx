@@ -330,13 +330,13 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         className="flex flex-wrap justify-center gap-3 mb-8"
       >
         <span className="px-3 py-1 bg-[#262626] border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[10px] tracking-widest">
-          [3-AGENT_DEBATE]
+          [HARDNESS FINANCE]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#fcc025]/20 text-[#fcc025] font-mono text-[10px] tracking-widest">
-          [ON-CHAIN_JUDGE]
+          [CONVICTION LAYER]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#ff716a]/20 text-[#ff716a] font-mono text-[10px] tracking-widest">
-          [PAY-TO-CHALLENGE]
+          [AGENT INFRASTRUCTURE]
         </span>
       </motion.div>
 
@@ -346,8 +346,8 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.1 }}
         className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] text-center max-w-5xl leading-none uppercase mb-6"
       >
-        The only AI trader you can{' '}
-        <span className="text-[#6dfe9c] italic">argue</span> with on-chain.
+        The Hardness Layer for{' '}
+        <span className="text-[#6dfe9c] italic">Agent</span> Finance
       </motion.h1>
 
       <motion.p
@@ -356,8 +356,8 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.2 }}
         className="font-mono text-[11px] text-[#adaaaa] uppercase tracking-widest mb-10 text-center max-w-2xl"
       >
-        Three agents debate every trade. A judge grades them on six dimensions.
-        Anyone can stake OKB to prove Bobby was wrong.
+        Before any agent executes, Bobby hardens the thesis. Three agents attack.
+        A judge scores. Anyone can stake to prove it wrong. What survives is conviction.
       </motion.p>
 
       <motion.div
@@ -607,18 +607,18 @@ function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSumm
 
 function ClosedLoop() {
   const steps = [
-    { title: 'THESIS', glyph: '>', desc: 'Alpha proposes trade', color: '#6dfe9c' },
-    { title: 'DEBATE', glyph: '><', desc: 'Red Team attacks', color: '#fcc025' },
-    { title: 'JUDGE', glyph: ':::', desc: '6-dimension audit', color: '#ff716a' },
-    { title: 'EXECUTE', glyph: '[!]', desc: 'CIO decides', color: '#6dfe9c' },
-    { title: 'BOUNTY', glyph: '$?', desc: 'Challengers stake', color: '#fcc025' },
-    { title: 'SETTLE', glyph: '=X=', desc: 'On-chain proof', color: '#6dfe9c' },
+    { title: 'SIGNAL', glyph: '>', desc: 'Raw signal enters the hardness chamber', color: '#6dfe9c' },
+    { title: 'PRESSURE', glyph: '><', desc: 'Thesis compressed under adversarial load', color: '#fcc025' },
+    { title: 'FRACTURE TEST', glyph: ':::', desc: '3 agents try to break the thesis', color: '#ff716a' },
+    { title: 'GRADE', glyph: '[!]', desc: '6-dimension hardness score', color: '#6dfe9c' },
+    { title: 'EXECUTE', glyph: '$?', desc: 'Only hardened theses pass', color: '#fcc025' },
+    { title: 'PROOF', glyph: '=X=', desc: 'On-chain record of what survived', color: '#6dfe9c' },
   ];
 
   return (
     <section id="loop" className="py-24 px-6 max-w-7xl mx-auto">
       <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-10 border-l-4 border-[#fcc025] pl-6">
-        Closed Loop
+        The Hardness Process
       </h2>
 
       <div className="grid gap-4 lg:grid-cols-6">
@@ -1549,10 +1549,10 @@ function Footer({ stats }: { stats: ProtocolStats | null }) {
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
           <div className="text-[#6dfe9c] font-bold font-mono text-sm uppercase mb-1">
-            BOBBY_PROTOCOL
+            BOBBY_PROTOCOL — HARDNESS FINANCE
           </div>
           <div className="text-[#6dfe9c]/40 font-mono text-[10px] uppercase">
-            Built for OKX X Layer · Build X Season 2
+            The conviction hardness layer for agent finance · X Layer
           </div>
           <div className="text-[#6dfe9c]/40 font-mono text-[10px] mt-1">
             Last sync: {stats ? new Date(stats.fetchedAt).toLocaleTimeString() : '—'}
