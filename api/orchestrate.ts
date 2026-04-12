@@ -310,3 +310,4 @@ Invalidation: ${p.invalidation || 'not specified'}`;
     return res.status(500).json({ error: msg });
   }
 }
+// Hardness Finance v1.1 — Financial Orchestration Infrastructure
