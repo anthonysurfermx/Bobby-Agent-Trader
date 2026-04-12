@@ -245,7 +245,7 @@ async function callStructuredVerdict(system: string, userMsg: string, timeoutMs 
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
   // Always use production domain — VERCEL_URL points to preview deployments that may have stale env vars
-  const host = 'https://defimexico.org';
+  const host = 'https://bobbyprotocol.xyz';
   const internalAuth = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
   try {
     const res = await fetch(`${host}${path}`, {
@@ -264,7 +264,7 @@ async function fetchLocalApi(path: string, body: any, noFallback = false): Promi
     if (noFallback) return { ok: false, error: `${path}: network error` };
   }
 
-  // Fallback to prod domain ONLY for read-only endpoints
+  // Fallback to alt domain ONLY for read-only endpoints
   try {
     const res2 = await fetch(`https://defimexico.org${path}`, {
       method: 'POST',
@@ -550,6 +550,7 @@ function yieldRecommendationStatus(
 
 async function fetchIntel(): Promise<any | null> {
   const urls = [
+    'https://bobbyprotocol.xyz/api/bobby-intel',
     'https://defimexico.org/api/bobby-intel',
     'https://defi-mexico-hub.vercel.app/api/bobby-intel',
   ];
