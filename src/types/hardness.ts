@@ -11,6 +11,11 @@ export interface RiskPolicy {
   allowedSymbols: string[];
   requireJudge: boolean;
   autoSettle: boolean;
+  // Guardrails (Principles #2, #5)
+  maxDrawdownPct?: number;        // Max portfolio drawdown before auto-block
+  maxRecursionDepth?: number;     // Termination limit for agent loops
+  stepBudgetOkb?: string;         // Cost ceiling per session
+  mode: 'advisory' | 'auto' | 'paper';
 }
 
 export interface AgentProfile {
@@ -18,12 +23,15 @@ export interface AgentProfile {
   owner: string;
   name: string;
   type: 'trading-agent' | 'strategy-agent' | 'observer';
+  version?: string;
   capabilities: string[];
   mcpEndpoint?: string;
   riskPolicy: RiskPolicy;
   metadataURI?: string;
+  memoryTier?: 'hot' | 'cold' | 'archived';  // Hierarchical memory (Principle #10)
   registeredAt?: number;
   stake?: string;
+  status?: 'active' | 'paused' | 'banned';
 }
 
 // ---- HardnessSpec: The Intake Spec ----
@@ -34,8 +42,9 @@ export interface AgentProfile {
  * Every prediction must pass through this schema before entering the sandbox.
  */
 export interface HardnessSpec {
-  // Identity
+  // Identity & Tracing (Principle #18)
   agentId: string;
+  traceId?: string;               // Causal chain link to previous session
   symbol: string;
   direction: 'LONG' | 'SHORT' | 'NEUTRAL';
   timeframe: '1H' | '4H' | '1D' | '1W';
@@ -60,6 +69,9 @@ export interface HardnessSpec {
     smartMoneyFlow?: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
   };
 
+  // Memory (Principle #1, #12)
+  previousObservations?: string[];  // Trace from last action observed
+
   // Provenance
   timestamp: number;
 }
@@ -67,6 +79,7 @@ export interface HardnessSpec {
 export interface HardnessVerdict {
   spec: HardnessSpec;
   hardnessScore: number; // 0-100
+  causalChain?: string[];  // Principle #18: causal antecedents of the verdict
   judgeScores: {
     dataIntegrity: number;
     adversarialQuality: number;
@@ -75,7 +88,7 @@ export interface HardnessVerdict {
     calibrationAlignment: number;
     novelty: number;
   };
-  action: 'EXECUTE' | 'REDUCE_SIZE' | 'PAPER_ONLY' | 'PUBLISH_ONLY' | 'REJECT';
+  action: 'EXECUTE' | 'REDUCE_SIZE' | 'PAPER_ONLY' | 'PUBLISH_ONLY' | 'REJECT' | 'REQUIRE_HUMAN_APPROVAL';
   biasesDetected: string[];
   redFlags: string[];
   rationale: string;
