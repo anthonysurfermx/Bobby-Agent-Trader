@@ -251,7 +251,7 @@ function TopTicker({ stats }: { stats: ProtocolStats | null }) {
 }
 
 function Nav() {
-  const sections = ['DEBATE', 'LOOP', 'JUDGE', 'WHY', 'BOUNTIES', 'MCP', 'CONTRACTS'];
+  const sections = ['DEBATE', 'LOOP', 'JUDGE', 'WHY', 'BOUNTIES', 'MCP', 'INTEROP', 'CONTRACTS'];
   return (
     <nav className="sticky top-8 w-full flex justify-between items-center px-6 py-4 bg-[#0e0e0e]/80 backdrop-blur-xl z-50 border-b border-[#494847]/15">
       <div className="text-xl font-black text-[#6dfe9c] tracking-tighter uppercase">
@@ -1109,6 +1109,124 @@ function McpSection({
   );
 }
 
+function AgentInterop({ stats }: { stats: ProtocolStats | null }) {
+  const mcpCalls = stats?.contracts.agentEconomy.stats.totalMcpCalls ?? '0';
+  const volume = stats?.contracts.agentEconomy.stats.totalVolumeOkb ?? '0';
+
+  const integrations = [
+    {
+      title: 'SKILL.MD',
+      desc: 'One file your agent downloads to consume Bobby via MCP. Zero-code integration — any Claude, GPT, or custom agent reads it and knows how to call every tool.',
+      href: '/skill.md',
+      cta: '_DOWNLOAD_SKILL',
+      color: '#6dfe9c',
+    },
+    {
+      title: 'REPUTATION_API',
+      desc: 'Public endpoint returning on-chain track record, win rate, economy stats, and bounty status. Your agent checks Bobby\'s credibility before paying for analysis.',
+      href: '/api/reputation',
+      cta: '_QUERY_REPUTATION',
+      color: '#fcc025',
+    },
+    {
+      title: 'JUDGE_MANIFEST',
+      desc: 'Machine-readable evaluation framework. Six dimensions, scoring rubrics, bias detection, and thresholds — so your agent can audit Bobby\'s debate quality programmatically.',
+      href: '/ai-judge-manifest.json',
+      cta: '_READ_MANIFEST',
+      color: '#ff716a',
+    },
+    {
+      title: 'x402_SETTLEMENT',
+      desc: 'Premium tools settle on X Layer via the x402 HTTP payment protocol. One contract call, one tx hash, and your agent gets the analysis. No accounts, no API keys for free tools.',
+      href: '/api/mcp-http',
+      cta: '_VIEW_ENDPOINT',
+      color: '#6dfe9c',
+    },
+  ];
+
+  return (
+    <section id="interop" className="py-24 px-6 bg-[#131313] border-y border-[#494847]/15">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-12">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4 border-l-4 border-[#6dfe9c] pl-6">
+              Agent-to-Agent Interop
+            </h2>
+            <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest pl-6">
+              Any AI agent can consume Bobby. Download the skill file and start calling.
+            </p>
+          </div>
+          <div className="flex gap-4 font-mono text-[10px]">
+            <div className="bg-black p-3 border border-[#6dfe9c]/20">
+              <div className="text-[#adaaaa]">AGENTS_SERVED</div>
+              <div className="text-[#6dfe9c] text-2xl font-bold">{mcpCalls}</div>
+            </div>
+            <div className="bg-black p-3 border border-[#6dfe9c]/20">
+              <div className="text-[#adaaaa]">OKB_SETTLED</div>
+              <div className="text-[#6dfe9c] text-2xl font-bold">{safeFixed(volume, 4)}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 mb-8">
+          {integrations.map((item, i) => (
+            <motion.div
+              key={item.title}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.05 }}
+              className="bg-black border border-[#494847]/15 p-6 hover:border-[#6dfe9c]/30 transition-all flex flex-col justify-between"
+            >
+              <div>
+                <div
+                  className="font-mono text-[11px] uppercase tracking-widest mb-3"
+                  style={{ color: item.color }}
+                >
+                  {item.title}
+                </div>
+                <p className="text-sm leading-6 text-[#adaaaa] mb-6">{item.desc}</p>
+              </div>
+              <a
+                href={item.href}
+                target={item.href.startsWith('/api') || item.href.endsWith('.json') || item.href.endsWith('.md') ? '_blank' : undefined}
+                rel="noreferrer"
+                className="inline-block border text-xs font-bold uppercase tracking-tighter px-4 py-2 hover:brightness-110 transition-all"
+                style={{
+                  color: item.color,
+                  borderColor: `${item.color}50`,
+                  backgroundColor: `${item.color}10`,
+                }}
+              >
+                {item.cta}
+              </a>
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="bg-black border border-[#494847]/20">
+          <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
+            <span>agent_quickstart.sh</span>
+            <span className="text-[#6dfe9c]">3 commands to integrate</span>
+          </div>
+          <pre className="p-6 font-mono text-[11px] text-[#6dfe9c]/80 overflow-x-auto leading-relaxed">
+{`# 1. Download the skill file (your agent reads this)
+curl -o bobby.skill.md https://bobbyprotocol.xyz/skill.md
+
+# 2. Check Bobby's on-chain reputation before trusting
+curl https://bobbyprotocol.xyz/api/reputation | jq '.reputation'
+
+# 3. Call a free tool — no payment, no API key
+curl -X POST https://bobbyprotocol.xyz/api/mcp-http \\
+  -H "Content-Type: application/json" \\
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_intel","arguments":{}},"id":"1"}'`}
+          </pre>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
   const contracts = useMemo(() => {
     if (!stats) return [];
@@ -1345,6 +1463,7 @@ export default function BobbyProtocolLanding() {
       <WhyMatters />
       <Bounties stats={stats} />
       <McpSection mcp={mcp} stats={stats} />
+      <AgentInterop stats={stats} />
       <LiveOnXLayer stats={stats} />
       <Footer stats={stats} />
     </div>

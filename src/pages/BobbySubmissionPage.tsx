@@ -46,7 +46,12 @@ const reviewerActions = [
     kind: settlementProof.lastSettlement.oklinkUrl ? 'external' : 'anchor',
     icon: Network,
   },
+  { label: 'Agent SKILL.MD', href: SKILL_MD, kind: 'internal', icon: FileCode2 },
+  { label: 'Reputation API', href: REPUTATION_API, kind: 'internal', icon: ShieldCheck },
 ];
+
+const SKILL_MD = '/skill.md';
+const REPUTATION_API = '/api/reputation';
 
 const judgeRows = [
   { label: 'Public GitHub', href: GITHUB_REPO, kind: 'external', status: 'check live' },
@@ -81,6 +86,18 @@ const judgeRows = [
   {
     label: 'MCP Streamable HTTP working',
     href: MCP_ENDPOINT,
+    kind: 'internal',
+    status: 'check live',
+  },
+  {
+    label: 'Agent SKILL.MD integration file',
+    href: SKILL_MD,
+    kind: 'internal',
+    status: 'check live',
+  },
+  {
+    label: 'On-chain reputation API',
+    href: REPUTATION_API,
     kind: 'internal',
     status: 'check live',
   },
