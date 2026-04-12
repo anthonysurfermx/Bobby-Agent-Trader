@@ -25,5 +25,27 @@
     "blockNumber": 57243627,
     "poster": "0x35e499a14c8c723c70df6ccc129a544be0cd92bc",
     "contract": "0xa8005ab465a0e02cb14824cd0e7630391fba673d"
+  },
+  "liveEndpoints": {
+    "verified": "2026-04-12T17:30:00Z",
+    "endpoints": [
+      { "path": "/api/mcp-http", "status": 200, "description": "MCP Streamable HTTP — 15 tools" },
+      { "path": "/api/protocol-heartbeat", "status": 200, "description": "Real-time protocol health" },
+      { "path": "/api/reputation", "status": 200, "description": "On-chain track record" },
+      { "path": "/api/registry", "status": 200, "description": "Agent catalog (3 agents)" },
+      { "path": "/api/activity", "status": 200, "description": "Live MCP call feed" },
+      { "path": "/api/bobby-protocol-stats", "status": 200, "description": "Aggregated protocol stats" },
+      { "path": "/api/conviction-tiers", "status": 200, "description": "Conviction-tier stratified performance" },
+      { "path": "/api/sentinel-demo", "status": 200, "description": "Agent-to-agent MCP demo" },
+      { "path": "/api/smart-money-leaderboard", "status": 200, "description": "OKX OnchainOS smart money aggregation" },
+      { "path": "/api/bobby-intel", "status": 200, "description": "10-source intelligence briefing" },
+      { "path": "/api/bobby-cycle", "status": 200, "description": "Autonomous 8h debate cycle" }
+    ]
+  },
+  "pluginStore": {
+    "status": "submitted",
+    "pr": "https://github.com/okx/plugin-store/pull/161",
+    "lintStatus": "passed (1 cosmetic warning)",
+    "submittedAt": "2026-04-12T17:00:00Z"
   }
 }
