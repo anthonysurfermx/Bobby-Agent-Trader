@@ -35,6 +35,9 @@ const metadata = [
   },
 ];
 
+const SKILL_MD = '/skill.md';
+const REPUTATION_API = '/api/reputation';
+
 const reviewerActions = [
   { label: 'Open Live Terminal', href: LIVE_TERMINAL, kind: 'internal', icon: TerminalSquare },
   { label: 'View MCP Endpoint', href: MCP_ENDPOINT, kind: 'internal', icon: Globe2 },
@@ -50,10 +53,8 @@ const reviewerActions = [
   { label: 'Reputation API', href: REPUTATION_API, kind: 'internal', icon: ShieldCheck },
   { label: 'Protocol Heartbeat', href: '/protocol/heartbeat', kind: 'internal', icon: Network },
   { label: 'Plugin Store PR', href: 'https://github.com/okx/plugin-store/pull/161', kind: 'external', icon: Trophy },
+  { label: 'Agent Console', href: '/protocol/console', kind: 'internal', icon: TerminalSquare },
 ];
-
-const SKILL_MD = '/skill.md';
-const REPUTATION_API = '/api/reputation';
 
 const judgeRows = [
   { label: 'Public GitHub', href: GITHUB_REPO, kind: 'external', status: 'check live' },
