@@ -35,6 +35,7 @@ interface OrchestrateBody {
     runJudge?: boolean;
     commitOnchain?: boolean;
     publishSignal?: boolean;
+    acknowledgeHighRisk?: boolean;
   };
 }
 
@@ -102,6 +103,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!OPENAI_API_KEY) {
     return res.status(503).json({ error: 'LLM not configured' });
+  }
+
+  // Principle #17: Approval Gates for high-risk actions
+  const rr = p.direction === 'long'
+    ? (p.target - p.entry) / Math.max(1, p.entry - p.stop)
+    : (p.entry - p.target) / Math.max(1, p.stop - p.entry);
+  const isHighRisk = (p.entry * (p.conviction || 5) / 10) > 50000 || rr < 1.0;
+  if (isHighRisk && !body.options?.acknowledgeHighRisk) {
+    return res.status(200).json({
+      ok: true,
+      requiresApproval: true,
+      reason: rr < 1.0 ? 'Risk/reward ratio below 1.0' : 'Notional exceeds $50K threshold',
+      riskReward: parseFloat(rr.toFixed(2)),
+      hint: 'Re-submit with options.acknowledgeHighRisk: true to proceed',
+    });
   }
 
   const opts = body.options || {};
@@ -224,6 +240,12 @@ Invalidation: ${p.invalidation || 'not specified'}`;
       judgePresent: runJudge,
       requestedNotionalUsd: p.entry,
     });
+    
+    // Punto 17: Approval Gates
+    let action = determineAction(hardnessScore);
+    if (action === 'execute' && agent?.riskPolicy.mode === 'advisory') {
+      action = 'require_human_approval';
+    }
 
     // On-chain proof
     let proofs: Record<string, string | null> | null = null;
