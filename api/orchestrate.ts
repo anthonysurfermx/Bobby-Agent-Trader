@@ -7,13 +7,15 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { computeHardnessScore, isHardnessRegistryConfigured, recordHardnessActivity } from './_lib/hardness-registry';
+import { createProof, createSession, evaluatePolicy, getAgent, updateSession } from './_lib/hardness-control-plane';
 
 export const config = { maxDuration: 120 };
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 interface OrchestrateBody {
-  agent: string;
+  agent?: string;
+  agentId?: string;
   intent?: string;
   prediction: {
     symbol: string;
@@ -71,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       description: 'Financial orchestration for AI agents. Submit a structured prediction, get it stress-tested through adversarial debate, scored on 6 dimensions, and proven on-chain.',
       usage: 'POST with JSON body: { agent, prediction: { symbol, direction, entry, target, stop, thesis }, options: { runDebate, runJudge, commitOnchain } }',
       docs: 'https://bobbyprotocol.xyz/protocol/console',
-      registry: '0x95D045b1488F0776419a0E09de4fc0687AbbAFbf',
+      registry: process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -97,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const runJudge = opts.runJudge !== false;
   const commitOnchain = opts.commitOnchain !== false;
   const publishSignal = opts.publishSignal !== false;
-  const agentId = body.agent || 'anonymous';
+  const agentId = body.agentId || body.agent || 'anonymous';
 
   try {
     const debateId = crypto.randomUUID();
@@ -105,6 +107,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rr = p.direction === 'long'
       ? (p.target - p.entry) / (p.entry - p.stop)
       : (p.entry - p.target) / (p.stop - p.entry);
+
+    const agent = agentId !== 'anonymous' ? await getAgent(agentId) : null;
 
     // Build the HardnessSpec packet (what enters the harness)
     const specPacket = `HARDNESS SPEC PACKET
@@ -115,6 +119,22 @@ Risk/Reward: ${rr.toFixed(2)} | Conviction: ${conviction}/10
 Thesis: ${p.thesis}
 Catalysts: ${(p.catalysts || []).join(', ') || 'none declared'}
 Invalidation: ${p.invalidation || 'not specified'}`;
+
+    const sessionId = `hs_${debateId}`;
+    await createSession({
+      session_id: sessionId,
+      agent_id: agentId,
+      intent: body.intent || 'evaluate_trade',
+      symbol: p.symbol,
+      direction: p.direction,
+      request_json: body as unknown as Record<string, unknown>,
+      context_json: {
+        specPacket,
+        riskReward: parseFloat(rr.toFixed(2)),
+        policy: agent?.risk_policy_json || null,
+      },
+      status: 'received',
+    });
 
     let alpha: Record<string, unknown> = {};
     let red: Record<string, unknown> = {};
@@ -171,10 +191,16 @@ Invalidation: ${p.invalidation || 'not specified'}`;
     const finalConviction = Math.max(1, Math.min(10,
       (cio as Record<string, number>).conviction || conviction
     ));
+    const policy = evaluatePolicy(agent?.risk_policy_json, {
+      symbol: p.symbol,
+      hardnessScore,
+      judgePresent: runJudge,
+      requestedNotionalUsd: p.entry,
+    });
 
     // On-chain proof
     let proofs: Record<string, string | null> | null = null;
-    if ((commitOnchain || publishSignal) && isHardnessRegistryConfigured()) {
+    if ((commitOnchain || publishSignal) && isHardnessRegistryConfigured() && policy.result !== 'blocked') {
       const proof = await recordHardnessActivity({
         threadId: debateId,
         symbol: p.symbol,
@@ -191,6 +217,13 @@ Invalidation: ${p.invalidation || 'not specified'}`;
           commitTxHash: proof.commitTxHash || null,
           signalTxHash: proof.signalTxHash || null,
         };
+        await createProof({
+          session_id: sessionId,
+          prediction_hash: proof.predictionHash,
+          commit_tx_hash: proof.commitTxHash || null,
+          signal_tx_hash: proof.signalTxHash || null,
+          chain_id: 196,
+        });
       }
     }
 
@@ -199,11 +232,14 @@ Invalidation: ${p.invalidation || 'not specified'}`;
       ...((judge as Record<string, string[]>).biases_detected || []),
     ]));
 
-    return res.status(200).json({
+    const responseBody = {
       ok: true,
       debateId,
+      sessionId,
       agent: agentId,
-      decision: action,
+      decision: policy.result === 'blocked' ? 'reject' : action,
+      policyResult: policy.result,
+      policyReason: policy.reason,
       hardnessScore,
       conviction: finalConviction,
       biases,
@@ -217,11 +253,29 @@ Invalidation: ${p.invalidation || 'not specified'}`;
       judge: { dimensions, recommendation: judgeRecommendation },
       proofs,
       sizing: {
-        suggestedAction: action,
+        suggestedAction: policy.result === 'blocked' ? 'reject' : action,
         riskReward: parseFloat(rr.toFixed(2)),
         maxConviction: finalConviction,
       },
+    };
+
+    await updateSession(sessionId, {
+      status: 'proved',
+      hardness_score: hardnessScore,
+      policy_result: policy.result,
+      decision_json: {
+        decision: responseBody.decision,
+        conviction: finalConviction,
+        recommendation: (cio as Record<string, string>).recommendation || '',
+        judgeRecommendation,
+        biases,
+        redFlags: (judge as Record<string, string[]>).red_flags || [],
+        prediction: p,
+        proofs,
+      },
     });
+
+    return res.status(200).json(responseBody);
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Orchestrate] Error:', msg);

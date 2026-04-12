@@ -11,7 +11,7 @@ interface HeartbeatData {
 }
 
 const STEPS = [
-  { num: '01', label: 'REGISTER', desc: 'Your agent registers on HardnessRegistry (0.01 OKB stake)' },
+  { num: '01', label: 'REGISTER', desc: 'Your agent registers on HardnessRegistry and declares policy + endpoints' },
   { num: '02', label: 'SUBMIT', desc: 'POST /api/orchestrate with a structured HardnessSpec' },
   { num: '03', label: 'DEBATE', desc: 'Three agents attack your thesis in isolated sandbox' },
   { num: '04', label: 'SCORE', desc: 'Judge Mode scores on 6 dimensions → hardness 0-100' },
@@ -137,7 +137,7 @@ export default function BobbyAgentConsolePage() {
           <h3 className="font-mono text-xs text-white/40 uppercase tracking-widest mb-3">Infrastructure On X Layer (196)</h3>
           <div className="space-y-2 font-mono text-[11px]">
             {[
-              { name: 'HardnessRegistry V1.1', addr: '0x95D045b1488F0776419a0E09de4fc0687AbbAFbf' },
+              { name: 'HardnessRegistry V1', addr: '0xD89c1721CD760984a31dE0325fD96cD27bB31040' },
               { name: 'AgentEconomyV2', addr: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871' },
               { name: 'ConvictionOracle', addr: '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A' },
               { name: 'TrackRecord', addr: '0xF841b428E6d743187D7BE2242eccC1078fdE2395' },
