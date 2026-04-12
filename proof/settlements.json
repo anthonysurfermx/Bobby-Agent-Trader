@@ -11,5 +11,19 @@
     "blockNumber": 57237403,
     "payer": "0xc3f836ec06a2202af23e59997a613ca0722f35d1",
     "contract": "0xD9540D770C8aF67e9E6412C92D78E34bc11ED871"
+  },
+  "firstBounty": {
+    "status": "confirmed",
+    "bountyId": 1,
+    "threadId": "debate-sentinel-okb-mnvzjyng",
+    "dimension": "DATA_INTEGRITY",
+    "rewardOkb": "0.001",
+    "claimWindowSecs": 604800,
+    "chainId": 196,
+    "txHash": "0x68d4c3f69a01cc3983a1d6b0b9625f54c474a8e80df90685a5cc38f3a2355ad0",
+    "oklinkUrl": "https://www.oklink.com/xlayer/tx/0x68d4c3f69a01cc3983a1d6b0b9625f54c474a8e80df90685a5cc38f3a2355ad0",
+    "blockNumber": 57243627,
+    "poster": "0x35e499a14c8c723c70df6ccc129a544be0cd92bc",
+    "contract": "0xa8005ab465a0e02cb14824cd0e7630391fba673d"
   }
 }
