@@ -1567,6 +1567,14 @@ function Footer({ stats }: { stats: ProtocolStats | null }) {
           >
             LIVE_TERMINAL
           </a>
+          <a
+            className="text-[#fcc025] hover:text-[#fcc025] font-mono text-[11px] uppercase font-bold"
+            href="https://github.com/okx/plugin-store/pull/161"
+            target="_blank"
+            rel="noreferrer"
+          >
+            PLUGIN_STORE_PR
+          </a>
         </div>
       </div>
     </footer>
