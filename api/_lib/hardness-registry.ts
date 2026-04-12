@@ -1,16 +1,14 @@
-import { ethers } from 'ethers';
-
 const XLAYER_RPC = 'https://rpc.xlayer.tech';
 export const HARDNESS_REGISTRY_ADDRESS =
-  process.env.HARDNESS_REGISTRY_ADDRESS || '0x95D045b1488F0776419a0E09de4fc0687AbbAFbf';
+  process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
 
 const HARDNESS_REGISTRY_ABI = [
-  'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, uint96 stake, string metadataURI)',
+  'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, string metadataURI)',
   'function getService(string serviceId) view returns ((address owner,address recipient,uint128 priceWei,uint128 totalRevenue,uint64 totalCalls,uint64 createdAt,bool active,string serviceId))',
-  'function registerAgent(string metadataURI) payable',
+  'function registerAgent(string metadataURI)',
   'function registerService(string serviceId, uint256 priceWei, address recipient)',
   'function commitPrediction(bytes32 predictionHash, string symbol, uint8 conviction, uint96 entry, uint96 target, uint96 stop)',
-  'function publishSignal(string symbol, uint8 hardnessScore, uint8 direction, uint8 conviction, bytes32 context)',
+  'function publishSignal(string symbol, uint8 direction, uint8 conviction, bytes32 context)',
   'function getPrediction(bytes32 predictionHash) view returns ((address agent,uint64 committedAt,uint64 minResolveAt,uint64 resolvedAt,uint8 conviction,uint8 result,uint96 entryPrice,uint96 targetPrice,uint96 stopPrice,uint96 exitPrice,int32 pnlBps,string symbol))',
 ];
 
@@ -18,11 +16,11 @@ const DEFAULT_AGENT_METADATA_URI =
   process.env.BOBBY_HARDNESS_AGENT_METADATA_URI || 'https://bobbyprotocol.xyz/api/agent-identity';
 
 export const HARDNESS_PREMIUM_SERVICES = [
-  { serviceId: 'bobby_analyze', priceWei: ethers.parseEther('0.001') },
-  { serviceId: 'bobby_debate', priceWei: ethers.parseEther('0.001') },
-  { serviceId: 'bobby_judge', priceWei: ethers.parseEther('0.001') },
-  { serviceId: 'bobby_security_scan', priceWei: ethers.parseEther('0.001') },
-  { serviceId: 'bobby_wallet_portfolio', priceWei: ethers.parseEther('0.001') },
+  { serviceId: 'bobby_analyze', priceWei: '1000000000000000' },
+  { serviceId: 'bobby_debate', priceWei: '1000000000000000' },
+  { serviceId: 'bobby_judge', priceWei: '1000000000000000' },
+  { serviceId: 'bobby_security_scan', priceWei: '1000000000000000' },
+  { serviceId: 'bobby_wallet_portfolio', priceWei: '1000000000000000' },
 ];
 
 let lastSetupAt = 0;
@@ -90,17 +88,19 @@ export function computeHardnessScore(dimensions: Record<string, number>): number
 async function getSigner() {
   const key = process.env.BOBBY_RECORDER_KEY || '';
   if (!key || !HARDNESS_REGISTRY_ADDRESS) return null;
+  const { ethers } = await import('ethers');
   const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
   return new ethers.Wallet(key, provider);
 }
 
-async function ensureBobbySetup(contract: ethers.Contract, signer: ethers.Wallet, metadataURI?: string, recipient?: string) {
+async function ensureBobbySetup(contract: any, signer: any, metadataURI?: string, recipient?: string) {
   const now = Date.now();
   if (now - lastSetupAt < 15 * 60 * 1000) return;
+  const { ethers } = await import('ethers');
 
   const profile = await contract.agentProfiles(signer.address);
   if (!profile.registered) {
-    const tx = await contract.registerAgent(metadataURI || DEFAULT_AGENT_METADATA_URI, { gasLimit: 250000n, value: ethers.parseEther('0.01') });
+    const tx = await contract.registerAgent(metadataURI || DEFAULT_AGENT_METADATA_URI, { gasLimit: 250000n });
     await tx.wait();
   }
 
@@ -109,13 +109,13 @@ async function ensureBobbySetup(contract: ethers.Contract, signer: ethers.Wallet
     try {
       const existing = await contract.getService(service.serviceId);
       if (existing.owner === ethers.ZeroAddress) {
-        const tx = await contract.registerService(service.serviceId, service.priceWei, payoutRecipient, { gasLimit: 300000n });
+        const tx = await contract.registerService(service.serviceId, BigInt(service.priceWei), payoutRecipient, { gasLimit: 300000n });
         await tx.wait();
       } else if (
         existing.owner.toLowerCase() === signer.address.toLowerCase() &&
-        (!existing.active || existing.recipient.toLowerCase() !== payoutRecipient.toLowerCase() || existing.priceWei !== service.priceWei)
+        (!existing.active || existing.recipient.toLowerCase() !== payoutRecipient.toLowerCase() || existing.priceWei !== BigInt(service.priceWei))
       ) {
-        const tx = await contract.registerService(service.serviceId, service.priceWei, payoutRecipient, { gasLimit: 300000n });
+        const tx = await contract.registerService(service.serviceId, BigInt(service.priceWei), payoutRecipient, { gasLimit: 300000n });
         await tx.wait();
       }
     } catch (error) {
@@ -130,6 +130,7 @@ export async function recordHardnessActivity(input: RecordHardnessActivityInput)
   const signer = await getSigner();
   if (!signer) return null;
 
+  const { ethers } = await import('ethers');
   const contract = new ethers.Contract(HARDNESS_REGISTRY_ADDRESS, HARDNESS_REGISTRY_ABI, signer);
   await ensureBobbySetup(contract, signer, input.metadataURI, input.recipient);
 
@@ -157,7 +158,6 @@ export async function recordHardnessActivity(input: RecordHardnessActivityInput)
   try {
     const tx = await contract.publishSignal(
       input.symbol,
-      0, // hardnessScore — will be certified later by scorer
       directionToEnum(input.direction),
       conviction,
       context,

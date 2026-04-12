@@ -1,5 +1,5 @@
-import { ethers } from 'ethers';
 import type { VercelRequest } from '@vercel/node';
+import { recoverMessageAddress } from 'viem';
 
 const AUTH_WINDOW_MS = 10 * 60 * 1000;
 
@@ -47,7 +47,10 @@ export async function verifyAgentRequest(
   }
 
   const message = buildMessage(action, payload, timestamp);
-  const signer = ethers.verifyMessage(message, signature);
+  const signer = await recoverMessageAddress({
+    message,
+    signature: signature as `0x${string}`,
+  });
   if (signer.toLowerCase() !== address.toLowerCase()) {
     return { ok: false, error: 'Signature does not match x-agent-address' };
   }

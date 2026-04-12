@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getConsensusRows, getAgent } from '../_lib/hardness-control-plane';
+import { getConsensusRows, getAgent } from '../_lib/hardness-control-plane.js';
 
 export const config = { maxDuration: 10 };
 

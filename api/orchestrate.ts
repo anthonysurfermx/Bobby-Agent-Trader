@@ -6,9 +6,9 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { computeHardnessScore, isHardnessRegistryConfigured, recordHardnessActivity } from './_lib/hardness-registry';
-import { createProof, createSession, evaluatePolicy, getAgent, updateSession } from './_lib/hardness-control-plane';
-import { buildAuthChallenge, verifyAgentRequest } from './_lib/agent-auth';
+import { computeHardnessScore, isHardnessRegistryConfigured, recordHardnessActivity } from './_lib/hardness-registry.js';
+import { createProof, createSession, evaluatePolicy, getAgent, updateSession } from './_lib/hardness-control-plane.js';
+import { buildAuthChallenge, verifyAgentRequest } from './_lib/agent-auth.js';
 
 export const config = { maxDuration: 120 };
 

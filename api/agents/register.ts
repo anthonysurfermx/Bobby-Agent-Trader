@@ -5,9 +5,9 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { HARDNESS_REGISTRY_ADDRESS } from '../_lib/hardness-registry';
-import { getAgent, upsertAgent } from '../_lib/hardness-control-plane';
-import { buildAuthChallenge, verifyAgentRequest } from '../_lib/agent-auth';
+import { HARDNESS_REGISTRY_ADDRESS } from '../_lib/hardness-registry.js';
+import { getAgent, upsertAgent } from '../_lib/hardness-control-plane.js';
+import { buildAuthChallenge, verifyAgentRequest } from '../_lib/agent-auth.js';
 
 export const config = { maxDuration: 15 };
 

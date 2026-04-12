@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { listAgentSessions, listProofsBySessions } from '../../_lib/hardness-control-plane';
+import { listAgentSessions, listProofsBySessions } from '../../_lib/hardness-control-plane.js';
 
 export const config = { maxDuration: 10 };
 

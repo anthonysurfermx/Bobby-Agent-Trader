@@ -11,7 +11,7 @@ import { canOpenPosition, getPositionSize } from '../src/lib/onchainos/risk-mana
 import type { TradeParams } from '../src/lib/onchainos/types.js';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bobby-technical.js';
 import { ethers } from 'ethers';
-import { recordHardnessActivity } from './_lib/hardness-registry';
+import { recordHardnessActivity } from './_lib/hardness-registry.js';
 
 export const config = { maxDuration: 300 };
 
