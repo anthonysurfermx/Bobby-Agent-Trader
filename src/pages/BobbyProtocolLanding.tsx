@@ -288,6 +288,12 @@ function Nav() {
         >
           GITHUB
         </a>
+        <a
+          href="/protocol/console"
+          className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] transition-colors font-bold tracking-tighter uppercase text-sm"
+        >
+          CONSOLE
+        </a>
       </div>
       <div className="flex gap-3">
         <a
@@ -356,8 +362,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.2 }}
         className="font-mono text-[11px] text-[#adaaaa] uppercase tracking-widest mb-10 text-center max-w-2xl"
       >
-        Before any agent executes, Bobby hardens the thesis. Three agents attack.
-        A judge scores. Anyone can stake to prove it wrong. What survives is conviction.
+        Connect any agent. Bobby stress-tests its decisions through adversarial debate, scores conviction on 6 dimensions, and publishes proof on-chain. What survives is hardened conviction.
       </motion.p>
 
       <motion.div
@@ -1841,7 +1846,7 @@ function Footer({ stats }: { stats: ProtocolStats | null }) {
             BOBBY_PROTOCOL — HARDNESS FINANCE
           </div>
           <div className="text-[#6dfe9c]/40 font-mono text-[10px] uppercase">
-            The conviction hardness layer for agent finance · X Layer
+            Financial orchestration infrastructure for AI agents · X Layer
           </div>
           <div className="text-[#6dfe9c]/40 font-mono text-[10px] mt-1">
             Last sync: {stats ? new Date(stats.fetchedAt).toLocaleTimeString() : '—'}
@@ -1913,10 +1918,10 @@ export default function BobbyProtocolLanding() {
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white font-sans relative overflow-x-hidden">
       <Helmet>
-        <title>Bobby Protocol | Adversarial AI Trading on X Layer</title>
+        <title>Bobby Protocol | Financial Orchestration for AI Agents</title>
         <meta
           name="description"
-          content="Three agents debate every trade. A judge grades them on six dimensions. Anyone can stake OKB to prove Bobby was wrong. Live on OKX X Layer."
+          content="Connect any AI agent to financial infrastructure. Stress-test decisions with adversarial debate. Score on 6 dimensions. Publish proof on X Layer."
         />
         <style>{`
           @keyframes marquee {
