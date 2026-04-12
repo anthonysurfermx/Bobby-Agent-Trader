@@ -47,5 +47,24 @@
     "pr": "https://github.com/okx/plugin-store/pull/161",
     "lintStatus": "passed (1 cosmetic warning)",
     "submittedAt": "2026-04-12T17:00:00Z"
+  },
+  "hardnessRegistry": {
+    "status": "deployed",
+    "contract": "0xD89c1721CD760984a31dE0325fD96cD27bB31040",
+    "txHash": "0x2538bfb4f66fd5a89def7dbff84a62c5203887dfb8a68c9ea4911e8c471914f6",
+    "chainId": 196,
+    "owner": "0x313530bceAD24D536E20494919AeFdd13cb2F3b2",
+    "resolvers": [
+      "0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea",
+      "0xc27Bf54D67165d1C81E3a39B4Dec7DD7F82137e0",
+      "0x313530bcead24d536e20494919aefdd13cb2f3b2"
+    ],
+    "resolverThreshold": 2,
+    "bytecodeSize": 22312,
+    "securityReviews": ["R1-self-pass", "R2-adversarial-pass"],
+    "tests": "50/50",
+    "deployedAt": "2026-04-12T19:30:00Z",
+    "oklinkUrl": "https://www.oklink.com/xlayer/address/0xd89c1721cd760984a31de0325fd96cd27bb31040",
+    "modules": ["multi-agent-track-record", "multi-agent-signal-feed", "agent-service-registry", "multi-resolver-bounties"]
   }
 }
