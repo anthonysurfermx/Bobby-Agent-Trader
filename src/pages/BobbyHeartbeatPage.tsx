@@ -241,6 +241,39 @@ export default function BobbyHeartbeatPage() {
             </motion.div>
           </div>
 
+          {/* Proven On-Chain Transactions */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 }}
+            className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
+          >
+            <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-3">Proven On-Chain Transactions</div>
+            <div className="space-y-2">
+              {[
+                { label: 'x402 MCP Payment', tx: '0x6593041ea93a338916dffdb3b203d034c240ec34fb2d04cbad2acbc7e7688fdf', detail: 'bobby_analyze | 0.001 OKB' },
+                { label: 'Bounty #1 Posted', tx: '0x68d4c3f69a01cc3983a1d6b0b9625f54c474a8e80df90685a5cc38f3a2355ad0', detail: 'DATA_INTEGRITY | 0.001 OKB' },
+              ].map((proof) => (
+                <a
+                  key={proof.tx}
+                  href={`https://www.oklink.com/xlayer/tx/${proof.tx}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between px-3 py-2 bg-white/[0.01] border border-white/[0.03] rounded-lg hover:border-green-400/30 transition group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-2 h-2 bg-green-400 rounded-full" />
+                    <span className="text-xs font-mono text-green-400">{proof.label}</span>
+                    <span className="text-xs font-mono text-white/30 hidden md:inline">{proof.detail}</span>
+                  </div>
+                  <span className="text-xs font-mono text-white/20 group-hover:text-green-400 transition">
+                    {proof.tx.slice(0, 14)}...{proof.tx.slice(-6)} ↗
+                  </span>
+                </a>
+              ))}
+            </div>
+          </motion.div>
+
           {/* Contract Status */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}

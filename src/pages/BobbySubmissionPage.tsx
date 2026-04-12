@@ -463,6 +463,28 @@ export default function BobbySubmissionPage() {
               </div>
             </Panel>
           </section>
+
+          <section className="mt-4">
+            <Panel title="OnchainOS APIs Used" kicker="OKX OnchainOS integration">
+              <div className="mt-4 space-y-3">
+                {[
+                  { path: '/api/v6/dex/market/signal/list', usage: 'Smart money signals — pre-debate intelligence fed to Alpha Hunter agent' },
+                  { path: '/api/v6/dex/aggregator/quote', usage: 'DEX aggregator quotes — trade execution after debate consensus' },
+                  { path: '/api/v5/dex/security/token-scan', usage: 'Token security scanning — bobby_security_scan MCP tool' },
+                  { path: '/api/v5/aigc/mcp/indicators', usage: 'Technical indicators — bobby_ta MCP tool for chart analysis' },
+                  { path: '/api/v5/dex/market/wallet-pnl', usage: 'Wallet PnL analysis — smart money leaderboard ranking' },
+                  { path: '/api/v5/dex/market/top-traders', usage: 'Top traders — smart money leaderboard discovery' },
+                ].map((api) => (
+                  <div key={api.path} className="flex flex-col gap-1 rounded-2xl border border-white/8 bg-black/20 p-4 sm:flex-row sm:items-center sm:gap-4">
+                    <code className="shrink-0 rounded-lg border border-[#8CFFB4]/20 bg-[#8CFFB4]/8 px-3 py-1 font-mono text-xs text-[#8CFFB4]">
+                      {api.path}
+                    </code>
+                    <span className="text-sm leading-6 text-white/72">{api.usage}</span>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          </section>
         </div>
       </div>
     </>

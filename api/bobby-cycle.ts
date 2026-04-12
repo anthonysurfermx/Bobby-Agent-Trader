@@ -1256,6 +1256,44 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
           }
         })();
       }
+
+      // ALWAYS publish conviction to Oracle — even when not trading
+      // This generates legitimate on-chain activity for every cycle
+      const oracleAddr = process.env.BOBBY_ORACLE_ADDRESS;
+      const oracleKey = process.env.BOBBY_RECORDER_KEY;
+      if (oracleAddr && oracleKey && symbol && conviction !== null && !cioSaysExecute) {
+        (async () => {
+          try {
+            const provider = new ethers.JsonRpcProvider('https://rpc.xlayer.tech');
+            const wallet = new ethers.Wallet(oracleKey, provider);
+            const oracleIface = new ethers.Interface([
+              'function publishSignal((string symbol, uint8 direction, uint8 conviction, uint8 agent, uint96 entryPrice, uint96 targetPrice, uint96 stopPrice, bytes32 debateHash, uint256 ttl))',
+            ]);
+            const debateHash = ethers.keccak256(ethers.toUtf8Bytes(threadId));
+            const dirNum = direction === 'long' ? 1 : direction === 'short' ? 2 : 0;
+            const convInt = Math.round((conviction ?? 0) * 10);
+            const currentPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price || 0;
+            const priceScaled = BigInt(Math.round(currentPrice * 1e8));
+            const tx = await Promise.race([
+              wallet.sendTransaction({
+                to: oracleAddr,
+                data: oracleIface.encodeFunctionData('publishSignal', [[
+                  symbol, dirNum, convInt, 0,
+                  priceScaled,
+                  priceScaled, // target = current when not trading
+                  priceScaled, // stop = current when not trading
+                  debateHash, BigInt(86400),
+                ]]),
+                gasLimit: 200000n,
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Oracle TX timeout')), 8000)),
+            ]) as any;
+            console.log(`[Cycle] Oracle signal (no-trade): ${tx.hash}`);
+          } catch (e: any) {
+            console.warn('[Cycle] Oracle no-trade signal failed (non-critical):', e.message);
+          }
+        })();
+      }
     }
 
     // ============================================================
