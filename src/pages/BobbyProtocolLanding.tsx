@@ -2007,7 +2007,7 @@ export default function BobbyProtocolLanding() {
       <HeroLiveDebate stats={stats} />
       <TrustBadge stats={stats} />
       <RevenueProof stats={stats} liveTxs={liveTxs} />
-      <TradingRoom stats={stats} pnl={pnl} />
+      {/* TradingRoom removed — repositioning Bobby as orchestration infra, not trading agent */}
       <ClosedLoop />
       <JudgeMode stats={stats} />
       <WhyMatters />
