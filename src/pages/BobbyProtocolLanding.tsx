@@ -16,6 +16,7 @@ import {
   RadarChart,
   ResponsiveContainer,
 } from 'recharts';
+import { useProtocolTxHistory } from '@/hooks/useProtocolTxHistory';
 
 // ---- Types ----
 
@@ -68,6 +69,12 @@ interface ProtocolStats {
     dimension: string;
     status: string;
     challengeCount: number;
+  }>;
+  bountySummary?: Record<string, {
+    totalCount: number;
+    openCount: number;
+    avgRewardOkb: number | null;
+    maxRewardOkb: number | null;
   }>;
   market: {
     prices: Price[];
@@ -1199,6 +1206,7 @@ function NodeCard({
 function Bounties({ stats }: { stats: ProtocolStats | null }) {
   const bounties = stats?.bounties ?? [];
   const bountiesContract = stats?.contracts.adversarialBounties;
+  const bountySummary = stats?.bountySummary ?? null;
   const dimensionCards = useMemo(() => {
     const base = [
       'DATA_INTEGRITY',
@@ -1210,6 +1218,19 @@ function Bounties({ stats }: { stats: ProtocolStats | null }) {
     ];
 
     return base.map((dimension) => {
+      const summary = bountySummary?.[dimension];
+      if (summary) {
+        return {
+          dimension,
+          count: summary.openCount,
+          avgReward: summary.avgRewardOkb,
+          hardest:
+            summary.maxRewardOkb !== null
+              ? `${summary.maxRewardOkb.toFixed(4)} OKB`
+              : 'Awaiting first challenger',
+        };
+      }
+
       const entries = bounties.filter((b) => b.dimension === dimension);
       const total = entries.reduce((sum, b) => sum + Number(b.rewardOkb || 0), 0);
       const avgReward = entries.length ? total / entries.length : null;
@@ -1223,7 +1244,7 @@ function Bounties({ stats }: { stats: ProtocolStats | null }) {
             : 'Awaiting first challenger',
       };
     });
-  }, [bounties]);
+  }, [bounties, bountySummary]);
 
   return (
     <section id="bounties" className="py-24 px-6 max-w-7xl mx-auto">
@@ -1631,6 +1652,15 @@ function TrustBadge({ stats }: { stats: ProtocolStats | null }) {
 
 function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs: LiveTx[] }) {
   const [expanded, setExpanded] = useState(false);
+  const {
+    historyExpanded,
+    setHistoryExpanded,
+    historicalTxs,
+    historyLoading,
+    historyError,
+    historyDone,
+    fetchHistoricalTxs,
+  } = useProtocolTxHistory();
   const volumeOkb = stats ? safeFixed(stats.contracts.agentEconomy.stats.totalVolumeOkb, 4) : '—';
   const mcpCalls = stats ? Number(stats.contracts.agentEconomy.stats.totalMcpCalls) : 0;
   const payments = stats ? Number(stats.contracts.agentEconomy.stats.totalPayments) : 0;
@@ -1714,6 +1744,96 @@ function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs
             {expanded ? `COLLAPSE (${liveTxs.length} txs)` : `SEE ALL ${liveTxs.length} TRANSACTIONS`}
           </button>
         )}
+
+        <div className="mt-4 border border-[#494847]/20 bg-black/20">
+          <button
+            onClick={() => setHistoryExpanded((current) => !current)}
+            className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left"
+          >
+            <div>
+              <div className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest">
+                HISTORICAL_ONCHAIN_ARCHIVE
+              </div>
+              <div className="font-mono text-[11px] text-white/30 mt-1">
+                Expand to inspect the full Bobby treasury transaction archive across protocol contracts.
+              </div>
+            </div>
+            <span className="font-mono text-[11px] text-[#6dfe9c] uppercase tracking-widest">
+              {historyExpanded ? 'COLLAPSE' : 'EXPAND'}
+            </span>
+          </button>
+
+          {historyExpanded && (
+            <div className="px-4 pb-4 border-t border-[#494847]/20">
+              {historyError && (
+                <div className="mt-4 font-mono text-[11px] text-[#ff716a]">
+                  Error loading historical archive: {historyError}
+                </div>
+              )}
+
+              {historicalTxs.length > 0 ? (
+                <>
+                  <div className="mt-4 flex items-center justify-between gap-4 font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest">
+                    <span>{historicalTxs.length} historical txs loaded</span>
+                    <span className={historyDone ? 'text-[#6dfe9c]' : 'text-[#fcc025]'}>
+                      {historyDone ? 'Archive complete' : 'Loading archive...'}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-2 max-h-[32rem] overflow-y-auto pr-1">
+                    {historicalTxs.map((tx) => (
+                      <a
+                        key={`${tx.hash}-${tx.blockNumber}`}
+                        href={`https://www.oklink.com/xlayer/tx/${tx.hash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-3 px-4 py-3 bg-black/40 border border-[#494847]/10 hover:border-[#6dfe9c]/30 transition-all group"
+                      >
+                        <span className="w-2 h-2 bg-[#fcc025] rounded-full shrink-0" />
+                        <span className="font-mono text-[10px] text-[#6dfe9c] uppercase w-40 shrink-0">
+                          {tx.contractName} :: {tx.method}
+                        </span>
+                        <span className="font-mono text-[10px] text-white/25 hidden md:block shrink-0">
+                          BLOCK #{tx.blockNumber.toLocaleString()}
+                        </span>
+                        <span className="font-mono text-[11px] text-white/40 truncate flex-1">
+                          {tx.hash.slice(0, 18)}...{tx.hash.slice(-8)}
+                        </span>
+                        {parseFloat(tx.valueOkb) > 0 && (
+                          <span className="font-mono text-[10px] text-[#fcc025] hidden lg:block">
+                            {parseFloat(tx.valueOkb).toFixed(4)} OKB
+                          </span>
+                        )}
+                        <span className="font-mono text-[10px] text-[#adaaaa] hidden md:block">
+                          {tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : '—'}
+                        </span>
+                        <span className="text-[#6dfe9c] opacity-0 group-hover:opacity-100 transition-opacity text-xs">
+                          ↗
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </>
+              ) : historyLoading ? (
+                <div className="mt-4 font-mono text-[11px] text-[#adaaaa] text-center">
+                  Loading historical transaction archive...
+                </div>
+              ) : (
+                <div className="mt-4 font-mono text-[11px] text-[#adaaaa] text-center">
+                  No historical transactions found yet.
+                </div>
+              )}
+
+              {!historyDone && !historyLoading && (
+                <button
+                  onClick={fetchHistoricalTxs}
+                  className="mt-4 w-full py-2.5 border border-[#494847]/20 hover:border-[#6dfe9c]/40 bg-black/20 hover:bg-black/40 transition-all font-mono text-[11px] uppercase tracking-widest text-[#adaaaa] hover:text-[#6dfe9c]"
+                >
+                  LOAD MORE HISTORY
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

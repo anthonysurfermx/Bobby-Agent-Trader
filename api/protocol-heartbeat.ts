@@ -74,13 +74,36 @@ const bountiesIface = new Interface([
 ]);
 
 async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetch(XLAYER_RPC, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 }),
-  });
-  const json = await res.json() as { result: unknown };
-  return json.result;
+  const urls = [XLAYER_RPC, XLAYER_RPC_FALLBACK];
+  let lastError: Error | null = null;
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`RPC ${res.status} from ${url}`);
+      }
+
+      const json = await res.json() as { result?: unknown; error?: { message?: string } };
+      if (json.error) {
+        throw new Error(json.error.message || `RPC error from ${url}`);
+      }
+      if (json.result == null) {
+        throw new Error(`RPC returned no result from ${url}`);
+      }
+
+      return json.result;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  throw lastError ?? new Error('RPC call failed');
 }
 
 async function ethCall(to: string, data: string): Promise<string> {
@@ -228,7 +251,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchRecentTxs(blockNumber),
     ]);
 
-    const treasuryWei = BigInt(String(treasuryBalanceHex) || '0').toString();
+    const treasuryWei = BigInt(treasuryBalanceHex ? String(treasuryBalanceHex) : '0x0').toString();
 
     // Decode getEconomyStats() — returns (totalDebates, totalMcpCalls, totalSignalAccesses, totalVolume, totalPayments)
     let totalDebates = '0';

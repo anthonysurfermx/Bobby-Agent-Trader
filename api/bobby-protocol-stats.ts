@@ -13,6 +13,7 @@ import {
   XLAYER_RPC_URL,
   getEconomyStats,
   listRecentBounties,
+  readBounty,
   readMinBounty,
   readNextBountyId,
 } from './_lib/xlayer-payments.js';
@@ -57,6 +58,72 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
     console.error('[protocol-stats]', (err as Error).message);
     return fallback;
   }
+}
+
+const BOUNTY_DIMENSIONS = [
+  'DATA_INTEGRITY',
+  'ADVERSARIAL_QUALITY',
+  'DECISION_LOGIC',
+  'RISK_MANAGEMENT',
+  'CALIBRATION_ALIGNMENT',
+  'NOVELTY',
+] as const;
+
+type BountyDimensionSummary = {
+  totalCount: number;
+  openCount: number;
+  avgRewardOkb: number | null;
+  maxRewardOkb: number | null;
+};
+
+function emptyBountySummary(): Record<string, BountyDimensionSummary> {
+  return Object.fromEntries(
+    BOUNTY_DIMENSIONS.map((dimension) => [
+      dimension,
+      {
+        totalCount: 0,
+        openCount: 0,
+        avgRewardOkb: null,
+        maxRewardOkb: null,
+      },
+    ]),
+  );
+}
+
+async function getBountySummary(nextBountyId: number): Promise<Record<string, BountyDimensionSummary>> {
+  const summary = emptyBountySummary();
+  const last = Math.max(0, nextBountyId - 1);
+
+  if (last === 0) {
+    return summary;
+  }
+
+  for (let start = 1; start <= last; start += 8) {
+    const ids = Array.from({ length: Math.min(8, last - start + 1) }, (_, index) => start + index);
+    const batch = await Promise.all(ids.map((id) => readBounty(id).catch(() => null)));
+
+    for (const bounty of batch) {
+      if (!bounty) continue;
+
+      const dimension = bounty.dimension in summary ? bounty.dimension : null;
+      if (!dimension) continue;
+
+      const rewardOkb = Number(bounty.rewardOkb || 0);
+      const current = summary[dimension];
+      const totalReward = (current.avgRewardOkb ?? 0) * current.totalCount + rewardOkb;
+      const nextTotalCount = current.totalCount + 1;
+
+      summary[dimension] = {
+        totalCount: nextTotalCount,
+        openCount: current.openCount + (bounty.status === 'OPEN' ? 1 : 0),
+        avgRewardOkb: totalReward / nextTotalCount,
+        maxRewardOkb:
+          current.maxRewardOkb === null ? rewardOkb : Math.max(current.maxRewardOkb, rewardOkb),
+      };
+    }
+  }
+
+  return summary;
 }
 
 async function getContractLastActivity(address: string): Promise<number | null> {
@@ -214,6 +281,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ),
   ]);
 
+  const bountySummary = await safe(() => getBountySummary(bountyNextId), emptyBountySummary());
+
   const blockNumber = Number.parseInt(String(blockHexResult || '0x0'), 16) || 0;
   const treasuryWei = BigInt(treasuryHexResult || '0x0');
 
@@ -278,6 +347,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     },
     bounties: recentBounties,
+    bountySummary,
     market: {
       prices: intel.prices,
       regime: intel.regime,

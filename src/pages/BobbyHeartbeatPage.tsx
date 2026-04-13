@@ -1,16 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-
-interface OnChainTx {
-  hash: string;
-  contract: string;
-  contractName: string;
-  method: string;
-  blockNumber: number;
-  timestamp: number | null;
-  valueOkb: string;
-}
+import { useProtocolTxHistory, type OnChainTx } from '@/hooks/useProtocolTxHistory';
 
 interface HeartbeatData {
   ok: boolean;
@@ -120,6 +111,15 @@ export default function BobbyHeartbeatPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [txExpanded, setTxExpanded] = useState(false);
+  const {
+    historyExpanded,
+    setHistoryExpanded,
+    historicalTxs,
+    historyLoading,
+    historyError,
+    historyDone,
+    fetchHistoricalTxs,
+  } = useProtocolTxHistory();
 
   const fetchHeartbeat = async () => {
     try {
@@ -336,6 +336,107 @@ export default function BobbyHeartbeatPage() {
             ) : (
               <div className="text-sm font-mono text-white/30 py-4 text-center">
                 Scanning recent blocks for activity...
+              </div>
+            )}
+          </motion.div>
+
+          {/* Historical Transaction Archive */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.37 }}
+            className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
+          >
+            <button
+              onClick={() => setHistoryExpanded((current) => !current)}
+              className="w-full flex items-center justify-between gap-4 text-left"
+            >
+              <div>
+                <div className="text-xs font-mono text-white/40 uppercase tracking-wider">Historical On-Chain Archive</div>
+                <div className="text-xs font-mono text-white/20 mt-1">
+                  Expand to inspect the full Bobby treasury transaction history across protocol contracts.
+                </div>
+              </div>
+              <span className="text-xs font-mono text-green-400 uppercase">
+                {historyExpanded ? 'Collapse' : 'Expand'}
+              </span>
+            </button>
+
+            {historyExpanded && (
+              <div className="mt-4 pt-4 border-t border-white/[0.04]">
+                {historyError && (
+                  <div className="mb-3 text-xs font-mono text-red-400">
+                    Error loading historical archive: {historyError}
+                  </div>
+                )}
+
+                {historicalTxs.length > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-mono text-white/30 uppercase tracking-wider">
+                        {historicalTxs.length} historical txs loaded
+                      </span>
+                      <span className="text-xs font-mono text-white/20">
+                        {historyDone ? 'Archive complete' : 'Loading archive...'}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5 max-h-[32rem] overflow-y-auto pr-1">
+                      {historicalTxs.map((tx, i) => (
+                        <motion.a
+                          key={`${tx.hash}-${tx.blockNumber}`}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: Math.min(i * 0.01, 0.2) }}
+                          href={`https://www.oklink.com/xlayer/tx/${tx.hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-between px-3 py-2 bg-white/[0.01] border border-white/[0.03] rounded-lg hover:border-green-400/30 transition group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0" />
+                            <span className={`text-xs font-mono flex-shrink-0 ${CONTRACT_COLORS[tx.contractName] || 'text-white/60'}`}>
+                              {tx.contractName}
+                            </span>
+                            <span className="text-xs font-mono text-white/50 flex-shrink-0">{tx.method}</span>
+                            <span className="text-xs font-mono text-white/20 hidden md:inline">
+                              block #{tx.blockNumber.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            {parseFloat(tx.valueOkb) > 0 && (
+                              <span className="text-xs font-mono text-amber-400/70 hidden sm:inline">
+                                {parseFloat(tx.valueOkb).toFixed(4)} OKB
+                              </span>
+                            )}
+                            <span className="text-xs font-mono text-white/20">
+                              {formatTimestamp(tx.timestamp)}
+                            </span>
+                            <span className="text-xs font-mono text-white/15 group-hover:text-green-400 transition hidden md:inline">
+                              {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)} ↗
+                            </span>
+                          </div>
+                        </motion.a>
+                      ))}
+                    </div>
+                  </>
+                ) : historyLoading ? (
+                  <div className="text-sm font-mono text-white/30 py-4 text-center">
+                    Loading historical transaction archive...
+                  </div>
+                ) : (
+                  <div className="text-sm font-mono text-white/30 py-4 text-center">
+                    No historical transactions found yet.
+                  </div>
+                )}
+
+                {!historyDone && !historyLoading && (
+                  <button
+                    onClick={fetchHistoricalTxs}
+                    className="mt-3 w-full py-2 border border-white/[0.06] hover:border-green-400/30 rounded-lg bg-white/[0.01] hover:bg-white/[0.03] transition-all text-xs font-mono uppercase tracking-wider text-white/30 hover:text-green-400"
+                  >
+                    Load More History
+                  </button>
+                )}
               </div>
             )}
           </motion.div>
