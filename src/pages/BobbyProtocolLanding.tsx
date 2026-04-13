@@ -384,10 +384,10 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
           [HARDNESS FINANCE]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#fcc025]/20 text-[#fcc025] font-mono text-[10px] tracking-widest">
-          [CONVICTION LAYER]
+          [ADAPTIVE CONTROL PLANE]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#ff716a]/20 text-[#ff716a] font-mono text-[10px] tracking-widest">
-          [AGENT INFRASTRUCTURE]
+          [FINANCIAL MEMORY + TRUST]
         </span>
       </motion.div>
 
@@ -407,7 +407,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.2 }}
         className="font-mono text-[11px] text-[#adaaaa] uppercase tracking-widest mb-10 text-center max-w-2xl"
       >
-        Connect any agent. Bobby stress-tests its decisions through adversarial debate, scores conviction on 6 dimensions, and publishes proof on-chain. What survives is hardened conviction.
+        Every financial decision becomes reusable intelligence. Bobby debates, judges, blocks, remembers, and adapts — so the next verdict is sharper than the last.
       </motion.p>
 
       <motion.div
@@ -855,32 +855,32 @@ function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
 function WhyMatters() {
   const pillars = [
     {
-      glyph: '////',
-      label: 'WHAT IS HARDNESS',
-      color: 'text-[#6dfe9c]',
-      borderHover: 'hover:border-[#6dfe9c]/30',
-      body: 'In materials science, hardness is resistance to deformation under force. Bobby applies the same principle to trading: every thesis is stress-tested under adversarial pressure before execution.',
-    },
-    {
       glyph: '!ERR',
       label: 'THE PROBLEM',
       color: 'text-[#fcc025]',
       borderHover: 'hover:border-[#fcc025]/30',
-      body: 'AI agents execute billions in trades with zero accountability. No challenge. No debate. No record. Soft decisions produce hard losses.',
+      body: 'AI agents execute billions in trades with zero accountability. No memory of what failed. No trust scoring. No adaptive control. Every agent starts from scratch, every time.',
     },
     {
       glyph: '>>>=',
-      label: 'HOW BOBBY HARDENS',
-      color: 'text-white',
-      borderHover: 'hover:border-white/20',
-      body: '3 agents attack from different angles. A Judge grades the debate. Anyone can stake OKB to prove the decision was wrong. What survives is conviction — tested, scored, and recorded on-chain.',
-    },
-    {
-      glyph: '[MCP]',
-      label: 'PLUG IN ANYWHERE',
+      label: 'TRACES → MEMORY → VERDICTS',
       color: 'text-[#6dfe9c]',
       borderHover: 'hover:border-[#6dfe9c]/30',
-      body: 'Any DEX, CEX, protocol, or autonomous agent can plug into Bobby\'s MCP. One integration adds a hardness layer to every trade your system touches.',
+      body: 'Every Bobby cycle produces a trace. Every trace distills into an episode. Episodes accumulate into calibration priors. The next verdict is informed by every past decision — not just prompts.',
+    },
+    {
+      glyph: '[!!]',
+      label: 'TRUST EARNED, NOT CONFIGURED',
+      color: 'text-white',
+      borderHover: 'hover:border-white/20',
+      body: 'Trust score computed from on-chain data: win rate, commitment history, bounty challenges, economic activity. Agents, wallets, and counterparties earn reputation through verifiable behavior.',
+    },
+    {
+      glyph: '><>',
+      label: 'ENTANGLED WITH YOUR OPERATION',
+      color: 'text-[#6dfe9c]',
+      borderHover: 'hover:border-[#6dfe9c]/30',
+      body: 'Bobby doesn\'t just execute workflows — it learns how your organization handles money. Risk tolerance, sizing patterns, regime preferences, failure modes. The more you use it, the harder it is to replace.',
     },
   ];
 
@@ -894,10 +894,10 @@ function WhyMatters() {
           className="mb-12"
         >
           <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4">
-            The Harness Layer
+            Not the Car. The Road.
           </h2>
           <p className="font-mono text-sm text-[#6dfe9c] tracking-wide max-w-3xl">
-            Bobby is the harness layer for on-chain trading. Before any agent executes, Bobby subjects the thesis to adversarial pressure.
+            Frameworks are cheap. Harnesses are getting cheaper. Bobby is the financial memory, trust, and control layer that makes the harness worth running.
           </p>
         </motion.div>
 
@@ -924,6 +924,120 @@ function WhyMatters() {
           ))}
         </div>
       </div>
+    </section>
+  );
+}
+
+function Flywheels() {
+  const wheels = [
+    {
+      label: 'DATA',
+      icon: '>',
+      color: '#6dfe9c',
+      input: 'Every financial interaction',
+      output: 'Structured traces in agent_events',
+      accumulates: 'Raw decision history',
+    },
+    {
+      label: 'MEMORY',
+      icon: '><',
+      color: '#fcc025',
+      input: 'Every trace',
+      output: 'Distilled episodes, heuristics, priors',
+      accumulates: 'Reusable financial intelligence',
+    },
+    {
+      label: 'TRUST',
+      icon: '!!',
+      color: '#60a5fa',
+      input: 'Every payment, fulfillment, challenge',
+      output: 'Reputation scores + bounty resolutions',
+      accumulates: 'Verifiable counterparty trust',
+    },
+    {
+      label: 'POLICY',
+      icon: '##',
+      color: '#ff716a',
+      input: 'Every override, block, challenge',
+      output: 'Refined guardrails + risk gates',
+      accumulates: 'Adaptive financial controls',
+    },
+    {
+      label: 'ENTANGLEMENT',
+      icon: '<>',
+      color: '#c084fc',
+      input: 'Every workflow pattern',
+      output: 'Customer-specific adaptation',
+      accumulates: 'Switching cost + institutional memory',
+    },
+  ];
+
+  return (
+    <section className="py-24 px-6 max-w-7xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-10"
+      >
+        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-3 border-l-4 border-[#c084fc] pl-6">
+          Five Flywheels. One Moat.
+        </h2>
+        <p className="font-mono text-sm text-[#adaaaa] max-w-3xl pl-6">
+          You can vibe-code an agent in a weekend. You can't vibe-code the thousandth customer's
+          accumulated patterns feeding back into the product. These flywheels are earned, not built.
+        </p>
+      </motion.div>
+
+      <div className="grid gap-3 md:grid-cols-5">
+        {wheels.map((w, i) => (
+          <motion.div
+            key={w.label}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.08 }}
+            className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4 hover:border-white/[0.08] transition-colors relative overflow-hidden"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <span
+                className="font-mono text-sm font-bold w-7 h-7 flex items-center justify-center rounded border"
+                style={{ color: w.color, borderColor: `${w.color}33` }}
+              >
+                {w.icon}
+              </span>
+              <span className="font-black text-xs uppercase tracking-tight text-white">{w.label}</span>
+            </div>
+            <div className="space-y-2 font-mono text-[10px]">
+              <div>
+                <span className="text-[#adaaaa]">IN: </span>
+                <span className="text-white/70">{w.input}</span>
+              </div>
+              <div>
+                <span className="text-[#adaaaa]">OUT: </span>
+                <span style={{ color: w.color }}>{w.output}</span>
+              </div>
+              <div className="border-t border-white/[0.04] pt-2 mt-2">
+                <span className="text-[#adaaaa]">COMPOUNDS: </span>
+                <span className="text-white/50">{w.accumulates}</span>
+              </div>
+            </div>
+            <div
+              className="absolute -bottom-6 -right-6 w-20 h-20 rounded-full opacity-[0.04] blur-xl"
+              style={{ backgroundColor: w.color }}
+            />
+          </motion.div>
+        ))}
+      </div>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        className="mt-6 font-mono text-[11px] text-center text-[#adaaaa]/60"
+      >
+        trace → distill → store memory → retrieve fragments → inject → adaptive verdict → trace
+      </motion.p>
     </section>
   );
 }
@@ -2560,6 +2674,7 @@ export default function BobbyProtocolLanding() {
       <ClosedLoop />
       <JudgeMode stats={stats} />
       <WhyMatters />
+      <Flywheels />
       <HarnessArchitecture />
       <Guardrails stats={stats} />
       <RiskOffMode />

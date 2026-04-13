@@ -435,12 +435,13 @@ export default function BobbySubmissionPage() {
           </section>
 
           <section className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-            <Panel title="Why This Matters" kicker="Closed loop">
+            <Panel title="Why This Matters" kicker="Adaptive Financial Control Plane">
               <div className="mt-4 space-y-3">
                 {[
-                  'AI agents hallucinate on thin-liquidity tokens. Bobby exposes that thesis to adversarial review before trust compounds.',
-                  'Judge Mode makes debate quality inspectable on six dimensions instead of hiding behind a single confidence score.',
-                  'Adversarial bounties let outside challengers prove miscalibration and get paid, creating a real correction loop.',
+                  'Every financial decision produces a trace. Every trace distills into memory. Every memory sharpens the next verdict. Bobby doesn\'t start from scratch — it compounds intelligence.',
+                  'Trust is earned on-chain, not configured. Win rate, commitment history, bounty challenges, and economic activity compute a verifiable trust score that any agent can query.',
+                  'Bobby adapts to how each operator handles money — risk tolerance, regime preferences, sizing patterns, failure modes. The more you use it, the harder it is to replace.',
+                  '11 guardrails run fail-closed in production code. No consensus → no trade. No stop loss → no trade. 3 losses → circuit breaker. This is not a prompt trick. This is financial infrastructure.',
                 ].map((item) => (
                   <div key={item} className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm leading-6 text-white/72">
                     {item}
