@@ -333,6 +333,12 @@ function Nav() {
         >
           CONSOLE
         </a>
+        <a
+          href="/protocol/harness"
+          className="text-[#fcc025]/60 hover:text-[#fcc025] transition-colors font-bold tracking-tighter uppercase text-sm"
+        >
+          HARNESS
+        </a>
       </div>
       <div className="flex gap-3">
         <a

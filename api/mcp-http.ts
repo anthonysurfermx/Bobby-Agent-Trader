@@ -26,6 +26,7 @@ import {
   storeReceipt,
 } from './_lib/mcp-challenges.js';
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
+import { logHarnessEvent } from './_lib/harness-events.js';
 
 export const config = { maxDuration: 60 };
 
@@ -512,6 +513,22 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
           metadata: { arguments: args, chainId: XLAYER_CHAIN_ID, transport: 'streamable-http' },
         });
       }
+
+      // Log harness event for all MCP tool calls
+      logHarnessEvent({
+        run_id: `mcp_${Date.now()}`,
+        agent: 'mcp',
+        event_type: 'mcp_call',
+        tool: toolName,
+        decision: 'allow',
+        payment_tx: verifiedPayment?.txHash,
+        meta: {
+          premium: PREMIUM_TOOLS.has(toolName),
+          payer: verifiedPayment?.payer,
+          value_okb: verifiedPayment?.valueOkb,
+          agent_name: req.headers['x-agent-name'] || null,
+        },
+      });
 
       return isNotification ? null : jsonrpcOk(id, result);
     }

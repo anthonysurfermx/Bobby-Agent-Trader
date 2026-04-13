@@ -13,6 +13,7 @@ import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bo
 import { ethers } from 'ethers';
 import { recordHardnessActivity } from './_lib/hardness-registry.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
+import { logHarnessEvent, buildVerdict } from './_lib/harness-events.js';
 
 export const config = { maxDuration: 300 };
 
@@ -1877,6 +1878,60 @@ ${lang === 'es' ? 'Responde en español mexicano, casual pero inteligente. Como 
           yield_position_id: yieldPositionId || activeYieldPosition?.id || null,
         }),
       });
+    }
+
+    // ============================================================
+    // PHASE 6b: Emit Harness Events (unified audit trail)
+    // ============================================================
+    const runId = cycleId || `cycle_${Date.now()}`;
+    const verdict = buildVerdict({
+      executed: !!executionResult,
+      conviction,
+      tradeRejectedReason,
+      isYieldPark: yieldDebateTriggered,
+      policyHits: [
+        conviction !== null && conviction >= 0.35 ? 'conviction_gate_pass' : 'conviction_gate_block',
+        executionResult ? 'stop_loss_set' : 'no_trade',
+        ...(yieldDebateTriggered ? ['yield_evaluation'] : []),
+      ],
+    });
+
+    logHarnessEvent({
+      run_id: runId,
+      thread_id: threadId,
+      agent: 'harness',
+      event_type: executionResult ? 'execution' : (yieldDebateTriggered ? 'park' : 'skip'),
+      symbol: digestSymbol || undefined,
+      direction: digestDirection || undefined,
+      decision: verdict.status,
+      conviction: conviction ?? undefined,
+      risk_score: verdict.risk_score,
+      policy_hits: verdict.policy_hits,
+      reason: verdict.reason,
+      trade_tx: txHash || undefined,
+      latency_ms: Date.now() - startTime,
+      meta: {
+        regime: intel.regime,
+        win_rate: track.winRate,
+        vibe: vibePhrase,
+        calibration_active: !!(calibration?.isOverconfident),
+        yield_triggered: yieldDebateTriggered,
+      },
+    });
+
+    // Log individual agent events from the debate
+    if (threadId) {
+      for (const agentName of ['alpha_hunter', 'red_team', 'cio'] as const) {
+        logHarnessEvent({
+          run_id: runId,
+          thread_id: threadId,
+          agent: agentName,
+          event_type: 'debate',
+          symbol: digestSymbol || undefined,
+          direction: digestDirection || undefined,
+          conviction: conviction ?? undefined,
+        });
+      }
     }
 
     // ============================================================

@@ -54,6 +54,7 @@ const reviewerActions = [
   { label: 'Protocol Heartbeat', href: '/protocol/heartbeat', kind: 'internal', icon: Network },
   { label: 'Plugin Store PR', href: 'https://github.com/okx/plugin-store/pull/161', kind: 'external', icon: Trophy },
   { label: 'Agent Console', href: '/protocol/console', kind: 'internal', icon: TerminalSquare },
+  { label: 'Harness Console', href: '/protocol/harness', kind: 'internal', icon: ShieldCheck },
 ];
 
 const judgeRows = [

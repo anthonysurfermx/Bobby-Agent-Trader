@@ -54,6 +54,7 @@ const NAV_ITEMS = [
   { id: 'signals', label: 'SIGNALS', path: '/agentic-world/bobby/signals' },
   { id: 'docs', label: 'AI DOCS', path: '/agentic-world/bobby/docs' },
   { id: 'marketplace', label: 'AGENT COMMERCE', path: '/agentic-world/bobby/marketplace' },
+  { id: 'harness', label: 'HARNESS', path: '/protocol/harness' },
 ] as const;
 
 const SIDE_ITEMS = [
