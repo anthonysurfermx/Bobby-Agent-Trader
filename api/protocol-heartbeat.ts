@@ -40,6 +40,20 @@ let heartbeatCache:
     }
   | null = null;
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // Contract name map for tx feed
 const CONTRACT_NAMES: Record<string, string> = {
   [AGENT_ECONOMY.toLowerCase()]: 'AgentEconomy',
@@ -177,7 +191,7 @@ async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
   // Scan last 1800 blocks (~30min) using parallel waves.
   // 10 blocks/batch × 10 parallel = 100 blocks/wave × 18 waves = 1800 blocks
   const txs: OnChainTx[] = [];
-  const windowBlocks = 1800;
+  const windowBlocks = 600;
   const batchSize = 5;
   const parallelBatches = 4;
   const waves = Math.ceil(windowBlocks / (batchSize * parallelBatches));
@@ -297,11 +311,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Bounties
       ethCall(BOUNTIES, bountiesIface.encodeFunctionData('nextBountyId')),
       // Supabase: recent cycles
-      sbQuery('agent_cycles', 'select=id,status,created_at,vibe_phrase,trades_executed&order=created_at.desc&limit=1'),
+      withTimeout(
+        sbQuery('agent_cycles', 'select=id,status,created_at,vibe_phrase,trades_executed&order=created_at.desc&limit=1'),
+        1500,
+        []
+      ),
       // Supabase: recent commerce
-      sbQuery('agent_commerce_events', 'select=id,tool_name,payment_status,created_at,payment_amount_wei,payer_address&order=created_at.desc&limit=5'),
+      withTimeout(
+        sbQuery('agent_commerce_events', 'select=id,tool_name,payment_status,created_at,payment_amount_wei,payer_address&order=created_at.desc&limit=5'),
+        1500,
+        []
+      ),
       // On-chain: scan recent blocks for Bobby contract txs
-      fetchRecentTxs(blockNumber),
+      withTimeout(fetchRecentTxs(blockNumber), 2500, [] as OnChainTx[]),
     ]);
 
     const treasuryWei = BigInt(treasuryBalanceHex ? String(treasuryBalanceHex) : '0x0').toString();

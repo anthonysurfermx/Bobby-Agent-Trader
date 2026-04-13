@@ -11,6 +11,24 @@ import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 15 };
 
+async function fetchJsonWithTimeout<T>(url: string, ms: number): Promise<T | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'Cache-Control': 'no-cache' },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    return await res.json() as T;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -22,11 +40,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const baseUrl = `${proto}://${host}`;
 
   // Fetch from both sources in parallel
-  const [events, heartbeatRes, bountyFallback] = await Promise.all([
+  const [events, heartbeatRes, txHistoryRes, bountyFallback] = await Promise.all([
     listAgentCommerceEvents(limit).catch(() => []),
-    fetch(`${baseUrl || BOBBY_PROTOCOL_BASE_URL}/api/protocol-heartbeat`, {
-      headers: { 'Cache-Control': 'no-cache' },
-    }).then(r => r.ok ? r.json() as Promise<{ recentTxs?: any[] }> : null).catch(() => null),
+    fetchJsonWithTimeout<{ recentTxs?: any[] }>(`${baseUrl || BOBBY_PROTOCOL_BASE_URL}/api/protocol-heartbeat`, 2500),
+    fetchJsonWithTimeout<{ items?: any[] }>(`${baseUrl || BOBBY_PROTOCOL_BASE_URL}/api/protocol-tx-history?limit=${limit}`, 3500),
     listRecentBounties(limit).catch(() => []),
   ]);
 
@@ -43,7 +60,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }));
 
   // On-chain txs from heartbeat
-  const onChainFeed = (heartbeatRes?.recentTxs || []).map((tx: any) => ({
+  const recentTxs = heartbeatRes?.recentTxs?.length
+    ? heartbeatRes.recentTxs
+    : (txHistoryRes?.items || []);
+
+  const onChainFeed = recentTxs.map((tx: any) => ({
     agent: 'bobby-protocol',
     tool: `${tx.contractName}::${tx.method}`,
     paid: parseFloat(tx.valueOkb || '0') > 0,
