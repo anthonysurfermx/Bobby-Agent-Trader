@@ -54,6 +54,26 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Pro
   }
 }
 
+async function fetchJsonWithTimeout(url: string, body: unknown, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`RPC ${res.status} from ${url}`);
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Contract name map for tx feed
 const CONTRACT_NAMES: Record<string, string> = {
   [AGENT_ECONOMY.toLowerCase()]: 'AgentEconomy',
@@ -111,17 +131,11 @@ async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
 
   for (const url of urls) {
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`RPC ${res.status} from ${url}`);
-      }
-
-      const json = await res.json() as { result?: unknown; error?: { message?: string } };
+      const json = await fetchJsonWithTimeout(
+        url,
+        { jsonrpc: '2.0', method, params, id: 1 },
+        2000
+      ) as { result?: unknown; error?: { message?: string } };
       if (json.error) {
         throw new Error(json.error.message || `RPC error from ${url}`);
       }
@@ -262,15 +276,7 @@ async function fetchBlockBatch(calls: unknown[]): Promise<Array<{ result?: RpcBl
 
   for (const url of urls) {
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(calls),
-      });
-      if (!res.ok) {
-        throw new Error(`RPC ${res.status} from ${url}`);
-      }
-      const json = await res.json() as unknown;
+      const json = await fetchJsonWithTimeout(url, calls, 2500) as unknown;
       if (!Array.isArray(json)) {
         throw new Error(`RPC returned non-array payload from ${url}`);
       }
