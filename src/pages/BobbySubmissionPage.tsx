@@ -40,7 +40,7 @@ const REPUTATION_API = '/api/reputation';
 
 const reviewerActions = [
   { label: 'Open Live Terminal', href: LIVE_TERMINAL, kind: 'internal', icon: TerminalSquare },
-  { label: 'View MCP Endpoint', href: MCP_ENDPOINT, kind: 'internal', icon: Globe2 },
+  { label: 'View MCP Endpoint', href: MCP_ENDPOINT, kind: 'external', icon: Globe2 },
   { label: 'Bounty Contract on OKLink', href: BOUNTY_CONTRACT, kind: 'external', icon: ShieldCheck },
   { label: 'GitHub Repository', href: GITHUB_REPO, kind: 'external', icon: GitBranch },
   {
@@ -49,8 +49,8 @@ const reviewerActions = [
     kind: settlementProof.lastSettlement.oklinkUrl ? 'external' : 'anchor',
     icon: Network,
   },
-  { label: 'Agent SKILL.MD', href: SKILL_MD, kind: 'internal', icon: FileCode2 },
-  { label: 'Reputation API', href: REPUTATION_API, kind: 'internal', icon: ShieldCheck },
+  { label: 'Agent SKILL.MD', href: SKILL_MD, kind: 'external', icon: FileCode2 },
+  { label: 'Reputation API', href: REPUTATION_API, kind: 'external', icon: ShieldCheck },
   { label: 'Protocol Heartbeat', href: '/protocol/heartbeat', kind: 'internal', icon: Network },
   { label: 'Plugin Store PR', href: 'https://github.com/okx/plugin-store/pull/161', kind: 'external', icon: Trophy },
   { label: 'Agent Console', href: '/protocol/console', kind: 'internal', icon: TerminalSquare },
