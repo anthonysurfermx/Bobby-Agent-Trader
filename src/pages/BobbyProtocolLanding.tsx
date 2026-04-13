@@ -1593,12 +1593,14 @@ function TrustBadge({ stats }: { stats: ProtocolStats | null }) {
 }
 
 function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs: LiveTx[] }) {
+  const [expanded, setExpanded] = useState(false);
   const volumeOkb = stats ? safeFixed(stats.contracts.agentEconomy.stats.totalVolumeOkb, 4) : '—';
   const mcpCalls = stats ? Number(stats.contracts.agentEconomy.stats.totalMcpCalls) : 0;
   const payments = stats ? Number(stats.contracts.agentEconomy.stats.totalPayments) : 0;
   const bounties = stats ? stats.contracts.adversarialBounties.totalPosted : 0;
 
-  const proofs = liveTxs.slice(0, 6).map((tx) => {
+  const visibleTxs = expanded ? liveTxs : liveTxs.slice(0, 6);
+  const proofs = visibleTxs.map((tx) => {
     const val = parseFloat(tx.valueOkb || '0');
     const age = tx.timestamp ? Math.floor(Date.now() / 1000 - tx.timestamp) : null;
     const ageStr = age !== null
@@ -1667,6 +1669,14 @@ function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs
             </a>
           ))}
         </div>
+        {liveTxs.length > 6 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="mt-4 w-full py-2.5 border border-[#494847]/20 hover:border-[#6dfe9c]/40 bg-black/20 hover:bg-black/40 transition-all font-mono text-[11px] uppercase tracking-widest text-[#adaaaa] hover:text-[#6dfe9c]"
+          >
+            {expanded ? `COLLAPSE (${liveTxs.length} txs)` : `SEE ALL ${liveTxs.length} TRANSACTIONS`}
+          </button>
+        )}
       </div>
     </section>
   );
