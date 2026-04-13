@@ -9,6 +9,7 @@ import { AuthProvider } from './hooks/useAuth';
 import Web3ContextProvider from '@/libs/components/Web3ContextProvider';
 import ProtectedRoute, { GuestRoute } from '@/components/auth/ProtectedRoute';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { lazyWithRetry } from '@/lib/lazyWithRetry';
 
 // Layout components (no lazy loading para layouts)
 import MainLayout from '@/components/layout/MainLayout';
@@ -17,7 +18,7 @@ import UserLayout from '@/pages/user/UserLayout';
 
 // Lazy load todas las páginas para mejor performance
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
-const BobbyProtocolLanding = lazy(() => import('@/pages/BobbyProtocolLanding'));
+const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbySubmissionPage = lazy(() => import('@/pages/BobbySubmissionPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
@@ -72,9 +73,9 @@ const BobbyMetacognitionPage = lazy(() => import('@/pages/BobbyMetacognitionPage
 const BobbySignalsPage = lazy(() => import('@/pages/BobbySignalsPage'));
 const BobbyDocsPage = lazy(() => import('@/pages/BobbyDocsPage'));
 const BobbyMarketplacePage = lazy(() => import('@/pages/BobbyMarketplacePage'));
-const BobbyHeartbeatPage = lazy(() => import('@/pages/BobbyHeartbeatPage'));
-const BobbyAgentConsolePage = lazy(() => import('@/pages/BobbyAgentConsolePage'));
-const BobbyNetworkConsolePage = lazy(() => import('@/pages/BobbyNetworkConsolePage'));
+const BobbyHeartbeatPage = lazyWithRetry(() => import('@/pages/BobbyHeartbeatPage'), 'protocol-heartbeat');
+const BobbyAgentConsolePage = lazyWithRetry(() => import('@/pages/BobbyAgentConsolePage'), 'protocol-console');
+const BobbyNetworkConsolePage = lazyWithRetry(() => import('@/pages/BobbyNetworkConsolePage'), 'protocol-network');
 
 
 // Auth pages
