@@ -6,6 +6,9 @@ import { useProtocolTxHistory, type OnChainTx } from '@/hooks/useProtocolTxHisto
 interface HeartbeatData {
   ok: boolean;
   timestamp: string;
+  cached?: boolean;
+  stale?: boolean;
+  error?: string;
   chain: { id: number; blockNumber: number; status: string };
   treasury: { address: string; balanceOkb: string };
   revenue: {
@@ -13,6 +16,12 @@ interface HeartbeatData {
     totalPayments: number;
     totalMcpCalls: number;
     totalDebates: number;
+  };
+  protocolTotals: {
+    bountyEscrowOkb: string;
+    totalBounties: number;
+    protocolNotionalOkb: string;
+    totalInteractions: number;
   };
   performance: { winRate: number; totalTrades: number; totalBounties: number };
   lastCycle: {
@@ -198,19 +207,19 @@ export default function BobbyHeartbeatPage() {
               sub={`${data.treasury.address.slice(0, 10)}...`}
             />
             <MetricCard
-              label="Revenue"
+              label="Settlement"
               value={`${parseFloat(data.revenue.totalVolumeOkb).toFixed(4)} OKB`}
-              sub={`${data.revenue.totalPayments} payments settled`}
+              sub={`${data.revenue.totalPayments} MCP payments settled`}
             />
             <MetricCard
-              label="Win Rate"
-              value={`${data.performance.winRate.toFixed(1)}%`}
-              sub={`${data.performance.totalTrades} trades`}
+              label="Bounty Escrow"
+              value={`${parseFloat(data.protocolTotals.bountyEscrowOkb).toFixed(4)} OKB`}
+              sub={`${data.protocolTotals.totalBounties} bounties posted`}
             />
             <MetricCard
-              label="Bounties"
-              value={data.performance.totalBounties}
-              sub="posted on-chain"
+              label="Protocol Total"
+              value={`${parseFloat(data.protocolTotals.protocolNotionalOkb).toFixed(4)} OKB`}
+              sub={`${data.performance.totalTrades} trades · ${data.revenue.totalMcpCalls} MCP calls`}
             />
           </motion.div>
 

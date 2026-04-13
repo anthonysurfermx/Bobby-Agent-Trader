@@ -1,0 +1,16 @@
+export const BOBBY_PROTOCOL_BASE_URL =
+  process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprotocol.xyz';
+
+export const XLAYER_CHAIN_ID = 196;
+export const XLAYER_RPC_URL = 'https://rpc.xlayer.tech';
+export const XLAYER_RPC_FALLBACK_URL = 'https://xlayerrpc.okx.com';
+
+export const BOBBY_TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
+export const BOBBY_AGENT_ECONOMY = '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871';
+export const BOBBY_ADVERSARIAL_BOUNTIES = '0xa8005ab465a0e02cb14824cd0e7630391fba673d';
+export const BOBBY_TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
+export const BOBBY_HARDNESS_REGISTRY =
+  process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
+export const BOBBY_CONVICTION_ORACLE =
+  process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
+export const BOBBY_AGENT_REGISTRY = '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b';

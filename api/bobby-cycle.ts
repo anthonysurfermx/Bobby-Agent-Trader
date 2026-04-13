@@ -12,12 +12,14 @@ import type { TradeParams } from '../src/lib/onchainos/types.js';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bobby-technical.js';
 import { ethers } from 'ethers';
 import { recordHardnessActivity } from './_lib/hardness-registry.js';
+import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 300 };
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+const READONLY_FALLBACK_HOSTS = [BOBBY_PROTOCOL_BASE_URL, 'https://defimexico.org', 'https://defi-mexico-hub.vercel.app'];
 
 // ---- Supabase helpers ----
 
@@ -245,11 +247,9 @@ async function callStructuredVerdict(system: string, userMsg: string, timeoutMs 
 // ---- Fetch local internal API ----
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
-  // Always use production domain — VERCEL_URL points to preview deployments that may have stale env vars
-  const host = 'https://bobbyprotocol.xyz';
   const internalAuth = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
   try {
-    const res = await fetch(`${host}${path}`, {
+    const res = await fetch(`${BOBBY_PROTOCOL_BASE_URL}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -266,14 +266,16 @@ async function fetchLocalApi(path: string, body: any, noFallback = false): Promi
   }
 
   // Fallback to alt domain ONLY for read-only endpoints
-  try {
-    const res2 = await fetch(`https://defimexico.org${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (res2.ok) return await res2.json();
-  } catch (e) { console.error(`Fallback failed for ${path}`, e); }
+  for (const host of READONLY_FALLBACK_HOSTS.slice(1)) {
+    try {
+      const res2 = await fetch(`${host}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (res2.ok) return await res2.json();
+    } catch (e) { console.error(`Fallback failed for ${path} via ${host}`, e); }
+  }
 
   return { ok: false, error: 'API unreachable' };
 }
@@ -550,11 +552,7 @@ function yieldRecommendationStatus(
 // ---- Fetch market intel (frozen snapshot) ----
 
 async function fetchIntel(): Promise<any | null> {
-  const urls = [
-    'https://bobbyprotocol.xyz/api/bobby-intel',
-    'https://defimexico.org/api/bobby-intel',
-    'https://defi-mexico-hub.vercel.app/api/bobby-intel',
-  ];
+  const urls = READONLY_FALLBACK_HOSTS.map((host) => `${host}/api/bobby-intel`);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000); // 20s hard cap
   try {
@@ -1963,8 +1961,8 @@ ${txStr}
 Balance: $${finalBalanceStr || '?'} | Positions: ${effectivePositions.length}
 
 Wallet: 0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea
-MCP: https://bobbyprotocol.xyz/api/mcp-http
-Heartbeat: https://bobbyprotocol.xyz/protocol/heartbeat`;
+MCP: ${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http
+Heartbeat: ${BOBBY_PROTOCOL_BASE_URL}/protocol/heartbeat`;
 
           const postRes = await fetch('https://www.moltbook.com/api/v1/posts', {
             method: 'POST',

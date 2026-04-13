@@ -1,6 +1,11 @@
-const XLAYER_RPC = 'https://rpc.xlayer.tech';
-export const HARDNESS_REGISTRY_ADDRESS =
-  process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
+import {
+  BOBBY_HARDNESS_REGISTRY,
+  BOBBY_PROTOCOL_BASE_URL,
+  XLAYER_RPC_URL,
+} from './protocol-constants.js';
+
+const XLAYER_RPC = XLAYER_RPC_URL;
+export const HARDNESS_REGISTRY_ADDRESS = BOBBY_HARDNESS_REGISTRY;
 
 const HARDNESS_REGISTRY_ABI = [
   'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, string metadataURI)',
@@ -13,7 +18,7 @@ const HARDNESS_REGISTRY_ABI = [
 ];
 
 const DEFAULT_AGENT_METADATA_URI =
-  process.env.BOBBY_HARDNESS_AGENT_METADATA_URI || 'https://bobbyprotocol.xyz/api/agent-identity';
+  process.env.BOBBY_HARDNESS_AGENT_METADATA_URI || `${BOBBY_PROTOCOL_BASE_URL}/api/agent-identity`;
 
 export const HARDNESS_PREMIUM_SERVICES = [
   { serviceId: 'bobby_analyze', priceWei: '1000000000000000' },

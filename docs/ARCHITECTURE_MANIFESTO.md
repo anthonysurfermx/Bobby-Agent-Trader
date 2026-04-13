@@ -109,7 +109,7 @@ Every resolved prediction alters the agent's future weight. Win rate, calibratio
 
 | Contract | Address | Layer |
 |----------|---------|-------|
-| HardnessRegistry V1.1 | 0x95D045b1488F0776419a0E09de4fc0687AbbAFbf | 1,5,6 |
+| HardnessRegistry V1.1 | 0xD89c1721CD760984a31dE0325fD96cD27bB31040 | 1,5,6 |
 | AgentEconomyV2 | 0xD9540D770C8aF67e9E6412C92D78E34bc11ED871 | 5 |
 | ConvictionOracle | 0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A | 5 |
 | TrackRecord | 0xF841b428E6d743187D7BE2242eccC1078fdE2395 | 5,7 |

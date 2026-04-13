@@ -1,8 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import {
+  BOBBY_ADVERSARIAL_BOUNTIES,
+  BOBBY_AGENT_ECONOMY,
+  BOBBY_CONVICTION_ORACLE,
+  BOBBY_HARDNESS_REGISTRY,
+  BOBBY_PROTOCOL_BASE_URL,
+  BOBBY_TRACK_RECORD,
+} from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 5 };
-
-const HARDNESS_REGISTRY = process.env.HARDNESS_REGISTRY_ADDRESS || '0x95D045b1488F0776419a0E09de4fc0687AbbAFbf';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -17,15 +23,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     type: 'trading-agent',
     identity_standard: 'hardness-agent/v1',
     capabilities: ['debate', 'judge', 'predict', 'bounty', 'hardness_test'],
-    mcp_endpoint: 'https://bobbyprotocol.xyz/api/mcp-http',
-    registry_endpoint: 'https://bobbyprotocol.xyz/api/registry',
-    hardness_test_endpoint: 'https://bobbyprotocol.xyz/api/hardness-test',
+    mcp_endpoint: `${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http`,
+    registry_endpoint: `${BOBBY_PROTOCOL_BASE_URL}/api/registry`,
+    hardness_test_endpoint: `${BOBBY_PROTOCOL_BASE_URL}/api/hardness-test`,
     contracts: {
-      hardnessRegistry: HARDNESS_REGISTRY,
-      agentEconomy: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871',
-      convictionOracle: '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A',
-      trackRecord: '0xF841b428E6d743187D7BE2242eccC1078fdE2395',
-      adversarialBounties: '0xa8005ab465a0e02cb14824cd0e7630391fba673d',
+      hardnessRegistry: BOBBY_HARDNESS_REGISTRY,
+      agentEconomy: BOBBY_AGENT_ECONOMY,
+      convictionOracle: BOBBY_CONVICTION_ORACLE,
+      trackRecord: BOBBY_TRACK_RECORD,
+      adversarialBounties: BOBBY_ADVERSARIAL_BOUNTIES,
     },
     pricing: {
       quick_score: '0.001 OKB',
@@ -38,9 +44,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       roadmap: 'clean_room_v2',
     },
     links: {
-      app: 'https://bobbyprotocol.xyz/agentic-world/bobby',
-      submission: 'https://bobbyprotocol.xyz/submission',
-      docs: 'https://bobbyprotocol.xyz/docs',
+      app: `${BOBBY_PROTOCOL_BASE_URL}/agentic-world/bobby`,
+      submission: `${BOBBY_PROTOCOL_BASE_URL}/submission`,
+      docs: `${BOBBY_PROTOCOL_BASE_URL}/docs`,
     },
   });
 }

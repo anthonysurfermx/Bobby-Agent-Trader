@@ -17,14 +17,20 @@ import {
   readMinBounty,
   readNextBountyId,
 } from './_lib/xlayer-payments.js';
+import {
+  BOBBY_AGENT_REGISTRY,
+  BOBBY_CONVICTION_ORACLE,
+  BOBBY_HARDNESS_REGISTRY,
+  BOBBY_TRACK_RECORD,
+  BOBBY_TREASURY,
+} from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 30 };
 
-const BOBBY_TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
-const CONVICTION_ORACLE = '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
-const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
-const HARDNESS_REGISTRY = '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
-const AGENT_REGISTRY = '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b';
+const CONVICTION_ORACLE = BOBBY_CONVICTION_ORACLE;
+const TRACK_RECORD = BOBBY_TRACK_RECORD;
+const HARDNESS_REGISTRY = BOBBY_HARDNESS_REGISTRY;
+const AGENT_REGISTRY = BOBBY_AGENT_REGISTRY;
 
 const ORACLE_INTERFACE = new Interface([
   'function symbolCount() view returns (uint256)',
@@ -286,18 +292,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const blockNumber = Number.parseInt(String(blockHexResult || '0x0'), 16) || 0;
   const treasuryWei = BigInt(treasuryHexResult || '0x0');
 
-  // Calculate total protocol revenue: economy volume + bounty stakes
+  // Keep paid MCP settlement separate from bounty escrow.
   const totalBountiesPosted = Math.max(0, bountyNextId - 1);
-  const bountyRevenueOkb = totalBountiesPosted * 0.001;
+  const bountyEscrowOkb = totalBountiesPosted * 0.001;
   const economyVol = parseFloat(economyStats.totalVolumeOkb || '0');
-  const totalRevenueOkb = (economyVol + bountyRevenueOkb).toFixed(4);
-
-  // Enrich economy stats with total protocol revenue
-  const enrichedEconomyStats = {
-    ...economyStats,
-    totalVolumeOkb: totalRevenueOkb,
-    totalPayments: String(parseInt(economyStats.totalPayments || '0') + totalBountiesPosted),
-  };
+  const protocolNotionalOkb = (economyVol + bountyEscrowOkb).toFixed(4);
 
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
   return res.status(200).json({
@@ -316,7 +315,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     contracts: {
       agentEconomy: {
         address: BOBBY_AGENT_ECONOMY,
-        stats: enrichedEconomyStats,
+        stats: economyStats,
         lastActivityBlock: economyLastBlock,
       },
       convictionOracle: {
@@ -345,6 +344,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         type: 'ERC-721',
         agents: 3,
       },
+    },
+    protocolTotals: {
+      mcpSettlementOkb: economyStats.totalVolumeOkb,
+      mcpPayments: Number(economyStats.totalPayments || '0'),
+      bountyEscrowOkb: bountyEscrowOkb.toFixed(4),
+      bountyCount: totalBountiesPosted,
+      protocolNotionalOkb,
+      totalInteractions: Number(economyStats.totalPayments || '0') + totalBountiesPosted,
     },
     bounties: recentBounties,
     bountySummary,

@@ -60,7 +60,15 @@ async function callRole(system: string, context: string, maxTokens = 500): Promi
   return data.choices[0]?.message?.content || '{}';
 }
 
-function determineAction(score: number): 'execute' | 'reduce_size' | 'paper_only' | 'publish_only' | 'reject' {
+type OrchestrateAction =
+  | 'execute'
+  | 'reduce_size'
+  | 'paper_only'
+  | 'publish_only'
+  | 'reject'
+  | 'require_human_approval';
+
+function determineAction(score: number): OrchestrateAction {
   if (score >= 80) return 'execute';
   if (score >= 65) return 'reduce_size';
   if (score >= 50) return 'paper_only';
@@ -230,7 +238,7 @@ Invalidation: ${p.invalidation || 'not specified'}`;
       judgeRecommendation = (judge as Record<string, string>).recommendation || 'pass';
     }
 
-    const action = determineAction(hardnessScore);
+    let action = determineAction(hardnessScore);
     const finalConviction = Math.max(1, Math.min(10,
       (cio as Record<string, number>).conviction || conviction
     ));
@@ -241,9 +249,7 @@ Invalidation: ${p.invalidation || 'not specified'}`;
       requestedNotionalUsd: p.entry,
     });
     
-    // Punto 17: Approval Gates
-    let action = determineAction(hardnessScore);
-    if (action === 'execute' && agent?.riskPolicy.mode === 'advisory') {
+    if (action === 'execute' && agent?.risk_policy_json?.mode === 'advisory') {
       action = 'require_human_approval';
     }
 

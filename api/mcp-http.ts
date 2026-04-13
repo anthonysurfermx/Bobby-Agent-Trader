@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -31,7 +32,7 @@ export const config = { maxDuration: 60 };
 const PROTOCOL_VERSION = '2025-03-26';
 const SERVER_NAME = 'bobby-protocol';
 const SERVER_VERSION = '3.0.0';
-const BASE_URL = 'https://bobbyprotocol.xyz';
+const BASE_URL = BOBBY_PROTOCOL_BASE_URL;
 
 const PREMIUM_TOOLS = new Set(['bobby_analyze', 'bobby_debate', 'bobby_security_scan', 'bobby_wallet_portfolio', 'bobby_judge']);
 const X402_PRICE_OKB = '0.001';
@@ -95,7 +96,7 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
 
   if (name === 'bobby_ta') {
     const res = await fetch(`${BASE_URL}/api/technical-analysis?symbol=${args.symbol || 'BTC'}`);
-    const data = await res.json();
+    const data = await res.json() as { summary?: unknown };
     return { content: [{ type: 'text', text: JSON.stringify(data.summary, null, 2) }] };
   }
 
@@ -104,11 +105,11 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
       fetch(`${BASE_URL}/api/bobby-intel`),
       fetch(`${BASE_URL}/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5`),
     ]);
-    const intelData = await intelRes.json();
+    const intelData = await intelRes.json() as { briefing?: string };
     let text = intelData.briefing;
 
     try {
-      const lbData = await leaderboardRes.json();
+      const lbData = await leaderboardRes.json() as { leaderboard?: any[] };
       if (leaderboardRes.ok && lbData.leaderboard?.length) {
         const rows = lbData.leaderboard.map((w: any, i: number) => {
           const addr = w.address ? `${w.address.slice(0, 6)}...${w.address.slice(-4)}` : 'unknown';
@@ -131,7 +132,7 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'signals' }),
     });
-    const data = await res.json();
+    const data = await res.json() as { data?: any[] };
     const signals = data.data?.slice(0, 5).map((s: any) => ({
       token: s.token?.symbol, amount: `$${parseFloat(s.amountUsd).toFixed(0)}`, wallets: s.triggerWalletCount,
     }));
@@ -155,7 +156,7 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
 
   if (name === 'bobby_stats') {
     const res = await fetch(`${BASE_URL}/api/bobby-pnl`);
-    const data = await res.json();
+    const data = await res.json() as { summary?: unknown };
     return { content: [{ type: 'text', text: JSON.stringify(data.summary, null, 2) }] };
   }
 
@@ -204,7 +205,7 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ thread_id: args.thread_id || undefined, language: args.language || 'en' }),
     });
-    const data = await res.json();
+    const data = await res.json() as { error?: string; verdict?: any };
     if (!res.ok) throw new Error(data.error || 'Judge Mode failed');
     const v = data.verdict;
     const summary = [

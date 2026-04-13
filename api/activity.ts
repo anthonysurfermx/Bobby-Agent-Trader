@@ -6,6 +6,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { listAgentCommerceEvents } from './_lib/agent-commerce-log.js';
+import { listRecentBounties } from './_lib/xlayer-payments.js';
+import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 15 };
 
@@ -15,13 +17,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const limit = Math.min(Number(req.query.limit) || 20, 50);
+  const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
+  const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'bobbyprotocol.xyz';
+  const baseUrl = `${proto}://${host}`;
 
   // Fetch from both sources in parallel
-  const [events, heartbeatRes] = await Promise.all([
+  const [events, heartbeatRes, bountyFallback] = await Promise.all([
     listAgentCommerceEvents(limit).catch(() => []),
-    fetch('https://bobbyprotocol.xyz/api/protocol-heartbeat', {
+    fetch(`${baseUrl || BOBBY_PROTOCOL_BASE_URL}/api/protocol-heartbeat`, {
       headers: { 'Cache-Control': 'no-cache' },
-    }).then(r => r.ok ? r.json() : null).catch(() => null),
+    }).then(r => r.ok ? r.json() as Promise<{ recentTxs?: any[] }> : null).catch(() => null),
+    listRecentBounties(limit).catch(() => []),
   ]);
 
   // Commerce events from Supabase
@@ -48,9 +54,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     source: 'onchain',
   }));
 
+  const bountyFeed = onChainFeed.length > 0 ? [] : bountyFallback.map((bounty: any) => ({
+    agent: 'bobby-protocol',
+    tool: `AdversarialBounties::${bounty.dimension}`,
+    paid: true,
+    amountOkb: bounty.rewardOkb ? Number(bounty.rewardOkb).toFixed(4) : null,
+    txHash: null,
+    agoSeconds: bounty.createdAt ? Math.max(0, Math.floor(Date.now() / 1000 - Number(bounty.createdAt))) : null,
+    timestamp: bounty.createdAt ? new Date(Number(bounty.createdAt) * 1000).toISOString() : null,
+    source: 'bounty',
+  }));
+
   // Merge, deduplicate by txHash, sort by recency, limit
   const seen = new Set<string>();
-  const merged = [...commerceFeed, ...onChainFeed]
+  const merged = [...commerceFeed, ...onChainFeed, ...bountyFeed]
     .filter((item) => {
       if (!item.txHash || seen.has(item.txHash)) return !item.txHash ? true : false;
       seen.add(item.txHash);

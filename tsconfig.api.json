@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "noEmit": true,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["node"]
+  },
+  "include": [
+    "api/_lib/protocol-constants.ts",
+    "api/_lib/xlayer-payments.ts",
+    "api/_lib/hardness-registry.ts",
+    "api/_lib/hardness-control-plane.ts",
+    "api/_lib/agent-auth.ts",
+    "api/activity.ts",
+    "api/agent-identity.ts",
+    "api/bobby-protocol-stats.ts",
+    "api/mcp-http.ts",
+    "api/orchestrate.ts",
+    "api/protocol-heartbeat.ts",
+    "api/protocol-tx-history.ts",
+    "api/registry.ts",
+    "api/reputation.ts"
+  ]
+}

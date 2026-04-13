@@ -57,6 +57,14 @@ interface ProtocolStats {
       lastActivityBlock: number | null;
     };
   };
+  protocolTotals: {
+    mcpSettlementOkb: string;
+    mcpPayments: number;
+    bountyEscrowOkb: string;
+    bountyCount: number;
+    protocolNotionalOkb: string;
+    totalInteractions: number;
+  };
   bounties: Array<{
     bountyId: string;
     threadHash: string;
@@ -1662,6 +1670,8 @@ function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs
     fetchHistoricalTxs,
   } = useProtocolTxHistory();
   const volumeOkb = stats ? safeFixed(stats.contracts.agentEconomy.stats.totalVolumeOkb, 4) : '—';
+  const bountyEscrowOkb = stats ? safeFixed(stats.protocolTotals.bountyEscrowOkb, 4) : '—';
+  const protocolNotionalOkb = stats ? safeFixed(stats.protocolTotals.protocolNotionalOkb, 4) : '—';
   const mcpCalls = stats ? Number(stats.contracts.agentEconomy.stats.totalMcpCalls) : 0;
   const payments = stats ? Number(stats.contracts.agentEconomy.stats.totalPayments) : 0;
   const bounties = stats ? stats.contracts.adversarialBounties.totalPosted : 0;
@@ -1696,18 +1706,22 @@ function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs
             <div className="text-center">
               <div className="text-[#adaaaa]">VOLUME_OKB</div>
               <div className="text-xl font-bold text-[#6dfe9c]">{volumeOkb}</div>
+              <div className="text-[9px] text-[#adaaaa]/70 mt-1">paid MCP settlement</div>
             </div>
             <div className="text-center">
               <div className="text-[#adaaaa]">PAYMENTS</div>
               <div className="text-xl font-bold text-white">{payments}</div>
+              <div className="text-[9px] text-[#adaaaa]/70 mt-1">settled via AgentEconomy</div>
             </div>
             <div className="text-center">
-              <div className="text-[#adaaaa]">MCP_CALLS</div>
-              <div className="text-xl font-bold text-white">{mcpCalls}</div>
+              <div className="text-[#adaaaa]">BOUNTY_ESCROW</div>
+              <div className="text-xl font-bold text-[#fcc025]">{bountyEscrowOkb}</div>
+              <div className="text-[9px] text-[#adaaaa]/70 mt-1">{bounties} bounties posted</div>
             </div>
             <div className="text-center">
-              <div className="text-[#adaaaa]">BOUNTIES</div>
-              <div className="text-xl font-bold text-white">{bounties}</div>
+              <div className="text-[#adaaaa]">PROTOCOL_NOTIONAL</div>
+              <div className="text-xl font-bold text-white">{protocolNotionalOkb}</div>
+              <div className="text-[9px] text-[#adaaaa]/70 mt-1">{mcpCalls} MCP calls</div>
             </div>
           </div>
         </div>

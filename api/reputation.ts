@@ -16,11 +16,16 @@ import {
   readMinBounty,
   readNextBountyId,
 } from './_lib/xlayer-payments.js';
+import {
+  BOBBY_CONVICTION_ORACLE,
+  BOBBY_PROTOCOL_BASE_URL,
+  BOBBY_TRACK_RECORD,
+} from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 15 };
 
-const CONVICTION_ORACLE = '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
-const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
+const CONVICTION_ORACLE = BOBBY_CONVICTION_ORACLE;
+const TRACK_RECORD = BOBBY_TRACK_RECORD;
 
 const ORACLE_INTERFACE = new Interface([
   'function symbolCount() view returns (uint256)',
@@ -103,6 +108,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const winRate = Number(winRateBps) / 100;
   const pnlPct = Number(totalPnlBps) / 100;
   const totalBounties = Math.max(0, bountyNextId - 1);
+  const bountyEscrowOkb = (totalBounties * Number(bountyMin.minBountyOkb || '0')).toFixed(4);
+  const protocolNotionalOkb = (
+    Number(economyStats.totalVolumeOkb || '0') + Number(bountyEscrowOkb)
+  ).toFixed(4);
 
   res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
   return res.status(200).json({
@@ -138,6 +147,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalPayments: Number(economyStats.totalPayments),
     },
 
+    protocolTotals: {
+      bountyEscrowOkb,
+      totalBounties,
+      protocolNotionalOkb,
+      totalInteractions: Number(economyStats.totalPayments) + totalBounties,
+    },
+
     bounties: {
       address: BOBBY_ADVERSARIAL_BOUNTIES,
       verified: true,
@@ -153,10 +169,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     },
 
     links: {
-      skillMd: 'https://bobbyprotocol.xyz/skill.md',
-      mcpEndpoint: 'https://bobbyprotocol.xyz/api/mcp-http',
-      judgeManifest: 'https://bobbyprotocol.xyz/ai-judge-manifest.json',
-      submission: 'https://bobbyprotocol.xyz/submission',
+      skillMd: `${BOBBY_PROTOCOL_BASE_URL}/skill.md`,
+      mcpEndpoint: `${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http`,
+      judgeManifest: `${BOBBY_PROTOCOL_BASE_URL}/ai-judge-manifest.json`,
+      submission: `${BOBBY_PROTOCOL_BASE_URL}/submission`,
       github: 'https://github.com/anthonysurfermx/Bobby-Agent-Trader',
     },
   });

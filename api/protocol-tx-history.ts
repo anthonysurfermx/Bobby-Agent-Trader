@@ -1,18 +1,29 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther } from 'ethers';
+import {
+  BOBBY_ADVERSARIAL_BOUNTIES,
+  BOBBY_AGENT_ECONOMY,
+  BOBBY_AGENT_REGISTRY,
+  BOBBY_CONVICTION_ORACLE,
+  BOBBY_HARDNESS_REGISTRY,
+  BOBBY_TRACK_RECORD,
+  BOBBY_TREASURY,
+  XLAYER_RPC_FALLBACK_URL,
+  XLAYER_RPC_URL,
+} from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 25 };
 
-const XLAYER_RPC = 'https://xlayerrpc.okx.com';
-const XLAYER_RPC_FALLBACK = 'https://rpc.xlayer.tech';
+const XLAYER_RPC = XLAYER_RPC_FALLBACK_URL;
+const XLAYER_RPC_FALLBACK = XLAYER_RPC_URL;
 
-const AGENT_ECONOMY = '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871';
-const BOUNTIES = '0xa8005ab465a0e02cb14824cd0e7630391fba673d';
-const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
-const HARDNESS_REGISTRY = '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
-const CONVICTION_ORACLE = process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
-const AGENT_REGISTRY = '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b';
-const TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
+const AGENT_ECONOMY = BOBBY_AGENT_ECONOMY;
+const BOUNTIES = BOBBY_ADVERSARIAL_BOUNTIES;
+const TRACK_RECORD = BOBBY_TRACK_RECORD;
+const HARDNESS_REGISTRY = BOBBY_HARDNESS_REGISTRY;
+const CONVICTION_ORACLE = BOBBY_CONVICTION_ORACLE;
+const AGENT_REGISTRY = BOBBY_AGENT_REGISTRY;
+const TREASURY = BOBBY_TREASURY;
 
 // Earliest known Bobby protocol deployment block on X Layer from forge broadcasts.
 const PROTOCOL_ACTIVITY_START_BLOCK = 0x34775f3;
@@ -74,6 +85,14 @@ interface OnChainTx {
   timestamp: number | null;
   valueOkb: string;
 }
+
+let txHistoryCache = new Map<
+  string,
+  {
+    payload: Record<string, unknown>;
+    storedAt: number;
+  }
+>();
 
 async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
   const urls = [XLAYER_RPC, XLAYER_RPC_FALLBACK];
@@ -153,8 +172,8 @@ async function fetchHistoricalTxPage(
 ): Promise<{ items: OnChainTx[]; nextCursor: number | null; done: boolean }> {
   const items: OnChainTx[] = [];
   let cursor = startBlock;
-  const batchSize = 10;
-  const parallelBatches = 10;
+  const batchSize = 5;
+  const parallelBatches = 3;
 
   while (cursor >= PROTOCOL_ACTIVITY_START_BLOCK && items.length < limit) {
     const requests: Promise<void>[] = [];
@@ -211,13 +230,9 @@ async function fetchHistoricalTxPage(
 
     if (blocksQueued === 0) break;
 
-    try {
-      await Promise.all(requests);
-    } catch {
-      const fallbackResult = await Promise.allSettled(requests);
-      if (fallbackResult.every((result) => result.status === 'rejected')) {
-        throw new Error('Unable to load block history from X Layer RPC');
-      }
+    const settled = await Promise.allSettled(requests);
+    if (settled.every((result) => result.status === 'rejected')) {
+      throw new Error('Unable to load block history from X Layer RPC');
     }
 
     cursor -= blocksQueued;
@@ -248,12 +263,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rawCursor = req.query.cursor;
     const parsedCursor = typeof rawCursor === 'string' ? Number(rawCursor) : latestBlock;
     const cursor = Number.isFinite(parsedCursor) ? Math.min(parsedCursor, latestBlock) : latestBlock;
+    const cacheKey = `${cursor}:${limit}`;
 
     const page = await fetchHistoricalTxPage(cursor, limit);
-
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
-    return res.status(200).json({
+    const payload = {
       ok: true,
+      cached: false,
+      degraded: false,
       latestBlock,
       startBlock: PROTOCOL_ACTIVITY_START_BLOCK,
       cursor,
@@ -261,10 +277,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       done: page.done,
       nextCursor: page.nextCursor,
       items: page.items,
+    };
+
+    txHistoryCache.set(cacheKey, {
+      payload,
+      storedAt: Date.now(),
     });
+
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+    return res.status(200).json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('[ProtocolTxHistory]', message);
-    return res.status(500).json({ error: message });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+    const rawCursor = req.query.cursor;
+    const parsedCursor = typeof rawCursor === 'string' ? Number(rawCursor) : null;
+    const cacheKey = `${parsedCursor ?? 'latest'}:${limit}`;
+    const cached = txHistoryCache.get(cacheKey);
+
+    if (cached) {
+      res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=120');
+      return res.status(200).json({
+        ...cached.payload,
+        cached: true,
+        degraded: true,
+        error: message,
+      });
+    }
+
+    return res.status(200).json({
+      ok: false,
+      cached: false,
+      degraded: true,
+      error: message,
+      latestBlock: 0,
+      startBlock: PROTOCOL_ACTIVITY_START_BLOCK,
+      cursor: parsedCursor ?? 0,
+      count: 0,
+      done: false,
+      nextCursor: null,
+      items: [],
+    });
   }
 }

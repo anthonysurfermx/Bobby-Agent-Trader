@@ -6,6 +6,16 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import {
+  BOBBY_ADVERSARIAL_BOUNTIES,
+  BOBBY_AGENT_ECONOMY,
+  BOBBY_CONVICTION_ORACLE,
+  BOBBY_HARDNESS_REGISTRY,
+  BOBBY_PROTOCOL_BASE_URL,
+  BOBBY_TRACK_RECORD,
+  XLAYER_CHAIN_ID,
+  XLAYER_RPC_FALLBACK_URL,
+} from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 5 };
 
@@ -91,11 +101,11 @@ const TOOLS = {
 };
 
 const CONTRACTS = {
-  hardnessRegistry: { address: process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040', purpose: 'Public hardness layer for agents, services, predictions, signals and bounties' },
-  agentEconomy: { address: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871', purpose: 'x402 payment settlement' },
-  convictionOracle: { address: '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A', purpose: 'Real-time conviction feed' },
-  trackRecord: { address: '0xF841b428E6d743187D7BE2242eccC1078fdE2395', purpose: 'Commit-reveal track record' },
-  adversarialBounties: { address: '0xa8005ab465a0e02cb14824cd0e7630391fba673d', purpose: 'Pay-to-challenge bounties', verified: true },
+  hardnessRegistry: { address: BOBBY_HARDNESS_REGISTRY, purpose: 'Public hardness layer for agents, services, predictions, signals and bounties' },
+  agentEconomy: { address: BOBBY_AGENT_ECONOMY, purpose: 'x402 payment settlement' },
+  convictionOracle: { address: BOBBY_CONVICTION_ORACLE, purpose: 'Real-time conviction feed' },
+  trackRecord: { address: BOBBY_TRACK_RECORD, purpose: 'Commit-reveal track record' },
+  adversarialBounties: { address: BOBBY_ADVERSARIAL_BOUNTIES, purpose: 'Pay-to-challenge bounties', verified: true },
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -107,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({
     protocol: 'Bobby Protocol',
     version: '3.0.0',
-    chain: { id: 196, name: 'X Layer', rpc: 'https://xlayerrpc.okx.com/' },
+    chain: { id: XLAYER_CHAIN_ID, name: 'X Layer', rpc: XLAYER_RPC_FALLBACK_URL },
     agents: AGENTS,
     tools: TOOLS,
     contracts: CONTRACTS,
@@ -120,14 +130,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'NOVELTY',
     ],
     endpoints: {
-      mcp: 'https://bobbyprotocol.xyz/api/mcp-http',
-      reputation: 'https://bobbyprotocol.xyz/api/reputation',
-      registry: 'https://bobbyprotocol.xyz/api/registry',
-      activity: 'https://bobbyprotocol.xyz/api/activity',
-      agentIdentity: 'https://bobbyprotocol.xyz/api/agent-identity',
-      hardnessTest: 'https://bobbyprotocol.xyz/api/hardness-test',
-      skillMd: 'https://bobbyprotocol.xyz/skill.md',
-      judgeManifest: 'https://bobbyprotocol.xyz/ai-judge-manifest.json',
+      mcp: `${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http`,
+      reputation: `${BOBBY_PROTOCOL_BASE_URL}/api/reputation`,
+      registry: `${BOBBY_PROTOCOL_BASE_URL}/api/registry`,
+      activity: `${BOBBY_PROTOCOL_BASE_URL}/api/activity`,
+      agentIdentity: `${BOBBY_PROTOCOL_BASE_URL}/api/agent-identity`,
+      hardnessTest: `${BOBBY_PROTOCOL_BASE_URL}/api/hardness-test`,
+      skillMd: `${BOBBY_PROTOCOL_BASE_URL}/skill.md`,
+      judgeManifest: `${BOBBY_PROTOCOL_BASE_URL}/ai-judge-manifest.json`,
     },
   });
 }

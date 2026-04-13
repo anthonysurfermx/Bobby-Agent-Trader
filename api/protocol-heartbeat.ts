@@ -5,22 +5,40 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Interface, formatEther } from 'ethers';
+import {
+  BOBBY_ADVERSARIAL_BOUNTIES,
+  BOBBY_AGENT_ECONOMY,
+  BOBBY_AGENT_REGISTRY,
+  BOBBY_CONVICTION_ORACLE,
+  BOBBY_HARDNESS_REGISTRY,
+  BOBBY_TRACK_RECORD,
+  BOBBY_TREASURY,
+  XLAYER_CHAIN_ID,
+  XLAYER_RPC_FALLBACK_URL,
+  XLAYER_RPC_URL,
+} from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 25 };
 
-const XLAYER_RPC = 'https://xlayerrpc.okx.com';
-const XLAYER_RPC_FALLBACK = 'https://rpc.xlayer.tech';
+const XLAYER_RPC = XLAYER_RPC_FALLBACK_URL;
+const XLAYER_RPC_FALLBACK = XLAYER_RPC_URL;
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Contract addresses
-const AGENT_ECONOMY = '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871';
-const BOUNTIES = '0xa8005ab465a0e02cb14824cd0e7630391fba673d';
-const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
-const HARDNESS_REGISTRY = '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
-const CONVICTION_ORACLE = process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
-const AGENT_REGISTRY = '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b';
-const TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
+const AGENT_ECONOMY = BOBBY_AGENT_ECONOMY;
+const BOUNTIES = BOBBY_ADVERSARIAL_BOUNTIES;
+const TRACK_RECORD = BOBBY_TRACK_RECORD;
+const HARDNESS_REGISTRY = BOBBY_HARDNESS_REGISTRY;
+const CONVICTION_ORACLE = BOBBY_CONVICTION_ORACLE;
+const AGENT_REGISTRY = BOBBY_AGENT_REGISTRY;
+const TREASURY = BOBBY_TREASURY;
+
+let heartbeatCache:
+  | {
+      payload: Record<string, unknown>;
+      storedAt: number;
+    }
+  | null = null;
 
 // Contract name map for tx feed
 const CONTRACT_NAMES: Record<string, string> = {
@@ -110,13 +128,13 @@ async function ethCall(to: string, data: string): Promise<string> {
   return (await rpcCall('eth_call', [{ to, data }, 'latest'])) as string;
 }
 
-async function sbQuery(table: string, query: string): Promise<unknown[]> {
+async function sbQuery(table: string, query: string): Promise<Record<string, unknown>[]> {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     });
     if (!res.ok) return [];
-    return await res.json();
+    return await res.json() as Record<string, unknown>[];
   } catch { return []; }
 }
 
@@ -128,6 +146,20 @@ interface OnChainTx {
   blockNumber: number;
   timestamp: number | null;
   valueOkb: string;
+}
+
+interface RpcBlockTx {
+  hash: string;
+  from?: string;
+  to?: string;
+  input?: string;
+  value?: string;
+}
+
+interface RpcBlock {
+  number?: string;
+  timestamp?: string;
+  transactions?: RpcBlockTx[];
 }
 
 function identifyMethod(to: string, input: string): string {
@@ -146,8 +178,8 @@ async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
   // 10 blocks/batch × 10 parallel = 100 blocks/wave × 18 waves = 1800 blocks
   const txs: OnChainTx[] = [];
   const windowBlocks = 1800;
-  const batchSize = 10; // X Layer batch limit
-  const parallelBatches = 10;
+  const batchSize = 5;
+  const parallelBatches = 4;
   const waves = Math.ceil(windowBlocks / (batchSize * parallelBatches));
 
   try {
@@ -173,15 +205,9 @@ async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
         if (batchCalls.length === 0) continue;
 
         promises.push(
-          fetch(XLAYER_RPC, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(batchCalls),
-          })
-            .then(async (r) => {
-              if (!r.ok) return;
-              const data = await r.json() as Array<{ result: any }>;
-              for (const blockResult of data) {
+          fetchBlockBatch(batchCalls)
+            .then((blocks) => {
+              for (const blockResult of blocks) {
                 const block = blockResult?.result;
                 if (!block?.transactions) continue;
                 const blockTs = parseInt(String(block.timestamp), 16);
@@ -214,6 +240,33 @@ async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
 
   txs.sort((a, b) => b.blockNumber - a.blockNumber);
   return txs.slice(0, 25);
+}
+
+async function fetchBlockBatch(calls: unknown[]): Promise<Array<{ result?: RpcBlock }>> {
+  const urls = [XLAYER_RPC, XLAYER_RPC_FALLBACK];
+  let lastError: Error | null = null;
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(calls),
+      });
+      if (!res.ok) {
+        throw new Error(`RPC ${res.status} from ${url}`);
+      }
+      const json = await res.json() as unknown;
+      if (!Array.isArray(json)) {
+        throw new Error(`RPC returned non-array payload from ${url}`);
+      }
+      return json as Array<{ result?: RpcBlock }>;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  throw lastError ?? new Error('Block batch RPC failed');
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -294,13 +347,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('[ProtocolHeartbeat] Failed to decode nextBountyId');
     }
 
-    // Calculate revenue — includes economy payments + bounty stakes
+    // Settlement is the real AgentEconomy on-chain volume.
+    // Protocol totals keep bounty escrow separate from paid MCP settlement.
     const economyVolumeOkb = parseFloat(formatEther(BigInt(totalVolumeWei)));
     const winRate = parseInt(winRateBps) / 100;
     const totalBounties = Math.max(0, parseInt(nextBountyId) - 1);
-    const bountyRevenue = totalBounties * 0.001; // 0.001 OKB per bounty posted
-    const totalRevenue = economyVolumeOkb + bountyRevenue;
-    const volumeOkb = totalRevenue.toFixed(4);
+    const bountyEscrowOkb = totalBounties * 0.001;
+    const protocolNotionalOkb = economyVolumeOkb + bountyEscrowOkb;
 
     // Last cycle
     const lastCycle = Array.isArray(recentCycles) && recentCycles.length > 0 ? recentCycles[0] : null;
@@ -321,14 +374,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Health checks
     const blockAge = blockNumber > 0 ? 'healthy' : 'stale';
     const cycleHealth = lastCycleAge !== null && lastCycleAge < 32400 ? 'healthy' : 'overdue'; // 9h tolerance
-    const contractHealth = parseInt(totalMcpCalls) > 0 ? 'active' : 'dormant';
+    const contractHealth = parseInt(totalMcpCalls) > 0 || totalBounties > 0 ? 'active' : 'dormant';
 
-    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=10');
-    return res.status(200).json({
+    const payload = {
       ok: true,
       timestamp: new Date().toISOString(),
+      cached: false,
+      stale: false,
       chain: {
-        id: 196,
+        id: XLAYER_CHAIN_ID,
         blockNumber,
         status: blockAge,
       },
@@ -337,10 +391,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         balanceOkb: formatEther(BigInt(treasuryWei)),
       },
       revenue: {
-        totalVolumeOkb: volumeOkb,
-        totalPayments: parseInt(totalPayments) + totalBounties,
+        totalVolumeOkb: economyVolumeOkb.toFixed(4),
+        totalPayments: parseInt(totalPayments),
         totalMcpCalls: parseInt(totalMcpCalls),
         totalDebates: parseInt(totalDebates),
+      },
+      protocolTotals: {
+        bountyEscrowOkb: bountyEscrowOkb.toFixed(4),
+        totalBounties,
+        protocolNotionalOkb: protocolNotionalOkb.toFixed(4),
+        totalInteractions: parseInt(totalPayments) + totalBounties,
       },
       performance: {
         winRate,
@@ -370,10 +430,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         convictionOracle: { address: CONVICTION_ORACLE },
         agentRegistry: { address: AGENT_REGISTRY },
       },
-    });
+    };
+
+    heartbeatCache = {
+      payload,
+      storedAt: Date.now(),
+    };
+
+    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=10');
+    return res.status(200).json(payload);
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[ProtocolHeartbeat] Error:', msg);
-    return res.status(500).json({ error: msg });
+
+    if (heartbeatCache) {
+      res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=30');
+      return res.status(200).json({
+        ...heartbeatCache.payload,
+        cached: true,
+        stale: true,
+        error: msg,
+        health: {
+          ...(heartbeatCache.payload.health as Record<string, unknown>),
+          overall: 'degraded',
+        },
+      });
+    }
+
+    return res.status(200).json({
+      ok: false,
+      cached: false,
+      stale: false,
+      error: msg,
+      timestamp: new Date().toISOString(),
+      chain: { id: XLAYER_CHAIN_ID, blockNumber: 0, status: 'degraded' },
+      treasury: { address: TREASURY, balanceOkb: '0.0000' },
+      revenue: { totalVolumeOkb: '0.0000', totalPayments: 0, totalMcpCalls: 0, totalDebates: 0 },
+      protocolTotals: { bountyEscrowOkb: '0.0000', totalBounties: 0, protocolNotionalOkb: '0.0000', totalInteractions: 0 },
+      performance: { winRate: 0, totalTrades: 0, totalBounties: 0 },
+      lastCycle: null,
+      recentCommerce: [],
+      recentTxs: [],
+      health: {
+        chain: 'degraded',
+        cycle: 'degraded',
+        contracts: 'degraded',
+        overall: 'degraded',
+      },
+      contracts: {
+        agentEconomy: { address: AGENT_ECONOMY },
+        bounties: { address: BOUNTIES, totalPosted: 0 },
+        trackRecord: { address: TRACK_RECORD },
+        hardnessRegistry: { address: HARDNESS_REGISTRY },
+        convictionOracle: { address: CONVICTION_ORACLE },
+        agentRegistry: { address: AGENT_REGISTRY },
+      },
+    });
   }
 }
