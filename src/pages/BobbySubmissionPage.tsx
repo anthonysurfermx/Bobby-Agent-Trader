@@ -83,43 +83,43 @@ const judgeRows = [
   {
     label: 'Judge Mode manifest',
     href: JUDGE_MANIFEST,
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
   {
     label: 'MCP Streamable HTTP working',
     href: MCP_ENDPOINT,
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
   {
     label: 'Agent SKILL.MD integration file',
     href: SKILL_MD,
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
   {
     label: 'On-chain reputation API',
     href: REPUTATION_API,
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
   {
     label: 'Agent registry (machine-readable catalog)',
     href: '/api/registry',
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
   {
     label: 'Live activity feed',
     href: '/api/activity',
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
   {
     label: 'Sentinel agent demo (agent-to-agent MCP)',
     href: '/api/sentinel-demo',
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
   {
@@ -131,13 +131,13 @@ const judgeRows = [
   {
     label: 'Smart money leaderboard (OKX OnchainOS)',
     href: '/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5',
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
   {
     label: 'Conviction-tier stratified performance',
     href: '/api/conviction-tiers',
-    kind: 'internal',
+    kind: 'api',
     status: 'check live',
   },
 ];
@@ -219,7 +219,7 @@ function JudgeLink({
 }: {
   label: string;
   href: string;
-  kind: 'internal' | 'external' | 'anchor';
+  kind: 'internal' | 'external' | 'anchor' | 'api';
   status: string;
 }) {
   const statusClass =
@@ -245,6 +245,7 @@ function JudgeLink({
   const cls =
     'flex items-center justify-between gap-4 rounded-2xl border border-white/8 bg-black/20 px-4 py-3 transition hover:border-[#8CFFB4]/30';
 
+  // React Router links for SPA pages
   if (kind === 'internal') {
     return (
       <Link to={href} className={cls}>
@@ -253,11 +254,12 @@ function JudgeLink({
     );
   }
 
+  // API endpoints and external links open in new tab
   return (
     <a
       href={href}
-      target={kind === 'external' ? '_blank' : undefined}
-      rel={kind === 'external' ? 'noreferrer' : undefined}
+      target="_blank"
+      rel="noreferrer"
       className={cls}
     >
       {content}
