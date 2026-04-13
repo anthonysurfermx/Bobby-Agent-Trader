@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 
+interface OnChainTx {
+  hash: string;
+  contract: string;
+  contractName: string;
+  method: string;
+  blockNumber: number;
+  timestamp: number | null;
+  valueOkb: string;
+}
+
 interface HeartbeatData {
   ok: boolean;
   timestamp: string;
@@ -27,6 +37,7 @@ interface HeartbeatData {
     payer: string | null;
     age: number;
   }>;
+  recentTxs: OnChainTx[];
   health: {
     chain: string;
     cycle: string;
@@ -34,9 +45,11 @@ interface HeartbeatData {
     overall: string;
   };
   contracts: {
-    agentEconomy: { address: string; lastActivityBlock: number };
+    agentEconomy: { address: string };
     bounties: { address: string; totalPosted: number };
     trackRecord: { address: string };
+    hardnessRegistry: { address: string };
+    convictionOracle: { address: string };
   };
 }
 
@@ -81,6 +94,23 @@ function MetricCard({ label, value, sub }: { label: string; value: string | numb
       {sub && <div className="text-xs font-mono text-white/30 mt-1">{sub}</div>}
     </div>
   );
+}
+
+const CONTRACT_COLORS: Record<string, string> = {
+  HardnessRegistry: 'text-green-400',
+  AdversarialBounties: 'text-amber-400',
+  TrackRecord: 'text-cyan-400',
+  AgentEconomy: 'text-purple-400',
+  ConvictionOracle: 'text-blue-400',
+};
+
+function formatTimestamp(ts: number | null): string {
+  if (!ts) return '';
+  const age = Math.floor(Date.now() / 1000 - ts);
+  if (age < 60) return `${age}s ago`;
+  if (age < 3600) return `${Math.floor(age / 60)}m ago`;
+  if (age < 86400) return `${Math.floor(age / 3600)}h ago`;
+  return `${Math.floor(age / 86400)}d ago`;
 }
 
 export default function BobbyHeartbeatPage() {
@@ -241,37 +271,61 @@ export default function BobbyHeartbeatPage() {
             </motion.div>
           </div>
 
-          {/* Proven On-Chain Transactions */}
+          {/* Live On-Chain Transaction Feed */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
             className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
           >
-            <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-3">Proven On-Chain Transactions</div>
-            <div className="space-y-2">
-              {[
-                { label: 'x402 MCP Payment', tx: '0x6593041ea93a338916dffdb3b203d034c240ec34fb2d04cbad2acbc7e7688fdf', detail: 'bobby_analyze | 0.001 OKB' },
-                { label: 'Bounty #1 Posted', tx: '0x68d4c3f69a01cc3983a1d6b0b9625f54c474a8e80df90685a5cc38f3a2355ad0', detail: 'DATA_INTEGRITY | 0.001 OKB' },
-              ].map((proof) => (
-                <a
-                  key={proof.tx}
-                  href={`https://www.oklink.com/xlayer/tx/${proof.tx}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between px-3 py-2 bg-white/[0.01] border border-white/[0.03] rounded-lg hover:border-green-400/30 transition group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-2 h-2 bg-green-400 rounded-full" />
-                    <span className="text-xs font-mono text-green-400">{proof.label}</span>
-                    <span className="text-xs font-mono text-white/30 hidden md:inline">{proof.detail}</span>
-                  </div>
-                  <span className="text-xs font-mono text-white/20 group-hover:text-green-400 transition">
-                    {proof.tx.slice(0, 14)}...{proof.tx.slice(-6)} ↗
-                  </span>
-                </a>
-              ))}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                <span className="text-xs font-mono text-white/40 uppercase tracking-wider">Live On-Chain Activity</span>
+              </div>
+              <span className="text-xs font-mono text-white/20">{data.recentTxs?.length || 0} txs</span>
             </div>
+            {data.recentTxs && data.recentTxs.length > 0 ? (
+              <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                {data.recentTxs.map((tx, i) => (
+                  <motion.a
+                    key={tx.hash}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.03 }}
+                    href={`https://www.oklink.com/xlayer/tx/${tx.hash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between px-3 py-2 bg-white/[0.01] border border-white/[0.03] rounded-lg hover:border-green-400/30 transition group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-1.5 h-1.5 bg-green-400 rounded-full flex-shrink-0" />
+                      <span className={`text-xs font-mono flex-shrink-0 ${CONTRACT_COLORS[tx.contractName] || 'text-white/60'}`}>
+                        {tx.contractName}
+                      </span>
+                      <span className="text-xs font-mono text-white/50 flex-shrink-0">{tx.method}</span>
+                      {parseFloat(tx.valueOkb) > 0 && (
+                        <span className="text-xs font-mono text-amber-400/60 flex-shrink-0 hidden sm:inline">
+                          {parseFloat(tx.valueOkb).toFixed(4)} OKB
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-xs font-mono text-white/20">
+                        {formatTimestamp(tx.timestamp)}
+                      </span>
+                      <span className="text-xs font-mono text-white/15 group-hover:text-green-400 transition hidden md:inline">
+                        {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)} ↗
+                      </span>
+                    </div>
+                  </motion.a>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm font-mono text-white/30 py-4 text-center">
+                Scanning recent blocks for activity...
+              </div>
+            )}
           </motion.div>
 
           {/* Contract Status */}
@@ -282,16 +336,18 @@ export default function BobbyHeartbeatPage() {
             className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
           >
             <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-3">Verified Contracts — X Layer (196)</div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {[
-                { name: 'AgentEconomy', addr: data.contracts.agentEconomy.address, extra: `Last block: ${data.contracts.agentEconomy.lastActivityBlock}` },
+                { name: 'HardnessRegistry', addr: data.contracts.hardnessRegistry?.address, extra: 'signals + predictions' },
+                { name: 'AgentEconomy', addr: data.contracts.agentEconomy.address, extra: `${data.revenue.totalPayments} payments` },
                 { name: 'AdversarialBounties', addr: data.contracts.bounties.address, extra: `${data.contracts.bounties.totalPosted} bounties` },
                 { name: 'TrackRecord', addr: data.contracts.trackRecord.address, extra: `${data.performance.totalTrades} trades` },
-              ].map((contract) => (
+                { name: 'ConvictionOracle', addr: data.contracts.convictionOracle?.address, extra: 'real-time feed' },
+              ].filter(c => c.addr).map((contract) => (
                 <div key={contract.name} className="border border-white/[0.04] rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-green-400 text-xs">&#10003;</span>
-                    <span className="text-xs font-mono text-white/60">{contract.name}</span>
+                    <span className={`text-xs ${CONTRACT_COLORS[contract.name] || 'text-green-400'}`}>&#10003;</span>
+                    <span className={`text-xs font-mono ${CONTRACT_COLORS[contract.name] || 'text-white/60'}`}>{contract.name}</span>
                   </div>
                   <a
                     href={`https://www.oklink.com/xlayer/address/${contract.addr}`}

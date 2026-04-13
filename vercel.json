@@ -49,6 +49,10 @@
     {
       "path": "/api/user-cycle",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron-activity",
+      "schedule": "0 */2 * * *"
     }
   ],
   "functions": {
@@ -135,6 +139,14 @@
     "api/judge-mode.ts": {
       "maxDuration": 60,
       "memory": 512
+    },
+    "api/generate-activity.ts": {
+      "maxDuration": 60,
+      "memory": 256
+    },
+    "api/cron-activity.ts": {
+      "maxDuration": 60,
+      "memory": 256
     }
   }
 }

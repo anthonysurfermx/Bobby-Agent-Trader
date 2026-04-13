@@ -1,13 +1,15 @@
 // GET /api/protocol-heartbeat
 // Real-time protocol health: last tx, active debate, bounty status, revenue, system health
+// Includes live on-chain transaction feed from all Bobby contracts
 // Designed for the Protocol Heartbeat dashboard page
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Interface, formatEther } from 'ethers';
 
-export const config = { maxDuration: 15 };
+export const config = { maxDuration: 25 };
 
 const XLAYER_RPC = 'https://xlayerrpc.okx.com';
+const XLAYER_RPC_FALLBACK = 'https://rpc.xlayer.tech';
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 
@@ -15,7 +17,43 @@ const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANO
 const AGENT_ECONOMY = '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871';
 const BOUNTIES = '0xa8005ab465a0e02cb14824cd0e7630391fba673d';
 const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
+const HARDNESS_REGISTRY = '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
+const CONVICTION_ORACLE = process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
 const TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
+
+// Contract name map for tx feed
+const CONTRACT_NAMES: Record<string, string> = {
+  [AGENT_ECONOMY.toLowerCase()]: 'AgentEconomy',
+  [BOUNTIES.toLowerCase()]: 'AdversarialBounties',
+  [TRACK_RECORD.toLowerCase()]: 'TrackRecord',
+  [HARDNESS_REGISTRY.toLowerCase()]: 'HardnessRegistry',
+  [CONVICTION_ORACLE.toLowerCase()]: 'ConvictionOracle',
+};
+
+// Method selectors for labeling txs
+const METHOD_LABELS: Record<string, Record<string, string>> = {
+  [HARDNESS_REGISTRY.toLowerCase()]: {
+    '0x': 'registerAgent',
+    '5a8e': 'publishSignal',
+    'c186': 'commitPrediction',
+    '3f60': 'registerService',
+  },
+  [BOUNTIES.toLowerCase()]: {
+    '89e0': 'postBounty',
+    '5656': 'submitChallenge',
+  },
+  [TRACK_RECORD.toLowerCase()]: {
+    '6c83': 'commitTrade',
+    'f7b1': 'resolveTrade',
+  },
+  [AGENT_ECONOMY.toLowerCase()]: {
+    '3fba': 'payDebateFee',
+    'f0a5': 'payMCPCall',
+  },
+  [CONVICTION_ORACLE.toLowerCase()]: {
+    '7bfc': 'publishSignal',
+  },
+};
 
 // ABI interfaces — source of truth for function selectors
 const economyIface = new Interface([
@@ -56,13 +94,114 @@ async function sbQuery(table: string, query: string): Promise<unknown[]> {
   } catch { return []; }
 }
 
+interface OnChainTx {
+  hash: string;
+  contract: string;
+  contractName: string;
+  method: string;
+  blockNumber: number;
+  timestamp: number | null;
+  valueOkb: string;
+}
+
+function identifyMethod(to: string, input: string): string {
+  const methods = METHOD_LABELS[to.toLowerCase()] || {};
+  const selector = (input || '0x').slice(2, 6).toLowerCase();
+  for (const [prefix, label] of Object.entries(methods)) {
+    if (prefix === '0x') continue;
+    if (selector.startsWith(prefix)) return label;
+  }
+  return 'interact';
+}
+
+async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
+  // Scan last 600 blocks (~30 min on X Layer with ~3s blocks)
+  // Uses batch JSON-RPC: 6 batches of 100 blocks = 6 RPC calls
+  const txs: OnChainTx[] = [];
+  const totalBlocks = 600;
+  const batchSize = 100;
+
+  try {
+    for (let offset = 0; offset < totalBlocks && txs.length < 25; offset += batchSize) {
+      const batchCalls = [];
+      for (let i = 0; i < batchSize; i++) {
+        const bn = blockNumber - offset - i;
+        if (bn <= 0) break;
+        batchCalls.push({
+          jsonrpc: '2.0',
+          method: 'eth_getBlockByNumber',
+          params: [`0x${bn.toString(16)}`, true],
+          id: i + 1,
+        });
+      }
+      if (batchCalls.length === 0) break;
+
+      const batchRes = await fetch(XLAYER_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batchCalls),
+      });
+
+      if (!batchRes.ok) {
+        // Try fallback RPC
+        const fallbackRes = await fetch(XLAYER_RPC_FALLBACK, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(batchCalls),
+        });
+        if (!fallbackRes.ok) break;
+        const fallbackData = await fallbackRes.json();
+        processBlockBatch(fallbackData as Array<{ result: any }>, txs);
+      } else {
+        const batchData = await batchRes.json();
+        processBlockBatch(batchData as Array<{ result: any }>, txs);
+      }
+    }
+  } catch (e) {
+    console.warn('[ProtocolHeartbeat] fetchRecentTxs failed:', e instanceof Error ? e.message : e);
+  }
+
+  txs.sort((a, b) => b.blockNumber - a.blockNumber);
+  return txs.slice(0, 25);
+}
+
+function processBlockBatch(results: Array<{ result: any }>, txs: OnChainTx[]) {
+  for (const blockResult of results) {
+    const block = blockResult?.result;
+    if (!block || !block.transactions) continue;
+    const blockTs = parseInt(String(block.timestamp), 16);
+    const blockNum = parseInt(String(block.number), 16);
+
+    for (const tx of block.transactions) {
+      const from = String(tx.from || '').toLowerCase();
+      const to = String(tx.to || '').toLowerCase();
+
+      if (from !== TREASURY.toLowerCase()) continue;
+      if (!CONTRACT_NAMES[to]) continue;
+
+      txs.push({
+        hash: tx.hash,
+        contract: to,
+        contractName: CONTRACT_NAMES[to] || 'Unknown',
+        method: identifyMethod(to, tx.input || '0x'),
+        blockNumber: blockNum,
+        timestamp: blockTs,
+        valueOkb: formatEther(BigInt(tx.value || '0x0')),
+      });
+    }
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    // Parallel fetch all data — use ethers Interface for correct selector encoding
+    // Phase 1: Get block number first (needed for tx scan range)
+    const blockHex = await rpcCall('eth_blockNumber', []);
+    const blockNumber = parseInt(String(blockHex), 16);
+
+    // Phase 2: Parallel fetch all data — use ethers Interface for correct selector encoding
     const [
-      blockHex,
       treasuryBalanceHex,
       economyStatsHex,
       winRateHex,
@@ -70,9 +209,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       nextBountyIdHex,
       recentCycles,
       recentCommerce,
+      recentTxs,
     ] = await Promise.all([
-      // Chain state
-      rpcCall('eth_blockNumber', []),
       rpcCall('eth_getBalance', [TREASURY, 'latest']),
       // Agent Economy — single call returns all 5 stats
       ethCall(AGENT_ECONOMY, economyIface.encodeFunctionData('getEconomyStats')),
@@ -85,9 +223,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       sbQuery('agent_cycles', 'select=id,status,created_at,vibe_phrase,trades_executed&order=created_at.desc&limit=1'),
       // Supabase: recent commerce
       sbQuery('agent_commerce_events', 'select=id,tool_name,payment_status,created_at,payment_amount_wei,payer_address&order=created_at.desc&limit=5'),
+      // On-chain: scan recent blocks for Bobby contract txs
+      fetchRecentTxs(blockNumber),
     ]);
 
-    const blockNumber = parseInt(String(blockHex), 16);
     const treasuryWei = BigInt(String(treasuryBalanceHex) || '0').toString();
 
     // Decode getEconomyStats() — returns (totalDebates, totalMcpCalls, totalSignalAccesses, totalVolume, totalPayments)
@@ -195,10 +334,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         contracts: contractHealth,
         overall: blockAge === 'healthy' && contractHealth === 'active' ? 'operational' : 'degraded',
       },
+      recentTxs: recentTxs as OnChainTx[],
       contracts: {
         agentEconomy: { address: AGENT_ECONOMY },
         bounties: { address: BOUNTIES, totalPosted: totalBounties },
         trackRecord: { address: TRACK_RECORD },
+        hardnessRegistry: { address: HARDNESS_REGISTRY },
+        convictionOracle: { address: CONVICTION_ORACLE },
       },
     });
   } catch (error) {
