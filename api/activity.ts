@@ -1,13 +1,17 @@
 // ============================================================
 // GET /api/activity
-// Live activity feed — recent MCP calls, payments, and agent
-// interactions. Powers the real-time feed on the landing page.
+// Live activity feed — recent on-chain txs + MCP commerce events.
+// Powers the real-time feed on the landing page.
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { listAgentCommerceEvents } from './_lib/agent-commerce-log.js';
 
-export const config = { maxDuration: 10 };
+export const config = { maxDuration: 15 };
+
+const BASE_URL = process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : 'https://bobbyprotocol.xyz';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -15,33 +19,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const limit = Math.min(Number(req.query.limit) || 20, 50);
-  const events = await listAgentCommerceEvents(limit);
 
-  const feed = events.map((e) => {
-    const agent = e.external_agent || 'anonymous';
-    const tool = e.tool_name || 'unknown';
-    const paid = e.payment_status === 'verified' && e.payment_amount_wei;
-    const amountOkb = paid ? (Number(e.payment_amount_wei) / 1e18).toFixed(4) : null;
-    const txHash = e.payment_tx_hash || null;
-    const ago = e.created_at
-      ? Math.floor((Date.now() - new Date(e.created_at).getTime()) / 1000)
-      : null;
+  // Fetch from both sources in parallel
+  const [events, heartbeatRes] = await Promise.all([
+    listAgentCommerceEvents(limit).catch(() => []),
+    fetch(`${BASE_URL}/api/protocol-heartbeat`).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
 
-    return {
-      agent,
-      tool,
-      paid: Boolean(paid),
-      amountOkb,
-      txHash,
-      agoSeconds: ago,
-      timestamp: e.created_at,
-    };
-  });
+  // Commerce events from Supabase
+  const commerceFeed = events.map((e: any) => ({
+    agent: e.external_agent || 'anonymous',
+    tool: e.tool_name || 'unknown',
+    paid: Boolean(e.payment_status === 'verified' && e.payment_amount_wei),
+    amountOkb: e.payment_amount_wei ? (Number(e.payment_amount_wei) / 1e18).toFixed(4) : null,
+    txHash: e.payment_tx_hash || null,
+    agoSeconds: e.created_at ? Math.floor((Date.now() - new Date(e.created_at).getTime()) / 1000) : null,
+    timestamp: e.created_at,
+    source: 'commerce',
+  }));
+
+  // On-chain txs from heartbeat
+  const onChainFeed = (heartbeatRes?.recentTxs || []).map((tx: any) => ({
+    agent: 'bobby-protocol',
+    tool: `${tx.contractName}::${tx.method}`,
+    paid: parseFloat(tx.valueOkb || '0') > 0,
+    amountOkb: parseFloat(tx.valueOkb || '0') > 0 ? parseFloat(tx.valueOkb).toFixed(4) : null,
+    txHash: tx.hash,
+    agoSeconds: tx.timestamp ? Math.floor(Date.now() / 1000 - tx.timestamp) : null,
+    timestamp: tx.timestamp ? new Date(tx.timestamp * 1000).toISOString() : null,
+    source: 'onchain',
+  }));
+
+  // Merge, deduplicate by txHash, sort by recency, limit
+  const seen = new Set<string>();
+  const merged = [...commerceFeed, ...onChainFeed]
+    .filter((item) => {
+      if (!item.txHash || seen.has(item.txHash)) return !item.txHash ? true : false;
+      seen.add(item.txHash);
+      return true;
+    })
+    .sort((a, b) => (a.agoSeconds ?? 9999) - (b.agoSeconds ?? 9999))
+    .slice(0, limit);
 
   res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=60');
   return res.status(200).json({
     ok: true,
-    count: feed.length,
-    feed,
+    count: merged.length,
+    feed: merged,
   });
 }
