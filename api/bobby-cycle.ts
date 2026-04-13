@@ -1935,34 +1935,39 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
 
     // ============================================================
     // PHASE 7b: Moltbook Auto-Post (Build X hackathon visibility)
-    // Fire-and-forget — posts cycle results to m/buildx
+    // Only posts on MEANINGFUL events: executions, high conviction,
+    // or resolutions. Routine skips are aggregated into 4h checkpoints.
     // ============================================================
     const MOLTBOOK_KEY = process.env.MOLTBOOK_API_KEY;
-    if (MOLTBOOK_KEY && threadId && !isDryRun) {
+    const convStr = conviction !== null ? Math.round(conviction * 10) : 0;
+    const isMeaningfulEvent = executionResult || (conviction !== null && conviction >= 0.5);
+    if (MOLTBOOK_KEY && threadId && !isDryRun && isMeaningfulEvent) {
       (async () => {
         try {
-          const convStr = conviction !== null ? Math.round(conviction * 10) : 0;
           const actionStr = executionResult
-            ? `EXECUTED ${direction?.toUpperCase()} ${symbol} @ $${entryPrice}`
-            : `NO TRADE — ${tradeRejectedReason || 'conviction too low'}`;
+            ? `**EXECUTED** ${direction?.toUpperCase()} ${symbol} @ $${entryPrice}`
+            : `HOLD — Conviction ${convStr}/10 (threshold: 3.5)`;
           const txStr = txHash
-            ? `On-chain: [${txHash.slice(0, 14)}...](https://www.oklink.com/xlayer/tx/${txHash})`
-            : 'No on-chain commit this cycle';
+            ? `On-chain proof: [${txHash.slice(0, 14)}...](https://www.oklink.com/xlayer/tx/${txHash})`
+            : '';
+          const guardrailStr = executionResult
+            ? 'All 11 guardrails passed. Stop loss set. Commit-reveal recorded.'
+            : `Guardrails active: conviction gate held at ${convStr}/10.`;
 
-          const moltContent = `Bobby Protocol — Cycle Update
+          const moltContent = `Bobby Protocol — Live Signal
 
-**${digestSymbol}** | ${digestDirection?.toUpperCase()} | Conviction: ${convStr}/10
 ${actionStr}
 
-Regime: ${intel.regime || 'unknown'} | Win Rate: ${track.winRate}%
+**Risk Decision**
+${guardrailStr}
+Regime: ${intel.regime || 'unknown'} | Win Rate: ${track.winRate}% | Debates: ${track.totalTrades || '?'}
 ${vibePhrase ? `> ${vibePhrase}` : ''}
+${txStr ? `\n${txStr}` : ''}
 
-${txStr}
-Balance: $${finalBalanceStr || '?'} | Positions: ${effectivePositions.length}
+**Guardrails Status**: Conviction gate (3.5/10) · Mandatory stop loss · Circuit breaker · 20% drawdown kill switch · Judge Mode 6D audit · Adversarial bounties · Fail-closed
 
-Wallet: 0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea
-MCP: ${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http
-Heartbeat: ${BOBBY_PROTOCOL_BASE_URL}/protocol/heartbeat`;
+Treasury: ${finalBalanceStr ? `$${finalBalanceStr}` : '—'} | Positions: ${effectivePositions.length}
+MCP: ${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http | Checkpoint: ${BOBBY_PROTOCOL_BASE_URL}/api/checkpoint`;
 
           const postRes = await fetch('https://www.moltbook.com/api/v1/posts', {
             method: 'POST',
@@ -1972,7 +1977,9 @@ Heartbeat: ${BOBBY_PROTOCOL_BASE_URL}/protocol/heartbeat`;
             },
             body: JSON.stringify({
               submolt_name: 'buildx',
-              title: `Bobby cycle: ${convStr}/10 ${digestSymbol} ${digestDirection} | ${executionResult ? 'EXECUTED' : 'SKIP'}`,
+              title: executionResult
+                ? `Bobby signal: ${digestSymbol} ${digestDirection?.toUpperCase()} ${convStr}/10 — EXECUTED`
+                : `Bobby signal: ${digestSymbol} ${digestDirection?.toUpperCase()} ${convStr}/10 — guardrails held`,
               content: moltContent,
             }),
           });

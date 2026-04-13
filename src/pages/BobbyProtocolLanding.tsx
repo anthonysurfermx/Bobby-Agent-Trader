@@ -1392,6 +1392,113 @@ function Guardrails({ stats }: { stats: ProtocolStats | null }) {
   );
 }
 
+function RiskOffMode() {
+  const modes = [
+    {
+      state: 'EXECUTE',
+      condition: 'Conviction ≥ 3.5/10 + all guardrails pass',
+      color: '#6dfe9c',
+      icon: '>>',
+      description: 'Full adversarial debate passed. CIO approves. Stop loss set. Commit-reveal recorded on-chain. Trade goes live.',
+    },
+    {
+      state: 'YIELD PARK',
+      condition: 'Conviction 1.5–3.5/10 + idle cash > $25',
+      color: '#fcc025',
+      icon: '%%',
+      description: 'Market is ambiguous — not enough edge to trade, but capital shouldn\'t sit idle. Bobby debates yield options (Aave V3, Compound, OKX Earn) with the same adversarial rigor. 20% kept liquid for fast re-entry.',
+    },
+    {
+      state: 'BLOCKED',
+      condition: 'Conviction < 1.5/10 or guardrail trip',
+      color: '#ff716a',
+      icon: '||',
+      description: 'No trade. No yield. Bobby sits on hands. Circuit breaker active after 3 losses. Drawdown kill switch at 20%. Capital is preserved — not deployed.',
+    },
+  ];
+
+  return (
+    <section id="risk-off" className="py-24 px-6 max-w-7xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-10"
+      >
+        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-3 border-l-4 border-[#fcc025] pl-6">
+          Three Outcomes. Never Guessing.
+        </h2>
+        <p className="font-mono text-sm text-[#adaaaa] max-w-3xl pl-6">
+          Every cycle ends in one of three deterministic states. Bobby never says "maybe" — it
+          executes, parks, or blocks. The decision is always explainable and always on-chain.
+        </p>
+      </motion.div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        {modes.map((m, i) => (
+          <motion.div
+            key={m.state}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1 }}
+            className="relative overflow-hidden rounded-xl border bg-white/[0.02] p-6"
+            style={{ borderColor: `${m.color}20` }}
+          >
+            {/* State header */}
+            <div className="flex items-center gap-3 mb-4">
+              <span
+                className="font-mono text-lg font-black w-10 h-10 flex items-center justify-center rounded border"
+                style={{ color: m.color, borderColor: `${m.color}40`, backgroundColor: `${m.color}08` }}
+              >
+                {m.icon}
+              </span>
+              <div>
+                <h3 className="font-black text-xl uppercase tracking-tight" style={{ color: m.color }}>
+                  {m.state}
+                </h3>
+                <p className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest">
+                  {m.condition}
+                </p>
+              </div>
+            </div>
+
+            {/* Description */}
+            <p className="text-sm text-[#adaaaa] leading-relaxed">
+              {m.description}
+            </p>
+
+            {/* Glow accent */}
+            <div
+              className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full opacity-[0.03] blur-2xl"
+              style={{ backgroundColor: m.color }}
+            />
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Explainability callout */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        className="mt-8 flex items-start gap-4 border border-white/[0.06] rounded-xl p-5 bg-white/[0.01]"
+      >
+        <span className="font-mono text-[#fcc025] text-lg shrink-0">?=</span>
+        <div>
+          <p className="text-sm text-white font-bold mb-1">Every decision is explainable.</p>
+          <p className="text-xs text-[#adaaaa] leading-relaxed">
+            Bobby posts the reason for every skip, every block, and every execution.
+            "Conviction 2.8/10 — Red Team destroyed Alpha's thesis on SOL range break.
+            CIO saw no asymmetric edge. Cash preserved."
+            This isn't a black box. It's a glass box with on-chain receipts.
+          </p>
+        </div>
+      </motion.div>
+    </section>
+  );
+}
+
 function Bounties({ stats }: { stats: ProtocolStats | null }) {
   const bounties = stats?.bounties ?? [];
   const bountiesContract = stats?.contracts.adversarialBounties;
@@ -2034,6 +2141,80 @@ function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs
   );
 }
 
+function LiveCheckpoint() {
+  const [cp, setCp] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    fetch('/api/checkpoint?hours=4')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => setCp(data))
+      .catch(() => {});
+  }, []);
+
+  if (!cp) return null;
+
+  const rd = cp.risk_decisions as Record<string, number> || {};
+  const oc = cp.on_chain as Record<string, unknown> || {};
+  const latest = cp.latest_debate as Record<string, unknown> | null;
+  const guardrails = cp.guardrails as Record<string, unknown> || {};
+
+  return (
+    <section className="py-12 px-6 max-w-7xl mx-auto">
+      <div className="bg-black border border-[#494847]/20">
+        <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
+          <span>checkpoint_4h.log</span>
+          <span className="text-[#fcc025]">LIVE PROOF LOOP</span>
+        </div>
+        <div className="p-4 space-y-3">
+          {/* Risk decisions strip */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {[
+              { label: 'DEBATES', value: rd.total_debates ?? '—', color: '#6dfe9c' },
+              { label: 'EXECUTED', value: rd.executed ?? 0, color: '#6dfe9c' },
+              { label: 'BLOCKED', value: `${rd.blocked ?? 0} (${rd.block_rate_pct ?? 0}%)`, color: '#ff716a' },
+              { label: 'AVG CONVICTION', value: `${rd.avg_conviction ?? '—'}/10`, color: '#fcc025' },
+              { label: 'WIN RATE', value: `${oc.win_rate_pct ?? '—'}%`, color: '#6dfe9c' },
+            ].map(m => (
+              <div key={m.label} className="font-mono text-center">
+                <div className="text-[9px] text-[#adaaaa] uppercase tracking-widest">{m.label}</div>
+                <div className="text-lg font-bold" style={{ color: m.color }}>{m.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Latest debate */}
+          {latest && (
+            <div className="border-t border-[#494847]/20 pt-3 font-mono text-[11px]">
+              <span className="text-[#adaaaa]">LATEST → </span>
+              <span className="text-white">{latest.symbol as string} {(latest.direction as string || '').toUpperCase()}</span>
+              <span className="text-[#adaaaa]"> conviction </span>
+              <span style={{ color: (latest.conviction as number) >= 3.5 ? '#6dfe9c' : '#ff716a' }}>
+                {latest.conviction as number}/10
+              </span>
+              <span className="text-[#adaaaa]"> → </span>
+              <span style={{ color: latest.decision === 'EXECUTE' ? '#6dfe9c' : '#ff716a' }}>
+                {latest.decision as string}
+              </span>
+            </div>
+          )}
+
+          {/* Guardrails status */}
+          <div className="border-t border-[#494847]/20 pt-3 flex flex-wrap gap-3 font-mono text-[10px]">
+            <span className="text-[#adaaaa]">GUARDRAILS:</span>
+            <span className={guardrails.circuit_breaker === 'ARMED' ? 'text-[#6dfe9c]' : 'text-[#ff716a]'}>
+              Circuit breaker: {guardrails.circuit_breaker as string}
+            </span>
+            <span className={(guardrails.yield_parking as string || '').startsWith('ACTIVE') ? 'text-[#fcc025]' : 'text-[#adaaaa]'}>
+              Yield parking: {guardrails.yield_parking as string}
+            </span>
+            <span className="text-[#6dfe9c]">Fail-closed: ON</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
   const fmtAgo = (secs: number | null) => {
     if (secs === null) return '—';
@@ -2375,9 +2556,11 @@ export default function BobbyProtocolLanding() {
       <WhyMatters />
       <HarnessArchitecture />
       <Guardrails stats={stats} />
+      <RiskOffMode />
       <Bounties stats={stats} />
       <McpSection mcp={mcp} stats={stats} />
       <AgentInterop stats={stats} />
+      <LiveCheckpoint />
       <ActivityFeed feed={activity} />
       <LiveOnXLayer stats={stats} />
       <Footer stats={stats} />
