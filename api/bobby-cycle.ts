@@ -13,7 +13,7 @@ import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bo
 import { ethers } from 'ethers';
 import { recordHardnessActivity } from './_lib/hardness-registry.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
-import { logHarnessEvent, buildVerdict } from './_lib/harness-events.js';
+import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 
 export const config = { maxDuration: 300 };
 
@@ -1934,11 +1934,25 @@ ${lang === 'es' ? 'Responde en español mexicano, casual pero inteligente. Como 
       }
     }
 
+    // ── Distill episode memory (L1) ──
+    distillEpisode({
+      threadId,
+      symbol: digestSymbol,
+      direction: digestDirection,
+      regime: intel.regime as string | undefined,
+      conviction,
+      verdict,
+      executed: !!executionResult,
+      yieldTriggered: yieldDebateTriggered,
+      vibePhrase,
+      runId,
+    });
+
     // ============================================================
     // PHASE 7: Twitter Integration (Challenge Mode)
     // ============================================================
     const TWITTER_BEARER = process.env.TWITTER_BEARER_TOKEN;
-    
+
     // Construct tweet
     const executeStr = executionResult ? `✅ EXECUTED: ${direction?.toUpperCase()} @ $${entryPrice}` : `⛔ NO TRADE: ${tradeRejectedReason || 'No setup'}`;
     const balanceNow = finalBalanceStr || '???';

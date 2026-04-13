@@ -39,6 +39,27 @@ CREATE INDEX IF NOT EXISTS idx_agent_events_run_id ON agent_events(run_id);
 CREATE INDEX IF NOT EXISTS idx_agent_events_created_at ON agent_events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agent_events_event_type ON agent_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_agent_events_agent ON agent_events(agent);
+
+CREATE TABLE IF NOT EXISTS memory_objects (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  kind text NOT NULL,
+  thread_id text,
+  symbol text,
+  direction text,
+  regime text,
+  conviction real,
+  outcome text,
+  pnl_pct real,
+  lesson text NOT NULL,
+  tags jsonb,
+  source_events jsonb,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_objects_kind ON memory_objects(kind);
+CREATE INDEX IF NOT EXISTS idx_memory_objects_symbol ON memory_objects(symbol);
+CREATE INDEX IF NOT EXISTS idx_memory_objects_created_at ON memory_objects(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_objects_outcome ON memory_objects(outcome);
 `;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

@@ -54,19 +54,46 @@ function fmtAgo(dateStr: string): string {
   return `${Math.floor(secs / 86400)}d ago`;
 }
 
+interface MemoryObject {
+  id: string;
+  kind: string;
+  thread_id?: string;
+  symbol?: string;
+  direction?: string;
+  regime?: string;
+  conviction?: number;
+  outcome?: string;
+  pnl_pct?: number;
+  lesson: string;
+  tags?: string[];
+  created_at: string;
+}
+
+interface MemoryStats {
+  total_episodes: number;
+  outcome_distribution: Record<string, number>;
+  symbol_distribution: Record<string, number>;
+  regime_distribution: Record<string, number>;
+}
+
 export default function BobbyHarnessConsolePage() {
   const [events, setEvents] = useState<HarnessEvent[]>([]);
+  const [memories, setMemories] = useState<MemoryObject[]>([]);
+  const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'events' | 'memory'>('events');
 
   useEffect(() => {
-    fetch('/api/harness-events?limit=100')
-      .then(r => r.json())
-      .then(data => {
-        setEvents(data.events || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch('/api/harness-events?limit=100').then(r => r.json()).catch(() => ({ events: [] })),
+      fetch('/api/harness-memory?limit=50').then(r => r.json()).catch(() => ({ memories: [], stats: null })),
+    ]).then(([evData, memData]) => {
+      setEvents(evData.events || []);
+      setMemories(memData.memories || []);
+      setMemoryStats(memData.stats || null);
+      setLoading(false);
+    });
   }, []);
 
   // Stats
@@ -135,6 +162,142 @@ export default function BobbyHarnessConsolePage() {
           ))}
         </motion.div>
 
+        {/* Main tabs: Events vs Memory */}
+        <div className="flex gap-3 font-mono text-[11px] uppercase tracking-widest border-b border-white/[0.06] pb-2">
+          <button
+            onClick={() => setActiveTab('events')}
+            className={`px-4 py-2 rounded-t transition-colors ${
+              activeTab === 'events'
+                ? 'text-[#6dfe9c] border-b-2 border-[#6dfe9c]'
+                : 'text-[#adaaaa] hover:text-white'
+            }`}
+          >
+            Trace Layer (L0)
+          </button>
+          <button
+            onClick={() => setActiveTab('memory')}
+            className={`px-4 py-2 rounded-t transition-colors ${
+              activeTab === 'memory'
+                ? 'text-[#fcc025] border-b-2 border-[#fcc025]'
+                : 'text-[#adaaaa] hover:text-white'
+            }`}
+          >
+            Memory Layer (L1) — {memories.length} episodes
+          </button>
+        </div>
+
+        {activeTab === 'memory' && (
+          <div className="space-y-4">
+            {/* Memory stats */}
+            {memoryStats && memoryStats.total_episodes > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
+                  <div className="font-mono text-[9px] text-[#adaaaa] uppercase tracking-widest mb-2">Outcomes</div>
+                  {Object.entries(memoryStats.outcome_distribution).map(([k, v]) => (
+                    <div key={k} className="flex justify-between font-mono text-[11px]">
+                      <span className={k === 'executed' ? 'text-[#6dfe9c]' : k === 'skip' ? 'text-[#ff716a]' : 'text-[#60a5fa]'}>{k}</span>
+                      <span className="text-white">{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
+                  <div className="font-mono text-[9px] text-[#adaaaa] uppercase tracking-widest mb-2">Symbols</div>
+                  {Object.entries(memoryStats.symbol_distribution).map(([k, v]) => (
+                    <div key={k} className="flex justify-between font-mono text-[11px]">
+                      <span className="text-white">{k}</span>
+                      <span className="text-[#fcc025]">{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
+                  <div className="font-mono text-[9px] text-[#adaaaa] uppercase tracking-widest mb-2">Regimes</div>
+                  {Object.entries(memoryStats.regime_distribution).map(([k, v]) => (
+                    <div key={k} className="flex justify-between font-mono text-[11px]">
+                      <span className="text-white">{k}</span>
+                      <span className="text-[#6dfe9c]">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Memory episodes */}
+            <div className="bg-black border border-[#494847]/20 rounded-lg overflow-hidden">
+              <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
+                <span>memory_episodes.log</span>
+                <span className="text-[#fcc025]">{memories.length} episodes</span>
+              </div>
+              {memories.length === 0 ? (
+                <div className="p-8 text-center font-mono text-[11px] text-[#adaaaa]">
+                  No episodes yet. Memories are distilled automatically after each debate cycle.
+                </div>
+              ) : (
+                <div className="divide-y divide-[#494847]/10">
+                  {memories.map((m) => {
+                    const outcomeColor = m.outcome === 'executed' ? '#6dfe9c' : m.outcome === 'park' ? '#60a5fa' : '#ff716a';
+                    return (
+                      <div key={m.id} className="px-4 py-3 font-mono text-[11px]">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="px-2 py-0.5 rounded text-[9px] uppercase font-bold border"
+                            style={{ color: outcomeColor, borderColor: `${outcomeColor}40`, backgroundColor: `${outcomeColor}10` }}
+                          >
+                            {m.outcome || '?'}
+                          </span>
+                          {m.symbol && <span className="text-white font-bold">{m.symbol} {m.direction?.toUpperCase()}</span>}
+                          {m.conviction != null && (
+                            <span style={{ color: m.conviction >= 0.35 ? '#6dfe9c' : '#ff716a' }}>
+                              {(m.conviction * 10).toFixed(1)}/10
+                            </span>
+                          )}
+                          {m.regime && <span className="text-[#adaaaa]">{m.regime}</span>}
+                          <span className="text-[#adaaaa]/40 ml-auto">
+                            {new Date(m.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-[#adaaaa] mt-1.5 leading-relaxed">{m.lesson}</p>
+                        {m.tags && m.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {(Array.isArray(m.tags) ? m.tags : []).map(t => (
+                              <span key={t} className="px-1.5 py-0.5 rounded border border-white/10 text-[9px] text-[#adaaaa]">{t}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Memory architecture reference */}
+            <div className="border border-white/[0.06] rounded-lg p-5 bg-white/[0.01]">
+              <h3 className="font-mono text-[11px] text-[#fcc025] uppercase tracking-widest mb-3">
+                :: EXPERIENTIAL MEMORY ARCHITECTURE ::
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-[10px]">
+                <div>
+                  <div className="text-[#6dfe9c] font-bold mb-1">L0 — Raw Traces</div>
+                  <div className="text-[#adaaaa]">agent_events table. Every tool call, debate, quote, payment, rejection.</div>
+                </div>
+                <div>
+                  <div className="text-[#fcc025] font-bold mb-1">L1 — Episodes</div>
+                  <div className="text-[#adaaaa]">Distilled after each cycle. Symbol, regime, conviction, outcome, lesson.</div>
+                </div>
+                <div>
+                  <div className="text-[#adaaaa]/60 font-bold mb-1">L2 — Heuristics</div>
+                  <div className="text-[#adaaaa]/40">Patterns from N episodes. "SOL shorts in low vol lose 80%." [Future]</div>
+                </div>
+                <div>
+                  <div className="text-[#adaaaa]/60 font-bold mb-1">L3 — Calibration Priors</div>
+                  <div className="text-[#adaaaa]/40">Meta-learning. "Conviction 8+ overestimates in high vol." [Future]</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'events' && <>
         {/* Filter tabs */}
         <div className="flex gap-2 font-mono text-[10px] uppercase tracking-widest">
           {['all', 'decisions', 'allow', 'deny', 'stable', 'mcp'].map(f => (
@@ -203,6 +366,7 @@ export default function BobbyHarnessConsolePage() {
             Every cycle produces a verdict. Every verdict is logged. Every log is queryable via /api/harness-events.
           </p>
         </motion.div>
+        </>}
       </div>
     </KineticShell>
   );
