@@ -118,6 +118,7 @@ export default function BobbyHeartbeatPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [txExpanded, setTxExpanded] = useState(false);
 
   const fetchHeartbeat = async () => {
     try {
@@ -286,41 +287,51 @@ export default function BobbyHeartbeatPage() {
               <span className="text-xs font-mono text-white/20">{data.recentTxs?.length || 0} txs</span>
             </div>
             {data.recentTxs && data.recentTxs.length > 0 ? (
-              <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
-                {data.recentTxs.map((tx, i) => (
-                  <motion.a
-                    key={tx.hash}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    href={`https://www.oklink.com/xlayer/tx/${tx.hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between px-3 py-2 bg-white/[0.01] border border-white/[0.03] rounded-lg hover:border-green-400/30 transition group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-1.5 h-1.5 bg-green-400 rounded-full flex-shrink-0" />
-                      <span className={`text-xs font-mono flex-shrink-0 ${CONTRACT_COLORS[tx.contractName] || 'text-white/60'}`}>
-                        {tx.contractName}
-                      </span>
-                      <span className="text-xs font-mono text-white/50 flex-shrink-0">{tx.method}</span>
-                      {parseFloat(tx.valueOkb) > 0 && (
-                        <span className="text-xs font-mono text-amber-400/60 flex-shrink-0 hidden sm:inline">
-                          {parseFloat(tx.valueOkb).toFixed(4)} OKB
+              <>
+                <div className="space-y-1.5">
+                  {(txExpanded ? data.recentTxs : data.recentTxs.slice(0, 6)).map((tx, i) => (
+                    <motion.a
+                      key={tx.hash}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      href={`https://www.oklink.com/xlayer/tx/${tx.hash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between px-3 py-2 bg-white/[0.01] border border-white/[0.03] rounded-lg hover:border-green-400/30 transition group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full flex-shrink-0" />
+                        <span className={`text-xs font-mono flex-shrink-0 ${CONTRACT_COLORS[tx.contractName] || 'text-white/60'}`}>
+                          {tx.contractName}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="text-xs font-mono text-white/20">
-                        {formatTimestamp(tx.timestamp)}
-                      </span>
-                      <span className="text-xs font-mono text-white/15 group-hover:text-green-400 transition hidden md:inline">
-                        {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)} ↗
-                      </span>
-                    </div>
-                  </motion.a>
-                ))}
-              </div>
+                        <span className="text-xs font-mono text-white/50 flex-shrink-0">{tx.method}</span>
+                        {parseFloat(tx.valueOkb) > 0 && (
+                          <span className="text-xs font-mono text-amber-400/60 flex-shrink-0 hidden sm:inline">
+                            {parseFloat(tx.valueOkb).toFixed(4)} OKB
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-xs font-mono text-white/20">
+                          {formatTimestamp(tx.timestamp)}
+                        </span>
+                        <span className="text-xs font-mono text-white/15 group-hover:text-green-400 transition hidden md:inline">
+                          {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)} ↗
+                        </span>
+                      </div>
+                    </motion.a>
+                  ))}
+                </div>
+                {data.recentTxs.length > 6 && (
+                  <button
+                    onClick={() => setTxExpanded(!txExpanded)}
+                    className="mt-3 w-full py-2 border border-white/[0.06] hover:border-green-400/30 rounded-lg bg-white/[0.01] hover:bg-white/[0.03] transition-all text-xs font-mono uppercase tracking-wider text-white/30 hover:text-green-400"
+                  >
+                    {txExpanded ? `Collapse` : `See all ${data.recentTxs.length} transactions`}
+                  </button>
+                )}
+              </>
             ) : (
               <div className="text-sm font-mono text-white/30 py-4 text-center">
                 Scanning recent blocks for activity...
