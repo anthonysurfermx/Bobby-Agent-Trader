@@ -23,6 +23,7 @@ const BOBBY_TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
 const CONVICTION_ORACLE = '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
 const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
 const HARDNESS_REGISTRY = '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
+const AGENT_REGISTRY = '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b';
 
 const ORACLE_INTERFACE = new Interface([
   'function symbolCount() view returns (uint256)',
@@ -256,6 +257,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         address: HARDNESS_REGISTRY,
         agentRegistered: hardnessRegistered,
         lastActivityBlock: hardnessLastBlock,
+      },
+      agentRegistry: {
+        address: AGENT_REGISTRY,
+        type: 'ERC-721',
+        agents: 3,
       },
     },
     bounties: recentBounties,

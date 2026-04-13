@@ -19,6 +19,7 @@ const BOUNTIES = '0xa8005ab465a0e02cb14824cd0e7630391fba673d';
 const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
 const HARDNESS_REGISTRY = '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
 const CONVICTION_ORACLE = process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
+const AGENT_REGISTRY = '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b';
 const TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
 
 // Contract name map for tx feed
@@ -28,6 +29,7 @@ const CONTRACT_NAMES: Record<string, string> = {
   [TRACK_RECORD.toLowerCase()]: 'TrackRecord',
   [HARDNESS_REGISTRY.toLowerCase()]: 'HardnessRegistry',
   [CONVICTION_ORACLE.toLowerCase()]: 'ConvictionOracle',
+  [AGENT_REGISTRY.toLowerCase()]: 'AgentRegistry',
 };
 
 // Method selectors for labeling txs (computed from contract ABIs via ethers)
@@ -339,6 +341,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         trackRecord: { address: TRACK_RECORD },
         hardnessRegistry: { address: HARDNESS_REGISTRY },
         convictionOracle: { address: CONVICTION_ORACLE },
+        agentRegistry: { address: AGENT_REGISTRY },
       },
     });
   } catch (error) {

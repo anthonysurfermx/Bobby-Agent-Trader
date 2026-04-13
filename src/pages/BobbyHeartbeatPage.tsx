@@ -102,6 +102,7 @@ const CONTRACT_COLORS: Record<string, string> = {
   TrackRecord: 'text-cyan-400',
   AgentEconomy: 'text-purple-400',
   ConvictionOracle: 'text-blue-400',
+  AgentRegistry: 'text-pink-400',
 };
 
 function formatTimestamp(ts: number | null): string {
@@ -354,6 +355,7 @@ export default function BobbyHeartbeatPage() {
                 { name: 'AdversarialBounties', addr: data.contracts.bounties.address, extra: `${data.contracts.bounties.totalPosted} bounties` },
                 { name: 'TrackRecord', addr: data.contracts.trackRecord.address, extra: `${data.performance.totalTrades} trades` },
                 { name: 'ConvictionOracle', addr: data.contracts.convictionOracle?.address, extra: 'real-time feed' },
+                { name: 'AgentRegistry', addr: (data.contracts as any).agentRegistry?.address || '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', extra: 'ERC-721 identity' },
               ].filter(c => c.addr).map((contract) => (
                 <div key={contract.name} className="border border-white/[0.04] rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1">

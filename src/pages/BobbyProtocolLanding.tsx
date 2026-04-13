@@ -1813,6 +1813,16 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
         ],
         lastBlock: c.adversarialBounties.lastActivityBlock,
       },
+      {
+        label: 'AGENT_REGISTRY',
+        address: (c as any).agentRegistry?.address || '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b',
+        rows: [
+          { k: 'TYPE', v: 'ERC-721' },
+          { k: 'AGENTS', v: '3' },
+          { k: 'IDENTITY', v: 'NFT-based' },
+        ],
+        lastBlock: null,
+      },
     ];
     return list;
   }, [stats]);
@@ -1823,11 +1833,11 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
         Live on X Layer
       </h2>
       <p className="text-center text-[#adaaaa] font-mono text-xs uppercase tracking-widest mb-12">
-        Five contracts. One protocol. All on OKX X Layer chain 196.
+        Six contracts. One protocol. All on OKX X Layer chain 196.
       </p>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {contracts.length === 0
-          ? Array.from({ length: 5 }).map((_, i) => (
+          ? Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
                 className="bg-[#131313] border border-[#494847]/15 p-5 animate-pulse h-48"
