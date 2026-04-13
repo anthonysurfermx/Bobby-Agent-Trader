@@ -35,7 +35,8 @@ const CONTRACT_NAMES: Record<string, string> = {
 // Method selectors for labeling txs (computed from contract ABIs via ethers)
 const METHOD_LABELS: Record<string, Record<string, string>> = {
   [HARDNESS_REGISTRY.toLowerCase()]: {
-    '0cdc': 'publishSignal',
+    '788e': 'publishSignal',
+    '0cdc': 'publishSignal', // legacy 4-arg selector
     '2672': 'commitPrediction',
     '2d2a': 'registerAgent',
     '7f19': 'registerService',

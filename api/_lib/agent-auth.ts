@@ -38,7 +38,12 @@ export async function verifyAgentRequest(
 
   const { signature, timestamp, address } = getAuthHeaders(req);
   if (!signature || !timestamp || !address) {
-    return { ok: true, mode: 'demo' as const, signer: null, message: null };
+    // Demo mode: allow read-only GET requests without auth, reject mutations
+    const method = req.method?.toUpperCase();
+    if (method === 'GET' || method === 'OPTIONS') {
+      return { ok: true, mode: 'demo' as const, signer: null, message: null };
+    }
+    return { ok: false, error: 'Missing x-agent-signature, x-agent-timestamp, and x-agent-address headers' };
   }
 
   const tsMs = Date.parse(timestamp);

@@ -5,10 +5,10 @@ export const HARDNESS_REGISTRY_ADDRESS =
 const HARDNESS_REGISTRY_ABI = [
   'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, string metadataURI)',
   'function getService(string serviceId) view returns ((address owner,address recipient,uint128 priceWei,uint128 totalRevenue,uint64 totalCalls,uint64 createdAt,bool active,string serviceId))',
-  'function registerAgent(string metadataURI)',
+  'function registerAgent(string metadataURI) payable',
   'function registerService(string serviceId, uint256 priceWei, address recipient)',
   'function commitPrediction(bytes32 predictionHash, string symbol, uint8 conviction, uint96 entry, uint96 target, uint96 stop)',
-  'function publishSignal(string symbol, uint8 direction, uint8 conviction, bytes32 context)',
+  'function publishSignal(string symbol, uint8 hardnessScore, uint8 direction, uint8 conviction, bytes32 context)',
   'function getPrediction(bytes32 predictionHash) view returns ((address agent,uint64 committedAt,uint64 minResolveAt,uint64 resolvedAt,uint8 conviction,uint8 result,uint96 entryPrice,uint96 targetPrice,uint96 stopPrice,uint96 exitPrice,int32 pnlBps,string symbol))',
 ];
 
@@ -98,9 +98,13 @@ async function ensureBobbySetup(contract: any, signer: any, metadataURI?: string
   if (now - lastSetupAt < 15 * 60 * 1000) return;
   const { ethers } = await import('ethers');
 
+  const { ethers: eth } = await import('ethers');
   const profile = await contract.agentProfiles(signer.address);
   if (!profile.registered) {
-    const tx = await contract.registerAgent(metadataURI || DEFAULT_AGENT_METADATA_URI, { gasLimit: 250000n });
+    const tx = await contract.registerAgent(metadataURI || DEFAULT_AGENT_METADATA_URI, {
+      gasLimit: 250000n,
+      value: eth.parseEther('0.01'), // 0.01 OKB stake required by contract
+    });
     await tx.wait();
   }
 
@@ -156,8 +160,10 @@ export async function recordHardnessActivity(input: RecordHardnessActivityInput)
 
   let signalTxHash: string | null = null;
   try {
+    const hardnessScore = Math.min(100, Math.max(0, conviction)); // same scale as conviction for now
     const tx = await contract.publishSignal(
       input.symbol,
+      hardnessScore,
       directionToEnum(input.direction),
       conviction,
       context,

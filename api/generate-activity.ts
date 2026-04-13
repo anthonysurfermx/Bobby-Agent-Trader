@@ -26,7 +26,7 @@ const AGENT_ECONOMY = process.env.BOBBY_ECONOMY_ADDRESS || '';
 
 // ABIs
 const HARDNESS_ABI = [
-  'function publishSignal(string symbol, uint8 direction, uint8 conviction, bytes32 context)',
+  'function publishSignal(string symbol, uint8 hardnessScore, uint8 direction, uint8 conviction, bytes32 context)',
   'function commitPrediction(bytes32 predictionHash, string symbol, uint8 conviction, uint96 entry, uint96 target, uint96 stop)',
   'function getPrediction(bytes32 predictionHash) view returns ((address agent,uint64 committedAt,uint64 minResolveAt,uint64 resolvedAt,uint8 conviction,uint8 result,uint96 entryPrice,uint96 targetPrice,uint96 stopPrice,uint96 exitPrice,int32 pnlBps,string symbol))',
 ];
@@ -205,10 +205,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const symbol of usedSymbols) {
       const direction = randomDirection();
       const conviction = randomConviction();
+      const hardnessScore = conviction; // hardness score mirrors conviction
       const context = ethers.keccak256(ethers.toUtf8Bytes(`bobby:signal:${symbol}:${now}`));
 
       const txData = hardnessIface.encodeFunctionData('publishSignal', [
-        symbol, direction, conviction, context,
+        symbol, hardnessScore, direction, conviction, context,
       ]);
 
       const hash = await sendTxSafe(wallet, {
