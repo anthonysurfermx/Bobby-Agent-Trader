@@ -468,6 +468,43 @@ export default function BobbySubmissionPage() {
           </section>
 
           <section className="mt-4">
+            <Panel title="11 Guardrails — Fail-Closed" kicker="Trust infrastructure">
+              <p className="mt-2 text-sm text-white/50 leading-relaxed">
+                Bobby is fail-closed. No consensus → no trade. No stop loss → no trade. 3 losses → circuit breaker. Every guardrail runs in production — not documentation.
+              </p>
+              <div className="mt-4 grid gap-2 md:grid-cols-2">
+                {[
+                  { label: 'Conviction Gate', desc: 'No trade below 3.5/10 after adversarial debate' },
+                  { label: 'Mandatory Stop Loss', desc: 'Every position requires exit plan; 3% default enforced' },
+                  { label: 'Circuit Breaker', desc: '3 consecutive losses → Red Team max aggression' },
+                  { label: 'Drawdown Kill Switch', desc: '20% drawdown → all trading halted' },
+                  { label: 'Hard Risk Gate', desc: '$50/trade, 30% max concentration, 5 max positions' },
+                  { label: 'Metacognition', desc: 'Auto-calibrates conviction when overconfident' },
+                  { label: 'Commit-Reveal', desc: 'Predictions on-chain BEFORE outcome is known' },
+                  { label: 'Judge Mode (6D)', desc: '6-dimension audit + 6 bias types detected' },
+                  { label: 'Adversarial Bounties', desc: 'Stake OKB to prove Bobby wrong on-chain' },
+                  { label: 'Yield Parking', desc: 'Low conviction → debates de-risk into stables' },
+                  { label: 'EIP-191 Auth', desc: 'Signed proof required for every mutation' },
+                ].map((g) => (
+                  <div key={g.label} className="flex items-start gap-3 rounded-xl border border-white/8 bg-black/20 p-3">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#ff716a]" />
+                    <div>
+                      <span className="text-xs font-bold text-white uppercase tracking-wide">{g.label}</span>
+                      <p className="text-[11px] text-white/50 leading-relaxed mt-0.5">{g.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 rounded-xl border border-[#ff716a]/20 bg-[#ff716a]/[0.04] p-4">
+                <p className="text-xs text-[#ff716a] font-mono uppercase tracking-widest mb-1">Fail-Closed Philosophy</p>
+                <p className="text-sm text-white/60 leading-relaxed">
+                  Debate doesn't converge? <strong className="text-white">Blocked.</strong> Judge can't verify? <strong className="text-white">Blocked.</strong> Drawdown exceeded? <strong className="text-white">All trading halted.</strong> The harness protects capital first, generates alpha second.
+                </p>
+              </div>
+            </Panel>
+          </section>
+
+          <section className="mt-4">
             <Panel title="OnchainOS APIs Used" kicker="OKX OnchainOS integration">
               <div className="mt-4 space-y-3">
                 {[

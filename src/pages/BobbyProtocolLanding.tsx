@@ -391,7 +391,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.1 }}
         className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] text-center max-w-5xl leading-none uppercase mb-6"
       >
-        The Hardness Layer for{' '}
+        The Harness Layer for{' '}
         <span className="text-[#6dfe9c] italic">Agent</span> Finance
       </motion.h1>
 
@@ -655,14 +655,14 @@ function ClosedLoop() {
     { title: 'PRESSURE', glyph: '><', desc: 'Thesis compressed under adversarial load', color: '#fcc025' },
     { title: 'FRACTURE TEST', glyph: ':::', desc: '3 agents try to break the thesis', color: '#ff716a' },
     { title: 'GRADE', glyph: '[!]', desc: '6-dimension hardness score', color: '#6dfe9c' },
-    { title: 'EXECUTE', glyph: '$?', desc: 'Only hardened theses pass', color: '#fcc025' },
-    { title: 'PROOF', glyph: '=X=', desc: 'On-chain record of what survived', color: '#6dfe9c' },
+    { title: 'GATE', glyph: '$?', desc: 'Pass → execute. Low conviction → park in yield. Fail → blocked.', color: '#fcc025' },
+    { title: 'PROOF', glyph: '=X=', desc: 'On-chain record: trade, park, or block — all committed', color: '#6dfe9c' },
   ];
 
   return (
     <section id="loop" className="py-24 px-6 max-w-7xl mx-auto">
       <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-10 border-l-4 border-[#fcc025] pl-6">
-        The Hardness Process
+        The Harness Process
       </h2>
 
       <div className="grid gap-4 lg:grid-cols-6">
@@ -888,10 +888,10 @@ function WhyMatters() {
           className="mb-12"
         >
           <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4">
-            The Hardness Layer
+            The Harness Layer
           </h2>
           <p className="font-mono text-sm text-[#6dfe9c] tracking-wide max-w-3xl">
-            Bobby is the hardness layer for on-chain trading. Before any agent executes, Bobby subjects the thesis to adversarial pressure.
+            Bobby is the harness layer for on-chain trading. Before any agent executes, Bobby subjects the thesis to adversarial pressure.
           </p>
         </motion.div>
 
@@ -922,7 +922,7 @@ function WhyMatters() {
   );
 }
 
-function HardnessArchitecture() {
+function HarnessArchitecture() {
   const [activeNode, setActiveNode] = useState<string | null>(null);
   const [flowStep, setFlowStep] = useState(0);
 
@@ -1208,6 +1208,187 @@ function NodeCard({
         {node.sub}
       </div>
     </motion.div>
+  );
+}
+
+function Guardrails({ stats }: { stats: ProtocolStats | null }) {
+  const totalBounties = stats?.protocolTotals.bountyCount ?? 0;
+  const totalCommitments = Number(stats?.contracts.trackRecord.stats.totalCommitments ?? 0);
+  const winRatePct = Number(stats?.contracts.trackRecord.stats.winRateBps ?? 0) / 100;
+
+  const guardrails = [
+    {
+      id: 'conviction-gate',
+      label: 'CONVICTION GATE',
+      rule: 'No trade below 3.5/10',
+      detail: 'Three agents debate every thesis. If conviction stays below 3.5/10 after adversarial pressure, the trade is blocked. No override.',
+      icon: '[ ]',
+      color: '#6dfe9c',
+    },
+    {
+      id: 'mandatory-stop',
+      label: 'MANDATORY STOP LOSS',
+      rule: 'No trade without exit plan',
+      detail: 'Every position requires a stop-loss price before execution. If the CIO omits it, a 3% default is enforced. No naked exposure.',
+      icon: '||',
+      color: '#6dfe9c',
+    },
+    {
+      id: 'circuit-breaker',
+      label: 'CIRCUIT BREAKER',
+      rule: '3 consecutive losses → max defense',
+      detail: 'After 3 losses in a row, Red Team switches to maximum aggression. The CIO receives a circuit-breaker warning. Only exceptional setups pass.',
+      icon: '!!',
+      color: '#ff716a',
+    },
+    {
+      id: 'drawdown-kill',
+      label: 'DRAWDOWN KILL SWITCH',
+      rule: '20% drawdown → all trading halted',
+      detail: 'If cumulative drawdown exceeds 20% of portfolio, every trade is rejected. No exceptions. The system stops itself.',
+      icon: '//',
+      color: '#ff716a',
+    },
+    {
+      id: 'risk-gate',
+      label: 'HARD RISK GATE',
+      rule: '$50/trade, 30% max concentration',
+      detail: 'Deterministic limits that no AI agent can override: max single trade size, max portfolio concentration per token, max concurrent positions.',
+      icon: '##',
+      color: '#fcc025',
+    },
+    {
+      id: 'calibration',
+      label: 'METACOGNITION',
+      rule: 'Overconfident? Conviction auto-adjusted',
+      detail: 'Bobby tracks its own calibration. If recent high-conviction calls underperformed, conviction scores are automatically scaled down. Self-correcting.',
+      icon: '><',
+      color: '#fcc025',
+    },
+    {
+      id: 'commit-reveal',
+      label: 'COMMIT-REVEAL',
+      rule: 'Predictions on-chain BEFORE outcome',
+      detail: 'Every prediction is recorded on X Layer before the market moves. No backfill. No hindsight edits. Verifiable integrity.',
+      icon: '=>',
+      color: '#6dfe9c',
+    },
+    {
+      id: 'judge-mode',
+      label: 'JUDGE MODE (6D)',
+      rule: 'Every debate audited on 6 dimensions',
+      detail: 'Data integrity, adversarial quality, decision logic, risk management, calibration alignment, novelty. Plus bias detection: recency, confirmation, anchoring, loss aversion.',
+      icon: '**',
+      color: '#6dfe9c',
+    },
+    {
+      id: 'adversarial-bounties',
+      label: 'ADVERSARIAL BOUNTIES',
+      rule: 'Stake OKB to prove Bobby wrong',
+      detail: `Anyone can challenge Bobby's analysis on-chain. ${totalBounties} bounties posted. Losses become paid post-mortems. Economic accountability.`,
+      icon: '$>',
+      color: '#fcc025',
+    },
+    {
+      id: 'yield-parking',
+      label: 'YIELD PARKING',
+      rule: 'Low conviction → autonomous de-risk',
+      detail: 'When conviction is too low to trade (1.5-3.5/10) and cash sits idle, Bobby evaluates yield options: Aave V3, Compound, OKX Earn. Debates the risk before parking.',
+      icon: '%%',
+      color: '#6dfe9c',
+    },
+    {
+      id: 'agent-auth',
+      label: 'EIP-191 AUTH',
+      rule: 'Every mutation requires signed proof',
+      detail: 'External agents must sign with EIP-191 to call premium tools or post bounties. 10-minute auth window. No anonymous writes.',
+      icon: '{}',
+      color: '#6dfe9c',
+    },
+  ];
+
+  return (
+    <section id="guardrails" className="py-24 px-6 max-w-7xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-12"
+      >
+        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4 border-l-4 border-[#ff716a] pl-6">
+          11 Guardrails. Fail-Closed.
+        </h2>
+        <p className="font-mono text-sm text-[#adaaaa] max-w-3xl pl-6">
+          No consensus → no trade. No stop loss → no trade. 3 losses → circuit breaker.
+          Bobby doesn't trust itself — it proves itself.
+        </p>
+
+        {/* Live stats strip */}
+        <div className="flex flex-wrap gap-6 mt-6 pl-6 font-mono text-[11px] uppercase tracking-widest">
+          <span className="text-[#6dfe9c]">
+            {totalCommitments} commitments on-chain
+          </span>
+          <span className="text-[#fcc025]">
+            {totalBounties} bounties posted
+          </span>
+          <span className="text-[#ff716a]">
+            {winRatePct > 0 ? `${winRatePct.toFixed(0)}% win rate` : 'tracking...'}
+          </span>
+        </div>
+      </motion.div>
+
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {guardrails.map((g, i) => (
+          <motion.div
+            key={g.id}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.05 }}
+            className="group bg-white/[0.02] border border-white/[0.04] rounded-xl p-5 hover:border-white/[0.08] transition-colors"
+          >
+            <div className="flex items-start gap-3 mb-3">
+              <span
+                className="font-mono text-xs font-bold shrink-0 w-8 h-8 flex items-center justify-center rounded border"
+                style={{ color: g.color, borderColor: `${g.color}33` }}
+              >
+                {g.icon}
+              </span>
+              <div>
+                <h3 className="font-black text-sm uppercase tracking-tight text-white">
+                  {g.label}
+                </h3>
+                <p className="font-mono text-[11px] mt-0.5" style={{ color: g.color }}>
+                  {g.rule}
+                </p>
+              </div>
+            </div>
+            <p className="text-[#adaaaa] text-xs leading-relaxed">
+              {g.detail}
+            </p>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Fail-closed manifesto */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        className="mt-10 border border-[#ff716a]/20 rounded-xl p-6 bg-[#ff716a]/[0.03]"
+      >
+        <p className="font-mono text-xs text-[#ff716a] uppercase tracking-widest mb-3">
+          :: FAIL-CLOSED PHILOSOPHY ::
+        </p>
+        <p className="text-[#adaaaa] text-sm leading-relaxed max-w-3xl">
+          Most trading agents are fail-open: if something breaks, the trade goes through anyway.
+          Bobby is fail-closed. Debate doesn't converge? <span className="text-white">Blocked.</span> Judge
+          can't verify? <span className="text-white">Blocked.</span> Stop loss missing? <span className="text-white">Blocked.</span> Drawdown
+          exceeded? <span className="text-white">All trading halted.</span> Every guardrail exists in production code — not
+          documentation promises. The harness protects capital first, generates alpha second.
+        </p>
+      </motion.div>
+    </section>
   );
 }
 
@@ -2192,7 +2373,8 @@ export default function BobbyProtocolLanding() {
       <ClosedLoop />
       <JudgeMode stats={stats} />
       <WhyMatters />
-      <HardnessArchitecture />
+      <HarnessArchitecture />
+      <Guardrails stats={stats} />
       <Bounties stats={stats} />
       <McpSection mcp={mcp} stats={stats} />
       <AgentInterop stats={stats} />
