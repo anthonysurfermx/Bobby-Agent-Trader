@@ -9,10 +9,6 @@ import { listAgentCommerceEvents } from './_lib/agent-commerce-log.js';
 
 export const config = { maxDuration: 15 };
 
-const BASE_URL = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : 'https://bobbyprotocol.xyz';
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -23,7 +19,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Fetch from both sources in parallel
   const [events, heartbeatRes] = await Promise.all([
     listAgentCommerceEvents(limit).catch(() => []),
-    fetch(`${BASE_URL}/api/protocol-heartbeat`).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch('https://bobbyprotocol.xyz/api/protocol-heartbeat', {
+      headers: { 'Cache-Control': 'no-cache' },
+    }).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
   // Commerce events from Supabase
