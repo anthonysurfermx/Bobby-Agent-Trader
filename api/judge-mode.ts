@@ -218,7 +218,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!claudeRes.ok) {
       const err = await claudeRes.text().catch(() => '');
       console.error('[JudgeMode] Claude error:', claudeRes.status, err);
-      return res.status(502).json({ error: `Claude API error: ${claudeRes.status}` });
+      return res.status(502).json({ error: `Claude API error: ${claudeRes.status}`, detail: err.slice(0, 300) });
     }
 
     const claudeData = await claudeRes.json() as { content: Array<{ text: string }> };
