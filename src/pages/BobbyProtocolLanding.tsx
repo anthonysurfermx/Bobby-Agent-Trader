@@ -685,18 +685,55 @@ function ClosedLoop() {
 function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
   const oracle = stats?.contracts.convictionOracle.stats;
   const tr = stats?.contracts.trackRecord.stats;
+  const [judgeScores, setJudgeScores] = useState<Record<string, number> | null>(null);
 
-  // Win rate is stored on-chain as basis points (0-10000). Oracle exposes
-  // symbol count; full per-dimension scoring requires the off-chain judge
-  // endpoint, which is not yet stable in prod. Until then we render the
-  // radar skeleton and show the live on-chain counts that DO exist.
+  // Fetch latest debate quality scores from Supabase
+  useEffect(() => {
+    const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
+    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+    fetch(`${SB}/rest/v1/forum_threads?debate_quality=not.is.null&order=created_at.desc&limit=5&select=debate_quality`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+    })
+      .then(r => r.json())
+      .then((rows: Array<{ debate_quality: any }>) => {
+        if (!rows?.length) return;
+        // Average across recent debates
+        const dims: Record<string, number[]> = {};
+        for (const row of rows) {
+          const dq = row.debate_quality;
+          if (!dq) continue;
+          // Support 6-dim judge-mode format
+          if (dq.dimensions) {
+            for (const [k, v] of Object.entries(dq.dimensions)) {
+              (dims[k] ??= []).push(Number(v) || 0);
+            }
+          } else {
+            // Map old 5-dim format to 6-dim
+            if (dq.data_citation != null) (dims['data_integrity'] ??= []).push(Number(dq.data_citation));
+            if (dq.red_team_rigor != null) (dims['adversarial_quality'] ??= []).push(Number(dq.red_team_rigor));
+            if (dq.actionability != null) (dims['decision_logic'] ??= []).push(Number(dq.actionability));
+            if (dq.specificity != null) (dims['risk_management'] ??= []).push(Number(dq.specificity));
+            if (dq.overall != null) (dims['calibration_alignment'] ??= []).push(Number(dq.overall));
+            if (dq.novel_insight != null) (dims['novelty'] ??= []).push(Number(dq.novel_insight));
+          }
+        }
+        const avg: Record<string, number> = {};
+        for (const [k, vals] of Object.entries(dims)) {
+          avg[k] = vals.reduce((a, b) => a + b, 0) / vals.length;
+        }
+        if (Object.keys(avg).length > 0) setJudgeScores(avg);
+      })
+      .catch(() => {});
+  }, []);
+
   const winRateBps = tr ? Number(tr.winRateBps) : 0;
   const winRatePct = winRateBps / 100;
-  const hasAnyData = oracle && Number(oracle.symbolCount) > 0;
 
   const radarData = JUDGE_AXES.map((axis) => ({
     dim: axis.label,
-    value: hasAnyData ? Math.min(5, Math.max(1, (winRatePct / 100) * 5)) : 0,
+    value: judgeScores
+      ? Math.min(5, Math.max(0, judgeScores[axis.dim.toLowerCase()] || 0))
+      : 0,
   }));
 
   return (
