@@ -30,28 +30,28 @@ const CONTRACT_NAMES: Record<string, string> = {
   [CONVICTION_ORACLE.toLowerCase()]: 'ConvictionOracle',
 };
 
-// Method selectors for labeling txs
+// Method selectors for labeling txs (computed from contract ABIs via ethers)
 const METHOD_LABELS: Record<string, Record<string, string>> = {
   [HARDNESS_REGISTRY.toLowerCase()]: {
-    '0x': 'registerAgent',
-    '5a8e': 'publishSignal',
-    'c186': 'commitPrediction',
-    '3f60': 'registerService',
+    '0cdc': 'publishSignal',
+    '2672': 'commitPrediction',
+    '2d2a': 'registerAgent',
+    '7f19': 'registerService',
   },
   [BOUNTIES.toLowerCase()]: {
-    '89e0': 'postBounty',
-    '5656': 'submitChallenge',
+    '02ed': 'postBounty',
+    '1cd3': 'submitChallenge',
   },
   [TRACK_RECORD.toLowerCase()]: {
-    '6c83': 'commitTrade',
-    'f7b1': 'resolveTrade',
+    'f8dd': 'commitTrade',
+    '7fc0': 'resolveTrade',
   },
   [AGENT_ECONOMY.toLowerCase()]: {
-    '3fba': 'payDebateFee',
-    'f0a5': 'payMCPCall',
+    '45d2': 'payDebateFee',
+    'a784': 'payMCPCall',
   },
   [CONVICTION_ORACLE.toLowerCase()]: {
-    '7bfc': 'publishSignal',
+    '5e39': 'publishSignal',
   },
 };
 
