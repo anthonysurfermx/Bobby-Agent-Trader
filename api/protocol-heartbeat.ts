@@ -115,47 +115,71 @@ function identifyMethod(to: string, input: string): string {
 }
 
 async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
-  // Scan last 600 blocks (~30 min on X Layer with ~3s blocks)
-  // Uses batch JSON-RPC: 6 batches of 100 blocks = 6 RPC calls
+  // X Layer has 1s blocks. Scan last 3600 blocks (1 hour) in parallel batches.
+  // We fire 6 batch RPCs in parallel, each covering 600 blocks.
   const txs: OnChainTx[] = [];
-  const totalBlocks = 600;
-  const batchSize = 100;
+  const windowBlocks = 3600;
+  const batchSize = 100; // blocks per RPC call
+  const parallelBatches = 6; // 6 concurrent RPCs × 100 blocks = 600 blocks per wave, 6 waves for 3600
+  const waves = Math.ceil(windowBlocks / (batchSize * parallelBatches));
 
   try {
-    for (let offset = 0; offset < totalBlocks && txs.length < 25; offset += batchSize) {
-      const batchCalls = [];
-      for (let i = 0; i < batchSize; i++) {
-        const bn = blockNumber - offset - i;
-        if (bn <= 0) break;
-        batchCalls.push({
-          jsonrpc: '2.0',
-          method: 'eth_getBlockByNumber',
-          params: [`0x${bn.toString(16)}`, true],
-          id: i + 1,
-        });
-      }
-      if (batchCalls.length === 0) break;
+    for (let wave = 0; wave < waves && txs.length < 25; wave++) {
+      const waveStart = wave * batchSize * parallelBatches;
+      const promises: Promise<void>[] = [];
 
-      const batchRes = await fetch(XLAYER_RPC, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(batchCalls),
-      });
+      for (let p = 0; p < parallelBatches; p++) {
+        const offset = waveStart + p * batchSize;
+        if (offset >= windowBlocks) break;
 
-      if (!batchRes.ok) {
-        // Try fallback RPC
-        const fallbackRes = await fetch(XLAYER_RPC_FALLBACK, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(batchCalls),
-        });
-        if (!fallbackRes.ok) break;
-        const fallbackData = await fallbackRes.json();
-        processBlockBatch(fallbackData as Array<{ result: any }>, txs);
-      } else {
-        const batchData = await batchRes.json();
-        processBlockBatch(batchData as Array<{ result: any }>, txs);
+        const batchCalls = [];
+        for (let i = 0; i < batchSize; i++) {
+          const bn = blockNumber - offset - i;
+          if (bn <= 0) break;
+          batchCalls.push({
+            jsonrpc: '2.0',
+            method: 'eth_getBlockByNumber',
+            params: [`0x${bn.toString(16)}`, true],
+            id: i + 1,
+          });
+        }
+        if (batchCalls.length === 0) continue;
+
+        promises.push(
+          fetch(XLAYER_RPC, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(batchCalls),
+          })
+            .then(async (r) => {
+              if (!r.ok) return;
+              const data = await r.json() as Array<{ result: any }>;
+              for (const blockResult of data) {
+                const block = blockResult?.result;
+                if (!block?.transactions) continue;
+                const blockTs = parseInt(String(block.timestamp), 16);
+                const blockNum = parseInt(String(block.number), 16);
+                for (const tx of block.transactions) {
+                  if (String(tx.from || '').toLowerCase() !== TREASURY.toLowerCase()) continue;
+                  const txTo = String(tx.to || '').toLowerCase();
+                  if (!CONTRACT_NAMES[txTo]) continue;
+                  txs.push({
+                    hash: tx.hash,
+                    contract: txTo,
+                    contractName: CONTRACT_NAMES[txTo],
+                    method: identifyMethod(txTo, tx.input || '0x'),
+                    blockNumber: blockNum,
+                    timestamp: blockTs,
+                    valueOkb: formatEther(BigInt(tx.value || '0x0')),
+                  });
+                }
+              }
+            })
+            .catch(() => {}) // ignore individual batch failures
+        );
       }
+
+      await Promise.all(promises);
     }
   } catch (e) {
     console.warn('[ProtocolHeartbeat] fetchRecentTxs failed:', e instanceof Error ? e.message : e);
@@ -163,33 +187,6 @@ async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
 
   txs.sort((a, b) => b.blockNumber - a.blockNumber);
   return txs.slice(0, 25);
-}
-
-function processBlockBatch(results: Array<{ result: any }>, txs: OnChainTx[]) {
-  for (const blockResult of results) {
-    const block = blockResult?.result;
-    if (!block || !block.transactions) continue;
-    const blockTs = parseInt(String(block.timestamp), 16);
-    const blockNum = parseInt(String(block.number), 16);
-
-    for (const tx of block.transactions) {
-      const from = String(tx.from || '').toLowerCase();
-      const to = String(tx.to || '').toLowerCase();
-
-      if (from !== TREASURY.toLowerCase()) continue;
-      if (!CONTRACT_NAMES[to]) continue;
-
-      txs.push({
-        hash: tx.hash,
-        contract: to,
-        contractName: CONTRACT_NAMES[to] || 'Unknown',
-        method: identifyMethod(to, tx.input || '0x'),
-        blockNumber: blockNum,
-        timestamp: blockTs,
-        valueOkb: formatEther(BigInt(tx.value || '0x0')),
-      });
-    }
-  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
