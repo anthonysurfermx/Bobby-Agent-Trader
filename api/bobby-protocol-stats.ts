@@ -22,9 +22,14 @@ export const config = { maxDuration: 30 };
 const BOBBY_TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
 const CONVICTION_ORACLE = '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
 const TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
+const HARDNESS_REGISTRY = '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
 
 const ORACLE_INTERFACE = new Interface([
   'function symbolCount() view returns (uint256)',
+]);
+
+const HARDNESS_INTERFACE = new Interface([
+  'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, string metadataURI)',
 ]);
 
 const TRACK_RECORD_INTERFACE = new Interface([
@@ -170,6 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     recentBounties,
     economyLastBlock,
     bountiesLastBlock,
+    hardnessLastBlock,
+    hardnessRegistered,
     intel,
   ] = await Promise.all([
     safe(() => rpcCall<string>('eth_blockNumber', []), '0x0'),
@@ -192,6 +199,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     safe(() => listRecentBounties(6), []),
     safe(() => getContractLastActivity(BOBBY_AGENT_ECONOMY), null),
     safe(() => getContractLastActivity(BOBBY_ADVERSARIAL_BOUNTIES), null),
+    safe(() => getContractLastActivity(HARDNESS_REGISTRY), null),
+    safe(async () => {
+      // Check if Bobby is registered on HardnessRegistry
+      const data = HARDNESS_INTERFACE.encodeFunctionData('agentProfiles', [BOBBY_TREASURY]);
+      const raw = await rpcCall<string>('eth_call', [{ to: HARDNESS_REGISTRY, data }, 'latest']);
+      const [registered] = HARDNESS_INTERFACE.decodeFunctionResult('agentProfiles', raw);
+      return registered;
+    }, false),
     safe(
       () => getPricesFromIntel(baseUrl),
       { prices: [], regime: null, xlayer: null }
@@ -236,6 +251,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         nextBountyId: bountyNextId,
         totalPosted: Math.max(0, bountyNextId - 1),
         lastActivityBlock: bountiesLastBlock,
+      },
+      hardnessRegistry: {
+        address: HARDNESS_REGISTRY,
+        agentRegistered: hardnessRegistered,
+        lastActivityBlock: hardnessLastBlock,
       },
     },
     bounties: recentBounties,

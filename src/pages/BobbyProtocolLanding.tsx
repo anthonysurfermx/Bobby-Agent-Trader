@@ -229,6 +229,30 @@ function useActivity() {
   return feed;
 }
 
+interface LiveTx {
+  hash: string;
+  contractName: string;
+  method: string;
+  valueOkb: string;
+  timestamp: number | null;
+}
+
+function useLiveTxs() {
+  const [txs, setTxs] = useState<LiveTx[]>([]);
+  useEffect(() => {
+    const fetchTxs = () => {
+      fetch('/api/protocol-heartbeat', { cache: 'no-store' })
+        .then((r) => r.json())
+        .then((j: { recentTxs?: LiveTx[] }) => setTxs(j.recentTxs ?? []))
+        .catch(() => {});
+    };
+    fetchTxs();
+    const t = setInterval(fetchTxs, 30_000);
+    return () => clearInterval(t);
+  }, []);
+  return txs;
+}
+
 // ---- Components ----
 
 function TopTicker({ stats }: { stats: ProtocolStats | null }) {
@@ -1568,24 +1592,24 @@ function TrustBadge({ stats }: { stats: ProtocolStats | null }) {
   );
 }
 
-function RevenueProof({ stats }: { stats: ProtocolStats | null }) {
+function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs: LiveTx[] }) {
   const volumeOkb = stats ? safeFixed(stats.contracts.agentEconomy.stats.totalVolumeOkb, 4) : '—';
   const mcpCalls = stats ? Number(stats.contracts.agentEconomy.stats.totalMcpCalls) : 0;
   const payments = stats ? Number(stats.contracts.agentEconomy.stats.totalPayments) : 0;
   const bounties = stats ? stats.contracts.adversarialBounties.totalPosted : 0;
 
-  const proofs = [
-    {
-      label: 'x402 MCP PAYMENT',
-      tx: '0x6593041ea93a338916dffdb3b203d034c240ec34fb2d04cbad2acbc7e7688fdf',
-      detail: 'bobby_analyze | 0.001 OKB | Block 57237403',
-    },
-    {
-      label: 'ADVERSARIAL BOUNTY #1',
-      tx: '0x68d4c3f69a01cc3983a1d6b0b9625f54c474a8e80df90685a5cc38f3a2355ad0',
-      detail: 'DATA_INTEGRITY | 0.001 OKB | Block 57243627',
-    },
-  ];
+  const proofs = liveTxs.slice(0, 6).map((tx) => {
+    const val = parseFloat(tx.valueOkb || '0');
+    const age = tx.timestamp ? Math.floor(Date.now() / 1000 - tx.timestamp) : null;
+    const ageStr = age !== null
+      ? age < 60 ? `${age}s ago` : age < 3600 ? `${Math.floor(age / 60)}m ago` : `${Math.floor(age / 3600)}h ago`
+      : '';
+    return {
+      label: `${tx.contractName} :: ${tx.method}`,
+      tx: tx.hash,
+      detail: `${val > 0 ? `${val.toFixed(4)} OKB | ` : ''}${ageStr}`,
+    };
+  });
 
   return (
     <section className="py-12 px-6 max-w-7xl mx-auto">
@@ -1718,7 +1742,17 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
   const contracts = useMemo(() => {
     if (!stats) return [];
     const c = stats.contracts;
-    return [
+    const list = [
+      {
+        label: 'HARDNESS_REGISTRY',
+        address: (c as any).hardnessRegistry?.address || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
+        rows: [
+          { k: 'SIGNALS', v: 'publishSignal' },
+          { k: 'PREDICTIONS', v: 'commitPrediction' },
+          { k: 'AGENT', v: (c as any).hardnessRegistry?.agentRegistered ? '✓ REGISTERED' : '—' },
+        ],
+        lastBlock: (c as any).hardnessRegistry?.lastActivityBlock || null,
+      },
       {
         label: 'AGENT_ECONOMY_V2',
         address: c.agentEconomy.address,
@@ -1770,6 +1804,7 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
         lastBlock: c.adversarialBounties.lastActivityBlock,
       },
     ];
+    return list;
   }, [stats]);
 
   return (
@@ -1778,11 +1813,11 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
         Live on X Layer
       </h2>
       <p className="text-center text-[#adaaaa] font-mono text-xs uppercase tracking-widest mb-12">
-        Four contracts. One protocol. All on OKX X Layer chain 196.
+        Five contracts. One protocol. All on OKX X Layer chain 196.
       </p>
-      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {contracts.length === 0
-          ? Array.from({ length: 4 }).map((_, i) => (
+          ? Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
                 className="bg-[#131313] border border-[#494847]/15 p-5 animate-pulse h-48"
@@ -1914,6 +1949,7 @@ export default function BobbyProtocolLanding() {
   const mcp = useMcpMeta();
   const pnl = usePnl();
   const activity = useActivity();
+  const liveTxs = useLiveTxs();
 
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white font-sans relative overflow-x-hidden">
@@ -1960,7 +1996,7 @@ export default function BobbyProtocolLanding() {
 
       <HeroLiveDebate stats={stats} />
       <TrustBadge stats={stats} />
-      <RevenueProof stats={stats} />
+      <RevenueProof stats={stats} liveTxs={liveTxs} />
       <TradingRoom stats={stats} pnl={pnl} />
       <ClosedLoop />
       <JudgeMode stats={stats} />
