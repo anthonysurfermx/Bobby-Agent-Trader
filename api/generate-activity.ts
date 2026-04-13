@@ -380,18 +380,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ═══════════════════════════════════════════════════════
     // 6. CONVICTION ORACLE — publishSignal (gas only)
+    //    Contract has 10-min cooldown per symbol. Use unique
+    //    symbols not used in recent calls to avoid reverts.
     // ═══════════════════════════════════════════════════════
     if (CONVICTION_ORACLE && includeOracle) {
       const oracleIface = new ethers.Interface(ORACLE_ABI);
-      const oracleSymbols = [...SYMBOLS].sort(() => Math.random() - 0.5).slice(0, 2);
+      // Use symbols not already used in HardnessRegistry signals this round
+      // to minimize cooldown collisions across contracts
+      const usedInSignals = new Set(usedSymbols);
+      const oracleSymbols = SYMBOLS
+        .filter(s => !usedInSignals.has(s))
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 2);
 
       for (const symbol of oracleSymbols) {
         const price = prices[symbol] || 100;
         const direction = randomDirection();
-        const conviction = Math.floor(Math.random() * 10) + 1;
+        const conviction = Math.floor(Math.random() * 10) + 1; // 1-10 for Oracle contract
         const agent = Math.floor(Math.random() * 3);
+        // Use unique debateHash per round to avoid duplicate signal reverts
         const debateHash = ethers.keccak256(
-          ethers.toUtf8Bytes(`bobby:oracle:${symbol}:${now}`)
+          ethers.toUtf8Bytes(`bobby:oracle:${symbol}:${now}:${Math.random().toString(36).slice(2, 8)}`)
         );
 
         const txData = oracleIface.encodeFunctionData('publishSignal', [{

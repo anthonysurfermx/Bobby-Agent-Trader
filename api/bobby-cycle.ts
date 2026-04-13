@@ -1190,7 +1190,8 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
               'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96)',
             ]);
             const debateHash = ethers.keccak256(ethers.toUtf8Bytes(threadId));
-            const convInt = Math.round((conviction ?? 0) * 10);
+            // Clamp to 0-10 — contract requires conviction <= 10
+            const convInt = Math.min(10, Math.max(0, Math.round((conviction ?? 0) * 10)));
             const txData = iface.encodeFunctionData('commitTrade', [
               debateHash, symbol, 0, convInt,
               BigInt(Math.round(commitEntry * 1e8)),
@@ -1291,7 +1292,8 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
             ]);
             const debateHash = ethers.keccak256(ethers.toUtf8Bytes(threadId));
             const dirNum = direction === 'long' ? 1 : direction === 'short' ? 2 : 0;
-            const convInt = Math.round((conviction ?? 0) * 10);
+            // Clamp to 0-10 — contract requires conviction <= 10
+            const convInt = Math.min(10, Math.max(0, Math.round((conviction ?? 0) * 10)));
             const currentPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price || 0;
             const priceScaled = BigInt(Math.round(currentPrice * 1e8));
             const tx = await Promise.race([
