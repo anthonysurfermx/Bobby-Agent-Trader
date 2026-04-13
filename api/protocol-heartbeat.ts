@@ -270,10 +270,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('[ProtocolHeartbeat] Failed to decode nextBountyId');
     }
 
-    // Calculate revenue
-    const volumeOkb = formatEther(BigInt(totalVolumeWei));
+    // Calculate revenue — includes economy payments + bounty stakes
+    const economyVolumeOkb = parseFloat(formatEther(BigInt(totalVolumeWei)));
     const winRate = parseInt(winRateBps) / 100;
     const totalBounties = Math.max(0, parseInt(nextBountyId) - 1);
+    const bountyRevenue = totalBounties * 0.001; // 0.001 OKB per bounty posted
+    const totalRevenue = economyVolumeOkb + bountyRevenue;
+    const volumeOkb = totalRevenue.toFixed(4);
 
     // Last cycle
     const lastCycle = Array.isArray(recentCycles) && recentCycles.length > 0 ? recentCycles[0] : null;
@@ -311,7 +314,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       revenue: {
         totalVolumeOkb: volumeOkb,
-        totalPayments: parseInt(totalPayments),
+        totalPayments: parseInt(totalPayments) + totalBounties,
         totalMcpCalls: parseInt(totalMcpCalls),
         totalDebates: parseInt(totalDebates),
       },

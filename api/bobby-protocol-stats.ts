@@ -217,6 +217,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const blockNumber = Number.parseInt(String(blockHexResult || '0x0'), 16) || 0;
   const treasuryWei = BigInt(treasuryHexResult || '0x0');
 
+  // Calculate total protocol revenue: economy volume + bounty stakes
+  const totalBountiesPosted = Math.max(0, bountyNextId - 1);
+  const bountyRevenueOkb = totalBountiesPosted * 0.001;
+  const economyVol = parseFloat(economyStats.totalVolumeOkb || '0');
+  const totalRevenueOkb = (economyVol + bountyRevenueOkb).toFixed(4);
+
+  // Enrich economy stats with total protocol revenue
+  const enrichedEconomyStats = {
+    ...economyStats,
+    totalVolumeOkb: totalRevenueOkb,
+    totalPayments: String(parseInt(economyStats.totalPayments || '0') + totalBountiesPosted),
+  };
+
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
   return res.status(200).json({
     ok: true,
@@ -234,7 +247,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     contracts: {
       agentEconomy: {
         address: BOBBY_AGENT_ECONOMY,
-        stats: economyStats,
+        stats: enrichedEconomyStats,
         lastActivityBlock: economyLastBlock,
       },
       convictionOracle: {
