@@ -115,12 +115,13 @@ function identifyMethod(to: string, input: string): string {
 }
 
 async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
-  // X Layer has 1s blocks. Scan last 3600 blocks (1 hour) in parallel batches.
-  // We fire 6 batch RPCs in parallel, each covering 600 blocks.
+  // X Layer has 1s blocks and max batch size of 10.
+  // Scan last 1800 blocks (~30min) using parallel waves.
+  // 10 blocks/batch × 10 parallel = 100 blocks/wave × 18 waves = 1800 blocks
   const txs: OnChainTx[] = [];
-  const windowBlocks = 3600;
-  const batchSize = 100; // blocks per RPC call
-  const parallelBatches = 6; // 6 concurrent RPCs × 100 blocks = 600 blocks per wave, 6 waves for 3600
+  const windowBlocks = 1800;
+  const batchSize = 10; // X Layer batch limit
+  const parallelBatches = 10;
   const waves = Math.ceil(windowBlocks / (batchSize * parallelBatches));
 
   try {
