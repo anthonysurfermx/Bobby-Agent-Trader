@@ -5,12 +5,11 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import Anthropic from '@anthropic-ai/sdk';
 
 export const config = { maxDuration: 180 };
 
-const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
-const anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
+const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODEL = 'gpt-4o-mini';
 
 // ── SSE helpers ────────────────────────────────────────────
 type SseWriter = (event: string, data: Record<string, unknown>) => void;
@@ -23,8 +22,6 @@ function sseWriter(res: VercelResponse): SseWriter {
 }
 
 // ── Guardrail catalog (matches src/data/playbooks.ts) ──────
-// Ordered for the Gauntlet grid. Each check is a lightweight
-// rule evaluated after the debate finishes.
 const GUARDRAILS = [
   { id: 'conviction_gate',     label: 'Conviction Gate' },
   { id: 'mandatory_stop',      label: 'Mandatory Stop Loss' },
@@ -67,7 +64,7 @@ const SYSTEM_JUDGE = `You are the Judge. Audit the debate that just happened. Ra
 Respond with ONLY valid JSON, no prose:
 {"data_integrity": <1-5>, "adversarial_quality": <1-5>, "decision_logic": <1-5>, "risk_management": <1-5>, "calibration_alignment": <1-5>, "novelty": <1-5>}`;
 
-// ── Stream a single agent turn, emitting phase_token events ─
+// ── Stream a single agent turn via OpenAI, emitting phase_token events ─
 async function streamAgent(
   send: SseWriter,
   phase: string,
@@ -76,23 +73,86 @@ async function streamAgent(
 ): Promise<string> {
   send('phase_start', { phase });
   let full = '';
-  const stream = await anthropic.messages.stream({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 400,
-    system,
-    messages: [{ role: 'user', content: userPayload }],
+
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${OPENAI_KEY}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      max_tokens: 400,
+      stream: true,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userPayload },
+      ],
+    }),
   });
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      full += event.delta.text;
-      send('phase_token', { phase, token: event.delta.text });
+
+  if (!resp.ok || !resp.body) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`OpenAI ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop() ?? '';
+    for (const ln of lines) {
+      if (!ln.startsWith('data: ')) continue;
+      const json = ln.slice(6).trim();
+      if (json === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(json);
+        const token = parsed.choices?.[0]?.delta?.content;
+        if (token) {
+          full += token;
+          send('phase_token', { phase, token });
+        }
+      } catch {
+        // ignore malformed chunk
+      }
     }
   }
+
   send('phase_end', { phase, text: full });
   return full;
 }
 
-// ── CIO parser ─────────────────────────────────────────────
+// ── One-shot OpenAI call (non-streaming) for Judge JSON ────
+async function openaiOneShot(system: string, user: string, maxTokens: number): Promise<string> {
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${OPENAI_KEY}`,
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`OpenAI ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data: any = await resp.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+// ── Parsers ────────────────────────────────────────────────
 function parseCio(text: string): { action: 'EXECUTE' | 'YIELD_PARK' | 'BLOCKED'; conviction: number } {
   const m = text.match(/VERDICT:\s*(EXECUTE|YIELD_PARK|BLOCKED)\s*\|\s*CONVICTION:\s*([0-9.]+)/i);
   if (!m) return { action: 'BLOCKED', conviction: 0 };
@@ -101,7 +161,6 @@ function parseCio(text: string): { action: 'EXECUTE' | 'YIELD_PARK' | 'BLOCKED';
   return { action, conviction };
 }
 
-// ── Judge parser (defensive) ───────────────────────────────
 function parseJudge(text: string): Record<string, number> {
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -120,8 +179,6 @@ function parseJudge(text: string): Record<string, number> {
 }
 
 // ── Guardrail evaluation ───────────────────────────────────
-// Each returns a boolean (pass). Policy mirrors bobby-cycle intent:
-// fail-closed — anything unclear blocks. Judge scores drive gates.
 function evalGuardrails(
   action: string,
   conviction: number,
@@ -134,7 +191,7 @@ function evalGuardrails(
     (judge.risk_management ?? 3) * 0.15 +
     (judge.calibration_alignment ?? 3) * 0.1 +
     (judge.novelty ?? 3) * 0.1;
-  const judgeScore20 = weighted * 4; // 1-5 → 4-20
+  const judgeScore20 = weighted * 4;
 
   return GUARDRAILS.map((g) => {
     let status: 'pass' | 'fail' | 'skip';
@@ -189,11 +246,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const playbookSlug = String(body.playbookSlug || 'conviction-gated-swing');
   const ticker = String(body.ticker || 'BTC').toUpperCase().slice(0, 12);
 
-  if (!ANTHROPIC_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+  if (!OPENAI_KEY) {
+    return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
-  // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -214,10 +270,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const ctx = `Playbook: ${playbookSlug}. Ticker: ${ticker}. Context: X Layer (chain 196), mid-2026 market.`;
 
-    // 1) Alpha Hunter
     const alphaText = await streamAgent(send, 'alpha_hunter', SYSTEM_ALPHA, ctx);
 
-    // 2) Red Team (reads Alpha)
     const redText = await streamAgent(
       send,
       'red_team',
@@ -225,7 +279,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `${ctx}\n\nBULL THESIS:\n${alphaText}`
     );
 
-    // 3) CIO (reads both)
     const cioText = await streamAgent(
       send,
       'cio',
@@ -235,38 +288,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { action, conviction } = parseCio(cioText);
     send('cio_verdict', { action, conviction });
 
-    // 4) Judge (6-D audit)
     send('phase_start', { phase: 'judge' });
-    const judgeResp = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
-      system: SYSTEM_JUDGE,
-      messages: [
-        {
-          role: 'user',
-          content: `DEBATE TRANSCRIPT:\n\n[ALPHA]\n${alphaText}\n\n[RED TEAM]\n${redText}\n\n[CIO]\n${cioText}`,
-        },
-      ],
-    });
-    const judgeText =
-      judgeResp.content
-        .map((c) => (c.type === 'text' ? c.text : ''))
-        .join('') || '';
+    const judgeText = await openaiOneShot(
+      SYSTEM_JUDGE,
+      `DEBATE TRANSCRIPT:\n\n[ALPHA]\n${alphaText}\n\n[RED TEAM]\n${redText}\n\n[CIO]\n${cioText}`,
+      200
+    );
     const judgeScores = parseJudge(judgeText);
     send('judge_scores', { scores: judgeScores });
     send('phase_end', { phase: 'judge' });
 
-    // 5) Guardrail Gauntlet
     send('phase_start', { phase: 'guardrails' });
     const results = evalGuardrails(action, conviction, judgeScores);
-    // Emit one at a time with a small gap so the UI can animate
     for (const r of results) {
       send('guardrail', r);
       await new Promise((r) => setTimeout(r, 140));
     }
     send('phase_end', { phase: 'guardrails' });
 
-    // 6) Final verdict
     const passed = results.filter((r) => r.status === 'pass').length;
     const failed = results.filter((r) => r.status === 'fail').length;
     const finalAction = failed > 0 && action === 'EXECUTE' ? 'BLOCKED' : action;
