@@ -364,12 +364,10 @@ function Nav() {
           </a>
         ))}
         <a
-          href="https://github.com/anthonysurfermx/Bobby-Agent-Trader"
-          target="_blank"
-          rel="noreferrer"
+          href="/protocol/sandbox"
           className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] transition-colors font-bold tracking-tighter uppercase text-sm"
         >
-          GITHUB
+          SANDBOX
         </a>
         <a
           href="/protocol/console"
