@@ -214,6 +214,18 @@ export async function listAgents(limit = 50) {
   return Array.isArray(rows) ? rows : [];
 }
 
+export async function countAgents() {
+  if (!hasSupabase()) return 0;
+  const query = new URLSearchParams({
+    select: 'agent_id',
+    limit: '1000',
+  });
+  const res = await fetch(`${SB_URL}/rest/v1/hardness_agents?${query.toString()}`, { headers: headers() });
+  if (!res.ok) return 0;
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
 export async function listRecentSessions(limit = 25) {
   if (!hasSupabase()) return [];
   const query = new URLSearchParams({

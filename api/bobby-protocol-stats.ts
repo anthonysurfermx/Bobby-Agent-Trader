@@ -6,6 +6,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther, Interface } from 'ethers';
+import { countAgents } from './_lib/hardness-control-plane.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -251,6 +252,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     bountiesLastBlock,
     hardnessLastBlock,
     hardnessRegistered,
+    agentCount,
     intel,
   ] = await Promise.all([
     safe(() => rpcCall<string>('eth_blockNumber', []), '0x0'),
@@ -281,6 +283,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [registered] = HARDNESS_INTERFACE.decodeFunctionResult('agentProfiles', raw);
       return registered;
     }, false),
+    safe(countAgents, 0),
     safe(
       () => getPricesFromIntel(baseUrl),
       { prices: [], regime: null, xlayer: null }
@@ -342,7 +345,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       agentRegistry: {
         address: AGENT_REGISTRY,
         type: 'ERC-721',
-        agents: 3,
+        agents: agentCount,
       },
     },
     protocolTotals: {

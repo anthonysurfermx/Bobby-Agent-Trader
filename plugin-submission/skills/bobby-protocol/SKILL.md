@@ -1,6 +1,6 @@
 ---
 name: bobby-protocol
-description: "Adversarial AI trading intelligence on X Layer. 3-agent debate (Alpha Hunter vs Red Team vs CIO), Judge Mode (6 dimensions), adversarial bounties, conviction oracle. 15 MCP tools — 10 free, 5 premium via x402. Use when agents need: market analysis, trading signals, security scans, debate-quality intelligence, or want to challenge AI trading decisions on-chain. Triggers: 'bobby analyze', 'bobby debate', 'bobby intel', 'bobby signals', 'bobby judge', 'bobby bounty', 'trade analysis', 'conviction score', 'adversarial review'."
+description: "Adversarial AI trading intelligence on X Layer. 3-agent debate (Alpha Hunter vs Red Team vs CIO), Judge Mode (6 dimensions), adversarial bounties, conviction oracle. 17 MCP tools — 10 free analytics, 2 free bounty builders, 5 premium via x402. Use when agents need: market analysis, trading signals, security scans, debate-quality intelligence, or want to challenge AI trading decisions on-chain. Triggers: 'bobby analyze', 'bobby debate', 'bobby intel', 'bobby signals', 'bobby judge', 'bobby bounty', 'trade analysis', 'conviction score', 'adversarial review'."
 license: MIT
 metadata:
   author: bobby-protocol

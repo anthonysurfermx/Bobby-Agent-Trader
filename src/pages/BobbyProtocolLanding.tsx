@@ -56,6 +56,16 @@ interface ProtocolStats {
       totalPosted: number;
       lastActivityBlock: number | null;
     };
+    hardnessRegistry: {
+      address: string;
+      agentRegistered: boolean;
+      lastActivityBlock: number | null;
+    };
+    agentRegistry: {
+      address: string;
+      type: string;
+      agents: number;
+    };
   };
   protocolTotals: {
     mcpSettlementOkb: string;
@@ -94,6 +104,11 @@ interface ProtocolStats {
 interface McpMeta {
   name: string;
   version: string;
+  counts?: {
+    totalTools: number;
+    freeTools: number;
+    premiumTools: number;
+  };
   pricing: {
     free: string[];
     premium: {
@@ -113,6 +128,23 @@ interface PnlSummary {
   winRate: number;
   wins: number;
   losses: number;
+}
+
+interface ReputationSummary {
+  ok: boolean;
+  trustScore?: {
+    score?: number;
+    philosophy?: string;
+  };
+}
+
+interface SentinelSummary {
+  ok: boolean;
+  totalMs: number;
+  summary?: {
+    calledFreeTools?: number;
+    receivedX402Challenge?: boolean;
+  };
 }
 
 // ---- Helpers ----
@@ -214,6 +246,28 @@ function usePnl() {
       .catch(() => setSummary(null));
   }, []);
   return summary;
+}
+
+function useReputation() {
+  const [data, setData] = useState<ReputationSummary | null>(null);
+  useEffect(() => {
+    fetch('/api/reputation', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setData(j as ReputationSummary))
+      .catch(() => setData(null));
+  }, []);
+  return data;
+}
+
+function useSentinelDemo() {
+  const [data, setData] = useState<SentinelSummary | null>(null);
+  useEffect(() => {
+    fetch('/api/sentinel-demo', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((j) => setData(j as SentinelSummary))
+      .catch(() => setData(null));
+  }, []);
+  return data;
 }
 
 interface ActivityItem {
@@ -532,8 +586,8 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
                 I'm an Agent
               </div>
               <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
-                Download skill.md, call 15 MCP tools, pay via x402,
-                check reputation, post adversarial bounties.
+                Download skill.md, call 17 MCP tools, pay via x402,
+                check reputation, inspect registry, post adversarial bounties.
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
                 {['SKILL.MD', 'MCP', 'x402', 'BOUNTIES'].map((t) => (
@@ -1061,8 +1115,8 @@ function HarnessArchitecture() {
       sub: '+ MCP / x402',
       icon: '[ ]',
       position: 'top',
-      description: '15 MCP tools over Streamable HTTP. Any agent calls Bobby via JSON-RPC. Premium tools gated by x402 on-chain payment.',
-      details: ['bobby_analyze', 'bobby_debate', 'bobby_judge', 'bobby_ta', 'bobby_intel', '+10 more'],
+      description: '17 MCP tools over Streamable HTTP. Any agent calls Bobby via JSON-RPC. Free analytics, bounty calldata builders, and premium tools gated by x402 on-chain payment.',
+      details: ['bobby_analyze', 'bobby_debate', 'bobby_judge', 'bobby_ta', 'bobby_intel', '+12 more'],
       color: '#6dfe9c',
     },
     {
@@ -1814,8 +1868,11 @@ function McpSection({
   stats: ProtocolStats | null;
 }) {
   const freeTools = mcp?.pricing.free ?? [];
+  const premiumTools = mcp?.pricing.premium.tools ?? [];
+  const totalTools = mcp?.counts?.totalTools ?? (freeTools.length + premiumTools.length);
   const calls = stats?.contracts.agentEconomy.stats.totalMcpCalls ?? '—';
   const volume = stats?.contracts.agentEconomy.stats.totalVolumeOkb ?? '—';
+  const payments = stats?.contracts.agentEconomy.stats.totalPayments ?? '—';
 
   return (
     <section id="mcp" className="py-24 px-6 bg-black">
@@ -1826,16 +1883,16 @@ function McpSection({
               Bobby-As-A-Service
             </h2>
             <p className="text-[#adaaaa] mb-8 uppercase font-mono text-xs tracking-widest">
-              15 MCP tools · Streamable HTTP · x402 settlement
+              {totalTools} MCP tools · {freeTools.length} free · {premiumTools.length} premium · Streamable HTTP · x402 settlement
             </p>
             <div className="bg-[#131313] p-4 border border-[#6dfe9c]/20 mb-4 font-mono text-[10px]">
               <div className="text-[#adaaaa] uppercase mb-1">MCP_CALLS_SETTLED</div>
               <div className="text-[#6dfe9c] text-3xl font-bold">{calls}</div>
             </div>
             <div className="bg-[#131313] p-4 border border-[#6dfe9c]/20 font-mono text-[10px]">
-              <div className="text-[#adaaaa] uppercase mb-1">TOTAL_OKB_SETTLED</div>
+              <div className="text-[#adaaaa] uppercase mb-1">SETTLED_PAYMENTS / OKB</div>
               <div className="text-[#6dfe9c] text-3xl font-bold">
-                {safeFixed(volume, 4)}
+                {payments} / {safeFixed(volume, 4)}
               </div>
             </div>
           </div>
@@ -1908,15 +1965,27 @@ function McpSection({
   );
 }
 
-function AgentInterop({ stats }: { stats: ProtocolStats | null }) {
-  const mcpCalls = stats?.contracts.agentEconomy.stats.totalMcpCalls ?? '0';
-  const volume = stats?.contracts.agentEconomy.stats.totalVolumeOkb ?? '0';
+function AgentInterop({
+  stats,
+  reputation,
+  sentinel,
+}: {
+  stats: ProtocolStats | null;
+  reputation: ReputationSummary | null;
+  sentinel: SentinelSummary | null;
+}) {
+  const registeredAgents = stats?.contracts.agentRegistry.agents ?? 0;
+  const trustScore = reputation?.trustScore?.score ?? null;
+  const sentinelCalls = sentinel?.summary?.calledFreeTools ?? 0;
+  const hasPremiumChallenge = sentinel?.summary?.receivedX402Challenge ?? false;
 
   const integrations = [
     { title: 'SKILL.MD', glyph: '>_', desc: 'One file, zero-code MCP integration', href: '/skill.md', cta: '_DOWNLOAD', color: '#6dfe9c' },
+    { title: 'REGISTRY', glyph: '#', desc: 'Machine-readable agent + tool catalog', href: '/api/registry', cta: '_QUERY', color: '#6dfe9c' },
     { title: 'REPUTATION_API', glyph: '%', desc: 'On-chain track record + win rate', href: '/api/reputation', cta: '_QUERY', color: '#fcc025' },
     { title: 'JUDGE_MANIFEST', glyph: ':::', desc: '6-dimension evaluation framework', href: '/ai-judge-manifest.json', cta: '_READ', color: '#ff716a' },
     { title: 'x402_SETTLEMENT', glyph: '$=', desc: 'Pay per call, settle on X Layer', href: '/api/mcp-http', cta: '_VIEW', color: '#6dfe9c' },
+    { title: 'SENTINEL_DEMO', glyph: 'A2A', desc: 'Live discovery, free calls, premium paywall challenge', href: '/api/sentinel-demo', cta: '_RUN', color: '#fcc025' },
   ];
 
   return (
@@ -1933,17 +2002,29 @@ function AgentInterop({ stats }: { stats: ProtocolStats | null }) {
           </div>
           <div className="flex gap-4 font-mono text-[10px]">
             <div className="bg-black p-3 border border-[#6dfe9c]/20">
-              <div className="text-[#adaaaa]">AGENTS_SERVED</div>
-              <div className="text-[#6dfe9c] text-2xl font-bold">{mcpCalls}</div>
+              <div className="text-[#adaaaa]">REGISTERED_AGENTS</div>
+              <div className="text-[#6dfe9c] text-2xl font-bold">{registeredAgents}</div>
             </div>
             <div className="bg-black p-3 border border-[#6dfe9c]/20">
-              <div className="text-[#adaaaa]">OKB_SETTLED</div>
-              <div className="text-[#6dfe9c] text-2xl font-bold">{safeFixed(volume, 4)}</div>
+              <div className="text-[#adaaaa]">TRUST_SCORE</div>
+              <div className="text-[#6dfe9c] text-2xl font-bold">
+                {trustScore !== null ? safeFixed(trustScore, 0) : '—'}
+              </div>
+            </div>
+            <div className="bg-black p-3 border border-[#6dfe9c]/20">
+              <div className="text-[#adaaaa]">SENTINEL_FREE_CALLS</div>
+              <div className="text-[#6dfe9c] text-2xl font-bold">{sentinelCalls}</div>
+            </div>
+            <div className="bg-black p-3 border border-[#6dfe9c]/20">
+              <div className="text-[#adaaaa]">PREMIUM_FLOW</div>
+              <div className={`text-2xl font-bold ${hasPremiumChallenge ? 'text-[#fcc025]' : 'text-white'}`}>
+                {hasPremiumChallenge ? '402 READY' : 'IDLE'}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
           {integrations.map((item, i) => (
             <motion.a
               key={item.title}
@@ -1973,19 +2054,26 @@ function AgentInterop({ stats }: { stats: ProtocolStats | null }) {
           ))}
         </div>
 
+        <div className="mb-8 bg-black border border-[#494847]/20 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-[#adaaaa]">
+          Live proof: Sentinel discovered Bobby via registry, queried reputation, completed {sentinelCalls} free MCP calls, and {hasPremiumChallenge ? 'received a real x402 premium challenge' : 'has not reached the premium challenge yet'}.
+        </div>
+
         <div className="bg-black border border-[#494847]/20">
           <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
             <span>agent_quickstart.sh</span>
-            <span className="text-[#6dfe9c]">3 commands to integrate</span>
+            <span className="text-[#6dfe9c]">4 commands to integrate</span>
           </div>
           <pre className="p-6 font-mono text-[11px] text-[#6dfe9c]/80 overflow-x-auto leading-relaxed">
 {`# 1. Download the skill file (your agent reads this)
 curl -o bobby.skill.md https://bobbyprotocol.xyz/skill.md
 
-# 2. Check Bobby's on-chain reputation before trusting
+# 2. Discover Bobby's tools and pricing
+curl https://bobbyprotocol.xyz/api/mcp-http
+
+# 3. Check Bobby's on-chain reputation before trusting
 curl https://bobbyprotocol.xyz/api/reputation | jq '.reputation'
 
-# 3. Call a free tool — no payment, no API key
+# 4. Call a free tool — no payment, no API key
 curl -X POST https://bobbyprotocol.xyz/api/mcp-http \\
   -H "Content-Type: application/json" \\
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_intel","arguments":{}},"id":"1"}'`}
@@ -2620,9 +2708,11 @@ function Footer({ stats }: { stats: ProtocolStats | null }) {
 export default function BobbyProtocolLanding() {
   const { data: stats, error, loading } = useProtocolStats();
   const mcp = useMcpMeta();
+  const reputation = useReputation();
   const pnl = usePnl();
   const activity = useActivity();
   const liveTxs = useLiveTxs();
+  const sentinel = useSentinelDemo();
 
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white font-sans relative overflow-x-hidden">
@@ -2680,7 +2770,7 @@ export default function BobbyProtocolLanding() {
       <RiskOffMode />
       <Bounties stats={stats} />
       <McpSection mcp={mcp} stats={stats} />
-      <AgentInterop stats={stats} />
+      <AgentInterop stats={stats} reputation={reputation} sentinel={sentinel} />
       <LiveCheckpoint />
       <ActivityFeed feed={activity} />
       <LiveOnXLayer stats={stats} />

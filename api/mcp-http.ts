@@ -334,6 +334,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           contract: BOBBY_AGENT_ECONOMY,
         },
       },
+      counts: {
+        totalTools: TOOLS.length,
+        freeTools: TOOLS.filter(t => !PREMIUM_TOOLS.has(t.name)).length,
+        premiumTools: PREMIUM_TOOLS.size,
+      },
     });
   }
 

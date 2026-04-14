@@ -85,7 +85,12 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
 
 ## Available Tools
 
-### Free Tier (10 tools)
+Bobby currently exposes **17 MCP tools** total:
+- **10 free analytics tools**
+- **2 free bounty calldata builders**
+- **5 premium x402 tools**
+
+### Free Analytics Tier (10 tools)
 
 | Tool | Description | Arguments |
 |------|-------------|-----------|
