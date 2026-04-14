@@ -136,6 +136,9 @@ export default function BobbyHarnessConsolePage() {
           <p className="font-mono text-[11px] text-[#adaaaa] uppercase tracking-widest mt-1">
             Every decision. Every guardrail. Every proof. Auditable.
           </p>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
+            This is the raw audit trail behind every Bobby verdict. <span className="text-[#6dfe9c]">Trace Layer</span> streams every event Bobby emits — signals received, debates run, guardrails fired, trades executed, MCP calls paid. <span className="text-[#60a5fa]">Memory Layer</span> shows how those traces distill into long-term episodes Bobby uses to sharpen the next debate. If you want to know <em>why</em> Bobby blocked a trade or charged an agent, it happened here first.
+          </p>
         </motion.div>
 
         {/* Stats strip */}

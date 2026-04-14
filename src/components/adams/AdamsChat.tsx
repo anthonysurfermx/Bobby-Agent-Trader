@@ -3573,13 +3573,13 @@ export function AdamsChat() {
               {!inputText && !isProcessing && messages.length < 3 && (
                 <div className="flex items-center gap-1 mr-1 overflow-x-auto no-scrollbar">
                   {[
+                    { label: '⚔ Pressure-test', cmd: 'Pressure-test this trade: long BTC at current price, 3x leverage, stop at -5%. Walk me through the debate.' },
+                    { label: '◎ Playbook', cmd: 'Run a wheel playbook on ETH: sell cash-secured put one week out, target 15 delta. What breaks it?' },
+                    { label: '⬡ Audit debate', cmd: 'Show me the latest resolved debate on-chain. Which guardrails fired and why?' },
                     { label: '₿ BTC', cmd: 'Analyze BTC' },
                     { label: 'Ξ ETH', cmd: 'Analyze ETH' },
                     { label: '◆ NVDA', cmd: 'Analyze NVDA' },
-                    { label: '◆ S&P 500', cmd: 'Analyze SPY' },
-                    { label: '◆ Oro', cmd: 'Analyze Gold' },
-                    { label: '$ Todos', cmd: 'Full market scan' },
-                    { label: '> Analizar Mercado', cmd: 'Full market analysis with all indicators' },
+                    { label: '> Full scan', cmd: 'Full market analysis with all indicators' },
                     { label: '× Debate', cmd: 'Should I long BTC right now?' },
                   ].map(btn => (
                     <button key={btn.label} onClick={() => { setInputText(btn.cmd); setTimeout(() => sendMessage(), 100); }}

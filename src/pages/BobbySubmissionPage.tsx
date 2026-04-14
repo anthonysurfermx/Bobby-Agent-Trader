@@ -38,40 +38,40 @@ const metadata = [
 const SKILL_MD = '/skill.md';
 const REPUTATION_API = '/api/reputation';
 
-const reviewerActions = [
+const startHereActions = [
   { label: 'Open Live Terminal', href: LIVE_TERMINAL, kind: 'internal', icon: TerminalSquare },
-  { label: 'View MCP Endpoint', href: MCP_ENDPOINT, kind: 'external', icon: Globe2 },
   { label: 'Bounty Contract on OKLink', href: BOUNTY_CONTRACT, kind: 'external', icon: ShieldCheck },
-  { label: 'GitHub Repository', href: GITHUB_REPO, kind: 'external', icon: GitBranch },
   {
     label: settlementProof.lastSettlement.txHash ? 'Last Settlement TX' : 'Settlement Slot',
     href: settlementProof.lastSettlement.oklinkUrl || '#settlement',
     kind: settlementProof.lastSettlement.oklinkUrl ? 'external' : 'anchor',
     icon: Network,
   },
+];
+
+const integrationActions = [
+  { label: 'MCP Endpoint', href: MCP_ENDPOINT, kind: 'external', icon: Globe2 },
   { label: 'Agent SKILL.MD', href: SKILL_MD, kind: 'external', icon: FileCode2 },
   { label: 'Reputation API', href: REPUTATION_API, kind: 'external', icon: ShieldCheck },
-  { label: 'Protocol Heartbeat', href: '/protocol/heartbeat', kind: 'internal', icon: Network },
-  { label: 'Plugin Store PR', href: 'https://github.com/okx/plugin-store/pull/161', kind: 'external', icon: Trophy },
   { label: 'Agent Console', href: '/protocol/console', kind: 'internal', icon: TerminalSquare },
+];
+
+const deepDiveActions = [
+  { label: 'GitHub Repository', href: GITHUB_REPO, kind: 'external', icon: GitBranch },
+  { label: 'Protocol Heartbeat', href: '/protocol/heartbeat', kind: 'internal', icon: Network },
   { label: 'Harness Console', href: '/protocol/harness', kind: 'internal', icon: ShieldCheck },
+  { label: 'Plugin Store PR', href: 'https://github.com/okx/plugin-store/pull/161', kind: 'external', icon: Trophy },
 ];
 
 const judgeRows = [
-  { label: 'Public GitHub', href: GITHUB_REPO, kind: 'external', status: 'check live' },
-  { label: 'Live terminal', href: LIVE_TERMINAL, kind: 'internal', status: 'check live' },
+  // Tier 1: on-chain proof (what a judge validates first)
   {
     label: 'Adversarial bounty contract verified',
     href: BOUNTY_CONTRACT,
     kind: 'external',
     status: 'check live',
   },
-  {
-    label: '3-agent debate streaming',
-    href: PROTOCOL_DEBATE,
-    kind: 'internal',
-    status: 'check live',
-  },
+  { label: 'Live terminal', href: LIVE_TERMINAL, kind: 'internal', status: 'check live' },
   {
     label: 'x402 MCP payment on-chain',
     href: settlementProof.lastSettlement.oklinkUrl || '#settlement',
@@ -82,8 +82,22 @@ const judgeRows = [
         : 'awaiting first settlement',
   },
   {
-    label: 'Judge Mode manifest',
-    href: JUDGE_MANIFEST,
+    label: '3-agent debate streaming',
+    href: PROTOCOL_DEBATE,
+    kind: 'internal',
+    status: 'check live',
+  },
+  {
+    label: 'Protocol Heartbeat dashboard (real-time health)',
+    href: '/protocol/heartbeat',
+    kind: 'internal',
+    status: 'check live',
+  },
+  { label: 'Public GitHub', href: GITHUB_REPO, kind: 'external', status: 'check live' },
+  // Tier 2: agent integration surface
+  {
+    label: 'Agent SKILL.MD integration file',
+    href: SKILL_MD,
     kind: 'api',
     status: 'check live',
   },
@@ -94,8 +108,8 @@ const judgeRows = [
     status: 'check live',
   },
   {
-    label: 'Agent SKILL.MD integration file',
-    href: SKILL_MD,
+    label: 'Judge Mode manifest',
+    href: JUDGE_MANIFEST,
     kind: 'api',
     status: 'check live',
   },
@@ -106,6 +120,13 @@ const judgeRows = [
     status: 'check live',
   },
   {
+    label: 'Sentinel agent demo (agent-to-agent MCP)',
+    href: '/api/sentinel-demo',
+    kind: 'api',
+    status: 'check live',
+  },
+  // Tier 3: supporting APIs
+  {
     label: 'Agent registry (machine-readable catalog)',
     href: '/api/registry',
     kind: 'api',
@@ -115,18 +136,6 @@ const judgeRows = [
     label: 'Live activity feed',
     href: '/api/activity',
     kind: 'api',
-    status: 'check live',
-  },
-  {
-    label: 'Sentinel agent demo (agent-to-agent MCP)',
-    href: '/api/sentinel-demo',
-    kind: 'api',
-    status: 'check live',
-  },
-  {
-    label: 'Protocol Heartbeat dashboard (real-time health)',
-    href: '/protocol/heartbeat',
-    kind: 'internal',
     status: 'check live',
   },
   {
@@ -306,9 +315,9 @@ export default function BobbySubmissionPage() {
                 Bobby Protocol - Build X Season 2 Submission
               </h1>
               <p className="mt-4 max-w-3xl text-base leading-7 text-white/65 md:text-lg">
-                Bobby is a live adversarial intelligence protocol for trading: three agents debate, Judge Mode audits,
-                MCP tools expose the system to other agents, and settlement happens on X Layer. This page is the fast
-                review surface for judges.
+                Bobby is the pressure-test layer for AI-driven financial decisions. Describe a trade or a vault leg,
+                three agents debate it, a Judge Mode audits the debate, 11 guardrails run fail-closed, and every verdict
+                lands on X Layer via commit-reveal. This page is the 60-second review surface for judges.
               </p>
               <Link
                 to="/"
@@ -336,8 +345,30 @@ export default function BobbySubmissionPage() {
 
           <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
             <Panel kicker="Reviewer console">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {reviewerActions.map((action) => (
+              <div className="mb-4 rounded-2xl border border-[#8CFFB4]/20 bg-[#8CFFB4]/[0.04] p-4">
+                <p className="text-sm leading-6 text-white/75">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8CFFB4]">60-second path →</span>{' '}
+                  Open the 3 links below in order. They prove the protocol is live, verified on X Layer, and settling MCP payments on-chain.
+                </p>
+              </div>
+
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[#8CFFB4]/80">Start here · live proof</div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {startHereActions.map((action) => (
+                  <ActionLink key={action.label} {...action} />
+                ))}
+              </div>
+
+              <div className="mt-5 mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">Integration surface · for agent builders</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {integrationActions.map((action) => (
+                  <ActionLink key={action.label} {...action} />
+                ))}
+              </div>
+
+              <div className="mt-5 mb-2 font-mono text-[10px] uppercase tracking-[0.22em] text-white/45">Deep dive · source + health</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {deepDiveActions.map((action) => (
                   <ActionLink key={action.label} {...action} />
                 ))}
               </div>
@@ -435,13 +466,13 @@ export default function BobbySubmissionPage() {
           </section>
 
           <section className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-            <Panel title="Why This Matters" kicker="Adaptive Financial Control Plane">
+            <Panel title="Why This Matters" kicker="The pressure-test layer">
               <div className="mt-4 space-y-3">
                 {[
-                  'Every financial decision produces a trace. Every trace distills into memory. Every memory sharpens the next verdict. Bobby doesn\'t start from scratch — it compounds intelligence.',
-                  'Trust is earned on-chain, not configured. Win rate, commitment history, bounty challenges, and economic activity compute a verifiable trust score that any agent can query.',
-                  'Bobby adapts to how each operator handles money — risk tolerance, regime preferences, sizing patterns, failure modes. The more you use it, the harder it is to replace.',
-                  '11 guardrails run fail-closed in production code. No consensus → no trade. No stop loss → no trade. 3 losses → circuit breaker. This is not a prompt trick. This is financial infrastructure.',
+                  'A trader describes a trade ("long BTC at 68k, 3x, stop -5%"). Three agents debate it — Alpha Hunter argues the case, Red Team attacks it, CIO allocates. Judge Mode audits the debate on six dimensions. Bobby returns EXECUTE, SKIP, or WAIT with reasoning that any reviewer can audit.',
+                  'An AI agent hits the MCP endpoint with the same question. Pays 0.001 OKB via x402. Gets the same verdict, on-chain, with a commit-reveal hash written before the outcome is known. No prompt trick — a settlement.',
+                  '11 guardrails run fail-closed in production. No consensus → no trade. No stop loss → no trade. 3 losses → circuit breaker. 20% drawdown → all trading halted. The harness protects capital first, generates alpha second.',
+                  'Anyone can challenge Bobby by staking OKB in the adversarial bounty contract. If Bobby is wrong, the challenger wins the stake and it becomes part of Bobby\'s on-chain record. Trust is earned in mainnet, not configured in a pitch.',
                 ].map((item) => (
                   <div key={item} className="rounded-2xl border border-white/8 bg-black/20 p-4 text-sm leading-6 text-white/72">
                     {item}

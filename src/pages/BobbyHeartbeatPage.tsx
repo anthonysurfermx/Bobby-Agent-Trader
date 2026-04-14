@@ -197,6 +197,17 @@ export default function BobbyHeartbeatPage() {
         </div>
       ) : data ? (
         <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+          {/* Hero blurb — what am I looking at? */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="border border-white/[0.04] bg-white/[0.02] rounded-xl p-4"
+          >
+            <p className="text-sm leading-6 text-white/65">
+              Live X Layer health for Bobby Protocol. Four signals — <span className="text-green-400">X Layer chain</span>, <span className="text-green-400">debate cycle</span>, <span className="text-green-400">on-chain contracts</span>, and <span className="text-green-400">overall</span> — roll up below. Green = operational. Amber = degraded (watch). Red = halted (Bobby stops trading until resolved). Treasury balance, MCP settlements, and bounty escrow below update every 60s and back up the numbers you see on the landing page.
+            </p>
+          </motion.div>
+
           {/* Health Status Row */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}

@@ -428,10 +428,10 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
           [HARDNESS FINANCE]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#fcc025]/20 text-[#fcc025] font-mono text-[10px] tracking-widest">
-          [ADAPTIVE CONTROL PLANE]
+          [PRESSURE-TEST LAYER]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#ff716a]/20 text-[#ff716a] font-mono text-[10px] tracking-widest">
-          [FINANCIAL MEMORY + TRUST]
+          [ON-CHAIN · X LAYER 196]
         </span>
       </motion.div>
 
@@ -441,17 +441,25 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.1 }}
         className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] text-center max-w-5xl leading-none uppercase mb-6"
       >
-        The Harness Layer for{' '}
-        <span className="text-[#6dfe9c] italic">Agent</span> Finance
+        Pressure-test <span className="text-[#6dfe9c] italic">every</span> trade before capital moves.
       </motion.h1>
 
       <motion.p
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="font-mono text-[11px] text-[#adaaaa] uppercase tracking-widest mb-10 text-center max-w-2xl"
+        className="text-sm md:text-base text-white/70 leading-6 mb-4 text-center max-w-3xl"
       >
-        Every financial decision becomes reusable intelligence. Bobby debates, judges, blocks, remembers, and adapts — so the next verdict is sharper than the last.
+        Describe a trade or a vault leg. Three agents debate it, a Judge audits the debate, 11 guardrails run fail-closed, and the verdict lands on X Layer <span className="text-[#6dfe9c]">before</span> the outcome is known. Bobby does not execute. Bobby does not custody. Bobby tells you whether the decision survives adversarial review — and logs the answer on-chain so you can prove later that you knew.
+      </motion.p>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest mb-10 text-center max-w-2xl"
+      >
+        EXECUTE · SKIP · WAIT — 70 seconds, auditable, challengeable with OKB.
       </motion.p>
 
       <motion.div
