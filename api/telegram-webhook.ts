@@ -177,24 +177,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           `🟡 CIO preparing verdict...`
         );
 
-        // Generate quick analysis with Haiku
+        // Generate quick analysis with gpt-4o-mini
         try {
-          const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-          if (ANTHROPIC_KEY) {
-            const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+          const OPENAI_KEY = process.env.OPENAI_API_KEY;
+          if (OPENAI_KEY) {
+            const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01' },
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
               body: JSON.stringify({
-                model: 'claude-haiku-4-5-20251001',
+                model: 'gpt-4o-mini',
                 max_tokens: 500,
-                system: `You are Bobby CIO, a trading intelligence agent. Give a brief 3-sentence market analysis of ${query}. Be concise, data-driven. Mention a direction (bullish/bearish/neutral) and a conviction level (1-10). End with one actionable insight.`,
-                messages: [{ role: 'user', content: `Quick analysis of ${query} right now.` }],
+                messages: [
+                  { role: 'system', content: `You are Bobby CIO, a trading intelligence agent. Give a brief 3-sentence market analysis of ${query}. Be concise, data-driven. Mention a direction (bullish/bearish/neutral) and a conviction level (1-10). End with one actionable insight.` },
+                  { role: 'user', content: `Quick analysis of ${query} right now.` },
+                ],
               }),
             });
 
             if (aiRes.ok) {
               const aiData = await aiRes.json() as any;
-              const analysis = aiData.content?.[0]?.text || '';
+              const analysis = aiData.choices?.[0]?.message?.content || '';
 
               if (analysis) {
                 // Send text analysis

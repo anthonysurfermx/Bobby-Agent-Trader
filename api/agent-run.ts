@@ -289,50 +289,72 @@ function filterSignals(signals: RawSignal[]): FilteredSignal[] {
   return filtered.slice(0, 10);
 }
 
-// ---- Claude call helper (shared by all agents) ----
+// ---- OpenAI call helper (shared by all agents) ----
+// Replaces Anthropic tool_use with OpenAI function-call tools API.
 async function callClaude(
   systemPrompt: string,
   userMsg: string,
   toolSchema?: { name: string; description: string; input_schema: Record<string, unknown> },
 ): Promise<{ text: string; toolInput: Record<string, unknown> | null }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { text: '', toolInput: null };
 
   const body: Record<string, unknown> = {
-    model: 'claude-sonnet-4-20250514',
+    model: 'gpt-4o',
     max_tokens: 1024,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userMsg }],
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userMsg },
+    ],
   };
 
   if (toolSchema) {
-    body.tools = [toolSchema];
-    body.tool_choice = { type: 'tool', name: toolSchema.name };
+    body.tools = [{
+      type: 'function',
+      function: {
+        name: toolSchema.name,
+        description: toolSchema.description,
+        parameters: toolSchema.input_schema,
+      },
+    }];
+    body.tool_choice = { type: 'function', function: { name: toolSchema.name } };
   }
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
     const t = await res.text();
-    return { text: `Claude ${res.status}: ${t.slice(0, 100)}`, toolInput: null };
+    return { text: `OpenAI ${res.status}: ${t.slice(0, 100)}`, toolInput: null };
   }
 
-  const result = await res.json() as { content: Array<{ type: string; text?: string; input?: Record<string, unknown> }> };
-  const toolUse = result.content.find(b => b.type === 'tool_use');
-  const textBlock = result.content.find(b => b.type === 'text');
-
-  return {
-    text: textBlock?.text || '',
-    toolInput: toolUse?.input || null,
+  const result = await res.json() as {
+    choices: Array<{
+      message: {
+        content: string | null;
+        tool_calls?: Array<{ function: { name: string; arguments: string } }>;
+      };
+    }>;
   };
+  const message = result.choices?.[0]?.message;
+  const text = message?.content || '';
+  const toolCall = message?.tool_calls?.[0];
+  let toolInput: Record<string, unknown> | null = null;
+  if (toolCall?.function?.arguments) {
+    try {
+      toolInput = JSON.parse(toolCall.function.arguments);
+    } catch {
+      toolInput = null;
+    }
+  }
+
+  return { text, toolInput };
 }
 
 // ---- Dynamic Conviction Score ----
@@ -459,7 +481,7 @@ async function multiAgentDebate(
   selfOptimizedPrompt?: string,
   opts?: { signalAgeMs?: number; performanceCtx?: string },
 ): Promise<DebateResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { decisions: [], reasoning: 'No API key', alphaView: '', redTeamView: '', judgeVerdict: '' };
 
   const signalCtx = buildSignalContext(signals, polyConsensusData, opts?.signalAgeMs, opts?.performanceCtx);
@@ -627,7 +649,7 @@ async function selfOptimizePrompt(recentCycles: Array<{ llm_reasoning: string; t
   // First check if we have a stored prompt from a previous cycle
   const storedPrompt = await fetchStoredPrompt();
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return storedPrompt; // Return stored even if no API key
 
   const cyclesSummary = recentCycles.slice(0, 10).map((c, i) =>
@@ -1540,7 +1562,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       trades_blocked: blocked,
       total_usd_deployed: totalDeployed,
       latency_ms: Date.now() - startMs,
-      llm_model: 'claude-sonnet-4-20250514',
+      llm_model: 'gpt-4o',
       llm_reasoning: debate.reasoning,
       status: 'completed',
     };

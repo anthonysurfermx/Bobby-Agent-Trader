@@ -20,11 +20,11 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export const config = { maxDuration: 120 };
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
 const CYCLE_SECRET = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
-const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const HAIKU_MODEL = 'gpt-4o-mini';
 
 const PERSONALITY_INSTRUCTIONS: Record<string, string> = {
   direct: 'Be concise, aggressive, no BS. Go straight to action.',
@@ -246,28 +246,29 @@ async function fetchIntel(req: VercelRequest): Promise<IntelSnapshot | null> {
 }
 
 async function callHaiku(system: string, userMsg: string, maxTokens = 1200): Promise<string> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
       model: HAIKU_MODEL,
       max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: userMsg }],
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userMsg },
+      ],
     }),
   });
 
   if (!response.ok) {
     const errorBody = await response.text().catch(() => '');
-    throw new Error(`Anthropic ${response.status}: ${errorBody.slice(0, 240)}`);
+    throw new Error(`OpenAI ${response.status}: ${errorBody.slice(0, 240)}`);
   }
 
-  const data = await response.json() as { content?: Array<{ text?: string }> };
-  return data.content?.[0]?.text || '';
+  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content || '';
 }
 
 function extractJsonPayload(raw: string): Record<string, unknown> {
@@ -683,8 +684,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Missing SUPABASE_SERVICE_ROLE_KEY' });
   }
 
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'Missing ANTHROPIC_API_KEY' });
+  if (!OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
   }
 
   if (!isAuthorized(req)) {

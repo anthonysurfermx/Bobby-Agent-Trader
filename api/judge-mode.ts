@@ -10,7 +10,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export const config = { maxDuration: 60, memory: 512 };
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = process.env.SB_URL || process.env.SUPABASE_URL || '';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -165,8 +164,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: 'Anthropic API key not configured' });
+  if (!OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
   const { thread_id, language = 'en' } = req.body as { thread_id?: string; language?: string };
@@ -195,7 +194,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(422).json({ error: 'Debate incomplete — need at least Alpha + Red Team posts' });
     }
 
-    // Build prompt and call LLM (OpenAI primary, Anthropic fallback)
+    // Build prompt and call OpenAI
     const prompt = buildJudgePrompt(thread, posts, calibration);
     const langNote = language === 'es'
       ? ' Write the rationale and red_flags in Spanish.'
@@ -204,64 +203,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let raw = '';
 
-    // Try OpenAI first (primary)
-    if (OPENAI_API_KEY) {
-      try {
-        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            max_tokens: 600,
-            messages: [
-              { role: 'system', content: systemMsg },
-              { role: 'user', content: prompt },
-            ],
-          }),
-        });
-        if (openaiRes.ok) {
-          const data = await openaiRes.json() as { choices: Array<{ message: { content: string } }> };
-          raw = data.choices[0]?.message?.content || '';
-          console.log('[JudgeMode] Used OpenAI gpt-4o');
-        }
-      } catch (e) {
-        console.warn('[JudgeMode] OpenAI failed, trying Anthropic:', e instanceof Error ? e.message : e);
-      }
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 600,
+        messages: [
+          { role: 'system', content: systemMsg },
+          { role: 'user', content: prompt },
+        ],
+      }),
+    });
+    if (!openaiRes.ok) {
+      const err = await openaiRes.text().catch(() => '');
+      console.error('[JudgeMode] OpenAI error:', openaiRes.status, err);
+      return res.status(502).json({ error: `OpenAI ${openaiRes.status}`, detail: err.slice(0, 300) });
     }
-
-    // Fallback to Anthropic
-    if (!raw && ANTHROPIC_API_KEY) {
-      const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 600,
-          system: systemMsg,
-          messages: [{ role: 'user', content: prompt }],
-        }),
-      });
-
-      if (!claudeRes.ok) {
-        const err = await claudeRes.text().catch(() => '');
-        console.error('[JudgeMode] Claude error:', claudeRes.status, err);
-        return res.status(502).json({ error: `Both LLM providers failed. Claude: ${claudeRes.status}`, detail: err.slice(0, 300) });
-      }
-
-      const claudeData = await claudeRes.json() as { content: Array<{ text: string }> };
-      raw = claudeData.content[0]?.text || '';
-      console.log('[JudgeMode] Used Anthropic Claude');
-    }
+    const data = await openaiRes.json() as { choices: Array<{ message: { content: string } }> };
+    raw = data.choices[0]?.message?.content || '';
+    console.log('[JudgeMode] Used OpenAI gpt-4o');
 
     if (!raw) {
-      return res.status(503).json({ error: 'No LLM API key configured or both providers failed' });
+      return res.status(503).json({ error: 'OpenAI returned empty response' });
     }
 
     // Parse JSON from response (strip markdown fences if any)

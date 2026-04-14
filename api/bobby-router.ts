@@ -9,7 +9,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export const config = { maxDuration: 10 };
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 const VALID_INTENTS = [
   'greeting', 'identity', 'portfolio', 'price', 'chart',
@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'message required' });
   }
 
-  if (!ANTHROPIC_API_KEY) {
+  if (!OPENAI_API_KEY) {
     return res.status(200).json({
       intent: 'ambiguous',
       confidence: 0,
@@ -52,17 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 100,
-        system: `You are a trading platform intent classifier. Classify the user's message into exactly ONE intent.
+    const systemPrompt = `You are a trading platform intent classifier. Classify the user's message into exactly ONE intent.
 
 INTENTS:
 - greeting: hi, hello, thanks, bye, casual chat
@@ -106,8 +96,20 @@ RULES:
 - Short vague messages like "hmm", "ok", "..." = off_topic
 
 Respond ONLY with JSON, no markdown:
-{"intent":"trade_chat","confidence":0.95,"language":"es","reason":"market outlook question"}`,
+{"intent":"trade_chat","confidence":0.95,"language":"es","reason":"market outlook question"}`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 100,
+        response_format: { type: 'json_object' },
         messages: [
+          { role: 'system', content: systemPrompt },
           {
             role: 'user',
             content: context
@@ -123,13 +125,13 @@ Respond ONLY with JSON, no markdown:
         intent: 'ambiguous' as Intent,
         confidence: 0,
         language: 'en',
-        reason: 'Haiku API error — cannot classify',
+        reason: 'OpenAI API error — cannot classify',
         source: 'regex',
       });
     }
 
-    const data = await response.json() as { content: Array<{ text: string }> };
-    const text = data.content[0]?.text || '';
+    const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+    const text = data.choices[0]?.message?.content || '';
 
     // Parse JSON response
     try {

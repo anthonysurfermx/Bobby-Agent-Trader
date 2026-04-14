@@ -17,7 +17,6 @@ import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-ev
 
 export const config = { maxDuration: 300 };
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
 const READONLY_FALLBACK_HOSTS = [BOBBY_PROTOCOL_BASE_URL, 'https://defimexico.org', 'https://defi-mexico-hub.vercel.app'];
@@ -79,9 +78,9 @@ async function sbPatch(table: string, filters: string, data: Record<string, unkn
   }
 }
 
-// ---- Claude helper ----
+// ---- OpenAI helper ----
 
-// Model mapping: Anthropic → OpenAI equivalents
+// Model mapping: Anthropic model id → OpenAI equivalent
 const OPENAI_FALLBACK: Record<string, string> = {
   'claude-haiku-4-5-20251001': 'gpt-4o-mini',
   'claude-sonnet-4-20250514': 'gpt-4o',
@@ -91,59 +90,37 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 async function callClaude(model: string, system: string, userMsg: string, maxTokens: number, timeoutMs = 25000): Promise<string> {
   const openaiModel = OPENAI_FALLBACK[model] || 'gpt-4o-mini';
+  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    // Always try OpenAI first (primary) — Anthropic credits exhausted
-    if (OPENAI_API_KEY) {
-      try {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: openaiModel,
-            max_tokens: maxTokens,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: userMsg },
-            ],
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-          return data.choices[0]?.message?.content || '';
-        }
-        const errBody = await res.text().catch(() => '');
-        console.warn(`[Cycle] OpenAI ${openaiModel} failed (${res.status}), falling back to Anthropic. ${errBody.slice(0, 100)}`);
-      } catch (e: any) {
-        if (e.name === 'AbortError') throw new Error(`LLM call timed out after ${timeoutMs}ms (${openaiModel})`);
-        console.warn(`[Cycle] OpenAI error, falling back to Anthropic: ${e.message}`);
-      }
-    }
-
-    // Fallback to Anthropic
-    if (!ANTHROPIC_API_KEY) throw new Error('Both OpenAI and Anthropic API keys unavailable');
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
       },
-      body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: userMsg }] }),
+      body: JSON.stringify({
+        model: openaiModel,
+        max_tokens: maxTokens,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userMsg },
+        ],
+      }),
     });
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
-      throw new Error(`Anthropic ${model}: ${res.status} ${errBody.slice(0, 200)}`);
+      throw new Error(`OpenAI ${openaiModel}: ${res.status} ${errBody.slice(0, 200)}`);
     }
-    const data = await res.json() as { content: Array<{ text: string }> };
-    return data.content[0]?.text || '';
+    const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+    return data.choices[0]?.message?.content || '';
+  } catch (e: any) {
+    if (e.name === 'AbortError') throw new Error(`LLM call timed out after ${timeoutMs}ms (${openaiModel})`);
+    throw e;
   } finally {
     clearTimeout(timer);
   }
@@ -703,8 +680,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: 'Anthropic API key not configured' });
+  if (!OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
   // Auth: Vercel crons send GET with CRON_SECRET, manual POST requires BOBBY_CYCLE_SECRET

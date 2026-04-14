@@ -7,23 +7,36 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
 
+// Model mapping: Anthropic → OpenAI
+const OPENAI_MODEL_MAP: Record<string, string> = {
+  'claude-haiku-4-5-20251001': 'gpt-4o-mini',
+  'claude-sonnet-4-20250514': 'gpt-4o',
+};
+
 async function callClaude(model: string, system: string, userMsg: string, maxTokens: number): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const openaiModel = OPENAI_MODEL_MAP[model] || 'gpt-4o-mini';
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
-    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: userMsg }] }),
+    body: JSON.stringify({
+      model: openaiModel,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userMsg },
+      ],
+    }),
   });
-  if (!res.ok) throw new Error(`Claude ${model}: ${res.status}`);
-  const data = await res.json() as { content: Array<{ text: string }> };
-  return data.content[0]?.text || '';
+  if (!res.ok) throw new Error(`OpenAI ${openaiModel}: ${res.status}`);
+  const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+  return data.choices[0]?.message?.content || '';
 }
 
 async function getTrackRecord(): Promise<{ wins: number; losses: number; winRate: number; lastCalls: string }> {
@@ -46,7 +59,7 @@ async function getTrackRecord(): Promise<{ wins: number; losses: number; winRate
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!ANTHROPIC_API_KEY) return res.status(503).json({ error: 'No API key' });
+  if (!OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
 
   const { language = 'en' } = req.body as { language?: string };
   const lang = language === 'es' ? 'es' : 'en';
