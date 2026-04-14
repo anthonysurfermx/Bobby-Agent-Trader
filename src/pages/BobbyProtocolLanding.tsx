@@ -129,16 +129,6 @@ interface McpMeta {
   } | null;
 }
 
-interface PnlSummary {
-  startingCapital: number;
-  currentEquity: number;
-  totalReturn: number;
-  totalTrades: number;
-  winRate: number;
-  wins: number;
-  losses: number;
-}
-
 interface ReputationSummary {
   ok: boolean;
   trustScore?: {
@@ -244,17 +234,6 @@ function useMcpMeta() {
       .catch(() => setData(null));
   }, []);
   return data;
-}
-
-function usePnl() {
-  const [summary, setSummary] = useState<PnlSummary | null>(null);
-  useEffect(() => {
-    fetch('/api/bobby-pnl', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j) => setSummary((j as { summary?: PnlSummary }).summary ?? null))
-      .catch(() => setSummary(null));
-  }, []);
-  return summary;
 }
 
 function useReputation() {
@@ -614,108 +593,6 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
           </a>
         </div>
       </motion.div>
-    </section>
-  );
-}
-
-function TradingRoom({ stats, pnl }: { stats: ProtocolStats | null; pnl: PnlSummary | null }) {
-  const debates = stats?.contracts.agentEconomy.stats.totalDebates ?? '—';
-  const mcpCalls = stats?.contracts.agentEconomy.stats.totalMcpCalls ?? '—';
-
-  // Role labels and one-line descriptors are static config — the identity
-  // of the three agents, not live data. Numeric metrics come from stats/pnl.
-  const agents = [
-    {
-      name: 'ALPHA_HUNTER',
-      color: '#6dfe9c',
-      role: 'OPPORTUNITY_SCOUT',
-      descriptor: 'Proposes long/short theses from on-chain and market data.',
-      metricA: { label: 'PROTOCOL_DEBATES', value: debates },
-      metricB: { label: 'MCP_CALLS', value: mcpCalls },
-    },
-    {
-      name: 'RED_TEAM',
-      color: '#fcc025',
-      role: 'ADVERSARIAL_CRITIC',
-      descriptor: 'Attacks every thesis before capital is committed.',
-      metricA: { label: 'AGENT_WIN_RATE', value: pnl ? `${pnl.winRate}%` : '—' },
-      metricB: { label: 'AGENT_LOSSES', value: pnl ? `${pnl.losses}` : '—' },
-    },
-    {
-      name: 'CIO',
-      color: '#ff716a',
-      role: 'FINAL_DECISION',
-      descriptor: 'Weighs both sides and emits the final conviction score.',
-      metricA: { label: 'AGENT_EQUITY', value: pnl ? `$${safeFixed(pnl.currentEquity, 2)}` : '—' },
-      metricB: { label: 'TOTAL_RETURN', value: pnl ? `${safeFixed(pnl.totalReturn, 2)}%` : '—' },
-    },
-  ];
-
-  return (
-    <section id="debate" className="py-24 px-6 max-w-7xl mx-auto">
-      <motion.h2
-        initial={{ opacity: 0, x: -20 }}
-        whileInView={{ opacity: 1, x: 0 }}
-        viewport={{ once: true }}
-        className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4 border-l-4 border-[#6dfe9c] pl-6"
-      >
-        The 3-Agent Trading Room
-      </motion.h2>
-      <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest pl-6 mb-12">
-        Every trade gets argued. No trade goes unquestioned.
-      </p>
-
-
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
-        {agents.map((a, i) => (
-          <motion.div
-            key={a.name}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.1 }}
-            className="bg-[#131313] p-6 border border-[#494847]/15 hover:border-[#6dfe9c]/30 transition-all"
-          >
-            <div className="flex items-center gap-4 mb-6">
-              <div
-                className="w-12 h-12 flex items-center justify-center text-2xl font-bold"
-                style={{
-                  backgroundColor: `${a.color}15`,
-                  color: a.color,
-                  border: `1px solid ${a.color}40`,
-                }}
-              >
-                {a.name[0]}
-              </div>
-              <div>
-                <div className="font-bold uppercase tracking-tighter text-lg">
-                  {a.name}
-                </div>
-                <div
-                  className="text-[10px] font-mono inline-block px-2"
-                  style={{ color: a.color, backgroundColor: `${a.color}15` }}
-                >
-                  ROLE: {a.role}
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 border-t border-[#494847]/15 pt-4 mb-4 font-mono text-[10px]">
-              <div>
-                <div className="text-[#adaaaa]">{a.metricA.label}</div>
-                <div className="text-xl" style={{ color: a.color }}>
-                  {a.metricA.value}
-                </div>
-              </div>
-              <div>
-                <div className="text-[#adaaaa]">{a.metricB.label}</div>
-                <div className="text-white text-xl">{a.metricB.value}</div>
-              </div>
-            </div>
-            <p className="text-xs text-[#adaaaa]">{a.descriptor}</p>
-          </motion.div>
-        ))}
-      </div>
-
     </section>
   );
 }
@@ -2790,7 +2667,6 @@ export default function BobbyProtocolLanding() {
   const { data: stats, error, loading } = useProtocolStats();
   const mcp = useMcpMeta();
   const reputation = useReputation();
-  const pnl = usePnl();
   const activity = useActivity();
   const liveTxs = useLiveTxs();
   const sentinel = useSentinelDemo();
@@ -2841,7 +2717,6 @@ export default function BobbyProtocolLanding() {
       <HeroLiveDebate stats={stats} />
       <TrustBadge stats={stats} />
       <RevenueProof stats={stats} liveTxs={liveTxs} />
-      {/* TradingRoom removed — repositioning Bobby as orchestration infra, not trading agent */}
       <ClosedLoop />
       <JudgeMode stats={stats} />
       <WhyMatters />

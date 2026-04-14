@@ -1,6 +1,31 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vercel/
+
+# Env
 .env
-.vercel
+.env.local
 *.local
-.env*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Working files (not for repo)
+tmp/
+stitch_*/
+output/pdf/
+*.log
+
+# AI working dirs (keep briefs tracked optionally)
+.ai/responses/
+.claude/worktrees/
+.claude/launch.json
+.claude/settings.local.json
