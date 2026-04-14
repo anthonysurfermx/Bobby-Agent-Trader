@@ -14,7 +14,7 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_stats","arguments":{}},"id":1}'
 ```
 
-## Available MCP Tools (18 tools)
+## Available MCP Tools (13 tools)
 
 ### Free Tools (no payment required)
 - `bobby_stats` — Track record: win rate, PnL, trades, $100 Challenge status

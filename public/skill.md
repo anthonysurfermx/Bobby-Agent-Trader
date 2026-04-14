@@ -90,7 +90,7 @@ Bobby currently exposes **18 MCP tools** total:
 - **2 free bounty calldata builders**
 - **5 premium x402 tools**
 
-### Free Analytics Tier (10 tools)
+### Free Analytics Tier (11 tools)
 
 | Tool | Description | Arguments |
 |------|-------------|-----------|

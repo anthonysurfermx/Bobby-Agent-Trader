@@ -1003,7 +1003,7 @@ function HarnessArchitecture() {
       icon: '[ ]',
       position: 'top',
       description: '18 MCP tools over Streamable HTTP. Any agent calls Bobby via JSON-RPC. Free analytics, bounty calldata builders, and premium tools gated by x402 on-chain payment.',
-      details: ['bobby_analyze', 'bobby_debate', 'bobby_judge', 'bobby_ta', 'bobby_intel', '+12 more'],
+      details: ['bobby_analyze', 'bobby_debate', 'bobby_judge', 'bobby_ta', 'bobby_intel', '+13 more'],
       color: '#6dfe9c',
     },
     {
