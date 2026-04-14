@@ -61,6 +61,12 @@ export default function BobbyPlaybooksPage() {
               Example plays showing where Bobby&apos;s harness prevents a specific failure mode. Every demo calls Bobby&apos;s
               live MCP tools against real market data. Not trading advice.
             </p>
+            <a
+              href="/protocol/sandbox"
+              className="mt-5 inline-flex items-center gap-2 rounded-lg border border-[#6dfe9c]/40 bg-[#6dfe9c]/10 px-4 py-2.5 font-['Space_Grotesk'] text-sm font-bold uppercase tracking-wider text-[#6dfe9c] transition-all hover:bg-[#6dfe9c]/20"
+            >
+              Run in Sandbox — Live Simulation →
+            </a>
           </header>
 
           {/* ── Filter + sort rail ── */}

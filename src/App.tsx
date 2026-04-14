@@ -78,6 +78,7 @@ const BobbyAgentConsolePage = lazyWithRetry(() => import('@/pages/BobbyAgentCons
 const BobbyNetworkConsolePage = lazyWithRetry(() => import('@/pages/BobbyNetworkConsolePage'), 'protocol-network');
 const BobbyHarnessConsolePage = lazyWithRetry(() => import('@/pages/BobbyHarnessConsolePage'), 'protocol-harness');
 const BobbyPlaybooksPage = lazyWithRetry(() => import('@/pages/BobbyPlaybooksPage'), 'protocol-playbooks');
+const BobbySandboxPage = lazyWithRetry(() => import('@/pages/BobbySandboxPage'), 'protocol-sandbox');
 
 
 // Auth pages
@@ -331,6 +332,14 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyPlaybooksPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'protocol/sandbox',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbySandboxPage />
             </Suspense>
           ),
         },

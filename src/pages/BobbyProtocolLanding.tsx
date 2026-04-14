@@ -532,6 +532,32 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         </div>
       </motion.div>
 
+      <motion.a
+        href="/protocol/sandbox"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45 }}
+        className="group relative w-full max-w-4xl mt-10 block bg-gradient-to-br from-[#6dfe9c]/10 via-[#131313] to-[#fcc025]/10 border border-[#6dfe9c]/30 hover:border-[#6dfe9c]/60 p-6 md:p-8 transition-all overflow-hidden"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(109,254,156,0.08),_transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex-1">
+            <div className="text-[#6dfe9c] font-mono text-[10px] tracking-widest mb-2">
+              NEW · LIVE_ADVERSARIAL_SIMULATION
+            </div>
+            <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-2">
+              Don&apos;t take our word for it. Pressure-test Bobby in the Sandbox.
+            </div>
+            <p className="text-[#adaaaa] text-xs leading-5 font-mono">
+              Watch Alpha Hunter, Red Team, CIO, Judge, and 11 guardrails run in real time. ~60–90s. Simulation only — no capital moves.
+            </p>
+          </div>
+          <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter whitespace-nowrap">
+            OPEN_SANDBOX →
+          </div>
+        </div>
+      </motion.a>
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

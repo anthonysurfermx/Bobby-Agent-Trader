@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { id: 'marketplace', label: 'AGENT COMMERCE', path: '/agentic-world/bobby/marketplace' },
   { id: 'harness', label: 'HARNESS', path: '/protocol/harness' },
   { id: 'playbooks', label: 'PLAYBOOKS', path: '/protocol/playbooks' },
+  { id: 'sandbox', label: 'SANDBOX', path: '/protocol/sandbox' },
 ] as const;
 
 type NavItemId = (typeof NAV_ITEMS)[number]['id'];
