@@ -442,29 +442,11 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         The Harness <span className="text-[#6dfe9c] italic">Finance</span> Layer for Agents
       </motion.h1>
 
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="text-sm md:text-base text-white/70 leading-6 mb-4 text-center max-w-3xl"
-      >
-        Describe a trade or a vault leg. Three agents debate it, a Judge audits the debate, 11 guardrails run fail-closed, and the verdict lands on X Layer <span className="text-[#6dfe9c]">before</span> the outcome is known. Bobby does not execute. Bobby does not custody. Bobby tells you whether the decision survives adversarial review — and logs the answer on-chain so you can prove later that you knew.
-      </motion.p>
-
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest mb-10 text-center max-w-2xl"
-      >
-        EXECUTE · SKIP · WAIT — 70 seconds, auditable, challengeable with OKB.
-      </motion.p>
-
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3 }}
-        className="w-full max-w-4xl bg-black border border-[#494847]/30 shadow-[0_0_40px_rgba(109,254,156,0.04)] relative overflow-hidden"
+        className="w-full max-w-4xl mt-6 bg-black border border-[#494847]/30 shadow-[0_0_40px_rgba(109,254,156,0.04)] relative overflow-hidden"
       >
         <div className="flex items-center justify-between bg-[#131313] px-4 py-2 border-b border-[#494847]/20">
           <div className="flex gap-2">
@@ -531,7 +513,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
       </motion.div>
 
       <motion.a
-        href="/protocol/sandbox"
+        href="/protocol/playbooks"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.45 }}
@@ -547,11 +529,11 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
               Don&apos;t take our word for it. Pressure-test Bobby in the Sandbox.
             </div>
             <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-              Watch Alpha Hunter, Red Team, CIO, Judge, and 11 guardrails run in real time. ~60–90s. Simulation only — no capital moves.
+              Browse the playbooks first, then run any strategy through Bobby&apos;s full adversarial debate in real time. ~60–90s. Simulation only.
             </p>
           </div>
           <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter whitespace-nowrap">
-            OPEN_SANDBOX →
+            BROWSE_PLAYBOOKS →
           </div>
         </div>
       </motion.a>

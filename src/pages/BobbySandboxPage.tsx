@@ -16,6 +16,19 @@ type AgentPhase = 'alpha_hunter' | 'red_team' | 'cio' | 'judge' | 'guardrails';
 type GuardrailStatus = 'pending' | 'pass' | 'fail' | 'skip';
 type VerdictAction = 'EXECUTE' | 'YIELD_PARK' | 'BLOCKED';
 
+interface MarketContext {
+  ticker: string;
+  price: number | null;
+  change24hPct: number | null;
+  high24h: number | null;
+  low24h: number | null;
+  volUsd24h: number | null;
+  source: 'okx' | 'unavailable';
+}
+
+const TICKER_PRESETS = ['BTC', 'ETH', 'SOL', 'OKB', 'BNB', 'XRP', 'DOGE'] as const;
+const RUN_COUNT_KEY = 'bobby_sandbox_runs';
+
 interface GuardrailCell {
   id: string;
   label: string;
@@ -52,7 +65,16 @@ const ACTION_STYLE: Record<VerdictAction, { bg: string; border: string; text: st
 
 // ── Page ───────────────────────────────────────────────────
 export default function BobbySandboxPage() {
-  const [playbookSlug, setPlaybookSlug] = useState<string>(PLAYBOOKS[0]?.slug ?? '');
+  // Read ?playbook= from URL
+  const initialPlaybook = (() => {
+    if (typeof window === 'undefined') return PLAYBOOKS[0]?.slug ?? '';
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get('playbook');
+    if (requested && PLAYBOOKS.some((p) => p.slug === requested)) return requested;
+    return PLAYBOOKS[0]?.slug ?? '';
+  })();
+
+  const [playbookSlug, setPlaybookSlug] = useState<string>(initialPlaybook);
   const [ticker, setTicker] = useState('BTC');
   const [running, setRunning] = useState(false);
   const [agents, setAgents] = useState<Record<AgentPhase, AgentState>>({
@@ -63,13 +85,22 @@ export default function BobbySandboxPage() {
     guardrails:   { text: '', status: 'idle' },
   });
   const [guardrails, setGuardrails] = useState<GuardrailCell[]>([]);
+  const [market, setMarket] = useState<MarketContext | null>(null);
   const [cioVerdict, setCioVerdict] = useState<{ action: VerdictAction; conviction: number } | null>(null);
   const [judgeScores, setJudgeScores] = useState<Record<string, number>>({});
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [runCount, setRunCount] = useState(0);
 
   const abortRef = useRef<AbortController | null>(null);
   const verdictRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RUN_COUNT_KEY);
+      if (raw) setRunCount(parseInt(raw, 10) || 0);
+    } catch {}
+  }, []);
 
   const selectedPlaybook = useMemo(
     () => PLAYBOOKS.find((p) => p.slug === playbookSlug),
@@ -92,10 +123,19 @@ export default function BobbySandboxPage() {
       guardrails:   { text: '', status: 'idle' },
     });
     setGuardrails([]);
+    setMarket(null);
     setCioVerdict(null);
     setJudgeScores({});
     setVerdict(null);
     setError(null);
+  }
+
+  function bumpRunCount() {
+    try {
+      const next = runCount + 1;
+      setRunCount(next);
+      localStorage.setItem(RUN_COUNT_KEY, String(next));
+    } catch {}
   }
 
   async function runSandbox() {
@@ -181,6 +221,9 @@ export default function BobbySandboxPage() {
         setAgents((s) => ({ ...s, [phase]: { ...s[phase], status: 'done' } }));
         break;
       }
+      case 'market_context':
+        setMarket(payload as MarketContext);
+        break;
       case 'cio_verdict':
         setCioVerdict({ action: payload.action, conviction: payload.conviction });
         break;
@@ -194,6 +237,7 @@ export default function BobbySandboxPage() {
         break;
       case 'verdict':
         setVerdict(payload as Verdict);
+        bumpRunCount();
         break;
       case 'error':
         setError(payload.message || 'Stream error');
@@ -252,29 +296,52 @@ export default function BobbySandboxPage() {
                 )}
 
                 <label className="mt-5 mb-2 block font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
-                  Ticker (optional)
+                  Ticker
                 </label>
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {TICKER_PRESETS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTicker(t)}
+                      disabled={running}
+                      className={`rounded-md border px-2 py-1 font-mono text-[10px] font-bold tracking-[0.14em] transition-colors disabled:opacity-50 ${
+                        ticker === t
+                          ? 'border-[#6dfe9c]/50 bg-[#6dfe9c]/15 text-[#6dfe9c]'
+                          : 'border-white/[0.08] bg-white/[0.02] text-white/55 hover:text-white/85'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   value={ticker}
-                  onChange={(e) => setTicker(e.target.value.toUpperCase())}
+                  onChange={(e) => setTicker(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                   disabled={running}
                   maxLength={12}
-                  placeholder="BTC"
+                  placeholder="Or type any OKX spot ticker"
                   className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2 font-mono text-sm text-white/90 focus:border-[#6dfe9c]/50 focus:outline-none disabled:opacity-50"
                 />
 
                 <button
                   onClick={runSandbox}
-                  disabled={running}
+                  disabled={running || !ticker}
                   className="mt-5 w-full rounded-lg border border-[#6dfe9c]/40 bg-[#6dfe9c]/10 px-4 py-3 font-['Space_Grotesk'] text-sm font-bold uppercase tracking-wider text-[#6dfe9c] transition-all hover:bg-[#6dfe9c]/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {running ? 'Pressure-Testing...' : 'Run Pressure-Test'}
+                  {running ? 'Pressure-Testing...' : `Run Pressure-Test · ${ticker || '—'}`}
                 </button>
 
                 <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
-                  Simulation only · No capital moves · No on-chain commit
+                  Real OKX data · Simulation only · No capital moves
                 </p>
+
+                {runCount > 0 && (
+                  <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-[#6dfe9c]/70">
+                    You&apos;ve run {runCount} pressure-test{runCount === 1 ? '' : 's'} in this browser
+                  </p>
+                )}
               </div>
 
               {/* Guardrail Gauntlet preview */}
@@ -310,6 +377,8 @@ export default function BobbySandboxPage() {
                   :: STREAM ERROR — {error} ::
                 </div>
               )}
+
+              {market && <MarketContextCard ctx={market} />}
 
               <AgentCard phase="alpha_hunter" state={agents.alpha_hunter} />
               <AgentCard phase="red_team" state={agents.red_team} />
@@ -661,5 +730,64 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{label}</div>
       <div className="font-['Space_Grotesk'] text-xl font-bold text-white">{value}</div>
     </div>
+  );
+}
+
+function MarketContextCard({ ctx }: { ctx: MarketContext }) {
+  const change = ctx.change24hPct;
+  const changeColor =
+    change === null ? '#888' : change > 0 ? '#6dfe9c' : change < 0 ? '#ff716a' : '#888';
+  const regime =
+    change === null ? 'unknown'
+    : change > 3 ? 'risk-on expansion'
+    : change > 0 ? 'mild bid'
+    : change > -3 ? 'chop / distribution'
+    : 'risk-off drawdown';
+  const fmtPrice = (n: number | null) =>
+    n === null ? '—' : `$${n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 2 })}`;
+  const fmtVol = (n: number | null) => {
+    if (n === null || !Number.isFinite(n)) return '—';
+    if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+    if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+    if (n >= 1e3) return `$${(n / 1e3).toFixed(1)}K`;
+    return `$${n.toFixed(0)}`;
+  };
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent p-5"
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-lg font-bold text-white/80">◉</span>
+          <div>
+            <div className="font-['Space_Grotesk'] text-lg font-bold text-white">
+              Market Context — {ctx.ticker}
+            </div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+              {ctx.source === 'okx' ? 'Live OKX spot · fetched just now' : 'data unavailable · reasoning general only'}
+            </div>
+          </div>
+        </div>
+        {change !== null && (
+          <span
+            className="rounded-md border px-2 py-1 font-mono text-xs font-bold"
+            style={{ borderColor: `${changeColor}55`, color: changeColor, background: `${changeColor}10` }}
+          >
+            {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <Stat label="Last" value={fmtPrice(ctx.price)} />
+        <Stat label="24h High" value={fmtPrice(ctx.high24h)} />
+        <Stat label="24h Low" value={fmtPrice(ctx.low24h)} />
+        <Stat label="24h Volume" value={fmtVol(ctx.volUsd24h)} />
+      </div>
+      <div className="mt-3 border-t border-white/[0.06] pt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-white/50">
+        Regime read: <span style={{ color: changeColor }}>{regime}</span>
+      </div>
+    </motion.div>
   );
 }

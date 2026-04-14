@@ -10,6 +10,63 @@ export const config = { maxDuration: 180 };
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = 'gpt-4o-mini';
+const OKX_BASE = 'https://www.okx.com';
+
+// ── Market context (real OKX data) ─────────────────────────
+interface MarketContext {
+  ticker: string;
+  price: number | null;
+  change24hPct: number | null;
+  high24h: number | null;
+  low24h: number | null;
+  volUsd24h: number | null;
+  source: 'okx' | 'unavailable';
+}
+
+async function fetchMarketContext(ticker: string): Promise<MarketContext> {
+  const instId = `${ticker}-USDT`;
+  try {
+    const resp = await fetch(`${OKX_BASE}/api/v5/market/ticker?instId=${instId}`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!resp.ok) throw new Error(`OKX ${resp.status}`);
+    const json = (await resp.json()) as { code: string; data: Array<{ last: string; open24h: string; high24h: string; low24h: string; volCcy24h: string }> };
+    if (json.code !== '0' || !json.data?.[0]) throw new Error('No data');
+    const t = json.data[0];
+    const last = parseFloat(t.last);
+    const open = parseFloat(t.open24h);
+    const change = open > 0 ? ((last - open) / open) * 100 : null;
+    return {
+      ticker,
+      price: Number.isFinite(last) ? last : null,
+      change24hPct: change,
+      high24h: parseFloat(t.high24h),
+      low24h: parseFloat(t.low24h),
+      volUsd24h: parseFloat(t.volCcy24h),
+      source: 'okx',
+    };
+  } catch {
+    return { ticker, price: null, change24hPct: null, high24h: null, low24h: null, volUsd24h: null, source: 'unavailable' };
+  }
+}
+
+function formatMarketForPrompt(ctx: MarketContext): string {
+  if (ctx.source === 'unavailable' || ctx.price === null) {
+    return `Ticker: ${ctx.ticker}. Market data: unavailable (offline probe). Reason about general conditions only.`;
+  }
+  const chg = ctx.change24hPct;
+  const regime = chg === null ? 'unknown' : chg > 3 ? 'risk-on expansion' : chg > 0 ? 'mild bid' : chg > -3 ? 'chop / distribution' : 'risk-off drawdown';
+  return [
+    `Ticker: ${ctx.ticker} (OKX spot ${ctx.ticker}-USDT).`,
+    `Last: $${ctx.price.toLocaleString(undefined, { maximumFractionDigits: 4 })}.`,
+    chg !== null ? `24h change: ${chg.toFixed(2)}%.` : '',
+    ctx.high24h && ctx.low24h ? `24h range: $${ctx.low24h} – $${ctx.high24h}.` : '',
+    ctx.volUsd24h ? `24h USD volume: $${Math.round(ctx.volUsd24h).toLocaleString()}.` : '',
+    `Regime read: ${regime}.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
 
 // ── SSE helpers ────────────────────────────────────────────
 type SseWriter = (event: string, data: Record<string, unknown>) => void;
@@ -244,7 +301,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const body = req.method === 'POST' ? (req.body || {}) : (req.query as Record<string, string>);
   const playbookSlug = String(body.playbookSlug || 'conviction-gated-swing');
-  const ticker = String(body.ticker || 'BTC').toUpperCase().slice(0, 12);
+  const rawTicker = String(body.ticker || 'BTC').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  const ticker = rawTicker || 'BTC';
 
   if (!OPENAI_KEY) {
     return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
@@ -268,7 +326,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dimensions: JUDGE_DIMENSIONS,
     });
 
-    const ctx = `Playbook: ${playbookSlug}. Ticker: ${ticker}. Context: X Layer (chain 196), mid-2026 market.`;
+    // Fetch real OKX spot context BEFORE debate
+    send('phase_start', { phase: 'market_context' });
+    const marketCtx = await fetchMarketContext(ticker);
+    send('market_context', marketCtx);
+    send('phase_end', { phase: 'market_context' });
+
+    const marketLine = formatMarketForPrompt(marketCtx);
+    const ctx = `Playbook: ${playbookSlug}. Venue: OKX + X Layer (chain 196). Live market (just fetched from OKX):\n${marketLine}`;
 
     const alphaText = await streamAgent(send, 'alpha_hunter', SYSTEM_ALPHA, ctx);
 

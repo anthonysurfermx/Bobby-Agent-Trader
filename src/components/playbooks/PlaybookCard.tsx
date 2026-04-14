@@ -71,7 +71,7 @@ export default function PlaybookCard({ playbook }: PlaybookCardProps) {
       </div>
 
       {/* ── CTA ── */}
-      <div className="mt-5 flex items-center justify-between border-t border-white/[0.04] pt-4">
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/[0.04] pt-4">
         <span className="text-xs text-white/50">{playbook.blockRateCopy}</span>
         {disabled ? (
           <span className="inline-flex items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
@@ -79,13 +79,21 @@ export default function PlaybookCard({ playbook }: PlaybookCardProps) {
             Coming soon
           </span>
         ) : (
-          <button
-            onClick={() => setOpen((o) => !o)}
-            className="inline-flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-green-400 transition-colors hover:bg-green-500/20"
-          >
-            {open ? 'Collapse' : 'Pressure-test this playbook'}
-            <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setOpen((o) => !o)}
+              className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/60 transition-colors hover:bg-white/[0.06]"
+            >
+              {open ? 'Collapse' : 'Details'}
+              <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            <a
+              href={`/protocol/sandbox?playbook=${encodeURIComponent(playbook.slug)}`}
+              className="inline-flex items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/15 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-green-400 transition-colors hover:bg-green-500/25"
+            >
+              Run in Sandbox →
+            </a>
+          </div>
         )}
       </div>
 
