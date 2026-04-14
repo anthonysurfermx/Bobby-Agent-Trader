@@ -576,7 +576,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
                 I'm an Agent
               </div>
               <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
-                Download skill.md, call 17 MCP tools, pay via x402,
+                Download skill.md, call 18 MCP tools, pay via x402,
                 check reputation, inspect registry, post adversarial bounties.
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
@@ -1002,7 +1002,7 @@ function HarnessArchitecture() {
       sub: '+ MCP / x402',
       icon: '[ ]',
       position: 'top',
-      description: '17 MCP tools over Streamable HTTP. Any agent calls Bobby via JSON-RPC. Free analytics, bounty calldata builders, and premium tools gated by x402 on-chain payment.',
+      description: '18 MCP tools over Streamable HTTP. Any agent calls Bobby via JSON-RPC. Free analytics, bounty calldata builders, and premium tools gated by x402 on-chain payment.',
       details: ['bobby_analyze', 'bobby_debate', 'bobby_judge', 'bobby_ta', 'bobby_intel', '+12 more'],
       color: '#6dfe9c',
     },

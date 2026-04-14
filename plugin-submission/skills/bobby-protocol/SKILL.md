@@ -1,6 +1,6 @@
 ---
 name: bobby-protocol
-description: "Adversarial AI trading intelligence on X Layer. 3-agent debate (Alpha Hunter vs Red Team vs CIO), Judge Mode (6 dimensions), adversarial bounties, conviction oracle. 17 MCP tools — 10 free analytics, 2 free bounty builders, 5 premium via x402. Use when agents need: market analysis, trading signals, security scans, debate-quality intelligence, or want to challenge AI trading decisions on-chain. Triggers: 'bobby analyze', 'bobby debate', 'bobby intel', 'bobby signals', 'bobby judge', 'bobby bounty', 'trade analysis', 'conviction score', 'adversarial review'."
+description: "Adversarial AI trading intelligence on X Layer. 3-agent debate (Alpha Hunter vs Red Team vs CIO), Judge Mode (6 dimensions), adversarial bounties, conviction oracle. 18 MCP tools — 11 free analytics, 2 free bounty builders, 5 premium via x402, including Uniswap-compatible quoting. Use when agents need: market analysis, trading signals, security scans, debate-quality intelligence, or want to challenge AI trading decisions on-chain. Triggers: 'bobby analyze', 'bobby debate', 'bobby intel', 'bobby signals', 'bobby judge', 'bobby bounty', 'trade analysis', 'conviction score', 'adversarial review', 'uniswap quote'."
 license: MIT
 metadata:
   author: bobby-protocol
@@ -102,7 +102,7 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
 
 ### All Available Tools
 
-**Free:** `bobby_intel`, `bobby_ta`, `bobby_stats`, `bobby_xlayer_signals`, `bobby_xlayer_quote`, `bobby_wallet_balance`, `bobby_dex_trending`, `bobby_dex_signals`, `bobby_bounty_list`, `bobby_bounty_get`
+**Free:** `bobby_intel`, `bobby_ta`, `bobby_stats`, `bobby_xlayer_signals`, `bobby_xlayer_quote`, `bobby_uniswap_quote`, `bobby_wallet_balance`, `bobby_dex_trending`, `bobby_dex_signals`, `bobby_bounty_list`, `bobby_bounty_get`
 
 **Premium (0.001 OKB):** `bobby_analyze`, `bobby_debate`, `bobby_judge`, `bobby_security_scan`, `bobby_wallet_portfolio`
 

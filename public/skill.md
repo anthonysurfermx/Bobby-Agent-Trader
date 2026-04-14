@@ -85,8 +85,8 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
 
 ## Available Tools
 
-Bobby currently exposes **17 MCP tools** total:
-- **10 free analytics tools**
+Bobby currently exposes **18 MCP tools** total:
+- **11 free analytics tools**
 - **2 free bounty calldata builders**
 - **5 premium x402 tools**
 
@@ -99,6 +99,7 @@ Bobby currently exposes **17 MCP tools** total:
 | `bobby_stats` | Track record (win rate, PnL, recent trades) | `{}` |
 | `bobby_xlayer_signals` | Smart money signals on X Layer | `{}` |
 | `bobby_xlayer_quote` | DEX swap quote on X Layer | `{ from, to, amount }` |
+| `bobby_uniswap_quote` | Uniswap-compatible exact-input quote on X Layer | `{ tokenIn, tokenOut, amount, chainId?, tradeType?, slippageBps? }` |
 | `bobby_wallet_balance` | Bobby's agentic wallet balance | `{ chain }` |
 | `bobby_dex_trending` | Trending tokens on-chain | `{ chain }` |
 | `bobby_dex_signals` | Smart money / whale / KOL signals | `{ chain, type }` |

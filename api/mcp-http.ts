@@ -28,6 +28,7 @@ import {
 } from './_lib/mcp-challenges.js';
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
 import { logHarnessEvent } from './_lib/harness-events.js';
+import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
 
 export const config = { maxDuration: 60 };
 
@@ -49,6 +50,7 @@ const TOOLS = [
   { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time data sources. Use sections param to filter: prices,regime,whale,sentiment,technical,macro.', inputSchema: { type: 'object', properties: { sections: { type: 'string', description: 'Comma-separated sections to include: prices,regime,whale,sentiment,technical,macro,funding,oi,prediction,traders,security. Omit for all.' } } } },
   { name: 'bobby_xlayer_signals', description: 'Smart money signals on X Layer (OKX L2).', inputSchema: { type: 'object', properties: {} } },
   { name: 'bobby_xlayer_quote', description: 'DEX swap quote on X Layer.', inputSchema: { type: 'object', properties: { from: { type: 'string', default: 'OKB' }, to: { type: 'string', default: 'USDT' }, amount: { type: 'string', default: '1' } } } },
+  { name: 'bobby_uniswap_quote', description: 'Uniswap-compatible exact-input quote on X Layer via the OKX OnchainOS DEX aggregator.', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'OKB', description: 'Token symbol or contract address on X Layer' }, tokenOut: { type: 'string', default: 'USDT', description: 'Token symbol or contract address on X Layer' }, amount: { type: 'string', default: '1', description: 'Human-readable exact-input amount' }, amountIn: { type: 'string', description: 'Alias for amount' }, chainId: { type: 'string', default: '196' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
   { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades).', inputSchema: { type: 'object', properties: {} } },
   { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'xlayer' } } } },
   { name: 'bobby_wallet_portfolio', description: 'Portfolio of any wallet address (multi-chain). PAID: 0.001 OKB.', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '196' } }, required: ['address'] } },
@@ -63,7 +65,7 @@ const TOOLS = [
 ];
 
 // ---- Tool Execution ----
-async function executeTool(name: string, args: Record<string, string>): Promise<{ content: Array<{ type: string; text: string }> }> {
+async function executeTool(name: string, args: Record<string, any>): Promise<{ content: Array<{ type: string; text: string }> }> {
   if (name === 'bobby_analyze' || name === 'bobby_debate') {
     const question = args.question || args.symbol || 'market';
     const message = name === 'bobby_debate'
@@ -231,6 +233,11 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
       }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
+  }
+
+  if (name === 'bobby_uniswap_quote') {
+    const quote = await getUniswapCompatibleQuote(BASE_URL, args);
+    return { content: [{ type: 'text', text: JSON.stringify(quote, null, 2) }] };
   }
 
   if (name === 'bobby_recommend') {
@@ -605,7 +612,7 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
     // ---- Call Tool ----
     case 'tools/call': {
       const toolName = params.name as string;
-      const args = (params.arguments || {}) as Record<string, string>;
+      const args = (params.arguments || {}) as Record<string, any>;
 
       if (!toolName) {
         return jsonrpcError(id, -32602, 'Missing tool name');

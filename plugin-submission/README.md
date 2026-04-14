@@ -10,9 +10,10 @@ npx skills add okx/plugin-store --name bobby-protocol
 
 ## What it does
 
-Bobby Protocol exposes 15 MCP tools over Streamable HTTP that any AI agent can consume:
+Bobby Protocol exposes 18 MCP tools over Streamable HTTP that any AI agent can consume:
 
-- **10 free tools** — market intel, technical analysis, signals, bounty queries
+- **11 free analytics tools** — market intel, technical analysis, signals, bounty queries, Uniswap-compatible quoting
+- **2 free bounty builders** — unsigned calldata for posting and challenging bounties
 - **5 premium tools** — full analysis, 3-agent debate, judge audit, security scan, portfolio analysis
 - Premium tools settle at 0.001 OKB per call via x402 on X Layer (Chain 196)
 

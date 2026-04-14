@@ -14,25 +14,31 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_stats","arguments":{}},"id":1}'
 ```
 
-## Available MCP Tools (12 tools)
+## Available MCP Tools (18 tools)
 
 ### Free Tools (no payment required)
 - `bobby_stats` — Track record: win rate, PnL, trades, $100 Challenge status
 - `bobby_ta` — Technical analysis: RSI, MACD, BB, SuperTrend, support/resistance
 - `bobby_intel` — Full intelligence briefing from 12 real-time data sources
 - `bobby_xlayer_signals` — Smart money signals on X Layer
+- `bobby_xlayer_quote` — DEX swap quote on X Layer
+- `bobby_uniswap_quote` — Uniswap-compatible exact-input quote on X Layer
+- `bobby_wallet_balance` — Check any wallet balance
 - `bobby_dex_trending` — Hot trending tokens on-chain
 - `bobby_dex_signals` — Smart money / whale / KOL buy signals
+- `bobby_bounty_list` — List recent adversarial bounties
+- `bobby_bounty_get` — Get a single bounty by id
 
 ### Premium Tools (x402 payment on X Layer)
 - `bobby_analyze` — Full market analysis with 12 data sources (0.001 OKB)
 - `bobby_debate` — Trigger 3-agent adversarial debate (0.001 OKB)
 - `bobby_security_scan` — Token contract safety scan (0.001 OKB)
 - `bobby_wallet_portfolio` — Multi-chain wallet analysis (0.001 OKB)
+- `bobby_judge` — Judge Mode audit on 6 dimensions (0.001 OKB)
 
 ### Other Tools
-- `bobby_wallet_balance` — Check any wallet balance
-- `bobby_xlayer_quote` — DEX swap quote on X Layer
+- `bobby_bounty_post` — Build unsigned calldata to post a bounty
+- `bobby_bounty_challenge` — Build unsigned calldata to challenge a bounty
 
 ## Smart Contracts on X Layer (Chain 196)
 

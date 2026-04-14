@@ -21,6 +21,7 @@ import {
   storeReceipt,
   getChallenge,
 } from './_lib/mcp-challenges.js';
+import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
 
 const BASE_URL = 'https://bobbyprotocol.xyz';
 
@@ -43,6 +44,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time sources', inputSchema: { type: 'object', properties: {} } },
           { name: 'bobby_xlayer_signals', description: 'Smart money signals on X Layer (OKX L2)', inputSchema: { type: 'object', properties: {} } },
           { name: 'bobby_xlayer_quote', description: 'DEX swap quote on X Layer', inputSchema: { type: 'object', properties: { from: { type: 'string', default: 'OKB' }, to: { type: 'string', default: 'USDT' }, amount: { type: 'string', default: '1' } } } },
+          { name: 'bobby_uniswap_quote', description: 'Uniswap-compatible exact-input quote on X Layer', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'OKB' }, tokenOut: { type: 'string', default: 'USDT' }, amount: { type: 'string', default: '1' }, amountIn: { type: 'string' }, chainId: { type: 'string', default: '196' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
           { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades)', inputSchema: { type: 'object', properties: {} } },
           { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance on any chain', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'xlayer' } } } },
           { name: 'bobby_wallet_portfolio', description: 'Get portfolio of any wallet address (multi-chain)', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '196' } }, required: ['address'] } },
@@ -55,7 +57,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
     // Execute tools
     case 'tools/call': {
       const toolName = params.name as string;
-      const args = (params.arguments || {}) as Record<string, string>;
+      const args = (params.arguments || {}) as Record<string, any>;
 
       if (toolName === 'bobby_analyze' || toolName === 'bobby_debate') {
         const question = args.question || args.symbol || 'market';
@@ -137,6 +139,11 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
         return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
       }
 
+      if (toolName === 'bobby_uniswap_quote') {
+        const quote = await getUniswapCompatibleQuote(BASE_URL, args);
+        return { content: [{ type: 'text', text: JSON.stringify(quote, null, 2) }] };
+      }
+
       if (toolName === 'bobby_stats') {
         const res = await fetch(`${BASE_URL}/api/bobby-pnl`);
         const data = await res.json();
@@ -208,7 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'mcp',
       endpoints: { tools: '/api/mcp-bobby' },
       pricing: {
-        free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_xlayer_signals', 'bobby_dex_trending', 'bobby_dex_signals', 'bobby_xlayer_quote', 'bobby_wallet_balance'],
+        free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_xlayer_signals', 'bobby_dex_trending', 'bobby_dex_signals', 'bobby_xlayer_quote', 'bobby_uniswap_quote', 'bobby_wallet_balance'],
         premium: {
           tools: Array.from(PREMIUM_TOOLS),
           price: `${X402_PRICE_OKB} OKB per call`,
