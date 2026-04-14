@@ -26,6 +26,36 @@ interface MarketContext {
   source: 'okx' | 'unavailable';
 }
 
+interface BobbyIntel {
+  regime?: string;
+  fearGreed?: number | string;
+  mood?: string;
+  dynamicConviction?: number;
+  technicalLeader?: string;
+  available: boolean;
+}
+
+interface InterruptionState {
+  phase: string;
+  message: string;
+  partialText?: string;
+}
+
+interface FeedRun {
+  id: string;
+  created_at: string;
+  playbook_slug: string;
+  ticker: string;
+  cio_action: string | null;
+  cio_conviction: number | null;
+  verdict_action: string | null;
+  guardrails_passed: number | null;
+  guardrails_total: number | null;
+  status: string;
+  error_phase: string | null;
+  market_snapshot?: MarketContext | null;
+}
+
 const TICKER_PRESETS = ['BTC', 'ETH', 'SOL', 'OKB', 'BNB', 'XRP', 'DOGE'] as const;
 const RUN_COUNT_KEY = 'bobby_sandbox_runs';
 
@@ -86,11 +116,15 @@ export default function BobbySandboxPage() {
   });
   const [guardrails, setGuardrails] = useState<GuardrailCell[]>([]);
   const [market, setMarket] = useState<MarketContext | null>(null);
+  const [intel, setIntel] = useState<BobbyIntel | null>(null);
   const [cioVerdict, setCioVerdict] = useState<{ action: VerdictAction; conviction: number } | null>(null);
   const [judgeScores, setJudgeScores] = useState<Record<string, number>>({});
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [interruption, setInterruption] = useState<InterruptionState | null>(null);
   const [runCount, setRunCount] = useState(0);
+  const [feed, setFeed] = useState<FeedRun[]>([]);
+  const [feedLoading, setFeedLoading] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const verdictRef = useRef<HTMLDivElement | null>(null);
@@ -100,6 +134,23 @@ export default function BobbySandboxPage() {
       const raw = localStorage.getItem(RUN_COUNT_KEY);
       if (raw) setRunCount(parseInt(raw, 10) || 0);
     } catch {}
+  }, []);
+
+  async function loadFeed() {
+    setFeedLoading(true);
+    try {
+      const r = await fetch('/api/sandbox-runs?limit=20');
+      const data = await r.json();
+      if (data.ok && Array.isArray(data.runs)) setFeed(data.runs);
+    } catch {
+      // non-fatal
+    } finally {
+      setFeedLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadFeed();
   }, []);
 
   const selectedPlaybook = useMemo(
@@ -124,10 +175,12 @@ export default function BobbySandboxPage() {
     });
     setGuardrails([]);
     setMarket(null);
+    setIntel(null);
     setCioVerdict(null);
     setJudgeScores({});
     setVerdict(null);
     setError(null);
+    setInterruption(null);
   }
 
   function bumpRunCount() {
@@ -153,6 +206,11 @@ export default function BobbySandboxPage() {
         body: JSON.stringify({ playbookSlug, ticker: ticker.trim() || 'BTC' }),
         signal: ctrl.signal,
       });
+      if (res.status === 429) {
+        const data = await res.json().catch(() => ({ message: 'Rate limit exceeded' }));
+        setError(data.message || 'Rate limit exceeded');
+        return;
+      }
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
       const reader = res.body.getReader();
@@ -224,6 +282,9 @@ export default function BobbySandboxPage() {
       case 'market_context':
         setMarket(payload as MarketContext);
         break;
+      case 'bobby_intel':
+        setIntel(payload as BobbyIntel);
+        break;
       case 'cio_verdict':
         setCioVerdict({ action: payload.action, conviction: payload.conviction });
         break;
@@ -240,7 +301,25 @@ export default function BobbySandboxPage() {
         bumpRunCount();
         break;
       case 'error':
-        setError(payload.message || 'Stream error');
+        setInterruption({
+          phase: payload.phase || 'unknown',
+          message: payload.message || 'Stream error',
+          partialText: payload.partialText,
+        });
+        // If partial text exists, try to attach it to the right agent card
+        if (payload.partialText && payload.phase) {
+          const phase = payload.phase as AgentPhase;
+          if (['alpha_hunter', 'red_team', 'cio'].includes(phase)) {
+            setAgents((s) => ({
+              ...s,
+              [phase]: { text: s[phase].text || payload.partialText, status: 'done' },
+            }));
+          }
+        }
+        break;
+      case 'done':
+        // Refresh feed so the new run shows up
+        loadFeed();
         break;
     }
   }
@@ -379,6 +458,37 @@ export default function BobbySandboxPage() {
               )}
 
               {market && <MarketContextCard ctx={market} />}
+              {intel && intel.available && <IntelCard intel={intel} />}
+
+              {interruption && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-[#fcc025]/40 bg-[#fcc025]/10 p-5"
+                >
+                  <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#fcc025]">
+                    <span className="font-bold">[!]</span>
+                    Phase interrupted — {interruption.phase}
+                  </div>
+                  <p className="text-sm leading-6 text-white/75">
+                    {interruption.message}
+                  </p>
+                  {interruption.partialText && (
+                    <div className="mt-3 rounded-md border border-white/[0.06] bg-black/30 p-3">
+                      <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+                        Partial transcript preserved
+                      </div>
+                      <div className="whitespace-pre-wrap font-mono text-xs leading-5 text-white/70">
+                        {interruption.partialText}
+                      </div>
+                    </div>
+                  )}
+                  <p className="mt-3 text-xs text-white/50">
+                    This run was still logged to the audit trail below with status{' '}
+                    <span className="font-bold text-[#fcc025]">interrupted</span>. Press <em>Run Pressure-Test</em> to try again.
+                  </p>
+                </motion.div>
+              )}
 
               <AgentCard phase="alpha_hunter" state={agents.alpha_hunter} />
               <AgentCard phase="red_team" state={agents.red_team} />
@@ -448,6 +558,28 @@ export default function BobbySandboxPage() {
               </AnimatePresence>
             </section>
           </div>
+
+          {/* ── Public audit trail ── */}
+          <section className="mt-14">
+            <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-white md:text-3xl">
+                  Last 20 pressure-tests
+                </h2>
+                <p className="mt-1 text-sm text-white/55">
+                  Every Sandbox run — including yours — is logged on a public audit trail. No run disappears.
+                </p>
+              </div>
+              <button
+                onClick={loadFeed}
+                disabled={feedLoading}
+                className="self-start rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/55 transition-colors hover:text-white/90 disabled:opacity-50 md:self-auto"
+              >
+                {feedLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+            <FeedList runs={feed} />
+          </section>
         </div>
       </KineticShell>
     </>
@@ -790,4 +922,115 @@ function MarketContextCard({ ctx }: { ctx: MarketContext }) {
       </div>
     </motion.div>
   );
+}
+
+function IntelCard({ intel }: { intel: BobbyIntel }) {
+  const bits: Array<{ label: string; value: string }> = [];
+  if (intel.regime) bits.push({ label: 'Regime', value: String(intel.regime) });
+  if (intel.fearGreed !== undefined) bits.push({ label: 'Fear/Greed', value: String(intel.fearGreed) });
+  if (intel.mood) bits.push({ label: 'Protocol Mood', value: String(intel.mood) });
+  if (typeof intel.dynamicConviction === 'number') {
+    bits.push({ label: 'Dynamic Conviction', value: intel.dynamicConviction.toFixed(2) });
+  }
+  if (intel.technicalLeader) bits.push({ label: 'Tech Leader', value: String(intel.technicalLeader) });
+  if (!bits.length) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-[#60a5fa]/30 bg-[#60a5fa]/[0.06] p-5"
+    >
+      <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#60a5fa]">
+        <span className="font-bold">◆</span>
+        Protocol Intel — injected into Alpha / Red / CIO prompts
+      </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {bits.map((b) => (
+          <div key={b.label} className="rounded-md bg-black/30 p-2">
+            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">{b.label}</div>
+            <div className="mt-0.5 font-['Space_Grotesk'] text-sm font-bold text-white">{b.value}</div>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function FeedList({ runs }: { runs: FeedRun[] }) {
+  if (!runs.length) {
+    return (
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 text-center text-sm text-white/45">
+        No pressure-tests logged yet. Be the first — pick a playbook above and run one.
+      </div>
+    );
+  }
+
+  const verdictStyle: Record<string, { color: string; label: string }> = {
+    EXECUTE:    { color: '#6dfe9c', label: 'EXECUTE' },
+    YIELD_PARK: { color: '#fcc025', label: 'YIELD PARK' },
+    BLOCKED:    { color: '#ff716a', label: 'BLOCKED' },
+  };
+
+  return (
+    <div className="space-y-2">
+      {runs.map((r) => {
+        const vs = r.verdict_action ? verdictStyle[r.verdict_action] : null;
+        const isInterrupted = r.status === 'interrupted';
+        const ago = timeAgo(r.created_at);
+        return (
+          <div
+            key={r.id}
+            className="flex flex-col gap-3 rounded-lg border border-white/[0.05] bg-white/[0.02] p-3 md:flex-row md:items-center md:justify-between"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-md border border-white/[0.08] bg-black/30 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
+                {r.ticker}
+              </span>
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/55">
+                {r.playbook_slug}
+              </span>
+              {isInterrupted && (
+                <span className="rounded-md border border-[#fcc025]/30 bg-[#fcc025]/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#fcc025]">
+                  interrupted @ {r.error_phase || '?'}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-[11px] text-white/65">
+              {typeof r.cio_conviction === 'number' && (
+                <span className="font-mono">
+                  <span className="text-white/40">conv</span>{' '}
+                  <span className="font-bold text-white/90">{r.cio_conviction.toFixed(1)}</span>
+                </span>
+              )}
+              {r.guardrails_total !== null && r.guardrails_total !== undefined && (
+                <span className="font-mono">
+                  <span className="text-white/40">gates</span>{' '}
+                  <span className="font-bold text-white/90">
+                    {r.guardrails_passed ?? '—'}/{r.guardrails_total}
+                  </span>
+                </span>
+              )}
+              {vs && (
+                <span
+                  className="rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em]"
+                  style={{ borderColor: `${vs.color}55`, color: vs.color, background: `${vs.color}10` }}
+                >
+                  {vs.label}
+                </span>
+              )}
+              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">{ago}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60_000) return 'just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+  return `${Math.floor(diff / 86_400_000)}d ago`;
 }
