@@ -201,11 +201,10 @@ function identifyMethod(to: string, input: string): string {
 }
 
 async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
-  // X Layer has 1s blocks and max batch size of 10.
-  // Scan last 1800 blocks (~30min) using parallel waves.
-  // 10 blocks/batch × 10 parallel = 100 blocks/wave × 18 waves = 1800 blocks
+  // X Layer has ~1-2s blocks. Scan last 5000 blocks (~90min) using parallel waves.
+  // This ensures txs from cron-activity (every 4h) are visible between runs.
   const txs: OnChainTx[] = [];
-  const windowBlocks = 600;
+  const windowBlocks = 5000;
   const batchSize = 5;
   const parallelBatches = 4;
   const waves = Math.ceil(windowBlocks / (batchSize * parallelBatches));
