@@ -34,9 +34,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const eventType = req.query.type as string | undefined;
 
   // Try agent_events table first (new unified events)
+  // Exclude demo traffic (meta.demo_source = 'playbooks_page') from the public Harness Console feed
   let typeFilter = '';
   if (eventType) typeFilter = `&event_type=eq.${eventType}`;
-  const events = await sbGet(`agent_events?order=created_at.desc&limit=${limit}${typeFilter}`);
+  const demoFilter = '&or=(meta->>demo_source.is.null,meta->>demo_source.neq.playbooks_page)';
+  const events = await sbGet(`agent_events?order=created_at.desc&limit=${limit}${typeFilter}${demoFilter}`);
 
   if (events && events.length > 0) {
     res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=60');

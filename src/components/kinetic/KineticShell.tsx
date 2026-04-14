@@ -9,9 +9,25 @@ import { ReactNode, useEffect, useState } from 'react';
 import { TradingRoomProvider, useTradingRoom } from '@/hooks/useTradingRoom';
 import { Lock } from 'lucide-react';
 
+const NAV_ITEMS = [
+  { id: 'terminal', label: 'TERMINAL', path: '/agentic-world/bobby' },
+  { id: 'challenge', label: 'CHALLENGE', path: '/agentic-world/bobby/challenge' },
+  { id: 'history', label: 'HISTORY', path: '/agentic-world/bobby/history' },
+  { id: 'agents', label: 'AGENTS', path: '/agentic-world/bobby/agents' },
+  { id: 'analytics', label: 'ANALYTICS', path: '/agentic-world/bobby/analytics' },
+  { id: 'metacognition', label: 'META', path: '/agentic-world/bobby/metacognition' },
+  { id: 'signals', label: 'SIGNALS', path: '/agentic-world/bobby/signals' },
+  { id: 'docs', label: 'AI DOCS', path: '/agentic-world/bobby/docs' },
+  { id: 'marketplace', label: 'AGENT COMMERCE', path: '/agentic-world/bobby/marketplace' },
+  { id: 'harness', label: 'HARNESS', path: '/protocol/harness' },
+  { id: 'playbooks', label: 'PLAYBOOKS', path: '/protocol/playbooks' },
+] as const;
+
+type NavItemId = (typeof NAV_ITEMS)[number]['id'];
+
 interface KineticShellProps {
   children: ReactNode;
-  activeTab?: 'terminal' | 'challenge' | 'history' | 'agents' | 'analytics' | 'metacognition' | 'signals';
+  activeTab?: NavItemId;
   showSidebar?: boolean;
 }
 
@@ -43,19 +59,6 @@ function TickerTape() {
     </div>
   );
 }
-
-const NAV_ITEMS = [
-  { id: 'terminal', label: 'TERMINAL', path: '/agentic-world/bobby' },
-  { id: 'challenge', label: 'CHALLENGE', path: '/agentic-world/bobby/challenge' },
-  { id: 'history', label: 'HISTORY', path: '/agentic-world/bobby/history' },
-  { id: 'agents', label: 'AGENTS', path: '/agentic-world/bobby/agents' },
-  { id: 'analytics', label: 'ANALYTICS', path: '/agentic-world/bobby/analytics' },
-  { id: 'metacognition', label: 'META', path: '/agentic-world/bobby/metacognition' },
-  { id: 'signals', label: 'SIGNALS', path: '/agentic-world/bobby/signals' },
-  { id: 'docs', label: 'AI DOCS', path: '/agentic-world/bobby/docs' },
-  { id: 'marketplace', label: 'AGENT COMMERCE', path: '/agentic-world/bobby/marketplace' },
-  { id: 'harness', label: 'HARNESS', path: '/protocol/harness' },
-] as const;
 
 const SIDE_ITEMS = [
   { icon: '⌘', label: 'Command', path: '/agentic-world/bobby/challenge' },

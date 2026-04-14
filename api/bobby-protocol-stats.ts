@@ -312,7 +312,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fetch(`${SB_URL}/rest/v1/forum_threads?select=resolution&entry_price=not.is.null`, {
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
         }).then(r => r.ok ? r.json() : []),
-        fetch(`${SB_URL}/rest/v1/agent_events?select=id`, {
+        // Exclude demo traffic (meta.demo_source = 'playbooks_page') from public metrics
+        fetch(`${SB_URL}/rest/v1/agent_events?select=id&or=(meta->>demo_source.is.null,meta->>demo_source.neq.playbooks_page)`, {
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'count=exact' },
         }).then(r => {
           const count = r.headers.get('content-range')?.split('/')[1];

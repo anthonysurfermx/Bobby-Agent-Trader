@@ -830,7 +830,12 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
     // ---- Call Tool ----
     case 'tools/call': {
       const toolName = params.name as string;
-      const args = (params.arguments || {}) as Record<string, any>;
+      const rawArgs = (params.arguments || {}) as Record<string, any>;
+      // Strip demo attribution before passing args to the tool handler — tools
+      // never need to see it. Only the generic mcp_call logger consumes it.
+      const demoSource = typeof rawArgs.demo_source === 'string' ? rawArgs.demo_source : null;
+      const { demo_source: _stripped, ...args } = rawArgs;
+      void _stripped;
 
       if (!toolName) {
         return jsonrpcError(id, -32602, 'Missing tool name');
@@ -973,6 +978,7 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
           payer: verifiedPayment?.payer,
           value_okb: verifiedPayment?.valueOkb,
           agent_name: req.headers['x-agent-name'] || null,
+          demo_source: demoSource,
         },
       });
 

@@ -19,6 +19,10 @@ interface ForumThread {
   conviction_score: number | null;
   symbol?: string | null;
   direction?: string | null;
+  entry_price?: number | null;
+  stop_price?: number | null;
+  target_price?: number | null;
+  expires_at?: string | null;
   price_at_creation: Record<string, unknown>;
 }
 
