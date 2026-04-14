@@ -51,12 +51,16 @@ const AGENTS = [
 
 const TOOLS = {
   free: [
+    { name: 'bobby_recommend', description: 'Current actionable recommendation with conviction and guardrails', cost: '0' },
+    { name: 'bobby_brief', description: 'Compact one-shot briefing for token-constrained agents', cost: '0' },
     { name: 'bobby_intel', description: 'Full intelligence briefing (10 sources)', cost: '0' },
     { name: 'bobby_ta', description: 'Technical analysis (SMA, RSI, MACD, Bollinger)', cost: '0' },
     { name: 'bobby_stats', description: 'Track record (win rate, PnL, trades)', cost: '0' },
     { name: 'bobby_xlayer_signals', description: 'Smart money signals on X Layer', cost: '0' },
     { name: 'bobby_xlayer_quote', description: 'DEX swap quote on X Layer', cost: '0' },
     { name: 'bobby_uniswap_quote', description: 'Uniswap-compatible exact-input quote on X Layer', cost: '0' },
+    { name: 'bobby_wheel_evaluate', description: 'Pressure-test a b1nary Wheel leg before committing collateral', cost: '0' },
+    { name: 'bobby_wheel_positions', description: 'Read-only snapshot of b1nary positions with Bobby context', cost: '0' },
     { name: 'bobby_wallet_balance', description: 'Agentic wallet balance', cost: '0' },
     { name: 'bobby_dex_trending', description: 'Trending tokens on-chain', cost: '0' },
     { name: 'bobby_dex_signals', description: 'Smart money / whale / KOL signals', cost: '0' },

@@ -85,21 +85,25 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
 
 ## Available Tools
 
-Bobby currently exposes **18 MCP tools** total:
-- **11 free analytics tools**
+Bobby currently exposes **22 MCP tools** total:
+- **15 free decision and analytics tools**
 - **2 free bounty calldata builders**
 - **5 premium x402 tools**
 
-### Free Analytics Tier (11 tools)
+### Free Decision + Analytics Tier (15 tools)
 
 | Tool | Description | Arguments |
 |------|-------------|-----------|
+| `bobby_recommend` | Current actionable recommendation with conviction and guardrails | `{ symbol? }` |
+| `bobby_brief` | Compact one-shot briefing for token-constrained agents | `{ symbol? }` |
 | `bobby_intel` | Full intelligence briefing (10 data sources) | `{}` |
 | `bobby_ta` | Technical analysis (SMA, RSI, MACD, Bollinger, S/R) | `{ symbol }` |
 | `bobby_stats` | Track record (win rate, PnL, recent trades) | `{}` |
 | `bobby_xlayer_signals` | Smart money signals on X Layer | `{}` |
 | `bobby_xlayer_quote` | DEX swap quote on X Layer | `{ from, to, amount }` |
 | `bobby_uniswap_quote` | Uniswap-compatible exact-input quote on X Layer | `{ tokenIn, tokenOut, amount, chainId?, tradeType?, slippageBps? }` |
+| `bobby_wheel_evaluate` | Pressure-test a b1nary Wheel leg with Bobby guardrails | `{ asset, side, strike, expiry_days, collateral? }` |
+| `bobby_wheel_positions` | Read-only snapshot of b1nary positions with Bobby context | `{ address }` |
 | `bobby_wallet_balance` | Bobby's agentic wallet balance | `{ chain }` |
 | `bobby_dex_trending` | Trending tokens on-chain | `{ chain }` |
 | `bobby_dex_signals` | Smart money / whale / KOL signals | `{ chain, type }` |
