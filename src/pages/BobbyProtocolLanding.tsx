@@ -347,7 +347,7 @@ function TopTicker({ stats }: { stats: ProtocolStats | null }) {
 }
 
 function Nav() {
-  const sections = ['DEBATE', 'LOOP', 'JUDGE', 'WHY', 'BOUNTIES', 'MCP', 'INTEROP', 'CONTRACTS'];
+  const sections = ['DEBATE', 'LOOP', 'JUDGE', 'BOUNTIES', 'MCP', 'INTEROP', 'CONTRACTS'];
   return (
     <nav className="sticky top-8 w-full flex justify-between items-center px-6 py-4 bg-[#0e0e0e]/80 backdrop-blur-xl z-50 border-b border-[#494847]/15">
       <div className="text-xl font-black text-[#6dfe9c] tracking-tighter uppercase">
@@ -416,7 +416,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
   const regime = typeof stats?.market.regime === 'string' ? (stats.market.regime as string) : '…';
 
   return (
-    <section className="relative min-h-[85vh] flex flex-col items-center justify-center pt-24 pb-16 px-6 overflow-hidden">
+    <section id="debate" className="relative min-h-[85vh] flex flex-col items-center justify-center pt-24 pb-16 px-6 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-[#6dfe9c]/5 to-transparent pointer-events-none" />
 
       <motion.div

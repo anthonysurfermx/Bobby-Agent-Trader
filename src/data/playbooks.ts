@@ -290,24 +290,4 @@ export const PLAYBOOKS: Playbook[] = [
     badge: { label: 'PREVIEW · Base (8453) live · X Layer pending', tone: 'preview' },
     status: 'preview',
   },
-  {
-    slug: 'breakout-audit-advanced',
-    name: 'Breakout Audit — Advanced',
-    category: 'directional',
-    tagline: 'Advanced playbook: premium-first, requires adversarial debate audit.',
-    whatItIs:
-      'Breakout confirmation routed through Bobby\'s debate + judge audit. Coming in a later release — requires premium tools that aren\'t the right first-contact experience for traders new to Bobby.',
-    painWithoutBobby:
-      'Buying the breakout right before the fakeout. A human-only confluence check misses the trap more often than not.',
-    tools: [
-      { name: 'bobby_analyze', role: 'Full market analysis', paid: true },
-      { name: 'bobby_judge', role: 'Independent debate audit', paid: true },
-    ],
-    guardrails: ['conviction_gate', 'judge_mode_6d', 'metacognition'],
-    blockRatePct: 50,
-    blockRateCopy: 'Coming soon',
-    demo: null,
-    badge: { label: 'Advanced — Coming soon', tone: 'advanced' },
-    status: 'advanced',
-  },
 ];
