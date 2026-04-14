@@ -801,28 +801,28 @@ function WhyMatters() {
       label: 'THE PROBLEM',
       color: 'text-[#fcc025]',
       borderHover: 'hover:border-[#fcc025]/30',
-      body: 'AI agents execute billions in trades with zero accountability. No memory of what failed. No trust scoring. No adaptive control. Every agent starts from scratch, every time.',
+      body: 'Agents execute billions with zero memory and zero accountability. Every new agent starts from scratch.',
     },
     {
       glyph: '>>>=',
       label: 'TRACES → MEMORY → VERDICTS',
       color: 'text-[#6dfe9c]',
       borderHover: 'hover:border-[#6dfe9c]/30',
-      body: 'Every Bobby cycle produces a trace. Every trace distills into an episode. Episodes accumulate into calibration priors. The next verdict is informed by every past decision — not just prompts.',
+      body: 'Every cycle traces. Every trace distills. Every memory sharpens the next verdict.',
     },
     {
       glyph: '[!!]',
-      label: 'TRUST EARNED, NOT CONFIGURED',
+      label: 'TRUST IS EARNED ON-CHAIN',
       color: 'text-white',
       borderHover: 'hover:border-white/20',
-      body: 'Trust score computed from on-chain data: win rate, commitment history, bounty challenges, economic activity. Agents, wallets, and counterparties earn reputation through verifiable behavior.',
+      body: 'Trust score from win rate, commitments, bounties, payments. No configs. Verifiable.',
     },
     {
       glyph: '><>',
-      label: 'ENTANGLED WITH YOUR OPERATION',
+      label: 'ADAPTS TO YOUR OPERATION',
       color: 'text-[#6dfe9c]',
       borderHover: 'hover:border-[#6dfe9c]/30',
-      body: 'Bobby doesn\'t just execute workflows — it learns how your organization handles money. Risk tolerance, sizing patterns, regime preferences, failure modes. The more you use it, the harder it is to replace.',
+      body: 'Bobby learns your risk tolerance, sizing, regime preferences. The more you use it, the harder it is to replace.',
     },
   ];
 
@@ -839,7 +839,7 @@ function WhyMatters() {
             Not the Car. The Road.
           </h2>
           <p className="font-mono text-sm text-[#6dfe9c] tracking-wide max-w-3xl">
-            Frameworks are cheap. Harnesses are getting cheaper. Bobby is the financial memory, trust, and control layer that makes the harness worth running.
+            Frameworks are cheap. Bobby is the memory, trust, and control layer that makes them matter.
           </p>
         </motion.div>
 
@@ -876,41 +876,41 @@ function Flywheels() {
       label: 'DATA',
       icon: '>',
       color: '#6dfe9c',
-      input: 'Every financial interaction',
-      output: 'Structured traces in agent_events',
-      accumulates: 'Raw decision history',
+      input: 'Every interaction',
+      output: 'Structured traces',
+      accumulates: 'Decision history',
     },
     {
       label: 'MEMORY',
       icon: '><',
       color: '#fcc025',
       input: 'Every trace',
-      output: 'Distilled episodes, heuristics, priors',
-      accumulates: 'Reusable financial intelligence',
+      output: 'Episodes + priors',
+      accumulates: 'Reusable intelligence',
     },
     {
       label: 'TRUST',
       icon: '!!',
       color: '#60a5fa',
-      input: 'Every payment, fulfillment, challenge',
-      output: 'Reputation scores + bounty resolutions',
-      accumulates: 'Verifiable counterparty trust',
+      input: 'Every payment + challenge',
+      output: 'Reputation scores',
+      accumulates: 'Verifiable trust',
     },
     {
       label: 'POLICY',
       icon: '##',
       color: '#ff716a',
-      input: 'Every override, block, challenge',
-      output: 'Refined guardrails + risk gates',
-      accumulates: 'Adaptive financial controls',
+      input: 'Every override + block',
+      output: 'Refined guardrails',
+      accumulates: 'Adaptive controls',
     },
     {
       label: 'ENTANGLEMENT',
       icon: '<>',
       color: '#c084fc',
       input: 'Every workflow pattern',
-      output: 'Customer-specific adaptation',
-      accumulates: 'Switching cost + institutional memory',
+      output: 'Custom adaptation',
+      accumulates: 'Switching cost',
     },
   ];
 
@@ -926,8 +926,7 @@ function Flywheels() {
           Five Flywheels. One Moat.
         </h2>
         <p className="font-mono text-sm text-[#adaaaa] max-w-3xl pl-6">
-          You can vibe-code an agent in a weekend. You can't vibe-code the thousandth customer's
-          accumulated patterns feeding back into the product. These flywheels are earned, not built.
+          You can vibe-code an agent in a weekend. You can't vibe-code accumulated memory.
         </p>
       </motion.div>
 
