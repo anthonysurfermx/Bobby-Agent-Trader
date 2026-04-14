@@ -2029,7 +2029,7 @@ ${actionStr}
 
 **Risk Decision**
 ${guardrailStr}
-Regime: ${intel.regime || 'unknown'} | Win Rate: ${track.winRate}% | Debates: ${track.totalTrades || '?'}
+Regime: ${intel.regime || 'unknown'} | Win Rate: ${track.winRate}% | Debates: ${track.wins + track.losses}
 ${vibePhrase ? `> ${vibePhrase}` : ''}
 ${txStr ? `\n${txStr}` : ''}
 

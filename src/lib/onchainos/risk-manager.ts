@@ -39,7 +39,7 @@ export function checkCircuitBreaker(currentEq: number, initialEq: number = CHALL
 }
 
 // 2. Position Sizing (Kelly simplified)
-export function getPositionSize(balance: number, conviction: number): number {
+export function getPositionSize(balance: number, conviction: number, _isSafeMode?: boolean): number {
   if (conviction < CHALLENGE_RULES.MIN_CONVICTION) return 0;
   
   // Tamaño máximo permitido por trade (20% del balance)
