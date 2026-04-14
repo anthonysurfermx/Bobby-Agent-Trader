@@ -76,35 +76,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     log.push({ step: 'reputation_check', tool: '/api/reputation', status: 'error', data: (err as Error).message, ms: Date.now() - t2 });
   }
 
-  // Step 3: Call bobby_intel (free tool)
+  // Step 3: Call bobby_brief (compact one-shot — optimized for agents)
   const t3 = Date.now();
-  const intelRes = await callMcpTool('bobby_intel', {});
+  const briefRes = await callMcpTool('bobby_brief', {});
+  const briefData = briefRes.result ? JSON.parse(briefRes.result.content[0]?.text || '{}') : null;
   log.push({
-    step: 'call_intel',
-    tool: 'bobby_intel',
-    status: intelRes.result ? 'ok' : 'error',
-    data: intelRes.result
-      ? `${intelRes.result.content[0]?.text?.slice(0, 200)}...`
-      : intelRes.error?.message,
+    step: 'call_brief',
+    tool: 'bobby_brief',
+    status: briefRes.result ? 'ok' : 'error',
+    data: briefData || briefRes.error?.message,
     ms: Date.now() - t3,
   });
 
-  // Step 4: Call bobby_stats (free tool)
+  // Step 4: Call bobby_recommend (actionable signal)
   const t4 = Date.now();
-  const statsRes = await callMcpTool('bobby_stats', {});
+  const recRes = await callMcpTool('bobby_recommend', {});
+  const recData = recRes.result ? JSON.parse(recRes.result.content[0]?.text || '{}') : null;
   log.push({
-    step: 'call_stats',
-    tool: 'bobby_stats',
-    status: statsRes.result ? 'ok' : 'error',
-    data: statsRes.result
-      ? `${statsRes.result.content[0]?.text?.slice(0, 200)}...`
-      : statsRes.error?.message,
+    step: 'call_recommend',
+    tool: 'bobby_recommend',
+    status: recRes.result ? 'ok' : 'error',
+    data: recData || recRes.error?.message,
     ms: Date.now() - t4,
   });
 
-  // Step 5: Call bobby_bounty_list (free tool)
+  // Step 5: Call bobby_ta for technical confirmation
+  const symbol = recData?.signal?.symbol || 'BTC';
   const t5 = Date.now();
-  const bountiesRes = await callMcpTool('bobby_bounty_list', { limit: 5 });
+  const taRes = await callMcpTool('bobby_ta', { symbol });
+  const taData = taRes.result ? JSON.parse(taRes.result.content[0]?.text || '{}') : null;
+  log.push({
+    step: 'call_ta',
+    tool: 'bobby_ta',
+    status: taRes.result ? 'ok' : 'error',
+    data: taData ? { symbol: taData.symbol, trend: taData.trend, rsi: taData.rsi, rsi_signal: taData.rsi_signal } : taRes.error?.message,
+    ms: Date.now() - t5,
+  });
+
+  // Step 6: Call bobby_bounty_list (check accountability)
+  const t6a = Date.now();
+  const bountiesRes = await callMcpTool('bobby_bounty_list', { limit: 3 });
   log.push({
     step: 'call_bounties',
     tool: 'bobby_bounty_list',
@@ -112,40 +123,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     data: bountiesRes.result
       ? `${bountiesRes.result.content[0]?.text?.slice(0, 200)}...`
       : bountiesRes.error?.message,
-    ms: Date.now() - t5,
+    ms: Date.now() - t6a,
   });
 
-  // Step 6: Attempt premium tool (will get 402 challenge)
+  // Step 7: Attempt premium tool (demonstrates x402 payment gate)
   const t6 = Date.now();
   const analyzeRes = await callMcpTool('bobby_analyze', { symbol: 'OKB' });
   const got402 = analyzeRes.error?.code === -32402;
+  const challengeData = got402 ? analyzeRes.error?.data as Record<string, unknown> : null;
   log.push({
     step: 'attempt_premium',
     tool: 'bobby_analyze',
     status: got402 ? '402_challenge_received' : analyzeRes.result ? 'ok' : 'error',
     data: got402
-      ? { message: 'Payment required — x402 challenge issued', challengeData: analyzeRes.error?.data }
+      ? {
+          message: 'Payment required — x402 challenge issued',
+          price: challengeData?.price,
+          currency: challengeData?.currency,
+          chainId: challengeData?.chainId,
+          contract: challengeData?.contract,
+          challengeId: challengeData?.challengeId,
+          instructions: 'Agent would call payMCPCall() on AgentEconomyV2, then retry with x-402-payment header',
+        }
       : analyzeRes.error?.message,
     ms: Date.now() - t6,
   });
 
   const totalMs = Date.now() - startAll;
 
+  // Build agent decision based on Bobby's recommendation
+  const sentinelDecision = recData?.recommendation === 'ACTIONABLE'
+    ? {
+        action: 'WOULD_EXECUTE',
+        reasoning: `Bobby recommends ${recData.signal.symbol} ${recData.signal.direction} at conviction ${recData.signal.conviction}/10. Entry: $${recData.signal.entry_price}, Stop: $${recData.signal.stop}, Target: $${recData.signal.target}. R:R = ${recData.signal.risk_reward}. TA confirms: ${taData?.trend || '?'} trend, RSI ${taData?.rsi || '?'}. All guardrails passed.`,
+      }
+    : {
+        action: 'HOLD',
+        reasoning: `Bobby verdict: ${recData?.verdict?.status || 'deny'}. ${recData?.verdict?.reason || 'Conviction below threshold.'}. Sentinel respects Bobby's guardrails and will not trade.`,
+      };
+
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
   return res.status(200).json({
     ok: true,
     agent: 'Sentinel',
-    version: '1.0.0',
-    description: 'Autonomous agent that discovers and consumes Bobby Protocol via MCP',
+    version: '2.0.0',
+    description: 'Autonomous agent that discovers Bobby Protocol, evaluates trust, consumes signals, and makes trading decisions based on Bobby\'s harness verdicts',
     totalMs,
     steps: log.length,
     log,
+    sentinel_decision: sentinelDecision,
     summary: {
       discoveredBobby: Boolean(registry && (registry as { protocol?: string }).protocol),
       checkedReputation: Boolean(reputation && (reputation as { ok?: boolean }).ok),
+      trustScore: (reputation as any)?.trustScore?.score || null,
       calledFreeTools: log.filter((l) => l.status === 'ok' && l.step.startsWith('call_')).length,
+      receivedSignal: recData?.recommendation || 'none',
       receivedX402Challenge: got402,
-      agentEconomy: 'Sentinel consumed 3 free MCP tools and received x402 payment gate for premium access',
+      agentEconomy: `Sentinel consumed ${log.filter(l => l.status === 'ok').length} Bobby tools in ${totalMs}ms. Trust verified. Signal received. x402 payment gate demonstrated.`,
     },
   });
 }

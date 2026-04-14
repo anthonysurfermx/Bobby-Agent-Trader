@@ -19,10 +19,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   return res.status(200).json({
     name: 'Bobby Protocol',
-    version: '3.1.0',
-    type: 'trading-agent',
-    identity_standard: 'hardness-agent/v1',
-    capabilities: ['debate', 'judge', 'predict', 'bounty', 'hardness_test'],
+    version: '4.0.0',
+    type: 'harness-finance-layer',
+    tagline: 'The Harness Finance Layer for AI agents. Traces, memory, trust, adaptive verdicts.',
+    identity_standard: 'harness-agent/v1',
+    capabilities: ['debate', 'judge', 'predict', 'bounty', 'hardness_test', 'memory', 'trust_score', 'adaptive_verdict'],
     mcp_endpoint: `${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http`,
     registry_endpoint: `${BOBBY_PROTOCOL_BASE_URL}/api/registry`,
     hardness_test_endpoint: `${BOBBY_PROTOCOL_BASE_URL}/api/hardness-test`,
