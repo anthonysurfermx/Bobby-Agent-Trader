@@ -60,7 +60,7 @@ const TOOLS = {
     { name: 'bobby_xlayer_quote', description: 'DEX swap quote on X Layer', cost: '0' },
     { name: 'bobby_uniswap_quote', description: 'Uniswap-compatible exact-input quote on X Layer', cost: '0' },
     { name: 'bobby_wheel_evaluate', description: 'Pressure-test a b1nary Wheel leg before committing collateral', cost: '0' },
-    { name: 'bobby_wheel_positions', description: 'Read-only snapshot of b1nary positions with Bobby context', cost: '0' },
+    { name: 'bobby_wheel_positions', description: 'Read-only snapshot of b1nary positions plus Bobby regime context', cost: '0' },
     { name: 'bobby_wallet_balance', description: 'Agentic wallet balance', cost: '0' },
     { name: 'bobby_dex_trending', description: 'Trending tokens on-chain', cost: '0' },
     { name: 'bobby_dex_signals', description: 'Smart money / whale / KOL signals', cost: '0' },

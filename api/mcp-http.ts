@@ -75,7 +75,7 @@ const TOOLS = [
   { name: 'bobby_bounty_post', description: 'Build unsigned calldata to post a new OKB bounty against a Bobby debate thread. Returns tx payload for the client to sign — never holds funds.', inputSchema: { type: 'object', properties: { thread_id: { type: 'string', description: 'Off-chain debate thread id' }, dimension: { type: 'string', enum: ['DATA_INTEGRITY', 'ADVERSARIAL_QUALITY', 'DECISION_LOGIC', 'RISK_MANAGEMENT', 'CALIBRATION_ALIGNMENT', 'NOVELTY'] }, reward_okb: { type: 'string', description: 'Bounty reward in OKB (e.g. "0.01")' }, claim_window_secs: { type: 'number', default: 0, description: 'Seconds until the poster can reclaim (0 = contract default, 7 days)' } }, required: ['thread_id', 'dimension', 'reward_okb'] } },
   { name: 'bobby_bounty_challenge', description: 'Build unsigned calldata to submit a challenge (evidence hash) against an existing bounty.', inputSchema: { type: 'object', properties: { bounty_id: { type: 'string', description: 'Bounty id to challenge' }, evidence_hash: { type: 'string', description: '32-byte hex hash of the evidence blob (IPFS/Arweave CID hash)' } }, required: ['bounty_id', 'evidence_hash'] } },
   { name: 'bobby_wheel_evaluate', description: 'Pressure-test a b1nary Wheel leg (covered put or covered call) before committing collateral. Pulls live quotes from b1nary, applies Bobby guardrails (strike distance, expiry window, annualized yield floor, regime gate) and returns SELL / SKIP / WAIT verdict with explainable reasoning. Source chain: Base (8453); X Layer execution pending b1nary deployment.', inputSchema: { type: 'object', properties: { asset: { type: 'string', enum: ['eth', 'cbbtc'], description: 'Underlying asset' }, side: { type: 'string', enum: ['put', 'call'], description: 'Option side to sell' }, strike: { type: 'number', description: 'Proposed strike price' }, expiry_days: { type: 'number', description: 'Days to expiry' }, collateral: { type: 'number', description: 'Collateral amount in the leg\'s quote token (USDC for puts, underlying for calls). Defaults to 1× the leg notional.' } }, required: ['asset', 'side', 'strike', 'expiry_days'] } },
-  { name: 'bobby_wheel_positions', description: 'Read-only snapshot of a wallet\'s live positions on b1nary, annotated with Bobby\'s ongoing verdict per leg. Source chain: Base (8453).', inputSchema: { type: 'object', properties: { address: { type: 'string', description: 'EVM wallet address to inspect' } }, required: ['address'] } },
+  { name: 'bobby_wheel_positions', description: 'Read-only snapshot of a wallet\'s live positions on b1nary plus Bobby\'s current regime context. Use bobby_wheel_evaluate to pressure-test new legs or rolls. Source chain: Base (8453).', inputSchema: { type: 'object', properties: { address: { type: 'string', description: 'EVM wallet address to inspect' } }, required: ['address'] } },
 ];
 
 // ---- Tool Execution ----
@@ -649,6 +649,11 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
       throw err;
     }
 
+    const regimeRes = await fetch(`${BASE_URL}/api/bobby-intel`).then(r => r.json()).catch(() => ({})) as Record<string, unknown>;
+    const briefing = typeof regimeRes.briefing === 'string' ? regimeRes.briefing : '';
+    const regimeMatch = briefing.match(/<MARKET_REGIME>(.*?)<\/MARKET_REGIME>/);
+    const regime = regimeMatch ? regimeMatch[1] : 'unknown';
+
     logHarnessEvent({
       run_id: `wheel-snap-${Date.now()}`,
       agent: 'mcp',
@@ -660,6 +665,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
         source_chain: B1NARY_SOURCE_CHAIN_ID,
         address,
         count: positions.length,
+        regime,
       },
     });
 
@@ -670,11 +676,15 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
           address,
           positions,
           count: positions.length,
+          bobby_context: {
+            regime,
+            note: 'Snapshot only. Use bobby_wheel_evaluate to pressure-test a fresh leg, roll, or strike change.',
+          },
           integration: {
             protocol: 'b1nary',
             source_chain: B1NARY_SOURCE_CHAIN_ID,
             deployment_status: B1NARY_DEPLOYMENT_STATUS,
-            note: 'Positions read from b1nary on Base. Pair with bobby_wheel_evaluate for pressure-tested verdicts.',
+            note: 'Positions read from b1nary on Base. Bobby context is global to the current regime, not a per-position verdict.',
           },
         }, null, 2),
       }],

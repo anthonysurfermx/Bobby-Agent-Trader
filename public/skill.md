@@ -103,7 +103,7 @@ Bobby currently exposes **22 MCP tools** total:
 | `bobby_xlayer_quote` | DEX swap quote on X Layer | `{ from, to, amount }` |
 | `bobby_uniswap_quote` | Uniswap-compatible exact-input quote on X Layer | `{ tokenIn, tokenOut, amount, chainId?, tradeType?, slippageBps? }` |
 | `bobby_wheel_evaluate` | Pressure-test a b1nary Wheel leg with Bobby guardrails | `{ asset, side, strike, expiry_days, collateral? }` |
-| `bobby_wheel_positions` | Read-only snapshot of b1nary positions with Bobby context | `{ address }` |
+| `bobby_wheel_positions` | Read-only snapshot of b1nary positions plus Bobby regime context | `{ address }` |
 | `bobby_wallet_balance` | Bobby's agentic wallet balance | `{ chain }` |
 | `bobby_dex_trending` | Trending tokens on-chain | `{ chain }` |
 | `bobby_dex_signals` | Smart money / whale / KOL signals | `{ chain, type }` |
