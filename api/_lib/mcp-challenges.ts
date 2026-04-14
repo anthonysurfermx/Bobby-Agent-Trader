@@ -19,6 +19,18 @@ interface Challenge {
   external_agent: string | null;
 }
 
+interface ReceiptRow {
+  tx_hash: string;
+  challenge_id: string;
+  payer_address: string;
+  tool_name: string;
+  block_number: number;
+  value_wei: string;
+  value_okb: string;
+  explorer_url: string | null;
+  created_at?: string;
+}
+
 /**
  * Create a new payment challenge for a premium MCP tool call.
  * Returns the challenge_id that the caller must include in their payMCPCall tx.
@@ -156,5 +168,24 @@ export async function getChallenge(challengeId: string): Promise<Challenge | nul
 
   if (!res.ok) return null;
   const rows = await res.json() as Challenge[];
+  return rows[0] || null;
+}
+
+/**
+ * Get the latest verified payment receipt for interop metadata surfaces.
+ */
+export async function getLatestReceipt(): Promise<ReceiptRow | null> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/mcp_payment_receipts?select=tx_hash,challenge_id,payer_address,tool_name,block_number,value_wei,value_okb,explorer_url,created_at&order=created_at.desc&limit=1`,
+    {
+      headers: {
+        apikey: SB_KEY,
+        Authorization: `Bearer ${SB_KEY}`,
+      },
+    },
+  );
+
+  if (!res.ok) return null;
+  const rows = await res.json() as ReceiptRow[];
   return rows[0] || null;
 }

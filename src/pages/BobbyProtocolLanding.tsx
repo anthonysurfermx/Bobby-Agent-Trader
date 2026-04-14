@@ -118,6 +118,15 @@ interface McpMeta {
       contract: string;
     };
   };
+  settlement?: {
+    tool: string;
+    txHash: string;
+    payer: string;
+    valueOkb: string;
+    blockNumber: number;
+    explorerUrl: string | null;
+    createdAt: string | null;
+  } | null;
 }
 
 interface PnlSummary {
@@ -277,7 +286,9 @@ interface ActivityItem {
   amountOkb: string | null;
   txHash: string | null;
   agoSeconds: number | null;
-  timestamp: string;
+  timestamp: string | null;
+  status?: string | null;
+  source?: 'commerce' | 'onchain' | 'bounty' | string;
 }
 
 function useActivity() {
@@ -1969,15 +1980,18 @@ function AgentInterop({
   stats,
   reputation,
   sentinel,
+  mcp,
 }: {
   stats: ProtocolStats | null;
   reputation: ReputationSummary | null;
   sentinel: SentinelSummary | null;
+  mcp: McpMeta | null;
 }) {
   const registeredAgents = stats?.contracts.agentRegistry.agents ?? 0;
   const trustScore = reputation?.trustScore?.score ?? null;
   const sentinelCalls = sentinel?.summary?.calledFreeTools ?? 0;
   const hasPremiumChallenge = sentinel?.summary?.receivedX402Challenge ?? false;
+  const latestSettlement = mcp?.settlement ?? null;
 
   const integrations = [
     { title: 'SKILL.MD', glyph: '>_', desc: 'One file, zero-code MCP integration', href: '/skill.md', cta: '_DOWNLOAD', color: '#6dfe9c' },
@@ -2056,6 +2070,11 @@ function AgentInterop({
 
         <div className="mb-8 bg-black border border-[#494847]/20 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-[#adaaaa]">
           Live proof: Sentinel discovered Bobby via registry, queried reputation, completed {sentinelCalls} free MCP calls, and {hasPremiumChallenge ? 'received a real x402 premium challenge' : 'has not reached the premium challenge yet'}.
+          {latestSettlement && (
+            <span className="block mt-2 text-[#6dfe9c]">
+              Last verified settlement: {latestSettlement.tool} paid {latestSettlement.valueOkb} OKB.
+            </span>
+          )}
         </div>
 
         <div className="bg-black border border-[#494847]/20">
@@ -2432,6 +2451,42 @@ function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
     return `${Math.floor(secs / 86400)}d ago`;
   };
 
+  const sourceCount = {
+    commerce: feed.filter((e) => e.source === 'commerce').length,
+    onchain: feed.filter((e) => e.source === 'onchain').length,
+    bounty: feed.filter((e) => e.source === 'bounty').length,
+  };
+  const fallbackOnly = sourceCount.bounty > 0 && sourceCount.commerce === 0 && sourceCount.onchain === 0;
+
+  const sourceBadge = (source?: string) => {
+    switch (source) {
+      case 'commerce':
+        return { label: 'A2A', className: 'text-[#6dfe9c] border-[#6dfe9c]/20 bg-[#6dfe9c]/10' };
+      case 'onchain':
+        return { label: 'TX', className: 'text-[#fcc025] border-[#fcc025]/20 bg-[#fcc025]/10' };
+      case 'bounty':
+        return { label: 'BOUNTY', className: 'text-white/70 border-white/10 bg-white/5' };
+      default:
+        return { label: 'EVENT', className: 'text-white/70 border-white/10 bg-white/5' };
+    }
+  };
+
+  const statusBadge = (status?: string | null, paid?: boolean) => {
+    if (paid || status === 'verified') {
+      return { label: 'PAID', className: 'text-[#fcc025] border-[#fcc025]/20 bg-[#fcc025]/10' };
+    }
+    if (status === 'free_call') {
+      return { label: 'FREE', className: 'text-[#6dfe9c] border-[#6dfe9c]/20 bg-[#6dfe9c]/10' };
+    }
+    if (status === 'challenge_issued') {
+      return { label: '402', className: 'text-[#ff716a] border-[#ff716a]/20 bg-[#ff716a]/10' };
+    }
+    if (status === 'bounty_posted') {
+      return { label: 'POSTED', className: 'text-white/70 border-white/10 bg-white/5' };
+    }
+    return { label: 'LIVE', className: 'text-white/60 border-white/10 bg-white/5' };
+  };
+
   if (feed.length === 0) {
     return (
       <section className="py-12 px-6 max-w-7xl mx-auto">
@@ -2453,21 +2508,34 @@ function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
       <div className="bg-black border border-[#494847]/20">
         <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
           <span>activity_feed.log</span>
-          <span className="text-[#6dfe9c] flex items-center gap-1">
+          <span className={`${fallbackOnly ? 'text-[#fcc025]' : 'text-[#6dfe9c]'} flex items-center gap-1`}>
             <span className="w-1.5 h-1.5 bg-[#6dfe9c] rounded-full animate-pulse" />
-            LIVE · {feed.length} events
+            {fallbackOnly
+              ? `FALLBACK · ${sourceCount.bounty} bounty events`
+              : `LIVE · ${sourceCount.commerce} A2A · ${sourceCount.onchain} tx · ${feed.length} events`}
           </span>
         </div>
+        {fallbackOnly && (
+          <div className="px-4 py-2 border-b border-[#494847]/10 font-mono text-[10px] text-[#fcc025]">
+            No recent A2A commerce or treasury txs surfaced yet. Showing latest bounty archive instead.
+          </div>
+        )}
         <div className="divide-y divide-[#494847]/10 max-h-[240px] overflow-y-auto">
-          {feed.map((e, i) => (
+          {feed.map((e, i) => {
+            const source = sourceBadge(e.source);
+            const status = statusBadge(e.status, e.paid);
+            return (
             <div key={i} className="px-4 py-2 font-mono text-[11px] flex items-center gap-3">
               <span className="text-[#adaaaa] w-14 shrink-0 text-right">{fmtAgo(e.agoSeconds)}</span>
-              <span className={e.paid ? 'text-[#fcc025]' : 'text-[#6dfe9c]'}>
-                {e.paid ? '$' : '::'}
+              <span className={`px-1.5 py-0.5 border text-[9px] uppercase tracking-widest ${source.className}`}>
+                {source.label}
+              </span>
+              <span className={`px-1.5 py-0.5 border text-[9px] uppercase tracking-widest ${status.className}`}>
+                {status.label}
               </span>
               <span className="text-white/60 truncate">{e.agent}</span>
               <span className="text-[#adaaaa]">→</span>
-              <span className="text-[#6dfe9c]">{e.tool}</span>
+              <span className={e.source === 'bounty' ? 'text-white/85' : 'text-[#6dfe9c]'}>{e.tool}</span>
               {e.paid && e.amountOkb && (
                 <span className="text-[#fcc025] ml-auto shrink-0">{e.amountOkb} OKB</span>
               )}
@@ -2482,7 +2550,7 @@ function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
                 </a>
               )}
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </section>
@@ -2559,7 +2627,7 @@ function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
         address: (c as any).agentRegistry?.address || '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b',
         rows: [
           { k: 'TYPE', v: 'ERC-721' },
-          { k: 'AGENTS', v: '3' },
+          { k: 'AGENTS', v: `${(c as any).agentRegistry?.agents ?? 0}` },
           { k: 'IDENTITY', v: 'NFT-based' },
         ],
         lastBlock: null,
@@ -2770,7 +2838,7 @@ export default function BobbyProtocolLanding() {
       <RiskOffMode />
       <Bounties stats={stats} />
       <McpSection mcp={mcp} stats={stats} />
-      <AgentInterop stats={stats} reputation={reputation} sentinel={sentinel} />
+      <AgentInterop stats={stats} reputation={reputation} sentinel={sentinel} mcp={mcp} />
       <LiveCheckpoint />
       <ActivityFeed feed={activity} />
       <LiveOnXLayer stats={stats} />

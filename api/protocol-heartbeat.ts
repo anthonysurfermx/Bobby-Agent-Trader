@@ -324,7 +324,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ),
       // Supabase: recent commerce
       withTimeout(
-        sbQuery('agent_commerce_events', 'select=id,tool_name,payment_status,created_at,payment_amount_wei,payer_address&order=created_at.desc&limit=5'),
+        sbQuery('agent_commerce_events', 'select=id,source,tool_name,payment_status,created_at,payment_amount_wei,payment_tx_hash,payer_address,external_agent&order=created_at.desc&limit=5'),
         1500,
         []
       ),
@@ -392,9 +392,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Recent commerce events
     const commerceEvents = Array.isArray(recentCommerce)
       ? recentCommerce.map((e: Record<string, unknown>) => ({
+          source: e.source || 'mcp',
           tool: e.tool_name,
           status: e.payment_status,
+          agent: e.external_agent || null,
           payer: e.payer_address ? String(e.payer_address).slice(0, 10) + '...' : null,
+          amountOkb: e.payment_amount_wei ? formatEther(BigInt(String(e.payment_amount_wei))) : null,
+          txHash: e.payment_tx_hash || null,
           age: Math.floor((Date.now() - new Date(String(e.created_at)).getTime()) / 1000),
         }))
       : [];

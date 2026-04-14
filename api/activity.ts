@@ -56,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     txHash: e.payment_tx_hash || null,
     agoSeconds: e.created_at ? Math.floor((Date.now() - new Date(e.created_at).getTime()) / 1000) : null,
     timestamp: e.created_at,
+    status: e.payment_status || 'unknown',
     source: 'commerce',
   }));
 
@@ -72,10 +73,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     txHash: tx.hash,
     agoSeconds: tx.timestamp ? Math.floor(Date.now() / 1000 - tx.timestamp) : null,
     timestamp: tx.timestamp ? new Date(tx.timestamp * 1000).toISOString() : null,
+    status: parseFloat(tx.valueOkb || '0') > 0 ? 'verified' : 'observed',
     source: 'onchain',
   }));
 
-  const bountyFeed = onChainFeed.length > 0 ? [] : bountyFallback.map((bounty: any) => ({
+  const bountyFeed = onChainFeed.length > 0 || commerceFeed.length > 0 ? [] : bountyFallback.map((bounty: any) => ({
     agent: 'bobby-protocol',
     tool: `AdversarialBounties::${bounty.dimension}`,
     paid: true,
@@ -83,6 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     txHash: null,
     agoSeconds: bounty.createdAt ? Math.max(0, Math.floor(Date.now() / 1000 - Number(bounty.createdAt))) : null,
     timestamp: bounty.createdAt ? new Date(Number(bounty.createdAt) * 1000).toISOString() : null,
+    status: 'bounty_posted',
     source: 'bounty',
   }));
 
@@ -101,6 +104,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({
     ok: true,
     count: merged.length,
+    counts: {
+      commerce: commerceFeed.length,
+      onchain: onChainFeed.length,
+      bounty: bountyFeed.length,
+    },
     feed: merged,
   });
 }

@@ -23,6 +23,7 @@ import {
 import {
   createChallenge,
   atomicConsumeChallenge,
+  getLatestReceipt,
   storeReceipt,
 } from './_lib/mcp-challenges.js';
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
@@ -313,6 +314,8 @@ function jsonrpcError(id: string | number | undefined, code: number, message: st
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // GET → server metadata (discovery)
   if (req.method === 'GET') {
+    const latestReceipt = await getLatestReceipt().catch(() => null);
+
     return res.status(200).json({
       name: SERVER_NAME,
       version: SERVER_VERSION,
@@ -339,6 +342,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         freeTools: TOOLS.filter(t => !PREMIUM_TOOLS.has(t.name)).length,
         premiumTools: PREMIUM_TOOLS.size,
       },
+      settlement: latestReceipt ? {
+        tool: latestReceipt.tool_name,
+        txHash: latestReceipt.tx_hash,
+        payer: latestReceipt.payer_address,
+        valueOkb: latestReceipt.value_okb,
+        blockNumber: latestReceipt.block_number,
+        explorerUrl: latestReceipt.explorer_url,
+        createdAt: latestReceipt.created_at || null,
+      } : null,
     });
   }
 
@@ -444,6 +456,20 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
             undefined,
             String(req.headers['x-agent-name'] || '').trim() || undefined,
           );
+          void logAgentCommerceEvent({
+            source: 'mcp-http',
+            tool_name: toolName,
+            payment_status: 'challenge_issued',
+            external_agent: String(req.headers['x-agent-name'] || '').trim() || null,
+            request_ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null,
+            user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
+            metadata: {
+              challengeId,
+              expiresAt,
+              chainId: XLAYER_CHAIN_ID,
+              transport: 'streamable-http',
+            },
+          });
           return jsonrpcError(id, -32402, `Payment required. ${toolName} costs ${X402_PRICE_OKB} OKB on X Layer.`, {
             challengeId,
             expiresAt,
@@ -476,6 +502,22 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
 
       // Execute the tool
       const result = await executeTool(toolName, args);
+
+      if (!PREMIUM_TOOLS.has(toolName)) {
+        void logAgentCommerceEvent({
+          source: 'mcp-http',
+          tool_name: toolName,
+          payment_status: 'free_call',
+          external_agent: String(req.headers['x-agent-name'] || '').trim() || null,
+          request_ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null,
+          user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
+          metadata: {
+            arguments: args,
+            chainId: XLAYER_CHAIN_ID,
+            transport: 'streamable-http',
+          },
+        });
+      }
 
       // Log premium tool usage
       if (verifiedPayment && PREMIUM_TOOLS.has(toolName)) {

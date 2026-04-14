@@ -32,9 +32,13 @@ interface HeartbeatData {
     ageSeconds: number;
   } | null;
   recentCommerce: Array<{
+    source?: string;
     tool: string;
     status: string;
+    agent: string | null;
     payer: string | null;
+    amountOkb: string | null;
+    txHash: string | null;
     age: number;
   }>;
   recentTxs: OnChainTx[];
@@ -84,6 +88,20 @@ function HealthBadge({ label, status }: { label: string; status: string }) {
       <span className="text-xs font-mono opacity-60">{status}</span>
     </div>
   );
+}
+
+function commerceBadge(status: string) {
+  if (status === 'verified') return 'text-green-400';
+  if (status === 'challenge_issued') return 'text-amber-400';
+  if (status === 'free_call') return 'text-cyan-400';
+  return 'text-white/50';
+}
+
+function commerceLabel(status: string) {
+  if (status === 'verified') return 'PAID';
+  if (status === 'challenge_issued') return '402';
+  if (status === 'free_call') return 'FREE';
+  return status.toUpperCase();
 }
 
 function MetricCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -258,26 +276,41 @@ export default function BobbyHeartbeatPage() {
               transition={{ delay: 0.3 }}
               className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
             >
-              <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-3">Recent MCP Payments</div>
+              <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-3">Recent Agent-to-Agent Activity</div>
               {data.recentCommerce.length > 0 ? (
                 <div className="space-y-2">
                   {data.recentCommerce.map((event, i) => (
                     <div key={i} className="flex items-center justify-between text-xs font-mono">
                       <div className="flex items-center gap-2">
-                        <span className={event.status === 'confirmed' ? 'text-green-400' : 'text-amber-400'}>
-                          {event.status === 'confirmed' ? '[PAID]' : '[PEND]'}
+                        <span className={commerceBadge(event.status)}>
+                          [{commerceLabel(event.status)}]
                         </span>
+                        {event.source && (
+                          <span className="text-white/20 uppercase">{event.source}</span>
+                        )}
                         <span className="text-white/60">{event.tool}</span>
                       </div>
                       <div className="flex items-center gap-3">
+                        {event.agent && <span className="text-white/20">{event.agent}</span>}
+                        {event.amountOkb && <span className="text-amber-400/70">{parseFloat(event.amountOkb).toFixed(4)} OKB</span>}
                         {event.payer && <span className="text-white/20">{event.payer}</span>}
+                        {event.txHash && (
+                          <a
+                            href={`https://www.oklink.com/xlayer/tx/${event.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-green-400/50 hover:text-green-400"
+                          >
+                            ↗
+                          </a>
+                        )}
                         <span className="text-white/30">{formatAge(event.age)}</span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-sm font-mono text-white/30">No commerce events yet</div>
+                <div className="text-sm font-mono text-white/30">No recent free calls, x402 challenges, or paid MCP settlements yet</div>
               )}
             </motion.div>
           </div>

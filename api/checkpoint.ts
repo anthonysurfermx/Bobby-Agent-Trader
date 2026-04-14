@@ -140,7 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     guardrails: guardrailsActive,
     links: {
       landing: `${BOBBY_PROTOCOL_BASE_URL}/protocol`,
-      heartbeat: `${BOBBY_PROTOCOL_BASE_URL}/protocol/heartbeat`,
+      heartbeat: `${BOBBY_PROTOCOL_BASE_URL}/api/protocol-heartbeat`,
       reputation: `${BOBBY_PROTOCOL_BASE_URL}/api/reputation`,
       mcp: `${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http`,
       submission: `${BOBBY_PROTOCOL_BASE_URL}/submission`,

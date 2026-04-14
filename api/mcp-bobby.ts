@@ -249,6 +249,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             undefined,
             String(req.headers['x-agent-name'] || '').trim() || undefined,
           );
+          void logAgentCommerceEvent({
+            source: 'mcp',
+            tool_name: toolName,
+            payment_status: 'challenge_issued',
+            external_agent: String(req.headers['x-agent-name'] || '').trim() || null,
+            request_ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null,
+            user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
+            metadata: {
+              challengeId,
+              expiresAt,
+              chainId: XLAYER_CHAIN_ID,
+              paymentContract: BOBBY_AGENT_ECONOMY,
+            },
+          });
           return res.status(402).json({
             jsonrpc: '2.0',
             error: {
@@ -324,6 +338,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.method === 'tools/call') {
       const toolName = (body.params as Record<string, unknown>)?.name as string;
       const args = ((body.params as Record<string, unknown>)?.arguments || {}) as Record<string, unknown>;
+      if (toolName && !PREMIUM_TOOLS.has(toolName)) {
+        void logAgentCommerceEvent({
+          source: 'mcp',
+          tool_name: toolName,
+          payment_status: 'free_call',
+          external_agent: String(req.headers['x-agent-name'] || '').trim() || null,
+          request_ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null,
+          user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
+          metadata: {
+            arguments: args,
+            chainId: XLAYER_CHAIN_ID,
+            paymentContract: BOBBY_AGENT_ECONOMY,
+          },
+        });
+      }
       if (toolName && PREMIUM_TOOLS.has(toolName) && verifiedPayment) {
         // Store verified receipt for Judge Mode + audit trail
         void storeReceipt({
