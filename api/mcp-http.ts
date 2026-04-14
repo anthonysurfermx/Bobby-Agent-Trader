@@ -29,6 +29,18 @@ import {
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
 import { logHarnessEvent } from './_lib/harness-events.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
+import {
+  getPrices as b1naryGetPrices,
+  getSpot as b1naryGetSpot,
+  getCapacity as b1naryGetCapacity,
+  getPositions as b1naryGetPositions,
+  B1naryCircuitBreakerError,
+  B1NARY_DEPLOYMENT_STATUS,
+  B1NARY_SOURCE_CHAIN_ID,
+  type B1naryAsset,
+  type B1naryOptionType,
+} from './_lib/b1nary.js';
+import { evaluateWheel } from './_lib/wheel-verdict.js';
 
 export const config = { maxDuration: 60 };
 
@@ -62,6 +74,8 @@ const TOOLS = [
   { name: 'bobby_bounty_get', description: 'Get a single adversarial bounty by id, including status, reward, dimension and effective expiry.', inputSchema: { type: 'object', properties: { bounty_id: { type: 'string', description: 'Bounty id (integer, 1-indexed)' } }, required: ['bounty_id'] } },
   { name: 'bobby_bounty_post', description: 'Build unsigned calldata to post a new OKB bounty against a Bobby debate thread. Returns tx payload for the client to sign — never holds funds.', inputSchema: { type: 'object', properties: { thread_id: { type: 'string', description: 'Off-chain debate thread id' }, dimension: { type: 'string', enum: ['DATA_INTEGRITY', 'ADVERSARIAL_QUALITY', 'DECISION_LOGIC', 'RISK_MANAGEMENT', 'CALIBRATION_ALIGNMENT', 'NOVELTY'] }, reward_okb: { type: 'string', description: 'Bounty reward in OKB (e.g. "0.01")' }, claim_window_secs: { type: 'number', default: 0, description: 'Seconds until the poster can reclaim (0 = contract default, 7 days)' } }, required: ['thread_id', 'dimension', 'reward_okb'] } },
   { name: 'bobby_bounty_challenge', description: 'Build unsigned calldata to submit a challenge (evidence hash) against an existing bounty.', inputSchema: { type: 'object', properties: { bounty_id: { type: 'string', description: 'Bounty id to challenge' }, evidence_hash: { type: 'string', description: '32-byte hex hash of the evidence blob (IPFS/Arweave CID hash)' } }, required: ['bounty_id', 'evidence_hash'] } },
+  { name: 'bobby_wheel_evaluate', description: 'Pressure-test a b1nary Wheel leg (covered put or covered call) before committing collateral. Pulls live quotes from b1nary, applies Bobby guardrails (strike distance, expiry window, annualized yield floor, regime gate) and returns SELL / SKIP / WAIT verdict with explainable reasoning. Source chain: Base (8453); X Layer execution pending b1nary deployment.', inputSchema: { type: 'object', properties: { asset: { type: 'string', enum: ['eth', 'cbbtc'], description: 'Underlying asset' }, side: { type: 'string', enum: ['put', 'call'], description: 'Option side to sell' }, strike: { type: 'number', description: 'Proposed strike price' }, expiry_days: { type: 'number', description: 'Days to expiry' }, collateral: { type: 'number', description: 'Collateral amount in the leg\'s quote token (USDC for puts, underlying for calls). Defaults to 1× the leg notional.' } }, required: ['asset', 'side', 'strike', 'expiry_days'] } },
+  { name: 'bobby_wheel_positions', description: 'Read-only snapshot of a wallet\'s live positions on b1nary, annotated with Bobby\'s ongoing verdict per leg. Source chain: Base (8453).', inputSchema: { type: 'object', properties: { address: { type: 'string', description: 'EVM wallet address to inspect' } }, required: ['address'] } },
 ];
 
 // ---- Tool Execution ----
@@ -470,6 +484,200 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
         value: '0x0',
         note: 'Sign and send from your wallet. Evidence must already be pinned off-chain (IPFS/Arweave) before posting.',
       }, null, 2) }],
+    };
+  }
+
+  if (name === 'bobby_wheel_evaluate') {
+    const asset = String(args.asset || '').toLowerCase() as B1naryAsset;
+    const side = String(args.side || '').toLowerCase() as B1naryOptionType;
+    if (asset !== 'eth' && asset !== 'cbbtc') throw new Error('asset must be eth or cbbtc');
+    if (side !== 'put' && side !== 'call') throw new Error('side must be put or call');
+    const strike = Number(args.strike);
+    const expiryDays = Number(args.expiry_days);
+    if (!Number.isFinite(strike) || strike <= 0) throw new Error('strike must be positive');
+    if (!Number.isFinite(expiryDays) || expiryDays <= 0) throw new Error('expiry_days must be positive');
+
+    let quotes, spot, capacity;
+    try {
+      [quotes, spot, capacity] = await Promise.all([
+        b1naryGetPrices(asset, side),
+        b1naryGetSpot(asset),
+        b1naryGetCapacity(asset),
+      ]);
+    } catch (err) {
+      if (err instanceof B1naryCircuitBreakerError) {
+        const text = JSON.stringify({
+          verdict: 'WAIT',
+          conviction: 0,
+          reasoning: 'b1nary circuit breaker is active — Bobby fails closed and will not recommend committing collateral.',
+          guardrailsTriggered: ['wheel_market_breaker'],
+          source_chain: B1NARY_SOURCE_CHAIN_ID,
+          deployment_status: B1NARY_DEPLOYMENT_STATUS,
+        }, null, 2);
+        logHarnessEvent({
+          run_id: `wheel-${Date.now()}`,
+          agent: 'mcp',
+          event_type: 'wheel_verdict',
+          tool: 'bobby_wheel_evaluate',
+          decision: 'deny',
+          reason: 'b1nary circuit breaker active',
+          policy_hits: ['wheel_market_breaker'],
+          meta: { protocol: 'b1nary', source_chain: B1NARY_SOURCE_CHAIN_ID, asset, side, strike, expiry_days: expiryDays },
+        });
+        return { content: [{ type: 'text', text }] };
+      }
+      throw err;
+    }
+
+    // Find the quote nearest to the requested strike + expiry to anchor pricing.
+    const candidate = quotes
+      .map(q => ({ q, score: Math.abs(q.strike - strike) + Math.abs(q.expiry_days - expiryDays) * 10 }))
+      .sort((a, b) => a.score - b.score)[0]?.q;
+
+    const premium = candidate?.premium ?? 0;
+    // Collateral convention: puts are USDC-collateralized at `strike × amount`,
+    // calls are collateralized in the underlying (1 unit = spot-denominated).
+    // If the caller didn't pass one, fall back to 1 contract's worth.
+    const defaultCollateral = side === 'put' ? strike : spot.spot;
+    const collateral = Number.isFinite(Number(args.collateral)) && Number(args.collateral) > 0
+      ? Number(args.collateral)
+      : defaultCollateral;
+
+    const regimeRes = await fetch(`${BASE_URL}/api/bobby-intel`).then(r => r.json()).catch(() => ({})) as Record<string, unknown>;
+    const briefing = typeof regimeRes.briefing === 'string' ? regimeRes.briefing : '';
+    const regimeMatch = briefing.match(/<MARKET_REGIME>(.*?)<\/MARKET_REGIME>/);
+    const regime = regimeMatch ? regimeMatch[1] : 'unknown';
+
+    const verdict = evaluateWheel({
+      asset,
+      side,
+      strike,
+      spot: spot.spot,
+      premium,
+      collateral,
+      expiryDays,
+      regime,
+      marketOpen: capacity.market_open,
+    });
+
+    const runId = `wheel-${Date.now()}`;
+    const decision = verdict.verdict === 'SELL' ? 'allow' : verdict.verdict === 'SKIP' ? 'deny' : 'stable';
+    logHarnessEvent({
+      run_id: runId,
+      agent: 'mcp',
+      event_type: 'wheel_verdict',
+      tool: 'bobby_wheel_evaluate',
+      decision,
+      conviction: verdict.conviction / 100,
+      risk_score: 100 - verdict.conviction,
+      policy_hits: verdict.guardrailsTriggered,
+      reason: verdict.reasoning,
+      meta: {
+        protocol: 'b1nary',
+        source_chain: B1NARY_SOURCE_CHAIN_ID,
+        deployment_status: B1NARY_DEPLOYMENT_STATUS,
+        asset,
+        side,
+        strike,
+        expiry_days: expiryDays,
+        premium,
+        collateral,
+        spot: spot.spot,
+        annualized_bps: verdict.yield.annualized_bps,
+        strike_distance_pct: verdict.strike_distance_pct,
+        regime,
+      },
+    });
+
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          verdict: verdict.verdict,
+          conviction: verdict.conviction,
+          reasoning: verdict.reasoning,
+          guardrails_triggered: verdict.guardrailsTriggered,
+          leg: {
+            asset,
+            side,
+            strike,
+            expiry_days: expiryDays,
+            premium,
+            collateral,
+            spot: spot.spot,
+            annualized_bps: verdict.yield.annualized_bps,
+            strike_distance_pct: Number((verdict.strike_distance_pct * 100).toFixed(3)),
+          },
+          context: {
+            regime,
+            market_open: capacity.market_open,
+            market_status: capacity.market_status,
+          },
+          integration: {
+            protocol: 'b1nary',
+            source_chain: B1NARY_SOURCE_CHAIN_ID,
+            deployment_status: B1NARY_DEPLOYMENT_STATUS,
+            note: 'Live read-only data from b1nary on Base. X Layer execution path pending b1nary deployment on chain 196.',
+          },
+        }, null, 2),
+      }],
+    };
+  }
+
+  if (name === 'bobby_wheel_positions') {
+    const address = String(args.address || '').trim();
+    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) throw new Error('address must be a valid EVM address');
+
+    let positions;
+    try {
+      positions = await b1naryGetPositions(address);
+    } catch (err) {
+      if (err instanceof B1naryCircuitBreakerError) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              address,
+              positions: [],
+              note: 'b1nary circuit breaker active — positions read unavailable.',
+              source_chain: B1NARY_SOURCE_CHAIN_ID,
+              deployment_status: B1NARY_DEPLOYMENT_STATUS,
+            }, null, 2),
+          }],
+        };
+      }
+      throw err;
+    }
+
+    logHarnessEvent({
+      run_id: `wheel-snap-${Date.now()}`,
+      agent: 'mcp',
+      event_type: 'wheel_positions_snapshot',
+      tool: 'bobby_wheel_positions',
+      reason: `Snapshot ${positions.length} b1nary position(s) for ${address}`,
+      meta: {
+        protocol: 'b1nary',
+        source_chain: B1NARY_SOURCE_CHAIN_ID,
+        address,
+        count: positions.length,
+      },
+    });
+
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          address,
+          positions,
+          count: positions.length,
+          integration: {
+            protocol: 'b1nary',
+            source_chain: B1NARY_SOURCE_CHAIN_ID,
+            deployment_status: B1NARY_DEPLOYMENT_STATUS,
+            note: 'Positions read from b1nary on Base. Pair with bobby_wheel_evaluate for pressure-tested verdicts.',
+          },
+        }, null, 2),
+      }],
     };
   }
 

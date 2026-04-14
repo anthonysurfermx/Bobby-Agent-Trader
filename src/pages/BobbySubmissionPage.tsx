@@ -507,6 +507,36 @@ export default function BobbySubmissionPage() {
           </section>
 
           <section className="mt-4">
+            <Panel title="Ecosystem Integration — b1nary" kicker="Pressure-test layer for vault protocols">
+              <p className="mt-2 text-sm text-white/60 leading-relaxed">
+                Bobby doesn't replace execution venues — it sits in front of them. <a href="https://www.b1nary.app" target="_blank" rel="noopener noreferrer" className="text-[#8CFFB4] underline decoration-[#8CFFB4]/40 underline-offset-2">b1nary</a> is the first concrete example: an options protocol where agents sell covered puts and calls to earn premium. Every Wheel-strategy leg is a judgment call (which strike, which expiry, whether to skip). Bobby turns that judgment into an explainable verdict.
+              </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8CFFB4] mb-2">MCP tool · free</div>
+                  <code className="text-sm text-white">bobby_wheel_evaluate</code>
+                  <p className="mt-2 text-xs leading-relaxed text-white/60">
+                    Pulls a live b1nary quote, applies 5 wheel guardrails (strike distance, expiry window, annualized yield floor, regime gate, market breaker) and returns SELL / SKIP / WAIT with reasoning. Every verdict logs to <code className="text-[#8CFFB4]">agent_events</code> as <code className="text-[#8CFFB4]">wheel_verdict</code>.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#8CFFB4] mb-2">MCP tool · free</div>
+                  <code className="text-sm text-white">bobby_wheel_positions</code>
+                  <p className="mt-2 text-xs leading-relaxed text-white/60">
+                    Read-only snapshot of a wallet's b1nary positions. Pair with <code className="text-[#8CFFB4]">bobby_wheel_evaluate</code> to monitor open legs against Bobby's current regime read.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-300/[0.04] p-4">
+                <p className="text-xs text-amber-200 font-mono uppercase tracking-widest mb-1">Chain note</p>
+                <p className="text-sm text-white/60 leading-relaxed">
+                  Live read-only integration against b1nary on <strong className="text-white">Base (8453)</strong> today. X Layer execution path is pending b1nary's deployment on chain 196 — verdict logic, guardrails, and event schema are deployment-ready. Every response surfaces <code className="text-[#8CFFB4]">deployment_status: base_live_xlayer_pending</code> so reviewers and agents never confuse source of truth.
+                </p>
+              </div>
+            </Panel>
+          </section>
+
+          <section className="mt-4">
             <Panel title="OnchainOS APIs Used" kicker="OKX OnchainOS integration">
               <div className="mt-4 space-y-3">
                 {[
