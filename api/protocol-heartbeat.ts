@@ -200,97 +200,56 @@ function identifyMethod(to: string, input: string): string {
   return 'interact';
 }
 
-async function fetchRecentTxs(blockNumber: number): Promise<OnChainTx[]> {
-  // Use eth_getLogs to find all contract interactions in one query.
-  // Much faster than scanning block-by-block.
-  // Window: 20,000 blocks (~6 hours) to capture cron-activity batches.
-  const txs: OnChainTx[] = [];
-  const windowBlocks = 20000;
-  const fromBlock = `0x${Math.max(0, blockNumber - windowBlocks).toString(16)}`;
-  const contractAddresses = Object.keys(CONTRACT_NAMES);
+async function fetchRecentTxs(_blockNumber: number): Promise<OnChainTx[]> {
+  // X Layer RPC limits eth_getLogs to 100 blocks, making large scans impractical.
+  // Instead, read recent on-chain txs from agent_events (stored by generate-activity).
+  // This is fast, reliable, and shows all txs regardless of timing.
+  if (!SB_KEY) return [];
 
   try {
-    // Query logs from all 6 contracts in parallel
-    const logPromises = contractAddresses.map(addr =>
-      fetchJsonWithTimeout(XLAYER_RPC, {
-        jsonrpc: '2.0', id: 1,
-        method: 'eth_getLogs',
-        params: [{ address: addr, fromBlock, toBlock: 'latest' }],
-      }, 5000).catch(() => ({ result: [] })) as Promise<{ result?: Array<{ transactionHash: string; blockNumber: string; address: string }> }>
-    );
-
-    const logResults = await Promise.all(logPromises);
-
-    // Collect unique tx hashes with their contract info
-    const seenHashes = new Set<string>();
-    for (const logRes of logResults) {
-      const logs = (logRes as { result?: unknown[] }).result || [];
-      for (const log of logs as Array<{ transactionHash: string; blockNumber: string; address: string }>) {
-        const hash = log.transactionHash;
-        if (seenHashes.has(hash)) continue;
-        seenHashes.add(hash);
-        const addr = String(log.address).toLowerCase();
-        const blockNum = parseInt(String(log.blockNumber), 16);
-        txs.push({
-          hash,
-          contract: addr,
-          contractName: CONTRACT_NAMES[addr] || 'Unknown',
-          method: 'interact', // will be enriched below
-          blockNumber: blockNum,
-          timestamp: null,
-          valueOkb: '0',
-        });
+    const res = await fetch(
+      `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&order=created_at.desc&limit=25&select=trade_tx,tool,symbol,reason,meta,created_at`,
+      {
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        signal: AbortSignal.timeout(4000),
       }
-    }
+    );
+    if (!res.ok) return [];
+    const rows = await res.json() as Array<{
+      trade_tx: string;
+      tool: string;
+      symbol: string | null;
+      reason: string | null;
+      meta: string | null;
+      created_at: string;
+    }>;
 
-    // Enrich top 25 txs with method labels and timestamps
-    txs.sort((a, b) => b.blockNumber - a.blockNumber);
-    const top = txs.slice(0, 25);
+    // Map tool types to contract names
+    const toolToContract: Record<string, string> = {
+      signal: 'HardnessRegistry',
+      prediction: 'HardnessRegistry',
+      bounty: 'AdversarialBounties',
+      trade_commit: 'TrackRecord',
+      economy: 'AgentEconomy',
+      oracle_signal: 'ConvictionOracle',
+      debate_fee: 'AgentEconomy',
+    };
 
-    if (top.length > 0) {
-      // Batch fetch tx details for method identification
-      const txDetailCalls = top.map((t, i) => ({
-        jsonrpc: '2.0', id: i + 1,
-        method: 'eth_getTransactionByHash',
-        params: [t.hash],
-      }));
-
-      try {
-        const detailRes = await fetchJsonWithTimeout(XLAYER_RPC, txDetailCalls, 5000) as Array<{ result?: { input?: string; value?: string; from?: string; blockNumber?: string } }>;
-        const details = Array.isArray(detailRes) ? detailRes : [detailRes];
-        for (let i = 0; i < details.length && i < top.length; i++) {
-          const d = details[i]?.result;
-          if (!d) continue;
-          top[i].method = identifyMethod(top[i].contract, d.input || '0x');
-          top[i].valueOkb = formatEther(BigInt(d.value || '0x0'));
-        }
-      } catch { /* non-critical — method labels stay as 'interact' */ }
-
-      // Get timestamps from block numbers (batch)
-      const uniqueBlocks = [...new Set(top.map(t => t.blockNumber))].slice(0, 10);
-      const blockCalls = uniqueBlocks.map((bn, i) => ({
-        jsonrpc: '2.0', id: i + 1,
-        method: 'eth_getBlockByNumber',
-        params: [`0x${bn.toString(16)}`, false],
-      }));
-      try {
-        const blockRes = await fetchJsonWithTimeout(XLAYER_RPC, blockCalls, 3000) as Array<{ result?: { timestamp?: string; number?: string } }>;
-        const blockTimestamps = new Map<number, number>();
-        const results = Array.isArray(blockRes) ? blockRes : [blockRes];
-        for (const br of results) {
-          if (br?.result?.number && br?.result?.timestamp) {
-            blockTimestamps.set(parseInt(String(br.result.number), 16), parseInt(String(br.result.timestamp), 16));
-          }
-        }
-        for (const t of top) {
-          t.timestamp = blockTimestamps.get(t.blockNumber) ?? null;
-        }
-      } catch { /* non-critical */ }
-    }
-
-    return top;
-  } catch (e) {
-    console.warn('[ProtocolHeartbeat] fetchRecentTxs failed:', e instanceof Error ? e.message : e);
+    return rows
+      .filter(r => r.trade_tx)
+      .map(r => {
+        const ts = new Date(r.created_at).getTime() / 1000;
+        return {
+          hash: r.trade_tx,
+          contract: '',
+          contractName: toolToContract[r.tool] || r.tool || 'Unknown',
+          method: r.reason || r.tool || 'interact',
+          blockNumber: 0,
+          timestamp: Math.floor(ts),
+          valueOkb: '0',
+        };
+      });
+  } catch {
     return [];
   }
 }

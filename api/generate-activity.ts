@@ -435,6 +435,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Store generated txs in agent_events for heartbeat/landing visibility
+    if (SB_KEY && results.length > 0) {
+      const rows = results.map(r => ({
+        run_id: `activity_${Date.now()}`,
+        agent: 'harness',
+        event_type: 'onchain_tx',
+        tool: r.type,
+        symbol: r.symbol || null,
+        trade_tx: r.txHash,
+        reason: r.detail || r.type,
+        meta: JSON.stringify({ contract: r.contract, type: r.type }),
+        created_at: new Date().toISOString(),
+      }));
+      fetch(`${SB_URL}/rest/v1/agent_events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SB_KEY,
+          Authorization: `Bearer ${SB_KEY}`,
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify(rows),
+      }).catch(() => {});
+    }
+
     // Final balance
     const finalBalance = await provider.getBalance(wallet.address);
 
