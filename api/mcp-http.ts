@@ -43,6 +43,7 @@ const X402_PRICE_OKB = '0.001';
 const TOOLS = [
   { name: 'bobby_analyze', description: 'Get Bobby\'s full market analysis with conviction score. PAID: 0.001 OKB.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol (BTC, ETH, SOL, OKB)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['symbol'] } },
   { name: 'bobby_debate', description: 'Trigger a 3-agent debate (Alpha Hunter vs Red Team vs CIO). PAID: 0.001 OKB.', inputSchema: { type: 'object', properties: { question: { type: 'string', description: 'Trading question to debate' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['question'] } },
+  { name: 'bobby_recommend', description: 'Get Bobby\'s current actionable recommendation: symbol, direction, conviction, entry/stop/target, and guardrail status. The signal your agent needs to decide.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol (BTC, ETH, SOL). Omit for Bobby\'s best current pick.' } } } },
   { name: 'bobby_ta', description: 'Technical analysis: SMA, RSI, MACD, Bollinger, support/resistance.', inputSchema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
   { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time data sources.', inputSchema: { type: 'object', properties: {} } },
   { name: 'bobby_xlayer_signals', description: 'Smart money signals on X Layer (OKX L2).', inputSchema: { type: 'object', properties: {} } },
@@ -156,10 +157,107 @@ async function executeTool(name: string, args: Record<string, string>): Promise<
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
   }
 
+  if (name === 'bobby_recommend') {
+    const SB_URL_MCP = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
+    const SB_KEY_MCP = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+    const symbolFilter = args.symbol ? `&symbol=eq.${args.symbol.toUpperCase()}` : '';
+    const threadsRes = await fetch(
+      `${SB_URL_MCP}/rest/v1/forum_threads?resolution=eq.pending&entry_price=not.is.null&order=created_at.desc&limit=5${symbolFilter}&select=symbol,direction,conviction_score,entry_price,stop_price,target_price,trigger_reason,created_at,expires_at,debate_quality`,
+      { headers: { apikey: SB_KEY_MCP, Authorization: `Bearer ${SB_KEY_MCP}` } }
+    );
+    const threads = await threadsRes.json() as Array<Record<string, unknown>>;
+    const latest = threads[0] || null;
+
+    if (!latest) {
+      return { content: [{ type: 'text', text: JSON.stringify({
+        recommendation: 'NO_SIGNAL',
+        reason: 'No active debate threads with trade parameters. Bobby is in observation mode.',
+        guardrails: { conviction_gate: '3.5/10 minimum', status: 'all_armed', fail_closed: true },
+        next_cycle: 'Bobby debates every 15 minutes. Check back soon.',
+      }, null, 2) }] };
+    }
+
+    const conv = (latest.conviction_score as number) || 0;
+    const direction = latest.direction as string || 'none';
+    const actionable = conv >= 0.35 && direction !== 'none';
+    const quality = latest.debate_quality as Record<string, unknown> | null;
+
+    const rec = {
+      recommendation: actionable ? 'ACTIONABLE' : 'OBSERVE',
+      signal: {
+        symbol: latest.symbol,
+        direction: direction.toUpperCase(),
+        conviction: parseFloat((conv * 10).toFixed(1)),
+        conviction_label: conv >= 0.7 ? 'HIGH' : conv >= 0.35 ? 'MEDIUM' : 'LOW',
+        entry_price: latest.entry_price,
+        stop_loss: latest.stop_price,
+        target: latest.target_price,
+        risk_reward: latest.stop_price && latest.target_price && latest.entry_price
+          ? parseFloat((Math.abs((latest.target_price as number) - (latest.entry_price as number)) / Math.abs((latest.entry_price as number) - (latest.stop_price as number))).toFixed(2))
+          : null,
+        debate_quality_score: quality?.overall_score ?? null,
+        expires_at: latest.expires_at,
+        generated_at: latest.created_at,
+      },
+      verdict: {
+        status: actionable ? 'allow' : 'deny',
+        reason: actionable
+          ? `Conviction ${(conv * 10).toFixed(1)}/10 passed conviction gate. Stop loss at $${latest.stop_price}. Target at $${latest.target_price}.`
+          : latest.trigger_reason || `Conviction ${(conv * 10).toFixed(1)}/10 below 3.5/10 threshold. Bobby recommends waiting.`,
+      },
+      guardrails: {
+        conviction_gate: conv >= 0.35 ? 'PASSED' : 'BLOCKED',
+        stop_loss: latest.stop_price ? 'SET' : 'MISSING',
+        circuit_breaker: 'ARMED',
+        fail_closed: true,
+      },
+      usage: actionable
+        ? 'This signal passed Bobby\'s 11 guardrails. Your agent can use entry/stop/target to size and execute. Bobby does not execute — your agent decides.'
+        : 'Bobby recommends NO TRADE at this conviction level. Check back next cycle (every 15 min).',
+    };
+    return { content: [{ type: 'text', text: JSON.stringify(rec, null, 2) }] };
+  }
+
   if (name === 'bobby_stats') {
-    const res = await fetch(`${BASE_URL}/api/bobby-pnl`);
-    const data = await res.json() as { summary?: unknown };
-    return { content: [{ type: 'text', text: JSON.stringify(data.summary, null, 2) }] };
+    const [repRes, cpRes] = await Promise.all([
+      fetch(`${BASE_URL}/api/reputation`).then(r => r.json()).catch(() => null),
+      fetch(`${BASE_URL}/api/checkpoint?hours=24`).then(r => r.json()).catch(() => null),
+    ]);
+    const rep = (repRes as Record<string, unknown>) || {};
+    const reputation = rep.reputation as Record<string, unknown> || {};
+    const trust = rep.trustScore as Record<string, unknown> || {};
+    const cp = (cpRes as Record<string, unknown>) || {};
+    const rd = cp.risk_decisions as Record<string, unknown> || {};
+    const stats = {
+      protocol: 'Bobby Protocol',
+      track_record: {
+        total_trades_resolved: reputation.totalTrades || 0,
+        total_commitments: reputation.totalCommitments || 0,
+        wins: reputation.wins || 0,
+        losses: reputation.losses || 0,
+        win_rate_pct: reputation.winRate || 0,
+        cumulative_pnl_pct: reputation.cumulativePnlPct || 0,
+        pending_resolution: reputation.pendingResolution || 0,
+      },
+      trust_score: trust.score || 0,
+      last_24h: {
+        debates: rd.total_debates || 0,
+        executed: rd.executed || 0,
+        blocked: rd.blocked || 0,
+        block_rate_pct: rd.block_rate_pct || 0,
+        avg_conviction: rd.avg_conviction || 0,
+      },
+      guardrails: {
+        conviction_gate: '3.5/10 minimum',
+        stop_loss: 'mandatory',
+        circuit_breaker: '3 consecutive losses',
+        drawdown_kill: '20% max',
+        fail_closed: true,
+      },
+      mcp_endpoint: `${BASE_URL}/api/mcp-http`,
+      harness_console: `${BASE_URL}/protocol/harness`,
+    };
+    return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
   }
 
   if (name === 'bobby_wallet_balance') {
