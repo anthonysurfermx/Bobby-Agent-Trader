@@ -334,6 +334,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pending: threads.length - resolved.length,
       };
       (debateStats as any).harnessEvents = eventsRes;
+
+      // Get latest on-chain tx timestamp to mark contracts as active
+      const latestTxRes = await fetch(
+        `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&order=created_at.desc&limit=1&select=created_at`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      ).then(r => r.ok ? r.json() : []).catch(() => []);
+      const latestOnchainTx = (latestTxRes as Array<{ created_at: string }>)[0];
+      if (latestOnchainTx) {
+        (debateStats as any).lastOnchainActivity = latestOnchainTx.created_at;
+      }
     } catch { /* non-critical */ }
   }
 

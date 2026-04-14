@@ -77,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     source: 'onchain',
   }));
 
-  const bountyFeed = onChainFeed.length > 0 || commerceFeed.length > 0 ? [] : bountyFallback.map((bounty: any) => ({
+  const bountyFeed = bountyFallback.map((bounty: any) => ({
     agent: 'bobby-protocol',
     tool: `AdversarialBounties::${bounty.dimension}`,
     paid: true,
