@@ -294,16 +294,16 @@ interface ActivityItem {
 function useActivity() {
   const [feed, setFeed] = useState<ActivityItem[]>([]);
   useEffect(() => {
-    fetch('/api/activity?limit=10', { cache: 'no-store' })
+    fetch('/api/activity?limit=100', { cache: 'no-store' })
       .then((r) => r.json())
       .then((j) => setFeed((j as { feed?: ActivityItem[] }).feed ?? []))
       .catch(() => setFeed([]));
     const t = setInterval(() => {
-      fetch('/api/activity?limit=10', { cache: 'no-store' })
+      fetch('/api/activity?limit=100', { cache: 'no-store' })
         .then((r) => r.json())
         .then((j) => setFeed((j as { feed?: ActivityItem[] }).feed ?? []))
         .catch(() => {});
-    }, 20_000);
+    }, 30_000);
     return () => clearInterval(t);
   }, []);
   return feed;
@@ -2443,6 +2443,9 @@ function LiveCheckpoint() {
 }
 
 function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const COLLAPSED_COUNT = 8;
+
   const fmtAgo = (secs: number | null) => {
     if (secs === null) return '—';
     if (secs < 60) return `${secs}s ago`;
@@ -2457,6 +2460,8 @@ function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
     bounty: feed.filter((e) => e.source === 'bounty').length,
   };
   const fallbackOnly = sourceCount.bounty > 0 && sourceCount.commerce === 0 && sourceCount.onchain === 0;
+  const visibleFeed = expanded ? feed : feed.slice(0, COLLAPSED_COUNT);
+  const hasMore = feed.length > COLLAPSED_COUNT;
 
   const sourceBadge = (source?: string) => {
     switch (source) {
@@ -2520,8 +2525,8 @@ function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
             No recent A2A commerce or treasury txs surfaced yet. Showing latest bounty archive instead.
           </div>
         )}
-        <div className="divide-y divide-[#494847]/10 max-h-[240px] overflow-y-auto">
-          {feed.map((e, i) => {
+        <div className={`divide-y divide-[#494847]/10 ${expanded ? 'max-h-[600px]' : 'max-h-[240px]'} overflow-y-auto transition-all`}>
+          {visibleFeed.map((e, i) => {
             const source = sourceBadge(e.source);
             const status = statusBadge(e.status, e.paid);
             return (
@@ -2552,6 +2557,14 @@ function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
             </div>
           )})}
         </div>
+        {hasMore && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="w-full py-2 border-t border-[#494847]/20 font-mono text-[10px] text-[#6dfe9c] uppercase tracking-widest hover:bg-[#6dfe9c]/[0.03] transition-colors"
+          >
+            {expanded ? `Collapse ↑` : `See all ${feed.length} events ↓`}
+          </button>
+        )}
       </div>
     </section>
   );
