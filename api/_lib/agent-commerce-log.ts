@@ -35,7 +35,7 @@ export async function logAgentCommerceEvent(event: AgentCommerceEventInput): Pro
   if (!hasSupabaseConfig()) return;
 
   try {
-    await fetch(`${SB_URL}/rest/v1/agent_commerce_events`, {
+    const res = await fetch(`${SB_URL}/rest/v1/agent_commerce_events`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({
@@ -51,6 +51,10 @@ export async function logAgentCommerceEvent(event: AgentCommerceEventInput): Pro
         metadata: event.metadata || {},
       }),
     });
+    if (!res.ok) {
+      const message = await res.text().catch(() => '');
+      console.error('[agent-commerce-log] insert failed', res.status, message);
+    }
   } catch {
     // Logging is best-effort. Bobby should still serve the tool response.
   }
