@@ -150,12 +150,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'POST only' });
   }
 
-  // Auth
-  const cycleSecret = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET;
-  if (cycleSecret) {
+  // Auth — accept either BOBBY_CYCLE_SECRET or CRON_SECRET
+  const secrets = [process.env.BOBBY_CYCLE_SECRET, process.env.CRON_SECRET].filter(Boolean);
+  if (secrets.length > 0) {
     const auth = req.headers.authorization;
     const bodySecret = (req.body as Record<string, unknown>)?.secret;
-    if (auth !== `Bearer ${cycleSecret}` && bodySecret !== cycleSecret) {
+    const matches = secrets.some(s => auth === `Bearer ${s}` || bodySecret === s);
+    if (!matches) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
   }
