@@ -134,10 +134,11 @@ async function getBountySummary(nextBountyId: number): Promise<Record<string, Bo
 }
 
 async function getContractLastActivity(address: string): Promise<number | null> {
+  // Search last 50,000 blocks (~28 hours) for activity
   try {
     const block = await rpcCall<string>('eth_blockNumber', []);
     const latest = Number.parseInt(String(block), 16);
-    const fromBlock = `0x${Math.max(0, latest - 5000).toString(16)}`;
+    const fromBlock = `0x${Math.max(0, latest - 50000).toString(16)}`;
     const logs = await rpcCall<Array<{ blockNumber: string }>>('eth_getLogs', [
       { address, fromBlock, toBlock: 'latest' },
     ]);
@@ -301,6 +302,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const economyVol = parseFloat(economyStats.totalVolumeOkb || '0');
   const protocolNotionalOkb = (economyVol + bountyEscrowOkb).toFixed(4);
 
+  // Supabase debate + resolution stats (real activity beyond on-chain contracts)
+  const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
+  const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+  let debateStats = { totalDebates: 0, resolved: 0, wins: 0, losses: 0, breakEven: 0, winRate: 0, pending: 0 };
+  if (SB_KEY) {
+    try {
+      const [threadsRes, eventsRes] = await Promise.all([
+        fetch(`${SB_URL}/rest/v1/forum_threads?select=resolution&entry_price=not.is.null`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        }).then(r => r.ok ? r.json() : []),
+        fetch(`${SB_URL}/rest/v1/agent_events?select=id`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'count=exact' },
+        }).then(r => {
+          const count = r.headers.get('content-range')?.split('/')[1];
+          return count ? parseInt(count) : 0;
+        }).catch(() => 0),
+      ]);
+      const threads = threadsRes as Array<{ resolution: string }>;
+      const resolved = threads.filter(t => t.resolution !== 'pending');
+      const wins = resolved.filter(t => t.resolution === 'win').length;
+      const losses = resolved.filter(t => t.resolution === 'loss').length;
+      const be = resolved.filter(t => t.resolution === 'break_even').length;
+      debateStats = {
+        totalDebates: threads.length,
+        resolved: resolved.length,
+        wins,
+        losses,
+        breakEven: be,
+        winRate: resolved.length > 0 ? parseFloat(((wins / resolved.length) * 100).toFixed(1)) : 0,
+        pending: threads.length - resolved.length,
+      };
+      (debateStats as any).harnessEvents = eventsRes;
+    } catch { /* non-critical */ }
+  }
+
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
   return res.status(200).json({
     ok: true,
@@ -358,6 +394,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     },
     bounties: recentBounties,
     bountySummary,
+    debateActivity: debateStats,
     market: {
       prices: intel.prices,
       regime: intel.regime,
