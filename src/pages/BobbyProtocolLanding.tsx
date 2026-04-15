@@ -611,6 +611,75 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
   );
 }
 
+function EcosystemBand() {
+  return (
+    <section className="py-16 px-6 border-y border-[#494847]/15 bg-[#0e0e0e]">
+      <div className="max-w-6xl mx-auto grid gap-10 md:grid-cols-2">
+        {/* ── Trusted by ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="group"
+        >
+          <div className="font-mono text-[10px] text-[#6dfe9c] uppercase tracking-[0.3em] mb-3">
+            TRUSTED BY
+          </div>
+          <a
+            href="https://www.espaciocripto.io"
+            target="_blank"
+            rel="noreferrer"
+            className="block bg-[#131313] border border-[#6dfe9c]/20 hover:border-[#6dfe9c]/50 p-6 transition-all"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="text-xl md:text-2xl font-black uppercase tracking-tighter mb-2">
+                  Espacio Cripto
+                </div>
+                <p className="text-[#adaaaa] text-xs leading-5 font-mono">
+                  LATAM&apos;s largest crypto AI trading community uses Bobby to pressure-test their agents before capital moves.
+                </p>
+              </div>
+              <span className="text-[#6dfe9c] font-mono text-sm shrink-0">↗</span>
+            </div>
+          </a>
+        </motion.div>
+
+        {/* ── Powered by ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.08 }}
+          className="group"
+        >
+          <div className="font-mono text-[10px] text-[#fcc025] uppercase tracking-[0.3em] mb-3">
+            POWERED BY
+          </div>
+          <a
+            href="https://www.b1nary.app"
+            target="_blank"
+            rel="noreferrer"
+            className="block bg-[#131313] border border-[#fcc025]/20 hover:border-[#fcc025]/50 p-6 transition-all"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="text-xl md:text-2xl font-black uppercase tracking-tighter mb-2">
+                  b1nary
+                </div>
+                <p className="text-[#adaaaa] text-xs leading-5 font-mono">
+                  Options protocol powering Bobby&apos;s wheel-strategy pressure-tests. Live on Base (8453), X Layer deployment pending.
+                </p>
+              </div>
+              <span className="text-[#fcc025] font-mono text-sm shrink-0">↗</span>
+            </div>
+          </a>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 function ClosedLoop() {
   const steps = [
     { title: 'SIGNAL', glyph: '>', desc: 'Raw signal enters the hardness chamber', color: '#6dfe9c' },
@@ -2432,6 +2501,7 @@ export default function BobbyProtocolLanding() {
       )}
 
       <HeroLiveDebate stats={stats} />
+      <EcosystemBand />
       <TrustBadge stats={stats} />
       <RevenueProof stats={stats} liveTxs={liveTxs} />
       <ClosedLoop />
