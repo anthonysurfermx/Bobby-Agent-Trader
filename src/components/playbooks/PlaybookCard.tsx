@@ -24,7 +24,11 @@ const CATEGORY_LABEL: Record<string, string> = {
 
 export default function PlaybookCard({ playbook }: PlaybookCardProps) {
   const [open, setOpen] = useState(false);
-  const disabled = playbook.status === 'advanced' || playbook.demo === null;
+  // Only "advanced" is truly not runnable. "live" with demo=null still runs
+  // in the Sandbox — we just can't show the inline MCP-tool demo.
+  const disabled = playbook.status === 'advanced';
+  const sandboxReady = playbook.status === 'live';
+  const hasInlineDemo = playbook.demo !== null;
 
   return (
     <div
@@ -82,19 +86,23 @@ export default function PlaybookCard({ playbook }: PlaybookCardProps) {
           </span>
         ) : (
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setOpen((o) => !o)}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/60 transition-colors hover:bg-white/[0.06]"
-            >
-              {open ? 'Collapse' : 'Details'}
-              <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </button>
-            <a
-              href={`/protocol/sandbox?playbook=${encodeURIComponent(playbook.slug)}`}
-              className="inline-flex items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/15 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-green-400 transition-colors hover:bg-green-500/25"
-            >
-              Run in Sandbox →
-            </a>
+            {hasInlineDemo && (
+              <button
+                onClick={() => setOpen((o) => !o)}
+                className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/60 transition-colors hover:bg-white/[0.06]"
+              >
+                {open ? 'Collapse' : 'Details'}
+                <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+              </button>
+            )}
+            {sandboxReady && (
+              <a
+                href={`/protocol/sandbox?playbook=${encodeURIComponent(playbook.slug)}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/15 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-green-400 transition-colors hover:bg-green-500/25"
+              >
+                Run in Sandbox →
+              </a>
+            )}
           </div>
         )}
       </div>
