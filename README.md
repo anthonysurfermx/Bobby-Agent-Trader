@@ -1,6 +1,6 @@
 <div align="center">
 
-![Bobby Agent Trader — The World's First Verifiable AI Trading Room](./public/bobby-hero.png)
+
 
 # Bobby Protocol
 
