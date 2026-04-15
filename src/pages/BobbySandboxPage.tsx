@@ -56,6 +56,16 @@ interface FeedRun {
   market_snapshot?: MarketContext | null;
 }
 
+interface FeedRunFull extends FeedRun {
+  alpha_text?: string | null;
+  red_text?: string | null;
+  cio_text?: string | null;
+  judge_scores?: Record<string, number> | null;
+  guardrail_results?: Array<{ id: string; label: string; status: string }> | null;
+  verdict_reason?: string | null;
+  error_message?: string | null;
+}
+
 const TICKER_PRESETS = ['BTC', 'ETH', 'SOL', 'OKB', 'BNB', 'XRP', 'DOGE'] as const;
 const RUN_COUNT_KEY = 'bobby_sandbox_runs';
 
@@ -957,6 +967,10 @@ function IntelCard({ intel }: { intel: BobbyIntel }) {
 }
 
 function FeedList({ runs }: { runs: FeedRun[] }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [fullRun, setFullRun] = useState<FeedRunFull | null>(null);
+  const [loadingFull, setLoadingFull] = useState(false);
+
   if (!runs.length) {
     return (
       <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 text-center text-sm text-white/45">
@@ -971,58 +985,197 @@ function FeedList({ runs }: { runs: FeedRun[] }) {
     BLOCKED:    { color: '#ff716a', label: 'BLOCKED' },
   };
 
+  async function toggleExpand(id: string) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      setFullRun(null);
+      return;
+    }
+    setExpandedId(id);
+    setFullRun(null);
+    setLoadingFull(true);
+    try {
+      const r = await fetch(`/api/sandbox-runs?limit=50&full=1`);
+      const data = await r.json();
+      if (data.ok && Array.isArray(data.runs)) {
+        const match = (data.runs as FeedRunFull[]).find((x) => x.id === id) || null;
+        setFullRun(match);
+      }
+    } catch {
+      // non-fatal
+    } finally {
+      setLoadingFull(false);
+    }
+  }
+
   return (
     <div className="space-y-2">
       {runs.map((r) => {
         const vs = r.verdict_action ? verdictStyle[r.verdict_action] : null;
         const isInterrupted = r.status === 'interrupted';
         const ago = timeAgo(r.created_at);
+        const isOpen = expandedId === r.id;
         return (
           <div
             key={r.id}
-            className="flex flex-col gap-3 rounded-lg border border-white/[0.05] bg-white/[0.02] p-3 md:flex-row md:items-center md:justify-between"
+            className="rounded-lg border border-white/[0.05] bg-white/[0.02] transition-colors hover:border-white/[0.1]"
           >
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-md border border-white/[0.08] bg-black/30 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
-                {r.ticker}
-              </span>
-              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/55">
-                {r.playbook_slug}
-              </span>
-              {isInterrupted && (
-                <span className="rounded-md border border-[#fcc025]/30 bg-[#fcc025]/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#fcc025]">
-                  interrupted @ {r.error_phase || '?'}
+            <button
+              onClick={() => toggleExpand(r.id)}
+              className="flex w-full flex-col gap-3 p-3 text-left md:flex-row md:items-center md:justify-between"
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="rounded-md border border-white/[0.08] bg-black/30 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
+                  {r.ticker}
                 </span>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-[11px] text-white/65">
-              {typeof r.cio_conviction === 'number' && (
-                <span className="font-mono">
-                  <span className="text-white/40">conv</span>{' '}
-                  <span className="font-bold text-white/90">{r.cio_conviction.toFixed(1)}</span>
+                <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/55">
+                  {r.playbook_slug}
                 </span>
-              )}
-              {r.guardrails_total !== null && r.guardrails_total !== undefined && (
-                <span className="font-mono">
-                  <span className="text-white/40">gates</span>{' '}
-                  <span className="font-bold text-white/90">
-                    {r.guardrails_passed ?? '—'}/{r.guardrails_total}
+                {isInterrupted && (
+                  <span className="rounded-md border border-[#fcc025]/30 bg-[#fcc025]/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#fcc025]">
+                    interrupted @ {r.error_phase || '?'}
                   </span>
-                </span>
-              )}
-              {vs && (
-                <span
-                  className="rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em]"
-                  style={{ borderColor: `${vs.color}55`, color: vs.color, background: `${vs.color}10` }}
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-4 text-[11px] text-white/65">
+                {typeof r.cio_conviction === 'number' && (
+                  <span className="font-mono">
+                    <span className="text-white/40">conv</span>{' '}
+                    <span className="font-bold text-white/90">{r.cio_conviction.toFixed(1)}</span>
+                  </span>
+                )}
+                {r.guardrails_total !== null && r.guardrails_total !== undefined && (
+                  <span className="font-mono">
+                    <span className="text-white/40">gates</span>{' '}
+                    <span className="font-bold text-white/90">
+                      {r.guardrails_passed ?? '—'}/{r.guardrails_total}
+                    </span>
+                  </span>
+                )}
+                {vs && (
+                  <span
+                    className="rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em]"
+                    style={{ borderColor: `${vs.color}55`, color: vs.color, background: `${vs.color}10` }}
+                  >
+                    {vs.label}
+                  </span>
+                )}
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">{ago}</span>
+                <span className="font-mono text-[10px] text-white/35">{isOpen ? '▲' : '▼'}</span>
+              </div>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
                 >
-                  {vs.label}
-                </span>
+                  <div className="border-t border-white/[0.05] p-4">
+                    {loadingFull && !fullRun && (
+                      <div className="font-mono text-[11px] text-white/45">Loading transcript...</div>
+                    )}
+                    {fullRun && fullRun.id === r.id && <FeedRunExpanded run={fullRun} />}
+                  </div>
+                </motion.div>
               )}
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">{ago}</span>
-            </div>
+            </AnimatePresence>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function FeedRunExpanded({ run }: { run: FeedRunFull }) {
+  return (
+    <div className="space-y-4">
+      {run.alpha_text && (
+        <TranscriptBlock label="Alpha Hunter" color="#6dfe9c" text={run.alpha_text} />
+      )}
+      {run.red_text && (
+        <TranscriptBlock label="Red Team" color="#ff716a" text={run.red_text} />
+      )}
+      {run.cio_text && (
+        <TranscriptBlock label="CIO" color="#fcc025" text={run.cio_text} />
+      )}
+      {run.judge_scores && Object.keys(run.judge_scores).length > 0 && (
+        <div>
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#60a5fa]">
+            Judge scores (6D)
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+            {Object.entries(run.judge_scores).map(([dim, score]) => (
+              <div key={dim} className="flex items-center justify-between rounded-md bg-black/30 px-2 py-1">
+                <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/55">{dim}</span>
+                <span className="font-mono text-[11px] font-bold text-white/90">{score}/5</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {run.guardrail_results && run.guardrail_results.length > 0 && (
+        <div>
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#c084fc]">
+            Guardrail gauntlet
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
+            {run.guardrail_results.map((g) => {
+              const color =
+                g.status === 'pass' ? '#6dfe9c' :
+                g.status === 'fail' ? '#ff716a' :
+                '#64748b';
+              const sym = g.status === 'pass' ? '✓' : g.status === 'fail' ? '✕' : '–';
+              return (
+                <div
+                  key={g.id}
+                  className="flex items-center gap-2 rounded-md border px-2 py-1"
+                  style={{ borderColor: `${color}44`, background: `${color}10` }}
+                >
+                  <span className="font-mono text-xs font-bold" style={{ color }}>{sym}</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-white/75">
+                    {g.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {run.verdict_reason && (
+        <div className="rounded-md border border-white/[0.08] bg-black/30 p-3">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+            Verdict reason
+          </div>
+          <p className="text-xs leading-5 text-white/75">{run.verdict_reason}</p>
+        </div>
+      )}
+      {run.error_message && run.status !== 'completed' && (
+        <div className="rounded-md border border-[#fcc025]/30 bg-[#fcc025]/10 p-3">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#fcc025]">
+            Error ({run.error_phase || 'unknown'})
+          </div>
+          <p className="text-xs leading-5 text-white/75">{run.error_message}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TranscriptBlock({ label, color, text }: { label: string; color: string; text: string }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em]" style={{ color }}>
+          {label}
+        </span>
+      </div>
+      <div className="rounded-md border border-white/[0.06] bg-black/30 p-3 font-mono text-[11px] leading-5 text-white/80 whitespace-pre-wrap">
+        {text}
+      </div>
     </div>
   );
 }

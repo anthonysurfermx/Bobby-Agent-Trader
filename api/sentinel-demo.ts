@@ -151,11 +151,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const totalMs = Date.now() - startAll;
 
-  // Build agent decision based on Bobby's recommendation
+  // Build agent decision based on Bobby's recommendation.
+  // `bobby_recommend` returns `stop_loss`, not `stop`. Keep fallback for safety.
+  const sig = recData?.signal || {};
+  const stopLoss = sig.stop_loss ?? sig.stop ?? '?';
   const sentinelDecision = recData?.recommendation === 'ACTIONABLE'
     ? {
         action: 'WOULD_EXECUTE',
-        reasoning: `Bobby recommends ${recData.signal.symbol} ${recData.signal.direction} at conviction ${recData.signal.conviction}/10. Entry: $${recData.signal.entry_price}, Stop: $${recData.signal.stop}, Target: $${recData.signal.target}. R:R = ${recData.signal.risk_reward}. TA confirms: ${taData?.trend || '?'} trend, RSI ${taData?.rsi || '?'}. All guardrails passed.`,
+        reasoning: `Bobby recommends ${sig.symbol} ${sig.direction} at conviction ${sig.conviction}/10. Entry: $${sig.entry_price}, Stop: $${stopLoss}, Target: $${sig.target}. R:R = ${sig.risk_reward}. TA confirms: ${taData?.trend || '?'} trend, RSI ${taData?.rsi || '?'}. All guardrails passed.`,
       }
     : {
         action: 'HOLD',
@@ -179,7 +182,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       calledFreeTools: log.filter((l) => l.status === 'ok' && l.step.startsWith('call_')).length,
       receivedSignal: recData?.recommendation || 'none',
       receivedX402Challenge: got402,
-      agentEconomy: `Sentinel consumed ${log.filter(l => l.status === 'ok').length} Bobby tools in ${totalMs}ms. Trust verified. Signal received. x402 payment gate demonstrated.`,
+      // Count only actual tool calls (not registry/reputation discovery).
+      agentEconomy: `Sentinel consumed ${log.filter(l => l.status === 'ok' && l.step.startsWith('call_')).length} Bobby tools in ${totalMs}ms. Trust verified. Signal received. x402 payment gate demonstrated.`,
     },
   });
 }

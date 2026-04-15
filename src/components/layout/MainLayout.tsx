@@ -74,6 +74,9 @@ export default function MainLayout() {
 
   // Navegación "Agentic World" (dropdown)
   const agenticNavigation = [
+    { name: 'Bobby Protocol', href: '/protocol', Icon: PixelLobster, description: 'The Harness Trading Layer for Agents — landing' },
+    { name: 'Sandbox (Live Simulation)', href: '/protocol/sandbox', Icon: PixelTarget, description: 'Pressure-test any strategy in an isolated environment' },
+    { name: 'Playbooks', href: '/protocol/playbooks', Icon: PixelTrophy, description: '11 strategies: directional, yield, volatility, arbitrage, risk' },
     { name: 'Deploy Your AI Agent', href: '/agentic-world', Icon: PixelTarget, description: 'Create your personal AI Trading Room' },
     { name: 'Bobby Agent Trader', href: '/agentic-world/bobby', Icon: PixelLobster, description: 'AI-powered autonomous trading terminal' },
     { name: 'Intelligence Protocol', href: '/agentic-world/bobby/marketplace', Icon: PixelTrophy, description: 'Bidirectional agent intelligence marketplace' },

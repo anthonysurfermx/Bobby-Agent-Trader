@@ -128,12 +128,19 @@ function formatMarketForPrompt(ctx: MarketContext): string {
 }
 
 // ── Bobby intel (compact protocol-wide context) ────────────
+interface TechnicalLeaderLite {
+  symbol: string;
+  direction?: string;
+  signal?: string;
+  conviction?: number;
+}
+
 interface BobbyIntel {
   regime?: string;
   fearGreed?: number | string;
   mood?: string;
   dynamicConviction?: number;
-  technicalLeader?: string;
+  technicalLeader?: TechnicalLeaderLite;
   available: boolean;
 }
 
@@ -142,12 +149,33 @@ async function fetchBobbyIntel(signal?: AbortSignal): Promise<BobbyIntel> {
     const resp = await fetch(`${BOBBY_INTEL_BASE}/api/bobby-intel`, { signal });
     if (!resp.ok) throw new Error(`intel ${resp.status}`);
     const json: any = await resp.json();
+    // Shape reference: api/bobby-intel.ts returns
+    //   { regime, fearGreed, performance: { mood, dynamicConviction, technicalLeader }, ... }
+    const perf = json?.performance || {};
+    const leader = perf.technicalLeader;
+    const leaderLite: TechnicalLeaderLite | undefined = leader && typeof leader === 'object'
+      ? {
+          symbol: String(leader.symbol || ''),
+          direction: leader.direction ? String(leader.direction) : undefined,
+          signal: leader.signal ? String(leader.signal) : undefined,
+          conviction: typeof leader.conviction === 'number' ? leader.conviction : undefined,
+        }
+      : undefined;
+
+    const fgRaw = json?.fearGreed;
+    const fg: number | string | undefined =
+      typeof fgRaw === 'number' ? fgRaw
+      : typeof fgRaw === 'string' ? fgRaw
+      : typeof fgRaw?.value === 'number' ? fgRaw.value
+      : typeof fgRaw?.value === 'string' ? fgRaw.value
+      : undefined;
+
     return {
-      regime: json?.regime || json?.market?.regime,
-      fearGreed: json?.fearGreed?.value ?? json?.fearGreed,
-      mood: json?.mood || json?.performance?.mood,
-      dynamicConviction: json?.dynamicConviction || json?.conviction?.dynamic,
-      technicalLeader: json?.technicalPulse?.leader || json?.leaders?.[0]?.symbol,
+      regime: typeof json?.regime === 'string' ? json.regime : undefined,
+      fearGreed: fg,
+      mood: typeof perf?.mood === 'string' ? perf.mood : undefined,
+      dynamicConviction: typeof perf?.dynamicConviction === 'number' ? perf.dynamicConviction : undefined,
+      technicalLeader: leaderLite && leaderLite.symbol ? leaderLite : undefined,
       available: true,
     };
   } catch {
@@ -162,7 +190,12 @@ function formatIntelForPrompt(intel: BobbyIntel): string {
   if (intel.fearGreed !== undefined) bits.push(`fear/greed: ${intel.fearGreed}`);
   if (intel.mood) bits.push(`protocol mood: ${intel.mood}`);
   if (typeof intel.dynamicConviction === 'number') bits.push(`dynamic conviction: ${intel.dynamicConviction.toFixed(2)}`);
-  if (intel.technicalLeader) bits.push(`technical leader: ${intel.technicalLeader}`);
+  if (intel.technicalLeader) {
+    const l = intel.technicalLeader;
+    const dir = l.direction || l.signal || '';
+    const conv = typeof l.conviction === 'number' ? ` conv ${l.conviction.toFixed(2)}` : '';
+    bits.push(`technical leader: ${l.symbol}${dir ? ` (${dir})` : ''}${conv}`);
+  }
   return bits.length ? `Protocol intel — ${bits.join('; ')}.` : '';
 }
 
@@ -338,9 +371,10 @@ async function streamAgent(
   }
 }
 
-async function openaiOneShot(system: string, user: string, maxTokens: number): Promise<string> {
+async function openaiOneShot(phase: string, system: string, user: string, maxTokens: number): Promise<string> {
+  const TIMEOUT_MS = 25_000;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -361,10 +395,18 @@ async function openaiOneShot(system: string, user: string, maxTokens: number): P
     });
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '');
-      throw new Error(`OpenAI ${resp.status}: ${errText.slice(0, 200)}`);
+      const wrapped = new PhaseTimeoutError(phase, 0);
+      wrapped.message = `OpenAI ${resp.status}: ${errText.slice(0, 200)}`;
+      throw wrapped;
     }
     const data: any = await resp.json();
     return data.choices?.[0]?.message?.content || '';
+  } catch (err: any) {
+    if (err instanceof PhaseTimeoutError) throw err;
+    if (err?.name === 'AbortError') throw new PhaseTimeoutError(phase, TIMEOUT_MS);
+    const wrapped = new PhaseTimeoutError(phase, 0);
+    wrapped.message = err?.message || `Phase ${phase} failed`;
+    throw wrapped;
   } finally {
     clearTimeout(timeout);
   }
@@ -601,6 +643,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 4) Judge
     send('phase_start', { phase: 'judge' });
     const judgeText = await openaiOneShot(
+      'judge',
       prompts.judge,
       `DEBATE TRANSCRIPT:\n\n[ALPHA]\n${alphaText}\n\n[RED TEAM]\n${redText}\n\n[CIO]\n${cioText}`,
       200,
