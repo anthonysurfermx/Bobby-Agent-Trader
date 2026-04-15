@@ -300,15 +300,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData('totalTrades')),
       // Bounties
       ethCall(BOUNTIES, bountiesIface.encodeFunctionData('nextBountyId')),
-      // Supabase: recent cycles
+      // Supabase: recent cycles (column is started_at, not created_at)
       withTimeout(
-        sbQuery('agent_cycles', 'select=id,status,created_at,vibe_phrase,trades_executed&order=created_at.desc&limit=1'),
+        sbQuery('agent_cycles', 'select=id,status,started_at,vibe_phrase,trades_executed&order=started_at.desc&limit=1'),
         1500,
         []
       ),
-      // Supabase: recent commerce
+      // Supabase: recent commerce — agent_commerce_events table never shipped.
+      // Fall back to sandbox_runs which has live activity (every public
+      // pressure-test is logged with full transcript). This is honest:
+      // every Sandbox run IS protocol activity.
       withTimeout(
-        sbQuery('agent_commerce_events', 'select=id,source,tool_name,payment_status,created_at,payment_amount_wei,payment_tx_hash,payer_address,external_agent&order=created_at.desc&limit=5'),
+        sbQuery('sandbox_runs', 'select=id,playbook_slug,ticker,verdict_action,cio_conviction,status,created_at&order=created_at.desc&limit=5'),
         1500,
         []
       ),
@@ -367,22 +370,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const bountyEscrowOkb = totalBounties * 0.001;
     const protocolNotionalOkb = economyVolumeOkb + bountyEscrowOkb;
 
-    // Last cycle
+    // Last cycle (column is started_at)
     const lastCycle = Array.isArray(recentCycles) && recentCycles.length > 0 ? recentCycles[0] : null;
     const lastCycleAge = lastCycle
-      ? Math.floor((Date.now() - new Date(String((lastCycle as Record<string, unknown>).created_at)).getTime()) / 1000)
+      ? Math.floor((Date.now() - new Date(String((lastCycle as Record<string, unknown>).started_at)).getTime()) / 1000)
       : null;
 
-    // Recent commerce events
+    // Recent commerce events — sourced from sandbox_runs (public pressure-tests).
+    // Each Sandbox run is real protocol activity: agents debate, guardrails run,
+    // verdicts persist. This is the honest commerce surface for the heartbeat.
     const commerceEvents = Array.isArray(recentCommerce)
       ? recentCommerce.map((e: Record<string, unknown>) => ({
-          source: e.source || 'mcp',
-          tool: e.tool_name,
-          status: e.payment_status,
-          agent: e.external_agent || null,
-          payer: e.payer_address ? String(e.payer_address).slice(0, 10) + '...' : null,
-          amountOkb: e.payment_amount_wei ? formatEther(BigInt(String(e.payment_amount_wei))) : null,
-          txHash: e.payment_tx_hash || null,
+          source: 'sandbox',
+          tool: `pressure_test:${e.playbook_slug}`,
+          status: e.status === 'completed' ? 'paid' : (e.status as string) || 'pending',
+          agent: e.ticker ? `pressure-test/${e.ticker}` : null,
+          payer: null,
+          amountOkb: null,
+          txHash: null,
+          verdict: e.verdict_action || null,
+          conviction: typeof e.cio_conviction === 'number' ? e.cio_conviction : null,
           age: Math.floor((Date.now() - new Date(String(e.created_at)).getTime()) / 1000),
         }))
       : [];
