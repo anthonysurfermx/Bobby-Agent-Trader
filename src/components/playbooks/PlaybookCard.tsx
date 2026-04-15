@@ -16,6 +16,8 @@ interface PlaybookCardProps {
 const CATEGORY_LABEL: Record<string, string> = {
   directional: 'Directional',
   yield: 'Yield',
+  volatility: 'Volatility',
+  arbitrage: 'Arbitrage',
   'on-chain-flow': 'On-chain flow',
   'risk-management': 'Risk management',
 };

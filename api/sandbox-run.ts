@@ -8,7 +8,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash } from 'crypto';
-import { PLAYBOOKS, GUARDRAIL_LABELS, type Playbook } from '../src/data/playbooks';
+import { PLAYBOOKS, type Playbook } from '../src/data/playbooks.js';
 
 export const config = { maxDuration: 180 };
 
@@ -191,11 +191,15 @@ const JUDGE_DIMENSIONS = [
 function categoryFraming(cat: string): string {
   switch (cat) {
     case 'yield':
-      return 'This is a YIELD playbook — reason in terms of idle-cash optimization, protocol risk (smart contract, depeg), and opportunity cost vs directional exposure.';
+      return 'This is a YIELD playbook — reason in terms of idle-cash optimization, protocol risk (smart contract, depeg), APY sustainability, and opportunity cost vs directional exposure.';
     case 'on-chain-flow':
       return 'This is an ON-CHAIN FLOW playbook — reason in terms of wallet behavior, liquidity migration, bridge activity, and MEV risk.';
     case 'risk-management':
-      return 'This is a RISK-MANAGEMENT playbook — reason in terms of circuit breakers, drawdown limits, position sizing, and tail risk.';
+      return 'This is a RISK-MANAGEMENT playbook — reason in terms of circuit breakers, drawdown limits, position sizing, tail risk, and correlation breakdowns.';
+    case 'volatility':
+      return 'This is a VOLATILITY playbook — reason in terms of implied vs realized vol, vega exposure, gamma risk, theta decay, and term-structure dislocations. Catalysts (earnings, unlocks, macro prints) are central.';
+    case 'arbitrage':
+      return 'This is an ARBITRAGE playbook — reason in terms of price/funding divergence between venues, execution slippage, borrow costs, and how fast the spread decays. Capital efficiency and leg-synchronization risk dominate.';
     default:
       return 'This is a DIRECTIONAL playbook — reason in terms of thesis, invalidation, entry trigger, and asymmetric payoff.';
   }

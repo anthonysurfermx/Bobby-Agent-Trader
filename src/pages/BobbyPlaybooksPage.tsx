@@ -17,6 +17,8 @@ const CATEGORIES: Array<{ id: CategoryFilter; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'directional', label: 'Directional' },
   { id: 'yield', label: 'Yield' },
+  { id: 'volatility', label: 'Volatility' },
+  { id: 'arbitrage', label: 'Arbitrage' },
   { id: 'on-chain-flow', label: 'On-chain flow' },
   { id: 'risk-management', label: 'Risk management' },
 ];

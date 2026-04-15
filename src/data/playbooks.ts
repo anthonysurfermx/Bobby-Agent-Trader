@@ -7,7 +7,13 @@
 // the UI. No playbook may be rendered without filling every slot.
 // ============================================================
 
-export type PlaybookCategory = 'directional' | 'yield' | 'on-chain-flow' | 'risk-management';
+export type PlaybookCategory =
+  | 'directional'
+  | 'yield'
+  | 'on-chain-flow'
+  | 'risk-management'
+  | 'volatility'
+  | 'arbitrage';
 export type DemoInputType = 'symbol' | 'chain' | 'wheel_leg' | 'none';
 export type PlaybookStatus = 'live' | 'preview' | 'advanced';
 
@@ -150,7 +156,7 @@ export const PLAYBOOKS: Playbook[] = [
       { name: 'bobby_xlayer_signals', role: 'Smart money on X Layer' },
       { name: 'bobby_security_scan', role: 'Optional deeper audit', paid: true },
     ],
-    guardrails: ['hard_risk_gate'],
+    guardrails: ['hard_risk_gate', 'metacognition'],
     blockRatePct: 25,
     blockRateCopy: 'Flags contract risk on roughly 1 in 4 trending tokens',
     demo: {
@@ -289,5 +295,137 @@ export const PLAYBOOKS: Playbook[] = [
     },
     badge: { label: 'PREVIEW · Base (8453) live · X Layer pending', tone: 'preview' },
     status: 'preview',
+  },
+
+  // ── Arbitrage ────────────────────────────────────────────
+  {
+    slug: 'funding-rate-harvest',
+    name: 'Funding Rate Harvest',
+    category: 'arbitrage',
+    tagline: "Harvest persistent positive funding without eating the underlying's drawdown.",
+    whatItIs:
+      "When a perp's funding rate sits persistently positive (longs paying shorts), a delta-neutral leg — short perp + long spot — collects funding while staying market-neutral. Bobby's debate filters this against carry erosion, venue-specific risk, and whether the positive funding is about to flip.",
+    painWithoutBobby:
+      'Entering a funding trade right before funding normalizes, or under-sizing the spot leg so a squeeze forces you out at a loss bigger than all harvested funding combined.',
+    tools: [
+      { name: 'bobby_brief', role: 'Spot + perp context bundle' },
+      { name: 'bobby_recommend', role: "Bobby's carry-trade entry signal" },
+    ],
+    guardrails: ['conviction_gate', 'mandatory_stop', 'hard_risk_gate', 'metacognition', 'circuit_breaker'],
+    blockRatePct: 55,
+    blockRateCopy: 'Blocks over half of funding trades that look "free"',
+    demo: null,
+    badge: { label: 'NEW · Arbitrage', tone: 'preview' },
+    status: 'live',
+  },
+
+  // ── Volatility ───────────────────────────────────────────
+  {
+    slug: 'volatility-crush-pre-catalyst',
+    name: 'Volatility Crush Pre-Catalyst',
+    category: 'volatility',
+    tagline: 'Sell rich premium into a scheduled catalyst — only if the market is mispricing the move.',
+    whatItIs:
+      "Implied vol spikes before known catalysts (ETH upgrade, macro print, unlock). Short premium captures the crush only when IV is meaningfully above realized AND Bobby's debate agrees the market is over-pricing the move. Red Team's job here is to sharpen the gamma tail risk.",
+    painWithoutBobby:
+      'Selling rich vol into a genuine regime shift. The "crush" never comes; gamma runs against you; one bad print vaporizes a quarter of harvested premium.',
+    tools: [
+      { name: 'bobby_analyze', role: 'IV vs realized vol + term structure', paid: true },
+      { name: 'bobby_judge', role: 'Independent audit of the crush thesis', paid: true },
+    ],
+    guardrails: ['conviction_gate', 'mandatory_stop', 'drawdown_kill_switch', 'judge_mode_6d', 'metacognition'],
+    blockRatePct: 65,
+    blockRateCopy: '2 in 3 "rich vol" setups fail the adversarial audit',
+    demo: null,
+    badge: { label: 'NEW · Volatility', tone: 'preview' },
+    status: 'live',
+  },
+
+  // ── Directional ──────────────────────────────────────────
+  {
+    slug: 'btc-eth-ratio-rotation',
+    name: 'BTC-ETH Ratio Rotation',
+    category: 'directional',
+    tagline: "Rotate between BTC and ETH when the ratio diverges past 2σ from its mean.",
+    whatItIs:
+      "When the ETH/BTC ratio stretches more than 2 standard deviations from its 90-day mean, a pair trade — long the laggard, short the leader — bets on mean reversion. Bobby's debate weighs whether the divergence is a regime shift or a reversion setup, and gates on whether dynamic conviction supports entry.",
+    painWithoutBobby:
+      'Shorting the "leader" right as a real regime change begins. The ratio trade converts from mean reversion to trend-following at the exact wrong time.',
+    tools: [
+      { name: 'bobby_brief', role: 'Ratio + regime context' },
+      { name: 'bobby_recommend', role: 'Pair-trade entry signal' },
+    ],
+    guardrails: ['conviction_gate', 'mandatory_stop', 'hard_risk_gate', 'metacognition', 'adversarial_bounties'],
+    blockRatePct: 50,
+    blockRateCopy: 'Half of ratio-trade setups fail when conviction is soft',
+    demo: null,
+    badge: { label: 'NEW · Pair trade', tone: 'preview' },
+    status: 'live',
+  },
+
+  // ── Yield ────────────────────────────────────────────────
+  {
+    slug: 'okb-staking-yield-park',
+    name: 'OKB Staking Yield Park',
+    category: 'yield',
+    tagline: "Park idle cash in OKB staking — only if debate says directional edge is weaker than the yield.",
+    whatItIs:
+      "When the debate can't reach conviction ≥3.5 on a directional trade, Bobby can park the USDT treasury in OKB staking / structured yield on OKX Earn instead of sitting idle. Yield Parking is the third outcome alongside EXECUTE and BLOCKED.",
+    painWithoutBobby:
+      "Cash sitting at 0% while a clear yield venue is available — or the opposite, yield-farming into a depeg because nobody pressure-tested the protocol risk.",
+    tools: [
+      { name: 'bobby_brief', role: 'Yield rates + protocol risk context' },
+      { name: 'bobby_recommend', role: 'Park-vs-deploy decision' },
+    ],
+    guardrails: ['yield_parking', 'conviction_gate', 'hard_risk_gate', 'metacognition'],
+    blockRatePct: 30,
+    blockRateCopy: 'Most yield parks pass — this gate is a routing decision, not a veto',
+    demo: null,
+    badge: { label: 'NEW · Yield', tone: 'preview' },
+    status: 'live',
+  },
+
+  // ── Directional (reversal) ───────────────────────────────
+  {
+    slug: 'mean-reversion-overshoot',
+    name: 'Mean Reversion Overshoot',
+    category: 'directional',
+    tagline: "Catch -3σ liquidation flushes without marrying the knife.",
+    whatItIs:
+      "Sharp -3σ moves on price+volume with RSI below 25 often snap back within 48h. Bobby's debate validates whether the flush was liquidation-driven (reversion setup) or news-driven (continuation risk). Red Team's job is to find a reason the reversion doesn't come.",
+    painWithoutBobby:
+      'Buying every -3σ wick and losing 4 times before the one that works pays for it — because there was no adversarial filter on which flushes reverse.',
+    tools: [
+      { name: 'bobby_brief', role: 'Price/volume/RSI context' },
+      { name: 'bobby_recommend', role: 'Reversion-entry signal' },
+    ],
+    guardrails: ['conviction_gate', 'mandatory_stop', 'drawdown_kill_switch', 'metacognition', 'adversarial_bounties'],
+    blockRatePct: 70,
+    blockRateCopy: '7 in 10 "falling knife" setups get rejected',
+    demo: null,
+    badge: { label: 'NEW · Reversion', tone: 'preview' },
+    status: 'live',
+  },
+
+  // ── Risk management ──────────────────────────────────────
+  {
+    slug: 'stablecoin-depeg-scanner',
+    name: 'Stablecoin Depeg Scanner',
+    category: 'risk-management',
+    tagline: 'Block every leg that touches a depegging stable before the unwind cascades.',
+    whatItIs:
+      "A continuous check: if USDT or USDC mid-price on OKX drops below 0.995, Bobby hard-gates every open trade that uses that stable as quote or collateral. This isn't a trade — it's a safety net. The debate here is about confidence in the depeg signal, not about whether to act.",
+    painWithoutBobby:
+      "Holding yield positions collateralized in a stable that's starting to wobble — the trade P&L goes to zero before you even hear about the depeg on Twitter.",
+    tools: [
+      { name: 'bobby_brief', role: 'Live stable mid-price + vol signal' },
+      { name: 'bobby_judge', role: 'Depeg confidence audit', paid: true },
+    ],
+    guardrails: ['circuit_breaker', 'drawdown_kill_switch', 'hard_risk_gate', 'metacognition', 'commit_reveal'],
+    blockRatePct: 95,
+    blockRateCopy: 'Near-total block rate during any stable-wobble event',
+    demo: null,
+    badge: { label: 'NEW · Safety net', tone: 'preview' },
+    status: 'live',
   },
 ];

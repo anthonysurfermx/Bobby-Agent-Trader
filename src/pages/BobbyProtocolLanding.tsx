@@ -423,13 +423,13 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         className="flex flex-wrap justify-center gap-3 mb-8"
       >
         <span className="px-3 py-1 bg-[#262626] border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[10px] tracking-widest">
-          [HARDNESS FINANCE]
+          [HARNESS FINANCE LAYER]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#fcc025]/20 text-[#fcc025] font-mono text-[10px] tracking-widest">
-          [PRESSURE-TEST LAYER]
+          [ISOLATED SANDBOX · LIVE]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#ff716a]/20 text-[#ff716a] font-mono text-[10px] tracking-widest">
-          [ON-CHAIN · X LAYER 196]
+          [11 STRATEGIES · X LAYER 196]
         </span>
       </motion.div>
 
@@ -523,13 +523,13 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex-1">
             <div className="text-[#6dfe9c] font-mono text-[10px] tracking-widest mb-2">
-              NEW · LIVE_ADVERSARIAL_SIMULATION
+              NEW · ISOLATED SANDBOX · 11 STRATEGIES
             </div>
             <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-2">
-              Don&apos;t take our word for it. Pressure-test Bobby in the Sandbox.
+              Test any strategy in an isolated environment before capital moves.
             </div>
             <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-              Browse the playbooks first, then run any strategy through Bobby&apos;s full adversarial debate in real time. ~60–90s. Simulation only.
+              Browse 11 pressure-test playbooks — directional, yield, volatility, arbitrage, on-chain flow, risk management. Each runs through Bobby&apos;s full adversarial debate + 11 guardrails in real time, with every run logged to a public audit trail.
             </p>
           </div>
           <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter whitespace-nowrap">
