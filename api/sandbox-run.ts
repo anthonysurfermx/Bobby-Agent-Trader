@@ -76,7 +76,10 @@ interface MarketContext {
 }
 
 async function fetchMarketContext(ticker: string, signal?: AbortSignal): Promise<MarketContext> {
-  const instId = `${ticker}-USDT`;
+  // Stablecoin self-pair has no spot ticker on OKX (USDT-USDT is invalid).
+  // For depeg-scanner playbooks, quote against USDC so we can observe the peg.
+  const isQuoteSelf = ticker === 'USDT';
+  const instId = isQuoteSelf ? 'USDC-USDT' : `${ticker}-USDT`;
   try {
     const resp = await fetch(`${OKX_BASE}/api/v5/market/ticker?instId=${instId}`, {
       headers: { 'Content-Type': 'application/json' },
@@ -218,20 +221,31 @@ function buildSystemPrompts(pb: Playbook | null): {
 
   const alpha = `You are Alpha Hunter, a bold trader looking for asymmetric bets on X Layer (OKB ecosystem).
 ${pbCtx ? `\nPlaybook context for this run:\n${pbCtx}\n` : ''}
-Output 3-5 short sentences. Build the BULL thesis for the ticker given. Mention 1 catalyst, 1 entry trigger, 1 invalidation. Terse, concrete, no hedging.`;
+Output 3-5 short sentences. Build the BULL thesis for the ticker given.
+Must reference the live market context (price, 24h move) AND the protocol intel (regime, fear/greed, technical leader) — not in generalities. If the intel is bearish, your bull thesis needs a concrete reason to dismiss it. If the intel is bullish, exploit it.
+Include: 1 catalyst, 1 entry trigger, 1 invalidation. Terse, concrete, no hedging.`;
 
   const red = `You are Red Team, an adversarial short seller. Your ONLY job is to destroy the thesis you just read.
 ${pbCtx ? `\nPlaybook context:\n${pbCtx}\n` : ''}
 Output 3-5 short sentences. Name the strongest counter-argument, the most likely failure mode, and one specific piece of evidence that would invalidate the bull case. Be ruthless. No "on the other hand."`;
 
-  const cio = `You are the CIO. You just read the bull thesis and the red team rebuttal.
+  const cio = `You are the CIO. You just read the bull thesis, the red team rebuttal, and protocol intel (regime, fear/greed, technical leader signal). Make a real call.
 ${pbCtx ? `\nPlaybook context:\n${pbCtx}\n` : ''}
-Output 3-4 short sentences + a final line in this exact format:
+Hard requirements:
+1. Cite or rebut the protocol intel explicitly. If the technical leader signal contradicts the bull thesis, say so. If fear/greed is below 30 in a bull thesis, address it.
+2. Score the trade by counting EVIDENCE. Each strong piece of bull evidence = +1.0. Each strong piece of bear evidence (from red team or intel) = -1.0. Soft/ambiguous evidence = ±0.3. Sum to a number from 0.0 to 10.0.
+3. DO NOT default to a "safe middle" number. If you find yourself writing 3.0 or 5.0 because it feels neutral, you are wrong — rate higher or lower based on actual evidence asymmetry.
+4. Use one decimal place that reflects real evidence count (e.g. 4.7, 6.2, 1.8, 7.3 — NOT round numbers).
+
+Output 3-4 short sentences explaining the decision (must reference intel + red team) + a final line in this exact format:
 VERDICT: <EXECUTE|YIELD_PARK|BLOCKED> | CONVICTION: <0.0-10.0>
-Rules:
-- BLOCKED if red team's counter is stronger than the thesis
-- YIELD_PARK if the thesis is plausible but conviction < 3.5
-- EXECUTE only if conviction >= 3.5 and no critical red-team flaw`;
+
+Routing:
+- BLOCKED if conviction < 1.5 OR red team found a critical flaw
+- YIELD_PARK if conviction is 1.5–3.4 (plausible but not enough edge)
+- EXECUTE if conviction ≥ 3.5 and no critical flaw
+
+Reminder: variability matters. Different trades → different conviction. A market with fear/greed 23 + bearish technical leader + macro headwinds is NOT the same as one with greed 75 + bullish leader + tailwinds.`;
 
   const judge = `You are the Judge. Audit the debate that just happened. Rate each of the 6 dimensions 1-5.
 Respond with ONLY valid JSON, no prose:
@@ -547,7 +561,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     send('phase_start', { phase: 'market_context' });
     const marketCtx = await fetchMarketContext(ticker);
     record.market_snapshot = marketCtx;
-    send('market_context', marketCtx);
+    send('market_context', marketCtx as unknown as Record<string, unknown>);
     send('phase_end', { phase: 'market_context' });
 
     // Protocol intel (soft — failure is non-fatal)
