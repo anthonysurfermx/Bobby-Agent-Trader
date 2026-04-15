@@ -21,11 +21,11 @@ Thumbs.db
 # Working files (not for repo)
 tmp/
 stitch_*/
-output/pdf/
 *.log
 
-# AI working dirs (keep briefs tracked optionally)
-.ai/responses/
+# Internal notes / AI working dirs — kept out of the public repo
+output/
+.ai/
 .claude/worktrees/
 .claude/launch.json
 .claude/settings.local.json
