@@ -423,7 +423,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         className="flex flex-wrap justify-center gap-3 mb-8"
       >
         <span className="px-3 py-1 bg-[#262626] border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[10px] tracking-widest">
-          [HARNESS FINANCE LAYER]
+          [HARNESS TRADING LAYER]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#fcc025]/20 text-[#fcc025] font-mono text-[10px] tracking-widest">
           [ISOLATED SANDBOX · LIVE]
@@ -439,7 +439,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.1 }}
         className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] text-center max-w-5xl leading-none uppercase mb-6"
       >
-        The Harness <span className="text-[#6dfe9c] italic">Finance</span> Layer for Agents
+        The Harness <span className="text-[#6dfe9c] italic">Trading</span> Layer for Agents
       </motion.h1>
 
       <motion.div

@@ -719,7 +719,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       name: SERVER_NAME,
       version: SERVER_VERSION,
       protocolVersion: PROTOCOL_VERSION,
-      description: 'Bobby Protocol — The Harness Finance Layer for AI agents. Adaptive financial control plane with adversarial debate, experiential memory, trust scoring, and on-chain settlement on X Layer.',
+      description: 'Bobby Protocol — The Harness Trading Layer for AI agents. Adaptive trading control plane with adversarial debate, experiential memory, trust scoring, and on-chain settlement on X Layer.',
       transport: 'streamable-http',
       endpoints: {
         mcp: '/api/mcp-http',
