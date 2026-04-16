@@ -6,28 +6,17 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { cached } from './_lib/api-cache';
+import {
+  collectDexSignals,
+  filterSignals,
+  type RawSignal,
+  type FilteredSignal,
+} from './_lib/signals';
 
 export const config = { maxDuration: 120 };
 
 // ---- Types ----
-interface RawSignal {
-  source: string;
-  chain: string;
-  tokenSymbol: string;
-  tokenAddress: string;
-  signalType: string;
-  amountUsd: number;
-  triggerWalletCount?: number;
-  soldRatioPct?: number;
-  marketCapUsd?: number;
-  confidence?: number;
-  metadata?: Record<string, unknown>;
-}
-
-interface FilteredSignal extends RawSignal {
-  filterScore: number;
-  reasons: string[];
-}
+// RawSignal + FilteredSignal now live in api/_lib/signals.ts (shared).
 
 interface TradeDecision {
   action: 'BUY' | 'SKIP';
@@ -192,113 +181,7 @@ async function getApproveCalldata(
   return null;
 }
 
-// ---- Collect OKX dex signals directly ----
-async function collectDexSignals(): Promise<RawSignal[]> {
-  const apiKey = process.env.OKX_API_KEY;
-  const secretKey = process.env.OKX_SECRET_KEY;
-  const passphrase = process.env.OKX_PASSPHRASE;
-  const projectId = process.env.OKX_PROJECT_ID;
-
-  if (!apiKey || !secretKey || !passphrase || !projectId) return [];
-
-  const chains = ['1', '501', '8453']; // ETH, SOL, Base
-
-  // Efficiency pass: fetch all chains in parallel (was sequential, ~3× RTT).
-  // Each chain fails independently via allSettled — same failure semantics as
-  // the prior `continue` in the for-loop.
-  const fetchChain = async (chainIndex: string): Promise<RawSignal[]> => {
-    const path = '/api/v6/dex/market/signal/list';
-    const body = JSON.stringify({ chainIndex, walletType: '1,2,3', minAmountUsd: '5000' });
-    const timestamp = new Date().toISOString();
-    const signature = await hmacSign(timestamp + 'POST' + path + body, secretKey);
-
-    const res = await fetch(`https://web3.okx.com${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'OK-ACCESS-KEY': apiKey,
-        'OK-ACCESS-SIGN': signature,
-        'OK-ACCESS-TIMESTAMP': timestamp,
-        'OK-ACCESS-PASSPHRASE': passphrase,
-        'OK-ACCESS-PROJECT': projectId,
-      },
-      body,
-    });
-
-    if (!res.ok) return [];
-    const json = await res.json() as { code: string; data: unknown };
-    if (json.code !== '0' || !Array.isArray(json.data)) return [];
-
-    const out: RawSignal[] = [];
-    for (const s of json.data as Array<Record<string, unknown>>) {
-      const token = s.token as Record<string, unknown> | undefined;
-      out.push({
-        source: 'okx_dex_signal',
-        chain: chainIndex,
-        tokenSymbol: String(token?.symbol || 'UNKNOWN'),
-        tokenAddress: String(token?.tokenAddress || ''),
-        signalType: String(s.walletType || ''),
-        amountUsd: parseFloat(String(s.amountUsd || '0')),
-        triggerWalletCount: parseInt(String(s.triggerWalletCount || '0')),
-        soldRatioPct: parseFloat(String(s.soldRatioPercent || '0')),
-        marketCapUsd: parseFloat(String(token?.marketCapUsd || '0')),
-      });
-    }
-    return out;
-  };
-
-  const results = await Promise.allSettled(chains.map(fetchChain));
-  const signals: RawSignal[] = [];
-  results.forEach((r, i) => {
-    if (r.status === 'fulfilled') {
-      signals.push(...r.value);
-    } else {
-      console.error(`[Agent] Chain ${chains[i]} signal error:`, r.reason);
-    }
-  });
-
-  return signals;
-}
-
-// ---- Filter signals ----
-function filterSignals(signals: RawSignal[]): FilteredSignal[] {
-  const filtered: FilteredSignal[] = [];
-
-  for (const signal of signals) {
-    const reasons: string[] = [];
-    let score = 0;
-
-    if (signal.source === 'okx_dex_signal') {
-      if (signal.amountUsd < 5000) continue;
-
-      const wallets = signal.triggerWalletCount || 0;
-      if (wallets >= 3) { score += 30; reasons.push(`${wallets} wallets`); }
-      else if (wallets >= 2) { score += 15; reasons.push(`${wallets} wallets`); }
-      else score += 5;
-
-      const sold = signal.soldRatioPct || 0;
-      if (sold < 10) { score += 25; reasons.push(`Only ${sold}% sold`); }
-      else if (sold < 30) { score += 15; }
-      else if (sold > 70) continue;
-
-      if (signal.amountUsd > 100000) { score += 20; reasons.push(`$${(signal.amountUsd / 1000).toFixed(0)}K`); }
-      else if (signal.amountUsd > 25000) { score += 10; }
-
-      if (signal.signalType === '1') { score += 10; reasons.push('Smart Money'); }
-      else if (signal.signalType === '3') { score += 8; reasons.push('Whale'); }
-      else if (signal.signalType === '2') { score += 5; reasons.push('KOL'); }
-
-      if (signal.marketCapUsd && signal.marketCapUsd < 100000) continue;
-    }
-
-    if (score < 20) continue;
-
-    filtered.push({ ...signal, filterScore: Math.min(100, score), reasons });
-  }
-
-  filtered.sort((a, b) => b.filterScore - a.filterScore);
-  return filtered.slice(0, 10);
-}
+// ---- Signal ingest + filter extracted to ./_lib/signals.ts ----
 
 // ---- OpenAI call helper (shared by all agents) ----
 // Replaces Anthropic tool_use with OpenAI function-call tools API.
@@ -1492,7 +1375,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Phase 0: Polymarket Intelligence (parallel with OKX)
     console.log('[Agent] Collecting signals + Polymarket intelligence...');
     const [raw, polyConsensus] = await Promise.all([
-      collectDexSignals(),
+      collectDexSignals({ logPrefix: '[Agent]' }),
       collectPolymarketIntelligence(),
     ]);
     console.log(`[Agent] ${raw.length} raw signals, ${polyConsensus.length} Polymarket consensus markets`);
