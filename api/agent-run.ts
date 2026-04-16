@@ -17,22 +17,19 @@ import {
   getSwapCalldata,
   getApproveCalldata,
 } from './_lib/dex-execution';
+import {
+  applyRiskGate,
+  calculateDynamicConviction,
+  kellySize,
+  type TradeDecision,
+} from './_lib/risk-gate';
 
 export const config = { maxDuration: 120 };
 
 // ---- Types ----
 // RawSignal + FilteredSignal now live in api/_lib/signals.ts (shared).
 
-interface TradeDecision {
-  action: 'BUY' | 'SKIP';
-  chain: string;
-  tokenAddress: string;
-  tokenSymbol: string;
-  amountUsd: number;
-  reason: string;
-  confidence: number;
-  signalSources: string[];
-}
+// TradeDecision moved to ./_lib/risk-gate.ts
 
 // ---- DEX execution helpers + TOKEN_REGISTRY extracted to ./_lib/dex-execution.ts ----
 // ---- Signal ingest + filter extracted to ./_lib/signals.ts ----
@@ -105,19 +102,7 @@ async function callClaude(
   return { text, toolInput };
 }
 
-// ---- Dynamic Conviction Score ----
-// Computes a 0-1 score combining OKX signal strength, Polymarket consensus, and latency penalty
-function calculateDynamicConviction(
-  okxScore: number,       // 0-1, normalized from filterScore (0-100)
-  polyConsensus: number,  // 0-1, normalized from Polymarket edgePct
-  latencyMs: number       // age of signal in ms
-): number {
-  // Exponential penalty: <=5min = fresh (0), 60min = ~0.22, >60min = caps at 0.5
-  const minutes = latencyMs / 60000;
-  const latencyPenalty = minutes <= 5 ? 0 : Math.min(0.5, 0.02 * Math.exp(0.04 * minutes));
-  const raw = (okxScore * 0.4) + (polyConsensus * 0.6) - latencyPenalty;
-  return Math.max(0, Math.min(1, raw));
-}
+// ---- Dynamic conviction + Kelly sizing + risk gate extracted to ./_lib/risk-gate.ts ----
 
 // ---- Calculate win rate from recent cycles ----
 type CycleRecord = { status: string; trades_executed: number; trades_successful?: number; total_usd_deployed?: number };
@@ -331,27 +316,6 @@ OUTPUT: Call execute_decisions. Set confidence as conviction_score (0.0-1.0). Ma
   };
 }
 
-// ---- Kelly Criterion Dynamic Position Sizing ----
-// f* = (p(b+1) - 1) / b
-// p = probability of success (confidence), b = win/loss ratio
-function kellySize(confidence: number, bankroll: number, maxExposurePct = 0.33): number {
-  // Estimate win/loss ratio from historical or use 2:1 default for crypto
-  const b = 2.0;
-  const p = Math.max(0.5, Math.min(0.95, confidence)); // clamp
-
-  const kelly = (p * (b + 1) - 1) / b;
-  if (kelly <= 0) return 0; // negative edge = don't bet
-
-  // Half-Kelly for safety (standard practice)
-  const halfKelly = kelly * 0.5;
-
-  // Apply to bankroll with max exposure cap
-  const size = Math.min(bankroll * halfKelly, bankroll * maxExposurePct);
-
-  // Floor at $5, cap at $75
-  return Math.max(5, Math.min(75, Math.round(size * 100) / 100));
-}
-
 // ---- Prompt Self-Optimization ----
 // Analyzes last N cycles' outcomes and generates an improved system prompt
 async function fetchStoredPrompt(): Promise<string | null> {
@@ -522,65 +486,7 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
   }
 }
 
-// ---- Risk gate with DETERMINISTIC conviction (Codex P1 audit) ----
-// The LLM confidence is used ONLY for explanation, NOT for gate/sizing.
-// Gate and sizing use backend-computed dynamicConviction from on-chain data.
-function applyRiskGate(
-  decisions: TradeDecision[],
-  bankroll = 500,
-  isSafeMode = false,
-  backendConvictions?: Map<string, number>, // symbol → dynamicConviction from backend
-): { approved: TradeDecision[]; blocked: number; sizingMethod: string } {
-  const approved: TradeDecision[] = [];
-  let exposure = 0;
-  const maxExposurePct = isSafeMode ? 0.15 : 0.30;
-  const maxExposure = bankroll * maxExposurePct;
-  const confidenceThreshold = isSafeMode ? 0.8 : 0.7;
-
-  // Codex P1: max daily loss = 10% of bankroll
-  const maxDailyLoss = bankroll * 0.10;
-  // Codex P1: max 3 concurrent positions
-  const maxPositions = 3;
-  // Codex P1: cooldown — no more than 1 trade per symbol per 4 hours
-  const recentSymbols = new Set<string>();
-
-  for (const d of decisions) {
-    // Codex P1: USE BACKEND CONVICTION, not LLM confidence
-    const deterministicConv = backendConvictions?.get(d.tokenSymbol) ?? d.confidence;
-
-    // Gate on deterministic score, not LLM hallucination
-    if (deterministicConv < confidenceThreshold) {
-      console.log(`[RiskGate] Blocked ${d.tokenSymbol}: backend conviction ${deterministicConv.toFixed(2)} < threshold ${confidenceThreshold}`);
-      continue;
-    }
-
-    // Codex P1: max concurrent positions
-    if (approved.length >= maxPositions) continue;
-
-    // Codex P1: no duplicate symbols
-    if (recentSymbols.has(d.tokenSymbol)) continue;
-    recentSymbols.add(d.tokenSymbol);
-
-    // Kelly sizing uses DETERMINISTIC conviction
-    const kellyAmount = kellySize(deterministicConv, bankroll, maxExposurePct);
-    d.amountUsd = isSafeMode ? kellyAmount * 0.5 : kellyAmount;
-
-    // Codex P1: max daily loss check
-    if (exposure + d.amountUsd > maxDailyLoss) continue;
-    if (exposure + d.amountUsd > maxExposure) continue;
-
-    // Store the deterministic conviction for transparency
-    (d as any).deterministicConviction = deterministicConv;
-    (d as any).llmConfidence = d.confidence;
-    d.confidence = deterministicConv; // Override with backend score
-
-    approved.push(d);
-    exposure += d.amountUsd;
-  }
-
-  const method = isSafeMode ? 'half-kelly-safe-mode' : 'half-kelly';
-  return { approved, blocked: decisions.length - approved.length, sizingMethod: method };
-}
+// applyRiskGate moved to ./_lib/risk-gate.ts
 
 // ---- Polymarket Intelligence — Direct API calls ----
 
