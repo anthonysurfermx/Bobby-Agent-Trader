@@ -7,7 +7,7 @@ Main product: **Bobby Agent Trader** — 3-agent debate system (Alpha Hunter, Re
 ## Tech Stack
 - Frontend: React 18, TypeScript, Tailwind CSS, Framer Motion, Recharts, wagmi/viem
 - Backend: Vercel serverless functions (api/*.ts), Supabase (Postgres + RLS)
-- AI: Claude API (Haiku for debates, Sonnet for judge), streaming via SSE
+- AI: Mixed provider — OpenAI GPT-4o for agent-run / bobby-cycle / bobby-intel debates (function-call tools API), Anthropic Claude Haiku for explain.ts streaming. Migrated from Anthropic tool_use to OpenAI function-call during the hackathon for stricter structured-output behavior; revert path is `api/_lib/llm.ts` wrapper if/when we reunify providers.
 - Blockchain: OKX X Layer (Chain 196), OKB native + USDT ERC-20
 - Design: Stitch Kinetic Terminal — dark terminal aesthetic (green-400 on #050505, glassmorphism cards)
 - Bot: Telegram via webhook (api/telegram-webhook.ts)
@@ -17,7 +17,7 @@ Main product: **Bobby Agent Trader** — 3-agent debate system (Alpha Hunter, Re
 api/agent-run.ts      — Main 8h cycle: signals → filter → debate → risk gate → execute
 api/bobby-intel.ts    — Fast intelligence snapshot (~10s): regime, conviction, mood
 api/bobby-cycle.ts    — User-facing debate cycle (every 5min via cron)
-api/explain.ts        — Claude Haiku streaming analysis via SSE
+api/explain.ts        — Anthropic Claude Haiku streaming analysis via SSE (only endpoint still on Anthropic)
 api/telegram-*.ts     — Bot webhook + payment verification
 src/pages/Bobby*.tsx  — 11+ views wrapped in KineticShell
 src/components/kinetic/KineticShell.tsx — Terminal frame + nav + ticker
