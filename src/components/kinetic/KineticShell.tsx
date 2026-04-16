@@ -106,7 +106,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false }: Kinetic
     <div className="min-h-screen bg-[#050505] text-[#e5e2e1] font-['Inter'] selection:bg-green-500 selection:text-black">
       {/* === Top Nav === */}
       <nav className={`sticky top-0 w-full flex justify-between items-center px-4 md:px-6 h-14 bg-[#131313]/80 backdrop-blur-md z-50 ${navGlow} border-b border-white/5`}>
-        <Link to="/agentic-world/bobby" className={`text-lg font-black tracking-tighter ${navAccent} font-mono hover:opacity-80 transition-opacity`}>
+        <Link to="/protocol" className={`text-lg font-black tracking-tighter ${navAccent} font-mono hover:opacity-80 transition-opacity`}>
           {roomMode === 'personal' && hasAgent
             ? `${agentName} TRADING ROOM`
             : `${agentName} AGENT TRADER`}
