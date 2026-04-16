@@ -166,77 +166,135 @@ function identifyMethod(to: string, input: string): string {
   return 'interact';
 }
 
+// X Layer RPC caps eth_getLogs at 100 blocks per call. We scan a window of
+// recent blocks in parallel chunks of 100, then batch-fetch the unique txs
+// the logs refer to. This is O(events) — not O(blocks) like the old
+// block-by-block scanner, which was timing out past ~2M blocks of gap.
+const LOGS_CHUNK_SIZE = 100;
+const MAX_PARALLEL_CHUNKS = 40;      // 40 × 100 = 4000 blocks ≈ 3.3h of X Layer
+const CONTRACT_ADDRESSES = Object.keys(CONTRACT_NAMES); // lowercase
+
 async function fetchHistoricalTxPage(
   startBlock: number,
   limit: number,
 ): Promise<{ items: OnChainTx[]; nextCursor: number | null; done: boolean }> {
-  const items: OnChainTx[] = [];
-  let cursor = startBlock;
-  const batchSize = 5;
-  const parallelBatches = 3;
+  // Scan window: [windowFrom, startBlock], clamped to the protocol genesis.
+  const windowFrom = Math.max(
+    PROTOCOL_ACTIVITY_START_BLOCK,
+    startBlock - LOGS_CHUNK_SIZE * MAX_PARALLEL_CHUNKS + 1,
+  );
 
-  while (cursor >= PROTOCOL_ACTIVITY_START_BLOCK && items.length < limit) {
-    const requests: Promise<void>[] = [];
-    let blocksQueued = 0;
-
-    for (let batchIndex = 0; batchIndex < parallelBatches; batchIndex++) {
-      const batchCalls = [];
-
-      for (let offset = 0; offset < batchSize; offset++) {
-        const blockNumber = cursor - (batchIndex * batchSize + offset);
-        if (blockNumber < PROTOCOL_ACTIVITY_START_BLOCK) break;
-
-        batchCalls.push({
-          jsonrpc: '2.0',
-          method: 'eth_getBlockByNumber',
-          params: [`0x${blockNumber.toString(16)}`, true],
-          id: offset + 1,
-        });
-      }
-
-      if (batchCalls.length === 0) break;
-      blocksQueued += batchCalls.length;
-
-      requests.push(
-        fetchBlockBatch(batchCalls)
-          .then(async (data) => {
-            for (const blockResult of data) {
-              const block = blockResult?.result;
-              if (!block?.transactions?.length) continue;
-
-              const blockTs = block.timestamp ? parseInt(String(block.timestamp), 16) : null;
-              const blockNum = block.number ? parseInt(String(block.number), 16) : 0;
-
-              for (const tx of block.transactions) {
-                if (String(tx.from || '').toLowerCase() !== TREASURY.toLowerCase()) continue;
-
-                const txTo = String(tx.to || '').toLowerCase();
-                if (!CONTRACT_NAMES[txTo]) continue;
-
-                items.push({
-                  hash: tx.hash,
-                  contract: txTo,
-                  contractName: CONTRACT_NAMES[txTo],
-                  method: identifyMethod(txTo, tx.input || '0x'),
-                  blockNumber: blockNum,
-                  timestamp: blockTs,
-                  valueOkb: formatEther(BigInt(tx.value || '0x0')),
-                });
-              }
-            }
-          })
-      );
-    }
-
-    if (blocksQueued === 0) break;
-
-    const settled = await Promise.allSettled(requests);
-    if (settled.every((result) => result.status === 'rejected')) {
-      throw new Error('Unable to load block history from X Layer RPC');
-    }
-
-    cursor -= blocksQueued;
+  // Build 100-block chunks, newest first.
+  const chunks: Array<{ from: number; to: number }> = [];
+  for (let to = startBlock; to >= windowFrom; to -= LOGS_CHUNK_SIZE) {
+    chunks.push({ from: Math.max(windowFrom, to - LOGS_CHUNK_SIZE + 1), to });
   }
+
+  // Parallel getLogs over chunks. Each returns the logs emitted by any of
+  // the 6 Bobby contracts in that 100-block slice.
+  const logResults = await Promise.allSettled(
+    chunks.map(({ from, to }) =>
+      rpcCall('eth_getLogs', [
+        {
+          fromBlock: `0x${from.toString(16)}`,
+          toBlock: `0x${to.toString(16)}`,
+          address: CONTRACT_ADDRESSES,
+        },
+      ]),
+    ),
+  );
+
+  // If every chunk failed, surface the first error — something is wrong.
+  if (logResults.every((r) => r.status === 'rejected')) {
+    throw new Error('Unable to load logs from X Layer RPC');
+  }
+
+  // Dedupe tx hashes across all logs (one tx often emits multiple logs).
+  const uniqueTxHashes = new Set<string>();
+  for (const r of logResults) {
+    if (r.status !== 'fulfilled' || !Array.isArray(r.value)) continue;
+    for (const log of r.value as Array<{ transactionHash?: string }>) {
+      if (log?.transactionHash) uniqueTxHashes.add(log.transactionHash);
+    }
+  }
+
+  if (uniqueTxHashes.size === 0) {
+    return {
+      items: [],
+      nextCursor: windowFrom > PROTOCOL_ACTIVITY_START_BLOCK ? windowFrom - 1 : null,
+      done: windowFrom <= PROTOCOL_ACTIVITY_START_BLOCK,
+    };
+  }
+
+  // Batch-fetch the unique transactions. 20 per RPC batch is a conservative
+  // fit for X Layer; we issue multiple batches in parallel if needed.
+  const TX_BATCH_SIZE = 20;
+  const hashes = Array.from(uniqueTxHashes);
+  const txBatches: unknown[][] = [];
+  for (let i = 0; i < hashes.length; i += TX_BATCH_SIZE) {
+    txBatches.push(
+      hashes.slice(i, i + TX_BATCH_SIZE).map((hash, idx) => ({
+        jsonrpc: '2.0',
+        method: 'eth_getTransactionByHash',
+        params: [hash],
+        id: idx + 1,
+      })),
+    );
+  }
+  const txResults = await Promise.allSettled(txBatches.map((b) => fetchBlockBatch(b)));
+  const txs: Array<RpcBlockTx & { blockNumber?: string }> = [];
+  for (const r of txResults) {
+    if (r.status !== 'fulfilled') continue;
+    for (const entry of r.value) {
+      const tx = (entry as { result?: RpcBlockTx & { blockNumber?: string } }).result;
+      if (tx) txs.push(tx);
+    }
+  }
+
+  // Filter: only Treasury-originated interactions with known contracts.
+  const relevant = txs.filter((tx) => {
+    if (String(tx.from || '').toLowerCase() !== TREASURY.toLowerCase()) return false;
+    return Boolean(CONTRACT_NAMES[String(tx.to || '').toLowerCase()]);
+  });
+
+  // Batch-fetch block timestamps for the unique blocks we actually need.
+  const blockNumbers = Array.from(
+    new Set(relevant.map((t) => t.blockNumber).filter(Boolean) as string[]),
+  );
+  const blockTsMap = new Map<string, number>();
+  if (blockNumbers.length > 0) {
+    const calls = blockNumbers.map((bn, i) => ({
+      jsonrpc: '2.0',
+      method: 'eth_getBlockByNumber',
+      params: [bn, false],
+      id: i + 1,
+    }));
+    try {
+      const blockRes = await fetchBlockBatch(calls);
+      for (const entry of blockRes) {
+        const block = (entry as { result?: RpcBlock }).result;
+        if (block?.number && block?.timestamp) {
+          blockTsMap.set(block.number, parseInt(String(block.timestamp), 16));
+        }
+      }
+    } catch {
+      // Non-fatal — timestamps become null for affected items.
+    }
+  }
+
+  const items: OnChainTx[] = relevant.map((tx) => {
+    const txTo = String(tx.to || '').toLowerCase();
+    const blockNumHex = tx.blockNumber ?? '';
+    return {
+      hash: tx.hash,
+      contract: txTo,
+      contractName: CONTRACT_NAMES[txTo],
+      method: identifyMethod(txTo, tx.input || '0x'),
+      blockNumber: blockNumHex ? parseInt(blockNumHex, 16) : 0,
+      timestamp: blockTsMap.get(blockNumHex) ?? null,
+      valueOkb: formatEther(BigInt(tx.value || '0x0')),
+    };
+  });
 
   items.sort((a, b) => {
     if (b.blockNumber !== a.blockNumber) return b.blockNumber - a.blockNumber;
@@ -245,8 +303,8 @@ async function fetchHistoricalTxPage(
 
   return {
     items: items.slice(0, limit),
-    nextCursor: cursor >= PROTOCOL_ACTIVITY_START_BLOCK ? cursor : null,
-    done: cursor < PROTOCOL_ACTIVITY_START_BLOCK,
+    nextCursor: windowFrom > PROTOCOL_ACTIVITY_START_BLOCK ? windowFrom - 1 : null,
+    done: windowFrom <= PROTOCOL_ACTIVITY_START_BLOCK,
   };
 }
 
