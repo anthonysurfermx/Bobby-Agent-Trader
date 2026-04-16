@@ -12,6 +12,7 @@ import {
   type TechnicalIndicatorBundle,
   type TechnicalIndicatorName,
 } from '../src/lib/bobby-technical.js';
+import { cached } from './_lib/api-cache';
 
 export const config = { maxDuration: 30 };
 
@@ -376,25 +377,29 @@ function aggregatePolyConsensus(
 }
 
 async function collectPolymarketIntelligence(): Promise<SmartMoneyConsensus[]> {
-  const traders = await fetchPolyLeaderboard(15);
-  if (traders.length === 0) return [];
+  // Shared TTL cache with agent-run.ts — same key, so both paths reuse
+  // each other's fetches. 5min TTL on a ~hourly-shifting consensus is safe.
+  return cached<SmartMoneyConsensus[]>('polymarket:consensus:v1', 300, async () => {
+    const traders = await fetchPolyLeaderboard(15);
+    if (traders.length === 0) return [];
 
-  const positionsByWallet = new Map<string, PolyPosition[]>();
+    const positionsByWallet = new Map<string, PolyPosition[]>();
 
-  // Batch fetch: 5 at a time to avoid rate limits
-  for (let i = 0; i < traders.length; i += 5) {
-    const batch = traders.slice(i, i + 5);
-    const results = await Promise.allSettled(
-      batch.map(t => fetchPolyPositions(t.proxyWallet))
-    );
-    results.forEach((r, idx) => {
-      if (r.status === 'fulfilled') {
-        positionsByWallet.set(batch[idx].proxyWallet, r.value);
-      }
-    });
-  }
+    // Batch fetch: 5 at a time to avoid rate limits
+    for (let i = 0; i < traders.length; i += 5) {
+      const batch = traders.slice(i, i + 5);
+      const results = await Promise.allSettled(
+        batch.map(t => fetchPolyPositions(t.proxyWallet))
+      );
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') {
+          positionsByWallet.set(batch[idx].proxyWallet, r.value);
+        }
+      });
+    }
 
-  return aggregatePolyConsensus(traders, positionsByWallet);
+    return aggregatePolyConsensus(traders, positionsByWallet);
+  });
 }
 
 // ---- Supabase: Recent Cycles (performance history) ----

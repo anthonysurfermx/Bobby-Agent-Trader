@@ -5,6 +5,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { cached } from './_lib/api-cache';
 
 export const config = { maxDuration: 120 };
 
@@ -954,29 +955,35 @@ function aggregatePolyConsensus(
 }
 
 async function collectPolymarketIntelligence(): Promise<SmartMoneyConsensus[]> {
-  console.log('[Agent] Fetching Polymarket leaderboard...');
-  const traders = await fetchPolyLeaderboard(15);
-  if (traders.length === 0) return [];
+  // Shared TTL cache: leaderboard + top-15 positions + aggregation are
+  // identical across all callers (agent-run, bobby-intel, dashboards). The
+  // consensus only shifts on the minute-scale, so a 5min TTL is safe and
+  // removes ~16 external calls per cycle.
+  return cached<SmartMoneyConsensus[]>('polymarket:consensus:v1', 300, async () => {
+    console.log('[Agent] Fetching Polymarket leaderboard (cache miss)...');
+    const traders = await fetchPolyLeaderboard(15);
+    if (traders.length === 0) return [];
 
-  console.log(`[Agent] ${traders.length} top traders, fetching positions...`);
-  const positionsByWallet = new Map<string, PolyPosition[]>();
+    console.log(`[Agent] ${traders.length} top traders, fetching positions...`);
+    const positionsByWallet = new Map<string, PolyPosition[]>();
 
-  // Batch fetch: 5 at a time
-  for (let i = 0; i < traders.length; i += 5) {
-    const batch = traders.slice(i, i + 5);
-    const results = await Promise.allSettled(
-      batch.map(t => fetchPolyPositions(t.proxyWallet))
-    );
-    results.forEach((r, idx) => {
-      if (r.status === 'fulfilled') {
-        positionsByWallet.set(batch[idx].proxyWallet, r.value);
-      }
-    });
-  }
+    // Batch fetch: 5 at a time
+    for (let i = 0; i < traders.length; i += 5) {
+      const batch = traders.slice(i, i + 5);
+      const results = await Promise.allSettled(
+        batch.map(t => fetchPolyPositions(t.proxyWallet))
+      );
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') {
+          positionsByWallet.set(batch[idx].proxyWallet, r.value);
+        }
+      });
+    }
 
-  const consensus = aggregatePolyConsensus(traders, positionsByWallet);
-  console.log(`[Agent] ${consensus.length} Polymarket consensus markets found`);
-  return consensus;
+    const consensus = aggregatePolyConsensus(traders, positionsByWallet);
+    console.log(`[Agent] ${consensus.length} Polymarket consensus markets found`);
+    return consensus;
+  });
 }
 
 // ---- Fetch advisor profiles for personalized greetings ----
