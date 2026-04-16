@@ -53,6 +53,14 @@
     {
       "path": "/api/cron-activity",
       "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/settle-trades",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/forum-resolve",
+      "schedule": "7,22,37,52 * * * *"
     }
   ],
   "functions": {
@@ -102,6 +110,10 @@
     },
     "api/forum-resolve.ts": {
       "maxDuration": 30,
+      "memory": 256
+    },
+    "api/settle-trades.ts": {
+      "maxDuration": 60,
       "memory": 256
     },
     "api/forum-morning.ts": {

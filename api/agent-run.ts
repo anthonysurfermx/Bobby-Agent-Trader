@@ -587,30 +587,74 @@ async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: str
 }
 
 // ---- Circuit breaker: halt cycle on sustained losses ----
-// Proxy implementation until `agent_trade_outcomes` table lands with real PnL.
-// Today we halt if the last 3 cycles executed trades but none were successful
-// (trades_successful = 0 despite trades_executed > 0). Fails open on DB error
-// so a Supabase outage does not freeze the bot — the per-cycle risk gate
-// (max_daily_loss in applyRiskGate) still bounds downside in that case.
+// Reads from agent_trades (settled by /api/settle-trades) so the signal is
+// real realized PnL, not the old trades_successful proxy. Two halt rules:
+//   1. Rolling 24h realized drawdown > 10% of bankroll.
+//   2. >=3 consecutive settled losses with no intervening win.
+// Fails open on DB error — per-cycle risk gate still bounds downside.
 async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string; detail?: string }> {
-  const cycles = await fetchRecentCycles(5);
-  if (cycles.length < 3) return { halted: false };
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { halted: false };
 
-  const executed = cycles.filter(c => c.status === 'completed' && c.trades_executed > 0);
-  if (executed.length < 3) return { halted: false };
+  const BANKROLL = 500;
+  const DRAWDOWN_PCT = 0.10;
+  const CONSECUTIVE_LOSSES = 3;
 
-  const last3 = executed.slice(0, 3);
-  const allLosses = last3.every(c => (c.trades_successful || 0) === 0);
-  if (allLosses) {
-    const lostUsd = last3.reduce((s, c) => s + (c.total_usd_deployed || 0), 0);
-    return {
-      halted: true,
-      reason: 'consecutive_losses_3',
-      detail: `Last 3 executing cycles had 0 successful trades. ~$${lostUsd.toFixed(0)} at risk.`,
-    };
+  try {
+    // Rolling 24h realized PnL from settled trades.
+    const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const recentUrl =
+      `${url}/rest/v1/agent_trades` +
+      `?settled_at=gte.${encodeURIComponent(sinceIso)}` +
+      `&status=eq.closed` +
+      `&select=outcome,realized_pnl_pct,amount_usd,settled_at` +
+      `&order=settled_at.desc&limit=100`;
+    const recentRes = await fetch(recentUrl, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!recentRes.ok) return { halted: false };
+    const recent = (await recentRes.json()) as Array<{
+      outcome: string;
+      realized_pnl_pct: number | null;
+      amount_usd: number | null;
+      settled_at: string;
+    }>;
+    if (!Array.isArray(recent) || recent.length === 0) return { halted: false };
+
+    // Rule 1: realized drawdown in USD / bankroll.
+    const realizedUsd = recent.reduce((sum, t) => {
+      const pct = (t.realized_pnl_pct || 0) / 100;
+      const notional = t.amount_usd || 0;
+      return sum + pct * notional;
+    }, 0);
+    if (realizedUsd < -BANKROLL * DRAWDOWN_PCT) {
+      return {
+        halted: true,
+        reason: 'rolling_drawdown_24h',
+        detail: `24h realized PnL $${realizedUsd.toFixed(2)} exceeds ${(DRAWDOWN_PCT * 100).toFixed(0)}% of $${BANKROLL} bankroll.`,
+      };
+    }
+
+    // Rule 2: N consecutive losses with no intervening win.
+    let streak = 0;
+    for (const t of recent) {
+      if (t.outcome === 'loss') streak += 1;
+      else if (t.outcome === 'win') break;
+      // break_even and null neither reset nor increment — skip.
+    }
+    if (streak >= CONSECUTIVE_LOSSES) {
+      return {
+        halted: true,
+        reason: `consecutive_losses_${streak}`,
+        detail: `${streak} settled losses in a row (24h window).`,
+      };
+    }
+
+    return { halted: false };
+  } catch {
+    return { halted: false };
   }
-
-  return { halted: false };
 }
 
 // ---- Risk gate with DETERMINISTIC conviction (Codex P1 audit) ----

@@ -1384,7 +1384,9 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
               if (openRes.ok) {
                 executionResult = openRes;
 
-                // Insert into agent_trades (Codex P0: metrics were never recorded)
+                // Insert into agent_trades (Codex P0: metrics were never recorded).
+                // Stop/target stamped here so /api/settle-trades can close and
+                // score the trade without joining across tables.
                 await sbInsert('agent_trades', {
                   cycle_id: cycleId || null,
                   chain: 'xlayer',
@@ -1393,6 +1395,8 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                   direction,
                   amount_usd: positionSizeUsd,
                   entry_price: currentPrice || entryPrice,
+                  stop_price: stopPrice || null,
+                  target_price: targetPrice || null,
                   tx_hash: openRes.ordId || openRes.orderId || null,
                   status: 'open',
                   llm_reasoning: cioPost.slice(0, 500),
