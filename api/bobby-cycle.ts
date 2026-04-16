@@ -1386,7 +1386,9 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
 
                 // Insert into agent_trades (Codex P0: metrics were never recorded).
                 // Stop/target stamped here so /api/settle-trades can close and
-                // score the trade without joining across tables.
+                // score the trade without joining across tables. expires_at
+                // matches the 48h horizon used for forum_threads — after that
+                // the settler marks break_even / win / loss based on the mark.
                 await sbInsert('agent_trades', {
                   cycle_id: cycleId || null,
                   chain: 'xlayer',
@@ -1397,6 +1399,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                   entry_price: currentPrice || entryPrice,
                   stop_price: stopPrice || null,
                   target_price: targetPrice || null,
+                  expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
                   tx_hash: openRes.ordId || openRes.orderId || null,
                   status: 'open',
                   llm_reasoning: cioPost.slice(0, 500),
