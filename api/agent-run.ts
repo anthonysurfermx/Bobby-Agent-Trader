@@ -29,17 +29,6 @@ interface TradeDecision {
   signalSources: string[];
 }
 
-// ---- HMAC for OKX ----
-async function hmacSign(message: string, secret: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)));
-}
-
 // ---- Token Registry (inline for Vercel serverless) ----
 const TOKEN_REGISTRY: Record<string, Record<string, { address: string; decimals: number }>> = {
   '196': { // X Layer

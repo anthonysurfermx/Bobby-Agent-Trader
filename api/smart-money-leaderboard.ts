@@ -4,6 +4,7 @@
 // Returns: smart money leaderboard with wallet PnL, signal strength, and trading patterns
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { hmacSign } from './_lib/okx-hmac';
 
 export const config = { maxDuration: 30 };
 
@@ -22,16 +23,6 @@ const TOKEN_REGISTRY: Record<string, Record<string, string>> = {
     USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
   },
 };
-
-async function hmacSign(message: string, secret: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)));
-}
 
 async function fetchOKXGet(path: string, apiKey: string, secretKey: string, passphrase: string, projectId: string) {
   const timestamp = new Date().toISOString();
