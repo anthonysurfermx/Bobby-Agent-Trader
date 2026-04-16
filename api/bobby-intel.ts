@@ -95,52 +95,60 @@ async function collectDexSignals(): Promise<RawSignal[]> {
   if (!apiKey || !secretKey || !passphrase || !projectId) return [];
 
   const chains = ['1', '501', '8453']; // ETH, SOL, Base
-  const signals: RawSignal[] = [];
   const now = Date.now();
 
-  for (const chainIndex of chains) {
-    try {
-      const path = '/api/v6/dex/market/signal/list';
-      const body = JSON.stringify({ chainIndex, walletType: '1,2,3', minAmountUsd: '5000' });
-      const timestamp = new Date().toISOString();
-      const signature = await hmacSign(timestamp + 'POST' + path + body, secretKey);
+  // Efficiency pass: fetch all chains in parallel (was sequential, ~3× RTT).
+  const fetchChain = async (chainIndex: string): Promise<RawSignal[]> => {
+    const path = '/api/v6/dex/market/signal/list';
+    const body = JSON.stringify({ chainIndex, walletType: '1,2,3', minAmountUsd: '5000' });
+    const timestamp = new Date().toISOString();
+    const signature = await hmacSign(timestamp + 'POST' + path + body, secretKey);
 
-      const res = await fetch(`https://web3.okx.com${path}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'OK-ACCESS-KEY': apiKey,
-          'OK-ACCESS-SIGN': signature,
-          'OK-ACCESS-TIMESTAMP': timestamp,
-          'OK-ACCESS-PASSPHRASE': passphrase,
-          'OK-ACCESS-PROJECT': projectId,
-        },
-        body,
+    const res = await fetch(`https://web3.okx.com${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'OK-ACCESS-KEY': apiKey,
+        'OK-ACCESS-SIGN': signature,
+        'OK-ACCESS-TIMESTAMP': timestamp,
+        'OK-ACCESS-PASSPHRASE': passphrase,
+        'OK-ACCESS-PROJECT': projectId,
+      },
+      body,
+    });
+
+    if (!res.ok) return [];
+    const json = await res.json() as { code: string; data: unknown };
+    if (json.code !== '0' || !Array.isArray(json.data)) return [];
+
+    const out: RawSignal[] = [];
+    for (const s of json.data as Array<Record<string, unknown>>) {
+      const token = s.token as Record<string, unknown> | undefined;
+      out.push({
+        source: 'okx_dex_signal',
+        chain: chainIndex,
+        tokenSymbol: String(token?.symbol || 'UNKNOWN'),
+        tokenAddress: String(token?.tokenAddress || ''),
+        signalType: String(s.walletType || ''),
+        amountUsd: parseFloat(String(s.amountUsd || '0')),
+        triggerWalletCount: parseInt(String(s.triggerWalletCount || '0')),
+        soldRatioPct: parseFloat(String(s.soldRatioPercent || '0')),
+        marketCapUsd: parseFloat(String(token?.marketCapUsd || '0')),
+        timestamp: now,
       });
-
-      if (!res.ok) continue;
-      const json = await res.json() as { code: string; data: unknown };
-      if (json.code !== '0' || !Array.isArray(json.data)) continue;
-
-      for (const s of json.data as Array<Record<string, unknown>>) {
-        const token = s.token as Record<string, unknown> | undefined;
-        signals.push({
-          source: 'okx_dex_signal',
-          chain: chainIndex,
-          tokenSymbol: String(token?.symbol || 'UNKNOWN'),
-          tokenAddress: String(token?.tokenAddress || ''),
-          signalType: String(s.walletType || ''),
-          amountUsd: parseFloat(String(s.amountUsd || '0')),
-          triggerWalletCount: parseInt(String(s.triggerWalletCount || '0')),
-          soldRatioPct: parseFloat(String(s.soldRatioPercent || '0')),
-          marketCapUsd: parseFloat(String(token?.marketCapUsd || '0')),
-          timestamp: now,
-        });
-      }
-    } catch (err) {
-      console.error(`[Bobby Intel] Chain ${chainIndex} signal error:`, err);
     }
-  }
+    return out;
+  };
+
+  const results = await Promise.allSettled(chains.map(fetchChain));
+  const signals: RawSignal[] = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      signals.push(...r.value);
+    } else {
+      console.error(`[Bobby Intel] Chain ${chains[i]} signal error:`, r.reason);
+    }
+  });
 
   return signals;
 }

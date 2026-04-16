@@ -201,50 +201,60 @@ async function collectDexSignals(): Promise<RawSignal[]> {
   if (!apiKey || !secretKey || !passphrase || !projectId) return [];
 
   const chains = ['1', '501', '8453']; // ETH, SOL, Base
-  const signals: RawSignal[] = [];
 
-  for (const chainIndex of chains) {
-    try {
-      const path = '/api/v6/dex/market/signal/list';
-      const body = JSON.stringify({ chainIndex, walletType: '1,2,3', minAmountUsd: '5000' });
-      const timestamp = new Date().toISOString();
-      const signature = await hmacSign(timestamp + 'POST' + path + body, secretKey);
+  // Efficiency pass: fetch all chains in parallel (was sequential, ~3× RTT).
+  // Each chain fails independently via allSettled — same failure semantics as
+  // the prior `continue` in the for-loop.
+  const fetchChain = async (chainIndex: string): Promise<RawSignal[]> => {
+    const path = '/api/v6/dex/market/signal/list';
+    const body = JSON.stringify({ chainIndex, walletType: '1,2,3', minAmountUsd: '5000' });
+    const timestamp = new Date().toISOString();
+    const signature = await hmacSign(timestamp + 'POST' + path + body, secretKey);
 
-      const res = await fetch(`https://web3.okx.com${path}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'OK-ACCESS-KEY': apiKey,
-          'OK-ACCESS-SIGN': signature,
-          'OK-ACCESS-TIMESTAMP': timestamp,
-          'OK-ACCESS-PASSPHRASE': passphrase,
-          'OK-ACCESS-PROJECT': projectId,
-        },
-        body,
+    const res = await fetch(`https://web3.okx.com${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'OK-ACCESS-KEY': apiKey,
+        'OK-ACCESS-SIGN': signature,
+        'OK-ACCESS-TIMESTAMP': timestamp,
+        'OK-ACCESS-PASSPHRASE': passphrase,
+        'OK-ACCESS-PROJECT': projectId,
+      },
+      body,
+    });
+
+    if (!res.ok) return [];
+    const json = await res.json() as { code: string; data: unknown };
+    if (json.code !== '0' || !Array.isArray(json.data)) return [];
+
+    const out: RawSignal[] = [];
+    for (const s of json.data as Array<Record<string, unknown>>) {
+      const token = s.token as Record<string, unknown> | undefined;
+      out.push({
+        source: 'okx_dex_signal',
+        chain: chainIndex,
+        tokenSymbol: String(token?.symbol || 'UNKNOWN'),
+        tokenAddress: String(token?.tokenAddress || ''),
+        signalType: String(s.walletType || ''),
+        amountUsd: parseFloat(String(s.amountUsd || '0')),
+        triggerWalletCount: parseInt(String(s.triggerWalletCount || '0')),
+        soldRatioPct: parseFloat(String(s.soldRatioPercent || '0')),
+        marketCapUsd: parseFloat(String(token?.marketCapUsd || '0')),
       });
-
-      if (!res.ok) continue;
-      const json = await res.json() as { code: string; data: unknown };
-      if (json.code !== '0' || !Array.isArray(json.data)) continue;
-
-      for (const s of json.data as Array<Record<string, unknown>>) {
-        const token = s.token as Record<string, unknown> | undefined;
-        signals.push({
-          source: 'okx_dex_signal',
-          chain: chainIndex,
-          tokenSymbol: String(token?.symbol || 'UNKNOWN'),
-          tokenAddress: String(token?.tokenAddress || ''),
-          signalType: String(s.walletType || ''),
-          amountUsd: parseFloat(String(s.amountUsd || '0')),
-          triggerWalletCount: parseInt(String(s.triggerWalletCount || '0')),
-          soldRatioPct: parseFloat(String(s.soldRatioPercent || '0')),
-          marketCapUsd: parseFloat(String(token?.marketCapUsd || '0')),
-        });
-      }
-    } catch (err) {
-      console.error(`[Agent] Chain ${chainIndex} signal error:`, err);
     }
-  }
+    return out;
+  };
+
+  const results = await Promise.allSettled(chains.map(fetchChain));
+  const signals: RawSignal[] = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      signals.push(...r.value);
+    } else {
+      console.error(`[Agent] Chain ${chains[i]} signal error:`, r.reason);
+    }
+  });
 
   return signals;
 }
@@ -701,6 +711,33 @@ async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: str
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   } catch { return []; }
+}
+
+// ---- Circuit breaker: halt cycle on sustained losses ----
+// Proxy implementation until `agent_trade_outcomes` table lands with real PnL.
+// Today we halt if the last 3 cycles executed trades but none were successful
+// (trades_successful = 0 despite trades_executed > 0). Fails open on DB error
+// so a Supabase outage does not freeze the bot — the per-cycle risk gate
+// (max_daily_loss in applyRiskGate) still bounds downside in that case.
+async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string; detail?: string }> {
+  const cycles = await fetchRecentCycles(5);
+  if (cycles.length < 3) return { halted: false };
+
+  const executed = cycles.filter(c => c.status === 'completed' && c.trades_executed > 0);
+  if (executed.length < 3) return { halted: false };
+
+  const last3 = executed.slice(0, 3);
+  const allLosses = last3.every(c => (c.trades_successful || 0) === 0);
+  if (allLosses) {
+    const lostUsd = last3.reduce((s, c) => s + (c.total_usd_deployed || 0), 0);
+    return {
+      halted: true,
+      reason: 'consecutive_losses_3',
+      detail: `Last 3 executing cycles had 0 successful trades. ~$${lostUsd.toFixed(0)} at risk.`,
+    };
+  }
+
+  return { halted: false };
 }
 
 // ---- Risk gate with DETERMINISTIC conviction (Codex P1 audit) ----
@@ -1412,6 +1449,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const startMs = Date.now();
   const startedAt = new Date().toISOString();
 
+  // Circuit breaker: halt on sustained losses. Manual runs can force-bypass
+  // with ?force=true for operator override; cron runs always respect it.
+  const forceBypass = req.query.force === 'true' && isManual;
+  if (!forceBypass) {
+    const breaker = await checkCircuitBreaker();
+    if (breaker.halted) {
+      console.warn(`[Agent] CIRCUIT BREAKER ACTIVE — ${breaker.reason}: ${breaker.detail}`);
+      const haltResult = {
+        started_at: startedAt,
+        completed_at: new Date().toISOString(),
+        signals_found: 0,
+        signals_filtered: 0,
+        llm_decisions: 0,
+        trades_executed: 0,
+        trades_blocked: 0,
+        total_usd_deployed: 0,
+        latency_ms: Date.now() - startMs,
+        llm_reasoning: `Halted: ${breaker.reason}. ${breaker.detail || ''}`,
+        status: 'halted',
+      };
+      await logToSupabase(haltResult);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({
+        ok: true,
+        halted: true,
+        reason: breaker.reason,
+        detail: breaker.detail,
+        cycle: haltResult,
+      });
+    }
+  }
+
   try {
     // Phase 0: Polymarket Intelligence (parallel with OKX)
     console.log('[Agent] Collecting signals + Polymarket intelligence...');
@@ -1518,27 +1587,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Phase 6: Execute
     let trades: any[];
     if (walletAddress && isManual) {
-      // Real execution mode — fetch swap calldata from OKX DEX Aggregator
+      // Real execution mode — fetch swap calldata from OKX DEX Aggregator.
+      // Fail-closed guard: if quote or swapTx are missing/invalid the trade
+      // is aborted rather than queued with placeholder data. A stale or
+      // malformed quote at sign-time is the classic silent-loss path.
       console.log(`[Agent] Fetching DEX calldata for wallet ${walletAddress.slice(0, 8)}...`);
       trades = [];
       for (const d of approved) {
         const chainId = d.chain || '196'; // Default X Layer for hackathon
         const fromAmount = String(Math.round(d.amountUsd * 1e6)); // USDC decimals
-        const quote = await getSwapQuote(chainId, 'USDC', d.tokenSymbol, d.amountUsd);
-        const swapTx = await getSwapCalldata(chainId, 'USDC', d.tokenSymbol, d.amountUsd, walletAddress);
-        const approveTx = await getApproveCalldata(chainId, 'USDC', fromAmount);
 
-        trades.push({
-          ...d,
-          txHash: null,
-          status: 'pending_execution',
-          execution: swapTx ? {
-            needsApproval: !!approveTx,
-            approveTx: approveTx || undefined,
-            swapTx,
-            quote: quote || { fromToken: 'USDC', toToken: d.tokenSymbol, fromAmount, toAmount: '0' },
-          } : undefined,
-        });
+        try {
+          const [quote, swapTx, approveTx] = await Promise.all([
+            getSwapQuote(chainId, 'USDC', d.tokenSymbol, d.amountUsd),
+            getSwapCalldata(chainId, 'USDC', d.tokenSymbol, d.amountUsd, walletAddress),
+            getApproveCalldata(chainId, 'USDC', fromAmount),
+          ]);
+
+          // Stale-quote abort: reject if we do not have a usable quote AND swap tx.
+          // A quote whose toAmount parses to 0 means no route or a dead pair.
+          const toAmountNum = quote ? parseFloat(String((quote as any).toAmount ?? '0')) : 0;
+          if (!quote || !swapTx || !(toAmountNum > 0)) {
+            console.warn(`[Agent] Abort ${d.tokenSymbol}: stale/invalid quote (toAmount=${toAmountNum}, swapTx=${!!swapTx})`);
+            trades.push({
+              ...d,
+              txHash: null,
+              status: 'aborted_stale_quote',
+              execution: undefined,
+            });
+            continue;
+          }
+
+          trades.push({
+            ...d,
+            txHash: null,
+            status: 'pending_execution',
+            execution: {
+              needsApproval: !!approveTx,
+              approveTx: approveTx || undefined,
+              swapTx,
+              quote,
+            },
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[Agent] Abort ${d.tokenSymbol}: execution prep failed — ${msg}`);
+          trades.push({
+            ...d,
+            txHash: null,
+            status: 'aborted_exec_error',
+            execution: undefined,
+          });
+        }
       }
     } else {
       // Cron/simulation mode
