@@ -15,6 +15,10 @@ import {
 
 export const config = { maxDuration: 30 };
 
+import { createLimiter, getClientIp } from './_lib/rate-limit';
+// 30 requests / 10 minutes per IP — blunts hammering, generous for dashboard polling.
+const intelLimiter = createLimiter(30, 10 * 60 * 1000);
+
 // ---- Types ----
 interface RawSignal {
   source: string;
@@ -1024,6 +1028,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const ip = getClientIp(req);
+  const rl = intelLimiter.check(ip);
+  if (rl.limited) {
+    const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));
+    res.setHeader('Retry-After', String(retryAfterSec));
+    res.setHeader('X-RateLimit-Limit', '30');
+    res.setHeader('X-RateLimit-Remaining', '0');
+    return res.status(429).json({ error: 'Rate limit exceeded. Try again later.', retryAfterSec });
+  }
+  res.setHeader('X-RateLimit-Remaining', String(rl.remaining));
 
   const startMs = Date.now();
 

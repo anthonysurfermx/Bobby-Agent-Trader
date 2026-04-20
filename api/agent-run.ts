@@ -30,6 +30,7 @@ import {
   type PolyLeaderboardEntry,
 } from './_lib/polymarket';
 import { checkTokenRiskBatch } from './_lib/okx-security';
+import { recordLlmFailure, classifyHttpStatus } from './_lib/llm-health';
 
 export const config = { maxDuration: 120 };
 
@@ -85,6 +86,14 @@ async function callClaude(
 
   if (!res.ok) {
     const t = await res.text();
+    recordLlmFailure({
+      endpoint: 'agent-run',
+      provider: 'openai',
+      model: 'gpt-4o',
+      kind: classifyHttpStatus(res.status),
+      httpStatus: res.status,
+      message: t.slice(0, 300),
+    });
     return { text: `OpenAI ${res.status}: ${t.slice(0, 100)}`, toolInput: null };
   }
 
@@ -104,6 +113,13 @@ async function callClaude(
     try {
       toolInput = JSON.parse(toolCall.function.arguments);
     } catch {
+      recordLlmFailure({
+        endpoint: 'agent-run',
+        provider: 'openai',
+        model: 'gpt-4o',
+        kind: 'parse_error',
+        message: `tool_call args not valid JSON: ${toolCall.function.arguments.slice(0, 200)}`,
+      });
       toolInput = null;
     }
   }
