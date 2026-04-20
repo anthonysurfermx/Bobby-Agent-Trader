@@ -29,9 +29,12 @@ export function calculateDynamicConviction(
   polyConsensus: number, // 0-1, normalized from Polymarket edgePct
   latencyMs: number,     // age of signal in ms
 ): number {
-  // Exponential penalty: <=5min = fresh (0), 60min = ~0.22, >60min capped at 0.5.
+  // Exponential penalty tightened: <=5min = fresh (0), 15min ≈ 0.16, 30min ≈ 0.55,
+  // 60min capped at 0.7. On-chain smart-money alpha decays fast — a 1h-old signal
+  // means whales have already rotated. Previous curve (0.02 * e^(0.04 * min)) was
+  // too permissive and let stale signals cross threshold.
   const minutes = latencyMs / 60000;
-  const latencyPenalty = minutes <= 5 ? 0 : Math.min(0.5, 0.02 * Math.exp(0.04 * minutes));
+  const latencyPenalty = minutes <= 5 ? 0 : Math.min(0.7, 0.05 * Math.exp(0.08 * minutes));
   const raw = okxScore * 0.4 + polyConsensus * 0.6 - latencyPenalty;
   return Math.max(0, Math.min(1, raw));
 }
@@ -73,9 +76,10 @@ export function applyRiskGate(
   bankroll = 500,
   isSafeMode = false,
   backendConvictions?: Map<string, number>, // symbol → dynamicConviction from backend
+  openExposureUsd = 0, // USD currently at risk in open (unsettled) positions — counts against caps.
 ): RiskGateResult {
   const approved: TradeDecision[] = [];
-  let exposure = 0;
+  let exposure = openExposureUsd;
   const maxExposurePct = isSafeMode ? 0.15 : 0.30;
   const maxExposure = bankroll * maxExposurePct;
   const confidenceThreshold = isSafeMode ? 0.8 : 0.7;
@@ -99,8 +103,14 @@ export function applyRiskGate(
     const kellyAmount = kellySize(deterministicConv, bankroll, maxExposurePct);
     d.amountUsd = isSafeMode ? kellyAmount * 0.5 : kellyAmount;
 
-    if (exposure + d.amountUsd > maxDailyLoss) continue;
-    if (exposure + d.amountUsd > maxExposure) continue;
+    if (exposure + d.amountUsd > maxDailyLoss) {
+      console.log(`[RiskGate] Blocked ${d.tokenSymbol}: would exceed maxDailyLoss ($${maxDailyLoss.toFixed(2)}), current exposure $${exposure.toFixed(2)}`);
+      continue;
+    }
+    if (exposure + d.amountUsd > maxExposure) {
+      console.log(`[RiskGate] Blocked ${d.tokenSymbol}: would exceed maxExposure ($${maxExposure.toFixed(2)}), current exposure $${exposure.toFixed(2)}`);
+      continue;
+    }
 
     // Preserve both scores on the decision for downstream auditability.
     (d as unknown as { deterministicConviction: number }).deterministicConviction = deterministicConv;

@@ -18,7 +18,10 @@ import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-ev
 export const config = { maxDuration: 300 };
 
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+if (!SB_KEY) {
+  console.error('[Cycle] FATAL: no Supabase key in env (SUPABASE_SERVICE_KEY / SUPABASE_SERVICE_ROLE_KEY / VITE_SUPABASE_ANON_KEY all missing)');
+}
 const READONLY_FALLBACK_HOSTS = [BOBBY_PROTOCOL_BASE_URL, 'https://defimexico.org', 'https://defi-mexico-hub.vercel.app'];
 
 // ---- Supabase helpers ----

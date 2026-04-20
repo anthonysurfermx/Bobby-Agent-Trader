@@ -29,8 +29,11 @@ import {
   type PolyPosition,
   type PolyLeaderboardEntry,
 } from './_lib/polymarket';
+import { checkTokenRiskBatch } from './_lib/okx-security';
 
 export const config = { maxDuration: 120 };
+
+const POLY_GAMMA = 'https://gamma-api.polymarket.com';
 
 // ---- Types ----
 // RawSignal + FilteredSignal now live in api/_lib/signals.ts (shared).
@@ -48,7 +51,7 @@ async function callClaude(
   toolSchema?: { name: string; description: string; input_schema: Record<string, unknown> },
 ): Promise<{ text: string; toolInput: Record<string, unknown> | null }> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { text: '', toolInput: null };
+  if (!apiKey) throw new Error('OPENAI_API_KEY missing — agent cannot run debate');
 
   const body: Record<string, unknown> = {
     model: 'gpt-4o',
@@ -111,6 +114,10 @@ async function callClaude(
 // ---- Dynamic conviction + Kelly sizing + risk gate extracted to ./_lib/risk-gate.ts ----
 
 // ---- Calculate win rate from recent cycles ----
+// Only uses real `trades_successful` (populated by /api/settle-trades from realized PnL).
+// The old "any cycle with >=1 trade is a win" heuristic was removed — it masked losses
+// and mis-sized Kelly. Cycles without success data count as neutral (0.5) rather than
+// falsifying the metric.
 type CycleRecord = { status: string; trades_executed: number; trades_successful?: number; total_usd_deployed?: number };
 function calculateWinRate(cycles: CycleRecord[]): number {
   if (cycles.length === 0) return 1; // optimistic default
@@ -119,15 +126,15 @@ function calculateWinRate(cycles: CycleRecord[]): number {
   const withTrades = completed.filter(c => c.trades_executed > 0);
   if (withTrades.length === 0) return 0.5; // no trades = neutral
 
-  // Real win rate: use trades_successful if available, otherwise fall back to heuristic
-  const hasSuccessData = withTrades.some(c => typeof c.trades_successful === 'number');
-  if (hasSuccessData) {
-    const totalExecuted = withTrades.reduce((sum, c) => sum + c.trades_executed, 0);
-    const totalSuccessful = withTrades.reduce((sum, c) => sum + (c.trades_successful || 0), 0);
-    return totalExecuted > 0 ? totalSuccessful / totalExecuted : 0.5;
+  const withSuccessData = withTrades.filter(c => typeof c.trades_successful === 'number');
+  if (withSuccessData.length === 0) {
+    // No settled data yet — stay neutral, do NOT inflate via legacy heuristic.
+    console.warn('[WinRate] No settled trade data in recent cycles; defaulting to 0.5 (neutral).');
+    return 0.5;
   }
-  // Fallback: cycles with trades / total completed (legacy heuristic)
-  return withTrades.length / completed.length;
+  const totalExecuted = withSuccessData.reduce((sum, c) => sum + c.trades_executed, 0);
+  const totalSuccessful = withSuccessData.reduce((sum, c) => sum + (c.trades_successful || 0), 0);
+  return totalExecuted > 0 ? totalSuccessful / totalExecuted : 0.5;
 }
 
 // ---- Determine agent mood from win rate ----
@@ -430,7 +437,10 @@ async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: str
 async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string; detail?: string }> {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return { halted: false };
+  if (!url || !key) {
+    console.warn('[CircuitBreaker] SUPABASE_URL/SERVICE_ROLE_KEY missing — breaker disabled (fail-open). Per-cycle risk gate still bounds downside.');
+    return { halted: false };
+  }
 
   const BANKROLL = 500;
   const DRAWDOWN_PCT = 0.10;
@@ -448,7 +458,10 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
     const recentRes = await fetch(recentUrl, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     });
-    if (!recentRes.ok) return { halted: false };
+    if (!recentRes.ok) {
+      console.error(`[CircuitBreaker] agent_trades query failed with HTTP ${recentRes.status} — fail-open. Investigate if schema/RLS changed.`);
+      return { halted: false };
+    }
     const recent = (await recentRes.json()) as Array<{
       outcome: string;
       realized_pnl_pct: number | null;
@@ -487,12 +500,35 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
     }
 
     return { halted: false };
-  } catch {
+  } catch (err) {
+    console.error('[CircuitBreaker] Unexpected error — fail-open:', err);
     return { halted: false };
   }
 }
 
 // applyRiskGate moved to ./_lib/risk-gate.ts
+
+// ---- Fetch USD currently at risk in open (unsettled) positions ----
+// Prevents cumulative over-exposure when multiple cycles fire before settlement.
+async function fetchOpenExposureUsd(): Promise<number> {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return 0;
+  try {
+    const q = `${url}/rest/v1/agent_trades?status=eq.open&select=amount_usd`;
+    const res = await fetch(q, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+    if (!res.ok) {
+      console.warn(`[OpenExposure] HTTP ${res.status} — treating open exposure as 0`);
+      return 0;
+    }
+    const rows = (await res.json()) as Array<{ amount_usd: number | null }>;
+    if (!Array.isArray(rows)) return 0;
+    return rows.reduce((sum, r) => sum + (r.amount_usd || 0), 0);
+  } catch (err) {
+    console.warn('[OpenExposure] fetch error — treating as 0:', err);
+    return 0;
+  }
+}
 
 // ---- Polymarket helpers extracted to ./_lib/polymarket.ts ----
 
@@ -1008,8 +1044,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`[Agent] ${raw.length} raw signals, ${polyConsensus.length} Polymarket consensus markets`);
 
     // Phase 2: Filter
-    const filtered = filterSignals(raw);
+    let filtered = filterSignals(raw);
     console.log(`[Agent] ${filtered.length} passed filters`);
+
+    // Phase 2b: Deterministic security pre-gate (OKX risk-token detection v2.2.9).
+    // Drops honeypots / blacklisted / high-tax tokens before they reach the LLM debate.
+    if (filtered.length > 0) {
+      const tokenSet = filtered
+        .filter(s => s.tokenAddress && s.tokenAddress.length > 0)
+        .map(s => ({ chainIndex: s.chain, tokenAddress: s.tokenAddress }));
+      if (tokenSet.length > 0) {
+        const risks = await checkTokenRiskBatch(tokenSet);
+        const before = filtered.length;
+        filtered = filtered.filter(s => {
+          const verdict = risks.get(`${s.chain}:${s.tokenAddress}`);
+          if (!verdict) return true; // unknown → permissive, Red Team is final check
+          if (!verdict.safe) {
+            console.warn(`[Agent] SECURITY BLOCK ${s.tokenSymbol} (${verdict.raw}): ${verdict.flags.join(',')} buyTax=${verdict.buyTax} sellTax=${verdict.sellTax}`);
+            return false;
+          }
+          return true;
+        });
+        if (before !== filtered.length) console.log(`[Agent] Security gate dropped ${before - filtered.length} flagged tokens`);
+      }
+    }
 
     if (filtered.length === 0) {
       const result = {
@@ -1098,7 +1156,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`[Agent] Debate complete: ${debate.decisions.length} decisions`);
 
     // Phase 5: Kelly Criterion Risk Gate (safe mode reduces exposure)
-    const { approved, blocked, sizingMethod } = applyRiskGate(debate.decisions, 500, isSafeMode);
+    // Pre-load open exposure so caps count unsettled positions from prior cycles.
+    const openExposure = await fetchOpenExposureUsd();
+    if (openExposure > 0) console.log(`[Agent] Open exposure from prior cycles: $${openExposure.toFixed(2)}`);
+    const { approved, blocked, sizingMethod } = applyRiskGate(debate.decisions, 500, isSafeMode, undefined, openExposure);
     console.log(`[Agent] ${approved.length} approved (${sizingMethod}), ${blocked} blocked`);
 
     // Phase 6: Execute

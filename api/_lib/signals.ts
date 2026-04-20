@@ -39,6 +39,45 @@ export interface CollectOptions {
 
 const CHAINS = ['1', '501', '8453']; // ETH, SOL, Base
 
+/** Parse a value that should be numeric, returning `fallback` on NaN/invalid. */
+function safeNum(v: unknown, fallback: number): number {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''));
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/** Fetch with exponential backoff on 429/5xx. Max 3 attempts, 400ms → 800ms → 1600ms. */
+async function fetchWithRetry(url: string, init: RequestInit, logPrefix: string, maxAttempts = 3): Promise<Response | null> {
+  let delayMs = 400;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (res.ok) return res;
+      // Retry on transient failures only
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt < maxAttempts) {
+          console.warn(`${logPrefix} ${res.status} on ${url}, retry ${attempt}/${maxAttempts - 1} in ${delayMs}ms`);
+          await new Promise(r => setTimeout(r, delayMs));
+          delayMs *= 2;
+          continue;
+        }
+      }
+      // Permanent failure (4xx except 429) — don't retry
+      console.error(`${logPrefix} ${res.status} permanent failure on ${url}`);
+      return res;
+    } catch (err) {
+      if (attempt < maxAttempts) {
+        console.warn(`${logPrefix} network error on ${url}, retry ${attempt}/${maxAttempts - 1}:`, err);
+        await new Promise(r => setTimeout(r, delayMs));
+        delayMs *= 2;
+        continue;
+      }
+      console.error(`${logPrefix} network error final:`, err);
+      return null;
+    }
+  }
+  return null;
+}
+
 /**
  * Collect whale DEX signals from OKX OnchainOS across ETH, SOL, Base in parallel.
  * Returns empty array if credentials are missing. Per-chain failures are logged
@@ -61,7 +100,7 @@ export async function collectDexSignals(options: CollectOptions = {}): Promise<R
     const timestamp = new Date().toISOString();
     const signature = await hmacSign(timestamp + 'POST' + path + body, secretKey);
 
-    const res = await fetch(`https://web3.okx.com${path}`, {
+    const res = await fetchWithRetry(`https://web3.okx.com${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -72,25 +111,28 @@ export async function collectDexSignals(options: CollectOptions = {}): Promise<R
         'OK-ACCESS-PROJECT': projectId,
       },
       body,
-    });
+    }, logPrefix);
 
-    if (!res.ok) return [];
+    if (!res || !res.ok) return [];
     const json = (await res.json()) as { code: string; data: unknown };
     if (json.code !== '0' || !Array.isArray(json.data)) return [];
 
     const out: RawSignal[] = [];
     for (const s of json.data as Array<Record<string, unknown>>) {
       const token = s.token as Record<string, unknown> | undefined;
+      // soldRatioPct: unknown OR invalid → 50 (neutral) so NaN never bypasses the filter.
+      // amountUsd: invalid → 0 so the $5K floor drops it.
+      // marketCapUsd: invalid → 0 so the $100K floor drops it.
       const sig: RawSignal = {
         source: 'okx_dex_signal',
         chain: chainIndex,
         tokenSymbol: String(token?.symbol || 'UNKNOWN'),
         tokenAddress: String(token?.tokenAddress || ''),
         signalType: String(s.walletType || ''),
-        amountUsd: parseFloat(String(s.amountUsd || '0')),
-        triggerWalletCount: parseInt(String(s.triggerWalletCount || '0')),
-        soldRatioPct: parseFloat(String(s.soldRatioPercent || '0')),
-        marketCapUsd: parseFloat(String(token?.marketCapUsd || '0')),
+        amountUsd: safeNum(s.amountUsd, 0),
+        triggerWalletCount: Math.max(0, Math.floor(safeNum(s.triggerWalletCount, 0))),
+        soldRatioPct: safeNum(s.soldRatioPercent, 50),
+        marketCapUsd: safeNum(token?.marketCapUsd, 0),
       };
       if (now !== undefined) sig.timestamp = now;
       out.push(sig);

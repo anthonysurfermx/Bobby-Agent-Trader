@@ -35,6 +35,36 @@ interface OkxCreds {
   projectId: string;
 }
 
+/**
+ * Client-side param validation (okx-dex-swap v2.2.5 pattern).
+ * Catches errors before signing — stops gas-waste on malformed requests.
+ * Throws with a clear message; callers wrap in try/catch to return null.
+ */
+function validateSwapParams(opts: {
+  chainId: string;
+  fromSymbol: string;
+  toSymbol: string;
+  amountUsd: number;
+  userWallet?: string;
+  slippage?: string;
+}): void {
+  const { chainId, fromSymbol, toSymbol, amountUsd, userWallet, slippage } = opts;
+  if (!chainId || !TOKEN_REGISTRY[chainId]) throw new Error(`unsupported chainId ${chainId}`);
+  const reg = TOKEN_REGISTRY[chainId];
+  if (!reg[fromSymbol]) throw new Error(`fromSymbol ${fromSymbol} not in registry for chain ${chainId}`);
+  if (!reg[toSymbol]) throw new Error(`toSymbol ${toSymbol} not in registry for chain ${chainId}`);
+  if (fromSymbol === toSymbol) throw new Error(`fromSymbol == toSymbol (${fromSymbol}) — no-op swap`);
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) throw new Error(`invalid amountUsd ${amountUsd}`);
+  if (amountUsd > 10000) throw new Error(`amountUsd ${amountUsd} exceeds safety ceiling $10K`);
+  if (userWallet !== undefined) {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(userWallet)) throw new Error(`invalid userWallet ${userWallet}`);
+  }
+  if (slippage !== undefined) {
+    const s = parseFloat(slippage);
+    if (!Number.isFinite(s) || s < 0 || s > 50) throw new Error(`slippage ${slippage} out of range [0, 50]`);
+  }
+}
+
 function creds(): OkxCreds | null {
   const apiKey = process.env.OKX_API_KEY;
   const secretKey = process.env.OKX_SECRET_KEY;
@@ -69,6 +99,13 @@ export async function getSwapQuote(
 ): Promise<SwapQuote | null> {
   const c = creds();
   if (!c) return null;
+
+  try {
+    validateSwapParams({ chainId, fromSymbol, toSymbol, amountUsd });
+  } catch (e) {
+    console.error('[DEX] Quote param validation failed:', (e as Error).message);
+    return null;
+  }
 
   const chainTokens = TOKEN_REGISTRY[chainId];
   if (!chainTokens || !chainTokens[fromSymbol] || !chainTokens[toSymbol]) return null;
@@ -115,6 +152,13 @@ export async function getSwapCalldata(
 ): Promise<SwapCalldata | null> {
   const c = creds();
   if (!c) return null;
+
+  try {
+    validateSwapParams({ chainId, fromSymbol, toSymbol, amountUsd, userWallet, slippage });
+  } catch (e) {
+    console.error('[DEX] Swap calldata param validation failed:', (e as Error).message);
+    return null;
+  }
 
   const chainTokens = TOKEN_REGISTRY[chainId];
   if (!chainTokens || !chainTokens[fromSymbol] || !chainTokens[toSymbol]) return null;
