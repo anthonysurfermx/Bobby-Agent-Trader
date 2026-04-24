@@ -8,20 +8,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ReactNode, useEffect, useState } from 'react';
 import { TradingRoomProvider, useTradingRoom } from '@/hooks/useTradingRoom';
 import { Lock } from 'lucide-react';
+import SkinInTheGameBadge from './SkinInTheGameBadge';
 
+// V3 IA: 4 páginas core (Gemini). Rutas legacy quedan alcanzables por deep-link.
 const NAV_ITEMS = [
-  { id: 'terminal', label: 'TERMINAL', path: '/agentic-world/bobby' },
-  { id: 'challenge', label: 'CHALLENGE', path: '/agentic-world/bobby/challenge' },
-  { id: 'history', label: 'HISTORY', path: '/agentic-world/bobby/history' },
-  { id: 'agents', label: 'AGENTS', path: '/agentic-world/bobby/agents' },
-  { id: 'analytics', label: 'ANALYTICS', path: '/agentic-world/bobby/analytics' },
-  { id: 'metacognition', label: 'META', path: '/agentic-world/bobby/metacognition' },
-  { id: 'signals', label: 'SIGNALS', path: '/agentic-world/bobby/signals' },
-  { id: 'docs', label: 'AI DOCS', path: '/agentic-world/bobby/docs' },
-  { id: 'marketplace', label: 'AGENT COMMERCE', path: '/agentic-world/bobby/marketplace' },
-  { id: 'harness', label: 'HARNESS', path: '/protocol/harness' },
-  { id: 'playbooks', label: 'PLAYBOOKS', path: '/protocol/playbooks' },
-  { id: 'sandbox', label: 'SANDBOX', path: '/protocol/sandbox' },
+  { id: 'terminal', label: 'WAR ROOM', path: '/agentic-world/bobby' },
+  { id: 'history', label: 'PERFORMANCE', path: '/agentic-world/bobby/history' },
+  { id: 'analytics', label: 'INTEL', path: '/agentic-world/bobby/analytics' },
+  { id: 'console', label: 'CONSOLE', path: '/agentic-world/bobby/console' },
 ] as const;
 
 type NavItemId = (typeof NAV_ITEMS)[number]['id'];
@@ -61,16 +55,6 @@ function TickerTape() {
   );
 }
 
-const SIDE_ITEMS = [
-  { icon: '⌘', label: 'Command', path: '/agentic-world/bobby/challenge' },
-  { icon: '◈', label: 'Intel', path: '/agentic-world/bobby/analytics' },
-  { icon: '◎', label: 'History', path: '/agentic-world/bobby/history' },
-  { icon: '△', label: 'Agents', path: '/agentic-world/bobby/agents' },
-  { icon: '◇', label: 'Debates', path: '/agentic-world/forum' },
-  { icon: '◉', label: 'Meta', path: '/agentic-world/bobby/metacognition' },
-  { icon: '⚡', label: 'Signals', path: '/agentic-world/bobby/signals' },
-];
-
 export default function KineticShell({ children, activeTab, showSidebar = false }: KineticShellProps) {
   return (
     <TradingRoomProvider>
@@ -109,7 +93,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false }: Kinetic
         <Link to="/protocol" className={`text-lg font-black tracking-tighter ${navAccent} font-mono hover:opacity-80 transition-opacity`}>
           {roomMode === 'personal' && hasAgent
             ? `${agentName} TRADING ROOM`
-            : `${agentName} AGENT TRADER`}
+            : `BOBBY PROTOCOL`}
         </Link>
 
         {/* Workspace Toggle */}
@@ -156,11 +140,14 @@ function KineticShellInner({ children, activeTab, showSidebar = false }: Kinetic
             </Link>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full animate-pulse ${roomMode === 'personal' && hasAgent ? 'bg-current ' + navAccent : 'bg-green-500'}`} />
-          <span className={`text-[9px] font-mono tracking-wider hidden sm:inline ${navAccent}`}>
-            {roomMode === 'personal' ? 'PERSONAL' : 'ONLINE'}
-          </span>
+        <div className="flex items-center gap-3">
+          <SkinInTheGameBadge />
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full animate-pulse ${roomMode === 'personal' && hasAgent ? 'bg-current ' + navAccent : 'bg-green-500'}`} />
+            <span className={`text-[9px] font-mono tracking-wider hidden sm:inline ${navAccent}`}>
+              {roomMode === 'personal' ? 'PERSONAL' : 'ONLINE'}
+            </span>
+          </div>
         </div>
       </nav>
 
@@ -179,11 +166,10 @@ function KineticShellInner({ children, activeTab, showSidebar = false }: Kinetic
       {/* === Mobile Bottom Nav === */}
       <nav className="md:hidden fixed bottom-0 w-full h-14 bg-[#131313]/90 backdrop-blur-xl border-t border-white/5 flex items-center justify-around px-4 z-50">
         {[
-          { id: 'terminal', icon: '⌘', label: 'TERMINAL', path: '/agentic-world/bobby' },
-          { id: 'challenge', icon: '◆', label: 'CHALLENGE', path: '/agentic-world/bobby/challenge' },
-          { id: 'history', icon: '◎', label: 'HISTORY', path: '/agentic-world/bobby/history' },
-          { id: 'agents', icon: '△', label: 'AGENTS', path: '/agentic-world/bobby/agents' },
-          { id: 'metacognition', icon: '◉', label: 'META', path: '/agentic-world/bobby/metacognition' },
+          { id: 'terminal', icon: '⌘', label: 'WAR ROOM', path: '/agentic-world/bobby' },
+          { id: 'history', icon: '◎', label: 'PERFORMANCE', path: '/agentic-world/bobby/history' },
+          { id: 'analytics', icon: '◈', label: 'INTEL', path: '/agentic-world/bobby/analytics' },
+          { id: 'console', icon: '△', label: 'CONSOLE', path: '/agentic-world/bobby/console' },
         ].map(item => (
           <Link key={item.id} to={item.path}
             className={`flex flex-col items-center gap-0.5 ${
