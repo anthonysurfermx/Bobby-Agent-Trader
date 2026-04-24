@@ -44,16 +44,16 @@ export default function SkinInTheGameBadge() {
   }, []);
 
   // Fallback (new user, zero trades, or transient error):
-  // copy de expectativa (Gemini) — comunica que el track record nace con el primer trade.
+  // expectation copy — signals the track record starts with the first trade.
   if (error || !summary || summary.totalTrades === 0) {
     return (
       <Link
         to="/agentic-world/bobby/history"
         className="hidden lg:flex items-center gap-1.5 text-[9px] font-mono text-white/30 hover:text-white/50 transition-colors"
-        title="El track record verificable arranca con el primer trade"
+        title="Track record begins with the first trade"
       >
         <Shield className="w-3 h-3" />
-        <span>0 TRADES · ESPERANDO PRIMER SETUP</span>
+        <span>0 TRADES · AWAITING FIRST SETUP</span>
       </Link>
     );
   }
@@ -65,7 +65,7 @@ export default function SkinInTheGameBadge() {
   return (
     <Link
       to="/agentic-world/bobby/history"
-      title={`${summary.totalTrades} trades verificados on-chain (X Layer)`}
+      title={`${summary.totalTrades} trades verified on-chain (X Layer)`}
       className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-sm bg-white/[0.02] border border-white/[0.04] hover:border-white/10 transition-colors font-mono text-[10px]"
     >
       <Shield className="w-3 h-3 text-green-400" />
@@ -73,7 +73,7 @@ export default function SkinInTheGameBadge() {
       <span className="text-white/20">·</span>
       <span className={returnColor}>{returnSign}{summary.totalReturn.toFixed(1)}% PnL</span>
       <span className="text-white/20">·</span>
-      <span className="text-white/40">VERIFICADO EN-CHAIN</span>
+      <span className="text-white/40">VERIFIED ON-CHAIN</span>
     </Link>
   );
 }

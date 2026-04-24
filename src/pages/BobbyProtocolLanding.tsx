@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
+import { Twitter, Github } from 'lucide-react';
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -382,19 +383,31 @@ function Nav() {
           REGISTRY
         </a>
       </div>
-      <div className="flex gap-3">
+      <div className="flex gap-3 items-center">
+        <a
+          href="https://twitter.com/bobbyprotocol"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Bobby Protocol on Twitter"
+          className="text-[#adaaaa] hover:text-[#6dfe9c] transition-colors p-2"
+        >
+          <Twitter className="w-4 h-4" />
+        </a>
+        <a
+          href="https://github.com/anthonysurfermx/Bobby-Agent-Trader"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Bobby Protocol on GitHub"
+          className="text-[#adaaaa] hover:text-[#6dfe9c] transition-colors p-2"
+        >
+          <Github className="w-4 h-4" />
+        </a>
         <a
           href="/protocol/heartbeat"
           className="flex items-center gap-2 bg-[#6dfe9c]/5 text-[#6dfe9c] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#6dfe9c]/20 hover:bg-[#6dfe9c]/15 transition-all"
         >
           <span className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse" />
           _HEARTBEAT
-        </a>
-        <a
-          href="/submission"
-          className="bg-[#fcc025]/10 text-[#fcc025] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#fcc025]/30 hover:bg-[#fcc025]/20 transition-all"
-        >
-          _SUBMISSION
         </a>
         <a
           href="/agentic-world/bobby"
@@ -439,7 +452,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.1 }}
         className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] text-center max-w-5xl leading-none uppercase mb-6"
       >
-        Los agentes prometen. <span className="text-[#6dfe9c] italic">Bobby prueba.</span>
+        Agents promise. <span className="text-[#6dfe9c] italic">Bobby proves.</span>
       </motion.h1>
 
       <motion.div
@@ -523,17 +536,17 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex-1">
             <div className="text-[#6dfe9c] font-mono text-[10px] tracking-widest mb-2">
-              TRACK RECORD · VERIFICADO ON-CHAIN
+              TRACK RECORD · VERIFIED ON-CHAIN
             </div>
             <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-2">
-              Cada decisión firmada antes del resultado. Sin screenshots, sin confianza.
+              Every decision signed before the outcome. No screenshots. No trust required.
             </div>
             <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-              Bobby debate 3-agentes, un Arbiter verifica que el trade concuerda con la tesis, y el resultado queda atestado en X Layer. Cualquier agente o humano puede leer la cadena y confirmar qué pasó — ningún captura de pantalla requerido.
+              Bobby runs a 3-agent debate, an Arbiter verifies the trade matches the thesis, and the outcome is attested on X Layer. Any agent or human can read the chain and confirm what happened — no screenshots required.
             </p>
           </div>
           <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter whitespace-nowrap">
-            VER TRACK RECORD →
+            VIEW TRACK RECORD →
           </div>
         </div>
       </motion.a>
@@ -558,11 +571,11 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
                 HUMAN_INTERFACE
               </div>
               <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-3">
-                Soy Humano
+                I'm Human
               </div>
               <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
-                Abrí la War Room. Mirá los 3 agentes debatiendo cada trade en vivo.
-                Aprobá o vetá antes de que mueva un dólar.
+                Open the War Room. Watch 3 agents debate each trade live.
+                Approve or veto before a single dollar moves.
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
                 {['WAR ROOM', 'PERFORMANCE', 'INTEL', 'CONSOLE'].map((t) => (
@@ -572,7 +585,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
                 ))}
               </div>
               <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter">
-                ENTRAR A WAR ROOM →
+                ENTER WAR ROOM →
               </div>
             </div>
           </a>
@@ -587,11 +600,11 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
                 AGENT_INTERFACE
               </div>
               <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-3">
-                Soy un Agente
+                I'm an Agent
               </div>
               <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
-                Conectá via MCP. Solicitá verificación de tus intents, accedé al
-                track record firmado, cobrá en USDT via x402.
+                Connect via MCP. Request verification for your intents, access
+                the signed track record, bill in USDT via x402.
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
                 {['MCP', 'VERIFY', 'x402', 'TRACK-RECORD'].map((t) => (
@@ -601,7 +614,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
                 ))}
               </div>
               <div className="text-[#fcc025] font-bold text-sm uppercase tracking-tighter">
-                EMPEZAR A INTEGRAR →
+                START INTEGRATING →
               </div>
             </div>
           </a>
@@ -637,7 +650,7 @@ function EcosystemBand() {
                   Espacio Cripto
                 </div>
                 <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-                  Espacio Cripto verifica los intents de sus agentes contra el track record firmado de Bobby antes de mover capital.
+                  Espacio Cripto verifies their agents' intents against Bobby's signed track record before moving capital.
                 </p>
               </div>
               <span className="text-[#6dfe9c] font-mono text-sm shrink-0">↗</span>
@@ -668,7 +681,7 @@ function EcosystemBand() {
                   b1nary
                 </div>
                 <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-                  Protocolo de opciones cuyas estrategias Bobby verifica como caso de uso real. Live en Base (8453), deploy X Layer pendiente.
+                  Options protocol whose strategies Bobby verifies as a real-world use case. Live on Base (8453), X Layer deployment pending.
                 </p>
               </div>
               <span className="text-[#fcc025] font-mono text-sm shrink-0">↗</span>
@@ -693,7 +706,7 @@ function ClosedLoop() {
   return (
     <section id="loop" className="py-24 px-6 max-w-7xl mx-auto">
       <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-10 border-l-4 border-[#fcc025] pl-6">
-        El Loop de Verificación
+        The Verification Loop
       </h2>
 
       <div className="grid gap-4 lg:grid-cols-6">
@@ -2460,10 +2473,10 @@ export default function BobbyProtocolLanding() {
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white font-sans relative overflow-x-hidden">
       <Helmet>
-        <title>Bobby Protocol — Los agentes prometen. Bobby prueba.</title>
+        <title>Bobby Protocol — Agents promise. Bobby proves.</title>
         <meta
           name="description"
-          content="Capa de verificación on-chain para agentes AI que mueven dinero. Cada decisión firmada antes del resultado, atestada en OKX X Layer."
+          content="On-chain verification layer for AI agents that move money. Every decision signed before the outcome, attested on OKX X Layer."
         />
         <style>{`
           @keyframes marquee {
