@@ -50,3 +50,39 @@ src/components/kinetic/KineticShell.tsx — Terminal frame + nav + ticker
 - Never push without building first
 - Don't add files to git that contain secrets (.env, credentials)
 - Don't over-engineer — ship fast, iterate after (hackathon mindset)
+
+## Nightly Sandbox Rules
+
+When running unsupervised (overnight, scheduled, or `/loop` in auto mode), the agent operates as a **branch factory**, not a deployer. Produce reviewable work — branches, commits, tests, reports, drafts. **Never take irreversible actions.**
+
+### Absolute prohibitions (enforced by `.claude/settings.local.json` deny list)
+- `git push origin main`, `git push --force`, `git reset --hard`, `git clean -f`
+- `git branch -D`, `git commit --amend`, `git rebase -i`, `git filter-branch`
+- `gh pr merge`, `gh pr close`, `gh repo delete`
+- `rm -rf`, `find -delete`, `sudo rm`
+- `vercel deploy`, `vercel --prod`, any Supabase prod write (`db push`, `db reset`)
+- `forge script --broadcast`, `forge create`, `cast send`
+- Any edit/write to `.env*` files
+- Any `--no-verify` or `--no-gpg-sign` flag
+- External comms: Telegram send, tweet, webhook POST to external APIs
+
+### Always do instead
+- Create a dedicated worktree per task: `.claude/worktrees/nightly-YYYY-MM-DD-<slug>/`
+- Commit to a dedicated branch: `nightly/YYYY-MM-DD-<slug>`
+- Write a report to `.ai/overnight/YYYY-MM-DD-<slug>.md` documenting: scope, commands run, tests pass/fail, files touched, risks flagged, open questions
+- Run `npm run build` and relevant tests before committing — commit only if they pass
+- Stop and write to `.ai/overnight/` if uncertain — never guess on ambiguous decisions
+
+### Scope rules for overnight tasks
+- **🟢 Safe**: research briefs, documentation, local-only tests, static analysis, translation, draft markdown in `.ai/`
+- **🟡 Medium (only with full test coverage)**: refactors within a single module, dependency bumps with test gate, bug fixes with explicit reproducer
+- **🔴 Forbidden**: prod deploys, DB migrations, contract deploys, architectural decisions, external comms, changes to `main`, bulk file deletion, any commit to `main` branch directly
+
+### Kill-switch
+If anything seems off, run `./scripts/panic.sh` — it kills overnight processes, resets worktrees with uncommitted changes back to their branch HEAD, and writes an incident report. It does **NOT** delete branches or commits.
+
+### Morning ritual (user, not agent)
+1. Read `.ai/overnight/YYYY-MM-DD-summary.md`
+2. `./scripts/morning-review.sh` to see diffs per branch
+3. Per branch: merge, refine, or delete worktree
+4. No agent action takes effect on `main` without explicit human approval
