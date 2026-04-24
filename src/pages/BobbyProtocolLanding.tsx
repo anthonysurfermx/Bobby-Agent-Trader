@@ -379,7 +379,7 @@ function Nav() {
           href="/protocol/harness"
           className="text-[#fcc025]/60 hover:text-[#fcc025] transition-colors font-bold tracking-tighter uppercase text-sm"
         >
-          HARNESS
+          REGISTRY
         </a>
       </div>
       <div className="flex gap-3">
@@ -423,13 +423,13 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         className="flex flex-wrap justify-center gap-3 mb-8"
       >
         <span className="px-3 py-1 bg-[#262626] border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[10px] tracking-widest">
-          [HARNESS TRADING LAYER]
+          [ON-CHAIN VERIFICATION LAYER]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#fcc025]/20 text-[#fcc025] font-mono text-[10px] tracking-widest">
-          [ISOLATED SANDBOX · LIVE]
+          [LIVE ON X LAYER 196]
         </span>
         <span className="px-3 py-1 bg-[#262626] border border-[#ff716a]/20 text-[#ff716a] font-mono text-[10px] tracking-widest">
-          [11 STRATEGIES · X LAYER 196]
+          [1,138 DECISIONS SIGNED]
         </span>
       </motion.div>
 
@@ -439,7 +439,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         transition={{ delay: 0.1 }}
         className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] text-center max-w-5xl leading-none uppercase mb-6"
       >
-        The Harness <span className="text-[#6dfe9c] italic">Trading</span> Layer for Agents
+        Los agentes prometen. <span className="text-[#6dfe9c] italic">Bobby prueba.</span>
       </motion.h1>
 
       <motion.div
@@ -513,7 +513,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
       </motion.div>
 
       <motion.a
-        href="/protocol/playbooks"
+        href="/agentic-world/bobby/history"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.45 }}
@@ -523,17 +523,17 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
         <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex-1">
             <div className="text-[#6dfe9c] font-mono text-[10px] tracking-widest mb-2">
-              NEW · ISOLATED SANDBOX · 11 STRATEGIES
+              TRACK RECORD · VERIFICADO ON-CHAIN
             </div>
             <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-2">
-              Test any strategy in an isolated environment before capital moves.
+              Cada decisión firmada antes del resultado. Sin screenshots, sin confianza.
             </div>
             <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-              Browse 11 pressure-test playbooks — directional, yield, volatility, arbitrage, on-chain flow, risk management. Each runs through Bobby&apos;s full adversarial debate + 11 guardrails in real time, with every run logged to a public audit trail.
+              Bobby debate 3-agentes, un Arbiter verifica que el trade concuerda con la tesis, y el resultado queda atestado en X Layer. Cualquier agente o humano puede leer la cadena y confirmar qué pasó — ningún captura de pantalla requerido.
             </p>
           </div>
           <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter whitespace-nowrap">
-            BROWSE_PLAYBOOKS →
+            VER TRACK RECORD →
           </div>
         </div>
       </motion.a>
@@ -558,21 +558,21 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
                 HUMAN_INTERFACE
               </div>
               <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-3">
-                I'm Human
+                Soy Humano
               </div>
               <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
-                Open the live terminal. Chat with Bobby, watch debates,
-                track the $100 challenge, analyze 70+ signals.
+                Abrí la War Room. Mirá los 3 agentes debatiendo cada trade en vivo.
+                Aprobá o vetá antes de que mueva un dólar.
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
-                {['TERMINAL', 'CHALLENGE', 'SIGNALS', 'ANALYTICS'].map((t) => (
+                {['WAR ROOM', 'PERFORMANCE', 'INTEL', 'CONSOLE'].map((t) => (
                   <span key={t} className="px-2 py-0.5 bg-[#6dfe9c]/10 border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[8px] tracking-wider">
                     {t}
                   </span>
                 ))}
               </div>
               <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter">
-                _OPEN_TERMINAL →
+                ENTRAR A WAR ROOM →
               </div>
             </div>
           </a>
@@ -587,21 +587,21 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
                 AGENT_INTERFACE
               </div>
               <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-3">
-                I'm an Agent
+                Soy un Agente
               </div>
               <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
-                Download skill.md, call 22 MCP tools, pay via x402,
-                check reputation, inspect registry, post adversarial bounties.
+                Conectá via MCP. Solicitá verificación de tus intents, accedé al
+                track record firmado, cobrá en USDT via x402.
               </p>
               <div className="flex flex-wrap gap-2 mb-4">
-                {['SKILL.MD', 'MCP', 'x402', 'BOUNTIES'].map((t) => (
+                {['MCP', 'VERIFY', 'x402', 'TRACK-RECORD'].map((t) => (
                   <span key={t} className="px-2 py-0.5 bg-[#fcc025]/10 border border-[#fcc025]/20 text-[#fcc025] font-mono text-[8px] tracking-wider">
                     {t}
                   </span>
                 ))}
               </div>
               <div className="text-[#fcc025] font-bold text-sm uppercase tracking-tighter">
-                _START_INTEGRATING →
+                EMPEZAR A INTEGRAR →
               </div>
             </div>
           </a>
@@ -637,7 +637,7 @@ function EcosystemBand() {
                   Espacio Cripto
                 </div>
                 <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-                  LATAM&apos;s largest crypto AI trading community uses Bobby to pressure-test their agents before capital moves.
+                  Espacio Cripto verifica los intents de sus agentes contra el track record firmado de Bobby antes de mover capital.
                 </p>
               </div>
               <span className="text-[#6dfe9c] font-mono text-sm shrink-0">↗</span>
@@ -668,7 +668,7 @@ function EcosystemBand() {
                   b1nary
                 </div>
                 <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-                  Options protocol powering Bobby&apos;s wheel-strategy pressure-tests. Live on Base (8453), X Layer deployment pending.
+                  Protocolo de opciones cuyas estrategias Bobby verifica como caso de uso real. Live en Base (8453), deploy X Layer pendiente.
                 </p>
               </div>
               <span className="text-[#fcc025] font-mono text-sm shrink-0">↗</span>
@@ -693,7 +693,7 @@ function ClosedLoop() {
   return (
     <section id="loop" className="py-24 px-6 max-w-7xl mx-auto">
       <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-10 border-l-4 border-[#fcc025] pl-6">
-        The Harness Process
+        El Loop de Verificación
       </h2>
 
       <div className="grid gap-4 lg:grid-cols-6">
@@ -906,28 +906,28 @@ function HarnessArchitecture() {
       sub: 'On-chain State',
       icon: '>>',
       position: 'left',
-      description: 'Persistent on-chain state. Every prediction, signal, payment, and bounty is immutable. The memory of the harness.',
+      description: 'Persistent on-chain state. Every prediction, signal, and payment is immutable. The memory of the protocol.',
       details: ['TrackRecord', 'ConvictionOracle', 'AgentStats', 'Commerce Log'],
       color: '#6dfe9c',
     },
     {
       id: 'harness',
-      label: 'HARNESS',
+      label: 'REGISTRY',
       sub: 'HardnessRegistry',
       icon: '***',
       position: 'center',
-      description: 'The coordinator. Registers agents, coordinates services, records predictions, publishes signals, manages bounties. Does not trade — ensures quality.',
+      description: 'The coordinator. Registers agents, records predictions, publishes signals, attests decisions. Does not trade — verifies.',
       details: ['0xD89c...1040', 'X Layer (196)', '5 modules', '2-of-3 resolvers'],
       color: '#fcc025',
     },
     {
-      id: 'sandbox',
-      label: 'SANDBOX',
+      id: 'arena',
+      label: 'ARENA',
       sub: 'Debate Chamber',
       icon: '>_',
       position: 'right',
-      description: 'Isolated adversarial testing. Three agents attack the thesis from different angles. Nothing leaves without being pressure-tested.',
-      details: ['Alpha Hunter', 'Red Team', 'CIO', 'Judge Mode'],
+      description: 'Adversarial deliberation. Three agents attack the thesis from different angles. Nothing leaves the arena without passing the debate + the Arbiter check.',
+      details: ['Alpha Hunter', 'Red Team', 'CIO', 'Arbiter'],
       color: '#6dfe9c',
     },
     {
@@ -936,17 +936,17 @@ function HarnessArchitecture() {
       sub: 'Cycle Engine',
       icon: '<>',
       position: 'bottom',
-      description: 'The autonomous loop. Every 8 hours: signal → debate → judge → commit → execute → prove. The heartbeat of hardness finance.',
+      description: 'The autonomous loop. Every 8 hours: signal → debate → verify → commit → execute → prove. The heartbeat of on-chain verification.',
       details: ['Signal Ingest', 'Debate Cycle', 'Risk Gate', 'On-chain Prove'],
       color: '#6dfe9c',
     },
   ];
 
   const flowLabels = [
-    'Signal enters the harness',
-    'Thesis enters the sandbox for pressure testing',
-    'Hardened conviction stored in session',
-    'Tools expose conviction to external agents',
+    'Signal enters the protocol',
+    'Thesis enters the arena for adversarial debate',
+    'Verified conviction sealed on-chain',
+    'Tools expose the verification to external agents',
     'Orchestration loops back for next cycle',
   ];
 
@@ -969,10 +969,10 @@ function HarnessArchitecture() {
         viewport={{ once: true }}
       >
         <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-2 text-center">
-          The Trading Harness
+          Verification Architecture
         </h2>
         <p className="text-center text-[#adaaaa] font-mono text-xs uppercase tracking-widest mb-4">
-          Inspired by Claude Code's architecture. Built for agent finance.
+          Inspired by Claude Code's architecture. Built for verified agent execution.
         </p>
 
         {/* Flow status bar */}
@@ -1337,10 +1337,10 @@ function Guardrails({ stats }: { stats: ProtocolStats | null }) {
         </p>
         <p className="text-[#adaaaa] text-sm leading-relaxed max-w-3xl">
           Most trading agents are fail-open: if something breaks, the trade goes through anyway.
-          Bobby is fail-closed. Debate doesn't converge? <span className="text-white">Blocked.</span> Judge
+          Bobby is fail-closed. Debate doesn't converge? <span className="text-white">Blocked.</span> Arbiter
           can't verify? <span className="text-white">Blocked.</span> Stop loss missing? <span className="text-white">Blocked.</span> Drawdown
-          exceeded? <span className="text-white">All trading halted.</span> Every guardrail exists in production code — not
-          documentation promises. The harness protects capital first, generates alpha second.
+          exceeded? <span className="text-white">All trading halted.</span> Every guardrail lives in production code — not
+          documentation promises. Bobby protects capital first, proves execution second.
         </p>
       </motion.div>
     </section>
@@ -2460,10 +2460,10 @@ export default function BobbyProtocolLanding() {
   return (
     <div className="min-h-screen bg-[#0e0e0e] text-white font-sans relative overflow-x-hidden">
       <Helmet>
-        <title>Bobby Protocol | Financial Orchestration for AI Agents</title>
+        <title>Bobby Protocol — Los agentes prometen. Bobby prueba.</title>
         <meta
           name="description"
-          content="Connect any AI agent to financial infrastructure. Stress-test decisions with adversarial debate. Score on 6 dimensions. Publish proof on X Layer."
+          content="Capa de verificación on-chain para agentes AI que mueven dinero. Cada decisión firmada antes del resultado, atestada en OKX X Layer."
         />
         <style>{`
           @keyframes marquee {
