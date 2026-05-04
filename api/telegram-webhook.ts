@@ -228,8 +228,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           `🤖 Agents: Alpha Hunter · Red Team · CIO\n\n` +
           `Commands:\n` +
           `<code>/analyze BTC</code> — Market analysis\n` +
+          `<code>/premium SYMBOL</code> — Paid debate (x402)\n` +
           `<code>/status</code> — Bot status\n` +
           `<code>/help</code> — All commands`
+        );
+      }
+
+      // /premium SYMBOL — A2A x402 paywall over Telegram (Phase 4)
+      // Replies with a deep link the user opens in their Agentic Wallet to pay
+      // and receive the full 3-agent debate.
+      if (text.startsWith('/premium')) {
+        const sym = text.replace(/^\/premium\s*/i, '').trim().toUpperCase() || 'BTC';
+        const challengeUrl = `${BASE_URL}/api/mcp-bobby?tool=bobby_debate&symbol=${encodeURIComponent(sym)}&from=telegram&chat=${groupId}`;
+        await sendTelegramMessage(groupId,
+          `💳 <b>Premium debate — ${sym}</b>\n\n` +
+          `Pay $0.10 USDT0 on X Layer to unlock the full 3-agent debate.\n` +
+          `Open in your OKX Agentic Wallet:\n\n` +
+          `👉 <a href="${challengeUrl}">${challengeUrl}</a>\n\n` +
+          `Settles instantly via x402. Treasury: <code>${process.env.BOBBY_TREASURY_ADDRESS || '0x09a8...'}</code>`,
         );
       }
     }

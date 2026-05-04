@@ -107,10 +107,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const totalUnrealizedPnl = openPositions.reduce((sum: number, p: any) => sum + p.unrealizedPnl, 0);
 
     // ── Starting capital estimation ──
-    // ── The $100 Challenge starts NOW — ignore pre-challenge test trades ──
-    const CHALLENGE_START = '2026-03-24T19:00:00.000Z'; // Challenge begins with $100 deposit
+    // ── The $100 Challenge: CONCLUDED 2026-05-04. Bobby pivots to OnchainOS Payments rail. ──
+    const CHALLENGE_START = '2026-03-24T19:00:00.000Z';
+    const CHALLENGE_END = '2026-05-04T00:00:00.000Z';
+    const CHALLENGE_STATUS = 'concluded';
+    const CHALLENGE_OUTCOME =
+      'Capital reduced to $0.0019 from $100. 0 trades executed during the 41-day window after pre-challenge wipeout. Protocol pivots to verifiable payments and verification-as-a-service via OnchainOS Payments + V3 Intent Escrow.';
     const startingCapital = 100;
-    const challengeTrades = closedPositions.filter((p: any) => p.closeTime && p.closeTime >= CHALLENGE_START);
+    const challengeTrades = closedPositions.filter(
+      (p: any) => p.closeTime && p.closeTime >= CHALLENGE_START && p.closeTime <= CHALLENGE_END,
+    );
     const preChallengeTradeCount = closedPositions.length - challengeTrades.length;
 
     // Stats only from challenge trades
@@ -138,6 +144,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         losses: challengeLosses,
         winRate: challengeTrades.length > 0 ? parseFloat((challengeWins / challengeTrades.length * 100).toFixed(1)) : 0,
         challengeStartedAt: CHALLENGE_START,
+        challengeEndedAt: CHALLENGE_END,
+        challengeStatus: CHALLENGE_STATUS,
+        challengeOutcome: CHALLENGE_OUTCOME,
         preChallengeTradesExcluded: preChallengeTradeCount,
       },
 

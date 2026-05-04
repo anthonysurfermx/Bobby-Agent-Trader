@@ -50,6 +50,10 @@ interface PnlData {
     wins: number;
     losses: number;
     winRate: number;
+    challengeStatus?: 'active' | 'concluded';
+    challengeStartedAt?: string;
+    challengeEndedAt?: string;
+    challengeOutcome?: string;
   };
   closedPositions: Array<{
     symbol: string;
@@ -289,11 +293,42 @@ export default function BobbyChallengePage() {
 
       <div className="max-w-7xl mx-auto p-6 md:p-10 pb-20">
 
+          {/* === Challenge Concluded Banner === */}
+          {pnl?.summary?.challengeStatus === 'concluded' && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8 p-5 rounded border-l-4 border-l-amber-500 border border-amber-500/20 bg-amber-500/[0.04]"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-mono text-[10px] tracking-widest text-amber-400">CHALLENGE_STATUS: CONCLUDED</span>
+                {pnl.summary.challengeEndedAt && (
+                  <span className="font-mono text-[10px] text-white/40">
+                    {new Date(pnl.summary.challengeStartedAt!).toISOString().slice(0, 10)} → {new Date(pnl.summary.challengeEndedAt).toISOString().slice(0, 10)}
+                  </span>
+                )}
+              </div>
+              <h2 className="font-mono text-sm md:text-base text-white mb-2">
+                The $100 Challenge has formally concluded. Bobby pivots to verifiable agent payments.
+              </h2>
+              {pnl.summary.challengeOutcome && (
+                <p className="text-white/50 text-xs md:text-sm font-mono leading-relaxed">
+                  {pnl.summary.challengeOutcome}
+                </p>
+              )}
+              <div className="mt-3 text-[11px] font-mono text-amber-400/80">
+                Next chapter → OnchainOS Payments rail (x402) + V3 Intent Escrow on X Layer.
+              </div>
+            </motion.div>
+          )}
+
           {/* === Hero Header === */}
           <motion.header initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="max-w-2xl">
-              <div className="font-mono text-[8px] text-green-500 mb-4 tracking-widest uppercase">system_status: active</div>
+              <div className={`font-mono text-[8px] mb-4 tracking-widest uppercase ${pnl?.summary?.challengeStatus === 'concluded' ? 'text-amber-500' : 'text-green-500'}`}>
+                system_status: {pnl?.summary?.challengeStatus === 'concluded' ? 'concluded' : 'active'}
+              </div>
               <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-none mb-4">
                 BOBBY <span className="text-white/20">$100</span> CHALLENGE
               </h1>

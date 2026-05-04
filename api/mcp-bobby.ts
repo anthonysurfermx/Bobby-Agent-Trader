@@ -22,6 +22,7 @@ import {
   getChallenge,
 } from './_lib/mcp-challenges.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
+import { ensurePaid, x402Config } from './_lib/x402.js';
 
 const BASE_URL = 'https://bobbyprotocol.xyz';
 
@@ -206,6 +207,16 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 const PREMIUM_TOOLS = new Set(['bobby_debate', 'bobby_analyze', 'bobby_security_scan', 'bobby_wallet_portfolio']);
 const X402_PRICE_OKB = '0.001';
 
+// USD prices used when the official x402 path is enabled (X402_ENABLED=true).
+// Auto-converted to USDT0 atomic units by the SDK. Legacy OKB pricing above
+// remains the source of truth while X402_ENABLED=false.
+const X402_TOOL_PRICE_USD: Record<string, string> = {
+  bobby_analyze: '$0.05',
+  bobby_debate: '$0.10',
+  bobby_security_scan: '$0.03',
+  bobby_wallet_portfolio: '$0.02',
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(200).json({
@@ -239,7 +250,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let verifiedPayment: Awaited<ReturnType<typeof verifyMcpPaymentTx>> | null = null;
   if (body.method === 'tools/call') {
     const toolName = (body.params as Record<string, unknown>)?.name as string;
-    if (PREMIUM_TOOLS.has(toolName)) {
+
+    // ---- Phase 1: official OnchainOS Payments (x402) path ----
+    // Activated when X402_ENABLED=true and the tool has a USD price entry.
+    // Falls through to the legacy OKB challenge path on miss/failure so
+    // existing integrations keep working during the migration.
+    if (
+      x402Config.enabled
+      && PREMIUM_TOOLS.has(toolName)
+      && X402_TOOL_PRICE_USD[toolName]
+    ) {
+      const bailOut = await ensurePaid(req, res, {
+        routeKey: `POST /api/mcp-bobby#${toolName}`,
+        priceUsd: X402_TOOL_PRICE_USD[toolName],
+        description: `Bobby premium tool: ${toolName}`,
+      });
+      if (bailOut) {
+        // 402 / verification error already written by the SDK.
+        void logAgentCommerceEvent({
+          source: 'mcp',
+          tool_name: toolName,
+          payment_status: 'x402_challenge_or_failure',
+          external_agent: String(req.headers['x-agent-name'] || '').trim() || null,
+          metadata: {
+            rail: 'onchainos_payments',
+            network: x402Config.network,
+            priceUsd: X402_TOOL_PRICE_USD[toolName],
+          },
+        });
+        return;
+      }
+      // Paid via x402 — skip the legacy OKB gate and continue to business logic.
+    }
+
+    if (PREMIUM_TOOLS.has(toolName) && !x402Config.enabled) {
       const txHash = extractPaymentTxHash(
         req.headers['x-402-payment']
         || req.headers['x-payment']
