@@ -7,6 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { tgSendVoiceAnalysis } from './_lib/telegram';
 
 export const config = { maxDuration: 60 };
 
@@ -29,28 +30,8 @@ async function sendTelegramMessage(chatId: number, text: string) {
 }
 
 async function sendVoiceNote(chatId: number, text: string, caption?: string) {
-  try {
-    const ttsRes = await fetch(`${BASE_URL}/api/bobby-voice-free`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text.slice(0, 1500), voice: 'cio', lang: 'en' }),
-    });
-    if (!ttsRes.ok) return false;
-    const audioBuffer = await ttsRes.arrayBuffer();
-
-    const formData = new FormData();
-    formData.append('chat_id', String(chatId));
-    formData.append('voice', new Blob([audioBuffer], { type: 'audio/ogg' }), 'analysis.ogg');
-    if (caption) formData.append('caption', caption);
-
-    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVoice`, {
-      method: 'POST',
-      body: formData,
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  // Unified TTS layer: free in-process Edge TTS by default, OpenAI opus optional.
+  return tgSendVoiceAnalysis(BOT_TOKEN, chatId, text.slice(0, 1500), caption, 'en');
 }
 
 // B2C DM format — personal, direct

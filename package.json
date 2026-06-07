@@ -62,6 +62,7 @@
     "date-fns": "^3.6.0",
     "dompurify": "^3.3.1",
     "dotenv": "^17.2.1",
+    "edge-tts-universal": "^1.4.0",
     "embla-carousel-react": "^8.6.0",
     "ethers": "^6.15.0",
     "formidable": "^3.5.4",
