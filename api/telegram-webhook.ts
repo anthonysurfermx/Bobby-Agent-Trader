@@ -8,8 +8,13 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { waitUntil } from '@vercel/functions';
+import { tgSendVoiceAnalysis } from './_lib/telegram';
+import { runDmAnalysis, detectSymbol } from './_lib/dm-analysis';
 
-export const config = { maxDuration: 10 };
+// Higher budget: DM voice analysis (OKX fetch + LLM + TTS) runs in waitUntil
+// after we ack Telegram, so the function must stay warm long enough.
+export const config = { maxDuration: 30 };
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
@@ -24,33 +29,8 @@ async function sendTelegramMessage(chatId: number, text: string, parseMode = 'HT
   });
 }
 
-async function sendVoiceNote(chatId: number, text: string, caption?: string) {
-  try {
-    // Generate TTS audio via Edge TTS server on Digital Ocean
-    const ttsRes = await fetch('https://bobbyprotocol.xyz/api/bobby-voice-free', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text.slice(0, 2000), voice: 'cio', lang: 'en' }),
-    });
-
-    if (!ttsRes.ok) return;
-    const audioBuffer = await ttsRes.arrayBuffer();
-
-    // Send voice note to Telegram
-    const formData = new FormData();
-    formData.append('chat_id', String(chatId));
-    formData.append('voice', new Blob([audioBuffer], { type: 'audio/ogg' }), 'bobby_analysis.ogg');
-    if (caption) formData.append('caption', caption);
-    formData.append('parse_mode', 'HTML');
-
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendVoice`, {
-      method: 'POST',
-      body: formData,
-    });
-  } catch (err) {
-    console.error('[telegram-webhook] Voice note failed:', err);
-  }
-}
+// Voice delivery is handled by the unified TTS layer (api/_lib/tts.ts +
+// telegram.ts): free in-process Edge TTS by default, OpenAI opus optional.
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -207,9 +187,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   `<i>Powered by Bobby Agent Trader · OKX X Layer</i>`
                 );
 
-                // Send voice note with the analysis
-                await sendVoiceNote(groupId, analysis,
-                  `🎙 Bobby CIO voice analysis — ${query.toUpperCase()}`
+                // Send voice note with the analysis (unified TTS layer)
+                await tgSendVoiceAnalysis(BOT_TOKEN, groupId, analysis,
+                  `🎙 Bobby CIO — ${query.toUpperCase()}`, 'en'
                 );
               }
             }
@@ -308,18 +288,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true });
       }
 
-      if (text.startsWith('/start')) {
+      if (text.startsWith('/start') && !text.startsWith('/start connect_')) {
         await sendTelegramMessage(chatId,
           `🎯 <b>Bobby Agent Trader</b>\n\n` +
-          `I'm an autonomous AI trading intelligence powered by 3 agents:\n\n` +
-          `🟢 <b>Alpha Hunter</b> — finds opportunities\n` +
-          `🔴 <b>Red Team</b> — challenges every thesis\n` +
-          `🟡 <b>CIO</b> — makes the final decision\n\n` +
-          `<b>For individuals:</b> Create your agent at the terminal and connect me for DM reports.\n` +
-          `<b>For groups:</b> Add me to your Telegram group for multi-agent market analysis.\n\n` +
-          `👉 <a href="${BASE_URL}/agentic-world/bobby/telegram">Learn more</a>\n\n` +
-          `<i>Built on OKX X Layer · x402 Payment Protocol</i>`
+          `Soy una inteligencia de trading autónoma con 3 agentes:\n\n` +
+          `🟢 <b>Alpha Hunter</b> — caza oportunidades\n` +
+          `🔴 <b>Red Team</b> — destroza cada tesis\n` +
+          `🟡 <b>CIO</b> — toma la decisión final\n\n` +
+          `🎙 <b>Mándame una moneda</b> (ej. <code>BTC</code>, <code>ETH</code>, <code>SOL</code>) ` +
+          `y te devuelvo todo el análisis de la terminal en un <b>mensaje de voz</b>.\n\n` +
+          `<i>Datos en vivo de OKX · X Layer</i>`
         );
+        return res.status(200).json({ ok: true });
+      }
+
+      // ── Free-form DM or /analyze /bobby → full terminal analysis as voice ──
+      const isAnalysisCmd = text.startsWith('/analyze') || text.startsWith('/bobby');
+      const isFreeForm = text.length > 0 && !text.startsWith('/');
+      if (isAnalysisCmd || isFreeForm) {
+        const query = text.replace(/^\/(analyze|bobby)\s*/i, '').trim() || 'BTC';
+        const symbol = detectSymbol(query);
+
+        // Ack immediately so Telegram doesn't retry; heavy work runs in waitUntil.
+        await sendTelegramMessage(chatId,
+          `🎙 <b>Bobby</b> está leyendo la terminal para <b>${symbol}</b>…\n` +
+          `<i>🟢 Alpha · 🔴 Red Team · 🟡 CIO</i>`
+        );
+
+        waitUntil((async () => {
+          try {
+            const result = await runDmAnalysis(query);
+            if (!result.ok || !result.verdict || !result.symbol) {
+              await sendTelegramMessage(chatId, `⚠️ ${result.error || 'No pude generar el análisis.'}`);
+              return;
+            }
+            // Full verdict as text, then the star: the voice message.
+            await sendTelegramMessage(chatId, result.verdict.captionHtml);
+            const shortCaption = `🎙 Bobby CIO — ${result.symbol} · ${result.verdict.conviction}/10`;
+            const voiceOk = await tgSendVoiceAnalysis(
+              BOT_TOKEN, chatId, result.verdict.voiceScript, shortCaption, 'es',
+            );
+            if (!voiceOk) {
+              await sendTelegramMessage(chatId,
+                `🔇 <i>(La nota de voz no salió esta vez — arriba tienes el análisis completo en texto.)</i>`,
+              );
+            }
+          } catch (err) {
+            console.error('[telegram-webhook] DM analysis job failed:', err);
+            await sendTelegramMessage(chatId,
+              `⚠️ Algo falló generando tu análisis. Intenta de nuevo en un momento.`,
+            );
+          }
+        })());
+
+        return res.status(200).json({ ok: true });
       }
     }
   } catch (err) {
