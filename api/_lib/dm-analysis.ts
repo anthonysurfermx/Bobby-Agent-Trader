@@ -4,8 +4,9 @@
 // "Todo el análisis de la terminal en un mensaje de voz."
 // Pulls REAL live market data from OKX v5 public endpoints
 // (no API key needed) and asks the CIO persona for a sharp
-// Spanish verdict. No hardcoded analysis — numbers are real,
-// the verdict text is LLM-generated. (no-hardcode rule)
+// verdict in the bot's language. No hardcoded analysis —
+// numbers are real, the verdict text is LLM-generated.
+// (no-hardcode rule)
 // ============================================================
 
 const OKX = 'https://www.okx.com';
@@ -105,56 +106,119 @@ export interface DmVerdict {
   conviction: number;
 }
 
-const SYSTEM_PROMPT = `Eres Bobby, el CIO soberano de Bobby Agent Trader — arquetipo Bobby Axelrod. Brutalmente honesto, agudo, con vocabulario de trader profesional. Hablas ESPAÑOL neutro latino. Proteges el capital como si fuera tuyo. No prometes, demuestras. Recibes datos REALES de mercado de OKX en vivo y entregas un veredicto claro y accionable. Nunca inventas números: usa solo los datos provistos.`;
+type Lang = 'es' | 'en';
 
-function buildUserPrompt(s: MarketSnapshot): string {
-  return `DATOS REALES OKX (en vivo) para ${s.symbol}:
-- Precio: $${s.price}
-- Cambio 24h: ${s.change24h}%
-- Rango 24h: $${s.low24h} – $${s.high24h}
-- Tendencia 7d: ${s.trend7d != null ? s.trend7d + '%' : 'n/d'}
-- Funding rate: ${s.fundingRate != null ? (s.fundingRate * 100).toFixed(4) + '% (' + s.fundingAnnual + '% anualizado)' : 'n/d'}
-- Open Interest: ${s.oi != null ? s.oi.toLocaleString('en-US') : 'n/d'}
-
-Entrega tu veredicto de CIO.`;
+interface LangStrings {
+  system: string;
+  voiceDesc: string;
+  thesisDesc: string;
+  riskDesc: string;
+  entryDesc: string;
+  stopDesc: string;
+  targetDesc: string;
+  dataHeader: (s: string) => string;
+  rowPrice: string;
+  rowChange: string;
+  rowRange: string;
+  rowTrend: string;
+  rowFunding: string;
+  rowOi: string;
+  annualized: string;
+  deliver: string;
+  capEntry: string;
+  capStop: string;
+  capTarget: string;
+  capRisk: string;
+  capFooter: string;
+  errData: (s: string) => string;
+  errEngine: string;
 }
 
-const VERDICT_TOOL = {
-  type: 'function' as const,
-  function: {
-    name: 'emit_verdict',
-    description: 'Veredicto del CIO Bobby sobre el activo.',
-    parameters: {
-      type: 'object',
-      properties: {
-        voice_script: {
-          type: 'string',
-          description:
-            'Texto HABLADO en español neutro, 60-100 palabras (~25-40s al leerse). Tono Bobby Axelrod: directo, con autoridad. SIN markdown, SIN emojis, SIN símbolos como $ o % (escribe "dólares", "por ciento"). Menciona la dirección, la conviction (di "conviction X sobre 10"), niveles aproximados de entrada/stop/objetivo y el riesgo clave. Empieza con un gancho.',
-        },
-        direction: { type: 'string', enum: ['long', 'short', 'neutral'] },
-        conviction: { type: 'number', description: 'Entero 1-10.' },
-        entry: { type: 'string', description: 'Nivel/zona de entrada, p.ej. "67.2k–67.5k" o "n/d".' },
-        stop: { type: 'string', description: 'Stop loss sugerido o "n/d".' },
-        target: { type: 'string', description: 'Objetivo o "n/d".' },
-        thesis: { type: 'string', description: 'Una frase: la tesis central en español.' },
-        key_risk: { type: 'string', description: 'Una frase: el riesgo principal en español.' },
-      },
-      required: ['voice_script', 'direction', 'conviction', 'thesis', 'key_risk'],
-    },
+const I18N: Record<Lang, LangStrings> = {
+  es: {
+    system: `Eres Bobby, el CIO soberano de Bobby Agent Trader — arquetipo Bobby Axelrod. Brutalmente honesto, agudo, con vocabulario de trader profesional. Hablas ESPAÑOL neutro latino. Proteges el capital como si fuera tuyo. No prometes, demuestras. Recibes datos REALES de mercado de OKX en vivo y entregas un veredicto claro y accionable. Nunca inventas números: usa solo los datos provistos.`,
+    voiceDesc:
+      'Texto HABLADO en español neutro, 60-100 palabras (~25-40s al leerse). Tono Bobby Axelrod: directo, con autoridad. SIN markdown, SIN emojis, SIN símbolos como $ o % (escribe "dólares", "por ciento"). Menciona la dirección, la conviction (di "conviction X sobre 10"), niveles aproximados de entrada/stop/objetivo y el riesgo clave. Empieza con un gancho.',
+    thesisDesc: 'Una frase: la tesis central en español.',
+    riskDesc: 'Una frase: el riesgo principal en español.',
+    entryDesc: 'Nivel/zona de entrada, p.ej. "67.2k–67.5k" o "n/d".',
+    stopDesc: 'Stop loss sugerido o "n/d".',
+    targetDesc: 'Objetivo o "n/d".',
+    dataHeader: (s: string) => `DATOS REALES OKX (en vivo) para ${s}:`,
+    rowPrice: 'Precio', rowChange: 'Cambio 24h', rowRange: 'Rango 24h', rowTrend: 'Tendencia 7d',
+    rowFunding: 'Funding rate', rowOi: 'Open Interest', annualized: 'anualizado', deliver: 'Entrega tu veredicto de CIO.',
+    capEntry: 'Entrada', capStop: 'Stop', capTarget: 'Objetivo', capRisk: 'Riesgo',
+    capFooter: 'Datos en vivo de OKX · Bobby Agent Trader',
+    errData: (s: string) => `No pude leer datos de ${s} en OKX ahora mismo. Intenta de nuevo en un momento.`,
+    errEngine: 'El motor de inteligencia no respondió. Intenta de nuevo en un momento.',
+  },
+  en: {
+    system: `You are Bobby, the Sovereign CIO of Bobby Agent Trader — a Bobby Axelrod archetype. Brutally honest, sharp, fluent in professional trader vocabulary. You speak ENGLISH. You protect capital like it's your own. You don't promise, you prove. You receive REAL live OKX market data and deliver a clear, actionable verdict. Never invent numbers: use only the data provided.`,
+    voiceDesc:
+      'SPOKEN text in English, 60-100 words (~25-40s read aloud). Bobby Axelrod tone: direct, authoritative. NO markdown, NO emojis, NO symbols like $ or % (write "dollars", "percent"). Mention the direction, conviction (say "conviction X out of 10"), approximate entry/stop/target levels and the key risk. Open with a hook.',
+    thesisDesc: 'One sentence: the core thesis in English.',
+    riskDesc: 'One sentence: the key risk in English.',
+    entryDesc: 'Entry level/zone, e.g. "67.2k–67.5k" or "n/a".',
+    stopDesc: 'Suggested stop loss or "n/a".',
+    targetDesc: 'Target or "n/a".',
+    dataHeader: (s: string) => `REAL live OKX data for ${s}:`,
+    rowPrice: 'Price', rowChange: '24h change', rowRange: '24h range', rowTrend: '7d trend',
+    rowFunding: 'Funding rate', rowOi: 'Open Interest', annualized: 'annualized', deliver: 'Deliver your CIO verdict.',
+    capEntry: 'Entry', capStop: 'Stop', capTarget: 'Target', capRisk: 'Risk',
+    capFooter: 'Live OKX data · Bobby Agent Trader',
+    errData: (s: string) => `Couldn't read ${s} data from OKX right now. Try again in a moment.`,
+    errEngine: 'The intelligence engine did not respond. Try again in a moment.',
   },
 };
 
-/** Ask the CIO persona for a structured Spanish verdict from a live snapshot. */
+function buildUserPrompt(s: MarketSnapshot, t: LangStrings): string {
+  return `${t.dataHeader(s.symbol)}
+- ${t.rowPrice}: $${s.price}
+- ${t.rowChange}: ${s.change24h}%
+- ${t.rowRange}: $${s.low24h} – $${s.high24h}
+- ${t.rowTrend}: ${s.trend7d != null ? s.trend7d + '%' : 'n/d'}
+- ${t.rowFunding}: ${s.fundingRate != null ? (s.fundingRate * 100).toFixed(4) + '% (' + s.fundingAnnual + '% ' + t.annualized + ')' : 'n/d'}
+- ${t.rowOi}: ${s.oi != null ? s.oi.toLocaleString('en-US') : 'n/d'}
+
+${t.deliver}`;
+}
+
+function buildTool(t: LangStrings) {
+  return {
+    type: 'function' as const,
+    function: {
+      name: 'emit_verdict',
+      description: 'Bobby CIO verdict on the asset.',
+      parameters: {
+        type: 'object',
+        properties: {
+          voice_script: { type: 'string', description: t.voiceDesc },
+          direction: { type: 'string', enum: ['long', 'short', 'neutral'] },
+          conviction: { type: 'number', description: '1-10 integer.' },
+          entry: { type: 'string', description: t.entryDesc },
+          stop: { type: 'string', description: t.stopDesc },
+          target: { type: 'string', description: t.targetDesc },
+          thesis: { type: 'string', description: t.thesisDesc },
+          key_risk: { type: 'string', description: t.riskDesc },
+        },
+        required: ['voice_script', 'direction', 'conviction', 'thesis', 'key_risk'],
+      },
+    },
+  };
+}
+
+/** Ask the CIO persona for a structured verdict from a live snapshot. */
 export async function generateDmVerdict(
   symbol: string,
   snapshot: MarketSnapshot,
+  lang: Lang = 'es',
 ): Promise<DmVerdict | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
     console.error('[dm-analysis] OPENAI_API_KEY missing');
     return null;
   }
+  const t = I18N[lang] || I18N.es;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -163,10 +227,10 @@ export async function generateDmVerdict(
       model: process.env.DM_MODEL || 'gpt-4o',
       max_tokens: 700,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildUserPrompt(snapshot) },
+        { role: 'system', content: t.system },
+        { role: 'user', content: buildUserPrompt(snapshot, t) },
       ],
-      tools: [VERDICT_TOOL],
+      tools: [buildTool(t)],
       tool_choice: { type: 'function', function: { name: 'emit_verdict' } },
     }),
   });
@@ -193,17 +257,19 @@ export async function generateDmVerdict(
     v.direction === 'long' ? '🟢 LONG' : v.direction === 'short' ? '🔴 SHORT' : '⚪ NEUTRAL';
   const s = snapshot;
   const sign = s.change24h >= 0 ? '+' : '';
+  const naSet = new Set(['n/d', 'n/a', 'na', '']);
+  const has = (x: string | undefined) => x != null && !naSet.has(String(x).toLowerCase().trim());
 
   const captionHtml =
     `🎯 <b>Bobby CIO — ${symbol}</b>\n\n` +
     `${dirLabel} · Conviction <b>${conv}/10</b>\n` +
     `💵 $${s.price} (${sign}${s.change24h}% 24h)\n\n` +
     `<i>${v.thesis}</i>\n\n` +
-    (v.entry && v.entry !== 'n/d' ? `📍 Entrada: ${v.entry}\n` : '') +
-    (v.stop && v.stop !== 'n/d' ? `🛑 Stop: ${v.stop}\n` : '') +
-    (v.target && v.target !== 'n/d' ? `🎯 Objetivo: ${v.target}\n` : '') +
-    `⚠️ Riesgo: ${v.key_risk}\n\n` +
-    `<i>Datos en vivo de OKX · Bobby Agent Trader</i>`;
+    (has(v.entry) ? `📍 ${t.capEntry}: ${v.entry}\n` : '') +
+    (has(v.stop) ? `🛑 ${t.capStop}: ${v.stop}\n` : '') +
+    (has(v.target) ? `🎯 ${t.capTarget}: ${v.target}\n` : '') +
+    `⚠️ ${t.capRisk}: ${v.key_risk}\n\n` +
+    `<i>${t.capFooter}</i>`;
 
   return { voiceScript: v.voice_script, captionHtml, direction: v.direction, conviction: conv };
 }
@@ -215,16 +281,13 @@ export interface DmAnalysisResult {
   error?: string;
 }
 
-/** End-to-end: query string → live snapshot → CIO verdict. */
-export async function runDmAnalysis(query: string): Promise<DmAnalysisResult> {
+/** End-to-end: query string → live snapshot → CIO verdict (in `lang`). */
+export async function runDmAnalysis(query: string, lang: Lang = 'es'): Promise<DmAnalysisResult> {
+  const t = I18N[lang] || I18N.es;
   const symbol = detectSymbol(query);
   const snapshot = await fetchSnapshot(symbol);
-  if (!snapshot) {
-    return { ok: false, error: `No pude leer datos de ${symbol} en OKX ahora mismo. Intenta de nuevo en un momento.` };
-  }
-  const verdict = await generateDmVerdict(symbol, snapshot);
-  if (!verdict) {
-    return { ok: false, error: 'El motor de inteligencia no respondió. Intenta de nuevo en un momento.' };
-  }
+  if (!snapshot) return { ok: false, error: t.errData(symbol) };
+  const verdict = await generateDmVerdict(symbol, snapshot, lang);
+  if (!verdict) return { ok: false, error: t.errEngine };
   return { ok: true, symbol, verdict };
 }
