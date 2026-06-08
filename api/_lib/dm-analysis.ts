@@ -224,7 +224,7 @@ export async function generateDmVerdict(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      model: process.env.DM_MODEL || 'gpt-4o',
+      model: process.env.DM_MODEL || 'gpt-4o-mini',
       max_tokens: 700,
       messages: [
         { role: 'system', content: t.system },
