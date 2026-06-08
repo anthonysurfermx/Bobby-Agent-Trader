@@ -207,19 +207,55 @@ function buildTool(t: LangStrings) {
   };
 }
 
-/** Ask the CIO persona for a structured verdict from a live snapshot. */
-export async function generateDmVerdict(
-  symbol: string,
-  snapshot: MarketSnapshot,
-  lang: Lang = 'es',
-): Promise<DmVerdict | null> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) {
-    console.error('[dm-analysis] OPENAI_API_KEY missing');
-    return null;
-  }
-  const t = I18N[lang] || I18N.es;
+// Gemini native structured-output schema (OpenAPI subset, uppercase types).
+function geminiSchema(t: LangStrings) {
+  return {
+    type: 'OBJECT',
+    properties: {
+      voice_script: { type: 'STRING', description: t.voiceDesc },
+      direction: { type: 'STRING', enum: ['long', 'short', 'neutral'] },
+      conviction: { type: 'INTEGER', description: '1-10' },
+      entry: { type: 'STRING', description: t.entryDesc },
+      stop: { type: 'STRING', description: t.stopDesc },
+      target: { type: 'STRING', description: t.targetDesc },
+      thesis: { type: 'STRING', description: t.thesisDesc },
+      key_risk: { type: 'STRING', description: t.riskDesc },
+    },
+    required: ['voice_script', 'direction', 'conviction', 'thesis', 'key_risk'],
+    propertyOrdering: ['voice_script', 'direction', 'conviction', 'entry', 'stop', 'target', 'thesis', 'key_risk'],
+  };
+}
 
+async function callGemini(key: string, t: LangStrings, snapshot: MarketSnapshot): Promise<any> {
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: t.system }] },
+        contents: [{ role: 'user', parts: [{ text: buildUserPrompt(snapshot, t) }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1200,
+          responseMimeType: 'application/json',
+          responseSchema: geminiSchema(t),
+          // Gemini 2.5 "thinking" eats output tokens and truncates the JSON;
+          // disable it — we want the structured verdict directly.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    },
+  );
+  if (!res.ok) throw new Error(`gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = (await res.json()) as any;
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('gemini: empty response');
+  return JSON.parse(text);
+}
+
+async function callOpenAI(key: string, t: LangStrings, snapshot: MarketSnapshot): Promise<any> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
@@ -234,23 +270,48 @@ export async function generateDmVerdict(
       tool_choice: { type: 'function', function: { name: 'emit_verdict' } },
     }),
   });
-
-  if (!res.ok) {
-    console.error('[dm-analysis] openai', res.status, (await res.text()).slice(0, 180));
-    return null;
-  }
-
+  if (!res.ok) throw new Error(`openai ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data = (await res.json()) as any;
-  const call = data.choices?.[0]?.message?.tool_calls?.[0];
-  if (!call?.function?.arguments) return null;
+  const args = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+  if (!args) throw new Error('openai: no tool call returned');
+  return JSON.parse(args);
+}
 
-  let v: any;
-  try {
-    v = JSON.parse(call.function.arguments);
-  } catch {
-    return null;
+/** Provider-agnostic verdict. Gemini (free tier) first, OpenAI fallback. */
+async function callLLM(t: LangStrings, snapshot: MarketSnapshot): Promise<any | null> {
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const provider = (process.env.DM_PROVIDER || (geminiKey ? 'gemini' : 'openai')).toLowerCase();
+
+  const tryGemini = () => {
+    if (!geminiKey) throw new Error('GEMINI_API_KEY missing');
+    return callGemini(geminiKey, t, snapshot);
+  };
+  const tryOpenAI = () => {
+    if (!openaiKey) throw new Error('OPENAI_API_KEY missing');
+    return callOpenAI(openaiKey, t, snapshot);
+  };
+  const chain = provider === 'openai' ? [tryOpenAI, tryGemini] : [tryGemini, tryOpenAI];
+
+  for (const fn of chain) {
+    try {
+      return await fn();
+    } catch (e) {
+      console.error('[dm-analysis] llm', e instanceof Error ? e.message : e);
+    }
   }
-  if (!v.voice_script) return null;
+  return null;
+}
+
+/** Ask the CIO persona for a structured verdict from a live snapshot. */
+export async function generateDmVerdict(
+  symbol: string,
+  snapshot: MarketSnapshot,
+  lang: Lang = 'es',
+): Promise<DmVerdict | null> {
+  const t = I18N[lang] || I18N.es;
+  const v = await callLLM(t, snapshot);
+  if (!v || !v.voice_script) return null;
 
   const conv = Math.max(1, Math.min(10, Math.round(v.conviction || 0)));
   const dirLabel =
