@@ -14,7 +14,7 @@ export async function tgSendMessage(
   token: string,
   chatId: number | string,
   text: string,
-  opts: { parseMode?: string; disablePreview?: boolean } = {},
+  opts: { parseMode?: string; disablePreview?: boolean; replyMarkup?: unknown } = {},
 ): Promise<boolean> {
   try {
     const res = await fetch(api(token, 'sendMessage'), {
@@ -25,6 +25,7 @@ export async function tgSendMessage(
         text,
         parse_mode: opts.parseMode ?? 'HTML',
         disable_web_page_preview: opts.disablePreview ?? true,
+        ...(opts.replyMarkup ? { reply_markup: opts.replyMarkup } : {}),
       }),
     });
     if (!res.ok) console.error('[telegram] sendMessage', res.status, (await res.text()).slice(0, 180));
@@ -68,6 +69,7 @@ export async function tgSendPhoto(
   chatId: number | string,
   image: Buffer,
   caption?: string,
+  replyMarkup?: unknown,
 ): Promise<boolean> {
   try {
     const form = new FormData();
@@ -77,6 +79,7 @@ export async function tgSendPhoto(
       form.append('caption', caption.slice(0, 1024));
       form.append('parse_mode', 'HTML');
     }
+    if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup));
     const res = await fetch(api(token, 'sendPhoto'), { method: 'POST', body: form });
     if (!res.ok) console.error('[telegram] sendPhoto', res.status, (await res.text()).slice(0, 180));
     return res.ok;

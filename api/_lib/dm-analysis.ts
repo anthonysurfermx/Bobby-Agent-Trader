@@ -9,6 +9,7 @@
 
 import { resolveAssetFromText, isMarketQuery, type ResolvedAsset, type AssetKind } from './assets.js';
 import { computeIndicators, type Indicators } from './indicators.js';
+import { buildOkxTradeUrl } from './okx-link.js';
 
 const OKX = 'https://www.okx.com';
 
@@ -91,6 +92,8 @@ export async function fetchSnapshot(asset: ResolvedAsset): Promise<MarketSnapsho
 export interface DmVerdict {
   voiceScript: string;
   captionHtml: string;
+  alphaTake: string;
+  redteamTake: string;
   direction: string;
   conviction: number;
 }
@@ -100,6 +103,8 @@ type Lang = 'es' | 'en';
 interface LangStrings {
   system: string;
   voiceDesc: string;
+  alphaDesc: string;
+  redteamDesc: string;
   thesisDesc: string;
   riskDesc: string;
   entryDesc: string;
@@ -130,9 +135,11 @@ interface LangStrings {
 
 const I18N: Record<Lang, LangStrings> = {
   es: {
-    system: `Eres Bobby, el CIO soberano de Bobby Agent Trader — arquetipo Bobby Axelrod. Brutalmente honesto, agudo, con vocabulario de trader profesional. Hablas ESPAÑOL neutro latino. Analizas cualquier activo: criptomonedas, acciones (stocks), metales, divisas. Proteges el capital como si fuera tuyo. No prometes, demuestras. Recibes datos REALES de mercado de OKX en vivo y entregas un veredicto claro y accionable. Nunca inventas números: usa solo los datos provistos.`,
+    system: `Eres el motor de debate de Bobby Agent Trader: TRES agentes discuten un activo con datos REALES de OKX en vivo. ALPHA HUNTER caza la oportunidad (sesgo alcista, agresivo, busca el setup). RED TEAM es el abogado del diablo (ataca la tesis de Alpha, expone por qué puede fallar). El CIO —Bobby, arquetipo Bobby Axelrod— escucha a ambos y DECIDE con conviction. Hablas ESPAÑOL neutro latino, vocabulario de trader, brutalmente honesto. Que se note el DESACUERDO entre Alpha y Red Team. Nunca inventas números: usa solo los datos provistos.`,
     voiceDesc:
-      'Texto HABLADO en español neutro, 60-100 palabras (~25-40s al leerse). Tono Bobby Axelrod: directo, con autoridad y energía. SIN markdown, SIN emojis, SIN símbolos como $ o % (escribe "dólares", "por ciento"). Menciona el activo por su nombre, la dirección, la conviction (di "conviction X sobre 10"), niveles aproximados de entrada/stop/objetivo y el riesgo clave. Empieza con un gancho.',
+      'Texto HABLADO en español, 90-130 palabras (~40-55s al leerse). Narra el DEBATE con energía y ritmo: primero qué ve ALPHA (la oportunidad), luego cómo el RED TEAM lo ataca (el riesgo real), y al final el veredicto del CIO con "conviction X sobre 10" y los niveles. Que se sienta la discusión entre los tres. Cita al menos un indicador real (RSI, media móvil o nivel). SIN markdown, SIN emojis, SIN símbolos como $ o % (escribe "dólares", "por ciento"). Empieza con un gancho.',
+    alphaDesc: 'La tesis de ALPHA HUNTER: la oportunidad / caso alcista, 1-2 frases, agresivo y específico, citando un dato.',
+    redteamDesc: 'El ataque del RED TEAM: por qué la tesis de Alpha puede fallar, el riesgo principal, 1-2 frases, escéptico y concreto.',
     thesisDesc: 'Una frase: la tesis central en español.',
     riskDesc: 'Una frase: el riesgo principal en español.',
     entryDesc: 'Nivel/zona de entrada, p.ej. "67.2k–67.5k" o "n/d".',
@@ -155,9 +162,11 @@ const I18N: Record<Lang, LangStrings> = {
     errEngine: 'El motor de inteligencia no respondió. Intenta de nuevo en un momento.',
   },
   en: {
-    system: `You are Bobby, the Sovereign CIO of Bobby Agent Trader — a Bobby Axelrod archetype. Brutally honest, sharp, fluent in professional trader vocabulary. You speak ENGLISH. You analyze any asset: crypto, stocks, metals, forex. You protect capital like it's your own. You don't promise, you prove. You receive REAL live OKX market data and deliver a clear, actionable verdict. Never invent numbers: use only the data provided.`,
+    system: `You are the debate engine of Bobby Agent Trader: THREE agents argue an asset using REAL live OKX data. ALPHA HUNTER hunts the opportunity (bullish bias, aggressive, finds the setup). RED TEAM is the devil's advocate (attacks Alpha's thesis, exposes why it fails). The CIO — Bobby, a Bobby Axelrod archetype — hears both and DECIDES with conviction. You speak ENGLISH, trader vocabulary, brutally honest. Make the DISAGREEMENT between Alpha and Red Team obvious. Never invent numbers: use only the data provided.`,
     voiceDesc:
-      'SPOKEN text in English, 60-100 words (~25-40s read aloud). Bobby Axelrod tone: direct, authoritative, energetic. NO markdown, NO emojis, NO symbols like $ or % (write "dollars", "percent"). Name the asset, give the direction, conviction (say "conviction X out of 10"), approximate entry/stop/target levels and the key risk. Open with a hook.',
+      'SPOKEN text in English, 90-130 words (~40-55s read aloud). Narrate the DEBATE with energy and pace: first what ALPHA sees (the opportunity), then how RED TEAM attacks it (the real risk), then the CIO verdict with "conviction X out of 10" and the levels. Make the three-way argument felt. Cite at least one real indicator (RSI, moving average or level). NO markdown, NO emojis, NO symbols like $ or % (write "dollars", "percent"). Open with a hook.',
+    alphaDesc: 'ALPHA HUNTER thesis: the opportunity / bull case, 1-2 sentences, aggressive and specific, citing a data point.',
+    redteamDesc: "RED TEAM attack: why Alpha's thesis can fail, the key risk, 1-2 sentences, skeptical and concrete.",
     thesisDesc: 'One sentence: the core thesis in English.',
     riskDesc: 'One sentence: the key risk in English.',
     entryDesc: 'Entry level/zone, e.g. "67.2k–67.5k" or "n/a".',
@@ -211,6 +220,8 @@ function geminiSchema(t: LangStrings) {
   return {
     type: 'OBJECT',
     properties: {
+      alpha_take: { type: 'STRING', description: t.alphaDesc },
+      redteam_take: { type: 'STRING', description: t.redteamDesc },
       voice_script: { type: 'STRING', description: t.voiceDesc },
       direction: { type: 'STRING', enum: ['long', 'short', 'neutral'] },
       conviction: { type: 'INTEGER', description: '1-10' },
@@ -220,8 +231,8 @@ function geminiSchema(t: LangStrings) {
       thesis: { type: 'STRING', description: t.thesisDesc },
       key_risk: { type: 'STRING', description: t.riskDesc },
     },
-    required: ['voice_script', 'direction', 'conviction', 'thesis', 'key_risk'],
-    propertyOrdering: ['voice_script', 'direction', 'conviction', 'entry', 'stop', 'target', 'thesis', 'key_risk'],
+    required: ['alpha_take', 'redteam_take', 'voice_script', 'direction', 'conviction', 'thesis', 'key_risk'],
+    propertyOrdering: ['alpha_take', 'redteam_take', 'voice_script', 'direction', 'conviction', 'entry', 'stop', 'target', 'thesis', 'key_risk'],
   };
 }
 
@@ -234,6 +245,8 @@ function buildTool(t: LangStrings) {
       parameters: {
         type: 'object',
         properties: {
+          alpha_take: { type: 'string', description: t.alphaDesc },
+          redteam_take: { type: 'string', description: t.redteamDesc },
           voice_script: { type: 'string', description: t.voiceDesc },
           direction: { type: 'string', enum: ['long', 'short', 'neutral'] },
           conviction: { type: 'number', description: '1-10 integer.' },
@@ -243,7 +256,7 @@ function buildTool(t: LangStrings) {
           thesis: { type: 'string', description: t.thesisDesc },
           key_risk: { type: 'string', description: t.riskDesc },
         },
-        required: ['voice_script', 'direction', 'conviction', 'thesis', 'key_risk'],
+        required: ['alpha_take', 'redteam_take', 'voice_script', 'direction', 'conviction', 'thesis', 'key_risk'],
       },
     },
   };
@@ -342,25 +355,37 @@ export async function generateDmVerdict(
   const naSet = new Set(['n/d', 'n/a', 'na', '']);
   const has = (x: string | undefined) => x != null && !naSet.has(String(x).toLowerCase().trim());
   const kindTag = t.kindLabels[s.kind] || '';
+  const alphaTake = String(v.alpha_take || '').trim();
+  const redteamTake = String(v.redteam_take || '').trim();
 
   const captionHtml =
-    `🎯 <b>Bobby CIO — ${s.symbol}</b> <i>(${kindTag})</i>\n\n` +
-    `${dirLabel} · Conviction <b>${conv}/10</b>\n` +
+    `🎯 <b>Bobby — ${s.symbol}</b> <i>(${kindTag})</i>\n` +
     `💵 $${s.price} (${sign}${s.change24h}% 24h)\n\n` +
-    `<i>${v.thesis}</i>\n\n` +
+    (alphaTake ? `🟢 <b>Alpha:</b> ${alphaTake}\n\n` : '') +
+    (redteamTake ? `🔴 <b>Red Team:</b> ${redteamTake}\n\n` : '') +
+    `🟡 <b>CIO:</b> ${dirLabel} · Conviction <b>${conv}/10</b>\n` +
+    `<i>${v.thesis}</i>\n` +
     (has(v.entry) ? `📍 ${t.capEntry}: ${v.entry}\n` : '') +
     (has(v.stop) ? `🛑 ${t.capStop}: ${v.stop}\n` : '') +
     (has(v.target) ? `🎯 ${t.capTarget}: ${v.target}\n` : '') +
     `⚠️ ${t.capRisk}: ${v.key_risk}\n\n` +
     `<i>${t.capFooter}</i>`;
 
-  return { voiceScript: v.voice_script, captionHtml, direction: v.direction, conviction: conv };
+  return {
+    voiceScript: v.voice_script,
+    captionHtml,
+    alphaTake,
+    redteamTake,
+    direction: v.direction,
+    conviction: conv,
+  };
 }
 
 export interface DmAnalysisResult {
   ok: boolean;
   symbol?: string;
   instId?: string;
+  okxUrl?: string;
   verdict?: DmVerdict;
   error?: string;
 }
@@ -384,5 +409,6 @@ export async function runDmAnalysis(query: string, lang: Lang = 'es'): Promise<D
   const verdict = await generateDmVerdict(snapshot, lang, marketMode);
   if (!verdict) return { ok: false, error: t.errEngine };
 
-  return { ok: true, symbol: snapshot.symbol, instId: snapshot.instId, verdict };
+  const okxUrl = buildOkxTradeUrl({ instId: asset.instId, base: asset.base, instType: asset.instType });
+  return { ok: true, symbol: snapshot.symbol, instId: snapshot.instId, okxUrl, verdict };
 }

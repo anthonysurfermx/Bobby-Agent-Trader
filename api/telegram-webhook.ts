@@ -13,6 +13,7 @@ import { tgSendMessage, tgSendVoiceAnalysis, tgSendPhoto } from './_lib/telegram
 import { runDmAnalysis } from './_lib/dm-analysis.js';
 import { resolveBot } from './_lib/telegram-bots.js';
 import { getChartImage } from './_lib/chart.js';
+import { okxButtonText } from './_lib/okx-link.js';
 
 // Higher budget: DM voice analysis (OKX fetch + LLM + TTS) runs in waitUntil
 // after we ack Telegram, so the function must stay warm long enough.
@@ -338,15 +339,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               await sendTelegramMessage(chatId, `⚠️ ${result.error || (isEs ? 'No pude generar el análisis.' : 'Could not generate the analysis.')}`);
               return;
             }
+            // One-tap "Trade on OKX" button (the funnel) under the verdict.
+            const okxButton = result.okxUrl
+              ? { inline_keyboard: [[{ text: okxButtonText(result.symbol, bot.lang), url: result.okxUrl }]] }
+              : undefined;
+
             // TradingView chart (additive) carrying the verdict as caption;
             // fall back to a plain text verdict if no chart / send fails.
             const chart = await getChartImage(result.instId || result.symbol, result.symbol);
             let verdictDelivered = false;
             if (chart) {
-              verdictDelivered = await tgSendPhoto(BOT_TOKEN, chatId, chart.image, result.verdict.captionHtml);
+              verdictDelivered = await tgSendPhoto(BOT_TOKEN, chatId, chart.image, result.verdict.captionHtml, okxButton);
             }
             if (!verdictDelivered) {
-              await sendTelegramMessage(chatId, result.verdict.captionHtml);
+              await tgSendMessage(BOT_TOKEN, chatId, result.verdict.captionHtml, { replyMarkup: okxButton });
             }
             // Then the star: the voice message.
             const shortCaption = `🎙 Bobby CIO — ${result.symbol} · ${result.verdict.conviction}/10`;
