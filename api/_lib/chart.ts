@@ -49,6 +49,14 @@ async function chartImgImage(instId: string, label: string, interval: string): P
   // Crypto → BINANCE spot; stock tokens → OKX swap (best-effort TradingView symbol).
   const ex = (process.env.CHART_EXCHANGE || (isSwap ? 'OKX' : 'BINANCE')).toUpperCase();
   const tvSymbol = isSwap ? `${ex}:${base}USDT.P` : `${ex}:${base}USDT`;
+  // Native TradingView studies so the chart reflects what the audio cites.
+  const studies = [
+    { name: 'Moving Average', input: { length: 20 }, override: { 'Plot.color': 'rgb(59,130,246)' } },
+    { name: 'Moving Average', input: { length: 50 }, override: { 'Plot.color': 'rgb(249,115,22)' } },
+    { name: 'Volume' },
+    { name: 'Relative Strength Index', input: { length: 14 } },
+    { name: 'MACD' },
+  ];
   try {
     const res = await fetch('https://api.chart-img.com/v2/tradingview/advanced-chart', {
       method: 'POST',
@@ -58,8 +66,8 @@ async function chartImgImage(instId: string, label: string, interval: string): P
         interval,
         theme: 'dark',
         width: 800,
-        height: 500,
-        studies: [{ name: 'Volume' }],
+        height: 600,
+        studies,
       }),
     });
     if (!res.ok) {

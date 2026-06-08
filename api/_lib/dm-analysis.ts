@@ -8,6 +8,7 @@
 // ============================================================
 
 import { resolveAssetFromText, isMarketQuery, type ResolvedAsset, type AssetKind } from './assets.js';
+import { computeIndicators, type Indicators } from './indicators.js';
 
 const OKX = 'https://www.okx.com';
 
@@ -36,6 +37,7 @@ export interface MarketSnapshot {
   fundingAnnual: number | null;
   oi: number | null;
   trend7d: number | null;
+  indicators: Indicators;
 }
 
 /** Fetch a live OKX snapshot for a resolved asset (crypto SPOT or stock/fx SWAP). */
@@ -45,7 +47,7 @@ export async function fetchSnapshot(asset: ResolvedAsset): Promise<MarketSnapsho
     okxGet(`/api/v5/market/ticker?instId=${asset.instId}`),
     perp ? okxGet(`/api/v5/public/funding-rate?instId=${perp}`) : Promise.resolve([] as any[]),
     perp ? okxGet(`/api/v5/public/open-interest?instType=SWAP&instId=${perp}`) : Promise.resolve([] as any[]),
-    okxGet(`/api/v5/market/candles?instId=${asset.instId}&bar=1D&limit=8`),
+    okxGet(`/api/v5/market/candles?instId=${asset.instId}&bar=1D&limit=60`),
   ]);
   if (tickers.length === 0) return null;
 
@@ -64,6 +66,11 @@ export async function fetchSnapshot(asset: ResolvedAsset): Promise<MarketSnapsho
   const f = funding[0];
   const fr = f ? parseFloat(f.fundingRate) : null;
 
+  // Oldest-first OHLC for indicators (OKX returns newest-first).
+  const ohlc = candles
+    .map((c) => [Number(c[0]), Number(c[1]), Number(c[2]), Number(c[3]), Number(c[4])])
+    .reverse();
+
   return {
     symbol: asset.display,
     kind: asset.kind,
@@ -77,6 +84,7 @@ export async function fetchSnapshot(asset: ResolvedAsset): Promise<MarketSnapsho
     fundingAnnual: fr != null ? +(fr * 3 * 365 * 100).toFixed(2) : null,
     oi: oi[0] ? parseFloat(oi[0].oiCcy) : null,
     trend7d: trend7d != null ? +trend7d.toFixed(2) : null,
+    indicators: computeIndicators(ohlc),
   };
 }
 
@@ -106,6 +114,9 @@ interface LangStrings {
   rowTrend: string;
   rowFunding: string;
   rowOi: string;
+  rowRsi: string;
+  rowMa: string;
+  rowLevels: string;
   annualized: string;
   deliver: string;
   capEntry: string;
@@ -135,7 +146,9 @@ const I18N: Record<Lang, LangStrings> = {
       forex: 'divisa / forex', commodity: 'materia prima', bond: 'bono', other: 'activo',
     },
     rowPrice: 'Precio', rowChange: 'Cambio 24h', rowRange: 'Rango 24h', rowTrend: 'Tendencia 7d',
-    rowFunding: 'Funding rate', rowOi: 'Open Interest', annualized: 'anualizado', deliver: 'Entrega tu veredicto de CIO.',
+    rowFunding: 'Funding rate', rowOi: 'Open Interest',
+    rowRsi: 'RSI(14)', rowMa: 'Medias móviles', rowLevels: 'Soporte/Resistencia (30d)',
+    annualized: 'anualizado', deliver: 'Entrega tu veredicto de CIO. Cita los indicadores relevantes (RSI, medias, niveles) en tu análisis.',
     capEntry: 'Entrada', capStop: 'Stop', capTarget: 'Objetivo', capRisk: 'Riesgo',
     capFooter: 'Datos en vivo de OKX · Bobby Agent Trader',
     errData: (s) => `No pude leer datos de ${s} en OKX ahora mismo. Intenta de nuevo en un momento.`,
@@ -158,7 +171,9 @@ const I18N: Record<Lang, LangStrings> = {
       forex: 'forex', commodity: 'commodity', bond: 'bond', other: 'asset',
     },
     rowPrice: 'Price', rowChange: '24h change', rowRange: '24h range', rowTrend: '7d trend',
-    rowFunding: 'Funding rate', rowOi: 'Open Interest', annualized: 'annualized', deliver: 'Deliver your CIO verdict.',
+    rowFunding: 'Funding rate', rowOi: 'Open Interest',
+    rowRsi: 'RSI(14)', rowMa: 'Moving averages', rowLevels: 'Support/Resistance (30d)',
+    annualized: 'annualized', deliver: 'Deliver your CIO verdict. Cite the relevant indicators (RSI, moving averages, levels) in your analysis.',
     capEntry: 'Entry', capStop: 'Stop', capTarget: 'Target', capRisk: 'Risk',
     capFooter: 'Live OKX data · Bobby Agent Trader',
     errData: (s) => `Couldn't read ${s} data from OKX right now. Try again in a moment.`,
@@ -177,9 +192,18 @@ function buildUserPrompt(s: MarketSnapshot, t: LangStrings, marketMode: boolean)
     `- ${t.rowTrend}: ${s.trend7d != null ? s.trend7d + '%' : 'n/d'}`,
     `- ${t.rowFunding}: ${s.fundingRate != null ? (s.fundingRate * 100).toFixed(4) + '% (' + s.fundingAnnual + '% ' + t.annualized + ')' : 'n/d'}`,
     `- ${t.rowOi}: ${s.oi != null ? s.oi.toLocaleString('en-US') : 'n/d'}`,
-    '',
-    t.deliver,
   );
+  const ind = s.indicators;
+  if (ind.rsi14 != null) lines.push(`- ${t.rowRsi}: ${ind.rsi14}`);
+  if (ind.sma20 != null || ind.sma50 != null) {
+    lines.push(
+      `- ${t.rowMa}: SMA20 ${ind.sma20 ?? 'n/d'} (${ind.priceVsSma20 != null ? (ind.priceVsSma20 >= 0 ? '+' : '') + ind.priceVsSma20 + '%' : 'n/d'}), SMA50 ${ind.sma50 ?? 'n/d'} (${ind.priceVsSma50 != null ? (ind.priceVsSma50 >= 0 ? '+' : '') + ind.priceVsSma50 + '%' : 'n/d'})`,
+    );
+  }
+  if (ind.support != null && ind.resistance != null) {
+    lines.push(`- ${t.rowLevels}: $${ind.support} / $${ind.resistance}`);
+  }
+  lines.push('', t.deliver);
   return lines.join('\n');
 }
 
