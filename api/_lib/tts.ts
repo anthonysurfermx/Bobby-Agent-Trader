@@ -52,15 +52,24 @@ async function edgeTTS(text: string, lang: string): Promise<SpeechResult> {
 async function openaiTTS(text: string, _lang: string): Promise<SpeechResult> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('openai-tts: OPENAI_API_KEY missing');
+  const model = process.env.TTS_OPENAI_MODEL || 'gpt-4o-mini-tts';
+  const body: Record<string, unknown> = {
+    model,
+    voice: process.env.TTS_OPENAI_VOICE || 'ash',
+    input: text.slice(0, MAX_CHARS),
+    response_format: 'opus',
+  };
+  // gpt-4o-mini-tts steers delivery via `instructions`; tts-1 only has `speed`.
+  if (model.includes('gpt-4o')) {
+    body.instructions = process.env.TTS_INSTRUCTIONS ||
+      'Habla con MUCHA energía, entusiasmo y un ritmo ágil y rápido. Eres un analista de trading seguro, dinámico y motivador, con urgencia, como quien suelta una señal caliente en vivo. Proyecta confianza y emoción. Nada monótono, nada lento.';
+  } else {
+    body.speed = Number(process.env.TTS_SPEED || '1.12');
+  }
   const res = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: process.env.TTS_OPENAI_MODEL || 'gpt-4o-mini-tts',
-      voice: process.env.TTS_OPENAI_VOICE || 'onyx',
-      input: text.slice(0, MAX_CHARS),
-      response_format: 'opus',
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`openai-tts ${res.status}: ${(await res.text()).slice(0, 180)}`);
   const audio = Buffer.from(await res.arrayBuffer());
