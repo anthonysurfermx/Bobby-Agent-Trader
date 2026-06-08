@@ -7,7 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { tgSendVoiceAnalysis } from './_lib/telegram';
+import { tgSendVoiceAnalysis } from './_lib/telegram.js';
 
 export const config = { maxDuration: 60 };
 

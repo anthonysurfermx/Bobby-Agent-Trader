@@ -5,7 +5,7 @@
 // per-endpoint copies that all proxied a now-dead TTS droplet.
 // ============================================================
 
-import { generateSpeech, type SpeechResult } from './tts';
+import { generateSpeech, type SpeechResult } from './tts.js';
 
 const api = (token: string, method: string) =>
   `https://api.telegram.org/bot${token}/${method}`;

@@ -9,9 +9,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { waitUntil } from '@vercel/functions';
-import { tgSendMessage, tgSendVoiceAnalysis } from './_lib/telegram';
-import { runDmAnalysis, detectSymbol } from './_lib/dm-analysis';
-import { resolveBot } from './_lib/telegram-bots';
+import { tgSendMessage, tgSendVoiceAnalysis } from './_lib/telegram.js';
+import { runDmAnalysis, detectSymbol } from './_lib/dm-analysis.js';
+import { resolveBot } from './_lib/telegram-bots.js';
 
 // Higher budget: DM voice analysis (OKX fetch + LLM + TTS) runs in waitUntil
 // after we ack Telegram, so the function must stay warm long enough.
