@@ -35,9 +35,9 @@ const MAX_CHARS = 4000;
 async function edgeTTS(text: string, lang: string): Promise<SpeechResult> {
   const voice = EDGE_VOICE[lang] || EDGE_VOICE.es;
   const communicate = new Communicate(text.slice(0, MAX_CHARS), { voice });
-  const chunks: Buffer[] = [];
+  const chunks: Uint8Array[] = [];
   for await (const msg of communicate.stream()) {
-    if (msg.type === 'audio' && msg.data) chunks.push(Buffer.from(msg.data));
+    if (msg.type === 'audio' && msg.data) chunks.push(msg.data as Uint8Array);
   }
   if (chunks.length === 0) throw new Error('edge-tts: empty audio stream');
   return {
