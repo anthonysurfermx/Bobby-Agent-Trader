@@ -45,7 +45,7 @@ export async function tgSendSpeech(
     const form = new FormData();
     form.append('chat_id', String(chatId));
     const field = speech.telegramMethod === 'sendVoice' ? 'voice' : 'audio';
-    form.append(field, new Blob([speech.audio], { type: speech.mime }), speech.filename);
+    form.append(field, new Blob([new Uint8Array(speech.audio)], { type: speech.mime }), speech.filename);
     if (caption) {
       form.append('caption', caption.slice(0, 1024));
       form.append('parse_mode', 'HTML');
