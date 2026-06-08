@@ -3,8 +3,10 @@
 // ------------------------------------------------------------
 // Free by default: renders a candlestick PNG with QuickChart
 // from live OKX candles for the resolved instId (works for any
-// asset: crypto SPOT or stock/metal/fx SWAP). If CHARTIMG_API_KEY
-// is set, upgrades to a real TradingView Advanced Chart.
+// asset: crypto SPOT or stock/metal/fx SWAP), with SMA20/SMA50
+// overlays so the chart reflects the moving averages the voice
+// cites. If CHARTIMG_API_KEY is set, upgrades to a real
+// TradingView Advanced Chart.
 //
 // Additive: returns null on any failure so the DM flow still
 // delivers the verdict + voice without a chart.
@@ -82,6 +84,19 @@ async function chartImgImage(instId: string, label: string, interval: string): P
   }
 }
 
+// Simple moving average aligned to the input series (null until the
+// window is full, so it overlays the right candles on a time axis).
+function sma(values: number[], period: number): (number | null)[] {
+  const out: (number | null)[] = [];
+  let sum = 0;
+  for (let i = 0; i < values.length; i++) {
+    sum += values[i];
+    if (i >= period) sum -= values[i - period];
+    out.push(i >= period - 1 ? sum / period : null);
+  }
+  return out;
+}
+
 // ── Free: candlestick PNG via QuickChart from OKX candles ──
 async function quickChartImage(instId: string, label: string, bar: string): Promise<ChartImage | null> {
   const candles = await fetchCandles(instId, bar);
@@ -91,16 +106,38 @@ async function quickChartImage(instId: string, label: string, bar: string): Prom
   const up = '#22c55e';
   const down = '#ef4444';
 
+  // SMA overlays computed from the closes already fetched — these mirror
+  // the "moving averages" the voice note cites. Drop nulls so each line
+  // starts where its window first fills.
+  const closes = candles.map((c) => c[4]);
+  const maLine = (period: number, color: string) => ({
+    type: 'line',
+    label: `SMA ${period}`,
+    data: sma(closes, period)
+      .map((v, i) => (v == null ? null : { x: candles[i][0], y: v }))
+      .filter(Boolean),
+    borderColor: color,
+    backgroundColor: color,
+    borderWidth: 1.5,
+    pointRadius: 0,
+    fill: false,
+    tension: 0,
+  });
+  const overlays = [maLine(20, '#3b82f6')];
+  if (closes.length >= 50) overlays.push(maLine(50, '#f97316'));
+
   const chart = {
     type: 'candlestick',
     data: {
       datasets: [
         {
+          type: 'candlestick',
           label: `${label} · ${bar}`,
           data: points,
           color: { up, down, unchanged: '#9ca3af' },
           borderColor: { up, down, unchanged: '#9ca3af' },
         },
+        ...overlays,
       ],
     },
     options: {
