@@ -10,7 +10,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { waitUntil } from '@vercel/functions';
 import { tgSendMessage, tgSendVoiceAnalysis, tgSendPhoto } from './_lib/telegram.js';
-import { runDmAnalysis, detectSymbol } from './_lib/dm-analysis.js';
+import { runDmAnalysis } from './_lib/dm-analysis.js';
 import { resolveBot } from './_lib/telegram-bots.js';
 import { getChartImage } from './_lib/chart.js';
 
@@ -161,26 +161,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           `🟡 CIO preparing verdict...`
         );
 
-        // Generate quick analysis with gpt-4o-mini
+        // Generate quick analysis with Gemini
         try {
-          const OPENAI_KEY = process.env.OPENAI_API_KEY;
-          if (OPENAI_KEY) {
-            const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+          if (GEMINI_KEY) {
+            const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+            const aiRes = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+              {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                model: 'gpt-4o-mini',
-                max_tokens: 500,
-                messages: [
-                  { role: 'system', content: `You are Bobby CIO, a trading intelligence agent. Give a brief 3-sentence market analysis of ${query}. Be concise, data-driven. Mention a direction (bullish/bearish/neutral) and a conviction level (1-10). End with one actionable insight.` },
-                  { role: 'user', content: `Quick analysis of ${query} right now.` },
-                ],
+                system_instruction: { parts: [{ text: `You are Bobby CIO, a trading intelligence agent. Give a brief 3-sentence market analysis of ${query}. Be concise, data-driven. Mention a direction (bullish/bearish/neutral) and a conviction level (1-10). End with one actionable insight.` }] },
+                contents: [{ role: 'user', parts: [{ text: `Quick analysis of ${query} right now.` }] }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } },
               }),
-            });
+            },
+            );
 
             if (aiRes.ok) {
               const aiData = await aiRes.json() as any;
-              const analysis = aiData.choices?.[0]?.message?.content || '';
+              const analysis = aiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
               if (analysis) {
                 // Send text analysis
@@ -321,13 +322,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const isFreeForm = text.length > 0 && !text.startsWith('/');
       if (isAnalysisCmd || isFreeForm) {
         const query = text.replace(/^\/(analyze|bobby)\s*/i, '').trim() || 'BTC';
-        const symbol = detectSymbol(query);
 
         // Ack immediately so Telegram doesn't retry; heavy work runs in waitUntil.
         await sendTelegramMessage(chatId, isEs
-          ? `🎙 <b>Bobby</b> está leyendo la terminal para <b>${symbol}</b>…\n` +
+          ? `🎙 <b>Bobby</b> está leyendo la terminal…\n` +
             `<i>🟢 Alpha · 🔴 Red Team · 🟡 CIO</i>`
-          : `🎙 <b>Bobby</b> is reading the terminal for <b>${symbol}</b>…\n` +
+          : `🎙 <b>Bobby</b> is reading the terminal…\n` +
             `<i>🟢 Alpha · 🔴 Red Team · 🟡 CIO</i>`
         );
 
@@ -340,7 +340,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             // TradingView chart (additive) carrying the verdict as caption;
             // fall back to a plain text verdict if no chart / send fails.
-            const chart = await getChartImage(result.symbol);
+            const chart = await getChartImage(result.instId || result.symbol, result.symbol);
             let verdictDelivered = false;
             if (chart) {
               verdictDelivered = await tgSendPhoto(BOT_TOKEN, chatId, chart.image, result.verdict.captionHtml);
