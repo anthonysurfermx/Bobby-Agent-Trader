@@ -137,9 +137,9 @@ const I18N: Record<Lang, LangStrings> = {
   es: {
     system: `Eres el motor de debate de Bobby Agent Trader: TRES agentes discuten un activo con datos REALES de OKX en vivo. ALPHA HUNTER caza la oportunidad (sesgo alcista, agresivo, busca el setup). RED TEAM es el abogado del diablo (ataca la tesis de Alpha, expone por qué puede fallar). El CIO —Bobby, arquetipo Bobby Axelrod— escucha a ambos y DECIDE con conviction. Hablas ESPAÑOL neutro latino, vocabulario de trader, brutalmente honesto. Que se note el DESACUERDO entre Alpha y Red Team. Nunca inventas números: usa solo los datos provistos.`,
     voiceDesc:
-      'Texto HABLADO en español, 90-130 palabras (~40-55s al leerse). Narra el DEBATE con energía y ritmo: primero qué ve ALPHA (la oportunidad), luego cómo el RED TEAM lo ataca (el riesgo real), y al final el veredicto del CIO con "conviction X sobre 10" y los niveles. Que se sienta la discusión entre los tres. Cita al menos un indicador real (RSI, media móvil o nivel). SIN markdown, SIN emojis, SIN símbolos como $ o % (escribe "dólares", "por ciento"). Empieza con un gancho.',
-    alphaDesc: 'La tesis de ALPHA HUNTER: la oportunidad / caso alcista, 1-2 frases, agresivo y específico, citando un dato.',
-    redteamDesc: 'El ataque del RED TEAM: por qué la tesis de Alpha puede fallar, el riesgo principal, 1-2 frases, escéptico y concreto.',
+      'Texto HABLADO en español, MÁXIMO 55-70 palabras (~25-30s). Punchy, directo, CERO relleno. Estructura: una frase de ALPHA (la oportunidad), una del RED TEAM (el contraataque/riesgo), y el veredicto del CIO con dirección y "conviction X sobre 10". Cita UN indicador real (RSI o una media). SIN markdown, SIN emojis, SIN símbolos como $ o % (escribe "dólares", "por ciento"). Arranca con un gancho corto.',
+    alphaDesc: 'La tesis de ALPHA HUNTER: la oportunidad / caso alcista en UNA frase corta y filosa, citando un dato.',
+    redteamDesc: 'El contraataque del RED TEAM: por qué la tesis de Alpha falla, en UNA frase corta y concreta.',
     thesisDesc: 'Una frase: la tesis central en español.',
     riskDesc: 'Una frase: el riesgo principal en español.',
     entryDesc: 'Nivel/zona de entrada, p.ej. "67.2k–67.5k" o "n/d".',
@@ -164,9 +164,9 @@ const I18N: Record<Lang, LangStrings> = {
   en: {
     system: `You are the debate engine of Bobby Agent Trader: THREE agents argue an asset using REAL live OKX data. ALPHA HUNTER hunts the opportunity (bullish bias, aggressive, finds the setup). RED TEAM is the devil's advocate (attacks Alpha's thesis, exposes why it fails). The CIO — Bobby, a Bobby Axelrod archetype — hears both and DECIDES with conviction. You speak ENGLISH, trader vocabulary, brutally honest. Make the DISAGREEMENT between Alpha and Red Team obvious. Never invent numbers: use only the data provided.`,
     voiceDesc:
-      'SPOKEN text in English, 90-130 words (~40-55s read aloud). Narrate the DEBATE with energy and pace: first what ALPHA sees (the opportunity), then how RED TEAM attacks it (the real risk), then the CIO verdict with "conviction X out of 10" and the levels. Make the three-way argument felt. Cite at least one real indicator (RSI, moving average or level). NO markdown, NO emojis, NO symbols like $ or % (write "dollars", "percent"). Open with a hook.',
-    alphaDesc: 'ALPHA HUNTER thesis: the opportunity / bull case, 1-2 sentences, aggressive and specific, citing a data point.',
-    redteamDesc: "RED TEAM attack: why Alpha's thesis can fail, the key risk, 1-2 sentences, skeptical and concrete.",
+      'SPOKEN text in English, MAX 55-70 words (~25-30s). Punchy, direct, ZERO filler. Structure: one line from ALPHA (the opportunity), one from RED TEAM (the counter/risk), and the CIO verdict with direction and "conviction X out of 10". Cite ONE real indicator (RSI or a moving average). NO markdown, NO emojis, NO symbols like $ or % (write "dollars", "percent"). Open with a short hook.',
+    alphaDesc: 'ALPHA HUNTER thesis: the opportunity / bull case in ONE sharp sentence, citing a data point.',
+    redteamDesc: "RED TEAM counter: why Alpha's thesis fails, in ONE short concrete sentence.",
     thesisDesc: 'One sentence: the core thesis in English.',
     riskDesc: 'One sentence: the key risk in English.',
     entryDesc: 'Entry level/zone, e.g. "67.2k–67.5k" or "n/a".',
@@ -264,29 +264,33 @@ function buildTool(t: LangStrings) {
 
 async function callGemini(key: string, t: LangStrings, s: MarketSnapshot, marketMode: boolean): Promise<any> {
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: t.system }] },
-        contents: [{ role: 'user', parts: [{ text: buildUserPrompt(s, t, marketMode) }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1200,
-          responseMimeType: 'application/json',
-          responseSchema: geminiSchema(t),
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      }),
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const body = JSON.stringify({
+    system_instruction: { parts: [{ text: t.system }] },
+    contents: [{ role: 'user', parts: [{ text: buildUserPrompt(s, t, marketMode) }] }],
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 1200,
+      responseMimeType: 'application/json',
+      responseSchema: geminiSchema(t),
+      thinkingConfig: { thinkingBudget: 0 },
     },
-  );
-  if (!res.ok) throw new Error(`gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = (await res.json()) as any;
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('gemini: empty response');
-  return JSON.parse(text);
+  });
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+    // One short retry on rate-limit (free-tier RPM) before giving up to the fallback.
+    if (res.status === 429 && attempt === 0) {
+      await new Promise((r) => setTimeout(r, 1600));
+      continue;
+    }
+    if (!res.ok) throw new Error(`gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const data = (await res.json()) as any;
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('gemini: empty response');
+    return JSON.parse(text);
+  }
+  throw new Error('gemini: rate-limited (retry exhausted)');
 }
 
 async function callOpenAI(key: string, t: LangStrings, s: MarketSnapshot, marketMode: boolean): Promise<any> {
