@@ -63,6 +63,29 @@ export async function tgSendSpeech(
   }
 }
 
+export async function tgSendPhoto(
+  token: string,
+  chatId: number | string,
+  image: Buffer,
+  caption?: string,
+): Promise<boolean> {
+  try {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append('photo', new Blob([new Uint8Array(image)], { type: 'image/png' }), 'chart.png');
+    if (caption) {
+      form.append('caption', caption.slice(0, 1024));
+      form.append('parse_mode', 'HTML');
+    }
+    const res = await fetch(api(token, 'sendPhoto'), { method: 'POST', body: form });
+    if (!res.ok) console.error('[telegram] sendPhoto', res.status, (await res.text()).slice(0, 180));
+    return res.ok;
+  } catch (err) {
+    console.error('[telegram] sendPhoto error', err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
 /**
  * Convenience: synthesize `voiceText` and deliver it (voice bubble or audio
  * clip depending on the TTS provider), with an optional short caption.

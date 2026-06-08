@@ -9,9 +9,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { waitUntil } from '@vercel/functions';
-import { tgSendMessage, tgSendVoiceAnalysis } from './_lib/telegram.js';
+import { tgSendMessage, tgSendVoiceAnalysis, tgSendPhoto } from './_lib/telegram.js';
 import { runDmAnalysis, detectSymbol } from './_lib/dm-analysis.js';
 import { resolveBot } from './_lib/telegram-bots.js';
+import { getChartImage } from './_lib/chart.js';
 
 // Higher budget: DM voice analysis (OKX fetch + LLM + TTS) runs in waitUntil
 // after we ack Telegram, so the function must stay warm long enough.
@@ -337,8 +338,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               await sendTelegramMessage(chatId, `⚠️ ${result.error || (isEs ? 'No pude generar el análisis.' : 'Could not generate the analysis.')}`);
               return;
             }
-            // Full verdict as text, then the star: the voice message.
-            await sendTelegramMessage(chatId, result.verdict.captionHtml);
+            // TradingView chart (additive) carrying the verdict as caption;
+            // fall back to a plain text verdict if no chart / send fails.
+            const chart = await getChartImage(result.symbol);
+            let verdictDelivered = false;
+            if (chart) {
+              verdictDelivered = await tgSendPhoto(BOT_TOKEN, chatId, chart.image, result.verdict.captionHtml);
+            }
+            if (!verdictDelivered) {
+              await sendTelegramMessage(chatId, result.verdict.captionHtml);
+            }
+            // Then the star: the voice message.
             const shortCaption = `🎙 Bobby CIO — ${result.symbol} · ${result.verdict.conviction}/10`;
             const voiceOk = await tgSendVoiceAnalysis(
               BOT_TOKEN, chatId, result.verdict.voiceScript, shortCaption, bot.lang,
