@@ -8,7 +8,7 @@
 // Fires-and-forgets — never blocks the caller.
 // ============================================================
 
-import { logHarnessEvent } from './harness-events';
+import { logHarnessEvent } from './harness-events.js';
 
 export type LlmFailureKind =
   | 'rate_limit'     // 429

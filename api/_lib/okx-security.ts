@@ -7,7 +7,7 @@
 // Docs: https://web3.okx.com/onchainos/dev-docs (okx-security skill, v2.2.9)
 // ============================================================
 
-import { hmacSign } from './okx-hmac';
+import { hmacSign } from './okx-hmac.js';
 
 export interface TokenRiskVerdict {
   chainIndex: string;

@@ -6,7 +6,7 @@
 // on purpose (different callers, different token addressing).
 // ============================================================
 
-import { hmacSign } from './okx-hmac';
+import { hmacSign } from './okx-hmac.js';
 
 const NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 

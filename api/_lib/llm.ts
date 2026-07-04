@@ -11,7 +11,7 @@
 // back to Anthropic: swap the provider here, not in every endpoint.
 // ============================================================
 
-import { recordLlmFailure, classifyHttpStatus } from './llm-health';
+import { recordLlmFailure, classifyHttpStatus } from './llm-health.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const BACKOFF_MS = [500, 1500];

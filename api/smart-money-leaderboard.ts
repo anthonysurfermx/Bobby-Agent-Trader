@@ -4,7 +4,7 @@
 // Returns: smart money leaderboard with wallet PnL, signal strength, and trading patterns
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { hmacSign } from './_lib/okx-hmac';
+import { hmacSign } from './_lib/okx-hmac.js';
 
 export const config = { maxDuration: 30 };
 
