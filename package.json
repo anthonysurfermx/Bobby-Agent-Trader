@@ -10,7 +10,8 @@
     "check:api": "tsc -p tsconfig.api.json",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:playbooks": "tsx scripts/test-playbooks.mts"
+    "test:playbooks": "tsx scripts/test-playbooks.mts",
+    "test:risk-gate": "tsx scripts/test-risk-gate.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

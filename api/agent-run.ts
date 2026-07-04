@@ -30,7 +30,9 @@ import {
   type PolyLeaderboardEntry,
 } from './_lib/polymarket';
 import { checkTokenRiskBatch } from './_lib/okx-security';
-import { recordLlmFailure, classifyHttpStatus } from './_lib/llm-health';
+import { callLlm } from './_lib/llm';
+import { checkPersistentLimit } from './_lib/rate-limit-persistent';
+import { getClientIp } from './_lib/rate-limit';
 
 export const config = { maxDuration: 120 };
 
@@ -45,86 +47,30 @@ const POLY_GAMMA = 'https://gamma-api.polymarket.com';
 // ---- Signal ingest + filter extracted to ./_lib/signals.ts ----
 
 // ---- OpenAI call helper (shared by all agents) ----
-// Replaces Anthropic tool_use with OpenAI function-call tools API.
+// Thin adapter over _lib/llm.ts (retry/backoff/abort live there).
+// Keeps the historical non-throwing contract: downstream debate code
+// expects errors as text, not exceptions.
 async function callClaude(
   systemPrompt: string,
   userMsg: string,
   toolSchema?: { name: string; description: string; input_schema: Record<string, unknown> },
 ): Promise<{ text: string; toolInput: Record<string, unknown> | null }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY missing — agent cannot run debate');
+  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY missing — agent cannot run debate');
 
-  const body: Record<string, unknown> = {
-    model: 'gpt-4o',
-    max_tokens: 1024,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMsg },
-    ],
-  };
-
-  if (toolSchema) {
-    body.tools = [{
-      type: 'function',
-      function: {
-        name: toolSchema.name,
-        description: toolSchema.description,
-        parameters: toolSchema.input_schema,
-      },
-    }];
-    body.tool_choice = { type: 'function', function: { name: toolSchema.name } };
-  }
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const t = await res.text();
-    recordLlmFailure({
+  try {
+    return await callLlm({
       endpoint: 'agent-run',
-      provider: 'openai',
+      system: systemPrompt,
+      user: userMsg,
       model: 'gpt-4o',
-      kind: classifyHttpStatus(res.status),
-      httpStatus: res.status,
-      message: t.slice(0, 300),
+      maxTokens: 1024,
+      tool: toolSchema
+        ? { name: toolSchema.name, description: toolSchema.description, parameters: toolSchema.input_schema }
+        : undefined,
     });
-    return { text: `OpenAI ${res.status}: ${t.slice(0, 100)}`, toolInput: null };
+  } catch (e) {
+    return { text: (e as Error).message.slice(0, 150), toolInput: null };
   }
-
-  const result = await res.json() as {
-    choices: Array<{
-      message: {
-        content: string | null;
-        tool_calls?: Array<{ function: { name: string; arguments: string } }>;
-      };
-    }>;
-  };
-  const message = result.choices?.[0]?.message;
-  const text = message?.content || '';
-  const toolCall = message?.tool_calls?.[0];
-  let toolInput: Record<string, unknown> | null = null;
-  if (toolCall?.function?.arguments) {
-    try {
-      toolInput = JSON.parse(toolCall.function.arguments);
-    } catch {
-      recordLlmFailure({
-        endpoint: 'agent-run',
-        provider: 'openai',
-        model: 'gpt-4o',
-        kind: 'parse_error',
-        message: `tool_call args not valid JSON: ${toolCall.function.arguments.slice(0, 200)}`,
-      });
-      toolInput = null;
-    }
-  }
-
-  return { text, toolInput };
 }
 
 // ---- Dynamic conviction + Kelly sizing + risk gate extracted to ./_lib/risk-gate.ts ----
@@ -1009,18 +955,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cronSecret = process.env.CRON_SECRET;
   const isManual = req.query.manual === 'true';
   const walletAddress = isManual ? String(req.query.wallet || '') : '';
-  if (cronSecret && !isManual) {
-    if (req.headers.authorization !== `Bearer ${cronSecret}`) {
-      return res.status(401).json({ error: 'Unauthorized' });
+  const hasOperatorAuth = Boolean(cronSecret) && req.headers.authorization === `Bearer ${cronSecret}`;
+  if (cronSecret && !isManual && !hasOperatorAuth) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Manual runs stay public (UI "analyze" button) but each one costs
+  // 3 LLM calls — cap them per IP and globally across all instances.
+  if (isManual && !hasOperatorAuth) {
+    const ip = getClientIp(req);
+    const [ipLimit, globalLimit] = await Promise.all([
+      checkPersistentLimit('agent-run-manual', ip, 3, 60 * 60),
+      checkPersistentLimit('agent-run-manual', 'global', 12, 60 * 60),
+    ]);
+    if (ipLimit.limited || globalLimit.limited) {
+      const resetAt = ipLimit.limited ? ipLimit.resetAt : globalLimit.resetAt;
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))));
+      return res.status(429).json({
+        ok: false,
+        error: 'Manual cycle limit reached. Bobby runs on his own schedule — check back soon.',
+      });
     }
   }
 
   const startMs = Date.now();
   const startedAt = new Date().toISOString();
 
-  // Circuit breaker: halt on sustained losses. Manual runs can force-bypass
-  // with ?force=true for operator override; cron runs always respect it.
-  const forceBypass = req.query.force === 'true' && isManual;
+  // Circuit breaker: halt on sustained losses. Only an authenticated
+  // operator (Bearer CRON_SECRET) may force-bypass with ?force=true;
+  // unauthenticated manual runs and cron always respect it.
+  const forceBypass = req.query.force === 'true' && isManual && hasOperatorAuth;
   if (!forceBypass) {
     const breaker = await checkCircuitBreaker();
     if (breaker.halted) {
