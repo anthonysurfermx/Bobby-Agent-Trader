@@ -5,34 +5,34 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { cached } from './_lib/api-cache';
+import { cached } from './_lib/api-cache.js';
 import {
   collectDexSignals,
   filterSignals,
   type RawSignal,
   type FilteredSignal,
-} from './_lib/signals';
+} from './_lib/signals.js';
 import {
   getSwapQuote,
   getSwapCalldata,
   getApproveCalldata,
-} from './_lib/dex-execution';
+} from './_lib/dex-execution.js';
 import {
   applyRiskGate,
   calculateDynamicConviction,
   kellySize,
   type TradeDecision,
-} from './_lib/risk-gate';
+} from './_lib/risk-gate.js';
 import {
   collectPolymarketIntelligence,
   type SmartMoneyConsensus,
   type PolyPosition,
   type PolyLeaderboardEntry,
-} from './_lib/polymarket';
-import { checkTokenRiskBatch } from './_lib/okx-security';
-import { callLlm } from './_lib/llm';
-import { checkPersistentLimit } from './_lib/rate-limit-persistent';
-import { getClientIp } from './_lib/rate-limit';
+} from './_lib/polymarket.js';
+import { checkTokenRiskBatch } from './_lib/okx-security.js';
+import { callLlm } from './_lib/llm.js';
+import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
+import { getClientIp } from './_lib/rate-limit.js';
 
 export const config = { maxDuration: 120 };
 

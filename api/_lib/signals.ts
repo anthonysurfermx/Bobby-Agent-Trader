@@ -28,7 +28,7 @@ export interface FilteredSignal extends RawSignal {
   reasons: string[];
 }
 
-import { hmacSign } from './okx-hmac';
+import { hmacSign } from './okx-hmac.js';
 
 export interface CollectOptions {
   /** Stamp each signal with Date.now() when ingested (used for signal-age latency). */

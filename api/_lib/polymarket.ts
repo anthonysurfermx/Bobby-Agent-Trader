@@ -6,7 +6,7 @@
 // position fetches per 5-minute window regardless of which path asked.
 // ============================================================
 
-import { cached } from './api-cache';
+import { cached } from './api-cache.js';
 
 const POLY_DATA = 'https://data-api.polymarket.com';
 

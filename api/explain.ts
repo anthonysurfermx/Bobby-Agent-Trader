@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkPersistentLimit } from './_lib/rate-limit-persistent';
+import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 

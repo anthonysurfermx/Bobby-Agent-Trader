@@ -5,7 +5,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { hmacSign } from './_lib/okx-hmac';
+import { hmacSign } from './_lib/okx-hmac.js';
 
 const OKX_BASE = 'https://web3.okx.com';
 

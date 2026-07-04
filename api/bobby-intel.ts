@@ -15,8 +15,8 @@ import {
 
 export const config = { maxDuration: 30 };
 
-import { createLimiter, getClientIp } from './_lib/rate-limit';
-import { getCache, setCache } from './_lib/api-cache';
+import { createLimiter, getClientIp } from './_lib/rate-limit.js';
+import { getCache, setCache } from './_lib/api-cache.js';
 
 // Full-snapshot TTL: a cache hit answers from one Supabase read instead
 // of fanning out to 18 external sources. 5 min is fresh enough for a
