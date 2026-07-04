@@ -1,6 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { checkPersistentLimit } from './_lib/rate-limit-persistent';
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+
+// Persistent caps (api_cache-backed, survive cold starts): per-IP daily
+// quota plus a global daily ceiling that bounds worst-case OpenAI spend
+// even under IP rotation.
+const DAILY_LIMIT_PER_IP = 10;
+const DAILY_LIMIT_GLOBAL = 300;
 
 // Rate limiting: 10 requests per day per IP (resets on cold start + 24h window)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -566,11 +573,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Rate limiting: 10 requests per day per IP
+  // Rate limiting: in-memory first (free, per instance), then persistent
+  // (cross-instance, survives cold starts) — per-IP quota + global cap.
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
   const rateCheck = isRateLimited(ip);
   if (rateCheck.limited) {
     return res.status(429).json({ error: `Daily limit reached (${RATE_LIMIT}/day). Resets in 24h. Save your queries for the insights that matter most.` });
+  }
+  const [ipLimit, globalLimit] = await Promise.all([
+    checkPersistentLimit('explain', ip, DAILY_LIMIT_PER_IP, 24 * 60 * 60),
+    checkPersistentLimit('explain', 'global', DAILY_LIMIT_GLOBAL, 24 * 60 * 60),
+  ]);
+  if (ipLimit.limited) {
+    return res.status(429).json({ error: `Daily limit reached (${DAILY_LIMIT_PER_IP}/day). Resets in 24h. Save your queries for the insights that matter most.` });
+  }
+  if (globalLimit.limited) {
+    console.error('[Explain] Global daily cap hit — possible abuse or organic spike');
+    return res.status(429).json({ error: 'Bobby is at capacity today. Try again tomorrow.' });
   }
 
   const { context, data, language = 'en' } = req.body || {};

@@ -8,7 +8,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { generateSpeech } from './_lib/tts';
+import { generateSpeech } from './_lib/tts.js';
 
 export const config = { maxDuration: 30 };
 

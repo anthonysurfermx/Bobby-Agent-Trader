@@ -14,6 +14,7 @@ import { ethers } from 'ethers';
 import { recordHardnessActivity } from './_lib/hardness-registry.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
+import { callLlm } from './_lib/llm.js';
 
 export const config = { maxDuration: 300 };
 
@@ -91,42 +92,18 @@ const OPENAI_FALLBACK: Record<string, string> = {
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
+// Thin adapter over _lib/llm.ts (retry/backoff/abort live there).
 async function callClaude(model: string, system: string, userMsg: string, maxTokens: number, timeoutMs = 25000): Promise<string> {
   const openaiModel = OPENAI_FALLBACK[model] || 'gpt-4o-mini';
-  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: openaiModel,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: userMsg },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '');
-      throw new Error(`OpenAI ${openaiModel}: ${res.status} ${errBody.slice(0, 200)}`);
-    }
-    const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-    return data.choices[0]?.message?.content || '';
-  } catch (e: any) {
-    if (e.name === 'AbortError') throw new Error(`LLM call timed out after ${timeoutMs}ms (${openaiModel})`);
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
+  const result = await callLlm({
+    endpoint: 'bobby-cycle',
+    system,
+    user: userMsg,
+    model: openaiModel,
+    maxTokens,
+    timeoutMs,
+  });
+  return result.text;
 }
 
 // ---- Structured Verdict via OpenAI function calling ----
@@ -167,61 +144,32 @@ const VERDICT_SCHEMA = {
 };
 
 async function callStructuredVerdict(system: string, userMsg: string, timeoutMs = 30000): Promise<StructuredVerdict> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const result = await callLlm({
+    endpoint: 'bobby-cycle',
+    system,
+    user: userMsg,
+    model: 'gpt-4o',
+    maxTokens: 500,
+    timeoutMs,
+    tool: {
+      name: 'submit_verdict',
+      description: 'Submit your trading verdict. This is MANDATORY — you must call this function.',
+      parameters: VERDICT_SCHEMA,
+    },
+  });
 
-  try {
-    if (!OPENAI_API_KEY) throw new Error('OpenAI API key required for structured verdict');
-
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 500,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: userMsg },
-        ],
-        tools: [{
-          type: 'function',
-          function: {
-            name: 'submit_verdict',
-            description: 'Submit your trading verdict. This is MANDATORY — you must call this function.',
-            parameters: VERDICT_SCHEMA,
-          },
-        }],
-        tool_choice: { type: 'function', function: { name: 'submit_verdict' } },
-      }),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '');
-      throw new Error(`OpenAI structured verdict failed: ${res.status} ${errBody.slice(0, 200)}`);
-    }
-
-    const data = await res.json() as any;
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall?.function?.arguments) {
-      throw new Error('No tool call in structured verdict response');
-    }
-
-    const verdict: StructuredVerdict = JSON.parse(toolCall.function.arguments);
-
-    // Validate critical fields
-    if (!['open', 'close', 'none'].includes(verdict.action)) verdict.action = 'none';
-    if (typeof verdict.conviction !== 'number' || verdict.conviction < 1 || verdict.conviction > 10) verdict.conviction = 3;
-    if (verdict.action === 'open' && (!verdict.symbol || verdict.symbol === 'none')) verdict.action = 'none';
-    if (verdict.action === 'open' && (!verdict.direction || verdict.direction === 'none')) verdict.action = 'none';
-
-    return verdict;
-  } finally {
-    clearTimeout(timer);
+  if (!result.toolInput) {
+    throw new Error('No tool call in structured verdict response');
   }
+  const verdict = result.toolInput as unknown as StructuredVerdict;
+
+  // Validate critical fields
+  if (!['open', 'close', 'none'].includes(verdict.action)) verdict.action = 'none';
+  if (typeof verdict.conviction !== 'number' || verdict.conviction < 1 || verdict.conviction > 10) verdict.conviction = 3;
+  if (verdict.action === 'open' && (!verdict.symbol || verdict.symbol === 'none')) verdict.action = 'none';
+  if (verdict.action === 'open' && (!verdict.direction || verdict.direction === 'none')) verdict.action = 'none';
+
+  return verdict;
 }
 
 

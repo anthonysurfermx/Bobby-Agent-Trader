@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { resolveAssetFromText } from './_lib/assets.js';
 
 interface Candle {
   ts: number;
@@ -211,7 +212,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const symbol = (req.query.symbol as string || 'BTC').toUpperCase();
-  const instId = `${symbol}-USDT`;
+  // Multi-asset: resolve the real OKX instId (SWAP for stocks/metals like
+  // NVDA-USDT-SWAP, SPOT for crypto). Falls back to spot for unknowns.
+  const resolved = await resolveAssetFromText(symbol);
+  const instId = resolved?.instId || `${symbol}-USDT`;
 
   try {
     const candles = await fetchCandles(instId, '1H', 168); // 7 days of hourly candles

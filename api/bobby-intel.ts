@@ -16,6 +16,13 @@ import {
 export const config = { maxDuration: 30 };
 
 import { createLimiter, getClientIp } from './_lib/rate-limit';
+import { getCache, setCache } from './_lib/api-cache';
+
+// Full-snapshot TTL: a cache hit answers from one Supabase read instead
+// of fanning out to 18 external sources. 5 min is fresh enough for a
+// briefing that cron consumes every 5 min anyway.
+const INTEL_CACHE_KEY = 'intel:snapshot';
+const INTEL_CACHE_TTL_SEC = 300;
 // 30 requests / 10 minutes per IP — blunts hammering, generous for dashboard polling.
 const intelLimiter = createLimiter(30, 10 * 60 * 1000);
 
@@ -1040,6 +1047,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   res.setHeader('X-RateLimit-Remaining', String(rl.remaining));
 
+  // Serve the cached snapshot when fresh — the response is fully global
+  // (no per-user data), so every caller can share it.
+  const fresh = req.query.fresh === 'true';
+  if (!fresh) {
+    const hit = await getCache<Record<string, unknown>>(INTEL_CACHE_KEY);
+    if (hit) {
+      res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
+      res.setHeader('X-Intel-Cache', 'hit');
+      return res.status(200).json(hit);
+    }
+  }
+
   const startMs = Date.now();
 
   try {
@@ -1194,8 +1213,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, xlayerFormatted, leaderFormatted, trendingFormatted, securityResults, trenchFormatted, calibration, technicalPulse, convictionModel);
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
+    res.setHeader('X-Intel-Cache', 'miss');
 
-    return res.status(200).json({
+    const payload = {
       ok: true,
       briefing,           // Pre-formatted XML-tagged block for injection into LLM context
       signals: signalsWithConviction,
@@ -1223,7 +1243,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         latencyMs,
         ts: Date.now(),
       },
-    });
+    };
+
+    await setCache(INTEL_CACHE_KEY, payload, INTEL_CACHE_TTL_SEC);
+
+    return res.status(200).json(payload);
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Bobby Intel] Error:', msg);

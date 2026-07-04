@@ -44,23 +44,11 @@
   "crons": [
     {
       "path": "/api/bobby-cycle",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/user-cycle",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron-activity",
-      "schedule": "0 */4 * * *"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/settle-trades",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/forum-resolve",
-      "schedule": "7,22,37,52 * * * *"
+      "schedule": "45 12 * * *"
     }
   ],
   "functions": {

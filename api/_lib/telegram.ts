@@ -5,7 +5,7 @@
 // per-endpoint copies that all proxied a now-dead TTS droplet.
 // ============================================================
 
-import { generateSpeech, type SpeechResult } from './tts';
+import { generateSpeech, type SpeechResult } from './tts.js';
 
 const api = (token: string, method: string) =>
   `https://api.telegram.org/bot${token}/${method}`;
@@ -14,7 +14,7 @@ export async function tgSendMessage(
   token: string,
   chatId: number | string,
   text: string,
-  opts: { parseMode?: string; disablePreview?: boolean } = {},
+  opts: { parseMode?: string; disablePreview?: boolean; replyMarkup?: unknown } = {},
 ): Promise<boolean> {
   try {
     const res = await fetch(api(token, 'sendMessage'), {
@@ -25,6 +25,7 @@ export async function tgSendMessage(
         text,
         parse_mode: opts.parseMode ?? 'HTML',
         disable_web_page_preview: opts.disablePreview ?? true,
+        ...(opts.replyMarkup ? { reply_markup: opts.replyMarkup } : {}),
       }),
     });
     if (!res.ok) console.error('[telegram] sendMessage', res.status, (await res.text()).slice(0, 180));
@@ -45,7 +46,7 @@ export async function tgSendSpeech(
     const form = new FormData();
     form.append('chat_id', String(chatId));
     const field = speech.telegramMethod === 'sendVoice' ? 'voice' : 'audio';
-    form.append(field, new Blob([speech.audio], { type: speech.mime }), speech.filename);
+    form.append(field, new Blob([new Uint8Array(speech.audio)], { type: speech.mime }), speech.filename);
     if (caption) {
       form.append('caption', caption.slice(0, 1024));
       form.append('parse_mode', 'HTML');
@@ -59,6 +60,31 @@ export async function tgSendSpeech(
     return res.ok;
   } catch (err) {
     console.error('[telegram] sendSpeech error', err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+export async function tgSendPhoto(
+  token: string,
+  chatId: number | string,
+  image: Buffer,
+  caption?: string,
+  replyMarkup?: unknown,
+): Promise<boolean> {
+  try {
+    const form = new FormData();
+    form.append('chat_id', String(chatId));
+    form.append('photo', new Blob([new Uint8Array(image)], { type: 'image/png' }), 'chart.png');
+    if (caption) {
+      form.append('caption', caption.slice(0, 1024));
+      form.append('parse_mode', 'HTML');
+    }
+    if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup));
+    const res = await fetch(api(token, 'sendPhoto'), { method: 'POST', body: form });
+    if (!res.ok) console.error('[telegram] sendPhoto', res.status, (await res.text()).slice(0, 180));
+    return res.ok;
+  } catch (err) {
+    console.error('[telegram] sendPhoto error', err instanceof Error ? err.message : err);
     return false;
   }
 }
