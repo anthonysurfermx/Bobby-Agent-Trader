@@ -1613,8 +1613,18 @@ function McpSection({
   const payments = stats?.contracts.agentEconomy.stats.totalPayments ?? '—';
 
   return (
-    <section id="mcp" className="py-24 px-6 bg-black">
-      <div className="max-w-7xl mx-auto">
+    <section id="mcp" className="relative py-24 px-6 bg-black overflow-hidden">
+      <video
+        className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none"
+        src="/videos/section-blue.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        onError={(e) => { (e.currentTarget as HTMLVideoElement).style.display = 'none'; }}
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black pointer-events-none" />
+      <div className="relative max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row gap-12">
           <div className="md:w-1/3">
             <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-6 leading-none">
