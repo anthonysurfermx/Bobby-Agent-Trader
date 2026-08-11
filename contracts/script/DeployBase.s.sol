@@ -109,6 +109,10 @@ contract DeployBase is Script {
         );
 
         Config memory c = _config();
+        address deployer = msg.sender;
+
+        // r8 #3: validate every economic parameter BEFORE any chain interaction.
+        _validateConfig(c);
 
         // r7 #2/#3: IntentEscrow (the LAST contract deployed) enforces F-013 —
         // cio/arbiter/keeper/resolver pairwise distinct, owner != keeper. Mirror
@@ -136,6 +140,12 @@ contract DeployBase is Script {
             c.resolverThreshold >= 1 && c.resolverThreshold <= initialResolvers.length,
             "RESOLVER_THRESHOLD exceeds resolver list"
         );
+        for (uint256 i = 0; i < initialResolvers.length; i++) {
+            require(initialResolvers[i] != address(0), "resolver list contains zero address");
+            for (uint256 j = i + 1; j < initialResolvers.length; j++) {
+                require(initialResolvers[i] != initialResolvers[j], "resolver list contains duplicates");
+            }
+        }
 
         vm.startBroadcast();
 
@@ -169,7 +179,8 @@ contract DeployBase is Script {
 
         vm.stopBroadcast();
 
-        _assertDeployment(d, c, initialResolvers);
+        _assertDeployment(d, c, initialResolvers, deployer);
+        _writeManifest(d, c, initialResolvers, deployer);
 
         console2.log("chain id            ", block.chainid);
         console2.log("hardness resolvers  ", initialResolvers.length);
@@ -193,10 +204,32 @@ contract DeployBase is Script {
         console2.log("registrationStake   ", c.registrationStake);
     }
 
+    /// @dev r8 #3: every economic parameter checked before touching the chain.
+    function _validateConfig(Config memory c) internal pure {
+        require(c.mcpCallFee > 0 && c.debateFeePerAgent > 0, "config: zero fee");
+        require(c.absoluteMinBounty > 0, "config: zero bounty floor");
+        require(c.minBounty >= c.absoluteMinBounty, "config: minBounty below floor");
+        require(c.registrationStake > 0, "config: zero registration stake");
+        require(
+            c.maxSizeUsd > 0 && c.maxSizeUsd <= 100_000_000e18,
+            "config: escrow maxSizeUsd out of bounds (18dp, ceiling 100M)"
+        );
+    }
+
     /// @dev r7 integration: post-deploy assertions — the script itself proves
     /// owners, roles, quorum and fees landed as configured before anyone flips
     /// PROTOCOL_CHAIN. All view calls; free on simulation, cheap on broadcast.
-    function _assertDeployment(Deployed memory d, Config memory c, address[] memory resolverSet) internal view {
+    function _assertDeployment(Deployed memory d, Config memory c, address[] memory resolverSet, address deployer) internal view {
+        // r8 #1: ownership of all seven contracts is the broadcaster, explicitly.
+        require(BobbyTrackRecord(d.trackRecord).owner() == deployer, "assert: trackRecord.owner");
+        require(BobbyConvictionOracle(d.convictionOracle).owner() == deployer, "assert: oracle.owner");
+        require(BobbyAgentEconomyV2(payable(d.agentEconomyV2)).owner() == deployer, "assert: economy.owner");
+        require(BobbyAdversarialBounties(payable(d.adversarialBounties)).owner() == deployer, "assert: bounties.owner");
+        require(HardnessRegistry(payable(d.hardnessRegistry)).owner() == deployer, "assert: hardness.owner");
+        require(BobbyAgentRegistry(d.agentRegistry).owner() == deployer, "assert: agentRegistry.owner");
+        require(BobbyIntentEscrow(d.intentEscrow).owner() == deployer, "assert: escrow.owner");
+        require(BobbyIntentEscrow(d.intentEscrow).chainIdExpected() == block.chainid, "assert: escrow.chainIdExpected");
+
         require(BobbyTrackRecord(d.trackRecord).bobby() == c.bobby, "assert: trackRecord.bobby");
         require(BobbyConvictionOracle(d.convictionOracle).bobby() == c.bobby, "assert: oracle.bobby");
 
@@ -218,6 +251,8 @@ contract DeployBase is Script {
         }
         require(hardness.REGISTRATION_STAKE() == c.registrationStake, "assert: hardness.stake");
         require(hardness.hardnessScorer() == c.hardnessScorer, "assert: hardness.scorer");
+        require(hardness.minBounty() == c.minBounty, "assert: hardness.minBounty");
+        require(hardness.ABSOLUTE_MIN_BOUNTY() == c.absoluteMinBounty, "assert: hardness.floor");
 
         BobbyIntentEscrow escrow = BobbyIntentEscrow(d.intentEscrow);
         require(escrow.cio() == c.cio && escrow.arbiter() == c.arbiter, "assert: escrow cio/arbiter");
@@ -225,5 +260,53 @@ contract DeployBase is Script {
         require(escrow.maxSizeUsd() == c.maxSizeUsd, "assert: escrow.maxSizeUsd");
 
         console2.log("post-deploy assertions: ALL PASSED");
+    }
+
+    /// @dev r8 #5: machine-readable manifest — no hand-copied addresses. Written
+    /// to deployments/<chainid>.json (fs_permissions in foundry.toml).
+    function _writeManifest(Deployed memory d, Config memory c, address[] memory resolverSet, address deployer) internal {
+        string memory m = "manifest";
+        vm.serializeUint(m, "chainId", block.chainid);
+        vm.serializeUint(m, "deployBlock", block.number);
+        vm.serializeAddress(m, "deployer", deployer);
+
+        string memory a = "addresses";
+        vm.serializeAddress(a, "trackRecord", d.trackRecord);
+        vm.serializeAddress(a, "convictionOracle", d.convictionOracle);
+        vm.serializeAddress(a, "agentEconomyV2", d.agentEconomyV2);
+        vm.serializeAddress(a, "adversarialBounties", d.adversarialBounties);
+        vm.serializeAddress(a, "hardnessRegistry", d.hardnessRegistry);
+        vm.serializeAddress(a, "agentRegistry", d.agentRegistry);
+        string memory addressesJson = vm.serializeAddress(a, "intentEscrow", d.intentEscrow);
+        vm.serializeString(m, "addresses", addressesJson);
+
+        string memory r = "roles";
+        vm.serializeAddress(r, "bobby", c.bobby);
+        vm.serializeAddress(r, "alpha", c.alpha);
+        vm.serializeAddress(r, "red", c.red);
+        vm.serializeAddress(r, "cio", c.cio);
+        vm.serializeAddress(r, "resolver", c.resolver);
+        vm.serializeAddress(r, "arbiter", c.arbiter);
+        vm.serializeAddress(r, "keeper", c.keeper);
+        string memory rolesJson = vm.serializeAddress(r, "hardnessScorer", c.hardnessScorer);
+        vm.serializeString(m, "roles", rolesJson);
+
+        string memory f = "fees";
+        vm.serializeUint(f, "mcpCallFeeWei", c.mcpCallFee);
+        vm.serializeUint(f, "debateFeePerAgentWei", c.debateFeePerAgent);
+        vm.serializeUint(f, "minBountyWei", c.minBounty);
+        vm.serializeUint(f, "absoluteMinBountyWei", c.absoluteMinBounty);
+        vm.serializeUint(f, "registrationStakeWei", c.registrationStake);
+        string memory feesJson = vm.serializeUint(f, "escrowMaxSizeUsd18dp", c.maxSizeUsd);
+        vm.serializeString(m, "fees", feesJson);
+
+        string memory q = "quorum";
+        vm.serializeAddress(q, "resolvers", resolverSet);
+        string memory quorumJson = vm.serializeUint(q, "threshold", c.resolverThreshold);
+        string memory out = vm.serializeString(m, "quorum", quorumJson);
+
+        string memory path = string.concat("deployments/", vm.toString(block.chainid), ".json");
+        vm.writeJson(out, path);
+        console2.log("manifest written:", path);
     }
 }

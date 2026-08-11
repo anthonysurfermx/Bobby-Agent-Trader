@@ -65,7 +65,7 @@ const BASE_CONTRACTS: ContractSet = {
 // Testnet canary — its OWN env vars so Sepolia and mainnet addresses can never
 // silently cross-contaminate.
 const BASE_SEPOLIA_CONTRACTS: ContractSet = {
-  treasury: process.env.TREASURY_ADDRESS_BASE || '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
+  treasury: process.env.TREASURY_ADDRESS_BASE_SEPOLIA || '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
   agentEconomy: process.env.BASE_SEPOLIA_AGENT_ECONOMY_ADDRESS || '',
   adversarialBounties: process.env.BASE_SEPOLIA_BOUNTIES_ADDRESS || '',
   trackRecord: process.env.BASE_SEPOLIA_TRACK_RECORD_ADDRESS || '',
