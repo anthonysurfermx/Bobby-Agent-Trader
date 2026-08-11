@@ -96,40 +96,99 @@ function BrandMark() {
   );
 }
 
-function NetworkVisual() {
+function NetworkVisual({ stats }: { stats: ProtocolStats | null }) {
   const nodes = [
-    { label: 'ALPHA', className: 'left-[2%] top-[8%]' },
-    { label: 'RED TEAM', className: 'right-[3%] top-[18%]' },
-    { label: 'CIO', className: 'left-[13%] bottom-[6%]' },
-    { label: 'PROOF', className: 'right-[10%] bottom-[0%]' },
+    { label: 'ALPHA', role: 'finds the setup', angle: -140 },
+    { label: 'RED TEAM', role: 'attacks the thesis', angle: -40 },
+    { label: 'CIO', role: 'makes the call', angle: 140 },
+    { label: 'PROOF', role: 'sealed on-chain', angle: 40 },
   ];
+  const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
 
   return (
-    <div className="relative mx-auto aspect-square w-full max-w-[520px]">
-      <div className="absolute inset-[14%] rounded-full border border-[#0052ff]/20 bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.22),rgba(5,5,5,0)_64%)]" />
-      <div className="absolute inset-[27%] rounded-full border border-dashed border-[#0052ff]/35" />
-      <div className="absolute inset-[39%] rounded-[2rem] bg-[#0052ff] p-5 text-white shadow-[0_25px_70px_rgba(0,82,255,0.45)]">
+    <div className="relative mx-auto aspect-square w-full max-w-[560px]">
+      {/* Ambient glow */}
+      <div className="absolute inset-[6%] rounded-full bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.28),transparent_62%)] blur-2xl" />
+
+      {/* Slow conic sweep */}
+      <motion.div
+        className="absolute inset-[10%] rounded-full opacity-60 [background:conic-gradient(from_0deg,transparent_0deg,rgba(0,82,255,0.35)_40deg,transparent_90deg)]"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 14, repeat: Infinity, ease: 'linear' }}
+      />
+
+      {/* Orbit rings */}
+      <div className="absolute inset-[10%] rounded-full border border-[#0052ff]/25" />
+      <motion.div
+        className="absolute inset-[22%] rounded-full border border-dashed border-[#0052ff]/40"
+        animate={{ rotate: -360 }}
+        transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+      />
+      <motion.div
+        className="absolute inset-[34%] rounded-full border border-dotted border-white/15"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
+      />
+
+      {/* Orbiting spark */}
+      <motion.div
+        className="absolute inset-[10%]"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
+      >
+        <span className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 rounded-full bg-[#7da6ff] shadow-[0_0_16px_4px_rgba(0,82,255,0.8)]" />
+      </motion.div>
+
+      {/* Center core */}
+      <motion.div
+        className="absolute inset-[36%] overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#0052ff] to-[#0033b8] p-4 text-white shadow-[0_25px_90px_rgba(0,82,255,0.55)] md:p-5"
+        animate={{ scale: [1, 1.03, 1] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+      >
         <div className="flex h-full flex-col justify-between">
-          <Sparkles className="h-5 w-5 opacity-80" />
-          <div>
-            <div className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.25em] text-white/65">Bobby</div>
-            <div className="text-xl font-extrabold tracking-[-0.06em]">Decision layer</div>
+          <div className="flex items-center justify-between">
+            <Sparkles className="h-4 w-4 opacity-80 md:h-5 md:w-5" />
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+          </div>
+          <div className="min-w-0">
+            <div className="mb-0.5 font-mono text-[8px] font-semibold uppercase tracking-[0.22em] text-white/60 md:text-[9px]">Bobby</div>
+            <div className="text-sm font-extrabold leading-tight tracking-[-0.04em] md:text-lg lg:text-xl">Decision layer</div>
+            <div className="mt-0.5 truncate font-mono text-[7px] uppercase tracking-[0.12em] text-white/55 md:text-[9px]">
+              {totalDebates ? `${formatNumber(totalDebates)} debates` : 'debating live'}
+            </div>
           </div>
         </div>
-      </div>
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" fill="none" aria-hidden="true">
-        <path d="M15 20 C38 23 39 38 50 50" stroke="#0052ff" strokeOpacity=".4" strokeWidth=".35" />
-        <path d="M86 28 C65 31 62 42 50 50" stroke="#0052ff" strokeOpacity=".45" strokeWidth=".35" />
-        <path d="M22 84 C36 75 38 63 50 50" stroke="#0052ff" strokeOpacity=".4" strokeWidth=".35" />
-        <path d="M79 86 C67 75 64 64 50 50" stroke="#ffffff" strokeOpacity=".2" strokeWidth=".35" />
-        <circle cx="50" cy="50" r="1.2" fill="#fff" />
-      </svg>
-      {nodes.map((node) => (
-        <div key={node.label} className={`absolute ${node.className} flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.4)] backdrop-blur`}>
-          <span className="h-2 w-2 rounded-full bg-[#0052ff]" />
-          <span className="font-mono text-[9px] font-bold tracking-[0.18em] text-white/70">{node.label}</span>
-        </div>
-      ))}
+      </motion.div>
+
+      {/* Agent nodes on the orbit */}
+      {nodes.map((node, index) => {
+        const radius = 45;
+        const x = 50 + radius * Math.cos((node.angle * Math.PI) / 180);
+        const y = 50 + radius * Math.sin((node.angle * Math.PI) / 180);
+        return (
+          <motion.div
+            key={node.label}
+            className="absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${x}%`, top: `${y}%` }}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 + index * 0.15 }}
+          >
+            <motion.div
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-[#0a0a14]/90 px-3 py-2 shadow-[0_10px_40px_rgba(0,82,255,0.25)] backdrop-blur"
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 3 + index, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0052ff] opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0052ff]" />
+              </span>
+              <span className="font-mono text-[9px] font-bold tracking-[0.18em] text-white/85">{node.label}</span>
+              <span className="hidden font-mono text-[8px] tracking-[0.08em] text-white/40 sm:inline">{node.role}</span>
+            </motion.div>
+          </motion.div>
+        );
+      })}
     </div>
   );
 }
@@ -148,8 +207,10 @@ export default function BobbyProtocolLanding() {
   const stats = useProtocolStats();
   const activity = useActivity();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'verified'>('all');
   const btc = price(stats, 'BTC');
   const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
+  const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
   const totalTrades = stats?.contracts?.trackRecord?.stats?.totalTrades;
   const totalInteractions = stats?.protocolTotals?.totalInteractions;
   const winRate = stats?.contracts?.trackRecord?.stats?.winRateBps;
@@ -160,7 +221,12 @@ export default function BobbyProtocolLanding() {
     ['Activity', '#activity'],
   ];
 
-  const activityLabel = useMemo(() => activity.slice(0, 5), [activity]);
+  const filteredActivity = useMemo(() => {
+    const list = activityFilter === 'all'
+      ? activity
+      : activity.filter((item) => (activityFilter === 'settled' ? item.paid : !item.paid));
+    return list.slice(0, 6);
+  }, [activity, activityFilter]);
 
   const marqueeItems = [
     ['Bobby is online', true],
@@ -214,9 +280,21 @@ export default function BobbyProtocolLanding() {
                 <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Enter War Room <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
                 <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">Explore <ChevronDown className="h-4 w-4" /></a>
               </div>
-              <div className="mt-12 flex items-center gap-3 text-xs text-white/45"><span className="flex -space-x-2"><span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#050505] bg-[#0052ff] text-[9px] font-bold text-white">A</span><span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#050505] bg-[#0052ff] text-[9px] font-bold text-white">R</span><span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#050505] bg-[#0052ff] text-[9px] font-bold text-white">C</span></span><span>Alpha, Red Team, and CIO — in every decision.</span></div>
+              <div className="mt-14 grid max-w-xl grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4">
+                {[
+                  ['Debates', formatNumber(totalDebates)],
+                  ['Decisions', formatNumber(totalTrades)],
+                  ['MCP calls', formatNumber(totalMcpCalls)],
+                  ['Win rate', winRate ? `${(Number(winRate) / 100).toFixed(1)}%` : '—'],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</div>
+                    <div className="font-mono text-3xl font-bold tracking-[-0.04em] text-white md:text-4xl">{value}</div>
+                  </div>
+                ))}
+              </div>
             </motion.div>
-            <motion.div initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .65, delay: .1 }}><NetworkVisual /></motion.div>
+            <motion.div initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .65, delay: .1 }}><NetworkVisual stats={stats} /></motion.div>
           </div>
         </section>
 
@@ -249,12 +327,57 @@ export default function BobbyProtocolLanding() {
         </section>
 
         <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_30%,rgba(0,82,255,.14),transparent_45%)]" />
-          <div className="relative z-10">
-          <div className="mx-auto grid max-w-7xl gap-14 px-5 py-20 lg:grid-cols-[.9fr_1.1fr] lg:px-8 lg:py-28">
-            <div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Live network</div><h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The network is thinking in public.</h2><p className="mt-6 max-w-md leading-7 text-white/50">No black box theatre. See the decision layer, the activity, and the evidence as it happens.</p><a href="/protocol/heartbeat" className="mt-8 inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff]">View protocol health <ArrowRight className="h-4 w-4" /></a></div>
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-8"><div className="mb-8 flex items-center justify-between border-b border-white/10 pb-5"><div><div className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Network activity</div><div className="mt-1 text-sm text-white/70">Live protocol signals</div></div><span className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#7da6ff]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#7da6ff]" /> Online</span></div>{activityLabel.length > 0 ? <div className="space-y-4">{activityLabel.map((item, index) => <div key={`${item.tool}-${index}`} className="flex items-center justify-between gap-3 border-b border-white/[0.07] pb-4 text-sm"><div className="flex min-w-0 items-center gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#0052ff]/20 font-mono text-[10px] font-bold text-[#7da6ff]">{(item.agent || 'B')[0]}</span><div className="min-w-0"><div className="truncate font-medium text-white/80">{item.tool || 'Agent decision'}</div><div className="text-xs text-white/35">{item.agent || 'Bobby network'} · {item.paid ? 'settled' : 'verified'}</div></div></div><span className="font-mono text-xs text-[#7da6ff]">{item.status || 'LIVE'}</span></div>)}</div> : <div className="rounded-2xl bg-white/[0.04] p-8 text-center text-sm text-white/45">Waiting for the next protocol event…</div>}</div>
-          </div>
+          <video className="absolute inset-0 h-full w-full object-cover opacity-45" src="/videos/orb.mp4" autoPlay muted loop playsInline aria-hidden="true" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
+          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Live network</div>
+            <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Decisions, never paused.<br />See the network in action.</h2>
+              <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
+            </div>
+
+            <div className="mb-8 flex flex-wrap items-center gap-2">
+              {([['all', 'All'], ['settled', 'Settled'], ['verified', 'Verified']] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setActivityFilter(key)}
+                  className={`rounded-lg px-4 py-2 font-mono text-xs uppercase tracking-[0.15em] transition ${activityFilter === key ? 'bg-white text-black' : 'border border-white/15 bg-white/[0.06] text-white/60 hover:bg-white/[0.12] hover:text-white'}`}
+                >
+                  {label}
+                </button>
+              ))}
+              <span className="ml-auto hidden items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#7da6ff] md:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#7da6ff]" /> Online</span>
+            </div>
+
+            {filteredActivity.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredActivity.map((item, index) => (
+                  <motion.div
+                    key={`${item.tool}-${index}`}
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.05 }}
+                    className="group rounded-2xl border border-white/10 bg-[#0a0a14]/80 p-6 backdrop-blur transition hover:-translate-y-1 hover:border-[#0052ff]/50"
+                  >
+                    <div className="mb-5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="grid h-7 w-7 place-items-center rounded-full bg-[#0052ff]/25 font-mono text-[10px] font-bold text-[#7da6ff]">{(item.agent || 'B')[0]}</span>
+                        <span className="text-sm text-white/60">{item.agent || 'Bobby network'}</span>
+                      </div>
+                      <span className="font-mono text-[10px] text-white/30">{item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}</span>
+                    </div>
+                    <div className="mb-6 truncate text-xl font-extrabold tracking-[-0.04em] text-white/90">{item.tool || 'Agent decision'}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm font-bold text-white/80">{item.paid ? 'x402 settled' : 'verified'}</span>
+                      <span className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${item.paid ? 'border-[#0052ff]/40 bg-[#0052ff]/15 text-[#7da6ff]' : 'border-white/15 bg-white/[0.06] text-white/55'}`}>{item.status || (item.paid ? 'settled' : 'live')}</span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-10 text-center text-sm text-white/45">Waiting for the next protocol event…</div>
+            )}
           </div>
         </section>
 
