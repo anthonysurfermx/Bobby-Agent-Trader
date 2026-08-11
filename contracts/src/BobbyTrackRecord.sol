@@ -209,12 +209,17 @@ contract BobbyTrackRecord {
     //  PHASE 2: RESOLVE — After the outcome is known
     // ============================================================
 
+    /// @dev Audit Base r5 [HIGH]: intentionally NOT `whenNotPaused`. A pause that
+    /// outlasts MAX_COMMITMENT_TTL would force losing commitments into
+    /// expireCommitment (zero PnL, no loss counted) — laundering losses out of a
+    /// reputational record. Pause gates NEW commitments, never settlement of ones
+    /// already made; resolveTrade stays onlyBobby regardless.
     function resolveTrade(
         bytes32 _debateHash,
         int256 _pnlBps,
         Result _result,
         uint96 _exitPrice
-    ) external onlyBobby whenNotPaused {
+    ) external onlyBobby {
         uint256 stored = commitIndex[_debateHash];
         require(stored != 0, "No commitment found");
         require(_result != Result.PENDING, "Cannot resolve as pending");
@@ -370,13 +375,17 @@ contract BobbyTrackRecord {
         return wins + losses;
     }
 
+    /// @dev Audit Base r5 [MED]: per-agent win rate over DECIDED outcomes only,
+    /// consistent with getWinRate(). `_total` keeps its ABI slot and meaning
+    /// (every recorded outcome incl. break-even and expired — coverage, not skill).
     function getAgentStats(Agent _agent) external view returns (
         uint256 _wins, uint256 _losses, uint256 _total, uint256 _winRate
     ) {
         _wins = agentWins[_agent];
         _losses = agentLosses[_agent];
         _total = agentTrades[_agent];
-        _winRate = _total > 0 ? (_wins * 10000) / _total : 0;
+        uint256 decided = _wins + _losses;
+        _winRate = decided > 0 ? (_wins * 10000) / decided : 0;
     }
 
     function getRecentTrades(uint256 _count) external view returns (Trade[] memory) {

@@ -556,7 +556,12 @@ contract HardnessRegistry {
         emit ChallengeSubmitted(bountyId, msg.sender, evidenceHash);
     }
 
-    function approveBountyResolution(uint256 bountyId, address winner) external whenNotPaused {
+    /// @dev Audit Base r5 [HIGH]: intentionally NOT `whenNotPaused` — same principle
+    /// as BobbyAdversarialBounties.resolveBounty. Pausing must stop new value
+    /// entering, never settlement of value already owed: a pause spanning the
+    /// grace window would lock resolvers out while the poster's reclaim clock
+    /// keeps running, letting the poster take back a bounty a challenger won.
+    function approveBountyResolution(uint256 bountyId, address winner) external {
         if (!resolvers[msg.sender]) revert NotAuthorized();
         Bounty storage bounty = bounties[bountyId];
         if (bounty.poster == address(0)) revert NotFound();
@@ -730,6 +735,9 @@ contract HardnessRegistry {
     }
 
     function setChallengeGracePeriod(uint32 newGracePeriod) external onlyOwner {
+        /// @dev Audit Base r5 [MED]: cap at 30 days to match BobbyAdversarialBounties —
+        /// an unbounded grace lets a future owner park bounties in limbo indefinitely.
+        if (newGracePeriod > 30 days) revert InvalidValue();
         challengeGracePeriod = newGracePeriod;
     }
 
