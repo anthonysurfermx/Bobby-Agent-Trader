@@ -72,6 +72,10 @@ export default defineConfig({
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
       },
+      '/api/okx-candles': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
       '/api/mcp-bobby': {
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
