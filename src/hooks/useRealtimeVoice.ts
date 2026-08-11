@@ -7,6 +7,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { matchAssetInText, normalizeAssetSymbol } from '@/lib/voice-assets';
 
 export type VoiceState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 
@@ -48,6 +49,12 @@ export interface DebateSides {
   redTeamSeverity: number | null;
   cioConviction: number | null;
   indicators: string[];
+  /**
+   * One price per agent, straight from the model's show_debate call — this is
+   * what gets drawn on the chart. Null when the model did not supply it; the
+   * chart then draws nothing rather than inventing a level.
+   */
+  levels: ChartLevel[];
 }
 
 export interface Thesis {
@@ -72,23 +79,23 @@ const TOOL_LABELS: Record<string, string> = {
 /** Tools resolved in the browser — they drive the UI, so a server hop would only add latency. */
 const UI_TOOLS = new Set(['set_chart', 'draw_levels', 'update_thesis', 'show_debate']);
 
-const SYMBOL_ALIASES: Record<string, string> = {
-  NVIDIA: 'NVDA', GOOGLE: 'GOOGL', ALPHABET: 'GOOGL', MICRON: 'MU', MICROSOFT: 'MSFT', APPLE: 'AAPL', TESLA: 'TSLA', AMAZON: 'AMZN',
-};
+/** Symbol handling lives in the shared registry so the chart, the voice tool
+ *  endpoint and this matcher can never disagree about what a ticker is. */
+const normalizeSymbol = normalizeAssetSymbol;
+const symbolMentioned = matchAssetInText;
 
-function normalizeSymbol(value: unknown): string {
-  const raw = String(value ?? 'BTC').trim().toUpperCase();
-  return SYMBOL_ALIASES[raw] ?? (raw.replace(/[^A-Z0-9]/g, '').slice(0, 12) || 'BTC');
-}
-
-function symbolMentioned(text: string): string | null {
-  const upper = text.toUpperCase();
-  const aliases: Array<[RegExp, string]> = [
-    [/\b(NVIDIA|NVDA)\b/, 'NVDA'], [/\b(GOOGLE|ALPHABET|GOOGL)\b/, 'GOOGL'], [/\b(MICRON|MU)\b/, 'MU'],
-    [/\b(BITCOIN|BTC)\b/, 'BTC'], [/\b(ETHEREUM|ETH)\b/, 'ETH'], [/\b(SOLANA|SOL)\b/, 'SOL'],
-    [/\b(APPLE|AAPL)\b/, 'AAPL'], [/\b(MICROSOFT|MSFT)\b/, 'MSFT'],
-  ];
-  return aliases.find(([pattern]) => pattern.test(upper))?.[1] ?? null;
+/** Pull one agent's price line out of a show_debate payload, or nothing. */
+function debateLevel(
+  args: Record<string, unknown>,
+  agent: 'alpha' | 'red' | 'cio',
+  priceKey: string,
+  labelKey: string,
+  fallbackLabel: string,
+): ChartLevel[] {
+  const price = Number(args[priceKey]);
+  if (!Number.isFinite(price) || price <= 0) return [];
+  const label = String(args[labelKey] ?? '').trim() || fallbackLabel;
+  return [{ price, label, kind: 'level', agent }];
 }
 
 export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
@@ -113,6 +120,19 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
   const rafRef = useRef<number | null>(null);
   const analysersRef = useRef<{ mic?: AnalyserNode; out?: AnalyserNode }>({});
   const stateRef = useRef<VoiceState>('idle');
+
+  // --- tool dispatch bookkeeping ---------------------------------------
+  // Tools are fired the moment their arguments finish streaming, not when the
+  // whole response completes. That is what makes the chart move while Bobby is
+  // still mid-sentence instead of seconds after he stops talking.
+  /** call_id → tool name, learned from response.output_item.added. */
+  const callNamesRef = useRef<Map<string, string>>(new Map());
+  /** call_ids already dispatched, so the response.done safety net never doubles up. */
+  const dispatchedRef = useRef<Set<string>>(new Set());
+  /** A response is streaming right now — response.create would be rejected. */
+  const responseActiveRef = useRef(false);
+  /** A tool finished mid-response, so we owe the model a response.create. */
+  const responseOwedRef = useRef(false);
 
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -140,6 +160,20 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
     if (dc?.readyState === 'open') dc.send(JSON.stringify(payload));
   }, []);
 
+  /**
+   * Hand a tool result back to the model. The result item can be added at any
+   * time, but asking for a new response while one is already streaming is
+   * rejected — so that request is deferred until the current turn ends.
+   */
+  const submitToolOutput = useCallback((callId: string, output: unknown) => {
+    send({
+      type: 'conversation.item.create',
+      item: { type: 'function_call_output', call_id: callId, output: JSON.stringify(output) },
+    });
+    if (responseActiveRef.current) responseOwedRef.current = true;
+    else send({ type: 'response.create' });
+  }, [send]);
+
   const runTool = useCallback(async (name: string, callId: string, rawArgs: string) => {
     const eventId = `${callId}-${name}`;
     setTools((prev) => [
@@ -162,6 +196,11 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
           setLevels(drawn);
           output = { ok: true, drawn: drawn.length };
         } else if (name === 'show_debate') {
+          const debateLevels = [
+            ...debateLevel(args, 'alpha', 'alpha_price', 'alpha_price_label', 'Tesis Alpha'),
+            ...debateLevel(args, 'red', 'red_team_price', 'red_team_price_label', 'Invalidación'),
+            ...debateLevel(args, 'cio', 'cio_price', 'cio_price_label', 'Decisión CIO'),
+          ];
           setDebate({
             alpha: String(args.alpha ?? ''),
             redTeam: String(args.red_team ?? ''),
@@ -170,8 +209,9 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
             redTeamSeverity: typeof args.red_team_severity === 'number' ? args.red_team_severity : null,
             cioConviction: typeof args.cio_conviction === 'number' ? args.cio_conviction : null,
             indicators: Array.isArray(args.indicators) ? args.indicators.map(String).slice(0, 4) : [],
+            levels: debateLevels,
           });
-          output = { ok: true, published: true };
+          output = { ok: true, published: true, levels_drawn: debateLevels.length };
         } else {
           setThesis({
             verdict: args.verdict,
@@ -183,11 +223,7 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
           output = { ok: true, published: true };
         }
         setTools((prev) => prev.map((t) => (t.id === eventId ? { ...t, status: 'done' } : t)));
-        send({
-          type: 'conversation.item.create',
-          item: { type: 'function_call_output', call_id: callId, output: JSON.stringify(output) },
-        });
-        send({ type: 'response.create' });
+        submitToolOutput(callId, output);
         return;
       }
 
@@ -208,12 +244,18 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
       setTools((prev) => prev.map((t) => (t.id === eventId ? { ...t, status: 'failed' } : t)));
     }
 
-    send({
-      type: 'conversation.item.create',
-      item: { type: 'function_call_output', call_id: callId, output: JSON.stringify(output) },
-    });
-    send({ type: 'response.create' });
-  }, [send]);
+    submitToolOutput(callId, output);
+  }, [submitToolOutput]);
+
+  /** Run a tool exactly once, whichever event surfaces it first. */
+  const dispatchTool = useCallback((name: string | undefined, callId: string, args: string) => {
+    if (!name || !callId || dispatchedRef.current.has(callId)) return;
+    dispatchedRef.current.add(callId);
+    if (dispatchedRef.current.size > 64) {
+      dispatchedRef.current = new Set([...dispatchedRef.current].slice(-32));
+    }
+    void runTool(name, callId, args);
+  }, [runTool]);
 
   const handleEvent = useCallback((event: Record<string, unknown>) => {
     const type = String(event.type ?? '');
@@ -221,6 +263,7 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
     // --- speaking / listening state ---
     if (type === 'input_audio_buffer.speech_started') setState('listening');
     if (type === 'input_audio_buffer.speech_stopped') setState('thinking');
+    if (type === 'response.created') responseActiveRef.current = true;
     if (type === 'response.output_audio.delta') setState('speaking');
     if (type === 'response.done' || type === 'response.output_audio.done') {
       setState((s) => (s === 'speaking' || s === 'thinking' ? 'listening' : s));
@@ -257,13 +300,37 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
     }
 
     // --- tool calls ---
+    // The model announces the call here, before any arguments have streamed.
+    // Remembering the name lets us fire as soon as the arguments land.
+    if (type === 'response.output_item.added') {
+      const item = event.item as Record<string, string> | undefined;
+      if (item?.type === 'function_call' && item.call_id && item.name) {
+        callNamesRef.current.set(item.call_id, item.name);
+      }
+    }
+
+    // The latency win: arguments are complete, so run the tool NOW — Bobby is
+    // usually still speaking, and the chart moves under his voice.
+    if (type === 'response.function_call_arguments.done') {
+      const callId = String(event.call_id ?? '');
+      const name = (event.name as string | undefined) ?? callNamesRef.current.get(callId);
+      dispatchTool(name, callId, String(event.arguments ?? ''));
+    }
+
     if (type === 'response.done') {
+      responseActiveRef.current = false;
+      // Safety net for any call the early path missed (e.g. a truncated turn).
       const output = (event.response as { output?: Array<Record<string, string>> })?.output ?? [];
       output
         .filter((item) => item.type === 'function_call')
-        .forEach((item) => runTool(item.name, item.call_id, item.arguments));
+        .forEach((item) => dispatchTool(item.name, item.call_id, item.arguments));
+      // A tool answered mid-turn; now that the turn is over, let Bobby continue.
+      if (responseOwedRef.current) {
+        responseOwedRef.current = false;
+        send({ type: 'response.create' });
+      }
     }
-  }, [runTool]);
+  }, [dispatchTool, send]);
 
   const disconnect = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -277,6 +344,10 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
     micRef.current = null;
     ctxRef.current = null;
     analysersRef.current = {};
+    callNamesRef.current.clear();
+    dispatchedRef.current.clear();
+    responseActiveRef.current = false;
+    responseOwedRef.current = false;
     setLevel(0);
     setState('idle');
   }, []);
@@ -380,6 +451,13 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
     debate,
     connect,
     disconnect,
+    setSymbol: (nextSymbol: string) => {
+      const next = normalizeSymbol(nextSymbol);
+      setSymbol(next);
+      setLevels([]);
+      setDebate(null);
+      setThesis(null);
+    },
     setTimeframe,
     dismissProposal: () => setProposal(null),
   };

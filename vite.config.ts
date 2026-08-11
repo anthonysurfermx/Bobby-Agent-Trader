@@ -76,6 +76,32 @@ export default defineConfig({
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
       },
+      // Voice desk: rehearsing the live room locally needs the same routes
+      // production uses — candles for equities, and the voice session + tools.
+      '/api/stock-candles': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/stock-price': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/okx-market': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/realtime-session': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/voice-tool': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/bobby-intel': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
       '/api/mcp-bobby': {
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,

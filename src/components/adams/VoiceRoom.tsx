@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, ShieldCheck, X, ChevronDown, Volume2, VolumeX } from 'lucide-react';
+import { Mic, MicOff, ShieldCheck, X, ChevronDown } from 'lucide-react';
 import { useRealtimeVoice, type VoiceState } from '@/hooks/useRealtimeVoice';
 import { LiveOrb } from './LiveOrb';
 import { MarketCanvas, type Timeframe } from './MarketCanvas';
@@ -33,9 +33,9 @@ const VERDICT_LABEL: Record<string, string> = {
 };
 
 const AGENTS = [
-  { key: 'alpha' as const, name: 'Alpha Hunter', roleEs: 'busca el setup', roleEn: 'finds the setup', voiceEs: 'Dalia · MX', voiceEn: 'Aria · US' },
-  { key: 'red' as const, name: 'Red Team', roleEs: 'ataca la tesis', roleEn: 'attacks the thesis', voiceEs: 'Jorge · MX', voiceEn: 'Guy · US' },
-  { key: 'cio' as const, name: 'CIO', roleEs: 'decide', roleEn: 'decides', voiceEs: 'Jorge · MX', voiceEn: 'Guy · US' },
+  { key: 'alpha' as const, name: 'Alpha Hunter', roleEs: 'busca el setup', roleEn: 'finds the setup' },
+  { key: 'red' as const, name: 'Red Team', roleEs: 'ataca la tesis', roleEn: 'attacks the thesis' },
+  { key: 'cio' as const, name: 'CIO', roleEs: 'decide', roleEn: 'decides' },
 ];
 
 function playActivationChime() {
@@ -63,7 +63,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
   const {
     state, error, level, transcript, tools, proposal,
     symbol, timeframe, levels, thesis, debate,
-    connect, disconnect, setTimeframe, dismissProposal,
+    connect, disconnect, setSymbol, setTimeframe, dismissProposal,
   } = useRealtimeVoice(voiceLang);
 
   const live = state !== 'idle' && state !== 'error';
@@ -71,9 +71,6 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
   const running = tools.filter((t) => t.status === 'running');
   const railRef = useRef<HTMLDivElement>(null);
   const [chartOpenMobile, setChartOpenMobile] = useState(false);
-  const [playingAgent, setPlayingAgent] = useState<string | null>(null);
-  const agentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const autoPlayedDebateRef = useRef<string>('');
 
   const activateVoice = useCallback(() => {
     if (live) { disconnect(); return; }
@@ -81,44 +78,6 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
     if (navigator.vibrate) navigator.vibrate(18);
     connect();
   }, [connect, disconnect, live]);
-
-  const playAgentVoice = useCallback(async (agent: typeof AGENTS[number]['key'], text: string) => {
-    if (!text) return;
-    agentAudioRef.current?.pause();
-    setPlayingAgent(agent);
-    try {
-      const response = await fetch('/api/bobby-voice-free', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice: agent, lang: voiceLang }),
-      });
-      if (!response.ok) throw new Error('voice unavailable');
-      const url = URL.createObjectURL(await response.blob());
-      const audio = new Audio(url);
-      agentAudioRef.current = audio;
-      await audio.play();
-      await new Promise<void>((resolve) => {
-        audio.onended = () => { URL.revokeObjectURL(url); setPlayingAgent(null); resolve(); };
-        audio.onerror = () => { URL.revokeObjectURL(url); setPlayingAgent(null); resolve(); };
-      });
-    } catch { setPlayingAgent(null); }
-  }, [voiceLang]);
-
-  useEffect(() => {
-    if (!debate) return;
-    const debateId = `${debate.alpha}|${debate.redTeam}|${debate.cio}`;
-    if (!debateId.replace(/\|/g, '').trim() || autoPlayedDebateRef.current === debateId) return;
-    autoPlayedDebateRef.current = debateId;
-    let cancelled = false;
-    void (async () => {
-      for (const [agent, text] of [['alpha', debate.alpha], ['red', debate.redTeam], ['cio', debate.cio]] as const) {
-        if (cancelled) return;
-        await playAgentVoice(agent, text);
-      }
-    })();
-    return () => { cancelled = true; agentAudioRef.current?.pause(); };
-  }, [debate, playAgentVoice]);
-
-  useEffect(() => () => { agentAudioRef.current?.pause(); }, []);
 
   const changeLanguage = (next: 'es' | 'en') => {
     setVoiceLang(next);
@@ -186,7 +145,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
               >
                 <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7da6ff]">{agent.name}</div>
                 <div className="font-mono text-[9px] text-white/30">{voiceLang === 'es' ? agent.roleEs : agent.roleEn}</div>
-                <div className="mt-1 font-mono text-[8px] text-white/20">{voiceLang === 'es' ? agent.voiceEs : agent.voiceEn}</div>
+                <div className="mt-1 font-mono text-[8px] text-white/20">{voiceLang === 'es' ? 'Bobby · voz única MX' : 'Bobby · single voice'}</div>
               </motion.div>
             ))}
           </div>
@@ -247,12 +206,17 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
             {symbol}/USDT · gráfica en vivo
             <ChevronDown className={`h-4 w-4 transition ${chartOpenMobile ? 'rotate-180' : ''}`} />
           </button>
-          <div className={`${chartOpenMobile ? 'block h-[52vh]' : 'hidden'} min-h-0 lg:block lg:flex-1`}>
+          {/* The candles are the evidence — the debate cards below never get to
+              squeeze them below a height that still reads on a recording. */}
+          <div className={`${chartOpenMobile ? 'block h-[52vh]' : 'hidden'} min-h-0 lg:block lg:min-h-[340px] lg:flex-1`}>
             <MarketCanvas
               symbol={symbol}
               timeframe={timeframe as Timeframe}
               levels={levels}
               debate={debate}
+              onSymbolChange={(nextSymbol) => {
+                setSymbol(nextSymbol);
+              }}
               onTimeframeChange={(tf) => setTimeframe(tf)}
             />
           </div>
@@ -264,7 +228,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="mt-3 grid gap-3 sm:grid-cols-3"
+                className="mt-3 grid shrink-0 gap-2 sm:grid-cols-3"
               >
                 {([
                   {
@@ -295,8 +259,8 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                     accent: 'border-yellow-300/40 bg-yellow-300/[0.08]', dot: 'bg-yellow-300', tone: 'text-yellow-200',
                   },
                 ] as const).map((side) => (
-                  <div key={side.name} className={`rounded-xl border p-4 backdrop-blur ${side.accent}`}>
-                    <div className="mb-2 flex items-center justify-between gap-2">
+                  <div key={side.name} className={`rounded-xl border p-3 backdrop-blur ${side.accent}`}>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className={`h-1.5 w-1.5 rounded-full ${side.dot}`} />
                         <span className={`font-mono text-[10px] font-bold uppercase tracking-[0.14em] ${side.tone}`}>
@@ -309,18 +273,22 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                         </span>
                       )}
                     </div>
-                    <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
+                    <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
                       {side.stance}
                     </div>
-                    <p className="min-h-[5rem] text-sm leading-6 text-white/75">{side.text || (voiceLang === 'es' ? 'Esperando análisis…' : 'Waiting for analysis…')}</p>
-                    <button
-                      onClick={() => playAgentVoice(side.key, side.text)}
-                      disabled={!side.text || playingAgent !== null}
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-white/50 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {playingAgent === side.key ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-                      {playingAgent === side.key ? (voiceLang === 'es' ? 'Reproduciendo' : 'Playing') : (voiceLang === 'es' ? 'Escuchar voz' : 'Play voice')}
-                    </button>
+                    <p className="line-clamp-4 min-h-[4rem] text-[13px] leading-5 text-white/75">{side.text || (voiceLang === 'es' ? 'Esperando análisis…' : 'Waiting for analysis…')}</p>
+                    {/* Ties the card to the line of the same colour on the chart. */}
+                    {(() => {
+                      const line = debate.levels.find((level) => level.agent === side.key);
+                      return line ? (
+                        <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-white/10 pt-2 font-mono text-[10px]">
+                          <span className="uppercase tracking-[0.1em] text-white/30">{line.label}</span>
+                          <span className={side.tone}>
+                            {line.price.toLocaleString('en-US', { maximumFractionDigits: line.price < 10 ? 4 : 2 })}
+                          </span>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 ))}
               </motion.div>

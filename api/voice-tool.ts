@@ -8,6 +8,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { isEquitySymbol, normalizeAssetSymbol } from '../src/lib/voice-assets.js';
 
 export const config = { maxDuration: 60 };
 
@@ -24,10 +25,11 @@ async function getJson(url: string, init?: RequestInit) {
 }
 
 async function getMarket(symbol: string) {
-  const ticker = String(symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
-  if (!ticker) throw new Error('symbol required');
-  const stockSymbols = new Set(['NVDA', 'AAPL', 'TSLA', 'META', 'GOOGL', 'AMZN', 'MSFT', 'AMD', 'INTC', 'COIN', 'MSTR', 'PLTR', 'NFLX', 'DIS', 'JPM', 'GS', 'SPY', 'QQQ']);
-  if (stockSymbols.has(ticker)) {
+  // Same registry the chart reads, so Bobby can never quote one venue while
+  // the human is looking at candles from the other.
+  const ticker = normalizeAssetSymbol(symbol);
+  if (!symbol) throw new Error('symbol required');
+  if (isEquitySymbol(ticker)) {
     const stock = (await getJson(`${SELF}/api/stock-price?symbols=${ticker}`)) as { quotes?: Array<Record<string, number | string>> };
     const quote = stock.quotes?.[0];
     if (!quote || !Number(quote.price)) return { symbol: ticker, available: false, assetType: 'equity' };
@@ -53,7 +55,7 @@ async function getMarket(symbol: string) {
 }
 
 async function runDebate(symbol: string, context?: string) {
-  const ticker = String(symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+  const ticker = normalizeAssetSymbol(symbol);
   const intel = (await getJson(`${SELF}/api/bobby-intel?symbol=${ticker}`)) as Record<string, unknown>;
   return {
     symbol: ticker,

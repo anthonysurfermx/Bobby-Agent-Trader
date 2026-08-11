@@ -4,7 +4,7 @@
 // appearing as price lines the moment he says them.
 // ============================================================
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createChart,
   ColorType,
@@ -15,6 +15,7 @@ import {
   type ISeriesApi,
   type IPriceLine,
 } from 'lightweight-charts';
+import { ASSET_GROUPS, getVoiceAsset, isEquitySymbol } from '@/lib/voice-assets';
 
 export interface ChartLevel {
   price: number;
@@ -30,11 +31,11 @@ const LEVEL_COLOR: Record<ChartLevel['kind'], string> = {
   level: '#8b8b93',
 };
 const AGENT_COLOR = { alpha: '#4ade80', red: '#ff716a', cio: '#facc15' } as const;
+const AGENT_LABEL = { alpha: 'ALPHA', red: 'RED TEAM', cio: 'CIO' } as const;
 
 const TIMEFRAMES = ['5m', '15m', '1H', '4H', '1D'] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
 
-const STOCK_SYMBOLS = new Set(['NVDA', 'GOOGL', 'GOOG', 'MU', 'MSFT', 'AAPL', 'TSLA', 'AMZN', 'META', 'AMD', 'INTC', 'COIN', 'MSTR', 'PLTR', 'NFLX', 'DIS', 'SPY', 'QQQ', 'XOM', 'JPM', 'GS', 'CVX']);
 const STOCK_TIMEFRAME: Record<Timeframe, { range: string; interval: string }> = {
   '5m': { range: '7d', interval: '15m' },
   '15m': { range: '7d', interval: '15m' },
@@ -50,6 +51,7 @@ export function MarketCanvas({
   timeframe,
   levels,
   debate,
+  onSymbolChange,
   onTimeframeChange,
 }: {
   symbol: string;
@@ -59,7 +61,9 @@ export function MarketCanvas({
     alpha: string; redTeam: string; cio: string;
     alphaConviction: number | null; redTeamSeverity: number | null; cioConviction: number | null;
     indicators: string[];
+    levels: ChartLevel[];
   } | null;
+  onSymbolChange: (symbol: string) => void;
   onTimeframeChange: (tf: Timeframe) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +74,30 @@ export function MarketCanvas({
   const [last, setLast] = useState<{ price: number; change: number } | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState(false);
+
+  const isStock = isEquitySymbol(symbol);
+
+  // Every line on this chart is a price an agent actually named. The three
+  // debate levels come straight from the model's show_debate call; a level
+  // Bobby drew explicitly with draw_levels overrides its agent's debate line.
+  // If an agent gave no price, nothing is drawn for it — never a synthetic one.
+  const drawnLines = useMemo(() => {
+    const debateLevels = (debate?.levels ?? []).filter(
+      (line) => !levels.some((level) => level.agent === line.agent),
+    );
+    return [...levels, ...debateLevels];
+  }, [levels, debate]);
+
+  const thesisPrices = useMemo(
+    () =>
+      Object.fromEntries(
+        drawnLines.filter((line) => line.agent).map((line) => [line.agent, line]),
+      ) as Partial<Record<'alpha' | 'red' | 'cio', ChartLevel>>,
+    [drawnLines],
+  );
+
+  const formatPrice = (price: number) =>
+    price.toLocaleString('en-US', { maximumFractionDigits: price < 10 ? 4 : 2 });
 
   // --- create chart once ---
   useEffect(() => {
@@ -137,9 +165,8 @@ export function MarketCanvas({
 
     const load = async () => {
       try {
-        const isStock = STOCK_SYMBOLS.has(symbol.toUpperCase());
         const stockConfig = STOCK_TIMEFRAME[timeframe];
-        const endpoint = isStock
+        const endpoint = isEquitySymbol(symbol)
           ? `/api/stock-candles?symbol=${encodeURIComponent(symbol)}&range=${stockConfig.range}&interval=${stockConfig.interval}`
           : `/api/okx-candles?instId=${encodeURIComponent(symbol)}-USDT&bar=${timeframe}&limit=100`;
         const response = await fetch(endpoint, { cache: 'no-store' });
@@ -202,25 +229,29 @@ export function MarketCanvas({
     const series = candleRef.current;
     if (!series) return;
     lineRefs.current.forEach((line) => series.removePriceLine(line));
-    lineRefs.current = levels.map((level) =>
+    lineRefs.current = drawnLines.map((level) =>
       series.createPriceLine({
         price: level.price,
         color: level.agent ? AGENT_COLOR[level.agent] : LEVEL_COLOR[level.kind],
-        lineWidth: 1,
+        // Agent theses are the headline of this chart — draw them heavier than
+        // an ordinary support line so they read on a recorded screen.
+        lineWidth: level.agent ? 2 : 1,
         lineStyle: level.kind === 'level' ? LineStyle.Dotted : LineStyle.Dashed,
         axisLabelVisible: true,
-        title: level.agent ? `${level.agent.toUpperCase()} · ${level.label}` : level.label,
+        title: level.agent ? `${AGENT_LABEL[level.agent]} · ${level.label}` : level.label,
       }),
     );
-  }, [levels]);
+  }, [drawnLines]);
 
   const positive = (last?.change ?? 0) >= 0;
 
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-[#0b0b12]/70 backdrop-blur">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <div className="flex items-baseline gap-3">
-          <span className="font-mono text-sm font-bold tracking-[0.08em] text-white">{symbol}/USDT</span>
+        <div className="flex min-w-0 items-baseline gap-3">
+          <span className="truncate font-mono text-sm font-bold tracking-[0.08em] text-white">
+            {isStock ? symbol : `${symbol}/USDT`}
+          </span>
           {last && (
             <>
               <span className="font-mono text-lg font-bold text-white">
@@ -232,7 +263,28 @@ export function MarketCanvas({
             </>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <select
+            aria-label="Seleccionar activo"
+            value={symbol}
+            onChange={(event) => onSymbolChange(event.target.value)}
+            className="max-w-[118px] rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 font-mono text-[10px] uppercase text-white/70 outline-none transition hover:border-white/25"
+          >
+            {/* If Bobby is on an asset outside the curated list (he can chart
+                anything the human names), keep it selectable rather than
+                silently snapping the picker back to BTC. */}
+            {!getVoiceAsset(symbol) && <option value={symbol}>{symbol}</option>}
+            {ASSET_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.assets.map((asset) => (
+                  <option key={asset.symbol} value={asset.symbol}>
+                    {asset.symbol} · {asset.name}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <div className="flex items-center gap-1">
           {TIMEFRAMES.map((tf) => (
             <button
               key={tf}
@@ -245,41 +297,47 @@ export function MarketCanvas({
             </button>
           ))}
         </div>
+        </div>
       </div>
 
+      {/* Legend for the three lines on the chart. Each row names the agent, the
+          level it drew and its score — the readable thesis text lives beside
+          the chart in VoiceRoom, so it is not repeated here. */}
       <div className="grid grid-cols-3 gap-1 border-b border-white/10 bg-black/20 px-2 py-2">
-        {[
-          { label: 'ALPHA', color: '#4ade80', state: debate?.alpha ? 'thesis visible' : 'awaiting thesis' },
-          { label: 'RED TEAM', color: '#ff716a', state: debate?.redTeam ? 'challenge visible' : 'awaiting challenge' },
-          { label: 'CIO', color: '#facc15', state: debate?.cio ? 'decision visible' : 'awaiting decision' },
-        ].map((agent) => (
-          <div key={agent.label} className="flex min-w-0 items-center gap-1.5 rounded border border-white/10 px-2 py-1.5">
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: agent.color }} />
-            <div className="min-w-0"><div className="truncate font-mono text-[8px] font-bold tracking-[.12em]" style={{ color: agent.color }}>{agent.label}</div><div className="truncate font-mono text-[8px] text-white/30">{agent.state}</div></div>
-          </div>
-        ))}
+        {([
+          { key: 'alpha', label: 'ALPHA', score: debate?.alphaConviction, waiting: 'busca el setup' },
+          { key: 'red', label: 'RED TEAM', score: debate?.redTeamSeverity, waiting: 'ataca la tesis' },
+          { key: 'cio', label: 'CIO', score: debate?.cioConviction, waiting: 'decide' },
+        ] as const).map((agent) => {
+          const line = thesisPrices[agent.key];
+          return (
+            <div key={agent.key} className="flex min-w-0 items-center gap-1.5 rounded border border-white/10 px-2 py-1.5">
+              <span
+                className="h-1.5 w-4 shrink-0 rounded-full"
+                style={{ backgroundColor: AGENT_COLOR[agent.key], opacity: line ? 1 : 0.25 }}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className="truncate font-mono text-[8px] font-bold tracking-[.12em]" style={{ color: AGENT_COLOR[agent.key] }}>
+                    {agent.label}
+                  </span>
+                  {agent.score !== null && agent.score !== undefined && (
+                    <span className="shrink-0 font-mono text-[8px] text-white/40">{agent.score}%</span>
+                  )}
+                </div>
+                <div className="truncate font-mono text-[8px] text-white/35">
+                  {line ? `${line.label} ${formatPrice(line.price)}` : agent.waiting}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div ref={containerRef} className="min-h-0 flex-1" />
 
-      {debate && (
-        <div className="grid grid-cols-1 gap-2 border-t border-white/10 p-3 sm:grid-cols-3">
-          {[
-            { key: 'alpha', name: 'ALPHA HUNTER', text: debate.alpha, score: debate.alphaConviction, color: '#4ade80', bg: 'rgba(74,222,128,.08)' },
-            { key: 'red', name: 'RED TEAM', text: debate.redTeam, score: debate.redTeamSeverity, color: '#ff716a', bg: 'rgba(255,113,106,.08)' },
-            { key: 'cio', name: 'BOBBY CIO', text: debate.cio, score: debate.cioConviction, color: '#facc15', bg: 'rgba(250,204,21,.08)' },
-          ].map((agent) => (
-            <div key={agent.key} className="min-w-0 rounded-lg border p-2.5" style={{ borderColor: `${agent.color}55`, background: agent.bg }}>
-              <div className="flex items-center justify-between gap-2"><span className="font-mono text-[9px] font-bold tracking-[.12em]" style={{ color: agent.color }}>{agent.name}</span>{agent.score !== null && <span className="font-mono text-[9px] text-white/45">{agent.score}%</span>}</div>
-              <p className="mt-1.5 line-clamp-3 text-[11px] leading-4 text-white/65">{agent.text || 'Esperando tesis…'}</p>
-            </div>
-          ))}
-          {debate.indicators.length > 0 && <div className="col-span-full flex flex-wrap gap-1.5">{debate.indicators.map((indicator) => <span key={indicator} className="rounded border border-white/10 bg-white/[.03] px-2 py-1 font-mono text-[9px] text-white/45">{indicator}</span>)}</div>}
-        </div>
-      )}
-
       <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
-        <span>{STOCK_SYMBOLS.has(symbol.toUpperCase()) ? 'Yahoo Finance · mercado accionario' : 'OKX · mercado cripto'}</span>
+        <span>{isStock ? 'Yahoo Finance · mercado accionario' : 'OKX · mercado cripto'}</span>
         <span className={error ? 'text-red-400' : undefined}>
           {error ? 'sin datos' : updatedAt ? `actualizado ${updatedAt.toLocaleTimeString('es-MX')}` : 'cargando…'}
         </span>

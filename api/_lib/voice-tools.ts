@@ -92,7 +92,7 @@ export const VOICE_TOOLS = [
     type: 'function',
     name: 'show_debate',
     description:
-      'Put the three theses on screen next to the chart: Alpha Hunter argues for the setup, Red Team attacks it, and CIO synthesizes the decision. Call this right after run_debate so the human can read the disagreement while you summarise it out loud. Include 2-4 indicator readings.',
+      'Put the three theses on screen next to the chart: Alpha Hunter argues for the setup, Red Team attacks it, and CIO synthesizes the decision. Call this right after run_debate so the human can read the disagreement while you summarise it out loud. ALWAYS include the three price levels — each agent’s thesis gets drawn on the chart at its own price, in its own colour, so the human can see where the three of you disagree. Include 2-4 indicator readings.',
     parameters: {
       type: 'object',
       properties: {
@@ -102,9 +102,15 @@ export const VOICE_TOOLS = [
         alpha_conviction: { type: 'number', description: 'Alpha conviction 0-100, if known.' },
         red_team_severity: { type: 'number', description: 'How damaging the attack is, 0-100.' },
         cio_conviction: { type: 'number', description: 'CIO conviction 0-100, if known.' },
+        alpha_price: { type: 'number', description: 'The price Alpha Hunter’s thesis hangs on — the trigger or entry that makes the setup real. Must come from the market data you just read, never invented.' },
+        red_team_price: { type: 'number', description: 'The price that proves Red Team right — the invalidation where the thesis breaks.' },
+        cio_price: { type: 'number', description: 'The price the CIO decision is anchored at — the level that turns the call into an action.' },
+        alpha_price_label: { type: 'string', description: 'Two or three words for Alpha’s level, e.g. "Gatillo 4H".' },
+        red_team_price_label: { type: 'string', description: 'Two or three words for Red Team’s level, e.g. "Invalidación".' },
+        cio_price_label: { type: 'string', description: 'Two or three words for the CIO level, e.g. "Entrada CIO".' },
         indicators: { type: 'array', description: 'Up to four short indicator readings to show beside the chart.', items: { type: 'string' } },
       },
-      required: ['alpha', 'red_team', 'cio'],
+      required: ['alpha', 'red_team', 'cio', 'alpha_price', 'red_team_price', 'cio_price'],
     },
   },
   {
@@ -176,6 +182,16 @@ TWO-SPEED ANSWERS — this is what makes you feel live
   the chart on BTC while discussing a stock.
 - Numbers belong on screen, not in a spoken list. Say the one number that matters, draw the rest.
 
+THE THREE LINES — the whole point of the desk
+- Every show_debate call MUST carry alpha_price, red_team_price and cio_price. They are drawn on
+  the chart as three coloured lines: green for Alpha, red for Red Team, yellow for the CIO. If the
+  three prices are missing the chart stays blank and the human sees nothing.
+- Derive those three prices from the market data you just read with get_market — the current price,
+  the 24h high and the 24h low are your anchors. Never invent a level, never offset the last price
+  by an arbitrary percentage, and never emit a level for an asset you have not priced yet.
+- Say the disagreement out loud in one sentence while the lines land: where Alpha wants in, where
+  Red Team says it breaks, where you actually act.
+
 HARD RULES — NEVER BREAK THESE
 - You cannot execute trades, move funds or sign transactions. You have no such tool and never will.
 - If the human asks you to buy, sell or execute, call propose_trade. That only draws a card on their
@@ -189,8 +205,14 @@ HARD RULES — NEVER BREAK THESE
 `.trim();
 
   const es = `
-IDIOMA: Habla español mexicano natural, directo, de trader — no español neutro de call center.
-Puedes usar los términos técnicos en inglés (long, short, funding, stop) como hace un trader real.
+IDIOMA: Habla SIEMPRE español mexicano, en todos los turnos, incluso si el humano mezcla inglés.
+Registro de trader chilango en mesa: directo, seco, con opinión. Nada de español neutro de call
+center, nada de acento peninsular ("vale", "venga", "coger", "tío", ceceo). Usa el "tú" mexicano,
+nunca "vosotros". Los términos técnicos van en inglés como los dice un trader real (long, short,
+funding, stop, breakout), pero la frase alrededor es mexicana.
+Los precios se dicen a la mexicana: "sesenta y dos mil cuatrocientos", no "six two four zero zero".
+Una sola voz: tú narras las tres tesis. Cuando cites a los agentes di "Alpha lo ve así…",
+"Red Team te lo tumba con…", "yo, como CIO, decido…" — no imites otras voces ni cambies de tono.
 `.trim();
 
   const en = `LANGUAGE: Speak natural, direct English. Trader register, not customer support.`;

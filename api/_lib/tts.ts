@@ -26,12 +26,13 @@ export interface SpeechResult {
 
 // Deep, authoritative neural voices — the "Bobby Axelrod" tone.
 const EDGE_VOICE: Record<string, string> = {
-  'es:alpha': process.env.TTS_EDGE_VOICE_ES_ALPHA || 'es-MX-DaliaNeural',
-  'es:red': process.env.TTS_EDGE_VOICE_ES_RED || 'es-MX-JorgeNeural',
-  'es:cio': process.env.TTS_EDGE_VOICE_ES_CIO || 'es-MX-JorgeNeural',
-  'en:alpha': process.env.TTS_EDGE_VOICE_EN_ALPHA || 'en-US-AriaNeural',
-  'en:red': process.env.TTS_EDGE_VOICE_EN_RED || 'en-US-GuyNeural',
-  'en:cio': process.env.TTS_EDGE_VOICE_EN_CIO || 'en-US-GuyNeural',
+  // One consistent Bobby identity across every debate card and fallback path.
+  'es:alpha': process.env.TTS_EDGE_VOICE_ES || 'es-MX-DaliaNeural',
+  'es:red': process.env.TTS_EDGE_VOICE_ES || 'es-MX-DaliaNeural',
+  'es:cio': process.env.TTS_EDGE_VOICE_ES || 'es-MX-DaliaNeural',
+  'en:alpha': process.env.TTS_EDGE_VOICE_EN || 'en-US-AriaNeural',
+  'en:red': process.env.TTS_EDGE_VOICE_EN || 'en-US-AriaNeural',
+  'en:cio': process.env.TTS_EDGE_VOICE_EN || 'en-US-AriaNeural',
 };
 
 const MAX_CHARS = 4000;
