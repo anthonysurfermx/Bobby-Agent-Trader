@@ -26,6 +26,16 @@ async function getJson(url: string, init?: RequestInit) {
 async function getMarket(symbol: string) {
   const ticker = String(symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
   if (!ticker) throw new Error('symbol required');
+  const stockSymbols = new Set(['NVDA', 'AAPL', 'TSLA', 'META', 'GOOGL', 'AMZN', 'MSFT', 'AMD', 'INTC', 'COIN', 'MSTR', 'PLTR', 'NFLX', 'DIS', 'JPM', 'GS', 'SPY', 'QQQ']);
+  if (stockSymbols.has(ticker)) {
+    const stock = (await getJson(`${SELF}/api/stock-price?symbols=${ticker}`)) as { quotes?: Array<Record<string, number | string>> };
+    const quote = stock.quotes?.[0];
+    if (!quote || !Number(quote.price)) return { symbol: ticker, available: false, assetType: 'equity' };
+    return {
+      symbol: ticker, assetType: 'equity', currency: 'USD', marketStatus: 'market-data', available: true,
+      price: Number(quote.price), change_24h_pct: Number(quote.change24h || 0), high_24h: Number(quote.dayHigh || 0), low_24h: Number(quote.dayLow || 0),
+    };
+  }
   const data = await getJson(`${SELF}/api/okx-market?instId=${ticker}-USDT&type=all`);
   const t = (data as { ticker?: Record<string, string> }).ticker;
   const funding = (data as { funding?: Record<string, string> }).funding;

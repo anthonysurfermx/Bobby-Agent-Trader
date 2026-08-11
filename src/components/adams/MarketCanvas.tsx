@@ -34,7 +34,7 @@ const AGENT_COLOR = { alpha: '#4ade80', red: '#ff716a', cio: '#facc15' } as cons
 const TIMEFRAMES = ['5m', '15m', '1H', '4H', '1D'] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
 
-const STOCK_SYMBOLS = new Set(['NVDA', 'GOOGL', 'GOOG', 'MU', 'MSFT', 'AAPL', 'TSLA', 'AMZN', 'META', 'AMD', 'COIN', 'MSTR', 'SPY', 'QQQ', 'XOM', 'JPM', 'GS', 'CVX']);
+const STOCK_SYMBOLS = new Set(['NVDA', 'GOOGL', 'GOOG', 'MU', 'MSFT', 'AAPL', 'TSLA', 'AMZN', 'META', 'AMD', 'INTC', 'COIN', 'MSTR', 'PLTR', 'NFLX', 'DIS', 'SPY', 'QQQ', 'XOM', 'JPM', 'GS', 'CVX']);
 const STOCK_TIMEFRAME: Record<Timeframe, { range: string; interval: string }> = {
   '5m': { range: '7d', interval: '15m' },
   '15m': { range: '7d', interval: '15m' },

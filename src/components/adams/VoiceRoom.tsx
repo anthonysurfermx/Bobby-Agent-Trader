@@ -73,6 +73,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
   const [chartOpenMobile, setChartOpenMobile] = useState(false);
   const [playingAgent, setPlayingAgent] = useState<string | null>(null);
   const agentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const autoPlayedDebateRef = useRef<string>('');
 
   const activateVoice = useCallback(() => {
     if (live) { disconnect(); return; }
@@ -94,10 +95,28 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
       const url = URL.createObjectURL(await response.blob());
       const audio = new Audio(url);
       agentAudioRef.current = audio;
-      audio.onended = () => { URL.revokeObjectURL(url); setPlayingAgent(null); };
       await audio.play();
+      await new Promise<void>((resolve) => {
+        audio.onended = () => { URL.revokeObjectURL(url); setPlayingAgent(null); resolve(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); setPlayingAgent(null); resolve(); };
+      });
     } catch { setPlayingAgent(null); }
   }, [voiceLang]);
+
+  useEffect(() => {
+    if (!debate) return;
+    const debateId = `${debate.alpha}|${debate.redTeam}|${debate.cio}`;
+    if (!debateId.replace(/\|/g, '').trim() || autoPlayedDebateRef.current === debateId) return;
+    autoPlayedDebateRef.current = debateId;
+    let cancelled = false;
+    void (async () => {
+      for (const [agent, text] of [['alpha', debate.alpha], ['red', debate.redTeam], ['cio', debate.cio]] as const) {
+        if (cancelled) return;
+        await playAgentVoice(agent, text);
+      }
+    })();
+    return () => { cancelled = true; agentAudioRef.current?.pause(); };
+  }, [debate, playAgentVoice]);
 
   useEffect(() => () => { agentAudioRef.current?.pause(); }, []);
 

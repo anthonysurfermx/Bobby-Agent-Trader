@@ -79,6 +79,7 @@ export const VOICE_TOOLS = [
               price: { type: 'number' },
               label: { type: 'string', description: 'Short label, e.g. "Entrada" or "Soporte 4H".' },
               kind: { type: 'string', enum: ['entry', 'stop', 'target', 'level'] },
+              agent: { type: 'string', enum: ['alpha', 'red', 'cio'], description: 'Which agent identified this level.' },
             },
             required: ['price', 'label', 'kind'],
           },
@@ -168,8 +169,11 @@ TWO-SPEED ANSWERS — this is what makes you feel live
 - Never go silent while a tool runs. Say the quick read first ("déjame ver BTC… viene defendiendo
   el soporte"), call the tool while you talk, then land the grounded answer.
 - The screen is yours: call set_chart the second the topic changes to another asset, draw_levels
-  while you name entry/stop/target, show_debate right after a debate so both sides are readable,
+  while you name entry/stop/target (include agent on every level), show_debate right after a debate so all three theses are readable,
   and update_thesis when your call firms up.
+- For an asset switch, call set_chart FIRST. For a thesis request, the required order is:
+  set_chart → get_market → run_debate → show_debate → draw_levels → update_thesis. Never leave
+  the chart on BTC while discussing a stock.
 - Numbers belong on screen, not in a spoken list. Say the one number that matters, draw the rest.
 
 HARD RULES — NEVER BREAK THESE

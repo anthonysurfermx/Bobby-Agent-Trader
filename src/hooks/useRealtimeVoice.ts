@@ -81,6 +81,16 @@ function normalizeSymbol(value: unknown): string {
   return SYMBOL_ALIASES[raw] ?? (raw.replace(/[^A-Z0-9]/g, '').slice(0, 12) || 'BTC');
 }
 
+function symbolMentioned(text: string): string | null {
+  const upper = text.toUpperCase();
+  const aliases: Array<[RegExp, string]> = [
+    [/\b(NVIDIA|NVDA)\b/, 'NVDA'], [/\b(GOOGLE|ALPHABET|GOOGL)\b/, 'GOOGL'], [/\b(MICRON|MU)\b/, 'MU'],
+    [/\b(BITCOIN|BTC)\b/, 'BTC'], [/\b(ETHEREUM|ETH)\b/, 'ETH'], [/\b(SOLANA|SOL)\b/, 'SOL'],
+    [/\b(APPLE|AAPL)\b/, 'AAPL'], [/\b(MICROSOFT|MSFT)\b/, 'MSFT'],
+  ];
+  return aliases.find(([pattern]) => pattern.test(upper))?.[1] ?? null;
+}
+
 export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
   const [state, setState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -220,6 +230,13 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
     if (type === 'conversation.item.input_audio_transcription.completed') {
       const text = String(event.transcript ?? '').trim();
       if (text) {
+        const mentioned = symbolMentioned(text);
+        if (mentioned) {
+          setSymbol(mentioned);
+          setLevels([]);
+          setDebate(null);
+          setThesis(null);
+        }
         setTranscript((prev) => [...prev.slice(-20), { id: `u-${Date.now()}`, role: 'user', text, final: true }]);
       }
     }
