@@ -120,103 +120,6 @@ function SectionMedia({ name, className = '' }: { name: string; className?: stri
   );
 }
 
-function NetworkVisual({ stats }: { stats: ProtocolStats | null }) {
-  const nodes = [
-    { label: 'ALPHA', role: 'finds the setup', angle: -140 },
-    { label: 'RED TEAM', role: 'attacks the thesis', angle: -40 },
-    { label: 'CIO', role: 'makes the call', angle: 140 },
-    { label: 'PROOF', role: 'sealed on-chain', angle: 40 },
-  ];
-  const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
-
-  return (
-    <div className="relative mx-auto aspect-square w-full max-w-[560px]">
-      {/* Ambient glow */}
-      <div className="absolute inset-[6%] rounded-full bg-[radial-gradient(circle_at_center,rgba(0,82,255,0.28),transparent_62%)] blur-2xl" />
-
-      {/* Slow conic sweep */}
-      <motion.div
-        className="absolute inset-[10%] rounded-full opacity-60 [background:conic-gradient(from_0deg,transparent_0deg,rgba(0,82,255,0.35)_40deg,transparent_90deg)]"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 14, repeat: Infinity, ease: 'linear' }}
-      />
-
-      {/* Orbit rings */}
-      <div className="absolute inset-[10%] rounded-full border border-[#0052ff]/25" />
-      <motion.div
-        className="absolute inset-[22%] rounded-full border border-dashed border-[#0052ff]/40"
-        animate={{ rotate: -360 }}
-        transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-      />
-      <motion.div
-        className="absolute inset-[34%] rounded-full border border-dotted border-white/15"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
-      />
-
-      {/* Orbiting spark */}
-      <motion.div
-        className="absolute inset-[10%]"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
-      >
-        <span className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 rounded-full bg-[#7da6ff] shadow-[0_0_16px_4px_rgba(0,82,255,0.8)]" />
-      </motion.div>
-
-      {/* Center core */}
-      <motion.div
-        className="absolute inset-[36%] overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#0052ff] to-[#0033b8] p-4 text-white shadow-[0_25px_90px_rgba(0,82,255,0.55)] md:p-5"
-        animate={{ scale: [1, 1.03, 1] }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-      >
-        <div className="flex h-full flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <Sparkles className="h-4 w-4 opacity-80 md:h-5 md:w-5" />
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-          </div>
-          <div className="min-w-0">
-            <div className="mb-0.5 font-mono text-[8px] font-semibold uppercase tracking-[0.22em] text-white/60 md:text-[9px]">Bobby</div>
-            <div className="text-sm font-extrabold leading-tight tracking-[-0.04em] md:text-lg lg:text-xl">Decision layer</div>
-            <div className="mt-0.5 truncate font-mono text-[7px] uppercase tracking-[0.12em] text-white/55 md:text-[9px]">
-              {totalDebates ? `${formatNumber(totalDebates)} debates` : 'debating live'}
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Agent nodes on the orbit */}
-      {nodes.map((node, index) => {
-        const radius = 45;
-        const x = 50 + radius * Math.cos((node.angle * Math.PI) / 180);
-        const y = 50 + radius * Math.sin((node.angle * Math.PI) / 180);
-        return (
-          <motion.div
-            key={node.label}
-            className="absolute -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${x}%`, top: `${y}%` }}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 + index * 0.15 }}
-          >
-            <motion.div
-              className="flex items-center gap-2 rounded-full border border-white/10 bg-[#0a0a14]/90 px-3 py-2 shadow-[0_10px_40px_rgba(0,82,255,0.25)] backdrop-blur"
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 3 + index, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0052ff] opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0052ff]" />
-              </span>
-              <span className="font-mono text-[9px] font-bold tracking-[0.18em] text-white/85">{node.label}</span>
-              <span className="hidden font-mono text-[8px] tracking-[0.08em] text-white/40 sm:inline">{node.role}</span>
-            </motion.div>
-          </motion.div>
-        );
-      })}
-    </div>
-  );
-}
-
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="border-t border-white/15 pt-4">
@@ -241,6 +144,7 @@ export default function BobbyProtocolLanding() {
 
   const navItems = [
     ['How it works', '#how-it-works'],
+    ['Capabilities', '#capabilities'],
     ['For agents', '#for-agents'],
     ['Activity', '#activity'],
   ];
@@ -293,7 +197,7 @@ export default function BobbyProtocolLanding() {
           <SectionMedia name="hero" className="opacity-55 grayscale contrast-125" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,.96)_0%,rgba(5,5,5,.7)_42%,rgba(5,5,5,.3)_100%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_46%,rgba(0,82,255,.4),transparent_35%)]" />
-          <div className="relative z-10 mx-auto grid min-h-[calc(100vh-72px)] max-w-7xl items-center gap-8 px-5 pb-20 pt-20 lg:grid-cols-[1.05fr_.95fr] lg:px-8 lg:pb-28 lg:pt-24">
+          <div className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl flex-col justify-center px-5 pb-20 pt-20 lg:px-8 lg:pb-28 lg:pt-24">
             <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
               <a href="/agentic-world/bobby/history" className="mb-8 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff] transition hover:text-white">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />A manifesto for the verified agent economy <span aria-hidden>›</span>
@@ -318,7 +222,6 @@ export default function BobbyProtocolLanding() {
                 ))}
               </div>
             </motion.div>
-            <motion.div initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: .65, delay: .1 }}><NetworkVisual stats={stats} /></motion.div>
           </div>
         </section>
 
@@ -421,11 +324,95 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
+        <section className="relative overflow-hidden border-y border-white/10 bg-[#08080a]" id="capabilities">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.14),transparent_42%)]" />
+          <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
+            <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+              <div>
+                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Protocol capabilities</div>
+                <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
+                  An agent-native decision layer,<br />everything it needs.
+                </h2>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-white/45">
+                Four surfaces turn autonomous trading from a black box into an inspectable, accountable system.
+              </p>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              {[
+                {
+                  title: 'Identity',
+                  description: 'Every agent decision has an author. Every outcome builds reputation. Both follow the agent into its next call.',
+                  image: '/images/protocol/agent-identity.jpg',
+                  alt: 'Synthetic human profile visible through textured cobalt glass',
+                  telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  verified'],
+                },
+                {
+                  title: 'Adversarial debate',
+                  description: 'Alpha proposes. Red Team attacks. The CIO resolves the disagreement into one explicit, accountable thesis.',
+                  image: '/images/protocol/adversarial-debate.jpg',
+                  alt: 'Three silhouettes debating behind illuminated blue glass',
+                  telemetry: ['debate.open  round_03', 'agents  alpha · red · cio', 'counterpoints  active', 'consensus  pending'],
+                },
+                {
+                  title: 'Risk gate',
+                  description: 'Capital never moves on narrative alone. Sizing, downside and invalidation must survive the gate first.',
+                  image: '/images/protocol/risk-gate.jpg',
+                  alt: 'Human hand meeting a luminous blue glass barrier',
+                  telemetry: ['risk.inspect  intent', 'exposure  bounded', 'invalidation  signed', 'gate  pass · park · block'],
+                },
+                {
+                  title: 'Proof',
+                  description: 'The protocol commits the decision before the outcome, creating an immutable track record without screenshots or hindsight.',
+                  image: '/images/protocol/onchain-proof.jpg',
+                  alt: 'Transparent cobalt glass monolith containing a sealed point of light',
+                  telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
+                },
+              ].map((capability, index) => (
+                <motion.article
+                  key={capability.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ delay: index * 0.06 }}
+                  className="group relative min-h-[430px] overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0f] md:min-h-[500px]"
+                >
+                  <img
+                    src={capability.image}
+                    alt={capability.alt}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                  />
+                  <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,7,.96)_0%,rgba(5,5,7,.72)_42%,rgba(5,5,7,.08)_100%)]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,7,.22)_0%,rgba(5,5,7,.05)_45%,rgba(5,5,7,.94)_100%)]" />
+                  <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity duration-300 group-hover:opacity-100" />
+
+                  <div className="relative z-10 flex min-h-[430px] max-w-[74%] flex-col p-7 md:min-h-[500px] md:p-9">
+                    <div className="mb-5 flex items-center gap-3">
+                      <span className="h-2 w-2 rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,.9)]" />
+                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#7da6ff]">Capability 0{index + 1}</span>
+                    </div>
+                    <h3 className="text-3xl font-extrabold tracking-[-0.05em] md:text-4xl">{capability.title}</h3>
+                    <p className="mt-5 max-w-lg text-sm leading-6 text-white/65 md:text-base md:leading-7">{capability.description}</p>
+
+                    <div className="mt-auto space-y-1 font-mono text-[10px] leading-5 text-white/38 md:text-[11px]">
+                      <div className="mb-2 text-[#7da6ff]">&gt; {capability.telemetry[0]}</div>
+                      {capability.telemetry.slice(1).map((line) => <div key={line}>&nbsp;&nbsp;{line}</div>)}
+                      <div className="pt-1 text-white/65">✓ system ready</div>
+                    </div>
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
           <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Live network</div>
+            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Live network</div>
             <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Decisions, never paused.<br />See the network in action.</h2>
               <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
@@ -480,8 +467,62 @@ export default function BobbyProtocolLanding() {
           <SectionMedia name="nebula" className="opacity-50" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Built for both sides</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A better interface for capital.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">One decision layer. Two ways in.</p></div>
-          <div className="grid gap-5 md:grid-cols-2"><a href="/agentic-world/bobby" className="group rounded-3xl bg-[#0052ff] p-8 text-white transition hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,82,255,0.35)] md:p-10"><div className="flex items-start justify-between"><Bot className="h-7 w-7" /><ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /></div><div className="mt-20 text-3xl font-extrabold tracking-[-0.06em]">For humans</div><p className="mt-3 max-w-sm text-sm leading-6 text-white/70">Open the War Room, watch the debate, and approve the move when the thesis earns it.</p><div className="mt-8 font-mono text-sm font-bold uppercase tracking-[0.12em]">Enter War Room →</div></a><a href="/protocol/docs" className="group rounded-3xl border border-white/10 bg-white/[0.05] p-8 text-white transition hover:-translate-y-1 hover:bg-white/[0.09] md:p-10"><div className="flex items-start justify-between"><Sparkles className="h-7 w-7 text-[#7da6ff]" /><ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /></div><div className="mt-20 text-3xl font-extrabold tracking-[-0.06em]">For agents</div><p className="mt-3 max-w-sm text-sm leading-6 text-white/55">Connect over MCP. Request conviction, inspect proof, and build Bobby into your execution workflow.</p><div className="mt-8 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff]">Read the docs →</div></a></div>
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Built for both sides</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A better interface for capital.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">One decision layer. Two ways in.</p></div>
+          <div className="grid gap-5 md:grid-cols-2">
+            <a
+              href="/agentic-world/bobby"
+              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
+            >
+              <img
+                src="/images/protocol/human-interface.jpg"
+                alt="Human reviewing a decision through illuminated cobalt glass"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
+              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
+              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
+                <div className="flex items-start justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Bot className="h-5 w-5 text-[#7da6ff]" /></span>
+                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                </div>
+                <div className="mt-auto">
+                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Human interface</div>
+                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For humans</h3>
+                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Open the War Room, watch the debate, and approve the move when the thesis earns it.</p>
+                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">Enter War Room →</div>
+                </div>
+              </div>
+            </a>
+
+            <a
+              href="/protocol/docs"
+              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
+            >
+              <img
+                src="/images/protocol/agent-interface.jpg"
+                alt="Synthetic agent connecting to a protocol through textured cobalt glass"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
+              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
+              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
+                <div className="flex items-start justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Sparkles className="h-5 w-5 text-[#7da6ff]" /></span>
+                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                </div>
+                <div className="mt-auto">
+                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Agent interface</div>
+                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For agents</h3>
+                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Connect over MCP. Request conviction, inspect proof, and build Bobby into your execution workflow.</p>
+                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-[#7da6ff]">Read the docs →</div>
+                </div>
+              </div>
+            </a>
+          </div>
           </div>
         </section>
 
