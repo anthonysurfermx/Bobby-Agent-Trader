@@ -267,6 +267,8 @@ contract DeployBase is Script {
     function _writeManifest(Deployed memory d, Config memory c, address[] memory resolverSet, address deployer) internal {
         string memory m = "manifest";
         vm.serializeUint(m, "chainId", block.chainid);
+        // NOTE: on a dry-run this is the SIMULATED block; only trust it after a
+        // real broadcast. VerifyBaseDeployment logs the live block on every run.
         vm.serializeUint(m, "deployBlock", block.number);
         vm.serializeAddress(m, "deployer", deployer);
 

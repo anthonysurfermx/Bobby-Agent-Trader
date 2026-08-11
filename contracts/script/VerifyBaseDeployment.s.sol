@@ -58,6 +58,7 @@ contract VerifyBaseDeployment is Script {
         );
         string memory json = vm.readFile(path);
         console2.log("manifest:", path);
+        console2.log("live block now:", block.number); // manifest deployBlock may be simulated
 
         _ok(vm.parseJsonUint(json, ".chainId") == block.chainid, "manifest chainId matches RPC chain");
 
