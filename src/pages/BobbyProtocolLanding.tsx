@@ -427,33 +427,83 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
   const regime = typeof stats?.market.regime === 'string' ? (stats.market.regime as string) : '…';
 
   return (
-    <section id="debate" className="relative min-h-[85vh] flex flex-col items-center justify-center pt-24 pb-16 px-6 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-[#6dfe9c]/5 to-transparent pointer-events-none" />
+    <section id="debate" className="relative flex flex-col overflow-hidden">
+      {/* Full-bleed hero, okx.ai style: background video + dark overlay, left-aligned copy */}
+      <div className="relative min-h-[92vh] flex flex-col justify-center px-6 md:px-12 lg:px-20">
+        <video
+          className="absolute inset-0 w-full h-full object-cover opacity-40 grayscale contrast-125 pointer-events-none"
+          src="/videos/hero.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          onError={(e) => { (e.currentTarget as HTMLVideoElement).style.display = 'none'; }}
+        />
+        {/* Fallback / overlay: code-noise gradient so the hero works before video assets land */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(0,82,255,0.12),_transparent_65%)] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black pointer-events-none" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-wrap justify-center gap-3 mb-8"
-      >
-        <span className="px-3 py-1 bg-[#262626] border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[10px] tracking-widest">
-          [ON-CHAIN VERIFICATION LAYER]
-        </span>
-        <span className="px-3 py-1 bg-[#262626] border border-[#fcc025]/20 text-[#fcc025] font-mono text-[10px] tracking-widest">
-          [LIVE ON X LAYER 196]
-        </span>
-        <span className="px-3 py-1 bg-[#262626] border border-[#ff716a]/20 text-[#ff716a] font-mono text-[10px] tracking-widest">
-          [1,138 DECISIONS SIGNED]
-        </span>
-      </motion.div>
+        <motion.a
+          href="/agentic-world/bobby/history"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative font-mono text-xs md:text-sm tracking-[0.2em] text-[#4C8FFF] uppercase mb-6 hover:text-white transition-colors w-fit"
+        >
+          A manifesto for the verified agent economy <span aria-hidden>›</span>
+        </motion.a>
 
-      <motion.h1
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] text-center max-w-5xl leading-none uppercase mb-6"
-      >
-        Agents promise. <span className="text-[#6dfe9c] italic">Bobby proves.</span>
-      </motion.h1>
+        <motion.h1
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="relative text-5xl md:text-7xl lg:text-8xl font-bold tracking-[-0.03em] max-w-5xl leading-[1.02] mb-10"
+        >
+          Agents promise.{' '}
+          <span className="text-[#0052FF]">Bobby proves.</span>
+        </motion.h1>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="relative flex flex-col sm:flex-row gap-4 max-w-2xl"
+        >
+          <a
+            href="/agentic-world/bobby"
+            className="flex-1 text-center bg-white text-black font-mono text-sm tracking-[0.15em] uppercase px-10 py-4 rounded-lg hover:bg-[#0052FF] hover:text-white transition-colors"
+          >
+            Enter War Room
+          </a>
+          <a
+            href="#loop"
+            className="flex-1 text-center bg-white/10 backdrop-blur border border-white/15 text-white font-mono text-sm tracking-[0.15em] uppercase px-10 py-4 rounded-lg hover:bg-white/20 transition-colors"
+          >
+            Explore
+          </a>
+        </motion.div>
+      </div>
+
+      {/* Marquee status strip, okx.ai style */}
+      <div className="relative border-y border-white/10 bg-[#0a0a14] py-3 overflow-hidden">
+        <div className="flex gap-12 whitespace-nowrap animate-marquee font-mono text-xs tracking-[0.15em] uppercase text-white/60">
+          {[0, 1].map((dup) => (
+            <div key={dup} className="flex gap-12 shrink-0">
+              <span>On-chain verification layer</span>
+              <span className="text-[#4C8FFF]">Online</span>
+              <span>1,138 decisions signed</span>
+              <span className="text-[#4C8FFF]">
+                {okb ? `OKB $${safeFixed(okb.price, 2)}` : 'OKB —'}
+              </span>
+              <span>{btc ? `BTC $${safeFixed(btc.price, 0)}` : 'BTC —'}</span>
+              <span>{eth ? `ETH $${safeFixed(eth.price, 0)}` : 'ETH —'}</span>
+              <span className="text-[#4C8FFF]">Agents debating</span>
+              <span>{stats ? `Block #${stats.chain.blockNumber.toLocaleString()}` : 'Connecting…'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center px-6 pb-16">
 
       <motion.div
         initial={{ opacity: 0, scale: 0.98 }}
@@ -620,6 +670,7 @@ function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
           </a>
         </div>
       </motion.div>
+      </div>
     </section>
   );
 }
