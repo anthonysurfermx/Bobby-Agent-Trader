@@ -96,6 +96,30 @@ function BrandMark() {
   );
 }
 
+// Full-bleed section background: video on md+, blurred still on mobile (saves data, avoids
+// mobile autoplay quirks). Poster JPGs are pre-blurred frames of the same videos.
+function SectionMedia({ name, className = '' }: { name: string; className?: string }) {
+  return (
+    <>
+      <img
+        src={`/posters/${name}.jpg`}
+        alt=""
+        aria-hidden="true"
+        className={`absolute inset-0 h-full w-full object-cover md:hidden ${className}`}
+      />
+      <video
+        className={`absolute inset-0 hidden h-full w-full object-cover md:block ${className}`}
+        src={`/videos/${name}.mp4`}
+        autoPlay
+        muted
+        loop
+        playsInline
+        aria-hidden="true"
+      />
+    </>
+  );
+}
+
 function NetworkVisual({ stats }: { stats: ProtocolStats | null }) {
   const nodes = [
     { label: 'ALPHA', role: 'finds the setup', angle: -140 },
@@ -266,7 +290,7 @@ export default function BobbyProtocolLanding() {
 
       <main className="relative">
         <section className="relative isolate min-h-[calc(100vh-72px)] overflow-hidden bg-[#050505] text-white">
-          <video className="absolute inset-0 h-full w-full object-cover opacity-55 grayscale contrast-125" src="/videos/hero.mp4" autoPlay muted loop playsInline aria-hidden="true" />
+          <SectionMedia name="hero" className="opacity-55 grayscale contrast-125" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,.96)_0%,rgba(5,5,5,.7)_42%,rgba(5,5,5,.3)_100%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_46%,rgba(0,82,255,.4),transparent_35%)]" />
           <div className="relative z-10 mx-auto grid min-h-[calc(100vh-72px)] max-w-7xl items-center gap-8 px-5 pb-20 pt-20 lg:grid-cols-[1.05fr_.95fr] lg:px-8 lg:pb-28 lg:pt-24">
@@ -310,24 +334,95 @@ export default function BobbyProtocolLanding() {
           </div>
         </div>
 
-        <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="how-it-works">
-          <video className="absolute inset-0 h-full w-full object-cover opacity-30" src="/videos/section-blue.mp4" autoPlay muted loop playsInline aria-hidden="true" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/40 to-[#050505]" />
-          <div className="relative z-10 mx-auto grid max-w-7xl gap-10 px-5 py-20 lg:grid-cols-[.8fr_1.2fr] lg:px-8 lg:py-28">
-          <div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / The protocol</div><h2 className="max-w-md text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Conviction is a team sport.</h2><p className="mt-6 max-w-md leading-7 text-white/55">Bobby turns a raw signal into a decision you can inspect, challenge, and verify. The result is legible to people and machines.</p></div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              { icon: Bot, title: 'Agents debate', text: 'Alpha finds the setup. Red Team tries to break it. The CIO makes the call.' },
-              { icon: ShieldCheck, title: 'Risk gets a vote', text: 'Six dimensions grade the thesis before any execution path can open.' },
-              { icon: CircleDollarSign, title: 'Capital stays gated', text: 'Pass, park, or block. Low conviction never gets disguised as a trade.' },
-              { icon: Check, title: 'Proof is permanent', text: 'Commit-reveal records make the track record auditable after the outcome.' },
-            ].map(({ icon: Icon, title, text }, index) => <motion.div key={title} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * .06 }} className="rounded-2xl border border-white/10 bg-white/[0.05] p-6 backdrop-blur"><Icon className="mb-10 h-5 w-5 text-[#7da6ff]" /><h3 className="text-lg font-extrabold tracking-[-0.04em]">{title}</h3><p className="mt-2 text-sm leading-6 text-white/55">{text}</p></motion.div>)}
-          </div>
+        <section className="relative isolate min-h-[940px] overflow-hidden bg-[#050505] text-white" id="how-it-works">
+          <SectionMedia name="orb" className="scale-105 opacity-75 blur-[2px] saturate-150" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,.88)_0%,rgba(5,5,5,.38)_55%,rgba(5,5,5,.24)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,5,.25)_0%,rgba(5,5,5,.2)_48%,rgba(5,5,5,.98)_88%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_67%_30%,rgba(0,82,255,.28),transparent_42%)]" />
+
+          <div className="relative z-10 mx-auto max-w-7xl px-5 pb-20 pt-24 lg:px-8 lg:pb-28 lg:pt-32">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              className="max-w-3xl"
+            >
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / The verification loop</div>
+              <h2 className="text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
+                Decisions, never blind.<br />
+                <span className="text-white/72">See Bobby in action.</span>
+              </h2>
+              <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">
+                Every signal enters an adversarial pipeline. Agents debate it, risk challenges it, and the protocol records the result before the market can rewrite the story.
+              </p>
+            </motion.div>
+
+            <div className="mt-14 grid grid-cols-2 gap-x-8 gap-y-7 md:grid-cols-4 lg:max-w-5xl">
+              {[
+                ['Total debates', formatNumber(totalDebates)],
+                ['Verified decisions', formatNumber(totalTrades)],
+                ['MCP calls', formatNumber(totalMcpCalls)],
+                ['Network interactions', formatNumber(totalInteractions)],
+              ].map(([label, value]) => (
+                <div key={label} className="border-l border-white/20 pl-4">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{label}</div>
+                  <div className="mt-2 font-mono text-2xl tracking-[-0.04em] text-white md:text-3xl">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-20 flex flex-col gap-4 border-t border-white/10 pt-6 lg:mt-24 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {['All stages', 'Signal', 'Debate', 'Risk gate', 'Proof'].map((label, index) => (
+                  <span
+                    key={label}
+                    className={`shrink-0 rounded-md px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] ${index === 0 ? 'bg-white text-black' : 'border border-white/10 bg-white/[0.07] text-white/55 backdrop-blur-md'}`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <div className="flex w-fit items-center gap-3 rounded-md border border-white/10 bg-white/[0.07] px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/60 backdrop-blur-md">
+                Live pipeline <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                { icon: Bot, eyebrow: 'Alpha Hunter', title: 'Find the asymmetric setup', text: 'Market structure, momentum and live intelligence become a thesis with explicit invalidation.', state: 'SIGNAL READY', step: '01' },
+                { icon: ShieldCheck, eyebrow: 'Red Team', title: 'Attack the thesis', text: 'The opposing agent searches for crowded positioning, weak assumptions and hidden downside.', state: 'CHALLENGED', step: '02' },
+                { icon: CircleDollarSign, eyebrow: 'CIO + Risk', title: 'Gate the capital', text: 'Conviction, sizing and downside are reconciled. Pass, park or block — never force the trade.', state: 'RISK GATED', step: '03' },
+                { icon: Check, eyebrow: 'Base proof', title: 'Commit before outcome', text: 'The decision and its rationale become a verifiable record before price reveals the answer.', state: 'ONCHAIN PROOF', step: '04' },
+              ].map(({ icon: Icon, eyebrow, title, text, state, step }, index) => (
+                <motion.article
+                  key={title}
+                  initial={{ opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.07 }}
+                  className="group flex min-h-[310px] flex-col rounded-xl border border-white/10 bg-[#101014]/80 p-6 shadow-[0_20px_50px_rgba(0,0,0,.35)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:bg-[#111726]/90"
+                >
+                  <div className="mb-8 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-white/45">
+                      <span className="grid h-7 w-7 place-items-center rounded-md bg-[#0052ff]/20 text-[#7da6ff]"><Icon className="h-3.5 w-3.5" /></span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.13em]">{eyebrow}</span>
+                    </div>
+                    <span className="font-mono text-[10px] text-white/25">{step}</span>
+                  </div>
+                  <h3 className="text-xl font-bold leading-tight tracking-[-0.04em] text-white/95">{title}</h3>
+                  <p className="mt-4 text-sm leading-6 text-white/45">{text}</p>
+                  <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-5">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">{state}</span>
+                    <span className="h-2 w-2 rounded-full bg-[#0052ff] shadow-[0_0_14px_rgba(0,82,255,.85)]" />
+                  </div>
+                </motion.article>
+              ))}
+            </div>
           </div>
         </section>
 
         <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
-          <video className="absolute inset-0 h-full w-full object-cover opacity-45" src="/videos/orb.mp4" autoPlay muted loop playsInline aria-hidden="true" />
+          <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Live network</div>
@@ -381,9 +476,13 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28" id="for-agents">
+        <section className="relative isolate overflow-hidden" id="for-agents">
+          <SectionMedia name="nebula" className="opacity-50" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
+          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
           <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Built for both sides</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A better interface for capital.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">One decision layer. Two ways in.</p></div>
           <div className="grid gap-5 md:grid-cols-2"><a href="/agentic-world/bobby" className="group rounded-3xl bg-[#0052ff] p-8 text-white transition hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,82,255,0.35)] md:p-10"><div className="flex items-start justify-between"><Bot className="h-7 w-7" /><ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /></div><div className="mt-20 text-3xl font-extrabold tracking-[-0.06em]">For humans</div><p className="mt-3 max-w-sm text-sm leading-6 text-white/70">Open the War Room, watch the debate, and approve the move when the thesis earns it.</p><div className="mt-8 font-mono text-sm font-bold uppercase tracking-[0.12em]">Enter War Room →</div></a><a href="/protocol/docs" className="group rounded-3xl border border-white/10 bg-white/[0.05] p-8 text-white transition hover:-translate-y-1 hover:bg-white/[0.09] md:p-10"><div className="flex items-start justify-between"><Sparkles className="h-7 w-7 text-[#7da6ff]" /><ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /></div><div className="mt-20 text-3xl font-extrabold tracking-[-0.06em]">For agents</div><p className="mt-3 max-w-sm text-sm leading-6 text-white/55">Connect over MCP. Request conviction, inspect proof, and build Bobby into your execution workflow.</p><div className="mt-8 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff]">Read the docs →</div></a></div>
+          </div>
         </section>
 
         <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:px-8"><Metric label="Debates" value={formatNumber(totalDebates)} detail="agent conversations" /><Metric label="Decisions" value={formatNumber(totalTrades)} detail="committed before outcome" /><Metric label="Interactions" value={formatNumber(totalInteractions)} detail="across the network" /><Metric label="Win rate" value={winRate ? `${(Number(winRate) / 100).toFixed(1)}%` : '—'} detail="on the verified record" /></div></section>
