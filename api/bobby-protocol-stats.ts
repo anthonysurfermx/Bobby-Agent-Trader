@@ -301,6 +301,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const bountyEscrowOkb = totalBountiesPosted * 0.001;
   const economyVol = parseFloat(economyStats.totalVolumeOkb || '0');
   const protocolNotionalOkb = (economyVol + bountyEscrowOkb).toFixed(4);
+  const onchainCommitments = Number(trackRecordStats.totalCommitments || 0);
+  const onchainResolved = Number(trackRecordStats.totalTrades || 0);
+  const onchainWinRate = onchainResolved > 0 ? Number((Number(trackRecordStats.winRateBps || 0) / 100).toFixed(1)) : null;
 
   // Supabase debate + resolution stats (real activity beyond on-chain contracts)
   const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
@@ -423,6 +426,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       bountyCount: totalBountiesPosted,
       protocolNotionalOkb,
       totalInteractions: Number(economyStats.totalPayments || '0') + totalBountiesPosted,
+    },
+    onchainRecord: {
+      commitmentsCreated: onchainCommitments,
+      decisionsResolved: onchainResolved,
+      pending: Math.max(0, onchainCommitments - onchainResolved),
+      winRate: onchainWinRate,
     },
     bounties: recentBounties,
     bountySummary,

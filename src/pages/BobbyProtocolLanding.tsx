@@ -32,6 +32,7 @@ interface ProtocolStats {
     agentRegistry?: { address?: string; type?: string; agents?: number };
   };
   protocolTotals?: { totalInteractions?: number; mcpPayments?: number };
+  onchainRecord?: { commitmentsCreated?: number; decisionsResolved?: number; pending?: number; winRate?: number | null };
   debateActivity?: {
     commitmentsCreated?: number;
     decisionsResolved?: number;
@@ -189,6 +190,7 @@ export default function BobbyProtocolLanding() {
   const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
   const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
   const publicRecord = stats?.debateActivity;
+  const onchainRecord = stats?.onchainRecord;
   const totalTrades = publicRecord?.commitmentsCreated ?? stats?.contracts?.trackRecord?.stats?.totalTrades;
   const totalInteractions = stats?.protocolTotals?.totalInteractions;
   const winRate = publicRecord?.decisionsResolved ? publicRecord.winRate : null;
@@ -201,13 +203,22 @@ export default function BobbyProtocolLanding() {
   const c = stats?.contracts;
   const proofPoints = [
     {
-      label: 'Public record',
+      label: 'On-chain record',
+      value: onchainRecord?.winRate !== null && onchainRecord?.winRate !== undefined ? `${onchainRecord.winRate.toFixed(1)}%` : '—',
+      detail: onchainRecord
+        ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
+        : 'Waiting for the TrackRecord contract.',
+      proof: 'TrackRecord contract',
+      href: `${xlayerExplorer}/${c?.trackRecord?.address ?? ''}`,
+    },
+    {
+      label: 'Public debate ledger',
       value: publicRecord ? `${formatNumber(publicRecord.decisionsResolved, '0')} resolved` : '—',
       detail: publicRecord
-        ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L`
+        ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L · ${publicRecord.winRate?.toFixed(1)}%`
         : 'Waiting for the public resolution ledger.',
       proof: 'Resolution ledger',
-      href: `${xlayerExplorer}/${c?.trackRecord?.address ?? ''}`,
+      href: '#activity',
     },
     {
       label: 'Adversarial bounties',
