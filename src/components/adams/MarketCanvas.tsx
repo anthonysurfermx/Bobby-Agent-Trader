@@ -11,17 +11,22 @@ import {
   LineStyle,
   CandlestickSeries,
   HistogramSeries,
+  LineSeries,
+  BaselineSeries,
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
 } from 'lightweight-charts';
 import { ASSET_GROUPS, getVoiceAsset, isEquitySymbol } from '@/lib/voice-assets';
+import { analyzeCandles, type Candle, type MarketAnalysis } from '@/lib/market-indicators';
 
 export interface ChartLevel {
   price: number;
   label: string;
   kind: 'entry' | 'stop' | 'target' | 'level';
   agent?: 'alpha' | 'red' | 'cio';
+  /** When present the level is a zone spanning price…priceTo, not a single line. */
+  priceTo?: number;
 }
 
 const LEVEL_COLOR: Record<ChartLevel['kind'], string> = {
@@ -44,7 +49,8 @@ const STOCK_TIMEFRAME: Record<Timeframe, { range: string; interval: string }> = 
   '1D': { range: '90d', interval: '1d' },
 };
 
-interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }
+/** Fill/stroke for an agent zone — same hue as its line and its card. */
+const ZONE_FILL = { alpha: 'rgba(74,222,128,0.13)', red: 'rgba(255,113,106,0.13)', cio: 'rgba(250,204,21,0.13)' } as const;
 
 export function MarketCanvas({
   symbol,
@@ -70,8 +76,15 @@ export function MarketCanvas({
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const ema20Ref = useRef<ISeriesApi<'Line'> | null>(null);
+  const ema50Ref = useRef<ISeriesApi<'Line'> | null>(null);
+  const zoneRefs = useRef<ISeriesApi<'Baseline'>[]>([]);
   const lineRefs = useRef<IPriceLine[]>([]);
+  /** Time range the zones span. State, not a ref — the zone effect must re-run
+   *  once candles arrive, otherwise a debate that lands first never gets drawn. */
+  const [span, setSpan] = useState<{ from: number; to: number } | null>(null);
   const [last, setLast] = useState<{ price: number; change: number } | null>(null);
+  const [analysis, setAnalysis] = useState<MarketAnalysis | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState(false);
 
@@ -139,6 +152,23 @@ export function MarketCanvas({
     });
     chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
 
+    // The two moving averages the desk reads out loud. Drawn over the candles
+    // so the analysis is visible, not just claimed.
+    ema20Ref.current = chart.addSeries(LineSeries, {
+      color: 'rgba(125,166,255,0.9)',
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+    ema50Ref.current = chart.addSeries(LineSeries, {
+      color: 'rgba(196,181,253,0.75)',
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
     const resize = () => {
       if (!containerRef.current) return;
       chart.applyOptions({
@@ -156,6 +186,10 @@ export function MarketCanvas({
       chartRef.current = null;
       candleRef.current = null;
       volumeRef.current = null;
+      ema20Ref.current = null;
+      ema50Ref.current = null;
+      zoneRefs.current = [];
+      lineRefs.current = [];
     };
   }, []);
 
@@ -203,8 +237,22 @@ export function MarketCanvas({
           })) as never,
         );
 
+        // Same function /api/voice-tool runs server-side, so the support the
+        // CIO names out loud is the exact level drawn here.
+        const computed = analyzeCandles(rows);
+        ema20Ref.current?.setData(computed.ema20Series as never);
+        ema50Ref.current?.setData(computed.ema50Series as never);
+        setAnalysis(computed);
+
         const first = rows[0];
         const latest = rows[rows.length - 1];
+        // Keep the same object while the range is unchanged so the 15s poll
+        // does not tear down and repaint the zones on every tick.
+        setSpan((prev) =>
+          prev && prev.from === first.time && prev.to === latest.time
+            ? prev
+            : { from: first.time, to: latest.time },
+        );
         setLast({
           price: latest.close,
           change: first.open ? ((latest.close - first.open) / first.open) * 100 : 0,
@@ -242,6 +290,47 @@ export function MarketCanvas({
       }),
     );
   }, [drawnLines]);
+
+  // --- agent zones: a shaded band where each agent says the level lives ---
+  const zones = useMemo(
+    () => drawnLines.filter((line) => line.agent && typeof line.priceTo === 'number'),
+    [drawnLines],
+  );
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    zoneRefs.current.forEach((zone) => { try { chart?.removeSeries(zone); } catch { /* chart torn down */ } });
+    zoneRefs.current = [];
+    if (!chart || !span || !zones.length) return;
+
+    zoneRefs.current = zones.map((zone) => {
+      const agent = zone.agent as 'alpha' | 'red' | 'cio';
+      const top = Math.max(zone.price, zone.priceTo as number);
+      const bottom = Math.min(zone.price, zone.priceTo as number);
+      // A baseline series filled down to `bottom` paints the band between the
+      // two prices — lightweight-charts has no native rectangle.
+      const band = chart.addSeries(BaselineSeries, {
+        baseValue: { type: 'price', price: bottom },
+        topFillColor1: ZONE_FILL[agent],
+        topFillColor2: ZONE_FILL[agent],
+        topLineColor: 'rgba(0,0,0,0)',
+        bottomFillColor1: 'rgba(0,0,0,0)',
+        bottomFillColor2: 'rgba(0,0,0,0)',
+        bottomLineColor: 'rgba(0,0,0,0)',
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        // The band is context, not price action — never let it stretch the scale.
+        autoscaleInfoProvider: () => null,
+      });
+      band.setData([
+        { time: span.from, value: top },
+        { time: span.to, value: top },
+      ] as never);
+      return band;
+    });
+  }, [zones, span]);
 
   const positive = (last?.change ?? 0) >= 0;
 
@@ -300,6 +389,27 @@ export function MarketCanvas({
         </div>
       </div>
 
+      {/* The reading behind the call: computed from the same candles on screen,
+          and from the same function the voice tool runs server-side. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/10 bg-black/25 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em]">
+        {([
+          { label: 'Tendencia', value: analysis?.trend, tone: analysis?.trend === 'alcista' ? 'text-green-400' : analysis?.trend === 'bajista' ? 'text-[#ff716a]' : 'text-white/50' },
+          { label: 'RSI 14', value: analysis?.rsi14, tone: analysis?.momentum === 'sobrecompra' ? 'text-[#ff716a]' : analysis?.momentum === 'sobreventa' ? 'text-green-400' : 'text-white/55' },
+          { label: 'EMA 20', value: analysis?.ema20 && formatPrice(analysis.ema20), tone: 'text-[#7da6ff]' },
+          { label: 'EMA 50', value: analysis?.ema50 && formatPrice(analysis.ema50), tone: 'text-[#c4b5fd]' },
+          { label: 'Soporte', value: analysis?.support && formatPrice(analysis.support), tone: 'text-white/55' },
+          { label: 'Resist.', value: analysis?.resistance && formatPrice(analysis.resistance), tone: 'text-white/55' },
+          { label: 'ATR', value: analysis?.atrPct !== null && analysis?.atrPct !== undefined ? `${analysis.atrPct}%` : null, tone: 'text-white/55' },
+        ] as const).map((item) => (
+          <span key={item.label} className="flex items-baseline gap-1">
+            <span className="text-white/25">{item.label}</span>
+            <span className={item.value === null || item.value === undefined ? 'text-white/20' : item.tone}>
+              {item.value ?? '—'}
+            </span>
+          </span>
+        ))}
+      </div>
+
       {/* Legend for the three lines on the chart. Each row names the agent, the
           level it drew and its score — the readable thesis text lives beside
           the chart in VoiceRoom, so it is not repeated here. */}
@@ -326,7 +436,11 @@ export function MarketCanvas({
                   )}
                 </div>
                 <div className="truncate font-mono text-[8px] text-white/35">
-                  {line ? `${line.label} ${formatPrice(line.price)}` : agent.waiting}
+                  {!line
+                    ? agent.waiting
+                    : typeof line.priceTo === 'number'
+                      ? `${line.label} ${formatPrice(Math.min(line.price, line.priceTo))}–${formatPrice(Math.max(line.price, line.priceTo))}`
+                      : `${line.label} ${formatPrice(line.price)}`}
                 </div>
               </div>
             </div>

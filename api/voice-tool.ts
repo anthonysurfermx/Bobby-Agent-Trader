@@ -9,6 +9,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isEquitySymbol, normalizeAssetSymbol } from '../src/lib/voice-assets.js';
+import { analyzeCandles, analysisSummary, type Candle } from '../src/lib/market-indicators.js';
 
 export const config = { maxDuration: 60 };
 
@@ -54,17 +55,61 @@ async function getMarket(symbol: string) {
   };
 }
 
+/**
+ * Candles for any asset the desk can chart, normalized to one shape. Crypto
+ * comes from OKX, equities and ETFs from Yahoo — the same split the chart uses.
+ */
+async function getCandles(ticker: string): Promise<Candle[]> {
+  const endpoint = isEquitySymbol(ticker)
+    ? `${SELF}/api/stock-candles?symbol=${encodeURIComponent(ticker)}&range=7d&interval=1h`
+    : `${SELF}/api/okx-candles?instId=${encodeURIComponent(ticker)}-USDT&bar=1H&limit=100`;
+  const payload = (await getJson(endpoint)) as { candles?: Array<Record<string, number | string>> };
+  return (payload.candles ?? [])
+    .map((row) => ({
+      time: Math.floor(Number(row.ts) / 1000),
+      open: Number(row.open), high: Number(row.high),
+      low: Number(row.low), close: Number(row.close), volume: Number(row.volume ?? 0),
+    }))
+    .filter((c) => Number.isFinite(c.close) && Number.isFinite(c.time))
+    .sort((a, b) => a.time - b.time);
+}
+
+/** The per-asset technical read bobby-intel already computes, if it covers this asset. */
+function pulseFor(intel: Record<string, unknown>, ticker: string) {
+  const pulse = intel.technicalPulse as { assets?: Array<Record<string, unknown>> } | undefined;
+  const asset = pulse?.assets?.find((a) => String(a.symbol).toUpperCase() === ticker);
+  if (!asset) return null;
+  return {
+    signal: asset.signal ?? null,
+    direction: asset.direction ?? null,
+    conviction_pct: typeof asset.conviction === 'number' ? Math.round(asset.conviction * 100) : null,
+    agreement_pct: typeof asset.agreement === 'number' ? Math.round(asset.agreement * 100) : null,
+    overview: asset.overview ?? null,
+    trade_plan: asset.tradePlan ?? null,
+  };
+}
+
 async function runDebate(symbol: string, context?: string) {
   const ticker = normalizeAssetSymbol(symbol);
-  const intel = (await getJson(`${SELF}/api/bobby-intel?symbol=${ticker}`)) as Record<string, unknown>;
+  // The indicator read never depends on the intel service — it is computed from
+  // the same candles the chart is drawing, so the two can never disagree.
+  const [intel, candles] = await Promise.all([
+    getJson(`${SELF}/api/bobby-intel?symbol=${ticker}`).catch(() => ({}) as Record<string, unknown>),
+    getCandles(ticker).catch(() => [] as Candle[]),
+  ]);
+  const technicals = candles.length ? analysisSummary(analyzeCandles(candles)) : null;
+  const pulse = pulseFor(intel as Record<string, unknown>, ticker);
+
   return {
     symbol: ticker,
     context: context ?? null,
-    conviction: intel.conviction ?? null,
-    direction: intel.direction ?? null,
-    regime: intel.regime ?? null,
-    mood: intel.mood ?? null,
-    signals: intel.signals ?? null,
+    regime: (intel as Record<string, unknown>).regime ?? null,
+    // Real readings off real candles — the anchors for the three agent zones.
+    technicals,
+    // Deeper multi-indicator scoring, only for the assets the intel desk covers.
+    technical_pulse: pulse,
+    how_to_use:
+      'Anchor Alpha on the support/demand side, Red Team on the level that breaks the thesis, and the CIO on where you would actually act. Size each zone with atrPct. Never state a level that is not derived from these numbers.',
     note: 'Analysis only. Bobby does not execute trades.',
   };
 }

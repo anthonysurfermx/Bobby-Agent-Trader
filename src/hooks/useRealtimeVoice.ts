@@ -39,6 +39,8 @@ export interface ChartLevel {
   label: string;
   kind: 'entry' | 'stop' | 'target' | 'level';
   agent?: 'alpha' | 'red' | 'cio';
+  /** When present the level is a shaded zone spanning price…priceTo. */
+  priceTo?: number;
 }
 
 export interface DebateSides {
@@ -84,18 +86,22 @@ const UI_TOOLS = new Set(['set_chart', 'draw_levels', 'update_thesis', 'show_deb
 const normalizeSymbol = normalizeAssetSymbol;
 const symbolMentioned = matchAssetInText;
 
-/** Pull one agent's price line out of a show_debate payload, or nothing. */
+/** Pull one agent's level (or zone) out of a show_debate payload, or nothing. */
 function debateLevel(
   args: Record<string, unknown>,
   agent: 'alpha' | 'red' | 'cio',
   priceKey: string,
   labelKey: string,
+  zoneKey: string,
   fallbackLabel: string,
 ): ChartLevel[] {
   const price = Number(args[priceKey]);
   if (!Number.isFinite(price) || price <= 0) return [];
   const label = String(args[labelKey] ?? '').trim() || fallbackLabel;
-  return [{ price, label, kind: 'level', agent }];
+  const zoneTo = Number(args[zoneKey]);
+  // A zone only counts when the far edge is a real, different price.
+  const priceTo = Number.isFinite(zoneTo) && zoneTo > 0 && zoneTo !== price ? zoneTo : undefined;
+  return [{ price, label, kind: 'level', agent, ...(priceTo === undefined ? {} : { priceTo }) }];
 }
 
 export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
@@ -192,14 +198,27 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
           if (args.timeframe) setTimeframe(String(args.timeframe));
           output = { ok: true, showing: args.symbol, timeframe: args.timeframe ?? 'unchanged' };
         } else if (name === 'draw_levels') {
-          const drawn = (args.levels ?? []) as ChartLevel[];
+          const drawn = ((args.levels ?? []) as Array<Record<string, unknown>>)
+            .map((raw) => {
+              const price = Number(raw.price);
+              if (!Number.isFinite(price)) return null;
+              const to = Number(raw.price_to);
+              return {
+                price,
+                label: String(raw.label ?? ''),
+                kind: (raw.kind ?? 'level') as ChartLevel['kind'],
+                ...(raw.agent ? { agent: raw.agent as ChartLevel['agent'] } : {}),
+                ...(Number.isFinite(to) && to > 0 && to !== price ? { priceTo: to } : {}),
+              } satisfies ChartLevel;
+            })
+            .filter((level): level is ChartLevel => level !== null);
           setLevels(drawn);
           output = { ok: true, drawn: drawn.length };
         } else if (name === 'show_debate') {
           const debateLevels = [
-            ...debateLevel(args, 'alpha', 'alpha_price', 'alpha_price_label', 'Tesis Alpha'),
-            ...debateLevel(args, 'red', 'red_team_price', 'red_team_price_label', 'Invalidación'),
-            ...debateLevel(args, 'cio', 'cio_price', 'cio_price_label', 'Decisión CIO'),
+            ...debateLevel(args, 'alpha', 'alpha_price', 'alpha_price_label', 'alpha_zone_to', 'Zona Alpha'),
+            ...debateLevel(args, 'red', 'red_team_price', 'red_team_price_label', 'red_team_zone_to', 'Invalidación'),
+            ...debateLevel(args, 'cio', 'cio_price', 'cio_price_label', 'cio_zone_to', 'Zona CIO'),
           ];
           setDebate({
             alpha: String(args.alpha ?? ''),
