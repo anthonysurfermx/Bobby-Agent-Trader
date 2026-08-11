@@ -20,7 +20,8 @@ contract DeployHardnessRegistry is Script {
 
         vm.startBroadcast();
 
-        HardnessRegistry registry = new HardnessRegistry(initialResolvers, uint8(thresholdRaw));
+        // Legacy X Layer deploy — OKB-sized params preserved
+        HardnessRegistry registry = new HardnessRegistry(initialResolvers, uint8(thresholdRaw), 0.0001 ether, 0.01 ether, 0.001 ether);
 
         console.log("=== HARDNESS REGISTRY ===");
         console.log("Contract:", address(registry));

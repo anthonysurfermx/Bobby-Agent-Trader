@@ -148,9 +148,11 @@ contract HardnessRegistry {
     uint256 public predictionTTL = 30 days;
     uint256 public defaultSignalTTL = 24 hours;
 
-    uint96 public constant ABSOLUTE_MIN_BOUNTY = 0.0001 ether;
-    uint96 public constant REGISTRATION_STAKE = 0.01 ether;
-    uint96 public minBounty = 0.001 ether;
+    /// @dev Audit D-3: floors/stakes are immutable per-deploy values, not source
+    /// constants — the old OKB-sized ether literals inflate ~40x as ETH on Base.
+    uint96 public immutable ABSOLUTE_MIN_BOUNTY;
+    uint96 public immutable REGISTRATION_STAKE;
+    uint96 public minBounty;
     uint32 public challengeGracePeriod = 3 days;
     uint32 public defaultClaimWindow = 7 days;
     uint8 public maxChallengesPerBounty = 50;
@@ -265,8 +267,19 @@ contract HardnessRegistry {
         _status = _NOT_ENTERED;
     }
 
-    constructor(address[] memory initialResolvers, uint8 initialThreshold) {
+    constructor(
+        address[] memory initialResolvers,
+        uint8 initialThreshold,
+        uint96 _absoluteMinBounty,
+        uint96 _registrationStake,
+        uint96 _initialMinBounty
+    ) {
+        if (_absoluteMinBounty == 0 || _registrationStake == 0) revert InvalidValue();
+        if (_initialMinBounty < _absoluteMinBounty) revert InvalidValue();
         owner = msg.sender;
+        ABSOLUTE_MIN_BOUNTY = _absoluteMinBounty;
+        REGISTRATION_STAKE = _registrationStake;
+        minBounty = _initialMinBounty;
         emit OwnershipTransferred(address(0), msg.sender);
 
         for (uint256 i = 0; i < initialResolvers.length; i++) {

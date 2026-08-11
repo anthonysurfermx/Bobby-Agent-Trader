@@ -24,7 +24,7 @@ contract HardnessRegistryTest is Test {
         address[] memory initialResolvers = new address[](2);
         initialResolvers[0] = resolver1;
         initialResolvers[1] = resolver2;
-        registry = new HardnessRegistry(initialResolvers, 2);
+        registry = new HardnessRegistry(initialResolvers, 2, 0.0001 ether, 0.01 ether, 0.001 ether);
 
         vm.deal(agent1, 10 ether);
         vm.deal(agent2, 10 ether);
@@ -70,7 +70,7 @@ contract HardnessRegistryTest is Test {
         initialResolvers[0] = resolver1;
 
         vm.expectRevert(HardnessRegistry.ThresholdTooHigh.selector);
-        new HardnessRegistry(initialResolvers, 2);
+        new HardnessRegistry(initialResolvers, 2, 0.0001 ether, 0.01 ether, 0.001 ether);
     }
 
     function test_registerAgent_createsProfile() public {

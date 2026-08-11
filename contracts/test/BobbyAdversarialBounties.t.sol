@@ -17,7 +17,7 @@ contract BobbyAdversarialBountiesTest is Test {
     string constant THREAD_ID = "4f8bc2d1-a9f3-4e6b-9812-3a4c5d6e7f80";
 
     function setUp() public {
-        bounties = new BobbyAdversarialBounties(resolver);
+        bounties = new BobbyAdversarialBounties(resolver, 0.0001 ether, 0.001 ether);
         vm.deal(poster, 10 ether);
         vm.deal(challenger1, 1 ether);
         vm.deal(challenger2, 1 ether);

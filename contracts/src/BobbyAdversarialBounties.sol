@@ -54,11 +54,13 @@ contract BobbyAdversarialBounties {
     address public resolver;      // Bobby backend or Judge Mode oracle
     bool public paused;
 
-    /// @dev Hard floor — owner cannot drop minBounty below this (anti-DoS)
-    uint96 public constant ABSOLUTE_MIN_BOUNTY = 0.0001 ether;
+    /// @dev Hard floor — owner cannot drop minBounty below this (anti-DoS).
+    /// Audit D-3: immutable, set per deploy — the old 0.0001-ether constant was
+    /// sized for OKB and would be ~40x more expensive as ETH on Base.
+    uint96 public immutable ABSOLUTE_MIN_BOUNTY;
 
     /// @dev Minimum bounty to prevent dust spam (owner-adjustable within floor)
-    uint96 public minBounty = 0.001 ether;
+    uint96 public minBounty;
 
     /// @dev Grace period added when a bounty receives at least one challenge
     ///      before expiring — protects honest challengers from resolver inaction
@@ -138,10 +140,14 @@ contract BobbyAdversarialBounties {
 
     // ---- Constructor ----
 
-    constructor(address _resolver) {
+    constructor(address _resolver, uint96 _absoluteMinBounty, uint96 _initialMinBounty) {
         require(_resolver != address(0), "Invalid resolver");
+        require(_absoluteMinBounty > 0, "Zero floor");
+        require(_initialMinBounty >= _absoluteMinBounty, "Min below floor");
         owner = msg.sender;
         resolver = _resolver;
+        ABSOLUTE_MIN_BOUNTY = _absoluteMinBounty;
+        minBounty = _initialMinBounty;
         emit OwnershipTransferred(address(0), msg.sender);
         emit ResolverUpdated(address(0), _resolver);
     }
