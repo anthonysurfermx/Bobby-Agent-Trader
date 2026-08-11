@@ -247,6 +247,19 @@ export function MarketCanvas({
         </div>
       </div>
 
+      <div className="grid grid-cols-3 gap-1 border-b border-white/10 bg-black/20 px-2 py-2">
+        {[
+          { label: 'ALPHA', color: '#4ade80', state: debate?.alpha ? 'thesis visible' : 'awaiting thesis' },
+          { label: 'RED TEAM', color: '#ff716a', state: debate?.redTeam ? 'challenge visible' : 'awaiting challenge' },
+          { label: 'CIO', color: '#facc15', state: debate?.cio ? 'decision visible' : 'awaiting decision' },
+        ].map((agent) => (
+          <div key={agent.label} className="flex min-w-0 items-center gap-1.5 rounded border border-white/10 px-2 py-1.5">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: agent.color }} />
+            <div className="min-w-0"><div className="truncate font-mono text-[8px] font-bold tracking-[.12em]" style={{ color: agent.color }}>{agent.label}</div><div className="truncate font-mono text-[8px] text-white/30">{agent.state}</div></div>
+          </div>
+        ))}
+      </div>
+
       <div ref={containerRef} className="min-h-0 flex-1" />
 
       {debate && (

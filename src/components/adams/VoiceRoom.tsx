@@ -5,9 +5,9 @@
 // Nothing here can move capital — trades surface as proposals the human confirms.
 // ============================================================
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, ShieldCheck, X, ChevronDown } from 'lucide-react';
+import { Mic, MicOff, ShieldCheck, X, ChevronDown, Volume2, VolumeX } from 'lucide-react';
 import { useRealtimeVoice, type VoiceState } from '@/hooks/useRealtimeVoice';
 import { LiveOrb } from './LiveOrb';
 import { MarketCanvas, type Timeframe } from './MarketCanvas';
@@ -33,23 +33,79 @@ const VERDICT_LABEL: Record<string, string> = {
 };
 
 const AGENTS = [
-  { key: 'alpha', name: 'Alpha Hunter', role: 'busca el setup' },
-  { key: 'red', name: 'Red Team', role: 'ataca la tesis' },
-  { key: 'cio', name: 'CIO', role: 'decide' },
+  { key: 'alpha' as const, name: 'Alpha Hunter', roleEs: 'busca el setup', roleEn: 'finds the setup', voiceEs: 'Dalia · MX', voiceEn: 'Aria · US' },
+  { key: 'red' as const, name: 'Red Team', roleEs: 'ataca la tesis', roleEn: 'attacks the thesis', voiceEs: 'Jorge · MX', voiceEn: 'Guy · US' },
+  { key: 'cio' as const, name: 'CIO', roleEs: 'decide', roleEn: 'decides', voiceEs: 'Jorge · MX', voiceEn: 'Guy · US' },
 ];
 
+function playActivationChime() {
+  try {
+    const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AudioContextCtor();
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.22);
+    gain.connect(ctx.destination);
+    [523.25, 783.99].forEach((frequency, index) => {
+      const oscillator = ctx.createOscillator();
+      oscillator.type = 'sine'; oscillator.frequency.value = frequency;
+      oscillator.connect(gain); oscillator.start(ctx.currentTime + index * 0.055); oscillator.stop(ctx.currentTime + 0.22);
+    });
+    window.setTimeout(() => void ctx.close(), 400);
+  } catch { /* optional feedback */ }
+}
+
 export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = {}) {
+  const [voiceLang, setVoiceLang] = useState<'es' | 'en'>(() => {
+    try { return localStorage.getItem('bobby_lang') === 'en' ? 'en' : 'es'; } catch { return 'es'; }
+  });
   const {
     state, error, level, transcript, tools, proposal,
     symbol, timeframe, levels, thesis, debate,
     connect, disconnect, setTimeframe, dismissProposal,
-  } = useRealtimeVoice('es');
+  } = useRealtimeVoice(voiceLang);
 
   const live = state !== 'idle' && state !== 'error';
   const debating = tools.some((t) => t.tool === 'run_debate' && t.status === 'running');
   const running = tools.filter((t) => t.status === 'running');
   const railRef = useRef<HTMLDivElement>(null);
   const [chartOpenMobile, setChartOpenMobile] = useState(false);
+  const [playingAgent, setPlayingAgent] = useState<string | null>(null);
+  const agentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const activateVoice = useCallback(() => {
+    if (live) { disconnect(); return; }
+    playActivationChime();
+    if (navigator.vibrate) navigator.vibrate(18);
+    connect();
+  }, [connect, disconnect, live]);
+
+  const playAgentVoice = useCallback(async (agent: typeof AGENTS[number]['key'], text: string) => {
+    if (!text) return;
+    agentAudioRef.current?.pause();
+    setPlayingAgent(agent);
+    try {
+      const response = await fetch('/api/bobby-voice-free', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice: agent, lang: voiceLang }),
+      });
+      if (!response.ok) throw new Error('voice unavailable');
+      const url = URL.createObjectURL(await response.blob());
+      const audio = new Audio(url);
+      agentAudioRef.current = audio;
+      audio.onended = () => { URL.revokeObjectURL(url); setPlayingAgent(null); };
+      await audio.play();
+    } catch { setPlayingAgent(null); }
+  }, [voiceLang]);
+
+  useEffect(() => () => { agentAudioRef.current?.pause(); }, []);
+
+  const changeLanguage = (next: 'es' | 'en') => {
+    setVoiceLang(next);
+    localStorage.setItem('bobby_lang', next);
+    if (live) disconnect();
+  };
 
   useEffect(() => {
     railRef.current?.scrollTo({ top: railRef.current.scrollHeight, behavior: 'smooth' });
@@ -71,6 +127,13 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/45">
+            <span>LANG</span>
+            <select value={voiceLang} onChange={(event) => changeLanguage(event.target.value as 'es' | 'en')} className="bg-transparent text-[#7da6ff] outline-none">
+              <option value="es">ES · MX</option>
+              <option value="en">EN · US</option>
+            </select>
+          </label>
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/45 backdrop-blur">
             <ShieldCheck className="h-3 w-3 text-[#7da6ff]" />
             <span className="hidden sm:inline">Bobby no ejecuta · tú confirmas</span>
@@ -103,7 +166,8 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                 className="rounded-lg border border-white/10 bg-[#0b0b12]/70 px-3 py-2 backdrop-blur"
               >
                 <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7da6ff]">{agent.name}</div>
-                <div className="font-mono text-[9px] text-white/30">{agent.role}</div>
+                <div className="font-mono text-[9px] text-white/30">{voiceLang === 'es' ? agent.roleEs : agent.roleEn}</div>
+                <div className="mt-1 font-mono text-[8px] text-white/20">{voiceLang === 'es' ? agent.voiceEs : agent.voiceEn}</div>
               </motion.div>
             ))}
           </div>
@@ -139,10 +203,10 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
           {/* mic */}
           <div className="relative mt-4 flex shrink-0 flex-col items-center gap-2">
             <button
-              onClick={live ? disconnect : connect}
+              onClick={activateVoice}
               aria-label={live ? 'Cerrar sesión de voz' : 'Abrir sesión de voz'}
               className={`group relative grid h-14 w-14 place-items-center rounded-full transition ${
-                live ? 'bg-white text-black hover:bg-[#0052ff] hover:text-white' : 'bg-[#0052ff] text-white hover:bg-[#0045d8]'
+                live ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)] hover:bg-[#ff716a] hover:text-white' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff] active:scale-95'
               }`}
             >
               <span className="pointer-events-none absolute inset-0 rounded-full border border-[#0052ff]/60"
@@ -150,7 +214,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
               {live ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </button>
             <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-              Análisis, no asesoría · récord simulado
+              {live ? (voiceLang === 'es' ? 'ACTIVO · toca para desconectar' : 'ACTIVE · tap to disconnect') : (voiceLang === 'es' ? 'TOCA PARA ACTIVAR · análisis, no asesoría' : 'TAP TO ACTIVATE · analysis, not advice')}
             </p>
           </div>
         </section>
@@ -181,28 +245,35 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="mt-3 grid gap-3 sm:grid-cols-2"
+                className="mt-3 grid gap-3 sm:grid-cols-3"
               >
                 {([
                   {
+                    key: 'alpha' as const,
                     name: 'Alpha Hunter',
-                    stance: 'el caso a favor',
+                    stance: voiceLang === 'es' ? 'el caso a favor' : 'the bullish case',
                     text: debate.alpha,
                     score: debate.alphaConviction,
-                    scoreLabel: 'convicción',
-                    accent: 'border-[#0052ff]/40 bg-[#0052ff]/[0.10]',
-                    dot: 'bg-[#0052ff]',
-                    tone: 'text-[#7da6ff]',
+                    scoreLabel: voiceLang === 'es' ? 'convicción' : 'conviction',
+                    accent: 'border-green-400/40 bg-green-400/[0.08]', dot: 'bg-green-400', tone: 'text-green-300',
                   },
                   {
+                    key: 'red' as const,
                     name: 'Red Team',
-                    stance: 'el ataque',
+                    stance: voiceLang === 'es' ? 'el ataque' : 'the attack',
                     text: debate.redTeam,
                     score: debate.redTeamSeverity,
-                    scoreLabel: 'severidad',
-                    accent: 'border-[#ff716a]/40 bg-[#ff716a]/[0.08]',
-                    dot: 'bg-[#ff716a]',
-                    tone: 'text-[#ff9d97]',
+                    scoreLabel: voiceLang === 'es' ? 'severidad' : 'severity',
+                    accent: 'border-[#ff716a]/40 bg-[#ff716a]/[0.08]', dot: 'bg-[#ff716a]', tone: 'text-[#ff9d97]',
+                  },
+                  {
+                    key: 'cio' as const,
+                    name: 'Bobby CIO',
+                    stance: voiceLang === 'es' ? 'la decisión final' : 'the final decision',
+                    text: debate.cio,
+                    score: debate.cioConviction,
+                    scoreLabel: voiceLang === 'es' ? 'convicción' : 'conviction',
+                    accent: 'border-yellow-300/40 bg-yellow-300/[0.08]', dot: 'bg-yellow-300', tone: 'text-yellow-200',
                   },
                 ] as const).map((side) => (
                   <div key={side.name} className={`rounded-xl border p-4 backdrop-blur ${side.accent}`}>
@@ -222,7 +293,15 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                     <div className="mb-2 font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
                       {side.stance}
                     </div>
-                    <p className="text-sm leading-6 text-white/75">{side.text}</p>
+                    <p className="min-h-[5rem] text-sm leading-6 text-white/75">{side.text || (voiceLang === 'es' ? 'Esperando análisis…' : 'Waiting for analysis…')}</p>
+                    <button
+                      onClick={() => playAgentVoice(side.key, side.text)}
+                      disabled={!side.text || playingAgent !== null}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-white/50 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {playingAgent === side.key ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                      {playingAgent === side.key ? (voiceLang === 'es' ? 'Reproduciendo' : 'Playing') : (voiceLang === 'es' ? 'Escuchar voz' : 'Play voice')}
+                    </button>
                   </div>
                 ))}
               </motion.div>

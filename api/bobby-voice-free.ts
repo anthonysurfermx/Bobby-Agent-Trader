@@ -17,14 +17,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { text, lang = 'es' } = req.body as { text?: string; voice?: string; lang?: string };
+  const { text, voice = 'cio', lang = 'es' } = req.body as { text?: string; voice?: string; lang?: string };
 
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'text is required' });
   }
 
   try {
-    const speech = await generateSpeech(text, { lang });
+    const speech = await generateSpeech(text, { lang, voice });
     if (!speech) {
       return res.status(502).json({ error: 'TTS synthesis failed' });
     }
