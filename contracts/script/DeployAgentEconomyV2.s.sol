@@ -17,7 +17,8 @@ contract DeployAgentEconomyV2 is Script {
 
         vm.startBroadcast();
 
-        BobbyAgentEconomyV2 economy = new BobbyAgentEconomyV2(alphaHunter, redTeam, cio);
+        // Legacy X Layer deploy — OKB-sized fees preserved
+        BobbyAgentEconomyV2 economy = new BobbyAgentEconomyV2(alphaHunter, redTeam, cio, 0.001 ether, 0.0001 ether);
 
         console.log("=== BOBBY AGENT ECONOMY V2 ===");
         console.log("Contract:", address(economy));

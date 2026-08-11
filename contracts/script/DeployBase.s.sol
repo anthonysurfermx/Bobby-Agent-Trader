@@ -62,10 +62,25 @@ contract DeployBase is Script {
 
     function _config() internal view returns (Config memory c) {
         c.bobby = vm.envAddress("BOBBY_ADDRESS");
-        c.alpha = vm.envOr("ALPHA_ADDRESS", c.bobby);
-        c.red = vm.envOr("RED_ADDRESS", c.bobby);
-        c.cio = vm.envOr("CIO_ADDRESS", c.bobby);
-        c.resolver = vm.envOr("RESOLVER_ADDRESS", c.bobby);
+        // r6 #2: on MAINNET the economic roles must be explicit and pairwise
+        // distinct — three agents paying one wallet is not a three-agent economy.
+        // On Sepolia they may collapse into BOBBY_ADDRESS as LOGICAL roles for
+        // testing; the run log states this out loud.
+        if (block.chainid == 8453) {
+            c.alpha = vm.envAddress("ALPHA_ADDRESS");
+            c.red = vm.envAddress("RED_ADDRESS");
+            c.cio = vm.envAddress("CIO_ADDRESS");
+            c.resolver = vm.envAddress("RESOLVER_ADDRESS");
+            require(
+                c.alpha != c.red && c.alpha != c.cio && c.red != c.cio && c.resolver != c.cio,
+                "Mainnet economic roles must be distinct"
+            );
+        } else {
+            c.alpha = vm.envOr("ALPHA_ADDRESS", c.bobby);
+            c.red = vm.envOr("RED_ADDRESS", c.bobby);
+            c.cio = vm.envOr("CIO_ADDRESS", c.bobby);
+            c.resolver = vm.envOr("RESOLVER_ADDRESS", c.bobby);
+        }
         // IntentEscrow F-013 requires cio/arbiter/keeper/resolver to be four
         // DISTINCT addresses (and owner != keeper). There is no safe default
         // for these — set them explicitly per deploy.
@@ -81,18 +96,36 @@ contract DeployBase is Script {
     }
 
     function run() external returns (Deployed memory d) {
+        // r6 #1: hard chain gate — a wrong RPC must fail loudly, not deploy
+        // seven contracts to whatever network answered.
+        require(
+            block.chainid == 8453 || block.chainid == 84532,
+            "DeployBase: target must be Base (8453) or Base Sepolia (84532)"
+        );
+
         Config memory c = _config();
-        address[] memory initialResolvers = new address[](1);
-        initialResolvers[0] = c.resolver;
+
+        // r6 #3: real resolver set. RESOLVER_ADDRESSES (comma-separated)
+        // overrides; otherwise this is honestly a centralized 1-of-1 with
+        // c.resolver, and any threshold > 1 fails here, not mid-broadcast.
+        address[] memory fallbackResolvers = new address[](1);
+        fallbackResolvers[0] = c.resolver;
+        address[] memory initialResolvers =
+            vm.envOr("RESOLVER_ADDRESSES", ",", fallbackResolvers);
+        require(
+            c.resolverThreshold >= 1 && c.resolverThreshold <= initialResolvers.length,
+            "RESOLVER_THRESHOLD exceeds resolver list"
+        );
 
         vm.startBroadcast();
 
         d.trackRecord = address(new BobbyTrackRecord(c.bobby));
         d.convictionOracle = address(new BobbyConvictionOracle(c.bobby));
 
-        BobbyAgentEconomyV2 economy = new BobbyAgentEconomyV2(c.alpha, c.red, c.cio);
-        economy.updateFees(c.mcpCallFee, c.debateFeePerAgent);
-        d.agentEconomyV2 = address(economy);
+        // r6 #4: fees enter via constructor — no transient OKB-priced window.
+        d.agentEconomyV2 = address(
+            new BobbyAgentEconomyV2(c.alpha, c.red, c.cio, c.mcpCallFee, c.debateFeePerAgent)
+        );
 
         d.adversarialBounties = address(
             new BobbyAdversarialBounties(c.resolver, c.absoluteMinBounty, c.minBounty)
@@ -115,6 +148,11 @@ contract DeployBase is Script {
         vm.stopBroadcast();
 
         console2.log("chain id            ", block.chainid);
+        console2.log("resolver count      ", initialResolvers.length);
+        console2.log("resolver threshold  ", c.resolverThreshold);
+        if (block.chainid != 8453 && c.alpha == c.bobby && c.red == c.bobby) {
+            console2.log("NOTE: agent roles collapsed into BOBBY_ADDRESS (logical roles, testnet only)");
+        }
         console2.log("TrackRecord         ", d.trackRecord);
         console2.log("ConvictionOracle    ", d.convictionOracle);
         console2.log("AgentEconomyV2      ", d.agentEconomyV2);

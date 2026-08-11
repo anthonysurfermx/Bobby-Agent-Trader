@@ -39,8 +39,10 @@ contract BobbyAgentEconomyV2 {
     address public immutable redTeam;
     address public immutable cio;
 
-    uint256 public mcpCallFee = 0.001 ether;          // 0.001 OKB
-    uint256 public debateFeePerAgent = 0.0001 ether;   // 0.0001 OKB per agent
+    /// @dev Audit D-3 (r6 #4): fees are constructor-set per deploy — no OKB-era
+    /// literal ever lives in bytecode, not even transiently between deploy txs.
+    uint256 public mcpCallFee;
+    uint256 public debateFeePerAgent;
 
     uint256 public totalMCPCalls;
     uint256 public totalDebates;
@@ -53,10 +55,19 @@ contract BobbyAgentEconomyV2 {
 
     // ---- Constructor ----
     /// @dev Audit R1 fix: validate non-zero addresses
-    constructor(address _alphaHunter, address _redTeam, address _cio) {
+    constructor(
+        address _alphaHunter,
+        address _redTeam,
+        address _cio,
+        uint256 _mcpCallFee,
+        uint256 _debateFeePerAgent
+    ) {
         require(_alphaHunter != address(0), "Invalid alpha");
         require(_redTeam != address(0), "Invalid red");
         require(_cio != address(0), "Invalid cio");
+        require(_mcpCallFee > 0 && _debateFeePerAgent > 0, "Zero fee");
+        mcpCallFee = _mcpCallFee;
+        debateFeePerAgent = _debateFeePerAgent;
         owner = msg.sender;
         alphaHunter = _alphaHunter;
         redTeam = _redTeam;

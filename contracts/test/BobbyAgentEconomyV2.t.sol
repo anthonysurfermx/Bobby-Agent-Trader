@@ -22,7 +22,7 @@ contract BobbyAgentEconomyV2Test is Test {
     address attacker = address(0xDEAD);
 
     function setUp() public {
-        economy = new BobbyAgentEconomyV2(alpha, red, cioAddr);
+        economy = new BobbyAgentEconomyV2(alpha, red, cioAddr, 0.001 ether, 0.0001 ether);
         // Fund test addresses
         vm.deal(agent, 10 ether);
         vm.deal(cioAddr, 10 ether);
@@ -150,13 +150,13 @@ contract BobbyAgentEconomyV2Test is Test {
     // ================================================================
     function test_constructor_rejectsZeroAddresses() public {
         vm.expectRevert("Invalid alpha");
-        new BobbyAgentEconomyV2(address(0), red, cioAddr);
+        new BobbyAgentEconomyV2(address(0), red, cioAddr, 0.001 ether, 0.0001 ether);
 
         vm.expectRevert("Invalid red");
-        new BobbyAgentEconomyV2(alpha, address(0), cioAddr);
+        new BobbyAgentEconomyV2(alpha, address(0), cioAddr, 0.001 ether, 0.0001 ether);
 
         vm.expectRevert("Invalid cio");
-        new BobbyAgentEconomyV2(alpha, red, address(0));
+        new BobbyAgentEconomyV2(alpha, red, address(0), 0.001 ether, 0.0001 ether);
     }
 
     // ================================================================
