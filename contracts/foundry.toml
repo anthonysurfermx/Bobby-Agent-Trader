@@ -10,7 +10,15 @@ optimizer_runs = 1
 [profile.default.fuzz]
 runs = 256
 
-# X Layer deployment
+# X Layer (legacy) + Base deployment
 [rpc_endpoints]
 xlayer = "https://rpc.xlayer.tech"
 xlayer_testnet = "https://testrpc.xlayer.tech"
+base = "https://mainnet.base.org"
+base_sepolia = "https://sepolia.base.org"
+
+# BaseScan verification — set BASESCAN_API_KEY in env (one key works for both
+# networks on Etherscan V2). `forge script ... --verify` picks these up by chain.
+[etherscan]
+base = { key = "${BASESCAN_API_KEY}", chain = 8453 }
+base_sepolia = { key = "${BASESCAN_API_KEY}", chain = 84532 }

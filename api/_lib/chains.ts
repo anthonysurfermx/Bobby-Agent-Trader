@@ -18,6 +18,7 @@ export interface ContractSet {
   hardnessRegistry: string;
   convictionOracle: string;
   agentRegistry: string;
+  intentEscrow: string;
 }
 
 export interface ChainConfig {
@@ -29,10 +30,17 @@ export interface ChainConfig {
   explorerApiUrl: string;
   nativeSymbol: string;
   nativeDecimals: number;
-  /** Denomination protocol fees are quoted in on this chain. */
-  feeToken: string;
-  feeTokenSymbol: string;
-  feeTokenDecimals: number;
+  /**
+   * D-3: ON-CHAIN protocol fees (MCP calls, bounties, stakes) are paid in the
+   * chain's NATIVE token on every chain — 'native' here always means msg.value.
+   */
+  onchainFeeToken: 'native';
+  onchainFeeSymbol: string;
+  onchainFeeDecimals: number;
+  /** x402 / off-chain settlement rail — stablecoin, NOT used by the contracts. */
+  x402SettlementToken: string;
+  x402SettlementSymbol: string;
+  x402SettlementDecimals: number;
   stable: string;
   stableSymbol: string;
   stableDecimals: number;
@@ -51,6 +59,20 @@ const BASE_CONTRACTS: ContractSet = {
   hardnessRegistry: process.env.BASE_HARDNESS_REGISTRY_ADDRESS || '',
   convictionOracle: process.env.BASE_ORACLE_ADDRESS || '',
   agentRegistry: process.env.BASE_AGENT_REGISTRY_ADDRESS || '',
+  intentEscrow: process.env.BASE_INTENT_ESCROW_ADDRESS || '',
+};
+
+// Testnet canary — its OWN env vars so Sepolia and mainnet addresses can never
+// silently cross-contaminate.
+const BASE_SEPOLIA_CONTRACTS: ContractSet = {
+  treasury: process.env.TREASURY_ADDRESS_BASE || '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
+  agentEconomy: process.env.BASE_SEPOLIA_AGENT_ECONOMY_ADDRESS || '',
+  adversarialBounties: process.env.BASE_SEPOLIA_BOUNTIES_ADDRESS || '',
+  trackRecord: process.env.BASE_SEPOLIA_TRACK_RECORD_ADDRESS || '',
+  hardnessRegistry: process.env.BASE_SEPOLIA_HARDNESS_REGISTRY_ADDRESS || '',
+  convictionOracle: process.env.BASE_SEPOLIA_ORACLE_ADDRESS || '',
+  agentRegistry: process.env.BASE_SEPOLIA_AGENT_REGISTRY_ADDRESS || '',
+  intentEscrow: process.env.BASE_SEPOLIA_INTENT_ESCROW_ADDRESS || '',
 };
 
 // Legacy production deployment. Preserved as the historical record — the plan is
@@ -63,6 +85,7 @@ const XLAYER_CONTRACTS: ContractSet = {
   hardnessRegistry: process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
   convictionOracle: process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A',
   agentRegistry: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b',
+  intentEscrow: '', // never deployed on X Layer
 };
 
 export const BASE: ChainConfig = {
@@ -73,11 +96,14 @@ export const BASE: ChainConfig = {
   explorerApiUrl: 'https://api.basescan.org/api',
   nativeSymbol: 'ETH',
   nativeDecimals: 18,
-  // Fees move from native OKB to USDC — note the 6 decimals, this is the single
-  // most dangerous difference in the whole migration.
-  feeToken: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
-  feeTokenSymbol: 'USDC',
-  feeTokenDecimals: 6,
+  // D-3: on-chain fees are native ETH (resized per deploy); USDC is ONLY the
+  // x402/off-chain settlement rail. Keep these two rails separate forever.
+  onchainFeeToken: 'native',
+  onchainFeeSymbol: 'ETH',
+  onchainFeeDecimals: 18,
+  x402SettlementToken: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+  x402SettlementSymbol: 'USDC',
+  x402SettlementDecimals: 6,
   stable: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
   stableSymbol: 'USDC',
   stableDecimals: 6,
@@ -92,8 +118,9 @@ export const BASE_SEPOLIA: ChainConfig = {
   rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
   explorerUrl: 'https://sepolia.basescan.org',
   explorerApiUrl: 'https://api-sepolia.basescan.org/api',
-  feeToken: '0x036cbd53842c5426634e7929541ec2318f3dcf7e',
+  x402SettlementToken: '0x036cbd53842c5426634e7929541ec2318f3dcf7e',
   stable: '0x036cbd53842c5426634e7929541ec2318f3dcf7e',
+  contracts: BASE_SEPOLIA_CONTRACTS,
 };
 
 export const XLAYER: ChainConfig = {
@@ -105,9 +132,12 @@ export const XLAYER: ChainConfig = {
   explorerApiUrl: 'https://www.oklink.com/api/v5/explorer/xlayer',
   nativeSymbol: 'OKB',
   nativeDecimals: 18,
-  feeToken: 'native',
-  feeTokenSymbol: 'OKB',
-  feeTokenDecimals: 18,
+  onchainFeeToken: 'native',
+  onchainFeeSymbol: 'OKB',
+  onchainFeeDecimals: 18,
+  x402SettlementToken: '0x1e4a5963abfd975d8c9021ce480b42188849d41d', // USDT (legacy x402 rail)
+  x402SettlementSymbol: 'USDT',
+  x402SettlementDecimals: 6,
   stable: '0x1e4a5963abfd975d8c9021ce480b42188849d41d', // USDT on X Layer
   stableSymbol: 'USDT',
   stableDecimals: 6,

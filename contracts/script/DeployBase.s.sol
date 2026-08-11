@@ -58,6 +58,7 @@ contract DeployBase is Script {
         uint96 registrationStake;
         uint256 maxSizeUsd;
         uint8 resolverThreshold;
+        address hardnessScorer;
     }
 
     function _config() internal view returns (Config memory c) {
@@ -94,6 +95,9 @@ contract DeployBase is Script {
         c.registrationStake = uint96(vm.envOr("REGISTRATION_STAKE_WEI", uint256(0.00025 ether)));
         c.maxSizeUsd = vm.envOr("ESCROW_MAX_SIZE_USD", uint256(10_000e18)); // $10k, 18dp encoding
         c.resolverThreshold = uint8(vm.envOr("RESOLVER_THRESHOLD", uint256(1)));
+        // r7 integration: judge-mode needs the scorer role; defaults to bobby so
+        // hardness certification is never silently dead after a deploy.
+        c.hardnessScorer = vm.envOr("HARDNESS_SCORER_ADDRESS", c.bobby);
     }
 
     function run() external returns (Deployed memory d) {
@@ -161,7 +165,11 @@ contract DeployBase is Script {
             )
         );
 
+        HardnessRegistry(payable(d.hardnessRegistry)).setHardnessScorer(c.hardnessScorer);
+
         vm.stopBroadcast();
+
+        _assertDeployment(d, c, initialResolvers);
 
         console2.log("chain id            ", block.chainid);
         console2.log("hardness resolvers  ", initialResolvers.length);
@@ -183,5 +191,39 @@ contract DeployBase is Script {
         console2.log("minBounty           ", c.minBounty);
         console2.log("absoluteMinBounty   ", c.absoluteMinBounty);
         console2.log("registrationStake   ", c.registrationStake);
+    }
+
+    /// @dev r7 integration: post-deploy assertions — the script itself proves
+    /// owners, roles, quorum and fees landed as configured before anyone flips
+    /// PROTOCOL_CHAIN. All view calls; free on simulation, cheap on broadcast.
+    function _assertDeployment(Deployed memory d, Config memory c, address[] memory resolverSet) internal view {
+        require(BobbyTrackRecord(d.trackRecord).bobby() == c.bobby, "assert: trackRecord.bobby");
+        require(BobbyConvictionOracle(d.convictionOracle).bobby() == c.bobby, "assert: oracle.bobby");
+
+        BobbyAgentEconomyV2 economy = BobbyAgentEconomyV2(payable(d.agentEconomyV2));
+        require(economy.mcpCallFee() == c.mcpCallFee, "assert: mcpCallFee");
+        require(economy.debateFeePerAgent() == c.debateFeePerAgent, "assert: debateFee");
+        require(economy.alphaHunter() == c.alpha && economy.redTeam() == c.red && economy.cio() == c.cio, "assert: economy roles");
+
+        BobbyAdversarialBounties bounties = BobbyAdversarialBounties(payable(d.adversarialBounties));
+        require(bounties.resolver() == c.resolver, "assert: bounties.resolver");
+        require(bounties.minBounty() == c.minBounty, "assert: bounties.minBounty");
+        require(bounties.ABSOLUTE_MIN_BOUNTY() == c.absoluteMinBounty, "assert: bounties.floor");
+
+        HardnessRegistry hardness = HardnessRegistry(payable(d.hardnessRegistry));
+        require(hardness.resolverThreshold() == c.resolverThreshold, "assert: hardness.threshold");
+        require(hardness.resolverCount() == resolverSet.length, "assert: hardness.resolverCount");
+        for (uint256 i = 0; i < resolverSet.length; i++) {
+            require(hardness.resolvers(resolverSet[i]), "assert: hardness resolver missing");
+        }
+        require(hardness.REGISTRATION_STAKE() == c.registrationStake, "assert: hardness.stake");
+        require(hardness.hardnessScorer() == c.hardnessScorer, "assert: hardness.scorer");
+
+        BobbyIntentEscrow escrow = BobbyIntentEscrow(d.intentEscrow);
+        require(escrow.cio() == c.cio && escrow.arbiter() == c.arbiter, "assert: escrow cio/arbiter");
+        require(escrow.keeper() == c.keeper && escrow.resolver() == c.resolver, "assert: escrow keeper/resolver");
+        require(escrow.maxSizeUsd() == c.maxSizeUsd, "assert: escrow.maxSizeUsd");
+
+        console2.log("post-deploy assertions: ALL PASSED");
     }
 }
