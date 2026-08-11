@@ -7,8 +7,10 @@ import {
   Check,
   ChevronDown,
   CircleDollarSign,
+  Database,
   Github,
   Menu,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Twitter,
@@ -19,7 +21,7 @@ type Price = { symbol: string; price: number; change24h: number };
 
 interface ProtocolStats {
   fetchedAt?: string;
-  chain?: { blockNumber?: number };
+  chain?: { id?: number; blockNumber?: number };
   treasury?: { balanceOkb?: string };
   contracts?: {
     agentEconomy?: { stats?: { totalDebates?: string; totalMcpCalls?: string } };
@@ -36,6 +38,8 @@ interface ActivityItem {
   paid?: boolean;
   timestamp?: string | null;
   status?: string | null;
+  source?: 'commerce' | 'onchain' | 'bounty' | string;
+  txHash?: string | null;
 }
 
 const formatNumber = (value: unknown, fallback = '—') => {
@@ -70,19 +74,31 @@ function useProtocolStats() {
 
 function useActivity() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    const load = () => fetch('/api/activity?limit=8', { cache: 'no-store' })
-      .then((response) => response.json())
-      .then((payload: { feed?: ActivityItem[] }) => setActivity(payload.feed ?? []))
-      .catch(() => setActivity([]));
-
-    load();
-    const interval = window.setInterval(load, 30_000);
-    return () => window.clearInterval(interval);
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/activity?limit=8', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Activity endpoint returned ${response.status}`);
+      const payload = (await response.json()) as { feed?: ActivityItem[] };
+      setActivity(payload.feed ?? []);
+      setError(false);
+    } catch {
+      setError(true);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  return activity;
+  useEffect(() => {
+    refresh();
+    const interval = window.setInterval(refresh, 30_000);
+    return () => window.clearInterval(interval);
+  }, [refresh]);
+
+  return { activity, isLoading, error, refresh };
 }
 
 function BrandMark() {
@@ -132,7 +148,7 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
 
 export default function BobbyProtocolLanding() {
   const stats = useProtocolStats();
-  const activity = useActivity();
+  const { activity, isLoading: isActivityLoading, error: activityError, refresh: refreshActivity } = useActivity();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'verified'>('all');
   const btc = price(stats, 'BTC');
@@ -141,6 +157,10 @@ export default function BobbyProtocolLanding() {
   const totalTrades = stats?.contracts?.trackRecord?.stats?.totalTrades;
   const totalInteractions = stats?.protocolTotals?.totalInteractions;
   const winRate = stats?.contracts?.trackRecord?.stats?.winRateBps;
+  const chainLabel = stats?.chain?.id === 8453 ? 'Base' : stats?.chain?.id === 196 ? 'X Layer' : 'Network';
+  const telemetryUpdatedAt = stats?.fetchedAt
+    ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
+    : null;
 
   const navItems = [
     ['How it works', '#how-it-works'],
@@ -158,8 +178,8 @@ export default function BobbyProtocolLanding() {
 
   const marqueeItems = [
     ['Bobby is online', true],
-    [btc ? `BTC $${btc.price.toLocaleString()}` : 'BTC —', false],
-    [stats?.chain?.blockNumber ? `Base block ${formatNumber(stats.chain.blockNumber)}` : 'On-chain verification', false],
+    [btc ? `BTC $${btc.price.toLocaleString('en-US')}` : 'BTC —', false],
+    [stats?.chain?.blockNumber ? `${stats.chain.id === 8453 ? 'Base' : 'X Layer'} block ${formatNumber(stats.chain.blockNumber)}` : 'On-chain verification', false],
     ['Every thesis gets challenged', false],
     ['Proof-of-debate', true],
     [`${formatNumber(totalTrades, '—')} decisions committed`, false],
@@ -428,7 +448,39 @@ export default function BobbyProtocolLanding() {
                   {label}
                 </button>
               ))}
-              <span className="ml-auto hidden items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#7da6ff] md:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#7da6ff]" /> Online</span>
+              <div className="ml-auto flex items-center gap-4">
+                <button onClick={refreshActivity} className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/45 transition hover:text-white" aria-label="Refresh network activity">
+                  <RefreshCw className={`h-3.5 w-3.5 ${isActivityLoading ? 'animate-spin' : ''}`} /> Refresh
+                </button>
+                <span className="hidden items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#7da6ff] md:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#7da6ff]" /> Online</span>
+              </div>
+            </div>
+
+            <div className="mb-5 grid overflow-hidden rounded-2xl border border-white/10 bg-[#080912]/85 backdrop-blur-xl lg:grid-cols-[1.25fr_.75fr]">
+              <div className="relative min-h-[220px] overflow-hidden border-b border-white/10 p-6 sm:p-8 lg:border-b-0 lg:border-r">
+                <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(0,82,255,.22)_1px,transparent_1px),linear-gradient(90deg,rgba(0,82,255,.22)_1px,transparent_1px)] [background-size:28px_28px]" />
+                <div className="absolute -left-20 top-1/2 h-44 w-44 -translate-y-1/2 rounded-full bg-[#0052ff]/30 blur-3xl" />
+                <div className="relative">
+                  <div className="mb-8 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] text-white/45"><span>Network telemetry</span><span className="text-[#7da6ff]">Live read</span></div>
+                  <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-3 text-center sm:gap-5">
+                    {[['RPC', chainLabel], ['Treasury', stats?.treasury?.balanceOkb ? `${Number(stats.treasury.balanceOkb).toFixed(3)} OKB` : 'Syncing'], ['Proof', activity.length ? `${activity.length} events` : 'Standby']].map(([label, value], index) => (
+                      <div key={label} className="contents">
+                        <div className="min-w-0 rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/10 px-2 py-4 shadow-[0_0_32px_rgba(0,82,255,.14)]">
+                          <span className="mx-auto mb-2 block h-2.5 w-2.5 rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,1)]" />
+                          <div className="truncate font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">{label}</div>
+                          <div className="mt-1 truncate text-xs font-bold text-white/85">{value}</div>
+                        </div>
+                        {index < 2 && <div className="h-px min-w-3 bg-gradient-to-r from-[#0052ff] to-[#0052ff]/15" />}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-7 font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{telemetryUpdatedAt ? `Snapshot verified ${telemetryUpdatedAt}` : 'Connecting to protocol telemetry'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-white/10">
+                <div className="bg-[#080912]/90 p-5 sm:p-6"><Database className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Latest block</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{formatNumber(stats?.chain?.blockNumber)}</div><div className="mt-1 text-xs text-white/40">{chainLabel}</div></div>
+                <div className="bg-[#080912]/90 p-5 sm:p-6"><ShieldCheck className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Feed status</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{activityError ? 'Retry' : isActivityLoading ? 'Syncing' : 'Verified'}</div><div className="mt-1 text-xs text-white/40">updates every 30s</div></div>
+              </div>
             </div>
 
             {filteredActivity.length > 0 ? (
@@ -458,7 +510,11 @@ export default function BobbyProtocolLanding() {
                 ))}
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-10 text-center text-sm text-white/45">Waiting for the next protocol event…</div>
+              <div className="rounded-2xl border border-dashed border-[#0052ff]/30 bg-[#0052ff]/[0.045] px-6 py-12 text-center">
+                <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10"><CircleDollarSign className="h-5 w-5 text-[#7da6ff]" /></div>
+                <div className="text-lg font-bold">{activityError ? 'Activity feed is reconnecting.' : isActivityLoading ? 'Reading protocol activity.' : 'No recent protocol events.'}</div>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{activityError ? 'The network telemetry is still available. Refresh to retry the event stream.' : 'The live network remains connected; the next verified event will appear here automatically.'}</p>
+              </div>
             )}
           </div>
         </section>
@@ -523,6 +579,35 @@ export default function BobbyProtocolLanding() {
               </div>
             </a>
           </div>
+          </div>
+        </section>
+
+        <section className="relative overflow-hidden bg-[#050505]" id="architecture">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(0,82,255,.12),transparent_45%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Architecture</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → proof on Base → agent economy. Twenty seconds, the whole protocol.</p>
+            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
+            >
+              <video
+                className="h-full w-full"
+                src="/videos/architecture.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster="/posters/architecture.jpg"
+              />
+            </motion.div>
           </div>
         </section>
 

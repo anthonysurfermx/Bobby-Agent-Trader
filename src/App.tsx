@@ -296,6 +296,14 @@ const router = createBrowserRouter(
           ),
         },
         {
+          path: 'protocol/docs',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyDocsPage />
+            </Suspense>
+          ),
+        },
+        {
           path: 'protocol/heartbeat',
           element: (
             <Suspense fallback={<PageLoader />}>
