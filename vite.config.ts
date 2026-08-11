@@ -62,6 +62,20 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api\/polymarket-clob/, ''),
       },
+      // Vercel owns the protocol API routes. Route local previews to the live
+      // deployment so /protocol can render the same telemetry as production.
+      '/api/activity': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/bobby-protocol-stats': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/mcp-bobby': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
     },
   },
 })

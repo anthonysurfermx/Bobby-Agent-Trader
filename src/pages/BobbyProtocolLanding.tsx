@@ -24,12 +24,33 @@ interface ProtocolStats {
   chain?: { id?: number; blockNumber?: number };
   treasury?: { balanceOkb?: string };
   contracts?: {
-    agentEconomy?: { stats?: { totalDebates?: string; totalMcpCalls?: string } };
-    trackRecord?: { stats?: { totalTrades?: string; winRateBps?: string } };
-    adversarialBounties?: { totalPosted?: number };
+    agentEconomy?: { address?: string; stats?: { totalDebates?: string; totalMcpCalls?: string } };
+    convictionOracle?: { address?: string };
+    trackRecord?: { address?: string; stats?: { totalTrades?: string; winRateBps?: string } };
+    adversarialBounties?: { address?: string; totalPosted?: number };
+    hardnessRegistry?: { address?: string };
+    agentRegistry?: { address?: string };
   };
   protocolTotals?: { totalInteractions?: number; mcpPayments?: number };
   market?: { prices?: Price[] };
+}
+
+interface McpMeta {
+  pricing?: {
+    free?: string[];
+    premium?: { tools?: string[]; price?: string; settlementContract?: string };
+  };
+}
+
+function useMcpMeta() {
+  const [meta, setMeta] = useState<McpMeta | null>(null);
+  useEffect(() => {
+    fetch('/api/mcp-bobby', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload: McpMeta) => setMeta(payload))
+      .catch(() => setMeta(null));
+  }, []);
+  return meta;
 }
 
 interface ActivityItem {
@@ -148,6 +169,7 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
 
 export default function BobbyProtocolLanding() {
   const stats = useProtocolStats();
+  const mcp = useMcpMeta();
   const { activity, isLoading: isActivityLoading, error: activityError, refresh: refreshActivity } = useActivity();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'verified'>('all');
@@ -428,11 +450,103 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
+        <section className="relative overflow-hidden bg-[#050505]" id="architecture">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(0,82,255,.12),transparent_45%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Architecture</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → proof on Base → agent economy. Twenty seconds, the whole protocol.</p>
+            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
+            >
+              <video
+                className="h-full w-full"
+                src="/videos/architecture.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster="/posters/architecture.jpg"
+              />
+            </motion.div>
+          </div>
+        </section>
+
+        <section className="relative isolate overflow-hidden" id="for-agents">
+          <SectionMedia name="nebula" className="opacity-50" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
+          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Built for both sides</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A better interface for capital.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">One decision layer. Two ways in.</p></div>
+          <div className="grid gap-5 md:grid-cols-2">
+            <a
+              href="/agentic-world/bobby"
+              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
+            >
+              <img
+                src="/images/protocol/human-interface.jpg"
+                alt="Human reviewing a decision through illuminated cobalt glass"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
+              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
+              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
+                <div className="flex items-start justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Bot className="h-5 w-5 text-[#7da6ff]" /></span>
+                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                </div>
+                <div className="mt-auto">
+                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Human interface</div>
+                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For humans</h3>
+                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Open the War Room, watch the debate, and approve the move when the thesis earns it.</p>
+                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">Enter War Room →</div>
+                </div>
+              </div>
+            </a>
+
+            <a
+              href="/protocol/docs"
+              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
+            >
+              <img
+                src="/images/protocol/agent-interface.jpg"
+                alt="Synthetic agent connecting to a protocol through textured cobalt glass"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
+              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
+              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
+                <div className="flex items-start justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Sparkles className="h-5 w-5 text-[#7da6ff]" /></span>
+                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                </div>
+                <div className="mt-auto">
+                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Agent interface</div>
+                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For agents</h3>
+                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Connect over MCP. Request conviction, inspect proof, and build Bobby into your execution workflow.</p>
+                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-[#7da6ff]">Read the docs →</div>
+                </div>
+              </div>
+            </a>
+          </div>
+          </div>
+        </section>
+
         <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
           <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Live network</div>
+            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Live network</div>
             <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Decisions, never paused.<br />See the network in action.</h2>
               <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
@@ -519,95 +633,67 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="relative isolate overflow-hidden" id="for-agents">
-          <SectionMedia name="nebula" className="opacity-50" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
-          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Built for both sides</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A better interface for capital.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">One decision layer. Two ways in.</p></div>
-          <div className="grid gap-5 md:grid-cols-2">
-            <a
-              href="/agentic-world/bobby"
-              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
-            >
-              <img
-                src="/images/protocol/human-interface.jpg"
-                alt="Human reviewing a decision through illuminated cobalt glass"
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
-              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
-              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
-                <div className="flex items-start justify-between">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Bot className="h-5 w-5 text-[#7da6ff]" /></span>
-                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                </div>
-                <div className="mt-auto">
-                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Human interface</div>
-                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For humans</h3>
-                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Open the War Room, watch the debate, and approve the move when the thesis earns it.</p>
-                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">Enter War Room →</div>
-                </div>
-              </div>
-            </a>
-
-            <a
-              href="/protocol/docs"
-              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
-            >
-              <img
-                src="/images/protocol/agent-interface.jpg"
-                alt="Synthetic agent connecting to a protocol through textured cobalt glass"
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
-              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
-              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
-                <div className="flex items-start justify-between">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Sparkles className="h-5 w-5 text-[#7da6ff]" /></span>
-                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                </div>
-                <div className="mt-auto">
-                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Agent interface</div>
-                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For agents</h3>
-                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Connect over MCP. Request conviction, inspect proof, and build Bobby into your execution workflow.</p>
-                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-[#7da6ff]">Read the docs →</div>
-                </div>
-              </div>
-            </a>
-          </div>
-          </div>
-        </section>
-
-        <section className="relative overflow-hidden bg-[#050505]" id="architecture">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(0,82,255,.12),transparent_45%)]" />
+        <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(0,82,255,.1),transparent_40%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Architecture</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Bobby-as-a-service</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Plug Bobby into your agent.</h2>
               </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → proof on Base → agent economy. Twenty seconds, the whole protocol.</p>
+              <div className="rounded-lg border border-white/10 bg-black/60 px-5 py-3 font-mono text-sm text-[#7da6ff]">POST /api/mcp-http</div>
             </div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
-            >
-              <video
-                className="h-full w-full"
-                src="/videos/architecture.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-                poster="/posters/architecture.jpg"
-              />
-            </motion.div>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-7">
+                <div className="mb-5 flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-white/60">Free tier</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{mcp?.pricing?.free?.length ?? '—'} tools</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(mcp?.pricing?.free ?? []).map((tool) => (
+                    <span key={tool} className="rounded-md border border-white/10 bg-white/[0.06] px-3 py-1.5 font-mono text-xs text-white/70">{tool}</span>
+                  ))}
+                  {!mcp && <span className="font-mono text-xs text-white/40">loading tool registry…</span>}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/[0.08] p-7">
+                <div className="mb-5 flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Premium — x402</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">{mcp?.pricing?.premium?.price ?? '—'}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(mcp?.pricing?.premium?.tools ?? []).map((tool) => (
+                    <span key={tool} className="rounded-md border border-[#0052ff]/40 bg-[#0052ff]/20 px-3 py-1.5 font-mono text-xs text-white/90">{tool}</span>
+                  ))}
+                  {!mcp && <span className="font-mono text-xs text-white/40">loading tool registry…</span>}
+                </div>
+                {mcp?.pricing?.premium?.settlementContract && (
+                  <div className="mt-6 border-t border-[#0052ff]/20 pt-4 font-mono text-[11px] text-white/45">settlement {mcp.pricing.premium.settlementContract}</div>
+                )}
+              </div>
+            </div>
+            {stats?.contracts && (
+              <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-white/10 pt-6">
+                {([
+                  ['AgentEconomy', stats.contracts.agentEconomy?.address],
+                  ['ConvictionOracle', stats.contracts.convictionOracle?.address],
+                  ['TrackRecord', stats.contracts.trackRecord?.address],
+                  ['AdversarialBounties', stats.contracts.adversarialBounties?.address],
+                  ['HardnessRegistry', stats.contracts.hardnessRegistry?.address],
+                  ['AgentRegistry', stats.contracts.agentRegistry?.address],
+                ] as const).filter(([, addr]) => addr).map(([name, addr]) => (
+                  <a
+                    key={name}
+                    href={`${stats.chain?.id === 8453 ? 'https://basescan.org' : 'https://www.oklink.com/xlayer'}/address/${addr}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-[11px] text-white/40 transition hover:text-[#7da6ff]"
+                  >
+                    {name} <span className="text-white/25">{addr!.slice(0, 6)}…{addr!.slice(-4)}</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
