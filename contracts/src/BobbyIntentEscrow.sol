@@ -341,6 +341,14 @@ contract BobbyIntentEscrow {
     }
 
     // ── Resolve (F-004: available even when paused) ──
+    /// @notice Records the resolver's ATTESTATION of an intent's outcome.
+    /// @dev Audit Base r5 [#4] — decision (2026-08-11): this ledger is an
+    /// attestation record, NOT price-derived truth. `pnlBps` and `resolveHash`
+    /// are supplied by the resolver and are not bound to any oracle or execution
+    /// venue; `overrideResolution` is the correction path within the challenge
+    /// window. Any public surface that displays this PnL MUST label it
+    /// "attested by resolver" and MUST NOT mix it into price-verified metrics
+    /// (e.g. BobbyTrackRecord's win rate, which IS price-bound as of r4).
     function resolveIntent(bytes32 intentHash, int128 pnlBps, bytes32 resolveHash) external onlyResolver {
         Trade storage t = trades[intentHash];
         if (t.state != TradeState.EXECUTED) revert WrongState();
