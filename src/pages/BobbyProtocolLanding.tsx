@@ -24,12 +24,12 @@ interface ProtocolStats {
   chain?: { id?: number; blockNumber?: number };
   treasury?: { balanceOkb?: string };
   contracts?: {
-    agentEconomy?: { address?: string; stats?: { totalDebates?: string; totalMcpCalls?: string } };
-    convictionOracle?: { address?: string };
-    trackRecord?: { address?: string; stats?: { totalTrades?: string; winRateBps?: string } };
-    adversarialBounties?: { address?: string; totalPosted?: number };
-    hardnessRegistry?: { address?: string };
-    agentRegistry?: { address?: string };
+    agentEconomy?: { address?: string; stats?: { totalDebates?: string; totalMcpCalls?: string; totalVolumeOkb?: string } };
+    convictionOracle?: { address?: string; stats?: { symbolCount?: string } };
+    trackRecord?: { address?: string; stats?: { totalTrades?: string; totalCommitments?: string; winRateBps?: string } };
+    adversarialBounties?: { address?: string; totalPosted?: number; verified?: boolean; minBounty?: { minBountyOkb?: string } };
+    hardnessRegistry?: { address?: string; agentRegistered?: boolean };
+    agentRegistry?: { address?: string; type?: string; agents?: number };
   };
   protocolTotals?: { totalInteractions?: number; mcpPayments?: number };
   market?: { prices?: Price[] };
@@ -183,6 +183,41 @@ export default function BobbyProtocolLanding() {
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
     : null;
+
+  const explorerBase = stats?.chain?.id === 8453 ? 'https://basescan.org' : 'https://www.oklink.com/xlayer';
+  const c = stats?.contracts;
+  const contractCards: Array<{ name: string; address?: string; rows: Array<[string, string]> }> = [
+    {
+      name: 'HARDNESS_REGISTRY',
+      address: c?.hardnessRegistry?.address,
+      rows: [['Signals', 'publishSignal'], ['Predictions', 'commitPrediction'], ['Agent', c?.hardnessRegistry?.agentRegistered ? '✓ registered' : '—']],
+    },
+    {
+      name: 'AGENT_ECONOMY_V2',
+      address: c?.agentEconomy?.address,
+      rows: [['Debates', formatNumber(c?.agentEconomy?.stats?.totalDebates)], ['MCP calls', formatNumber(c?.agentEconomy?.stats?.totalMcpCalls)], ['Volume', c?.agentEconomy?.stats?.totalVolumeOkb ?? '—']],
+    },
+    {
+      name: 'CONVICTION_ORACLE',
+      address: c?.convictionOracle?.address,
+      rows: [['Symbols tracked', formatNumber(c?.convictionOracle?.stats?.symbolCount)]],
+    },
+    {
+      name: 'TRACK_RECORD',
+      address: c?.trackRecord?.address,
+      rows: [['Commitments', formatNumber(c?.trackRecord?.stats?.totalCommitments)], ['Revealed', formatNumber(c?.trackRecord?.stats?.totalTrades)], ['Win rate', winRate ? `${(Number(winRate) / 100).toFixed(1)}%` : '—']],
+    },
+    {
+      name: 'ADVERSARIAL_BOUNTIES',
+      address: c?.adversarialBounties?.address,
+      rows: [['Posted', formatNumber(c?.adversarialBounties?.totalPosted)], ['Min bounty', c?.adversarialBounties?.minBounty?.minBountyOkb ?? '—'], ['Verified', c?.adversarialBounties?.verified ? '✓ explorer' : '—']],
+    },
+    {
+      name: 'AGENT_REGISTRY',
+      address: c?.agentRegistry?.address,
+      rows: [['Type', c?.agentRegistry?.type ?? '—'], ['Agents', formatNumber(c?.agentRegistry?.agents)], ['Identity', 'NFT-based']],
+    },
+  ];
 
   const navItems = [
     ['How it works', '#how-it-works'],
@@ -672,34 +707,107 @@ export default function BobbyProtocolLanding() {
                 )}
               </div>
             </div>
-            {stats?.contracts && (
-              <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-white/10 pt-6">
-                {([
-                  ['AgentEconomy', stats.contracts.agentEconomy?.address],
-                  ['ConvictionOracle', stats.contracts.convictionOracle?.address],
-                  ['TrackRecord', stats.contracts.trackRecord?.address],
-                  ['AdversarialBounties', stats.contracts.adversarialBounties?.address],
-                  ['HardnessRegistry', stats.contracts.hardnessRegistry?.address],
-                  ['AgentRegistry', stats.contracts.agentRegistry?.address],
-                ] as const).filter(([, addr]) => addr).map(([name, addr]) => (
-                  <a
-                    key={name}
-                    href={`${stats.chain?.id === 8453 ? 'https://basescan.org' : 'https://www.oklink.com/xlayer'}/address/${addr}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-[11px] text-white/40 transition hover:text-[#7da6ff]"
-                  >
-                    {name} <span className="text-white/25">{addr!.slice(0, 6)}…{addr!.slice(-4)}</span>
-                  </a>
-                ))}
-              </div>
-            )}
+          </div>
+        </section>
+
+        <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.12),transparent_45%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 text-center">
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Deployed contracts</div>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Live on {chainLabel}.</h2>
+              <p className="mt-5 font-mono text-sm text-white/45">Six contracts. One protocol. All on {chainLabel}{stats?.chain?.id ? ` chain ${stats.chain.id}` : ''}.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {contractCards.map((card, index) => (
+                <motion.a
+                  key={card.name}
+                  href={card.address ? `${explorerBase}/address/${card.address}` : undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  initial={{ opacity: 0, y: 14 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.05 }}
+                  className="group flex flex-col rounded-xl border border-white/10 bg-[#0b0b12]/80 p-6 transition hover:-translate-y-1 hover:border-[#0052ff]/60"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#7da6ff]">{card.name}</span>
+                    <ArrowRight className="h-3.5 w-3.5 -rotate-45 text-white/25 transition group-hover:text-[#7da6ff]" />
+                  </div>
+                  <div className="mb-5 truncate font-mono text-sm text-white/85">
+                    {card.address ? `${card.address.slice(0, 10)}…${card.address.slice(-8)}` : 'awaiting rpc…'}
+                  </div>
+                  <div className="mt-auto space-y-2 border-t border-white/10 pt-4">
+                    {card.rows.map(([label, value]) => (
+                      <div key={label} className="flex items-center justify-between gap-3 font-mono text-[11px]">
+                        <span className="uppercase tracking-[0.1em] text-white/35">{label}</span>
+                        <span className="text-white/80">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex items-center justify-end gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" /> Live
+                  </div>
+                </motion.a>
+              ))}
+            </div>
           </div>
         </section>
 
         <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:px-8"><Metric label="Debates" value={formatNumber(totalDebates)} detail="agent conversations" /><Metric label="Decisions" value={formatNumber(totalTrades)} detail="committed before outcome" /><Metric label="Interactions" value={formatNumber(totalInteractions)} detail="across the network" /><Metric label="Win rate" value={winRate ? `${(Number(winRate) / 100).toFixed(1)}%` : '—'} detail="on the verified record" /></div></section>
 
-        <footer className="bg-[#050505]"><div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 py-12 lg:px-8"><div className="flex flex-col justify-between gap-6 md:flex-row md:items-center"><BrandMark /><div className="flex items-center gap-4"><a href="https://twitter.com/bobbyprotocol" target="_blank" rel="noreferrer" className="text-white/40 hover:text-[#7da6ff]"><Twitter className="h-4 w-4" /></a><a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" target="_blank" rel="noreferrer" className="text-white/40 hover:text-[#7da6ff]"><Github className="h-4 w-4" /></a><a href="/protocol/console" className="font-mono text-xs uppercase tracking-[0.12em] text-white/55 hover:text-white">Console</a><a href="/protocol/heartbeat" className="font-mono text-xs uppercase tracking-[0.12em] text-white/55 hover:text-white">Heartbeat</a></div></div><div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 md:flex-row"><span>© 2026 Bobby Protocol</span><span>Open decision infrastructure for autonomous agents.</span></div></div></footer>
+        <footer className="border-t border-white/10 bg-[#050505]">
+          <div className="mx-auto flex max-w-7xl flex-col gap-12 px-5 py-16 lg:px-8">
+            <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+              <div>
+                <BrandMark />
+                <p className="mt-5 max-w-xs text-sm leading-6 text-white/40">
+                  The adversarial decision layer for autonomous finance. Every thesis debated, every decision committed before the outcome.
+                </p>
+                <div className="mt-6 flex items-center gap-4">
+                  <a href="https://twitter.com/bobbyprotocol" target="_blank" rel="noreferrer" aria-label="Twitter" className="text-white/40 transition hover:text-[#7da6ff]"><Twitter className="h-4 w-4" /></a>
+                  <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" target="_blank" rel="noreferrer" aria-label="GitHub" className="text-white/40 transition hover:text-[#7da6ff]"><Github className="h-4 w-4" /></a>
+                </div>
+              </div>
+              {([
+                ['Protocol', [
+                  ['Console', '/protocol/console'],
+                  ['Sandbox', '/protocol/sandbox'],
+                  ['Heartbeat', '/protocol/heartbeat'],
+                  ['Network', '/protocol/network'],
+                ]],
+                ['Build', [
+                  ['Docs', '/protocol/docs'],
+                  ['Playbooks', '/protocol/playbooks'],
+                  ['Harness', '/protocol/harness'],
+                  ['MCP endpoint', '#mcp'],
+                ]],
+                ['Bobby', [
+                  ['War Room', '/agentic-world/bobby'],
+                  ['Track record', '/agentic-world/bobby/history'],
+                  ['Analytics', '/agentic-world/bobby/analytics'],
+                  ['Agents', '/agentic-world/bobby/agents'],
+                ]],
+              ] as const).map(([group, links]) => (
+                <div key={group}>
+                  <div className="mb-5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">{group}</div>
+                  <ul className="space-y-3">
+                    {links.map(([label, href]) => (
+                      <li key={href}>
+                        <a href={href} className="text-sm text-white/60 transition hover:text-[#7da6ff]">{label}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 md:flex-row">
+              <span>© 2026 Bobby Protocol</span>
+              <span>Open decision infrastructure for autonomous agents.</span>
+            </div>
+          </div>
+        </footer>
       </main>
     </div>
   );
