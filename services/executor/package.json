@@ -1,0 +1,14 @@
+{
+  "name": "bobby-executor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "viem": "^2.21.0"
+  }
+}

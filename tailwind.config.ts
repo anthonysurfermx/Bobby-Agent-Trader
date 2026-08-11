@@ -62,6 +62,7 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
+				'base-blue': 'hsl(var(--base-blue))',
 				'neon-green': 'hsl(var(--neon-green))',
 				'electric-blue': 'hsl(var(--electric-blue))',
 				'dark-surface': 'hsl(var(--dark-surface))',

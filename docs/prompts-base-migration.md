@@ -33,6 +33,22 @@ Branch de trabajo: `feat/base-migration`. Regla: `npm run build` verde antes de 
 > 7. Links de explorer vía `txUrl()`/`addressUrl()` de chains.ts.
 > No commitear secretos; env nuevas: BASE_RPC_URL, BASESCAN_API_KEY, TREASURY_ADDRESS_BASE.
 
+### Adición: re-branding Base (Codex, después del refactor funcional)
+> Rebrand visual inspirado en okx.ai (minimal, mucho aire, tipografía grande) con la
+> paleta de base.org: azul Base #0052FF como acento único. Los tokens YA están migrados
+> en `src/index.css` (`--primary`, `--base-blue`, gradientes y sombras) y tailwind expone
+> `base-blue`. Tu tarea es el sweep mecánico: reemplazar clases hardcodeadas
+> `green-400/emerald-*/text-green-*` por `primary`/`base-blue` en todos los componentes
+> (KineticShell, hero, tickers, charts de Recharts con verde hardcodeado #00FF88 → #0052FF).
+> Mantener ámbar=warning y rojo=error. No tocar semántica de PnL positivo/negativo
+> (ganancia puede seguir verde en números — decisión: ganancia verde, UI/marca azul).
+
+### Adición: conectar el ejecutor Fly.io (Codex)
+> El droplet de Digital Ocean ya no existe. El nuevo servicio vive en `services/executor/`
+> (Express + viem, Base 8453, Bearer auth, allowlist). `api/chain-trade.ts` debe apuntar a
+> `${EXECUTOR_URL}/api/base` con `Authorization: Bearer ${EXECUTOR_TOKEN}` (env de Vercel).
+> Anthony lo deploya con `fly deploy` (ver services/executor/README.md).
+
 ---
 
 ## Prompt para Kimi (Fase 1 ronda 2 + Fase 5: auditoría y QA)
