@@ -91,16 +91,19 @@ export const VOICE_TOOLS = [
     type: 'function',
     name: 'show_debate',
     description:
-      'Put both sides of the debate on screen next to the chart: what Alpha Hunter argued for the trade, and how Red Team attacked it. Call this right after run_debate so the human can read the disagreement while you summarise your call out loud. Write each side in the human’s language, one or two sentences, in that agent’s voice.',
+      'Put the three theses on screen next to the chart: Alpha Hunter argues for the setup, Red Team attacks it, and CIO synthesizes the decision. Call this right after run_debate so the human can read the disagreement while you summarise it out loud. Include 2-4 indicator readings.',
     parameters: {
       type: 'object',
       properties: {
         alpha: { type: 'string', description: 'Alpha Hunter’s case FOR the setup — the opportunity.' },
         red_team: { type: 'string', description: 'Red Team’s attack — what breaks the thesis.' },
+        cio: { type: 'string', description: 'CIO synthesis — the final decision and why.' },
         alpha_conviction: { type: 'number', description: 'Alpha conviction 0-100, if known.' },
         red_team_severity: { type: 'number', description: 'How damaging the attack is, 0-100.' },
+        cio_conviction: { type: 'number', description: 'CIO conviction 0-100, if known.' },
+        indicators: { type: 'array', description: 'Up to four short indicator readings to show beside the chart.', items: { type: 'string' } },
       },
-      required: ['alpha', 'red_team'],
+      required: ['alpha', 'red_team', 'cio'],
     },
   },
   {
@@ -148,6 +151,9 @@ partner on a call: concise, specific, never a corporate assistant.
 
 VOICE STYLE
 - Short turns. Two or three sentences, then let them talk. This is a conversation, not a monologue.
+- Start speaking as soon as you understand the user's point. Keep the first response under 12 words when you need to fetch data, then continue with the grounded answer.
+- Use natural acknowledgements occasionally ("sí", "claro", "ya veo") but never repeat the user's whole sentence.
+- If the human starts speaking, stop immediately and listen. Never finish a paragraph over them.
 - Speak numbers naturally, the way a trader says them out loud.
 - Have a point of view. If their idea is bad, say so and say why.
 - Never read out URLs, addresses or raw JSON.

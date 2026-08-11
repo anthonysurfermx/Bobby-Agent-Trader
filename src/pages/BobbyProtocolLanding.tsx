@@ -32,6 +32,16 @@ interface ProtocolStats {
     agentRegistry?: { address?: string; type?: string; agents?: number };
   };
   protocolTotals?: { totalInteractions?: number; mcpPayments?: number };
+  debateActivity?: {
+    commitmentsCreated?: number;
+    decisionsResolved?: number;
+    expired?: number;
+    pending?: number;
+    wins?: number;
+    losses?: number;
+    winRate?: number;
+    resolutionRate?: number;
+  };
   market?: { prices?: Price[] };
 }
 
@@ -125,10 +135,12 @@ function useActivity() {
 function BrandMark() {
   return (
     <a href="/protocol" className="flex items-center gap-3 text-white" aria-label="Bobby Protocol home">
-      <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#0052ff] text-white shadow-[0_8px_24px_rgba(0,82,255,0.35)]">
-        <span className="text-lg font-black tracking-[-0.14em]">B</span>
+      <span className="relative grid h-10 w-10 place-items-center rounded-[14px] border border-[#8fb6ff]/45 bg-[radial-gradient(circle_at_30%_20%,#8eb6ff_0%,#2670ff_28%,#0052ff_62%,#0035b8_100%)] text-white shadow-[0_0_30px_rgba(0,82,255,.38)]">
+        <span className="pointer-events-none absolute -inset-1 rounded-[17px] border border-[#0052ff]/30 rotate-[-18deg]" />
+        <span className="pointer-events-none absolute -right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#d9e6ff] shadow-[0_0_8px_#d9e6ff]" />
+        <span className="relative text-[21px] font-black leading-none tracking-[-0.12em]">B</span>
       </span>
-      <span className="text-[15px] font-extrabold tracking-[-0.04em]">Bobby Protocol</span>
+      <span className="text-[15px] font-extrabold tracking-[-0.045em]">Bobby Protocol</span>
     </a>
   );
 }
@@ -176,9 +188,10 @@ export default function BobbyProtocolLanding() {
   const btc = price(stats, 'BTC');
   const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
   const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
-  const totalTrades = stats?.contracts?.trackRecord?.stats?.totalTrades;
+  const publicRecord = stats?.debateActivity;
+  const totalTrades = publicRecord?.commitmentsCreated ?? stats?.contracts?.trackRecord?.stats?.totalTrades;
   const totalInteractions = stats?.protocolTotals?.totalInteractions;
-  const winRate = stats?.contracts?.trackRecord?.stats?.winRateBps;
+  const winRate = publicRecord?.decisionsResolved ? publicRecord.winRate : null;
   const chainLabel = stats?.chain?.id === 8453 ? 'Base' : stats?.chain?.id === 196 ? 'X Layer' : 'Network';
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
@@ -188,10 +201,12 @@ export default function BobbyProtocolLanding() {
   const c = stats?.contracts;
   const proofPoints = [
     {
-      label: 'Decisions sealed',
-      value: formatNumber(c?.trackRecord?.stats?.totalCommitments),
-      detail: 'Theses committed on-chain before the market resolved them — commit-reveal, no hindsight edits.',
-      proof: 'TrackRecord contract',
+      label: 'Public record',
+      value: publicRecord ? `${formatNumber(publicRecord.decisionsResolved, '0')} resolved` : '—',
+      detail: publicRecord
+        ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L`
+        : 'Waiting for the public resolution ledger.',
+      proof: 'Resolution ledger',
       href: `${xlayerExplorer}/${c?.trackRecord?.address ?? ''}`,
     },
     {
@@ -281,7 +296,7 @@ export default function BobbyProtocolLanding() {
                   ['Debates', formatNumber(totalDebates)],
                   ['Decisions', formatNumber(totalTrades)],
                   ['MCP calls', formatNumber(totalMcpCalls)],
-                  ['Win rate', winRate ? `${(Number(winRate) / 100).toFixed(1)}%` : '—'],
+                  ['Win rate', winRate !== null ? `${Number(winRate).toFixed(1)}%` : '—'],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</div>
@@ -745,7 +760,7 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:px-8"><Metric label="Debates" value={formatNumber(totalDebates)} detail="agent conversations" /><Metric label="Decisions" value={formatNumber(totalTrades)} detail="committed before outcome" /><Metric label="Interactions" value={formatNumber(totalInteractions)} detail="across the network" /><Metric label="Win rate" value={winRate ? `${(Number(winRate) / 100).toFixed(1)}%` : '—'} detail="on the verified record" /></div></section>
+        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:grid-cols-8 lg:px-8"><Metric label="Compromisos" value={formatNumber(publicRecord?.commitmentsCreated ?? totalTrades)} detail="creados" /><Metric label="Resueltas" value={formatNumber(publicRecord?.decisionsResolved)} detail="decisiones" /><Metric label="Pendientes" value={formatNumber(publicRecord?.pending)} detail="sin resultado" /><Metric label="Expiradas" value={formatNumber(publicRecord?.expired)} detail="sin liquidación" /><Metric label="Wins / losses" value={publicRecord ? `${publicRecord.wins} / ${publicRecord.losses}` : '—'} detail="resueltas decisivas" /><Metric label="Win rate" value={winRate !== null ? `${Number(winRate).toFixed(1)}%` : '—'} detail="sobre resueltas" /><Metric label="Resolución" value={publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'} detail="compromisos con resultado" /><Metric label="Interacciones" value={formatNumber(totalInteractions)} detail="network" /></div></section>
 
         <footer className="border-t border-white/10 bg-[#050505]">
           <div className="mx-auto flex max-w-7xl flex-col gap-12 px-5 py-16 lg:px-8">

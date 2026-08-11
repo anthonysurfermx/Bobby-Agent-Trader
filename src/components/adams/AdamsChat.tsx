@@ -2802,7 +2802,7 @@ export function AdamsChat() {
   const latestUser = [...messages].reverse().find(m => m.role === 'user');
 
   return (
-    <div className="h-full text-white flex flex-col overflow-hidden" style={{ background: '#050505' }}>
+    <div className="relative h-full overflow-hidden bg-[#050505] text-white before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_50%_18%,rgba(0,82,255,.16),transparent_29%),linear-gradient(180deg,#050505_0%,#070913_48%,#050505_100%)]">
       {/* Step 1: Trading Mode Selection (first thing user sees) */}
       {!tradingMode && <TradingModeSelector onSelect={handleModeSelect} language={lang} onInitVoice={initVoiceContext} />}
 
@@ -2856,18 +2856,14 @@ export function AdamsChat() {
       {showMenu && <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />}
 
       {/* ===== MINIMAL HEADER BAR ===== */}
-      <div className="flex-shrink-0 border-b border-white/[0.04]">
-        <div className="max-w-4xl mx-auto px-2 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between">
+      <div className="relative z-10 flex-shrink-0 border-b border-white/[0.08] bg-[#050505]/75 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
           <div className="flex items-center gap-3">
-            <Link to="/agentic-world" className="text-white/15 hover:text-white/40 transition-colors">
+            <Link to="/protocol" className="text-white/30 hover:text-white transition-colors">
               <ArrowLeft className="w-3.5 h-3.5" />
             </Link>
-            <span className="text-[12px] font-mono font-bold text-white/40 tracking-[1px]">{advisorName.toUpperCase()}</span>
-            <span className="text-[8px] font-mono text-white/10 hidden sm:inline">×</span>
-            <a href="https://www.okx.com" target="_blank" rel="noopener noreferrer"
-              className="text-[8px] font-mono text-white/15 hover:text-white/40 transition-colors hidden sm:inline">
-              OKX OnchainOS
-            </a>
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#0052ff] text-sm font-black shadow-[0_0_24px_rgba(0,82,255,.55)]">B</span>
+            <div><span className="block text-sm font-extrabold tracking-[-.04em]">Bobby</span><span className="font-mono text-[9px] uppercase tracking-[.18em] text-[#7da6ff]">Decision interface</span></div>
           </div>
           <div className="flex items-center gap-1">
             {/* Stop button — visible when speaking or processing */}
@@ -2879,12 +2875,12 @@ export function AdamsChat() {
               </button>
             )}
             <button onClick={toggleVoice}
-              className={`p-1.5 transition-colors ${voiceEnabled ? 'text-green-400/70 hover:text-green-400' : 'text-white/15 hover:text-white/30'}`}
+              className={`rounded-full border p-2 transition-colors ${voiceEnabled ? 'border-[#0052ff]/35 bg-[#0052ff]/10 text-[#7da6ff] hover:bg-[#0052ff]/20' : 'border-white/10 text-white/30 hover:text-white'}`}
               title={voiceEnabled ? 'Voice ON' : 'Voice OFF'}>
               {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
             </button>
             <button onClick={toggleTradingRoom}
-              className={`flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-mono font-bold tracking-wider transition-all ${tradingRoom ? 'bg-yellow-400/15 text-yellow-400 border border-yellow-400/30' : 'bg-white/5 text-white/30 border border-white/10 hover:text-white/50'}`}
+              className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[9px] font-mono font-bold tracking-wider transition-all sm:flex ${tradingRoom ? 'border border-[#0052ff]/30 bg-[#0052ff]/10 text-[#7da6ff]' : 'border border-white/10 bg-white/5 text-white/30 hover:text-white/50'}`}
               title={tradingRoom ? 'Trading Room ON' : 'Solo Trader'}>
               <Users className="w-3 h-3" />
               {tradingRoom ? (lang === 'es' ? 'SALA' : 'ROOM') : 'SOLO'}
@@ -2944,10 +2940,10 @@ export function AdamsChat() {
       </div>
 
       {/* ===== STITCH SPLIT LAYOUT: Left Panel (35%) + Right Panel (65%) ===== */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative z-10 flex flex-1 overflow-hidden">
 
       {/* === Left Panel — Conviction Board + Agent Status + Macro Stream (desktop only) === */}
-      <aside className="hidden lg:flex w-[35%] border-r border-white/[0.06] flex-col p-5 space-y-6 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+      <aside className="hidden">
         {/* Agent identity badge */}
         {advisorName !== 'Bobby' && (
           <div className="bg-green-500/[0.04] border border-green-500/15 rounded p-3 flex items-center gap-3">
@@ -3160,12 +3156,12 @@ export function AdamsChat() {
       </aside>
 
       {/* === Right Panel — Orb + Chat + Input === */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
 
       {/* ===== COMMAND CENTER: ORB + HUD ===== */}
-      <div className="flex-shrink-0 relative" style={{ background: '#050505' }}>
+      <div className="relative flex-shrink-0 overflow-hidden">
         {/* Top status bar — mode, vibe, regime */}
-        <div className="flex items-center justify-between px-3 sm:px-4 py-1" style={{ background: 'rgba(255,255,255,0.015)' }}>
+        <div className="hidden items-center justify-between px-3 sm:px-4 py-1" style={{ background: 'rgba(255,255,255,0.015)' }}>
           <div className="flex items-center gap-2">
             <span className="text-[7px] font-mono text-white/20 uppercase tracking-wider" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               {tradingMode === 'auto' ? '🤖 AUTO' : tradingMode === 'confirm' ? '👤 CONFIRM' : '📄 PAPER'}
@@ -3195,7 +3191,7 @@ export function AdamsChat() {
 
         {/* Bloomberg-style ticker tape — live prices scrolling */}
         {tickerTape.length > 0 && (
-          <div className="overflow-hidden border-b border-white/[0.03] bg-white/[0.01]">
+          <div className="hidden overflow-hidden border-b border-white/[0.03] bg-white/[0.01]">
             <div className="flex animate-marquee whitespace-nowrap py-1">
               {[...tickerTape, ...tickerTape].map((t, i) => (
                 <span key={`${t.symbol}-${i}`} className="inline-flex items-center gap-1.5 mx-4 text-[9px] font-mono">
@@ -3212,12 +3208,16 @@ export function AdamsChat() {
 
         {/* Orb center + orbital data */}
         <div
-          className="flex flex-col items-center py-1.5 sm:py-3 cursor-pointer select-none"
+          className="relative flex min-h-[250px] cursor-pointer select-none flex-col items-center justify-center overflow-hidden px-5 py-8 sm:min-h-[330px]"
           onClick={() => {
             if (orbState === 'speaking') { stopVoice(); return; }
             if (orbState !== 'thinking') toggleListening();
           }}
         >
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-full opacity-35 [background-image:linear-gradient(rgba(0,82,255,.22)_1px,transparent_1px),linear-gradient(90deg,rgba(0,82,255,.22)_1px,transparent_1px)] [background-size:42px_42px]" />
+          <div className="pointer-events-none absolute h-[420px] w-[420px] rounded-full border border-[#0052ff]/20" />
+          <div className="pointer-events-none absolute h-[280px] w-[280px] rounded-full border border-[#0052ff]/25 shadow-[0_0_100px_rgba(0,82,255,.25)]" />
+          <div className="relative z-10 mb-2 text-center"><div className="font-mono text-[10px] font-bold uppercase tracking-[.24em] text-[#7da6ff]">Voice-first decision room</div><h1 className="mt-3 text-3xl font-extrabold tracking-[-.065em] sm:text-5xl">Talk it through.</h1><p className="mt-2 text-sm text-white/45">Bobby listens, challenges the thesis, then answers.</p></div>
           {/* Orbital position chips — float around the orb */}
           {hudPositions.length > 0 && orbState === 'idle' && (
             <div className="flex items-center gap-1.5 mb-1">
@@ -3230,15 +3230,14 @@ export function AdamsChat() {
             </div>
           )}
 
-          <div className="sm:hidden"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={60} /></div>
-          <div className="hidden sm:block"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={100} /></div>
-          <span className={`text-[8px] sm:text-[9px] font-mono mt-1 sm:mt-1.5 tracking-[2px] ${activeAgent === 'alpha' ? 'text-green-400/60' : activeAgent === 'redteam' ? 'text-red-400/60' : activeAgent === 'cio' ? 'text-yellow-400/60' : 'text-green-400/40'
-            }`}>
+          <div className="relative z-10 sm:hidden"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={108} /></div>
+          <div className="relative z-10 hidden sm:block"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={150} /></div>
+          <span className="relative z-10 mt-2 font-mono text-[9px] tracking-[.18em] text-[#7da6ff]">
             {orbState === 'listening' ? (lang === 'es' ? 'TOCA PARA PARAR · ESCUCHANDO...' : 'TAP TO STOP · LISTENING...') : orbState === 'thinking' ? (lang === 'es' ? 'PROCESANDO...' : 'PROCESSING...') : orbState === 'speaking' ? (activeAgent === 'alpha' ? '🟢 ALPHA HUNTER' : activeAgent === 'redteam' ? '🔴 RED TEAM' : activeAgent === 'cio' ? '🟡 BOBBY CIO' : (lang === 'es' ? 'TOCA PARA INTERRUMPIR' : 'TAP TO INTERRUPT')) : (lang === 'es' ? 'TOCA PARA HABLAR' : 'TAP TO TALK')}
           </span>
           {/* Live market sentiment badges */}
           {marketBadge && orbState === 'idle' && (
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="relative z-10 mt-3 flex items-center gap-2">
               <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full ${marketBadge.fgi <= 25 ? 'text-red-400/80 bg-red-500/8' :
                   marketBadge.fgi >= 75 ? 'text-green-400/80 bg-green-500/8' :
                     'text-amber-400/80 bg-amber-500/8'
@@ -3257,11 +3256,11 @@ export function AdamsChat() {
       </div>
 
       {/* ===== COMMAND CENTER: MIDDLE AREA (STAGE + TIMELINE) ===== */}
-      <div className="flex-1 min-h-0 flex flex-row overflow-hidden relative">
+      <div className="relative flex min-h-0 flex-1 flex-row overflow-hidden">
 
         {/* Main Stage */}
         <div className="flex-1 min-w-0 overflow-y-auto flex flex-col" ref={scrollRef}>
-          <div className="max-w-4xl mx-auto w-full px-2 sm:px-4 flex flex-col items-center flex-1 pt-2">
+          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-4 pt-5 sm:px-6">
 
             {/* ConvictionBoard removed — was showing only crypto, not stocks.
                 Price data now lives in the price cards that appear after Bobby's analysis. */}
@@ -3321,7 +3320,7 @@ export function AdamsChat() {
                   transition={{ duration: 0.4, ease: 'easeOut' }}
                   className="w-full max-w-2xl mx-auto"
                 >
-                  <div className="border border-white/[0.04] bg-white/[0.02] backdrop-blur-sm p-3 sm:p-5">
+                  <div className="rounded-2xl border border-white/10 bg-[#090b14]/85 p-5 shadow-[0_20px_70px_rgba(0,0,0,.35)] backdrop-blur-sm sm:p-7">
                     <div className="text-[12px] sm:text-[13px] leading-relaxed text-white/80 font-mono">
                       <DebateText text={latestAdvisor.text} />
                     </div>
@@ -3517,7 +3516,7 @@ export function AdamsChat() {
       </div>
 
       {/* ===== INPUT BAR — Bottom ===== */}
-      <div className="flex-shrink-0 border-t border-white/[0.04] pb-14 sm:pb-0" style={{ background: '#080808' }}>
+      <div className="flex-shrink-0 border-t border-white/10 bg-[#050505]/85 pb-4 pt-2 backdrop-blur-xl sm:pb-5">
         {canChat ? (
           <>
             {/* Guest badge — shows remaining free messages */}
@@ -3530,8 +3529,8 @@ export function AdamsChat() {
                 </span>
               </div>
             )}
-            <div className="max-w-4xl mx-auto px-2 sm:px-4 pt-1.5 sm:pt-2 pb-0.5 sm:pb-1">
-              <div className="flex gap-1 sm:gap-2 overflow-x-auto no-scrollbar justify-start sm:justify-center sm:flex-wrap">
+            <div className="mx-auto max-w-3xl px-4 pb-2 sm:px-6">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar justify-start sm:flex-wrap">
                 {(() => {
                   const qa = t('quickActions') as { gold: string; silver: string; allPrices: string; analyze: string };
                   return [
@@ -3546,8 +3545,8 @@ export function AdamsChat() {
                   ];
                 })().map(a => (
                   <button key={a.label} onClick={() => sendMessage(a.label)} disabled={isProcessing}
-                    className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-white/[0.05] bg-white/[0.01] text-white/30 hover:bg-white/[0.04] hover:text-white/60 hover:border-white/10 transition-all disabled:opacity-20 font-mono whitespace-nowrap flex-shrink-0">
-                    <span className="text-green-400/60">{a.icon}</span>
+                    className="flex flex-shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/[.03] px-3 py-1.5 font-mono text-[10px] text-white/55 transition-all hover:border-[#0052ff]/45 hover:bg-[#0052ff]/10 hover:text-white disabled:opacity-20">
+                    <span className="text-[#7da6ff]">{a.icon}</span>
                     {a.display}
                   </button>
                 ))}
@@ -3561,11 +3560,11 @@ export function AdamsChat() {
                 </Link>
               </div>
             </div>
-            <div className="max-w-4xl mx-auto px-2 sm:px-4 py-1.5 sm:py-2.5 flex items-center gap-1.5 sm:gap-2">
+            <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-2 sm:px-6">
               <button onClick={toggleListening} disabled={isProcessing}
                 className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border transition-all active:scale-[0.95] flex-shrink-0 rounded-full ${isListening
-                    ? 'bg-red-500/20 border-red-500/50 text-red-400 animate-pulse'
-                    : 'border-white/[0.06] text-white/20 hover:border-green-500/20 hover:text-green-400/60'
+                    ? 'animate-pulse border-[#0052ff] bg-[#0052ff]/25 text-white'
+                    : 'border-[#0052ff]/35 bg-[#0052ff]/10 text-[#7da6ff] hover:bg-[#0052ff]/20'
                   }`}>
                 {isListening ? <Mic className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <MicOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
               </button>
@@ -3600,11 +3599,11 @@ export function AdamsChat() {
                   }, 300);
                 }}
                 placeholder={isListening ? t('listening') as string : `${lang === 'es' ? 'Habla con' : lang === 'pt' ? 'Fale com' : 'Talk to'} ${advisorName}...`}
-                className={`flex-1 bg-transparent border-0 border-b px-2 sm:px-3 py-1.5 sm:py-2 text-[12px] sm:text-[13px] text-white/90 placeholder:text-white/15 outline-none transition-colors font-mono ${isListening ? 'border-red-500/20' : 'border-white/[0.06] focus:border-white/10'
+                className={`flex-1 rounded-xl border bg-white/[.035] px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 outline-none transition-colors ${isListening ? 'border-[#0052ff]/60' : 'border-white/10 focus:border-[#0052ff]/60'
                   }`}
                 disabled={isProcessing} />
               <button onClick={() => sendMessage()} disabled={!inputText.trim() || isProcessing}
-                className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center transition-all active:scale-[0.95] rounded-full ${inputText.trim() && !isProcessing ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'text-white/10 cursor-not-allowed'
+                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all active:scale-[0.95] ${inputText.trim() && !isProcessing ? 'bg-[#0052ff] text-white shadow-[0_0_26px_rgba(0,82,255,.45)] hover:bg-[#1c6cff]' : 'cursor-not-allowed bg-white/[.04] text-white/15'
                   }`}>
                 {isProcessing ? <Activity className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin" /> : <ArrowUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
               </button>

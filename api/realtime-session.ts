@@ -41,7 +41,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           model,
           instructions: voiceInstructions(lang === 'en' ? 'en' : 'es'),
           audio: {
-            input: { turn_detection: { type: 'semantic_vad' } },
+            // Fast conversational mode: detect the pause, interrupt Bobby when
+            // the human starts speaking, and answer without waiting for a
+            // semantic end-of-thought pass.
+            input: {
+              turn_detection: {
+                type: 'server_vad',
+                threshold: 0.48,
+                prefix_padding_ms: 280,
+                silence_duration_ms: 360,
+                create_response: true,
+                interrupt_response: true,
+              },
+            },
             output: { voice: process.env.REALTIME_VOICE || 'marin' },
           },
           tools: VOICE_TOOLS,

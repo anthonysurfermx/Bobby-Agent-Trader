@@ -37,13 +37,17 @@ export interface ChartLevel {
   price: number;
   label: string;
   kind: 'entry' | 'stop' | 'target' | 'level';
+  agent?: 'alpha' | 'red' | 'cio';
 }
 
 export interface DebateSides {
   alpha: string;
   redTeam: string;
+  cio: string;
   alphaConviction: number | null;
   redTeamSeverity: number | null;
+  cioConviction: number | null;
+  indicators: string[];
 }
 
 export interface Thesis {
@@ -67,6 +71,15 @@ const TOOL_LABELS: Record<string, string> = {
 
 /** Tools resolved in the browser — they drive the UI, so a server hop would only add latency. */
 const UI_TOOLS = new Set(['set_chart', 'draw_levels', 'update_thesis', 'show_debate']);
+
+const SYMBOL_ALIASES: Record<string, string> = {
+  NVIDIA: 'NVDA', GOOGLE: 'GOOGL', ALPHABET: 'GOOGL', MICRON: 'MU', MICROSOFT: 'MSFT', APPLE: 'AAPL', TESLA: 'TSLA', AMAZON: 'AMZN',
+};
+
+function normalizeSymbol(value: unknown): string {
+  const raw = String(value ?? 'BTC').trim().toUpperCase();
+  return SYMBOL_ALIASES[raw] ?? (raw.replace(/[^A-Z0-9]/g, '').slice(0, 12) || 'BTC');
+}
 
 export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
   const [state, setState] = useState<VoiceState>('idle');
@@ -131,7 +144,7 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
       if (UI_TOOLS.has(name)) {
         // Resolved locally: these only move pixels, so they land instantly.
         if (name === 'set_chart') {
-          if (args.symbol) setSymbol(String(args.symbol).toUpperCase());
+          if (args.symbol) setSymbol(normalizeSymbol(args.symbol));
           if (args.timeframe) setTimeframe(String(args.timeframe));
           output = { ok: true, showing: args.symbol, timeframe: args.timeframe ?? 'unchanged' };
         } else if (name === 'draw_levels') {
@@ -142,8 +155,11 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
           setDebate({
             alpha: String(args.alpha ?? ''),
             redTeam: String(args.red_team ?? ''),
+            cio: String(args.cio ?? ''),
             alphaConviction: typeof args.alpha_conviction === 'number' ? args.alpha_conviction : null,
             redTeamSeverity: typeof args.red_team_severity === 'number' ? args.red_team_severity : null,
+            cioConviction: typeof args.cio_conviction === 'number' ? args.cio_conviction : null,
+            indicators: Array.isArray(args.indicators) ? args.indicators.map(String).slice(0, 4) : [],
           });
           output = { ok: true, published: true };
         } else {

@@ -20,6 +20,7 @@ export interface ChartLevel {
   price: number;
   label: string;
   kind: 'entry' | 'stop' | 'target' | 'level';
+  agent?: 'alpha' | 'red' | 'cio';
 }
 
 const LEVEL_COLOR: Record<ChartLevel['kind'], string> = {
@@ -28,9 +29,19 @@ const LEVEL_COLOR: Record<ChartLevel['kind'], string> = {
   target: '#4ade80',
   level: '#8b8b93',
 };
+const AGENT_COLOR = { alpha: '#4ade80', red: '#ff716a', cio: '#facc15' } as const;
 
 const TIMEFRAMES = ['5m', '15m', '1H', '4H', '1D'] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
+
+const STOCK_SYMBOLS = new Set(['NVDA', 'GOOGL', 'GOOG', 'MU', 'MSFT', 'AAPL', 'TSLA', 'AMZN', 'META', 'AMD', 'COIN', 'MSTR', 'SPY', 'QQQ', 'XOM', 'JPM', 'GS', 'CVX']);
+const STOCK_TIMEFRAME: Record<Timeframe, { range: string; interval: string }> = {
+  '5m': { range: '7d', interval: '15m' },
+  '15m': { range: '7d', interval: '15m' },
+  '1H': { range: '7d', interval: '1h' },
+  '4H': { range: '30d', interval: '1d' },
+  '1D': { range: '90d', interval: '1d' },
+};
 
 interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }
 
@@ -38,11 +49,17 @@ export function MarketCanvas({
   symbol,
   timeframe,
   levels,
+  debate,
   onTimeframeChange,
 }: {
   symbol: string;
   timeframe: Timeframe;
   levels: ChartLevel[];
+  debate?: {
+    alpha: string; redTeam: string; cio: string;
+    alphaConviction: number | null; redTeamSeverity: number | null; cioConviction: number | null;
+    indicators: string[];
+  } | null;
   onTimeframeChange: (tf: Timeframe) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,12 +137,15 @@ export function MarketCanvas({
 
     const load = async () => {
       try {
-        const response = await fetch(
-          `/api/okx-candles?instId=${symbol}-USDT&bar=${timeframe}&limit=100`,
-          { cache: 'no-store' },
-        );
+        const isStock = STOCK_SYMBOLS.has(symbol.toUpperCase());
+        const stockConfig = STOCK_TIMEFRAME[timeframe];
+        const endpoint = isStock
+          ? `/api/stock-candles?symbol=${encodeURIComponent(symbol)}&range=${stockConfig.range}&interval=${stockConfig.interval}`
+          : `/api/okx-candles?instId=${encodeURIComponent(symbol)}-USDT&bar=${timeframe}&limit=100`;
+        const response = await fetch(endpoint, { cache: 'no-store' });
         const payload = await response.json();
-        // /api/okx-candles returns { candles: [{ ts, open, high, low, close, volume }] },
+        // Both OKX and Yahoo return the same normalized candle shape here,
+        // so the chart behaves identically for crypto and equities.
         // oldest first; raw OKX arrays are tolerated as a fallback.
         const rows: Candle[] = (payload.candles ?? payload.data ?? [])
           .map((row: Record<string, number | string> | Array<number | string>) => {
@@ -185,11 +205,11 @@ export function MarketCanvas({
     lineRefs.current = levels.map((level) =>
       series.createPriceLine({
         price: level.price,
-        color: LEVEL_COLOR[level.kind],
+        color: level.agent ? AGENT_COLOR[level.agent] : LEVEL_COLOR[level.kind],
         lineWidth: 1,
         lineStyle: level.kind === 'level' ? LineStyle.Dotted : LineStyle.Dashed,
         axisLabelVisible: true,
-        title: level.label,
+        title: level.agent ? `${level.agent.toUpperCase()} · ${level.label}` : level.label,
       }),
     );
   }, [levels]);
@@ -229,8 +249,24 @@ export function MarketCanvas({
 
       <div ref={containerRef} className="min-h-0 flex-1" />
 
+      {debate && (
+        <div className="grid grid-cols-1 gap-2 border-t border-white/10 p-3 sm:grid-cols-3">
+          {[
+            { key: 'alpha', name: 'ALPHA HUNTER', text: debate.alpha, score: debate.alphaConviction, color: '#4ade80', bg: 'rgba(74,222,128,.08)' },
+            { key: 'red', name: 'RED TEAM', text: debate.redTeam, score: debate.redTeamSeverity, color: '#ff716a', bg: 'rgba(255,113,106,.08)' },
+            { key: 'cio', name: 'BOBBY CIO', text: debate.cio, score: debate.cioConviction, color: '#facc15', bg: 'rgba(250,204,21,.08)' },
+          ].map((agent) => (
+            <div key={agent.key} className="min-w-0 rounded-lg border p-2.5" style={{ borderColor: `${agent.color}55`, background: agent.bg }}>
+              <div className="flex items-center justify-between gap-2"><span className="font-mono text-[9px] font-bold tracking-[.12em]" style={{ color: agent.color }}>{agent.name}</span>{agent.score !== null && <span className="font-mono text-[9px] text-white/45">{agent.score}%</span>}</div>
+              <p className="mt-1.5 line-clamp-3 text-[11px] leading-4 text-white/65">{agent.text || 'Esperando tesis…'}</p>
+            </div>
+          ))}
+          {debate.indicators.length > 0 && <div className="col-span-full flex flex-wrap gap-1.5">{debate.indicators.map((indicator) => <span key={indicator} className="rounded border border-white/10 bg-white/[.03] px-2 py-1 font-mono text-[9px] text-white/45">{indicator}</span>)}</div>}
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
-        <span>OKX · velas en vivo</span>
+        <span>{STOCK_SYMBOLS.has(symbol.toUpperCase()) ? 'Yahoo Finance · mercado accionario' : 'OKX · mercado cripto'}</span>
         <span className={error ? 'text-red-400' : undefined}>
           {error ? 'sin datos' : updatedAt ? `actualizado ${updatedAt.toLocaleTimeString('es-MX')}` : 'cargando…'}
         </span>

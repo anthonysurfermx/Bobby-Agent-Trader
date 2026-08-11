@@ -169,6 +169,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
               symbol={symbol}
               timeframe={timeframe as Timeframe}
               levels={levels}
+              debate={debate}
               onTimeframeChange={(tf) => setTimeframe(tf)}
             />
           </div>

@@ -305,13 +305,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Supabase debate + resolution stats (real activity beyond on-chain contracts)
   const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
   const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-  let debateStats = { totalDebates: 0, resolved: 0, wins: 0, losses: 0, breakEven: 0, winRate: 0, pending: 0 };
+  let debateStats = {
+    totalDebates: 0,
+    commitmentsCreated: 0,
+    decisionsResolved: 0,
+    expired: 0,
+    wins: 0,
+    losses: 0,
+    breakEven: 0,
+    winRate: 0,
+    resolutionRate: 0,
+    pending: 0,
+  };
   if (SB_KEY) {
     try {
-      const [threadsRes, eventsRes] = await Promise.all([
-        fetch(`${SB_URL}/rest/v1/forum_threads?select=resolution&entry_price=not.is.null`, {
-          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-        }).then(r => r.ok ? r.json() : []),
+      const countRows = async (filter = '') => {
+        const response = await fetch(`${SB_URL}/rest/v1/forum_threads?select=id&entry_price=not.is.null${filter}`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'count=exact' },
+        });
+        if (!response.ok) return 0;
+        const contentRange = response.headers.get('content-range');
+        return Number(contentRange?.split('/')[1] || 0);
+      };
+      const [commitmentsCreated, pending, wins, losses, breakEven, expired, eventsRes] = await Promise.all([
+        countRows(),
+        countRows('&resolution=eq.pending'),
+        countRows('&resolution=eq.win'),
+        countRows('&resolution=eq.loss'),
+        countRows('&resolution=eq.break_even'),
+        countRows('&resolution=eq.expired'),
         // Exclude demo traffic (meta.demo_source = 'playbooks_page') from public metrics
         fetch(`${SB_URL}/rest/v1/agent_events?select=id&or=(meta->>demo_source.is.null,meta->>demo_source.neq.playbooks_page)`, {
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'count=exact' },
@@ -320,19 +342,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return count ? parseInt(count) : 0;
         }).catch(() => 0),
       ]);
-      const threads = threadsRes as Array<{ resolution: string }>;
-      const resolved = threads.filter(t => t.resolution !== 'pending');
-      const wins = resolved.filter(t => t.resolution === 'win').length;
-      const losses = resolved.filter(t => t.resolution === 'loss').length;
-      const be = resolved.filter(t => t.resolution === 'break_even').length;
+      const decisionsResolved = wins + losses + breakEven;
       debateStats = {
-        totalDebates: threads.length,
-        resolved: resolved.length,
+        totalDebates: commitmentsCreated,
+        commitmentsCreated,
+        decisionsResolved,
+        expired,
         wins,
         losses,
-        breakEven: be,
-        winRate: resolved.length > 0 ? parseFloat(((wins / resolved.length) * 100).toFixed(1)) : 0,
-        pending: threads.length - resolved.length,
+        breakEven,
+        winRate: decisionsResolved > 0 ? parseFloat(((wins / decisionsResolved) * 100).toFixed(1)) : 0,
+        resolutionRate: commitmentsCreated > 0 ? parseFloat(((decisionsResolved / commitmentsCreated) * 100).toFixed(1)) : 0,
+        pending,
       };
       (debateStats as any).harnessEvents = eventsRes;
 

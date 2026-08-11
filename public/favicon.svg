@@ -1,34 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
-  <!-- Background -->
-  <rect width="32" height="32" rx="4" fill="#0a0a0a"/>
-
-  <!-- Pixel grid "D" letter -->
-  <!-- Column 1 (x=6): full height bar -->
-  <rect x="6" y="6" width="3" height="3" fill="#22c55e"/>
-  <rect x="6" y="9" width="3" height="3" fill="#22c55e"/>
-  <rect x="6" y="12" width="3" height="3" fill="#22c55e"/>
-  <rect x="6" y="15" width="3" height="3" fill="#22c55e"/>
-  <rect x="6" y="18" width="3" height="3" fill="#22c55e"/>
-  <rect x="6" y="21" width="3" height="3" fill="#22c55e"/>
-
-  <!-- Top row extending right -->
-  <rect x="9" y="6" width="3" height="3" fill="#22c55e"/>
-  <rect x="12" y="6" width="3" height="3" fill="#22c55e"/>
-  <rect x="15" y="6" width="3" height="3" fill="#4ade80"/>
-
-  <!-- Bottom row extending right -->
-  <rect x="9" y="21" width="3" height="3" fill="#22c55e"/>
-  <rect x="12" y="21" width="3" height="3" fill="#22c55e"/>
-  <rect x="15" y="21" width="3" height="3" fill="#4ade80"/>
-
-  <!-- Right curve -->
-  <rect x="18" y="9" width="3" height="3" fill="#4ade80"/>
-  <rect x="21" y="12" width="3" height="3" fill="#86efac"/>
-  <rect x="21" y="15" width="3" height="3" fill="#86efac"/>
-  <rect x="18" y="18" width="3" height="3" fill="#4ade80"/>
-
-  <!-- Subtle glow pixel accents -->
-  <rect x="3" y="3" width="2" height="2" fill="#22c55e" opacity="0.15"/>
-  <rect x="27" y="27" width="2" height="2" fill="#22c55e" opacity="0.15"/>
-  <rect x="27" y="3" width="2" height="2" fill="#22c55e" opacity="0.1"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="g" cx="30%" cy="22%" r="85%">
+      <stop offset="0" stop-color="#77a7ff"/>
+      <stop offset="0.42" stop-color="#0052ff"/>
+      <stop offset="1" stop-color="#0034b8"/>
+    </radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="64" height="64" rx="17" fill="#050505"/>
+  <circle cx="32" cy="32" r="22" fill="#0052ff" opacity=".28" filter="url(#glow)"/>
+  <circle cx="32" cy="32" r="19" fill="url(#g)"/>
+  <path d="M25 18v28h9.5c8 0 13.5-5.3 13.5-14S42.5 18 34.5 18H25Zm7 6h2.2c4.3 0 7 2.7 7 8s-2.7 8-7 8H32V24Z" fill="#fff"/>
+  <circle cx="18" cy="15" r="2" fill="#b8d2ff"/>
+  <circle cx="49" cy="48" r="1.5" fill="#7da6ff" opacity=".8"/>
 </svg>
