@@ -56,18 +56,19 @@ export default function BobbyNetworkConsolePage() {
     <div className="min-h-screen bg-[#050505] text-white">
       <Helmet><title>Network Console | Bobby Protocol</title></Helmet>
 
-      <div className="border-b border-white/[0.04] px-6 py-4 flex items-center justify-between">
+      <div className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/80 px-6 py-4 backdrop-blur-xl flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <a href="/agentic-world/bobby/console" className="text-white/40 hover:text-green-400 transition text-sm font-mono">&larr; AGENT CONSOLE</a>
-          <h1 className="text-lg font-mono text-green-400 tracking-wider">NETWORK CONSOLE</h1>
+          <a href="/agentic-world/bobby/console" className="font-mono text-xs uppercase tracking-[0.15em] text-white/45 transition hover:text-white">&larr; Agent console</a>
+          <h1 className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Network console</h1>
         </div>
-        <div className="text-xs font-mono text-white/20">Hardness Control Plane</div>
+        <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/25">Hardness control plane</div>
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-10 space-y-8">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-3xl font-black tracking-tight mb-3">Multi-Agent Financial Network</h2>
-          <p className="text-white/50 font-mono text-sm max-w-3xl">
+          <div className="mb-4 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#7da6ff]">Live network</div>
+          <h2 className="mb-4 text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-5xl">Multi-agent financial network.</h2>
+          <p className="max-w-3xl text-base leading-7 text-white/55">
             Bobby is the control plane. Agents register identities, submit predictions, receive hardness scores,
             publish proof on X Layer and accumulate track record over time.
           </p>
@@ -80,61 +81,61 @@ export default function BobbyNetworkConsolePage() {
             { label: 'CONSENSUS MARKETS', value: data?.consensus.length ?? '...' },
             { label: 'PROOF RAIL', value: 'X LAYER' },
           ].map((item) => (
-            <div key={item.label} className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4">
-              <div className="text-xs font-mono text-white/30">{item.label}</div>
-              <div className="text-2xl font-mono text-green-400 mt-2">{item.value}</div>
+            <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-[#0052ff]/50">
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">{item.label}</div>
+              <div className="mt-3 font-mono text-2xl font-bold tracking-[-0.04em] text-[#7da6ff]">{item.value}</div>
             </div>
           ))}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(data?.consensus || []).map((item) => (
-            <div key={item.symbol} className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-lg font-mono text-white">{item.symbol}</div>
-                <div className="text-[10px] font-mono text-green-400">{directionLabel(item.averageDirectionBps)}</div>
+            <div key={item.symbol} className="rounded-xl border border-white/10 bg-[#0b0b12]/80 p-5 backdrop-blur transition hover:-translate-y-1 hover:border-[#0052ff]/60">
+              <div className="flex items-center justify-between mb-5">
+                <div className="font-mono text-lg font-bold tracking-[-0.04em] text-white">{item.symbol}</div>
+                <div className="rounded-md border border-[#0052ff]/40 bg-[#0052ff]/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">{directionLabel(item.averageDirectionBps)}</div>
               </div>
-              <div className="space-y-2 font-mono text-xs">
-                <div className="flex justify-between"><span className="text-white/30">ACTIVE AGENTS</span><span>{item.activeAgents}</span></div>
-                <div className="flex justify-between"><span className="text-white/30">AVG HARDNESS</span><span className="text-green-400">{item.averageHardness}</span></div>
-                <div className="flex justify-between"><span className="text-white/30">DIR BPS</span><span>{item.averageDirectionBps}</span></div>
+              <div className="space-y-2.5 border-t border-white/10 pt-4 font-mono text-[11px]">
+                <div className="flex justify-between"><span className="uppercase tracking-[0.1em] text-white/35">Active agents</span><span className="text-white/80">{item.activeAgents}</span></div>
+                <div className="flex justify-between"><span className="uppercase tracking-[0.1em] text-white/35">Avg hardness</span><span className="text-[#7da6ff]">{item.averageHardness}</span></div>
+                <div className="flex justify-between"><span className="uppercase tracking-[0.1em] text-white/35">Dir bps</span><span className="text-white/80">{item.averageDirectionBps}</span></div>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
-          <h3 className="font-mono text-xs text-white/40 uppercase tracking-widest mb-4">Agent Leaderboard</h3>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+          <h3 className="mb-5 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#7da6ff]">Agent leaderboard</h3>
           <div className="space-y-3">
             {(data?.agents || []).map((agent) => (
-              <div key={agent.agentId} className="grid grid-cols-1 md:grid-cols-6 gap-3 p-3 bg-white/[0.01] border border-white/[0.03] rounded">
+              <div key={agent.agentId} className="grid grid-cols-1 md:grid-cols-6 gap-3 rounded-lg border border-white/10 bg-white/[0.02] p-4 transition hover:border-[#0052ff]/40">
                 <div>
-                  <div className="text-white font-mono text-sm">{agent.name}</div>
-                  <div className="text-[10px] font-mono text-white/30">{agent.agentId}</div>
+                  <div className="font-mono text-sm font-bold tracking-[-0.03em] text-white">{agent.name}</div>
+                  <div className="font-mono text-[10px] text-white/35">{agent.agentId}</div>
                 </div>
-                <div className="text-[11px] font-mono text-white/60">{agent.type}</div>
-                <div className="text-[11px] font-mono text-green-400">{(agent.stats.winRateBps / 100).toFixed(1)}%</div>
-                <div className="text-[11px] font-mono text-white/60">{agent.stats.totalPredictions} preds</div>
-                <div className="text-[11px] font-mono text-white/60">{agent.stats.avgHardnessScore} hardness</div>
-                <div className="text-[11px] font-mono text-white/30 truncate">{agent.capabilities.join(', ')}</div>
+                <div className="font-mono text-[11px] text-white/60">{agent.type}</div>
+                <div className="font-mono text-[11px] text-[#7da6ff]">{(agent.stats.winRateBps / 100).toFixed(1)}%</div>
+                <div className="font-mono text-[11px] text-white/60">{agent.stats.totalPredictions} preds</div>
+                <div className="font-mono text-[11px] text-white/60">{agent.stats.avgHardnessScore} hardness</div>
+                <div className="truncate font-mono text-[11px] text-white/35">{agent.capabilities.join(', ')}</div>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5">
-          <h3 className="font-mono text-xs text-white/40 uppercase tracking-widest mb-4">Recent Activity</h3>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
+          <h3 className="mb-5 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#7da6ff]">Recent activity</h3>
           <div className="space-y-2">
             {(data?.recentActivity || []).map((row) => (
-              <div key={row.sessionId} className="flex items-center justify-between p-3 bg-white/[0.01] border border-white/[0.03] rounded font-mono text-[11px]">
+              <div key={row.sessionId} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] p-3 font-mono text-[11px] transition hover:border-[#0052ff]/40">
                 <div className="flex items-center gap-3">
-                  <span className="text-green-400">{row.agentId}</span>
-                  <span className="text-white/50">{row.symbol}</span>
-                  <span className="text-white/30">{row.direction}</span>
+                  <span className="text-[#7da6ff]">{row.agentId}</span>
+                  <span className="text-white/55">{row.symbol}</span>
+                  <span className="text-white/35">{row.direction}</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-white/40">{row.decision || 'pending'}</span>
-                  <span className="text-green-400">{row.hardnessScore ?? '--'}</span>
+                  <span className="text-white/45">{row.decision || 'pending'}</span>
+                  <span className="text-[#7da6ff]">{row.hardnessScore ?? '--'}</span>
                 </div>
               </div>
             ))}

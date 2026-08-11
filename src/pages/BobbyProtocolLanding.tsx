@@ -184,38 +184,29 @@ export default function BobbyProtocolLanding() {
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
     : null;
 
-  const explorerBase = stats?.chain?.id === 8453 ? 'https://basescan.org' : 'https://www.oklink.com/xlayer';
+  const xlayerExplorer = 'https://www.oklink.com/xlayer/address';
   const c = stats?.contracts;
-  const contractCards: Array<{ name: string; address?: string; rows: Array<[string, string]> }> = [
+  const proofPoints = [
     {
-      name: 'HARDNESS_REGISTRY',
-      address: c?.hardnessRegistry?.address,
-      rows: [['Signals', 'publishSignal'], ['Predictions', 'commitPrediction'], ['Agent', c?.hardnessRegistry?.agentRegistered ? '✓ registered' : '—']],
+      label: 'Decisions sealed',
+      value: formatNumber(c?.trackRecord?.stats?.totalCommitments),
+      detail: 'Theses committed on-chain before the market resolved them — commit-reveal, no hindsight edits.',
+      proof: 'TrackRecord contract',
+      href: `${xlayerExplorer}/${c?.trackRecord?.address ?? ''}`,
     },
     {
-      name: 'AGENT_ECONOMY_V2',
-      address: c?.agentEconomy?.address,
-      rows: [['Debates', formatNumber(c?.agentEconomy?.stats?.totalDebates)], ['MCP calls', formatNumber(c?.agentEconomy?.stats?.totalMcpCalls)], ['Volume', c?.agentEconomy?.stats?.totalVolumeOkb ?? '—']],
+      label: 'Adversarial bounties',
+      value: formatNumber(c?.adversarialBounties?.totalPosted),
+      detail: 'Open bounties paid for breaking Bobby\u2019s own reasoning. Being wrong in public is part of the design.',
+      proof: 'AdversarialBounties contract',
+      href: `${xlayerExplorer}/${c?.adversarialBounties?.address ?? ''}`,
     },
     {
-      name: 'CONVICTION_ORACLE',
-      address: c?.convictionOracle?.address,
-      rows: [['Symbols tracked', formatNumber(c?.convictionOracle?.stats?.symbolCount)]],
-    },
-    {
-      name: 'TRACK_RECORD',
-      address: c?.trackRecord?.address,
-      rows: [['Commitments', formatNumber(c?.trackRecord?.stats?.totalCommitments)], ['Revealed', formatNumber(c?.trackRecord?.stats?.totalTrades)], ['Win rate', winRate ? `${(Number(winRate) / 100).toFixed(1)}%` : '—']],
-    },
-    {
-      name: 'ADVERSARIAL_BOUNTIES',
-      address: c?.adversarialBounties?.address,
-      rows: [['Posted', formatNumber(c?.adversarialBounties?.totalPosted)], ['Min bounty', c?.adversarialBounties?.minBounty?.minBountyOkb ?? '—'], ['Verified', c?.adversarialBounties?.verified ? '✓ explorer' : '—']],
-    },
-    {
-      name: 'AGENT_REGISTRY',
-      address: c?.agentRegistry?.address,
-      rows: [['Type', c?.agentRegistry?.type ?? '—'], ['Agents', formatNumber(c?.agentRegistry?.agents)], ['Identity', 'NFT-based']],
+      label: 'Contracts live',
+      value: '6',
+      detail: 'Registry, economy, oracle, track record, bounties and identity — all deployed and explorer-verified.',
+      proof: 'AgentEconomy V2 contract',
+      href: `${xlayerExplorer}/${c?.agentEconomy?.address ?? ''}`,
     },
   ];
 
@@ -314,6 +305,35 @@ export default function BobbyProtocolLanding() {
           </div>
         </div>
 
+        <section className="relative overflow-hidden bg-[#050505]" id="architecture">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(0,82,255,.12),transparent_45%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / Architecture</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → proof on Base → agent economy. Twenty seconds, the whole protocol.</p>
+            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
+            >
+              <video
+                className="h-full w-full"
+                src="/videos/architecture.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster="/posters/architecture.jpg"
+              />
+            </motion.div>
+          </div>
+        </section>
+
         <section className="relative isolate min-h-[940px] overflow-hidden bg-[#050505] text-white" id="how-it-works">
           <SectionMedia name="orb" className="scale-105 opacity-75 blur-[2px] saturate-150" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,.88)_0%,rgba(5,5,5,.38)_55%,rgba(5,5,5,.24)_100%)]" />
@@ -327,7 +347,7 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.25 }}
               className="max-w-3xl"
             >
-              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / The verification loop</div>
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The verification loop</div>
               <h2 className="text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
                 Decisions, never blind.<br />
                 <span className="text-white/72">See Bobby in action.</span>
@@ -406,7 +426,7 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
             <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
-                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Protocol capabilities</div>
+                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Protocol capabilities</div>
                 <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
                   An agent-native decision layer,<br />everything it needs.
                 </h2>
@@ -482,35 +502,6 @@ export default function BobbyProtocolLanding() {
                 </motion.article>
               ))}
             </div>
-          </div>
-        </section>
-
-        <section className="relative overflow-hidden bg-[#050505]" id="architecture">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(0,82,255,.12),transparent_45%)]" />
-          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Architecture</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
-              </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → proof on Base → agent economy. Twenty seconds, the whole protocol.</p>
-            </div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
-            >
-              <video
-                className="h-full w-full"
-                src="/videos/architecture.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-                poster="/posters/architecture.jpg"
-              />
-            </motion.div>
           </div>
         </section>
 
@@ -711,46 +702,45 @@ export default function BobbyProtocolLanding() {
         </section>
 
         <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.12),transparent_45%)]" />
-          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-12 text-center">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Deployed contracts</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Live on {chainLabel}.</h2>
-              <p className="mt-5 font-mono text-sm text-white/45">Six contracts. One protocol. All on {chainLabel}{stats?.chain?.id ? ` chain ${stats.chain.id}` : ''}.</p>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
+            <div className="mb-12 max-w-3xl">
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Proven on X Layer.<br />Now building on Base.</h2>
+              <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
+                Bobby ran in production on OKX X Layer through the hackathon era. Every number below is on-chain and independently verifiable — nothing here is a screenshot.
+              </p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {contractCards.map((card, index) => (
+
+            <div className="grid gap-4 md:grid-cols-3">
+              {proofPoints.map((point, index) => (
                 <motion.a
-                  key={card.name}
-                  href={card.address ? `${explorerBase}/address/${card.address}` : undefined}
+                  key={point.label}
+                  href={point.href}
                   target="_blank"
                   rel="noreferrer"
                   initial={{ opacity: 0, y: 14 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: index * 0.05 }}
-                  className="group flex flex-col rounded-xl border border-white/10 bg-[#0b0b12]/80 p-6 transition hover:-translate-y-1 hover:border-[#0052ff]/60"
+                  transition={{ delay: index * 0.06 }}
+                  className="group flex flex-col rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-7 transition hover:-translate-y-1 hover:border-[#0052ff]/60"
                 >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    <span className="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#7da6ff]">{card.name}</span>
+                  <div className="mb-6 flex items-start justify-between">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">{point.label}</span>
                     <ArrowRight className="h-3.5 w-3.5 -rotate-45 text-white/25 transition group-hover:text-[#7da6ff]" />
                   </div>
-                  <div className="mb-5 truncate font-mono text-sm text-white/85">
-                    {card.address ? `${card.address.slice(0, 10)}…${card.address.slice(-8)}` : 'awaiting rpc…'}
-                  </div>
-                  <div className="mt-auto space-y-2 border-t border-white/10 pt-4">
-                    {card.rows.map(([label, value]) => (
-                      <div key={label} className="flex items-center justify-between gap-3 font-mono text-[11px]">
-                        <span className="uppercase tracking-[0.1em] text-white/35">{label}</span>
-                        <span className="text-white/80">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex items-center justify-end gap-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" /> Live
-                  </div>
+                  <div className="font-mono text-5xl font-bold tracking-[-0.05em] text-white">{point.value}</div>
+                  <p className="mt-4 text-sm leading-6 text-white/50">{point.detail}</p>
+                  <div className="mt-6 border-t border-white/10 pt-4 font-mono text-[11px] text-[#7da6ff]">{point.proof}</div>
                 </motion.a>
               ))}
+            </div>
+
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
+              <span>Chain 196 · OKX X Layer</span>
+              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord on OKLink ↗</a>
+              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">AgentEconomy on OKLink ↗</a>
+              <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>
             </div>
           </div>
         </section>

@@ -90,7 +90,7 @@ interface Verdict {
 }
 
 const AGENT_META: Record<AgentPhase, { label: string; accent: string; glyph: string; tagline: string }> = {
-  alpha_hunter: { label: 'Alpha Hunter', accent: '#6dfe9c', glyph: '>>>', tagline: 'Bull thesis' },
+  alpha_hunter: { label: 'Alpha Hunter', accent: '#7da6ff', glyph: '>>>', tagline: 'Bull thesis' },
   red_team:     { label: 'Red Team',     accent: '#ff716a', glyph: ':::', tagline: 'Adversarial rebuttal' },
   cio:          { label: 'CIO',          accent: '#fcc025', glyph: '[!]', tagline: 'Capital decision' },
   judge:        { label: 'Judge',        accent: '#60a5fa', glyph: '(6)', tagline: '6-dimension audit' },
@@ -98,7 +98,7 @@ const AGENT_META: Record<AgentPhase, { label: string; accent: string; glyph: str
 };
 
 const ACTION_STYLE: Record<VerdictAction, { bg: string; border: string; text: string; label: string }> = {
-  EXECUTE:    { bg: 'bg-[#6dfe9c]/10', border: 'border-[#6dfe9c]/40', text: 'text-[#6dfe9c]', label: 'EXECUTE' },
+  EXECUTE:    { bg: 'bg-[#0052ff]/10', border: 'border-[#0052ff]/40', text: 'text-[#7da6ff]', label: 'EXECUTE' },
   YIELD_PARK: { bg: 'bg-[#fcc025]/10', border: 'border-[#fcc025]/40', text: 'text-[#fcc025]', label: 'YIELD PARK' },
   BLOCKED:    { bg: 'bg-[#ff716a]/10', border: 'border-[#ff716a]/40', text: 'text-[#ff716a]', label: 'BLOCKED' },
 };
@@ -343,15 +343,15 @@ export default function BobbySandboxPage() {
           content="Pressure-test a playbook in a live adversarial simulation. Watch Alpha Hunter, Red Team, CIO, Judge, and 11 guardrails run in real time."
         />
       </Helmet>
-      <KineticShell activeTab="sandbox">
+      <KineticShell activeTab="sandbox" minimalNav>
         <div className="mx-auto max-w-7xl px-4 py-10 md:px-8">
           {/* ── Header ── */}
           <header className="mb-8">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#6dfe9c]/20 bg-[#6dfe9c]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.24em] text-[#6dfe9c]">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-[#7da6ff]">
               Live adversarial simulation · ~60–90s · No capital moves
             </div>
-            <h1 className="max-w-3xl font-['Space_Grotesk'] text-4xl font-bold leading-tight md:text-5xl">
-              Sandbox — Watch Bobby Pressure-Test a Trade
+            <h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-[-0.07em] md:text-5xl">
+              Sandbox — watch Bobby pressure-test a thesis
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-white/65">
               Pick a playbook, choose a ticker, and watch the full adversarial debate run in real time.
@@ -363,15 +363,15 @@ export default function BobbySandboxPage() {
           <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
             {/* ── LEFT: Controls ── */}
             <aside className="space-y-5">
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-                <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
+              <div className="rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-5">
+                <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
                   Playbook
                 </label>
                 <select
                   value={playbookSlug}
                   onChange={(e) => setPlaybookSlug(e.target.value)}
                   disabled={running}
-                  className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2 font-mono text-sm text-white/90 focus:border-[#6dfe9c]/50 focus:outline-none disabled:opacity-50"
+                  className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-white/90 focus:border-[#0052ff]/60 focus:outline-none disabled:opacity-50"
                 >
                   {PLAYBOOKS.map((p) => (
                     <option key={p.slug} value={p.slug}>
@@ -384,7 +384,7 @@ export default function BobbySandboxPage() {
                   <p className="mt-3 text-xs leading-5 text-white/60">{selectedPlaybook.tagline}</p>
                 )}
 
-                <label className="mt-5 mb-2 block font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
+                <label className="mt-5 mb-2 block font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
                   Ticker
                 </label>
                 <div className="mb-2 flex flex-wrap gap-1.5">
@@ -394,10 +394,10 @@ export default function BobbySandboxPage() {
                       type="button"
                       onClick={() => setTicker(t)}
                       disabled={running}
-                      className={`rounded-md border px-2 py-1 font-mono text-[10px] font-bold tracking-[0.14em] transition-colors disabled:opacity-50 ${
+                      className={`rounded-lg border px-2 py-1 font-mono text-[10px] font-bold tracking-[0.14em] transition-colors disabled:opacity-50 ${
                         ticker === t
-                          ? 'border-[#6dfe9c]/50 bg-[#6dfe9c]/15 text-[#6dfe9c]'
-                          : 'border-white/[0.08] bg-white/[0.02] text-white/55 hover:text-white/85'
+                          ? 'border-[#0052ff]/50 bg-[#0052ff]/20 text-[#7da6ff]'
+                          : 'border-white/10 bg-white/[0.04] text-white/55 hover:text-white/85'
                       }`}
                     >
                       {t}
@@ -411,33 +411,33 @@ export default function BobbySandboxPage() {
                   disabled={running}
                   maxLength={12}
                   placeholder="Or type any OKX spot ticker"
-                  className="w-full rounded-lg border border-white/[0.08] bg-black/40 px-3 py-2 font-mono text-sm text-white/90 focus:border-[#6dfe9c]/50 focus:outline-none disabled:opacity-50"
+                  className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-white/90 focus:border-[#0052ff]/60 focus:outline-none disabled:opacity-50"
                 />
 
                 <button
                   onClick={runSandbox}
                   disabled={running || !ticker}
-                  className="mt-5 w-full rounded-lg border border-[#6dfe9c]/40 bg-[#6dfe9c]/10 px-4 py-3 font-['Space_Grotesk'] text-sm font-bold uppercase tracking-wider text-[#6dfe9c] transition-all hover:bg-[#6dfe9c]/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-5 w-full rounded-lg bg-white px-4 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition-all hover:bg-[#0052ff] hover:text-white active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {running ? 'Pressure-Testing...' : `Run Pressure-Test · ${ticker || '—'}`}
+                  {running ? 'Pressure-testing...' : `Run pressure-test · ${ticker || '—'}`}
                 </button>
 
-                <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
+                <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-white/35">
                   Real OKX data · Simulation only · No capital moves
                 </p>
 
                 {runCount > 0 && (
-                  <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.16em] text-[#6dfe9c]/70">
+                  <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-[#7da6ff]/80">
                     You&apos;ve run {runCount} pressure-test{runCount === 1 ? '' : 's'} in this browser
                   </p>
                 )}
               </div>
 
               {/* Guardrail Gauntlet preview */}
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/50">
-                    Guardrail Gauntlet
+                  <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
+                    Guardrail gauntlet
                   </span>
                   <span className="font-mono text-[10px] text-white/40">
                     {guardrails.filter((g) => g.status === 'pass').length}/
@@ -462,7 +462,7 @@ export default function BobbySandboxPage() {
             {/* ── RIGHT: Live stream ── */}
             <section className="space-y-5">
               {error && (
-                <div className="rounded-lg border border-[#ff716a]/40 bg-[#ff716a]/10 p-4 font-mono text-sm text-[#ff716a]">
+                <div className="rounded-xl border border-[#ff716a]/40 bg-[#ff716a]/10 p-4 font-mono text-sm text-[#ff716a]">
                   :: STREAM ERROR — {error} ::
                 </div>
               )}
@@ -474,9 +474,9 @@ export default function BobbySandboxPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="rounded-xl border border-[#fcc025]/40 bg-[#fcc025]/10 p-5"
+                  className="rounded-2xl border border-[#fcc025]/40 bg-[#fcc025]/10 p-5"
                 >
-                  <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#fcc025]">
+                  <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#fcc025]">
                     <span className="font-bold">[!]</span>
                     Phase interrupted — {interruption.phase}
                   </div>
@@ -484,8 +484,8 @@ export default function BobbySandboxPage() {
                     {interruption.message}
                   </p>
                   {interruption.partialText && (
-                    <div className="mt-3 rounded-md border border-white/[0.06] bg-black/30 p-3">
-                      <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+                    <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
+                      <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
                         Partial transcript preserved
                       </div>
                       <div className="whitespace-pre-wrap font-mono text-xs leading-5 text-white/70">
@@ -506,14 +506,14 @@ export default function BobbySandboxPage() {
               <JudgeCard state={agents.judge} scores={judgeScores} />
 
               {/* Live guardrail gauntlet, larger */}
-              <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
                 <div className="mb-4 flex items-center gap-3">
                   <span className="font-mono text-lg font-bold text-[#c084fc]">###</span>
                   <div>
-                    <div className="font-['Space_Grotesk'] text-lg font-bold text-white">
-                      Guardrail Gauntlet
+                    <div className="text-lg font-extrabold tracking-[-0.05em] text-white">
+                      Guardrail gauntlet
                     </div>
-                    <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
                       Fail-closed checks · 11 gates
                     </div>
                   </div>
@@ -543,24 +543,24 @@ export default function BobbySandboxPage() {
                     transition={{ duration: 0.4 }}
                     className={`rounded-2xl border-2 p-8 ${ACTION_STYLE[verdict.action].border} ${ACTION_STYLE[verdict.action].bg}`}
                   >
-                    <div className="font-mono text-[10px] uppercase tracking-[0.24em] text-white/45">
-                      Final Verdict
+                    <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">
+                      Final verdict
                     </div>
                     <div
-                      className={`mt-2 font-['Space_Grotesk'] text-5xl font-black tracking-tight ${ACTION_STYLE[verdict.action].text}`}
+                      className={`mt-2 text-5xl font-extrabold tracking-[-0.07em] ${ACTION_STYLE[verdict.action].text}`}
                     >
                       {ACTION_STYLE[verdict.action].label}
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
                       <Stat label="Conviction" value={`${verdict.conviction.toFixed(1)}/10`} />
                       <Stat
-                        label="Guardrails Passed"
+                        label="Guardrails passed"
                         value={`${verdict.guardrailsPassed}/${verdict.guardrailsTotal}`}
                       />
-                      <Stat label="Guardrails Failed" value={`${verdict.guardrailsFailed}`} />
+                      <Stat label="Guardrails failed" value={`${verdict.guardrailsFailed}`} />
                     </div>
                     <p className="mt-5 text-sm leading-6 text-white/75">{verdict.reason}</p>
-                    <p className="mt-4 border-t border-white/[0.08] pt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">
+                    <p className="mt-4 border-t border-white/10 pt-3 font-mono text-[10px] uppercase tracking-[0.15em] text-white/35">
                       Simulation only · No capital moved · No on-chain commit
                     </p>
                   </motion.div>
@@ -573,7 +573,7 @@ export default function BobbySandboxPage() {
           <section className="mt-14">
             <div className="mb-4 flex flex-col gap-1 md:flex-row md:items-end md:justify-between">
               <div>
-                <h2 className="font-['Space_Grotesk'] text-2xl font-bold text-white md:text-3xl">
+                <h2 className="text-2xl font-extrabold tracking-[-0.06em] text-white md:text-3xl">
                   Last 20 pressure-tests
                 </h2>
                 <p className="mt-1 text-sm text-white/55">
@@ -583,7 +583,7 @@ export default function BobbySandboxPage() {
               <button
                 onClick={loadFeed}
                 disabled={feedLoading}
-                className="self-start rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white/55 transition-colors hover:text-white/90 disabled:opacity-50 md:self-auto"
+                className="self-start rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-white/70 backdrop-blur transition-colors hover:text-white disabled:opacity-50 md:self-auto"
               >
                 {feedLoading ? 'Refreshing...' : 'Refresh'}
               </button>
@@ -604,11 +604,11 @@ function AgentCard({ phase, state }: { phase: AgentPhase; state: AgentState }) {
   return (
     <motion.div
       animate={{
-        borderColor: isActive ? `${meta.accent}66` : 'rgba(255,255,255,0.06)',
+        borderColor: isActive ? `${meta.accent}66` : 'rgba(255,255,255,0.10)',
         boxShadow: isActive ? `0 0 24px ${meta.accent}22` : '0 0 0 transparent',
       }}
       transition={{ duration: 0.3 }}
-      className="rounded-xl border bg-white/[0.02] p-5"
+      className="rounded-2xl border bg-white/[0.04] p-5"
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -616,8 +616,8 @@ function AgentCard({ phase, state }: { phase: AgentPhase; state: AgentState }) {
             {meta.glyph}
           </span>
           <div>
-            <div className="font-['Space_Grotesk'] text-lg font-bold text-white">{meta.label}</div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+            <div className="text-lg font-extrabold tracking-[-0.05em] text-white">{meta.label}</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               {meta.tagline}
             </div>
           </div>
@@ -644,11 +644,11 @@ function CioCard({
   return (
     <motion.div
       animate={{
-        borderColor: isActive ? `${meta.accent}66` : 'rgba(255,255,255,0.06)',
+        borderColor: isActive ? `${meta.accent}66` : 'rgba(255,255,255,0.10)',
         boxShadow: isActive ? `0 0 24px ${meta.accent}22` : '0 0 0 transparent',
       }}
       transition={{ duration: 0.3 }}
-      className="rounded-xl border bg-white/[0.02] p-5"
+      className="rounded-2xl border bg-white/[0.04] p-5"
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -656,8 +656,8 @@ function CioCard({
             {meta.glyph}
           </span>
           <div>
-            <div className="font-['Space_Grotesk'] text-lg font-bold text-white">{meta.label}</div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+            <div className="text-lg font-extrabold tracking-[-0.05em] text-white">{meta.label}</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               {meta.tagline}
             </div>
           </div>
@@ -665,7 +665,7 @@ function CioCard({
         <div className="flex items-center gap-3">
           {verdict && (
             <span
-              className={`rounded-md border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${ACTION_STYLE[verdict.action].border} ${ACTION_STYLE[verdict.action].text}`}
+              className={`rounded-lg border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.15em] ${ACTION_STYLE[verdict.action].border} ${ACTION_STYLE[verdict.action].text}`}
             >
               {ACTION_STYLE[verdict.action].label}
             </span>
@@ -676,10 +676,10 @@ function CioCard({
       {verdict && (
         <div className="mb-3 flex items-center gap-6">
           <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               Conviction
             </div>
-            <div className="font-['Space_Grotesk'] text-2xl font-bold text-white">
+            <div className="text-2xl font-extrabold tracking-[-0.05em] text-white">
               {verdict.conviction.toFixed(1)}<span className="text-sm text-white/40">/10</span>
             </div>
           </div>
@@ -706,15 +706,15 @@ function JudgeCard({ state, scores }: { state: AgentState; scores: Record<string
     { id: 'novelty',               label: 'Novelty' },
   ];
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="font-mono text-lg font-bold" style={{ color: meta.accent }}>
             {meta.glyph}
           </span>
           <div>
-            <div className="font-['Space_Grotesk'] text-lg font-bold text-white">{meta.label}</div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+            <div className="text-lg font-extrabold tracking-[-0.05em] text-white">{meta.label}</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               {meta.tagline}
             </div>
           </div>
@@ -726,7 +726,7 @@ function JudgeCard({ state, scores }: { state: AgentState; scores: Record<string
           const raw = scores[d.id] ?? 0;
           const pct = hasScores ? (raw / 5) * 100 : 0;
           return (
-            <div key={d.id} className="rounded-lg bg-black/30 p-3">
+            <div key={d.id} className="rounded-lg border border-white/10 bg-black/30 p-3">
               <div className="mb-1 flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/55">
                   {d.label}
@@ -764,7 +764,7 @@ function GuardrailDot({ cell }: { cell: GuardrailCell }) {
         background: isActive ? `${color}33` : 'rgba(255,255,255,0.03)',
         borderColor: isActive ? `${color}99` : 'rgba(255,255,255,0.08)',
       }}
-      className="aspect-square rounded-md border"
+      className="aspect-square rounded-lg border"
     >
       {isActive && (
         <motion.div
@@ -831,7 +831,7 @@ function StatusPill({ status, accent }: { status: AgentState['status']; accent: 
 
 function ConvictionBar({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, (value / 10) * 100));
-  const color = value >= 3.5 ? '#6dfe9c' : value >= 1.5 ? '#fcc025' : '#ff716a';
+  const color = value >= 3.5 ? '#0052ff' : value >= 1.5 ? '#fcc025' : '#ff716a';
   return (
     <div className="flex-1">
       <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -869,8 +869,8 @@ function BlinkingCursor() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{label}</div>
-      <div className="font-['Space_Grotesk'] text-xl font-bold text-white">{value}</div>
+      <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">{label}</div>
+      <div className="text-xl font-extrabold tracking-[-0.05em] text-white">{value}</div>
     </div>
   );
 }
@@ -898,23 +898,23 @@ function MarketContextCard({ ctx }: { ctx: MarketContext }) {
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent p-5"
+      className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.05] to-transparent p-5"
     >
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="font-mono text-lg font-bold text-white/80">◉</span>
           <div>
-            <div className="font-['Space_Grotesk'] text-lg font-bold text-white">
-              Market Context — {ctx.ticker}
+            <div className="text-lg font-extrabold tracking-[-0.05em] text-white">
+              Market context — {ctx.ticker}
             </div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
               {ctx.source === 'okx' ? 'Live OKX spot · fetched just now' : 'data unavailable · reasoning general only'}
             </div>
           </div>
         </div>
         {change !== null && (
           <span
-            className="rounded-md border px-2 py-1 font-mono text-xs font-bold"
+            className="rounded-lg border px-2 py-1 font-mono text-xs font-bold"
             style={{ borderColor: `${changeColor}55`, color: changeColor, background: `${changeColor}10` }}
           >
             {change >= 0 ? '+' : ''}{change.toFixed(2)}%
@@ -927,7 +927,7 @@ function MarketContextCard({ ctx }: { ctx: MarketContext }) {
         <Stat label="24h Low" value={fmtPrice(ctx.low24h)} />
         <Stat label="24h Volume" value={fmtVol(ctx.volUsd24h)} />
       </div>
-      <div className="mt-3 border-t border-white/[0.06] pt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-white/50">
+      <div className="mt-3 border-t border-white/10 pt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-white/50">
         Regime read: <span style={{ color: changeColor }}>{regime}</span>
       </div>
     </motion.div>
@@ -948,17 +948,17 @@ function IntelCard({ intel }: { intel: BobbyIntel }) {
     <motion.div
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-[#60a5fa]/30 bg-[#60a5fa]/[0.06] p-5"
+      className="rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/[0.08] p-5"
     >
-      <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#60a5fa]">
+      <div className="mb-3 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#7da6ff]">
         <span className="font-bold">◆</span>
         Protocol Intel — injected into Alpha / Red / CIO prompts
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         {bits.map((b) => (
-          <div key={b.label} className="rounded-md bg-black/30 p-2">
-            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">{b.label}</div>
-            <div className="mt-0.5 font-['Space_Grotesk'] text-sm font-bold text-white">{b.value}</div>
+          <div key={b.label} className="rounded-lg border border-white/10 bg-black/30 p-2">
+            <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/40">{b.label}</div>
+            <div className="mt-0.5 text-sm font-extrabold tracking-[-0.04em] text-white">{b.value}</div>
           </div>
         ))}
       </div>
@@ -973,14 +973,14 @@ function FeedList({ runs }: { runs: FeedRun[] }) {
 
   if (!runs.length) {
     return (
-      <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 text-center text-sm text-white/45">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center text-sm text-white/45">
         No pressure-tests logged yet. Be the first — pick a playbook above and run one.
       </div>
     );
   }
 
   const verdictStyle: Record<string, { color: string; label: string }> = {
-    EXECUTE:    { color: '#6dfe9c', label: 'EXECUTE' },
+    EXECUTE:    { color: '#7da6ff', label: 'EXECUTE' },
     YIELD_PARK: { color: '#fcc025', label: 'YIELD PARK' },
     BLOCKED:    { color: '#ff716a', label: 'BLOCKED' },
   };
@@ -1018,21 +1018,21 @@ function FeedList({ runs }: { runs: FeedRun[] }) {
         return (
           <div
             key={r.id}
-            className="rounded-lg border border-white/[0.05] bg-white/[0.02] transition-colors hover:border-white/[0.1]"
+            className="rounded-xl border border-white/10 bg-white/[0.04] transition-colors hover:border-[#0052ff]/40"
           >
             <button
               onClick={() => toggleExpand(r.id)}
               className="flex w-full flex-col gap-3 p-3 text-left md:flex-row md:items-center md:justify-between"
             >
               <div className="flex flex-wrap items-center gap-3">
-                <span className="rounded-md border border-white/[0.08] bg-black/30 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
+                <span className="rounded-lg border border-white/10 bg-black/30 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/80">
                   {r.ticker}
                 </span>
                 <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/55">
                   {r.playbook_slug}
                 </span>
                 {isInterrupted && (
-                  <span className="rounded-md border border-[#fcc025]/30 bg-[#fcc025]/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#fcc025]">
+                  <span className="rounded-lg border border-[#fcc025]/30 bg-[#fcc025]/10 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#fcc025]">
                     interrupted @ {r.error_phase || '?'}
                   </span>
                 )}
@@ -1054,7 +1054,7 @@ function FeedList({ runs }: { runs: FeedRun[] }) {
                 )}
                 {vs && (
                   <span
-                    className="rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em]"
+                    className="rounded-lg border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em]"
                     style={{ borderColor: `${vs.color}55`, color: vs.color, background: `${vs.color}10` }}
                   >
                     {vs.label}
@@ -1074,7 +1074,7 @@ function FeedList({ runs }: { runs: FeedRun[] }) {
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div className="border-t border-white/[0.05] p-4">
+                  <div className="border-t border-white/10 p-4">
                     {loadingFull && !fullRun && (
                       <div className="font-mono text-[11px] text-white/45">Loading transcript...</div>
                     )}
@@ -1094,7 +1094,7 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
   return (
     <div className="space-y-4">
       {run.alpha_text && (
-        <TranscriptBlock label="Alpha Hunter" color="#6dfe9c" text={run.alpha_text} />
+        <TranscriptBlock label="Alpha Hunter" color="#7da6ff" text={run.alpha_text} />
       )}
       {run.red_text && (
         <TranscriptBlock label="Red Team" color="#ff716a" text={run.red_text} />
@@ -1104,12 +1104,12 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
       )}
       {run.judge_scores && Object.keys(run.judge_scores).length > 0 && (
         <div>
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#60a5fa]">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#7da6ff]">
             Judge scores (6D)
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
             {Object.entries(run.judge_scores).map(([dim, score]) => (
-              <div key={dim} className="flex items-center justify-between rounded-md bg-black/30 px-2 py-1">
+              <div key={dim} className="flex items-center justify-between rounded-lg border border-white/10 bg-black/30 px-2 py-1">
                 <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/55">{dim}</span>
                 <span className="font-mono text-[11px] font-bold text-white/90">{score}/5</span>
               </div>
@@ -1119,7 +1119,7 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
       )}
       {run.guardrail_results && run.guardrail_results.length > 0 && (
         <div>
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[#c084fc]">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#c084fc]">
             Guardrail gauntlet
           </div>
           <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
@@ -1132,7 +1132,7 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
               return (
                 <div
                   key={g.id}
-                  className="flex items-center gap-2 rounded-md border px-2 py-1"
+                  className="flex items-center gap-2 rounded-lg border px-2 py-1"
                   style={{ borderColor: `${color}44`, background: `${color}10` }}
                 >
                   <span className="font-mono text-xs font-bold" style={{ color }}>{sym}</span>
@@ -1146,15 +1146,15 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
         </div>
       )}
       {run.verdict_reason && (
-        <div className="rounded-md border border-white/[0.08] bg-black/30 p-3">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
+        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
             Verdict reason
           </div>
           <p className="text-xs leading-5 text-white/75">{run.verdict_reason}</p>
         </div>
       )}
       {run.error_message && run.status !== 'completed' && (
-        <div className="rounded-md border border-[#fcc025]/30 bg-[#fcc025]/10 p-3">
+        <div className="rounded-lg border border-[#fcc025]/30 bg-[#fcc025]/10 p-3">
           <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[#fcc025]">
             Error ({run.error_phase || 'unknown'})
           </div>
@@ -1169,11 +1169,11 @@ function TranscriptBlock({ label, color, text }: { label: string; color: string;
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em]" style={{ color }}>
+        <span className="font-mono text-[10px] uppercase tracking-[0.15em]" style={{ color }}>
           {label}
         </span>
       </div>
-      <div className="rounded-md border border-white/[0.06] bg-black/30 p-3 font-mono text-[11px] leading-5 text-white/80 whitespace-pre-wrap">
+      <div className="rounded-lg border border-white/10 bg-black/30 p-3 font-mono text-[11px] leading-5 text-white/80 whitespace-pre-wrap">
         {text}
       </div>
     </div>
