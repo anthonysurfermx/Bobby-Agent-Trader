@@ -72,8 +72,9 @@ contract DeployBase is Script {
             c.cio = vm.envAddress("CIO_ADDRESS");
             c.resolver = vm.envAddress("RESOLVER_ADDRESS");
             require(
-                c.alpha != c.red && c.alpha != c.cio && c.red != c.cio && c.resolver != c.cio,
-                "Mainnet economic roles must be distinct"
+                c.alpha != c.red && c.alpha != c.cio && c.alpha != c.resolver
+                    && c.red != c.cio && c.red != c.resolver && c.cio != c.resolver,
+                "Mainnet economic roles must be pairwise distinct"
             );
         } else {
             c.alpha = vm.envOr("ALPHA_ADDRESS", c.bobby);
@@ -105,7 +106,22 @@ contract DeployBase is Script {
 
         Config memory c = _config();
 
-        // r6 #3: real resolver set. RESOLVER_ADDRESSES (comma-separated)
+        // r7 #2/#3: IntentEscrow (the LAST contract deployed) enforces F-013 —
+        // cio/arbiter/keeper/resolver pairwise distinct, owner != keeper. Mirror
+        // that check HERE, before vm.startBroadcast(), so a bad role set fails
+        // with zero contracts deployed instead of six-of-seven. On Sepolia this
+        // means collapsed defaults are NOT enough for the escrow: CIO_ADDRESS
+        // and RESOLVER_ADDRESS must still be distinct from each other and from
+        // arbiter/keeper.
+        require(
+            c.cio != c.arbiter && c.cio != c.keeper && c.cio != c.resolver
+                && c.arbiter != c.keeper && c.arbiter != c.resolver
+                && c.keeper != c.resolver,
+            "IntentEscrow roles (cio/arbiter/keeper/resolver) must be pairwise distinct"
+        );
+        require(msg.sender != c.keeper, "IntentEscrow: deployer (owner) must not be keeper");
+
+        // r7: RESOLVER_ADDRESSES quorum applies to HardnessRegistry ONLY. RESOLVER_ADDRESSES (comma-separated)
         // overrides; otherwise this is honestly a centralized 1-of-1 with
         // c.resolver, and any threshold > 1 fails here, not mid-broadcast.
         address[] memory fallbackResolvers = new address[](1);
@@ -148,8 +164,9 @@ contract DeployBase is Script {
         vm.stopBroadcast();
 
         console2.log("chain id            ", block.chainid);
-        console2.log("resolver count      ", initialResolvers.length);
-        console2.log("resolver threshold  ", c.resolverThreshold);
+        console2.log("hardness resolvers  ", initialResolvers.length);
+        console2.log("hardness threshold  ", c.resolverThreshold);
+        console2.log("bounties+escrow resolver (single, by design)", c.resolver);
         if (block.chainid != 8453 && c.alpha == c.bobby && c.red == c.bobby) {
             console2.log("NOTE: agent roles collapsed into BOBBY_ADDRESS (logical roles, testnet only)");
         }
