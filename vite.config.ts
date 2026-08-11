@@ -76,6 +76,30 @@ export default defineConfig({
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
       },
+      '/api/protocol-heartbeat': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/protocol-tx-history': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/network': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/harness-events': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/harness-memory': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
+      '/api/sandbox-runs': {
+        target: 'https://bobbyprotocol.xyz',
+        changeOrigin: true,
+      },
     },
   },
 })

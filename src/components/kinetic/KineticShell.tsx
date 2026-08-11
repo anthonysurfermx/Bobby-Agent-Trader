@@ -166,6 +166,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
       </div>
 
       {/* === Mobile Bottom Nav === */}
+      {!minimalNav && (
       <nav className="md:hidden fixed bottom-0 w-full h-14 bg-[#131313]/90 backdrop-blur-xl border-t border-white/5 flex items-center justify-around px-4 z-50">
         {[
           { id: 'terminal', icon: '⌘', label: 'WAR ROOM', path: '/agentic-world/bobby' },
@@ -182,6 +183,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
           </Link>
         ))}
       </nav>
+      )}
     </div>
   );
 }
