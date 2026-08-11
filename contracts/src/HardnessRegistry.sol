@@ -408,9 +408,11 @@ contract HardnessRegistry {
         if (exitPrice == 0) revert InvalidValue();
         if (block.timestamp < prediction.minResolveAt) revert TooSoon();
         if (block.timestamp > prediction.committedAt + predictionTTL) revert Expired();
-        if (
-            msg.sender != prediction.agent && !agentProfiles[msg.sender].registered && !resolvers[msg.sender]
-        ) revert NotAuthorized();
+        /// @dev Kimi/Codex audit (Base r4, CRITICAL): being a registered agent must NOT
+        /// grant resolution rights over other agents' predictions — otherwise any
+        /// attacker can register and stamp LOSS on a competitor's record. Only the
+        /// prediction's own agent or an explicitly approved resolver may resolve.
+        if (msg.sender != prediction.agent && !resolvers[msg.sender]) revert NotAuthorized();
         if (result == PredictionResult.NONE || result == PredictionResult.EXPIRED) revert InvalidResult();
 
         if (result == PredictionResult.WIN) {

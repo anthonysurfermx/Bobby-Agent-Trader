@@ -252,10 +252,13 @@ contract BobbyAdversarialBounties {
 
     /// @notice Resolver picks a winning challenger and releases funds via pull-payment
     /// @dev Owner can resolve as a backstop if resolver is compromised
+    /// @dev Audit Base r1 [H-1]: intentionally NOT `whenNotPaused`. Pausing must stop
+    /// new value entering, never settlement of value already in — otherwise a pause
+    /// outlasting claimWindow+grace lets the poster reclaim a bounty a challenger
+    /// already won, while the payout path is frozen.
     function resolveBounty(uint256 _bountyId, address _winner)
         external
         onlyResolver
-        whenNotPaused
     {
         Bounty storage b = bounties[_bountyId];
         require(b.poster != address(0), "Bounty not found");

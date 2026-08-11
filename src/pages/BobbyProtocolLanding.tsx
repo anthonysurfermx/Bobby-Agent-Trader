@@ -194,6 +194,24 @@ export default function BobbyProtocolLanding() {
   const totalTrades = publicRecord?.commitmentsCreated ?? stats?.contracts?.trackRecord?.stats?.totalTrades;
   const totalInteractions = stats?.protocolTotals?.totalInteractions;
   const winRate = publicRecord?.decisionsResolved ? publicRecord.winRate : null;
+
+  // Audit Base r4: a percentage over a tiny sample reads as skill when it is
+  // noise. Below this many decided outcomes we show raw counts, never a rate.
+  const WIN_RATE_MIN_SAMPLE = 20;
+  const formatWinRate = (
+    rate: number | null | undefined,
+    resolved: number | null | undefined,
+    wins?: number | null,
+    losses?: number | null,
+  ) => {
+    if (rate === null || rate === undefined || !resolved) return '—';
+    if (resolved < WIN_RATE_MIN_SAMPLE) {
+      return wins !== undefined && wins !== null && losses !== undefined && losses !== null
+        ? `${wins}W / ${losses}L`
+        : `n=${resolved}`;
+    }
+    return `${Number(rate).toFixed(1)}% (n=${resolved})`;
+  };
   const chainLabel = stats?.chain?.id === 8453 ? 'Base' : stats?.chain?.id === 196 ? 'X Layer' : 'Network';
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
@@ -204,7 +222,7 @@ export default function BobbyProtocolLanding() {
   const proofPoints = [
     {
       label: 'On-chain record',
-      value: onchainRecord?.winRate !== null && onchainRecord?.winRate !== undefined ? `${onchainRecord.winRate.toFixed(1)}%` : '—',
+      value: formatWinRate(onchainRecord?.winRate, onchainRecord?.decisionsResolved),
       detail: onchainRecord
         ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
         : 'Waiting for the TrackRecord contract.',
@@ -307,7 +325,7 @@ export default function BobbyProtocolLanding() {
                   ['Debates', formatNumber(totalDebates)],
                   ['Decisions', formatNumber(totalTrades)],
                   ['MCP calls', formatNumber(totalMcpCalls)],
-                  ['Win rate', winRate !== null ? `${Number(winRate).toFixed(1)}%` : '—'],
+                  ['Win rate', formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</div>
@@ -640,12 +658,12 @@ export default function BobbyProtocolLanding() {
                       </div>
                     ))}
                   </div>
-                  <p className="mt-7 font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{telemetryUpdatedAt ? `Snapshot verified ${telemetryUpdatedAt}` : 'Connecting to protocol telemetry'}</p>
+                  <p className="mt-7 font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{telemetryUpdatedAt ? `Snapshot fetched ${telemetryUpdatedAt}` : 'Connecting to protocol telemetry'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-px bg-white/10">
                 <div className="bg-[#080912]/90 p-5 sm:p-6"><Database className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Latest block</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{formatNumber(stats?.chain?.blockNumber)}</div><div className="mt-1 text-xs text-white/40">{chainLabel}</div></div>
-                <div className="bg-[#080912]/90 p-5 sm:p-6"><ShieldCheck className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Feed status</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{activityError ? 'Retry' : isActivityLoading ? 'Syncing' : 'Verified'}</div><div className="mt-1 text-xs text-white/40">updates every 30s</div></div>
+                <div className="bg-[#080912]/90 p-5 sm:p-6"><ShieldCheck className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Feed status</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{activityError ? 'Retry' : isActivityLoading ? 'Syncing' : 'Live'}</div><div className="mt-1 text-xs text-white/40">updates every 30s</div></div>
               </div>
             </div>
 
@@ -771,7 +789,7 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:grid-cols-8 lg:px-8"><Metric label="Compromisos" value={formatNumber(publicRecord?.commitmentsCreated ?? totalTrades)} detail="creados" /><Metric label="Resueltas" value={formatNumber(publicRecord?.decisionsResolved)} detail="decisiones" /><Metric label="Pendientes" value={formatNumber(publicRecord?.pending)} detail="sin resultado" /><Metric label="Expiradas" value={formatNumber(publicRecord?.expired)} detail="sin liquidación" /><Metric label="Wins / losses" value={publicRecord ? `${publicRecord.wins} / ${publicRecord.losses}` : '—'} detail="resueltas decisivas" /><Metric label="Win rate" value={winRate !== null ? `${Number(winRate).toFixed(1)}%` : '—'} detail="sobre resueltas" /><Metric label="Resolución" value={publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'} detail="compromisos con resultado" /><Metric label="Interacciones" value={formatNumber(totalInteractions)} detail="network" /></div></section>
+        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:grid-cols-8 lg:px-8"><Metric label="Compromisos" value={formatNumber(publicRecord?.commitmentsCreated ?? totalTrades)} detail="creados" /><Metric label="Resueltas" value={formatNumber(publicRecord?.decisionsResolved)} detail="decisiones" /><Metric label="Pendientes" value={formatNumber(publicRecord?.pending)} detail="sin resultado" /><Metric label="Expiradas" value={formatNumber(publicRecord?.expired)} detail="sin liquidación" /><Metric label="Wins / losses" value={publicRecord ? `${publicRecord.wins} / ${publicRecord.losses}` : '—'} detail="resueltas decisivas" /><Metric label="Win rate" value={formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)} detail={publicRecord?.decisionsResolved && publicRecord.decisionsResolved < WIN_RATE_MIN_SAMPLE ? `muestra chica (n=${publicRecord.decisionsResolved})` : 'sobre resueltas'} /><Metric label="Resolución" value={publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'} detail="compromisos con resultado" /><Metric label="Interacciones" value={formatNumber(totalInteractions)} detail="network" /></div></section>
 
         <footer className="border-t border-white/10 bg-[#050505]">
           <div className="mx-auto flex max-w-7xl flex-col gap-12 px-5 py-16 lg:px-8">

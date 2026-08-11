@@ -74,10 +74,26 @@ async function getProtocolStats() {
   };
   const tr = stats.contracts?.trackRecord?.stats ?? {};
   const ec = stats.contracts?.agentEconomy?.stats ?? {};
+  // Audit Base r4 (MEDIUM): never hand the model a naked win rate. The sample
+  // size travels WITH the number, and tiny samples are flagged so Bobby cannot
+  // honestly say "100% effectiveness" over one resolved trade.
+  const revealed = Number(tr.totalTrades ?? 0);
+  const winRatePct = tr.winRateBps ? Number(tr.winRateBps) / 100 : null;
   return {
     decisions_committed: tr.totalCommitments ?? null,
-    decisions_revealed: tr.totalTrades ?? null,
-    win_rate_pct: tr.winRateBps ? Number(tr.winRateBps) / 100 : null,
+    decisions_revealed: revealed,
+    win_rate:
+      winRatePct === null || revealed === 0
+        ? null
+        : {
+            pct: winRatePct,
+            sample_size: revealed,
+            statistically_meaningful: revealed >= 20,
+            how_to_say_it:
+              revealed >= 20
+                ? `${winRatePct}% over ${revealed} resolved decisions`
+                : `only ${revealed} resolved decision${revealed === 1 ? '' : 's'} so far — too few to quote a percentage as skill`,
+          },
     mcp_calls: ec.totalMcpCalls ?? null,
     total_interactions: stats.protocolTotals?.totalInteractions ?? null,
     basis: 'paper/simulated track record, committed on-chain before outcome',
