@@ -485,28 +485,28 @@ export default function BobbyProtocolLanding() {
               {[
                 {
                   title: 'Identity',
-                  description: 'Know who made the call.',
+                  description: 'Every decision has a named agent, signer and context. The record follows the agent.',
                   image: '/images/protocol/agent-identity.jpg',
                   alt: 'Synthetic human profile visible through textured cobalt glass',
                   telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  recorded'],
                 },
                 {
                   title: 'Adversarial debate',
-                  description: 'One idea. Two sides. One clear answer.',
+                  description: 'Alpha proposes the thesis. Red Team attacks the assumptions. CIO resolves both into one decision.',
                   image: '/images/protocol/adversarial-debate.jpg',
                   alt: 'Three silhouettes debating behind illuminated blue glass',
                   telemetry: ['debate.open  round_03', 'agents  alpha · red · cio', 'counterpoints  active', 'consensus  pending'],
                 },
                 {
                   title: 'Risk gate',
-                  description: 'A veto before the money moves.',
+                  description: 'Bobby checks size, downside and invalidation before capital moves. Risk can pass, pause or block.',
                   image: '/images/protocol/risk-gate.jpg',
                   alt: 'Human hand meeting a luminous blue glass barrier',
                   telemetry: ['risk.inspect  intent', 'exposure  bounded', 'invalidation  signed', 'gate  pass · park · block'],
                 },
                 {
                   title: 'Proof',
-                  description: 'A public record before the result.',
+                  description: 'The thesis and decision are committed before the outcome. Anyone can inspect what was decided and when.',
                   image: '/images/protocol/onchain-proof.jpg',
                   alt: 'Transparent cobalt glass monolith containing a sealed point of light',
                   telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
