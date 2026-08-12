@@ -1,20 +1,11 @@
 [extend]
 useDefault = true
 
-[[allowlists]]
+[allowlist]
 description = "Known public identifiers: Supabase anon JWT, EVM addresses, and a localStorage key"
 regexTarget = "match"
 regexes = [
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0\.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4''',
   '''0x[a-fA-F0-9]{40}''',
   '''mercado-lp-enhancements-v1''',
-]
-
-[[allowlists]]
-description = "Exact public stablecoin addresses captured by the legacy generic-api-key rule"
-regexTarget = "secret"
-regexes = [
-  '''833589fcd6edb6e08f4c7c32d4f71b54bda02913''',
-  '''036cbd53842c5426634e7929541ec2318f3dcf7e''',
-  '''1e4a5963abfd975d8c9021ce480b42188849d41d''',
 ]
