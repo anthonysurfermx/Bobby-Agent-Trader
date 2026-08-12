@@ -7,6 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther, Interface } from 'ethers';
 import { countAgents } from './_lib/hardness-control-plane.js';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -79,8 +80,8 @@ const BOUNTY_DIMENSIONS = [
 type BountyDimensionSummary = {
   totalCount: number;
   openCount: number;
-  avgRewardOkb: number | null;
-  maxRewardOkb: number | null;
+  avgRewardNative: number | null;
+  maxRewardNative: number | null;
 };
 
 function emptyBountySummary(): Record<string, BountyDimensionSummary> {
@@ -90,8 +91,8 @@ function emptyBountySummary(): Record<string, BountyDimensionSummary> {
       {
         totalCount: 0,
         openCount: 0,
-        avgRewardOkb: null,
-        maxRewardOkb: null,
+        avgRewardNative: null,
+        maxRewardNative: null,
       },
     ]),
   );
@@ -115,17 +116,17 @@ async function getBountySummary(nextBountyId: number): Promise<Record<string, Bo
       const dimension = bounty.dimension in summary ? bounty.dimension : null;
       if (!dimension) continue;
 
-      const rewardOkb = Number(bounty.rewardOkb || 0);
+      const rewardNative = Number(bounty.rewardNative || 0);
       const current = summary[dimension];
-      const totalReward = (current.avgRewardOkb ?? 0) * current.totalCount + rewardOkb;
+      const totalReward = (current.avgRewardNative ?? 0) * current.totalCount + rewardNative;
       const nextTotalCount = current.totalCount + 1;
 
       summary[dimension] = {
         totalCount: nextTotalCount,
         openCount: current.openCount + (bounty.status === 'OPEN' ? 1 : 0),
-        avgRewardOkb: totalReward / nextTotalCount,
-        maxRewardOkb:
-          current.maxRewardOkb === null ? rewardOkb : Math.max(current.maxRewardOkb, rewardOkb),
+        avgRewardNative: totalReward / nextTotalCount,
+        maxRewardNative:
+          current.maxRewardNative === null ? rewardNative : Math.max(current.maxRewardNative, rewardNative),
       };
     }
   }
@@ -271,7 +272,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }),
     safe(getOracleStats, { symbolCount: '0' }),
     safe(getTrackRecordStats, { totalTrades: '0', totalCommitments: '0', winRateBps: '0' }),
-    safe(readMinBounty, { minBountyWei: '0', minBountyOkb: '0' }),
+    safe(readMinBounty, { minBountyWei: '0', minBountyNative: '0', minBountyOkb: '0' }),
     safe(readNextBountyId, 1),
     safe(() => listRecentBounties(6), []),
     safe(() => getContractLastActivity(BOBBY_AGENT_ECONOMY), null),
@@ -298,9 +299,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Keep paid MCP settlement separate from bounty escrow.
   const totalBountiesPosted = Math.max(0, bountyNextId - 1);
-  const bountyEscrowOkb = totalBountiesPosted * 0.001;
+  const bountyEscrowNative = totalBountiesPosted * Number(bountyMin.minBountyNative || '0');
   const economyVol = parseFloat(economyStats.totalVolumeNative || '0');
-  const protocolNotionalOkb = (economyVol + bountyEscrowOkb).toFixed(4);
+  const protocolNotionalNative = (economyVol + bountyEscrowNative).toFixed(4);
   const onchainCommitments = Number(trackRecordStats.totalCommitments || 0);
   const onchainResolved = Number(trackRecordStats.totalTrades || 0);
   const onchainWinRate = onchainResolved > 0 ? Number((Number(trackRecordStats.winRateBps || 0) / 100).toFixed(1)) : null;
@@ -382,13 +383,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     fetchedAt: new Date().toISOString(),
     chain: {
       id: XLAYER_CHAIN_ID,
+      name: DEFAULT_CHAIN.name,
+      nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+      explorerUrl: DEFAULT_CHAIN.explorerUrl,
       blockNumber,
       rpc: XLAYER_RPC_URL,
     },
     treasury: {
       address: BOBBY_TREASURY,
       balanceWei: treasuryWei.toString(),
-      balanceOkb: formatEther(treasuryWei),
+      balanceNative: formatEther(treasuryWei),
     },
     contracts: {
       agentEconomy: {
@@ -424,11 +428,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     },
     protocolTotals: {
-      mcpSettlementOkb: economyStats.totalVolumeNative,
+      mcpSettlementNative: economyStats.totalVolumeNative,
       mcpPayments: Number(economyStats.totalPayments || '0'),
-      bountyEscrowOkb: bountyEscrowOkb.toFixed(4),
+      bountyEscrowNative: bountyEscrowNative.toFixed(4),
       bountyCount: totalBountiesPosted,
-      protocolNotionalOkb,
+      protocolNotionalNative,
       totalInteractions: Number(economyStats.totalPayments || '0') + totalBountiesPosted,
     },
     onchainRecord: {

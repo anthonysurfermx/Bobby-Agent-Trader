@@ -8,6 +8,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { listAgentCommerceEvents } from './_lib/agent-commerce-log.js';
 import { listRecentBounties } from './_lib/xlayer-payments.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 
 export const config = { maxDuration: 15 };
 
@@ -52,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     agent: e.external_agent || 'anonymous',
     tool: e.tool_name || 'unknown',
     paid: Boolean(e.payment_status === 'verified' && e.payment_amount_wei),
-    amountOkb: e.payment_amount_wei ? (Number(e.payment_amount_wei) / 1e18).toFixed(4) : null,
+    amountNative: e.payment_amount_wei ? (Number(e.payment_amount_wei) / 1e18).toFixed(4) : null,
     txHash: e.payment_tx_hash || null,
     agoSeconds: e.created_at ? Math.floor((Date.now() - new Date(e.created_at).getTime()) / 1000) : null,
     timestamp: e.created_at,
@@ -68,12 +69,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const onChainFeed = recentTxs.map((tx: any) => ({
     agent: 'bobby-protocol',
     tool: `${tx.contractName}::${tx.method}`,
-    paid: parseFloat(tx.valueOkb || '0') > 0,
-    amountOkb: parseFloat(tx.valueOkb || '0') > 0 ? parseFloat(tx.valueOkb).toFixed(4) : null,
+    paid: parseFloat(tx.valueNative || '0') > 0,
+    amountNative: parseFloat(tx.valueNative || '0') > 0 ? parseFloat(tx.valueNative).toFixed(4) : null,
     txHash: tx.hash,
     agoSeconds: tx.timestamp ? Math.floor(Date.now() / 1000 - tx.timestamp) : null,
     timestamp: tx.timestamp ? new Date(tx.timestamp * 1000).toISOString() : null,
-    status: parseFloat(tx.valueOkb || '0') > 0 ? 'verified' : 'observed',
+    status: parseFloat(tx.valueNative || '0') > 0 ? 'verified' : 'observed',
     source: 'onchain',
   }));
 
@@ -81,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     agent: 'bobby-protocol',
     tool: `AdversarialBounties::${bounty.dimension}`,
     paid: true,
-    amountOkb: bounty.rewardOkb ? Number(bounty.rewardOkb).toFixed(4) : null,
+    amountNative: bounty.rewardNative ? Number(bounty.rewardNative).toFixed(4) : null,
     txHash: null,
     agoSeconds: bounty.createdAt ? Math.max(0, Math.floor(Date.now() / 1000 - Number(bounty.createdAt))) : null,
     timestamp: bounty.createdAt ? new Date(Number(bounty.createdAt) * 1000).toISOString() : null,
@@ -103,6 +104,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=60');
   return res.status(200).json({
     ok: true,
+    chain: {
+      id: DEFAULT_CHAIN.id,
+      name: DEFAULT_CHAIN.name,
+      nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+      explorerUrl: DEFAULT_CHAIN.explorerUrl,
+    },
     count: merged.length,
     counts: {
       commerce: commerceFeed.length,

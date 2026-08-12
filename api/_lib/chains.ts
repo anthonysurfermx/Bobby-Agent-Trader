@@ -30,6 +30,8 @@ export interface ChainConfig {
   explorerApiUrl: string;
   nativeSymbol: string;
   nativeDecimals: number;
+  /** First block that can contain Bobby protocol activity on this deployment. */
+  protocolDeploymentBlock: number;
   /**
    * D-3: ON-CHAIN protocol fees (MCP calls, bounties, stakes) are paid in the
    * chain's NATIVE token on every chain — 'native' here always means msg.value.
@@ -96,6 +98,7 @@ export const BASE: ChainConfig = {
   explorerApiUrl: 'https://api.basescan.org/api',
   nativeSymbol: 'ETH',
   nativeDecimals: 18,
+  protocolDeploymentBlock: Number(process.env.BASE_PROTOCOL_DEPLOYMENT_BLOCK || 0),
   // D-3: on-chain fees are native ETH (resized per deploy); USDC is ONLY the
   // x402/off-chain settlement rail. Keep these two rails separate forever.
   onchainFeeToken: 'native',
@@ -118,6 +121,7 @@ export const BASE_SEPOLIA: ChainConfig = {
   rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
   explorerUrl: 'https://sepolia.basescan.org',
   explorerApiUrl: 'https://api-sepolia.basescan.org/api',
+  protocolDeploymentBlock: 45_364_125,
   x402SettlementToken: '0x036cbd53842c5426634e7929541ec2318f3dcf7e',
   stable: '0x036cbd53842c5426634e7929541ec2318f3dcf7e',
   contracts: BASE_SEPOLIA_CONTRACTS,
@@ -132,6 +136,7 @@ export const XLAYER: ChainConfig = {
   explorerApiUrl: 'https://www.oklink.com/api/v5/explorer/xlayer',
   nativeSymbol: 'OKB',
   nativeDecimals: 18,
+  protocolDeploymentBlock: 0x34775f3,
   onchainFeeToken: 'native',
   onchainFeeSymbol: 'OKB',
   onchainFeeDecimals: 18,

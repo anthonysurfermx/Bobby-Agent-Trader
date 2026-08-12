@@ -11,6 +11,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:playbooks": "tsx scripts/test-playbooks.mts",
+    "test:record-auth": "tsx scripts/test-record-auth.mts",
     "test:risk-gate": "tsx scripts/test-risk-gate.mts"
   },
   "dependencies": {

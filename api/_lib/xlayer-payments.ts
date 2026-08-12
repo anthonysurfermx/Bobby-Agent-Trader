@@ -5,6 +5,7 @@ import {
   XLAYER_CHAIN_ID,
   XLAYER_RPC_URL,
 } from './protocol-constants.js';
+import { DEFAULT_CHAIN } from './chains.js';
 
 export {
   BOBBY_ADVERSARIAL_BOUNTIES,
@@ -13,10 +14,9 @@ export {
   XLAYER_RPC_URL,
 } from './protocol-constants.js';
 
-export const PREMIUM_MCP_FEE_WEI = 1000000000000000n; // 0.001 OKB
-
 const ECONOMY_INTERFACE = new Interface([
   'function payMCPCall(bytes32 challengeId, string toolName) payable',
+  'function mcpCallFee() view returns (uint256)',
   'function getEconomyStats() view returns (uint256,uint256,uint256,uint256,uint256)',
   'function getStats() view returns (uint256,uint256,uint256)',
 ]);
@@ -49,6 +49,8 @@ export interface BountySummary {
   threadHash: string;
   poster: string;
   rewardWei: string;
+  rewardNative: string;
+  /** @deprecated X Layer compatibility alias; use rewardNative. */
   rewardOkb: string;
   winner: string;
   createdAt: number;
@@ -92,12 +94,14 @@ export async function readBounty(bountyId: number | string): Promise<BountySumma
   let effectiveExpiry = createdAt + claimWindowSecs;
   if (statusIdx === 1 /* CHALLENGED */) effectiveExpiry += grace;
 
+  const rewardNative = formatEther(rewardWei);
   return {
     bountyId: id.toString(),
     threadHash: String(d[0]),
     poster: poster.toLowerCase(),
     rewardWei: rewardWei.toString(),
-    rewardOkb: formatEther(rewardWei),
+    rewardNative,
+    rewardOkb: rewardNative,
     winner: String(d[3]).toLowerCase(),
     createdAt,
     claimWindowSecs,
@@ -115,12 +119,18 @@ export async function readNextBountyId(): Promise<number> {
   return Number(next);
 }
 
-export async function readMinBounty(): Promise<{ minBountyWei: string; minBountyOkb: string }> {
+export async function readMinBounty(): Promise<{
+  minBountyWei: string;
+  minBountyNative: string;
+  /** @deprecated X Layer compatibility alias; use minBountyNative. */
+  minBountyOkb: string;
+}> {
   const data = BOUNTIES_INTERFACE.encodeFunctionData('minBounty');
   const raw = await rpcCall<string>('eth_call', [{ to: BOBBY_ADVERSARIAL_BOUNTIES, data }, 'latest']);
   const [min] = BOUNTIES_INTERFACE.decodeFunctionResult('minBounty', raw);
   const wei = BigInt(min.toString());
-  return { minBountyWei: wei.toString(), minBountyOkb: formatEther(wei) };
+  const minBountyNative = formatEther(wei);
+  return { minBountyWei: wei.toString(), minBountyNative, minBountyOkb: minBountyNative };
 }
 
 export async function listRecentBounties(limit = 10): Promise<BountySummary[]> {
@@ -181,6 +191,8 @@ export interface VerifiedMcpPayment {
   challengeId: string;
   toolName: string;
   valueWei: string;
+  valueNative: string;
+  /** @deprecated X Layer compatibility alias; use valueNative. */
   valueOkb: string;
   blockNumber: number;
 }
@@ -198,18 +210,41 @@ async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
   });
 
   if (!res.ok) {
-    throw new Error(`X Layer RPC ${res.status}`);
+    throw new Error(`${DEFAULT_CHAIN.name} RPC ${res.status}`);
   }
 
   const json = await res.json() as RpcEnvelope<T>;
   if (json.error) {
-    throw new Error(json.error.message || 'X Layer RPC error');
+    throw new Error(json.error.message || `${DEFAULT_CHAIN.name} RPC error`);
   }
   if (json.result == null) {
-    throw new Error('X Layer RPC returned no result');
+    throw new Error(`${DEFAULT_CHAIN.name} RPC returned no result`);
   }
 
   return json.result;
+}
+
+export interface McpFee {
+  feeWei: string;
+  feeNative: string;
+  nativeSymbol: string;
+  chainId: number;
+  chainName: string;
+}
+
+/** Read the configured deployment's live fee instead of assuming X Layer's legacy price. */
+export async function readMcpCallFee(): Promise<McpFee> {
+  const data = ECONOMY_INTERFACE.encodeFunctionData('mcpCallFee');
+  const raw = await rpcCall<string>('eth_call', [{ to: BOBBY_AGENT_ECONOMY, data }, 'latest']);
+  const [fee] = ECONOMY_INTERFACE.decodeFunctionResult('mcpCallFee', raw);
+  const feeWei = BigInt(fee.toString());
+  return {
+    feeWei: feeWei.toString(),
+    feeNative: formatEther(feeWei),
+    nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+    chainId: DEFAULT_CHAIN.id,
+    chainName: DEFAULT_CHAIN.name,
+  };
 }
 
 export function extractPaymentTxHash(rawHeader: string | string[] | undefined): string | null {
@@ -235,11 +270,12 @@ export async function verifyMcpPaymentTx(
 
   const to = String(tx.to || '').toLowerCase();
   if (to !== BOBBY_AGENT_ECONOMY.toLowerCase()) {
-    throw new Error('Payment tx must call BobbyAgentEconomy on X Layer');
+    throw new Error(`Payment tx must call BobbyAgentEconomy on ${DEFAULT_CHAIN.name}`);
   }
 
   const valueWei = BigInt(tx.value || '0x0');
-  if (valueWei < PREMIUM_MCP_FEE_WEI) {
+  const { feeWei } = await readMcpCallFee();
+  if (valueWei < BigInt(feeWei)) {
     throw new Error('Payment tx value is below Bobby MCP premium fee');
   }
 
@@ -259,6 +295,7 @@ export async function verifyMcpPaymentTx(
     throw new Error(`Payment tx tool mismatch: expected ${expectedToolName}, got ${toolName || 'unknown'}`);
   }
 
+  const valueNative = formatEther(valueWei);
   return {
     txHash,
     payer: String(tx.from || '').toLowerCase(),
@@ -266,7 +303,8 @@ export async function verifyMcpPaymentTx(
     challengeId,
     toolName,
     valueWei: valueWei.toString(),
-    valueOkb: formatEther(valueWei),
+    valueNative,
+    valueOkb: valueNative,
     blockNumber: Number.parseInt(String(receipt.blockNumber || '0x0'), 16) || 0,
   };
 }

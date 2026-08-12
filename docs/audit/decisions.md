@@ -34,15 +34,23 @@ registra qué se decidió, quién y la regla operativa que deja.
   rondas existente resetea `approvalCount` a 0 e invalida los votos previos
   (incluidos los de la llave comprometida). Documentado como runbook, no como fix.
 
-## D-3 · Fees OKB → USDC en el deploy a Base (r1 H-2)
+## D-3 · Fees on-chain en token nativo; USDC solo para el rail x402 (r1 H-2, revisada 2026-08-12)
 
-- **Hallazgo**: todos los fees/floors son literales `ether` dimensionados para OKB
-  (`0.001 ether` ≈ $0.10 en OKB, ≈ $4 en ETH). `ABSOLUTE_MIN_BOUNTY` es `constant`.
-- **Decisión de arquitectura ya tomada**: en Base los fees se denominan en USDC
-  (6 decimales) — ver `api/_lib/chains.ts` (`feeToken`/`feeTokenDecimals`).
-- **Pendiente ejecutable**: antes del deploy, los scripts `Deploy*.s.sol` deben
-  fijar los parámetros re-denominados, y las constantes `constant` (como
-  `ABSOLUTE_MIN_BOUNTY`) deben editarse en fuente. Checklist en r3.
+- **Hallazgo original**: todos los fees/floors eran literales `ether` dimensionados
+  para OKB (`0.001 ether` ≈ $0.10 en OKB, ≈ $4 en ETH). `ABSOLUTE_MIN_BOUNTY` era
+  `constant`.
+- **Decisión FINAL (opción A, la implementada)**: los fees ON-CHAIN (MCP calls,
+  bounties, stakes, debate fees) se pagan en el **token nativo de cada chain**
+  (`msg.value`) — OKB en X Layer, ETH en Base — con parámetros re-dimensionados
+  por deploy vía constructor (ya immutables/configurables, no constants). USDC es
+  **exclusivamente** el rail de settlement x402/off-chain. Los dos rieles nunca se
+  mezclan. Fuente de verdad: `api/_lib/chains.ts` (`onchainFeeToken: 'native'`,
+  `x402SettlementToken: USDC`) y los constructores en `DeployBase.s.sol`.
+- **Nota histórica**: una versión anterior de esta decisión proponía denominar los
+  fees on-chain en USDC (6 decimales). Se descartó antes del deploy de Sepolia —
+  cobrar ERC-20 en cada write añadía approve-flow y gas sin beneficio para el
+  canario. El deploy de Sepolia (84532) ya corre con fees nativos ETH
+  (mcpCallFee 0.000025 ETH, debateFee 0.0000025 ETH por agente).
 
 ## D-4 · Mainnet Base: el owner de los 7 contratos será un Safe, no una EOA (2026-08-11)
 

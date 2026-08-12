@@ -21,6 +21,7 @@ import {
   BOBBY_PROTOCOL_BASE_URL,
   BOBBY_TRACK_RECORD,
 } from './_lib/protocol-constants.js';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 
 export const config = { maxDuration: 15 };
 
@@ -101,16 +102,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalVolumeNative: '0',
       totalPayments: '0',
     }),
-    safe(readMinBounty, { minBountyWei: '0', minBountyOkb: '0' }),
+    safe(readMinBounty, { minBountyWei: '0', minBountyNative: '0', minBountyOkb: '0' }),
     safe(readNextBountyId, 1),
   ]);
 
   const winRate = Number(winRateBps) / 100;
   const pnlPct = Number(totalPnlBps) / 100;
   const totalBounties = Math.max(0, bountyNextId - 1);
-  const bountyEscrowOkb = (totalBounties * Number(bountyMin.minBountyOkb || '0')).toFixed(4);
-  const protocolNotionalOkb = (
-    Number(economyStats.totalVolumeNative || '0') + Number(bountyEscrowOkb)
+  const bountyEscrowNative = (totalBounties * Number(bountyMin.minBountyNative || '0')).toFixed(4);
+  const protocolNotionalNative = (
+    Number(economyStats.totalVolumeNative || '0') + Number(bountyEscrowNative)
   ).toFixed(4);
 
   // ── Composite Trust Score (0-100) ──
@@ -144,7 +145,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ok: true,
     protocol: 'Bobby Protocol',
     version: '3.1.0',
-    chain: { id: XLAYER_CHAIN_ID, name: 'X Layer', rpc: XLAYER_RPC_URL },
+    chain: {
+      id: XLAYER_CHAIN_ID,
+      name: DEFAULT_CHAIN.name,
+      nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+      explorerUrl: DEFAULT_CHAIN.explorerUrl,
+      rpc: XLAYER_RPC_URL,
+    },
     fetchedAt: new Date().toISOString(),
 
     trustScore: {
@@ -199,9 +206,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     },
 
     protocolTotals: {
-      bountyEscrowOkb,
+      bountyEscrowNative,
       totalBounties,
-      protocolNotionalOkb,
+      protocolNotionalNative,
       totalInteractions: Number(economyStats.totalPayments) + totalBounties,
     },
 
@@ -209,7 +216,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       address: BOBBY_ADVERSARIAL_BOUNTIES,
       verified: true,
       totalPosted: totalBounties,
-      minBountyOkb: bountyMin.minBountyOkb,
+      minBountyNative: bountyMin.minBountyNative,
     },
 
     contracts: {

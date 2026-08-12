@@ -21,13 +21,13 @@ type Price = { symbol: string; price: number; change24h: number };
 
 interface ProtocolStats {
   fetchedAt?: string;
-  chain?: { id?: number; blockNumber?: number };
-  treasury?: { balanceOkb?: string };
+  chain?: { id?: number; name?: string; nativeSymbol?: string; explorerUrl?: string; blockNumber?: number };
+  treasury?: { balanceNative?: string };
   contracts?: {
     agentEconomy?: { address?: string; stats?: { totalDebates?: string; totalMcpCalls?: string; totalVolumeNative?: string } };
     convictionOracle?: { address?: string; stats?: { symbolCount?: string } };
     trackRecord?: { address?: string; stats?: { totalTrades?: string; totalCommitments?: string; winRateBps?: string } };
-    adversarialBounties?: { address?: string; totalPosted?: number; verified?: boolean; minBounty?: { minBountyOkb?: string } };
+    adversarialBounties?: { address?: string; totalPosted?: number; verified?: boolean; minBounty?: { minBountyNative?: string } };
     hardnessRegistry?: { address?: string; agentRegistered?: boolean };
     agentRegistry?: { address?: string; type?: string; agents?: number };
   };
@@ -212,12 +212,13 @@ export default function BobbyProtocolLanding() {
     }
     return `${Number(rate).toFixed(1)}% (n=${resolved})`;
   };
-  const chainLabel = stats?.chain?.id === 8453 ? 'Base' : stats?.chain?.id === 196 ? 'X Layer' : 'Network';
+  const chainLabel = stats?.chain?.name || (stats?.chain?.id === 196 ? 'X Layer' : 'Network');
+  const nativeSymbol = stats?.chain?.nativeSymbol || (stats?.chain?.id === 196 ? 'OKB' : 'ETH');
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
     : null;
 
-  const xlayerExplorer = 'https://www.oklink.com/xlayer/address';
+  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://www.oklink.com/xlayer'}/address`;
   const c = stats?.contracts;
   const proofPoints = [
     {
@@ -227,7 +228,7 @@ export default function BobbyProtocolLanding() {
         ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
         : 'Waiting for the TrackRecord contract.',
       proof: 'TrackRecord contract',
-      href: `${xlayerExplorer}/${c?.trackRecord?.address ?? ''}`,
+      href: `${explorerAddressUrl}/${c?.trackRecord?.address ?? ''}`,
     },
     {
       label: 'Public debate ledger',
@@ -243,14 +244,14 @@ export default function BobbyProtocolLanding() {
       value: formatNumber(c?.adversarialBounties?.totalPosted),
       detail: 'Open bounties paid for breaking Bobby\u2019s own reasoning. Being wrong in public is part of the design.',
       proof: 'AdversarialBounties contract',
-      href: `${xlayerExplorer}/${c?.adversarialBounties?.address ?? ''}`,
+      href: `${explorerAddressUrl}/${c?.adversarialBounties?.address ?? ''}`,
     },
     {
       label: 'Contracts live',
       value: '6',
       detail: 'Registry, economy, oracle, track record, bounties and identity — all deployed and explorer-verified.',
       proof: 'AgentEconomy V2 contract',
-      href: `${xlayerExplorer}/${c?.agentEconomy?.address ?? ''}`,
+      href: `${explorerAddressUrl}/${c?.agentEconomy?.address ?? ''}`,
     },
   ];
 
@@ -271,7 +272,7 @@ export default function BobbyProtocolLanding() {
   const marqueeItems = [
     ['Bobby is online', true],
     [btc ? `BTC $${btc.price.toLocaleString('en-US')}` : 'BTC —', false],
-    [stats?.chain?.blockNumber ? `${stats.chain.id === 8453 ? 'Base' : 'X Layer'} block ${formatNumber(stats.chain.blockNumber)}` : 'On-chain verification', false],
+    [stats?.chain?.blockNumber ? `${chainLabel} block ${formatNumber(stats.chain.blockNumber)}` : 'On-chain verification', false],
     ['Every thesis gets challenged', false],
     ['Proof-of-debate', true],
     [`${formatNumber(totalTrades, '—')} decisions committed`, false],
@@ -647,7 +648,7 @@ export default function BobbyProtocolLanding() {
                 <div className="relative">
                   <div className="mb-8 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] text-white/45"><span>Network telemetry</span><span className="text-[#7da6ff]">Live read</span></div>
                   <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-3 text-center sm:gap-5">
-                    {[['RPC', chainLabel], ['Treasury', stats?.treasury?.balanceOkb ? `${Number(stats.treasury.balanceOkb).toFixed(3)} OKB` : 'Syncing'], ['Proof', activity.length ? `${activity.length} events` : 'Standby']].map(([label, value], index) => (
+                    {[['RPC', chainLabel], ['Treasury', stats?.treasury?.balanceNative ? `${Number(stats.treasury.balanceNative).toFixed(3)} ${nativeSymbol}` : 'Syncing'], ['Proof', activity.length ? `${activity.length} events` : 'Standby']].map(([label, value], index) => (
                       <div key={label} className="contents">
                         <div className="min-w-0 rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/10 px-2 py-4 shadow-[0_0_32px_rgba(0,82,255,.14)]">
                           <span className="mx-auto mb-2 block h-2.5 w-2.5 rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,1)]" />

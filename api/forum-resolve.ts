@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireRecordAuth, recordAuthHeaders } from './_lib/record-auth.js';
 
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
@@ -72,6 +73,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Fail-closed: this handler mutates Supabase threads and triggers on-chain
+  // resolutions with backend credentials — GET included, so both are guarded.
+  if (!requireRecordAuth(req, res)) return;
+
   try {
     // Fetch all pending threads with trading params
     const threadsRes = await fetch(
@@ -83,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const threads: PendingThread[] = await threadsRes.json();
-    const results: Array<{ id: string; symbol: string; resolution: string; pnl: number | null }> = [];
+    const results: Array<{ id: string; symbol: string; resolution: string; pnl: number | null; onchain: boolean }> = [];
 
     // Get unique symbols to minimize API calls
     const symbols = [...new Set(threads.map(t => t.symbol).filter(Boolean))];
@@ -145,12 +150,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           status: 'resolved',
         });
 
-        // Resolve on-chain X Layer
+        // Resolve on-chain (chain follows the deployment's DEFAULT_CHAIN)
+        let onchainOk = false;
         try {
           const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://bobbyprotocol.xyz';
-          await fetch(`${host}/api/xlayer-record`, {
+          const onchainRes = await fetch(`${host}/api/xlayer-record`, {
              method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
+             headers: { 'Content-Type': 'application/json', ...recordAuthHeaders() },
              body: JSON.stringify({
                action: 'resolve',
                threadId: thread.id,
@@ -159,6 +165,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                pnlBps: pnlPct ? parseFloat(pnlPct.toFixed(2)) : 0
              })
           });
+          onchainOk = onchainRes.ok;
+          if (!onchainRes.ok) {
+            console.error('[Resolve] On-chain resolve failed:', onchainRes.status, await onchainRes.text().catch(() => ''));
+          }
         } catch(e) { console.error('Failed to resolve on-chain', e); }
 
         // "Te lo dije" — agents react to the outcome (makes forum feel alive)
@@ -193,7 +203,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
         } catch (e) { console.warn('[Resolve] Reaction post failed:', e); }
 
-        results.push({ id: thread.id, symbol: thread.symbol, resolution, pnl: pnlPct ? parseFloat(pnlPct.toFixed(2)) : null });
+        results.push({ id: thread.id, symbol: thread.symbol, resolution, pnl: pnlPct ? parseFloat(pnlPct.toFixed(2)) : null, onchain: onchainOk });
       } else {
         // Check if thread should be marked stale (price moved >5% from entry without hitting target/stop)
         const movePct = Math.abs(((currentPrice - entry) / entry) * 100);

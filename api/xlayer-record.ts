@@ -1,6 +1,6 @@
 // ============================================================
 // POST /api/xlayer-record
-// Commit-Reveal Track Record on X Layer
+// Commit-Reveal Track Record on the configured protocol chain
 // Phase 1 (commit): Records prediction BEFORE outcome is known
 // Phase 2 (resolve): Records outcome AFTER min time has elapsed
 // Audited by Gemini Pro + Codex (2026-03-17)
@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN, txUrl, addressUrl } from './_lib/chains.js';
+import { requireRecordAuth } from './_lib/record-auth.js';
 
 // Chain-aware since the Sepolia canary: RPC and addresses follow PROTOCOL_CHAIN.
 // Legacy env vars remain as fallback for the X Layer production deployment.
@@ -170,18 +171,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // ─── POST: Commit or Resolve a trade ───
   if (req.method === 'POST') {
-    const { action } = req.body as { action: string };
+    // Fail-closed: signs txs with the recorder key — never publicly writable.
+    if (!requireRecordAuth(req, res)) return;
+
+    const body = (req.body || {}) as Record<string, unknown>;
+    const action = typeof body.action === 'string' ? body.action.toLowerCase() : '';
 
     // ── COMMIT: Record prediction before outcome ──
     if (action === 'commit') {
-      const { threadId, symbol, agent, conviction, entryPrice, targetPrice, stopPrice } = req.body as {
+      const { threadId, symbol, agent, conviction, entryPrice, targetPrice, stopPrice } = body as {
         threadId: string; symbol: string; agent: string;
         conviction: number; entryPrice: number;
         targetPrice?: number; stopPrice?: number;
       };
 
-      if (!threadId || !symbol || conviction == null || !entryPrice) {
-        return res.status(400).json({ error: 'Missing: threadId, symbol, conviction, entryPrice' });
+      const validOptionalPrice = (value: unknown) =>
+        value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+      if (
+        typeof threadId !== 'string' || threadId.length === 0 || threadId.length > 256 ||
+        typeof symbol !== 'string' || !/^[A-Za-z0-9._:-]{1,32}$/.test(symbol) ||
+        typeof agent !== 'string' || AGENT_MAP[agent.toLowerCase()] === undefined ||
+        typeof conviction !== 'number' || !Number.isFinite(conviction) || conviction < 0 || conviction > 10 ||
+        typeof entryPrice !== 'number' || !Number.isFinite(entryPrice) || entryPrice <= 0 ||
+        !validOptionalPrice(targetPrice) || !validOptionalPrice(stopPrice)
+      ) {
+        return res.status(400).json({ error: 'Invalid commit payload' });
       }
 
       const debateHash = toDebateHash(threadId);
@@ -254,9 +268,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               nonce: nonce++,
             });
             economyTxHash = economyTx.hash;
-            console.log(`[X Layer] Debate fee paid: ${economyTx.hash}`);
+            console.log(`[${DEFAULT_CHAIN.name}] Debate fee paid: ${economyTx.hash}`);
           } catch (econErr: any) {
-            console.warn('[X Layer] Economy payment failed (non-critical):', econErr.message);
+            console.warn(`[${DEFAULT_CHAIN.name}] Economy payment failed (non-critical):`, econErr.message);
           }
         }
 
@@ -265,7 +279,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (ORACLE_ADDRESS) {
           try {
             const oracleIface = new ethers.Interface(ORACLE_ABI);
-            const dir = DIRECTION_MAP[String(req.body.direction || '').toLowerCase()] ?? 0;
+            const dir = DIRECTION_MAP[String(body.direction || '').toLowerCase()] ?? 0;
             const oracleTxData = oracleIface.encodeFunctionData('publishSignal', [{
               symbol, direction: dir, conviction: convUint8, agent: agentEnum,
               entryPrice: BigInt(Math.round(entryPrice * 1e8)),
@@ -280,9 +294,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               nonce: nonce++,
             });
             oracleTxHash = oracleTx.hash;
-            console.log(`[X Layer] Oracle published: ${oracleTx.hash}`);
+            console.log(`[${DEFAULT_CHAIN.name}] Oracle published: ${oracleTx.hash}`);
           } catch (oracleErr: any) {
-            console.warn('[X Layer] Oracle publish failed (non-critical):', oracleErr.message);
+            console.warn(`[${DEFAULT_CHAIN.name}] Oracle publish failed (non-critical):`, oracleErr.message);
           }
         }
 
@@ -299,32 +313,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           data: { debateHash, symbol, agent: agentEnum, conviction },
         });
       } catch (err: any) {
-        console.error('[X Layer] Emit Error:', err);
+        console.error(`[${DEFAULT_CHAIN.name}] Emit Error:`, err);
         return res.status(500).json({ error: 'Failed to broadcast tx: ' + err.message });
       }
     }
 
     // ── RESOLVE: Record outcome after min time elapsed ──
     if (action === 'resolve') {
-      const { threadId, pnlBps, result, exitPrice } = req.body as {
+      const { threadId, pnlBps, result, exitPrice } = body as {
         threadId: string; pnlBps: number; result: string; exitPrice: number;
       };
 
-      if (!threadId || result == null || !exitPrice) {
-        return res.status(400).json({ error: 'Missing: threadId, result, exitPrice' });
+      const normalizedResult = typeof result === 'string' ? result.toLowerCase() : '';
+      if (
+        typeof threadId !== 'string' || threadId.length === 0 || threadId.length > 256 ||
+        !['win', 'loss', 'break_even'].includes(normalizedResult) ||
+        typeof pnlBps !== 'number' || !Number.isFinite(pnlBps) ||
+        typeof exitPrice !== 'number' || !Number.isFinite(exitPrice) || exitPrice <= 0
+      ) {
+        return res.status(400).json({ error: 'Invalid resolve payload' });
       }
 
       const debateHash = toDebateHash(threadId);
-      const resultEnum = RESULT_MAP[result?.toLowerCase()] ?? 0;
+      const resultEnum = RESULT_MAP[normalizedResult];
 
       // Coherence checks (mirrors contract invariants — Codex Audit)
-      if (result === 'win' && pnlBps <= 0) {
+      if (normalizedResult === 'win' && pnlBps <= 0) {
         return res.status(400).json({ error: 'WIN must have positive PnL' });
       }
-      if (result === 'loss' && pnlBps >= 0) {
+      if (normalizedResult === 'loss' && pnlBps >= 0) {
         return res.status(400).json({ error: 'LOSS must have negative PnL' });
       }
-      if (result === 'break_even' && pnlBps !== 0) {
+      if (normalizedResult === 'break_even' && pnlBps !== 0) {
         return res.status(400).json({ error: 'BREAK_EVEN must have zero PnL' });
       }
 
@@ -360,13 +380,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           onchain: true,
           broadcast: true,
           action: 'resolve',
-          message: 'Resolution broadcast to X Layer',
+          message: `Resolution broadcast to ${DEFAULT_CHAIN.name}`,
           txHash: tx.hash,
           explorer: txUrl(tx.hash),
           data: { debateHash, result: resultEnum },
         });
       } catch (err: any) {
-        console.error('[X Layer] Emit Error:', err);
+        console.error(`[${DEFAULT_CHAIN.name}] Emit Error:`, err);
         return res.status(500).json({ error: 'Failed to broadcast resolve tx: ' + err.message });
       }
     }

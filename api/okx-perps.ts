@@ -7,6 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
+import { recordAuthHeaders } from './_lib/record-auth.js';
 
 const OKX_BASE = 'https://www.okx.com';
 
@@ -346,7 +347,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-record`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', ...recordAuthHeaders() },
               body: JSON.stringify({
                 action: 'commit',
                 threadId: `perp-${symbol}-${orderId}-${Date.now()}`,
