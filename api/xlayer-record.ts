@@ -8,11 +8,14 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 
-const XLAYER_RPC = 'https://rpc.xlayer.tech';
-const CONTRACT_ADDRESS = process.env.BOBBY_CONTRACT_ADDRESS || '';
-const ORACLE_ADDRESS = process.env.BOBBY_ORACLE_ADDRESS || '';
-const ECONOMY_ADDRESS = process.env.BOBBY_ECONOMY_ADDRESS || '';
+// Chain-aware since the Sepolia canary: RPC and addresses follow PROTOCOL_CHAIN.
+// Legacy env vars remain as fallback for the X Layer production deployment.
+const XLAYER_RPC = DEFAULT_CHAIN.rpcUrl;
+const CONTRACT_ADDRESS = DEFAULT_CHAIN.contracts.trackRecord || process.env.BOBBY_CONTRACT_ADDRESS || '';
+const ORACLE_ADDRESS = DEFAULT_CHAIN.contracts.convictionOracle || process.env.BOBBY_ORACLE_ADDRESS || '';
+const ECONOMY_ADDRESS = DEFAULT_CHAIN.contracts.agentEconomy || process.env.BOBBY_ECONOMY_ADDRESS || '';
 const RECORDER_KEY = process.env.BOBBY_RECORDER_KEY || '';
 
 // Agent enum matches contract: CIO=0, ALPHA=1, REDTEAM=2
@@ -227,10 +230,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           try {
             const economyIface = new ethers.Interface(ECONOMY_ABI);
             const economyTxData = economyIface.encodeFunctionData('payDebateFee', [debateHash]);
+            // Fee is chain-sized (OKB on X Layer, resized ETH on Base) — read it
+            // from the contract instead of hardcoding a denomination.
+            const economyContract = new ethers.Contract(ECONOMY_ADDRESS, ECONOMY_ABI, provider);
+            const feePerAgent = (await economyContract.debateFeePerAgent()) as bigint;
             const economyTx = await wallet.sendTransaction({
               to: ECONOMY_ADDRESS,
               data: economyTxData,
-              value: ethers.parseEther('0.0002'), // 0.0001 OKB × 2 agents
+              value: feePerAgent * 2n, // two counterparties per debate
               gasLimit: 200000n,
             });
             economyTxHash = economyTx.hash;
