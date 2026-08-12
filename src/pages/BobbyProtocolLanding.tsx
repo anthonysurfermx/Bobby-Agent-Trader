@@ -24,7 +24,7 @@ interface ProtocolStats {
   chain?: { id?: number; blockNumber?: number };
   treasury?: { balanceOkb?: string };
   contracts?: {
-    agentEconomy?: { address?: string; stats?: { totalDebates?: string; totalMcpCalls?: string; totalVolumeOkb?: string } };
+    agentEconomy?: { address?: string; stats?: { totalDebates?: string; totalMcpCalls?: string; totalVolumeNative?: string } };
     convictionOracle?: { address?: string; stats?: { symbolCount?: string } };
     trackRecord?: { address?: string; stats?: { totalTrades?: string; totalCommitments?: string; winRateBps?: string } };
     adversarialBounties?: { address?: string; totalPosted?: number; verified?: boolean; minBounty?: { minBountyOkb?: string } };

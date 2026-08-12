@@ -48,7 +48,7 @@ interface StatsResponse {
   contracts: {
     trackRecord: { stats: { totalTrades: string; totalCommitments: string; winRateBps: string } };
     adversarialBounties: { totalPosted: number };
-    agentEconomy: { stats: { totalDebates: string; totalVolumeOkb: string } };
+    agentEconomy: { stats: { totalDebates: string; totalVolumeNative: string } };
   };
   protocolTotals: { protocolNotionalOkb: string };
 }

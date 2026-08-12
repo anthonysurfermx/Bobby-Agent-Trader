@@ -12,7 +12,8 @@ interface HeartbeatData {
   chain: { id: number; blockNumber: number; status: string };
   treasury: { address: string; balanceOkb: string };
   revenue: {
-    totalVolumeOkb: string;
+    totalVolumeNative: string;
+    nativeSymbol?: string;
     totalPayments: number;
     totalMcpCalls: number;
     totalDebates: number;
@@ -238,7 +239,7 @@ export default function BobbyHeartbeatPage() {
             />
             <MetricCard
               label="Settlement"
-              value={`${parseFloat(data.revenue.totalVolumeOkb).toFixed(4)} OKB`}
+              value={`${parseFloat(data.revenue.totalVolumeNative).toFixed(4)} ${data.revenue.nativeSymbol || 'OKB'}`}
               sub={`${data.revenue.totalPayments} MCP payments settled`}
             />
             <MetricCard

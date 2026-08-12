@@ -266,7 +266,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalMcpCalls: '0',
       totalSignalAccesses: '0',
       totalVolumeWei: '0',
-      totalVolumeOkb: '0',
+      totalVolumeNative: '0',
       totalPayments: '0',
     }),
     safe(getOracleStats, { symbolCount: '0' }),
@@ -299,7 +299,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Keep paid MCP settlement separate from bounty escrow.
   const totalBountiesPosted = Math.max(0, bountyNextId - 1);
   const bountyEscrowOkb = totalBountiesPosted * 0.001;
-  const economyVol = parseFloat(economyStats.totalVolumeOkb || '0');
+  const economyVol = parseFloat(economyStats.totalVolumeNative || '0');
   const protocolNotionalOkb = (economyVol + bountyEscrowOkb).toFixed(4);
   const onchainCommitments = Number(trackRecordStats.totalCommitments || 0);
   const onchainResolved = Number(trackRecordStats.totalTrades || 0);
@@ -424,7 +424,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     },
     protocolTotals: {
-      mcpSettlementOkb: economyStats.totalVolumeOkb,
+      mcpSettlementOkb: economyStats.totalVolumeNative,
       mcpPayments: Number(economyStats.totalPayments || '0'),
       bountyEscrowOkb: bountyEscrowOkb.toFixed(4),
       bountyCount: totalBountiesPosted,

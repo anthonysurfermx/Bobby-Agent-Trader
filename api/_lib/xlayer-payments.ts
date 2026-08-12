@@ -276,7 +276,7 @@ export async function getEconomyStats(): Promise<{
   totalMcpCalls: string;
   totalSignalAccesses: string;
   totalVolumeWei: string;
-  totalVolumeOkb: string;
+  totalVolumeNative: string;
   totalPayments: string;
 }> {
   const data = ECONOMY_INTERFACE.encodeFunctionData('getEconomyStats');
@@ -289,7 +289,7 @@ export async function getEconomyStats(): Promise<{
     totalMcpCalls: decoded[1].toString(),
     totalSignalAccesses: decoded[2].toString(),
     totalVolumeWei,
-    totalVolumeOkb: formatEther(decoded[3]),
+    totalVolumeNative: formatEther(decoded[3]),
     totalPayments: decoded[4].toString(),
   };
 }

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 interface HeartbeatData {
   ok: boolean;
-  revenue: { totalVolumeOkb: string; totalPayments: number; totalMcpCalls: number; totalDebates: number };
+  revenue: { totalVolumeNative: string; nativeSymbol?: string; totalPayments: number; totalMcpCalls: number; totalDebates: number };
   performance: { winRate: number; totalTrades: number; totalBounties: number };
   health: { overall: string };
   chain: { blockNumber: number };
@@ -87,7 +87,7 @@ export default function BobbyAgentConsolePage() {
             </div>
             <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">Revenue</div>
-              <div className="mt-2 font-mono text-xl font-bold tracking-[-0.04em] text-[#7da6ff]">{heartbeat ? `${parseFloat(heartbeat.revenue.totalVolumeOkb).toFixed(4)} OKB` : '...'}</div>
+              <div className="mt-2 font-mono text-xl font-bold tracking-[-0.04em] text-[#7da6ff]">{heartbeat ? `${parseFloat(heartbeat.revenue.totalVolumeNative).toFixed(4)} ${heartbeat.revenue.nativeSymbol || 'OKB'}` : '...'}</div>
             </div>
             <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">Win rate</div>

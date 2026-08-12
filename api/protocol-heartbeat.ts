@@ -5,6 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Interface, formatEther } from 'ethers';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -414,7 +415,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         balanceOkb: formatEther(BigInt(treasuryWei)),
       },
       revenue: {
-        totalVolumeOkb: economyVolumeOkb.toFixed(4),
+        totalVolumeNative: economyVolumeOkb.toFixed(4),
+        nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
         totalPayments: parseInt(totalPayments),
         totalMcpCalls: parseInt(totalMcpCalls),
         totalDebates: parseInt(totalDebates),
@@ -488,7 +490,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       timestamp: new Date().toISOString(),
       chain: { id: XLAYER_CHAIN_ID, blockNumber: 0, status: 'degraded' },
       treasury: { address: TREASURY, balanceOkb: '0.0000' },
-      revenue: { totalVolumeOkb: '0.0000', totalPayments: 0, totalMcpCalls: 0, totalDebates: 0 },
+      revenue: { totalVolumeNative: '0.0000', nativeSymbol: DEFAULT_CHAIN.nativeSymbol, totalPayments: 0, totalMcpCalls: 0, totalDebates: 0 },
       protocolTotals: { bountyEscrowOkb: '0.0000', totalBounties: 0, protocolNotionalOkb: '0.0000', totalInteractions: 0 },
       performance: { winRate: 0, totalTrades: 0, totalBounties: 0 },
       lastCycle: null,

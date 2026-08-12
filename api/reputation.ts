@@ -98,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalMcpCalls: '0',
       totalSignalAccesses: '0',
       totalVolumeWei: '0',
-      totalVolumeOkb: '0',
+      totalVolumeNative: '0',
       totalPayments: '0',
     }),
     safe(readMinBounty, { minBountyWei: '0', minBountyOkb: '0' }),
@@ -110,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const totalBounties = Math.max(0, bountyNextId - 1);
   const bountyEscrowOkb = (totalBounties * Number(bountyMin.minBountyOkb || '0')).toFixed(4);
   const protocolNotionalOkb = (
-    Number(economyStats.totalVolumeOkb || '0') + Number(bountyEscrowOkb)
+    Number(economyStats.totalVolumeNative || '0') + Number(bountyEscrowOkb)
   ).toFixed(4);
 
   // ── Composite Trust Score (0-100) ──
@@ -194,7 +194,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalDebates: Number(economyStats.totalDebates),
       totalMcpCalls: Number(economyStats.totalMcpCalls),
       totalSignalAccesses: Number(economyStats.totalSignalAccesses),
-      totalVolumeOkb: economyStats.totalVolumeOkb,
+      totalVolumeNative: economyStats.totalVolumeNative,
       totalPayments: Number(economyStats.totalPayments),
     },
 
