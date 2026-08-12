@@ -11,17 +11,22 @@
 // exactly why the Base addresses must be populated and audited first.
 // ============================================================
 
-import { DEFAULT_CHAIN, XLAYER, XLAYER_CHAIN_ID as CHAIN_ID_XLAYER } from './chains.js';
+import { DEFAULT_CHAIN } from './chains.js';
 
 export const BOBBY_PROTOCOL_BASE_URL =
   process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprotocol.xyz';
 
+// Sepolia smoke test caught the half-migrated shim: addresses followed
+// DEFAULT_CHAIN but these three stayed pinned to XLAYER, so endpoints asked the
+// X Layer RPC about Sepolia addresses (no code there → silent zeros). ALL
+// aliases must move together with PROTOCOL_CHAIN — misleading names and all.
+
 /** @deprecated use DEFAULT_CHAIN.id / getChain(id) from ./chains.js */
-export const XLAYER_CHAIN_ID = CHAIN_ID_XLAYER;
+export const XLAYER_CHAIN_ID = DEFAULT_CHAIN.id;
 /** @deprecated use DEFAULT_CHAIN.rpcUrl */
-export const XLAYER_RPC_URL = XLAYER.rpcUrl;
+export const XLAYER_RPC_URL = DEFAULT_CHAIN.rpcUrl;
 /** @deprecated use DEFAULT_CHAIN.rpcFallbackUrl */
-export const XLAYER_RPC_FALLBACK_URL = XLAYER.rpcFallbackUrl ?? XLAYER.rpcUrl;
+export const XLAYER_RPC_FALLBACK_URL = DEFAULT_CHAIN.rpcFallbackUrl ?? DEFAULT_CHAIN.rpcUrl;
 
 /** @deprecated use DEFAULT_CHAIN.contracts.* */
 export const BOBBY_TREASURY = DEFAULT_CHAIN.contracts.treasury;
