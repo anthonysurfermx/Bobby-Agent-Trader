@@ -276,6 +276,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               to: ORACLE_ADDRESS,
               data: oracleTxData,
               gasLimit: ((await wallet.estimateGas({ to: ORACLE_ADDRESS, data: oracleTxData })) * 13n) / 10n,
+              nonce: nonce++,
             });
             oracleTxHash = oracleTx.hash;
             console.log(`[X Layer] Oracle published: ${oracleTx.hash}`);
