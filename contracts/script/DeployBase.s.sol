@@ -59,6 +59,7 @@ contract DeployBase is Script {
         uint256 maxSizeUsd;
         uint8 resolverThreshold;
         address hardnessScorer;
+        address expectedOwner;
     }
 
     function _config() internal view returns (Config memory c) {
@@ -90,14 +91,29 @@ contract DeployBase is Script {
         c.keeper = vm.envAddress("KEEPER_ADDRESS");
         c.mcpCallFee = vm.envOr("FEE_MCP_CALL_WEI", uint256(0.000025 ether));
         c.debateFeePerAgent = vm.envOr("FEE_DEBATE_PER_AGENT_WEI", uint256(0.0000025 ether));
-        c.minBounty = uint96(vm.envOr("MIN_BOUNTY_WEI", uint256(0.000025 ether)));
-        c.absoluteMinBounty = uint96(vm.envOr("ABSOLUTE_MIN_BOUNTY_WEI", uint256(0.0000025 ether)));
-        c.registrationStake = uint96(vm.envOr("REGISTRATION_STAKE_WEI", uint256(0.00025 ether)));
+        // r9 L-02: validate every env value at full width BEFORE narrowing — a
+        // fat-fingered value must fail loudly, never truncate into a "valid" fee.
+        uint256 rawMinBounty = vm.envOr("MIN_BOUNTY_WEI", uint256(0.000025 ether));
+        uint256 rawAbsMinBounty = vm.envOr("ABSOLUTE_MIN_BOUNTY_WEI", uint256(0.0000025 ether));
+        uint256 rawStake = vm.envOr("REGISTRATION_STAKE_WEI", uint256(0.00025 ether));
+        uint256 rawThreshold = vm.envOr("RESOLVER_THRESHOLD", uint256(1));
+        require(rawMinBounty <= type(uint96).max, "MIN_BOUNTY_WEI exceeds uint96");
+        require(rawAbsMinBounty <= type(uint96).max, "ABSOLUTE_MIN_BOUNTY_WEI exceeds uint96");
+        require(rawStake <= type(uint96).max, "REGISTRATION_STAKE_WEI exceeds uint96");
+        require(rawThreshold >= 1 && rawThreshold <= type(uint8).max, "RESOLVER_THRESHOLD out of range");
+        c.minBounty = uint96(rawMinBounty);
+        c.absoluteMinBounty = uint96(rawAbsMinBounty);
+        c.registrationStake = uint96(rawStake);
+        c.resolverThreshold = uint8(rawThreshold);
         c.maxSizeUsd = vm.envOr("ESCROW_MAX_SIZE_USD", uint256(10_000e18)); // $10k, 18dp encoding
-        c.resolverThreshold = uint8(vm.envOr("RESOLVER_THRESHOLD", uint256(1)));
         // r7 integration: judge-mode needs the scorer role; defaults to bobby so
         // hardness certification is never silently dead after a deploy.
         c.hardnessScorer = vm.envOr("HARDNESS_SCORER_ADDRESS", c.bobby);
+        // r9 H-02 / D-4: the address that must END UP owning all seven
+        // contracts. On mainnet this is the Safe — mandatory, and distinct from
+        // the hot deployer EOA. On testnet it defaults to the deployer (no
+        // handoff), keeping the canary flow unchanged.
+        c.expectedOwner = vm.envOr("OWNER_SAFE_ADDRESS", address(0));
     }
 
     function run() external returns (Deployed memory d) {
@@ -110,6 +126,14 @@ contract DeployBase is Script {
 
         Config memory c = _config();
         address deployer = msg.sender;
+
+        // r9 H-02 / D-4: resolve the final owner. Mainnet REQUIRES a Safe that
+        // is not the deployer EOA and already has code on-chain.
+        if (c.expectedOwner == address(0)) c.expectedOwner = deployer;
+        if (block.chainid == 8453) {
+            require(c.expectedOwner != deployer, "Mainnet: OWNER_SAFE_ADDRESS must be set and != deployer (D-4)");
+            require(c.expectedOwner.code.length > 0, "Mainnet: OWNER_SAFE_ADDRESS has no code (Safe not deployed?)");
+        }
 
         // r8 #3: validate every economic parameter BEFORE any chain interaction.
         _validateConfig(c);
@@ -140,6 +164,12 @@ contract DeployBase is Script {
             c.resolverThreshold >= 1 && c.resolverThreshold <= initialResolvers.length,
             "RESOLVER_THRESHOLD exceeds resolver list"
         );
+        // r9 L-02: mainnet must never silently run a 1-of-1 quorum. Forgetting
+        // RESOLVER_ADDRESSES / RESOLVER_THRESHOLD fails here, pre-broadcast.
+        if (block.chainid == 8453) {
+            require(initialResolvers.length >= 3, "Mainnet: RESOLVER_ADDRESSES must list >= 3 resolvers");
+            require(c.resolverThreshold >= 2, "Mainnet: RESOLVER_THRESHOLD must be >= 2 (runbook: 2-of-3)");
+        }
         for (uint256 i = 0; i < initialResolvers.length; i++) {
             require(initialResolvers[i] != address(0), "resolver list contains zero address");
             for (uint256 j = i + 1; j < initialResolvers.length; j++) {
@@ -176,6 +206,20 @@ contract DeployBase is Script {
         );
 
         HardnessRegistry(payable(d.hardnessRegistry)).setHardnessScorer(c.hardnessScorer);
+
+        // r9 H-02: scripted handoff — propose the Safe as pendingOwner on all
+        // seven contracts in the SAME broadcast. Two-step everywhere: the Safe
+        // must acceptOwnership() (batched in its UI) before it owns anything,
+        // so a typo'd address can never take ownership.
+        if (c.expectedOwner != deployer) {
+            BobbyTrackRecord(d.trackRecord).transferOwnership(c.expectedOwner);
+            BobbyConvictionOracle(d.convictionOracle).transferOwnership(c.expectedOwner);
+            BobbyAgentEconomyV2(payable(d.agentEconomyV2)).transferOwnership(c.expectedOwner);
+            BobbyAdversarialBounties(payable(d.adversarialBounties)).transferOwnership(c.expectedOwner);
+            HardnessRegistry(payable(d.hardnessRegistry)).transferOwnership(c.expectedOwner);
+            BobbyAgentRegistry(d.agentRegistry).transferOwnership(c.expectedOwner);
+            BobbyIntentEscrow(d.intentEscrow).transferOwnership(c.expectedOwner);
+        }
 
         vm.stopBroadcast();
 
@@ -220,7 +264,9 @@ contract DeployBase is Script {
     /// owners, roles, quorum and fees landed as configured before anyone flips
     /// PROTOCOL_CHAIN. All view calls; free on simulation, cheap on broadcast.
     function _assertDeployment(Deployed memory d, Config memory c, address[] memory resolverSet, address deployer) internal view {
-        // r8 #1: ownership of all seven contracts is the broadcaster, explicitly.
+        // r8 #1 + r9 H-02: right after deploy the broadcaster still owns all
+        // seven (two-step: ownership only moves when the Safe accepts), and if
+        // a handoff was requested, every pendingOwner must be the Safe.
         require(BobbyTrackRecord(d.trackRecord).owner() == deployer, "assert: trackRecord.owner");
         require(BobbyConvictionOracle(d.convictionOracle).owner() == deployer, "assert: oracle.owner");
         require(BobbyAgentEconomyV2(payable(d.agentEconomyV2)).owner() == deployer, "assert: economy.owner");
@@ -228,6 +274,15 @@ contract DeployBase is Script {
         require(HardnessRegistry(payable(d.hardnessRegistry)).owner() == deployer, "assert: hardness.owner");
         require(BobbyAgentRegistry(d.agentRegistry).owner() == deployer, "assert: agentRegistry.owner");
         require(BobbyIntentEscrow(d.intentEscrow).owner() == deployer, "assert: escrow.owner");
+        if (c.expectedOwner != deployer) {
+            require(BobbyTrackRecord(d.trackRecord).pendingOwner() == c.expectedOwner, "assert: trackRecord.pendingOwner");
+            require(BobbyConvictionOracle(d.convictionOracle).pendingOwner() == c.expectedOwner, "assert: oracle.pendingOwner");
+            require(BobbyAgentEconomyV2(payable(d.agentEconomyV2)).pendingOwner() == c.expectedOwner, "assert: economy.pendingOwner");
+            require(BobbyAdversarialBounties(payable(d.adversarialBounties)).pendingOwner() == c.expectedOwner, "assert: bounties.pendingOwner");
+            require(HardnessRegistry(payable(d.hardnessRegistry)).pendingOwner() == c.expectedOwner, "assert: hardness.pendingOwner");
+            require(BobbyAgentRegistry(d.agentRegistry).pendingOwner() == c.expectedOwner, "assert: agentRegistry.pendingOwner");
+            require(BobbyIntentEscrow(d.intentEscrow).pendingOwner() == c.expectedOwner, "assert: escrow.pendingOwner");
+        }
         require(BobbyIntentEscrow(d.intentEscrow).chainIdExpected() == block.chainid, "assert: escrow.chainIdExpected");
 
         require(BobbyTrackRecord(d.trackRecord).bobby() == c.bobby, "assert: trackRecord.bobby");
@@ -271,6 +326,8 @@ contract DeployBase is Script {
         // real broadcast. VerifyBaseDeployment logs the live block on every run.
         vm.serializeUint(m, "deployBlock", block.number);
         vm.serializeAddress(m, "deployer", deployer);
+        // r9 H-02: the address that must end up owning all seven contracts.
+        vm.serializeAddress(m, "expectedOwner", c.expectedOwner);
 
         string memory a = "addresses";
         vm.serializeAddress(a, "trackRecord", d.trackRecord);

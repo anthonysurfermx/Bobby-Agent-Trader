@@ -1,5 +1,8 @@
 [profile.default]
-src = "."
+# r9 M-06: production source is ONLY src/ — a root-level duplicate once made
+# `forge inspect BobbyTrackRecord` ambiguous and pointed the generic artifact
+# at a stale, vulnerable copy. legacy/ (X Layer-era V1, Counter) is not compiled.
+src = "src"
 test = "test"
 out = "out"
 libs = ["lib"]

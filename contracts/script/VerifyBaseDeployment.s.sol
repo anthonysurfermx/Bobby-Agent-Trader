@@ -84,8 +84,14 @@ contract VerifyBaseDeployment is Script {
             scorer: vm.parseJsonAddress(json, ".roles.hardnessScorer")
         });
 
+        // r9 H-02: verify against the owner the deploy DECLARED, not the
+        // deployer. Old manifests without the field fall back to deployer.
+        address expectedOwner = vm.keyExistsJson(json, ".expectedOwner")
+            ? vm.parseJsonAddress(json, ".expectedOwner")
+            : r.deployer;
+
         _verifyCode(a);
-        _verifyOwnership(a, r.deployer);
+        _verifyOwnership(a, r.deployer, expectedOwner);
         _verifyEconomy(a, r, json);
         _verifyBounties(a, r, json);
         _verifyHardness(a, r, json);
@@ -105,14 +111,28 @@ contract VerifyBaseDeployment is Script {
         _ok(a.escrow.code.length > 0, "intentEscrow has code");
     }
 
-    function _verifyOwnership(Addrs memory a, address deployer) internal {
-        _ok(BobbyTrackRecord(a.trackRecord).owner() == deployer, "trackRecord.owner == deployer");
-        _ok(BobbyConvictionOracle(a.oracle).owner() == deployer, "oracle.owner == deployer");
-        _ok(BobbyAgentEconomyV2(payable(a.economy)).owner() == deployer, "economy.owner == deployer");
-        _ok(BobbyAdversarialBounties(payable(a.bounties)).owner() == deployer, "bounties.owner == deployer");
-        _ok(HardnessRegistry(payable(a.hardness)).owner() == deployer, "hardness.owner == deployer");
-        _ok(BobbyAgentRegistry(a.agentRegistry).owner() == deployer, "agentRegistry.owner == deployer");
-        _ok(BobbyIntentEscrow(a.escrow).owner() == deployer, "escrow.owner == deployer");
+    /// @dev r9 H-02: a contract passes if the expected owner already owns it,
+    /// or if the handoff to it is still pending (owner == deployer AND
+    /// pendingOwner == expected). It FAILS in the state D-4 prohibits: the
+    /// deployer EOA owning with no handoff in flight.
+    function _verifyOwnership(Addrs memory a, address deployer, address expected) internal {
+        _checkOwner(BobbyTrackRecord(a.trackRecord).owner(), BobbyTrackRecord(a.trackRecord).pendingOwner(), deployer, expected, "trackRecord");
+        _checkOwner(BobbyConvictionOracle(a.oracle).owner(), BobbyConvictionOracle(a.oracle).pendingOwner(), deployer, expected, "oracle");
+        _checkOwner(BobbyAgentEconomyV2(payable(a.economy)).owner(), BobbyAgentEconomyV2(payable(a.economy)).pendingOwner(), deployer, expected, "economy");
+        _checkOwner(BobbyAdversarialBounties(payable(a.bounties)).owner(), BobbyAdversarialBounties(payable(a.bounties)).pendingOwner(), deployer, expected, "bounties");
+        _checkOwner(HardnessRegistry(payable(a.hardness)).owner(), HardnessRegistry(payable(a.hardness)).pendingOwner(), deployer, expected, "hardness");
+        _checkOwner(BobbyAgentRegistry(a.agentRegistry).owner(), BobbyAgentRegistry(a.agentRegistry).pendingOwner(), deployer, expected, "agentRegistry");
+        _checkOwner(BobbyIntentEscrow(a.escrow).owner(), BobbyIntentEscrow(a.escrow).pendingOwner(), deployer, expected, "escrow");
+    }
+
+    function _checkOwner(address liveOwner, address livePending, address deployer, address expected, string memory label) internal {
+        if (liveOwner == expected) {
+            _ok(true, string.concat(label, ".owner == expectedOwner"));
+        } else if (liveOwner == deployer && livePending == expected) {
+            _ok(true, string.concat(label, ".owner: handoff PENDING (Safe must acceptOwnership)"));
+        } else {
+            _ok(false, string.concat(label, ".owner neither expectedOwner nor pending handoff"));
+        }
     }
 
     function _verifyEconomy(Addrs memory a, Roles memory r, string memory json) internal {

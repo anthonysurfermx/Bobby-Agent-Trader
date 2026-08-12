@@ -223,6 +223,11 @@ contract BobbyTrackRecord {
         uint256 stored = commitIndex[_debateHash];
         require(stored != 0, "No commitment found");
         require(_result != Result.PENDING, "Cannot resolve as pending");
+        /// @dev Audit Base r9 [H-01]: EXPIRED skipped the whole price derivation,
+        /// letting the recorder launder any losing trade as a zero-PnL EXPIRED
+        /// right after minResolveAt. The ONLY expiry path is the permissionless
+        /// expireCommitment() after MAX_COMMITMENT_TTL.
+        require(_result != Result.EXPIRED, "Use expireCommitment()");
         require(_exitPrice > 0, "Exit price required");
 
         uint256 cIdx = stored - 1;
@@ -241,9 +246,6 @@ contract BobbyTrackRecord {
             require(_pnlBps < 0, "LOSS must have negative PnL");
         } else if (_result == Result.BREAK_EVEN) {
             require(_pnlBps == 0, "BREAK_EVEN must have zero PnL");
-        } else if (_result == Result.EXPIRED) {
-            /// @dev Gemini v2: EXPIRED must have zero PnL
-            require(_pnlBps == 0, "EXPIRED must have zero PnL");
         }
 
         /// @dev Kimi/Codex audit (Base r4, HIGH): the outcome must be DERIVABLE from
@@ -252,7 +254,7 @@ contract BobbyTrackRecord {
         /// target, stop below entry — is a long). A WIN can no longer be declared
         /// on an exit the math says lost, and reported PnL may deviate from raw
         /// price PnL only within a small fee/slippage band that cannot flip sign.
-        if (_result != Result.EXPIRED) {
+        {
             bool isLong = c.targetPrice > 0
                 ? c.targetPrice > c.entryPrice
                 : c.stopPrice < c.entryPrice;

@@ -14,6 +14,8 @@ contract BobbyAgentRegistry {
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event AgentRegistered(uint256 indexed tokenId, string name, AgentRole role);
     event StatsUpdated(uint256 indexed tokenId, uint256 debates, uint256 winRate, uint256 calibrationError);
+    event OwnershipTransferStarted(address indexed currentOwner, address indexed pendingOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ---- Types ----
     enum AgentRole { CIO, ALPHA_HUNTER, RED_TEAM }
@@ -33,7 +35,11 @@ contract BobbyAgentRegistry {
     }
 
     // ---- State ----
-    address public immutable owner;
+    /// @dev Audit Base r9 [H-02]: owner was immutable, making the D-4 Safe
+    /// handoff impossible post-deploy. Two-step transfer, same pattern as the
+    /// other five contracts.
+    address public owner;
+    address public pendingOwner;
     uint256 public totalAgents;
 
     mapping(uint256 => AgentIdentity) public agents;
@@ -43,6 +49,20 @@ contract BobbyAgentRegistry {
     // ---- Constructor ----
     constructor() {
         owner = msg.sender;
+    }
+
+    // ---- Ownership (Audit Base r9 H-02) ----
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address");
+        pendingOwner = _newOwner;
+        emit OwnershipTransferStarted(owner, _newOwner);
+    }
+
+    function acceptOwnership() external {
+        require(msg.sender == pendingOwner, "Not pending owner");
+        emit OwnershipTransferred(owner, pendingOwner);
+        owner = pendingOwner;
+        pendingOwner = address(0);
     }
 
     // ---- Modifiers ----

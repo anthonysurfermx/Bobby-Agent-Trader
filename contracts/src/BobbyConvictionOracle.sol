@@ -54,6 +54,11 @@ contract BobbyConvictionOracle {
     /// @dev Default signal TTL (24 hours)
     uint256 public defaultTTL = 24 hours;
 
+    /// @dev Audit Base r9 [L-01]: hard TTL bounds — signals live minutes to
+    /// days, never seconds or years.
+    uint256 public constant MIN_SIGNAL_TTL = 5 minutes;
+    uint256 public constant MAX_SIGNAL_TTL = 30 days;
+
     /// @dev Gemini v2: minimum cooldown between signals for same symbol
     uint256 public signalCooldown = 10 minutes;
 
@@ -137,7 +142,12 @@ contract BobbyConvictionOracle {
             );
         }
 
-        uint64 expiry = uint64(block.timestamp + (_input.ttl > 0 ? _input.ttl : defaultTTL));
+        /// @dev Audit Base r9 [L-01]: bound TTL BEFORE the uint64 cast — an
+        /// oversized value could truncate expiry into the past (signal born
+        /// dead) or make it effectively permanent.
+        uint256 ttl = _input.ttl > 0 ? _input.ttl : defaultTTL;
+        require(ttl >= MIN_SIGNAL_TTL && ttl <= MAX_SIGNAL_TTL, "TTL out of range");
+        uint64 expiry = uint64(block.timestamp + ttl);
 
         _latestSignal[symHash] = Signal({
             debateHash: _input.debateHash,
@@ -239,6 +249,7 @@ contract BobbyConvictionOracle {
     }
 
     function setDefaultTTL(uint256 _ttl) external onlyOwner {
+        require(_ttl >= MIN_SIGNAL_TTL && _ttl <= MAX_SIGNAL_TTL, "TTL out of range");
         defaultTTL = _ttl;
     }
 

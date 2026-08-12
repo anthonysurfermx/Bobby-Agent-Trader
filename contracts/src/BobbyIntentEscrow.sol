@@ -215,14 +215,19 @@ contract BobbyIntentEscrow {
     }
 
     // ── Admin (F-010) ──
+    /// @dev Audit Base r9 [M-01]: owner != keeper (R2-006) must survive ownership
+    /// transfer, not just construction and rotateRole. Checked at proposal AND
+    /// acceptance because the keeper can be rotated in between.
     function transferOwnership(address next) external onlyOwner {
         if (next == address(0)) revert ZeroAddress();
+        if (next == keeper) revert DuplicateRole();
         pendingOwner = next;
         emit OwnershipTransferStarted(owner, next);
     }
 
     function acceptOwnership() external {
         if (msg.sender != pendingOwner) revert NotPendingOwner();
+        if (msg.sender == keeper) revert DuplicateRole();
         address prev = owner;
         owner = pendingOwner;
         delete pendingOwner;
@@ -241,6 +246,7 @@ contract BobbyIntentEscrow {
         } else if (role == "keeper") {
             if (next == cio || next == arbiter || next == resolver) revert DuplicateRole();
             if (next == owner) revert DuplicateRole(); // R2-006 keeper must not be owner
+            if (next == pendingOwner) revert DuplicateRole(); // r9 M-01: would collide at acceptOwnership
             prev = keeper; keeper = next;
         } else if (role == "resolver") {
             if (next == cio || next == arbiter || next == keeper) revert DuplicateRole();
