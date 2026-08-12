@@ -1,21 +1,41 @@
-# Runbook — Deploy canario a Base Sepolia
+# Runbook — Redeploy canario a Base Sepolia (r10.2)
 
-Luz verde de Codex (testnet solamente — NO es aprobación de mainnet).
-Contratos: commit auditado r4–r8, 125/125 tests. Quórum recomendado: **2-de-3**.
+Luz verde de Codex sobre `193973a` (testnet solamente — NO es aprobación de
+mainnet). Contratos: commit auditado r9 → fixes r10/r10.1/r10.2, **152/152
+tests** (1,000 fuzz runs). Quórum recomendado: **2-de-3**.
+
+Este es un REDEPLOY COMPLETO: los contratos no son upgradeables y r10 cambió
+bytecode (TrackRecord, EconomyV2, AgentRegistry, ConvictionOracle,
+IntentEscrow). El deployment anterior de Sepolia (bloque 45364116) queda
+obsoleto; sus direcciones NO se reutilizan.
 
 ## Direcciones que Anthony debe definir (ninguna vive en el repo)
 
 | Variable | Rol | Restricciones |
 |---|---|---|
-| `--sender` / wallet firmante | Owner de los 7 contratos | Con ETH de Sepolia (faucet Coinbase/Alchemy). **No puede ser el keeper** |
+| `--sender` / wallet firmante | Owner inicial de los 7 contratos | Con ETH de Sepolia (faucet Coinbase/Alchemy). **No puede ser el keeper** |
 | `BOBBY_ADDRESS` | Recorder (TrackRecord/Oracle) | Normalmente la wallet del backend (recorder key) |
 | `CIO_ADDRESS` | CIO del escrow + economy | Distinta de arbiter/keeper/resolver |
 | `ARBITER_ADDRESS` | Árbitro del escrow | Distinta de las otras 3 del escrow |
-| `KEEPER_ADDRESS` | Keeper del escrow | Distinta de las otras 3 **y del firmante** |
+| `KEEPER_ADDRESS` | Keeper del escrow | Distinta de las otras 3, **del firmante** y de `OWNER_SAFE_ADDRESS` |
 | `RESOLVER_ADDRESS` | Resolver único de Bounties + Escrow | Debe estar incluida en la lista de abajo |
 | `RESOLVER_ADDRESSES` | Quórum de HardnessRegistry | `0xR1,0xR2,0xR3` — sin ceros ni duplicados; R1 = RESOLVER_ADDRESS |
 | `RESOLVER_THRESHOLD` | Umbral del quórum | `2` (2-de-3) |
 | `BASESCAN_API_KEY` | Verificación en BaseScan | Export en shell, **nunca** a git |
+
+### Variables de ownership (r10 H-02) — opcionales en Sepolia, OBLIGATORIAS en mainnet
+
+| Variable | Rol | Sepolia | Mainnet (8453) |
+|---|---|---|---|
+| `OWNER_SAFE_ADDRESS` | Dueño final de los 7 contratos | Opcional (default: firmante, sin handoff) | Obligatoria; ≠ deployer; ≠ keeper |
+| `OWNER_SAFE_CODEHASH` | Pin del bytecode del proxy Safe auditado | No aplica | Obligatoria — `cast codehash <safe>` |
+| `OWNER_SAFE_SINGLETON` | Pin del singleton (slot 0) | No aplica | Obligatoria — `cast storage <safe> 0`, cotejado contra [safe-global/safe-deployments](https://github.com/safe-global/safe-deployments) |
+
+En mainnet, `SafeOwnerGate` exige además: threshold ≥ 2 sobre ≥ 3 owners, cero
+módulos habilitados y guard slot vacío. El handoff se PROPONE en el mismo
+broadcast (two-step); el Safe debe aceptar los 7 `acceptOwnership()` (batch en
+su UI) y `VerifyBaseDeployment` en 8453 solo pasa con ownership ACEPTADO y
+`pendingOwner == 0`.
 
 ## Paso 1 — Dry-run real (sin broadcast)
 
@@ -24,7 +44,8 @@ cd contracts && export BASESCAN_API_KEY=... && BOBBY_ADDRESS=0x... CIO_ADDRESS=0
 ```
 
 Éxito = `post-deploy assertions: ALL PASSED` + `manifest written: deployments/84532.json`.
-Revisar el manifiesto (roles, fees, quórum). Ojo: su `deployBlock` es simulado.
+Revisar el manifiesto (roles, fees, quórum, `expectedOwner`). Ojo: su
+`deployBlock` es simulado.
 
 ## Paso 2 — Broadcast (Anthony firma)
 
@@ -36,18 +57,31 @@ Mismo comando + `--broadcast --verify --interactives 1`.
 cd contracts && forge script script/VerifyBaseDeployment.s.sol --rpc-url base_sepolia
 ```
 
-Éxito = `LIVE VERIFICATION PASSED - checks: ~35`. Solo entonces:
+Éxito = `LIVE VERIFICATION PASSED` (~36+ checks, ahora incluye
+owner/pendingOwner contra `expectedOwner` del manifest). Solo entonces:
 
 ## Paso 4 — Integración (Claude)
 
-1. Cargar `BASE_SEPOLIA_*_ADDRESS` (7) + `TREASURY_ADDRESS_BASE_SEPOLIA` en Vercel
-   desde `deployments/84532.json` — nunca a mano.
+1. Cargar `BASE_SEPOLIA_*_ADDRESS` (7) + `TREASURY_ADDRESS_BASE_SEPOLIA` en
+   Vercel desde `deployments/84532.json` — nunca a mano. Son direcciones
+   NUEVAS: reemplazar las del deployment anterior en todos los targets
+   (prod/dev/preview) donde estén cargadas.
 2. Confirmar los 7 contratos verificados en sepolia.basescan.org.
 3. Smoke test del API (`/api/bobby-protocol-stats` contra Sepolia).
-4. **Al final**: `PROTOCOL_CHAIN=base-sepolia`.
+4. Ciclo canario completo (commit → oracle → fee → resolve WIN/LOSS) y
+   dejar el canario corriendo 24–48 h.
+5. **Al final**: `PROTOCOL_CHAIN=base-sepolia`.
 
 ## No hacer
 
 - No usar direcciones ficticias en el dry-run real.
 - No encender `PROTOCOL_CHAIN` antes del Paso 3 en verde.
 - No reutilizar estas addresses/params para mainnet sin nueva aprobación.
+- No presentar el canario como track record inmanipulable: la decisión
+  exitPrice (oracle-verified vs attested) sigue abierta y bloquea ese claim.
+
+## Bloqueantes de mainnet (fuera de este runbook)
+
+M-02–M-05 (HardnessRegistry/bounties), decisión de modelo de confianza de
+`exitPrice`, creación + auditoría externa + pinning del Safe 2-de-3 real, y
+handoffs ACEPTADOS (no solo propuestos) en los 7 contratos.
