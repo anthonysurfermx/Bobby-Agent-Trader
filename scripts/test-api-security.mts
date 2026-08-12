@@ -144,17 +144,24 @@ try {
     assert.equal(fetchCalls, 1, 'rejected signals must not reach execution dependencies');
   }
 
-  const [orchestrateSource, registerSource, controlPlaneSource] = await Promise.all([
+  const [orchestrateSource, registerSource, controlPlaneSource, forumRegisterSource, voiceAssetsSource, executorSource] = await Promise.all([
     readFile(new URL('../api/orchestrate.ts', import.meta.url), 'utf8'),
     readFile(new URL('../api/agents/register.ts', import.meta.url), 'utf8'),
     readFile(new URL('../api/_lib/hardness-control-plane.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../api/forum-agent-register.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/lib/voice-assets.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../services/executor/index.mjs', import.meta.url), 'utf8'),
   ]);
   assert.match(orchestrateSource, /const commitOnchain = internalRequest &&/, 'public orchestration must not spend recorder gas');
   assert.match(orchestrateSource, /body as unknown as Record<string, unknown>/, 'orchestration signatures must cover the full request');
   assert.match(registerSource, /existing\?\.owner_address \|\| body\.owner/, 'existing agent ownership must not be replaceable by a new signer');
   assert.doesNotMatch(controlPlaneSource, /VITE_SUPABASE_ANON_KEY/, 'control-plane mutations must not fall back to the browser anon key');
+  assert.match(forumRegisterSource, /createHmac\('sha256', API_KEY_PEPPER\)/, 'forum API keys must use a keyed digest');
+  assert.doesNotMatch(voiceAssetsSource, /USDT\?\|USDC\|PERP\|SWAP/, 'asset normalization must not use the vulnerable suffix regex');
+  assert.match(executorSource, /Object\.hasOwn\(ACTIONS, action\)/, 'executor actions must use own-property allowlisting');
+  assert.match(executorSource, /console\.error\('\[executor\] action failed:', action, message\)/, 'executor logs must use a constant format string');
 
-  console.log('api-security: 22/22 checks passed');
+  console.log('api-security: 26/26 checks passed');
 } finally {
   globalThis.fetch = originalFetch;
   const restore = (name: string, value: string | undefined) => {

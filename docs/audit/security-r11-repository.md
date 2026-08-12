@@ -28,7 +28,8 @@ This is **not** a final Base mainnet sign-off. Mainnet remains blocked by the un
 
 - Production application build: pass.
 - ESLint (`--quiet`): pass.
-- Application security/regression suites: 326 assertions pass.
+- Application security/regression suites: 330 assertions pass.
+- CodeQL: three high-severity findings identified during PR analysis and fixed before merge (asset normalization ReDoS, unkeyed API credential hashing, and externally controlled executor log formatting).
 - Foundry build and EIP-170 size check: pass; `HardnessRegistry` retains 1,805 bytes of margin.
 - Foundry suite: 152 tests pass with 1,000 fuzz runs.
 - Gitleaks full repository history: no findings after narrowly allowlisting public chain addresses and the public Supabase anonymous key.

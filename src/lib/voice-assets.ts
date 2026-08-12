@@ -153,11 +153,20 @@ export function getVoiceAsset(symbol: string): VoiceAsset | undefined {
 
 /** Coerce anything the model or a select emits into a ticker we can chart. */
 export function normalizeAssetSymbol(value: unknown): string {
-  const raw = String(value ?? 'BTC').trim().toUpperCase();
+  const raw = String(value ?? 'BTC').trim().toUpperCase().slice(0, 128);
   if (SPOKEN_TO_SYMBOL[raw]) return SPOKEN_TO_SYMBOL[raw];
   // The model sometimes hands back a full pair ("BTC-USDT", "ETH/USD"); the
   // chart and the market endpoint both want the bare base ticker.
-  const base = raw.replace(/[-/](USDT?|USDC|PERP|SWAP).*$/, '');
+  const dashIndex = raw.indexOf('-');
+  const slashIndex = raw.indexOf('/');
+  const separatorIndex = dashIndex === -1
+    ? slashIndex
+    : slashIndex === -1
+      ? dashIndex
+      : Math.min(dashIndex, slashIndex);
+  const quote = separatorIndex === -1 ? '' : raw.slice(separatorIndex + 1);
+  const knownQuote = ['USD', 'USDT', 'USDC', 'PERP', 'SWAP'].some((suffix) => quote.startsWith(suffix));
+  const base = separatorIndex !== -1 && knownQuote ? raw.slice(0, separatorIndex) : raw;
   if (SPOKEN_TO_SYMBOL[base]) return SPOKEN_TO_SYMBOL[base];
   return base.replace(/[^A-Z0-9]/g, '').slice(0, 12) || 'BTC';
 }

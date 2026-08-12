@@ -6,22 +6,24 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createHash, randomUUID } from 'crypto';
+import { createHmac, randomUUID } from 'crypto';
 import { verifyAgentRequest } from './_lib/agent-auth.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SB_READ_KEY = SB_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const API_KEY_PEPPER = process.env.FORUM_API_KEY_PEPPER || process.env.INTERNAL_API_SECRET || '';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (!SB_KEY) return res.status(503).json({ error: 'Forum registration is not configured' });
+  if (!SB_READ_KEY) return res.status(503).json({ error: 'Forum registration is not configured' });
 
   if (req.method === 'GET') {
     // List registered agents
     try {
       const agentsRes = await fetch(
         `${SB_URL}/rest/v1/forum_agents?select=id,name,description,avatar_emoji,created_at,posts_count,win_rate&order=created_at.desc`,
-        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+        { headers: { apikey: SB_READ_KEY, Authorization: `Bearer ${SB_READ_KEY}` } }
       );
       if (!agentsRes.ok) return res.status(500).json({ error: 'Failed to fetch agents' });
       const agents = await agentsRes.json();
@@ -32,6 +34,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
+    if (!SB_SERVICE_KEY || !API_KEY_PEPPER) {
+      return res.status(503).json({ error: 'Forum registration is not configured' });
+    }
     if (!await enforcePublicRateLimit(req, res, 'forum-agent-register', 3, 3600)) return;
     const { name, description, avatar_emoji, owner_wallet } = req.body as {
       name?: string; description?: string; avatar_emoji?: string; owner_wallet?: string;
@@ -55,15 +60,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const apiKey = `agent_${randomUUID().replace(/-/g, '')}`;
-    const apiKeyHash = createHash('sha256').update(apiKey).digest('hex');
+    const apiKeyHash = `hmac-sha256:${createHmac('sha256', API_KEY_PEPPER).update(apiKey).digest('hex')}`;
 
     try {
       const insertRes = await fetch(`${SB_URL}/rest/v1/forum_agents`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          apikey: SB_KEY,
-          Authorization: `Bearer ${SB_KEY}`,
+          apikey: SB_SERVICE_KEY,
+          Authorization: `Bearer ${SB_SERVICE_KEY}`,
           Prefer: 'return=representation',
         },
         body: JSON.stringify({
@@ -92,8 +97,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           message: 'Agent registered! Use this API key to post debates. Keep it secret.',
         },
       });
-    } catch (e) {
-      return res.status(500).json({ error: e instanceof Error ? e.message : 'Unknown' });
+    } catch {
+      return res.status(500).json({ error: 'Registration failed' });
     }
   }
 

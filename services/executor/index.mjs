@@ -2,6 +2,7 @@
 // Replaces the deleted Digital Ocean droplet. Hardened from day one:
 // Bearer auth, action allowlist, no arbitrary params passthrough.
 import express from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { createPublicClient, http, parseUnits, formatUnits } from 'viem';
 import { base } from 'viem/chains';
 
@@ -47,12 +48,21 @@ const quoterAbi = [{
 const app = express();
 app.use(express.json({ limit: '64kb' }));
 
+function safeTokenEqual(provided, expected) {
+  const left = Buffer.from(provided);
+  const right = Buffer.from(expected);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
 app.get('/health', (_req, res) => res.json({ ok: true, chain: 8453, service: 'bobby-executor' }));
 
 // Auth on everything else
 app.use((req, res, next) => {
   const auth = req.headers.authorization || '';
-  if (auth !== `Bearer ${AUTH_TOKEN}`) return res.status(401).json({ error: 'unauthorized' });
+  const provided = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  if (!provided || !safeTokenEqual(provided, AUTH_TOKEN)) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
   next();
 });
 
@@ -92,14 +102,17 @@ const ACTIONS = {
 
 app.post('/api/base', async (req, res) => {
   const { action, params = {} } = req.body || {};
+  if (typeof action !== 'string' || !Object.hasOwn(ACTIONS, action)) {
+    return res.status(400).json({ error: 'unknown action', allowed: Object.keys(ACTIONS) });
+  }
   const handler = ACTIONS[action];
-  if (!handler) return res.status(400).json({ error: `unknown action '${action}'`, allowed: Object.keys(ACTIONS) });
   try {
     const data = await handler(params);
     return res.json({ ok: true, action, data });
   } catch (err) {
-    console.error(`[executor] ${action} failed:`, err.message);
-    return res.status(422).json({ ok: false, action, error: err.message });
+    const message = err instanceof Error ? err.message : 'unknown error';
+    console.error('[executor] action failed:', action, message);
+    return res.status(422).json({ ok: false, action, error: 'request failed' });
   }
 });
 
