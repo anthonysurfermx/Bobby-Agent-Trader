@@ -61,8 +61,9 @@ const CONTRACT_ABI = [
   'function losses() view returns (uint256)',
   'function totalPnlBps() view returns (int256)',
   'function getAgentStats(uint8 _agent) view returns (uint256 _wins, uint256 _losses, uint256 _total, uint256 _winRate)',
-  'function getRecentTrades(uint256 _count) view returns (tuple(bytes32 debateHash, string symbol, uint8 agent, int256 pnlBps, uint8 conviction, uint8 result, uint256 entryPrice, uint256 exitPrice, uint256 committedAt, uint256 resolvedAt, address recorder)[])',
-  'function getRecentCommitments(uint256 _count) view returns (tuple(bytes32 debateHash, string symbol, uint8 agent, uint8 conviction, uint256 entryPrice, uint256 targetPrice, uint256 stopPrice, uint256 committedAt, address recorder, bool resolved)[])',
+  // Tuple order MUST mirror the storage struct layout (slot-packed since Base r4)
+  'function getRecentTrades(uint256 _count) view returns (tuple(bytes32 debateHash, uint96 entryPrice, uint96 exitPrice, uint64 committedAt, uint64 resolvedAt, address recorder, uint8 agent, uint8 conviction, uint8 result, int256 pnlBps, string symbol)[])',
+  'function getRecentCommitments(uint256 _count) view returns (tuple(bytes32 debateHash, uint96 entryPrice, uint96 targetPrice, uint64 committedAt, uint96 stopPrice, address recorder, uint64 minResolveAt, uint8 agent, uint8 conviction, bool resolved, string symbol)[])',
 ];
 
 // Helper: eth_call to contract
@@ -118,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               jsonrpc: '2.0', id: 2, method: 'eth_call',
-              params: [{ to: ECONOMY_ADDRESS, data: '0x0afe1e28' }, 'latest'], // getEconomyStats()
+              params: [{ to: ECONOMY_ADDRESS, data: '0x2576feb5' }, 'latest'], // getEconomyStats() — keccak-derived, old 0x0afe1e28 reverted on V2
             }),
           });
           const economyJson = await economyRes.json();
@@ -148,7 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           convictionOracle: ORACLE_ADDRESS,
           agentEconomy: ECONOMY_ADDRESS,
         },
-        chain: 'X Layer (196)',
+        chain: `${DEFAULT_CHAIN.name} (${DEFAULT_CHAIN.id})`,
         explorer: addressUrl(CONTRACT_ADDRESS),
         version: 'v3 — Commit-Reveal + Agent Economy (Audited by Gemini + Codex)',
         stats: {
