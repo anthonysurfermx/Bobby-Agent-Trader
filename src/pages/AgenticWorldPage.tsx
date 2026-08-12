@@ -164,10 +164,10 @@ export default function AgenticWorldPage() {
           </div>
 
           <h1 className="text-4xl md:text-6xl lg:text-8xl font-black tracking-tighter leading-none mb-4 uppercase text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-white/20">
-            A TRADING ROOM<br/>THAT <span className="text-green-400 italic">THINKS</span>
+            A DECISION ROOM<br/>THAT <span className="text-green-400 italic">THINKS</span>
           </h1>
           <p className="text-lg md:text-xl text-white/60 font-bold mb-4">
-            Not a bot. Not alerts. A metacognitive system where 3 AI agents debate every move before you see it.
+            Not a bot. Not alerts. Three agents debate before you act.
           </p>
 
           <p className="text-sm md:text-base text-white/30 max-w-2xl leading-relaxed mb-12 border-l-2 border-green-500/20 pl-8">

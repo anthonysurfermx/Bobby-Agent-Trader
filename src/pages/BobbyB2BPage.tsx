@@ -84,10 +84,10 @@ export default function BobbyB2BPage() {
               <span className="font-mono text-[9px] uppercase tracking-widest text-green-400">System Online</span>
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight mb-6">
-              Turn Your Telegram Group Into an <span className="text-green-400 italic">AI Trading Room</span>
+              Make every market decision <span className="text-green-400 italic">earn it.</span>
             </h1>
             <p className="text-white/40 text-lg max-w-xl mb-10 leading-relaxed">
-              Three agents debate every market move. Your community watches in real-time. Voice notes, risk gates and a decision record before capital moves.
+              Three agents debate. Risk can say no. Your group sees the decision before capital moves.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <a href="https://t.me/Bobbyagentraderbot?startgroup=true" target="_blank" rel="noopener noreferrer"

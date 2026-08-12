@@ -316,7 +316,7 @@ export default function BobbyProtocolLanding() {
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />Accountability infrastructure for autonomous finance <span aria-hidden>›</span>
               </a>
               <h1 className="max-w-3xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Make the <span className="text-[#0052ff]">thesis earn it.</span></h1>
-              <p className="mt-8 max-w-xl text-lg leading-8 text-white/60 md:text-xl">Bobby is the accountability layer for autonomous finance. Three agents debate, risk gets a veto, and the decision leaves a proof trail before capital moves.</p>
+              <p className="mt-8 max-w-xl text-lg leading-8 text-white/60 md:text-xl">Three agents debate. Risk can say no. The decision is public before capital moves.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
                 <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a decision <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
                 <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the gate <ChevronDown className="h-4 w-4" /></a>
@@ -358,7 +358,7 @@ export default function BobbyProtocolLanding() {
                 <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / Architecture</div>
                 <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
               </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → committed record. The accountability loop for autonomous finance.</p>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Four checks before capital moves.</p>
             </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -366,14 +366,10 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.2 }}
               className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
             >
-              <video
-                className="h-full w-full"
-                src="/videos/architecture.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-                poster="/posters/architecture.jpg"
+              <img
+                className="h-full w-full object-cover"
+                src="/images/protocol/architecture-simple.png"
+                alt="Bobby checks a thesis, debates it, applies a risk veto, and creates a public record"
               />
             </motion.div>
           </div>
@@ -392,22 +388,22 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.25 }}
               className="max-w-3xl"
             >
-              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The accountability loop</div>
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Before capital moves</div>
               <h2 className="text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
-                Decisions, never blind.<br />
-                <span className="text-white/72">See Bobby in action.</span>
+                No blind decisions.<br />
+                <span className="text-white/72">Just four checks.</span>
               </h2>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">
-                Every proposal enters an adversarial pipeline. Agents debate it, risk challenges it, and the protocol commits the decision before the market can rewrite the story.
+                Bobby makes the thesis earn the right to move.
               </p>
             </motion.div>
 
             <div className="mt-14 grid grid-cols-2 gap-x-8 gap-y-7 md:grid-cols-4 lg:max-w-5xl">
               {[
-                ['Total debates', formatNumber(totalDebates)],
-                ['Verified decisions', formatNumber(totalTrades)],
-                ['MCP calls', formatNumber(totalMcpCalls)],
-                ['Network interactions', formatNumber(totalInteractions)],
+                ['Debates', formatNumber(totalDebates)],
+                ['Decisions', formatNumber(totalTrades)],
+                ['Agent calls', formatNumber(totalMcpCalls)],
+                ['Interactions', formatNumber(totalInteractions)],
               ].map(([label, value]) => (
                 <div key={label} className="border-l border-white/20 pl-4">
                   <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{label}</div>
@@ -434,10 +430,10 @@ export default function BobbyProtocolLanding() {
 
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
-                { icon: Bot, eyebrow: 'Alpha Hunter', title: 'Find the asymmetric setup', text: 'Market structure, momentum and live intelligence become a thesis with explicit invalidation.', state: 'SIGNAL READY', step: '01' },
-                { icon: ShieldCheck, eyebrow: 'Red Team', title: 'Attack the thesis', text: 'The opposing agent searches for crowded positioning, weak assumptions and hidden downside.', state: 'CHALLENGED', step: '02' },
-                { icon: CircleDollarSign, eyebrow: 'CIO + Risk', title: 'Gate the capital', text: 'Conviction, sizing and downside are reconciled. Pass, park or block — never force the trade.', state: 'RISK GATED', step: '03' },
-                { icon: Check, eyebrow: 'Committed record', title: 'Commit before outcome', text: 'The decision and its rationale become inspectable before price reveals the answer. Market truth remains a separate claim.', state: 'PROOF TRAIL', step: '04' },
+                { icon: Bot, eyebrow: '01 / Thesis', title: 'Find the idea', text: 'A clear setup with a clear invalidation.', state: 'PROPOSED', step: '01' },
+                { icon: ShieldCheck, eyebrow: '02 / Debate', title: 'Attack the idea', text: 'Red Team looks for what can break it.', state: 'CHALLENGED', step: '02' },
+                { icon: CircleDollarSign, eyebrow: '03 / Risk veto', title: 'Protect the capital', text: 'Risk can pass, pause or block.', state: 'GATED', step: '03' },
+                { icon: Check, eyebrow: '04 / Public record', title: 'Leave the record', text: 'The decision is visible before the result.', state: 'RECORDED', step: '04' },
               ].map(({ icon: Icon, eyebrow, title, text, state, step }, index) => (
                 <motion.article
                   key={title}
@@ -473,11 +469,11 @@ export default function BobbyProtocolLanding() {
               <div>
                 <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Protocol capabilities</div>
                 <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
-                  An agent-native decision layer,<br />everything it needs.
+                  The tools to<br />make decisions better.
                 </h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">
-                Four surfaces turn autonomous decisions from a black box into an inspectable, accountable system.
+                Debate, risk, proof and a simple interface.
               </p>
             </div>
 
