@@ -86,9 +86,9 @@ export default function BobbyAnalyticsPage() {
 
       <div className="p-6 md:p-8 max-w-7xl mx-auto pb-20">
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end mb-8">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight">PERFORMANCE_ANALYTICS</h1>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex min-w-0 justify-between items-end mb-8">
+          <div className="min-w-0">
+            <h1 className="break-all text-2xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl">PERFORMANCE_ANALYTICS</h1>
             <p className="font-mono text-xs text-white/30 mt-1">
               Bobby's $100 Challenge · Real OKX trades · <span className="text-green-400">LIVE</span>
             </p>

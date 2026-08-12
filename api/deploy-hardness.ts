@@ -6,6 +6,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
@@ -21,15 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'POST only' });
   }
 
-  // Auth
-  const secret = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.authorization;
-    const bodySecret = (req.body as Record<string, unknown>)?.secret;
-    if (auth !== `Bearer ${secret}` && bodySecret !== secret) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
+  if (!requireInternalAuth(req, res)) return;
 
   const deployerKey = process.env.BOBBY_RECORDER_KEY;
   if (!deployerKey) {

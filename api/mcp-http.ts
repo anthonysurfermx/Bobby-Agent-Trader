@@ -43,6 +43,7 @@ import {
   type B1naryOptionType,
 } from './_lib/b1nary.js';
 import { evaluateWheel } from './_lib/wheel-verdict.js';
+import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
@@ -224,7 +225,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_xlayer_signals') {
     const res = await fetch(`${BASE_URL}/api/xlayer-trade`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'signals' }),
     });
     const data = await res.json() as { data?: any[] };
@@ -236,7 +237,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_xlayer_quote') {
     const res = await fetch(`${BASE_URL}/api/xlayer-trade`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({
         action: 'quote',
         params: {
@@ -359,7 +360,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_wallet_balance') {
     const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'balance', params: { chain: args.chain || 'xlayer' } }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -367,7 +368,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_wallet_portfolio') {
     const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '196' } }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -375,7 +376,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_security_scan') {
     const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'scan-token', params: { address: args.address, chain: args.chain || '1' } }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -383,7 +384,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_dex_trending') {
     const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'trending', params: { chain: args.chain || '1' } }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -391,7 +392,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_dex_signals') {
     const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'signals', params: { chain: args.chain || '1', type: args.type || 'smart_money' } }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -757,6 +758,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  if (!await enforcePublicRateLimit(req, res, 'mcp-http', 120, 600)) return;
+  if (JSON.stringify(req.body || {}).length > 100_000) {
+    return res.status(413).json(jsonrpcError(undefined, -32600, 'Request too large'));
+  }
+
   if (req.method === 'DELETE') {
     // Session termination — stateless server, just acknowledge
     return res.status(200).json({ ok: true });
@@ -768,6 +774,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Accept application/json (single message) or could be batch
   const body = req.body as JsonRpcMessage | JsonRpcMessage[];
+  if (Array.isArray(body) && (body.length === 0 || body.length > 20)) {
+    return res.status(400).json(jsonrpcError(undefined, -32600, 'Batch must contain 1-20 messages'));
+  }
   const messages = Array.isArray(body) ? body : [body];
   const results: unknown[] = [];
 

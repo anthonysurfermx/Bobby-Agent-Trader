@@ -6,10 +6,11 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // Model mapping: Anthropic → OpenAI
 const OPENAI_MODEL_MAP: Record<string, string> = {
@@ -108,9 +109,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!requireInternalAuth(req, res)) return;
 
-  if (!OPENAI_API_KEY) {
-    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!OPENAI_API_KEY || !SB_SERVICE_KEY) {
+    return res.status(503).json({ error: 'Forum generation is not configured' });
   }
 
   const { language = 'en' } = req.body as { language?: string };

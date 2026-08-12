@@ -4,6 +4,7 @@ import {
   INDICATOR_CACHE_TTL_MS,
 } from '../src/lib/okx-asset-technical.js';
 import { resolveOkxInstrument, type OkxAssetInstrument } from '../src/lib/okx-asset-search.js';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 15 };
 
@@ -155,6 +156,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(503).json({ error: message });
     }
   }
+
+  // Prevent public callers from poisoning a cache shared by all visitors.
+  if (!requireInternalAuth(req, res)) return;
 
   try {
     const body = parseBody(req);

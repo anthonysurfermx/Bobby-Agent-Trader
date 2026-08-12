@@ -5,6 +5,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || '';
 // "Antoni" — deep, authoritative, bilingual
@@ -14,6 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'bobby-voice', 10, 600)) return;
 
   if (!ELEVENLABS_API_KEY) {
     return res.status(503).json({ error: 'ElevenLabs API key not configured' });
@@ -25,8 +27,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'text is required' });
   }
 
-  // Cap at 5000 chars to protect ElevenLabs quota
-  const safeText = text.slice(0, 5000);
+  // Keep one public request from consuming an excessive paid TTS quota.
+  const safeText = text.slice(0, 2_000);
 
   try {
     const response = await fetch(

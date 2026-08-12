@@ -8,13 +8,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { tgSendVoiceAnalysis } from './_lib/telegram.js';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
 const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const CYCLE_SECRET = process.env.BOBBY_CYCLE_SECRET || '';
 const BASE_URL = 'https://defimexico.org';
 
 // B2C: 100 free messages, then $1 USDT
@@ -70,11 +70,7 @@ function renderGroupMessage(posts: any, conviction: number, symbol: string | nul
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  // Auth
-  if (CYCLE_SECRET) {
-    const auth = req.headers.authorization;
-    if (auth !== `Bearer ${CYCLE_SECRET}`) return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (!requireInternalAuth(req, res)) return;
 
   if (!SB_SERVICE_KEY || !BOT_TOKEN) return res.status(500).json({ error: 'Server misconfigured' });
 

@@ -7,6 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { hmacSign } from './_lib/okx-hmac.js';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 const OKX_BASE = 'https://web3.okx.com';
 
@@ -50,12 +51,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'okx-signal', 60, 600)) return;
 
   const {
     chains = '1,501',        // Ethereum + Solana by default
     walletType = '1,2,3',    // All: Smart Money, KOL, Whale
     minAmountUsd = '5000',
   } = req.query;
+  if (!/^\d{1,10}(,\d{1,10}){0,9}$/.test(String(chains))
+    || !/^[123](,[123]){0,2}$/.test(String(walletType))
+    || !/^\d{1,12}(\.\d{1,2})?$/.test(String(minAmountUsd))) {
+    return res.status(400).json({ error: 'Invalid signal parameters' });
+  }
 
   const apiKey = process.env.OKX_API_KEY;
   const secretKey = process.env.OKX_SECRET_KEY;
@@ -148,6 +155,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[OKX Signal] Error:', msg);
-    return res.status(500).json({ error: msg });
+    return res.status(500).json({ error: 'OKX signal request failed' });
   }
 }

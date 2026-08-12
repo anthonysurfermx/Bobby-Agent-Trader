@@ -5,6 +5,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
@@ -18,14 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'GET only (Vercel cron)' });
   }
 
-  // Auth: Vercel cron sends Authorization: Bearer <CRON_SECRET>
-  const cronSecret = process.env.CRON_SECRET || process.env.BOBBY_CYCLE_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.authorization;
-    if (auth !== `Bearer ${cronSecret}`) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
+  if (!requireInternalAuth(req, res)) return;
 
   try {
     // Call the main generate-activity endpoint
@@ -33,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${cronSecret || ''}`,
+        ...internalAuthHeaders(),
       },
       body: JSON.stringify({
         signals: 3,

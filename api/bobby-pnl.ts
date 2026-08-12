@@ -6,6 +6,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 const OKX_BASE = 'https://www.okx.com';
 const API_KEY = process.env.OKX_CEX_API_KEY || process.env.OKX_API_KEY || '';
@@ -32,7 +33,10 @@ async function okxGet(path: string): Promise<any> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
+  if (!await enforcePublicRateLimit(req, res, 'bobby-pnl', 30, 600)) return;
   if (!API_KEY) {
+    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
     return res.status(200).json({
       ok: false,
       message: 'OKX CEX API not configured. Set OKX_CEX_API_KEY env vars.',

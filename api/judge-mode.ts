@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60, memory: 512 };
 
@@ -163,6 +164,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'judge-mode', 10, 600)) return;
 
   if (!OPENAI_API_KEY) {
     return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });

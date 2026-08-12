@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 10 };
 
@@ -31,6 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'bobby-router', 60, 600)) return;
 
   const { message, context } = req.body as {
     message: string;
@@ -39,6 +41,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'message required' });
+  }
+  if (message.length > 4_000 || (context != null && (typeof context !== 'string' || context.length > 8_000))) {
+    return res.status(413).json({ error: 'Request is too large' });
   }
 
   if (!OPENAI_API_KEY) {

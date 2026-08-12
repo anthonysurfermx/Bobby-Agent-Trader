@@ -23,6 +23,7 @@ import {
   getChallenge,
 } from './_lib/mcp-challenges.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
+import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
 
 const BASE_URL = 'https://bobbyprotocol.xyz';
 
@@ -154,7 +155,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
       // Agentic Wallet tools (via droplet onchainos service)
       if (toolName === 'bobby_wallet_balance') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'balance', params: { chain: args.chain || 'xlayer' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -162,7 +163,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
       if (toolName === 'bobby_wallet_portfolio') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '196' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -170,7 +171,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
       if (toolName === 'bobby_security_scan') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'scan-token', params: { address: args.address, chain: args.chain || '1' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -178,7 +179,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
       if (toolName === 'bobby_dex_trending') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'trending', params: { chain: args.chain || '1' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -186,7 +187,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
       if (toolName === 'bobby_dex_signals') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'signals', params: { chain: args.chain || '1', type: args.type || 'smart_money' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -227,6 +228,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       },
     });
+  }
+
+  if (!await enforcePublicRateLimit(req, res, 'mcp-bobby', 120, 600)) return;
+  if (JSON.stringify(req.body || {}).length > 100_000) {
+    return res.status(413).json({ jsonrpc: '2.0', error: { code: -32600, message: 'Request too large' }, id: null });
   }
 
   const body = req.body as JsonRpcRequest;

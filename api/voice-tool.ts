@@ -10,6 +10,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isEquitySymbol, normalizeAssetSymbol } from '../src/lib/voice-assets.js';
 import { analyzeCandles, analysisSummary, type Candle } from '../src/lib/market-indicators.js';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
@@ -151,6 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'voice-tool', 60, 60)) return;
 
   const { tool, args } = (req.body ?? {}) as { tool?: ToolName; args?: Record<string, unknown> };
 

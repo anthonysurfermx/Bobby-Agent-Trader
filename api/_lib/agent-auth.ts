@@ -1,16 +1,9 @@
 import type { VercelRequest } from '@vercel/node';
 import { recoverMessageAddress } from 'viem';
+import { buildAgentAuthChallenge } from '../../src/lib/agent-request-auth.js';
+import { isInternalRequest } from './request-security.js';
 
 const AUTH_WINDOW_MS = 10 * 60 * 1000;
-
-function buildMessage(action: string, payload: Record<string, unknown>, timestamp: string) {
-  return [
-    'Bobby Hardness Finance',
-    `action:${action}`,
-    `timestamp:${timestamp}`,
-    `payload:${JSON.stringify(payload)}`,
-  ].join('\n');
-}
 
 export function getAuthHeaders(req: VercelRequest) {
   return {
@@ -21,7 +14,7 @@ export function getAuthHeaders(req: VercelRequest) {
 }
 
 export function buildAuthChallenge(action: string, payload: Record<string, unknown>, timestamp: string) {
-  return buildMessage(action, payload, timestamp);
+  return buildAgentAuthChallenge(action, payload, timestamp);
 }
 
 export async function verifyAgentRequest(
@@ -30,9 +23,7 @@ export async function verifyAgentRequest(
   payload: Record<string, unknown>,
   expectedOwner?: string | null
 ) {
-  const internalSecret = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
-  const authz = String(req.headers.authorization || '');
-  if (internalSecret && authz === `Bearer ${internalSecret}`) {
+  if (isInternalRequest(req)) {
     return { ok: true, mode: 'internal' as const, signer: null, message: null };
   }
 
@@ -51,7 +42,7 @@ export async function verifyAgentRequest(
     return { ok: false, error: 'Stale or invalid x-agent-timestamp' };
   }
 
-  const message = buildMessage(action, payload, timestamp);
+  const message = buildAgentAuthChallenge(action, payload, timestamp);
   const signer = await recoverMessageAddress({
     message,
     signature: signature as `0x${string}`,

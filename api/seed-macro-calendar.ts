@@ -4,6 +4,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 10 };
 
@@ -43,6 +44,8 @@ const MACRO_EVENTS_2026 = [
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  if (!requireInternalAuth(req, res)) return;
   if (!SB_KEY) return res.status(500).json({ error: 'No Supabase key' });
 
   const rows = MACRO_EVENTS_2026.map(e => ({

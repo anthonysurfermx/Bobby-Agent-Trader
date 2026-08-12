@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import OpenAI from 'openai';
 import { computeHardnessScore, isHardnessRegistryConfigured, recordHardnessActivity } from './_lib/hardness-registry.js';
+import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
 
 export const config = { maxDuration: 90 };
 
@@ -51,6 +52,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!await enforcePublicRateLimit(req, res, 'hardness-test', 5, 600)) return;
+
   const body = (req.body || {}) as HardnessTestRequest;
   const prediction = body.prediction || {};
 
@@ -58,6 +61,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({
       error: 'Missing prediction fields: symbol, direction, entry, target, stop, thesis',
     });
+  }
+
+  const prices = [prediction.entry, prediction.target, prediction.stop].map(Number);
+  if (!/^[A-Z0-9.-]{1,20}$/i.test(prediction.symbol)
+    || !['long', 'short'].includes(prediction.direction)
+    || prices.some((value) => !Number.isFinite(value) || value <= 0)
+    || typeof prediction.thesis !== 'string'
+    || prediction.thesis.length > 4_000
+    || (body.agent != null && (typeof body.agent !== 'string' || body.agent.length > 80))) {
+    return res.status(400).json({ error: 'Invalid prediction' });
   }
 
   if (!client) {
@@ -126,7 +139,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const finalConviction = Math.max(1, Math.min(10, Math.round(cio.conviction || normalizedConviction)));
 
     let onChainProof: Record<string, string | null | boolean> | null = null;
-    const shouldCommitOnchain = body.commitOnchain !== false;
+    // Public Hardness requests are analysis-only. Spending the recorder wallet
+    // and writing chain state is an explicitly authenticated operation.
+    const shouldCommitOnchain = body.commitOnchain === true && isInternalRequest(req);
     if (shouldCommitOnchain && isHardnessRegistryConfigured()) {
       const proof = await recordHardnessActivity({
         threadId: debateId,

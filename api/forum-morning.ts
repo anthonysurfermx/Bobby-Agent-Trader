@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
@@ -59,6 +60,7 @@ async function getTrackRecord(): Promise<{ wins: number; losses: number; winRate
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!requireInternalAuth(req, res)) return;
   if (!OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
 
   const { language = 'en' } = req.body as { language?: string };

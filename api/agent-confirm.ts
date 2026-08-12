@@ -3,11 +3,16 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  // The client used to be able to inject arbitrary PnL records into the same
+  // table used by risk and performance metrics. Only a trusted verifier may
+  // record an execution until receipt verification is implemented here.
+  if (!requireInternalAuth(req, res)) return;
 
   const { walletAddress, txHash, status, chain, tokenSymbol, amountUsd } = req.body || {};
 

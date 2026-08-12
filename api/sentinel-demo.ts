@@ -8,10 +8,12 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 30 };
 
-const MCP_ENDPOINT = 'https://bobbyprotocol.xyz/api/mcp-http';
+const MCP_ENDPOINT = `${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http`;
 
 interface McpResponse {
   jsonrpc: string;
@@ -46,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'sentinel-demo', 10, 600)) return;
 
   const log: Array<{ step: string; tool: string; status: string; data?: unknown; ms: number }> = [];
   const startAll = Date.now();
@@ -54,9 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const t1 = Date.now();
   let registry: Record<string, unknown> = {};
   try {
-    const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
-    const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'bobbyprotocol.xyz';
-    const regRes = await fetch(`${proto}://${host}/api/registry`, { cache: 'no-store' });
+    const regRes = await fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/registry`, { cache: 'no-store' });
     registry = (await regRes.json()) as Record<string, unknown>;
     log.push({ step: 'discover', tool: '/api/registry', status: 'ok', ms: Date.now() - t1 });
   } catch (err) {
@@ -67,9 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const t2 = Date.now();
   let reputation: Record<string, unknown> = {};
   try {
-    const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
-    const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'bobbyprotocol.xyz';
-    const repRes = await fetch(`${proto}://${host}/api/reputation`, { cache: 'no-store' });
+    const repRes = await fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/reputation`, { cache: 'no-store' });
     reputation = (await repRes.json()) as Record<string, unknown>;
     log.push({ step: 'reputation_check', tool: '/api/reputation', status: 'ok', ms: Date.now() - t2 });
   } catch (err) {

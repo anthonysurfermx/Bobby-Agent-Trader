@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash } from 'crypto';
 import { PLAYBOOKS, type Playbook } from '../src/data/playbooks.js';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 180 };
 
@@ -527,6 +528,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'sandbox-run', RATE_LIMIT_MAX, 3600)) return;
 
   const body = req.method === 'POST' ? (req.body || {}) : (req.query as Record<string, string>);
   const playbookSlug = String(body.playbookSlug || 'conviction-gated-swing');

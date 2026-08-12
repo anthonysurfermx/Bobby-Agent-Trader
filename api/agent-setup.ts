@@ -6,6 +6,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { verifyAgentRequest } from './_lib/agent-auth.js';
+import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
 
 export const config = { maxDuration: 15 };
 
@@ -22,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'agent-setup', 10, 3600)) return;
 
   if (!SB_SERVICE_KEY) {
     return res.status(500).json({ error: 'Server misconfigured — missing service key' });
@@ -34,6 +37,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Validate wallet
   if (!wallet_address || !/^0x[a-fA-F0-9]{40}$/.test(wallet_address)) {
     return res.status(400).json({ error: 'Invalid wallet_address' });
+  }
+
+  const authPayload = {
+    wallet_address,
+    agent_name,
+    voice,
+    personality,
+    cadence_hours,
+    markets,
+    delivery,
+  };
+  const auth = await verifyAgentRequest(req, 'setup-agent', authPayload, wallet_address);
+  if (!auth.ok) {
+    return res.status(401).json({ error: auth.error });
   }
 
   // Validate agent_name
@@ -102,8 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Fire first personal cycle async (don't await — return immediately)
     // The scheduler will pick it up since next_run_at = now()
     // For instant gratification, we also try to trigger it directly
-    const cycleSecret = process.env.BOBBY_CYCLE_SECRET;
-    if (cycleSecret) {
+    const authHeaders = internalAuthHeaders();
+    if (Object.keys(authHeaders).length > 0) {
       const baseUrl = req.headers.host?.includes('localhost')
         ? `http://${req.headers.host}`
         : 'https://defimexico.org';
@@ -112,7 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${cycleSecret}`,
+          ...authHeaders,
         },
         body: JSON.stringify({
           agent_profile_id: profile.id,

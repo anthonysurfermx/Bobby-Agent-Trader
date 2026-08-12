@@ -7,6 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { VOICE_TOOLS, voiceInstructions } from './_lib/voice-tools.js';
+import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
 
 export const config = { maxDuration: 15 };
 
@@ -19,6 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'realtime-session', 8, 600)) return;
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -26,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { tier, lang } = (req.body ?? {}) as { tier?: string; lang?: string };
-  const model = tier === 'premium' ? MODEL_PREMIUM : MODEL_STANDARD;
+  const model = tier === 'premium' && isInternalRequest(req) ? MODEL_PREMIUM : MODEL_STANDARD;
 
   try {
     const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {

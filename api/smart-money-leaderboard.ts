@@ -5,6 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { hmacSign } from './_lib/okx-hmac.js';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 30 };
 
@@ -76,8 +77,14 @@ interface SmartMoneyEntry {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (!await enforcePublicRateLimit(req, res, 'smart-money-leaderboard', 30, 600)) return;
 
   const { chains = '196,1', tokens = 'OKB,ETH', limit = '10' } = req.query;
+  if (!/^\d{1,10}(,\d{1,10}){0,4}$/.test(String(chains))
+    || !/^[A-Za-z0-9]{1,12}(,[A-Za-z0-9]{1,12}){0,9}$/.test(String(tokens))
+    || !/^\d{1,2}$/.test(String(limit)) || Number(limit) < 1 || Number(limit) > 50) {
+    return res.status(400).json({ error: 'Invalid leaderboard parameters' });
+  }
 
   const apiKey = process.env.OKX_API_KEY;
   const secretKey = process.env.OKX_SECRET_KEY;
@@ -208,6 +215,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[SmartMoneyLeaderboard] Error:', msg);
-    return res.status(500).json({ error: msg });
+    return res.status(500).json({ error: 'Leaderboard request failed' });
   }
 }

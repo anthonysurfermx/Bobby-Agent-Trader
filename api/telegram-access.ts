@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 30 };
 
@@ -34,6 +35,8 @@ async function sendTelegramMessage(chatId: number, text: string) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const limit = req.method === 'POST' ? 10 : 120;
+  if (!await enforcePublicRateLimit(req, res, `telegram-access-${req.method || 'unknown'}`, limit, 3600)) return;
   if (!SB_SERVICE_KEY) return res.status(500).json({ error: 'Server misconfigured' });
   const supabase = createClient(SB_URL, SB_SERVICE_KEY);
 
@@ -166,8 +169,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // P0 FIX: Verify tx_hash on-chain before activating
-    if (!tx_hash || typeof tx_hash !== 'string' || !tx_hash.startsWith('0x')) {
+    if (!tx_hash || typeof tx_hash !== 'string' || !/^0x[a-fA-F0-9]{64}$/.test(tx_hash)) {
       return res.status(400).json({ error: 'Valid tx_hash required' });
+    }
+    if (wallet_address && !/^0x[a-fA-F0-9]{40}$/.test(wallet_address)) {
+      return res.status(400).json({ error: 'Valid wallet_address required' });
     }
 
     // Check tx_hash not already used (anti-replay)
