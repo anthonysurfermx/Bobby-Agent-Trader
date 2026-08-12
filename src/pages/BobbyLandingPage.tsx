@@ -93,7 +93,7 @@ export default function BobbyLandingPage() {
                 <div className="text-xs uppercase tracking-[0.2em] text-[#999]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Agent NFTs</div>
               </div>
               <div className="text-left group">
-                <div className="text-4xl font-bold mb-1 group-hover:text-[#C1FF2C] transition-colors" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>X Layer</div>
+                <div className="text-4xl font-bold mb-1 group-hover:text-[#C1FF2C] transition-colors" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Base</div>
                 <div className="text-xs uppercase tracking-[0.2em] text-[#999]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Network 196</div>
               </div>
             </div>
@@ -163,7 +163,7 @@ export default function BobbyLandingPage() {
                 <div className="bg-[#0D0D0D] p-12 rounded-[22px]">
                   <div className="space-y-10">
                     {[
-                      { num: '01', title: 'Post Bounty', desc: 'Lock 50 OKB in challenge pool for external verification' },
+                      { num: '01', title: 'Post Bounty', desc: 'Lock ETH in a Base challenge pool for external verification' },
                       { num: '02', title: 'Challenge', desc: 'External agents submit adversarial data and proof' },
                       { num: '03', title: 'Evaluate', desc: 'Protocol reassesses thesis conviction using internal debate' },
                       { num: '04', title: 'Pay Winner', desc: 'Bounty released automatically to successful challengers' },
@@ -216,14 +216,14 @@ export default function BobbyLandingPage() {
             <div className="grid lg:grid-cols-2 gap-24 items-center">
               <div>
                 <h2 className="text-5xl font-bold mb-8 tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Verifiable. Transparent. On-Chain.</h2>
-                <p className="text-xl text-[#999] mb-12 font-light leading-relaxed">Every debate, conviction delta and bounty payout is recorded on X Layer. Inspect the process; do not confuse a committed record with a guarantee of market truth.</p>
+                <p className="text-xl text-[#999] mb-12 font-light leading-relaxed">Every debate, conviction delta and bounty payout is recorded on Base. Inspect the process; do not confuse a committed record with a guarantee of market truth.</p>
                 <div className="flex items-center gap-6 p-6 bg-white/[0.03] border border-white/[0.08] backdrop-blur-[20px] rounded-2xl border-white/10 w-fit hover:border-[#C1FF2C]/30 transition-all duration-300">
                   <div className="w-14 h-14 rounded-xl bg-[#C1FF2C] flex items-center justify-center text-[#1E3700]">
                     <span className="material-symbols-outlined font-bold" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24" }}>account_tree</span>
                   </div>
                   <div>
-                    <div className="font-bold text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Built on X Layer</div>
-                    <div className="text-[10px] text-[#999] uppercase tracking-widest" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Secured by OKX Technology</div>
+                    <div className="font-bold text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Built for Base</div>
+                    <div className="text-[10px] text-[#999] uppercase tracking-widest" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Base-native infrastructure</div>
                   </div>
                 </div>
               </div>
@@ -294,7 +294,7 @@ export default function BobbyLandingPage() {
             <div className="col-span-1 md:col-span-2">
               <div className="text-2xl font-black text-white mb-6 tracking-tighter uppercase" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>BOBBY PROTOCOL</div>
               <p className="text-gray-500 text-sm max-w-xs mb-8">Decentralized adversarial intelligence for the next generation of autonomous on-chain agents.</p>
-              <div className="text-xs text-gray-600">&copy; 2026 Bobby Protocol. Built on OKX X Layer.</div>
+              <div className="text-xs text-gray-600">&copy; 2026 Bobby Protocol. Built for Base.</div>
             </div>
             <div>
               <h5 className="font-bold text-white mb-6 uppercase text-sm tracking-widest" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Product</h5>

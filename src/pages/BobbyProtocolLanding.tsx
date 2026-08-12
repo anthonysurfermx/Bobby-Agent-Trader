@@ -212,13 +212,13 @@ export default function BobbyProtocolLanding() {
     }
     return `${Number(rate).toFixed(1)}% (n=${resolved})`;
   };
-  const chainLabel = stats?.chain?.name || (stats?.chain?.id === 196 ? 'X Layer' : 'Network');
+  const chainLabel = stats?.chain?.id === 196 ? 'Legacy X Layer' : (stats?.chain?.name || 'Base');
   const nativeSymbol = stats?.chain?.nativeSymbol || (stats?.chain?.id === 196 ? 'OKB' : 'ETH');
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
     : null;
 
-  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://www.oklink.com/xlayer'}/address`;
+  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://basescan.org'}/address`;
   const c = stats?.contracts;
   const proofPoints = [
     {
@@ -753,7 +753,7 @@ export default function BobbyProtocolLanding() {
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
               <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A track record in public.<br />A stricter build on Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Bobby ran in production on OKX X Layer through the hackathon era. These records show what was committed on-chain; they do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
+                Bobby ran in production on X Layer through the hackathon era. Those legacy records show what was committed on-chain; the current build and next deployment are Base-first. They do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
               </p>
             </div>
 
@@ -782,9 +782,9 @@ export default function BobbyProtocolLanding() {
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
-              <span>Chain 196 · OKX X Layer</span>
-              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord on OKLink ↗</a>
-              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">AgentEconomy on OKLink ↗</a>
+              <span>Base · 8453</span>
+              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy TrackRecord ↗</a>
+              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy AgentEconomy ↗</a>
               <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>
             </div>
           </div>
