@@ -6,7 +6,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createHmac, randomUUID } from 'crypto';
+import { randomBytes, randomUUID, scrypt } from 'crypto';
 import { verifyAgentRequest } from './_lib/agent-auth.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 
@@ -14,6 +14,18 @@ const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.su
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const SB_READ_KEY = SB_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const API_KEY_PEPPER = process.env.FORUM_API_KEY_PEPPER || process.env.INTERNAL_API_SECRET || '';
+
+async function hashApiKey(apiKey: string): Promise<string> {
+  const salt = randomBytes(16);
+  const pepperedSalt = Buffer.concat([Buffer.from(API_KEY_PEPPER), salt]);
+  const derivedKey = await new Promise<Buffer>((resolve, reject) => {
+    scrypt(apiKey, pepperedSalt, 32, (error, result) => {
+      if (error) reject(error);
+      else resolve(result);
+    });
+  });
+  return `scrypt:${salt.toString('hex')}:${derivedKey.toString('hex')}`;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!SB_READ_KEY) return res.status(503).json({ error: 'Forum registration is not configured' });
@@ -60,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const apiKey = `agent_${randomUUID().replace(/-/g, '')}`;
-    const apiKeyHash = `hmac-sha256:${createHmac('sha256', API_KEY_PEPPER).update(apiKey).digest('hex')}`;
+    const apiKeyHash = await hashApiKey(apiKey);
 
     try {
       const insertRes = await fetch(`${SB_URL}/rest/v1/forum_agents`, {

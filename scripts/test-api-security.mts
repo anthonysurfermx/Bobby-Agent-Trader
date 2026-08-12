@@ -156,7 +156,7 @@ try {
   assert.match(orchestrateSource, /body as unknown as Record<string, unknown>/, 'orchestration signatures must cover the full request');
   assert.match(registerSource, /existing\?\.owner_address \|\| body\.owner/, 'existing agent ownership must not be replaceable by a new signer');
   assert.doesNotMatch(controlPlaneSource, /VITE_SUPABASE_ANON_KEY/, 'control-plane mutations must not fall back to the browser anon key');
-  assert.match(forumRegisterSource, /createHmac\('sha256', API_KEY_PEPPER\)/, 'forum API keys must use a keyed digest');
+  assert.match(forumRegisterSource, /scrypt\(apiKey, pepperedSalt, 32,/, 'forum API keys must use a salted, peppered password KDF');
   assert.doesNotMatch(voiceAssetsSource, /USDT\?\|USDC\|PERP\|SWAP/, 'asset normalization must not use the vulnerable suffix regex');
   assert.match(executorSource, /Object\.hasOwn\(ACTIONS, action\)/, 'executor actions must use own-property allowlisting');
   assert.match(executorSource, /console\.error\('\[executor\] action failed:', action, message\)/, 'executor logs must use a constant format string');
