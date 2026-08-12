@@ -177,12 +177,23 @@ async function callStructuredVerdict(system: string, userMsg: string, timeoutMs 
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
   const internalAuth = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
+  // Sepolia canary fix: on preview/dev deployments self-calls MUST stay on THIS
+  // deployment — routing through the production domain would make the cycle
+  // write on-chain through prod (X Layer, old recorder). VERCEL_URL is the
+  // current deployment host; the bypass header clears SSO protection when
+  // "Protection Bypass for Automation" is enabled on the project.
+  const selfHost =
+    process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production' && process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : BOBBY_PROTOCOL_BASE_URL;
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
   try {
-    const res = await fetch(`${BOBBY_PROTOCOL_BASE_URL}${path}`, {
+    const res = await fetch(`${selfHost}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(internalAuth ? { 'x-internal-secret': internalAuth } : {}),
+        ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
       },
       body: JSON.stringify(body)
     });
