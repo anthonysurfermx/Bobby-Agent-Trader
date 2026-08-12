@@ -220,11 +220,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Estimate + 30% headroom — fixed limits caused an out-of-gas on the
         // first Sepolia publishSignal (new-symbol storage writes).
+        // Explicit sequential nonces: the three txs fire back-to-back and the
+        // RPC may not see the previous one in pending yet, which made ethers
+        // reuse a nonce and silently drop the economy fee on canary-002.
+        let nonce = await provider.getTransactionCount(wallet.address, 'pending');
         const commitGas = await wallet.estimateGas({ to: CONTRACT_ADDRESS, data: txData });
         const tx = await wallet.sendTransaction({
           to: CONTRACT_ADDRESS,
           data: txData,
           gasLimit: (commitGas * 13n) / 10n,
+          nonce: nonce++,
         });
 
         // Pay debate fee via AgentEconomy (non-blocking)
@@ -245,6 +250,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               data: economyTxData,
               value: feePerAgent * 2n, // two counterparties per debate
               gasLimit: (economyGas * 13n) / 10n,
+              nonce: nonce++,
             });
             economyTxHash = economyTx.hash;
             console.log(`[X Layer] Debate fee paid: ${economyTx.hash}`);
