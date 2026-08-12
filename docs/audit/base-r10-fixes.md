@@ -126,6 +126,40 @@ constructor (`"Zero fee"`).
 5. Redeploy Sepolia + `VerifyBaseDeployment` + canario 24–48h + re-auditoría
    (Slither, fuzz, invariants) sobre el árbol nuevo.
 
+## Addendum r10.1 — respuesta a la review de Codex (2026-08-12)
+
+Codex auditó `6c64738`: aprobó H-01, la lógica de M-01, M-06 y los tres Low,
+pero reportó 5 hallazgos sobre el tooling de H-02 y la cobertura de M-01.
+Los cinco quedan cerrados en este commit:
+
+1. **[P1] El verificador aprobaba handoff pendiente como estado final.**
+   `_checkOwner` ahora es chain-aware: en 8453 SOLO pasa
+   `owner == expectedOwner && pendingOwner == address(0)` — aceptado, no
+   propuesto. La rama tolerante (handoff PENDING) queda explícitamente
+   limitada a testnet.
+2. **[P1] `OWNER_SAFE_ADDRESS` no se validaba como Safe 2-de-3.**
+   `ISafeMinimal` (getThreshold/getOwners) en ambos scripts: DeployBase exige
+   en 8453 `getThreshold() >= 2` y `getOwners().length >= 3` pre-broadcast, y
+   VerifyBaseDeployment re-prueba lo mismo contra estado live (más
+   `expectedOwner != deployer`). Un contrato arbitrario o smart wallet 1-de-1
+   revierte con error explícito.
+3. **[P2] `fuzzOwnershipAndRotation` nunca se ejecutaba** (faltaba en el
+   allowlist de `targetSelector` — cobertura declarada vacua). Añadido como
+   sexto selector. Prueba empírica: un invariant temporal
+   `assertEq(handler.ownershipFuzzCalls(), 0)` FALLÓ con counterexample
+   `fuzzOwnershipAndRotation(8166, 185)` — el fuzzer lo invoca de verdad. El
+   contador `ownershipFuzzCalls` queda permanente en el handler para que la
+   cobertura sea verificable y no asumida.
+4. **[P2] Manifests viejos podían bendecir ownership EOA.** El fallback
+   `expectedOwner → deployer` ahora es testnet-only; en 8453 un manifest sin
+   el campo hace fallar la verificación con instrucción de redeploy.
+5. **[P3]** `expectedOwner != keeper` se valida pre-broadcast (antes revertía
+   recién en el séptimo transferOwnership, dejando deploy parcial), y el
+   import roto de `legacy/DeployAgentEconomy.s.sol` apunta a `./`.
+
+Re-evidencia: build limpio, 134/134 con 1,000 fuzz runs, invariants del
+escrow ahora ejercitando ownership transfer/acceptance/rotación de keeper.
+
 ## Para el auditor (Codex)
 
 - Diff completo en la rama `fix/base-r9-round1` vs `feat/base-migration`.

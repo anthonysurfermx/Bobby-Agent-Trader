@@ -2,6 +2,13 @@
 pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
+
+/// @dev r10 review [P1]: minimal Safe surface — enough to prove the owner is
+/// a real multisig with the D-4 policy (>= 2-of-3), not just "has bytecode".
+interface ISafeMinimal {
+    function getThreshold() external view returns (uint256);
+    function getOwners() external view returns (address[] memory);
+}
 import {BobbyTrackRecord} from "../src/BobbyTrackRecord.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
@@ -128,11 +135,19 @@ contract DeployBase is Script {
         address deployer = msg.sender;
 
         // r9 H-02 / D-4: resolve the final owner. Mainnet REQUIRES a Safe that
-        // is not the deployer EOA and already has code on-chain.
+        // is not the deployer EOA and actually enforces the D-4 policy.
         if (c.expectedOwner == address(0)) c.expectedOwner = deployer;
+        // r10 review [P3]: IntentEscrow.transferOwnership rejects the keeper —
+        // catch the collision BEFORE broadcast, not six contracts in.
+        require(c.expectedOwner != c.keeper, "OWNER_SAFE_ADDRESS must not be the keeper");
         if (block.chainid == 8453) {
             require(c.expectedOwner != deployer, "Mainnet: OWNER_SAFE_ADDRESS must be set and != deployer (D-4)");
             require(c.expectedOwner.code.length > 0, "Mainnet: OWNER_SAFE_ADDRESS has no code (Safe not deployed?)");
+            // r10 review [P1]: bytecode is not a multisig. Prove the D-4
+            // policy on-chain: >= 2 threshold over >= 3 owners, and the hot
+            // deployer EOA must not be able to reach quorum alone.
+            require(ISafeMinimal(c.expectedOwner).getThreshold() >= 2, "Mainnet: Safe threshold must be >= 2 (D-4)");
+            require(ISafeMinimal(c.expectedOwner).getOwners().length >= 3, "Mainnet: Safe must have >= 3 owners (D-4)");
         }
 
         // r8 #3: validate every economic parameter BEFORE any chain interaction.

@@ -162,7 +162,13 @@ contract BobbyIntentEscrowHandler is Test {
     /// @dev r9 M-01: fuzz ownership transfer/acceptance and keeper rotation —
     /// the previous handler never exercised these paths, which is why the
     /// keeper-becomes-owner collapse survived the invariant suite.
+    /// ownershipFuzzCalls exists so coverage is verifiable, never assumed
+    /// (r10 review: the first version of this handler was not allowlisted and
+    /// ran zero times while the report claimed coverage).
+    uint256 public ownershipFuzzCalls;
+
     function fuzzOwnershipAndRotation(uint256 rawTarget, uint8 rawAction) external {
+        ownershipFuzzCalls++;
         address[6] memory candidates =
             [owner, cio, arbiter, keeper, resolver, address(uint160(0x9000 + (rawTarget % 16)))];
         address target = candidates[bound(rawTarget, 0, 5)];
@@ -301,12 +307,15 @@ contract BobbyIntentEscrowInvariantTest is Test {
         escrow = new BobbyIntentEscrow(TEST_CHAIN_ID, TEST_MAX_SIZE, owner, cio, arbiter, keeper, resolver);
         handler = new BobbyIntentEscrowHandler(escrow, owner, cio, arbiter, keeper, resolver);
 
-        bytes4[] memory selectors = new bytes4[](5);
+        bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = BobbyIntentEscrowHandler.executeValid.selector;
         selectors[1] = BobbyIntentEscrowHandler.executeWithBadCioSig.selector;
         selectors[2] = BobbyIntentEscrowHandler.resolveAsResolver.selector;
         selectors[3] = BobbyIntentEscrowHandler.resolveAsNonResolver.selector;
         selectors[4] = BobbyIntentEscrowHandler.pauseAndTryExecute.selector;
+        // r10 review [P2]: the ownership handler was written but never
+        // allowlisted — 0 invocations in 1,000 runs. Now it fuzzes for real.
+        selectors[5] = BobbyIntentEscrowHandler.fuzzOwnershipAndRotation.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
         targetContract(address(handler));
     }

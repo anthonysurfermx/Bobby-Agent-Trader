@@ -2,6 +2,13 @@
 pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
+
+/// @dev r10 review [P1]: same minimal Safe surface as DeployBase — the final
+/// verifier must re-prove the multisig policy, not trust the deploy script.
+interface ISafeMinimal {
+    function getThreshold() external view returns (uint256);
+    function getOwners() external view returns (address[] memory);
+}
 import {BobbyTrackRecord} from "../src/BobbyTrackRecord.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
@@ -85,10 +92,22 @@ contract VerifyBaseDeployment is Script {
         });
 
         // r9 H-02: verify against the owner the deploy DECLARED, not the
-        // deployer. Old manifests without the field fall back to deployer.
-        address expectedOwner = vm.keyExistsJson(json, ".expectedOwner")
-            ? vm.parseJsonAddress(json, ".expectedOwner")
-            : r.deployer;
+        // deployer. r10 review [P2]: the deployer fallback is TESTNET-ONLY —
+        // on mainnet a manifest without expectedOwner must fail, or a stale
+        // manifest could bless EOA ownership.
+        address expectedOwner;
+        if (vm.keyExistsJson(json, ".expectedOwner")) {
+            expectedOwner = vm.parseJsonAddress(json, ".expectedOwner");
+        } else {
+            require(block.chainid != 8453, "VERIFY FAILED: mainnet manifest missing expectedOwner (redeploy with r10 DeployBase)");
+            expectedOwner = r.deployer;
+        }
+        if (block.chainid == 8453) {
+            // r10 review [P1]: re-prove D-4 against live chain state.
+            _ok(expectedOwner != r.deployer, "expectedOwner is not the deployer EOA (D-4)");
+            _ok(ISafeMinimal(expectedOwner).getThreshold() >= 2, "expectedOwner Safe threshold >= 2 (D-4)");
+            _ok(ISafeMinimal(expectedOwner).getOwners().length >= 3, "expectedOwner Safe has >= 3 owners (D-4)");
+        }
 
         _verifyCode(a);
         _verifyOwnership(a, r.deployer, expectedOwner);
@@ -125,8 +144,15 @@ contract VerifyBaseDeployment is Script {
         _checkOwner(BobbyIntentEscrow(a.escrow).owner(), BobbyIntentEscrow(a.escrow).pendingOwner(), deployer, expected, "escrow");
     }
 
+    /// @dev r10 review [P1]: a pending handoff is NOT an acceptable final
+    /// state on mainnet — the EOA still holds every privilege and can replace
+    /// pendingOwner at will. On 8453 only owner == expected AND no pending
+    /// proposal passes; the tolerant branch exists for testnet iteration only.
     function _checkOwner(address liveOwner, address livePending, address deployer, address expected, string memory label) internal {
-        if (liveOwner == expected) {
+        if (block.chainid == 8453) {
+            _ok(liveOwner == expected, string.concat(label, ".owner == expectedOwner (mainnet: accepted, not pending)"));
+            _ok(livePending == address(0), string.concat(label, ".pendingOwner cleared (mainnet)"));
+        } else if (liveOwner == expected) {
             _ok(true, string.concat(label, ".owner == expectedOwner"));
         } else if (liveOwner == deployer && livePending == expected) {
             _ok(true, string.concat(label, ".owner: handoff PENDING (Safe must acceptOwnership)"));
