@@ -8,7 +8,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
-import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { DEFAULT_CHAIN, txUrl, addressUrl } from './_lib/chains.js';
 
 // Chain-aware since the Sepolia canary: RPC and addresses follow PROTOCOL_CHAIN.
 // Legacy env vars remain as fallback for the X Layer production deployment.
@@ -149,7 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           agentEconomy: ECONOMY_ADDRESS,
         },
         chain: 'X Layer (196)',
-        explorer: `https://www.oklink.com/xlayer/address/${CONTRACT_ADDRESS}`,
+        explorer: addressUrl(CONTRACT_ADDRESS),
         version: 'v3 — Commit-Reveal + Agent Economy (Audited by Gemini + Codex)',
         stats: {
           winRate: parseInt(winRateHex, 16) / 100,
@@ -218,10 +218,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           BigInt(Math.round((stopPrice || 0) * 1e8))
         ]);
 
+        // Estimate + 30% headroom — fixed limits caused an out-of-gas on the
+        // first Sepolia publishSignal (new-symbol storage writes).
+        const commitGas = await wallet.estimateGas({ to: CONTRACT_ADDRESS, data: txData });
         const tx = await wallet.sendTransaction({
           to: CONTRACT_ADDRESS,
           data: txData,
-          gasLimit: 300000n,
+          gasLimit: (commitGas * 13n) / 10n,
         });
 
         // Pay debate fee via AgentEconomy (non-blocking)
@@ -234,11 +237,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // from the contract instead of hardcoding a denomination.
             const economyContract = new ethers.Contract(ECONOMY_ADDRESS, ECONOMY_ABI, provider);
             const feePerAgent = (await economyContract.debateFeePerAgent()) as bigint;
+            const economyGas = await wallet.estimateGas({
+              to: ECONOMY_ADDRESS, data: economyTxData, value: feePerAgent * 2n,
+            });
             const economyTx = await wallet.sendTransaction({
               to: ECONOMY_ADDRESS,
               data: economyTxData,
               value: feePerAgent * 2n, // two counterparties per debate
-              gasLimit: 200000n,
+              gasLimit: (economyGas * 13n) / 10n,
             });
             economyTxHash = economyTx.hash;
             console.log(`[X Layer] Debate fee paid: ${economyTx.hash}`);
@@ -261,7 +267,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               debateHash, ttl: 86400n, // 24h
             }]);
             const oracleTx = await wallet.sendTransaction({
-              to: ORACLE_ADDRESS, data: oracleTxData, gasLimit: 200000n,
+              to: ORACLE_ADDRESS,
+              data: oracleTxData,
+              gasLimit: ((await wallet.estimateGas({ to: ORACLE_ADDRESS, data: oracleTxData })) * 13n) / 10n,
             });
             oracleTxHash = oracleTx.hash;
             console.log(`[X Layer] Oracle published: ${oracleTx.hash}`);
@@ -275,11 +283,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           onchain: true,
           broadcast: true,
           action: 'commit',
-          message: 'Commitment broadcast to X Layer' + (oracleTxHash ? ' + Oracle updated' : '') + (economyTxHash ? ' + Debate fee paid' : ''),
+          message: `Commitment broadcast to ${DEFAULT_CHAIN.name}` + (oracleTxHash ? ' + Oracle updated' : '') + (economyTxHash ? ' + Debate fee paid' : ''),
           txHash: tx.hash,
           oracleTxHash,
           economyTxHash,
-          explorer: `https://www.oklink.com/xlayer/tx/${tx.hash}`,
+          explorer: txUrl(tx.hash),
           data: { debateHash, symbol, agent: agentEnum, conviction },
         });
       } catch (err: any) {
@@ -346,7 +354,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           action: 'resolve',
           message: 'Resolution broadcast to X Layer',
           txHash: tx.hash,
-          explorer: `https://www.oklink.com/xlayer/tx/${tx.hash}`,
+          explorer: txUrl(tx.hash),
           data: { debateHash, result: resultEnum },
         });
       } catch (err: any) {
