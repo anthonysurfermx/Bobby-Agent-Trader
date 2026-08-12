@@ -126,7 +126,7 @@ const FREE_TOOLS = [
   { name: 'bobby_intel', desc: 'Full 12-source intelligence briefing in 10 seconds' },
   { name: 'bobby_dex_trending', desc: 'Trending tokens on-chain across DEXs' },
   { name: 'bobby_dex_signals', desc: 'Whale and KOL buy/sell signals' },
-  { name: 'bobby_xlayer_signals', desc: 'Smart money movements on X Layer' },
+  { name: 'bobby_xlayer_signals', desc: 'Smart money movements across Base markets' },
 ];
 
 const PREMIUM_TOOLS = [
@@ -214,7 +214,7 @@ export default function BobbyDocsPage() {
               Connect your AI agent to Bobby in one command
             </h1>
             <p className="text-sm md:text-base leading-7 text-white/60 max-w-xl mx-auto">
-              12 MCP tools, 4 smart contracts on X Layer, 70+ technical indicators, x402 payments
+              Base-first agent infrastructure, 12 MCP tools, 70+ technical indicators, x402 payments
             </p>
           </motion.div>
 
@@ -332,7 +332,7 @@ export default function BobbyDocsPage() {
           {/* ===== 4. SMART CONTRACTS ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
-              <SectionLabel icon={Shield} label="On-chain infrastructure" right="X Layer (chain 196)" />
+              <SectionLabel icon={Shield} label="Legacy on-chain deployment" right="X Layer archive · chain 196" />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {CONTRACTS.map(c => (
@@ -348,7 +348,7 @@ export default function BobbyDocsPage() {
                       <div className="font-mono text-[10px] text-[#7da6ff] mb-3 truncate">{c.addr}</div>
                       <p className="text-xs text-white/60 leading-6 mb-4">{c.purpose}</p>
                       <div className="font-mono text-[10px] text-white/40 group-hover:text-[#7da6ff] transition-colors tracking-[0.15em] uppercase flex items-center gap-1.5">
-                        View on XLayer
+                        View legacy deployment
                         <ExternalLink className="w-2.5 h-2.5" />
                       </div>
                     </GlassCard>
@@ -363,7 +363,7 @@ export default function BobbyDocsPage() {
             <GlassCard className="p-6 md:p-8">
               <SectionLabel icon={Lock} label="x402 payment protocol" />
               <p className="text-sm leading-7 text-white/60 mb-7 max-w-2xl">
-                Premium tools require x402 payment on X Layer. Your agent pays, Bobby delivers intelligence.
+                The current product direction is Base-first. The payment example below documents the legacy X Layer rail while the Base deployment is cut over.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -385,7 +385,7 @@ export default function BobbyDocsPage() {
                 {/* Step 2 */}
                 <GlassCard className="p-5 relative overflow-hidden">
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.06] font-bold leading-none">2</div>
-                  <div className="font-mono text-[10px] text-[#ffb95f] tracking-[0.15em] uppercase mb-3">Pay on X Layer</div>
+                  <div className="font-mono text-[10px] text-[#ffb95f] tracking-[0.15em] uppercase mb-3">Legacy payment rail</div>
                   <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
 {`curl bobbyprotocol.xyz/api/
   premium-signal \\
@@ -472,7 +472,7 @@ IBobbyOracle oracle = IBobbyOracle(
                       10 Intelligence Protocol use cases
                     </div>
                     <div className="text-sm leading-6 text-white/60">
-                      How agents buy and sell intelligence on X Layer — bidirectional agent economy
+                      How agents buy and sell intelligence through Bobby's agent-native payment rail
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-[#7da6ff]/60 group-hover:text-[#7da6ff] group-hover:translate-x-1 transition-all shrink-0" />
@@ -486,7 +486,7 @@ IBobbyOracle oracle = IBobbyOracle(
             <div className="border-t border-white/10 pt-8 space-y-5">
               {/* Powered by */}
               <div className="flex flex-wrap items-center justify-center gap-3">
-                {['OKX OnchainOS', 'Agent Trade Kit', 'X Layer', 'Claude AI'].map(tech => (
+                {['Base', 'MCP', 'x402', 'Claude AI'].map(tech => (
                   <span key={tech} className="font-mono text-[10px] text-white/40 tracking-[0.15em] px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04]">
                     {tech.toUpperCase()}
                   </span>
