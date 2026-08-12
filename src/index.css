@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Keep every interactive control comfortably tappable on phones. */
+@media (max-width: 767px) {
+  button,
+  [role='button'],
+  input:not([type='hidden']),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  button,
+  [role='button'] {
+    min-width: 44px;
+  }
+
+  /* Preserve the visual checkbox while extending its invisible hit area. */
+  button[role='checkbox'] {
+    position: relative;
+    min-width: 1rem;
+    min-height: 1rem;
+  }
+
+  button[role='checkbox']::after {
+    position: absolute;
+    inset: -14px;
+    content: '';
+  }
+}
+
 /* Hide scrollbar but keep scroll functionality */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

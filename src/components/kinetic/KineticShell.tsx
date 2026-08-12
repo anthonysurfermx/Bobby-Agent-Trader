@@ -159,7 +159,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
       {/* === Content with optional sidebar === */}
       <div className="flex">
         {/* Main content */}
-        <main className="flex-1"
+        <main className="min-w-0 flex-1"
           style={{ background: 'linear-gradient(to bottom, transparent 50%, rgba(34,197,94,0.006) 50%)', backgroundSize: '100% 4px' }}>
           {children}
         </main>
