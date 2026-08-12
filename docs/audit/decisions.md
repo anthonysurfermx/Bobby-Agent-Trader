@@ -43,3 +43,22 @@ registra qué se decidió, quién y la regla operativa que deja.
 - **Pendiente ejecutable**: antes del deploy, los scripts `Deploy*.s.sol` deben
   fijar los parámetros re-denominados, y las constantes `constant` (como
   `ABSOLUTE_MIN_BOUNTY`) deben editarse en fuente. Checklist en r3.
+
+## D-4 · Mainnet Base: el owner de los 7 contratos será un Safe, no una EOA (2026-08-11)
+
+- **Contexto**: el canario Sepolia (84532) usa Wallet A
+  (`0x821990Bda0BAa05F96506fd73ef439D0C2f17302`) como owner/bobby/alpha/red/
+  hardnessScorer simultáneamente. Aceptable en testnet; inaceptable en mainnet:
+  una sola llave comprometida controla pausas, fees, roles y upgrades de rol en
+  los 7 contratos.
+- **Decisión**: para el deploy a Base mainnet (8453), `--sender`/owner será un
+  **Safe multisig** (mínimo 2-de-3). La EOA Wallet A puede conservar roles
+  operativos calientes (recorder/bobby) porque firma transacciones frecuentes,
+  pero owner, arbiter y la administración del quórum de resolvers viven en el Safe.
+- **Implicaciones ejecutables**:
+  1. Crear el Safe en Base antes del dry-run de mainnet y añadirlo al runbook
+     como variable (`OWNER_SAFE_ADDRESS`).
+  2. `DeployBase.s.sol` ya separa roles por env vars — solo cambia el valor de
+     owner; validar que el guard pairwise de mainnet (r7) acepte Safe como owner.
+  3. Los params de fees re-denominados (D-3) se ejecutan vía el Safe, no por EOA.
+- **Estado**: decisión tomada; bloqueante para mainnet, no para el canario.
