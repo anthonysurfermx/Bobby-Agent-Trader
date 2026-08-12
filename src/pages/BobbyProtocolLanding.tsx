@@ -355,8 +355,8 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / The system</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Simple on purpose.<br />Hard to fool.</h2>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / Architecture</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">Four checks before capital moves.</p>
             </div>
@@ -366,15 +366,14 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.2 }}
               className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
             >
-              <motion.img
-                className="h-full w-full object-cover"
-                src="/images/protocol/architecture-simple.png"
-                alt="Bobby checks a thesis, debates it, applies a risk veto, and creates a public record"
-                initial={{ opacity: 0.72, scale: 1.06 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.025 }}
-                viewport={{ once: true, amount: 0.25 }}
-                transition={{ duration: 1.1, ease: 'easeOut' }}
+              <video
+                className="h-full w-full"
+                src="/videos/architecture.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster="/posters/architecture.jpg"
               />
             </motion.div>
           </div>
@@ -823,6 +822,7 @@ export default function BobbyProtocolLanding() {
               </div>
               {([
                 ['Protocol', [
+                  ['Architecture', '/protocol/architecture'],
                   ['Console', '/protocol/console'],
                   ['Sandbox', '/protocol/sandbox'],
                   ['Heartbeat', '/protocol/heartbeat'],
