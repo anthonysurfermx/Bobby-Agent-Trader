@@ -296,13 +296,13 @@ export default function BobbyProtocolLanding() {
           </nav>
           <div className="hidden items-center gap-3 md:flex">
             <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" target="_blank" rel="noreferrer" className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"><Github className="h-4 w-4" /></a>
-            <a href="/agentic-world/bobby" className="rounded-lg bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Open War Room</a>
+            <a href="/agentic-world/bobby" className="rounded-lg bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Try Bobby</a>
           </div>
           <button onClick={() => setMenuOpen((open) => !open)} className="rounded-full p-2 md:hidden" aria-label="Toggle navigation">
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
-        {menuOpen && <nav className="border-t border-white/10 bg-[#0a0a0a] px-5 py-4 md:hidden">{navItems.map(([label, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-3 font-mono text-xs uppercase tracking-[0.15em] text-white/70">{label}</a>)}<a href="/agentic-world/bobby" className="mt-2 block rounded-lg bg-white px-5 py-3 text-center font-mono text-xs font-bold uppercase tracking-[0.15em] text-black">Open War Room</a></nav>}
+        {menuOpen && <nav className="border-t border-white/10 bg-[#0a0a0a] px-5 py-4 md:hidden">{navItems.map(([label, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-3 font-mono text-xs uppercase tracking-[0.15em] text-white/70">{label}</a>)}<a href="/agentic-world/bobby" className="mt-2 block rounded-lg bg-white px-5 py-3 text-center font-mono text-xs font-bold uppercase tracking-[0.15em] text-black">Try Bobby</a></nav>}
       </header>
 
       <main className="relative">
@@ -355,8 +355,8 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / Architecture</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / The system</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Simple on purpose.<br />Hard to fool.</h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">Four checks before capital moves.</p>
             </div>
@@ -472,9 +472,9 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
             <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
-                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Protocol capabilities</div>
+                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / What Bobby does</div>
                 <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
-                  The tools to<br />make decisions better.
+                  Four checks.<br />One clear decision.
                 </h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">
@@ -486,28 +486,28 @@ export default function BobbyProtocolLanding() {
               {[
                 {
                   title: 'Identity',
-                  description: 'Every agent decision has an author. Every outcome builds reputation. Both follow the agent into its next call.',
+                  description: 'Know who made the call.',
                   image: '/images/protocol/agent-identity.jpg',
                   alt: 'Synthetic human profile visible through textured cobalt glass',
                   telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  recorded'],
                 },
                 {
                   title: 'Adversarial debate',
-                  description: 'Alpha proposes. Red Team attacks. The CIO resolves the disagreement into one explicit, accountable thesis.',
+                  description: 'One idea. Two sides. One clear answer.',
                   image: '/images/protocol/adversarial-debate.jpg',
                   alt: 'Three silhouettes debating behind illuminated blue glass',
                   telemetry: ['debate.open  round_03', 'agents  alpha · red · cio', 'counterpoints  active', 'consensus  pending'],
                 },
                 {
                   title: 'Risk gate',
-                  description: 'Capital never moves on narrative alone. Sizing, downside and invalidation must survive the gate first.',
+                  description: 'A veto before the money moves.',
                   image: '/images/protocol/risk-gate.jpg',
                   alt: 'Human hand meeting a luminous blue glass barrier',
                   telemetry: ['risk.inspect  intent', 'exposure  bounded', 'invalidation  signed', 'gate  pass · park · block'],
                 },
                 {
                   title: 'Proof',
-                  description: 'The protocol commits the decision before the outcome, creating an immutable track record without screenshots or hindsight.',
+                  description: 'A public record before the result.',
                   image: '/images/protocol/onchain-proof.jpg',
                   alt: 'Transparent cobalt glass monolith containing a sealed point of light',
                   telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
@@ -560,7 +560,7 @@ export default function BobbyProtocolLanding() {
           <SectionMedia name="nebula" className="opacity-50" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Built for both sides</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A better interface for capital.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">One decision layer. Two ways in.</p></div>
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Your interface</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One protocol.<br />Two ways in.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">For people. For agents.</p></div>
           <div className="grid gap-5 md:grid-cols-2">
             <a
               href="/agentic-world/bobby"
@@ -633,9 +633,9 @@ export default function BobbyProtocolLanding() {
           <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Live protocol</div>
+            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Public by design</div>
             <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A decision you can inspect.<br />See the protocol in action.</h2>
+              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Proof over promises.<br />See the record.</h2>
               <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
             </div>
 
@@ -726,7 +726,7 @@ export default function BobbyProtocolLanding() {
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
                 <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Bobby-as-a-service</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Plug Bobby into your agent.</h2>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give your agent<br />a second layer.</h2>
               </div>
               <div className="rounded-lg border border-white/10 bg-black/60 px-5 py-3 font-mono text-sm text-[#7da6ff]">POST /api/mcp-http</div>
             </div>
@@ -767,7 +767,7 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A track record in public.<br />A stricter build on Base.</h2>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The next build is Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
                 Bobby ran in production on X Layer through the hackathon era. Those legacy records show what was committed on-chain; the current build and next deployment are Base-first. They do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
               </p>
