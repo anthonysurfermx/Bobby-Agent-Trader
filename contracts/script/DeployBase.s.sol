@@ -2,13 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
-
-/// @dev r10 review [P1]: minimal Safe surface — enough to prove the owner is
-/// a real multisig with the D-4 policy (>= 2-of-3), not just "has bytecode".
-interface ISafeMinimal {
-    function getThreshold() external view returns (uint256);
-    function getOwners() external view returns (address[] memory);
-}
+import {SafeOwnerGate} from "./SafeOwnerGate.sol";
 import {BobbyTrackRecord} from "../src/BobbyTrackRecord.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
@@ -67,6 +61,8 @@ contract DeployBase is Script {
         uint8 resolverThreshold;
         address hardnessScorer;
         address expectedOwner;
+        bytes32 expectedOwnerCodehash;
+        address expectedOwnerSingleton;
     }
 
     function _config() internal view returns (Config memory c) {
@@ -121,6 +117,12 @@ contract DeployBase is Script {
         // the hot deployer EOA. On testnet it defaults to the deployer (no
         // handoff), keeping the canary flow unchanged.
         c.expectedOwner = vm.envOr("OWNER_SAFE_ADDRESS", address(0));
+        // r10.1 review [P1]: the Safe's exact on-chain identity, pinned after
+        // creating and externally auditing it (runbook: `cast codehash <safe>`
+        // and `cast storage <safe> 0`, cross-checked against the official
+        // safe-deployments registry). Mandatory on 8453.
+        c.expectedOwnerCodehash = vm.envOr("OWNER_SAFE_CODEHASH", bytes32(0));
+        c.expectedOwnerSingleton = vm.envOr("OWNER_SAFE_SINGLETON", address(0));
     }
 
     function run() external returns (Deployed memory d) {
@@ -142,12 +144,11 @@ contract DeployBase is Script {
         require(c.expectedOwner != c.keeper, "OWNER_SAFE_ADDRESS must not be the keeper");
         if (block.chainid == 8453) {
             require(c.expectedOwner != deployer, "Mainnet: OWNER_SAFE_ADDRESS must be set and != deployer (D-4)");
-            require(c.expectedOwner.code.length > 0, "Mainnet: OWNER_SAFE_ADDRESS has no code (Safe not deployed?)");
-            // r10 review [P1]: bytecode is not a multisig. Prove the D-4
-            // policy on-chain: >= 2 threshold over >= 3 owners, and the hot
-            // deployer EOA must not be able to reach quorum alone.
-            require(ISafeMinimal(c.expectedOwner).getThreshold() >= 2, "Mainnet: Safe threshold must be >= 2 (D-4)");
-            require(ISafeMinimal(c.expectedOwner).getOwners().length >= 3, "Mainnet: Safe must have >= 3 owners (D-4)");
+            // r10.1 review [P1]: getters alone are mimicable. The gate proves
+            // the owner is byte-identical to the externally-audited Safe
+            // (pinned codehash + singleton) with an effective >= 2-of-3
+            // policy and no module/guard side doors. See SafeOwnerGate.sol.
+            SafeOwnerGate.validate(c.expectedOwner, deployer, c.expectedOwnerCodehash, c.expectedOwnerSingleton);
         }
 
         // r8 #3: validate every economic parameter BEFORE any chain interaction.
@@ -343,6 +344,9 @@ contract DeployBase is Script {
         vm.serializeAddress(m, "deployer", deployer);
         // r9 H-02: the address that must end up owning all seven contracts.
         vm.serializeAddress(m, "expectedOwner", c.expectedOwner);
+        // r10.1 [P1]: pinned Safe identity so the verifier re-proves it live.
+        vm.serializeBytes32(m, "expectedOwnerCodehash", c.expectedOwnerCodehash);
+        vm.serializeAddress(m, "expectedOwnerSingleton", c.expectedOwnerSingleton);
 
         string memory a = "addresses";
         vm.serializeAddress(a, "trackRecord", d.trackRecord);

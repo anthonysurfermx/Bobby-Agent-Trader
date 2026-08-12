@@ -2,13 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
-
-/// @dev r10 review [P1]: same minimal Safe surface as DeployBase — the final
-/// verifier must re-prove the multisig policy, not trust the deploy script.
-interface ISafeMinimal {
-    function getThreshold() external view returns (uint256);
-    function getOwners() external view returns (address[] memory);
-}
+import {SafeOwnerGate} from "./SafeOwnerGate.sol";
 import {BobbyTrackRecord} from "../src/BobbyTrackRecord.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
@@ -95,18 +89,23 @@ contract VerifyBaseDeployment is Script {
         // deployer. r10 review [P2]: the deployer fallback is TESTNET-ONLY —
         // on mainnet a manifest without expectedOwner must fail, or a stale
         // manifest could bless EOA ownership.
-        address expectedOwner;
-        if (vm.keyExistsJson(json, ".expectedOwner")) {
-            expectedOwner = vm.parseJsonAddress(json, ".expectedOwner");
-        } else {
-            require(block.chainid != 8453, "VERIFY FAILED: mainnet manifest missing expectedOwner (redeploy with r10 DeployBase)");
-            expectedOwner = r.deployer;
-        }
+        address expectedOwner = _resolveExpectedOwner(json, r.deployer);
         if (block.chainid == 8453) {
-            // r10 review [P1]: re-prove D-4 against live chain state.
-            _ok(expectedOwner != r.deployer, "expectedOwner is not the deployer EOA (D-4)");
-            _ok(ISafeMinimal(expectedOwner).getThreshold() >= 2, "expectedOwner Safe threshold >= 2 (D-4)");
-            _ok(ISafeMinimal(expectedOwner).getOwners().length >= 3, "expectedOwner Safe has >= 3 owners (D-4)");
+            // r10.1 review [P1]: re-prove the pinned Safe identity and its
+            // effective policy against LIVE chain state — codehash, singleton,
+            // >= 2-of-3, no modules, no guard. Pins are read from the
+            // manifest, which must carry them on mainnet.
+            require(
+                vm.keyExistsJson(json, ".expectedOwnerCodehash") && vm.keyExistsJson(json, ".expectedOwnerSingleton"),
+                "VERIFY FAILED: mainnet manifest missing pinned Safe identity (expectedOwnerCodehash/expectedOwnerSingleton)"
+            );
+            SafeOwnerGate.validate(
+                expectedOwner,
+                r.deployer,
+                vm.parseJsonBytes32(json, ".expectedOwnerCodehash"),
+                vm.parseJsonAddress(json, ".expectedOwnerSingleton")
+            );
+            _ok(true, "expectedOwner passes SafeOwnerGate (pinned codehash+singleton, >=2-of-3, no modules/guard)");
         }
 
         _verifyCode(a);
@@ -118,6 +117,19 @@ contract VerifyBaseDeployment is Script {
 
         console2.log("");
         console2.log("LIVE VERIFICATION PASSED - checks:", checksPassed);
+    }
+
+    /// @dev r10 review [P2]: extracted so the manifest-resolution branches are
+    /// unit-testable (see test/DeploymentGates.t.sol).
+    function _resolveExpectedOwner(string memory json, address deployer) internal view returns (address) {
+        if (vm.keyExistsJson(json, ".expectedOwner")) {
+            return vm.parseJsonAddress(json, ".expectedOwner");
+        }
+        require(
+            block.chainid != 8453,
+            "VERIFY FAILED: mainnet manifest missing expectedOwner (redeploy with r10 DeployBase)"
+        );
+        return deployer;
     }
 
     function _verifyCode(Addrs memory a) internal {

@@ -160,6 +160,60 @@ Los cinco quedan cerrados en este commit:
 Re-evidencia: build limpio, 134/134 con 1,000 fuzz runs, invariants del
 escrow ahora ejercitando ownership transfer/acceptance/rotación de keeper.
 
+## Addendum r10.2 — respuesta a la review de r10.1 (2026-08-12)
+
+Codex aprobó 4 de los 5 fixes de r10.1 y dejó dos hallazgos: el gate del Safe
+era imitable (getters no prueban autenticidad ni política efectiva) y las
+garantías de deployment no tenían tests. Ambos cerrados:
+
+### [P1] Gate del Safe → `script/SafeOwnerGate.sol` (compartido por deploy y verify)
+
+Se adopta la **alternativa que la review marcó como aceptable**: el Safe se
+crea PRIMERO, se audita externamente, y su identidad on-chain exacta queda
+**pineada** — no se intenta "detectar" un Safe por sus getters. El gate
+prueba contra estado live:
+
+1. `codehash(safe) == OWNER_SAFE_CODEHASH` pineado — byte-idéntico al
+   artefacto auditado; un impostor con los mismos getters no puede igualarlo;
+2. storage slot 0 == `OWNER_SAFE_SINGLETON` pineado, y el singleton tiene
+   código — el paso de runbook es cotejar ese singleton contra el registro
+   oficial `safe-global/safe-deployments` para chain 8453;
+3. `getThreshold() >= 2` y `getOwners().length >= 3` (política D-4);
+4. `getModulesPaginated(SENTINEL, 10)` vacío — sin ruta
+   `execTransactionFromModule` que evada el quorum;
+5. guard storage slot (keccak de `guard_manager.guard.address`, computado en
+   el código, no transcrito) == 0 — semántica de ejecución vanilla.
+
+**Reformulación honesta (pedida por la review):** esto NO es una prueba
+trust-free de "Safe auténtico". Prueba que el owner es byte-idéntico a un
+deployment específico auditado externamente, con política efectiva ≥ 2-de-3
+y sin rutas de ejecución adicionales (módulos/guard). La autenticidad del
+singleton descansa en el paso de runbook contra safe-deployments.
+
+Los pins entran por env (`OWNER_SAFE_CODEHASH`, `OWNER_SAFE_SINGLETON`,
+obligatorios en 8453), se escriben al manifest
+(`expectedOwnerCodehash`/`expectedOwnerSingleton`), y
+`VerifyBaseDeployment` los exige en el manifest mainnet y re-ejecuta el gate
+completo contra estado live.
+
+### [P2] Tests de las garantías de deployment → `test/DeploymentGates.t.sol`
+
+18 tests nuevos (152/152 total):
+
+- **SafeOwnerGate** (10): happy path; impostor con getters correctos pero
+  bytecode distinto → rechazado por codehash; singleton equivocado en slot 0;
+  singleton sin código; threshold 1; solo 2 owners; módulo habilitado; guard
+  seteado; pins ausentes; owner == deployer.
+- **`_checkOwner`** (5): en 8453 el handoff pendiente FALLA, aceptado con
+  pendingOwner sucio FALLA, aceptado y limpio PASA; en 84532 pending PASA y
+  owner ajeno FALLA.
+- **`_resolveExpectedOwner`** (3): manifest con campo lo lee; manifest legacy
+  en 8453 FALLA; en testnet cae a deployer.
+
+`_resolveExpectedOwner` se extrajo como función interna testeable; los tests
+de `_checkOwner` usan un harness que subclasea el script. La validación del
+gate corre vía un caller externo para que `expectRevert` capture cada rama.
+
 ## Para el auditor (Codex)
 
 - Diff completo en la rama `fix/base-r9-round1` vs `feat/base-migration`.
