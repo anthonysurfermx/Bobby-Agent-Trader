@@ -20,8 +20,13 @@ de API de docs.pyth.network. Nada citado de memoria.
 Contratos Pyth en Base (ambos con código verificado):
 - Actual: `0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a`
 - Post-upgrade (programa 2026-08-18): `0xbC16aee60f64864882BC6C4E428e148Fc0E272F5`
-  → el diseño v2 debe hacer la dirección de Pyth **configurable por el Safe**,
-  no constante.
+  → el diseño v2 necesita poder rotar la dirección de Pyth, pero **NO
+  libremente configurable** (review Codex): el contrato lleva una
+  **allowlist de direcciones aprobadas** administrada por el Safe, con
+  validación al aprobar (código presente, idealmente check de
+  versión/codehash del contrato Pyth) y **evento emitido en cada cambio** —
+  mismo patrón de pinning que SafeOwnerGate. Un owner comprometido no debe
+  poder apuntar el oráculo a un contrato arbitrario en una sola tx.
 
 ## 2. Coste por trade verificado (entry + exit)
 
@@ -37,10 +42,12 @@ El coste real no discrimina; la **cobertura y la granularidad sí**.
 
 ## 3. Granularidad temporal — el punto decisivo
 
-- **Pyth (Benchmarks):** update firmado con `publishTime` a resolución de
-  segundos, obtenible para cualquier instante histórico; el contrato acota
-  `[minPublishTime, maxPublishTime]`. La ventana la define nuestro diseño
-  (p.ej. ±60 s del exit declarado).
+- **Pyth (Benchmarks):** **actualización histórica verificable dentro de una
+  ventana temporal explícita** — el contrato acota
+  `[minPublishTime, maxPublishTime]` y el update firmado debe caer dentro.
+  Pyth NO garantiza que exista una observación exactamente en el segundo del
+  trade; garantiza que la que se presente cae en la ventana que nuestro
+  diseño declare (p.ej. ±60 s del exit).
 - **Chainlink:** solo existen los rounds que el deviation/heartbeat produjo.
   Para BTC/ETH (0.1–0.15%) hay rounds frecuentes en mercado normal. Para
   **SOL en Base la garantía es 0.5%/24 h**: en un mercado lateral el round
@@ -57,7 +64,7 @@ majors entran (y XAU de regalo para XAUT con basis documentado).
 
 | Riesgo | Chainlink | Pyth |
 |---|---|---|
-| Dependencia off-chain en el resolve | RPC para walk de rounds (sin auth) | Hermes/Benchmarks: **API key obligatoria desde 2026-08-18**; free tier hoy 10 req/10 s por IP (sobra para Bobby); coste de tiers con key **sin confirmar aún** |
+| Dependencia off-chain en el resolve | RPC para walk de rounds (sin auth) | Hermes/Benchmarks: **API key obligatoria desde 2026-08-18**; free tier hoy 10 req/10 s por IP (sobra para Bobby); coste de tiers con key **sin confirmar aún**. **La key es un secreto operativo del BACKEND** (env var Vercel, patrón `BASESCAN_API_KEY`): nunca entra al contrato, al frontend ni al repo — el contrato solo verifica el update firmado, no habla con Hermes |
 | Superficie de auditoría del contrato v2 | menor (view + validación de timestamp del round) | media (llamada externa a Pyth + fee + validación de ventana; la verificación de firmas vive en el contrato de Pyth, auditado) |
 | Selección adversarial dentro de la ventana | elegir round favorable dentro de la laguna de rounds (no acotable por diseño propio) | deslizamiento ≤ ventana declarada (acotable por diseño: ventana estrecha) |
 | Cambio de dirección del proveedor | proxies estables | upgrade 2026-08-18 anunciado → dirección configurable por Safe |
@@ -78,14 +85,19 @@ majors entran (y XAU de regalo para XAUT con basis documentado).
 **Opción de cinturón y tirantes** (a evaluar en diseño v2, coste ~nulo): para
 BTC/ETH, además del update de Pyth, hacer un sanity-check contra el feed
 Chainlink correspondiente (lectura view gratis) con banda amplia (p.ej. 200
-bps). Dos proveedores independientes tendrían que fallar juntos para colar un
-precio falso en los dos majors.
+bps). **Requisito de diseño (review Codex): NO BLOQUEANTE.** Si la
+discrepancia excede la banda, el contrato emite evento/flag para revisión
+off-chain — nunca revierte el resolve. Convertir el cross-check en requisito
+duro acoplaría la liveness del resolve a un segundo proveedor: un feed
+Chainlink pausado o desviado podría congelar resoluciones legítimas (DoS por
+dependencia). La verdad la ancla Pyth; Chainlink solo observa.
 
 ## 6. Acciones antes de congelar el diseño v2
 
 1. **Registrar la API key de Pyth ANTES del 2026-08-18** y confirmar rate
    limit/coste del tier con key (hoy la doc pública no lista precios). Dueño:
-   Anthony.
+   Anthony. La key vive como env var del backend (gitignoreada/Vercel
+   Sensitive) — es secreto operativo, no parte del diseño del contrato.
 2. PoC mínimo en Base Sepolia (Pyth también vive ahí:
    `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`): medir gas real de
    `parsePriceFeedUpdates` con 1 update y validar el flujo
