@@ -366,10 +366,15 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.2 }}
               className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
             >
-              <img
+              <motion.img
                 className="h-full w-full object-cover"
                 src="/images/protocol/architecture-simple.png"
                 alt="Bobby checks a thesis, debates it, applies a risk veto, and creates a public record"
+                initial={{ opacity: 0.72, scale: 1.06 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.025 }}
+                viewport={{ once: true, amount: 0.25 }}
+                transition={{ duration: 1.1, ease: 'easeOut' }}
               />
             </motion.div>
           </div>
@@ -516,11 +521,16 @@ export default function BobbyProtocolLanding() {
                   transition={{ delay: index * 0.06 }}
                   className="group relative min-h-[430px] overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0f] md:min-h-[500px]"
                 >
-                  <img
+                  <motion.img
                     src={capability.image}
                     alt={capability.alt}
                     loading="lazy"
-                    className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    initial={{ opacity: 0.7, scale: 1.08 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    whileHover={{ scale: 1.06 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ duration: 1.2, delay: index * 0.05, ease: 'easeOut' }}
                   />
                   <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,7,.96)_0%,rgba(5,5,7,.72)_42%,rgba(5,5,7,.08)_100%)]" />
                   <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,7,.22)_0%,rgba(5,5,7,.05)_45%,rgba(5,5,7,.94)_100%)]" />
@@ -556,11 +566,16 @@ export default function BobbyProtocolLanding() {
               href="/agentic-world/bobby"
               className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
             >
-              <img
+              <motion.img
                 src="/images/protocol/human-interface.jpg"
                 alt="Human reviewing a decision through illuminated cobalt glass"
                 loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                className="absolute inset-0 h-full w-full object-cover"
+                initial={{ opacity: 0.72, scale: 1.08 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.06 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 1.2, ease: 'easeOut' }}
               />
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
@@ -583,11 +598,16 @@ export default function BobbyProtocolLanding() {
               href="/protocol/docs"
               className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
             >
-              <img
+              <motion.img
                 src="/images/protocol/agent-interface.jpg"
                 alt="Synthetic agent connecting to a protocol through textured cobalt glass"
                 loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                className="absolute inset-0 h-full w-full object-cover"
+                initial={{ opacity: 0.72, scale: 1.08 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.06 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 1.2, ease: 'easeOut' }}
               />
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
