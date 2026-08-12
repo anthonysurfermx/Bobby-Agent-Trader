@@ -1,6 +1,6 @@
 # Decisión pendiente — Modelo de confianza del precio en BobbyTrackRecord
 
-**Fecha:** 2026-08-12 · **Estado:** BORRADOR para decisión de Anthony + review de Codex
+**Fecha:** 2026-08-12 · **Estado:** revisado por Codex (correcciones incorporadas) — pendiente decisión final de Anthony
 **Bloquea:** el veredicto GO de TrackRecord para Base mainnet (r9, hallazgo abierto
 "exit price auto-reportado"). No bloquea el redeploy canario de Sepolia.
 
@@ -53,19 +53,31 @@ pasa un `roundId`; el contrato hace `getRoundData(roundId)`, exige que el
   recorder podría elegir el round más favorable dentro de la ventana).
 - Cobertura: BTC/ETH/SOL sí; OKB no; XAUT/PAXG improbable en Base.
 
-### C — Pyth en Base (benchmarks con timestamp exacto)
-Pyth permite obtener un update **firmado para un `publishTime` pasado
-específico** (Benchmarks) y verificarlo on-chain vía
+### C — Pyth en Base (benchmarks: precio histórico verificable en ventana acotada)
+Pyth Benchmarks permite obtener un update **firmado con `publishTime` histórico**
+y verificarlo on-chain vía
 `parsePriceFeedUpdates(updateData, ids, minPublishTime, maxPublishTime)`.
-El resolve incluye el update firmado del instante del exit; el contrato exige
-`publishTime` dentro de la ventana declarada y el mismo tolerance band.
 
-- ✅ Semántica perfecta para "precio en el momento T del exit" — la ventana se
-  ancla al timestamp, no al round disponible; cobertura mayor (XAU/USD existe
-  en Pyth); BTC/ETH/SOL de sobra.
+**Precisión semántica (corrección Codex, 2026-08-12):** esto NO prueba "el
+precio en el instante exacto T del trade". Prueba que existió un precio firmado
+cuyo `publishTime` cae **dentro de una ventana declarada** `[min, max]`. La
+garantía correcta es *"precio histórico verificable dentro de una ventana
+acotada"* — la ventana es un parámetro de diseño del contrato, y su anchura es
+parte del límite residual de manipulación (junto con el tolerance band).
+Ref: docs.pyth.network/price-feeds/core/use-historical-price-data
+
+- ✅ La ventana se ancla al timestamp del trade (no al round que casualmente
+  exista, como en Chainlink); cobertura mayor (XAU/USD existe en Pyth);
+  BTC/ETH/SOL de sobra.
 - ❌ Fee por update (mínima) + gas de verificación; el backend debe llamar a
-  Hermes para obtener el update firmado; superficie de auditoría algo mayor
-  (aunque la verificación de firmas vive en el contrato de Pyth, ya auditado).
+  Hermes/Benchmarks para obtener el update firmado; superficie de auditoría
+  algo mayor (aunque la verificación de firmas vive en el contrato de Pyth,
+  ya auditado).
+- ⚠️ **Dependencia operativa**: Pyth exige API key/autenticación para sus
+  endpoints desde el **2026-08-18** (docs.pyth.network/price-feeds/core/
+  fetch-price-updates). Antes de comprometerse: confirmar disponibilidad de
+  Benchmarks/Hermes con key, límites de rate y coste — es un servicio externo
+  en el camino crítico del resolve.
 
 ### D — Uniswap v3/v4 TWAP en Base
 TWAP del pool correspondiente como precio de referencia.
@@ -99,20 +111,25 @@ Oráculo para lo que tiene feed + attestation etiquetada para lo que no:
 | Mata el hallazgo r9 | ❌ (lo formaliza) | ✅ núcleo | ✅ núcleo | ❌ | ✅ núcleo, honesto en el resto |
 | Cobertura BTC/ETH/SOL | n/a | ✅ | ✅ | ❌ | ✅ |
 | Cobertura XAUT/OKB | n/a | ❌ | parcial (XAU) | ❌ | etiquetado attested |
-| Precio en el instante T | n/a | ≈ (round más cercano) | ✅ exacto | TWAP ventana | según feed |
+| Anclaje temporal | n/a | ≈ round más cercano | ventana acotada por timestamp | TWAP ventana | según feed |
 | Gas/fees extra | 0 | ~0 | fee update + gas | lectura pool | según nivel |
 | Superficie de auditoría | 0 | pequeña | media | media-alta | media |
 | Nueva ronda de audit | no | sí | sí | sí | sí |
 
 ## 5. Recomendación
 
-**Opción E con Pyth como oráculo primario** (Chainlink como alternativa
-aceptable si en la review pesa más la simplicidad de auditoría que la
-exactitud temporal):
+**Opción E con Pyth como candidato primario** (Chainlink como alternativa
+aceptable si en la review pesa más la simplicidad de auditoría o si el coste/
+disponibilidad de Benchmarks con autenticación no convence):
 
-- Pyth Benchmarks es la única opción cuya semántica coincide con lo que el
-  contrato quiere probar: *"este era el precio en el instante del exit"*, no
-  *"este era un precio reciente cuando se minó el resolve"*.
+- Pyth Benchmarks es la opción cuya semántica más se acerca a lo que el
+  contrato quiere probar: *"existió este precio firmado dentro de la ventana
+  declarada alrededor del exit"*, en vez de *"este era un precio reciente
+  cuando se minó el resolve"*. La ventana es explícita y auditable.
+- **La elección final Pyth vs Chainlink queda condicionada** (posición
+  compartida con Codex) a validar: coste real por resolve, disponibilidad de
+  feeds en Base, complejidad de integración, y el requisito de API key de
+  Pyth vigente desde 2026-08-18.
 - El tolerance band (sugerido: 100 bps, configurable por el Safe) absorbe el
   basis perp/índice de los majors y queda documentado como **límite residual
   de manipulación**: un recorder deshonesto ya no puede inventar precios,
@@ -120,6 +137,28 @@ exactitud temporal):
   no oculto.
 - El nivel ATTESTED preserva el universo abierto sin mentir: OKB o XAUT
   pueden seguir registrándose, con su etiqueta y su win rate aparte.
+
+## 5b. Requisitos de diseño para TrackRecord v2 (fijados en review, 2026-08-12)
+
+No negociables si se aprueba cualquier variante con oráculo:
+
+1. **`entryPrice` se verifica al crear el commitment**, no solo en el
+   resolve. Verificar solo el exit deja media tesis sin probar.
+2. **Persistencia completa de la evidencia**: por cada extremo verificado se
+   guarda on-chain el precio de oráculo usado, su `publishTime`, el feed ID
+   y el modo del trade (`VERIFIED`/`ATTESTED`). El manifest de reputación se
+   reconstruye desde datos del contrato, no desde logs del backend.
+3. **Inmutabilidad del entry**: una resolución NUNCA puede reinterpretar
+   retrospectivamente el oráculo del entry (ni su precio, ni su ventana, ni
+   su modo). Lo snapshoteado en el commit es final — mismo principio que el
+   fix M-02 de TTL.
+4. **Ventana temporal y tolerance band se definen POR SEPARADO para entry y
+   exit** (el entry se ancla al momento del commit con mercado en vivo; el
+   exit puede resolverse horas después del cierre real — sus riesgos de
+   manipulación difieren).
+5. **Validación operativa previa**: confirmar Benchmarks/Hermes con la
+   autenticación obligatoria (API key, desde 2026-08-18), su rate limit y
+   coste, ANTES de comprometer el diseño a Pyth.
 
 ## 6. Implicaciones si se aprueba
 
@@ -135,12 +174,24 @@ exactitud temporal):
 5. Mensaje público mientras tanto: "resultados derivados de precios
    reportados, acotados on-chain" — nunca "imposible de manipular".
 
-## 7. Preguntas abiertas para cerrar la decisión
+## 7. Estado de la decisión
 
-1. ¿Aceptas restringir el nivel "verified" a BTC/ETH/SOL en v1? (Todo lo
-   demás nace ATTESTED hasta tener feed.)
-2. ¿Pyth (exactitud temporal) o Chainlink (simplicidad de auditoría)?
-3. ¿Tolerance band inicial: 50, 100 o 150 bps? (Trade-off: menor banda =
-   menos manipulación residual, más resolves legítimos rechazados por basis.)
-4. ¿Se verifica también el `entryPrice` en el commit (recomendado) o solo el
-   exit en v1?
+Recomendación provisional de Codex (2026-08-12), alineada con la sección 5:
+
+> BTC/ETH/SOL verified + resto attested separado + **entry y exit
+> verificados** + Pyth con **ventana explícita** y tolerancia inicial de
+> **100 bps**.
+
+Con eso quedan pre-acordados los puntos 1, 3 y 4 de las preguntas originales.
+Lo que falta para cerrar:
+
+1. **Confirmación de Anthony** de la recomendación provisional (universo
+   verified BTC/ETH/SOL, 100 bps inicial, entry+exit).
+2. **Pyth vs Chainlink — decisión condicionada a evidencia**: validar coste
+   por resolve, disponibilidad de feeds en Base, complejidad real de
+   integración y el requisito de API key de Pyth (obligatoria desde
+   2026-08-18: rate limits y coste del tier disponible). Entregable: una
+   página comparativa con números reales, antes del diseño de v2.
+3. **Anchura de las ventanas** entry/exit (parámetro nuevo que la corrección
+   de semántica hace explícito): a definir en el diseño de v2 con la
+   evidencia del punto 2.
