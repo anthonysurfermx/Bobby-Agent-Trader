@@ -185,7 +185,7 @@ export default function BobbyProtocolLanding() {
   const mcp = useMcpMeta();
   const { activity, isLoading: isActivityLoading, error: activityError, refresh: refreshActivity } = useActivity();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'verified'>('all');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'recorded'>('all');
   const btc = price(stats, 'BTC');
   const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
   const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
@@ -281,8 +281,8 @@ export default function BobbyProtocolLanding() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet>
-        <title>Bobby Protocol — The decision layer for autonomous agents</title>
-        <meta name="description" content="Bobby gives autonomous agents a shared, adversarial decision layer with live proof." />
+        <title>Bobby Protocol — Make the thesis earn it</title>
+        <meta name="description" content="Before capital moves, Bobby makes the thesis earn it: adversarial debate, risk gates and a verifiable decision record." />
       </Helmet>
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
@@ -313,13 +313,13 @@ export default function BobbyProtocolLanding() {
           <div className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl flex-col justify-center px-5 pb-20 pt-20 lg:px-8 lg:pb-28 lg:pt-24">
             <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
               <a href="/agentic-world/bobby/history" className="mb-8 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff] transition hover:text-white">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />A manifesto for the verified agent economy <span aria-hidden>›</span>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />Accountability infrastructure for autonomous finance <span aria-hidden>›</span>
               </a>
-              <h1 className="max-w-3xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Agents need a <span className="text-[#0052ff]">second opinion.</span></h1>
-              <p className="mt-8 max-w-xl text-lg leading-8 text-white/60 md:text-xl">Bobby is the adversarial decision layer for autonomous finance. Three agents debate the thesis, pressure-test the risk, and leave a proof trail before capital moves.</p>
+              <h1 className="max-w-3xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Make the <span className="text-[#0052ff]">thesis earn it.</span></h1>
+              <p className="mt-8 max-w-xl text-lg leading-8 text-white/60 md:text-xl">Bobby is the accountability layer for autonomous finance. Three agents debate, risk gets a veto, and the decision leaves a proof trail before capital moves.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-                <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Enter War Room <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
-                <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">Explore <ChevronDown className="h-4 w-4" /></a>
+                <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a decision <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
+                <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the gate <ChevronDown className="h-4 w-4" /></a>
               </div>
               <div className="mt-14 grid max-w-xl grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4">
                 {[
@@ -358,7 +358,7 @@ export default function BobbyProtocolLanding() {
                 <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / Architecture</div>
                 <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
               </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → proof on Base → agent economy. Twenty seconds, the whole protocol.</p>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → committed record. The accountability loop for autonomous finance.</p>
             </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -392,13 +392,13 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.25 }}
               className="max-w-3xl"
             >
-              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The verification loop</div>
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The accountability loop</div>
               <h2 className="text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
                 Decisions, never blind.<br />
                 <span className="text-white/72">See Bobby in action.</span>
               </h2>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">
-                Every signal enters an adversarial pipeline. Agents debate it, risk challenges it, and the protocol records the result before the market can rewrite the story.
+                Every proposal enters an adversarial pipeline. Agents debate it, risk challenges it, and the protocol commits the decision before the market can rewrite the story.
               </p>
             </motion.div>
 
@@ -437,7 +437,7 @@ export default function BobbyProtocolLanding() {
                 { icon: Bot, eyebrow: 'Alpha Hunter', title: 'Find the asymmetric setup', text: 'Market structure, momentum and live intelligence become a thesis with explicit invalidation.', state: 'SIGNAL READY', step: '01' },
                 { icon: ShieldCheck, eyebrow: 'Red Team', title: 'Attack the thesis', text: 'The opposing agent searches for crowded positioning, weak assumptions and hidden downside.', state: 'CHALLENGED', step: '02' },
                 { icon: CircleDollarSign, eyebrow: 'CIO + Risk', title: 'Gate the capital', text: 'Conviction, sizing and downside are reconciled. Pass, park or block — never force the trade.', state: 'RISK GATED', step: '03' },
-                { icon: Check, eyebrow: 'Base proof', title: 'Commit before outcome', text: 'The decision and its rationale become a verifiable record before price reveals the answer.', state: 'ONCHAIN PROOF', step: '04' },
+                { icon: Check, eyebrow: 'Committed record', title: 'Commit before outcome', text: 'The decision and its rationale become inspectable before price reveals the answer. Market truth remains a separate claim.', state: 'PROOF TRAIL', step: '04' },
               ].map(({ icon: Icon, eyebrow, title, text, state, step }, index) => (
                 <motion.article
                   key={title}
@@ -477,7 +477,7 @@ export default function BobbyProtocolLanding() {
                 </h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">
-                Four surfaces turn autonomous trading from a black box into an inspectable, accountable system.
+                Four surfaces turn autonomous decisions from a black box into an inspectable, accountable system.
               </p>
             </div>
 
@@ -488,7 +488,7 @@ export default function BobbyProtocolLanding() {
                   description: 'Every agent decision has an author. Every outcome builds reputation. Both follow the agent into its next call.',
                   image: '/images/protocol/agent-identity.jpg',
                   alt: 'Synthetic human profile visible through textured cobalt glass',
-                  telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  verified'],
+                  telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  recorded'],
                 },
                 {
                   title: 'Adversarial debate',
@@ -617,14 +617,14 @@ export default function BobbyProtocolLanding() {
           <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Live network</div>
+            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Live protocol</div>
             <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Decisions, never paused.<br />See the network in action.</h2>
+              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A decision you can inspect.<br />See the protocol in action.</h2>
               <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
             </div>
 
             <div className="mb-8 flex flex-wrap items-center gap-2">
-              {([['all', 'All'], ['settled', 'Settled'], ['verified', 'Verified']] as const).map(([key, label]) => (
+              {([['all', 'All'], ['settled', 'Settled'], ['recorded', 'Recorded']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setActivityFilter(key)}
@@ -688,7 +688,7 @@ export default function BobbyProtocolLanding() {
                     </div>
                     <div className="mb-6 truncate text-xl font-extrabold tracking-[-0.04em] text-white/90">{item.tool || 'Agent decision'}</div>
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-sm font-bold text-white/80">{item.paid ? 'x402 settled' : 'verified'}</span>
+                      <span className="font-mono text-sm font-bold text-white/80">{item.paid ? 'x402 settled' : 'recorded'}</span>
                       <span className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${item.paid ? 'border-[#0052ff]/40 bg-[#0052ff]/15 text-[#7da6ff]' : 'border-white/15 bg-white/[0.06] text-white/55'}`}>{item.status || (item.paid ? 'settled' : 'live')}</span>
                     </div>
                   </motion.div>
@@ -698,7 +698,7 @@ export default function BobbyProtocolLanding() {
               <div className="rounded-2xl border border-dashed border-[#0052ff]/30 bg-[#0052ff]/[0.045] px-6 py-12 text-center">
                 <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10"><CircleDollarSign className="h-5 w-5 text-[#7da6ff]" /></div>
                 <div className="text-lg font-bold">{activityError ? 'Activity feed is reconnecting.' : isActivityLoading ? 'Reading protocol activity.' : 'No recent protocol events.'}</div>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{activityError ? 'The network telemetry is still available. Refresh to retry the event stream.' : 'The live network remains connected; the next verified event will appear here automatically.'}</p>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{activityError ? 'The network telemetry is still available. Refresh to retry the event stream.' : 'The live network remains connected; the next recorded event will appear here automatically.'}</p>
               </div>
             )}
           </div>
@@ -751,9 +751,9 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Proven on X Layer.<br />Now building on Base.</h2>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A track record in public.<br />A stricter build on Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Bobby ran in production on OKX X Layer through the hackathon era. Every number below is on-chain and independently verifiable — nothing here is a screenshot.
+                Bobby ran in production on OKX X Layer through the hackathon era. These records show what was committed on-chain; they do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
               </p>
             </div>
 
@@ -798,7 +798,7 @@ export default function BobbyProtocolLanding() {
               <div>
                 <BrandMark />
                 <p className="mt-5 max-w-xs text-sm leading-6 text-white/40">
-                  The adversarial decision layer for autonomous finance. Every thesis debated, every decision committed before the outcome.
+                  The accountability layer for autonomous finance. Every thesis debated, every decision committed before the outcome.
                 </p>
                 <div className="mt-6 flex items-center gap-4">
                   <a href="https://twitter.com/bobbyprotocol" target="_blank" rel="noreferrer" aria-label="Twitter" className="text-white/40 transition hover:text-[#7da6ff]"><Twitter className="h-4 w-4" /></a>
@@ -839,7 +839,7 @@ export default function BobbyProtocolLanding() {
             </div>
             <div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 md:flex-row">
               <span>© 2026 Bobby Protocol</span>
-              <span>Open decision infrastructure for autonomous agents.</span>
+              <span>Make the thesis earn it.</span>
             </div>
           </div>
         </footer>

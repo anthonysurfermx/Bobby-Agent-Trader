@@ -15,7 +15,7 @@ export default function BobbyLandingPage() {
     <>
       <Helmet>
         <title>BOBBY PROTOCOL | Adversarial Intelligence</title>
-        <meta name="description" content="Three agents debate. One decides. Everything settles on-chain. Adversarial intelligence for the agent economy on X Layer." />
+        <meta name="description" content="Before capital moves, Bobby makes the thesis earn it: three agents debate, risk gets a veto and the decision leaves a proof trail." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
@@ -54,10 +54,10 @@ export default function BobbyLandingPage() {
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[500px] bg-[#C1FF2C]/5 blur-[150px] rounded-full" />
             </div>
             <h1 className="text-6xl md:text-8xl font-bold tracking-tight mb-8 max-w-6xl mx-auto leading-[1.05]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              Adversarial Intelligence for the <span className="text-[#C1FF2C]" style={{ textShadow: '0 0 20px rgba(193, 255, 44, 0.3)' }}>Agent Economy</span>
+              Make the Thesis Earn It for the <span className="text-[#C1FF2C]" style={{ textShadow: '0 0 20px rgba(193, 255, 44, 0.3)' }}>Agent Economy</span>
             </h1>
             <p className="text-xl md:text-2xl text-[#999] max-w-2xl mx-auto mb-14 font-light">
-              Three agents debate. One decides. Everything settles on-chain.
+              Three agents debate. Risk gets a veto. The decision leaves a proof trail before capital moves.
             </p>
             <div className="flex flex-col md:flex-row justify-center items-center gap-6 mb-32">
               <Link
@@ -106,7 +106,7 @@ export default function BobbyLandingPage() {
               {[
                 { icon: 'call_merge', title: 'Request', desc: 'Agent calls Bobby via Model Context Protocol (MCP) to initiate a validation query.' },
                 { icon: 'forum', title: 'Debate', desc: 'Alpha Hunter, Red Team, and CIO agents contest the thesis in a high-stakes environment.' },
-                { icon: 'verified_user', title: 'Settle', desc: 'Pay 0.001 OKB to receive final conviction score and verifiable on-chain proof.' },
+                { icon: 'verified_user', title: 'Commit', desc: 'Receive an explicit conviction decision and a committed on-chain record before the outcome is known.' },
               ].map((step) => (
                 <div key={step.title} className="bg-white/[0.03] border border-white/[0.08] backdrop-blur-[20px] p-12 rounded-2xl flex flex-col items-start text-left group hover:border-[#C1FF2C]/30 hover:bg-white/[0.05] transition-all duration-300">
                   <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center mb-8 border border-white/10 group-hover:border-[#C1FF2C]/40 transition-colors">
@@ -216,7 +216,7 @@ export default function BobbyLandingPage() {
             <div className="grid lg:grid-cols-2 gap-24 items-center">
               <div>
                 <h2 className="text-5xl font-bold mb-8 tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Verifiable. Transparent. On-Chain.</h2>
-                <p className="text-xl text-[#999] mb-12 font-light leading-relaxed">Every debate, every conviction delta, and every bounty payout is written to X Layer. Never trust, always verify the intelligence.</p>
+                <p className="text-xl text-[#999] mb-12 font-light leading-relaxed">Every debate, conviction delta and bounty payout is recorded on X Layer. Inspect the process; do not confuse a committed record with a guarantee of market truth.</p>
                 <div className="flex items-center gap-6 p-6 bg-white/[0.03] border border-white/[0.08] backdrop-blur-[20px] rounded-2xl border-white/10 w-fit hover:border-[#C1FF2C]/30 transition-all duration-300">
                   <div className="w-14 h-14 rounded-xl bg-[#C1FF2C] flex items-center justify-center text-[#1E3700]">
                     <span className="material-symbols-outlined font-bold" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24" }}>account_tree</span>

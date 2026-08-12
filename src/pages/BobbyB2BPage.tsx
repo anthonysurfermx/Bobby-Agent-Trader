@@ -35,14 +35,14 @@ const FEATURES = [
   { Icon: MessageSquare, title: 'Multi-Agent Debates', desc: 'Watch Alpha and Red Team clash while CIO decides the play.' },
   { Icon: Signal, title: 'Real-Time Signals', desc: 'Formatted alerts for entries, TPs, and stop losses without lag.' },
   { Icon: Radar, title: 'Market Scanning', desc: 'Deep scanning across DEXs and CEXs, identifying liquidity shifts.' },
-  { Icon: Shield, title: 'On-Chain Proof', desc: 'Every signal logged on X Layer blockchain. 100% accountability.' },
+  { Icon: Shield, title: 'Decision record', desc: 'Every debate and decision leaves an inspectable on-chain record.' },
   { Icon: CreditCard, title: 'x402 Payments', desc: 'Seamless community billing through the x402 protocol on X Layer.' },
 ];
 
 const FAQ = [
   { q: 'Is this a trading bot?', a: 'Bobby is an intelligence layer, not an execution bot. It provides institutional-grade analysis, sentiment tracking, and risk assessment to help your group make better decisions. Zero custody.' },
   { q: 'What markets are covered?', a: 'Crypto (BTC, ETH, SOL, and more), US stocks (NVDA, TSLA, AAPL), and commodities (Gold, Silver). Configurable per group.' },
-  { q: 'Is it safe for my group?', a: 'Bobby only requires permission to read and send messages. It cannot access wallets or private data. All signals are verifiable on-chain.' },
+  { q: 'Is it safe for my group?', a: 'Bobby only requires permission to read and send messages. It cannot access wallets or private data. The decision process and record are inspectable on-chain; market outcomes are never guaranteed.' },
   { q: 'How do I pay?', a: 'Payment via x402 protocol on OKX X Layer. Connect your Web3 wallet, pay 8 USDT, and Bobby activates instantly. Zero gas on X Layer.' },
 ];
 
@@ -51,9 +51,9 @@ export default function BobbyB2BPage() {
     <div className="min-h-screen bg-[#050505] text-white font-['Inter']">
       <Helmet>
         <title>Bobby Agent Trader for Telegram Groups | AI Trading Intelligence</title>
-        <meta name="description" content="Turn your Telegram group into an AI Trading Room. Three agents debate every market move. Voice notes, signals, on-chain proof." />
+        <meta name="description" content="Turn your Telegram group into an AI decision room. Three agents debate every market move, risk gets a veto, and decisions leave a proof trail." />
         <meta property="og:title" content="Bobby Agent Trader — Telegram Group Intelligence" />
-        <meta property="og:description" content="Three agents debate. Your community watches. Voice notes, signals, on-chain proof." />
+        <meta property="og:description" content="Three agents debate. Your community watches. Voice notes, risk gates and an inspectable decision record." />
         <meta property="og:image" content="https://defimexico.org/bobby-hero.png" />
         <meta name="twitter:card" content="summary_large_image" />
       </Helmet>
@@ -87,7 +87,7 @@ export default function BobbyB2BPage() {
               Turn Your Telegram Group Into an <span className="text-green-400 italic">AI Trading Room</span>
             </h1>
             <p className="text-white/40 text-lg max-w-xl mb-10 leading-relaxed">
-              Three agents debate every market move. Your community watches in real-time. Voice notes, signals, and verifiable on-chain proof.
+              Three agents debate every market move. Your community watches in real-time. Voice notes, risk gates and a decision record before capital moves.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <a href="https://t.me/Bobbyagentraderbot?startgroup=true" target="_blank" rel="noopener noreferrer"
