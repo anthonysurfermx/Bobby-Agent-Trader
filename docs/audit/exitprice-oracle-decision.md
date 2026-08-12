@@ -158,7 +158,18 @@ No negociables si se aprueba cualquier variante con oráculo:
    manipulación difieren).
 5. **Validación operativa previa**: confirmar Benchmarks/Hermes con la
    autenticación obligatoria (API key, desde 2026-08-18), su rate limit y
-   coste, ANTES de comprometer el diseño a Pyth.
+   coste, ANTES de comprometer el diseño a Pyth. La API key es **secreto
+   operativo del backend** (env var, patrón `BASESCAN_API_KEY`) — nunca del
+   contrato ni del frontend.
+6. **Rotación de oráculo acotada**: la dirección del contrato Pyth se rota
+   solo dentro de una **allowlist aprobada por el Safe**, con validación de
+   código/versión al aprobar y evento en cada cambio — nunca libremente
+   configurable (un owner comprometido no puede apuntar a un oráculo
+   arbitrario en una tx).
+7. **Cross-checks secundarios NUNCA bloqueantes**: si se añade el
+   sanity-check Chainlink para BTC/ETH, una discrepancia emite evento/flag,
+   jamás revierte el resolve — atar la liveness a un segundo proveedor es
+   una vía de DoS (ver `oracle-comparison.md` §5).
 
 ## 6. Implicaciones si se aprueba
 
