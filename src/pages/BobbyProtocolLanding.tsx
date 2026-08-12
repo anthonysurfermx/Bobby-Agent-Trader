@@ -237,7 +237,7 @@ export default function BobbyProtocolLanding() {
         ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L · ${publicRecord.winRate?.toFixed(1)}%`
         : 'Waiting for the public resolution ledger.',
       proof: 'Resolution ledger',
-      href: '#activity',
+      href: '#what-it-does',
     },
     {
       label: 'Adversarial bounties',
@@ -259,7 +259,7 @@ export default function BobbyProtocolLanding() {
     ['How it works', '#how-it-works'],
     ['Capabilities', '#capabilities'],
     ['For agents', '#for-agents'],
-    ['Activity', '#activity'],
+    ['What it does', '#what-it-does'],
   ];
 
   const filteredActivity = useMemo(() => {
@@ -628,7 +628,31 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
+        <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="what-it-does">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(0,82,255,.18),transparent_36%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 max-w-3xl">
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / What Bobby does</div>
+              <h2 className="text-5xl font-extrabold leading-[.96] tracking-[-0.08em] md:text-7xl">It turns an idea<br />into a decision.</h2>
+              <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">Bring a thesis. Bobby challenges it, checks the downside, and gives you one clear decision before the result.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                { step: '01', title: 'Bring the idea', text: 'Start with a market thesis.' },
+                { step: '02', title: 'Test the downside', text: 'Opposing agents look for what breaks it.' },
+                { step: '03', title: 'Get the call', text: 'Pass, pause or block — with a public record.' },
+              ].map((item) => (
+                <div key={item.step} className="rounded-2xl border border-white/10 bg-white/[0.035] p-7 transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:bg-[#0052ff]/[0.08]">
+                  <div className="mb-12 font-mono text-sm font-bold text-[#7da6ff]">{item.step}</div>
+                  <h3 className="text-2xl font-extrabold tracking-[-0.05em]">{item.title}</h3>
+                  <p className="mt-3 max-w-xs text-sm leading-6 text-white/45">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {false && <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
           <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
@@ -717,9 +741,9 @@ export default function BobbyProtocolLanding() {
               </div>
             )}
           </div>
-        </section>
+        </section>}
 
-        <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
+        {false && <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(0,82,255,.1),transparent_40%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -759,13 +783,13 @@ export default function BobbyProtocolLanding() {
               </div>
             </div>
           </div>
-        </section>
+        </section>}
 
         <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Track record</div>
               <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The next build is Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
                 Bobby ran in production on X Layer through the hackathon era. Those legacy records show what was committed on-chain; the current build and next deployment are Base-first. They do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
@@ -832,7 +856,7 @@ export default function BobbyProtocolLanding() {
                   ['Docs', '/protocol/docs'],
                   ['Playbooks', '/protocol/playbooks'],
                   ['Harness', '/protocol/harness'],
-                  ['MCP endpoint', '#mcp'],
+                  ['MCP endpoint', '/protocol/docs'],
                 ]],
                 ['Bobby', [
                   ['War Room', '/agentic-world/bobby'],
