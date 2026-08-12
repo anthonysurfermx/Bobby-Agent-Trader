@@ -39,26 +39,81 @@ su UI) y `VerifyBaseDeployment` en 8453 solo pasa con ownership ACEPTADO y
 
 ## Paso 1 — Dry-run real (sin broadcast)
 
+### RPC: usar el endpoint sin rate-limit
+
+El RPC público oficial `sepolia.base.org` (alias `base_sepolia`) limita a
+3 req/s y **cuelga el dry-run** durante su ráfaga de view calls. Orden de
+preferencia (definidos en `foundry.toml`):
+
+1. **`base_sepolia_publicnode`** ← default del dry-run/verify
+   (`https://base-sepolia-rpc.publicnode.com`).
+2. `base_sepolia_drpc` — fallback si publicnode falla
+   (`https://base-sepolia.drpc.org`).
+3. `base_sepolia` — oficial, alternativa secundaria; sirve pero puede
+   throttlear en la ráfaga.
+
 ```bash
-cd contracts && export BASESCAN_API_KEY=... && BOBBY_ADDRESS=0x... CIO_ADDRESS=0x... ARBITER_ADDRESS=0x... KEEPER_ADDRESS=0x... RESOLVER_ADDRESS=0xR1 RESOLVER_ADDRESSES=0xR1,0xR2,0xR3 RESOLVER_THRESHOLD=2 forge script script/DeployBase.s.sol --rpc-url base_sepolia --sender 0xFIRMANTE
+cd contracts && export BASESCAN_API_KEY=... && BOBBY_ADDRESS=0x... CIO_ADDRESS=0x... ARBITER_ADDRESS=0x... KEEPER_ADDRESS=0x... RESOLVER_ADDRESS=0xR1 RESOLVER_ADDRESSES=0xR1,0xR2,0xR3 RESOLVER_THRESHOLD=2 forge script script/DeployBase.s.sol --rpc-url base_sepolia_publicnode --sender 0xFIRMANTE
 ```
+
+Si `base_sepolia_publicnode` falla, repetir con `--rpc-url base_sepolia_drpc`
+(o `base_sepolia` como último recurso).
 
 Éxito = `post-deploy assertions: ALL PASSED` + `manifest written: deployments/84532.json`.
 Revisar el manifiesto (roles, fees, quórum, `expectedOwner`). Ojo: su
 `deployBlock` es simulado.
 
-## Paso 2 — Broadcast (Anthony firma)
+> **El dry-run SOBRESCRIBE `deployments/84532.json`** con direcciones
+> simuladas. Mientras el broadcast real (Paso 2) no ocurra, restaurar el
+> manifest del deployment vigente antes de commitear cualquier cosa:
+> `git checkout HEAD -- deployments/84532.json`. Limpiar también
+> `broadcast/DeployBase.s.sol/84532/dry-run` y `cache/DeployBase.s.sol`.
 
-Mismo comando + `--broadcast --verify --interactives 1`.
+## Paso 2 — Broadcast (Anthony firma — SOLO Anthony)
+
+Mismo comando + `--broadcast --verify --interactives 1`, contra el mismo RPC
+sin rate-limit. Requiere la keystore/firma del deployer (Wallet A) — el
+agente NO ejecuta este paso.
+
+Comando listo (rellenar las 4 direcciones de roles del escrow; el resto son
+las del deployment canario vigente):
+
+```bash
+cd contracts && export BASESCAN_API_KEY=<tu_key> && \
+BOBBY_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302 \
+CIO_ADDRESS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7 \
+ARBITER_ADDRESS=0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843 \
+KEEPER_ADDRESS=0x01b2a464b6Dc0Dc57Fd912d877a7C05502cf3D2e \
+RESOLVER_ADDRESS=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854 \
+RESOLVER_ADDRESSES=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854,0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26,0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514 \
+RESOLVER_THRESHOLD=2 \
+forge script script/DeployBase.s.sol \
+  --rpc-url base_sepolia_publicnode \
+  --account wallet-a2 --sender 0x821990Bda0BAa05F96506fd73ef439D0C2f17302 \
+  --broadcast --verify --interactives 1
+```
+
+Notas:
+- `--account wallet-a2` es la keystore foundry del deployer (ajustar si el
+  nombre difiere). Foundry pedirá la contraseña de forma interactiva.
+- Estas direcciones REUTILIZAN los roles del canario anterior; son roles,
+  no addresses de contrato — las de contrato serán nuevas (redeploy).
+- Tras el broadcast, el manifest `deployments/84532.json` queda con las
+  direcciones REALES minadas — ese sí se commitea (reemplaza al viejo).
+- El dry-run del agente (contra `base_sepolia_publicnode`) ya dio
+  `post-deploy assertions: ALL PASSED`; el broadcast repite el mismo camino
+  añadiendo las transacciones firmadas.
 
 ## Paso 3 — Verificación de lo minado (Claude)
 
 ```bash
-cd contracts && forge script script/VerifyBaseDeployment.s.sol --rpc-url base_sepolia
+cd contracts && forge script script/VerifyBaseDeployment.s.sol --rpc-url base_sepolia_publicnode
 ```
 
 Éxito = `LIVE VERIFICATION PASSED` (~36+ checks, ahora incluye
-owner/pendingOwner contra `expectedOwner` del manifest). Solo entonces:
+owner/pendingOwner contra `expectedOwner` del manifest). Mismo orden de RPC
+que el Paso 1 (`base_sepolia_publicnode` → `base_sepolia_drpc` →
+`base_sepolia`). Solo entonces:
 
 ## Paso 4 — Integración (Claude)
 
