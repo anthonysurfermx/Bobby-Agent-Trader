@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1200, initial-scale=1" />
+    <title>Bobby Protocol social card</title>
+    <style>
+      * { box-sizing: border-box; }
+
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        margin: 0;
+        overflow: hidden;
+        background: #02030a;
+        color: #fff;
+        font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+      }
+
+      .card {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        isolation: isolate;
+        overflow: hidden;
+        background: #02030a;
+      }
+
+      .tunnel {
+        position: absolute;
+        z-index: -3;
+        top: 0;
+        left: -230px;
+        width: 1890px;
+        height: 630px;
+        object-fit: cover;
+        filter: saturate(1.18) brightness(.92) contrast(1.08);
+      }
+
+      .shade {
+        position: absolute;
+        z-index: -2;
+        inset: 0;
+        background:
+          linear-gradient(90deg, #02030a 0%, rgba(2, 3, 10, .98) 35%, rgba(2, 3, 10, .76) 57%, rgba(2, 3, 10, .08) 100%),
+          linear-gradient(180deg, rgba(2, 3, 10, .18), rgba(2, 3, 10, .72));
+      }
+
+      .grid {
+        position: absolute;
+        z-index: -1;
+        inset: 0;
+        opacity: .06;
+        background-image:
+          linear-gradient(rgba(255,255,255,.7) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,.7) 1px, transparent 1px);
+        background-size: 52px 52px;
+      }
+
+      .brand {
+        position: absolute;
+        top: 48px;
+        left: 64px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .mark {
+        width: 82px;
+        height: 82px;
+        object-fit: cover;
+        border-radius: 24px;
+        box-shadow: 0 0 42px rgba(0, 82, 255, .45);
+      }
+
+      .brand-name {
+        font-size: 27px;
+        font-weight: 850;
+        letter-spacing: -.035em;
+      }
+
+      .brand-kicker {
+        margin-top: 8px;
+        color: #8fb6ff;
+        font-family: "SFMono-Regular", Menlo, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .16em;
+      }
+
+      .copy {
+        position: absolute;
+        top: 181px;
+        left: 64px;
+        width: 690px;
+        padding-left: 28px;
+        border-left: 4px solid #0052ff;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 66px;
+        font-weight: 900;
+        line-height: .98;
+        letter-spacing: -.072em;
+      }
+
+      h1 span {
+        display: block;
+        margin-top: 8px;
+        color: #3978ff;
+        text-shadow: 0 0 32px rgba(0, 82, 255, .28);
+      }
+
+      .subtitle {
+        max-width: 570px;
+        margin: 34px 0 0;
+        color: rgba(235, 240, 252, .72);
+        font-size: 24px;
+        line-height: 1.42;
+        letter-spacing: -.02em;
+      }
+
+      .proof {
+        position: absolute;
+        left: 92px;
+        bottom: 88px;
+        padding: 12px 18px;
+        border: 1px solid rgba(125, 166, 255, .4);
+        border-radius: 999px;
+        background: rgba(5, 20, 51, .75);
+        color: #b9d0ff;
+        font-family: "SFMono-Regular", Menlo, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: .09em;
+      }
+
+      .url {
+        position: absolute;
+        left: 92px;
+        bottom: 43px;
+        font-family: "SFMono-Regular", Menlo, monospace;
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: .035em;
+      }
+
+      .live {
+        position: absolute;
+        right: 48px;
+        bottom: 42px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: rgba(255,255,255,.68);
+        font-family: "SFMono-Regular", Menlo, monospace;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .12em;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #3978ff;
+        box-shadow: 0 0 16px #3978ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <img class="tunnel" src="/images/protocol/bobby-twitter-cover.png" alt="" />
+      <div class="shade"></div>
+      <div class="grid"></div>
+
+      <div class="brand">
+        <img class="mark" src="/images/protocol/bobby-protocol-mark.png" alt="" />
+        <div>
+          <div class="brand-name">Bobby Protocol</div>
+          <div class="brand-kicker">ADVERSARIAL DECISION LAYER</div>
+        </div>
+      </div>
+
+      <section class="copy">
+        <h1>Agents need a <span>second opinion.</span></h1>
+        <p class="subtitle">Three agents debate the thesis. Proof lands before capital moves.</p>
+      </section>
+
+      <div class="proof">ON-CHAIN&nbsp;&nbsp;/&nbsp;&nbsp;ADVERSARIAL&nbsp;&nbsp;/&nbsp;&nbsp;VERIFIABLE</div>
+      <div class="url">bobbyprotocol.xyz</div>
+      <div class="live"><span class="dot"></span>PROTOCOL ONLINE</div>
+    </main>
+  </body>
+</html>

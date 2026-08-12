@@ -18,6 +18,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
@@ -197,15 +198,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Cron auth (same pattern agent-run uses): require bearer in prod, allow
-  // manual runs without it so operators can trigger settlement ad-hoc.
-  const cronSecret = process.env.CRON_SECRET;
-  const isManual = req.query.manual === 'true';
-  if (cronSecret && !isManual) {
-    if (req.headers.authorization !== `Bearer ${cronSecret}`) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
+  if (!requireInternalAuth(req, res)) return;
 
   if (!SB_URL || !SB_KEY) {
     return res.status(500).json({ error: 'Supabase credentials not configured' });

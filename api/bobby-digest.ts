@@ -5,6 +5,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { isInternalRequest } from './_lib/request-security.js';
 
 export const config = { maxDuration: 10 };
 
@@ -18,6 +19,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const wallet = req.query.wallet as string | undefined;
   const lang = (req.query.lang as string) || 'en';
+  if (wallet && !isInternalRequest(req)) {
+    return res.status(401).json({ error: 'Wallet-specific digests require authentication' });
+  }
   // Only show digests from the last 24h
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -44,20 +48,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (digests.length === 0) {
       return res.status(200).json({ ok: true, hasDigest: false, digests: [] });
-    }
-
-    // Mark as delivered
-    const latestId = digests[0].id;
-    if (!digests[0].delivered_at) {
-      await fetch(`${SB_URL}/rest/v1/user_digests?id=eq.${latestId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SB_KEY,
-          Authorization: `Bearer ${SB_KEY}`,
-        },
-        body: JSON.stringify({ delivered_at: new Date().toISOString() }),
-      });
     }
 
     // Parse JSON fields

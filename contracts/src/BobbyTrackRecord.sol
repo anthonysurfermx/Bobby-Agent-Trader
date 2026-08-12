@@ -73,6 +73,10 @@ contract BobbyTrackRecord {
     /// @dev Maximum time a commitment can stay unresolved before expiry
     uint256 public constant MAX_COMMITMENT_TTL = 30 days;
 
+    /// @dev Max allowed gap (in bps) between reported PnL and PnL computed from
+    /// committed entry vs. exit price — room for fees/slippage, never a sign flip.
+    int256 public constant PNL_TOLERANCE_BPS = 100;
+
     Commitment[] public commitments;
     Trade[] public trades;
     uint256 public wins;
@@ -205,15 +209,25 @@ contract BobbyTrackRecord {
     //  PHASE 2: RESOLVE — After the outcome is known
     // ============================================================
 
+    /// @dev Audit Base r5 [HIGH]: intentionally NOT `whenNotPaused`. A pause that
+    /// outlasts MAX_COMMITMENT_TTL would force losing commitments into
+    /// expireCommitment (zero PnL, no loss counted) — laundering losses out of a
+    /// reputational record. Pause gates NEW commitments, never settlement of ones
+    /// already made; resolveTrade stays onlyBobby regardless.
     function resolveTrade(
         bytes32 _debateHash,
         int256 _pnlBps,
         Result _result,
         uint96 _exitPrice
-    ) external onlyBobby whenNotPaused {
+    ) external onlyBobby {
         uint256 stored = commitIndex[_debateHash];
         require(stored != 0, "No commitment found");
         require(_result != Result.PENDING, "Cannot resolve as pending");
+        /// @dev Audit Base r9 [H-01]: EXPIRED skipped the whole price derivation,
+        /// letting the recorder launder any losing trade as a zero-PnL EXPIRED
+        /// right after minResolveAt. The ONLY expiry path is the permissionless
+        /// expireCommitment() after MAX_COMMITMENT_TTL.
+        require(_result != Result.EXPIRED, "Use expireCommitment()");
         require(_exitPrice > 0, "Exit price required");
 
         uint256 cIdx = stored - 1;
@@ -232,9 +246,35 @@ contract BobbyTrackRecord {
             require(_pnlBps < 0, "LOSS must have negative PnL");
         } else if (_result == Result.BREAK_EVEN) {
             require(_pnlBps == 0, "BREAK_EVEN must have zero PnL");
-        } else if (_result == Result.EXPIRED) {
-            /// @dev Gemini v2: EXPIRED must have zero PnL
-            require(_pnlBps == 0, "EXPIRED must have zero PnL");
+        }
+
+        /// @dev Kimi/Codex audit (Base r4, HIGH): the outcome must be DERIVABLE from
+        /// the committed prices, not merely internally coherent. Direction is
+        /// inferred from the committed levels (target above entry — or, absent a
+        /// target, stop below entry — is a long). A WIN can no longer be declared
+        /// on an exit the math says lost, and reported PnL may deviate from raw
+        /// price PnL only within a small fee/slippage band that cannot flip sign.
+        {
+            bool isLong = c.targetPrice > 0
+                ? c.targetPrice > c.entryPrice
+                : c.stopPrice < c.entryPrice;
+            int256 entry = int256(uint256(c.entryPrice));
+            int256 exitP = int256(uint256(_exitPrice));
+            int256 computedPnlBps = isLong
+                ? ((exitP - entry) * 10000) / entry
+                : ((entry - exitP) * 10000) / entry;
+
+            if (computedPnlBps > 0) {
+                require(_result == Result.WIN, "Prices imply WIN");
+            } else if (computedPnlBps < 0) {
+                require(_result == Result.LOSS, "Prices imply LOSS");
+            } else {
+                require(_result == Result.BREAK_EVEN, "Prices imply BREAK_EVEN");
+            }
+
+            int256 deviation = _pnlBps - computedPnlBps;
+            if (deviation < 0) deviation = -deviation;
+            require(deviation <= PNL_TOLERANCE_BPS, "PnL not derivable from prices");
         }
 
         c.resolved = true;
@@ -323,19 +363,31 @@ contract BobbyTrackRecord {
         return commitments.length;
     }
 
+    /// @dev Kimi/Codex audit (Base r4, MEDIUM): win rate is computed over DECIDED
+    /// outcomes only (wins + losses). Expired and break-even commitments no longer
+    /// dilute the denominator — they are coverage, not performance.
     function getWinRate() external view returns (uint256) {
-        uint256 total = trades.length;
-        if (total == 0) return 0;
-        return (wins * 10000) / total;
+        uint256 decided = wins + losses;
+        if (decided == 0) return 0;
+        return (wins * 10000) / decided;
     }
 
+    /// @notice Sample size behind getWinRate — publish this next to the rate.
+    function getDecidedCount() external view returns (uint256) {
+        return wins + losses;
+    }
+
+    /// @dev Audit Base r5 [MED]: per-agent win rate over DECIDED outcomes only,
+    /// consistent with getWinRate(). `_total` keeps its ABI slot and meaning
+    /// (every recorded outcome incl. break-even and expired — coverage, not skill).
     function getAgentStats(Agent _agent) external view returns (
         uint256 _wins, uint256 _losses, uint256 _total, uint256 _winRate
     ) {
         _wins = agentWins[_agent];
         _losses = agentLosses[_agent];
         _total = agentTrades[_agent];
-        _winRate = _total > 0 ? (_wins * 10000) / _total : 0;
+        uint256 decided = _wins + _losses;
+        _winRate = decided > 0 ? (_wins * 10000) / decided : 0;
     }
 
     function getRecentTrades(uint256 _count) external view returns (Trade[] memory) {

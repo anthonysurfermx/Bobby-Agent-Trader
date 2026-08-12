@@ -296,6 +296,14 @@ const router = createBrowserRouter(
           ),
         },
         {
+          path: 'protocol/docs',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyDocsPage />
+            </Suspense>
+          ),
+        },
+        {
           path: 'protocol/heartbeat',
           element: (
             <Suspense fallback={<PageLoader />}>
@@ -340,6 +348,15 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbySandboxPage />
+            </Suspense>
+          ),
+        },
+        // Voice experience is a focused, full-screen Bobby surface.
+        {
+          path: 'agentic-world/bobby',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAgentTraderPage />
             </Suspense>
           ),
         },
@@ -584,15 +601,6 @@ const router = createBrowserRouter(
               element: (
                 <Suspense fallback={<PageLoader />}>
                   <ConsensusPage />
-                </Suspense>
-              ),
-            },
-            // Bobby Terminal route stays in MainLayout (it's full-screen with z-[100])
-            {
-              path: 'agentic-world/bobby',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <BobbyAgentTraderPage />
                 </Suspense>
               ),
             },

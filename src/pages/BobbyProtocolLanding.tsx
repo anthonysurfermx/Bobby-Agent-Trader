@@ -1,2533 +1,849 @@
-// ============================================================
-// BobbyProtocolLanding — /protocol
-// Kinetic Terminal landing page for Bobby Protocol (Build X S2).
-// Every number, card, and status pulses from a real endpoint.
-// Design: Stitch export "Adversarial Architect" / Kinetic Terminal.
-// ============================================================
-
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { Twitter, Github } from 'lucide-react';
 import {
-  PolarAngleAxis,
-  PolarGrid,
-  PolarRadiusAxis,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-} from 'recharts';
-import { useProtocolTxHistory } from '@/hooks/useProtocolTxHistory';
-
-// ---- Types ----
+  ArrowRight,
+  Bot,
+  Check,
+  ChevronDown,
+  CircleDollarSign,
+  Database,
+  Github,
+  Menu,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Twitter,
+  X,
+} from 'lucide-react';
 
 type Price = { symbol: string; price: number; change24h: number };
 
 interface ProtocolStats {
-  ok: boolean;
-  fetchedAt: string;
-  chain: { id: number; blockNumber: number; rpc: string };
-  treasury: { address: string; balanceWei: string; balanceOkb: string };
-  contracts: {
-    agentEconomy: {
-      address: string;
-      stats: {
-        totalDebates: string;
-        totalMcpCalls: string;
-        totalSignalAccesses: string;
-        totalVolumeWei: string;
-        totalVolumeOkb: string;
-        totalPayments: string;
-      };
-      lastActivityBlock: number | null;
-    };
-    convictionOracle: {
-      address: string;
-      stats: { symbolCount: string };
-    };
-    trackRecord: {
-      address: string;
-      stats: { totalTrades: string; totalCommitments: string; winRateBps: string };
-    };
-    adversarialBounties: {
-      address: string;
-      verified: boolean;
-      minBounty: { minBountyWei: string; minBountyOkb: string };
-      nextBountyId: number;
-      totalPosted: number;
-      lastActivityBlock: number | null;
-    };
-    hardnessRegistry: {
-      address: string;
-      agentRegistered: boolean;
-      lastActivityBlock: number | null;
-    };
-    agentRegistry: {
-      address: string;
-      type: string;
-      agents: number;
-    };
+  fetchedAt?: string;
+  chain?: { id?: number; name?: string; nativeSymbol?: string; explorerUrl?: string; blockNumber?: number };
+  treasury?: { balanceNative?: string };
+  contracts?: {
+    agentEconomy?: { address?: string; stats?: { totalDebates?: string; totalMcpCalls?: string; totalVolumeNative?: string } };
+    convictionOracle?: { address?: string; stats?: { symbolCount?: string } };
+    trackRecord?: { address?: string; stats?: { totalTrades?: string; totalCommitments?: string; winRateBps?: string } };
+    adversarialBounties?: { address?: string; totalPosted?: number; verified?: boolean; minBounty?: { minBountyNative?: string } };
+    hardnessRegistry?: { address?: string; agentRegistered?: boolean };
+    agentRegistry?: { address?: string; type?: string; agents?: number };
   };
-  protocolTotals: {
-    mcpSettlementOkb: string;
-    mcpPayments: number;
-    bountyEscrowOkb: string;
-    bountyCount: number;
-    protocolNotionalOkb: string;
-    totalInteractions: number;
+  protocolTotals?: { totalInteractions?: number; mcpPayments?: number };
+  onchainRecord?: { commitmentsCreated?: number; decisionsResolved?: number; pending?: number; winRate?: number | null };
+  debateActivity?: {
+    commitmentsCreated?: number;
+    decisionsResolved?: number;
+    expired?: number;
+    pending?: number;
+    wins?: number;
+    losses?: number;
+    winRate?: number;
+    resolutionRate?: number;
   };
-  bounties: Array<{
-    bountyId: string;
-    threadHash: string;
-    poster: string;
-    rewardOkb: string;
-    winner: string;
-    createdAt: number;
-    claimWindowSecs: number;
-    effectiveExpiry: number;
-    dimension: string;
-    status: string;
-    challengeCount: number;
-  }>;
-  bountySummary?: Record<string, {
-    totalCount: number;
-    openCount: number;
-    avgRewardOkb: number | null;
-    maxRewardOkb: number | null;
-  }>;
-  market: {
-    prices: Price[];
-    regime: unknown;
-    xlayer: unknown;
-  };
+  market?: { prices?: Price[] };
 }
 
 interface McpMeta {
-  name: string;
-  version: string;
-  counts?: {
-    totalTools: number;
-    freeTools: number;
-    premiumTools: number;
+  pricing?: {
+    free?: string[];
+    premium?: { tools?: string[]; price?: string; settlementContract?: string };
   };
-  pricing: {
-    free: string[];
-    premium: {
-      tools: string[];
-      price: string;
-      priceWei: string;
-      contract: string;
-    };
-  };
-  settlement?: {
-    tool: string;
-    txHash: string;
-    payer: string;
-    valueOkb: string;
-    blockNumber: number;
-    explorerUrl: string | null;
-    createdAt: string | null;
-  } | null;
-}
-
-interface ReputationSummary {
-  ok: boolean;
-  trustScore?: {
-    score?: number;
-    philosophy?: string;
-  };
-}
-
-interface SentinelSummary {
-  ok: boolean;
-  totalMs: number;
-  summary?: {
-    calledFreeTools?: number;
-    receivedX402Challenge?: boolean;
-  };
-}
-
-// ---- Helpers ----
-
-const safeFixed = (n: unknown, digits = 2): string => {
-  if (n === null || n === undefined) return '—';
-  const v = typeof n === 'number' ? n : Number(n);
-  if (!Number.isFinite(v)) return '—';
-  return v.toFixed(digits);
-};
-
-const safeSignedFixed = (n: unknown, digits = 2): string => {
-  if (n === null || n === undefined) return '—';
-  const v = typeof n === 'number' ? n : Number(n);
-  if (!Number.isFinite(v)) return '—';
-  return `${v > 0 ? '+' : ''}${v.toFixed(digits)}`;
-};
-
-const truncate = (s: string, head = 6, tail = 4) =>
-  !s ? '—' : `${s.slice(0, head)}...${s.slice(-tail)}`;
-
-const formatCountdown = (targetEpoch: number) => {
-  const diff = targetEpoch - Math.floor(Date.now() / 1000);
-  if (diff <= 0) return 'EXPIRED';
-  const d = Math.floor(diff / 86400);
-  const h = Math.floor((diff % 86400) / 3600);
-  const m = Math.floor((diff % 3600) / 60);
-  return `${d}d ${h}h ${m}m`;
-};
-
-const DIMENSION_COLOR: Record<string, string> = {
-  DATA_INTEGRITY: 'text-[#6dfe9c]',
-  ADVERSARIAL_QUALITY: 'text-[#fcc025]',
-  DECISION_LOGIC: 'text-white',
-  RISK_MANAGEMENT: 'text-[#ff716a]',
-  CALIBRATION_ALIGNMENT: 'text-[#6dfe9c]',
-  NOVELTY: 'text-[#fcc025]',
-};
-
-// Radar chart data: judge dimensions. When we don't have a live verdict,
-// we use the 6 dimensions with neutral values (3/5). This is ONLY the
-// axis structure — real scores will fill in once /api/judge-mode works.
-const JUDGE_AXES = [
-  { dim: 'DATA_INTEGRITY', label: 'DATA', value: 0 },
-  { dim: 'ADVERSARIAL_QUALITY', label: 'ADVERSARIAL', value: 0 },
-  { dim: 'DECISION_LOGIC', label: 'LOGIC', value: 0 },
-  { dim: 'RISK_MANAGEMENT', label: 'RISK', value: 0 },
-  { dim: 'CALIBRATION_ALIGNMENT', label: 'CALIBRATION', value: 0 },
-  { dim: 'NOVELTY', label: 'NOVELTY', value: 0 },
-];
-
-// ---- Hooks ----
-
-function useProtocolStats() {
-  const [data, setData] = useState<ProtocolStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch('/api/bobby-protocol-stats', { cache: 'no-store' });
-      if (!res.ok) throw new Error(`stats ${res.status}`);
-      const json = (await res.json()) as ProtocolStats;
-      setData(json);
-      setError(null);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStats();
-    const t = setInterval(fetchStats, 30_000);
-    return () => clearInterval(t);
-  }, [fetchStats]);
-
-  return { data, error, loading, refresh: fetchStats };
 }
 
 function useMcpMeta() {
-  const [data, setData] = useState<McpMeta | null>(null);
+  const [meta, setMeta] = useState<McpMeta | null>(null);
   useEffect(() => {
-    fetch('/api/mcp-http', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j) => setData(j as McpMeta))
-      .catch(() => setData(null));
+    fetch('/api/mcp-bobby', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload: McpMeta) => setMeta(payload))
+      .catch(() => setMeta(null));
   }, []);
-  return data;
-}
-
-function useReputation() {
-  const [data, setData] = useState<ReputationSummary | null>(null);
-  useEffect(() => {
-    fetch('/api/reputation', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j) => setData(j as ReputationSummary))
-      .catch(() => setData(null));
-  }, []);
-  return data;
-}
-
-function useSentinelDemo() {
-  const [data, setData] = useState<SentinelSummary | null>(null);
-  useEffect(() => {
-    fetch('/api/sentinel-demo', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j) => setData(j as SentinelSummary))
-      .catch(() => setData(null));
-  }, []);
-  return data;
+  return meta;
 }
 
 interface ActivityItem {
-  agent: string;
-  tool: string;
-  paid: boolean;
-  amountOkb: string | null;
-  txHash: string | null;
-  agoSeconds: number | null;
-  timestamp: string | null;
+  agent?: string;
+  tool?: string;
+  paid?: boolean;
+  timestamp?: string | null;
   status?: string | null;
   source?: 'commerce' | 'onchain' | 'bounty' | string;
+  txHash?: string | null;
+}
+
+const formatNumber = (value: unknown, fallback = '—') => {
+  if (value === null || value === undefined || value === '') return fallback;
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toLocaleString('en-US') : fallback;
+};
+
+const price = (stats: ProtocolStats | null, symbol: string) =>
+  stats?.market?.prices?.find((item) => item.symbol === symbol);
+
+function useProtocolStats() {
+  const [stats, setStats] = useState<ProtocolStats | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const response = await fetch('/api/bobby-protocol-stats', { cache: 'no-store' });
+      if (response.ok) setStats((await response.json()) as ProtocolStats);
+    } catch {
+      // The page remains useful as a product overview when live RPC data is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const interval = window.setInterval(refresh, 30_000);
+    return () => window.clearInterval(interval);
+  }, [refresh]);
+
+  return stats;
 }
 
 function useActivity() {
-  const [feed, setFeed] = useState<ActivityItem[]>([]);
-  useEffect(() => {
-    fetch('/api/activity?limit=100', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((j) => setFeed((j as { feed?: ActivityItem[] }).feed ?? []))
-      .catch(() => setFeed([]));
-    const t = setInterval(() => {
-      fetch('/api/activity?limit=100', { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((j) => setFeed((j as { feed?: ActivityItem[] }).feed ?? []))
-        .catch(() => {});
-    }, 30_000);
-    return () => clearInterval(t);
-  }, []);
-  return feed;
-}
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-interface LiveTx {
-  hash: string;
-  contractName: string;
-  method: string;
-  valueOkb: string;
-  timestamp: number | null;
-}
-
-function useLiveTxs() {
-  const [txs, setTxs] = useState<LiveTx[]>([]);
-  useEffect(() => {
-    const fetchTxs = () => {
-      fetch('/api/protocol-heartbeat', { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((j: { recentTxs?: LiveTx[] }) => setTxs(j.recentTxs ?? []))
-        .catch(() => {});
-    };
-    fetchTxs();
-    const t = setInterval(fetchTxs, 30_000);
-    return () => clearInterval(t);
-  }, []);
-  return txs;
-}
-
-// ---- Components ----
-
-function TopTicker({ stats }: { stats: ProtocolStats | null }) {
-  const okb = stats?.market.prices.find((p) => p.symbol === 'OKB');
-  const btc = stats?.market.prices.find((p) => p.symbol === 'BTC');
-  const eth = stats?.market.prices.find((p) => p.symbol === 'ETH');
-
-  const items = [
-    okb ? `OKB $${safeFixed(okb.price, 2)} (${safeSignedFixed(okb.change24h, 2)}%)` : 'OKB —',
-    btc ? `BTC $${safeFixed(btc.price, 0)}` : 'BTC —',
-    eth ? `ETH $${safeFixed(eth.price, 0)}` : 'ETH —',
-    stats ? `XLAYER BLOCK #${(stats.chain.blockNumber ?? 0).toLocaleString()}` : 'XLAYER —',
-    stats ? `TREASURY ${safeFixed(stats.treasury.balanceOkb, 4)} OKB` : 'TREASURY —',
-    stats ? `MCP CALLS SETTLED: ${stats.contracts.agentEconomy.stats.totalMcpCalls ?? '—'}` : 'MCP CALLS —',
-    stats ? `DEBATES: ${stats.contracts.agentEconomy.stats.totalDebates ?? '—'}` : 'DEBATES —',
-    stats ? `BOUNTIES POSTED: ${stats.contracts.adversarialBounties.totalPosted ?? 0}` : 'BOUNTIES —',
-  ];
-  const loop = [...items, ...items];
-  return (
-    <header className="fixed top-0 left-0 right-0 z-[60] h-8 bg-black border-b border-[#6dfe9c]/20 overflow-hidden whitespace-nowrap flex items-center">
-      <div className="flex gap-8 px-4 animate-[marquee_40s_linear_infinite]">
-        {loop.map((txt, i) => (
-          <span
-            key={i}
-            className="font-mono text-[10px] uppercase tracking-widest text-[#6dfe9c]"
-          >
-            {txt}
-          </span>
-        ))}
-      </div>
-    </header>
-  );
-}
-
-function Nav() {
-  const sections = ['DEBATE', 'LOOP', 'JUDGE', 'BOUNTIES', 'MCP', 'INTEROP', 'CONTRACTS'];
-  return (
-    <nav className="sticky top-8 w-full flex justify-between items-center px-6 py-4 bg-[#0e0e0e]/80 backdrop-blur-xl z-50 border-b border-[#494847]/15">
-      <div className="text-xl font-black text-[#6dfe9c] tracking-tighter uppercase">
-        BOBBY_PROTOCOL
-      </div>
-      <div className="hidden md:flex gap-8">
-        {sections.map((s) => (
-          <a
-            key={s}
-            href={`#${s.toLowerCase()}`}
-            className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] transition-colors font-bold tracking-tighter uppercase text-sm"
-          >
-            {s}
-          </a>
-        ))}
-        <a
-          href="/protocol/sandbox"
-          className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] transition-colors font-bold tracking-tighter uppercase text-sm"
-        >
-          SANDBOX
-        </a>
-        <a
-          href="/protocol/console"
-          className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] transition-colors font-bold tracking-tighter uppercase text-sm"
-        >
-          CONSOLE
-        </a>
-        <a
-          href="/protocol/harness"
-          className="text-[#fcc025]/60 hover:text-[#fcc025] transition-colors font-bold tracking-tighter uppercase text-sm"
-        >
-          REGISTRY
-        </a>
-      </div>
-      <div className="flex gap-3 items-center">
-        <a
-          href="https://twitter.com/bobbyprotocol"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Bobby Protocol on Twitter"
-          className="text-[#adaaaa] hover:text-[#6dfe9c] transition-colors p-2"
-        >
-          <Twitter className="w-4 h-4" />
-        </a>
-        <a
-          href="https://github.com/anthonysurfermx/Bobby-Agent-Trader"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Bobby Protocol on GitHub"
-          className="text-[#adaaaa] hover:text-[#6dfe9c] transition-colors p-2"
-        >
-          <Github className="w-4 h-4" />
-        </a>
-        <a
-          href="/protocol/heartbeat"
-          className="flex items-center gap-2 bg-[#6dfe9c]/5 text-[#6dfe9c] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#6dfe9c]/20 hover:bg-[#6dfe9c]/15 transition-all"
-        >
-          <span className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse" />
-          _HEARTBEAT
-        </a>
-        <a
-          href="/agentic-world/bobby"
-          className="bg-[#6dfe9c]/10 text-[#6dfe9c] px-4 py-2 font-bold tracking-tighter uppercase text-sm border border-[#6dfe9c]/30 hover:bg-[#6dfe9c]/20 transition-all"
-        >
-          _OPEN_TERMINAL
-        </a>
-      </div>
-    </nav>
-  );
-}
-
-function HeroLiveDebate({ stats }: { stats: ProtocolStats | null }) {
-  const okb = stats?.market.prices.find((p) => p.symbol === 'OKB');
-  const btc = stats?.market.prices.find((p) => p.symbol === 'BTC');
-  const eth = stats?.market.prices.find((p) => p.symbol === 'ETH');
-  const regime = typeof stats?.market.regime === 'string' ? (stats.market.regime as string) : '…';
-
-  return (
-    <section id="debate" className="relative min-h-[85vh] flex flex-col items-center justify-center pt-24 pb-16 px-6 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-[#6dfe9c]/5 to-transparent pointer-events-none" />
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-wrap justify-center gap-3 mb-8"
-      >
-        <span className="px-3 py-1 bg-[#262626] border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[10px] tracking-widest">
-          [ON-CHAIN VERIFICATION LAYER]
-        </span>
-        <span className="px-3 py-1 bg-[#262626] border border-[#fcc025]/20 text-[#fcc025] font-mono text-[10px] tracking-widest">
-          [LIVE ON X LAYER 196]
-        </span>
-        <span className="px-3 py-1 bg-[#262626] border border-[#ff716a]/20 text-[#ff716a] font-mono text-[10px] tracking-widest">
-          [1,138 DECISIONS SIGNED]
-        </span>
-      </motion.div>
-
-      <motion.h1
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[-0.04em] text-center max-w-5xl leading-none uppercase mb-6"
-      >
-        Agents promise. <span className="text-[#6dfe9c] italic">Bobby proves.</span>
-      </motion.h1>
-
-      <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.3 }}
-        className="w-full max-w-4xl mt-6 bg-black border border-[#494847]/30 shadow-[0_0_40px_rgba(109,254,156,0.04)] relative overflow-hidden"
-      >
-        <div className="flex items-center justify-between bg-[#131313] px-4 py-2 border-b border-[#494847]/20">
-          <div className="flex gap-2">
-            <div className="w-2 h-2 bg-[#ff716a]" />
-            <div className="w-2 h-2 bg-[#fcc025]" />
-            <div className="w-2 h-2 bg-[#6dfe9c]" />
-          </div>
-          <div className="font-mono text-[10px] text-[#adaaaa] tracking-widest uppercase">
-            LIVE_MARKET_FEED // {regime.slice(0, 50) || 'AWAITING_REGIME'}
-          </div>
-        </div>
-
-        <div className="p-6 font-mono text-xs space-y-3">
-          <div className="flex gap-3 items-start">
-            <span className="text-[#6dfe9c] shrink-0 w-20">[OKB]</span>
-            <span className="text-[#6dfe9c]/90 flex-1">
-              {okb
-                ? `$${safeFixed(okb.price, 2)}  ${safeSignedFixed(okb.change24h, 2)}%`
-                : 'awaiting intel...'}
-            </span>
-          </div>
-          <div className="flex gap-3 items-start">
-            <span className="text-[#6dfe9c] shrink-0 w-20">[BTC]</span>
-            <span className="text-[#6dfe9c]/90 flex-1">
-              {btc
-                ? `$${safeFixed(btc.price, 0)}  ${safeSignedFixed(btc.change24h, 2)}%`
-                : 'awaiting intel...'}
-            </span>
-          </div>
-          <div className="flex gap-3 items-start">
-            <span className="text-[#6dfe9c] shrink-0 w-20">[ETH]</span>
-            <span className="text-[#6dfe9c]/90 flex-1">
-              {eth
-                ? `$${safeFixed(eth.price, 0)}  ${safeSignedFixed(eth.change24h, 2)}%`
-                : 'awaiting intel...'}
-            </span>
-          </div>
-          <div className="flex gap-3 items-start">
-            <span className="text-[#fcc025] shrink-0 w-20">[XLAYER]</span>
-            <span className="text-[#fcc025]/90 flex-1">
-              {stats
-                ? `BLOCK #${stats.chain.blockNumber.toLocaleString()}  ·  TREASURY ${safeFixed(stats.treasury.balanceOkb, 4)} OKB`
-                : 'awaiting rpc...'}
-            </span>
-          </div>
-          <div className="flex gap-3 items-start">
-            <span className="text-white/70 shrink-0 w-20">[ECONOMY]</span>
-            <span className="text-white/70 flex-1">
-              {stats
-                ? `${stats.contracts.agentEconomy.stats.totalDebates} debates  ·  ${stats.contracts.agentEconomy.stats.totalMcpCalls} mcp calls  ·  ${safeFixed(stats.contracts.agentEconomy.stats.totalVolumeOkb, 4)} OKB settled`
-                : 'awaiting economy...'}
-            </span>
-          </div>
-
-          <div className="mt-6 border-t border-[#494847]/15 pt-3 flex items-center justify-between font-mono text-[10px] tracking-widest uppercase">
-            <span className="font-bold text-[#6dfe9c]">
-              {stats ? 'FEED_LIVE' : 'CONNECTING'}
-            </span>
-            <span className="text-[#adaaaa]">
-              {stats ? new Date(stats.fetchedAt).toLocaleTimeString() : '—'}
-            </span>
-          </div>
-        </div>
-      </motion.div>
-
-      <motion.a
-        href="/agentic-world/bobby/history"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.45 }}
-        className="group relative w-full max-w-4xl mt-10 block bg-gradient-to-br from-[#6dfe9c]/10 via-[#131313] to-[#fcc025]/10 border border-[#6dfe9c]/30 hover:border-[#6dfe9c]/60 p-6 md:p-8 transition-all overflow-hidden"
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(109,254,156,0.08),_transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex-1">
-            <div className="text-[#6dfe9c] font-mono text-[10px] tracking-widest mb-2">
-              TRACK RECORD · VERIFIED ON-CHAIN
-            </div>
-            <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-2">
-              Every decision signed before the outcome. No screenshots. No trust required.
-            </div>
-            <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-              Bobby runs a 3-agent debate, an Arbiter verifies the trade matches the thesis, and the outcome is attested on X Layer. Any agent or human can read the chain and confirm what happened — no screenshots required.
-            </p>
-          </div>
-          <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter whitespace-nowrap">
-            VIEW TRACK RECORD →
-          </div>
-        </div>
-      </motion.a>
-
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="w-full max-w-4xl mt-10"
-      >
-        <div className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest text-center mb-4">
-          SELECT_INTERFACE //
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <a
-            href="/agentic-world/bobby"
-            className="group relative bg-[#131313] border border-[#6dfe9c]/20 hover:border-[#6dfe9c]/60 p-6 md:p-8 transition-all overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-[#6dfe9c]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative">
-              <div className="text-[#6dfe9c] font-mono text-[10px] tracking-widest mb-3">
-                HUMAN_INTERFACE
-              </div>
-              <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-3">
-                I'm Human
-              </div>
-              <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
-                Open the War Room. Watch 3 agents debate each trade live.
-                Approve or veto before a single dollar moves.
-              </p>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {['WAR ROOM', 'PERFORMANCE', 'INTEL', 'CONSOLE'].map((t) => (
-                  <span key={t} className="px-2 py-0.5 bg-[#6dfe9c]/10 border border-[#6dfe9c]/20 text-[#6dfe9c] font-mono text-[8px] tracking-wider">
-                    {t}
-                  </span>
-                ))}
-              </div>
-              <div className="text-[#6dfe9c] font-bold text-sm uppercase tracking-tighter">
-                ENTER WAR ROOM →
-              </div>
-            </div>
-          </a>
-
-          <a
-            href="#interop"
-            className="group relative bg-[#131313] border border-[#fcc025]/20 hover:border-[#fcc025]/60 p-6 md:p-8 transition-all overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-[#fcc025]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="relative">
-              <div className="text-[#fcc025] font-mono text-[10px] tracking-widest mb-3">
-                AGENT_INTERFACE
-              </div>
-              <div className="text-2xl md:text-3xl font-black tracking-tighter uppercase mb-3">
-                I'm an Agent
-              </div>
-              <p className="text-[#adaaaa] text-xs leading-5 mb-4 font-mono">
-                Connect via MCP. Request verification for your intents, access
-                the signed track record, bill in USDT via x402.
-              </p>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {['MCP', 'VERIFY', 'x402', 'TRACK-RECORD'].map((t) => (
-                  <span key={t} className="px-2 py-0.5 bg-[#fcc025]/10 border border-[#fcc025]/20 text-[#fcc025] font-mono text-[8px] tracking-wider">
-                    {t}
-                  </span>
-                ))}
-              </div>
-              <div className="text-[#fcc025] font-bold text-sm uppercase tracking-tighter">
-                START INTEGRATING →
-              </div>
-            </div>
-          </a>
-        </div>
-      </motion.div>
-    </section>
-  );
-}
-
-function EcosystemBand() {
-  return (
-    <section className="py-16 px-6 border-y border-[#494847]/15 bg-[#0e0e0e]">
-      <div className="max-w-6xl mx-auto grid gap-10 md:grid-cols-2">
-        {/* ── Trusted by ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="group"
-        >
-          <div className="font-mono text-[10px] text-[#6dfe9c] uppercase tracking-[0.3em] mb-3">
-            TRUSTED BY
-          </div>
-          <a
-            href="https://www.espaciocripto.io"
-            target="_blank"
-            rel="noreferrer"
-            className="block bg-[#131313] border border-[#6dfe9c]/20 hover:border-[#6dfe9c]/50 p-6 transition-all"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="text-xl md:text-2xl font-black uppercase tracking-tighter mb-2">
-                  Espacio Cripto
-                </div>
-                <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-                  Espacio Cripto verifies their agents' intents against Bobby's signed track record before moving capital.
-                </p>
-              </div>
-              <span className="text-[#6dfe9c] font-mono text-sm shrink-0">↗</span>
-            </div>
-          </a>
-        </motion.div>
-
-        {/* ── Powered by ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.08 }}
-          className="group"
-        >
-          <div className="font-mono text-[10px] text-[#fcc025] uppercase tracking-[0.3em] mb-3">
-            POWERED BY
-          </div>
-          <a
-            href="https://www.b1nary.app"
-            target="_blank"
-            rel="noreferrer"
-            className="block bg-[#131313] border border-[#fcc025]/20 hover:border-[#fcc025]/50 p-6 transition-all"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="text-xl md:text-2xl font-black uppercase tracking-tighter mb-2">
-                  b1nary
-                </div>
-                <p className="text-[#adaaaa] text-xs leading-5 font-mono">
-                  Options protocol whose strategies Bobby verifies as a real-world use case. Live on Base (8453), X Layer deployment pending.
-                </p>
-              </div>
-              <span className="text-[#fcc025] font-mono text-sm shrink-0">↗</span>
-            </div>
-          </a>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function ClosedLoop() {
-  const steps = [
-    { title: 'SIGNAL', glyph: '>', desc: 'Raw signal enters the hardness chamber', color: '#6dfe9c' },
-    { title: 'PRESSURE', glyph: '><', desc: 'Thesis compressed under adversarial load', color: '#fcc025' },
-    { title: 'FRACTURE TEST', glyph: ':::', desc: '3 agents try to break the thesis', color: '#ff716a' },
-    { title: 'GRADE', glyph: '[!]', desc: '6-dimension hardness score', color: '#6dfe9c' },
-    { title: 'GATE', glyph: '$?', desc: 'Pass → execute. Low conviction → park in yield. Fail → blocked.', color: '#fcc025' },
-    { title: 'PROOF', glyph: '=X=', desc: 'On-chain record: trade, park, or block — all committed', color: '#6dfe9c' },
-  ];
-
-  return (
-    <section id="loop" className="py-24 px-6 max-w-7xl mx-auto">
-      <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-10 border-l-4 border-[#fcc025] pl-6">
-        The Verification Loop
-      </h2>
-
-      <div className="grid gap-4 lg:grid-cols-6">
-        {steps.map((step, index) => (
-          <motion.div
-            key={step.title}
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: index * 0.05 }}
-            className="relative bg-[#131313] border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all"
-          >
-            <div
-              className="mb-3 font-mono text-2xl font-bold"
-              style={{ color: step.color }}
-            >
-              {step.glyph}
-            </div>
-            <h3 className="font-mono text-[11px] uppercase tracking-widest mb-2" style={{ color: step.color }}>
-              {step.title}
-            </h3>
-            <p className="font-mono text-[10px] text-[#adaaaa]">{step.desc}</p>
-            {index < steps.length - 1 && (
-              <div className="hidden lg:block absolute -right-2 top-6 text-[#6dfe9c]/45 font-mono text-lg">
-                →
-              </div>
-            )}
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function JudgeMode({ stats }: { stats: ProtocolStats | null }) {
-  const oracle = stats?.contracts.convictionOracle.stats;
-  const tr = stats?.contracts.trackRecord.stats;
-  const [judgeScores, setJudgeScores] = useState<Record<string, number> | null>(null);
-
-  // Fetch latest debate quality scores from Supabase
-  useEffect(() => {
-    const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
-    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
-    fetch(`${SB}/rest/v1/forum_threads?debate_quality=not.is.null&order=created_at.desc&limit=5&select=debate_quality`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
-    })
-      .then(r => r.json())
-      .then((rows: Array<{ debate_quality: any }>) => {
-        if (!rows?.length) return;
-        // Average across recent debates
-        const dims: Record<string, number[]> = {};
-        for (const row of rows) {
-          const dq = row.debate_quality;
-          if (!dq) continue;
-          // Support 6-dim judge-mode format
-          if (dq.dimensions) {
-            for (const [k, v] of Object.entries(dq.dimensions)) {
-              (dims[k] ??= []).push(Number(v) || 0);
-            }
-          } else {
-            // Map old 5-dim format to 6-dim
-            if (dq.data_citation != null) (dims['data_integrity'] ??= []).push(Number(dq.data_citation));
-            if (dq.red_team_rigor != null) (dims['adversarial_quality'] ??= []).push(Number(dq.red_team_rigor));
-            if (dq.actionability != null) (dims['decision_logic'] ??= []).push(Number(dq.actionability));
-            if (dq.specificity != null) (dims['risk_management'] ??= []).push(Number(dq.specificity));
-            if (dq.overall != null) (dims['calibration_alignment'] ??= []).push(Number(dq.overall));
-            if (dq.novel_insight != null) (dims['novelty'] ??= []).push(Number(dq.novel_insight));
-          }
-        }
-        const avg: Record<string, number> = {};
-        for (const [k, vals] of Object.entries(dims)) {
-          avg[k] = vals.reduce((a, b) => a + b, 0) / vals.length;
-        }
-        if (Object.keys(avg).length > 0) setJudgeScores(avg);
-      })
-      .catch(() => {});
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/activity?limit=8', { cache: 'no-store' });
+      if (!response.ok) throw new Error(`Activity endpoint returned ${response.status}`);
+      const payload = (await response.json()) as { feed?: ActivityItem[] };
+      setActivity(payload.feed ?? []);
+      setError(false);
+    } catch {
+      setError(true);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const winRateBps = tr ? Number(tr.winRateBps) : 0;
-  const winRatePct = winRateBps / 100;
-
-  const radarData = JUDGE_AXES.map((axis) => ({
-    dim: axis.label,
-    value: judgeScores
-      ? Math.min(5, Math.max(0, judgeScores[axis.dim.toLowerCase()] || 0))
-      : 0,
-  }));
-
-  return (
-    <section
-      id="judge"
-      className="py-24 px-6 bg-[#131313] border-y border-[#494847]/15"
-    >
-      <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          className="aspect-square max-w-md mx-auto w-full"
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={radarData} outerRadius="75%">
-              <PolarGrid stroke="#6dfe9c" strokeOpacity={0.2} />
-              <PolarAngleAxis
-                dataKey="dim"
-                tick={{ fill: '#6dfe9c', fontSize: 10, fontFamily: 'JetBrains Mono' }}
-              />
-              <PolarRadiusAxis angle={90} domain={[0, 5]} tick={false} axisLine={false} />
-              <Radar
-                dataKey="value"
-                stroke="#6dfe9c"
-                fill="#6dfe9c"
-                fillOpacity={0.25}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </motion.div>
-
-        <div>
-          <motion.h2
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-6"
-          >
-            Judge Mode: On-Chain Audit
-          </motion.h2>
-          <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest mb-8">
-            Data / Adversarial / Logic / Risk / Calibration / Novelty
-          </p>
-
-          <div className="flex items-baseline gap-4 mb-8">
-            <span className="text-7xl font-black text-[#6dfe9c] font-mono tracking-tighter">
-              {tr ? safeFixed(winRatePct, 0) : '—'}
-            </span>
-            <span className="text-sm font-bold text-[#adaaaa] uppercase">
-              / 100 ON_CHAIN_WIN_RATE
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-8 font-mono text-[11px]">
-            <div className="bg-black p-4 border border-[#494847]/15">
-              <div className="text-[#adaaaa] uppercase mb-1">Commitments</div>
-              <div className="text-[#6dfe9c] text-2xl">
-                {tr?.totalCommitments ?? '—'}
-              </div>
-            </div>
-            <div className="bg-black p-4 border border-[#494847]/15">
-              <div className="text-[#adaaaa] uppercase mb-1">Revealed_Trades</div>
-              <div className="text-[#6dfe9c] text-2xl">
-                {tr?.totalTrades ?? '—'}
-              </div>
-            </div>
-            <div className="bg-black p-4 border border-[#494847]/15">
-              <div className="text-[#adaaaa] uppercase mb-1">Oracle_Symbols</div>
-              <div className="text-[#6dfe9c] text-2xl">
-                {oracle?.symbolCount ?? '—'}
-              </div>
-            </div>
-            <div className="bg-black p-4 border border-[#494847]/15">
-              <div className="text-[#adaaaa] uppercase mb-1">Oracle_Address</div>
-              <div className="text-[#6dfe9c] text-xs break-all">
-                {stats
-                  ? truncate(stats.contracts.convictionOracle.address, 10, 6)
-                  : '—'}
-              </div>
-            </div>
-          </div>
-
-          <a
-            className="inline-block border border-[#6dfe9c]/30 text-[#6dfe9c] px-4 py-2 text-xs font-bold uppercase tracking-tighter hover:bg-[#6dfe9c]/10"
-            href={`https://www.oklink.com/xlayer/address/${stats?.contracts.convictionOracle.address}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            _VIEW_ORACLE_ON_OKLINK
-          </a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function HarnessArchitecture() {
-  const [activeNode, setActiveNode] = useState<string | null>(null);
-  const [flowStep, setFlowStep] = useState(0);
-
-  // Auto-cycle through flow steps
   useEffect(() => {
-    const timer = setInterval(() => {
-      setFlowStep(prev => (prev + 1) % 5);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, []);
+    refresh();
+    const interval = window.setInterval(refresh, 30_000);
+    return () => window.clearInterval(interval);
+  }, [refresh]);
 
-  const nodes = [
-    {
-      id: 'tools',
-      label: 'TOOLS',
-      sub: '+ MCP / x402',
-      icon: '[ ]',
-      position: 'top',
-      description: '22 MCP tools over Streamable HTTP. Any agent calls Bobby via JSON-RPC. Free decision tools, analytics, bounty calldata builders, and premium tools gated by x402 on-chain payment.',
-      details: ['bobby_analyze', 'bobby_debate', 'bobby_judge', 'bobby_wheel_evaluate', 'bobby_wheel_positions', '+17 more'],
-      color: '#6dfe9c',
-    },
-    {
-      id: 'session',
-      label: 'SESSION',
-      sub: 'On-chain State',
-      icon: '>>',
-      position: 'left',
-      description: 'Persistent on-chain state. Every prediction, signal, and payment is immutable. The memory of the protocol.',
-      details: ['TrackRecord', 'ConvictionOracle', 'AgentStats', 'Commerce Log'],
-      color: '#6dfe9c',
-    },
-    {
-      id: 'harness',
-      label: 'REGISTRY',
-      sub: 'HardnessRegistry',
-      icon: '***',
-      position: 'center',
-      description: 'The coordinator. Registers agents, records predictions, publishes signals, attests decisions. Does not trade — verifies.',
-      details: ['0xD89c...1040', 'X Layer (196)', '5 modules', '2-of-3 resolvers'],
-      color: '#fcc025',
-    },
-    {
-      id: 'arena',
-      label: 'ARENA',
-      sub: 'Debate Chamber',
-      icon: '>_',
-      position: 'right',
-      description: 'Adversarial deliberation. Three agents attack the thesis from different angles. Nothing leaves the arena without passing the debate + the Arbiter check.',
-      details: ['Alpha Hunter', 'Red Team', 'CIO', 'Arbiter'],
-      color: '#6dfe9c',
-    },
-    {
-      id: 'orchestration',
-      label: 'ORCHESTRATION',
-      sub: 'Cycle Engine',
-      icon: '<>',
-      position: 'bottom',
-      description: 'The autonomous loop. Every 8 hours: signal → debate → verify → commit → execute → prove. The heartbeat of on-chain verification.',
-      details: ['Signal Ingest', 'Debate Cycle', 'Risk Gate', 'On-chain Prove'],
-      color: '#6dfe9c',
-    },
-  ];
+  return { activity, isLoading, error, refresh };
+}
 
-  const flowLabels = [
-    'Signal enters the protocol',
-    'Thesis enters the arena for adversarial debate',
-    'Verified conviction sealed on-chain',
-    'Tools expose the verification to external agents',
-    'Orchestration loops back for next cycle',
-  ];
-
-  // Flow connections: which nodes are highlighted per step
-  const flowConnections: Record<number, string[]> = {
-    0: ['orchestration', 'harness'],
-    1: ['harness', 'sandbox'],
-    2: ['sandbox', 'session'],
-    3: ['session', 'tools'],
-    4: ['tools', 'orchestration'],
-  };
-
-  const activeConnections = flowConnections[flowStep] || [];
-
+function BrandMark() {
   return (
-    <section id="architecture" className="py-24 px-6 max-w-7xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-      >
-        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-2 text-center">
-          Verification Architecture
-        </h2>
-        <p className="text-center text-[#adaaaa] font-mono text-xs uppercase tracking-widest mb-4">
-          Inspired by Claude Code's architecture. Built for verified agent execution.
-        </p>
-
-        {/* Flow status bar */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#131313] border border-[#494847]/30">
-            <span className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse" />
-            <span className="font-mono text-[11px] text-[#6dfe9c]">
-              {flowLabels[flowStep]}
-            </span>
-          </div>
-          <div className="flex justify-center gap-1 mt-3">
-            {flowLabels.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setFlowStep(i)}
-                className={`w-8 h-1 transition-all ${i === flowStep ? 'bg-[#6dfe9c]' : 'bg-[#494847]/30'}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Architecture diagram */}
-        <div className="relative max-w-3xl mx-auto">
-          {/* Connection lines (CSS) */}
-          <div className="hidden md:block absolute inset-0 pointer-events-none">
-            {/* Top to center */}
-            <div className={`absolute left-1/2 top-0 w-px h-[calc(50%-80px)] transition-all duration-700 ${
-              activeConnections.includes('tools') && activeConnections.includes('harness')
-                ? 'bg-[#6dfe9c] shadow-[0_0_8px_#6dfe9c]'
-                : activeConnections.includes('tools') || activeConnections.includes('harness')
-                ? 'bg-[#494847]/60'
-                : 'bg-[#494847]/20'
-            }`} style={{ transform: 'translateX(-50%)', top: '160px', height: '80px' }} />
-            {/* Center to bottom */}
-            <div className={`absolute left-1/2 w-px transition-all duration-700 ${
-              activeConnections.includes('orchestration') && activeConnections.includes('harness')
-                ? 'bg-[#6dfe9c] shadow-[0_0_8px_#6dfe9c]'
-                : activeConnections.includes('orchestration') || activeConnections.includes('harness')
-                ? 'bg-[#494847]/60'
-                : 'bg-[#494847]/20'
-            }`} style={{ transform: 'translateX(-50%)', bottom: '160px', height: '80px' }} />
-            {/* Left to center */}
-            <div className={`absolute top-1/2 h-px transition-all duration-700 ${
-              activeConnections.includes('session') && activeConnections.includes('harness')
-                ? 'bg-[#6dfe9c] shadow-[0_0_8px_#6dfe9c]'
-                : activeConnections.includes('session')
-                ? 'bg-[#494847]/60'
-                : 'bg-[#494847]/20'
-            }`} style={{ transform: 'translateY(-50%)', left: 'calc(16.67% + 80px)', width: 'calc(33.33% - 80px)' }} />
-            {/* Center to right */}
-            <div className={`absolute top-1/2 h-px transition-all duration-700 ${
-              activeConnections.includes('sandbox') && activeConnections.includes('harness')
-                ? 'bg-[#6dfe9c] shadow-[0_0_8px_#6dfe9c]'
-                : activeConnections.includes('sandbox')
-                ? 'bg-[#494847]/60'
-                : 'bg-[#494847]/20'
-            }`} style={{ transform: 'translateY(-50%)', right: 'calc(16.67% + 80px)', width: 'calc(33.33% - 80px)' }} />
-          </div>
-
-          {/* Grid layout matching Claude's diagram */}
-          <div className="grid grid-cols-3 gap-4 md:gap-6" style={{ gridTemplateRows: 'auto auto auto' }}>
-            {/* Row 1: Tools (center top) */}
-            <div className="col-start-2">
-              <NodeCard
-                node={nodes[0]}
-                isActive={activeConnections.includes('tools')}
-                isHovered={activeNode === 'tools'}
-                onHover={setActiveNode}
-              />
-            </div>
-
-            {/* Row 2: Session | Harness | Sandbox */}
-            <div>
-              <NodeCard
-                node={nodes[1]}
-                isActive={activeConnections.includes('session')}
-                isHovered={activeNode === 'session'}
-                onHover={setActiveNode}
-              />
-            </div>
-            <div>
-              <NodeCard
-                node={nodes[2]}
-                isActive={activeConnections.includes('harness')}
-                isHovered={activeNode === 'harness'}
-                onHover={setActiveNode}
-                isCenter
-              />
-            </div>
-            <div>
-              <NodeCard
-                node={nodes[3]}
-                isActive={activeConnections.includes('sandbox')}
-                isHovered={activeNode === 'sandbox'}
-                onHover={setActiveNode}
-              />
-            </div>
-
-            {/* Row 3: Orchestration (center bottom) */}
-            <div className="col-start-2">
-              <NodeCard
-                node={nodes[4]}
-                isActive={activeConnections.includes('orchestration')}
-                isHovered={activeNode === 'orchestration'}
-                onHover={setActiveNode}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Detail panel */}
-        <motion.div
-          key={activeNode || 'default'}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-8 max-w-2xl mx-auto"
-        >
-          {activeNode ? (
-            <div className="bg-[#131313] border border-[#494847]/30 p-5">
-              <div className="font-mono text-[10px] text-[#6dfe9c] uppercase tracking-widest mb-2">
-                {nodes.find(n => n.id === activeNode)?.label}
-              </div>
-              <p className="text-sm text-[#adaaaa] mb-3">
-                {nodes.find(n => n.id === activeNode)?.description}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {nodes.find(n => n.id === activeNode)?.details.map(d => (
-                  <span key={d} className="font-mono text-[10px] px-2 py-1 bg-[#6dfe9c]/10 text-[#6dfe9c] border border-[#6dfe9c]/20">
-                    {d}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center font-mono text-[11px] text-[#adaaaa]/40">
-              hover a node to see details
-            </div>
-          )}
-        </motion.div>
-      </motion.div>
-    </section>
+    <a href="/protocol" className="flex items-center gap-3 text-white" aria-label="Bobby Protocol home">
+      <span className="relative grid h-10 w-10 place-items-center rounded-[14px] border border-[#8fb6ff]/45 bg-[radial-gradient(circle_at_30%_20%,#8eb6ff_0%,#2670ff_28%,#0052ff_62%,#0035b8_100%)] text-white shadow-[0_0_30px_rgba(0,82,255,.38)]">
+        <span className="pointer-events-none absolute -inset-1 rounded-[17px] border border-[#0052ff]/30 rotate-[-18deg]" />
+        <span className="pointer-events-none absolute -right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#d9e6ff] shadow-[0_0_8px_#d9e6ff]" />
+        <span className="relative text-[21px] font-black leading-none tracking-[-0.12em]">B</span>
+      </span>
+      <span className="text-[15px] font-extrabold tracking-[-0.045em]">Bobby Protocol</span>
+    </a>
   );
 }
 
-function NodeCard({
-  node,
-  isActive,
-  isHovered,
-  onHover,
-  isCenter = false,
-}: {
-  node: { id: string; label: string; sub: string; icon: string; color: string };
-  isActive: boolean;
-  isHovered: boolean;
-  onHover: (id: string | null) => void;
-  isCenter?: boolean;
-}) {
-  const borderColor = isActive
-    ? node.color
-    : isHovered
-    ? `${node.color}60`
-    : '#494847';
-  const bgOpacity = isCenter ? 'bg-white/[0.04]' : 'bg-white/[0.02]';
-
+// Full-bleed section background: video on md+, blurred still on mobile (saves data, avoids
+// mobile autoplay quirks). Poster JPGs are pre-blurred frames of the same videos.
+function SectionMedia({ name, className = '' }: { name: string; className?: string }) {
   return (
-    <motion.div
-      onMouseEnter={() => onHover(node.id)}
-      onMouseLeave={() => onHover(null)}
-      animate={{
-        borderColor,
-        boxShadow: isActive ? `0 0 20px ${node.color}20` : 'none',
-      }}
-      className={`${bgOpacity} border p-4 md:p-5 cursor-pointer transition-all relative`}
-      style={{ borderColor }}
-    >
-      {isActive && (
-        <div className="absolute top-2 right-2">
-          <span className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse inline-block" />
-        </div>
-      )}
-      <div className={`font-mono text-lg mb-1 ${isCenter ? 'text-[#fcc025]' : 'text-[#adaaaa]/60'}`}>
-        {node.icon}
-      </div>
-      <div className="font-mono text-xs font-bold text-white uppercase tracking-wider">
-        {node.label}
-      </div>
-      <div className="font-mono text-[10px] text-[#adaaaa] mt-0.5">
-        {node.sub}
-      </div>
-    </motion.div>
+    <>
+      <img
+        src={`/posters/${name}.jpg`}
+        alt=""
+        aria-hidden="true"
+        className={`absolute inset-0 h-full w-full object-cover md:hidden ${className}`}
+      />
+      <video
+        className={`absolute inset-0 hidden h-full w-full object-cover md:block ${className}`}
+        src={`/videos/${name}.mp4`}
+        autoPlay
+        muted
+        loop
+        playsInline
+        aria-hidden="true"
+      />
+    </>
   );
 }
 
-function Guardrails({ stats }: { stats: ProtocolStats | null }) {
-  const totalBounties = stats?.protocolTotals.bountyCount ?? 0;
-  const totalCommitments = Number(stats?.contracts.trackRecord.stats.totalCommitments ?? 0);
-  const winRatePct = Number(stats?.contracts.trackRecord.stats.winRateBps ?? 0) / 100;
-
-  const guardrails = [
-    {
-      id: 'conviction-gate',
-      label: 'CONVICTION GATE',
-      rule: 'No trade below 3.5/10',
-      detail: 'Three agents debate every thesis. If conviction stays below 3.5/10 after adversarial pressure, the trade is blocked. No override.',
-      icon: '[ ]',
-      color: '#6dfe9c',
-    },
-    {
-      id: 'mandatory-stop',
-      label: 'MANDATORY STOP LOSS',
-      rule: 'No trade without exit plan',
-      detail: 'Every position requires a stop-loss price before execution. If the CIO omits it, a 3% default is enforced. No naked exposure.',
-      icon: '||',
-      color: '#6dfe9c',
-    },
-    {
-      id: 'circuit-breaker',
-      label: 'CIRCUIT BREAKER',
-      rule: '3 consecutive losses → max defense',
-      detail: 'After 3 losses in a row, Red Team switches to maximum aggression. The CIO receives a circuit-breaker warning. Only exceptional setups pass.',
-      icon: '!!',
-      color: '#ff716a',
-    },
-    {
-      id: 'drawdown-kill',
-      label: 'DRAWDOWN KILL SWITCH',
-      rule: '20% drawdown → all trading halted',
-      detail: 'If cumulative drawdown exceeds 20% of portfolio, every trade is rejected. No exceptions. The system stops itself.',
-      icon: '//',
-      color: '#ff716a',
-    },
-    {
-      id: 'risk-gate',
-      label: 'HARD RISK GATE',
-      rule: '$50/trade, 30% max concentration',
-      detail: 'Deterministic limits that no AI agent can override: max single trade size, max portfolio concentration per token, max concurrent positions.',
-      icon: '##',
-      color: '#fcc025',
-    },
-    {
-      id: 'calibration',
-      label: 'METACOGNITION',
-      rule: 'Overconfident? Conviction auto-adjusted',
-      detail: 'Bobby tracks its own calibration. If recent high-conviction calls underperformed, conviction scores are automatically scaled down. Self-correcting.',
-      icon: '><',
-      color: '#fcc025',
-    },
-    {
-      id: 'commit-reveal',
-      label: 'COMMIT-REVEAL',
-      rule: 'Predictions on-chain BEFORE outcome',
-      detail: 'Every prediction is recorded on X Layer before the market moves. No backfill. No hindsight edits. Verifiable integrity.',
-      icon: '=>',
-      color: '#6dfe9c',
-    },
-    {
-      id: 'judge-mode',
-      label: 'JUDGE MODE (6D)',
-      rule: 'Every debate audited on 6 dimensions',
-      detail: 'Data integrity, adversarial quality, decision logic, risk management, calibration alignment, novelty. Plus bias detection: recency, confirmation, anchoring, loss aversion.',
-      icon: '**',
-      color: '#6dfe9c',
-    },
-    {
-      id: 'adversarial-bounties',
-      label: 'ADVERSARIAL BOUNTIES',
-      rule: 'Stake OKB to prove Bobby wrong',
-      detail: `Anyone can challenge Bobby's analysis on-chain. ${totalBounties} bounties posted. Losses become paid post-mortems. Economic accountability.`,
-      icon: '$>',
-      color: '#fcc025',
-    },
-    {
-      id: 'yield-parking',
-      label: 'YIELD PARKING',
-      rule: 'Low conviction → autonomous de-risk',
-      detail: 'When conviction is too low to trade (1.5-3.5/10) and cash sits idle, Bobby evaluates yield options: Aave V3, Compound, OKX Earn. Debates the risk before parking.',
-      icon: '%%',
-      color: '#6dfe9c',
-    },
-    {
-      id: 'agent-auth',
-      label: 'EIP-191 AUTH',
-      rule: 'Every mutation requires signed proof',
-      detail: 'External agents must sign with EIP-191 to call premium tools or post bounties. 10-minute auth window. No anonymous writes.',
-      icon: '{}',
-      color: '#6dfe9c',
-    },
-  ];
-
+function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <section id="guardrails" className="py-24 px-6 max-w-7xl mx-auto">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="mb-12"
-      >
-        <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4 border-l-4 border-[#ff716a] pl-6">
-          11 Guardrails. Fail-Closed.
-        </h2>
-        <p className="font-mono text-sm text-[#adaaaa] max-w-3xl pl-6">
-          No consensus → no trade. No stop loss → no trade. 3 losses → circuit breaker.
-          Bobby doesn't trust itself — it proves itself.
-        </p>
-
-        {/* Live stats strip */}
-        <div className="flex flex-wrap gap-6 mt-6 pl-6 font-mono text-[11px] uppercase tracking-widest">
-          <span className="text-[#6dfe9c]">
-            {totalCommitments} commitments on-chain
-          </span>
-          <span className="text-[#fcc025]">
-            {totalBounties} bounties posted
-          </span>
-          <span className="text-[#ff716a]">
-            {winRatePct > 0 ? `${winRatePct.toFixed(0)}% win rate` : 'tracking...'}
-          </span>
-        </div>
-      </motion.div>
-
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        {guardrails.map((g, i) => (
-          <motion.div
-            key={g.id}
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.05 }}
-            className="group bg-white/[0.02] border border-white/[0.04] rounded-xl p-5 hover:border-white/[0.08] transition-colors"
-          >
-            <div className="flex items-start gap-3 mb-3">
-              <span
-                className="font-mono text-xs font-bold shrink-0 w-8 h-8 flex items-center justify-center rounded border"
-                style={{ color: g.color, borderColor: `${g.color}33` }}
-              >
-                {g.icon}
-              </span>
-              <div>
-                <h3 className="font-black text-sm uppercase tracking-tight text-white">
-                  {g.label}
-                </h3>
-                <p className="font-mono text-[11px] mt-0.5" style={{ color: g.color }}>
-                  {g.rule}
-                </p>
-              </div>
-            </div>
-            <p className="text-[#adaaaa] text-xs leading-relaxed">
-              {g.detail}
-            </p>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Fail-closed manifesto */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        className="mt-10 border border-[#ff716a]/20 rounded-xl p-6 bg-[#ff716a]/[0.03]"
-      >
-        <p className="font-mono text-xs text-[#ff716a] uppercase tracking-widest mb-3">
-          :: FAIL-CLOSED PHILOSOPHY ::
-        </p>
-        <p className="text-[#adaaaa] text-sm leading-relaxed max-w-3xl">
-          Most trading agents are fail-open: if something breaks, the trade goes through anyway.
-          Bobby is fail-closed. Debate doesn't converge? <span className="text-white">Blocked.</span> Arbiter
-          can't verify? <span className="text-white">Blocked.</span> Stop loss missing? <span className="text-white">Blocked.</span> Drawdown
-          exceeded? <span className="text-white">All trading halted.</span> Every guardrail lives in production code — not
-          documentation promises. Bobby protects capital first, proves execution second.
-        </p>
-      </motion.div>
-    </section>
+    <div className="border-t border-white/15 pt-4">
+      <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">{label}</div>
+      <div className="text-3xl font-extrabold tracking-[-0.07em] text-white">{value}</div>
+      <div className="mt-1 text-xs text-white/40">{detail}</div>
+    </div>
   );
 }
-
-function Bounties({ stats }: { stats: ProtocolStats | null }) {
-  const bounties = stats?.bounties ?? [];
-  const bountiesContract = stats?.contracts.adversarialBounties;
-  const bountySummary = stats?.bountySummary ?? null;
-  const dimensionCards = useMemo(() => {
-    const base = [
-      'DATA_INTEGRITY',
-      'ADVERSARIAL_QUALITY',
-      'DECISION_LOGIC',
-      'RISK_MANAGEMENT',
-      'CALIBRATION_ALIGNMENT',
-      'NOVELTY',
-    ];
-
-    return base.map((dimension) => {
-      const summary = bountySummary?.[dimension];
-      if (summary) {
-        return {
-          dimension,
-          count: summary.openCount,
-          avgReward: summary.avgRewardOkb,
-          hardest:
-            summary.maxRewardOkb !== null
-              ? `${summary.maxRewardOkb.toFixed(4)} OKB`
-              : 'Awaiting first challenger',
-        };
-      }
-
-      const entries = bounties.filter((b) => b.dimension === dimension);
-      const total = entries.reduce((sum, b) => sum + Number(b.rewardOkb || 0), 0);
-      const avgReward = entries.length ? total / entries.length : null;
-      return {
-        dimension,
-        count: entries.length,
-        avgReward,
-        hardest:
-          entries.length > 0
-            ? `${Math.max(...entries.map((b) => Number(b.rewardOkb || 0))).toFixed(4)} OKB`
-            : 'Awaiting first challenger',
-      };
-    });
-  }, [bounties, bountySummary]);
-
-  return (
-    <section id="bounties" className="py-24 px-6 max-w-7xl mx-auto">
-      <div className="flex flex-wrap justify-between items-end mb-12 gap-4">
-        <div>
-          <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase">
-            Adversarial Bounties
-          </h2>
-          <p className="text-[#adaaaa] mt-2 font-mono text-xs uppercase tracking-widest">
-            Stake OKB to prove Bobby was wrong. Win it if he was.
-          </p>
-          {bountiesContract && (
-            <p className="mt-2 font-mono text-[10px] text-[#6dfe9c]/60">
-              CONTRACT: {bountiesContract.address}
-              {bountiesContract.verified && ' ✓ VERIFIED ON OKLINK'}
-              {' · MIN '}
-              {bountiesContract.minBounty.minBountyOkb} OKB
-            </p>
-          )}
-        </div>
-        <a
-          href={`https://www.oklink.com/xlayer/address/${bountiesContract?.address ?? ''}`}
-          target="_blank"
-          rel="noreferrer"
-          className="bg-[#6dfe9c] text-[#005f2e] px-6 py-2 font-bold uppercase text-sm tracking-tighter hover:brightness-110"
-        >
-          [+] POST A BOUNTY
-        </a>
-      </div>
-
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
-        {dimensionCards.map((card) => (
-          <div
-            key={card.dimension}
-            className="bg-[#131313] border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all"
-          >
-            <div className={`font-mono text-[10px] uppercase tracking-widest mb-4 ${DIMENSION_COLOR[card.dimension] ?? 'text-white'}`}>
-              {card.dimension}
-            </div>
-            <div className="grid grid-cols-2 gap-4 font-mono text-[10px] mb-4">
-              <div>
-                <div className="text-[#adaaaa]">OPEN_BOUNTIES</div>
-                <div className="text-xl text-white">{card.count}</div>
-              </div>
-              <div>
-                <div className="text-[#adaaaa]">AVG_REWARD</div>
-                <div className="text-xl text-[#6dfe9c]">
-                  {card.avgReward === null ? '—' : `${card.avgReward.toFixed(4)} OKB`}
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-[#494847]/15 pt-4 font-mono text-[11px] leading-6">
-              <div className="flex justify-between">
-                <span className="text-[#adaaaa]">HARDEST_TO_WIN</span>
-                <span className="text-[#fcc025]">{card.hardest}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#adaaaa]">RESOLVER</span>
-                <span className="text-white">JUDGE_MODE</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {bounties.length === 0 ? (
-        <div className="bg-[#131313] border border-[#494847]/20 p-6 flex items-center justify-between gap-6 font-mono text-xs">
-          <div>
-            <span className="text-[#6dfe9c]">Awaiting first challenger</span>
-            <span className="text-[#adaaaa] ml-3">contract live · chain 196</span>
-          </div>
-          <a
-            href={`https://www.oklink.com/xlayer/address/${bountiesContract?.address ?? ''}`}
-            target="_blank"
-            rel="noreferrer"
-            className="bg-[#6dfe9c] text-[#005f2e] px-5 py-2 font-bold uppercase text-[11px] tracking-tighter hover:brightness-110 shrink-0"
-          >
-            [+] POST FIRST BOUNTY
-          </a>
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {bounties.map((b) => (
-            <div
-              key={b.bountyId}
-              className="bg-[#131313] p-6 border border-[#494847]/15 flex flex-col justify-between hover:border-[#6dfe9c]/30 transition-all"
-            >
-              <div>
-                <div className="flex justify-between items-start mb-4">
-                  <span className="font-mono text-[10px] text-[#6dfe9c]">
-                    #BOUNTY_{b.bountyId}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 text-[9px] font-bold border ${
-                      b.status === 'OPEN'
-                        ? 'text-[#6dfe9c] border-[#6dfe9c]/30 bg-[#6dfe9c]/10'
-                        : b.status === 'CHALLENGED'
-                        ? 'text-[#fcc025] border-[#fcc025]/30 bg-[#fcc025]/10'
-                        : 'text-[#adaaaa] border-[#adaaaa]/30 bg-white/[0.02]'
-                    }`}
-                  >
-                    {b.status}
-                  </span>
-                </div>
-                <h3
-                  className={`font-bold text-sm leading-tight mb-4 uppercase font-mono ${
-                    DIMENSION_COLOR[b.dimension] ?? 'text-white'
-                  }`}
-                >
-                  DIMENSION: {b.dimension.replace(/_/g, ' ')}
-                </h3>
-                <div className="font-mono text-[10px] text-[#adaaaa] mb-4">
-                  THREAD_HASH: {truncate(b.threadHash, 10, 6)}
-                </div>
-              </div>
-              <div className="space-y-2 font-mono text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-[#adaaaa]">REWARD:</span>
-                  <span className="text-[#6dfe9c] font-bold">
-                    {safeFixed(b.rewardOkb, 4)} OKB
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#adaaaa]">CHALLENGERS:</span>
-                  <span>{b.challengeCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#adaaaa]">EXPIRES:</span>
-                  <span className="text-[#fcc025]">
-                    {formatCountdown(b.effectiveExpiry)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#adaaaa]">POSTER:</span>
-                  <span>{truncate(b.poster)}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function McpSection({
-  mcp,
-  stats,
-}: {
-  mcp: McpMeta | null;
-  stats: ProtocolStats | null;
-}) {
-  const freeTools = mcp?.pricing.free ?? [];
-  const premiumTools = mcp?.pricing.premium.tools ?? [];
-  const totalTools = mcp?.counts?.totalTools ?? (freeTools.length + premiumTools.length);
-  const calls = stats?.contracts.agentEconomy.stats.totalMcpCalls ?? '—';
-  const volume = stats?.contracts.agentEconomy.stats.totalVolumeOkb ?? '—';
-  const payments = stats?.contracts.agentEconomy.stats.totalPayments ?? '—';
-
-  return (
-    <section id="mcp" className="py-24 px-6 bg-black">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row gap-12">
-          <div className="md:w-1/3">
-            <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-6 leading-none">
-              Bobby-As-A-Service
-            </h2>
-            <p className="text-[#adaaaa] mb-8 uppercase font-mono text-xs tracking-widest">
-              {totalTools} MCP tools · {freeTools.length} free · {premiumTools.length} premium · Streamable HTTP · x402 settlement
-            </p>
-            <div className="bg-[#131313] p-4 border border-[#6dfe9c]/20 mb-4 font-mono text-[10px]">
-              <div className="text-[#adaaaa] uppercase mb-1">MCP_CALLS_SETTLED</div>
-              <div className="text-[#6dfe9c] text-3xl font-bold">{calls}</div>
-            </div>
-            <div className="bg-[#131313] p-4 border border-[#6dfe9c]/20 font-mono text-[10px]">
-              <div className="text-[#adaaaa] uppercase mb-1">SETTLED_PAYMENTS / OKB</div>
-              <div className="text-[#6dfe9c] text-3xl font-bold">
-                {payments} / {safeFixed(volume, 4)}
-              </div>
-            </div>
-          </div>
-
-          <div className="md:w-2/3 space-y-6">
-            <div className="bg-[#131313] p-5 border border-[#494847]/20">
-              <div className="font-bold text-[#6dfe9c] mb-3 text-xs uppercase tracking-tighter">
-                FREE_TIER ({freeTools.length})
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 font-mono text-[10px]">
-                {freeTools.map((t) => (
-                  <div
-                    key={t}
-                    className="bg-black border border-[#494847]/15 px-2 py-1 text-[#6dfe9c]/80 truncate"
-                    title={t}
-                  >
-                    :: {t}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-[#131313] p-5 border border-[#fcc025]/20">
-              <div className="font-bold text-[#fcc025] mb-3 text-xs uppercase tracking-tighter">
-                PAID_TIER — {mcp?.pricing.premium.price ?? '0.001 OKB'} / call
-              </div>
-              <div className="space-y-2 font-mono text-[10px]">
-                {[
-                  { tool: 'bobby_analyze', flow: 'Alpha (thesis) → Red Team (attack) → CIO (verdict)' },
-                  { tool: 'bobby_debate', flow: 'Alpha (bull) → Red Team (bear) → CIO (synthesis)' },
-                  { tool: 'bobby_judge', flow: 'Data → Adversarial → Logic → Risk → Calibration → Novelty' },
-                  { tool: 'bobby_security_scan', flow: 'Contract scan → Liquidity check → Risk score' },
-                  { tool: 'bobby_wallet_portfolio', flow: 'Balances → DeFi positions → Risk assessment' },
-                ].map((t) => (
-                  <div
-                    key={t.tool}
-                    className="bg-black border border-[#fcc025]/20 px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[#fcc025]">◉ {t.tool}</span>
-                      <span className="text-[#fcc025]/60">0.001 OKB</span>
-                    </div>
-                    <div className="text-[#adaaaa] text-[9px]">{t.flow}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-black border border-[#494847]/20">
-              <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
-                <span>integration_sample.json-rpc</span>
-                <span className="text-[#6dfe9c]">POST /api/mcp-http</span>
-              </div>
-              <pre className="p-6 font-mono text-[11px] text-[#6dfe9c]/80 overflow-x-auto">
-{`{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "bobby_bounty_list",
-    "arguments": { "limit": 5 }
-  },
-  "id": "demo-1"
-}`}
-              </pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function AgentInterop({
-  stats,
-  reputation,
-  sentinel,
-  mcp,
-}: {
-  stats: ProtocolStats | null;
-  reputation: ReputationSummary | null;
-  sentinel: SentinelSummary | null;
-  mcp: McpMeta | null;
-}) {
-  const registeredAgents = stats?.contracts.agentRegistry.agents ?? 0;
-  const trustScore = reputation?.trustScore?.score ?? null;
-  const sentinelCalls = sentinel?.summary?.calledFreeTools ?? 0;
-  const hasPremiumChallenge = sentinel?.summary?.receivedX402Challenge ?? false;
-  const latestSettlement = mcp?.settlement ?? null;
-
-  const integrations = [
-    { title: 'SKILL.MD', glyph: '>_', desc: 'One file, zero-code MCP integration', href: '/skill.md', cta: '_DOWNLOAD', color: '#6dfe9c' },
-    { title: 'REGISTRY', glyph: '#', desc: 'Machine-readable agent + tool catalog', href: '/api/registry', cta: '_QUERY', color: '#6dfe9c' },
-    { title: 'REPUTATION_API', glyph: '%', desc: 'On-chain track record + win rate', href: '/api/reputation', cta: '_QUERY', color: '#fcc025' },
-    { title: 'JUDGE_MANIFEST', glyph: ':::', desc: '6-dimension evaluation framework', href: '/ai-judge-manifest.json', cta: '_READ', color: '#ff716a' },
-    { title: 'x402_SETTLEMENT', glyph: '$=', desc: 'Pay per call, settle on X Layer', href: '/api/mcp-http', cta: '_VIEW', color: '#6dfe9c' },
-    { title: 'SENTINEL_DEMO', glyph: 'A2A', desc: 'Live discovery, free calls, premium paywall challenge', href: '/api/sentinel-demo', cta: '_RUN', color: '#fcc025' },
-  ];
-
-  return (
-    <section id="interop" className="py-24 px-6 bg-[#131313] border-y border-[#494847]/15">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-12">
-          <div>
-            <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-4 border-l-4 border-[#6dfe9c] pl-6">
-              Agent-to-Agent Interop
-            </h2>
-            <p className="text-[#adaaaa] uppercase font-mono text-xs tracking-widest pl-6">
-              Any AI agent can consume Bobby. Download the skill file and start calling.
-            </p>
-          </div>
-          <div className="flex gap-4 font-mono text-[10px]">
-            <div className="bg-black p-3 border border-[#6dfe9c]/20">
-              <div className="text-[#adaaaa]">REGISTERED_AGENTS</div>
-              <div className="text-[#6dfe9c] text-2xl font-bold">{registeredAgents}</div>
-            </div>
-            <div className="bg-black p-3 border border-[#6dfe9c]/20">
-              <div className="text-[#adaaaa]">TRUST_SCORE</div>
-              <div className="text-[#6dfe9c] text-2xl font-bold">
-                {trustScore !== null ? safeFixed(trustScore, 0) : '—'}
-              </div>
-            </div>
-            <div className="bg-black p-3 border border-[#6dfe9c]/20">
-              <div className="text-[#adaaaa]">SENTINEL_FREE_CALLS</div>
-              <div className="text-[#6dfe9c] text-2xl font-bold">{sentinelCalls}</div>
-            </div>
-            <div className="bg-black p-3 border border-[#6dfe9c]/20">
-              <div className="text-[#adaaaa]">PREMIUM_FLOW</div>
-              <div className={`text-2xl font-bold ${hasPremiumChallenge ? 'text-[#fcc025]' : 'text-white'}`}>
-                {hasPremiumChallenge ? '402 READY' : 'IDLE'}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-          {integrations.map((item, i) => (
-            <motion.a
-              key={item.title}
-              href={item.href}
-              target={item.href.startsWith('/api') || item.href.endsWith('.json') || item.href.endsWith('.md') ? '_blank' : undefined}
-              rel="noreferrer"
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-              className="bg-black border border-[#494847]/15 p-5 hover:border-[#6dfe9c]/30 transition-all group"
-            >
-              <div className="font-mono text-2xl font-bold mb-3" style={{ color: item.color }}>
-                {item.glyph}
-              </div>
-              <div className="font-mono text-[10px] uppercase tracking-widest mb-2" style={{ color: item.color }}>
-                {item.title}
-              </div>
-              <p className="font-mono text-[10px] text-[#adaaaa] mb-3">{item.desc}</p>
-              <div
-                className="font-mono text-[10px] font-bold uppercase opacity-60 group-hover:opacity-100 transition-opacity"
-                style={{ color: item.color }}
-              >
-                {item.cta} →
-              </div>
-            </motion.a>
-          ))}
-        </div>
-
-        <div className="mb-8 bg-black border border-[#494847]/20 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-[#adaaaa]">
-          Live proof: Sentinel discovered Bobby via registry, queried reputation, completed {sentinelCalls} free MCP calls, and {hasPremiumChallenge ? 'received a real x402 premium challenge' : 'has not reached the premium challenge yet'}.
-          {latestSettlement && (
-            <span className="block mt-2 text-[#6dfe9c]">
-              Last verified settlement: {latestSettlement.tool} paid {latestSettlement.valueOkb} OKB.
-            </span>
-          )}
-        </div>
-
-        <div className="bg-black border border-[#494847]/20">
-          <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
-            <span>agent_quickstart.sh</span>
-            <span className="text-[#6dfe9c]">4 commands to integrate</span>
-          </div>
-          <pre className="p-6 font-mono text-[11px] text-[#6dfe9c]/80 overflow-x-auto leading-relaxed">
-{`# 1. Download the skill file (your agent reads this)
-curl -o bobby.skill.md https://bobbyprotocol.xyz/skill.md
-
-# 2. Discover Bobby's tools and pricing
-curl https://bobbyprotocol.xyz/api/mcp-http
-
-# 3. Check Bobby's on-chain reputation before trusting
-curl https://bobbyprotocol.xyz/api/reputation | jq '.reputation'
-
-# 4. Call a free tool — no payment, no API key
-curl -X POST https://bobbyprotocol.xyz/api/mcp-http \\
-  -H "Content-Type: application/json" \\
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_intel","arguments":{}},"id":"1"}'`}
-          </pre>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TrustBadge({ stats }: { stats: ProtocolStats | null }) {
-  const winRateBps = stats ? Number(stats.contracts.trackRecord.stats.winRateBps) : 0;
-  const winRate = winRateBps / 100;
-  const mcpCalls = stats ? Number(stats.contracts.agentEconomy.stats.totalMcpCalls) : 0;
-  const bounties = stats ? stats.contracts.adversarialBounties.totalPosted : 0;
-  const verified = stats ? stats.contracts.adversarialBounties.verified : false;
-
-  const level =
-    winRate >= 60 ? { label: 'HIGH', color: '#6dfe9c' } :
-    winRate >= 40 ? { label: 'MODERATE', color: '#fcc025' } :
-    winRate > 0 ? { label: 'LOW', color: '#ff716a' } :
-    { label: 'UNRATED', color: '#adaaaa' };
-
-  return (
-    <section className="py-12 px-6 max-w-7xl mx-auto">
-      <div className="bg-[#131313] border border-[#494847]/15 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div
-              className="w-14 h-14 flex items-center justify-center border-2 font-mono text-lg font-bold"
-              style={{ color: level.color, borderColor: level.color, backgroundColor: `${level.color}15` }}
-            >
-              {level.label === 'UNRATED' ? '?' : winRate > 0 ? `${safeFixed(winRate, 0)}` : '—'}
-            </div>
-            <div>
-              <div className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest">
-                PROTOCOL_TRUST
-              </div>
-              <div className="font-bold text-lg uppercase" style={{ color: level.color }}>
-                {level.label}
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-6 font-mono text-[10px]">
-            <div className="text-center">
-              <div className="text-[#adaaaa]">WIN_RATE</div>
-              <div className="text-xl font-bold" style={{ color: level.color }}>
-                {winRate > 0 ? `${safeFixed(winRate, 1)}%` : '—'}
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-[#adaaaa]">MCP_CALLS</div>
-              <div className="text-xl font-bold text-white">{mcpCalls}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[#adaaaa]">BOUNTIES</div>
-              <div className="text-xl font-bold text-white">{bounties}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[#adaaaa]">CONTRACTS</div>
-              <div className="text-xl font-bold text-[#6dfe9c]">
-                {verified ? '4 ✓' : '4'}
-              </div>
-            </div>
-            <a
-              href="/protocol/heartbeat"
-              className="flex items-center gap-2 border border-[#6dfe9c]/30 px-4 py-2 hover:bg-[#6dfe9c]/10 transition-all"
-            >
-              <div className="w-2 h-2 bg-[#6dfe9c] rounded-full animate-pulse" />
-              <span className="font-mono text-[10px] text-[#6dfe9c] uppercase tracking-wider">
-                LIVE HEARTBEAT
-              </span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function RevenueProof({ stats, liveTxs }: { stats: ProtocolStats | null; liveTxs: LiveTx[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const {
-    historyExpanded,
-    setHistoryExpanded,
-    historicalTxs,
-    historyLoading,
-    historyError,
-    historyDone,
-    fetchHistoricalTxs,
-  } = useProtocolTxHistory();
-  const volumeOkb = stats ? safeFixed(stats.contracts.agentEconomy.stats.totalVolumeOkb, 4) : '—';
-  const bountyEscrowOkb = stats ? safeFixed(stats.protocolTotals.bountyEscrowOkb, 4) : '—';
-  const protocolNotionalOkb = stats ? safeFixed(stats.protocolTotals.protocolNotionalOkb, 4) : '—';
-  const mcpCalls = stats ? Number(stats.contracts.agentEconomy.stats.totalMcpCalls) : 0;
-  const payments = stats ? Number(stats.contracts.agentEconomy.stats.totalPayments) : 0;
-  const bounties = stats ? stats.contracts.adversarialBounties.totalPosted : 0;
-
-  const visibleTxs = expanded ? liveTxs : liveTxs.slice(0, 6);
-  const proofs = visibleTxs.map((tx) => {
-    const val = parseFloat(tx.valueOkb || '0');
-    const age = tx.timestamp ? Math.floor(Date.now() / 1000 - tx.timestamp) : null;
-    const ageStr = age !== null
-      ? age < 60 ? `${age}s ago` : age < 3600 ? `${Math.floor(age / 60)}m ago` : `${Math.floor(age / 3600)}h ago`
-      : '';
-    return {
-      label: `${tx.contractName} :: ${tx.method}`,
-      tx: tx.hash,
-      detail: `${val > 0 ? `${val.toFixed(4)} OKB | ` : ''}${ageStr}`,
-    };
-  });
-
-  return (
-    <section className="py-12 px-6 max-w-7xl mx-auto">
-      <div className="bg-[#131313] border border-[#494847]/15 p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div>
-            <div className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest mb-1">
-              REVENUE_PROOF
-            </div>
-            <div className="text-lg font-bold text-white">
-              Autonomous Revenue on X Layer
-            </div>
-          </div>
-          <div className="flex gap-6 font-mono text-[10px]">
-            <div className="text-center">
-              <div className="text-[#adaaaa]">VOLUME_OKB</div>
-              <div className="text-xl font-bold text-[#6dfe9c]">{volumeOkb}</div>
-              <div className="text-[9px] text-[#adaaaa]/70 mt-1">paid MCP settlement</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[#adaaaa]">PAYMENTS</div>
-              <div className="text-xl font-bold text-white">{payments}</div>
-              <div className="text-[9px] text-[#adaaaa]/70 mt-1">settled via AgentEconomy</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[#adaaaa]">BOUNTY_ESCROW</div>
-              <div className="text-xl font-bold text-[#fcc025]">{bountyEscrowOkb}</div>
-              <div className="text-[9px] text-[#adaaaa]/70 mt-1">{bounties} bounties posted</div>
-            </div>
-            <div className="text-center">
-              <div className="text-[#adaaaa]">PROTOCOL_NOTIONAL</div>
-              <div className="text-xl font-bold text-white">{protocolNotionalOkb}</div>
-              <div className="text-[9px] text-[#adaaaa]/70 mt-1">{mcpCalls} MCP calls</div>
-            </div>
-          </div>
-        </div>
-        <div className="space-y-2">
-          {proofs.map((p) => (
-            <a
-              key={p.tx}
-              href={`https://www.oklink.com/xlayer/tx/${p.tx}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-3 px-4 py-3 bg-black/40 border border-[#494847]/10 hover:border-[#6dfe9c]/30 transition-all group"
-            >
-              <span className="w-2 h-2 bg-[#6dfe9c] rounded-full" />
-              <span className="font-mono text-[10px] text-[#6dfe9c] uppercase w-40 shrink-0">
-                {p.label}
-              </span>
-              <span className="font-mono text-[11px] text-white/40 truncate flex-1">
-                {p.tx.slice(0, 18)}...{p.tx.slice(-8)}
-              </span>
-              <span className="font-mono text-[10px] text-[#adaaaa] hidden md:block">
-                {p.detail}
-              </span>
-              <span className="text-[#6dfe9c] opacity-0 group-hover:opacity-100 transition-opacity text-xs">
-                ↗
-              </span>
-            </a>
-          ))}
-        </div>
-        {liveTxs.length > 6 && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="mt-4 w-full py-2.5 border border-[#494847]/20 hover:border-[#6dfe9c]/40 bg-black/20 hover:bg-black/40 transition-all font-mono text-[11px] uppercase tracking-widest text-[#adaaaa] hover:text-[#6dfe9c]"
-          >
-            {expanded ? `COLLAPSE (${liveTxs.length} txs)` : `SEE ALL ${liveTxs.length} TRANSACTIONS`}
-          </button>
-        )}
-
-        <div className="mt-4 border border-[#494847]/20 bg-black/20">
-          <button
-            onClick={() => setHistoryExpanded((current) => !current)}
-            className="w-full flex items-center justify-between gap-4 px-4 py-3 text-left"
-          >
-            <div>
-              <div className="font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest">
-                HISTORICAL_ONCHAIN_ARCHIVE
-              </div>
-              <div className="font-mono text-[11px] text-white/30 mt-1">
-                Expand to inspect the full Bobby treasury transaction archive across protocol contracts.
-              </div>
-            </div>
-            <span className="font-mono text-[11px] text-[#6dfe9c] uppercase tracking-widest">
-              {historyExpanded ? 'COLLAPSE' : 'EXPAND'}
-            </span>
-          </button>
-
-          {historyExpanded && (
-            <div className="px-4 pb-4 border-t border-[#494847]/20">
-              {historyError && (
-                <div className="mt-4 font-mono text-[11px] text-[#ff716a]">
-                  Error loading historical archive: {historyError}
-                </div>
-              )}
-
-              {historicalTxs.length > 0 ? (
-                <>
-                  <div className="mt-4 flex items-center justify-between gap-4 font-mono text-[10px] text-[#adaaaa] uppercase tracking-widest">
-                    <span>{historicalTxs.length} historical txs loaded</span>
-                    <span className={historyDone ? 'text-[#6dfe9c]' : 'text-[#fcc025]'}>
-                      {historyDone ? 'Archive complete' : 'Loading archive...'}
-                    </span>
-                  </div>
-                  <div className="mt-3 space-y-2 max-h-[32rem] overflow-y-auto pr-1">
-                    {historicalTxs.map((tx) => (
-                      <a
-                        key={`${tx.hash}-${tx.blockNumber}`}
-                        href={`https://www.oklink.com/xlayer/tx/${tx.hash}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-3 px-4 py-3 bg-black/40 border border-[#494847]/10 hover:border-[#6dfe9c]/30 transition-all group"
-                      >
-                        <span className="w-2 h-2 bg-[#fcc025] rounded-full shrink-0" />
-                        <span className="font-mono text-[10px] text-[#6dfe9c] uppercase w-40 shrink-0">
-                          {tx.contractName} :: {tx.method}
-                        </span>
-                        <span className="font-mono text-[10px] text-white/25 hidden md:block shrink-0">
-                          BLOCK #{tx.blockNumber.toLocaleString()}
-                        </span>
-                        <span className="font-mono text-[11px] text-white/40 truncate flex-1">
-                          {tx.hash.slice(0, 18)}...{tx.hash.slice(-8)}
-                        </span>
-                        {parseFloat(tx.valueOkb) > 0 && (
-                          <span className="font-mono text-[10px] text-[#fcc025] hidden lg:block">
-                            {parseFloat(tx.valueOkb).toFixed(4)} OKB
-                          </span>
-                        )}
-                        <span className="font-mono text-[10px] text-[#adaaaa] hidden md:block">
-                          {tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleString() : '—'}
-                        </span>
-                        <span className="text-[#6dfe9c] opacity-0 group-hover:opacity-100 transition-opacity text-xs">
-                          ↗
-                        </span>
-                      </a>
-                    ))}
-                  </div>
-                </>
-              ) : historyLoading ? (
-                <div className="mt-4 font-mono text-[11px] text-[#adaaaa] text-center">
-                  Loading historical transaction archive...
-                </div>
-              ) : (
-                <div className="mt-4 font-mono text-[11px] text-[#adaaaa] text-center">
-                  No historical transactions found yet.
-                </div>
-              )}
-
-              {!historyDone && !historyLoading && (
-                <button
-                  onClick={fetchHistoricalTxs}
-                  className="mt-4 w-full py-2.5 border border-[#494847]/20 hover:border-[#6dfe9c]/40 bg-black/20 hover:bg-black/40 transition-all font-mono text-[11px] uppercase tracking-widest text-[#adaaaa] hover:text-[#6dfe9c]"
-                >
-                  LOAD MORE HISTORY
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LiveCheckpoint() {
-  const [cp, setCp] = useState<Record<string, unknown> | null>(null);
-
-  useEffect(() => {
-    fetch('/api/checkpoint?hours=4')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => setCp(data))
-      .catch(() => {});
-  }, []);
-
-  if (!cp) return null;
-
-  const rd = cp.risk_decisions as Record<string, number> || {};
-  const oc = cp.on_chain as Record<string, unknown> || {};
-  const latest = cp.latest_debate as Record<string, unknown> | null;
-  const guardrails = cp.guardrails as Record<string, unknown> || {};
-
-  return (
-    <section className="py-12 px-6 max-w-7xl mx-auto">
-      <div className="bg-black border border-[#494847]/20">
-        <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
-          <span>checkpoint_4h.log</span>
-          <span className="text-[#fcc025]">LIVE PROOF LOOP</span>
-        </div>
-        <div className="p-4 space-y-3">
-          {/* Risk decisions strip */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {[
-              { label: 'DEBATES', value: rd.total_debates ?? '—', color: '#6dfe9c' },
-              { label: 'EXECUTED', value: rd.executed ?? 0, color: '#6dfe9c' },
-              { label: 'BLOCKED', value: `${rd.blocked ?? 0} (${rd.block_rate_pct ?? 0}%)`, color: '#ff716a' },
-              { label: 'AVG CONVICTION', value: `${rd.avg_conviction ?? '—'}/10`, color: '#fcc025' },
-              { label: 'WIN RATE', value: `${oc.win_rate_pct ?? '—'}%`, color: '#6dfe9c' },
-            ].map(m => (
-              <div key={m.label} className="font-mono text-center">
-                <div className="text-[9px] text-[#adaaaa] uppercase tracking-widest">{m.label}</div>
-                <div className="text-lg font-bold" style={{ color: m.color }}>{m.value}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Latest debate */}
-          {latest && (
-            <div className="border-t border-[#494847]/20 pt-3 font-mono text-[11px]">
-              <span className="text-[#adaaaa]">LATEST → </span>
-              <span className="text-white">{latest.symbol as string} {(latest.direction as string || '').toUpperCase()}</span>
-              <span className="text-[#adaaaa]"> conviction </span>
-              <span style={{ color: (latest.conviction as number) >= 3.5 ? '#6dfe9c' : '#ff716a' }}>
-                {latest.conviction as number}/10
-              </span>
-              <span className="text-[#adaaaa]"> → </span>
-              <span style={{ color: latest.decision === 'EXECUTE' ? '#6dfe9c' : '#ff716a' }}>
-                {latest.decision as string}
-              </span>
-            </div>
-          )}
-
-          {/* Guardrails status */}
-          <div className="border-t border-[#494847]/20 pt-3 flex flex-wrap gap-3 font-mono text-[10px]">
-            <span className="text-[#adaaaa]">GUARDRAILS:</span>
-            <span className={guardrails.circuit_breaker === 'ARMED' ? 'text-[#6dfe9c]' : 'text-[#ff716a]'}>
-              Circuit breaker: {guardrails.circuit_breaker as string}
-            </span>
-            <span className={(guardrails.yield_parking as string || '').startsWith('ACTIVE') ? 'text-[#fcc025]' : 'text-[#adaaaa]'}>
-              Yield parking: {guardrails.yield_parking as string}
-            </span>
-            <span className="text-[#6dfe9c]">Fail-closed: ON</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ActivityFeed({ feed }: { feed: ActivityItem[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const COLLAPSED_COUNT = 8;
-
-  const fmtAgo = (secs: number | null) => {
-    if (secs === null) return '—';
-    if (secs < 60) return `${secs}s ago`;
-    if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-    if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-    return `${Math.floor(secs / 86400)}d ago`;
-  };
-
-  const sourceCount = {
-    commerce: feed.filter((e) => e.source === 'commerce').length,
-    onchain: feed.filter((e) => e.source === 'onchain').length,
-    bounty: feed.filter((e) => e.source === 'bounty').length,
-  };
-  const fallbackOnly = sourceCount.bounty > 0 && sourceCount.commerce === 0 && sourceCount.onchain === 0;
-  const visibleFeed = expanded ? feed : feed.slice(0, COLLAPSED_COUNT);
-  const hasMore = feed.length > COLLAPSED_COUNT;
-
-  const sourceBadge = (source?: string) => {
-    switch (source) {
-      case 'commerce':
-        return { label: 'A2A', className: 'text-[#6dfe9c] border-[#6dfe9c]/20 bg-[#6dfe9c]/10' };
-      case 'onchain':
-        return { label: 'TX', className: 'text-[#fcc025] border-[#fcc025]/20 bg-[#fcc025]/10' };
-      case 'bounty':
-        return { label: 'BOUNTY', className: 'text-white/70 border-white/10 bg-white/5' };
-      default:
-        return { label: 'EVENT', className: 'text-white/70 border-white/10 bg-white/5' };
-    }
-  };
-
-  const statusBadge = (status?: string | null, paid?: boolean) => {
-    if (paid || status === 'verified') {
-      return { label: 'PAID', className: 'text-[#fcc025] border-[#fcc025]/20 bg-[#fcc025]/10' };
-    }
-    if (status === 'free_call') {
-      return { label: 'FREE', className: 'text-[#6dfe9c] border-[#6dfe9c]/20 bg-[#6dfe9c]/10' };
-    }
-    if (status === 'challenge_issued') {
-      return { label: '402', className: 'text-[#ff716a] border-[#ff716a]/20 bg-[#ff716a]/10' };
-    }
-    if (status === 'bounty_posted') {
-      return { label: 'POSTED', className: 'text-white/70 border-white/10 bg-white/5' };
-    }
-    return { label: 'LIVE', className: 'text-white/60 border-white/10 bg-white/5' };
-  };
-
-  if (feed.length === 0) {
-    return (
-      <section className="py-12 px-6 max-w-7xl mx-auto">
-        <div className="bg-black border border-[#494847]/20">
-          <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
-            <span>activity_feed.log</span>
-            <span className="text-[#6dfe9c]">LIVE</span>
-          </div>
-          <div className="p-4 font-mono text-[11px] text-[#adaaaa] text-center">
-            Awaiting first agent interaction...
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="py-12 px-6 max-w-7xl mx-auto">
-      <div className="bg-black border border-[#494847]/20">
-        <div className="bg-[#131313] px-4 py-2 border-b border-[#494847]/20 flex justify-between font-mono text-[10px] text-[#adaaaa]">
-          <span>activity_feed.log</span>
-          <span className={`${fallbackOnly ? 'text-[#fcc025]' : 'text-[#6dfe9c]'} flex items-center gap-1`}>
-            <span className="w-1.5 h-1.5 bg-[#6dfe9c] rounded-full animate-pulse" />
-            {fallbackOnly
-              ? `FALLBACK · ${sourceCount.bounty} bounty events`
-              : `LIVE · ${sourceCount.commerce} A2A · ${sourceCount.onchain} tx · ${feed.length} events`}
-          </span>
-        </div>
-        {fallbackOnly && (
-          <div className="px-4 py-2 border-b border-[#494847]/10 font-mono text-[10px] text-[#fcc025]">
-            No recent A2A commerce or treasury txs surfaced yet. Showing latest bounty archive instead.
-          </div>
-        )}
-        <div className={`divide-y divide-[#494847]/10 ${expanded ? 'max-h-[600px]' : 'max-h-[240px]'} overflow-y-auto transition-all`}>
-          {visibleFeed.map((e, i) => {
-            const source = sourceBadge(e.source);
-            const status = statusBadge(e.status, e.paid);
-            return (
-            <div key={i} className="px-4 py-2 font-mono text-[11px] flex items-center gap-3">
-              <span className="text-[#adaaaa] w-14 shrink-0 text-right">{fmtAgo(e.agoSeconds)}</span>
-              <span className={`px-1.5 py-0.5 border text-[9px] uppercase tracking-widest ${source.className}`}>
-                {source.label}
-              </span>
-              <span className={`px-1.5 py-0.5 border text-[9px] uppercase tracking-widest ${status.className}`}>
-                {status.label}
-              </span>
-              <span className="text-white/60 truncate">{e.agent}</span>
-              <span className="text-[#adaaaa]">→</span>
-              <span className={e.source === 'bounty' ? 'text-white/85' : 'text-[#6dfe9c]'}>{e.tool}</span>
-              {e.paid && e.amountOkb && (
-                <span className="text-[#fcc025] ml-auto shrink-0">{e.amountOkb} OKB</span>
-              )}
-              {e.txHash && (
-                <a
-                  href={`https://www.oklink.com/xlayer/tx/${e.txHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[#6dfe9c]/40 hover:text-[#6dfe9c] shrink-0"
-                >
-                  ↗
-                </a>
-              )}
-            </div>
-          )})}
-        </div>
-        {hasMore && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="w-full py-2 border-t border-[#494847]/20 font-mono text-[10px] text-[#6dfe9c] uppercase tracking-widest hover:bg-[#6dfe9c]/[0.03] transition-colors"
-          >
-            {expanded ? `Collapse ↑` : `See all ${feed.length} events ↓`}
-          </button>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function LiveOnXLayer({ stats }: { stats: ProtocolStats | null }) {
-  const contracts = useMemo(() => {
-    if (!stats) return [];
-    const c = stats.contracts;
-    const list = [
-      {
-        label: 'HARDNESS_REGISTRY',
-        address: (c as any).hardnessRegistry?.address || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
-        rows: [
-          { k: 'SIGNALS', v: 'publishSignal' },
-          { k: 'PREDICTIONS', v: 'commitPrediction' },
-          { k: 'AGENT', v: (c as any).hardnessRegistry?.agentRegistered ? '✓ REGISTERED' : '—' },
-        ],
-        lastBlock: (c as any).hardnessRegistry?.lastActivityBlock || null,
-      },
-      {
-        label: 'AGENT_ECONOMY_V2',
-        address: c.agentEconomy.address,
-        rows: [
-          { k: 'DEBATES', v: c.agentEconomy.stats.totalDebates },
-          { k: 'MCP_CALLS', v: c.agentEconomy.stats.totalMcpCalls },
-          {
-            k: 'VOLUME_OKB',
-            v: safeFixed(c.agentEconomy.stats.totalVolumeOkb, 4),
-          },
-        ],
-        lastBlock: c.agentEconomy.lastActivityBlock,
-      },
-      {
-        label: 'CONVICTION_ORACLE',
-        address: c.convictionOracle.address,
-        rows: [
-          { k: 'SYMBOLS_TRACKED', v: c.convictionOracle.stats.symbolCount },
-        ],
-        lastBlock: null,
-      },
-      {
-        label: 'TRACK_RECORD',
-        address: c.trackRecord.address,
-        rows: [
-          { k: 'COMMITMENTS', v: c.trackRecord.stats.totalCommitments },
-          { k: 'REVEALED', v: c.trackRecord.stats.totalTrades },
-          {
-            k: 'WIN_RATE',
-            v: `${safeFixed(Number(c.trackRecord.stats.winRateBps) / 100, 1)}%`,
-          },
-        ],
-        lastBlock: null,
-      },
-      {
-        label: 'ADVERSARIAL_BOUNTIES',
-        address: c.adversarialBounties.address,
-        rows: [
-          { k: 'POSTED', v: `${c.adversarialBounties.totalPosted}` },
-          {
-            k: 'MIN_OKB',
-            v: c.adversarialBounties.minBounty.minBountyOkb,
-          },
-          {
-            k: 'VERIFIED',
-            v: c.adversarialBounties.verified ? '✓ OKLINK' : '—',
-          },
-        ],
-        lastBlock: c.adversarialBounties.lastActivityBlock,
-      },
-      {
-        label: 'AGENT_REGISTRY',
-        address: (c as any).agentRegistry?.address || '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b',
-        rows: [
-          { k: 'TYPE', v: 'ERC-721' },
-          { k: 'AGENTS', v: `${(c as any).agentRegistry?.agents ?? 0}` },
-          { k: 'IDENTITY', v: 'NFT-based' },
-        ],
-        lastBlock: null,
-      },
-    ];
-    return list;
-  }, [stats]);
-
-  return (
-    <section id="contracts" className="py-24 px-6 max-w-7xl mx-auto">
-      <h2 className="text-3xl md:text-4xl font-black tracking-tighter uppercase mb-2 text-center">
-        Live on X Layer
-      </h2>
-      <p className="text-center text-[#adaaaa] font-mono text-xs uppercase tracking-widest mb-12">
-        Six contracts. One protocol. All on OKX X Layer chain 196.
-      </p>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {contracts.length === 0
-          ? Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="bg-[#131313] border border-[#494847]/15 p-5 animate-pulse h-48"
-              />
-            ))
-          : contracts.map((ct) => (
-              <a
-                key={ct.label}
-                href={`https://www.oklink.com/xlayer/address/${ct.address}`}
-                target="_blank"
-                rel="noreferrer"
-                className="bg-[#131313] border border-[#494847]/15 p-5 relative overflow-hidden hover:border-[#6dfe9c]/40 transition-all group block"
-              >
-                <div className="font-mono text-[9px] text-[#6dfe9c] uppercase mb-2 flex justify-between">
-                  <span>{ct.label}</span>
-                  <span className="text-[#6dfe9c] opacity-40 group-hover:opacity-100 transition-opacity">
-                    ↗
-                  </span>
-                </div>
-                <div className="font-mono text-[11px] text-white mb-6 truncate">
-                  {truncate(ct.address, 10, 8)}
-                </div>
-                <div className="space-y-2 font-mono text-[10px]">
-                  {ct.rows.map((r) => (
-                    <div
-                      key={r.k}
-                      className="flex justify-between border-b border-[#494847]/10 pb-1"
-                    >
-                      <span className="text-[#adaaaa]">{r.k}</span>
-                      <span className="text-[#6dfe9c]">{r.v}</span>
-                    </div>
-                  ))}
-                  {ct.lastBlock && (
-                    <div className="flex justify-between pt-1">
-                      <span className="text-[#adaaaa]">LAST_BLOCK</span>
-                      <span className="text-[#6dfe9c]">
-                        #{ct.lastBlock.toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="absolute bottom-2 right-2 flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 bg-[#6dfe9c] rounded-full animate-pulse" />
-                  <span className="font-mono text-[8px] text-[#6dfe9c] uppercase">
-                    LIVE
-                  </span>
-                </div>
-              </a>
-            ))}
-      </div>
-    </section>
-  );
-}
-
-function Footer({ stats }: { stats: ProtocolStats | null }) {
-  return (
-    <footer className="w-full px-8 py-12 bg-[#0e0e0e] border-t border-[#494847]/15">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-        <div>
-          <div className="text-[#6dfe9c] font-bold font-mono text-sm uppercase mb-1">
-            BOBBY_PROTOCOL — HARDNESS FINANCE
-          </div>
-          <div className="text-[#6dfe9c]/40 font-mono text-[10px] uppercase">
-            Financial orchestration infrastructure for AI agents · X Layer
-          </div>
-          <div className="text-[#6dfe9c]/40 font-mono text-[10px] mt-1">
-            Last sync: {stats ? new Date(stats.fetchedAt).toLocaleTimeString() : '—'}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-6">
-          <a
-            className="text-[#fcc025] hover:text-[#fcc025] font-mono text-[11px] uppercase font-bold"
-            href="/submission"
-          >
-            SUBMISSION
-          </a>
-          <a
-            className="text-[#6dfe9c] hover:text-[#6dfe9c] font-mono text-[11px] uppercase font-bold animate-pulse"
-            href="/protocol/heartbeat"
-          >
-            HEARTBEAT
-          </a>
-          <a
-            className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] font-mono text-[11px] uppercase"
-            href="https://github.com/anthonysurfermx/Bobby-Agent-Trader"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GITHUB
-          </a>
-          <a
-            className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] font-mono text-[11px] uppercase"
-            href="/api/mcp-http"
-          >
-            MCP_ENDPOINT
-          </a>
-          <a
-            className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] font-mono text-[11px] uppercase"
-            href="https://t.me/bobbyagentraderbot"
-            target="_blank"
-            rel="noreferrer"
-          >
-            TELEGRAM_BOT
-          </a>
-          <a
-            className="text-[#6dfe9c]/60 hover:text-[#6dfe9c] font-mono text-[11px] uppercase"
-            href="/agentic-world/bobby"
-          >
-            LIVE_TERMINAL
-          </a>
-          <a
-            className="text-[#fcc025] hover:text-[#fcc025] font-mono text-[11px] uppercase font-bold"
-            href="https://github.com/okx/plugin-store/pull/161"
-            target="_blank"
-            rel="noreferrer"
-          >
-            PLUGIN_STORE_PR
-          </a>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-// ---- Page ----
 
 export default function BobbyProtocolLanding() {
-  const { data: stats, error, loading } = useProtocolStats();
+  const stats = useProtocolStats();
   const mcp = useMcpMeta();
-  const reputation = useReputation();
-  const activity = useActivity();
-  const liveTxs = useLiveTxs();
-  const sentinel = useSentinelDemo();
+  const { activity, isLoading: isActivityLoading, error: activityError, refresh: refreshActivity } = useActivity();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'verified'>('all');
+  const btc = price(stats, 'BTC');
+  const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
+  const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
+  const publicRecord = stats?.debateActivity;
+  const onchainRecord = stats?.onchainRecord;
+  const totalTrades = publicRecord?.commitmentsCreated ?? stats?.contracts?.trackRecord?.stats?.totalTrades;
+  const totalInteractions = stats?.protocolTotals?.totalInteractions;
+  const winRate = publicRecord?.decisionsResolved ? publicRecord.winRate : null;
+
+  // Audit Base r4: a percentage over a tiny sample reads as skill when it is
+  // noise. Below this many decided outcomes we show raw counts, never a rate.
+  const WIN_RATE_MIN_SAMPLE = 20;
+  const formatWinRate = (
+    rate: number | null | undefined,
+    resolved: number | null | undefined,
+    wins?: number | null,
+    losses?: number | null,
+  ) => {
+    if (rate === null || rate === undefined || !resolved) return '—';
+    if (resolved < WIN_RATE_MIN_SAMPLE) {
+      return wins !== undefined && wins !== null && losses !== undefined && losses !== null
+        ? `${wins}W / ${losses}L`
+        : `n=${resolved}`;
+    }
+    return `${Number(rate).toFixed(1)}% (n=${resolved})`;
+  };
+  const chainLabel = stats?.chain?.name || (stats?.chain?.id === 196 ? 'X Layer' : 'Network');
+  const nativeSymbol = stats?.chain?.nativeSymbol || (stats?.chain?.id === 196 ? 'OKB' : 'ETH');
+  const telemetryUpdatedAt = stats?.fetchedAt
+    ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
+    : null;
+
+  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://www.oklink.com/xlayer'}/address`;
+  const c = stats?.contracts;
+  const proofPoints = [
+    {
+      label: 'On-chain record',
+      value: formatWinRate(onchainRecord?.winRate, onchainRecord?.decisionsResolved),
+      detail: onchainRecord
+        ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
+        : 'Waiting for the TrackRecord contract.',
+      proof: 'TrackRecord contract',
+      href: `${explorerAddressUrl}/${c?.trackRecord?.address ?? ''}`,
+    },
+    {
+      label: 'Public debate ledger',
+      value: publicRecord ? `${formatNumber(publicRecord.decisionsResolved, '0')} resolved` : '—',
+      detail: publicRecord
+        ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L · ${publicRecord.winRate?.toFixed(1)}%`
+        : 'Waiting for the public resolution ledger.',
+      proof: 'Resolution ledger',
+      href: '#activity',
+    },
+    {
+      label: 'Adversarial bounties',
+      value: formatNumber(c?.adversarialBounties?.totalPosted),
+      detail: 'Open bounties paid for breaking Bobby\u2019s own reasoning. Being wrong in public is part of the design.',
+      proof: 'AdversarialBounties contract',
+      href: `${explorerAddressUrl}/${c?.adversarialBounties?.address ?? ''}`,
+    },
+    {
+      label: 'Contracts live',
+      value: '6',
+      detail: 'Registry, economy, oracle, track record, bounties and identity — all deployed and explorer-verified.',
+      proof: 'AgentEconomy V2 contract',
+      href: `${explorerAddressUrl}/${c?.agentEconomy?.address ?? ''}`,
+    },
+  ];
+
+  const navItems = [
+    ['How it works', '#how-it-works'],
+    ['Capabilities', '#capabilities'],
+    ['For agents', '#for-agents'],
+    ['Activity', '#activity'],
+  ];
+
+  const filteredActivity = useMemo(() => {
+    const list = activityFilter === 'all'
+      ? activity
+      : activity.filter((item) => (activityFilter === 'settled' ? item.paid : !item.paid));
+    return list.slice(0, 6);
+  }, [activity, activityFilter]);
+
+  const marqueeItems = [
+    ['Bobby is online', true],
+    [btc ? `BTC $${btc.price.toLocaleString('en-US')}` : 'BTC —', false],
+    [stats?.chain?.blockNumber ? `${chainLabel} block ${formatNumber(stats.chain.blockNumber)}` : 'On-chain verification', false],
+    ['Every thesis gets challenged', false],
+    ['Proof-of-debate', true],
+    [`${formatNumber(totalTrades, '—')} decisions committed`, false],
+  ] as const;
 
   return (
-    <div className="min-h-screen bg-[#0e0e0e] text-white font-sans relative overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet>
-        <title>Bobby Protocol — Agents promise. Bobby proves.</title>
-        <meta
-          name="description"
-          content="On-chain verification layer for AI agents that move money. Every decision signed before the outcome, attested on OKX X Layer."
-        />
-        <style>{`
-          @keyframes marquee {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-          }
-          body::after {
-            content: "";
-            position: fixed;
-            inset: 0;
-            background:
-              linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.25) 50%),
-              linear-gradient(90deg, rgba(255,0,0,0.06), rgba(0,255,0,0.02), rgba(0,0,255,0.06));
-            background-size: 100% 2px, 3px 100%;
-            z-index: 9999;
-            pointer-events: none;
-            opacity: 0.06;
-          }
-        `}</style>
+        <title>Bobby Protocol — The decision layer for autonomous agents</title>
+        <meta name="description" content="Bobby gives autonomous agents a shared, adversarial decision layer with live proof." />
       </Helmet>
 
-      <TopTicker stats={stats} />
-      <Nav />
+      <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
 
-      {loading && !stats && (
-        <div className="pt-32 pb-20 text-center font-mono text-[11px] text-[#6dfe9c] uppercase tracking-widest">
-          :: BOOTING PROTOCOL DATA STREAM ::
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 lg:px-8">
+          <BrandMark />
+          <nav className="hidden items-center gap-9 md:flex">
+            {navItems.map(([label, href]) => <a key={href} href={href} className="font-mono text-xs uppercase tracking-[0.15em] text-white/55 transition hover:text-white">{label}</a>)}
+            <a href="/protocol/docs" className="font-mono text-xs uppercase tracking-[0.15em] text-white/55 transition hover:text-white">Docs</a>
+          </nav>
+          <div className="hidden items-center gap-3 md:flex">
+            <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" target="_blank" rel="noreferrer" className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"><Github className="h-4 w-4" /></a>
+            <a href="/agentic-world/bobby" className="rounded-lg bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Open War Room</a>
+          </div>
+          <button onClick={() => setMenuOpen((open) => !open)} className="rounded-full p-2 md:hidden" aria-label="Toggle navigation">
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
-      )}
+        {menuOpen && <nav className="border-t border-white/10 bg-[#0a0a0a] px-5 py-4 md:hidden">{navItems.map(([label, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-3 font-mono text-xs uppercase tracking-[0.15em] text-white/70">{label}</a>)}<a href="/agentic-world/bobby" className="mt-2 block rounded-lg bg-white px-5 py-3 text-center font-mono text-xs font-bold uppercase tracking-[0.15em] text-black">Open War Room</a></nav>}
+      </header>
 
-      {error && !stats && (
-        <div className="pt-32 pb-20 text-center font-mono text-[11px] text-[#ff716a] uppercase tracking-widest">
-          :: PROTOCOL OFFLINE — {error} ::
+      <main className="relative">
+        <section className="relative isolate min-h-[calc(100vh-72px)] overflow-hidden bg-[#050505] text-white">
+          <SectionMedia name="hero" className="opacity-55 grayscale contrast-125" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,.96)_0%,rgba(5,5,5,.7)_42%,rgba(5,5,5,.3)_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_46%,rgba(0,82,255,.4),transparent_35%)]" />
+          <div className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl flex-col justify-center px-5 pb-20 pt-20 lg:px-8 lg:pb-28 lg:pt-24">
+            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
+              <a href="/agentic-world/bobby/history" className="mb-8 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff] transition hover:text-white">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />A manifesto for the verified agent economy <span aria-hidden>›</span>
+              </a>
+              <h1 className="max-w-3xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Agents need a <span className="text-[#0052ff]">second opinion.</span></h1>
+              <p className="mt-8 max-w-xl text-lg leading-8 text-white/60 md:text-xl">Bobby is the adversarial decision layer for autonomous finance. Three agents debate the thesis, pressure-test the risk, and leave a proof trail before capital moves.</p>
+              <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+                <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Enter War Room <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
+                <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">Explore <ChevronDown className="h-4 w-4" /></a>
+              </div>
+              <div className="mt-14 grid max-w-xl grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4">
+                {[
+                  ['Debates', formatNumber(totalDebates)],
+                  ['Decisions', formatNumber(totalTrades)],
+                  ['MCP calls', formatNumber(totalMcpCalls)],
+                  ['Win rate', formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</div>
+                    <div className="font-mono text-3xl font-bold tracking-[-0.04em] text-white md:text-4xl">{value}</div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        <div className="border-y border-white/10 bg-[#0a0a14] py-4 overflow-hidden">
+          <div className="flex gap-12 whitespace-nowrap animate-marquee font-mono text-xs uppercase tracking-[0.18em] text-white/50">
+            {[0, 1].map((dup) => (
+              <div key={dup} className="flex gap-12 shrink-0">
+                {marqueeItems.map(([label, highlight], index) => (
+                  <span key={`${dup}-${index}`} className={highlight ? 'text-[#7da6ff]' : undefined}>{label}</span>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
-      )}
 
-      <HeroLiveDebate stats={stats} />
-      <EcosystemBand />
-      <TrustBadge stats={stats} />
-      <RevenueProof stats={stats} liveTxs={liveTxs} />
-      <ClosedLoop />
-      <JudgeMode stats={stats} />
-      <HarnessArchitecture />
-      <Guardrails stats={stats} />
-      <Bounties stats={stats} />
-      <McpSection mcp={mcp} stats={stats} />
-      <AgentInterop stats={stats} reputation={reputation} sentinel={sentinel} mcp={mcp} />
-      <LiveCheckpoint />
-      <ActivityFeed feed={activity} />
-      <LiveOnXLayer stats={stats} />
-      <Footer stats={stats} />
+        <section className="relative overflow-hidden bg-[#050505]" id="architecture">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(0,82,255,.12),transparent_45%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / Architecture</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → proof on Base → agent economy. Twenty seconds, the whole protocol.</p>
+            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
+            >
+              <video
+                className="h-full w-full"
+                src="/videos/architecture.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                poster="/posters/architecture.jpg"
+              />
+            </motion.div>
+          </div>
+        </section>
+
+        <section className="relative isolate min-h-[940px] overflow-hidden bg-[#050505] text-white" id="how-it-works">
+          <SectionMedia name="orb" className="scale-105 opacity-75 blur-[2px] saturate-150" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,.88)_0%,rgba(5,5,5,.38)_55%,rgba(5,5,5,.24)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,5,.25)_0%,rgba(5,5,5,.2)_48%,rgba(5,5,5,.98)_88%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_67%_30%,rgba(0,82,255,.28),transparent_42%)]" />
+
+          <div className="relative z-10 mx-auto max-w-7xl px-5 pb-20 pt-24 lg:px-8 lg:pb-28 lg:pt-32">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              className="max-w-3xl"
+            >
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The verification loop</div>
+              <h2 className="text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
+                Decisions, never blind.<br />
+                <span className="text-white/72">See Bobby in action.</span>
+              </h2>
+              <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">
+                Every signal enters an adversarial pipeline. Agents debate it, risk challenges it, and the protocol records the result before the market can rewrite the story.
+              </p>
+            </motion.div>
+
+            <div className="mt-14 grid grid-cols-2 gap-x-8 gap-y-7 md:grid-cols-4 lg:max-w-5xl">
+              {[
+                ['Total debates', formatNumber(totalDebates)],
+                ['Verified decisions', formatNumber(totalTrades)],
+                ['MCP calls', formatNumber(totalMcpCalls)],
+                ['Network interactions', formatNumber(totalInteractions)],
+              ].map(([label, value]) => (
+                <div key={label} className="border-l border-white/20 pl-4">
+                  <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{label}</div>
+                  <div className="mt-2 font-mono text-2xl tracking-[-0.04em] text-white md:text-3xl">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-20 flex flex-col gap-4 border-t border-white/10 pt-6 lg:mt-24 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {['All stages', 'Signal', 'Debate', 'Risk gate', 'Proof'].map((label, index) => (
+                  <span
+                    key={label}
+                    className={`shrink-0 rounded-md px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] ${index === 0 ? 'bg-white text-black' : 'border border-white/10 bg-white/[0.07] text-white/55 backdrop-blur-md'}`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+              <div className="flex w-fit items-center gap-3 rounded-md border border-white/10 bg-white/[0.07] px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/60 backdrop-blur-md">
+                Live pipeline <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                { icon: Bot, eyebrow: 'Alpha Hunter', title: 'Find the asymmetric setup', text: 'Market structure, momentum and live intelligence become a thesis with explicit invalidation.', state: 'SIGNAL READY', step: '01' },
+                { icon: ShieldCheck, eyebrow: 'Red Team', title: 'Attack the thesis', text: 'The opposing agent searches for crowded positioning, weak assumptions and hidden downside.', state: 'CHALLENGED', step: '02' },
+                { icon: CircleDollarSign, eyebrow: 'CIO + Risk', title: 'Gate the capital', text: 'Conviction, sizing and downside are reconciled. Pass, park or block — never force the trade.', state: 'RISK GATED', step: '03' },
+                { icon: Check, eyebrow: 'Base proof', title: 'Commit before outcome', text: 'The decision and its rationale become a verifiable record before price reveals the answer.', state: 'ONCHAIN PROOF', step: '04' },
+              ].map(({ icon: Icon, eyebrow, title, text, state, step }, index) => (
+                <motion.article
+                  key={title}
+                  initial={{ opacity: 0, y: 18 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.07 }}
+                  className="group flex min-h-[310px] flex-col rounded-xl border border-white/10 bg-[#101014]/80 p-6 shadow-[0_20px_50px_rgba(0,0,0,.35)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:bg-[#111726]/90"
+                >
+                  <div className="mb-8 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-white/45">
+                      <span className="grid h-7 w-7 place-items-center rounded-md bg-[#0052ff]/20 text-[#7da6ff]"><Icon className="h-3.5 w-3.5" /></span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.13em]">{eyebrow}</span>
+                    </div>
+                    <span className="font-mono text-[10px] text-white/25">{step}</span>
+                  </div>
+                  <h3 className="text-xl font-bold leading-tight tracking-[-0.04em] text-white/95">{title}</h3>
+                  <p className="mt-4 text-sm leading-6 text-white/45">{text}</p>
+                  <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-5">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">{state}</span>
+                    <span className="h-2 w-2 rounded-full bg-[#0052ff] shadow-[0_0_14px_rgba(0,82,255,.85)]" />
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="relative overflow-hidden border-y border-white/10 bg-[#08080a]" id="capabilities">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.14),transparent_42%)]" />
+          <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
+            <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+              <div>
+                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Protocol capabilities</div>
+                <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
+                  An agent-native decision layer,<br />everything it needs.
+                </h2>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-white/45">
+                Four surfaces turn autonomous trading from a black box into an inspectable, accountable system.
+              </p>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              {[
+                {
+                  title: 'Identity',
+                  description: 'Every agent decision has an author. Every outcome builds reputation. Both follow the agent into its next call.',
+                  image: '/images/protocol/agent-identity.jpg',
+                  alt: 'Synthetic human profile visible through textured cobalt glass',
+                  telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  verified'],
+                },
+                {
+                  title: 'Adversarial debate',
+                  description: 'Alpha proposes. Red Team attacks. The CIO resolves the disagreement into one explicit, accountable thesis.',
+                  image: '/images/protocol/adversarial-debate.jpg',
+                  alt: 'Three silhouettes debating behind illuminated blue glass',
+                  telemetry: ['debate.open  round_03', 'agents  alpha · red · cio', 'counterpoints  active', 'consensus  pending'],
+                },
+                {
+                  title: 'Risk gate',
+                  description: 'Capital never moves on narrative alone. Sizing, downside and invalidation must survive the gate first.',
+                  image: '/images/protocol/risk-gate.jpg',
+                  alt: 'Human hand meeting a luminous blue glass barrier',
+                  telemetry: ['risk.inspect  intent', 'exposure  bounded', 'invalidation  signed', 'gate  pass · park · block'],
+                },
+                {
+                  title: 'Proof',
+                  description: 'The protocol commits the decision before the outcome, creating an immutable track record without screenshots or hindsight.',
+                  image: '/images/protocol/onchain-proof.jpg',
+                  alt: 'Transparent cobalt glass monolith containing a sealed point of light',
+                  telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
+                },
+              ].map((capability, index) => (
+                <motion.article
+                  key={capability.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ delay: index * 0.06 }}
+                  className="group relative min-h-[430px] overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0f] md:min-h-[500px]"
+                >
+                  <img
+                    src={capability.image}
+                    alt={capability.alt}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                  />
+                  <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,7,.96)_0%,rgba(5,5,7,.72)_42%,rgba(5,5,7,.08)_100%)]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,7,.22)_0%,rgba(5,5,7,.05)_45%,rgba(5,5,7,.94)_100%)]" />
+                  <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity duration-300 group-hover:opacity-100" />
+
+                  <div className="relative z-10 flex min-h-[430px] max-w-[74%] flex-col p-7 md:min-h-[500px] md:p-9">
+                    <div className="mb-5 flex items-center gap-3">
+                      <span className="h-2 w-2 rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,.9)]" />
+                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#7da6ff]">Capability 0{index + 1}</span>
+                    </div>
+                    <h3 className="text-3xl font-extrabold tracking-[-0.05em] md:text-4xl">{capability.title}</h3>
+                    <p className="mt-5 max-w-lg text-sm leading-6 text-white/65 md:text-base md:leading-7">{capability.description}</p>
+
+                    <div className="mt-auto space-y-1 font-mono text-[10px] leading-5 text-white/38 md:text-[11px]">
+                      <div className="mb-2 text-[#7da6ff]">&gt; {capability.telemetry[0]}</div>
+                      {capability.telemetry.slice(1).map((line) => <div key={line}>&nbsp;&nbsp;{line}</div>)}
+                      <div className="pt-1 text-white/65">✓ system ready</div>
+                    </div>
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="relative isolate overflow-hidden" id="for-agents">
+          <SectionMedia name="nebula" className="opacity-50" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
+          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Built for both sides</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A better interface for capital.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">One decision layer. Two ways in.</p></div>
+          <div className="grid gap-5 md:grid-cols-2">
+            <a
+              href="/agentic-world/bobby"
+              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
+            >
+              <img
+                src="/images/protocol/human-interface.jpg"
+                alt="Human reviewing a decision through illuminated cobalt glass"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
+              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
+              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
+                <div className="flex items-start justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Bot className="h-5 w-5 text-[#7da6ff]" /></span>
+                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                </div>
+                <div className="mt-auto">
+                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Human interface</div>
+                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For humans</h3>
+                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Open the War Room, watch the debate, and approve the move when the thesis earns it.</p>
+                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">Enter War Room →</div>
+                </div>
+              </div>
+            </a>
+
+            <a
+              href="/protocol/docs"
+              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
+            >
+              <img
+                src="/images/protocol/agent-interface.jpg"
+                alt="Synthetic agent connecting to a protocol through textured cobalt glass"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
+              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
+              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
+                <div className="flex items-start justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Sparkles className="h-5 w-5 text-[#7da6ff]" /></span>
+                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                </div>
+                <div className="mt-auto">
+                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Agent interface</div>
+                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For agents</h3>
+                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Connect over MCP. Request conviction, inspect proof, and build Bobby into your execution workflow.</p>
+                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-[#7da6ff]">Read the docs →</div>
+                </div>
+              </div>
+            </a>
+          </div>
+          </div>
+        </section>
+
+        <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
+          <SectionMedia name="section-blue" className="opacity-45" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
+          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Live network</div>
+            <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Decisions, never paused.<br />See the network in action.</h2>
+              <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
+            </div>
+
+            <div className="mb-8 flex flex-wrap items-center gap-2">
+              {([['all', 'All'], ['settled', 'Settled'], ['verified', 'Verified']] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setActivityFilter(key)}
+                  className={`rounded-lg px-4 py-2 font-mono text-xs uppercase tracking-[0.15em] transition ${activityFilter === key ? 'bg-white text-black' : 'border border-white/15 bg-white/[0.06] text-white/60 hover:bg-white/[0.12] hover:text-white'}`}
+                >
+                  {label}
+                </button>
+              ))}
+              <div className="ml-auto flex items-center gap-4">
+                <button onClick={refreshActivity} className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/45 transition hover:text-white" aria-label="Refresh network activity">
+                  <RefreshCw className={`h-3.5 w-3.5 ${isActivityLoading ? 'animate-spin' : ''}`} /> Refresh
+                </button>
+                <span className="hidden items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#7da6ff] md:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#7da6ff]" /> Online</span>
+              </div>
+            </div>
+
+            <div className="mb-5 grid overflow-hidden rounded-2xl border border-white/10 bg-[#080912]/85 backdrop-blur-xl lg:grid-cols-[1.25fr_.75fr]">
+              <div className="relative min-h-[220px] overflow-hidden border-b border-white/10 p-6 sm:p-8 lg:border-b-0 lg:border-r">
+                <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(0,82,255,.22)_1px,transparent_1px),linear-gradient(90deg,rgba(0,82,255,.22)_1px,transparent_1px)] [background-size:28px_28px]" />
+                <div className="absolute -left-20 top-1/2 h-44 w-44 -translate-y-1/2 rounded-full bg-[#0052ff]/30 blur-3xl" />
+                <div className="relative">
+                  <div className="mb-8 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] text-white/45"><span>Network telemetry</span><span className="text-[#7da6ff]">Live read</span></div>
+                  <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-3 text-center sm:gap-5">
+                    {[['RPC', chainLabel], ['Treasury', stats?.treasury?.balanceNative ? `${Number(stats.treasury.balanceNative).toFixed(3)} ${nativeSymbol}` : 'Syncing'], ['Proof', activity.length ? `${activity.length} events` : 'Standby']].map(([label, value], index) => (
+                      <div key={label} className="contents">
+                        <div className="min-w-0 rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/10 px-2 py-4 shadow-[0_0_32px_rgba(0,82,255,.14)]">
+                          <span className="mx-auto mb-2 block h-2.5 w-2.5 rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,1)]" />
+                          <div className="truncate font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">{label}</div>
+                          <div className="mt-1 truncate text-xs font-bold text-white/85">{value}</div>
+                        </div>
+                        {index < 2 && <div className="h-px min-w-3 bg-gradient-to-r from-[#0052ff] to-[#0052ff]/15" />}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-7 font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{telemetryUpdatedAt ? `Snapshot fetched ${telemetryUpdatedAt}` : 'Connecting to protocol telemetry'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-white/10">
+                <div className="bg-[#080912]/90 p-5 sm:p-6"><Database className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Latest block</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{formatNumber(stats?.chain?.blockNumber)}</div><div className="mt-1 text-xs text-white/40">{chainLabel}</div></div>
+                <div className="bg-[#080912]/90 p-5 sm:p-6"><ShieldCheck className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Feed status</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{activityError ? 'Retry' : isActivityLoading ? 'Syncing' : 'Live'}</div><div className="mt-1 text-xs text-white/40">updates every 30s</div></div>
+              </div>
+            </div>
+
+            {filteredActivity.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredActivity.map((item, index) => (
+                  <motion.div
+                    key={`${item.tool}-${index}`}
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.05 }}
+                    className="group rounded-2xl border border-white/10 bg-[#0a0a14]/80 p-6 backdrop-blur transition hover:-translate-y-1 hover:border-[#0052ff]/50"
+                  >
+                    <div className="mb-5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="grid h-7 w-7 place-items-center rounded-full bg-[#0052ff]/25 font-mono text-[10px] font-bold text-[#7da6ff]">{(item.agent || 'B')[0]}</span>
+                        <span className="text-sm text-white/60">{item.agent || 'Bobby network'}</span>
+                      </div>
+                      <span className="font-mono text-[10px] text-white/30">{item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}</span>
+                    </div>
+                    <div className="mb-6 truncate text-xl font-extrabold tracking-[-0.04em] text-white/90">{item.tool || 'Agent decision'}</div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm font-bold text-white/80">{item.paid ? 'x402 settled' : 'verified'}</span>
+                      <span className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${item.paid ? 'border-[#0052ff]/40 bg-[#0052ff]/15 text-[#7da6ff]' : 'border-white/15 bg-white/[0.06] text-white/55'}`}>{item.status || (item.paid ? 'settled' : 'live')}</span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[#0052ff]/30 bg-[#0052ff]/[0.045] px-6 py-12 text-center">
+                <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10"><CircleDollarSign className="h-5 w-5 text-[#7da6ff]" /></div>
+                <div className="text-lg font-bold">{activityError ? 'Activity feed is reconnecting.' : isActivityLoading ? 'Reading protocol activity.' : 'No recent protocol events.'}</div>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{activityError ? 'The network telemetry is still available. Refresh to retry the event stream.' : 'The live network remains connected; the next verified event will appear here automatically.'}</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(0,82,255,.1),transparent_40%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Bobby-as-a-service</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Plug Bobby into your agent.</h2>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-black/60 px-5 py-3 font-mono text-sm text-[#7da6ff]">POST /api/mcp-http</div>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-7">
+                <div className="mb-5 flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-white/60">Free tier</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{mcp?.pricing?.free?.length ?? '—'} tools</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(mcp?.pricing?.free ?? []).map((tool) => (
+                    <span key={tool} className="rounded-md border border-white/10 bg-white/[0.06] px-3 py-1.5 font-mono text-xs text-white/70">{tool}</span>
+                  ))}
+                  {!mcp && <span className="font-mono text-xs text-white/40">loading tool registry…</span>}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/[0.08] p-7">
+                <div className="mb-5 flex items-center justify-between">
+                  <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Premium — x402</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">{mcp?.pricing?.premium?.price ?? '—'}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(mcp?.pricing?.premium?.tools ?? []).map((tool) => (
+                    <span key={tool} className="rounded-md border border-[#0052ff]/40 bg-[#0052ff]/20 px-3 py-1.5 font-mono text-xs text-white/90">{tool}</span>
+                  ))}
+                  {!mcp && <span className="font-mono text-xs text-white/40">loading tool registry…</span>}
+                </div>
+                {mcp?.pricing?.premium?.settlementContract && (
+                  <div className="mt-6 border-t border-[#0052ff]/20 pt-4 font-mono text-[11px] text-white/45">settlement {mcp.pricing.premium.settlementContract}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
+            <div className="mb-12 max-w-3xl">
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Proven on X Layer.<br />Now building on Base.</h2>
+              <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
+                Bobby ran in production on OKX X Layer through the hackathon era. Every number below is on-chain and independently verifiable — nothing here is a screenshot.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              {proofPoints.map((point, index) => (
+                <motion.a
+                  key={point.label}
+                  href={point.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  initial={{ opacity: 0, y: 14 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.06 }}
+                  className="group flex flex-col rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-7 transition hover:-translate-y-1 hover:border-[#0052ff]/60"
+                >
+                  <div className="mb-6 flex items-start justify-between">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">{point.label}</span>
+                    <ArrowRight className="h-3.5 w-3.5 -rotate-45 text-white/25 transition group-hover:text-[#7da6ff]" />
+                  </div>
+                  <div className="font-mono text-5xl font-bold tracking-[-0.05em] text-white">{point.value}</div>
+                  <p className="mt-4 text-sm leading-6 text-white/50">{point.detail}</p>
+                  <div className="mt-6 border-t border-white/10 pt-4 font-mono text-[11px] text-[#7da6ff]">{point.proof}</div>
+                </motion.a>
+              ))}
+            </div>
+
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
+              <span>Chain 196 · OKX X Layer</span>
+              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord on OKLink ↗</a>
+              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">AgentEconomy on OKLink ↗</a>
+              <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:grid-cols-8 lg:px-8"><Metric label="Compromisos" value={formatNumber(publicRecord?.commitmentsCreated ?? totalTrades)} detail="creados" /><Metric label="Resueltas" value={formatNumber(publicRecord?.decisionsResolved)} detail="decisiones" /><Metric label="Pendientes" value={formatNumber(publicRecord?.pending)} detail="sin resultado" /><Metric label="Expiradas" value={formatNumber(publicRecord?.expired)} detail="sin liquidación" /><Metric label="Wins / losses" value={publicRecord ? `${publicRecord.wins} / ${publicRecord.losses}` : '—'} detail="resueltas decisivas" /><Metric label="Win rate" value={formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)} detail={publicRecord?.decisionsResolved && publicRecord.decisionsResolved < WIN_RATE_MIN_SAMPLE ? `muestra chica (n=${publicRecord.decisionsResolved})` : 'sobre resueltas'} /><Metric label="Resolución" value={publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'} detail="compromisos con resultado" /><Metric label="Interacciones" value={formatNumber(totalInteractions)} detail="network" /></div></section>
+
+        <footer className="border-t border-white/10 bg-[#050505]">
+          <div className="mx-auto flex max-w-7xl flex-col gap-12 px-5 py-16 lg:px-8">
+            <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+              <div>
+                <BrandMark />
+                <p className="mt-5 max-w-xs text-sm leading-6 text-white/40">
+                  The adversarial decision layer for autonomous finance. Every thesis debated, every decision committed before the outcome.
+                </p>
+                <div className="mt-6 flex items-center gap-4">
+                  <a href="https://twitter.com/bobbyprotocol" target="_blank" rel="noreferrer" aria-label="Twitter" className="text-white/40 transition hover:text-[#7da6ff]"><Twitter className="h-4 w-4" /></a>
+                  <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" target="_blank" rel="noreferrer" aria-label="GitHub" className="text-white/40 transition hover:text-[#7da6ff]"><Github className="h-4 w-4" /></a>
+                </div>
+              </div>
+              {([
+                ['Protocol', [
+                  ['Console', '/protocol/console'],
+                  ['Sandbox', '/protocol/sandbox'],
+                  ['Heartbeat', '/protocol/heartbeat'],
+                  ['Network', '/protocol/network'],
+                ]],
+                ['Build', [
+                  ['Docs', '/protocol/docs'],
+                  ['Playbooks', '/protocol/playbooks'],
+                  ['Harness', '/protocol/harness'],
+                  ['MCP endpoint', '#mcp'],
+                ]],
+                ['Bobby', [
+                  ['War Room', '/agentic-world/bobby'],
+                  ['Track record', '/agentic-world/bobby/history'],
+                  ['Analytics', '/agentic-world/bobby/analytics'],
+                  ['Agents', '/agentic-world/bobby/agents'],
+                ]],
+              ] as const).map(([group, links]) => (
+                <div key={group}>
+                  <div className="mb-5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">{group}</div>
+                  <ul className="space-y-3">
+                    {links.map(([label, href]) => (
+                      <li key={href}>
+                        <a href={href} className="text-sm text-white/60 transition hover:text-[#7da6ff]">{label}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 md:flex-row">
+              <span>© 2026 Bobby Protocol</span>
+              <span>Open decision infrastructure for autonomous agents.</span>
+            </div>
+          </div>
+        </footer>
+      </main>
     </div>
   );
 }

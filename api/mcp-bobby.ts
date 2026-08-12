@@ -10,11 +10,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
 import {
   BOBBY_AGENT_ECONOMY,
-  PREMIUM_MCP_FEE_WEI,
   XLAYER_CHAIN_ID,
   extractPaymentTxHash,
+  readMcpCallFee,
   verifyMcpPaymentTx,
 } from './_lib/xlayer-payments.js';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   createChallenge,
   atomicConsumeChallenge,
@@ -22,6 +23,7 @@ import {
   getChallenge,
 } from './_lib/mcp-challenges.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
+import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
 
 const BASE_URL = 'https://bobbyprotocol.xyz';
 
@@ -153,7 +155,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
       // Agentic Wallet tools (via droplet onchainos service)
       if (toolName === 'bobby_wallet_balance') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'balance', params: { chain: args.chain || 'xlayer' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -161,7 +163,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
       if (toolName === 'bobby_wallet_portfolio') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '196' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -169,7 +171,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
       if (toolName === 'bobby_security_scan') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'scan-token', params: { address: args.address, chain: args.chain || '1' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -177,7 +179,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
       if (toolName === 'bobby_dex_trending') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'trending', params: { chain: args.chain || '1' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -185,7 +187,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
       if (toolName === 'bobby_dex_signals') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'signals', params: { chain: args.chain || '1', type: args.type || 'smart_money' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
@@ -204,13 +206,12 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 // Free tools: tools/list, bobby_intel, bobby_stats, bobby_ta
 // Premium tools: bobby_debate, bobby_analyze, bobby_security_scan
 const PREMIUM_TOOLS = new Set(['bobby_debate', 'bobby_analyze', 'bobby_security_scan', 'bobby_wallet_portfolio']);
-const X402_PRICE_OKB = '0.001';
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
+    const fee = await readMcpCallFee().catch(() => null);
     return res.status(200).json({
       name: 'Bobby Protocol',
-      description: 'Intelligence Protocol on X Layer — 3-agent debate, conviction scoring, adversarial correction. x402 payment for premium tools.',
+      description: `Intelligence Protocol on ${DEFAULT_CHAIN.name} — 3-agent debate, conviction scoring, adversarial correction. x402 payment for premium tools.`,
       version: '3.0.0',
       protocol: 'mcp',
       endpoints: { tools: '/api/mcp-bobby' },
@@ -218,8 +219,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_xlayer_signals', 'bobby_dex_trending', 'bobby_dex_signals', 'bobby_xlayer_quote', 'bobby_uniswap_quote', 'bobby_wallet_balance'],
         premium: {
           tools: Array.from(PREMIUM_TOOLS),
-          price: `${X402_PRICE_OKB} OKB per call`,
-          priceWei: PREMIUM_MCP_FEE_WEI.toString(),
+          price: fee ? `${fee.feeNative} ${fee.nativeSymbol} per call` : 'temporarily unavailable',
+          priceWei: fee?.feeWei ?? null,
           protocol: 'x402',
           chainId: XLAYER_CHAIN_ID,
           settlementContract: BOBBY_AGENT_ECONOMY,
@@ -227,6 +228,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       },
     });
+  }
+
+  if (!await enforcePublicRateLimit(req, res, 'mcp-bobby', 120, 600)) return;
+  if (JSON.stringify(req.body || {}).length > 100_000) {
+    return res.status(413).json({ jsonrpc: '2.0', error: { code: -32600, message: 'Request too large' }, id: null });
   }
 
   const body = req.body as JsonRpcRequest;
@@ -250,9 +256,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!txHash) {
         // No payment: create a new challenge and return 402
         try {
+          const fee = await readMcpCallFee();
           const { challengeId, expiresAt } = await createChallenge(
             toolName,
-            PREMIUM_MCP_FEE_WEI.toString(),
+            fee.feeWei,
             undefined,
             String(req.headers['x-agent-name'] || '').trim() || undefined,
           );
@@ -266,7 +273,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             metadata: {
               challengeId,
               expiresAt,
-              chainId: XLAYER_CHAIN_ID,
+              chainId: fee.chainId,
               paymentContract: BOBBY_AGENT_ECONOMY,
             },
           });
@@ -274,19 +281,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             jsonrpc: '2.0',
             error: {
               code: -32402,
-              message: `Payment required. ${toolName} costs ${X402_PRICE_OKB} OKB on X Layer.`,
+              message: `Payment required. ${toolName} costs ${fee.feeNative} ${fee.nativeSymbol} on ${fee.chainName}.`,
               data: {
                 challengeId,
                 expiresAt,
-                price: X402_PRICE_OKB,
-                priceWei: PREMIUM_MCP_FEE_WEI.toString(),
-                currency: 'OKB',
+                price: fee.feeNative,
+                priceWei: fee.feeWei,
+                currency: fee.nativeSymbol,
                 protocol: 'x402',
-                chain: `X Layer (${XLAYER_CHAIN_ID})`,
-                chainId: XLAYER_CHAIN_ID,
+                chain: `${fee.chainName} (${fee.chainId})`,
+                chainId: fee.chainId,
                 settlementContract: BOBBY_AGENT_ECONOMY,
                 settlementMethod: 'payMCPCall(bytes32 challengeId, string toolName)',
-                instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${X402_PRICE_OKB} OKB. Then retry with x-402-payment: <txHash> and x-challenge-id: ${challengeId}`,
+                instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol}. Then retry with x-402-payment: <txHash> and x-challenge-id: ${challengeId}`,
               },
             },
             id: body.id,
@@ -310,7 +317,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           error: {
             code: -32402,
             message: error?.message || 'Payment verification failed',
-            data: { protocol: 'x402', txHash, chain: `X Layer (${XLAYER_CHAIN_ID})` },
+            data: { protocol: 'x402', txHash, chain: `${DEFAULT_CHAIN.name} (${DEFAULT_CHAIN.id})` },
           },
           id: body.id,
         });

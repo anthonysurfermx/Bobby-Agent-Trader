@@ -14,7 +14,7 @@ export interface RiskPolicy {
   // Guardrails (Principles #2, #5)
   maxDrawdownPct?: number;        // Max portfolio drawdown before auto-block
   maxRecursionDepth?: number;     // Termination limit for agent loops
-  stepBudgetOkb?: string;         // Cost ceiling per session
+  stepBudgetNative?: string;         // Cost ceiling per session
   mode: 'advisory' | 'auto' | 'paper';
 }
 
@@ -53,7 +53,7 @@ export interface HardnessSpec {
   entryPrice: number;
   targetPrice: number;
   stopLossPrice: number;
-  riskAmountOkb?: number;
+  riskAmountNative?: number;
 
   // Thesis Specification (the "contract" of the decision)
   thesis: string;

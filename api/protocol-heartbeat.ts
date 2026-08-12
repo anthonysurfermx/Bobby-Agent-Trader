@@ -5,6 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Interface, formatEther } from 'ethers';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -173,7 +174,7 @@ interface OnChainTx {
   method: string;
   blockNumber: number;
   timestamp: number | null;
-  valueOkb: string;
+  valueNative: string;
 }
 
 interface RpcBlockTx {
@@ -246,7 +247,7 @@ async function fetchRecentTxs(_blockNumber: number): Promise<OnChainTx[]> {
           method: r.reason || r.tool || 'interact',
           blockNumber: 0,
           timestamp: Math.floor(ts),
-          valueOkb: '0',
+          valueNative: '0',
         };
       });
   } catch {
@@ -288,6 +289,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       winRateHex,
       totalTradesHex,
       nextBountyIdHex,
+      minBountyHex,
       recentCycles,
       recentCommerce,
       recentTxs,
@@ -300,6 +302,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData('totalTrades')),
       // Bounties
       ethCall(BOUNTIES, bountiesIface.encodeFunctionData('nextBountyId')),
+      ethCall(BOUNTIES, bountiesIface.encodeFunctionData('minBounty')),
       // Supabase: recent cycles (column is started_at, not created_at)
       withTimeout(
         sbQuery('agent_cycles', 'select=id,status,started_at,vibe_phrase,trades_executed&order=started_at.desc&limit=1'),
@@ -355,20 +358,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Decode nextBountyId from Bounties contract
     let nextBountyId = '0';
+    let minBountyWei = '0';
     try {
       const [nbi] = bountiesIface.decodeFunctionResult('nextBountyId', String(nextBountyIdHex));
       nextBountyId = nbi.toString();
     } catch {
       console.error('[ProtocolHeartbeat] Failed to decode nextBountyId');
     }
+    try {
+      const [minimum] = bountiesIface.decodeFunctionResult('minBounty', String(minBountyHex));
+      minBountyWei = minimum.toString();
+    } catch {
+      console.error('[ProtocolHeartbeat] Failed to decode minBounty');
+    }
 
     // Settlement is the real AgentEconomy on-chain volume.
     // Protocol totals keep bounty escrow separate from paid MCP settlement.
-    const economyVolumeOkb = parseFloat(formatEther(BigInt(totalVolumeWei)));
+    const economyVolumeNative = parseFloat(formatEther(BigInt(totalVolumeWei)));
     const winRate = parseInt(winRateBps) / 100;
     const totalBounties = Math.max(0, parseInt(nextBountyId) - 1);
-    const bountyEscrowOkb = totalBounties * 0.001;
-    const protocolNotionalOkb = economyVolumeOkb + bountyEscrowOkb;
+    const bountyEscrowNative = totalBounties * parseFloat(formatEther(BigInt(minBountyWei)));
+    const protocolNotionalNative = economyVolumeNative + bountyEscrowNative;
 
     // Last cycle (column is started_at)
     const lastCycle = Array.isArray(recentCycles) && recentCycles.length > 0 ? recentCycles[0] : null;
@@ -386,7 +396,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           status: e.status === 'completed' ? 'paid' : (e.status as string) || 'pending',
           agent: e.ticker ? `pressure-test/${e.ticker}` : null,
           payer: null,
-          amountOkb: null,
+          amountNative: null,
           txHash: null,
           verdict: e.verdict_action || null,
           conviction: typeof e.cio_conviction === 'number' ? e.cio_conviction : null,
@@ -406,23 +416,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       stale: false,
       chain: {
         id: XLAYER_CHAIN_ID,
+        name: DEFAULT_CHAIN.name,
+        nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+        explorerUrl: DEFAULT_CHAIN.explorerUrl,
         blockNumber,
         status: blockAge,
       },
       treasury: {
         address: TREASURY,
-        balanceOkb: formatEther(BigInt(treasuryWei)),
+        balanceNative: formatEther(BigInt(treasuryWei)),
       },
       revenue: {
-        totalVolumeOkb: economyVolumeOkb.toFixed(4),
+        totalVolumeNative: economyVolumeNative.toFixed(4),
+        nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
         totalPayments: parseInt(totalPayments),
         totalMcpCalls: parseInt(totalMcpCalls),
         totalDebates: parseInt(totalDebates),
       },
       protocolTotals: {
-        bountyEscrowOkb: bountyEscrowOkb.toFixed(4),
+        bountyEscrowNative: bountyEscrowNative.toFixed(4),
         totalBounties,
-        protocolNotionalOkb: protocolNotionalOkb.toFixed(4),
+        protocolNotionalNative: protocolNotionalNative.toFixed(4),
         totalInteractions: parseInt(totalPayments) + totalBounties,
       },
       performance: {
@@ -486,10 +500,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       stale: false,
       error: msg,
       timestamp: new Date().toISOString(),
-      chain: { id: XLAYER_CHAIN_ID, blockNumber: 0, status: 'degraded' },
-      treasury: { address: TREASURY, balanceOkb: '0.0000' },
-      revenue: { totalVolumeOkb: '0.0000', totalPayments: 0, totalMcpCalls: 0, totalDebates: 0 },
-      protocolTotals: { bountyEscrowOkb: '0.0000', totalBounties: 0, protocolNotionalOkb: '0.0000', totalInteractions: 0 },
+      chain: { id: XLAYER_CHAIN_ID, name: DEFAULT_CHAIN.name, nativeSymbol: DEFAULT_CHAIN.nativeSymbol, explorerUrl: DEFAULT_CHAIN.explorerUrl, blockNumber: 0, status: 'degraded' },
+      treasury: { address: TREASURY, balanceNative: '0.0000' },
+      revenue: { totalVolumeNative: '0.0000', nativeSymbol: DEFAULT_CHAIN.nativeSymbol, totalPayments: 0, totalMcpCalls: 0, totalDebates: 0 },
+      protocolTotals: { bountyEscrowNative: '0.0000', totalBounties: 0, protocolNotionalNative: '0.0000', totalInteractions: 0 },
       performance: { winRate: 0, totalTrades: 0, totalBounties: 0 },
       lastCycle: null,
       recentCommerce: [],

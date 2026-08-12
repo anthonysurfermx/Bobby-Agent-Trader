@@ -24,7 +24,7 @@ contract HardnessRegistryTest is Test {
         address[] memory initialResolvers = new address[](2);
         initialResolvers[0] = resolver1;
         initialResolvers[1] = resolver2;
-        registry = new HardnessRegistry(initialResolvers, 2);
+        registry = new HardnessRegistry(initialResolvers, 2, 0.0001 ether, 0.01 ether, 0.001 ether);
 
         vm.deal(agent1, 10 ether);
         vm.deal(agent2, 10 ether);
@@ -70,7 +70,7 @@ contract HardnessRegistryTest is Test {
         initialResolvers[0] = resolver1;
 
         vm.expectRevert(HardnessRegistry.ThresholdTooHigh.selector);
-        new HardnessRegistry(initialResolvers, 2);
+        new HardnessRegistry(initialResolvers, 2, 0.0001 ether, 0.01 ether, 0.001 ether);
     }
 
     function test_registerAgent_createsProfile() public {
@@ -250,13 +250,30 @@ contract HardnessRegistryTest is Test {
         assertEq(winRateBps, 10000);
     }
 
-    function test_resolvePrediction_byRegisteredOracleAgent() public {
+    /// @dev Audit Base r4 (CRITICAL): being a registered agent grants NO authority
+    /// over other agents' predictions — the old behavior let anyone register and
+    /// stamp LOSS on a competitor's record.
+    function test_resolvePrediction_registeredAgentCannotResolveOthers() public {
         bytes32 predictionHash = _predictionHash("pred-5");
         vm.prank(agent1);
         registry.commitPrediction(predictionHash, "SOL-USD", 66, 150e8, 175e8, 130e8);
 
         vm.warp(block.timestamp + registry.minPredictionAge());
         vm.prank(agent2);
+        vm.expectRevert(HardnessRegistry.NotAuthorized.selector);
+        registry.resolvePrediction(predictionHash, -800, HardnessRegistry.PredictionResult.LOSS, 138e8);
+    }
+
+    function test_resolvePrediction_byApprovedResolver() public {
+        bytes32 predictionHash = _predictionHash("pred-5b");
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "SOL-USD", 66, 150e8, 175e8, 130e8);
+
+        address approvedResolver = makeAddr("approvedResolver");
+        registry.updateResolver(approvedResolver, true);
+
+        vm.warp(block.timestamp + registry.minPredictionAge());
+        vm.prank(approvedResolver);
         registry.resolvePrediction(predictionHash, -800, HardnessRegistry.PredictionResult.LOSS, 138e8);
 
         (uint256 wins, uint256 losses, uint256 winRateBps) = registry.getAgentStats(agent1);

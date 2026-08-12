@@ -17,13 +17,13 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 120 };
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
-const CYCLE_SECRET = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
 const HAIKU_MODEL = 'gpt-4o-mini';
 
 const PERSONALITY_INSTRUCTIONS: Record<string, string> = {
@@ -92,18 +92,6 @@ interface DebatePayload {
     cio: string;
   };
   signal: DebateSignal;
-}
-
-function isAuthorized(req: VercelRequest): boolean {
-  if (!CYCLE_SECRET) return true;
-  const authHeader = req.headers.authorization;
-  const internalHeader = req.headers['x-internal-secret'];
-  const bodySecret = (req.body as { secret?: string } | undefined)?.secret;
-  const querySecret = typeof req.query.secret === 'string' ? req.query.secret : undefined;
-  return authHeader === `Bearer ${CYCLE_SECRET}`
-    || internalHeader === CYCLE_SECRET
-    || bodySecret === CYCLE_SECRET
-    || querySecret === CYCLE_SECRET;
 }
 
 function sanitizeWallet(wallet: unknown): string | null {
@@ -589,12 +577,11 @@ async function runSingleProfile(
   // Fire-and-forget: deliver to Telegram (DMs + Groups)
   const threadId = typeof thread.id === 'string' ? thread.id : null;
   if (threadId) {
-    const cycleSecret = process.env.BOBBY_CYCLE_SECRET;
     fetch('https://defimexico.org/api/telegram-deliver', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(cycleSecret ? { Authorization: `Bearer ${cycleSecret}` } : {}),
+        ...internalAuthHeaders(),
       },
       body: JSON.stringify({
         thread_id: threadId,
@@ -688,9 +675,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Missing OPENAI_API_KEY' });
   }
 
-  if (!isAuthorized(req)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (!requireInternalAuth(req, res)) return;
 
   const supabase = createClient(SB_URL, SB_SERVICE_KEY);
 

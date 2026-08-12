@@ -33,6 +33,7 @@ import { checkTokenRiskBatch } from './_lib/okx-security.js';
 import { callLlm } from './_lib/llm.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIp } from './_lib/rate-limit.js';
+import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 120 };
 
@@ -952,12 +953,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Auth check for cron (skip for manual)
-  const cronSecret = process.env.CRON_SECRET;
   const isManual = req.query.manual === 'true';
   const walletAddress = isManual ? String(req.query.wallet || '') : '';
-  const hasOperatorAuth = Boolean(cronSecret) && req.headers.authorization === `Bearer ${cronSecret}`;
-  if (cronSecret && !isManual && !hasOperatorAuth) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  const hasOperatorAuth = isInternalRequest(req);
+  if (!isManual && !requireInternalAuth(req, res)) return;
+  if (walletAddress && !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+    return res.status(400).json({ error: 'Invalid wallet address' });
   }
 
   // Manual runs stay public (UI "analyze" button) but each one costs
@@ -1070,7 +1071,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Still generate greetings with Polymarket data even if no OKX signals
       const allProfiles0 = await fetchAdvisorProfiles();
       const profiles0 = isManual
-        ? allProfiles0
+        ? allProfiles0.filter((profile) => profile.wallet_address.toLowerCase() === walletAddress.toLowerCase())
         : allProfiles0.filter(p => new Date().getUTCHours() % (p.scan_interval_hours || 8) === 0);
 
       // Fetch last greetings for memory continuity (parallel)
@@ -1238,7 +1239,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // For manual triggers, send to all profiles. For cron, only send to profiles
     // whose scan_interval_hours divides evenly into the current hour.
     const profiles = isManual
-      ? allProfiles
+      ? allProfiles.filter((profile) => profile.wallet_address.toLowerCase() === walletAddress.toLowerCase())
       : allProfiles.filter(p => {
           const interval = p.scan_interval_hours || 8;
           return currentHour % interval === 0;

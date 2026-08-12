@@ -5,12 +5,14 @@
 // ============================================================
 
 import { useNavigate } from 'react-router-dom';
-import { useAccount } from 'wagmi';
+import { useAccount, useSignMessage } from 'wagmi';
 import AgentWizard from '@/components/kinetic/AgentWizard';
+import { buildAgentAuthChallenge } from '@/lib/agent-request-auth';
 
 export default function DeployAgentPage() {
   const navigate = useNavigate();
   const { address } = useAccount();
+  const { signMessageAsync } = useSignMessage();
 
   const handleComplete = async (config: {
     agent_name: string;
@@ -33,13 +35,28 @@ export default function DeployAgentPage() {
     // If wallet connected, also save to Supabase for persistence
     if (address) {
       try {
+        const payload = {
+          wallet_address: address,
+          agent_name: config.agent_name,
+          voice: config.voice,
+          personality: config.personality,
+          cadence_hours: config.cadence_hours,
+          markets: config.markets,
+          delivery: config.delivery,
+        };
+        const timestamp = new Date().toISOString();
+        const signature = await signMessageAsync({
+          message: buildAgentAuthChallenge('setup-agent', payload, timestamp),
+        });
         const res = await fetch('/api/agent-setup', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            wallet_address: address,
-            ...config,
-          }),
+          headers: {
+            'Content-Type': 'application/json',
+            'x-agent-address': address,
+            'x-agent-timestamp': timestamp,
+            'x-agent-signature': signature,
+          },
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (data.ok && data.agent_profile) {

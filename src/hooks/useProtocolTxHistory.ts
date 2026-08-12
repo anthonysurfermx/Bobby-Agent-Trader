@@ -7,7 +7,7 @@ export interface OnChainTx {
   method: string;
   blockNumber: number;
   timestamp: number | null;
-  valueOkb: string;
+  valueNative: string;
 }
 
 interface HistoricalTxResponse {

@@ -44,13 +44,14 @@ interface CycleRow {
 
 interface StatsResponse {
   ok: boolean;
-  treasury: { balanceOkb: string };
+  chain: { id: number; name: string; nativeSymbol: string; explorerUrl: string };
+  treasury: { balanceNative: string };
   contracts: {
     trackRecord: { stats: { totalTrades: string; totalCommitments: string; winRateBps: string } };
     adversarialBounties: { totalPosted: number };
-    agentEconomy: { stats: { totalDebates: string; totalVolumeOkb: string } };
+    agentEconomy: { stats: { totalDebates: string; totalVolumeNative: string } };
   };
-  protocolTotals: { protocolNotionalOkb: string };
+  protocolTotals: { protocolNotionalNative: string };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -109,13 +110,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // On-chain proof
   const onChain = stats ? {
-    treasury_okb: stats.treasury.balanceOkb,
+    chain: stats.chain,
+    treasury_native: stats.treasury.balanceNative,
     total_commitments: Number(stats.contracts.trackRecord.stats.totalCommitments),
     total_trades: Number(stats.contracts.trackRecord.stats.totalTrades),
     win_rate_pct: Number(stats.contracts.trackRecord.stats.winRateBps) / 100,
     total_bounties: stats.contracts.adversarialBounties.totalPosted,
     total_debates: Number(stats.contracts.agentEconomy.stats.totalDebates),
-    protocol_volume_okb: stats.protocolTotals.protocolNotionalOkb,
+    protocol_volume_native: stats.protocolTotals.protocolNotionalNative,
   } : null;
 
   // Guardrails status

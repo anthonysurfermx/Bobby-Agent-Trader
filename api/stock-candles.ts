@@ -9,7 +9,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 export const config = { maxDuration: 10 };
 
 const VALID_RANGES: Record<string, { range: string; interval: string }> = {
-  '7d': { range: '7d', interval: '1d' },
+  '7d': { range: '7d', interval: '1h' },
   '30d': { range: '1mo', interval: '1d' },
   '90d': { range: '3mo', interval: '1d' },
 };
@@ -21,7 +21,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const symbol = ((req.query.symbol as string) || 'NVDA').toUpperCase();
   const rangeKey = (req.query.range as string) || '7d';
-  const config = VALID_RANGES[rangeKey] || VALID_RANGES['7d'];
+  const requestedInterval = (req.query.interval as string) || '';
+  const allowedIntervals = new Set(['15m', '1h', '1d']);
+  const baseConfig = VALID_RANGES[rangeKey] || VALID_RANGES['7d'];
+  const config = allowedIntervals.has(requestedInterval) ? { ...baseConfig, interval: requestedInterval } : baseConfig;
 
   // Validate symbol (letters only, 1-5 chars)
   if (!/^[A-Z]{1,5}$/.test(symbol)) {

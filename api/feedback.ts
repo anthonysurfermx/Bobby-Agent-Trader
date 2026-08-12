@@ -5,23 +5,30 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const NOTIFY_EMAIL = 'anthochavez.ra@gmail.com';
 const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[char] || char);
+}
+
 async function sendEmailNotification(feedback: Record<string, unknown>): Promise<void> {
-  const type = String(feedback.type || 'bug').toUpperCase();
+  const type = escapeHtml(String(feedback.type || 'bug').toUpperCase());
   const emoji = type === 'BUG' ? '🐛' : type === 'FEATURE' ? '💡' : '💬';
-  const from = String(feedback.user_email || feedback.wallet_address || 'Anonymous');
+  const from = escapeHtml(feedback.user_email || feedback.wallet_address || 'Anonymous');
   const subject = `${emoji} Bobby Feedback: ${type} — ${from}`;
   const body = `<h2>${emoji} Bobby Feedback</h2>
 <p><strong>Type:</strong> ${type}</p>
 <p><strong>From:</strong> ${from}</p>
-<p><strong>Page:</strong> ${feedback.page || 'unknown'}</p>
+<p><strong>Page:</strong> ${escapeHtml(feedback.page || 'unknown')}</p>
 <p><strong>Message:</strong></p>
-<blockquote style="border-left:3px solid #10b981;padding-left:12px;color:#333">${feedback.message}</blockquote>
+<blockquote style="border-left:3px solid #10b981;padding-left:12px;color:#333">${escapeHtml(feedback.message)}</blockquote>
 <p style="color:#999;font-size:12px">${new Date().toLocaleString('es-MX')}</p>`;
 
   try {
@@ -50,6 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'feedback', 5, 3600)) return;
 
   const { type, message, page, context, user_email, wallet_address } = req.body || {};
 

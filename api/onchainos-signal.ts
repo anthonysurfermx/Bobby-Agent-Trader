@@ -8,10 +8,11 @@ import { z } from 'zod';
 import { processAgentSignal } from '../src/lib/onchainos/signal-processor.js';
 import { executeTrade } from '../src/lib/onchainos/client.js';
 import type { SignalResponse } from '../src/lib/onchainos/types.js';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 const SignalRequestSchema = z.object({
-  walletAddress: z.string().min(1),
-  marketSlug: z.string().min(1),
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  marketSlug: z.string().min(1).max(200),
   score: z.number().min(0).max(100),
   direction: z.enum(['YES', 'NO']),
   outcomePrice: z.number().min(0).max(1),
@@ -22,6 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!requireInternalAuth(req, res)) return;
 
   // Validar body con Zod
   const parsed = SignalRequestSchema.safeParse(req.body);

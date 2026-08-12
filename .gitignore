@@ -28,4 +28,20 @@ output/
 .ai/
 .claude/worktrees/
 .claude/launch.json
+.claude/settings.json
 .claude/settings.local.json
+.claude/veronica-token
+.claude/skills/
+.claude/templates/
+.claude/workflows/
+.codex/
+.agents/
+skills-lock.json
+skills/okx-*
+
+# Personal operational data
+trading-journal.md
+
+# Local research/download artifacts
+public/logos/
+src/types/register.ts

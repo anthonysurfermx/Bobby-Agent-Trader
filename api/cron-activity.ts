@@ -5,6 +5,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
@@ -18,14 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'GET only (Vercel cron)' });
   }
 
-  // Auth: Vercel cron sends Authorization: Bearer <CRON_SECRET>
-  const cronSecret = process.env.CRON_SECRET || process.env.BOBBY_CYCLE_SECRET;
-  if (cronSecret) {
-    const auth = req.headers.authorization;
-    if (auth !== `Bearer ${cronSecret}`) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
+  if (!requireInternalAuth(req, res)) return;
 
   try {
     // Call the main generate-activity endpoint
@@ -33,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${cronSecret || ''}`,
+        ...internalAuthHeaders(),
       },
       body: JSON.stringify({
         signals: 3,
@@ -60,6 +54,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const rd = cp.risk_decisions as Record<string, unknown> || {};
           const oc = cp.on_chain as Record<string, unknown> || {};
           const guardrails = cp.guardrails as Record<string, unknown> || {};
+          const chain = oc.chain as Record<string, unknown> || {};
+          const nativeSymbol = String(chain.nativeSymbol || 'native');
           const latest = cp.latest_debate as Record<string, unknown> | null;
 
           const title = `Bobby checkpoint: ${rd.total_debates || 0} debates | ${rd.executed || 0} executed | ${rd.block_rate_pct || 0}% blocked`;
@@ -78,8 +74,8 @@ ${latestStr}
 
 **On-Chain Proof**
 Commitments: ${oc.total_commitments || '—'} | Win rate: ${oc.win_rate_pct || '—'}%
-Bounties: ${oc.total_bounties || '—'} | Treasury: ${oc.treasury_okb || '—'} OKB
-Protocol volume: ${oc.protocol_volume_okb || '—'} OKB
+Bounties: ${oc.total_bounties || '—'} | Treasury: ${oc.treasury_native || '—'} ${nativeSymbol}
+Protocol volume: ${oc.protocol_volume_native || '—'} ${nativeSymbol}
 
 **Guardrails**: ${guardrails.circuit_breaker || 'ARMED'} | Yield parking: ${guardrails.yield_parking || 'STANDBY'}
 Philosophy: **fail-closed** — no consensus → no trade

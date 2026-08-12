@@ -89,6 +89,36 @@ const markdownToHtml = (md: string) => {
   return processed;
 };
 
+const TRUSTED_EMBED_HOSTS = new Set([
+  'www.youtube.com',
+  'www.youtube-nocookie.com',
+  'player.vimeo.com',
+]);
+
+function sanitizePostHtml(html: string): string {
+  const sanitized = DOMPurify.sanitize(html, {
+    ADD_TAGS: ['iframe'],
+    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'sandbox', 'referrerpolicy', 'loading'],
+  });
+  const template = document.createElement('template');
+  template.innerHTML = sanitized;
+  template.content.querySelectorAll('iframe').forEach((frame) => {
+    try {
+      const source = new URL(frame.getAttribute('src') || '', window.location.origin);
+      if (source.protocol !== 'https:' || !TRUSTED_EMBED_HOSTS.has(source.hostname)) {
+        frame.remove();
+        return;
+      }
+      frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation');
+      frame.setAttribute('referrerpolicy', 'no-referrer');
+      frame.setAttribute('loading', 'lazy');
+    } catch {
+      frame.remove();
+    }
+  });
+  return template.innerHTML;
+}
+
 // Splits content into alternating HTML segments and DefiChart components
 const PostContent = ({ content }: { content: string }) => {
   // Split on [defichart:type:identifier] tags
@@ -121,7 +151,7 @@ const PostContent = ({ content }: { content: string }) => {
     return (
       <div
         className="prose prose-lg max-w-none text-foreground prose-headings:text-foreground prose-p:text-muted-foreground prose-a:text-primary prose-strong:text-foreground prose-code:text-foreground prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground [&_iframe]:rounded-xl [&_iframe]:border [&_iframe]:border-border"
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent, { ADD_TAGS: ['iframe'], ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling'] }) }}
+        dangerouslySetInnerHTML={{ __html: sanitizePostHtml(htmlContent) }}
       />
     );
   }
@@ -130,7 +160,7 @@ const PostContent = ({ content }: { content: string }) => {
     <div className="prose prose-lg max-w-none text-foreground prose-headings:text-foreground prose-p:text-muted-foreground prose-a:text-primary prose-strong:text-foreground prose-code:text-foreground prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground [&_iframe]:rounded-xl [&_iframe]:border [&_iframe]:border-border">
       {segments.map((seg, i) =>
         seg.type === 'html' ? (
-          <div key={i} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(`<p class="mb-4">${seg.html}</p>`, { ADD_TAGS: ['iframe'], ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling'] }) }} />
+          <div key={i} dangerouslySetInnerHTML={{ __html: sanitizePostHtml(`<p class="mb-4">${seg.html}</p>`) }} />
         ) : (
           <DefiChart key={i} type={seg.chartType} identifier={seg.identifier} />
         )

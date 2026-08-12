@@ -7,6 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther, Interface } from 'ethers';
 import { countAgents } from './_lib/hardness-control-plane.js';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -79,8 +80,8 @@ const BOUNTY_DIMENSIONS = [
 type BountyDimensionSummary = {
   totalCount: number;
   openCount: number;
-  avgRewardOkb: number | null;
-  maxRewardOkb: number | null;
+  avgRewardNative: number | null;
+  maxRewardNative: number | null;
 };
 
 function emptyBountySummary(): Record<string, BountyDimensionSummary> {
@@ -90,8 +91,8 @@ function emptyBountySummary(): Record<string, BountyDimensionSummary> {
       {
         totalCount: 0,
         openCount: 0,
-        avgRewardOkb: null,
-        maxRewardOkb: null,
+        avgRewardNative: null,
+        maxRewardNative: null,
       },
     ]),
   );
@@ -115,17 +116,17 @@ async function getBountySummary(nextBountyId: number): Promise<Record<string, Bo
       const dimension = bounty.dimension in summary ? bounty.dimension : null;
       if (!dimension) continue;
 
-      const rewardOkb = Number(bounty.rewardOkb || 0);
+      const rewardNative = Number(bounty.rewardNative || 0);
       const current = summary[dimension];
-      const totalReward = (current.avgRewardOkb ?? 0) * current.totalCount + rewardOkb;
+      const totalReward = (current.avgRewardNative ?? 0) * current.totalCount + rewardNative;
       const nextTotalCount = current.totalCount + 1;
 
       summary[dimension] = {
         totalCount: nextTotalCount,
         openCount: current.openCount + (bounty.status === 'OPEN' ? 1 : 0),
-        avgRewardOkb: totalReward / nextTotalCount,
-        maxRewardOkb:
-          current.maxRewardOkb === null ? rewardOkb : Math.max(current.maxRewardOkb, rewardOkb),
+        avgRewardNative: totalReward / nextTotalCount,
+        maxRewardNative:
+          current.maxRewardNative === null ? rewardNative : Math.max(current.maxRewardNative, rewardNative),
       };
     }
   }
@@ -266,12 +267,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalMcpCalls: '0',
       totalSignalAccesses: '0',
       totalVolumeWei: '0',
-      totalVolumeOkb: '0',
+      totalVolumeNative: '0',
       totalPayments: '0',
     }),
     safe(getOracleStats, { symbolCount: '0' }),
     safe(getTrackRecordStats, { totalTrades: '0', totalCommitments: '0', winRateBps: '0' }),
-    safe(readMinBounty, { minBountyWei: '0', minBountyOkb: '0' }),
+    safe(readMinBounty, { minBountyWei: '0', minBountyNative: '0', minBountyOkb: '0' }),
     safe(readNextBountyId, 1),
     safe(() => listRecentBounties(6), []),
     safe(() => getContractLastActivity(BOBBY_AGENT_ECONOMY), null),
@@ -298,20 +299,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Keep paid MCP settlement separate from bounty escrow.
   const totalBountiesPosted = Math.max(0, bountyNextId - 1);
-  const bountyEscrowOkb = totalBountiesPosted * 0.001;
-  const economyVol = parseFloat(economyStats.totalVolumeOkb || '0');
-  const protocolNotionalOkb = (economyVol + bountyEscrowOkb).toFixed(4);
+  const bountyEscrowNative = totalBountiesPosted * Number(bountyMin.minBountyNative || '0');
+  const economyVol = parseFloat(economyStats.totalVolumeNative || '0');
+  const protocolNotionalNative = (economyVol + bountyEscrowNative).toFixed(4);
+  const onchainCommitments = Number(trackRecordStats.totalCommitments || 0);
+  const onchainResolved = Number(trackRecordStats.totalTrades || 0);
+  const onchainWinRate = onchainResolved > 0 ? Number((Number(trackRecordStats.winRateBps || 0) / 100).toFixed(1)) : null;
 
   // Supabase debate + resolution stats (real activity beyond on-chain contracts)
   const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
   const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-  let debateStats = { totalDebates: 0, resolved: 0, wins: 0, losses: 0, breakEven: 0, winRate: 0, pending: 0 };
+  let debateStats = {
+    totalDebates: 0,
+    commitmentsCreated: 0,
+    decisionsResolved: 0,
+    expired: 0,
+    wins: 0,
+    losses: 0,
+    breakEven: 0,
+    winRate: 0,
+    resolutionRate: 0,
+    pending: 0,
+  };
   if (SB_KEY) {
     try {
-      const [threadsRes, eventsRes] = await Promise.all([
-        fetch(`${SB_URL}/rest/v1/forum_threads?select=resolution&entry_price=not.is.null`, {
-          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-        }).then(r => r.ok ? r.json() : []),
+      const countRows = async (filter = '') => {
+        // Audit Base r4 (MEDIUM): mirror the agent_events demo exclusion. No demo
+        // flow writes forum_threads today, but if one ever does (convention:
+        // trigger_data.demo_source), it must not leak into public debate metrics.
+        const demoFilter = '&trigger_data->>demo_source=is.null';
+        const response = await fetch(`${SB_URL}/rest/v1/forum_threads?select=id&entry_price=not.is.null${demoFilter}${filter}`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'count=exact' },
+        });
+        if (!response.ok) return 0;
+        const contentRange = response.headers.get('content-range');
+        return Number(contentRange?.split('/')[1] || 0);
+      };
+      const [commitmentsCreated, pending, wins, losses, breakEven, expired, eventsRes] = await Promise.all([
+        countRows(),
+        countRows('&resolution=eq.pending'),
+        countRows('&resolution=eq.win'),
+        countRows('&resolution=eq.loss'),
+        countRows('&resolution=eq.break_even'),
+        countRows('&resolution=eq.expired'),
         // Exclude demo traffic (meta.demo_source = 'playbooks_page') from public metrics
         fetch(`${SB_URL}/rest/v1/agent_events?select=id&or=(meta->>demo_source.is.null,meta->>demo_source.neq.playbooks_page)`, {
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'count=exact' },
@@ -320,19 +350,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return count ? parseInt(count) : 0;
         }).catch(() => 0),
       ]);
-      const threads = threadsRes as Array<{ resolution: string }>;
-      const resolved = threads.filter(t => t.resolution !== 'pending');
-      const wins = resolved.filter(t => t.resolution === 'win').length;
-      const losses = resolved.filter(t => t.resolution === 'loss').length;
-      const be = resolved.filter(t => t.resolution === 'break_even').length;
+      const decisionsResolved = wins + losses + breakEven;
       debateStats = {
-        totalDebates: threads.length,
-        resolved: resolved.length,
+        totalDebates: commitmentsCreated,
+        commitmentsCreated,
+        decisionsResolved,
+        expired,
         wins,
         losses,
-        breakEven: be,
-        winRate: resolved.length > 0 ? parseFloat(((wins / resolved.length) * 100).toFixed(1)) : 0,
-        pending: threads.length - resolved.length,
+        breakEven,
+        winRate: decisionsResolved > 0 ? parseFloat(((wins / decisionsResolved) * 100).toFixed(1)) : 0,
+        resolutionRate: commitmentsCreated > 0 ? parseFloat(((decisionsResolved / commitmentsCreated) * 100).toFixed(1)) : 0,
+        pending,
       };
       (debateStats as any).harnessEvents = eventsRes;
 
@@ -354,13 +383,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     fetchedAt: new Date().toISOString(),
     chain: {
       id: XLAYER_CHAIN_ID,
+      name: DEFAULT_CHAIN.name,
+      nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+      explorerUrl: DEFAULT_CHAIN.explorerUrl,
       blockNumber,
       rpc: XLAYER_RPC_URL,
     },
     treasury: {
       address: BOBBY_TREASURY,
       balanceWei: treasuryWei.toString(),
-      balanceOkb: formatEther(treasuryWei),
+      balanceNative: formatEther(treasuryWei),
     },
     contracts: {
       agentEconomy: {
@@ -396,12 +428,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     },
     protocolTotals: {
-      mcpSettlementOkb: economyStats.totalVolumeOkb,
+      mcpSettlementNative: economyStats.totalVolumeNative,
       mcpPayments: Number(economyStats.totalPayments || '0'),
-      bountyEscrowOkb: bountyEscrowOkb.toFixed(4),
+      bountyEscrowNative: bountyEscrowNative.toFixed(4),
       bountyCount: totalBountiesPosted,
-      protocolNotionalOkb,
+      protocolNotionalNative,
       totalInteractions: Number(economyStats.totalPayments || '0') + totalBountiesPosted,
+    },
+    onchainRecord: {
+      commitmentsCreated: onchainCommitments,
+      decisionsResolved: onchainResolved,
+      pending: Math.max(0, onchainCommitments - onchainResolved),
+      winRate: onchainWinRate,
     },
     bounties: recentBounties,
     bountySummary,

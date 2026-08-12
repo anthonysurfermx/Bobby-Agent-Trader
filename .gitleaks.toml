@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known public identifiers: Supabase anon JWT, EVM addresses, and a localStorage key"
+regexTarget = "match"
+regexes = [
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0\.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4''',
+  '''0x[a-fA-F0-9]{40}''',
+  '''mercado-lp-enhancements-v1''',
+]

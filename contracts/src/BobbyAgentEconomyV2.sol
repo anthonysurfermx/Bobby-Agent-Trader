@@ -29,18 +29,26 @@ contract BobbyAgentEconomyV2 {
     );
 
     event Withdrawal(address indexed to, uint256 amount);
+    event OwnershipTransferStarted(address indexed currentOwner, address indexed pendingOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event FeesUpdated(uint256 mcpCallFee, uint256 debateFeePerAgent);
     event Paused(address indexed by);
     event Unpaused(address indexed by);
 
     // ---- State ----
-    address public immutable owner;
+    /// @dev Audit Base r9 [H-02]: owner was immutable, making the D-4 Safe
+    /// handoff impossible post-deploy. Two-step transfer, same pattern as the
+    /// other five contracts.
+    address public owner;
+    address public pendingOwner;
     address public immutable alphaHunter;
     address public immutable redTeam;
     address public immutable cio;
 
-    uint256 public mcpCallFee = 0.001 ether;          // 0.001 OKB
-    uint256 public debateFeePerAgent = 0.0001 ether;   // 0.0001 OKB per agent
+    /// @dev Audit D-3 (r6 #4): fees are constructor-set per deploy — no OKB-era
+    /// literal ever lives in bytecode, not even transiently between deploy txs.
+    uint256 public mcpCallFee;
+    uint256 public debateFeePerAgent;
 
     uint256 public totalMCPCalls;
     uint256 public totalDebates;
@@ -53,10 +61,19 @@ contract BobbyAgentEconomyV2 {
 
     // ---- Constructor ----
     /// @dev Audit R1 fix: validate non-zero addresses
-    constructor(address _alphaHunter, address _redTeam, address _cio) {
+    constructor(
+        address _alphaHunter,
+        address _redTeam,
+        address _cio,
+        uint256 _mcpCallFee,
+        uint256 _debateFeePerAgent
+    ) {
         require(_alphaHunter != address(0), "Invalid alpha");
         require(_redTeam != address(0), "Invalid red");
         require(_cio != address(0), "Invalid cio");
+        require(_mcpCallFee > 0 && _debateFeePerAgent > 0, "Zero fee");
+        mcpCallFee = _mcpCallFee;
+        debateFeePerAgent = _debateFeePerAgent;
         owner = msg.sender;
         alphaHunter = _alphaHunter;
         redTeam = _redTeam;
@@ -153,8 +170,26 @@ contract BobbyAgentEconomyV2 {
     }
 
     // ---- Admin ----
+    /// @dev Audit Base r9 [H-02]: two-step ownership transfer so the D-4 Safe
+    /// handoff is executable and typo-safe (Safe must accept).
+    function transferOwnership(address _newOwner) external onlyOwner {
+        require(_newOwner != address(0), "Zero address");
+        pendingOwner = _newOwner;
+        emit OwnershipTransferStarted(owner, _newOwner);
+    }
+
+    function acceptOwnership() external {
+        require(msg.sender == pendingOwner, "Not pending owner");
+        emit OwnershipTransferred(owner, pendingOwner);
+        owner = pendingOwner;
+        pendingOwner = address(0);
+    }
+
     /// @dev Audit R1 fix: emit FeesUpdated event
+    /// @dev Audit Base r9 [L-03]: same non-zero guard as the constructor — a
+    /// zero fee would hand out free MCP calls and free challengeId consumption.
     function updateFees(uint256 _mcpFee, uint256 _debateFee) external onlyOwner {
+        require(_mcpFee > 0 && _debateFee > 0, "Zero fee");
         mcpCallFee = _mcpFee;
         debateFeePerAgent = _debateFee;
         emit FeesUpdated(_mcpFee, _debateFee);

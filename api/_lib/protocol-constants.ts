@@ -1,16 +1,38 @@
+// ============================================================
+// DEPRECATED — kept only so the 12 existing consumers keep compiling.
+//
+// Every value here now derives from ./chains.ts, which is the single source of
+// truth for chain ids, RPCs, explorers and deployed addresses. Do not add new
+// constants to this file, and prefer importing `getChain` / `DEFAULT_CHAIN`
+// directly in new code.
+//
+// Migration note: these exports resolve against DEFAULT_CHAIN, so flipping
+// PROTOCOL_CHAIN=base moves every legacy consumer to Base at once — which is
+// exactly why the Base addresses must be populated and audited first.
+// ============================================================
+
+import { DEFAULT_CHAIN } from './chains.js';
+
 export const BOBBY_PROTOCOL_BASE_URL =
   process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprotocol.xyz';
 
-export const XLAYER_CHAIN_ID = 196;
-export const XLAYER_RPC_URL = 'https://rpc.xlayer.tech';
-export const XLAYER_RPC_FALLBACK_URL = 'https://xlayerrpc.okx.com';
+// Sepolia smoke test caught the half-migrated shim: addresses followed
+// DEFAULT_CHAIN but these three stayed pinned to XLAYER, so endpoints asked the
+// X Layer RPC about Sepolia addresses (no code there → silent zeros). ALL
+// aliases must move together with PROTOCOL_CHAIN — misleading names and all.
 
-export const BOBBY_TREASURY = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea';
-export const BOBBY_AGENT_ECONOMY = '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871';
-export const BOBBY_ADVERSARIAL_BOUNTIES = '0xa8005ab465a0e02cb14824cd0e7630391fba673d';
-export const BOBBY_TRACK_RECORD = '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
-export const BOBBY_HARDNESS_REGISTRY =
-  process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040';
-export const BOBBY_CONVICTION_ORACLE =
-  process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A';
-export const BOBBY_AGENT_REGISTRY = '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b';
+/** @deprecated use DEFAULT_CHAIN.id / getChain(id) from ./chains.js */
+export const XLAYER_CHAIN_ID = DEFAULT_CHAIN.id;
+/** @deprecated use DEFAULT_CHAIN.rpcUrl */
+export const XLAYER_RPC_URL = DEFAULT_CHAIN.rpcUrl;
+/** @deprecated use DEFAULT_CHAIN.rpcFallbackUrl */
+export const XLAYER_RPC_FALLBACK_URL = DEFAULT_CHAIN.rpcFallbackUrl ?? DEFAULT_CHAIN.rpcUrl;
+
+/** @deprecated use DEFAULT_CHAIN.contracts.* */
+export const BOBBY_TREASURY = DEFAULT_CHAIN.contracts.treasury;
+export const BOBBY_AGENT_ECONOMY = DEFAULT_CHAIN.contracts.agentEconomy;
+export const BOBBY_ADVERSARIAL_BOUNTIES = DEFAULT_CHAIN.contracts.adversarialBounties;
+export const BOBBY_TRACK_RECORD = DEFAULT_CHAIN.contracts.trackRecord;
+export const BOBBY_HARDNESS_REGISTRY = DEFAULT_CHAIN.contracts.hardnessRegistry;
+export const BOBBY_CONVICTION_ORACLE = DEFAULT_CHAIN.contracts.convictionOracle;
+export const BOBBY_AGENT_REGISTRY = DEFAULT_CHAIN.contracts.agentRegistry;

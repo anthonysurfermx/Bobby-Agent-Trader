@@ -7,6 +7,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
+import { recordAuthHeaders } from './_lib/record-auth.js';
+import { enforcePublicRateLimit, isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
 
 const OKX_BASE = 'https://www.okx.com';
 
@@ -132,6 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'okx-perps', 60, 60)) return;
 
   const { action, credentials, params } = req.body as {
     action: string;
@@ -139,23 +142,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     params?: Record<string, any>;
   };
 
-  // ── Auth for mutant actions: require internal secret or user credentials ──
-  const mutantActions = ['open_position', 'close_position', 'set_tpsl'];
-  if (mutantActions.includes(action)) {
-    const internalSecret = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET;
-    const hasUserCreds = credentials?.apiKey && credentials?.secret;
-    const hasInternalAuth = !!internalSecret && params?.internalSecret === internalSecret;
-    const hasHeaderAuth = !!internalSecret && req.headers['x-internal-secret'] === internalSecret;
-    if (!hasUserCreds && !hasInternalAuth && !hasHeaderAuth) {
-      return res.status(401).json({ error: 'Unauthorized — credentials or internal auth required for trading' });
-    }
+  const tradingMode: 'paper' | 'live' = params?.mode === 'live' ? 'live' : 'paper';
+  const allowedActions = new Set([
+    'market_info', 'leverage_info', 'setup_account', 'set_leverage',
+    'open_position', 'close_position', 'set_tpsl', 'positions', 'balance',
+  ]);
+  if (!allowedActions.has(action)) {
+    return res.status(400).json({ error: 'Unsupported action' });
   }
+  const hasUserCreds = Boolean(
+    credentials
+    && typeof credentials.apiKey === 'string' && credentials.apiKey.length >= 8
+    && typeof credentials.secret === 'string' && credentials.secret.length >= 8
+    && typeof credentials.passphrase === 'string' && credentials.passphrase.length >= 1,
+  );
+
+  // Every action that touches an OKX account is private. Public callers may
+  // only request market/leverage metadata. When user credentials are supplied,
+  // those exact credentials are used; they must never act as a boolean bypass
+  // that unlocks Bobby's server-side account.
+  const accountActions = new Set([
+    'setup_account',
+    'set_leverage',
+    'open_position',
+    'close_position',
+    'set_tpsl',
+    'positions',
+    'balance',
+  ]);
+  if (accountActions.has(action) && !hasUserCreds && !requireInternalAuth(req, res)) {
+    return;
+  }
+
+  const resolved = hasUserCreds
+    ? { creds: credentials as OKXCredentials, simulated: tradingMode === 'paper' }
+    : getCredentials(tradingMode);
 
   // ── PUBLIC: Get mark price + funding (no credentials needed) ──
   // ── SETUP: Configure account for perpetual trading ──
   if (action === 'setup_account') {
-    const tradingMode = params?.mode === 'paper' ? 'paper' : 'live';
-    const { creds: setupCreds, simulated } = getCredentials(tradingMode as any);
+    const { creds: setupCreds, simulated } = resolved;
     const c = { ...setupCreds, simulated };
     try {
       // 1. Set position mode to long/short
@@ -233,9 +259,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // ── Resolve credentials based on trading mode ──
-  const tradingMode = (params?.mode === 'live') ? 'live' : 'paper'; // Default: paper
-  const { creds: resolvedCreds, simulated } = getCredentials(tradingMode);
+  // ── Resolve credentials based on the authenticated caller ──
+  const { creds: resolvedCreds, simulated } = resolved;
 
   if (!resolvedCreds.apiKey || !resolvedCreds.secret || !resolvedCreds.passphrase) {
     return res.status(400).json({
@@ -340,13 +365,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // On-chain commit: register this trade prediction on X Layer
       // Skip if caller will handle commit separately (e.g. bobby-cycle)
-      if (!params?.skipOnchainCommit) {
+      if (!params?.skipOnchainCommit && isInternalRequest(req)) {
         try {
           const commitRes = await fetch(
             `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-record`,
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', ...recordAuthHeaders() },
               body: JSON.stringify({
                 action: 'commit',
                 threadId: `perp-${symbol}-${orderId}-${Date.now()}`,

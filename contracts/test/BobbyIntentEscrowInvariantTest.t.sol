@@ -159,6 +159,39 @@ contract BobbyIntentEscrowHandler is Test {
         escrow.setPaused(false);
     }
 
+    /// @dev r9 M-01: fuzz ownership transfer/acceptance and keeper rotation —
+    /// the previous handler never exercised these paths, which is why the
+    /// keeper-becomes-owner collapse survived the invariant suite.
+    /// ownershipFuzzCalls exists so coverage is verifiable, never assumed
+    /// (r10 review: the first version of this handler was not allowlisted and
+    /// ran zero times while the report claimed coverage).
+    uint256 public ownershipFuzzCalls;
+
+    function fuzzOwnershipAndRotation(uint256 rawTarget, uint8 rawAction) external {
+        ownershipFuzzCalls++;
+        address[6] memory candidates =
+            [owner, cio, arbiter, keeper, resolver, address(uint160(0x9000 + (rawTarget % 16)))];
+        address target = candidates[bound(rawTarget, 0, 5)];
+        uint8 action = uint8(bound(uint256(rawAction), 0, 2));
+
+        if (action == 0) {
+            vm.prank(owner);
+            try escrow.transferOwnership(target) {} catch {}
+        } else if (action == 1) {
+            address pending = escrow.pendingOwner();
+            if (pending == address(0)) return;
+            vm.prank(pending);
+            try escrow.acceptOwnership() {
+                owner = pending;
+            } catch {}
+        } else {
+            vm.prank(owner);
+            try escrow.rotateRole("keeper", target) {
+                keeper = target;
+            } catch {}
+        }
+    }
+
     function executedCount() external view returns (uint256) {
         return executedHashes.length;
     }
@@ -274,12 +307,15 @@ contract BobbyIntentEscrowInvariantTest is Test {
         escrow = new BobbyIntentEscrow(TEST_CHAIN_ID, TEST_MAX_SIZE, owner, cio, arbiter, keeper, resolver);
         handler = new BobbyIntentEscrowHandler(escrow, owner, cio, arbiter, keeper, resolver);
 
-        bytes4[] memory selectors = new bytes4[](5);
+        bytes4[] memory selectors = new bytes4[](6);
         selectors[0] = BobbyIntentEscrowHandler.executeValid.selector;
         selectors[1] = BobbyIntentEscrowHandler.executeWithBadCioSig.selector;
         selectors[2] = BobbyIntentEscrowHandler.resolveAsResolver.selector;
         selectors[3] = BobbyIntentEscrowHandler.resolveAsNonResolver.selector;
         selectors[4] = BobbyIntentEscrowHandler.pauseAndTryExecute.selector;
+        // r10 review [P2]: the ownership handler was written but never
+        // allowlisted — 0 invocations in 1,000 runs. Now it fuzzes for real.
+        selectors[5] = BobbyIntentEscrowHandler.fuzzOwnershipAndRotation.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
         targetContract(address(handler));
     }
@@ -328,6 +364,9 @@ contract BobbyIntentEscrowInvariantTest is Test {
     }
 
     function invariant_roleSeparationHolds() public view {
+        // r9 M-01: R2-006 must hold across ownership transfers too
+        assertTrue(escrow.owner() != escrow.keeper());
+        assertTrue(escrow.pendingOwner() != escrow.keeper() || escrow.pendingOwner() == address(0));
         assertTrue(escrow.cio() != escrow.arbiter());
         assertTrue(escrow.cio() != escrow.keeper());
         assertTrue(escrow.cio() != escrow.resolver());

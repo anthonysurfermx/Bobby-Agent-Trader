@@ -11,6 +11,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
@@ -150,16 +151,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'POST only' });
   }
 
-  // Auth — accept either BOBBY_CYCLE_SECRET or CRON_SECRET
-  const secrets = [process.env.BOBBY_CYCLE_SECRET, process.env.CRON_SECRET].filter(Boolean);
-  if (secrets.length > 0) {
-    const auth = req.headers.authorization;
-    const bodySecret = (req.body as Record<string, unknown>)?.secret;
-    const matches = secrets.some(s => auth === `Bearer ${s}` || bodySecret === s);
-    if (!matches) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
+  if (!requireInternalAuth(req, res)) return;
 
   const recorderKey = process.env[RECORDER_KEY_ENV];
   if (!recorderKey) {

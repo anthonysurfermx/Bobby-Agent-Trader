@@ -86,3 +86,47 @@ If anything seems off, run `./scripts/panic.sh` — it kills overnight processes
 2. `./scripts/morning-review.sh` to see diffs per branch
 3. Per branch: merge, refine, or delete worktree
 4. No agent action takes effect on `main` without explicit human approval
+
+## Publicación de tesis al dashboard de Veronica
+
+El copiloto es el **motor de tesis** para TODOS los instrumentos (no solo CBRS).
+Una tesis de trading = plan con gatillo de entrada, stop e invalidación — como
+"CBRS: entrar si vela 4H cierra >236, stop 213, TPs 249/263/277, tesis muerta si
+CBRS <215 o BTC <60k".
+
+**Cuándo publicar:** en el momento en que Anthony confirme que YA PUSO las órdenes
+en OKX ("listo, ya están las órdenes", "done", etc.) — esa es la señal de que la
+tesis pasó de idea a ejecución. Publicar inmediatamente, sin que él lo pida, ANTES
+de que las órdenes se llenen (el fill llega después y el dashboard lo vincula).
+Las ideas/planes que se discuten pero aún no tienen órdenes en el exchange NO se
+publican — solo tesis de ejecución:
+
+```bash
+curl -s -X POST https://anthony-investments.vercel.app/api/theses \
+  -H "Authorization: Bearer $(cat .claude/veronica-token)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inst_id": "CBRS",
+    "direction": "long",
+    "trigger_px": 236,
+    "stop_px": 213,
+    "tp_px": [249, 263, 277],
+    "thesis_md": "## Qué vimos\n<contexto del análisis en español llano: estructura, niveles, datos on-chain/noticias>\n\n## Plan\nEntrada: cierre 4H sobre 236 (confirmación, no anticipación). Stop: 213. Objetivos: 249 / 263 / 277.\n\n## Qué la invalida\nCBRS pierde 215 o BTC pierde 60,000."
+  }'
+```
+
+Reglas:
+- `thesis_md` en **español llano** (lo leerá la clienta, no un trader): qué vimos,
+  el plan con números, y qué la invalida. Mínimo 80 caracteres.
+- `inst_id` puede ser el ticker corto ("CBRS") — el sistema lo normaliza a CBRS-USDT-SWAP.
+- Publica una **nueva versión** si la tesis cambia materialmente (la anterior se
+  descarta sola). Si la tesis muere sin trade (ej. rompió la invalidación), no
+  hace falta avisar — queda descartada cuando llegue la siguiente.
+- Cuando las órdenes se llenen, el dashboard detectará el fill (sync cada 15 min)
+  y vinculará la tesis activa de ese instrumento automáticamente. No publicar
+  tesis "después" del fill: el valor está en que existe ANTES.
+- Si es posible, verificar las órdenes reales en OKX (solo lectura) antes de
+  publicar, para que los números de la tesis coincidan con lo realmente colocado.
+- El token vive en `.claude/veronica-token` (gitignoreado — nunca commitearlo).
+  Es write-only (solo publica tesis, no opera ni lee la cuenta). Si se filtra,
+  se revoca en la tabla `agents` del proyecto Supabase `anthony-investments`.

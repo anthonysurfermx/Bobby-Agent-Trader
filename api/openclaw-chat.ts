@@ -8,6 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAdviceMode, type AdviceMode } from '../src/lib/advice-mode.js';
 import { matchInvestorEdgeCasePolicy, type InvestorEdgeCasePolicy } from '../src/lib/investor-edge-cases.js';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || '';
 const OPENCLAW_TOKEN = process.env.OPENCLAW_TOKEN || '';
@@ -900,6 +901,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'openclaw-chat', 30, 600)) return;
 
   const { message, history, language } = req.body as {
     message: string;
@@ -910,6 +912,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'message is required' });
+  }
+  if (message.length > 12_000 || (history?.length || 0) > 30) {
+    return res.status(413).json({ error: 'Request is too large' });
   }
 
   // Sanitize user message: strip XML-like tags and agent markers
@@ -1070,4 +1075,3 @@ async function streamOpenAI(
     res.end();
   }
 }
-

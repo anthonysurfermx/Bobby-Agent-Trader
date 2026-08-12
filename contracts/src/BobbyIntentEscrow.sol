@@ -215,14 +215,19 @@ contract BobbyIntentEscrow {
     }
 
     // ── Admin (F-010) ──
+    /// @dev Audit Base r9 [M-01]: owner != keeper (R2-006) must survive ownership
+    /// transfer, not just construction and rotateRole. Checked at proposal AND
+    /// acceptance because the keeper can be rotated in between.
     function transferOwnership(address next) external onlyOwner {
         if (next == address(0)) revert ZeroAddress();
+        if (next == keeper) revert DuplicateRole();
         pendingOwner = next;
         emit OwnershipTransferStarted(owner, next);
     }
 
     function acceptOwnership() external {
         if (msg.sender != pendingOwner) revert NotPendingOwner();
+        if (msg.sender == keeper) revert DuplicateRole();
         address prev = owner;
         owner = pendingOwner;
         delete pendingOwner;
@@ -241,6 +246,7 @@ contract BobbyIntentEscrow {
         } else if (role == "keeper") {
             if (next == cio || next == arbiter || next == resolver) revert DuplicateRole();
             if (next == owner) revert DuplicateRole(); // R2-006 keeper must not be owner
+            if (next == pendingOwner) revert DuplicateRole(); // r9 M-01: would collide at acceptOwnership
             prev = keeper; keeper = next;
         } else if (role == "resolver") {
             if (next == cio || next == arbiter || next == keeper) revert DuplicateRole();
@@ -341,6 +347,14 @@ contract BobbyIntentEscrow {
     }
 
     // ── Resolve (F-004: available even when paused) ──
+    /// @notice Records the resolver's ATTESTATION of an intent's outcome.
+    /// @dev Audit Base r5 [#4] — decision (2026-08-11): this ledger is an
+    /// attestation record, NOT price-derived truth. `pnlBps` and `resolveHash`
+    /// are supplied by the resolver and are not bound to any oracle or execution
+    /// venue; `overrideResolution` is the correction path within the challenge
+    /// window. Any public surface that displays this PnL MUST label it
+    /// "attested by resolver" and MUST NOT mix it into price-verified metrics
+    /// (e.g. BobbyTrackRecord's win rate, which IS price-bound as of r4).
     function resolveIntent(bytes32 intentHash, int128 pnlBps, bytes32 resolveHash) external onlyResolver {
         Trade storage t = trades[intentHash];
         if (t.state != TradeState.EXECUTED) revert WrongState();

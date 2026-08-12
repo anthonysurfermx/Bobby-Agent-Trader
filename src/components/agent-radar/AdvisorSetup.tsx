@@ -1,7 +1,7 @@
 // ============================================================
 // AdvisorSetup — Iron Man-style AI advisor onboarding
 // 4 steps: Your Name → Name Your Advisor → Pick Categories → Language
-// Stores profile in Supabase + localStorage
+// Stores the profile locally. Remote sync must go through a wallet-signed API.
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -42,9 +42,6 @@ const CATEGORIES = [
 
 const LS_KEY = 'agent_radar_profile';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
-
 // ---- Helpers ----
 
 function loadProfile(): AdvisorProfile | null {
@@ -58,93 +55,13 @@ function saveProfile(profile: AdvisorProfile) {
   localStorage.setItem(LS_KEY, JSON.stringify(profile));
 }
 
-async function upsertProfileToSupabase(profile: AdvisorProfile) {
-  try {
-    // Try update first
-    const updateRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/agent_profiles?wallet_address=eq.${profile.walletAddress}`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify({
-          user_name: profile.userName,
-          advisor_name: profile.advisorName,
-          categories: profile.categories,
-          language: profile.language,
-          scan_interval_hours: profile.scanIntervalHours,
-          updated_at: new Date().toISOString(),
-        }),
-      }
-    );
-
-    // If no rows updated, insert
-    if (updateRes.status === 200) {
-      // Check if any rows were actually updated by trying a count
-      const checkRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/agent_profiles?wallet_address=eq.${profile.walletAddress}&select=id`,
-        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-      );
-      const rows = await checkRes.json();
-      if (Array.isArray(rows) && rows.length === 0) {
-        // Insert new
-        await fetch(`${SUPABASE_URL}/rest/v1/agent_profiles`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-            Prefer: 'return=minimal',
-          },
-          body: JSON.stringify({
-            wallet_address: profile.walletAddress,
-            user_name: profile.userName,
-            advisor_name: profile.advisorName,
-            categories: profile.categories,
-            language: profile.language,
-            scan_interval_hours: profile.scanIntervalHours,
-          }),
-        });
-      }
-    }
-  } catch (err) {
-    console.warn('[AdvisorSetup] Supabase save failed:', err);
-  }
-}
-
-async function fetchProfileFromSupabase(wallet: string): Promise<AdvisorProfile | null> {
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/agent_profiles?wallet_address=eq.${wallet}&select=*&limit=1`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-    );
-    if (!res.ok) return null;
-    const rows = await res.json();
-    if (!Array.isArray(rows) || rows.length === 0) return null;
-    const r = rows[0];
-    return {
-      walletAddress: r.wallet_address,
-      userName: r.user_name,
-      advisorName: r.advisor_name,
-      categories: r.categories,
-      language: r.language,
-      scanIntervalHours: r.scan_interval_hours || 8,
-    };
-  } catch { return null; }
-}
-
 // ---- Hook ----
 
 export function useAdvisorProfile() {
   const { address, isConnected } = useAccount();
   const [profile, setProfile] = useState<AdvisorProfile | null>(loadProfile);
-  const [loading, setLoading] = useState(false);
 
-  // Sync from Supabase when wallet connects
+  // Profiles stay local until the legacy radar has a wallet-signed sync API.
   useEffect(() => {
     if (!isConnected || !address) return;
 
@@ -153,28 +70,17 @@ export function useAdvisorProfile() {
       setProfile(local);
       return;
     }
-
-    // Try Supabase
-    setLoading(true);
-    fetchProfileFromSupabase(address.toLowerCase())
-      .then(p => {
-        if (p) {
-          saveProfile(p);
-          setProfile(p);
-        }
-      })
-      .finally(() => setLoading(false));
+    setProfile(null);
   }, [isConnected, address]);
 
   const saveNewProfile = (p: AdvisorProfile) => {
     saveProfile(p);
     setProfile(p);
-    upsertProfileToSupabase(p);
   };
 
   const needsSetup = isConnected && !profile;
 
-  return { profile, needsSetup, loading, saveNewProfile, isConnected };
+  return { profile, needsSetup, loading: false, saveNewProfile, isConnected };
 }
 
 // ---- Component ----

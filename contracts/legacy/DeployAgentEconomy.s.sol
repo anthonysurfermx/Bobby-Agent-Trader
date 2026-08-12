@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Script.sol";
-import "../src/BobbyAgentEconomy.sol";
+import "./BobbyAgentEconomy.sol";
 
 /// @title Deploy Bobby Agent Economy to X Layer
 /// @dev Run: BOBBY_ADDRESS=0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea forge script script/DeployAgentEconomy.s.sol --rpc-url https://rpc.xlayer.tech --broadcast

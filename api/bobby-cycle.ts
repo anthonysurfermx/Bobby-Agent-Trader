@@ -15,6 +15,7 @@ import { recordHardnessActivity } from './_lib/hardness-registry.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
+import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 300 };
 
@@ -176,13 +177,24 @@ async function callStructuredVerdict(system: string, userMsg: string, timeoutMs 
 // ---- Fetch local internal API ----
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
-  const internalAuth = process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
+  const internalAuth = process.env.INTERNAL_API_SECRET || process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
+  // Sepolia canary fix: on preview/dev deployments self-calls MUST stay on THIS
+  // deployment — routing through the production domain would make the cycle
+  // write on-chain through prod (X Layer, old recorder). VERCEL_URL is the
+  // current deployment host; the bypass header clears SSO protection when
+  // "Protection Bypass for Automation" is enabled on the project.
+  const selfHost =
+    process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production' && process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : BOBBY_PROTOCOL_BASE_URL;
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
   try {
-    const res = await fetch(`${BOBBY_PROTOCOL_BASE_URL}${path}`, {
+    const res = await fetch(`${selfHost}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(internalAuth ? { 'x-internal-secret': internalAuth } : {}),
+        ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
       },
       body: JSON.stringify(body)
     });
@@ -199,7 +211,10 @@ async function fetchLocalApi(path: string, body: any, noFallback = false): Promi
     try {
       const res2 = await fetch(`${host}${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(internalAuth ? { 'x-internal-secret': internalAuth } : {}),
+        },
         body: JSON.stringify(body)
       });
       if (res2.ok) return await res2.json();
@@ -541,24 +556,8 @@ function directionMatchesTechnical(
 
 async function fetchPositions(mode: 'paper' | 'live' = 'live'): Promise<any[]> {
   try {
-    const urls = [
-      'https://defimexico.org/api/okx-perps',
-      'https://defi-mexico-hub.vercel.app/api/okx-perps',
-    ];
-    for (const url of urls) {
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'positions', params: { mode } }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.ok) return data.positions || [];
-        }
-      } catch { continue; }
-    }
-    return [];
+    const data = await fetchLocalApi('/api/okx-perps', { action: 'positions', params: { mode } });
+    return data?.ok ? data.positions || [] : [];
   } catch { return []; }
 }
 
@@ -635,26 +634,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
-  // Auth: Vercel crons send GET with CRON_SECRET, manual POST requires BOBBY_CYCLE_SECRET
-  const cronSecret = process.env.CRON_SECRET;
-  const cycleSecret = process.env.BOBBY_CYCLE_SECRET || cronSecret;
-  if (req.method === 'GET' && cronSecret) {
-    const authHeader = req.headers.authorization;
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return res.status(401).json({ error: 'Unauthorized cron call' });
-    }
-  }
-  if (req.method === 'POST' && cycleSecret) {
-    const bodyKind = (req.body as any)?.kind;
-    // Allow dryrun without auth for testing — dryrun never executes real trades
-    if (bodyKind !== 'challenge_dryrun') {
-      const authHeader = req.headers.authorization;
-      const bodySecret = (req.body as any)?.secret;
-      if (authHeader !== `Bearer ${cycleSecret}` && bodySecret !== cycleSecret) {
-        return res.status(401).json({ error: 'Unauthorized — set BOBBY_CYCLE_SECRET' });
-      }
-    }
-  }
+  // Every path can spend API quota and persist cycle output; live paths can
+  // additionally execute trades and write on-chain, so auth is fail-closed.
+  if (!requireInternalAuth(req, res)) return;
 
   const body = req.method === 'POST' ? (req.body || {}) : {};
   const language = body.language || 'es';
@@ -1329,7 +1311,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
               // 3. Execute Trade on OKX
               const openRes = await fetchLocalApi('/api/okx-perps', {
                 action: 'open_position',
-                params: { symbol, direction, leverage, amount: positionSizeUsd, conviction, mode: okxMode, skipOnchainCommit: true, internalSecret: cycleSecret },
+                params: { symbol, direction, leverage, amount: positionSizeUsd, conviction, mode: okxMode, skipOnchainCommit: true },
               }, true);
 
               if (openRes.ok) {
@@ -1364,14 +1346,14 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                 if (stopPrice || targetPrice) {
                   tpslResult = await fetchLocalApi('/api/okx-perps', {
                     action: 'set_tpsl',
-                    params: { symbol, direction, stopLoss: stopPrice, takeProfit: targetPrice, mode: okxMode, internalSecret: cycleSecret }
+                    params: { symbol, direction, stopLoss: stopPrice, takeProfit: targetPrice, mode: okxMode }
                   }, true /* noFallback */);
                   // If TP/SL failed and we have a stop, this is dangerous — close position
                   if (!tpslResult?.ok && stopPrice) {
                     console.error('[Cycle] TP/SL FAILED — closing unprotected position');
                     const closeRes = await fetchLocalApi('/api/okx-perps', {
                       action: 'close_position',
-                      params: { symbol, direction, mode: okxMode, internalSecret: cycleSecret }
+                      params: { symbol, direction, mode: okxMode }
                     }, true /* noFallback */);
                     // Verify the close actually worked
                     executionResult = null;
@@ -1443,7 +1425,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
         console.log(`[Cycle] Closing position: ${direction} ${symbol}`);
         const closeRes = await fetchLocalApi('/api/okx-perps', {
           action: 'close_position',
-          params: { symbol, direction, mode: okxMode, internalSecret: process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '' }
+          params: { symbol, direction, mode: okxMode }
         }, true);
         if (closeRes?.ok) {
           executionResult = { ...closeRes, action: 'close' };
@@ -1922,12 +1904,11 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
 
     // Deliver Bobby's public debate to active Telegram groups
     if (threadId) {
-      const cycleSecret = process.env.BOBBY_CYCLE_SECRET;
       fetch('https://defimexico.org/api/telegram-deliver', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(cycleSecret ? { Authorization: `Bearer ${cycleSecret}` } : {}),
+          ...internalAuthHeaders(),
         },
         body: JSON.stringify({
           thread_id: threadId,

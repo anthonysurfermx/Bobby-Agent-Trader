@@ -9,6 +9,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { computeHardnessScore, isHardnessRegistryConfigured, recordHardnessActivity } from './_lib/hardness-registry.js';
 import { createProof, createSession, evaluatePolicy, getAgent, updateSession } from './_lib/hardness-control-plane.js';
 import { buildAuthChallenge, verifyAgentRequest } from './_lib/agent-auth.js';
+import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
 
 export const config = { maxDuration: 120 };
 
@@ -88,14 +89,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         headers: ['x-agent-address', 'x-agent-timestamp', 'x-agent-signature'],
         challengeExample: buildAuthChallenge(
           'orchestrate',
-          { agentId: 'your-agent', symbol: 'BTC', direction: 'long', entry: 83000, target: 95000, stop: 78000 },
+          {
+            agentId: 'your-agent',
+            prediction: { symbol: 'BTC', direction: 'long', entry: 83000, target: 95000, stop: 78000, thesis: 'Structured thesis' },
+          },
           new Date().toISOString()
         ),
-        fallback: 'If omitted, Bobby accepts demo-mode orchestration.',
+        fallback: 'Mutations require a wallet signature. On-chain writes require internal authorization.',
       },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+
+  const internalRequest = isInternalRequest(req);
+  if (!internalRequest && !await enforcePublicRateLimit(req, res, 'orchestrate', 10, 3600)) return;
 
   const body = req.body as OrchestrateBody;
   const p = body?.prediction;
@@ -107,6 +114,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       required: ['prediction.symbol', 'prediction.direction', 'prediction.entry', 'prediction.target', 'prediction.stop', 'prediction.thesis'],
       hint: 'Bobby requires a structured spec. Raw "long BTC" is not enough.',
     });
+  }
+  const prices = [p.entry, p.target, p.stop];
+  const validShape = /^[A-Za-z0-9._-]{1,20}$/.test(p.symbol)
+    && (p.direction === 'long' || p.direction === 'short')
+    && prices.every((value) => Number.isFinite(value) && value > 0 && value <= 1e12)
+    && typeof p.thesis === 'string' && p.thesis.length <= 4_000
+    && (!p.catalysts || (Array.isArray(p.catalysts) && p.catalysts.length <= 10
+      && p.catalysts.every((item) => typeof item === 'string' && item.length <= 500)))
+    && (!p.invalidation || (typeof p.invalidation === 'string' && p.invalidation.length <= 1_000))
+    && (!p.timeframe || (typeof p.timeframe === 'string' && p.timeframe.length <= 50))
+    && (!body.agentId || (typeof body.agentId === 'string' && body.agentId.length <= 100))
+    && (!body.agent || (typeof body.agent === 'string' && body.agent.length <= 100))
+    && (!body.intent || (typeof body.intent === 'string' && body.intent.length <= 100))
+    && (p.conviction == null || (Number.isFinite(p.conviction) && p.conviction >= 1 && p.conviction <= 10));
+  const validLevels = p.direction === 'long'
+    ? p.stop < p.entry && p.entry < p.target
+    : p.target < p.entry && p.entry < p.stop;
+  if (!validShape || !validLevels) {
+    return res.status(400).json({ error: 'Invalid or oversized HardnessSpec' });
   }
 
   if (!OPENAI_API_KEY) {
@@ -131,8 +157,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const opts = body.options || {};
   const runDebate = opts.runDebate !== false;
   const runJudge = opts.runJudge !== false;
-  const commitOnchain = opts.commitOnchain !== false;
-  const publishSignal = opts.publishSignal !== false;
+  // Public agents can request analysis, but only an authenticated backend job
+  // may spend the recorder wallet's gas or publish under Bobby's identity.
+  const commitOnchain = internalRequest && opts.commitOnchain !== false;
+  const publishSignal = internalRequest && opts.publishSignal !== false;
   const agentId = body.agentId || body.agent || 'anonymous';
 
   try {
@@ -146,14 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const auth = await verifyAgentRequest(
       req,
       'orchestrate',
-      {
-        agentId,
-        symbol: p.symbol,
-        direction: p.direction,
-        entry: p.entry,
-        target: p.target,
-        stop: p.stop,
-      },
+      body as unknown as Record<string, unknown>,
       agent?.owner_address || null
     );
     if (!auth.ok) {

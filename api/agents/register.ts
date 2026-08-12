@@ -6,8 +6,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { HARDNESS_REGISTRY_ADDRESS } from '../_lib/hardness-registry.js';
-import { getAgent, upsertAgent } from '../_lib/hardness-control-plane.js';
+import { getAgent, hasSupabase, upsertAgent } from '../_lib/hardness-control-plane.js';
 import { buildAuthChallenge, verifyAgentRequest } from '../_lib/agent-auth.js';
+import { enforcePublicRateLimit } from '../_lib/request-security.js';
 
 export const config = { maxDuration: 15 };
 
@@ -42,11 +43,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       auth: {
         headers: ['x-agent-address', 'x-agent-timestamp', 'x-agent-signature'],
         challengeExample: buildAuthChallenge('register-agent', { agentId: 'your-agent', owner: '0x...', name: 'Your Agent' }, new Date().toISOString()),
-        fallback: 'If omitted, Bobby accepts demo-mode registration.',
+        fallback: 'Registration requires a wallet signature from the owner.',
       },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!await enforcePublicRateLimit(req, res, 'agent-register', 10, 3600)) return;
+  if (!hasSupabase()) return res.status(503).json({ error: 'Agent registry storage is not configured' });
 
   const body = req.body as RegisterBody;
 
@@ -68,17 +71,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  const validAgentId = /^[A-Za-z0-9._:-]{1,100}$/.test(body.agentId);
+  const validOwner = /^0x[a-fA-F0-9]{40}$/.test(body.owner);
+  const validName = typeof body.name === 'string' && body.name.trim().length > 0 && body.name.length <= 100;
+  const validUrl = (value?: string) => !value || (() => {
+    try { return new URL(value).protocol === 'https:' && value.length <= 500; } catch { return false; }
+  })();
+  if (!validAgentId || !validOwner || !validName || !validUrl(body.mcpEndpoint) || !validUrl(body.webhookUrl)
+    || (body.capabilities && (!Array.isArray(body.capabilities) || body.capabilities.length > 30
+      || body.capabilities.some((item) => typeof item !== 'string' || item.length > 100)))) {
+    return res.status(400).json({ error: 'Invalid or oversized agent registration' });
+  }
+
+  const existing = await getAgent(body.agentId);
+
   const auth = await verifyAgentRequest(
     req,
     'register-agent',
-    { agentId: body.agentId, owner: body.owner, name: body.name },
-    body.owner
+    body as unknown as Record<string, unknown>,
+    existing?.owner_address || body.owner
   );
   if (!auth.ok) {
     return res.status(401).json({ error: auth.error });
   }
-
-  const existing = await getAgent(body.agentId);
 
   const profile = await upsertAgent({
     agent_id: body.agentId,
@@ -100,6 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     },
     status: 'active',
   });
+  if (!profile) return res.status(502).json({ error: 'Agent registry write failed' });
 
   try {
     // Build metadata URI for on-chain registration

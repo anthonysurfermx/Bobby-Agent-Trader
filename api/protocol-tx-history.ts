@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther } from 'ethers';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -25,8 +26,7 @@ const CONVICTION_ORACLE = BOBBY_CONVICTION_ORACLE;
 const AGENT_REGISTRY = BOBBY_AGENT_REGISTRY;
 const TREASURY = BOBBY_TREASURY;
 
-// Earliest known Bobby protocol deployment block on X Layer from forge broadcasts.
-const PROTOCOL_ACTIVITY_START_BLOCK = 0x34775f3;
+const PROTOCOL_ACTIVITY_START_BLOCK = DEFAULT_CHAIN.protocolDeploymentBlock;
 
 const CONTRACT_NAMES: Record<string, string> = {
   [AGENT_ECONOMY.toLowerCase()]: 'AgentEconomy',
@@ -83,7 +83,7 @@ interface OnChainTx {
   method: string;
   blockNumber: number;
   timestamp: number | null;
-  valueOkb: string;
+  valueNative: string;
 }
 
 let txHistoryCache = new Map<
@@ -166,7 +166,8 @@ function identifyMethod(to: string, input: string): string {
   return 'interact';
 }
 
-// X Layer RPC caps eth_getLogs at 100 blocks per call. We scan a window of
+// The legacy X Layer RPC caps eth_getLogs at 100 blocks per call. The same
+// conservative window also works on Base and keeps request size predictable.
 // recent blocks in parallel chunks of 100, then batch-fetch the unique txs
 // the logs refer to. This is O(events) — not O(blocks) like the old
 // block-by-block scanner, which was timing out past ~2M blocks of gap.
@@ -206,7 +207,7 @@ async function fetchHistoricalTxPage(
 
   // If every chunk failed, surface the first error — something is wrong.
   if (logResults.every((r) => r.status === 'rejected')) {
-    throw new Error('Unable to load logs from X Layer RPC');
+    throw new Error(`Unable to load logs from ${DEFAULT_CHAIN.name} RPC`);
   }
 
   // Dedupe tx hashes across all logs (one tx often emits multiple logs).
@@ -292,7 +293,7 @@ async function fetchHistoricalTxPage(
       method: identifyMethod(txTo, tx.input || '0x'),
       blockNumber: blockNumHex ? parseInt(blockNumHex, 16) : 0,
       timestamp: blockTsMap.get(blockNumHex) ?? null,
-      valueOkb: formatEther(BigInt(tx.value || '0x0')),
+      valueNative: formatEther(BigInt(tx.value || '0x0')),
     };
   });
 
@@ -314,6 +315,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    if (PROTOCOL_ACTIVITY_START_BLOCK <= 0) {
+      return res.status(503).json({
+        ok: false,
+        error: `Protocol deployment block is not configured for ${DEFAULT_CHAIN.name}`,
+      });
+    }
     const latestBlockHex = await rpcCall('eth_blockNumber', []);
     const latestBlock = parseInt(String(latestBlockHex), 16);
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
@@ -326,6 +333,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const page = await fetchHistoricalTxPage(cursor, limit);
     const payload = {
       ok: true,
+      chain: {
+        id: DEFAULT_CHAIN.id,
+        name: DEFAULT_CHAIN.name,
+        nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+        explorerUrl: DEFAULT_CHAIN.explorerUrl,
+      },
       cached: false,
       degraded: false,
       latestBlock,
@@ -365,6 +378,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({
       ok: false,
+      chain: {
+        id: DEFAULT_CHAIN.id,
+        name: DEFAULT_CHAIN.name,
+        nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+        explorerUrl: DEFAULT_CHAIN.explorerUrl,
+      },
       cached: false,
       degraded: true,
       error: message,

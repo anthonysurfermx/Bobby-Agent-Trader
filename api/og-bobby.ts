@@ -11,8 +11,8 @@ export const config = { runtime: 'edge' };
 export default async function handler(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const title = searchParams.get('title') || 'Bobby Agent Trader';
-    const subtitle = searchParams.get('subtitle') || 'Your AI Trading Room — 3 Agents Debate. You Decide.';
+    const title = searchParams.get('title') || 'Agents need a second opinion.';
+    const subtitle = searchParams.get('subtitle') || 'Three agents debate the thesis. Proof lands before capital moves.';
 
     return new ImageResponse(
       ({
@@ -25,7 +25,7 @@ export default async function handler(req: Request) {
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'flex-start',
-            background: 'linear-gradient(135deg, #050505 0%, #0a1a0a 50%, #050505 100%)',
+            background: 'linear-gradient(125deg, #02030a 0%, #061a44 66%, #0052ff 100%)',
             fontFamily: 'monospace',
             padding: '80px',
           },
@@ -47,8 +47,8 @@ export default async function handler(req: Request) {
                         width: '12px',
                         height: '12px',
                         borderRadius: '50%',
-                        background: '#22c55e',
-                        boxShadow: '0 0 10px #22c55e',
+                        background: '#3978ff',
+                        boxShadow: '0 0 14px #3978ff',
                       },
                     },
                   },
@@ -56,12 +56,12 @@ export default async function handler(req: Request) {
                     type: 'span',
                     props: {
                       style: {
-                        color: '#22c55e',
+                        color: '#8fb6ff',
                         fontSize: '14px',
                         letterSpacing: '4px',
                         textTransform: 'uppercase' as const,
                       },
-                      children: 'BUILT ON OKX X LAYER',
+                      children: 'BOBBY PROTOCOL · ADVERSARIAL DECISION LAYER',
                     },
                   },
                 ],
@@ -85,7 +85,7 @@ export default async function handler(req: Request) {
               type: 'p',
               props: {
                 style: {
-                  color: 'rgba(255,255,255,0.5)',
+                  color: 'rgba(235,240,252,0.68)',
                   fontSize: '24px',
                   margin: '0 0 40px 0',
                   maxWidth: '800px',
@@ -111,8 +111,7 @@ export default async function handler(req: Request) {
                         gap: '8px',
                       },
                       children: [
-                        { type: 'span', props: { style: { fontSize: '20px' }, children: '🟢' } },
-                        { type: 'span', props: { style: { color: '#4ade80', fontSize: '16px' }, children: 'Alpha Hunter' } },
+                        { type: 'span', props: { style: { color: '#8fb6ff', fontSize: '16px' }, children: 'ON-CHAIN' } },
                       ],
                     },
                   },
@@ -125,8 +124,7 @@ export default async function handler(req: Request) {
                         gap: '8px',
                       },
                       children: [
-                        { type: 'span', props: { style: { fontSize: '20px' }, children: '🔴' } },
-                        { type: 'span', props: { style: { color: '#f87171', fontSize: '16px' }, children: 'Red Team' } },
+                        { type: 'span', props: { style: { color: '#8fb6ff', fontSize: '16px' }, children: 'ADVERSARIAL' } },
                       ],
                     },
                   },
@@ -139,8 +137,7 @@ export default async function handler(req: Request) {
                         gap: '8px',
                       },
                       children: [
-                        { type: 'span', props: { style: { fontSize: '20px' }, children: '🟡' } },
-                        { type: 'span', props: { style: { color: '#fbbf24', fontSize: '16px' }, children: 'Bobby CIO' } },
+                        { type: 'span', props: { style: { color: '#8fb6ff', fontSize: '16px' }, children: 'VERIFIABLE' } },
                       ],
                     },
                   },

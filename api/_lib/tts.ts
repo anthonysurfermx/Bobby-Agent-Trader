@@ -26,14 +26,19 @@ export interface SpeechResult {
 
 // Deep, authoritative neural voices — the "Bobby Axelrod" tone.
 const EDGE_VOICE: Record<string, string> = {
-  es: process.env.TTS_EDGE_VOICE_ES || 'es-MX-JorgeNeural',
-  en: process.env.TTS_EDGE_VOICE_EN || 'en-US-GuyNeural',
+  // One consistent Bobby identity across every debate card and fallback path.
+  'es:alpha': process.env.TTS_EDGE_VOICE_ES || 'es-MX-DaliaNeural',
+  'es:red': process.env.TTS_EDGE_VOICE_ES || 'es-MX-DaliaNeural',
+  'es:cio': process.env.TTS_EDGE_VOICE_ES || 'es-MX-DaliaNeural',
+  'en:alpha': process.env.TTS_EDGE_VOICE_EN || 'en-US-AriaNeural',
+  'en:red': process.env.TTS_EDGE_VOICE_EN || 'en-US-AriaNeural',
+  'en:cio': process.env.TTS_EDGE_VOICE_EN || 'en-US-AriaNeural',
 };
 
 const MAX_CHARS = 4000;
 
-async function edgeTTS(text: string, lang: string): Promise<SpeechResult> {
-  const voice = EDGE_VOICE[lang] || EDGE_VOICE.es;
+async function edgeTTS(text: string, lang: string, agent = 'cio'): Promise<SpeechResult> {
+  const voice = EDGE_VOICE[`${lang}:${agent}`] || EDGE_VOICE[`${lang}:cio`] || EDGE_VOICE['es:cio'];
   const communicate = new Communicate(text.slice(0, MAX_CHARS), { voice });
   const chunks: Uint8Array[] = [];
   for await (const msg of communicate.stream()) {
@@ -91,9 +96,10 @@ async function openaiTTS(text: string, _lang: string): Promise<SpeechResult> {
  */
 export async function generateSpeech(
   text: string,
-  opts: { lang?: string } = {},
+  opts: { lang?: string; voice?: string } = {},
 ): Promise<SpeechResult | null> {
   const lang = opts.lang || 'es';
+  const agent = opts.voice === 'alpha' || opts.voice === 'red' ? opts.voice : 'cio';
   const clean = (text || '').trim();
   if (!clean) return null;
 
@@ -102,7 +108,7 @@ export async function generateSpeech(
 
   for (const fn of chain) {
     try {
-      return await fn(clean, lang);
+      return await fn(clean, lang, agent);
     } catch (err) {
       console.error('[tts]', fn.name, err instanceof Error ? err.message : err);
     }

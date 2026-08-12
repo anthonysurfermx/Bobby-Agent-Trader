@@ -9,6 +9,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { generateSpeech } from './_lib/tts.js';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 30 };
 
@@ -16,15 +17,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 20, 600)) return;
 
-  const { text, lang = 'es' } = req.body as { text?: string; voice?: string; lang?: string };
+  const { text, voice = 'cio', lang = 'es' } = req.body as { text?: string; voice?: string; lang?: string };
 
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'text is required' });
   }
+  if (text.length > 2_000) {
+    return res.status(413).json({ error: 'text exceeds 2000 characters' });
+  }
 
   try {
-    const speech = await generateSpeech(text, { lang });
+    const speech = await generateSpeech(text, { lang, voice });
     if (!speech) {
       return res.status(502).json({ error: 'TTS synthesis failed' });
     }

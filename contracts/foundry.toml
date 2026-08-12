@@ -1,8 +1,12 @@
 [profile.default]
-src = "."
+# r9 M-06: production source is ONLY src/ — a root-level duplicate once made
+# `forge inspect BobbyTrackRecord` ambiguous and pointed the generic artifact
+# at a stale, vulnerable copy. legacy/ (X Layer-era V1, Counter) is not compiled.
+src = "src"
 test = "test"
 out = "out"
 libs = ["lib"]
+fs_permissions = [{ access = "read-write", path = "./deployments" }]
 solc_version = "0.8.24"
 optimizer = true
 optimizer_runs = 1
@@ -10,7 +14,21 @@ optimizer_runs = 1
 [profile.default.fuzz]
 runs = 256
 
-# X Layer deployment
+# X Layer (legacy) + Base deployment
 [rpc_endpoints]
 xlayer = "https://rpc.xlayer.tech"
 xlayer_testnet = "https://testrpc.xlayer.tech"
+base = "https://mainnet.base.org"
+base_sepolia = "https://sepolia.base.org"
+# r10.2: the public sepolia.base.org endpoint rate-limits at 3 req/s, which
+# stalls the dry-run's burst of view calls (Codex hit this on 193973a). These
+# alternates handled a 12-call burst with no throttling — prefer them for
+# dry-run and verify. Override at will with `--rpc-url <url>`.
+base_sepolia_publicnode = "https://base-sepolia-rpc.publicnode.com"
+base_sepolia_drpc = "https://base-sepolia.drpc.org"
+
+# BaseScan verification — set BASESCAN_API_KEY in env (one key works for both
+# networks on Etherscan V2). `forge script ... --verify` picks these up by chain.
+[etherscan]
+base = { key = "${BASESCAN_API_KEY}", chain = 8453 }
+base_sepolia = { key = "${BASESCAN_API_KEY}", chain = 84532 }

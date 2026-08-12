@@ -16,7 +16,8 @@ contract DeployAdversarialBounties is Script {
 
         vm.startBroadcast();
 
-        BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(resolver);
+        // Legacy X Layer deploy — OKB-sized params preserved
+        BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(resolver, 0.0001 ether, 0.001 ether);
 
         console.log("=== BOBBY ADVERSARIAL BOUNTIES ===");
         console.log("Contract:", address(bounties));

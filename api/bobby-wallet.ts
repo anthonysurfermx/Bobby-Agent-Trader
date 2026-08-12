@@ -1,20 +1,26 @@
 // ============================================================
 // POST /api/bobby-wallet — Agentic Wallet via OnchainOS on droplet
 // Proxy to the wallet service running onchainos CLI
-// Endpoints: status, balance, addresses, portfolio, send, tx-history
+// Read-only endpoints: status, balance, addresses, portfolio, history and scans
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireInternalAuth } from './_lib/request-security.js';
 
 const WALLET_SERVER = process.env.WALLET_SERVER_URL || 'http://143.110.194.171:8789';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  if (!requireInternalAuth(req, res)) return;
+
   const { action } = req.method === 'POST' ? (req.body || {}) : (req.query as Record<string, string>);
 
   if (!action) {
     return res.status(400).json({
       error: 'Missing action param',
-      available: ['status', 'balance', 'addresses', 'portfolio', 'send', 'tx-history', 'scan-token', 'scan-dapp', 'swap-quote', 'trending', 'signals'],
+      available: ['status', 'balance', 'addresses', 'portfolio', 'tx-history', 'scan-token', 'scan-dapp', 'swap-quote', 'trending', 'signals'],
     });
   }
 
@@ -24,7 +30,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     balance:      { path: '/api/wallet/balance', method: 'GET' },
     addresses:    { path: '/api/wallet/addresses', method: 'GET' },
     portfolio:    { path: '/api/wallet/portfolio', method: 'POST' },
-    send:         { path: '/api/wallet/send', method: 'POST' },
     'tx-history': { path: '/api/wallet/tx-history', method: 'GET' },
     'scan-token': { path: '/api/security/scan-token', method: 'POST' },
     'scan-dapp':  { path: '/api/security/scan-dapp', method: 'POST' },

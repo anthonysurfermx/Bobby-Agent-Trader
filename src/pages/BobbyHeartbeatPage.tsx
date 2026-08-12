@@ -9,18 +9,19 @@ interface HeartbeatData {
   cached?: boolean;
   stale?: boolean;
   error?: string;
-  chain: { id: number; blockNumber: number; status: string };
-  treasury: { address: string; balanceOkb: string };
+  chain: { id: number; name?: string; nativeSymbol?: string; explorerUrl?: string; blockNumber: number; status: string };
+  treasury: { address: string; balanceNative: string };
   revenue: {
-    totalVolumeOkb: string;
+    totalVolumeNative: string;
+    nativeSymbol?: string;
     totalPayments: number;
     totalMcpCalls: number;
     totalDebates: number;
   };
   protocolTotals: {
-    bountyEscrowOkb: string;
+    bountyEscrowNative: string;
     totalBounties: number;
-    protocolNotionalOkb: string;
+    protocolNotionalNative: string;
     totalInteractions: number;
   };
   performance: { winRate: number; totalTrades: number; totalBounties: number };
@@ -37,7 +38,7 @@ interface HeartbeatData {
     status: string;
     agent: string | null;
     payer: string | null;
-    amountOkb: string | null;
+    amountNative: string | null;
     txHash: string | null;
     age: number;
   }>;
@@ -82,10 +83,10 @@ function HealthBadge({ label, status }: { label: string; status: string }) {
     ? 'border-amber-400/30 text-amber-400'
     : 'border-red-400/30 text-red-400';
   return (
-    <div className={`border ${colors} rounded-lg px-3 py-2 flex items-center gap-2 bg-white/[0.02]`}>
+    <div className={`border ${colors} rounded-xl px-3.5 py-2.5 flex items-center gap-2 bg-white/[0.04] backdrop-blur`}>
       <StatusDot status={status} />
-      <span className="text-xs font-mono uppercase">{label}</span>
-      <span className="text-xs font-mono opacity-60">{status}</span>
+      <span className="text-[10px] font-mono uppercase tracking-[0.15em]">{label}</span>
+      <span className="text-[10px] font-mono uppercase tracking-[0.15em] opacity-60">{status}</span>
     </div>
   );
 }
@@ -106,16 +107,16 @@ function commerceLabel(status: string) {
 
 function MetricCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-4">
-      <div className="text-xs font-mono text-white/40 uppercase tracking-wider">{label}</div>
-      <div className="text-2xl font-mono text-green-400 mt-1">{value}</div>
+    <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-4">
+      <div className="text-[10px] font-mono text-white/40 uppercase tracking-[0.15em]">{label}</div>
+      <div className="text-2xl font-mono text-[#7da6ff] mt-1.5 tracking-[-0.04em]">{value}</div>
       {sub && <div className="text-xs font-mono text-white/30 mt-1">{sub}</div>}
     </div>
   );
 }
 
 const CONTRACT_COLORS: Record<string, string> = {
-  HardnessRegistry: 'text-green-400',
+  HardnessRegistry: 'text-[#7da6ff]',
   AdversarialBounties: 'text-amber-400',
   TrackRecord: 'text-cyan-400',
   AgentEconomy: 'text-purple-400',
@@ -169,27 +170,33 @@ export default function BobbyHeartbeatPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Chain-aware labels — served by the API, fallback to X Layer legacy
+  const chainName = data?.chain?.name || 'X Layer';
+  const chainId = data?.chain?.id ?? 196;
+  const sym = data?.chain?.nativeSymbol || data?.revenue?.nativeSymbol || 'OKB';
+  const explorerUrl = data?.chain?.explorerUrl || 'https://www.oklink.com/xlayer';
+
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <div className="min-h-screen bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet><title>Protocol Heartbeat | Bobby Agent Trader</title></Helmet>
 
       {/* Header */}
-      <div className="border-b border-white/[0.04] px-6 py-4 flex items-center justify-between">
+      <div className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <a href="/protocol" className="text-white/40 hover:text-green-400 transition text-sm font-mono">
-            &larr; PROTOCOL
+          <a href="/protocol" className="text-white/45 hover:text-[#7da6ff] transition text-[10px] font-mono uppercase tracking-[0.15em]">
+            &larr; Protocol
           </a>
-          <h1 className="text-lg font-mono text-green-400 tracking-wider">PROTOCOL HEARTBEAT</h1>
+          <h1 className="text-lg font-extrabold tracking-[-0.07em] text-white">Protocol heartbeat</h1>
           {data?.health && <StatusDot status={data.health.overall} />}
         </div>
-        <div className="text-xs font-mono text-white/30">
+        <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-white/30">
           Last refresh: {lastRefresh.toLocaleTimeString()}
         </div>
       </div>
 
       {loading && !data ? (
         <div className="flex items-center justify-center h-64">
-          <div className="text-green-400 font-mono animate-pulse">Connecting to X Layer...</div>
+          <div className="text-[#7da6ff] font-mono text-xs uppercase tracking-[0.15em] animate-pulse">Connecting on-chain...</div>
         </div>
       ) : error && !data ? (
         <div className="flex items-center justify-center h-64">
@@ -201,10 +208,11 @@ export default function BobbyHeartbeatPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="border border-white/[0.04] bg-white/[0.02] rounded-xl p-4"
+            className="border border-white/10 bg-white/[0.04] rounded-2xl p-5"
           >
+            <div className="mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Live protocol health</div>
             <p className="text-sm leading-6 text-white/65">
-              Live X Layer health for Bobby Protocol. Four signals — <span className="text-green-400">X Layer chain</span>, <span className="text-green-400">debate cycle</span>, <span className="text-green-400">on-chain contracts</span>, and <span className="text-green-400">overall</span> — roll up below. Green = operational. Amber = degraded (watch). Red = halted (Bobby stops trading until resolved). Treasury balance, MCP settlements, and bounty escrow below update every 60s and back up the numbers you see on the landing page.
+              Live {chainName} health for Bobby Protocol. Four signals — <span className="text-[#7da6ff]">{chainName} chain</span>, <span className="text-[#7da6ff]">debate cycle</span>, <span className="text-[#7da6ff]">on-chain contracts</span>, and <span className="text-[#7da6ff]">overall</span> — roll up below. Green = operational. Amber = degraded (watch). Red = halted (Bobby stops trading until resolved). Treasury balance, MCP settlements, and bounty escrow below update every 60s and back up the numbers you see on the landing page.
             </p>
           </motion.div>
 
@@ -214,7 +222,7 @@ export default function BobbyHeartbeatPage() {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-wrap gap-3"
           >
-            <HealthBadge label="X Layer" status={data.health.chain} />
+            <HealthBadge label={chainName} status={data.health.chain} />
             <HealthBadge label="Cycle" status={data.health.cycle} />
             <HealthBadge label="Contracts" status={data.health.contracts} />
             <HealthBadge label="Overall" status={data.health.overall} />
@@ -232,22 +240,22 @@ export default function BobbyHeartbeatPage() {
           >
             <MetricCard
               label="Treasury"
-              value={`${parseFloat(data.treasury.balanceOkb).toFixed(4)} OKB`}
+              value={`${parseFloat(data.treasury.balanceNative).toFixed(4)} ${sym}`}
               sub={`${data.treasury.address.slice(0, 10)}...`}
             />
             <MetricCard
               label="Settlement"
-              value={`${parseFloat(data.revenue.totalVolumeOkb).toFixed(4)} OKB`}
+              value={`${parseFloat(data.revenue.totalVolumeNative).toFixed(4)} ${sym}`}
               sub={`${data.revenue.totalPayments} MCP payments settled`}
             />
             <MetricCard
               label="Bounty Escrow"
-              value={`${parseFloat(data.protocolTotals.bountyEscrowOkb).toFixed(4)} OKB`}
+              value={`${parseFloat(data.protocolTotals.bountyEscrowNative).toFixed(4)} ${sym}`}
               sub={`${data.protocolTotals.totalBounties} bounties posted`}
             />
             <MetricCard
               label="Protocol Total"
-              value={`${parseFloat(data.protocolTotals.protocolNotionalOkb).toFixed(4)} OKB`}
+              value={`${parseFloat(data.protocolTotals.protocolNotionalNative).toFixed(4)} ${sym}`}
               sub={`${data.performance.totalTrades} trades · ${data.revenue.totalMcpCalls} MCP calls`}
             />
           </motion.div>
@@ -259,9 +267,9 @@ export default function BobbyHeartbeatPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
+              className="bg-white/[0.04] border border-white/10 rounded-2xl p-5"
             >
-              <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-3">Last Debate Cycle</div>
+              <div className="text-[10px] font-mono text-white/40 uppercase tracking-[0.15em] mb-3">Last Debate Cycle</div>
               {data.lastCycle ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -285,9 +293,9 @@ export default function BobbyHeartbeatPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
+              className="bg-white/[0.04] border border-white/10 rounded-2xl p-5"
             >
-              <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-3">Recent Agent-to-Agent Activity</div>
+              <div className="text-[10px] font-mono text-white/40 uppercase tracking-[0.15em] mb-3">Recent Agent-to-Agent Activity</div>
               {data.recentCommerce.length > 0 ? (
                 <div className="space-y-2">
                   {data.recentCommerce.map((event, i) => (
@@ -303,14 +311,14 @@ export default function BobbyHeartbeatPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         {event.agent && <span className="text-white/20">{event.agent}</span>}
-                        {event.amountOkb && <span className="text-amber-400/70">{parseFloat(event.amountOkb).toFixed(4)} OKB</span>}
+                        {event.amountNative && <span className="text-amber-400/70">{parseFloat(event.amountNative).toFixed(4)} {sym}</span>}
                         {event.payer && <span className="text-white/20">{event.payer}</span>}
                         {event.txHash && (
                           <a
-                            href={`https://www.oklink.com/xlayer/tx/${event.txHash}`}
+                            href={`${explorerUrl}/tx/${event.txHash}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-green-400/50 hover:text-green-400"
+                            className="text-[#7da6ff]/60 hover:text-[#7da6ff]"
                           >
                             ↗
                           </a>
@@ -331,12 +339,12 @@ export default function BobbyHeartbeatPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
-            className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
+            className="bg-white/[0.04] border border-white/10 rounded-2xl p-5"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-xs font-mono text-white/40 uppercase tracking-wider">Live On-Chain Activity</span>
+                <span className="w-2 h-2 bg-[#0052ff] rounded-full animate-pulse shadow-[0_0_14px_rgba(0,82,255,.85)]" />
+                <span className="text-[10px] font-mono text-white/40 uppercase tracking-[0.15em]">Live on-chain activity</span>
               </div>
               <span className="text-xs font-mono text-white/20">{data.recentTxs?.length || 0} txs</span>
             </div>
@@ -349,20 +357,20 @@ export default function BobbyHeartbeatPage() {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.03 }}
-                      href={`https://www.oklink.com/xlayer/tx/${tx.hash}`}
+                      href={`${explorerUrl}/tx/${tx.hash}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between px-3 py-2 bg-white/[0.01] border border-white/[0.03] rounded-lg hover:border-green-400/30 transition group"
+                      className="flex items-center justify-between px-3 py-2 bg-white/[0.02] border border-white/10 rounded-lg hover:border-[#0052ff]/50 transition group"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full flex-shrink-0" />
+                        <span className="w-1.5 h-1.5 bg-[#0052ff] rounded-full flex-shrink-0" />
                         <span className={`text-xs font-mono flex-shrink-0 ${CONTRACT_COLORS[tx.contractName] || 'text-white/60'}`}>
                           {tx.contractName}
                         </span>
                         <span className="text-xs font-mono text-white/50 flex-shrink-0">{tx.method}</span>
-                        {parseFloat(tx.valueOkb) > 0 && (
+                        {parseFloat(tx.valueNative) > 0 && (
                           <span className="text-xs font-mono text-amber-400/60 flex-shrink-0 hidden sm:inline">
-                            {parseFloat(tx.valueOkb).toFixed(4)} OKB
+                            {parseFloat(tx.valueNative).toFixed(4)} {sym}
                           </span>
                         )}
                       </div>
@@ -370,7 +378,7 @@ export default function BobbyHeartbeatPage() {
                         <span className="text-xs font-mono text-white/20">
                           {formatTimestamp(tx.timestamp)}
                         </span>
-                        <span className="text-xs font-mono text-white/15 group-hover:text-green-400 transition hidden md:inline">
+                        <span className="text-xs font-mono text-white/25 group-hover:text-[#7da6ff] transition hidden md:inline">
                           {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)} ↗
                         </span>
                       </div>
@@ -380,7 +388,7 @@ export default function BobbyHeartbeatPage() {
                 {data.recentTxs.length > 6 && (
                   <button
                     onClick={() => setTxExpanded(!txExpanded)}
-                    className="mt-3 w-full py-2 border border-white/[0.06] hover:border-green-400/30 rounded-lg bg-white/[0.01] hover:bg-white/[0.03] transition-all text-xs font-mono uppercase tracking-wider text-white/30 hover:text-green-400"
+                    className="mt-3 w-full py-2.5 rounded-lg border border-white/15 bg-white/10 backdrop-blur transition-all text-[10px] font-mono uppercase tracking-[0.15em] text-white/60 hover:bg-[#0052ff] hover:border-[#0052ff] hover:text-white"
                   >
                     {txExpanded ? `Collapse` : `See all ${data.recentTxs.length} transactions`}
                   </button>
@@ -398,25 +406,25 @@ export default function BobbyHeartbeatPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.37 }}
-            className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
+            className="bg-white/[0.04] border border-white/10 rounded-2xl p-5"
           >
             <button
               onClick={() => setHistoryExpanded((current) => !current)}
               className="w-full flex items-center justify-between gap-4 text-left"
             >
               <div>
-                <div className="text-xs font-mono text-white/40 uppercase tracking-wider">Historical On-Chain Archive</div>
+                <div className="text-[10px] font-mono text-white/40 uppercase tracking-[0.15em]">Historical on-chain archive</div>
                 <div className="text-xs font-mono text-white/20 mt-1">
                   Expand to inspect the full Bobby treasury transaction history across protocol contracts.
                 </div>
               </div>
-              <span className="text-xs font-mono text-green-400 uppercase">
+              <span className="text-[10px] font-mono text-[#7da6ff] uppercase tracking-[0.15em]">
                 {historyExpanded ? 'Collapse' : 'Expand'}
               </span>
             </button>
 
             {historyExpanded && (
-              <div className="mt-4 pt-4 border-t border-white/[0.04]">
+              <div className="mt-4 pt-4 border-t border-white/10">
                 {historyError && (
                   <div className="mb-3 text-xs font-mono text-red-400">
                     Error loading historical archive: {historyError}
@@ -426,7 +434,7 @@ export default function BobbyHeartbeatPage() {
                 {historicalTxs.length > 0 ? (
                   <>
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-mono text-white/30 uppercase tracking-wider">
+                      <span className="text-[10px] font-mono text-white/30 uppercase tracking-[0.15em]">
                         {historicalTxs.length} historical txs loaded
                       </span>
                       <span className="text-xs font-mono text-white/20">
@@ -440,10 +448,10 @@ export default function BobbyHeartbeatPage() {
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: Math.min(i * 0.01, 0.2) }}
-                          href={`https://www.oklink.com/xlayer/tx/${tx.hash}`}
+                          href={`${explorerUrl}/tx/${tx.hash}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center justify-between px-3 py-2 bg-white/[0.01] border border-white/[0.03] rounded-lg hover:border-green-400/30 transition group"
+                          className="flex items-center justify-between px-3 py-2 bg-white/[0.02] border border-white/10 rounded-lg hover:border-[#0052ff]/50 transition group"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <span className="w-1.5 h-1.5 bg-amber-400 rounded-full flex-shrink-0" />
@@ -456,15 +464,15 @@ export default function BobbyHeartbeatPage() {
                             </span>
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
-                            {parseFloat(tx.valueOkb) > 0 && (
+                            {parseFloat(tx.valueNative) > 0 && (
                               <span className="text-xs font-mono text-amber-400/70 hidden sm:inline">
-                                {parseFloat(tx.valueOkb).toFixed(4)} OKB
+                                {parseFloat(tx.valueNative).toFixed(4)} {sym}
                               </span>
                             )}
                             <span className="text-xs font-mono text-white/20">
                               {formatTimestamp(tx.timestamp)}
                             </span>
-                            <span className="text-xs font-mono text-white/15 group-hover:text-green-400 transition hidden md:inline">
+                            <span className="text-xs font-mono text-white/25 group-hover:text-[#7da6ff] transition hidden md:inline">
                               {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)} ↗
                             </span>
                           </div>
@@ -485,7 +493,7 @@ export default function BobbyHeartbeatPage() {
                 {!historyDone && !historyLoading && (
                   <button
                     onClick={fetchHistoricalTxs}
-                    className="mt-3 w-full py-2 border border-white/[0.06] hover:border-green-400/30 rounded-lg bg-white/[0.01] hover:bg-white/[0.03] transition-all text-xs font-mono uppercase tracking-wider text-white/30 hover:text-green-400"
+                    className="mt-3 w-full py-2.5 rounded-lg border border-white/15 bg-white/10 backdrop-blur transition-all text-[10px] font-mono uppercase tracking-[0.15em] text-white/60 hover:bg-[#0052ff] hover:border-[#0052ff] hover:text-white"
                   >
                     Load More History
                   </button>
@@ -499,9 +507,9 @@ export default function BobbyHeartbeatPage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-5"
+            className="bg-white/[0.04] border border-white/10 rounded-2xl p-5"
           >
-            <div className="text-xs font-mono text-white/40 uppercase tracking-wider mb-3">Verified Contracts — X Layer (196)</div>
+            <div className="text-[10px] font-mono text-white/40 uppercase tracking-[0.15em] mb-3">Verified Contracts — {chainName} ({chainId})</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {[
                 { name: 'HardnessRegistry', addr: data.contracts.hardnessRegistry?.address, extra: 'signals + predictions' },
@@ -511,16 +519,16 @@ export default function BobbyHeartbeatPage() {
                 { name: 'ConvictionOracle', addr: data.contracts.convictionOracle?.address, extra: 'real-time feed' },
                 { name: 'AgentRegistry', addr: (data.contracts as any).agentRegistry?.address || '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', extra: 'ERC-721 identity' },
               ].filter(c => c.addr).map((contract) => (
-                <div key={contract.name} className="border border-white/[0.04] rounded-lg p-3">
+                <div key={contract.name} className="border border-white/10 bg-white/[0.02] rounded-xl p-3 transition hover:border-[#0052ff]/40">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs ${CONTRACT_COLORS[contract.name] || 'text-green-400'}`}>&#10003;</span>
+                    <span className={`text-xs ${CONTRACT_COLORS[contract.name] || 'text-[#7da6ff]'}`}>&#10003;</span>
                     <span className={`text-xs font-mono ${CONTRACT_COLORS[contract.name] || 'text-white/60'}`}>{contract.name}</span>
                   </div>
                   <a
-                    href={`https://www.oklink.com/xlayer/address/${contract.addr}`}
+                    href={`${explorerUrl}/address/${contract.addr}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-mono text-green-400/60 hover:text-green-400 transition break-all"
+                    className="text-xs font-mono text-[#7da6ff]/70 hover:text-[#7da6ff] transition break-all"
                   >
                     {contract.addr.slice(0, 10)}...{contract.addr.slice(-8)}
                   </a>
@@ -544,8 +552,8 @@ export default function BobbyHeartbeatPage() {
           </motion.div>
 
           {/* Footer */}
-          <div className="text-center text-xs font-mono text-white/20 pt-4 border-t border-white/[0.04]">
-            Bobby Protocol — Adversarial Trading Intelligence on X Layer
+          <div className="text-center text-[10px] font-mono uppercase tracking-[0.15em] text-white/25 pt-6 border-t border-white/10">
+            Bobby Protocol — Adversarial Trading Intelligence on {chainName}
           </div>
         </div>
       ) : null}

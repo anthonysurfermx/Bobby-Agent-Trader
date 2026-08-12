@@ -148,9 +148,11 @@ contract HardnessRegistry {
     uint256 public predictionTTL = 30 days;
     uint256 public defaultSignalTTL = 24 hours;
 
-    uint96 public constant ABSOLUTE_MIN_BOUNTY = 0.0001 ether;
-    uint96 public constant REGISTRATION_STAKE = 0.01 ether;
-    uint96 public minBounty = 0.001 ether;
+    /// @dev Audit D-3: floors/stakes are immutable per-deploy values, not source
+    /// constants — the old OKB-sized ether literals inflate ~40x as ETH on Base.
+    uint96 public immutable ABSOLUTE_MIN_BOUNTY;
+    uint96 public immutable REGISTRATION_STAKE;
+    uint96 public minBounty;
     uint32 public challengeGracePeriod = 3 days;
     uint32 public defaultClaimWindow = 7 days;
     uint8 public maxChallengesPerBounty = 50;
@@ -265,8 +267,19 @@ contract HardnessRegistry {
         _status = _NOT_ENTERED;
     }
 
-    constructor(address[] memory initialResolvers, uint8 initialThreshold) {
+    constructor(
+        address[] memory initialResolvers,
+        uint8 initialThreshold,
+        uint96 _absoluteMinBounty,
+        uint96 _registrationStake,
+        uint96 _initialMinBounty
+    ) {
+        if (_absoluteMinBounty == 0 || _registrationStake == 0) revert InvalidValue();
+        if (_initialMinBounty < _absoluteMinBounty) revert InvalidValue();
         owner = msg.sender;
+        ABSOLUTE_MIN_BOUNTY = _absoluteMinBounty;
+        REGISTRATION_STAKE = _registrationStake;
+        minBounty = _initialMinBounty;
         emit OwnershipTransferred(address(0), msg.sender);
 
         for (uint256 i = 0; i < initialResolvers.length; i++) {
@@ -408,9 +421,11 @@ contract HardnessRegistry {
         if (exitPrice == 0) revert InvalidValue();
         if (block.timestamp < prediction.minResolveAt) revert TooSoon();
         if (block.timestamp > prediction.committedAt + predictionTTL) revert Expired();
-        if (
-            msg.sender != prediction.agent && !agentProfiles[msg.sender].registered && !resolvers[msg.sender]
-        ) revert NotAuthorized();
+        /// @dev Kimi/Codex audit (Base r4, CRITICAL): being a registered agent must NOT
+        /// grant resolution rights over other agents' predictions — otherwise any
+        /// attacker can register and stamp LOSS on a competitor's record. Only the
+        /// prediction's own agent or an explicitly approved resolver may resolve.
+        if (msg.sender != prediction.agent && !resolvers[msg.sender]) revert NotAuthorized();
         if (result == PredictionResult.NONE || result == PredictionResult.EXPIRED) revert InvalidResult();
 
         if (result == PredictionResult.WIN) {
@@ -554,7 +569,12 @@ contract HardnessRegistry {
         emit ChallengeSubmitted(bountyId, msg.sender, evidenceHash);
     }
 
-    function approveBountyResolution(uint256 bountyId, address winner) external whenNotPaused {
+    /// @dev Audit Base r5 [HIGH]: intentionally NOT `whenNotPaused` — same principle
+    /// as BobbyAdversarialBounties.resolveBounty. Pausing must stop new value
+    /// entering, never settlement of value already owed: a pause spanning the
+    /// grace window would lock resolvers out while the poster's reclaim clock
+    /// keeps running, letting the poster take back a bounty a challenger won.
+    function approveBountyResolution(uint256 bountyId, address winner) external {
         if (!resolvers[msg.sender]) revert NotAuthorized();
         Bounty storage bounty = bounties[bountyId];
         if (bounty.poster == address(0)) revert NotFound();
@@ -728,6 +748,9 @@ contract HardnessRegistry {
     }
 
     function setChallengeGracePeriod(uint32 newGracePeriod) external onlyOwner {
+        /// @dev Audit Base r5 [MED]: cap at 30 days to match BobbyAdversarialBounties —
+        /// an unbounded grace lets a future owner park bounties in limbo indefinitely.
+        if (newGracePeriod > 30 days) revert InvalidValue();
         challengeGracePeriod = newGracePeriod;
     }
 
