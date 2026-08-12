@@ -9,7 +9,7 @@
     "trackRecord": "0xE23c8E749BeEa116734d449F3F4631E0DaBf8Fe0"
   },
   "chainId": 84532,
-  "deployBlock": 45364116,
+  "deployBlock": 45364125,
   "deployer": "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
   "fees": {
     "absoluteMinBountyWei": 2500000000000,
@@ -36,5 +36,80 @@
     "keeper": "0x01b2a464b6Dc0Dc57Fd912d877a7C05502cf3D2e",
     "red": "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
     "resolver": "0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854"
-  }
+  },
+  "deployBlockNote": "real mined block from receipts (earlier value 45364116 was the simulation phase)",
+  "transactions": [
+    {
+      "hash": "0x63ae9b01988e1a9e8ea0505b3602cbabcb47e2e4a9d95af38b9db5ca74b74e01",
+      "block": 45364125,
+      "contractName": "BobbyTrackRecord",
+      "contractAddress": "0xe23c8e749beea116734d449f3f4631e0dabf8fe0",
+      "function": null,
+      "gasUsed": 2755607,
+      "status": "0x1"
+    },
+    {
+      "hash": "0x36f0d91bebd77c7b4cebca237d4f5e9ae9d09eeb17b50a565e2909525e103363",
+      "block": 45364125,
+      "contractName": "BobbyConvictionOracle",
+      "contractAddress": "0xec423bb7649757d09cb5e8d579d3b8acbeb37564",
+      "function": null,
+      "gasUsed": 1636905,
+      "status": "0x1"
+    },
+    {
+      "hash": "0x4be97bcce77c9dafc4d975f1304785280dcece5dd59c019676d9ee83bbe11ceb",
+      "block": 45364125,
+      "contractName": "BobbyAgentEconomyV2",
+      "contractAddress": "0x96f64f997c5e3df922f9811e07991ad9a77b382f",
+      "function": null,
+      "gasUsed": 930873,
+      "status": "0x1"
+    },
+    {
+      "hash": "0x9a89af9dfd7615159aa2a303f18d905bc4d55fec07cd07b242e9f9b41dd36a9f",
+      "block": 45364125,
+      "contractName": "BobbyAdversarialBounties",
+      "contractAddress": "0x3cd9a8a9f6a60853cd60e72a82d4648317280137",
+      "function": null,
+      "gasUsed": 2064685,
+      "status": "0x1"
+    },
+    {
+      "hash": "0x0c16871510189fc4f35021d302fc0685e3856155f2f48cdafa08f55c79d0ca93",
+      "block": 45364125,
+      "contractName": "HardnessRegistry",
+      "contractAddress": "0x9de45730ac13abe5ff36d2babfacc0eb1f656c06",
+      "function": null,
+      "gasUsed": 5232687,
+      "status": "0x1"
+    },
+    {
+      "hash": "0xade59d5d216dee119c05422e5da34237e7ef6242675cd1c688594e3c3bd7bb94",
+      "block": 45364125,
+      "contractName": "BobbyAgentRegistry",
+      "contractAddress": "0xfea7046cec9411c688f4f64f4a8a57c60bd37c6b",
+      "function": null,
+      "gasUsed": 1229455,
+      "status": "0x1"
+    },
+    {
+      "hash": "0xcf9e2986bb3a00f6b69d38d73c78a3365e77c3779ed8ce0fdd4dd75feb0b2256",
+      "block": 45364125,
+      "contractName": "BobbyIntentEscrow",
+      "contractAddress": "0x43e926db0d3a16133bc326567ce3e1a72ea8320f",
+      "function": null,
+      "gasUsed": 1687553,
+      "status": "0x1"
+    },
+    {
+      "hash": "0x99c50d26d13513b55e7ae46165804de65d5dc58bede6d280dd40272167103b18",
+      "block": 45364125,
+      "contractName": "HardnessRegistry",
+      "contractAddress": "0x9de45730ac13abe5ff36d2babfacc0eb1f656c06",
+      "function": "setHardnessScorer(address)",
+      "gasUsed": 46898,
+      "status": "0x1"
+    }
+  ]
 }
