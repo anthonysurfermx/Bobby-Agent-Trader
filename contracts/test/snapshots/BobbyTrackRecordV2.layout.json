@@ -1,200 +1,647 @@
-[
-  {
-    "label": "owner",
-    "slot": "0",
-    "offset": 0,
-    "type": "t_address"
-  },
-  {
-    "label": "pendingOwner",
-    "slot": "1",
-    "offset": 0,
-    "type": "t_address"
-  },
-  {
-    "label": "bobby",
-    "slot": "2",
-    "offset": 0,
-    "type": "t_address"
-  },
-  {
-    "label": "paused",
-    "slot": "2",
-    "offset": 20,
-    "type": "t_bool"
-  },
-  {
-    "label": "minCommitAge",
-    "slot": "3",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "commitments",
-    "slot": "4",
-    "offset": 0,
-    "type": "t_array(t_struct(Commitment)153_storage)dyn_storage"
-  },
-  {
-    "label": "trades",
-    "slot": "5",
-    "offset": 0,
-    "type": "t_array(t_struct(Trade)194_storage)dyn_storage"
-  },
-  {
-    "label": "commitIndex",
-    "slot": "6",
-    "offset": 0,
-    "type": "t_mapping(t_bytes32,t_uint256)"
-  },
-  {
-    "label": "pendingCount",
-    "slot": "7",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "tradeIndex",
-    "slot": "8",
-    "offset": 0,
-    "type": "t_mapping(t_bytes32,t_uint256)"
-  },
-  {
-    "label": "feedOf",
-    "slot": "9",
-    "offset": 0,
-    "type": "t_mapping(t_bytes32,t_bytes32)"
-  },
-  {
-    "label": "approvedPyth",
-    "slot": "10",
-    "offset": 0,
-    "type": "t_mapping(t_address,t_bool)"
-  },
-  {
-    "label": "pythActivatableAt",
-    "slot": "11",
-    "offset": 0,
-    "type": "t_mapping(t_address,t_uint64)"
-  },
-  {
-    "label": "activePyth",
-    "slot": "12",
-    "offset": 0,
-    "type": "t_address"
-  },
-  {
-    "label": "sanityFeedOf",
-    "slot": "13",
-    "offset": 0,
-    "type": "t_mapping(t_bytes32,t_address)"
-  },
-  {
-    "label": "params",
-    "slot": "14",
-    "offset": 0,
-    "type": "t_struct(VerificationParams)108_storage"
-  },
-  {
-    "label": "winsVerified",
-    "slot": "15",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "lossesVerified",
-    "slot": "16",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "totalPnlBpsVerified",
-    "slot": "17",
-    "offset": 0,
-    "type": "t_int256"
-  },
-  {
-    "label": "winsAttested",
-    "slot": "18",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "lossesAttested",
-    "slot": "19",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "totalPnlBpsAttested",
-    "slot": "20",
-    "offset": 0,
-    "type": "t_int256"
-  },
-  {
-    "label": "resolvedVerified",
-    "slot": "21",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "resolvedAttested",
-    "slot": "22",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "expiredVerified",
-    "slot": "23",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "expiredAttested",
-    "slot": "24",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "pendingVerified",
-    "slot": "25",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "pendingAttested",
-    "slot": "26",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "agentWinsByMode",
-    "slot": "27",
-    "offset": 0,
-    "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
-  },
-  {
-    "label": "agentLossesByMode",
-    "slot": "28",
-    "offset": 0,
-    "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
-  },
-  {
-    "label": "agentTradesByMode",
-    "slot": "29",
-    "offset": 0,
-    "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
-  },
-  {
-    "label": "retainedFees",
-    "slot": "30",
-    "offset": 0,
-    "type": "t_uint256"
-  },
-  {
-    "label": "_lock",
-    "slot": "31",
-    "offset": 0,
-    "type": "t_uint256"
+{
+  "storage": [
+    {
+      "label": "owner",
+      "offset": 0,
+      "slot": "0",
+      "type": "t_address"
+    },
+    {
+      "label": "pendingOwner",
+      "offset": 0,
+      "slot": "1",
+      "type": "t_address"
+    },
+    {
+      "label": "bobby",
+      "offset": 0,
+      "slot": "2",
+      "type": "t_address"
+    },
+    {
+      "label": "paused",
+      "offset": 20,
+      "slot": "2",
+      "type": "t_bool"
+    },
+    {
+      "label": "minCommitAge",
+      "offset": 0,
+      "slot": "3",
+      "type": "t_uint256"
+    },
+    {
+      "label": "commitments",
+      "offset": 0,
+      "slot": "4",
+      "type": "t_array(t_struct(Commitment)153_storage)dyn_storage"
+    },
+    {
+      "label": "trades",
+      "offset": 0,
+      "slot": "5",
+      "type": "t_array(t_struct(Trade)194_storage)dyn_storage"
+    },
+    {
+      "label": "commitIndex",
+      "offset": 0,
+      "slot": "6",
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "pendingCount",
+      "offset": 0,
+      "slot": "7",
+      "type": "t_uint256"
+    },
+    {
+      "label": "tradeIndex",
+      "offset": 0,
+      "slot": "8",
+      "type": "t_mapping(t_bytes32,t_uint256)"
+    },
+    {
+      "label": "feedOf",
+      "offset": 0,
+      "slot": "9",
+      "type": "t_mapping(t_bytes32,t_bytes32)"
+    },
+    {
+      "label": "approvedPyth",
+      "offset": 0,
+      "slot": "10",
+      "type": "t_mapping(t_address,t_bool)"
+    },
+    {
+      "label": "pythActivatableAt",
+      "offset": 0,
+      "slot": "11",
+      "type": "t_mapping(t_address,t_uint64)"
+    },
+    {
+      "label": "activePyth",
+      "offset": 0,
+      "slot": "12",
+      "type": "t_address"
+    },
+    {
+      "label": "sanityFeedOf",
+      "offset": 0,
+      "slot": "13",
+      "type": "t_mapping(t_bytes32,t_address)"
+    },
+    {
+      "label": "params",
+      "offset": 0,
+      "slot": "14",
+      "type": "t_struct(VerificationParams)108_storage"
+    },
+    {
+      "label": "winsVerified",
+      "offset": 0,
+      "slot": "15",
+      "type": "t_uint256"
+    },
+    {
+      "label": "lossesVerified",
+      "offset": 0,
+      "slot": "16",
+      "type": "t_uint256"
+    },
+    {
+      "label": "totalPnlBpsVerified",
+      "offset": 0,
+      "slot": "17",
+      "type": "t_int256"
+    },
+    {
+      "label": "winsAttested",
+      "offset": 0,
+      "slot": "18",
+      "type": "t_uint256"
+    },
+    {
+      "label": "lossesAttested",
+      "offset": 0,
+      "slot": "19",
+      "type": "t_uint256"
+    },
+    {
+      "label": "totalPnlBpsAttested",
+      "offset": 0,
+      "slot": "20",
+      "type": "t_int256"
+    },
+    {
+      "label": "resolvedVerified",
+      "offset": 0,
+      "slot": "21",
+      "type": "t_uint256"
+    },
+    {
+      "label": "resolvedAttested",
+      "offset": 0,
+      "slot": "22",
+      "type": "t_uint256"
+    },
+    {
+      "label": "expiredVerified",
+      "offset": 0,
+      "slot": "23",
+      "type": "t_uint256"
+    },
+    {
+      "label": "expiredAttested",
+      "offset": 0,
+      "slot": "24",
+      "type": "t_uint256"
+    },
+    {
+      "label": "pendingVerified",
+      "offset": 0,
+      "slot": "25",
+      "type": "t_uint256"
+    },
+    {
+      "label": "pendingAttested",
+      "offset": 0,
+      "slot": "26",
+      "type": "t_uint256"
+    },
+    {
+      "label": "agentWinsByMode",
+      "offset": 0,
+      "slot": "27",
+      "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
+    },
+    {
+      "label": "agentLossesByMode",
+      "offset": 0,
+      "slot": "28",
+      "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
+    },
+    {
+      "label": "agentTradesByMode",
+      "offset": 0,
+      "slot": "29",
+      "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
+    },
+    {
+      "label": "retainedFees",
+      "offset": 0,
+      "slot": "30",
+      "type": "t_uint256"
+    },
+    {
+      "label": "_lock",
+      "offset": 0,
+      "slot": "31",
+      "type": "t_uint256"
+    }
+  ],
+  "types": {
+    "t_address": {
+      "label": "address",
+      "members": [],
+      "numberOfBytes": "20"
+    },
+    "t_array(t_struct(Commitment)153_storage)dyn_storage": {
+      "label": "struct BobbyTrackRecordV2.Commitment[]",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_array(t_struct(Trade)194_storage)dyn_storage": {
+      "label": "struct BobbyTrackRecordV2.Trade[]",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_bool": {
+      "label": "bool",
+      "members": [],
+      "numberOfBytes": "1"
+    },
+    "t_bytes32": {
+      "label": "bytes32",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_enum(Agent)76": {
+      "label": "enum BobbyTrackRecordV2.Agent",
+      "members": [],
+      "numberOfBytes": "1"
+    },
+    "t_enum(PriceMode)80": {
+      "label": "enum BobbyTrackRecordV2.PriceMode",
+      "members": [],
+      "numberOfBytes": "1"
+    },
+    "t_enum(Result)72": {
+      "label": "enum BobbyTrackRecordV2.Result",
+      "members": [],
+      "numberOfBytes": "1"
+    },
+    "t_int256": {
+      "label": "int256",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_int32": {
+      "label": "int32",
+      "members": [],
+      "numberOfBytes": "4"
+    },
+    "t_int64": {
+      "label": "int64",
+      "members": [],
+      "numberOfBytes": "8"
+    },
+    "t_mapping(t_address,t_bool)": {
+      "label": "mapping(address => bool)",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_address,t_uint64)": {
+      "label": "mapping(address => uint64)",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_bytes32,t_address)": {
+      "label": "mapping(bytes32 => address)",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_bytes32,t_bytes32)": {
+      "label": "mapping(bytes32 => bytes32)",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_bytes32,t_uint256)": {
+      "label": "mapping(bytes32 => uint256)",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))": {
+      "label": "mapping(enum BobbyTrackRecordV2.Agent => mapping(enum BobbyTrackRecordV2.PriceMode => uint256))",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_mapping(t_enum(PriceMode)80,t_uint256)": {
+      "label": "mapping(enum BobbyTrackRecordV2.PriceMode => uint256)",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_string_storage": {
+      "label": "string",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_struct(Commitment)153_storage": {
+      "label": "struct BobbyTrackRecordV2.Commitment",
+      "members": [
+        {
+          "label": "debateHash",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_bytes32"
+        },
+        {
+          "label": "entryPrice",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint96"
+        },
+        {
+          "label": "targetPrice",
+          "offset": 12,
+          "slot": "1",
+          "type": "t_uint96"
+        },
+        {
+          "label": "committedAt",
+          "offset": 24,
+          "slot": "1",
+          "type": "t_uint64"
+        },
+        {
+          "label": "stopPrice",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint96"
+        },
+        {
+          "label": "recorder",
+          "offset": 12,
+          "slot": "2",
+          "type": "t_address"
+        },
+        {
+          "label": "minResolveAt",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_uint64"
+        },
+        {
+          "label": "agent",
+          "offset": 8,
+          "slot": "3",
+          "type": "t_enum(Agent)76"
+        },
+        {
+          "label": "conviction",
+          "offset": 9,
+          "slot": "3",
+          "type": "t_uint8"
+        },
+        {
+          "label": "resolved",
+          "offset": 10,
+          "slot": "3",
+          "type": "t_bool"
+        },
+        {
+          "label": "mode",
+          "offset": 11,
+          "slot": "3",
+          "type": "t_enum(PriceMode)80"
+        },
+        {
+          "label": "entryWindowSec",
+          "offset": 12,
+          "slot": "3",
+          "type": "t_uint16"
+        },
+        {
+          "label": "exitWindowSec",
+          "offset": 14,
+          "slot": "3",
+          "type": "t_uint16"
+        },
+        {
+          "label": "maxExitLagSec",
+          "offset": 16,
+          "slot": "3",
+          "type": "t_uint24"
+        },
+        {
+          "label": "challengeWindowSec",
+          "offset": 19,
+          "slot": "3",
+          "type": "t_uint24"
+        },
+        {
+          "label": "entryTolBps",
+          "offset": 22,
+          "slot": "3",
+          "type": "t_uint16"
+        },
+        {
+          "label": "exitTolBps",
+          "offset": 24,
+          "slot": "3",
+          "type": "t_uint16"
+        },
+        {
+          "label": "confMaxBps",
+          "offset": 26,
+          "slot": "3",
+          "type": "t_uint16"
+        },
+        {
+          "label": "entryEvidence",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_struct(OracleEvidence)92_storage"
+        },
+        {
+          "label": "symbol",
+          "offset": 0,
+          "slot": "6",
+          "type": "t_string_storage"
+        }
+      ],
+      "numberOfBytes": "224"
+    },
+    "t_struct(OracleEvidence)92_storage": {
+      "label": "struct BobbyTrackRecordV2.OracleEvidence",
+      "members": [
+        {
+          "label": "feedId",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_bytes32"
+        },
+        {
+          "label": "price",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_int64"
+        },
+        {
+          "label": "conf",
+          "offset": 8,
+          "slot": "1",
+          "type": "t_uint64"
+        },
+        {
+          "label": "expo",
+          "offset": 16,
+          "slot": "1",
+          "type": "t_int32"
+        },
+        {
+          "label": "publishTime",
+          "offset": 20,
+          "slot": "1",
+          "type": "t_uint64"
+        }
+      ],
+      "numberOfBytes": "64"
+    },
+    "t_struct(Trade)194_storage": {
+      "label": "struct BobbyTrackRecordV2.Trade",
+      "members": [
+        {
+          "label": "debateHash",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_bytes32"
+        },
+        {
+          "label": "entryPrice",
+          "offset": 0,
+          "slot": "1",
+          "type": "t_uint96"
+        },
+        {
+          "label": "exitPrice",
+          "offset": 12,
+          "slot": "1",
+          "type": "t_uint96"
+        },
+        {
+          "label": "committedAt",
+          "offset": 24,
+          "slot": "1",
+          "type": "t_uint64"
+        },
+        {
+          "label": "resolvedAt",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_uint64"
+        },
+        {
+          "label": "recorder",
+          "offset": 8,
+          "slot": "2",
+          "type": "t_address"
+        },
+        {
+          "label": "agent",
+          "offset": 28,
+          "slot": "2",
+          "type": "t_enum(Agent)76"
+        },
+        {
+          "label": "conviction",
+          "offset": 29,
+          "slot": "2",
+          "type": "t_uint8"
+        },
+        {
+          "label": "result",
+          "offset": 30,
+          "slot": "2",
+          "type": "t_enum(Result)72"
+        },
+        {
+          "label": "mode",
+          "offset": 31,
+          "slot": "2",
+          "type": "t_enum(PriceMode)80"
+        },
+        {
+          "label": "pnlBps",
+          "offset": 0,
+          "slot": "3",
+          "type": "t_int256"
+        },
+        {
+          "label": "exitAt",
+          "offset": 0,
+          "slot": "4",
+          "type": "t_uint64"
+        },
+        {
+          "label": "challengeDeadline",
+          "offset": 8,
+          "slot": "4",
+          "type": "t_uint64"
+        },
+        {
+          "label": "stopChallenged",
+          "offset": 16,
+          "slot": "4",
+          "type": "t_bool"
+        },
+        {
+          "label": "entryEvidence",
+          "offset": 0,
+          "slot": "5",
+          "type": "t_struct(OracleEvidence)92_storage"
+        },
+        {
+          "label": "exitEvidence",
+          "offset": 0,
+          "slot": "7",
+          "type": "t_struct(OracleEvidence)92_storage"
+        },
+        {
+          "label": "symbol",
+          "offset": 0,
+          "slot": "9",
+          "type": "t_string_storage"
+        }
+      ],
+      "numberOfBytes": "320"
+    },
+    "t_struct(VerificationParams)108_storage": {
+      "label": "struct BobbyTrackRecordV2.VerificationParams",
+      "members": [
+        {
+          "label": "entryWindowSec",
+          "offset": 0,
+          "slot": "0",
+          "type": "t_uint16"
+        },
+        {
+          "label": "exitWindowSec",
+          "offset": 2,
+          "slot": "0",
+          "type": "t_uint16"
+        },
+        {
+          "label": "maxExitLagSec",
+          "offset": 4,
+          "slot": "0",
+          "type": "t_uint24"
+        },
+        {
+          "label": "challengeWindowSec",
+          "offset": 7,
+          "slot": "0",
+          "type": "t_uint24"
+        },
+        {
+          "label": "entryTolBps",
+          "offset": 10,
+          "slot": "0",
+          "type": "t_uint16"
+        },
+        {
+          "label": "exitTolBps",
+          "offset": 12,
+          "slot": "0",
+          "type": "t_uint16"
+        },
+        {
+          "label": "confMaxBps",
+          "offset": 14,
+          "slot": "0",
+          "type": "t_uint16"
+        }
+      ],
+      "numberOfBytes": "32"
+    },
+    "t_uint16": {
+      "label": "uint16",
+      "members": [],
+      "numberOfBytes": "2"
+    },
+    "t_uint24": {
+      "label": "uint24",
+      "members": [],
+      "numberOfBytes": "3"
+    },
+    "t_uint256": {
+      "label": "uint256",
+      "members": [],
+      "numberOfBytes": "32"
+    },
+    "t_uint64": {
+      "label": "uint64",
+      "members": [],
+      "numberOfBytes": "8"
+    },
+    "t_uint8": {
+      "label": "uint8",
+      "members": [],
+      "numberOfBytes": "1"
+    },
+    "t_uint96": {
+      "label": "uint96",
+      "members": [],
+      "numberOfBytes": "12"
+    }
   }
-]
+}

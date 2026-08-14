@@ -38,3 +38,6 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
       - run: forge build --sizes
       - run: forge test --fuzz-runs 1000
+      # Storage-layout regression gate (spec F-06 / audit r2 external P2):
+      # fails on ANY drift in top-level slots OR struct member layouts.
+      - run: bash script/check-layout.sh

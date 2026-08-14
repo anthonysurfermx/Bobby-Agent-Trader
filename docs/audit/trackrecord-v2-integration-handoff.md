@@ -1,13 +1,23 @@
 # TrackRecord v2 — Handoff de integración para el backend (Codex)
 
-**Fecha:** 2026-08-14 · **Estado del contrato:** 203/203 tests, viaIR, 23,374 B
-(margen 1,202). **✅ ABI FROZEN (2026-08-14, commit `7934024` en
-`feat/trackrecord-v2`).** Verificación adversarial final completada: **0 P0/P1**,
-3 P2 corregidos. El ABI NO cambió con esos fixes, así que este archivo es
-estable — **Codex puede cablear el adaptador contra él**. ABI completo:
-`docs/audit/BobbyTrackRecordV2.abi.json`. (Único caso que reabriría el ABI: si
-el recorte de tolerances o el trabajo de DeployBase revelara una firma faltante
-— improbable; avisaría de inmediato.)
+**Fecha:** 2026-08-14 · **Estado:** ⚠️ **FREEZE REVOCADO Y RE-EMITIDO tras el
+P1 externo.** Cronología honesta: (1) mi verificación interna dio 0 P0/P1 y
+declaré "ABI FROZEN" en `7934024`/`c75de39` — **prematuro**: la ronda EXTERNA
+(Codex+Kimi) seguía corriendo. (2) Codex encontró un **P1 reproducible**
+(falso stop-loss: dirección/stop validados contra el entry REPORTADO mientras
+el PnL usa el de Pyth — un challenger podía fabricar una LOSS sobre una
+ganancia verificada). (3) Fix aplicado según la recomendación de Codex: el
+stop y el target deben quedar del lado correcto de AMBOS entries (reportado Y
+oráculo) al commitear, y el PnL del stop se deriva SIEMPRE del entry de Pyth.
+Regresiones LONG+SHORT simétricas + invariant dedicada
+(`invariant_challengedTradesAreGenuineLosses`) + fuzzer ampliado (entries
+divergentes, shorts, attested, refunds rechazados) + layout gate cubriendo
+miembros de structs + paso de CI.
+
+**El fix NO tocó firmas: el ABI de `BobbyTrackRecordV2.abi.json` sigue siendo
+el vigente.** Regla de proceso nueva: **el freeze lo declara la ronda externa,
+no yo** — queda FROZEN cuando Codex/Kimi validen el fix del P1 sobre el commit
+que lo contiene. Hasta entonces: no cablear escrituras firmadas.
 
 ## 1. Cambios de interfaz vs v1 (lo que rompe el cableado viejo)
 
@@ -87,8 +97,12 @@ check es decorativo), `PythApproved/Activated/Revoked`, `RefundRetained`,
   que tú, un error visible a calldata vieja firmada.
 
 ## 5. Lo que sigue NO-GO (depende de esto o de humanos)
-1. Verificación adversarial final del código corregido (en curso) → congela ABI.
-2. `DeployBase.s.sol`/`Verify` actualizados a V2 (mío, tras congelar).
+1. **Ronda externa Codex/Kimi valida el fix del P1** → recién ahí ABI FROZEN.
+2. `DeployBase.s.sol`/`Verify` actualizados a V2 (mío, tras el freeze).
+   **Requisito de Codex (P2): el deploy mainnet DEBE exigir ≥2 direcciones
+   Pyth canónicas, distintas y con código** — el constructor las acepta pero
+   no las exige; el gate vive en el script (la promesa V-03 de recuperación
+   inmediata necesita el alterno sembrado de verdad).
 3. Safe 2-de-3 real + pin codehash/singleton (runbook `safe-setup-runbook.md`).
 4. Recorte de tolerances con basis perp-vs-Pyth real.
 5. Canario final V2 en Sepolia con evidencia Pyth real → soak.

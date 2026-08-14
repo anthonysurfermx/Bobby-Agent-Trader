@@ -48,10 +48,44 @@ contract Handler is Test {
         try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, tgt, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, d) {} catch {}
     }
 
+    /// @dev Audit r2 external P2 (Codex/Kimi): the handler only generated LONGs
+    ///      whose reported entry equaled the oracle entry — precisely why the
+    ///      fuzzer could never surface the reported-vs-oracle stop P1. This
+    ///      action commits with a reported entry DIVERGENT from the oracle
+    ///      (inside the 100 bps band) in both directions, and SHORTs too.
+    function commitVerifiedDivergent(uint16 offBps, uint16 stopDelta, bool short_) external {
+        bytes32 h = keccak256(abi.encode("v", nonce++));
+        uint96 off = uint96((uint256(ENTRY) * (uint256(offBps) % 95)) / 10_000);
+        uint64 ts = uint64(vm.getBlockTimestamp());
+        bytes[] memory d = _update(int64(ENTRY), ts - 5, ts - 70);
+        if (short_) {
+            // reported below oracle (inside band); stop strictly above BOTH.
+            uint96 rep = ENTRY - off;
+            uint96 stop = ENTRY + (uint96(stopDelta) % 2000 + 1) * 1e8;
+            try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.REDTEAM, 5, rep, 0, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, d) {} catch {}
+        } else {
+            // reported above oracle (inside band); stop strictly below BOTH.
+            uint96 rep = ENTRY + off;
+            uint96 stop = ENTRY - (uint96(stopDelta) % 2000 + 1) * 1e8;
+            try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.ALPHA, 5, rep, 0, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, d) {} catch {}
+        }
+    }
+
     function commitAttested() external {
         bytes32 h = keccak256(abi.encode("a", nonce++));
         bytes[] memory empty = new bytes[](0);
         try rec.commitTrade(h, "OKB", BobbyTrackRecordV2.Agent.ALPHA, 5, 50e8, 60e8, 40e8, BobbyTrackRecordV2.PriceMode.ATTESTED, empty) {} catch {}
+    }
+
+    /// @dev Audit r2 external P2: ATTESTED resolution was never fuzzed.
+    function resolveAttested(uint256 idx, bool win) external {
+        bytes32 h = keccak256(abi.encode("a", idx % (nonce + 1)));
+        bytes[] memory empty = new bytes[](0);
+        if (win) {
+            try rec.resolveTrade(h, 1000, BobbyTrackRecordV2.Result.WIN, 55e8, 0, empty) {} catch {}
+        } else {
+            try rec.resolveTrade(h, -1000, BobbyTrackRecordV2.Result.LOSS, 45e8, 0, empty) {} catch {}
+        }
     }
 
     function warp(uint32 secs) external {
@@ -80,6 +114,33 @@ contract Handler is Test {
         try rec.challengeStopBreach{value: 10}(h, anchor, d) {} catch {}
     }
 
+    /// @dev High-side breach tick so SHORT stops are also challengeable.
+    function challengeHigh(uint256 idx) external {
+        bytes32 h = keccak256(abi.encode("v", idx % (nonce + 1)));
+        uint64 anchor = uint64(vm.getBlockTimestamp()) - 200;
+        bytes[] memory d = _update(int64(90_000e8), anchor + 3, anchor - 10);
+        try rec.challengeStopBreach{value: 10}(h, anchor, d) {} catch {}
+    }
+
+    /// @dev Audit r2 external P2: the retained-refund custody path was never
+    ///      fuzzed (invariant d was vacuous). Toggling this makes the handler
+    ///      reject ETH, so overpaid commits/resolves exercise RefundRetained.
+    bool public refuseRefunds;
+
+    function toggleRefunds(bool refuse) external {
+        refuseRefunds = refuse;
+    }
+
+    /// @dev Overpay on purpose so a refund is owed; if refuseRefunds is set,
+    ///      the handler's receive() reverts, forcing the RefundRetained path so
+    ///      invariant (d) actually constrains real retained custody.
+    function overpayCommit() external {
+        bytes32 h = keccak256(abi.encode("v", nonce++));
+        uint64 ts = uint64(vm.getBlockTimestamp());
+        bytes[] memory d = _update(int64(ENTRY), ts - 5, ts - 70);
+        try rec.commitTrade{value: 1 ether}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, ENTRY + 3000e8, ENTRY - 1000e8, BobbyTrackRecordV2.PriceMode.VERIFIED, d) {} catch {}
+    }
+
     /// @dev Audit r2 P2: the random walk rarely lands a challenge inside a
     ///      RESOLVED trade's finality window (anchor vs exitAt drift), so the
     ///      reclassify-of-resolved-WIN path was effectively un-fuzzed. This
@@ -102,7 +163,10 @@ contract Handler is Test {
         try rec.challengeStopBreach{value: 10}(h, anchor, dc) {} catch {}
     }
 
-    receive() external payable {}
+    receive() external payable {
+        // When refusing, revert refunds so the contract must retain them.
+        require(!refuseRefunds, "refusing refund");
+    }
 }
 
 contract BobbyTrackRecordV2InvariantTest is Test {
@@ -126,6 +190,28 @@ contract BobbyTrackRecordV2InvariantTest is Test {
         rec.setBobby(address(handler));
         vm.deal(address(handler), 100 ether);
         targetContract(address(handler));
+        // Audit r2 external (Codex): EXPLICIT selector list — adding handler
+        // actions without selecting them would silently empty the coverage.
+        // Every state-exercising action is enumerated here; view getters are
+        // excluded so fuzz calls aren't wasted.
+        bytes4[] memory sels = new bytes4[](10);
+        sels[0] = Handler.commitVerified.selector;
+        sels[1] = Handler.commitVerifiedDivergent.selector;
+        sels[2] = Handler.commitAttested.selector;
+        sels[3] = Handler.resolveVerified.selector;
+        sels[4] = Handler.resolveAttested.selector;
+        sels[5] = Handler.expire.selector;
+        sels[6] = Handler.challenge.selector;
+        sels[7] = Handler.challengeHigh.selector;
+        sels[8] = Handler.resolveThenChallenge.selector;
+        sels[9] = Handler.warp.selector;
+        targetSelector(FuzzSelector({addr: address(handler), selectors: sels}));
+        // toggleRefunds + overpayCommit run as their own pair so the retained-
+        // refund path is exercised deterministically, not left to chance.
+        bytes4[] memory refundSels = new bytes4[](2);
+        refundSels[0] = Handler.toggleRefunds.selector;
+        refundSels[1] = Handler.overpayCommit.selector;
+        targetSelector(FuzzSelector({addr: address(handler), selectors: refundSels}));
     }
 
     /// (a) Per-mode ledgers never cross: a verified outcome never lands in an
@@ -158,6 +244,23 @@ contract BobbyTrackRecordV2InvariantTest is Test {
     ///     forwarding), so its balance can never exceed what it tracked.
     function invariant_balanceIsRetainedOnly() public view {
         assertLe(rec.retainedFees(), address(rec).balance + 1);
+    }
+
+    /// (f) No challenged trade carries a non-negative PnL (audit r2 external
+    ///     P1): a stop-breach reclassification must ALWAYS produce a genuine
+    ///     loss against the oracle entry. If the reported-vs-oracle stop bug
+    ///     ever reappeared, a challenged trade could show pnlBps >= 0 — this
+    ///     invariant would catch it directly. Also asserts every stopChallenged
+    ///     row is a LOSS.
+    function invariant_challengedTradesAreGenuineLosses() public view {
+        uint256 n = rec.totalTrades();
+        for (uint256 i = 0; i < n; i++) {
+            BobbyTrackRecordV2.Trade memory t = rec.getTrade(i);
+            if (t.stopChallenged) {
+                assertEq(uint8(t.result), uint8(BobbyTrackRecordV2.Result.LOSS), "challenged must be LOSS");
+                assertLt(t.pnlBps, int256(0), "challenged LOSS must have negative pnl");
+            }
+        }
     }
 
     /// (e) Mode purity of the agent ledgers (audit r2 P2): the per-agent trade

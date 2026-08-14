@@ -421,7 +421,26 @@ contract BobbyTrackRecordV2 {
             : 0;
         (OracleEvidence memory entryEv, uint256 refund) =
             _verifyAndPay(_entryUpdateData, feedId, minT, maxT, params.confMaxBps);
-        _requireWithinBand(a.entryPrice, _toE8(entryEv.price, entryEv.expo), params.entryTolBps);
+        uint256 entryOracle1e8 = _toE8(entryEv.price, entryEv.expo);
+        _requireWithinBand(a.entryPrice, entryOracle1e8, params.entryTolBps);
+
+        // Fix (audit r2 external, Codex P1): the stop and target must sit on
+        // the correct side of the ORACLE entry too, not just the reported one.
+        // Otherwise a stop inside the entry tolerance band (above the oracle
+        // entry, long) lets a challenger "prove" a stop-breach with a tick that
+        // is still a GAIN against the verified entry — a fabricated LOSS.
+        // With this gate, any tick crossing the stop is a genuine oracle-loss.
+        {
+            bool isLong = a.stopPrice < a.entryPrice;
+            if (isLong ? uint256(a.stopPrice) >= entryOracle1e8 : uint256(a.stopPrice) <= entryOracle1e8) {
+                revert InvalidDirection();
+            }
+            if (a.targetPrice > 0) {
+                if (isLong ? uint256(a.targetPrice) <= entryOracle1e8 : uint256(a.targetPrice) >= entryOracle1e8) {
+                    revert InvalidDirection();
+                }
+            }
+        }
 
         _storeCommitment(a, PriceMode.VERIFIED, feedId, entryEv);
         _refund(refund);
@@ -714,7 +733,13 @@ contract BobbyTrackRecordV2 {
     /// @notice Prove, with a signed oracle update, that the committed stop was
     ///         crossed during the trade's life. A pending trade resolves as
     ///         LOSS at the stop; a resolved WIN/BREAK_EVEN inside its finality
-    ///         window is reclassified to LOSS at the stop.
+    ///         window is reclassified to LOSS at the stop. These semantics are
+    ///         safe against fabricated losses because commit-time validation
+    ///         (audit r2 external, Codex P1) requires the stop to sit strictly
+    ///         on the loss side of the ORACLE entry as well as the reported
+    ///         one — any tick that crosses the stop is therefore a genuine
+    ///         loss against the verified entry, and the loss magnitude is
+    ///         derived from the oracle entry (never the reported one).
     /// @param _anchorTs the challenger's search anchor: the update must be the
     ///        first tick at/after it (Unique semantics make that tick
     ///        deterministic — the challenger picks WHERE to look, never WHAT
@@ -778,22 +803,19 @@ contract BobbyTrackRecordV2 {
         _refund(refund);
     }
 
-    /// @dev Loss magnitude at the stop, from the COMMITTED levels: both are
-    ///      pre-outcome commitments (entry additionally oracle-banded at
-    ///      commit) and the commit-time direction invariant makes the sign
-    ///      strictly negative. Using the ORACLE entry here could flip the
-    ///      sign when the stop sits inside the entry tolerance band
-    ///      (tight-stop scalps) — flagged for the audit round.
+    /// @dev Loss magnitude at the stop, derived from the ORACLE entry (audit
+    ///      r2 external, Codex P1 — never the reported entry, which could
+    ///      shrink the loss by the tolerance band). Commit-time validation
+    ///      guarantees the stop sits strictly on the loss side of the oracle
+    ///      entry, so the sign is structurally negative; the −1 bp floor only
+    ///      covers integer truncation on ultra-tight stops (V-06).
     function _stopLossBps(Commitment storage c) internal view returns (int256) {
-        int256 entry = int256(uint256(c.entryPrice));
+        uint256 entryOracle1e8 = _toE8(c.entryEvidence.price, c.entryEvidence.expo);
+        int256 entry = int256(entryOracle1e8);
         int256 stopP = int256(uint256(c.stopPrice));
         int256 bps = c.stopPrice < c.entryPrice
             ? ((stopP - entry) * 10000) / entry
             : ((entry - stopP) * 10000) / entry;
-        // V-06: an ultra-tight stop can truncate toward zero. A stop breach is
-        // always a loss — floor the magnitude at 1 bp so it never records as a
-        // zero-PnL LOSS (which would silently under-count totalPnlBpsVerified
-        // and violate the "LOSS has negative PnL" coherence invariant).
         return bps < 0 ? bps : int256(-1);
     }
 
