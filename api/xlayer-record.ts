@@ -29,6 +29,11 @@ import {
   toV2DebateHash,
   type PriceMode,
 } from './_lib/track-record-v2.js';
+import {
+  assertProviderChain,
+  recorderKeyEnvForChain,
+  requireProtocolWriteSafety,
+} from './_lib/protocol-write-safety.js';
 
 // Chain-aware since the Sepolia canary: RPC and addresses follow PROTOCOL_CHAIN.
 // Legacy env vars remain as fallback for the X Layer production deployment.
@@ -36,7 +41,8 @@ const XLAYER_RPC = DEFAULT_CHAIN.rpcUrl;
 const CONTRACT_ADDRESS = DEFAULT_CHAIN.contracts.trackRecord || process.env.BOBBY_CONTRACT_ADDRESS || '';
 const ORACLE_ADDRESS = DEFAULT_CHAIN.contracts.convictionOracle || process.env.BOBBY_ORACLE_ADDRESS || '';
 const ECONOMY_ADDRESS = DEFAULT_CHAIN.contracts.agentEconomy || process.env.BOBBY_ECONOMY_ADDRESS || '';
-const RECORDER_KEY = process.env.BOBBY_RECORDER_KEY || '';
+const RECORDER_KEY_ENV = recorderKeyEnvForChain(DEFAULT_CHAIN.id);
+const RECORDER_KEY = process.env[RECORDER_KEY_ENV] || '';
 const USE_TRACK_RECORD_V2 = isTrackRecordV2(DEFAULT_CHAIN.id);
 
 // Agent enum matches contract: CIO=0, ALPHA=1, REDTEAM=2
@@ -237,6 +243,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     // Fail-closed: signs txs with the recorder key — never publicly writable.
     if (!requireRecordAuth(req, res)) return;
+    if (!requireProtocolWriteSafety(res, ['trackRecord'])) return;
 
     const body = (req.body || {}) as Record<string, unknown>;
     const action = typeof body.action === 'string' ? body.action.toLowerCase() : '';
@@ -312,6 +319,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+        await assertProviderChain(provider, DEFAULT_CHAIN.id);
         const wallet = new ethers.Wallet(RECORDER_KEY, provider);
         const iface = new ethers.Interface(USE_TRACK_RECORD_V2 ? TRACK_RECORD_V2_ABI : TRACK_RECORD_V1_ABI);
         // Normalize conviction: if float (0.0-1.0), convert to uint8 (0-10)
@@ -554,6 +562,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+        await assertProviderChain(provider, DEFAULT_CHAIN.id);
         const wallet = new ethers.Wallet(RECORDER_KEY, provider);
         const iface = new ethers.Interface(USE_TRACK_RECORD_V2 ? TRACK_RECORD_V2_ABI : TRACK_RECORD_V1_ABI);
         let txData: string;

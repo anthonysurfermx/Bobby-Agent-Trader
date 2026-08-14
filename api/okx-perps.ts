@@ -8,7 +8,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac, randomUUID } from 'crypto';
 import { recordAuthHeaders } from './_lib/record-auth.js';
-import { enforcePublicRateLimit, isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
+import { isProtocolCutoverFrozen } from './_lib/protocol-write-safety.js';
+import { enforcePublicRateLimit, isTradingRequest, requireTradingAuth } from './_lib/request-security.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
 
 const OKX_BASE = 'https://www.okx.com';
@@ -156,7 +157,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     && typeof credentials.secret === 'string' && credentials.secret.length >= 8
     && typeof credentials.passphrase === 'string' && credentials.passphrase.length >= 1,
   );
-  const internalCaller = isInternalRequest(req);
+  const internalCaller = isTradingRequest(req);
 
   // Every action that touches an OKX account is private. Public callers may
   // only request market/leverage metadata. When user credentials are supplied,
@@ -171,8 +172,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'positions',
     'balance',
   ]);
-  if (accountActions.has(action) && !hasUserCreds && !internalCaller && !requireInternalAuth(req, res)) {
+  if (accountActions.has(action) && !hasUserCreds && !requireTradingAuth(req, res)) {
     return;
+  }
+
+  // Freeze Bobby's server-held live account during the protocol cutover. A
+  // user trading with their own supplied credentials remains independent of
+  // Bobby's maintenance window, and read-only balance/position checks remain
+  // available to operators.
+  const serverLiveMutations = new Set([
+    'setup_account',
+    'set_leverage',
+    'open_position',
+    'close_position',
+    'set_tpsl',
+  ]);
+  if (
+    !hasUserCreds &&
+    tradingMode === 'live' &&
+    serverLiveMutations.has(action) &&
+    isProtocolCutoverFrozen()
+  ) {
+    return res.status(503).json({ error: 'Bobby live trading is frozen for the protocol cutover' });
   }
 
   const resolved = hasUserCreds

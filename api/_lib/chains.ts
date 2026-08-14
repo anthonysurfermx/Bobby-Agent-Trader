@@ -54,7 +54,7 @@ export interface ChainConfig {
 // an empty string is a loud failure, which is what we want versus silently
 // reading an X Layer contract from a Base RPC.
 const BASE_CONTRACTS: ContractSet = {
-  treasury: process.env.TREASURY_ADDRESS_BASE || '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
+  treasury: process.env.TREASURY_ADDRESS_BASE || '',
   agentEconomy: process.env.BASE_AGENT_ECONOMY_ADDRESS || '',
   adversarialBounties: process.env.BASE_BOUNTIES_ADDRESS || '',
   trackRecord: process.env.BASE_TRACK_RECORD_ADDRESS || '',
@@ -155,12 +155,30 @@ export const XLAYER: ChainConfig = {
  * Flip to BASE (or set PROTOCOL_CHAIN=base) once the audited redeploy is live
  * and the addresses above are populated.
  */
-export const DEFAULT_CHAIN: ChainConfig =
-  process.env.PROTOCOL_CHAIN === 'base'
-    ? BASE
-    : process.env.PROTOCOL_CHAIN === 'base-sepolia'
-      ? BASE_SEPOLIA
-      : XLAYER;
+export type ProtocolChainName = 'xlayer' | 'base-sepolia' | 'base';
+
+/**
+ * Resolve the protocol chain strictly. A typo in PROTOCOL_CHAIN must never
+ * fall back to X Layer: on a writer that would sign a valid transaction on
+ * the wrong network with the same hot key.
+ */
+export function resolveProtocolChain(value: string | undefined): {
+  name: ProtocolChainName;
+  config: ChainConfig;
+} {
+  const normalized = (value || 'xlayer').trim().toLowerCase();
+  if (normalized === 'base') return { name: 'base', config: BASE };
+  if (normalized === 'base-sepolia') return { name: 'base-sepolia', config: BASE_SEPOLIA };
+  if (normalized === 'xlayer') return { name: 'xlayer', config: XLAYER };
+  throw new Error(
+    `Invalid PROTOCOL_CHAIN=${JSON.stringify(value)}; expected xlayer, base-sepolia, or base`,
+  );
+}
+
+const selectedProtocolChain = resolveProtocolChain(process.env.PROTOCOL_CHAIN);
+
+export const PROTOCOL_CHAIN_NAME = selectedProtocolChain.name;
+export const DEFAULT_CHAIN: ChainConfig = selectedProtocolChain.config;
 
 export const CHAINS: Record<number, ChainConfig> = {
   [BASE.id]: BASE,

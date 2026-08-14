@@ -56,6 +56,44 @@ export function internalAuthHeaders(): Record<string, string> {
   return secret ? { 'x-internal-secret': secret } : {};
 }
 
+type CapabilitySecretEnv = 'TRADING_API_SECRET' | 'PROTOCOL_AUTOMATION_SECRET';
+
+function isCapabilityRequest(req: VercelRequest, envName: CapabilitySecretEnv): boolean {
+  const provided = providedInternalSecret(req);
+  const expected = process.env[envName] || '';
+  return Boolean(provided && expected && secretsMatch(provided, expected));
+}
+
+function requireCapabilityAuth(
+  req: VercelRequest,
+  res: VercelResponse,
+  envName: CapabilitySecretEnv,
+): boolean {
+  if (!process.env[envName]) {
+    res.status(503).json({ error: `${envName} not configured` });
+    return false;
+  }
+  if (!isCapabilityRequest(req, envName)) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return false;
+  }
+  return true;
+}
+
+function capabilityAuthHeaders(envName: CapabilitySecretEnv): Record<string, string> {
+  const secret = process.env[envName] || '';
+  return secret ? { 'x-internal-secret': secret } : {};
+}
+
+export const isTradingRequest = (req: VercelRequest) => isCapabilityRequest(req, 'TRADING_API_SECRET');
+export const requireTradingAuth = (req: VercelRequest, res: VercelResponse) =>
+  requireCapabilityAuth(req, res, 'TRADING_API_SECRET');
+export const tradingAuthHeaders = () => capabilityAuthHeaders('TRADING_API_SECRET');
+
+export const requireProtocolAutomationAuth = (req: VercelRequest, res: VercelResponse) =>
+  requireCapabilityAuth(req, res, 'PROTOCOL_AUTOMATION_SECRET');
+export const protocolAutomationAuthHeaders = () => capabilityAuthHeaders('PROTOCOL_AUTOMATION_SECRET');
+
 /**
  * Layered public rate limit: a fast per-instance limit plus the existing
  * Supabase-backed cross-instance counter. The local limiter still protects a

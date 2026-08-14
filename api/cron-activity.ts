@@ -5,7 +5,10 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
+import {
+  protocolAutomationAuthHeaders,
+  requireInternalAuth,
+} from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
 
@@ -27,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...internalAuthHeaders(),
+        ...protocolAutomationAuthHeaders(),
       },
       body: JSON.stringify({
         signals: 3,

@@ -8,7 +8,11 @@ import {
 import {
   internalAuthHeaders,
   isInternalRequest,
+  protocolAutomationAuthHeaders,
+  requireProtocolAutomationAuth,
   requireInternalAuth,
+  requireTradingAuth,
+  tradingAuthHeaders,
 } from '../api/_lib/request-security.js';
 
 function responseRecorder() {
@@ -44,6 +48,8 @@ const previous = process.env.XLAYER_RECORD_SECRET;
 const previousInternal = process.env.INTERNAL_API_SECRET;
 const previousCycle = process.env.BOBBY_CYCLE_SECRET;
 const previousCron = process.env.CRON_SECRET;
+const previousTrading = process.env.TRADING_API_SECRET;
+const previousProtocolAutomation = process.env.PROTOCOL_AUTOMATION_SECRET;
 
 try {
   delete process.env.XLAYER_RECORD_SECRET;
@@ -98,7 +104,34 @@ try {
   assert.equal(isInternalRequest(internalRequest('cron-secret', true)), true, 'bearer auth must be supported');
   assert.deepEqual(internalAuthHeaders(), { 'x-internal-secret': 'dedicated-internal-secret' });
 
-  console.log('record-auth: 11/11 checks passed');
+  delete process.env.TRADING_API_SECRET;
+  delete process.env.PROTOCOL_AUTOMATION_SECRET;
+  {
+    const { response, state } = responseRecorder();
+    assert.equal(requireTradingAuth(internalRequest('cron-secret'), response), false);
+    assert.equal(state.status, 503, 'missing trading secret must fail closed');
+  }
+  process.env.TRADING_API_SECRET = 'trade-only-secret';
+  process.env.PROTOCOL_AUTOMATION_SECRET = 'protocol-only-secret';
+  {
+    const { response, state } = responseRecorder();
+    assert.equal(requireTradingAuth(internalRequest('cron-secret'), response), false);
+    assert.equal(state.status, 401, 'cron secret must not authorize trading');
+  }
+  {
+    const { response, state } = responseRecorder();
+    assert.equal(requireTradingAuth(internalRequest('trade-only-secret'), response), true);
+    assert.equal(state.status, undefined);
+  }
+  {
+    const { response, state } = responseRecorder();
+    assert.equal(requireProtocolAutomationAuth(internalRequest('trade-only-secret'), response), false);
+    assert.equal(state.status, 401, 'trading secret must not authorize protocol automation');
+  }
+  assert.deepEqual(tradingAuthHeaders(), { 'x-internal-secret': 'trade-only-secret' });
+  assert.deepEqual(protocolAutomationAuthHeaders(), { 'x-internal-secret': 'protocol-only-secret' });
+
+  console.log('record-auth: capability isolation checks passed');
 } finally {
   if (previous === undefined) delete process.env.XLAYER_RECORD_SECRET;
   else process.env.XLAYER_RECORD_SECRET = previous;
@@ -108,4 +141,8 @@ try {
   else process.env.BOBBY_CYCLE_SECRET = previousCycle;
   if (previousCron === undefined) delete process.env.CRON_SECRET;
   else process.env.CRON_SECRET = previousCron;
+  if (previousTrading === undefined) delete process.env.TRADING_API_SECRET;
+  else process.env.TRADING_API_SECRET = previousTrading;
+  if (previousProtocolAutomation === undefined) delete process.env.PROTOCOL_AUTOMATION_SECRET;
+  else process.env.PROTOCOL_AUTOMATION_SECRET = previousProtocolAutomation;
 }
