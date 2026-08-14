@@ -21,6 +21,7 @@ jobs:
       - run: npm run test:playbooks
       - run: npm run test:api-security
       - run: npm run test:record-auth
+      - run: npm run test:protocol-write-safety
       - run: npm run test:risk-gate
       - run: npm run build
       - run: npm run lint -- --quiet

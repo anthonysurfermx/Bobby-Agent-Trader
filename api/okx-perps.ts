@@ -8,7 +8,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
 import { recordAuthHeaders } from './_lib/record-auth.js';
-import { enforcePublicRateLimit, isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
+import { isProtocolCutoverFrozen } from './_lib/protocol-write-safety.js';
+import { enforcePublicRateLimit, isTradingRequest, requireTradingAuth } from './_lib/request-security.js';
 
 const OKX_BASE = 'https://www.okx.com';
 
@@ -170,8 +171,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'positions',
     'balance',
   ]);
-  if (accountActions.has(action) && !hasUserCreds && !requireInternalAuth(req, res)) {
+  if (accountActions.has(action) && !hasUserCreds && !requireTradingAuth(req, res)) {
     return;
+  }
+
+  // Freeze Bobby's server-held live account during the protocol cutover. A
+  // user trading with their own supplied credentials remains independent of
+  // Bobby's maintenance window, and read-only balance/position checks remain
+  // available to operators.
+  const serverLiveMutations = new Set([
+    'setup_account',
+    'set_leverage',
+    'open_position',
+    'close_position',
+    'set_tpsl',
+  ]);
+  if (
+    !hasUserCreds &&
+    tradingMode === 'live' &&
+    serverLiveMutations.has(action) &&
+    isProtocolCutoverFrozen()
+  ) {
+    return res.status(503).json({ error: 'Bobby live trading is frozen for the protocol cutover' });
   }
 
   const resolved = hasUserCreds
@@ -365,7 +386,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // On-chain commit: register this trade prediction on X Layer
       // Skip if caller will handle commit separately (e.g. bobby-cycle)
-      if (!params?.skipOnchainCommit && isInternalRequest(req)) {
+      if (!params?.skipOnchainCommit && isTradingRequest(req)) {
         try {
           const commitRes = await fetch(
             `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-record`,

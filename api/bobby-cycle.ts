@@ -13,9 +13,12 @@ import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bo
 import { ethers } from 'ethers';
 import { recordHardnessActivity } from './_lib/hardness-registry.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
+import { DEFAULT_CHAIN, XLAYER_CHAIN_ID } from './_lib/chains.js';
+import { assertProviderChain, legacyXLayerWritesAllowed } from './_lib/protocol-write-safety.js';
+import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
-import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
+import { internalAuthHeaders, requireInternalAuth, tradingAuthHeaders } from './_lib/request-security.js';
 
 export const config = { maxDuration: 300 };
 
@@ -177,7 +180,11 @@ async function callStructuredVerdict(system: string, userMsg: string, timeoutMs 
 // ---- Fetch local internal API ----
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
-  const internalAuth = process.env.INTERNAL_API_SECRET || process.env.BOBBY_CYCLE_SECRET || process.env.CRON_SECRET || '';
+  const authHeaders = path === '/api/okx-perps'
+    ? tradingAuthHeaders()
+    : path === '/api/xlayer-record'
+      ? recordAuthHeaders()
+      : internalAuthHeaders();
   // Sepolia canary fix: on preview/dev deployments self-calls MUST stay on THIS
   // deployment — routing through the production domain would make the cycle
   // write on-chain through prod (X Layer, old recorder). VERCEL_URL is the
@@ -193,7 +200,7 @@ async function fetchLocalApi(path: string, body: any, noFallback = false): Promi
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(internalAuth ? { 'x-internal-secret': internalAuth } : {}),
+        ...authHeaders,
         ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
       },
       body: JSON.stringify(body)
@@ -213,7 +220,7 @@ async function fetchLocalApi(path: string, body: any, noFallback = false): Promi
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(internalAuth ? { 'x-internal-secret': internalAuth } : {}),
+          ...authHeaders,
         },
         body: JSON.stringify(body)
       });
@@ -645,6 +652,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestedMode = body.mode || kind;
   const yieldCandidates = resolveYieldCandidates(body.yieldCandidates);
   const challengeMode = resolveChallengeMode(req.method, requestedMode);
+  if (challengeMode === 'live' && process.env.PROTOCOL_CUTOVER_FREEZE === 'true') {
+    return res.status(503).json({
+      error: 'Live Bobby cycles are frozen during the protocol cutover',
+    });
+  }
   const okxMode = challengeMode === 'paper' ? 'paper' : 'live';
   const isDryRun = challengeMode === 'dryrun';
   const shouldCommitOnchain = challengeMode === 'live';
@@ -1089,11 +1101,15 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
       const xlayerKey = process.env.BOBBY_RECORDER_KEY || '';
       const currentPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price || 0;
       const commitEntry = entryPrice || currentPrice;
-      if (symbol && conviction !== null && commitEntry > 0 && xlayerContract && xlayerKey) {
+      if (
+        DEFAULT_CHAIN.id === XLAYER_CHAIN_ID && legacyXLayerWritesAllowed() &&
+        symbol && conviction !== null && commitEntry > 0 && xlayerContract && xlayerKey
+      ) {
         // Fire-and-forget — don't await
         (async () => {
           try {
             const provider = new ethers.JsonRpcProvider('https://rpc.xlayer.tech');
+            await assertProviderChain(provider, XLAYER_CHAIN_ID);
             const wallet = new ethers.Wallet(xlayerKey, provider);
             const iface = new ethers.Interface([
               'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96)',
@@ -1191,10 +1207,14 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
       // This generates legitimate on-chain activity for every cycle
       const oracleAddr = process.env.BOBBY_ORACLE_ADDRESS;
       const oracleKey = process.env.BOBBY_RECORDER_KEY;
-      if (oracleAddr && oracleKey && symbol && conviction !== null && !cioSaysExecute) {
+      if (
+        DEFAULT_CHAIN.id === XLAYER_CHAIN_ID && legacyXLayerWritesAllowed() &&
+        oracleAddr && oracleKey && symbol && conviction !== null && !cioSaysExecute
+      ) {
         (async () => {
           try {
             const provider = new ethers.JsonRpcProvider('https://rpc.xlayer.tech');
+            await assertProviderChain(provider, XLAYER_CHAIN_ID);
             const wallet = new ethers.Wallet(oracleKey, provider);
             const oracleIface = new ethers.Interface([
               'function publishSignal((string symbol, uint8 direction, uint8 conviction, uint8 agent, uint96 entryPrice, uint96 targetPrice, uint96 stopPrice, bytes32 debateHash, uint256 ttl))',
