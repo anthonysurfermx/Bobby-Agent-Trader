@@ -163,6 +163,27 @@ contract Handler is Test {
         try rec.challengeStopBreach{value: 10}(h, anchor, dc) {} catch {}
     }
 
+    /// @dev Audit r2 external P2: the EXACT Codex P1 configuration, driven
+    ///      deterministically so the mutation test has a live path to it —
+    ///      reported entry 63,600 above oracle 63,000 (in the 100 bps band),
+    ///      stop 63,300 sitting BETWEEN them, then a challenge with an in-band
+    ///      tick 63,200 that crosses the stop but is a gain vs the oracle entry.
+    ///      With the fix this reverts at commit (no trade). Revert the fix and
+    ///      the fuzzer reaches a fabricated LOSS that invariant (f) catches.
+    function resolveThenChallengeExploit() external {
+        bytes32 h = keccak256(abi.encode("v", nonce++));
+        uint64 t0 = uint64(vm.getBlockTimestamp());
+        bytes[] memory de = _update(int64(ENTRY), t0 - 5, t0 - 70); // oracle 63,000
+        try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, 63_600e8, 66_000e8, 63_300e8, BobbyTrackRecordV2.PriceMode.VERIFIED, de) {} catch { return; }
+        vm.warp(vm.getBlockTimestamp() + 2 hours);
+        uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
+        bytes[] memory dr = _update(int64(64_000e8), exitAt - 10, exitAt - 300);
+        try rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, dr) {} catch { return; }
+        uint64 anchor = t0 + 1 hours;
+        bytes[] memory dc = _update(int64(63_200e8), anchor + 3, anchor - 10); // in-band breach
+        try rec.challengeStopBreach{value: 10}(h, anchor, dc) {} catch {}
+    }
+
     receive() external payable {
         // When refusing, revert refunds so the contract must retain them.
         require(!refuseRefunds, "refusing refund");
@@ -206,6 +227,11 @@ contract BobbyTrackRecordV2InvariantTest is Test {
         sels[8] = Handler.resolveThenChallenge.selector;
         sels[9] = Handler.warp.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: sels}));
+        // The exact-PoC exploit path, selected so the mutation test (revert the
+        // commit-time fix) has a live route to a fabricated LOSS.
+        bytes4[] memory poc = new bytes4[](1);
+        poc[0] = Handler.resolveThenChallengeExploit.selector;
+        targetSelector(FuzzSelector({addr: address(handler), selectors: poc}));
         // toggleRefunds + overpayCommit run as their own pair so the retained-
         // refund path is exercised deterministically, not left to chance.
         bytes4[] memory refundSels = new bytes4[](2);
@@ -246,19 +272,30 @@ contract BobbyTrackRecordV2InvariantTest is Test {
         assertLe(rec.retainedFees(), address(rec).balance + 1);
     }
 
-    /// (f) No challenged trade carries a non-negative PnL (audit r2 external
-    ///     P1): a stop-breach reclassification must ALWAYS produce a genuine
-    ///     loss against the oracle entry. If the reported-vs-oracle stop bug
-    ///     ever reappeared, a challenged trade could show pnlBps >= 0 — this
-    ///     invariant would catch it directly. Also asserts every stopChallenged
-    ///     row is a LOSS.
+    /// (f) Every stop-breach reclassification is a GENUINE loss against the
+    ///     ORACLE entry (audit r2 external P1). The earlier version only checked
+    ///     `result==LOSS && pnlBps<0` — useless, because the P1 exploit ALSO
+    ///     produced a negative reported pnl from committed levels. The real
+    ///     property the P1 violates is that the breach EVIDENCE tick must be on
+    ///     the loss side of the oracle ENTRY evidence. All mock updates use
+    ///     expo -8, so the stored int64 prices are already 1e8-scaled and
+    ///     directly comparable. Reintroducing the P1 (stop inside the entry
+    ///     band, above the oracle entry for a long) makes a challenged trade's
+    ///     breach evidence sit ABOVE the oracle entry → this assertion fails.
     function invariant_challengedTradesAreGenuineLosses() public view {
         uint256 n = rec.totalTrades();
         for (uint256 i = 0; i < n; i++) {
             BobbyTrackRecordV2.Trade memory t = rec.getTrade(i);
-            if (t.stopChallenged) {
-                assertEq(uint8(t.result), uint8(BobbyTrackRecordV2.Result.LOSS), "challenged must be LOSS");
-                assertLt(t.pnlBps, int256(0), "challenged LOSS must have negative pnl");
+            if (!t.stopChallenged) continue;
+            assertEq(uint8(t.result), uint8(BobbyTrackRecordV2.Result.LOSS), "challenged must be LOSS");
+            // direction from the committed stop (t.exitPrice) vs reported entry
+            bool isLong = t.exitPrice < t.entryPrice;
+            int64 entryOracle = t.entryEvidence.price;
+            int64 breachOracle = t.exitEvidence.price;
+            if (isLong) {
+                assertLt(breachOracle, entryOracle, "long breach must be below the ORACLE entry");
+            } else {
+                assertGt(breachOracle, entryOracle, "short breach must be above the ORACLE entry");
             }
         }
     }
