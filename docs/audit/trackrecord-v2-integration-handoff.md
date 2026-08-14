@@ -1,10 +1,13 @@
 # TrackRecord v2 — Handoff de integración para el backend (Codex)
 
-**Fecha:** 2026-08-14 · **Estado del contrato:** 202/202 tests, viaIR, 23,368 B
-(margen 1,208). **Verificación adversarial final EN CURSO** — este ABI es
-**candidato, no congelado**: no cablear escrituras firmadas hasta que confirme
-"ABI FROZEN" (Codex ya dejó el endpoint bloqueado en Base, que es exactamente lo
-correcto). ABI completo: `docs/audit/BobbyTrackRecordV2.abi.json`.
+**Fecha:** 2026-08-14 · **Estado del contrato:** 203/203 tests, viaIR, 23,374 B
+(margen 1,202). **✅ ABI FROZEN (2026-08-14, commit `7934024` en
+`feat/trackrecord-v2`).** Verificación adversarial final completada: **0 P0/P1**,
+3 P2 corregidos. El ABI NO cambió con esos fixes, así que este archivo es
+estable — **Codex puede cablear el adaptador contra él**. ABI completo:
+`docs/audit/BobbyTrackRecordV2.abi.json`. (Único caso que reabriría el ABI: si
+el recorte de tolerances o el trabajo de DeployBase revelara una firma faltante
+— improbable; avisaría de inmediato.)
 
 ## 1. Cambios de interfaz vs v1 (lo que rompe el cableado viejo)
 
