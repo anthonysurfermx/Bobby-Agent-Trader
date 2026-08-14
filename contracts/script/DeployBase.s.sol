@@ -3,7 +3,8 @@ pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {SafeOwnerGate} from "./SafeOwnerGate.sol";
-import {BobbyTrackRecord} from "../src/BobbyTrackRecord.sol";
+import {PythOracleGate} from "./PythOracleGate.sol";
+import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
 import {BobbyAdversarialBounties} from "../src/BobbyAdversarialBounties.sol";
@@ -125,6 +126,21 @@ contract DeployBase is Script {
         c.expectedOwnerSingleton = vm.envOr("OWNER_SAFE_SINGLETON", address(0));
     }
 
+    /// @dev V2 verification params. Defaults are the audited deploy config
+    ///      (Anthony's §8 decisions: maxExitLag 600s cap, 7-day challenge
+    ///      window, 100 bps tolerances to be tightened from real basis, conf
+    ///      50 bps). Overridable per deploy; the constructor re-validates every
+    ///      field against its hard bounds, so a bad env value fails loudly.
+    function _v2Params() internal view returns (BobbyTrackRecordV2.VerificationParams memory p) {
+        p.entryWindowSec = uint16(vm.envOr("V2_ENTRY_WINDOW_SEC", uint256(60)));
+        p.exitWindowSec = uint16(vm.envOr("V2_EXIT_WINDOW_SEC", uint256(120)));
+        p.maxExitLagSec = uint24(vm.envOr("V2_MAX_EXIT_LAG_SEC", uint256(600)));
+        p.challengeWindowSec = uint24(vm.envOr("V2_CHALLENGE_WINDOW_SEC", uint256(7 days)));
+        p.entryTolBps = uint16(vm.envOr("V2_ENTRY_TOL_BPS", uint256(100)));
+        p.exitTolBps = uint16(vm.envOr("V2_EXIT_TOL_BPS", uint256(100)));
+        p.confMaxBps = uint16(vm.envOr("V2_CONF_MAX_BPS", uint256(50)));
+    }
+
     function run() external returns (Deployed memory d) {
         // r6 #1: hard chain gate — a wrong RPC must fail loudly, not deploy
         // seven contracts to whatever network answered.
@@ -193,9 +209,19 @@ contract DeployBase is Script {
             }
         }
 
+        // TrackRecordV2: oracle-verified. The Pyth set is the chain's CANONICAL
+        // set (not raw env) — mainnet gets upgraded-active + current-fallback,
+        // asserted distinct and code-bearing. Params default to the audited
+        // deploy config (maxExitLag 600s etc.) and are re-validated by the
+        // constructor's bounds. Feeds: BTC/ETH/SOL, ids pinned in the gate.
+        BobbyTrackRecordV2.VerificationParams memory v2Params = _v2Params();
+        address[] memory pyths = PythOracleGate.canonicalPyths(block.chainid);
+        PythOracleGate.assertCanonical(block.chainid, pyths);
+        (string[] memory v2Symbols, bytes32[] memory v2Feeds) = PythOracleGate.verifiedFeeds();
+
         vm.startBroadcast();
 
-        d.trackRecord = address(new BobbyTrackRecord(c.bobby));
+        d.trackRecord = address(new BobbyTrackRecordV2(c.bobby, v2Params, pyths, v2Symbols, v2Feeds));
         d.convictionOracle = address(new BobbyConvictionOracle(c.bobby));
 
         // r6 #4: fees enter via constructor — no transient OKB-priced window.
@@ -228,7 +254,7 @@ contract DeployBase is Script {
         // must acceptOwnership() (batched in its UI) before it owns anything,
         // so a typo'd address can never take ownership.
         if (c.expectedOwner != deployer) {
-            BobbyTrackRecord(d.trackRecord).transferOwnership(c.expectedOwner);
+            BobbyTrackRecordV2(d.trackRecord).transferOwnership(c.expectedOwner);
             BobbyConvictionOracle(d.convictionOracle).transferOwnership(c.expectedOwner);
             BobbyAgentEconomyV2(payable(d.agentEconomyV2)).transferOwnership(c.expectedOwner);
             BobbyAdversarialBounties(payable(d.adversarialBounties)).transferOwnership(c.expectedOwner);
@@ -283,7 +309,7 @@ contract DeployBase is Script {
         // r8 #1 + r9 H-02: right after deploy the broadcaster still owns all
         // seven (two-step: ownership only moves when the Safe accepts), and if
         // a handoff was requested, every pendingOwner must be the Safe.
-        require(BobbyTrackRecord(d.trackRecord).owner() == deployer, "assert: trackRecord.owner");
+        require(BobbyTrackRecordV2(d.trackRecord).owner() == deployer, "assert: trackRecord.owner");
         require(BobbyConvictionOracle(d.convictionOracle).owner() == deployer, "assert: oracle.owner");
         require(BobbyAgentEconomyV2(payable(d.agentEconomyV2)).owner() == deployer, "assert: economy.owner");
         require(BobbyAdversarialBounties(payable(d.adversarialBounties)).owner() == deployer, "assert: bounties.owner");
@@ -291,7 +317,7 @@ contract DeployBase is Script {
         require(BobbyAgentRegistry(d.agentRegistry).owner() == deployer, "assert: agentRegistry.owner");
         require(BobbyIntentEscrow(d.intentEscrow).owner() == deployer, "assert: escrow.owner");
         if (c.expectedOwner != deployer) {
-            require(BobbyTrackRecord(d.trackRecord).pendingOwner() == c.expectedOwner, "assert: trackRecord.pendingOwner");
+            require(BobbyTrackRecordV2(d.trackRecord).pendingOwner() == c.expectedOwner, "assert: trackRecord.pendingOwner");
             require(BobbyConvictionOracle(d.convictionOracle).pendingOwner() == c.expectedOwner, "assert: oracle.pendingOwner");
             require(BobbyAgentEconomyV2(payable(d.agentEconomyV2)).pendingOwner() == c.expectedOwner, "assert: economy.pendingOwner");
             require(BobbyAdversarialBounties(payable(d.adversarialBounties)).pendingOwner() == c.expectedOwner, "assert: bounties.pendingOwner");
@@ -301,8 +327,24 @@ contract DeployBase is Script {
         }
         require(BobbyIntentEscrow(d.intentEscrow).chainIdExpected() == block.chainid, "assert: escrow.chainIdExpected");
 
-        require(BobbyTrackRecord(d.trackRecord).bobby() == c.bobby, "assert: trackRecord.bobby");
+        require(BobbyTrackRecordV2(d.trackRecord).bobby() == c.bobby, "assert: trackRecord.bobby");
         require(BobbyConvictionOracle(d.convictionOracle).bobby() == c.bobby, "assert: oracle.bobby");
+
+        // TrackRecordV2 oracle wiring: the ACTIVE Pyth is the chain's canonical
+        // index-0 (mainnet = upgraded), every canonical address is approved (so
+        // the V-03 fallback is real), and the three verified feeds are seeded.
+        {
+            BobbyTrackRecordV2 tr = BobbyTrackRecordV2(d.trackRecord);
+            address[] memory want = PythOracleGate.canonicalPyths(block.chainid);
+            require(tr.activePyth() == want[0], "assert: trackRecord.activePyth != canonical active");
+            for (uint256 i = 0; i < want.length; i++) {
+                require(tr.approvedPyth(want[i]), "assert: canonical pyth not approved");
+            }
+            (string[] memory syms, bytes32[] memory feeds) = PythOracleGate.verifiedFeeds();
+            for (uint256 i = 0; i < syms.length; i++) {
+                require(tr.feedOf(keccak256(bytes(syms[i]))) == feeds[i], "assert: verified feed not seeded");
+            }
+        }
 
         BobbyAgentEconomyV2 economy = BobbyAgentEconomyV2(payable(d.agentEconomyV2));
         require(economy.mcpCallFee() == c.mcpCallFee, "assert: mcpCallFee");
