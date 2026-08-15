@@ -16,6 +16,7 @@ import {
   Twitter,
   X,
 } from 'lucide-react';
+import ReleaseStatusCard from '@/components/protocol/ReleaseStatusCard';
 
 // Live protocol telemetry — same endpoint the landing consumes. The page keeps
 // working as an architecture overview when RPC data is unavailable.
@@ -80,10 +81,11 @@ function SectionMedia({ name, className = '' }: { name: string; className?: stri
   );
 }
 
-type Status = 'live' | 'canary' | 'spec' | 'gated';
+type Status = 'live' | 'legacy' | 'canary' | 'spec' | 'gated';
 
 const STATUS_STYLES: Record<Status, { dot: string; text: string; label: string }> = {
   live: { dot: 'bg-emerald-400', text: 'text-emerald-300', label: 'LIVE' },
+  legacy: { dot: 'bg-violet-400', text: 'text-violet-300', label: 'LEGACY' },
   canary: { dot: 'bg-amber-400', text: 'text-amber-300', label: 'CANARY' },
   spec: { dot: 'bg-sky-400', text: 'text-sky-300', label: 'SPEC' },
   gated: { dot: 'bg-rose-400', text: 'text-rose-300', label: 'GATED' },
@@ -93,7 +95,7 @@ function StatusPill({ status }: { status: Status }) {
   const s = STATUS_STYLES[status];
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.18em] ${s.text}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${s.dot} motion-safe:animate-pulse`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot} ${status === 'live' || status === 'canary' ? 'motion-safe:animate-pulse' : ''}`} />
       {s.label}
     </span>
   );
@@ -156,8 +158,8 @@ const LAYERS = [
     title: 'Proof layer',
     text: 'Every decision committed before its outcome.',
     items: [
-      ['X Layer · chain 196 — full record', 'live'],
-      ['Base Sepolia · 84532 — protocol rehearsal', 'canary'],
+      ['X Layer · chain 196 — legacy archive', 'legacy'],
+      ['Base Sepolia · 84532 — final V2 canary pending', 'canary'],
       ['Base mainnet · 8453 — behind hard gates', 'gated'],
     ] as const,
   },
@@ -185,7 +187,7 @@ const LAYERS = [
 ] as const;
 
 const CONTRACT_ROLES = [
-  ['BobbyTrackRecord', 'trackRecord', 'Win/loss record resolved against reference prices. v2 will verify entry and exit.'],
+  ['BobbyTrackRecordV2', 'trackRecord', 'Oracle-backed entry and exit evidence, challengeable stops and a separate attested ledger.'],
   ['BobbyConvictionOracle', 'convictionOracle', 'Conviction commitments published before execution. The no-take-backs ledger.'],
   ['BobbyAgentEconomyV2', 'agentEconomy', 'Debate fees and protocol economy, denominated in native gas.'],
   ['BobbyAgentRegistry', 'agentRegistry', 'Agent identities with a registration stake behind every name.'],
@@ -196,28 +198,29 @@ const CONTRACT_ROLES = [
 
 const CHAIN_STAGES = [
   {
-    status: 'live' as Status,
+    status: 'legacy' as Status,
     name: 'X Layer',
     chainId: '196',
-    text: 'The production record. Thousands of commitments debated, committed and resolved in public since launch.',
+    text: 'The public legacy archive. Historical commitments remain readable and are never relabeled as Base or oracle-verified V2 outcomes.',
   },
   {
     status: 'canary' as Status,
     name: 'Base Sepolia',
     chainId: '84532',
-    text: 'Full-protocol rehearsal: seven contracts, live verification, win/loss cycles and a hardened API — burned in before real value moves.',
+    text: 'The previous canary proved the migration path. A final TrackRecord V2 deployment and soak must reproduce the exact mainnet candidate.',
   },
   {
     status: 'gated' as Status,
     name: 'Base mainnet',
     chainId: '8453',
-    text: 'Deliberately NO-GO until every gate closes. Shipping fast is easy; earning mainnet is the point.',
-    gates: ['Safe 2-of-3 owner — identity pinned on-chain', 'TrackRecord v2 — entry & exit oracle-verified', 'Security round M-02…M-05 closed', 'Full 3-round adversarial audit'],
+    text: 'Deliberately NO-GO until deployment artifacts, ownership and public readback all match the reviewed release candidate.',
+    gates: ['Deploy + Verify V2 — official Pyth set', 'Backend adapter — verified ≠ attested', 'Safe 2-of-3 — final owner on-chain', 'Base Sepolia V2 — lifecycle + soak'],
   },
 ];
 
 const DOCS = [
   { name: 'Architecture & status', href: '/protocol/architecture', text: 'The system, the debate cycle and the deployment pipeline — with an honest component-by-component status.', internal: true },
+  { name: 'Mainnet release readiness', href: 'https://github.com/anthonysurfermx/Bobby-Agent-Trader/blob/main/docs/release-readiness.md', text: 'The operational gates for Safe ownership, Pyth, canary evidence, deployment and production promotion.' },
   { name: 'Architecture manifesto', href: 'https://github.com/anthonysurfermx/Bobby-Agent-Trader/blob/main/docs/ARCHITECTURE_MANIFESTO.md', text: 'Why proof-of-process beats promises, and the design rules the protocol refuses to break.' },
   { name: 'Base migration plan', href: 'https://github.com/anthonysurfermx/Bobby-Agent-Trader/blob/main/docs/plan-migracion-base.md', text: 'The full cutover plan to Base: contracts, Uniswap v4 rail, payments and the phase gates.' },
   { name: 'Security audits', href: 'https://github.com/anthonysurfermx/Bobby-Agent-Trader/tree/main/docs/audit', text: 'Every adversarial round published — findings, fixes and the NO-GO calls, in the open.' },
@@ -499,6 +502,7 @@ export default function BobbyArchitecturePage() {
               title="Mainnet is earned, not shipped."
               lede="The protocol moves chain by chain, each stage burning in before the next unlocks. The current NO-GO on Base mainnet is a feature of the process, not a delay."
             />
+            <ReleaseStatusCard className="mt-10" />
             <div className="mt-14 grid gap-4 lg:grid-cols-3">
               {CHAIN_STAGES.map((stage, index) => (
                 <motion.div

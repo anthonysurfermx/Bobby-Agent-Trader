@@ -12,6 +12,7 @@ import {
   AlertTriangle, Wallet, MessageSquare, TrendingUp, Lock, Eye
 } from 'lucide-react';
 import KineticShell from '@/components/kinetic/KineticShell';
+import ReleaseStatusCard from '@/components/protocol/ReleaseStatusCard';
 
 // --------------- Shared Components ---------------
 
@@ -31,12 +32,14 @@ function CopyBlock({ code, label }: { code: string; label?: string }) {
         {code}
       </div>
       <button
+        type="button"
+        aria-label={label ? `Copy ${label}` : 'Copy code'}
         onClick={() => {
           navigator.clipboard.writeText(code);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }}
-        className="absolute top-2 right-2 p-1.5 bg-white/10 hover:bg-white/20 rounded-lg border border-white/15 backdrop-blur transition-all opacity-0 group-hover:opacity-100"
+        className="absolute top-2 right-2 p-1.5 bg-white/10 hover:bg-white/20 rounded-lg border border-white/15 backdrop-blur transition-all opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7da6ff]"
       >
         {copied ? <Check className="w-3.5 h-3.5 text-[#7da6ff]" /> : <Copy className="w-3.5 h-3.5 text-white/50" />}
       </button>
@@ -101,7 +104,7 @@ function Badge({ type }: { type: 'free' | 'x402' }) {
 const CONTRACTS = [
   { name: 'BobbyTrackRecord', addr: '0xf841b428e6d743187d7be2242eccc1078fde2395', desc: 'Commit-reveal predictions', purpose: 'Immutable on-chain prediction history' },
   { name: 'BobbyConvictionOracle', addr: '0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a', desc: 'Conviction feed for protocols', purpose: 'Real-time conviction data feed' },
-  { name: 'BobbyAgentEconomy', addr: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871', desc: 'Agent-to-agent payments', purpose: 'x402 payment settlement' },
+  { name: 'BobbyAgentEconomyV2', addr: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871', desc: 'Agent-to-agent payments', purpose: 'Legacy x402 payment settlement' },
   { name: 'BobbyAgentRegistry', addr: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', desc: 'Agent Identity NFTs', purpose: 'On-chain agent identity layer' },
 ];
 
@@ -214,8 +217,12 @@ export default function BobbyDocsPage() {
               Connect your AI agent to Bobby in one command
             </h1>
             <p className="text-sm md:text-base leading-7 text-white/60 max-w-xl mx-auto">
-              Base-first agent infrastructure, 12 MCP tools, 70+ technical indicators, x402 payments
+              Base-first agent infrastructure, public legacy proofs and an explicitly gated mainnet release
             </p>
+          </motion.div>
+
+          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+            <ReleaseStatusCard />
           </motion.div>
 
           {/* ===== 2. HERO — INSTANT INTEGRATION ===== */}
@@ -237,6 +244,8 @@ export default function BobbyDocsPage() {
                   claude mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby
                 </div>
                 <button
+                  type="button"
+                  aria-label="Copy MCP installation command"
                   onClick={() => {
                     navigator.clipboard.writeText('claude mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby');
                   }}

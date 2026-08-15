@@ -16,6 +16,7 @@ import {
   Twitter,
   X,
 } from 'lucide-react';
+import ReleaseStatusCard from '@/components/protocol/ReleaseStatusCard';
 
 type Price = { symbol: string; price: number; change24h: number };
 
@@ -52,6 +53,8 @@ interface McpMeta {
     premium?: { tools?: string[]; price?: string; settlementContract?: string };
   };
 }
+
+const SHOW_LEGACY_LIVE_SECTIONS = import.meta.env.VITE_SHOW_LEGACY_LIVE_SECTIONS === 'true';
 
 function useMcpMeta() {
   const [meta, setMeta] = useState<McpMeta | null>(null);
@@ -247,9 +250,9 @@ export default function BobbyProtocolLanding() {
       href: `${explorerAddressUrl}/${c?.adversarialBounties?.address ?? ''}`,
     },
     {
-      label: 'Contracts live',
+      label: 'Legacy proof contracts',
       value: '6',
-      detail: 'Registry, economy, oracle, track record, bounties and identity — all deployed and explorer-verified.',
+      detail: 'The X Layer deployment remains public as historical evidence while the reviewed Base release candidate advances through launch gates.',
       proof: 'AgentEconomy V2 contract',
       href: `${explorerAddressUrl}/${c?.agentEconomy?.address ?? ''}`,
     },
@@ -636,7 +639,7 @@ export default function BobbyProtocolLanding() {
               <h2 className="text-5xl font-extrabold leading-[.96] tracking-[-0.08em] md:text-7xl">It turns an idea<br />into a decision.</h2>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">Bring a thesis. Bobby challenges it, checks the downside, and gives you one clear decision before the result.</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
                 { step: '01', title: 'Bring the idea', text: 'Start with a market thesis.' },
                 { step: '02', title: 'Test the downside', text: 'Opposing agents look for what breaks it.' },
@@ -652,7 +655,7 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        {false && <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
+        {SHOW_LEGACY_LIVE_SECTIONS ? <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
           <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
@@ -741,9 +744,9 @@ export default function BobbyProtocolLanding() {
               </div>
             )}
           </div>
-        </section>}
+        </section> : null}
 
-        {false && <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
+        {SHOW_LEGACY_LIVE_SECTIONS ? <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(0,82,255,.1),transparent_40%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
@@ -783,18 +786,20 @@ export default function BobbyProtocolLanding() {
               </div>
             </div>
           </div>
-        </section>}
+        </section> : null}
 
         <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Track record</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The next build is Base.</h2>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />Base mainnet is gated.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Bobby ran in production on X Layer through the hackathon era. Those legacy records show what was committed on-chain; the current build and next deployment are Base-first. They do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
+                Bobby ran on X Layer through the hackathon era. Those records remain a public archive of what the legacy contracts committed. TrackRecord V2 is now implemented and security-reviewed, but no Base mainnet address will be presented as live before deployment, Safe ownership and canary evidence reconcile.
               </p>
             </div>
+
+            <ReleaseStatusCard className="mb-8" />
 
             <div className="grid gap-4 md:grid-cols-3">
               {proofPoints.map((point, index) => (
@@ -821,7 +826,7 @@ export default function BobbyProtocolLanding() {
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
-              <span>Base · 8453</span>
+              <span>Base mainnet · gated</span>
               <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy TrackRecord ↗</a>
               <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy AgentEconomy ↗</a>
               <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>
@@ -869,7 +874,7 @@ export default function BobbyProtocolLanding() {
                   <div className="mb-5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">{group}</div>
                   <ul className="space-y-3">
                     {links.map(([label, href]) => (
-                      <li key={href}>
+                      <li key={`${label}-${href}`}>
                         <a href={href} className="text-sm text-white/60 transition hover:text-[#7da6ff]">{label}</a>
                       </li>
                     ))}
