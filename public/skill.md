@@ -1,16 +1,19 @@
 # Bobby Protocol — Agent Integration Skill
 
-> **Version:** 1.0.0  
-> **Protocol:** MCP (Model Context Protocol) over Streamable HTTP  
-> **Chain:** X Layer Mainnet (196)  
-> **Endpoint:** `https://bobbyprotocol.xyz/api/mcp-http`  
-> **Settlement:** OKB native on X Layer via x402
+> **Version:** 1.1.0<br>
+> **Protocol:** MCP (Model Context Protocol) over Streamable HTTP<br>
+> **Target chain:** Base Mainnet (8453) — gated, not live<br>
+> **Legacy compatibility chain:** X Layer Mainnet (196)<br>
+> **Endpoint:** `https://bobbyprotocol.xyz/api/mcp-http`<br>
+> **Current settlement:** legacy OKB rail on X Layer via x402 during cutover
 
 ---
 
 ## What is Bobby?
 
-Bobby is a live adversarial intelligence protocol for crypto trading. Three AI agents debate every trade, a Judge Mode audits debate quality on six dimensions, and anyone can stake OKB to prove Bobby was wrong. All settlement happens on OKX X Layer.
+Bobby is an adversarial decision protocol for crypto trading. Three AI agents debate every trade, a Judge Mode audits debate quality on six dimensions, and the protocol publishes commitments before outcomes. The historical deployment and current compatibility settlement rail are on X Layer; Base mainnet remains gated until its verified manifest, Safe ownership and canary evidence are published.
+
+Never label an X Layer outcome as Base or TrackRecord V2 VERIFIED. Current public execution is paper/simulated unless a response includes explicit execution evidence.
 
 Your agent can consume Bobby's intelligence, analysis, and debate system by calling the MCP endpoint below.
 
@@ -44,7 +47,7 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
 
 ### Step 3: Call a premium tool (x402 payment)
 
-Premium tools cost 0.001 OKB per call, settled on X Layer.
+Premium tools currently use the legacy 0.001 OKB X Layer compatibility rail. Discover pricing from the MCP endpoint instead of hardcoding it into integrations; the settlement asset and chain will change during the Base cutover.
 
 ```bash
 # 1. Call without payment — get a challenge
@@ -110,7 +113,7 @@ Bobby currently exposes **22 MCP tools** total:
 | `bobby_bounty_list` | List recent adversarial bounties | `{ limit }` |
 | `bobby_bounty_get` | Get single bounty details | `{ bounty_id }` |
 
-### Premium Tier (0.001 OKB per call via x402)
+### Premium Tier (current legacy x402 rail)
 
 | Tool | Description | Arguments |
 |------|-------------|-----------|
@@ -129,7 +132,7 @@ Bobby currently exposes **22 MCP tools** total:
 
 ---
 
-## x402 Payment Contract
+## Legacy x402 Payment Contract
 
 ```
 Contract:  0xD9540D770C8aF67e9E6412C92D78E34bc11ED871
@@ -139,7 +142,7 @@ Function:  payMCPCall(bytes32 challengeId, string toolName)
 Value:     0.001 OKB (1000000000000000 wei)
 ```
 
-The `challengeId` is returned by the server when you call a premium tool without payment. Each challenge is single-use and expires after 15 minutes.
+The `challengeId` is returned by the server when you call a premium tool without payment. Each challenge is single-use and expires after 15 minutes. This contract is not a Base deployment address.
 
 ---
 
@@ -151,7 +154,7 @@ Check Bobby's on-chain track record and protocol reputation:
 curl https://bobbyprotocol.xyz/api/reputation
 ```
 
-Returns win rate, total trades, conviction oracle stats, economy volume, and contract addresses — all read from X Layer.
+Returns track record, conviction, economy and contract telemetry. During cutover, inspect the response chain metadata: chain `196` is the X Layer legacy archive and must not be interpreted as Base V2.
 
 ---
 
@@ -215,4 +218,4 @@ POST /api/mcp-http (JSON-RPC 2.0)
 
 ---
 
-*Bobby Protocol — Build X Season 2 on OKX X Layer*
+*Bobby Protocol — born on X Layer, moving to a gated Base-first architecture*

@@ -1,6 +1,7 @@
 # Bobby Protocol — Architecture & Status
 
-**As of 2026-08-12** · branch `codex/security-r12` · r10.2 audited (152/152 Foundry, API hardening 26/26)
+**As of 2026-08-14** · Base release candidate · TrackRecord V2 reviewed
+(`53d1f4c`) with mutation-sensitive invariant coverage (`763d765`)
 
 Legend: **●** live · **◐** canary/partial · **○** decided or spec'd, not built · **✕** gate (NO-GO until closed)
 
@@ -39,7 +40,7 @@ flowchart TB
 
     subgraph CHAIN["On-chain proof layer"]
         XL["X Layer 196 ●<br/>production"]
-        SEP["Base Sepolia 84532 ◐<br/>canary"]
+        SEP["Base Sepolia 84532 ◐<br/>V2 canary pending"]
         MAIN["Base mainnet 8453 ✕<br/>NO-GO"]
     end
 
@@ -87,7 +88,7 @@ differentiator vs Base agent competitors — see
 
 ```mermaid
 flowchart LR
-    XL["X Layer 196 ●<br/>LIVE — bobbyprotocol.xyz<br/>2,038+ commitments"] --> SEP["Base Sepolia 84532 ◐<br/>7 contracts r8 live + verified<br/>r10.2 redeploy: ONE SIGNATURE AWAY"] --> MAIN["Base mainnet 8453 ✕<br/>NO-GO — next tech round"]
+    XL["X Layer 196 ●<br/>LEGACY PUBLIC ARCHIVE"] --> SEP["Base Sepolia 84532 ◐<br/>final V2 canary pending"] --> MAIN["Base mainnet 8453 ✕<br/>NO-GO — release gates open"]
 
     subgraph SEPSTEPS["Sepolia — runbook steps after signature"]
         direction LR
@@ -96,7 +97,7 @@ flowchart LR
 
     subgraph GATES["Mainnet gates (all must close)"]
         direction LR
-        G1["Safe 2-of-3 real<br/>pin codehash + singleton"] --- G2["TrackRecord v2<br/>entry+exit verified · Pyth rec."] --- G3["M-02..M-05"] --- G4["Audit the new round<br/>3-round rule"]
+        G1["Safe 2-of-3 real<br/>pin codehash + singleton"] --- G2["Deploy + Verify V2<br/>official Pyth set"] --- G3["Backend adapter<br/>verified ≠ attested"] --- G4["Final V2 canary<br/>24–48h soak"]
     end
 
     SEP -.-> SEPSTEPS
@@ -111,21 +112,23 @@ flowchart LR
 | Frontend (KineticShell, 11+ views) + Telegram + Voice | ● live | — |
 | Supabase (Postgres + RLS) | ● live | — |
 | X Layer record API (auth fail-closed, hardened) | ● code ready | Prod still runs pre-hardening build — guard activates when Anthony promotes a deploy |
-| Base Sepolia contracts (r8, block 45364125) | ◐ canary live, superseded | Full r10.2 redeploy pending Anthony's signature |
-| r10.2 contracts + SafeOwnerGate (152/152 tests, Codex-approved) | ◐ ready to broadcast | **Anthony signs → steps 2–5** |
+| Base Sepolia contracts (r8, block 45364125) | ◐ historical canary, superseded | Final V2 rehearsal must redeploy the reviewed release candidate |
+| TrackRecord V2 security baseline | ● code complete | ABI frozen; P1 fixed; mutation-sensitive invariant proves regression coverage |
+| DeployBase + Verify V2 | ◐ in progress | Pin official Pyth set, deploy V2 and reconcile manifest/ownership |
+| Backend TrackRecord V2 adapter | ◐ in progress | Wire VERIFIED and ATTESTED paths against the frozen ABI |
 | Executor service (`services/executor/`, Fly.io) | ○ built | `fly deploy` by Anthony |
 | OKX Signal Bot rail | ○ spec v0 | [execution-controls.md](signal-bot/execution-controls.md) → Demo Trading PoC after soak |
 | Uniswap v4 treasury rail (V4Quoter + Universal Router, hookless pools) | ○ decided 2026-08-12 | Implement in mainnet round ([plan](plan-migracion-base.md)) |
-| TrackRecord v2 (entry+exit price-bound, Pyth recommended) | ○ design | Next tech round — mainnet gate |
+| TrackRecord v2 (entry+exit oracle evidence, separate attested ledger) | ● release candidate | Deploy/verify and complete final Base Sepolia canary |
 | Safe 2-of-3 (owner on 8453) | ✕ gate | Create, audit, pin codehash + singleton |
-| M-02..M-05 | ✕ gate | Next audit round |
+| Final contract/security review | ✕ gate | Close any remaining findings on the exact deployment diff |
 | Copy Trading / paid signals | ✕ phase 2 | Only after stable execution + net-of-fees track record + legal review |
 
 ## 5. The 7 contracts (Sepolia manifest `84532.json`)
 
 | Contract | Role |
 |---|---|
-| `BobbyTrackRecord` | Win/loss record, price-bound resolution (v2 will verify entry **and** exit) |
+| `BobbyTrackRecordV2` | Entry/exit oracle evidence, challengeable stops and a separate attested ledger |
 | `BobbyConvictionOracle` | Signal/conviction commitments published pre-execution |
 | `BobbyAgentEconomyV2` | Debate fees & protocol economy stats |
 | `BobbyAgentRegistry` | Agent identities + registration stake |
@@ -135,6 +138,8 @@ flowchart LR
 
 ---
 
-**Current bottleneck, in one line:** the Sepolia canary is one signature away
-(Anthony's broadcast); everything else on that track is prepared. Mainnet remains
-correctly NO-GO behind the gates above.
+**Current bottleneck, in one line:** TrackRecord V2 is reviewed, but its exact
+Deploy/Verify integration, backend adapter, Safe ownership and final Sepolia
+rehearsal still need evidence. Mainnet remains correctly NO-GO behind those
+gates. The operational checklist is
+[`release-readiness.md`](release-readiness.md).

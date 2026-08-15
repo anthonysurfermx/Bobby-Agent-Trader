@@ -1,8 +1,12 @@
 # Plan de migración: Bobby Protocol → Base (Chain 8453) — v2
 
-**Fecha:** 2026-08-10 (v2 tras auditoría de alcance de Codex) · **Ejecutores:** Claude (arquitecto/contratos), Codex (refactor), Kimi (auditoría/QA)
+**Fecha:** 2026-08-14 (v3, release candidate TrackRecord V2) · **Ejecutores:** Claude (arquitecto/contratos), Codex (refactor/auditoría), Kimi (auditoría/QA)
 **Decisiones de Anthony:** cutover total de X Layer · Uniswap nativo en Base · USDC (6 dec) · misma treasury, fondear ~0.01 ETH.
-**Estimación revisada: 2–3 semanas** (la v1 decía 5–7 días; subestimaba contratos, pagos y droplet).
+
+> Este documento conserva el alcance completo de migración. La autorización de
+> lanzamiento ya no depende de una estimación de calendario: depende de cerrar
+> con evidencia cada gate de [`release-readiness.md`](release-readiness.md).
+> TrackRecord V2 está implementado y revisado; Base mainnet sigue en NO-GO.
 
 ## Estado por bloque (auditoría v2)
 | Bloque | Esfuerzo | Nota |
@@ -11,7 +15,7 @@
 | Backend lectura (stats, heartbeat, tx-history) | Medio | RPC/explorer swap vía chains.ts |
 | DEX swap (quote/approve/swap) | Alto | Reescritura real: hoy TODO pasa por OKX DEX Aggregator, incluso `mcp-uniswap-quote.ts` (es un wrapper con nombre engañoso) |
 | Pagos MCP/x402 (`xlayer-payments.ts`) | Alto | Denominados en OKB wei (`PREMIUM_MCP_FEE_WEI = 0.001 OKB`); pasar a USDC ERC-20 cambia ABI, decimales (18→6), validación de chainId, contrato receptor |
-| Contratos + historial | Muy alto | 7 contratos: TrackRecord, ConvictionOracle, AgentEconomy(V2), AdversarialBounties, AgentRegistry, IntentEscrow, HardnessRegistry. Redeploy = estado cero (reputación, bounties, historial NO migran) |
+| Contratos + historial | Muy alto | 7 contratos. TrackRecord V2 ya cerró el P1 externo y congeló ABI/layout; Deploy/Verify V2, Safe y canario final siguen bloqueando mainnet. Redeploy = estado cero (reputación, bounties, historial NO migran) |
 | Droplet externo | **Bloqueo operativo** | `xlayer-trade.ts` → IP pública `/api/xlayer` con `{action, params}`; sin acceso/soporte Base no hay ejecución real |
 
 ## Fase −1 (NUEVA, bloqueante): droplet + decisión de historial
@@ -40,6 +44,8 @@
 
 ## Fase 1 — Contratos (Claude + Kimi, 3–5 días)
 - Alcance real: **7 contratos** + scripts Deploy* en `contracts/broadcast/`. Revisar cada uno por supuestos de OKB/18 decimales (AgentEconomy, Bounties, IntentEscrow manejan valor — máxima atención).
+- TrackRecord V2: implementación y fix P1 completos (`53d1f4c`), con invariant mutation-sensitive (`763d765`). El siguiente trabajo es integrar el constructor/ABI en DeployBase + Verify y en el backend; cualquier cambio al contrato reabre auditoría.
+- Pyth en Base: fijar por `chainId` las direcciones oficiales current/upgraded de la transición 2026-08-18, con la upgraded activa para despliegues nuevos. Dos contratos Pyth son recuperación de migración, no independencia de proveedor.
 - Redeploy = estado cero: se acepta (decisión cutover). El estado histórico queda legible en X Layer y archivado en Supabase; documentar snapshot final (reputaciones, bounties abiertos) antes del apagado.
 - 3 rondas de auditoría obligatorias (Claude → Kimi adversarial → Codex diff) **antes** de cada deploy. Sepolia primero, mainnet después.
 

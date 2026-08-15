@@ -1,6 +1,12 @@
 # Bobby Agent Trader — AI Integration Guide
 
-Bobby is a 3-agent adversarial AI trading system on OKX X Layer. Three agents debate every trade, predictions are committed on-chain before outcomes, and the system evaluates its own accuracy.
+Bobby is a Base-first, 3-agent adversarial decision protocol. Three agents debate every trade, decisions are committed before outcomes, and the system publishes a separated VERIFIED/ATTESTED record. The current X Layer integration is a legacy compatibility rail and public archive; Base mainnet is gated, not live.
+
+## Release Safety
+- Do not present any Base mainnet contract address until it appears in the verified deployment manifest.
+- X Layer addresses and statistics are legacy/archive data.
+- TrackRecord V2 is security-reviewed; deployment, Safe ownership, backend integration and Base Sepolia soak remain launch gates.
+- Current public execution is paper/simulated unless a response explicitly proves otherwise.
 
 ## Quick Start
 
@@ -29,7 +35,7 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
 - `bobby_bounty_list` — List recent adversarial bounties
 - `bobby_bounty_get` — Get a single bounty by id
 
-### Premium Tools (x402 payment on X Layer)
+### Premium Tools (current legacy x402 payment rail)
 - `bobby_analyze` — Full market analysis with 12 data sources (0.001 OKB)
 - `bobby_debate` — Trigger 3-agent adversarial debate (0.001 OKB)
 - `bobby_security_scan` — Token contract safety scan (0.001 OKB)
@@ -40,7 +46,9 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
 - `bobby_bounty_post` — Build unsigned calldata to post a bounty
 - `bobby_bounty_challenge` — Build unsigned calldata to challenge a bounty
 
-## Smart Contracts on X Layer (Chain 196)
+## Legacy Smart Contracts on X Layer (Chain 196)
+
+These addresses are historical/compatibility deployments. They are not Base addresses and their outcomes must not be labeled TrackRecord V2 VERIFIED.
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
@@ -66,6 +74,8 @@ IBobbyOracle oracle = IBobbyOracle(0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a);
 ```
 
 ## x402 Payment Flow
+
+The flow below documents the current legacy compatibility rail during the Base cutover.
 
 ```
 GET /api/premium-signal
@@ -97,3 +107,4 @@ GET /api/bobby-asset-search?q=PEPE
 - GitHub: https://github.com/anthonysurfermx/Bobby-Agent-Trader
 - MCP: https://bobbyprotocol.xyz/api/mcp-bobby
 - Explorer: https://www.oklink.com/xlayer/address/0xf841b428e6d743187d7be2242eccc1078fde2395
+- Mainnet readiness: https://github.com/anthonysurfermx/Bobby-Agent-Trader/blob/main/docs/release-readiness.md

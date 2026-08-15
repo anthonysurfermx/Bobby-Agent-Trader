@@ -3,19 +3,22 @@
 <head>
 <meta charset="utf-8">
 <title>Bobby Agent Trader — Developer Docs</title>
-<meta name="description" content="Connect your AI agent to Bobby in one command. 12 MCP tools, 4 smart contracts on X Layer, 70+ technical indicators.">
+<meta name="description" content="Connect an AI agent to Bobby's adversarial decision tools. Base mainnet is gated; X Layer remains a legacy compatibility rail and public archive.">
 </head>
 <body>
 <h1>Bobby Agent Trader — Developer Documentation</h1>
-<p>Connect your AI agent to Bobby in one command. 12 MCP tools, 4 smart contracts on X Layer, 70+ technical indicators, x402 payments.</p>
+<p>Connect your AI agent to Bobby's adversarial decision tools, public record and x402-compatible API.</p>
+<aside>
+<strong>Release status:</strong> Bobby is Base-first, but Base mainnet is not live yet. The X Layer contracts below are a legacy compatibility rail and public archive. Do not present them as Base or TrackRecord V2 VERIFIED deployments. See the <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader/blob/main/docs/release-readiness.md">mainnet readiness gates</a>.
+</aside>
 
 <h2>Quick Start</h2>
 <pre>
 # Add Bobby to Claude Code
-claude mcp add bobby-trader https://defimexico.org/api/mcp-bobby
+claude mcp add bobby-trader https://bobbyprotocol.xyz/api/mcp-bobby
 
 # Call Bobby via API
-curl -X POST https://defimexico.org/api/mcp-bobby \
+curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_ta","arguments":{"symbol":"BTC"}},"id":1}'
 </pre>
@@ -32,15 +35,16 @@ curl -X POST https://defimexico.org/api/mcp-bobby \
 <li><strong>bobby_wallet_balance</strong> — Check any wallet balance on any chain</li>
 </ul>
 
-<h3>Premium Tools (x402 payment on X Layer)</h3>
+<h3>Premium Tools (current legacy x402 rail)</h3>
 <ul>
-<li><strong>bobby_analyze</strong> — Full market analysis with 12 data sources (0.01 USDC)</li>
-<li><strong>bobby_debate</strong> — Trigger 3-agent adversarial debate: Alpha Hunter vs Red Team vs CIO (0.01 USDC)</li>
-<li><strong>bobby_security_scan</strong> — Token contract safety scan (0.01 USDC)</li>
-<li><strong>bobby_wallet_portfolio</strong> — Multi-chain wallet analysis (0.01 USDC)</li>
+<li><strong>bobby_analyze</strong> — Full market analysis with 12 data sources (price returned by API)</li>
+<li><strong>bobby_debate</strong> — Trigger 3-agent adversarial debate: Alpha Hunter vs Red Team vs CIO (price returned by API)</li>
+<li><strong>bobby_security_scan</strong> — Token contract safety scan (price returned by API)</li>
+<li><strong>bobby_wallet_portfolio</strong> — Multi-chain wallet analysis (price returned by API)</li>
 </ul>
 
-<h2>Smart Contracts on X Layer (Chain 196)</h2>
+<h2>Legacy Smart Contracts on X Layer (Chain 196)</h2>
+<p>These are historical/compatibility addresses, not Base deployment addresses.</p>
 <table border="1">
 <tr><th>Contract</th><th>Address</th><th>Purpose</th></tr>
 <tr><td>BobbyTrackRecord</td><td>0xf841b428e6d743187d7be2242eccc1078fde2395</td><td>Commit-reveal predictions — locked before outcomes</td></tr>
@@ -65,6 +69,7 @@ IBobbyOracle oracle = IBobbyOracle(0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a);
 </pre>
 
 <h2>x402 Payment Flow</h2>
+<p>This flow documents the current legacy compatibility rail during the Base cutover. Clients should discover payment requirements from the API rather than hardcoding chain or amount.</p>
 <pre>
 # Step 1: Request premium signal (returns 402)
 GET /api/premium-signal
@@ -107,11 +112,11 @@ GET /api/bobby-signals
 
 <h2>Links</h2>
 <ul>
-<li>Live: <a href="https://defimexico.org/bobby">defimexico.org/bobby</a></li>
+<li>Live: <a href="https://bobbyprotocol.xyz">bobbyprotocol.xyz</a></li>
 <li>GitHub: <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader">github.com/anthonysurfermx/Bobby-Agent-Trader</a></li>
-<li>MCP Endpoint: <a href="https://defimexico.org/api/mcp-bobby">defimexico.org/api/mcp-bobby</a></li>
-<li>LLM Context: <a href="https://defimexico.org/llms.txt">defimexico.org/llms.txt</a></li>
-<li>Marketplace: <a href="https://defimexico.org/agentic-world/bobby/marketplace">defimexico.org/agentic-world/bobby/marketplace</a></li>
+<li>MCP Endpoint: <a href="https://bobbyprotocol.xyz/api/mcp-bobby">bobbyprotocol.xyz/api/mcp-bobby</a></li>
+<li>LLM Context: <a href="https://bobbyprotocol.xyz/llms.txt">bobbyprotocol.xyz/llms.txt</a></li>
+<li>Marketplace: <a href="https://bobbyprotocol.xyz/agentic-world/bobby/marketplace">bobbyprotocol.xyz/agentic-world/bobby/marketplace</a></li>
 </ul>
 </body>
 </html>
