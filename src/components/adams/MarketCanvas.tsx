@@ -17,7 +17,7 @@ import {
   type ISeriesApi,
   type IPriceLine,
 } from 'lightweight-charts';
-import { ASSET_GROUPS, getVoiceAsset, isEquitySymbol } from '@/lib/voice-assets';
+import { ASSET_GROUPS, getVoiceAsset, isEquitySymbol, type AssetVenue } from '@/lib/voice-assets';
 import { analyzeCandles, type Candle, type MarketAnalysis } from '@/lib/market-indicators';
 
 export interface ChartLevel {
@@ -57,6 +57,7 @@ export function MarketCanvas({
   timeframe,
   levels,
   debate,
+  language,
   onSymbolChange,
   onTimeframeChange,
 }: {
@@ -69,6 +70,7 @@ export function MarketCanvas({
     indicators: string[];
     levels: ChartLevel[];
   } | null;
+  language: 'es' | 'en';
   onSymbolChange: (symbol: string) => void;
   onTimeframeChange: (tf: Timeframe) => void;
 }) {
@@ -80,6 +82,7 @@ export function MarketCanvas({
   const ema50Ref = useRef<ISeriesApi<'Line'> | null>(null);
   const zoneRefs = useRef<ISeriesApi<'Baseline'>[]>([]);
   const lineRefs = useRef<IPriceLine[]>([]);
+  const previousSymbolRef = useRef(symbol);
   /** Time range the zones span. State, not a ref — the zone effect must re-run
    *  once candles arrive, otherwise a debate that lands first never gets drawn. */
   const [span, setSpan] = useState<{ from: number; to: number } | null>(null);
@@ -87,8 +90,19 @@ export function MarketCanvas({
   const [analysis, setAnalysis] = useState<MarketAnalysis | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState(false);
+  // The feed returned no candles for this symbol (e.g. an asset that isn't on
+  // the venue we routed to). Distinct from a network error — and we CLEAR the
+  // chart rather than leave the previous symbol's candles on screen mislabeled.
+  const [noData, setNoData] = useState(false);
 
-  const isStock = isEquitySymbol(symbol);
+  // The venue the candles ACTUALLY came from, resolved at fetch time. For a
+  // symbol in the registry this equals its declared venue; for one the human
+  // named that isn't curated, we probe OKX then Yahoo and remember whichever
+  // answered — so uncurated equities (and altcoins) chart with the right label.
+  const [resolvedVenue, setResolvedVenue] = useState<AssetVenue>(
+    isEquitySymbol(symbol) ? 'equity' : 'okx',
+  );
+  const isStock = resolvedVenue === 'equity';
 
   // Every line on this chart is a price an agent actually named. The three
   // debate levels come straight from the model's show_debate call; a level
@@ -196,37 +210,129 @@ export function MarketCanvas({
   // --- load + poll candles ---
   useEffect(() => {
     let cancelled = false;
+    let hasRenderedRows = false;
+    const symbolChanged = previousSymbolRef.current !== symbol;
+    previousSymbolRef.current = symbol;
+
+    // Price lines belong to the symbol that produced them. Clear them on an
+    // asset switch so a BTC thesis can never remain visible on an equity chart.
+    // A timeframe switch keeps the levels because the underlying asset is the
+    // same; new levels will be restored by the dedicated effect below.
+    if (symbolChanged && candleRef.current) {
+      lineRefs.current.forEach((line) => {
+        try {
+          candleRef.current?.removePriceLine(line);
+        } catch {
+          // The chart may be tearing down during a fast route/symbol change.
+        }
+      });
+      lineRefs.current = [];
+    }
+
+    const clearMarketState = () => {
+      candleRef.current?.setData([] as never);
+      volumeRef.current?.setData([] as never);
+      ema20Ref.current?.setData([] as never);
+      ema50Ref.current?.setData([] as never);
+      setAnalysis(null);
+      setLast(null);
+      setSpan(null);
+      setUpdatedAt(null);
+    };
+    // Registry symbols know their venue up front. For an uncurated ticker we
+    // discover it on the first successful fetch and reuse it, so the 15s poll
+    // stops re-probing both venues once one has answered.
+    let cachedVenue: AssetVenue | null = getVoiceAsset(symbol)?.venue ?? null;
+    // Best-guess label the instant the symbol changes, corrected once the fetch
+    // resolves the real venue (matters for uncurated tickers probed on OKX).
+    setResolvedVenue(cachedVenue ?? 'okx');
+    // Clear synchronously on every symbol/timeframe change. Otherwise the old
+    // candles are briefly displayed under the new ticker while fetch is pending.
+    clearMarketState();
+    setNoData(false);
+    setError(false);
 
     const load = async () => {
       try {
         const stockConfig = STOCK_TIMEFRAME[timeframe];
-        const endpoint = isEquitySymbol(symbol)
-          ? `/api/stock-candles?symbol=${encodeURIComponent(symbol)}&range=${stockConfig.range}&interval=${stockConfig.interval}`
-          : `/api/okx-candles?instId=${encodeURIComponent(symbol)}-USDT&bar=${timeframe}&limit=100`;
-        const response = await fetch(endpoint, { cache: 'no-store' });
-        const payload = await response.json();
-        // Both OKX and Yahoo return the same normalized candle shape here,
-        // so the chart behaves identically for crypto and equities.
-        // oldest first; raw OKX arrays are tolerated as a fallback.
-        const rows: Candle[] = (payload.candles ?? payload.data ?? [])
-          .map((row: Record<string, number | string> | Array<number | string>) => {
-            if (Array.isArray(row)) {
+        let hadFetchError = false;
+        // Both OKX and Yahoo return the same normalized candle shape here, so
+        // the chart behaves identically for crypto and equities. Oldest first;
+        // raw OKX arrays are tolerated as a fallback.
+        const parseRows = (payload: { candles?: unknown; data?: unknown }): Candle[] =>
+          ((payload.candles ?? payload.data ?? []) as Array<Record<string, number | string> | Array<number | string>>)
+            .map((row) => {
+              if (Array.isArray(row)) {
+                return {
+                  time: Math.floor(Number(row[0]) / 1000),
+                  open: Number(row[1]), high: Number(row[2]),
+                  low: Number(row[3]), close: Number(row[4]), volume: Number(row[5] ?? 0),
+                };
+              }
               return {
-                time: Math.floor(Number(row[0]) / 1000),
-                open: Number(row[1]), high: Number(row[2]),
-                low: Number(row[3]), close: Number(row[4]), volume: Number(row[5] ?? 0),
+                time: Math.floor(Number(row.ts) / 1000),
+                open: Number(row.open), high: Number(row.high),
+                low: Number(row.low), close: Number(row.close), volume: Number(row.volume ?? 0),
               };
-            }
-            return {
-              time: Math.floor(Number(row.ts) / 1000),
-              open: Number(row.open), high: Number(row.high),
-              low: Number(row.low), close: Number(row.close), volume: Number(row.volume ?? 0),
-            };
-          })
-          .filter((c: Candle) => Number.isFinite(c.close) && Number.isFinite(c.time))
-          .sort((a: Candle, b: Candle) => a.time - b.time);
+            })
+            .filter((c: Candle) => Number.isFinite(c.close) && Number.isFinite(c.time))
+            .sort((a: Candle, b: Candle) => a.time - b.time);
 
-        if (cancelled || !rows.length || !candleRef.current) return;
+        const fetchFrom = async (venue: AssetVenue): Promise<Candle[]> => {
+          try {
+            const url = venue === 'equity'
+              ? `/api/stock-candles?symbol=${encodeURIComponent(symbol)}&range=${stockConfig.range}&interval=${stockConfig.interval}`
+              : `/api/okx-candles?instId=${encodeURIComponent(symbol)}-USDT&bar=${timeframe}&limit=100`;
+            const response = await fetch(url, { cache: 'no-store' });
+            if (!response.ok) {
+              hadFetchError = true;
+              return [];
+            }
+            return parseRows(await response.json());
+          } catch {
+            hadFetchError = true;
+            return [];
+          }
+        };
+
+        let venue: AssetVenue;
+        let rows: Candle[];
+        if (cachedVenue) {
+          venue = cachedVenue;
+          rows = await fetchFrom(venue);
+        } else {
+          // Uncurated ticker the human named: try crypto (OKX), then fall back
+          // to equities (Yahoo) so assets outside the registry still chart.
+          rows = await fetchFrom('okx');
+          venue = 'okx';
+          if (!rows.length && !cancelled) {
+            const equityRows = await fetchFrom('equity');
+            if (equityRows.length) { rows = equityRows; venue = 'equity'; }
+          }
+        }
+
+        if (cancelled || !candleRef.current) return;
+        if (rows.length) cachedVenue = venue; // lock in the venue that answered
+        setResolvedVenue(venue);
+
+        // No candles for this symbol: clear the chart so a failed/unsupported
+        // asset never shows the PREVIOUS symbol's candles under a new label
+        // (the "TSM/USDT with BTC's price" bug). Show an explicit empty state.
+        if (!rows.length) {
+          if (hasRenderedRows) {
+            // A polling blip must not erase a valid chart. Keep the last candles
+            // for this SAME symbol and mark them stale in the footer.
+            setNoData(false);
+            setError(true);
+          } else {
+            clearMarketState();
+            setNoData(!hadFetchError);
+            setError(hadFetchError);
+          }
+          return;
+        }
+        setNoData(false);
+        hasRenderedRows = true;
 
         candleRef.current.setData(rows as never);
         volumeRef.current?.setData(
@@ -260,7 +366,11 @@ export function MarketCanvas({
         setUpdatedAt(new Date());
         setError(false);
       } catch {
-        if (!cancelled) setError(true);
+        if (!cancelled) {
+          if (!hasRenderedRows) clearMarketState();
+          setNoData(false);
+          setError(true);
+        }
       }
     };
 
@@ -337,10 +447,17 @@ export function MarketCanvas({
   return (
     <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-[#0b0b12]/70 backdrop-blur">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <div className="flex min-w-0 items-baseline gap-3">
+        <div className="flex min-w-0 items-baseline gap-2">
           <span className="truncate font-mono text-sm font-bold tracking-[0.08em] text-white">
             {isStock ? symbol : `${symbol}/USDT`}
           </span>
+          {/* Name the asset the human just spoke, so the chart always says what
+              it's showing ("Nvidia", "Bitcoin") — not just a bare ticker. */}
+          {getVoiceAsset(symbol)?.name && (
+            <span className="hidden truncate text-[11px] text-white/40 sm:inline">
+              {getVoiceAsset(symbol)!.name}
+            </span>
+          )}
           {last && (
             <>
               <span className="font-mono text-lg font-bold text-white">
@@ -448,12 +565,37 @@ export function MarketCanvas({
         })}
       </div>
 
-      <div ref={containerRef} className="min-h-0 flex-1" />
+      <div className="relative min-h-0 flex-1">
+        <div ref={containerRef} className="absolute inset-0" />
+        {noData && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[#050505]/80 text-center">
+            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50">
+              {language === 'es' ? `sin datos para ${symbol}` : `no data for ${symbol}`}
+            </span>
+            <span className="font-mono text-[9px] text-white/25">
+              {language === 'es'
+                ? (!getVoiceAsset(symbol)
+                    ? 'no hay velas en OKX ni Yahoo Finance para este activo'
+                    : `no hay velas en ${isStock ? 'Yahoo Finance' : 'OKX'} para este activo`)
+                : (!getVoiceAsset(symbol)
+                    ? 'no candles on OKX or Yahoo Finance for this asset'
+                    : `no candles on ${isStock ? 'Yahoo Finance' : 'OKX'} for this asset`)}
+            </span>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
-        <span>{isStock ? 'Yahoo Finance · mercado accionario' : 'OKX · mercado cripto'}</span>
+        <span>{isStock
+          ? (language === 'es' ? 'Yahoo Finance · mercado accionario' : 'Yahoo Finance · equities')
+          : (language === 'es' ? 'OKX · mercado cripto' : 'OKX · crypto market')}
+        </span>
         <span className={error ? 'text-red-400' : undefined}>
-          {error ? 'sin datos' : updatedAt ? `actualizado ${updatedAt.toLocaleTimeString('es-MX')}` : 'cargando…'}
+          {error
+            ? (language === 'es' ? 'sin datos' : 'no data')
+            : updatedAt
+              ? `${language === 'es' ? 'actualizado' : 'updated'} ${updatedAt.toLocaleTimeString(language === 'es' ? 'es-MX' : 'en-US')}`
+              : (language === 'es' ? 'cargando…' : 'loading…')}
         </span>
       </div>
     </div>

@@ -9,8 +9,20 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, ShieldCheck, X, ChevronDown } from 'lucide-react';
 import { useRealtimeVoice, type VoiceState } from '@/hooks/useRealtimeVoice';
+import { getVoiceAsset, isEquitySymbol } from '@/lib/voice-assets';
 import { LiveOrb } from './LiveOrb';
 import { MarketCanvas, type Timeframe } from './MarketCanvas';
+
+/** How the desk labels the asset on screen: "Nvidia · NVDA" for equities,
+ *  "BTC/USDT" for crypto — never "NVDA/USDT" (equities aren't a USDT pair). */
+function assetLabel(symbol: string): string {
+  const asset = getVoiceAsset(symbol);
+  // Unknown symbols are venue-neutral until MarketCanvas probes the feeds.
+  // This avoids showing an uncurated equity such as TSM as "TSM/USDT".
+  if (!asset) return symbol;
+  if (isEquitySymbol(symbol)) return `${asset.name} · ${symbol}`;
+  return `${symbol}/USDT`;
+}
 
 const STATE_COPY: Record<VoiceState, { label: string; hint: string }> = {
   idle: { label: 'En reposo', hint: 'Toca el micrófono y háblale a Bobby' },
@@ -120,9 +132,11 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
           {onSwitchToChat && (
             <button
               onClick={onSwitchToChat}
-              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/45 transition hover:text-white"
+              title={voiceLang === 'es' ? 'Usa texto si hay ruido alrededor' : 'Use text when the room is noisy'}
+              className="min-h-11 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/45 transition hover:border-[#0052ff]/40 hover:text-white sm:min-h-0 sm:px-3"
             >
-              Chat
+              <span className="sm:hidden">{voiceLang === 'es' ? 'Texto' : 'Text'}</span>
+              <span className="hidden sm:inline">{voiceLang === 'es' ? 'Texto · ruido' : 'Text · noisy room'}</span>
             </button>
           )}
         </div>
@@ -203,7 +217,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
             onClick={() => setChartOpenMobile((open) => !open)}
             className="mb-3 flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/60 lg:hidden"
           >
-            {symbol}/USDT · gráfica en vivo
+            {assetLabel(symbol)} · gráfica en vivo
             <ChevronDown className={`h-4 w-4 transition ${chartOpenMobile ? 'rotate-180' : ''}`} />
           </button>
           {/* The candles are the evidence — the debate cards below never get to
@@ -214,6 +228,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
               timeframe={timeframe as Timeframe}
               levels={levels}
               debate={debate}
+              language={voiceLang}
               onSymbolChange={(nextSymbol) => {
                 setSymbol(nextSymbol);
               }}
@@ -221,7 +236,8 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
             />
           </div>
 
-          {/* the debate, made readable next to the price it is about */}
+          {/* The full debate stays readable beside the price; the spoken answer
+              is deliberately only the executive summary. */}
           <AnimatePresence>
             {debate && (
               <motion.div
@@ -230,6 +246,14 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                 exit={{ opacity: 0 }}
                 className="mt-3 grid shrink-0 gap-2 sm:grid-cols-3"
               >
+                <div className="sm:col-span-3 flex items-center justify-between px-1">
+                  <span className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">
+                    {voiceLang === 'es' ? 'Debate en 3 lecturas' : 'Debate in 3 reads'}
+                  </span>
+                  <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">
+                    {voiceLang === 'es' ? 'Resumen por Bobby · niveles en gráfica' : 'Bobby summary · levels on chart'}
+                  </span>
+                </div>
                 {([
                   {
                     key: 'alpha' as const,
@@ -276,7 +300,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                     <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
                       {side.stance}
                     </div>
-                    <p className="line-clamp-4 min-h-[4rem] text-[13px] leading-5 text-white/75">{side.text || (voiceLang === 'es' ? 'Esperando análisis…' : 'Waiting for analysis…')}</p>
+                    <p className="max-h-24 min-h-[3.75rem] overflow-y-auto text-[13px] leading-5 text-white/75">{side.text || (voiceLang === 'es' ? 'Esperando análisis…' : 'Waiting for analysis…')}</p>
                     {/* Ties the card to the line of the same colour on the chart. */}
                     {(() => {
                       const line = debate.levels.find((level) => level.agent === side.key);

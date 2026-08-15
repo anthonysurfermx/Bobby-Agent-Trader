@@ -40,8 +40,8 @@ class BobbyErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 
 export default function BobbyAgentTraderPage() {
   const { address } = useAccount();
-  // Voice is the primary way in; the classic chat stays one click away as a
-  // fallback for muted rooms, unsupported browsers and typing-only users.
+  // Voice is the primary way in; text is a first-class fallback for noisy
+  // rooms, unsupported browsers and people who prefer to type.
   const [mode, setMode] = useState<'voice' | 'chat'>('voice');
 
   return (
@@ -50,15 +50,10 @@ export default function BobbyAgentTraderPage() {
         {mode === 'voice' ? (
           <VoiceRoom onSwitchToChat={() => setMode('chat')} />
         ) : (
-          <>
-            <AdamsChat />
-            <button
-              onClick={() => setMode('voice')}
-              className="absolute bottom-24 right-4 z-50 rounded-lg border border-[#0052ff]/40 bg-[#0052ff]/15 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7da6ff] backdrop-blur transition hover:bg-[#0052ff]/25"
-            >
-              Volver a voz
-            </button>
-          </>
+          // One voice room only: the LIVE DESK (VoiceRoom). "CHAT" is a pure
+          // TEXT surface — AdamsChat in textOnly hides its own voice orb so it
+          // no longer reads as a second (weaker) voice room.
+          <AdamsChat onSwitchToVoice={() => setMode('voice')} textOnly />
         )}
       </main>
       <ProactiveNotification walletAddress={address} />
