@@ -27,9 +27,15 @@ verifica y documenta; no firma ni promueve nada.
 El gate de Pyth (`PythOracleGate.sol`) exige el set canónico exacto. En Sepolia
 usa el contrato actualizado `0x5f52e4DBEA21f5b23523B6e20d50c29ae0a4EB83`
 como activo y conserva `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`
-como fallback preaprobado. Así el canario reproduce la postura de migración de
-mainnet en lugar de ensayar solamente el contrato anterior. Feeds pineados en
-la librería.
+como fallback preaprobado. Ambas direcciones tienen código y responden a
+`getUpdateFee` (verificado on-chain el 2026-08-14). Así el canario reproduce la
+postura de migración de mainnet en lugar de ensayar solamente el contrato
+anterior. Feeds pineados en la librería.
+
+**Residual del primer commit VERIFIED:** el PoC original probó el parse contra
+la dirección current. El canario debe confirmar que el payload del Hermes
+actualizado parsea contra la dirección upgraded activa. El adaptador selecciona
+el endpoint según `activePyth` y nunca degrada un símbolo VERIFIED a ATTESTED.
 
 ## 1. Direcciones que Anthony define (roles — ninguna vive en el repo)
 
@@ -136,6 +142,18 @@ Dejar el canario 24–48h. Vigilar (bugs que el canario cazó históricamente):
 carrera de nonces, gas fijo (out-of-gas en payable), shim de chain a medias,
 y ahora: fetch de Hermes fallando (reintentar, nunca degradar a ATTESTED).
 
+El adaptador debe reportar éxito únicamente después de un receipt `status=1`.
+Un hash emitido o una respuesta `onchain:false` no autoriza actualizar la fila
+de Supabase. Para la wallet recorder, provocar dos invocaciones solapadas y
+confirmar que el retry de nonce conserva ambas transacciones. Un ciclo con
+veredicto `none` no debe crear un commitment de TrackRecord; su señal neutral
+vive solamente en ConvictionOracle/Hardness. Repetir con un ciclo `paper`, uno
+`dryrun` y un trade `live` rechazado por el risk gate: ninguno debe incrementar
+`totalCommitments`. Una orden live aprobada debe mostrar el orden exacto
+`risk gate → commitment confirmado → orden OKX`. Una llamada pública con
+credenciales OKX del usuario tampoco debe gastar gas de la recorder wallet ni
+atribuir esa operación al track record de Bobby.
+
 ## 7. No hacer
 
 - No usar direcciones ficticias en el dry-run real.
@@ -148,5 +166,6 @@ y ahora: fetch de Hermes fallando (reintentar, nunca degradar a ATTESTED).
 
 Safe 2-de-3 real (+ pin codehash/singleton), los 2 Pyth canónicos de mainnet
 (el gate ya los exige; Sepolia ensaya la misma forma), recorte de tolerances con
-basis real, y el handoff ACEPTADO de los 7 contratos. Ver
+basis real, el watcher histórico que challengea stop breaches antes de publicar
+un WIN, y el handoff ACEPTADO de los 7 contratos. Ver
 `safe-setup-runbook.md` y el frente de Codex.

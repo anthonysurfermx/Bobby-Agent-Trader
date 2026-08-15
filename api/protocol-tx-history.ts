@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { formatEther } from 'ethers';
+import { Interface, formatEther } from 'ethers';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { TRACK_RECORD_V2_ABI } from './_lib/track-record-v2.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -28,6 +29,13 @@ const TREASURY = BOBBY_TREASURY;
 
 const PROTOCOL_ACTIVITY_START_BLOCK = DEFAULT_CHAIN.protocolDeploymentBlock;
 
+const trackRecordV1WriteIface = new Interface([
+  'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96)',
+  'function resolveTrade(bytes32,int256,uint8,uint96)',
+]);
+const trackRecordV2WriteIface = new Interface(TRACK_RECORD_V2_ABI);
+const selectorPrefix = (iface: Interface, name: string) => iface.getFunction(name)!.selector.slice(2, 6);
+
 const CONTRACT_NAMES: Record<string, string> = {
   [AGENT_ECONOMY.toLowerCase()]: 'AgentEconomy',
   [BOUNTIES.toLowerCase()]: 'AdversarialBounties',
@@ -50,8 +58,10 @@ const METHOD_LABELS: Record<string, Record<string, string>> = {
     '1cd3': 'submitChallenge',
   },
   [TRACK_RECORD.toLowerCase()]: {
-    'f8dd': 'commitTrade',
-    '7fc0': 'resolveTrade',
+    [selectorPrefix(trackRecordV1WriteIface, 'commitTrade')]: 'commitTrade (v1)',
+    [selectorPrefix(trackRecordV1WriteIface, 'resolveTrade')]: 'resolveTrade (v1)',
+    [selectorPrefix(trackRecordV2WriteIface, 'commitTrade')]: 'commitTrade (v2)',
+    [selectorPrefix(trackRecordV2WriteIface, 'resolveTrade')]: 'resolveTrade (v2)',
   },
   [AGENT_ECONOMY.toLowerCase()]: {
     '45d2': 'payDebateFee',

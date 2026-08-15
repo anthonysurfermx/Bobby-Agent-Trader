@@ -22,6 +22,7 @@ import {
   BOBBY_TRACK_RECORD,
 } from './_lib/protocol-constants.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { isTrackRecordV2, readTrackRecordPublicStats } from './_lib/track-record-v2.js';
 
 export const config = { maxDuration: 15 };
 
@@ -30,16 +31,6 @@ const TRACK_RECORD = BOBBY_TRACK_RECORD;
 
 const ORACLE_INTERFACE = new Interface([
   'function symbolCount() view returns (uint256)',
-]);
-
-const TRACK_RECORD_INTERFACE = new Interface([
-  'function totalTrades() view returns (uint256)',
-  'function totalCommitments() view returns (uint256)',
-  'function getWinRate() view returns (uint256)',
-  'function wins() view returns (uint256)',
-  'function losses() view returns (uint256)',
-  'function totalPnlBps() view returns (int256)',
-  'function pendingCount() view returns (uint256)',
 ]);
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
@@ -74,25 +65,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const [
-    totalTrades,
-    totalCommitments,
-    winRateBps,
-    wins,
-    losses,
-    totalPnlBps,
-    pendingCount,
+    trackRecord,
     symbolCount,
     economyStats,
     bountyMin,
     bountyNextId,
   ] = await Promise.all([
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'totalTrades'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'totalCommitments'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'getWinRate'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'wins'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'losses'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'totalPnlBps'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'pendingCount'), BigInt(0)),
+    safe(
+      () => readTrackRecordPublicStats(
+        (data) => rpcCall<string>('eth_call', [{ to: TRACK_RECORD, data }, 'latest']),
+        isTrackRecordV2(DEFAULT_CHAIN.id),
+      ),
+      {
+        version: isTrackRecordV2(DEFAULT_CHAIN.id) ? 'v2' as const : 'v1' as const,
+        totalTrades: '0', totalCommitments: '0', winRateBps: '0', wins: '0', losses: '0',
+        totalPnlBps: '0', pending: '0', resolutionBps: '0',
+      },
+    ),
     safe(() => callView(CONVICTION_ORACLE, ORACLE_INTERFACE, 'symbolCount'), BigInt(0)),
     safe(getEconomyStats, {
       totalDebates: '0',
@@ -106,8 +95,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     safe(readNextBountyId, 1),
   ]);
 
-  const winRate = Number(winRateBps) / 100;
-  const pnlPct = Number(totalPnlBps) / 100;
+  const winRate = Number(trackRecord.winRateBps) / 100;
+  const pnlPct = Number(trackRecord.totalPnlBps) / 100;
   const totalBounties = Math.max(0, bountyNextId - 1);
   const bountyEscrowNative = (totalBounties * Number(bountyMin.minBountyNative || '0')).toFixed(4);
   const protocolNotionalNative = (
@@ -122,15 +111,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   //   economy       (20%): log-scaled total interactions (50+ = full marks)
   //   bounties      (10%): external challenges posted (10+ = full marks)
   //   integrity     (10%): commit-reveal ratio (commitments vs trades)
-  const nTrades = Number(totalTrades);
-  const nCommitments = Number(totalCommitments);
+  const nTrades = trackRecord.verified ? Number(trackRecord.verified.resolved) : Number(trackRecord.totalTrades);
+  const nCommitments = trackRecord.verified
+    ? Number(trackRecord.verified.resolved) + Number(trackRecord.verified.expired) + Number(trackRecord.verified.pending)
+    : Number(trackRecord.totalCommitments);
   const nInteractions = Number(economyStats.totalPayments) + totalBounties;
 
-  const trackScore = Math.min(winRate, 100);
+  const resolutionFactor = trackRecord.version === 'v2'
+    ? Math.min(1, Number(trackRecord.resolutionBps) / 10_000)
+    : 1;
+  const trackScore = Math.min(winRate, 100) * resolutionFactor;
   const activityScore = nCommitments > 0 ? Math.min(100, (Math.log10(nCommitments + 1) / Math.log10(101)) * 100) : 0;
   const economyScore = nInteractions > 0 ? Math.min(100, (Math.log10(nInteractions + 1) / Math.log10(51)) * 100) : 0;
   const bountyScore = Math.min(100, (totalBounties / 10) * 100);
-  const integrityScore = nTrades > 0 ? Math.min(100, (nCommitments / Math.max(nTrades, 1)) * 100) : (nCommitments > 0 ? 100 : 0);
+  const integrityScore = trackRecord.version === 'v2'
+    ? resolutionFactor * 100
+    : nTrades > 0
+      ? Math.min(100, (nTrades / Math.max(nCommitments, 1)) * 100)
+      : 0;
 
   const trustScore = Math.round(
     trackScore * 0.35 +
@@ -180,15 +178,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     },
 
     reputation: {
+      version: trackRecord.version,
       winRate,
-      winRateRaw: winRateBps.toString(),
+      winRateRaw: trackRecord.winRateBps,
+      resolutionRate: Number(trackRecord.resolutionBps) / 100,
       totalTrades: nTrades,
       totalCommitments: nCommitments,
-      pendingResolution: Number(pendingCount),
-      wins: Number(wins),
-      losses: Number(losses),
-      cumulativePnlBps: Number(totalPnlBps),
+      pendingResolution: Number(trackRecord.pending),
+      wins: Number(trackRecord.wins),
+      losses: Number(trackRecord.losses),
+      cumulativePnlBps: Number(trackRecord.totalPnlBps),
       cumulativePnlPct: pnlPct,
+      attested: trackRecord.attested || null,
     },
 
     oracle: {

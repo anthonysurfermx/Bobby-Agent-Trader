@@ -6,6 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Interface, formatEther } from 'ethers';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { TRACK_RECORD_V2_ABI, isTrackRecordV2, readTrackRecordPublicStats } from './_lib/track-record-v2.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -33,6 +34,13 @@ const HARDNESS_REGISTRY = BOBBY_HARDNESS_REGISTRY;
 const CONVICTION_ORACLE = BOBBY_CONVICTION_ORACLE;
 const AGENT_REGISTRY = BOBBY_AGENT_REGISTRY;
 const TREASURY = BOBBY_TREASURY;
+
+const trackRecordV1WriteIface = new Interface([
+  'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96)',
+  'function resolveTrade(bytes32,int256,uint8,uint96)',
+]);
+const trackRecordV2WriteIface = new Interface(TRACK_RECORD_V2_ABI);
+const selectorPrefix = (iface: Interface, name: string) => iface.getFunction(name)!.selector.slice(2, 6);
 
 let heartbeatCache:
   | {
@@ -99,8 +107,10 @@ const METHOD_LABELS: Record<string, Record<string, string>> = {
     '1cd3': 'submitChallenge',
   },
   [TRACK_RECORD.toLowerCase()]: {
-    'f8dd': 'commitTrade',
-    '7fc0': 'resolveTrade',
+    [selectorPrefix(trackRecordV1WriteIface, 'commitTrade')]: 'commitTrade (v1)',
+    [selectorPrefix(trackRecordV1WriteIface, 'resolveTrade')]: 'resolveTrade (v1)',
+    [selectorPrefix(trackRecordV2WriteIface, 'commitTrade')]: 'commitTrade (v2)',
+    [selectorPrefix(trackRecordV2WriteIface, 'resolveTrade')]: 'resolveTrade (v2)',
   },
   [AGENT_ECONOMY.toLowerCase()]: {
     '45d2': 'payDebateFee',
@@ -114,11 +124,6 @@ const METHOD_LABELS: Record<string, Record<string, string>> = {
 // ABI interfaces — source of truth for function selectors
 const economyIface = new Interface([
   'function getEconomyStats() view returns (uint256, uint256, uint256, uint256, uint256)',
-]);
-
-const trackRecordIface = new Interface([
-  'function getWinRate() view returns (uint256)',
-  'function totalTrades() view returns (uint256)',
 ]);
 
 const bountiesIface = new Interface([
@@ -155,6 +160,13 @@ async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
 
 async function ethCall(to: string, data: string): Promise<string> {
   return (await rpcCall('eth_call', [{ to, data }, 'latest'])) as string;
+}
+
+async function getTrackRecordStats() {
+  return readTrackRecordPublicStats(
+    (data) => ethCall(TRACK_RECORD, data),
+    isTrackRecordV2(DEFAULT_CHAIN.id),
+  );
 }
 
 async function sbQuery(table: string, query: string): Promise<Record<string, unknown>[]> {
@@ -286,8 +298,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const [
       treasuryBalanceHex,
       economyStatsHex,
-      winRateHex,
-      totalTradesHex,
+      trackRecordStats,
       nextBountyIdHex,
       minBountyHex,
       recentCycles,
@@ -298,8 +309,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Agent Economy — single call returns all 5 stats
       ethCall(AGENT_ECONOMY, economyIface.encodeFunctionData('getEconomyStats')),
       // Track Record
-      ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData('getWinRate')),
-      ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData('totalTrades')),
+      getTrackRecordStats(),
       // Bounties
       ethCall(BOUNTIES, bountiesIface.encodeFunctionData('nextBountyId')),
       ethCall(BOUNTIES, bountiesIface.encodeFunctionData('minBounty')),
@@ -340,22 +350,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('[ProtocolHeartbeat] Failed to decode getEconomyStats');
     }
 
-    // Decode single-value returns from TrackRecord
-    let winRateBps = '0';
-    let totalTrades = '0';
-    try {
-      const [wr] = trackRecordIface.decodeFunctionResult('getWinRate', String(winRateHex));
-      winRateBps = wr.toString();
-    } catch {
-      console.error('[ProtocolHeartbeat] Failed to decode getWinRate');
-    }
-    try {
-      const [tt] = trackRecordIface.decodeFunctionResult('totalTrades', String(totalTradesHex));
-      totalTrades = tt.toString();
-    } catch {
-      console.error('[ProtocolHeartbeat] Failed to decode totalTrades');
-    }
-
     // Decode nextBountyId from Bounties contract
     let nextBountyId = '0';
     let minBountyWei = '0';
@@ -375,7 +369,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Settlement is the real AgentEconomy on-chain volume.
     // Protocol totals keep bounty escrow separate from paid MCP settlement.
     const economyVolumeNative = parseFloat(formatEther(BigInt(totalVolumeWei)));
-    const winRate = parseInt(winRateBps) / 100;
+    const winRate = parseInt(trackRecordStats.winRateBps) / 100;
+    const scoredTrades = trackRecordStats.verified
+      ? parseInt(trackRecordStats.verified.resolved)
+      : parseInt(trackRecordStats.totalTrades);
     const totalBounties = Math.max(0, parseInt(nextBountyId) - 1);
     const bountyEscrowNative = totalBounties * parseFloat(formatEther(BigInt(minBountyWei)));
     const protocolNotionalNative = economyVolumeNative + bountyEscrowNative;
@@ -441,7 +438,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       performance: {
         winRate,
-        totalTrades: parseInt(totalTrades),
+        totalTrades: scoredTrades,
+        resolutionRate: parseInt(trackRecordStats.resolutionBps) / 100,
+        recordVersion: trackRecordStats.version,
+        attested: trackRecordStats.attested || null,
         totalBounties,
       },
       lastCycle: lastCycle ? {

@@ -20,6 +20,7 @@
     "api/_lib/hardness-registry.ts",
     "api/_lib/hardness-control-plane.ts",
     "api/_lib/agent-auth.ts",
+    "api/_lib/track-record-v2.ts",
     "api/activity.ts",
     "api/agent-identity.ts",
     "api/bobby-protocol-stats.ts",
@@ -28,6 +29,8 @@
     "api/protocol-heartbeat.ts",
     "api/protocol-tx-history.ts",
     "api/registry.ts",
-    "api/reputation.ts"
+    "api/reputation.ts",
+    "api/xlayer-record.ts",
+    "api/forum-resolve.ts"
   ]
 }

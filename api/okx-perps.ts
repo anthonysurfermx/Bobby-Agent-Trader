@@ -6,9 +6,10 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createHmac } from 'crypto';
+import { createHmac, randomUUID } from 'crypto';
 import { recordAuthHeaders } from './_lib/record-auth.js';
 import { enforcePublicRateLimit, isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 
 const OKX_BASE = 'https://www.okx.com';
 
@@ -31,8 +32,7 @@ const DEMO_KEY = process.env.OKX_DEMO_API_KEY || '';
 const DEMO_SECRET = process.env.OKX_DEMO_SECRET_KEY || '';
 const DEMO_PASSPHRASE = process.env.OKX_DEMO_PASSPHRASE || '';
 
-// X Layer contract for on-chain track record
-const TRACK_RECORD_CONTRACT = process.env.BOBBY_CONTRACT_ADDRESS || '0xF841b428E6d743187D7BE2242eccC1078fdE2395';
+const TRACK_RECORD_CONTRACT = DEFAULT_CHAIN.contracts.trackRecord || process.env.BOBBY_CONTRACT_ADDRESS || '';
 
 function getCredentials(mode: 'paper' | 'live'): { creds: OKXCredentials; simulated: boolean } {
   if (mode === 'paper') {
@@ -156,6 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     && typeof credentials.secret === 'string' && credentials.secret.length >= 8
     && typeof credentials.passphrase === 'string' && credentials.passphrase.length >= 1,
   );
+  const internalCaller = isInternalRequest(req);
 
   // Every action that touches an OKX account is private. Public callers may
   // only request market/leverage metadata. When user credentials are supplied,
@@ -170,7 +171,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'positions',
     'balance',
   ]);
-  if (accountActions.has(action) && !hasUserCreds && !requireInternalAuth(req, res)) {
+  if (accountActions.has(action) && !hasUserCreds && !internalCaller && !requireInternalAuth(req, res)) {
     return;
   }
 
@@ -343,7 +344,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // Step 5: Place market order (sz in ETH units for SWAP)
+      // Step 5: Confirm the prediction on-chain BEFORE a live order. Paper
+      // orders and public user-managed accounts do not write Bobby's production
+      // TrackRecord. Internal callers that own the precommit flow (bobby-cycle)
+      // must explicitly attest confirmation.
+      let precommitData: Record<string, unknown> | null = null;
+      const requiresTrackRecord = tradingMode === 'live' && internalCaller;
+      if (requiresTrackRecord && params?.skipOnchainCommit) {
+        if (params?.precommitConfirmed !== true) {
+          return res.status(409).json({
+            ok: false,
+            error: 'Live execution requires a confirmed on-chain precommit',
+          });
+        }
+      } else if (requiresTrackRecord) {
+        const selfHost = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : 'https://bobbyprotocol.xyz';
+        const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
+        const commitRes = await fetch(`${selfHost}/api/xlayer-record`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...recordAuthHeaders(),
+            ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+          },
+          body: JSON.stringify({
+            action: 'commit',
+            threadId: `perp-${symbol}-${randomUUID()}`,
+            symbol,
+            direction,
+            agent: 'cio',
+            conviction: params?.conviction || 7,
+            entryPrice: markPrice,
+            targetPrice: direction === 'long' ? markPrice * 1.05 : markPrice * 0.95,
+            stopPrice: direction === 'long' ? markPrice * 0.97 : markPrice * 1.03,
+          }),
+        });
+        precommitData = await commitRes.json().catch(() => ({})) as Record<string, unknown>;
+        if (!commitRes.ok || precommitData.ok !== true ||
+            precommitData.onchain !== true || precommitData.confirmed !== true) {
+          return res.status(503).json({
+            ok: false,
+            error: 'On-chain precommit failed; live order was not submitted',
+          });
+        }
+      }
+
+      // Step 6: Place market order only after the live precommit gate.
       const orderResult = await okxRequest('POST', '/api/v5/trade/order', {
         instId,
         tdMode: 'isolated',
@@ -363,36 +411,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const orderId = orderResult.data?.[0]?.ordId;
 
-      // On-chain commit: register this trade prediction on X Layer
-      // Skip if caller will handle commit separately (e.g. bobby-cycle)
-      if (!params?.skipOnchainCommit && isInternalRequest(req)) {
-        try {
-          const commitRes = await fetch(
-            `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-record`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...recordAuthHeaders() },
-              body: JSON.stringify({
-                action: 'commit',
-                threadId: `perp-${symbol}-${orderId}-${Date.now()}`,
-                symbol,
-                agent: 'cio',
-                conviction: params?.conviction || 7,
-                entryPrice: markPrice,
-                targetPrice: direction === 'long' ? markPrice * 1.05 : markPrice * 0.95,
-                stopPrice: direction === 'long' ? markPrice * 0.97 : markPrice * 1.03,
-              }),
-            }
-          );
-          const commitData = await commitRes.json();
-          console.log('[Perps] On-chain commit:', commitData.ok ? 'success' : 'pending');
-        } catch (err) {
-          console.warn('[Perps] On-chain commit failed (non-blocking):', err);
-        }
-      } else {
-        console.log('[Perps] Skipping on-chain commit (caller handles it)');
-      }
-
       return res.status(200).json({
         ok: true,
         action: 'position_opened',
@@ -401,13 +419,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         leverage: `${leverage}x`,
         margin: `${amountUSDT} USDT`,
         notional: `${(sizeRounded * markPrice).toFixed(2)} USDT`,
-        size: `${sizeRounded} ETH`,
+        size: `${sizeRounded} ${symbol}`,
         markPrice,
         orderId,
         instId,
         mode: tradingMode,
         simulated,
-        onchain: { contract: TRACK_RECORD_CONTRACT, chain: 'X Layer (196)' },
+        onchain: {
+          required: requiresTrackRecord,
+          confirmed: requiresTrackRecord,
+          contract: TRACK_RECORD_CONTRACT,
+          chain: `${DEFAULT_CHAIN.name} (${DEFAULT_CHAIN.id})`,
+          adapter: precommitData,
+        },
       });
     } catch (err) {
       console.error('[Perps] open_position error:', err);

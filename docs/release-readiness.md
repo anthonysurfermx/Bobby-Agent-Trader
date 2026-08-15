@@ -1,6 +1,6 @@
 # Base mainnet release readiness
 
-**Updated:** 2026-08-14
+**Updated:** 2026-08-15
 **Target:** Base mainnet (`8453`)
 **Deployment state:** **NO-GO until every blocking gate below is closed**
 
@@ -17,7 +17,8 @@ none of them independently authorize mainnet.
 | ABI and storage layout | Complete | 126-entry ABI match; struct-member layout gate | Deploy, backend and published ABI use the same artifact |
 | Contract size | Watch | 23,499 B runtime; 1,077 B below EIP-170 | No unreviewed runtime growth |
 | Deploy and verify scripts V2 | Complete | `4dee332` plus upgraded Sepolia parity check | Constructor, canonical Pyth set, Safe checks and manifest reconciliation pass |
-| Backend V2 adapter | In progress | Claude workstream | VERIFIED and ATTESTED writes/readbacks pass against canary |
+| Backend V2 adapter | Code complete; canary pending | Chain-aware ABI/Pyth adapter; 53 focused checks | VERIFIED and ATTESTED writes/readbacks pass against the live canary |
+| Stop-breach watcher | Pending | Contract challenge path is tested; production worker is not wired | Historical stop scan runs before publishing WIN and challenges genuine breaches |
 | Pyth/Hermes production access | Human gate | Credential stays outside git | Authenticated price updates work from the production runtime before the provider cutoff |
 | Safe 2-of-3 | Blocked on owner setup | [`audit/safe-setup-runbook.md`](audit/safe-setup-runbook.md) | Threshold, owners, singleton, modules, guard and final ownership verified live |
 | Base Sepolia V2 canary | Pending | — | Deploy, verify, E2E lifecycle and soak complete |
@@ -27,7 +28,7 @@ none of them independently authorize mainnet.
 
 ## Current verification evidence
 
-The release-preparation branch was checked locally on 2026-08-14 with:
+The release-preparation branch was checked locally through 2026-08-15 with:
 
 - production web build and API typecheck passing;
 - 214/214 Foundry tests passing with 1,000 fuzz runs;
@@ -35,11 +36,23 @@ The release-preparation branch was checked locally on 2026-08-14 with:
 - storage and struct-member layout matching the frozen snapshot;
 - TrackRecord V2 runtime size of 23,499 B, leaving 1,077 B under EIP-170;
 - 26/26 API security checks and 11/11 record-auth checks passing;
+- 53/53 TrackRecord V2 adapter checks passing;
 - 32/32 risk-gate assertions and 261/261 playbook assertions passing;
-- no secrets detected by Gitleaks in the working diff or 14 unpushed commits;
+- no secrets detected by Gitleaks in the candidate source diff (ignored build
+  artifacts excluded);
 - mobile and desktop browser checks passing on `/protocol`,
   `/protocol/docs` and `/protocol/architecture`, with no console errors or
   horizontal overflow.
+
+The adapter now keeps the V1 X Layer path isolated from the V2 Base path,
+selects the Hermes endpoint from the contract's active canonical Pyth address,
+anchors entry/exit evidence to near-block ticks, requires explicit LONG/SHORT
+intent, waits for a successful core transaction
+receipt before the forum persists a resolution, retries known recorder-wallet
+nonce races, commits only after the live risk gate passes, prevents paper or
+user-managed orders from spending the recorder wallet, and exposes VERIFIED
+and ATTESTED statistics separately. These are code-level results; they do not
+replace the real Sepolia rehearsal.
 
 `npm audit --omit=dev` currently reports 11 moderate findings and no high or
 critical production findings. They all trace to old `uuid` versions inside the
@@ -123,7 +136,9 @@ Required evidence:
 9. Complete one ATTESTED lifecycle and confirm it does not affect VERIFIED
    statistics.
 10. Confirm public API and website read back the same chain state.
-11. Soak for 24–48 hours with logs and alerts enabled.
+11. Exercise the automated historical stop-breach watcher before allowing a
+    provisional WIN to become public/final.
+12. Soak for 24–48 hours with logs and alerts enabled.
 
 ## Mainnet launch sequence
 

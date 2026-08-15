@@ -23,6 +23,10 @@ interface PendingThread {
   expires_at: string;
   created_at: string;
   status?: string;
+  trigger_data?: {
+    challenge_mode?: string;
+    track_record_required?: boolean;
+  } | null;
 }
 
 async function getCurrentPrice(symbol: string): Promise<number | null> {
@@ -45,7 +49,9 @@ async function getCurrentPrice(symbol: string): Promise<number | null> {
   try {
     const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`);
     if (res.ok) {
-      const data = await res.json();
+      const data = await res.json() as {
+        chart?: { result?: Array<{ meta?: { regularMarketPrice?: number } }> };
+      };
       const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
       if (price && price > 0) return price;
     }
@@ -87,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Failed to fetch threads' });
     }
 
-    const threads: PendingThread[] = await threadsRes.json();
+    const threads = await threadsRes.json() as PendingThread[];
     const results: Array<{ id: string; symbol: string; resolution: string; pnl: number | null; onchain: boolean }> = [];
 
     // Get unique symbols to minimize API calls
@@ -104,6 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!thread.symbol || !thread.entry_price || !prices[thread.symbol]) continue;
 
       const currentPrice = prices[thread.symbol];
+      let settledPrice = currentPrice;
       const entry = thread.entry_price;
       const stop = thread.stop_price;
       const target = thread.target_price;
@@ -141,35 +148,105 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (resolution) {
-        // Update thread status to stale, and mark resolution
-        await updateThread(thread.id, {
-          resolution,
-          resolution_price: currentPrice,
-          resolution_pnl_pct: pnlPct ? parseFloat(pnlPct.toFixed(2)) : null,
-          resolved_at: new Date().toISOString(),
-          status: 'resolved',
-        });
-
-        // Resolve on-chain (chain follows the deployment's DEFAULT_CHAIN)
-        let onchainOk = false;
-        try {
+        // For an executed live trade: chain first, database second. Paper and
+        // risk-rejected debates remain explicit off-chain attestations.
+        const trackRecordRequired = thread.trigger_data?.track_record_required === true;
+        const shouldAttemptOnchain = trackRecordRequired || thread.trigger_data?.challenge_mode === 'live';
+        let canPersist = !shouldAttemptOnchain;
+        let settledOnchain = false;
+        let onchainError = '';
+        if (shouldAttemptOnchain) {
+          try {
           const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://bobbyprotocol.xyz';
+          const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
           const onchainRes = await fetch(`${host}/api/xlayer-record`, {
              method: 'POST',
-             headers: { 'Content-Type': 'application/json', ...recordAuthHeaders() },
+             headers: {
+               'Content-Type': 'application/json',
+               ...recordAuthHeaders(),
+               ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+             },
              body: JSON.stringify({
                action: 'resolve',
                threadId: thread.id,
+               symbol: thread.symbol,
                result: resolution === 'break_even' ? 'break_even' : resolution,
                exitPrice: currentPrice,
-               pnlBps: pnlPct ? parseFloat(pnlPct.toFixed(2)) : 0
+               pnlBps: pnlPct !== null ? parseFloat(pnlPct.toFixed(2)) : 0
              })
           });
-          onchainOk = onchainRes.ok;
           if (!onchainRes.ok) {
-            console.error('[Resolve] On-chain resolve failed:', onchainRes.status, await onchainRes.text().catch(() => ''));
+            onchainError = await onchainRes.text().catch(() => '');
+            // A live debate can still be rejected by the risk gate before any
+            // commitment exists. Only that explicit 404 may fall back to the
+            // forum's attested result; confirmed commitments stay fail-closed.
+            if (onchainRes.status === 404 && !trackRecordRequired) {
+              canPersist = true;
+            } else {
+              console.error('[Resolve] On-chain resolve failed:', onchainRes.status, onchainError);
+            }
+          } else {
+            const onchainBody = await onchainRes.json() as {
+              onchain?: boolean;
+              confirmed?: boolean;
+              idempotent?: boolean;
+              data?: {
+                oracleResult?: string;
+                oraclePnlBps?: string;
+                oracleExitPriceE8?: string;
+              };
+            };
+            settledOnchain = onchainBody.onchain === true &&
+              (onchainBody.confirmed === true || onchainBody.idempotent === true);
+            canPersist = settledOnchain;
+            if (!settledOnchain) {
+              console.error('[Resolve] Adapter returned without a confirmed on-chain resolution');
+            }
+            // V2 is authoritative when it returns oracle-derived values.
+            if (onchainBody.data?.oracleResult) resolution = onchainBody.data.oracleResult;
+            if (onchainBody.data?.oraclePnlBps !== undefined) {
+              pnlPct = Number(onchainBody.data.oraclePnlBps) / 100;
+            }
+            if (onchainBody.data?.oracleExitPriceE8 !== undefined) {
+              const verifiedExit = Number(onchainBody.data.oracleExitPriceE8) / 1e8;
+              if (Number.isFinite(verifiedExit) && verifiedExit > 0) settledPrice = verifiedExit;
+            }
           }
-        } catch(e) { console.error('Failed to resolve on-chain', e); }
+          } catch(e) {
+            onchainError = e instanceof Error ? e.message : String(e);
+            console.error('Failed to resolve on-chain', e);
+          }
+        }
+
+        if (!canPersist) {
+          results.push({
+            id: thread.id,
+            symbol: thread.symbol,
+            resolution,
+            pnl: pnlPct !== null ? parseFloat(pnlPct.toFixed(2)) : null,
+            onchain: settledOnchain,
+          });
+          continue;
+        }
+
+        const updated = await updateThread(thread.id, {
+          resolution,
+          resolution_price: settledPrice,
+          resolution_pnl_pct: pnlPct !== null ? parseFloat(pnlPct.toFixed(2)) : null,
+          resolved_at: new Date().toISOString(),
+          status: 'resolved',
+        });
+        if (!updated) {
+          console.error('[Resolve] Settlement succeeded but Supabase update failed:', thread.id, onchainError);
+          results.push({
+            id: thread.id,
+            symbol: thread.symbol,
+            resolution,
+            pnl: pnlPct !== null ? parseFloat(pnlPct.toFixed(2)) : null,
+            onchain: settledOnchain,
+          });
+          continue;
+        }
 
         // "Te lo dije" — agents react to the outcome (makes forum feel alive)
         try {
@@ -198,12 +275,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               thread_id: thread.id,
               agent: reactionAgent,
               content: reactionContent,
-              data_snapshot: { resolution, pnlPct: pnlPct?.toFixed(2), exitPrice: currentPrice },
+              data_snapshot: { resolution, pnlPct: pnlPct?.toFixed(2), exitPrice: settledPrice },
             }),
           });
         } catch (e) { console.warn('[Resolve] Reaction post failed:', e); }
 
-        results.push({ id: thread.id, symbol: thread.symbol, resolution, pnl: pnlPct ? parseFloat(pnlPct.toFixed(2)) : null, onchain: onchainOk });
+        results.push({ id: thread.id, symbol: thread.symbol, resolution, pnl: pnlPct !== null ? parseFloat(pnlPct.toFixed(2)) : null, onchain: settledOnchain });
       } else {
         // Check if thread should be marked stale (price moved >5% from entry without hitting target/stop)
         const movePct = Math.abs(((currentPrice - entry) / entry) * 100);

@@ -8,6 +8,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther, Interface } from 'ethers';
 import { countAgents } from './_lib/hardness-control-plane.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { isTrackRecordV2, readTrackRecordPublicStats } from './_lib/track-record-v2.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -40,12 +41,6 @@ const ORACLE_INTERFACE = new Interface([
 
 const HARDNESS_INTERFACE = new Interface([
   'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, string metadataURI)',
-]);
-
-const TRACK_RECORD_INTERFACE = new Interface([
-  'function totalTrades() view returns (uint256)',
-  'function totalCommitments() view returns (uint256)',
-  'function getWinRate() view returns (uint256)',
 ]);
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
@@ -159,28 +154,10 @@ async function getOracleStats() {
 }
 
 async function getTrackRecordStats() {
-  const [totalTradesRaw, totalCommitmentsRaw, winRateRaw] = await Promise.all([
-    rpcCall<string>('eth_call', [
-      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData('totalTrades') },
-      'latest',
-    ]),
-    rpcCall<string>('eth_call', [
-      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData('totalCommitments') },
-      'latest',
-    ]),
-    rpcCall<string>('eth_call', [
-      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData('getWinRate') },
-      'latest',
-    ]),
-  ]);
-  const [totalTrades] = TRACK_RECORD_INTERFACE.decodeFunctionResult('totalTrades', totalTradesRaw);
-  const [totalCommitments] = TRACK_RECORD_INTERFACE.decodeFunctionResult('totalCommitments', totalCommitmentsRaw);
-  const [winRate] = TRACK_RECORD_INTERFACE.decodeFunctionResult('getWinRate', winRateRaw);
-  return {
-    totalTrades: totalTrades.toString(),
-    totalCommitments: totalCommitments.toString(),
-    winRateBps: winRate.toString(), // contract returns basis points (0-10000)
-  };
+  return readTrackRecordPublicStats(
+    (data) => rpcCall<string>('eth_call', [{ to: TRACK_RECORD, data }, 'latest']),
+    isTrackRecordV2(DEFAULT_CHAIN.id),
+  );
 }
 
 async function getPricesFromIntel(baseUrl: string) {
@@ -271,7 +248,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalPayments: '0',
     }),
     safe(getOracleStats, { symbolCount: '0' }),
-    safe(getTrackRecordStats, { totalTrades: '0', totalCommitments: '0', winRateBps: '0' }),
+    safe(getTrackRecordStats, {
+      version: isTrackRecordV2(DEFAULT_CHAIN.id) ? 'v2' as const : 'v1' as const,
+      totalTrades: '0', totalCommitments: '0', winRateBps: '0', wins: '0', losses: '0',
+      totalPnlBps: '0', pending: '0', resolutionBps: '0',
+    }),
     safe(readMinBounty, { minBountyWei: '0', minBountyNative: '0', minBountyOkb: '0' }),
     safe(readNextBountyId, 1),
     safe(() => listRecentBounties(6), []),
@@ -302,8 +283,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const bountyEscrowNative = totalBountiesPosted * Number(bountyMin.minBountyNative || '0');
   const economyVol = parseFloat(economyStats.totalVolumeNative || '0');
   const protocolNotionalNative = (economyVol + bountyEscrowNative).toFixed(4);
-  const onchainCommitments = Number(trackRecordStats.totalCommitments || 0);
-  const onchainResolved = Number(trackRecordStats.totalTrades || 0);
+  const onchainCommitments = trackRecordStats.verified
+    ? Number(trackRecordStats.verified.resolved) + Number(trackRecordStats.verified.expired) + Number(trackRecordStats.verified.pending)
+    : Number(trackRecordStats.totalCommitments || 0);
+  const onchainResolved = trackRecordStats.verified
+    ? Number(trackRecordStats.verified.resolved)
+    : Number(trackRecordStats.totalTrades || 0);
   const onchainWinRate = onchainResolved > 0 ? Number((Number(trackRecordStats.winRateBps || 0) / 100).toFixed(1)) : null;
 
   // Supabase debate + resolution stats (real activity beyond on-chain contracts)
@@ -436,10 +421,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalInteractions: Number(economyStats.totalPayments || '0') + totalBountiesPosted,
     },
     onchainRecord: {
+      version: trackRecordStats.version,
       commitmentsCreated: onchainCommitments,
       decisionsResolved: onchainResolved,
-      pending: Math.max(0, onchainCommitments - onchainResolved),
+      pending: Number(trackRecordStats.pending),
       winRate: onchainWinRate,
+      resolutionRate: Number(trackRecordStats.resolutionBps) / 100,
+      attested: trackRecordStats.attested || null,
     },
     bounties: recentBounties,
     bountySummary,

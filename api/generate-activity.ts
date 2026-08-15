@@ -12,6 +12,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
 import { requireInternalAuth } from './_lib/request-security.js';
+import { DEFAULT_CHAIN, XLAYER_CHAIN_ID } from './_lib/chains.js';
 
 export const config = { maxDuration: 60 };
 
@@ -152,6 +153,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!requireInternalAuth(req, res)) return;
+
+  // This legacy activity generator contains X Layer-only addresses and V1
+  // calldata. It must never run after the protocol cutover selects Base.
+  if (DEFAULT_CHAIN.id !== XLAYER_CHAIN_ID) {
+    return res.status(409).json({
+      error: 'Legacy X Layer activity generation is disabled on the selected protocol chain',
+    });
+  }
 
   const recorderKey = process.env[RECORDER_KEY_ENV];
   if (!recorderKey) {

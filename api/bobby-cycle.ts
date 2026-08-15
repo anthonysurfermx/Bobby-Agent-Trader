@@ -16,6 +16,9 @@ import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
 import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
+import { recordAuthHeaders } from './_lib/record-auth.js';
+import { sendWithNonceRetry, waitForSuccessfulReceipt } from './_lib/chain-tx.js';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
 
 export const config = { maxDuration: 300 };
 
@@ -194,6 +197,7 @@ async function fetchLocalApi(path: string, body: any, noFallback = false): Promi
       headers: {
         'Content-Type': 'application/json',
         ...(internalAuth ? { 'x-internal-secret': internalAuth } : {}),
+        ...(path === '/api/xlayer-record' ? recordAuthHeaders() : {}),
         ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
       },
       body: JSON.stringify(body)
@@ -651,6 +655,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const shouldPublishTwitter = challengeMode === 'live';
   const startTime = Date.now();
   let cycleId: string | undefined;
+  let trackRecordCommitConfirmed = !shouldCommitOnchain;
+  let trackRecordCommitPayload: {
+    action: 'commit';
+    threadId: string;
+    symbol: string;
+    direction: string;
+    agent: 'cio';
+    conviction: number;
+    entryPrice: number;
+    targetPrice: number;
+    stopPrice: number;
+  } | null = null;
 
   try {
     // ============================================================
@@ -1031,24 +1047,27 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                     (lang === 'es' ? 'Noche' : 'Evening');
     const topic = `${session} Cycle — ${topicDate}`;
 
+    const threadTriggerData = {
+      regime: intel.regime, fgi: intel.fearGreed, dxy: intel.dxy,
+      technical: technicalPulse || null,
+      conviction_model: intel.performance?.convictionModel || null,
+      backend_blend: {
+        llm_conviction: llmConviction,
+        backend_anchor: convictionAnchor,
+        blend_weight: convictionAnchor !== null ? 0.7 : null,
+        post_blend_conviction: rawConviction,
+        technical_alignment: technicalAlignment,
+      },
+      challenge_mode: challengeMode,
+      track_record_required: false,
+      ...(calActive ? { calibration: { raw_conviction: rawConviction, adjusted_conviction: conviction, multiplier: calAdj } } : {}),
+    };
     const thread = await sbInsert('forum_threads', {
       topic,
       trigger_reason: `Autonomous ${kind} cycle`,
       cycle_id: cycleId || null,
       // Codex P1: store both raw and adjusted conviction + calibration metadata
-      trigger_data: {
-        regime: intel.regime, fgi: intel.fearGreed, dxy: intel.dxy,
-        technical: technicalPulse || null,
-        conviction_model: intel.performance?.convictionModel || null,
-        backend_blend: {
-          llm_conviction: llmConviction,
-          backend_anchor: convictionAnchor,
-          blend_weight: convictionAnchor !== null ? 0.7 : null,
-          post_blend_conviction: rawConviction,
-          technical_alignment: technicalAlignment,
-        },
-        ...(calActive ? { calibration: { raw_conviction: rawConviction, adjusted_conviction: conviction, multiplier: calAdj } } : {}),
-      },
+      trigger_data: threadTriggerData,
       language: lang,
       conviction_score: conviction, // adjusted (what Bobby actually uses)
       price_at_creation: Object.fromEntries((intel.prices || []).map((p: any) => [p.symbol, p.price])),
@@ -1083,118 +1102,34 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
         data_snapshot: snapshot,
       })));
 
-      // On-chain commit: fire-and-forget to avoid blocking the cycle
-      // X Layer RPC can be slow — this should NEVER cause a timeout
-      const xlayerContract = process.env.BOBBY_CONTRACT_ADDRESS || '';
-      const xlayerKey = process.env.BOBBY_RECORDER_KEY || '';
+      // Prepare the chain-aware payload, but do not submit it until the risk
+      // manager approves the live order. Paper/dry-run cycles never write the
+      // production TrackRecord, and rejected trades never become commitments.
       const currentPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price || 0;
       const commitEntry = entryPrice || currentPrice;
-      if (symbol && conviction !== null && commitEntry > 0 && xlayerContract && xlayerKey) {
-        // Fire-and-forget — don't await
-        (async () => {
-          try {
-            const provider = new ethers.JsonRpcProvider('https://rpc.xlayer.tech');
-            const wallet = new ethers.Wallet(xlayerKey, provider);
-            const iface = new ethers.Interface([
-              'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96)',
-            ]);
-            const debateHash = ethers.keccak256(ethers.toUtf8Bytes(threadId));
-            // Clamp to 0-10 — contract requires conviction <= 10
-            const convInt = Math.min(10, Math.max(0, Math.round((conviction ?? 0) * 10)));
-            const txData = iface.encodeFunctionData('commitTrade', [
-              debateHash, symbol, 0, convInt,
-              BigInt(Math.round(commitEntry * 1e8)),
-              BigInt(Math.round((targetPrice || commitEntry * 1.05) * 1e8)),
-              BigInt(Math.round((stopPrice || commitEntry * 0.95) * 1e8)),
-            ]);
-            const tx = await Promise.race([
-              wallet.sendTransaction({ to: xlayerContract, data: txData, gasLimit: 300000n }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('TX timeout 8s')), 8000)),
-            ]) as any;
-            console.log(`[Cycle] On-chain commit: ${tx.hash}`);
-
-            try {
-              const hardnessProof = await recordHardnessActivity({
-                threadId,
-                symbol,
-                direction: (direction as 'long' | 'short' | 'neutral' | 'none') || 'none',
-                conviction: conviction ?? 0,
-                entryPrice: commitEntry,
-                targetPrice: targetPrice || commitEntry * 1.05,
-                stopPrice: stopPrice || commitEntry * 0.95,
-                shouldCommitPrediction: true,
-              });
-              if (hardnessProof) {
-                console.log(`[Cycle] Hardness proof: ${hardnessProof.commitTxHash || 'no-commit'} / ${hardnessProof.signalTxHash || 'no-signal'}`);
-              }
-            } catch (e: any) {
-              console.warn('[Cycle] HardnessRegistry sync failed (non-critical):', e.message);
-            }
-
-            // Additional on-chain txs for "Most Active Agent" prize density:
-            // 1. Publish conviction signal to ConvictionOracle
-            const oracleAddr = process.env.BOBBY_ORACLE_ADDRESS;
-            if (oracleAddr && direction) {
-              try {
-                const oracleIface = new ethers.Interface([
-                  'function publishSignal((string symbol, uint8 direction, uint8 conviction, uint8 agent, uint96 entryPrice, uint96 targetPrice, uint96 stopPrice, bytes32 debateHash, uint256 ttl))',
-                ]);
-                const dirNum = direction === 'long' ? 1 : direction === 'short' ? 2 : 0;
-                const oracleTx = await Promise.race([
-                  wallet.sendTransaction({
-                    to: oracleAddr,
-                    data: oracleIface.encodeFunctionData('publishSignal', [[
-                      symbol, dirNum, convInt, 0,
-                      BigInt(Math.round(commitEntry * 1e8)),
-                      BigInt(Math.round((targetPrice || commitEntry * 1.05) * 1e8)),
-                      BigInt(Math.round((stopPrice || commitEntry * 0.95) * 1e8)),
-                      debateHash, BigInt(86400),
-                    ]]),
-                    gasLimit: 200000n,
-                  }),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('Oracle TX timeout')), 8000)),
-                ]) as any;
-                console.log(`[Cycle] Oracle signal published: ${oracleTx.hash}`);
-              } catch (e: any) {
-                console.warn('[Cycle] Oracle publish failed (non-critical):', e.message);
-              }
-            }
-
-            // 2. Pay debate fee to AgentEconomy (Alpha + Red Team compensation)
-            const economyAddr = process.env.BOBBY_ECONOMY_ADDRESS;
-            if (economyAddr) {
-              try {
-                const econIface = new ethers.Interface([
-                  'function payDebateFee(bytes32 debateHash) payable',
-                ]);
-                const econTx = await Promise.race([
-                  wallet.sendTransaction({
-                    to: economyAddr,
-                    data: econIface.encodeFunctionData('payDebateFee', [debateHash]),
-                    value: ethers.parseEther('0.0002'), // 0.0001 per agent × 2
-                    gasLimit: 150000n,
-                  }),
-                  new Promise((_, reject) => setTimeout(() => reject(new Error('Economy TX timeout')), 8000)),
-                ]) as any;
-                console.log(`[Cycle] Debate fee paid: ${econTx.hash}`);
-              } catch (e: any) {
-                console.warn('[Cycle] Debate fee payment failed (non-critical):', e.message);
-              }
-            }
-          } catch (e: any) {
-            console.warn('[Cycle] On-chain commit failed (non-critical):', e.message);
-          }
-        })();
+      const commitTarget = targetPrice || (direction === 'short' ? commitEntry * 0.95 : commitEntry * 1.05);
+      const commitStop = stopPrice || (direction === 'short' ? commitEntry * 1.03 : commitEntry * 0.97);
+      if (shouldCommitOnchain && cioSaysExecute && symbol && direction && conviction !== null && commitEntry > 0) {
+        trackRecordCommitPayload = {
+          action: 'commit',
+          threadId,
+          symbol,
+          direction,
+          agent: 'cio',
+          conviction,
+          entryPrice: commitEntry,
+          targetPrice: commitTarget,
+          stopPrice: commitStop,
+        };
       }
 
       // ALWAYS publish conviction to Oracle — even when not trading
       // This generates legitimate on-chain activity for every cycle
-      const oracleAddr = process.env.BOBBY_ORACLE_ADDRESS;
+      const oracleAddr = DEFAULT_CHAIN.contracts.convictionOracle;
       const oracleKey = process.env.BOBBY_RECORDER_KEY;
       if (oracleAddr && oracleKey && symbol && conviction !== null && !cioSaysExecute) {
-        (async () => {
           try {
-            const provider = new ethers.JsonRpcProvider('https://rpc.xlayer.tech');
+            const provider = new ethers.JsonRpcProvider(DEFAULT_CHAIN.rpcUrl);
             const wallet = new ethers.Wallet(oracleKey, provider);
             const oracleIface = new ethers.Interface([
               'function publishSignal((string symbol, uint8 direction, uint8 conviction, uint8 agent, uint96 entryPrice, uint96 targetPrice, uint96 stopPrice, bytes32 debateHash, uint256 ttl))',
@@ -1205,8 +1140,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
             const convInt = Math.min(10, Math.max(0, Math.round((conviction ?? 0) * 10)));
             const currentPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price || 0;
             const priceScaled = BigInt(Math.round(currentPrice * 1e8));
-            const tx = await Promise.race([
-              wallet.sendTransaction({
+            const tx = await sendWithNonceRetry(wallet, provider, {
                 to: oracleAddr,
                 data: oracleIface.encodeFunctionData('publishSignal', [[
                   symbol, dirNum, convInt, 0,
@@ -1216,9 +1150,8 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                   debateHash, BigInt(86400),
                 ]]),
                 gasLimit: 200000n,
-              }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Oracle TX timeout')), 8000)),
-            ]) as any;
+            });
+            await waitForSuccessfulReceipt(tx);
             console.log(`[Cycle] Oracle signal (no-trade): ${tx.hash}`);
 
             try {
@@ -1241,7 +1174,6 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
           } catch (e: any) {
             console.warn('[Cycle] Oracle no-trade signal failed (non-critical):', e.message);
           }
-        })();
       }
     }
 
@@ -1308,10 +1240,64 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
             const riskValidation = canOpenPosition(tradeParams, balanceObj, conviction, effectivePositions.length, currentPrice);
 
             if (riskValidation.valid) {
+              // Commit only after every off-chain risk check has passed and
+              // immediately before the market order. A missing receipt is a
+              // hard stop for live execution.
+              if (shouldCommitOnchain) {
+                if (!trackRecordCommitPayload) {
+                  throw new Error('TrackRecord payload unavailable for approved live trade');
+                }
+                let commitRes = await fetchLocalApi('/api/xlayer-record', trackRecordCommitPayload, true);
+                if (!commitRes?.ok || commitRes?.onchain !== true || commitRes?.confirmed !== true) {
+                  await new Promise(resolve => setTimeout(resolve, 250));
+                  commitRes = await fetchLocalApi('/api/xlayer-record', trackRecordCommitPayload, true);
+                }
+                trackRecordCommitConfirmed = commitRes?.ok === true &&
+                  commitRes?.onchain === true && commitRes?.confirmed === true;
+                if (!trackRecordCommitConfirmed) {
+                  throw new Error(`TrackRecord precommit not confirmed: ${commitRes?.error || 'unknown error'}`);
+                }
+                txHash = commitRes.txHash || null;
+                await sbPatch('forum_threads', `id=eq.${trackRecordCommitPayload.threadId}`, {
+                  trigger_data: {
+                    ...threadTriggerData,
+                    track_record_required: true,
+                    track_record_tx_hash: txHash,
+                  },
+                });
+
+                try {
+                  const hardnessProof = await recordHardnessActivity({
+                    threadId: trackRecordCommitPayload.threadId,
+                    symbol: trackRecordCommitPayload.symbol,
+                    direction: trackRecordCommitPayload.direction as 'long' | 'short',
+                    conviction: trackRecordCommitPayload.conviction,
+                    entryPrice: trackRecordCommitPayload.entryPrice,
+                    targetPrice: trackRecordCommitPayload.targetPrice,
+                    stopPrice: trackRecordCommitPayload.stopPrice,
+                    shouldCommitPrediction: true,
+                  });
+                  if (hardnessProof) {
+                    console.log(`[Cycle] Hardness proof: ${hardnessProof.commitTxHash || 'no-commit'} / ${hardnessProof.signalTxHash || 'no-signal'}`);
+                  }
+                } catch (hardnessError: any) {
+                  console.warn('[Cycle] HardnessRegistry sync failed (non-critical):', hardnessError.message);
+                }
+              }
+
               // 3. Execute Trade on OKX
               const openRes = await fetchLocalApi('/api/okx-perps', {
                 action: 'open_position',
-                params: { symbol, direction, leverage, amount: positionSizeUsd, conviction, mode: okxMode, skipOnchainCommit: true },
+                params: {
+                  symbol,
+                  direction,
+                  leverage,
+                  amount: positionSizeUsd,
+                  conviction,
+                  mode: okxMode,
+                  skipOnchainCommit: true,
+                  precommitConfirmed: trackRecordCommitConfirmed,
+                },
               }, true);
 
               if (openRes.ok) {
@@ -1380,29 +1366,9 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                   }
                 }
 
-                // 5. On-chain commit — already handled during debate creation (line ~531)
-                // Skip duplicate commit here to avoid "Already committed" revert
-                if (executionResult && shouldCommitOnchain && false) {
-                  try {
-                    const commitRes = await fetchLocalApi('/api/xlayer-record', {
-                      action: 'commit',
-                      threadId: threadId || `bobby-cycle-${Date.now()}`,
-                      symbol,
-                      agent: 'cio',
-                      conviction: conviction !== null ? Math.round(conviction * 10) : 5,
-                      entryPrice: currentPrice,
-                      targetPrice,
-                      stopPrice,
-                    }, true);
-                    if (commitRes.ok) {
-                      txHash = commitRes.txHash;
-                    } else {
-                      console.warn('[Cycle] Trade executed but on-chain commit failed');
-                    }
-                  } catch (commitErr) {
-                    console.warn('[Cycle] On-chain commit exception (trade still open):', commitErr);
-                  }
-                } else if (executionResult && challengeMode === 'paper') {
+                // The only commit is the guarded adapter call made when the
+                // debate is created. A second path here would race/duplicate it.
+                if (executionResult && challengeMode === 'paper') {
                   txHash = 'paper-mode';
                 }
 
