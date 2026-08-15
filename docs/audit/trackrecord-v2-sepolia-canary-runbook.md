@@ -24,9 +24,16 @@ verifica y documenta; no firma ni promueve nada.
 | Ciclo canario | commit→resolve WIN/LOSS | + **verificación de precio con update firmado de Hermes** + **challenge de stop-breach** |
 | Feeds | — | BTC/ETH/SOL sembrados en el constructor |
 
-El gate de Pyth (`PythOracleGate.sol`) exige el set canónico exacto: en Sepolia
-es `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729` (1 dirección — el requisito de
-≥2 con fallback es SOLO mainnet). Feeds pineados en la librería.
+El gate de Pyth (`PythOracleGate.sol`) exige el set canónico exacto. **Sepolia
+también tiene par current/upgraded** (verificado on-chain 2026-08-14: ambas con
+código y respondiendo `getUpdateFee`): activa = **upgraded
+`0x5f52e4DBEA21f5b23523B6e20d50c29ae0a4EB83`**, fallback = current
+`0xA2aa501b19aff244D90cc15a4Cf739D2725B5729` — mismo patrón que mainnet (Pyth
+recomienda la upgraded para integraciones nuevas). Feeds pineados en la
+librería. **Residual a confirmar en el 1er commit VERIFIED del canario:** el PoC
+probó el parse contra la CURRENT; confirmar que un update firmado de Hermes
+parsea igual contra la UPGRADED activa (riesgo bajo — el mismo Hermes sirve
+ambas). Si fallara, activar temporalmente la current y reportar.
 
 ## 1. Direcciones que Anthony define (roles — ninguna vive en el repo)
 
