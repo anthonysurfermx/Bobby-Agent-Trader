@@ -61,9 +61,11 @@ contract DeployBase is Script {
         uint256 maxSizeUsd;
         uint8 resolverThreshold;
         address hardnessScorer;
+        address recorder;
         address expectedOwner;
         bytes32 expectedOwnerCodehash;
         address expectedOwnerSingleton;
+        address[] expectedOwnerOwners;
     }
 
     function _config() internal view returns (Config memory c) {
@@ -78,8 +80,8 @@ contract DeployBase is Script {
             c.cio = vm.envAddress("CIO_ADDRESS");
             c.resolver = vm.envAddress("RESOLVER_ADDRESS");
             require(
-                c.alpha != c.red && c.alpha != c.cio && c.alpha != c.resolver
-                    && c.red != c.cio && c.red != c.resolver && c.cio != c.resolver,
+                c.alpha != c.red && c.alpha != c.cio && c.alpha != c.resolver && c.red != c.cio && c.red != c.resolver
+                    && c.cio != c.resolver,
                 "Mainnet economic roles must be pairwise distinct"
             );
         } else {
@@ -113,6 +115,7 @@ contract DeployBase is Script {
         // r7 integration: judge-mode needs the scorer role; defaults to bobby so
         // hardness certification is never silently dead after a deploy.
         c.hardnessScorer = vm.envOr("HARDNESS_SCORER_ADDRESS", c.bobby);
+        c.recorder = vm.envOr("BASE_RECORDER_ADDRESS", c.bobby);
         // r9 H-02 / D-4: the address that must END UP owning all seven
         // contracts. On mainnet this is the Safe — mandatory, and distinct from
         // the hot deployer EOA. On testnet it defaults to the deployer (no
@@ -124,6 +127,8 @@ contract DeployBase is Script {
         // safe-deployments registry). Mandatory on 8453.
         c.expectedOwnerCodehash = vm.envOr("OWNER_SAFE_CODEHASH", bytes32(0));
         c.expectedOwnerSingleton = vm.envOr("OWNER_SAFE_SINGLETON", address(0));
+        address[] memory noOwners = new address[](0);
+        c.expectedOwnerOwners = vm.envOr("OWNER_SAFE_OWNERS", ",", noOwners);
     }
 
     /// @dev V2 verification params. Defaults are the audited deploy config
@@ -132,13 +137,29 @@ contract DeployBase is Script {
     ///      50 bps). Overridable per deploy; the constructor re-validates every
     ///      field against its hard bounds, so a bad env value fails loudly.
     function _v2Params() internal view returns (BobbyTrackRecordV2.VerificationParams memory p) {
-        p.entryWindowSec = uint16(vm.envOr("V2_ENTRY_WINDOW_SEC", uint256(60)));
-        p.exitWindowSec = uint16(vm.envOr("V2_EXIT_WINDOW_SEC", uint256(120)));
-        p.maxExitLagSec = uint24(vm.envOr("V2_MAX_EXIT_LAG_SEC", uint256(600)));
-        p.challengeWindowSec = uint24(vm.envOr("V2_CHALLENGE_WINDOW_SEC", uint256(7 days)));
-        p.entryTolBps = uint16(vm.envOr("V2_ENTRY_TOL_BPS", uint256(100)));
-        p.exitTolBps = uint16(vm.envOr("V2_EXIT_TOL_BPS", uint256(100)));
-        p.confMaxBps = uint16(vm.envOr("V2_CONF_MAX_BPS", uint256(50)));
+        uint256 entryWindowSec = vm.envOr("V2_ENTRY_WINDOW_SEC", uint256(60));
+        uint256 exitWindowSec = vm.envOr("V2_EXIT_WINDOW_SEC", uint256(120));
+        uint256 maxExitLagSec = vm.envOr("V2_MAX_EXIT_LAG_SEC", uint256(600));
+        uint256 challengeWindowSec = vm.envOr("V2_CHALLENGE_WINDOW_SEC", uint256(7 days));
+        uint256 entryTolBps = vm.envOr("V2_ENTRY_TOL_BPS", uint256(100));
+        uint256 exitTolBps = vm.envOr("V2_EXIT_TOL_BPS", uint256(100));
+        uint256 confMaxBps = vm.envOr("V2_CONF_MAX_BPS", uint256(50));
+        require(entryWindowSec <= type(uint16).max, "V2_ENTRY_WINDOW_SEC exceeds uint16");
+        require(exitWindowSec <= type(uint16).max, "V2_EXIT_WINDOW_SEC exceeds uint16");
+        require(maxExitLagSec <= type(uint24).max, "V2_MAX_EXIT_LAG_SEC exceeds uint24");
+        require(challengeWindowSec <= type(uint24).max, "V2_CHALLENGE_WINDOW_SEC exceeds uint24");
+        require(entryTolBps <= type(uint16).max, "V2_ENTRY_TOL_BPS exceeds uint16");
+        require(exitTolBps <= type(uint16).max, "V2_EXIT_TOL_BPS exceeds uint16");
+        require(confMaxBps <= type(uint16).max, "V2_CONF_MAX_BPS exceeds uint16");
+        p = BobbyTrackRecordV2.VerificationParams({
+            entryWindowSec: uint16(entryWindowSec),
+            exitWindowSec: uint16(exitWindowSec),
+            maxExitLagSec: uint24(maxExitLagSec),
+            challengeWindowSec: uint24(challengeWindowSec),
+            entryTolBps: uint16(entryTolBps),
+            exitTolBps: uint16(exitTolBps),
+            confMaxBps: uint16(confMaxBps)
+        });
     }
 
     function run() external returns (Deployed memory d) {
@@ -160,11 +181,14 @@ contract DeployBase is Script {
         require(c.expectedOwner != c.keeper, "OWNER_SAFE_ADDRESS must not be the keeper");
         if (block.chainid == 8453) {
             require(c.expectedOwner != deployer, "Mainnet: OWNER_SAFE_ADDRESS must be set and != deployer (D-4)");
+            require(c.recorder == c.bobby, "Mainnet: BASE_RECORDER_ADDRESS must equal BOBBY_ADDRESS");
             // r10.1 review [P1]: getters alone are mimicable. The gate proves
             // the owner is byte-identical to the externally-audited Safe
             // (pinned codehash + singleton) with an effective >= 2-of-3
             // policy and no module/guard side doors. See SafeOwnerGate.sol.
-            SafeOwnerGate.validate(c.expectedOwner, deployer, c.expectedOwnerCodehash, c.expectedOwnerSingleton);
+            SafeOwnerGate.validate(
+                c.expectedOwner, deployer, c.expectedOwnerCodehash, c.expectedOwnerSingleton, c.expectedOwnerOwners
+            );
         }
 
         // r8 #3: validate every economic parameter BEFORE any chain interaction.
@@ -178,9 +202,8 @@ contract DeployBase is Script {
         // and RESOLVER_ADDRESS must still be distinct from each other and from
         // arbiter/keeper.
         require(
-            c.cio != c.arbiter && c.cio != c.keeper && c.cio != c.resolver
-                && c.arbiter != c.keeper && c.arbiter != c.resolver
-                && c.keeper != c.resolver,
+            c.cio != c.arbiter && c.cio != c.keeper && c.cio != c.resolver && c.arbiter != c.keeper
+                && c.arbiter != c.resolver && c.keeper != c.resolver,
             "IntentEscrow roles (cio/arbiter/keeper/resolver) must be pairwise distinct"
         );
         require(msg.sender != c.keeper, "IntentEscrow: deployer (owner) must not be keeper");
@@ -190,8 +213,7 @@ contract DeployBase is Script {
         // c.resolver, and any threshold > 1 fails here, not mid-broadcast.
         address[] memory fallbackResolvers = new address[](1);
         fallbackResolvers[0] = c.resolver;
-        address[] memory initialResolvers =
-            vm.envOr("RESOLVER_ADDRESSES", ",", fallbackResolvers);
+        address[] memory initialResolvers = vm.envOr("RESOLVER_ADDRESSES", ",", fallbackResolvers);
         require(
             c.resolverThreshold >= 1 && c.resolverThreshold <= initialResolvers.length,
             "RESOLVER_THRESHOLD exceeds resolver list"
@@ -225,13 +247,9 @@ contract DeployBase is Script {
         d.convictionOracle = address(new BobbyConvictionOracle(c.bobby));
 
         // r6 #4: fees enter via constructor — no transient OKB-priced window.
-        d.agentEconomyV2 = address(
-            new BobbyAgentEconomyV2(c.alpha, c.red, c.cio, c.mcpCallFee, c.debateFeePerAgent)
-        );
+        d.agentEconomyV2 = address(new BobbyAgentEconomyV2(c.alpha, c.red, c.cio, c.mcpCallFee, c.debateFeePerAgent));
 
-        d.adversarialBounties = address(
-            new BobbyAdversarialBounties(c.resolver, c.absoluteMinBounty, c.minBounty)
-        );
+        d.adversarialBounties = address(new BobbyAdversarialBounties(c.resolver, c.absoluteMinBounty, c.minBounty));
 
         d.hardnessRegistry = address(
             new HardnessRegistry(
@@ -242,9 +260,7 @@ contract DeployBase is Script {
         d.agentRegistry = address(new BobbyAgentRegistry());
 
         d.intentEscrow = address(
-            new BobbyIntentEscrow(
-                block.chainid, c.maxSizeUsd, msg.sender, c.cio, c.arbiter, c.keeper, c.resolver
-            )
+            new BobbyIntentEscrow(block.chainid, c.maxSizeUsd, msg.sender, c.cio, c.arbiter, c.keeper, c.resolver)
         );
 
         HardnessRegistry(payable(d.hardnessRegistry)).setHardnessScorer(c.hardnessScorer);
@@ -265,8 +281,8 @@ contract DeployBase is Script {
 
         vm.stopBroadcast();
 
-        _assertDeployment(d, c, initialResolvers, deployer);
-        _writeManifest(d, c, initialResolvers, deployer);
+        _assertDeployment(d, c, initialResolvers, deployer, v2Params);
+        _writeManifest(d, c, initialResolvers, deployer, v2Params, pyths);
 
         console2.log("chain id            ", block.chainid);
         console2.log("hardness resolvers  ", initialResolvers.length);
@@ -305,7 +321,13 @@ contract DeployBase is Script {
     /// @dev r7 integration: post-deploy assertions — the script itself proves
     /// owners, roles, quorum and fees landed as configured before anyone flips
     /// PROTOCOL_CHAIN. All view calls; free on simulation, cheap on broadcast.
-    function _assertDeployment(Deployed memory d, Config memory c, address[] memory resolverSet, address deployer) internal view {
+    function _assertDeployment(
+        Deployed memory d,
+        Config memory c,
+        address[] memory resolverSet,
+        address deployer,
+        BobbyTrackRecordV2.VerificationParams memory expectedParams
+    ) internal view {
         // r8 #1 + r9 H-02: right after deploy the broadcaster still owns all
         // seven (two-step: ownership only moves when the Safe accepts), and if
         // a handoff was requested, every pendingOwner must be the Safe.
@@ -317,12 +339,29 @@ contract DeployBase is Script {
         require(BobbyAgentRegistry(d.agentRegistry).owner() == deployer, "assert: agentRegistry.owner");
         require(BobbyIntentEscrow(d.intentEscrow).owner() == deployer, "assert: escrow.owner");
         if (c.expectedOwner != deployer) {
-            require(BobbyTrackRecordV2(d.trackRecord).pendingOwner() == c.expectedOwner, "assert: trackRecord.pendingOwner");
-            require(BobbyConvictionOracle(d.convictionOracle).pendingOwner() == c.expectedOwner, "assert: oracle.pendingOwner");
-            require(BobbyAgentEconomyV2(payable(d.agentEconomyV2)).pendingOwner() == c.expectedOwner, "assert: economy.pendingOwner");
-            require(BobbyAdversarialBounties(payable(d.adversarialBounties)).pendingOwner() == c.expectedOwner, "assert: bounties.pendingOwner");
-            require(HardnessRegistry(payable(d.hardnessRegistry)).pendingOwner() == c.expectedOwner, "assert: hardness.pendingOwner");
-            require(BobbyAgentRegistry(d.agentRegistry).pendingOwner() == c.expectedOwner, "assert: agentRegistry.pendingOwner");
+            require(
+                BobbyTrackRecordV2(d.trackRecord).pendingOwner() == c.expectedOwner, "assert: trackRecord.pendingOwner"
+            );
+            require(
+                BobbyConvictionOracle(d.convictionOracle).pendingOwner() == c.expectedOwner,
+                "assert: oracle.pendingOwner"
+            );
+            require(
+                BobbyAgentEconomyV2(payable(d.agentEconomyV2)).pendingOwner() == c.expectedOwner,
+                "assert: economy.pendingOwner"
+            );
+            require(
+                BobbyAdversarialBounties(payable(d.adversarialBounties)).pendingOwner() == c.expectedOwner,
+                "assert: bounties.pendingOwner"
+            );
+            require(
+                HardnessRegistry(payable(d.hardnessRegistry)).pendingOwner() == c.expectedOwner,
+                "assert: hardness.pendingOwner"
+            );
+            require(
+                BobbyAgentRegistry(d.agentRegistry).pendingOwner() == c.expectedOwner,
+                "assert: agentRegistry.pendingOwner"
+            );
             require(BobbyIntentEscrow(d.intentEscrow).pendingOwner() == c.expectedOwner, "assert: escrow.pendingOwner");
         }
         require(BobbyIntentEscrow(d.intentEscrow).chainIdExpected() == block.chainid, "assert: escrow.chainIdExpected");
@@ -339,17 +378,24 @@ contract DeployBase is Script {
             require(tr.activePyth() == want[0], "assert: trackRecord.activePyth != canonical active");
             for (uint256 i = 0; i < want.length; i++) {
                 require(tr.approvedPyth(want[i]), "assert: canonical pyth not approved");
+                require(
+                    tr.pythActivatableAt(want[i]) <= block.timestamp, "assert: fallback pyth activation is timelocked"
+                );
             }
             (string[] memory syms, bytes32[] memory feeds) = PythOracleGate.verifiedFeeds();
             for (uint256 i = 0; i < syms.length; i++) {
                 require(tr.feedOf(keccak256(bytes(syms[i]))) == feeds[i], "assert: verified feed not seeded");
             }
+            _assertVerificationParams(tr, expectedParams);
         }
 
         BobbyAgentEconomyV2 economy = BobbyAgentEconomyV2(payable(d.agentEconomyV2));
         require(economy.mcpCallFee() == c.mcpCallFee, "assert: mcpCallFee");
         require(economy.debateFeePerAgent() == c.debateFeePerAgent, "assert: debateFee");
-        require(economy.alphaHunter() == c.alpha && economy.redTeam() == c.red && economy.cio() == c.cio, "assert: economy roles");
+        require(
+            economy.alphaHunter() == c.alpha && economy.redTeam() == c.red && economy.cio() == c.cio,
+            "assert: economy roles"
+        );
 
         BobbyAdversarialBounties bounties = BobbyAdversarialBounties(payable(d.adversarialBounties));
         require(bounties.resolver() == c.resolver, "assert: bounties.resolver");
@@ -377,7 +423,36 @@ contract DeployBase is Script {
 
     /// @dev r8 #5: machine-readable manifest — no hand-copied addresses. Written
     /// to deployments/<chainid>.json (fs_permissions in foundry.toml).
-    function _writeManifest(Deployed memory d, Config memory c, address[] memory resolverSet, address deployer) internal {
+    function _assertVerificationParams(BobbyTrackRecordV2 tr, BobbyTrackRecordV2.VerificationParams memory expected)
+        internal
+        view
+    {
+        (
+            uint16 entryWindowSec,
+            uint16 exitWindowSec,
+            uint24 maxExitLagSec,
+            uint24 challengeWindowSec,
+            uint16 entryTolBps,
+            uint16 exitTolBps,
+            uint16 confMaxBps
+        ) = tr.params();
+        require(entryWindowSec == expected.entryWindowSec, "assert: v2.entryWindowSec");
+        require(exitWindowSec == expected.exitWindowSec, "assert: v2.exitWindowSec");
+        require(maxExitLagSec == expected.maxExitLagSec, "assert: v2.maxExitLagSec");
+        require(challengeWindowSec == expected.challengeWindowSec, "assert: v2.challengeWindowSec");
+        require(entryTolBps == expected.entryTolBps, "assert: v2.entryTolBps");
+        require(exitTolBps == expected.exitTolBps, "assert: v2.exitTolBps");
+        require(confMaxBps == expected.confMaxBps, "assert: v2.confMaxBps");
+    }
+
+    function _writeManifest(
+        Deployed memory d,
+        Config memory c,
+        address[] memory resolverSet,
+        address deployer,
+        BobbyTrackRecordV2.VerificationParams memory v2Params,
+        address[] memory pyths
+    ) internal {
         string memory m = "manifest";
         vm.serializeUint(m, "chainId", block.chainid);
         // NOTE: on a dry-run this is the SIMULATED block; only trust it after a
@@ -389,6 +464,7 @@ contract DeployBase is Script {
         // r10.1 [P1]: pinned Safe identity so the verifier re-proves it live.
         vm.serializeBytes32(m, "expectedOwnerCodehash", c.expectedOwnerCodehash);
         vm.serializeAddress(m, "expectedOwnerSingleton", c.expectedOwnerSingleton);
+        vm.serializeAddress(m, "expectedOwnerOwners", c.expectedOwnerOwners);
 
         string memory a = "addresses";
         vm.serializeAddress(a, "trackRecord", d.trackRecord);
@@ -408,8 +484,24 @@ contract DeployBase is Script {
         vm.serializeAddress(r, "resolver", c.resolver);
         vm.serializeAddress(r, "arbiter", c.arbiter);
         vm.serializeAddress(r, "keeper", c.keeper);
+        vm.serializeAddress(r, "recorder", c.recorder);
         string memory rolesJson = vm.serializeAddress(r, "hardnessScorer", c.hardnessScorer);
         vm.serializeString(m, "roles", rolesJson);
+
+        string memory v = "verificationParams";
+        vm.serializeUint(v, "entryWindowSec", v2Params.entryWindowSec);
+        vm.serializeUint(v, "exitWindowSec", v2Params.exitWindowSec);
+        vm.serializeUint(v, "maxExitLagSec", v2Params.maxExitLagSec);
+        vm.serializeUint(v, "challengeWindowSec", v2Params.challengeWindowSec);
+        vm.serializeUint(v, "entryTolBps", v2Params.entryTolBps);
+        vm.serializeUint(v, "exitTolBps", v2Params.exitTolBps);
+        string memory verificationParamsJson = vm.serializeUint(v, "confMaxBps", v2Params.confMaxBps);
+        vm.serializeString(m, "verificationParams", verificationParamsJson);
+
+        string memory o = "oracle";
+        vm.serializeAddress(o, "activePyth", pyths[0]);
+        string memory oracleJson = vm.serializeAddress(o, "pyths", pyths);
+        vm.serializeString(m, "oracle", oracleJson);
 
         string memory f = "fees";
         vm.serializeUint(f, "mcpCallFeeWei", c.mcpCallFee);
