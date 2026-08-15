@@ -194,7 +194,15 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
       if (UI_TOOLS.has(name)) {
         // Resolved locally: these only move pixels, so they land instantly.
         if (name === 'set_chart') {
-          if (args.symbol) setSymbol(normalizeSymbol(args.symbol));
+          if (args.symbol) {
+            setSymbol(normalizeSymbol(args.symbol));
+            // set_chart starts a fresh visual context. The model calls it
+            // before analysing an asset, so retaining a prior thesis here can
+            // put BTC levels and zones over NVDA candles until later tools land.
+            setLevels([]);
+            setDebate(null);
+            setThesis(null);
+          }
           if (args.timeframe) setTimeframe(String(args.timeframe));
           output = { ok: true, showing: args.symbol, timeframe: args.timeframe ?? 'unchanged' };
         } else if (name === 'draw_levels') {
