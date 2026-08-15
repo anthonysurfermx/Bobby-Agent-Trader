@@ -1,12 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { Contract, Interface, JsonRpcProvider, Wallet, getAddress, id, keccak256 } from 'ethers';
 
-type Phase = 'predeploy' | 'postdeploy' | 'cutover';
+type Phase = 'predeploy' | 'postdeploy' | 'canary' | 'cutover';
 
 const phaseArg = process.argv.find((arg) => arg.startsWith('--phase='));
 const phase = (phaseArg?.split('=')[1] || 'cutover') as Phase;
-if (!['predeploy', 'postdeploy', 'cutover'].includes(phase)) {
-  throw new Error(`Unknown phase ${phase}; use predeploy, postdeploy, or cutover`);
+if (!['predeploy', 'postdeploy', 'canary', 'cutover'].includes(phase)) {
+  throw new Error(`Unknown phase ${phase}; use predeploy, postdeploy, canary, or cutover`);
 }
 
 const failures: string[] = [];
@@ -76,10 +76,21 @@ requireEnv('HARDNESS_SCORER_ADDRESS', validAddress);
 requireEnv('XLAYER_RECORD_SECRET');
 requireEnv('TRADING_API_SECRET');
 requireEnv('PROTOCOL_AUTOMATION_SECRET');
-if (env('PROTOCOL_CUTOVER_FREEZE') !== 'true') {
-  fail('PROTOCOL_CUTOVER_FREEZE must equal true until the launch canary passes');
+const mustRemainFrozen = phase !== 'cutover';
+if (mustRemainFrozen && env('PROTOCOL_CUTOVER_FREEZE') !== 'true') {
+  fail(`PROTOCOL_CUTOVER_FREEZE must equal true during ${phase}`);
+} else if (!mustRemainFrozen && env('PROTOCOL_CUTOVER_FREEZE') !== 'false') {
+  fail('PROTOCOL_CUTOVER_FREEZE must equal false in the reviewed target cutover configuration');
 } else {
-  pass('live trading is frozen for the deployment window');
+  pass(mustRemainFrozen
+    ? 'backend protocol writers remain frozen'
+    : 'target cutover configuration explicitly removes the freeze');
+}
+
+if (env('BASE_RECORDER_ADDRESS') && env('BOBBY_ADDRESS')) {
+  if (env('BASE_RECORDER_ADDRESS').toLowerCase() !== env('BOBBY_ADDRESS').toLowerCase()) {
+    fail('BASE_RECORDER_ADDRESS must equal BOBBY_ADDRESS authorized by the contracts');
+  } else pass('Base recorder equals the on-chain bobby authorization role');
 }
 
 const economicRoles = ['ALPHA_ADDRESS', 'RED_ADDRESS', 'CIO_ADDRESS', 'RESOLVER_ADDRESS'].map(env).filter(Boolean);
@@ -173,6 +184,31 @@ const positiveUint96 = (value: string) => {
   }
 };
 
+const positiveIntegerWithin = (max: bigint) => (value: string) => {
+  if (!/^[1-9][0-9]*$/.test(value)) return false;
+  try {
+    return BigInt(value) <= max;
+  } catch {
+    return false;
+  }
+};
+
+const verificationParamEnvByManifestKey: Record<string, string> = {
+  entryWindowSec: 'V2_ENTRY_WINDOW_SEC',
+  exitWindowSec: 'V2_EXIT_WINDOW_SEC',
+  maxExitLagSec: 'V2_MAX_EXIT_LAG_SEC',
+  challengeWindowSec: 'V2_CHALLENGE_WINDOW_SEC',
+  entryTolBps: 'V2_ENTRY_TOL_BPS',
+  exitTolBps: 'V2_EXIT_TOL_BPS',
+  confMaxBps: 'V2_CONF_MAX_BPS',
+};
+for (const [key, name] of Object.entries(verificationParamEnvByManifestKey)) {
+  const max = key === 'maxExitLagSec' || key === 'challengeWindowSec'
+    ? (1n << 24n) - 1n
+    : (1n << 16n) - 1n;
+  requireEnv(name, positiveIntegerWithin(max));
+}
+
 for (const name of [
   'FEE_MCP_CALL_WEI',
   'FEE_DEBATE_PER_AGENT_WEI',
@@ -227,6 +263,7 @@ const addressEnvByManifestKey: Record<string, string> = {
 
 const roleEnvByManifestKey: Record<string, string> = {
   bobby: 'BOBBY_ADDRESS',
+  recorder: 'BASE_RECORDER_ADDRESS',
   alpha: 'ALPHA_ADDRESS',
   red: 'RED_ADDRESS',
   cio: 'CIO_ADDRESS',
@@ -264,6 +301,13 @@ if (manifest) {
   if (String(manifest.expectedOwnerSingleton || '').toLowerCase() !== env('OWNER_SAFE_SINGLETON').toLowerCase()) {
     fail('manifest expectedOwnerSingleton does not match OWNER_SAFE_SINGLETON');
   } else pass('manifest Safe singleton matches the pinned value');
+  const normalizedManifestSafeOwners = Array.isArray(manifest.expectedOwnerOwners)
+    ? manifest.expectedOwnerOwners.map((value: unknown) => String(value).toLowerCase()).sort()
+    : [];
+  const normalizedConfiguredSafeOwners = safeOwners.map((value) => value.toLowerCase()).sort();
+  if (JSON.stringify(normalizedManifestSafeOwners) !== JSON.stringify(normalizedConfiguredSafeOwners)) {
+    fail('manifest expectedOwnerOwners does not match OWNER_SAFE_OWNERS');
+  } else pass('manifest pins the exact reviewed Safe owner set');
   if (String(manifest.deployer || '').toLowerCase() !== env('DEPLOYER_ADDRESS').toLowerCase()) {
     fail('manifest deployer does not match DEPLOYER_ADDRESS');
   } else pass('manifest deployer matches the reviewed deployer');
@@ -292,6 +336,12 @@ if (manifest) {
     } else pass(`${envName} matches manifest`);
   }
 
+  for (const [key, envName] of Object.entries(verificationParamEnvByManifestKey)) {
+    if (String(manifest.verificationParams?.[key] ?? '') !== env(envName)) {
+      fail(`manifest verificationParams.${key} does not match ${envName}`);
+    } else pass(`${envName} matches manifest`);
+  }
+
   const manifestResolvers = Array.isArray(manifest.quorum?.resolvers)
     ? manifest.quorum.resolvers.map(String)
     : [];
@@ -305,8 +355,8 @@ if (manifest) {
   } else pass('resolver threshold matches manifest');
 
   const receiptEvidence = Array.isArray(manifest.transactions) ? manifest.transactions : [];
-  if (receiptEvidence.length < 8) {
-    fail('manifest must contain live receipt evidence for the full broadcast');
+  if (receiptEvidence.length !== 15) {
+    fail('manifest must contain exactly 15 receipts (7 creates, scorer call, 7 ownership handoffs)');
   } else {
     const invalidReceipt = receiptEvidence.some((receipt: Record<string, unknown>) =>
       receipt.status !== '0x1' ||
@@ -367,6 +417,16 @@ if (manifest) {
     if (callEvidence.length !== expectedCalls.length) {
       fail('receipt evidence contains an unexpected or duplicate non-CREATE call');
     } else pass('receipt evidence contains only the reviewed scorer and ownership calls');
+
+    if (manifest.receiptEvidence?.schema !== 'bobby-base-receipts-v2') {
+      fail('manifest receiptEvidence schema is not finalized v2 evidence');
+    } else if (Number(manifest.receiptEvidence?.chainId) !== 8453) {
+      fail('manifest receiptEvidence chainId does not equal 8453');
+    } else if (Number(manifest.receiptEvidence?.receiptCount) !== receiptEvidence.length) {
+      fail('manifest receiptEvidence count does not match transactions');
+    } else if (!BYTES32_RE.test(String(manifest.receiptEvidence?.evidenceHash || ''))) {
+      fail('manifest receiptEvidence is missing its canonical evidenceHash');
+    } else pass('manifest carries finalized canonical receipt evidence');
   }
 
   if (env('BASE_PROTOCOL_DEPLOYMENT_BLOCK') !== String(manifest.deployBlock)) {
@@ -374,20 +434,20 @@ if (manifest) {
   } else pass('BASE_PROTOCOL_DEPLOYMENT_BLOCK matches manifest');
 }
 
-if (phase === 'cutover') {
+if (phase === 'predeploy' || phase === 'postdeploy' || phase === 'canary') {
+  if (env('PROTOCOL_WRITES_ENABLED') === 'true') {
+    fail(`PROTOCOL_WRITES_ENABLED must not be true during ${phase}`);
+  } else pass(`automatic protocol writes remain disabled during ${phase}`);
+}
+
+if (phase === 'canary' || phase === 'cutover') {
   if (env('VERCEL_ENV') !== 'production') fail('VERCEL_ENV must equal production');
-  else pass('cutover is scoped to Vercel production');
+  else pass(`${phase} is scoped to Vercel production`);
   if (env('PROTOCOL_CHAIN') !== 'base') fail('PROTOCOL_CHAIN must equal base');
   else pass('PROTOCOL_CHAIN targets Base');
-  if (env('PROTOCOL_WRITES_ENABLED') !== 'true') fail('PROTOCOL_WRITES_ENABLED must equal true');
-  else pass('protocol writes explicitly enabled');
   if (env('PROTOCOL_WRITE_CHAIN_ID') !== '8453') fail('PROTOCOL_WRITE_CHAIN_ID must equal 8453');
   else pass('write chain confirmation equals 8453');
   requireEnv('BASE_RECORDER_KEY');
-  requireEnv('BASE_RPC_URL', (value) => /^https:\/\//i.test(value));
-  requireEnv('XLAYER_RECORD_SECRET');
-  requireEnv('TRADING_API_SECRET');
-  requireEnv('PROTOCOL_AUTOMATION_SECRET');
   if (env('BASE_RECORDER_KEY') && env('BASE_RECORDER_ADDRESS')) {
     try {
       if (new Wallet(env('BASE_RECORDER_KEY')).address.toLowerCase() !== env('BASE_RECORDER_ADDRESS').toLowerCase()) {
@@ -397,90 +457,190 @@ if (phase === 'cutover') {
       fail('BASE_RECORDER_KEY is not a valid private key');
     }
   }
+}
 
-  if (
-    manifest &&
-    validAddress(env('OWNER_SAFE_ADDRESS')) &&
-    validAddress(env('OWNER_SAFE_SINGLETON')) &&
-    safeOwners.length === 3 &&
-    env('BASE_RPC_URL')
-  ) {
-    const provider = new JsonRpcProvider(env('BASE_RPC_URL'), 8453, { staticNetwork: true });
-    try {
-      const network = await provider.getNetwork();
-      if (Number(network.chainId) !== 8453) throw new Error(`RPC answered for chain ${network.chainId}`);
-      pass('live RPC confirms Base mainnet chain id');
+if (phase === 'cutover') {
+  if (env('PROTOCOL_WRITES_ENABLED') !== 'true') fail('PROTOCOL_WRITES_ENABLED must equal true in the target cutover configuration');
+  else pass('target cutover configuration explicitly enables writes');
+  requireEnv('BASE_CANARY_COMMIT_TX_HASH', (value) => BYTES32_RE.test(value));
+  requireEnv('BASE_CANARY_RESOLVE_TX_HASH', (value) => BYTES32_RE.test(value));
+}
 
-      const safe = env('OWNER_SAFE_ADDRESS');
-      const safeCode = await provider.getCode(safe);
-      if (safeCode === '0x') fail('OWNER_SAFE_ADDRESS has no live code');
-      else if (keccak256(safeCode).toLowerCase() !== env('OWNER_SAFE_CODEHASH').toLowerCase()) {
-        fail('live Safe proxy codehash does not match OWNER_SAFE_CODEHASH');
-      } else pass('live Safe proxy codehash matches the pin');
+if (phase !== 'predeploy') requireEnv('BASE_RPC_URL', (value) => /^https:\/\//i.test(value));
 
-      const singletonWord = await provider.getStorage(safe, 0n);
-      const liveSingleton = getAddress(`0x${singletonWord.slice(-40)}`);
-      if (liveSingleton.toLowerCase() !== env('OWNER_SAFE_SINGLETON').toLowerCase()) {
-        fail('live Safe singleton does not match OWNER_SAFE_SINGLETON');
-      } else if (await provider.getCode(liveSingleton) === '0x') {
-        fail('pinned Safe singleton has no live code');
-      } else pass('live Safe singleton matches the pin and has code');
+if (
+  phase !== 'predeploy' &&
+  manifest &&
+  validAddress(env('OWNER_SAFE_ADDRESS')) &&
+  validAddress(env('OWNER_SAFE_SINGLETON')) &&
+  safeOwners.length === 3 &&
+  env('BASE_RPC_URL')
+) {
+  const provider = new JsonRpcProvider(env('BASE_RPC_URL'), 8453, { staticNetwork: true });
+  try {
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== 8453) throw new Error(`RPC answered for chain ${network.chainId}`);
+    pass('live RPC confirms Base mainnet chain id');
 
-      const safeContract = new Contract(safe, [
-        'function getThreshold() view returns (uint256)',
-        'function getOwners() view returns (address[])',
-        'function getModulesPaginated(address,uint256) view returns (address[],address)',
-      ], provider);
-      const [liveThreshold, liveOwners, modulePage] = await Promise.all([
-        safeContract.getThreshold() as Promise<bigint>,
-        safeContract.getOwners() as Promise<string[]>,
-        safeContract.getModulesPaginated('0x0000000000000000000000000000000000000001', 10) as Promise<[string[], string]>,
+    const safe = env('OWNER_SAFE_ADDRESS');
+    const safeCode = await provider.getCode(safe);
+    if (safeCode === '0x') fail('OWNER_SAFE_ADDRESS has no live code');
+    else if (keccak256(safeCode).toLowerCase() !== env('OWNER_SAFE_CODEHASH').toLowerCase()) {
+      fail('live Safe proxy codehash does not match OWNER_SAFE_CODEHASH');
+    } else pass('live Safe proxy codehash matches the pin');
+
+    const singletonWord = await provider.getStorage(safe, 0n);
+    const liveSingleton = getAddress(`0x${singletonWord.slice(-40)}`);
+    if (liveSingleton.toLowerCase() !== env('OWNER_SAFE_SINGLETON').toLowerCase()) {
+      fail('live Safe singleton does not match OWNER_SAFE_SINGLETON');
+    } else if (await provider.getCode(liveSingleton) === '0x') {
+      fail('pinned Safe singleton has no live code');
+    } else pass('live Safe singleton matches the pin and has code');
+
+    const safeContract = new Contract(safe, [
+      'function getThreshold() view returns (uint256)',
+      'function getOwners() view returns (address[])',
+      'function getModulesPaginated(address,uint256) view returns (address[],address)',
+    ], provider);
+    const [liveThreshold, liveOwners, modulePage] = await Promise.all([
+      safeContract.getThreshold() as Promise<bigint>,
+      safeContract.getOwners() as Promise<string[]>,
+      safeContract.getModulesPaginated('0x0000000000000000000000000000000000000001', 10) as Promise<[string[], string]>,
+    ]);
+    if (liveThreshold !== 2n) fail('live Safe threshold must equal 2');
+    else pass('live Safe threshold equals 2');
+    const normalizedLiveOwners = liveOwners.map((value) => value.toLowerCase()).sort();
+    const normalizedExpectedOwners = safeOwners.map((value) => value.toLowerCase()).sort();
+    if (JSON.stringify(normalizedLiveOwners) !== JSON.stringify(normalizedExpectedOwners)) {
+      fail('live Safe owners do not match OWNER_SAFE_OWNERS');
+    } else pass('live Safe owners match the reviewed 2-of-3 set');
+    if (modulePage[0].length !== 0) fail('live Safe has enabled modules');
+    else pass('live Safe has no enabled modules');
+    const guardWord = await provider.getStorage(safe, id('guard_manager.guard.address'));
+    if (BigInt(guardWord) !== 0n) fail('live Safe has a guard configured');
+    else pass('live Safe has no guard configured');
+
+    const ownershipAbi = [
+      'function owner() view returns (address)',
+      'function pendingOwner() view returns (address)',
+    ];
+    for (const [manifestKey] of Object.entries(addressEnvByManifestKey)) {
+      const contractAddress = String(manifest.addresses?.[manifestKey] || '');
+      const contract = new Contract(contractAddress, ownershipAbi, provider);
+      const [owner, pendingOwner, code] = await Promise.all([
+        contract.owner() as Promise<string>,
+        contract.pendingOwner() as Promise<string>,
+        provider.getCode(contractAddress),
       ]);
-      if (liveThreshold !== 2n) fail('live Safe threshold must equal 2');
-      else pass('live Safe threshold equals 2');
-      const normalizedLiveOwners = liveOwners.map((value) => value.toLowerCase()).sort();
-      const normalizedExpectedOwners = safeOwners.map((value) => value.toLowerCase()).sort();
-      if (JSON.stringify(normalizedLiveOwners) !== JSON.stringify(normalizedExpectedOwners)) {
-        fail('live Safe owners do not match OWNER_SAFE_OWNERS');
-      } else pass('live Safe owners match the reviewed 2-of-3 set');
-      if (modulePage[0].length !== 0) fail('live Safe has enabled modules');
-      else pass('live Safe has no enabled modules');
-      const guardWord = await provider.getStorage(safe, id('guard_manager.guard.address'));
-      if (BigInt(guardWord) !== 0n) fail('live Safe has a guard configured');
-      else pass('live Safe has no guard configured');
-
-      const ownershipAbi = [
-        'function owner() view returns (address)',
-        'function pendingOwner() view returns (address)',
-      ];
-      for (const [manifestKey] of Object.entries(addressEnvByManifestKey)) {
-        const contract = new Contract(String(manifest.addresses?.[manifestKey] || ''), ownershipAbi, provider);
-        const [owner, pendingOwner, code] = await Promise.all([
-          contract.owner() as Promise<string>,
-          contract.pendingOwner() as Promise<string>,
-          provider.getCode(String(manifest.addresses?.[manifestKey] || '')),
-        ]);
-        if (code === '0x') fail(`${manifestKey} has no live runtime code`);
-        else if (owner.toLowerCase() !== safe.toLowerCase()) fail(`${manifestKey}.owner is not the reviewed Safe`);
-        else if (pendingOwner.toLowerCase() !== ZERO_ADDRESS) fail(`${manifestKey}.pendingOwner is not cleared`);
-        else pass(`${manifestKey} is live, Safe-owned and has no pending owner`);
-      }
-
-      const hardness = new Contract(String(manifest.addresses?.hardnessRegistry || ''), [
-        'function hardnessScorer() view returns (address)',
-      ], provider);
-      const liveScorer = await hardness.hardnessScorer() as string;
-      if (liveScorer.toLowerCase() !== env('HARDNESS_SCORER_ADDRESS').toLowerCase()) {
-        fail('live Hardness scorer does not match HARDNESS_SCORER_ADDRESS');
-      } else pass('live Hardness scorer matches the reviewed role');
-    } catch (error) {
-      fail(`live Base cutover verification failed: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      provider.destroy();
+      if (code === '0x') fail(`${manifestKey} has no live runtime code`);
+      else if (owner.toLowerCase() !== safe.toLowerCase()) fail(`${manifestKey}.owner is not the reviewed Safe`);
+      else if (pendingOwner.toLowerCase() !== ZERO_ADDRESS) fail(`${manifestKey}.pendingOwner is not cleared`);
+      else pass(`${manifestKey} is live, Safe-owned and has no pending owner`);
     }
+
+    const hardness = new Contract(String(manifest.addresses?.hardnessRegistry || ''), [
+      'function hardnessScorer() view returns (address)',
+    ], provider);
+    const liveScorer = await hardness.hardnessScorer() as string;
+    if (liveScorer.toLowerCase() !== env('HARDNESS_SCORER_ADDRESS').toLowerCase()) {
+      fail('live Hardness scorer does not match HARDNESS_SCORER_ADDRESS');
+    } else pass('live Hardness scorer matches the reviewed role');
+
+    const trackRecord = new Contract(String(manifest.addresses?.trackRecord || ''), [
+      'function bobby() view returns (address)',
+      'function params() view returns (uint16,uint16,uint24,uint24,uint16,uint16,uint16)',
+      'function activePyth() view returns (address)',
+      'function approvedPyth(address) view returns (bool)',
+      'function pythActivatableAt(address) view returns (uint64)',
+    ], provider);
+    const [liveBobby, liveParams, liveActivePyth, latestBlock] = await Promise.all([
+      trackRecord.bobby() as Promise<string>,
+      trackRecord.params() as Promise<readonly bigint[]>,
+      trackRecord.activePyth() as Promise<string>,
+      provider.getBlockNumber(),
+    ]);
+    if (liveBobby.toLowerCase() !== env('BASE_RECORDER_ADDRESS').toLowerCase()) {
+      fail('live TrackRecord bobby does not equal BASE_RECORDER_ADDRESS');
+    } else pass('live TrackRecord authorizes the reviewed recorder');
+    const paramKeys = Object.keys(verificationParamEnvByManifestKey);
+    for (let index = 0; index < paramKeys.length; index += 1) {
+      const key = paramKeys[index];
+      if (String(liveParams[index]) !== String(manifest.verificationParams?.[key] ?? '')) {
+        fail(`live TrackRecord params.${key} does not match manifest`);
+      } else pass(`live TrackRecord params.${key} matches manifest`);
+    }
+    const manifestPyths = Array.isArray(manifest.oracle?.pyths) ? manifest.oracle.pyths.map(String) : [];
+    if (!manifestPyths.length || liveActivePyth.toLowerCase() !== String(manifest.oracle?.activePyth || '').toLowerCase()) {
+      fail('live active Pyth does not match the finalized manifest');
+    } else pass('live active Pyth matches the finalized manifest');
+    for (const pyth of manifestPyths) {
+      const [approved, activatableAt, code] = await Promise.all([
+        trackRecord.approvedPyth(pyth) as Promise<boolean>,
+        trackRecord.pythActivatableAt(pyth) as Promise<bigint>,
+        provider.getCode(pyth),
+      ]);
+      if (code === '0x') fail(`canonical Pyth ${pyth} has no live code`);
+      else if (!approved) fail(`canonical Pyth ${pyth} is not approved`);
+      else if (activatableAt > BigInt(Math.floor(Date.now() / 1000))) fail(`canonical Pyth ${pyth} is still timelocked`);
+      else pass(`canonical Pyth ${pyth} is code-bearing, approved and immediately activatable`);
+    }
+
+    for (const receipt of manifest.transactions as Array<Record<string, unknown>>) {
+      const liveReceipt = await provider.getTransactionReceipt(String(receipt.hash));
+      if (!liveReceipt || liveReceipt.status !== 1 || liveReceipt.blockHash.toLowerCase() !== String(receipt.blockHash).toLowerCase()) {
+        fail(`finalized receipt ${String(receipt.hash)} is missing, failed or non-canonical`);
+      }
+    }
+    if (!failures.some((item) => item.startsWith('finalized receipt '))) {
+      pass('all finalized deployment receipts remain canonical');
+    }
+
+    if (phase === 'cutover' && BYTES32_RE.test(env('BASE_CANARY_COMMIT_TX_HASH')) && BYTES32_RE.test(env('BASE_CANARY_RESOLVE_TX_HASH'))) {
+      const canaryInterface = new Interface([
+        'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96,uint8,bytes[])',
+        'function resolveTrade(bytes32,int256,uint8,uint96,uint64,bytes[])',
+      ]);
+      const canaryRows = [
+        { label: 'commit', hash: env('BASE_CANARY_COMMIT_TX_HASH'), selector: canaryInterface.getFunction('commitTrade')!.selector },
+        { label: 'resolve', hash: env('BASE_CANARY_RESOLVE_TX_HASH'), selector: canaryInterface.getFunction('resolveTrade')!.selector },
+      ];
+      let debateHash = '';
+      let previousBlock = 0;
+      for (const row of canaryRows) {
+        const [receipt, transaction] = await Promise.all([
+          provider.getTransactionReceipt(row.hash),
+          provider.getTransaction(row.hash),
+        ]);
+        if (!receipt || !transaction || receipt.status !== 1) {
+          fail(`Base canary ${row.label} transaction is missing or failed`);
+          continue;
+        }
+        const parsed = canaryInterface.parseTransaction({ data: transaction.data });
+        const rowDebateHash = String(parsed?.args?.[0] || '').toLowerCase();
+        if (
+          transaction.to?.toLowerCase() !== String(manifest.addresses?.trackRecord).toLowerCase() ||
+          transaction.from.toLowerCase() !== env('BASE_RECORDER_ADDRESS').toLowerCase() ||
+          transaction.data.slice(0, 10).toLowerCase() !== row.selector.toLowerCase()
+        ) {
+          fail(`Base canary ${row.label} is not the reviewed recorder call to TrackRecordV2`);
+        } else if (latestBlock - receipt.blockNumber < 12) {
+          fail(`Base canary ${row.label} has fewer than 12 confirmations`);
+        } else if (previousBlock && receipt.blockNumber < previousBlock) {
+          fail('Base canary resolve was mined before its commit');
+        } else if (debateHash && rowDebateHash !== debateHash) {
+          fail('Base canary commit and resolve use different debate hashes');
+        } else {
+          debateHash = rowDebateHash;
+          previousBlock = receipt.blockNumber;
+          pass(`Base canary ${row.label} receipt is canonical and confirmed`);
+        }
+      }
+    }
+  } catch (error) {
+    fail(`live Base ${phase} verification failed: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    provider.destroy();
   }
-} else if (env('PROTOCOL_WRITES_ENABLED') === 'true') {
-  warnings.push('PROTOCOL_WRITES_ENABLED is already true before the cutover phase');
 }
 
 console.log(`\nBobby Base mainnet readiness — ${phase.toUpperCase()}`);
@@ -495,5 +655,12 @@ if (failures.length) {
   for (const item of failures) console.log(`  x   ${item}`);
   process.exitCode = 1;
 } else {
-  console.log('GO: configuration gates passed');
+  const verdict = phase === 'predeploy'
+    ? 'READY: pre-broadcast configuration gates passed'
+    : phase === 'postdeploy'
+      ? 'READY: live deployment verified; backend remains frozen'
+      : phase === 'canary'
+        ? 'READY: send the bounded direct on-chain canary while backend writers remain frozen'
+        : 'GO: launch configuration and confirmed Base canary passed; promote this exact target environment';
+  console.log(verdict);
 }

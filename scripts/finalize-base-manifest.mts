@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { Interface, keccak256 } from 'ethers';
+import { Interface, keccak256, toUtf8Bytes } from 'ethers';
 
 const chainArg = process.argv.find((arg) => arg.startsWith('--chain-id='));
 const chainId = Number(chainArg?.split('=')[1] || 8453);
@@ -108,6 +108,14 @@ if (expectedOwner.toLowerCase() !== deployer.toLowerCase()) {
 }
 const seenCalls = new Set<string>();
 
+function broadcastInput(tx: Record<string, any>): string {
+  const input = String(tx.transaction?.input || tx.transaction?.data || '');
+  if (!/^0x[0-9a-fA-F]+$/.test(input)) {
+    throw new Error(`broadcast transaction ${String(tx.hash || tx.contractName || '')} has no encoded input`);
+  }
+  return input;
+}
+
 for (let index = 0; index < transactions.length; index += 1) {
   const tx = transactions[index] as Record<string, any>;
   const localReceipt = localReceipts[index] as Record<string, any>;
@@ -132,11 +140,17 @@ for (let index = 0; index < transactions.length; index += 1) {
   const isCreate = tx.transactionType === 'CREATE';
   const contractName = String(tx.contractName || '');
   const declaredAddress = String(tx.contractAddress || '');
+  const declaredInput = broadcastInput(tx);
+  if (keccak256(declaredInput).toLowerCase() !== keccak256(liveTransaction.input).toLowerCase()) {
+    throw new Error(`transaction ${hash} input differs between Foundry broadcast and live chain`);
+  }
   if (isCreate) {
     const manifestKey = manifestKeyByContract[contractName];
     if (!manifestKey) throw new Error(`unexpected deployed contract ${contractName}`);
     const expectedAddress = String(manifest.addresses?.[manifestKey] || '');
     if (
+      live.to !== null ||
+      liveTransaction.to !== null ||
       !live.contractAddress ||
       live.contractAddress.toLowerCase() !== declaredAddress.toLowerCase() ||
       live.contractAddress.toLowerCase() !== expectedAddress.toLowerCase()
@@ -171,6 +185,7 @@ for (let index = 0; index < transactions.length; index += 1) {
   }
 
   evidence.push({
+    index,
     hash: live.transactionHash,
     block: Number(BigInt(live.blockNumber)),
     blockHash: live.blockHash,
@@ -196,12 +211,20 @@ if (seenCalls.size !== expectedCalls.size || [...expectedCalls.keys()].some((key
 }
 
 const deployBlock = Math.min(...evidence.map((item) => Number(item.block)));
-const coreMatches = Number(manifest.deployBlock) === deployBlock && evidence.every((item) => {
-  const existing = (manifest.transactions || []).find(
-    (candidate: Record<string, unknown>) => candidate.hash === item.hash,
-  );
-  return existing && existing.status === '0x1' && Number(existing.block) === item.block;
-});
+const evidenceHash = keccak256(toUtf8Bytes(JSON.stringify(evidence)));
+const canonicalReceiptEvidence = {
+  schema: 'bobby-base-receipts-v2',
+  source: broadcastPath,
+  chainId,
+  receiptCount: evidence.length,
+  evidenceHash,
+};
+const coreMatches =
+  Number(manifest.deployBlock) === deployBlock &&
+  Array.isArray(manifest.transactions) &&
+  manifest.transactions.length === evidence.length &&
+  JSON.stringify(manifest.transactions) === JSON.stringify(evidence) &&
+  JSON.stringify(manifest.receiptEvidence) === JSON.stringify(canonicalReceiptEvidence);
 
 if (!shouldWrite) {
   if (!coreMatches) {
@@ -213,11 +236,7 @@ if (!shouldWrite) {
 } else {
   manifest.deployBlock = deployBlock;
   manifest.transactions = evidence;
-  manifest.receiptEvidence = {
-    source: broadcastPath,
-    chainId,
-    receiptCount: evidence.length,
-  };
+  manifest.receiptEvidence = canonicalReceiptEvidence;
   delete manifest.deployBlockNote;
 
   const tempPath = `${manifestPath}.tmp`;

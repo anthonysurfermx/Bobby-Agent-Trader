@@ -44,6 +44,7 @@ contract VerifyBaseDeployment is Script {
         address resolver;
         address arbiter;
         address keeper;
+        address recorder;
         address scorer;
     }
 
@@ -54,10 +55,8 @@ contract VerifyBaseDeployment is Script {
     }
 
     function run() external {
-        string memory path = vm.envOr(
-            "MANIFEST_PATH",
-            string.concat("deployments/", vm.toString(block.chainid), ".json")
-        );
+        string memory path =
+            vm.envOr("MANIFEST_PATH", string.concat("deployments/", vm.toString(block.chainid), ".json"));
         string memory json = vm.readFile(path);
         console2.log("manifest:", path);
         console2.log("live block now:", block.number); // manifest deployBlock may be simulated
@@ -83,6 +82,7 @@ contract VerifyBaseDeployment is Script {
             resolver: vm.parseJsonAddress(json, ".roles.resolver"),
             arbiter: vm.parseJsonAddress(json, ".roles.arbiter"),
             keeper: vm.parseJsonAddress(json, ".roles.keeper"),
+            recorder: vm.parseJsonAddress(json, ".roles.recorder"),
             scorer: vm.parseJsonAddress(json, ".roles.hardnessScorer")
         });
 
@@ -104,9 +104,11 @@ contract VerifyBaseDeployment is Script {
                 expectedOwner,
                 r.deployer,
                 vm.parseJsonBytes32(json, ".expectedOwnerCodehash"),
-                vm.parseJsonAddress(json, ".expectedOwnerSingleton")
+                vm.parseJsonAddress(json, ".expectedOwnerSingleton"),
+                vm.parseJsonAddressArray(json, ".expectedOwnerOwners")
             );
-            _ok(true, "expectedOwner passes SafeOwnerGate (pinned codehash+singleton, >=2-of-3, no modules/guard)");
+            _ok(true, "expectedOwner passes SafeOwnerGate (pinned identity, exact 2-of-3 owners, no modules/guard)");
+            _ok(r.recorder == r.bobby, "manifest recorder == bobby authorization role");
         }
 
         _verifyCode(a);
@@ -148,20 +150,68 @@ contract VerifyBaseDeployment is Script {
     /// pendingOwner == expected). It FAILS in the state D-4 prohibits: the
     /// deployer EOA owning with no handoff in flight.
     function _verifyOwnership(Addrs memory a, address deployer, address expected) internal {
-        _checkOwner(BobbyTrackRecordV2(a.trackRecord).owner(), BobbyTrackRecordV2(a.trackRecord).pendingOwner(), deployer, expected, "trackRecord");
-        _checkOwner(BobbyConvictionOracle(a.oracle).owner(), BobbyConvictionOracle(a.oracle).pendingOwner(), deployer, expected, "oracle");
-        _checkOwner(BobbyAgentEconomyV2(payable(a.economy)).owner(), BobbyAgentEconomyV2(payable(a.economy)).pendingOwner(), deployer, expected, "economy");
-        _checkOwner(BobbyAdversarialBounties(payable(a.bounties)).owner(), BobbyAdversarialBounties(payable(a.bounties)).pendingOwner(), deployer, expected, "bounties");
-        _checkOwner(HardnessRegistry(payable(a.hardness)).owner(), HardnessRegistry(payable(a.hardness)).pendingOwner(), deployer, expected, "hardness");
-        _checkOwner(BobbyAgentRegistry(a.agentRegistry).owner(), BobbyAgentRegistry(a.agentRegistry).pendingOwner(), deployer, expected, "agentRegistry");
-        _checkOwner(BobbyIntentEscrow(a.escrow).owner(), BobbyIntentEscrow(a.escrow).pendingOwner(), deployer, expected, "escrow");
+        _checkOwner(
+            BobbyTrackRecordV2(a.trackRecord).owner(),
+            BobbyTrackRecordV2(a.trackRecord).pendingOwner(),
+            deployer,
+            expected,
+            "trackRecord"
+        );
+        _checkOwner(
+            BobbyConvictionOracle(a.oracle).owner(),
+            BobbyConvictionOracle(a.oracle).pendingOwner(),
+            deployer,
+            expected,
+            "oracle"
+        );
+        _checkOwner(
+            BobbyAgentEconomyV2(payable(a.economy)).owner(),
+            BobbyAgentEconomyV2(payable(a.economy)).pendingOwner(),
+            deployer,
+            expected,
+            "economy"
+        );
+        _checkOwner(
+            BobbyAdversarialBounties(payable(a.bounties)).owner(),
+            BobbyAdversarialBounties(payable(a.bounties)).pendingOwner(),
+            deployer,
+            expected,
+            "bounties"
+        );
+        _checkOwner(
+            HardnessRegistry(payable(a.hardness)).owner(),
+            HardnessRegistry(payable(a.hardness)).pendingOwner(),
+            deployer,
+            expected,
+            "hardness"
+        );
+        _checkOwner(
+            BobbyAgentRegistry(a.agentRegistry).owner(),
+            BobbyAgentRegistry(a.agentRegistry).pendingOwner(),
+            deployer,
+            expected,
+            "agentRegistry"
+        );
+        _checkOwner(
+            BobbyIntentEscrow(a.escrow).owner(),
+            BobbyIntentEscrow(a.escrow).pendingOwner(),
+            deployer,
+            expected,
+            "escrow"
+        );
     }
 
     /// @dev r10 review [P1]: a pending handoff is NOT an acceptable final
     /// state on mainnet — the EOA still holds every privilege and can replace
     /// pendingOwner at will. On 8453 only owner == expected AND no pending
     /// proposal passes; the tolerant branch exists for testnet iteration only.
-    function _checkOwner(address liveOwner, address livePending, address deployer, address expected, string memory label) internal {
+    function _checkOwner(
+        address liveOwner,
+        address livePending,
+        address deployer,
+        address expected,
+        string memory label
+    ) internal {
         if (block.chainid == 8453) {
             _ok(liveOwner == expected, string.concat(label, ".owner == expectedOwner (mainnet: accepted, not pending)"));
             _ok(livePending == address(0), string.concat(label, ".pendingOwner cleared (mainnet)"));
@@ -177,27 +227,67 @@ contract VerifyBaseDeployment is Script {
     function _verifyEconomy(Addrs memory a, Roles memory r, string memory json) internal {
         _ok(BobbyTrackRecordV2(a.trackRecord).bobby() == r.bobby, "trackRecord.bobby");
         _ok(BobbyConvictionOracle(a.oracle).bobby() == r.bobby, "oracle.bobby");
-        _verifyTrackRecordV2Oracle(a);
+        _verifyTrackRecordV2Oracle(a, json);
         BobbyAgentEconomyV2 eco = BobbyAgentEconomyV2(payable(a.economy));
         _ok(eco.alphaHunter() == r.alpha && eco.redTeam() == r.red && eco.cio() == r.cio, "economy agent roles");
         _ok(eco.mcpCallFee() == vm.parseJsonUint(json, ".fees.mcpCallFeeWei"), "economy.mcpCallFee");
-        _ok(eco.debateFeePerAgent() == vm.parseJsonUint(json, ".fees.debateFeePerAgentWei"), "economy.debateFeePerAgent");
+        _ok(
+            eco.debateFeePerAgent() == vm.parseJsonUint(json, ".fees.debateFeePerAgentWei"), "economy.debateFeePerAgent"
+        );
     }
 
     /// @dev TrackRecordV2 oracle wiring against LIVE mined state: the active
     ///      Pyth is the chain's canonical index-0, all canonical addresses are
     ///      approved (V-03 fallback real), and BTC/ETH/SOL feeds are seeded.
-    function _verifyTrackRecordV2Oracle(Addrs memory a) internal {
+    function _verifyTrackRecordV2Oracle(Addrs memory a, string memory json) internal {
         BobbyTrackRecordV2 tr = BobbyTrackRecordV2(a.trackRecord);
         address[] memory want = PythOracleGate.canonicalPyths(block.chainid);
         _ok(tr.activePyth() == want[0], "trackRecord.activePyth == canonical active");
+        _ok(
+            vm.parseJsonAddress(json, ".oracle.activePyth") == want[0], "manifest oracle.activePyth == canonical active"
+        );
+        address[] memory manifestPyths = vm.parseJsonAddressArray(json, ".oracle.pyths");
+        _ok(manifestPyths.length == want.length, "manifest oracle.pyths length");
         for (uint256 i = 0; i < want.length; i++) {
             _ok(tr.approvedPyth(want[i]), string.concat("canonical pyth approved ", vm.toString(want[i])));
+            _ok(
+                tr.pythActivatableAt(want[i]) <= block.timestamp,
+                string.concat("canonical pyth activation ready ", vm.toString(want[i]))
+            );
+            _ok(manifestPyths[i] == want[i], string.concat("manifest canonical pyth ", vm.toString(want[i])));
         }
         (string[] memory syms, bytes32[] memory feeds) = PythOracleGate.verifiedFeeds();
         for (uint256 i = 0; i < syms.length; i++) {
             _ok(tr.feedOf(keccak256(bytes(syms[i]))) == feeds[i], string.concat("verified feed seeded ", syms[i]));
         }
+        (
+            uint16 entryWindowSec,
+            uint16 exitWindowSec,
+            uint24 maxExitLagSec,
+            uint24 challengeWindowSec,
+            uint16 entryTolBps,
+            uint16 exitTolBps,
+            uint16 confMaxBps
+        ) = tr.params();
+        _ok(
+            entryWindowSec == vm.parseJsonUint(json, ".verificationParams.entryWindowSec"),
+            "trackRecord.params.entryWindowSec"
+        );
+        _ok(
+            exitWindowSec == vm.parseJsonUint(json, ".verificationParams.exitWindowSec"),
+            "trackRecord.params.exitWindowSec"
+        );
+        _ok(
+            maxExitLagSec == vm.parseJsonUint(json, ".verificationParams.maxExitLagSec"),
+            "trackRecord.params.maxExitLagSec"
+        );
+        _ok(
+            challengeWindowSec == vm.parseJsonUint(json, ".verificationParams.challengeWindowSec"),
+            "trackRecord.params.challengeWindowSec"
+        );
+        _ok(entryTolBps == vm.parseJsonUint(json, ".verificationParams.entryTolBps"), "trackRecord.params.entryTolBps");
+        _ok(exitTolBps == vm.parseJsonUint(json, ".verificationParams.exitTolBps"), "trackRecord.params.exitTolBps");
+        _ok(confMaxBps == vm.parseJsonUint(json, ".verificationParams.confMaxBps"), "trackRecord.params.confMaxBps");
     }
 
     function _verifyBounties(Addrs memory a, Roles memory r, string memory json) internal {

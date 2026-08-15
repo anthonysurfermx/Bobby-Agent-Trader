@@ -79,11 +79,14 @@ contract ImpostorSafe {
 /// @dev SafeOwnerGate.validate is internal (inlined) — expectRevert needs an
 /// external call frame, so the tests go through this caller.
 contract GateCaller {
-    function callGate(address safe, address deployer, bytes32 pinnedCodehash, address pinnedSingleton)
-        external
-        view
-    {
-        SafeOwnerGate.validate(safe, deployer, pinnedCodehash, pinnedSingleton);
+    function callGate(
+        address safe,
+        address deployer,
+        bytes32 pinnedCodehash,
+        address pinnedSingleton,
+        address[] memory expectedOwners
+    ) external view {
+        SafeOwnerGate.validate(safe, deployer, pinnedCodehash, pinnedSingleton, expectedOwners);
     }
 }
 
@@ -119,10 +122,21 @@ contract DeploymentGatesTest is Test {
         return address(safe).codehash;
     }
 
+    function _owners(MockSafe target) internal view returns (address[] memory) {
+        return target.getOwners();
+    }
+
+    function _defaultOwners() internal pure returns (address[] memory owners) {
+        owners = new address[](3);
+        owners[0] = address(0xAA00);
+        owners[1] = address(0xAA01);
+        owners[2] = address(0xAA02);
+    }
+
     // ── SafeOwnerGate: the audited-artifact pin ──
 
     function test_gate_happyPathPasses() public view {
-        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton));
+        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton), _defaultOwners());
     }
 
     function test_gate_rejectsImpostorWithRightGetters() public {
@@ -130,56 +144,82 @@ contract DeploymentGatesTest is Test {
         // right threshold, right owner count, right slot-0 singleton — but not
         // the audited bytecode.
         vm.expectRevert(bytes("SafeGate: proxy codehash != pinned codehash"));
-        gate.callGate(address(impostor), DEPLOYER, _pin(), address(singleton));
+        gate.callGate(address(impostor), DEPLOYER, _pin(), address(singleton), _defaultOwners());
     }
 
     function test_gate_rejectsWrongSingleton() public {
         vm.store(address(safe), bytes32(uint256(0)), bytes32(uint256(uint160(address(0xDEAD)))));
         vm.expectRevert(bytes("SafeGate: slot-0 singleton != pinned singleton"));
-        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton));
+        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton), _defaultOwners());
     }
 
     function test_gate_rejectsSingletonWithoutCode() public {
         MockSafe eoaSingleton = new MockSafe(address(0xBEEF), 2, 3);
         vm.expectRevert(bytes("SafeGate: pinned singleton has no code"));
-        gate.callGate(address(eoaSingleton), DEPLOYER, address(eoaSingleton).codehash, address(0xBEEF));
+        gate.callGate(
+            address(eoaSingleton), DEPLOYER, address(eoaSingleton).codehash, address(0xBEEF), _defaultOwners()
+        );
     }
 
     function test_gate_rejectsThresholdOne() public {
         MockSafe weak = new MockSafe(address(singleton), 1, 3);
-        vm.expectRevert(bytes("SafeGate: threshold must be >= 2 (D-4)"));
-        gate.callGate(address(weak), DEPLOYER, address(weak).codehash, address(singleton));
+        vm.expectRevert(bytes("SafeGate: threshold must equal 2 (D-4)"));
+        gate.callGate(address(weak), DEPLOYER, address(weak).codehash, address(singleton), _defaultOwners());
     }
 
     function test_gate_rejectsTwoOwners() public {
         MockSafe weak = new MockSafe(address(singleton), 2, 2);
-        vm.expectRevert(bytes("SafeGate: must have >= 3 owners (D-4)"));
-        gate.callGate(address(weak), DEPLOYER, address(weak).codehash, address(singleton));
+        address[] memory expected = new address[](3);
+        expected[0] = address(0xAA00);
+        expected[1] = address(0xAA01);
+        expected[2] = address(0xAA02);
+        vm.expectRevert(bytes("SafeGate: Safe must have exactly 3 owners (D-4)"));
+        gate.callGate(address(weak), DEPLOYER, address(weak).codehash, address(singleton), expected);
+    }
+
+    function test_gate_rejectsThresholdAboveTwo() public {
+        MockSafe weak = new MockSafe(address(singleton), 3, 3);
+        vm.expectRevert(bytes("SafeGate: threshold must equal 2 (D-4)"));
+        gate.callGate(address(weak), DEPLOYER, address(weak).codehash, address(singleton), _defaultOwners());
+    }
+
+    function test_gate_rejectsDifferentThreeOwnerSet() public {
+        address[] memory expected = _defaultOwners();
+        expected[2] = address(0xBEEF);
+        vm.expectRevert(bytes("SafeGate: live owners != OWNER_SAFE_OWNERS"));
+        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton), expected);
+    }
+
+    function test_gate_rejectsDuplicateExpectedOwners() public {
+        address[] memory expected = _defaultOwners();
+        expected[2] = expected[1];
+        vm.expectRevert(bytes("SafeGate: expected owner set has duplicates"));
+        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton), expected);
     }
 
     function test_gate_rejectsEnabledModule() public {
         safe.enableModule(address(0x1234));
         vm.expectRevert(bytes("SafeGate: modules enabled - module txs bypass the quorum"));
-        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton));
+        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton), _defaultOwners());
     }
 
     function test_gate_rejectsGuard() public {
         vm.store(address(safe), GUARD_SLOT, bytes32(uint256(uint160(address(0x6A4D))))); // any nonzero
         vm.expectRevert(bytes("SafeGate: guard set - must be vanilla or separately audited"));
-        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton));
+        gate.callGate(address(safe), DEPLOYER, _pin(), address(singleton), _defaultOwners());
     }
 
     function test_gate_rejectsUnpinnedIdentity() public {
         vm.expectRevert(bytes("SafeGate: OWNER_SAFE_CODEHASH not pinned"));
-        gate.callGate(address(safe), DEPLOYER, bytes32(0), address(singleton));
+        gate.callGate(address(safe), DEPLOYER, bytes32(0), address(singleton), _defaultOwners());
 
         vm.expectRevert(bytes("SafeGate: OWNER_SAFE_SINGLETON not pinned"));
-        gate.callGate(address(safe), DEPLOYER, _pin(), address(0));
+        gate.callGate(address(safe), DEPLOYER, _pin(), address(0), _defaultOwners());
     }
 
     function test_gate_rejectsDeployerAsOwner() public {
         vm.expectRevert(bytes("SafeGate: owner must not be the deployer EOA (D-4)"));
-        gate.callGate(DEPLOYER, DEPLOYER, _pin(), address(singleton));
+        gate.callGate(DEPLOYER, DEPLOYER, _pin(), address(singleton), _defaultOwners());
     }
 
     // ── VerifyBaseDeployment._checkOwner: chain-aware final-state gate ──
