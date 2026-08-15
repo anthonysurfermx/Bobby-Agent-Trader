@@ -13,7 +13,8 @@
     "test:playbooks": "tsx scripts/test-playbooks.mts",
     "test:api-security": "tsx scripts/test-api-security.mts",
     "test:record-auth": "tsx scripts/test-record-auth.mts",
-    "test:risk-gate": "tsx scripts/test-risk-gate.mts"
+    "test:risk-gate": "tsx scripts/test-risk-gate.mts",
+    "test:trackrecord-v2": "tsx scripts/test-trackrecord-v2-lib.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",
