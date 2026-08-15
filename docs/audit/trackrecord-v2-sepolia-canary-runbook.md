@@ -5,9 +5,9 @@ correr un ciclo canario que ejercite la ruta VERIFIED (commit→resolve→challe
 con evidencia Pyth REAL, y dejarlo en soak 24h. Es el prerrequisito del NO-GO #3
 de mainnet ("redeploy Sepolia + canario 24h").
 
-**Estado del código:** `feat/trackrecord-v2` — 208/208 tests, viaIR 23,499 B
-(margen 1,077), P1 externo cerrado, layout gate en CI. Dry-run V2 en Sepolia:
-`post-deploy assertions: ALL PASSED`.
+**Estado del código:** baseline V2 `763d765` + integración de deploy `4dee332`
+— 214/214 tests, viaIR 23,499 B (margen 1,077), P1 externo cerrado,
+layout gate en CI. Dry-run V2 en Sepolia: `post-deploy assertions: ALL PASSED`.
 
 **Regla de la casa:** el broadcast (paso 2) lo firma Anthony. El agente prepara,
 verifica y documenta; no firma ni promueve nada.
@@ -19,14 +19,17 @@ verifica y documenta; no firma ni promueve nada.
 | | r10.2 | Este (V2) |
 |---|---|---|
 | Contrato TrackRecord | `BobbyTrackRecord` (1 arg) | `BobbyTrackRecordV2` (5 args) |
-| Oráculo | ninguno | **Pyth canónico por chainId** (Sepolia: 1 dirección; mainnet: upgraded+fallback) |
+| Oráculo | ninguno | **Pyth canónico por chainId** (upgraded activo + current fallback) |
 | Env nuevas | — | `V2_*` params (opcionales, tienen defaults auditados) |
 | Ciclo canario | commit→resolve WIN/LOSS | + **verificación de precio con update firmado de Hermes** + **challenge de stop-breach** |
 | Feeds | — | BTC/ETH/SOL sembrados en el constructor |
 
-El gate de Pyth (`PythOracleGate.sol`) exige el set canónico exacto: en Sepolia
-es `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729` (1 dirección — el requisito de
-≥2 con fallback es SOLO mainnet). Feeds pineados en la librería.
+El gate de Pyth (`PythOracleGate.sol`) exige el set canónico exacto. En Sepolia
+usa el contrato actualizado `0x5f52e4DBEA21f5b23523B6e20d50c29ae0a4EB83`
+como activo y conserva `0xA2aa501b19aff244D90cc15a4Cf739D2725B5729`
+como fallback preaprobado. Así el canario reproduce la postura de migración de
+mainnet en lugar de ensayar solamente el contrato anterior. Feeds pineados en
+la librería.
 
 ## 1. Direcciones que Anthony define (roles — ninguna vive en el repo)
 
@@ -144,5 +147,6 @@ y ahora: fetch de Hermes fallando (reintentar, nunca degradar a ATTESTED).
 ## 8. Bloqueantes de mainnet que este canario NO cubre
 
 Safe 2-de-3 real (+ pin codehash/singleton), los 2 Pyth canónicos de mainnet
-(el gate ya los exige), recorte de tolerances con basis real, y el handoff
-ACEPTADO de los 7 contratos. Ver `safe-setup-runbook.md` y el frente de Codex.
+(el gate ya los exige; Sepolia ensaya la misma forma), recorte de tolerances con
+basis real, y el handoff ACEPTADO de los 7 contratos. Ver
+`safe-setup-runbook.md` y el frente de Codex.

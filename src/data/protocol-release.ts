@@ -4,7 +4,7 @@ export const PROTOCOL_RELEASE = {
   mainnetState: 'Mainnet gated',
   trackRecordState: 'Security-reviewed',
   trackRecordDetail: 'ABI frozen · P1 fixed · mutation coverage active',
-  testEvidence: '208 contract tests · layout drift gate',
+  testEvidence: '214 contract tests · layout drift gate',
   readinessUrl:
     'https://github.com/anthonysurfermx/Bobby-Agent-Trader/blob/main/docs/release-readiness.md',
   gates: [

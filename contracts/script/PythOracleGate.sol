@@ -22,10 +22,11 @@ pragma solidity ^0.8.20;
 ///      Source: docs.pyth.network/price-feeds/core/contract-addresses/evm
 library PythOracleGate {
     // Base mainnet (8453)
-    address internal constant BASE_PYTH_CURRENT  = 0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a;
+    address internal constant BASE_PYTH_CURRENT = 0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a;
     address internal constant BASE_PYTH_UPGRADED = 0xbC16aee60f64864882BC6C4E428e148Fc0E272F5;
     // Base Sepolia (84532)
-    address internal constant BASE_SEPOLIA_PYTH  = 0xA2aa501b19aff244D90cc15a4Cf739D2725B5729;
+    address internal constant BASE_SEPOLIA_PYTH_CURRENT = 0xA2aa501b19aff244D90cc15a4Cf739D2725B5729;
+    address internal constant BASE_SEPOLIA_PYTH_UPGRADED = 0x5f52e4DBEA21f5b23523B6e20d50c29ae0a4EB83;
 
     // Canonical Pyth price-feed ids (verified live via Hermes, 2026-08-12).
     bytes32 internal constant FEED_BTC = 0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43;
@@ -41,26 +42,29 @@ library PythOracleGate {
         if (chainId == 8453) {
             pyths = new address[](2);
             pyths[0] = BASE_PYTH_UPGRADED; // active per Pyth guidance
-            pyths[1] = BASE_PYTH_CURRENT;  // pre-approved fallback
+            pyths[1] = BASE_PYTH_CURRENT; // pre-approved fallback
         } else if (chainId == 84532) {
-            pyths = new address[](1);
-            pyths[0] = BASE_SEPOLIA_PYTH;
+            // The canary mirrors mainnet's migration posture: new integrations
+            // exercise the upgraded contract while the current deployment is
+            // retained as an explicitly approved recovery path.
+            pyths = new address[](2);
+            pyths[0] = BASE_SEPOLIA_PYTH_UPGRADED;
+            pyths[1] = BASE_SEPOLIA_PYTH_CURRENT;
         } else {
             revert("PythOracleGate: unsupported chain");
         }
     }
 
     /// @notice The verified-universe symbols + feed ids, 1:1 and ordered.
-    function verifiedFeeds()
-        internal
-        pure
-        returns (string[] memory symbols, bytes32[] memory feedIds)
-    {
+    function verifiedFeeds() internal pure returns (string[] memory symbols, bytes32[] memory feedIds) {
         symbols = new string[](3);
         feedIds = new bytes32[](3);
-        symbols[0] = "BTC"; feedIds[0] = FEED_BTC;
-        symbols[1] = "ETH"; feedIds[1] = FEED_ETH;
-        symbols[2] = "SOL"; feedIds[2] = FEED_SOL;
+        symbols[0] = "BTC";
+        feedIds[0] = FEED_BTC;
+        symbols[1] = "ETH";
+        feedIds[1] = FEED_ETH;
+        symbols[2] = "SOL";
+        feedIds[2] = FEED_SOL;
     }
 
     /// @notice Assert a candidate `_pyths` array equals the chain's canonical
@@ -71,8 +75,8 @@ library PythOracleGate {
     function assertCanonical(uint256 chainId, address[] memory pyths) internal view {
         address[] memory want = canonicalPyths(chainId);
         require(pyths.length == want.length, "PythOracleGate: wrong pyth count");
-        if (chainId == 8453) {
-            require(pyths.length >= 2, "PythOracleGate: mainnet needs active + fallback");
+        if (chainId == 8453 || chainId == 84532) {
+            require(pyths.length >= 2, "PythOracleGate: active + fallback required");
         }
         for (uint256 i = 0; i < want.length; i++) {
             require(pyths[i] == want[i], "PythOracleGate: pyth address off canonical set");

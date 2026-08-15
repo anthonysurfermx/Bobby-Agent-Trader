@@ -16,8 +16,9 @@ none of them independently authorize mainnet.
 | P1 invariant coverage | Complete | `763d765`; mutation reintroducing exploit makes invariant fail | Included in CI and final test run |
 | ABI and storage layout | Complete | 126-entry ABI match; struct-member layout gate | Deploy, backend and published ABI use the same artifact |
 | Contract size | Watch | 23,499 B runtime; 1,077 B below EIP-170 | No unreviewed runtime growth |
-| Deploy and verify scripts V2 | In progress | Claude workstream | Constructor, Pyth set, Safe checks and manifest reconciliation pass |
+| Deploy and verify scripts V2 | Complete | `4dee332` plus upgraded Sepolia parity check | Constructor, canonical Pyth set, Safe checks and manifest reconciliation pass |
 | Backend V2 adapter | In progress | Claude workstream | VERIFIED and ATTESTED writes/readbacks pass against canary |
+| Pyth/Hermes production access | Human gate | Credential stays outside git | Authenticated price updates work from the production runtime before the provider cutoff |
 | Safe 2-of-3 | Blocked on owner setup | [`audit/safe-setup-runbook.md`](audit/safe-setup-runbook.md) | Threshold, owners, singleton, modules, guard and final ownership verified live |
 | Base Sepolia V2 canary | Pending | — | Deploy, verify, E2E lifecycle and soak complete |
 | Base mainnet funding | Human gate | — | Approved treasury receives bounded deployment gas |
@@ -29,7 +30,7 @@ none of them independently authorize mainnet.
 The release-preparation branch was checked locally on 2026-08-14 with:
 
 - production web build and API typecheck passing;
-- 208/208 Foundry tests passing with 1,000 fuzz runs;
+- 214/214 Foundry tests passing with 1,000 fuzz runs;
 - six TrackRecord V2 invariants exercised with explicit handler selectors;
 - storage and struct-member layout matching the frozen snapshot;
 - TrackRecord V2 runtime size of 23,499 B, leaving 1,077 B under EIP-170;
