@@ -225,6 +225,16 @@ const recordSource = readFileSync('api/xlayer-record.ts', 'utf8');
 assert.match(recordSource, /Commitment is already resolved and cannot authorize a new order/);
 assert.match(recordSource, /Commitment is too old to authorize a new order/);
 
+const provenanceMigration = readFileSync(
+  'supabase/migrations/202608150001_chain_provenance_hardening.sql',
+  'utf8',
+);
+const expiryGuardOffset = provenanceMigration.indexOf("clock_timestamp() >= timestamptz '2026-08-17 00:00:00+00'");
+const firstWriteOffset = provenanceMigration.indexOf('create table if not exists');
+assert.ok(expiryGuardOffset >= 0, 'provenance repair must carry a fixed pre-cutover expiry');
+assert.ok(firstWriteOffset > expiryGuardOffset, 'provenance expiry must run before the first migration write');
+assert.match(provenanceMigration, /Do not bypass this guard/);
+
 const gitignoreSource = readFileSync('.gitignore', 'utf8');
 assert.match(gitignoreSource, /^\.env\*$/m);
 assert.match(gitignoreSource, /^!\.env\.example$/m);

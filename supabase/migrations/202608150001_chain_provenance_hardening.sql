@@ -3,6 +3,20 @@
 -- captures the actual migration boundary once, so reruns never rewrite Base or
 -- Sepolia rows created afterwards.
 
+-- This repair deliberately expires before the earliest authorized mainnet
+-- window. If it was not applied by then, stop and produce a newly reviewed
+-- migration from live data; never move this deadline or run the UPDATEs by
+-- hand. That makes a late application fail before legitimate Base rows can be
+-- relabelled as X Layer.
+do $$
+begin
+  if clock_timestamp() >= timestamptz '2026-08-17 00:00:00+00' then
+    raise exception using
+      message = 'Chain provenance repair expired before Base cutover',
+      hint = 'Do not bypass this guard. Reconcile live 8453 rows and ship a newly reviewed forward migration.';
+  end if;
+end $$;
+
 create table if not exists public.protocol_migration_markers (
   key text primary key,
   recorded_at timestamptz not null default now()

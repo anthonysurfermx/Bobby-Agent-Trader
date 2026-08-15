@@ -40,7 +40,10 @@ blocked until the TrackRecordV2 audit closes and the final artifact is merged.
    its one-time pre-cutover boundary and prevents old binaries from fabricating
    Base provenance; the latter must deny anon/authenticated access and produce
    exactly one winner for concurrent claims on one `debate_hash`. Do not enable
-   live trading if either migration or its preflight is absent.
+   live trading if either migration or its preflight is absent. The provenance
+   repair expires at `2026-08-17T00:00:00Z`; if that deadline is missed, do not
+   bypass it or run its updates manually. Reconcile live `8453` rows and ship a
+   newly reviewed forward migration instead.
 
 ## Saturday — exact Sepolia rehearsal
 

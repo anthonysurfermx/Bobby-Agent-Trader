@@ -78,6 +78,10 @@ order id. A deterministic `clOrdId` reconciles a lost HTTP response, while a
 concurrent loser never submits another order. Resolved commitments and pending
 commitments older than 15 minutes are rejected. The migration must be applied
 and exercised in the canary; source code alone does not create this guarantee.
+The provenance repair also expires before the earliest authorized mainnet
+window, so applying it late fails before any legitimate Base row can be
+relabelled. Missing that deadline requires a new live-data reconciliation and
+reviewed forward migration; operators must never bypass the SQL guard.
 
 The mainnet checker is a **configuration/evidence checker**, not launch
 authorization. Canary/cutover now perform an authenticated Hermes fetch and a
