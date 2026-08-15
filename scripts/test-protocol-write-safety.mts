@@ -165,11 +165,12 @@ assert.equal(previewBase.ok, false);
 assert.ok(previewBase.blockers.some((item) => item.includes('VERCEL_ENV=production')));
 
 const xlayerRecordSource = readFileSync('api/xlayer-record.ts', 'utf8');
-assert.match(xlayerRecordSource, /requireProtocolWriteSafety\(res, \['trackRecord'\]\)/);
 assert.match(xlayerRecordSource, /recorderKeyEnvForChain\(DEFAULT_CHAIN\.id\)/);
 assert.match(xlayerRecordSource, /TRACK_RECORD_V2_ABI/);
 assert.match(xlayerRecordSource, /isTrackRecordV2\(DEFAULT_CHAIN\.id\)/);
 assert.doesNotMatch(xlayerRecordSource, /requireCompatibleTrackRecordAdapter/);
+assert.match(xlayerRecordSource, /LEGACY_XLAYER \? process\.env\.BOBBY_ORACLE_ADDRESS/);
+assert.match(xlayerRecordSource, /\['trackRecord', 'convictionOracle', 'agentEconomy'\]/);
 
 for (const legacyWriter of ['api/generate-activity.ts', 'api/auto-bounty.ts']) {
   assert.match(readFileSync(legacyWriter, 'utf8'), /requireLegacyXLayerMode/);
@@ -185,6 +186,9 @@ assert.match(cycleSource, /legacyXLayerWritesAllowed\(\)/);
 assert.match(cycleSource, /PROTOCOL_CUTOVER_FREEZE/);
 assert.match(cycleSource, /tradingAuthHeaders\(\)/);
 assert.match(cycleSource, /recordAuthHeaders\(\)/);
+assert.match(cycleSource, /requireLiveCycleAuth\(req, res\)/);
+assert.match(cycleSource, /chain: PROTOCOL_CHAIN_NAME/);
+assert.match(cycleSource, /chain_id: DEFAULT_CHAIN\.id/);
 
 const hardnessSource = readFileSync('api/_lib/hardness-registry.ts', 'utf8');
 assert.match(hardnessSource, /REGISTRATION_STAKE\(\)/);
@@ -209,6 +213,17 @@ assert.doesNotMatch(frontendChainsSource, /treasury: '0x09a81ff70ddbc5e8b88f168b
 const perpsSource = readFileSync('api/okx-perps.ts', 'utf8');
 assert.match(perpsSource, /isProtocolCutoverFrozen\(\)/);
 assert.match(perpsSource, /serverLiveMutations/);
+assert.match(perpsSource, /body: JSON\.stringify\(precommitPayload\)/);
+assert.doesNotMatch(perpsSource, /skipOnchainCommit|precommitConfirmed/);
+assert.match(perpsSource, /acquireTradeExecutionClaim/);
+assert.match(perpsSource, /clientOrderIdForDebateHash/);
+assert.match(perpsSource, /markTradeExecutionSubmitted/);
+assert.match(perpsSource, /internalCaller && !hasUserCreds/);
+assert.match(perpsSource, /User-supplied OKX credentials cannot consume Bobby TrackRecord commitments/);
+
+const recordSource = readFileSync('api/xlayer-record.ts', 'utf8');
+assert.match(recordSource, /Commitment is already resolved and cannot authorize a new order/);
+assert.match(recordSource, /Commitment is too old to authorize a new order/);
 
 const gitignoreSource = readFileSync('.gitignore', 'utf8');
 assert.match(gitignoreSource, /^\.env\*$/m);
@@ -227,6 +242,16 @@ const readinessSource = readFileSync('scripts/check-mainnet-readiness.mts', 'utf
 assert.match(readinessSource, /OWNER_SAFE_OWNERS/);
 assert.match(readinessSource, /hardnessScorer\(\)/);
 assert.match(readinessSource, /receipt\.inputHash/);
+assert.match(readinessSource, /Number\(parsed\?\.args\?\.\[7\]\) === 1/);
+assert.match(readinessSource, /Base canary stored VERIFIED lifecycle carries canonical Pyth evidence/);
+assert.match(readinessSource, /latestBlockTimestamp/);
+assert.match(readinessSource, /const pausableKeys/);
+assert.match(readinessSource, /OFFICIAL_BASE_PYTHS/);
+assert.match(readinessSource, /OFFICIAL_BASE_FEEDS/);
+assert.match(readinessSource, /activePyth\(\{ blockTag: receipt\.blockNumber \}\)/);
+assert.match(readinessSource, /authenticated Hermes preflight returned canonical BTC evidence/);
+assert.match(readinessSource, /trade_execution_claims grants, RLS and insert\/update\/delete round trip passed/);
+assert.match(readinessSource, /shares a block with Pyth\/feed configuration changes/);
 
 const finalizerSource = readFileSync('scripts/finalize-base-manifest.mts', 'utf8');
 assert.match(finalizerSource, /eth_getTransactionByHash/);

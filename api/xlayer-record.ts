@@ -8,7 +8,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
-import { DEFAULT_CHAIN, txUrl, addressUrl } from './_lib/chains.js';
+import { DEFAULT_CHAIN, XLAYER_CHAIN_ID, txUrl, addressUrl } from './_lib/chains.js';
 import { requireRecordAuth } from './_lib/record-auth.js';
 import { sendWithNonceRetry, waitForSuccessfulReceipt } from './_lib/chain-tx.js';
 import {
@@ -38,12 +38,17 @@ import {
 // Chain-aware since the Sepolia canary: RPC and addresses follow PROTOCOL_CHAIN.
 // Legacy env vars remain as fallback for the X Layer production deployment.
 const XLAYER_RPC = DEFAULT_CHAIN.rpcUrl;
-const CONTRACT_ADDRESS = DEFAULT_CHAIN.contracts.trackRecord || process.env.BOBBY_CONTRACT_ADDRESS || '';
-const ORACLE_ADDRESS = DEFAULT_CHAIN.contracts.convictionOracle || process.env.BOBBY_ORACLE_ADDRESS || '';
-const ECONOMY_ADDRESS = DEFAULT_CHAIN.contracts.agentEconomy || process.env.BOBBY_ECONOMY_ADDRESS || '';
+const LEGACY_XLAYER = DEFAULT_CHAIN.id === XLAYER_CHAIN_ID;
+const CONTRACT_ADDRESS = DEFAULT_CHAIN.contracts.trackRecord
+  || (LEGACY_XLAYER ? process.env.BOBBY_CONTRACT_ADDRESS || '' : '');
+const ORACLE_ADDRESS = DEFAULT_CHAIN.contracts.convictionOracle
+  || (LEGACY_XLAYER ? process.env.BOBBY_ORACLE_ADDRESS || '' : '');
+const ECONOMY_ADDRESS = DEFAULT_CHAIN.contracts.agentEconomy
+  || (LEGACY_XLAYER ? process.env.BOBBY_ECONOMY_ADDRESS || '' : '');
 const RECORDER_KEY_ENV = recorderKeyEnvForChain(DEFAULT_CHAIN.id);
 const RECORDER_KEY = process.env[RECORDER_KEY_ENV] || '';
 const USE_TRACK_RECORD_V2 = isTrackRecordV2(DEFAULT_CHAIN.id);
+const TRADE_PRECOMMIT_MAX_AGE_SEC = Number(process.env.TRADE_PRECOMMIT_MAX_AGE_SEC || '900');
 
 // Agent enum matches contract: CIO=0, ALPHA=1, REDTEAM=2
 const AGENT_MAP: Record<string, number> = {
@@ -87,6 +92,8 @@ const TRACK_RECORD_V1_ABI = [
   'function wins() view returns (uint256)',
   'function losses() view returns (uint256)',
   'function totalPnlBps() view returns (int256)',
+  'function commitIndex(bytes32) view returns (uint256)',
+  'function commitments(uint256) view returns (bytes32 debateHash,uint96 entryPrice,uint96 targetPrice,uint64 committedAt,uint96 stopPrice,address recorder,uint64 minResolveAt,uint8 agent,uint8 conviction,bool resolved,string symbol)',
   'function getAgentStats(uint8 _agent) view returns (uint256 _wins, uint256 _losses, uint256 _total, uint256 _winRate)',
   // Tuple order MUST mirror the storage struct layout (slot-packed since Base r4)
   'function getRecentTrades(uint256 _count) view returns (tuple(bytes32 debateHash, uint96 entryPrice, uint96 exitPrice, uint64 committedAt, uint64 resolvedAt, address recorder, uint8 agent, uint8 conviction, uint8 result, int256 pnlBps, string symbol)[])',
@@ -243,7 +250,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     // Fail-closed: signs txs with the recorder key — never publicly writable.
     if (!requireRecordAuth(req, res)) return;
-    if (!requireProtocolWriteSafety(res, ['trackRecord'])) return;
+    if (!requireProtocolWriteSafety(res, ['trackRecord', 'convictionOracle', 'agentEconomy'])) return;
 
     const body = (req.body || {}) as Record<string, unknown>;
     const action = typeof body.action === 'string' ? body.action.toLowerCase() : '';
@@ -327,6 +334,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const entryPriceE8 = numberToE8(entryPrice);
         const targetPriceE8 = targetPrice ? numberToE8(targetPrice) : 0n;
         const stopPriceE8 = stopPrice ? numberToE8(stopPrice) : 0n;
+        if (!Number.isSafeInteger(TRADE_PRECOMMIT_MAX_AGE_SEC)
+          || TRADE_PRECOMMIT_MAX_AGE_SEC < 60
+          || TRADE_PRECOMMIT_MAX_AGE_SEC > 3600) {
+          throw new Error('TRADE_PRECOMMIT_MAX_AGE_SEC must be an integer between 60 and 3600');
+        }
+
+        // V1 needs the same idempotent confirmation semantics as V2 so a
+        // trading caller can prove an earlier commitment by replaying the exact
+        // payload. A mismatched payload bound to the same debate hash fails.
+        if (!USE_TRACK_RECORD_V2) {
+          const track = new ethers.Contract(CONTRACT_ADDRESS, TRACK_RECORD_V1_ABI, provider);
+          const existing = await track.commitIndex(debateHash) as bigint;
+          if (existing !== 0n) {
+            const commitment = await track.commitments(existing - 1n);
+            if (commitment.resolved) {
+              return res.status(409).json({ error: 'Commitment is already resolved and cannot authorize a new order' });
+            }
+            const chainHead = await provider.getBlock('latest');
+            const committedAt = Number(commitment.committedAt);
+            if (!chainHead || committedAt > chainHead.timestamp
+              || chainHead.timestamp - committedAt > TRADE_PRECOMMIT_MAX_AGE_SEC) {
+              return res.status(409).json({ error: 'Commitment is too old to authorize a new order' });
+            }
+            const sameCommitment =
+              String(commitment.symbol) === canonicalSymbol
+              && Number(commitment.agent) === agentEnum
+              && Number(commitment.conviction) === convUint8
+              && BigInt(commitment.entryPrice) === entryPriceE8
+              && BigInt(commitment.targetPrice) === targetPriceE8
+              && BigInt(commitment.stopPrice) === stopPriceE8;
+            if (!sameCommitment) {
+              return res.status(409).json({ error: 'Debate hash is already bound to different commitment data' });
+            }
+            return res.status(200).json({
+              ok: true,
+              onchain: true,
+              broadcast: false,
+              confirmed: true,
+              idempotent: true,
+              action: 'commit',
+              message: 'Legacy commitment was already confirmed on-chain',
+              data: { debateHash, symbol: canonicalSymbol, agent: agentEnum, conviction },
+            });
+          }
+        }
 
         let pythFee = 0n;
         let entryUpdate: Awaited<ReturnType<typeof fetchHermesPriceUpdate>> | null = null;
@@ -343,6 +395,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const existing = await track.commitIndex(debateHash) as bigint;
           if (existing !== 0n) {
             const commitment = await track.getCommitment(existing - 1n);
+            if (commitment.resolved) {
+              return res.status(409).json({ error: 'Commitment is already resolved and cannot authorize a new order' });
+            }
+            const chainHead = await provider.getBlock('latest');
+            const committedAt = Number(commitment.committedAt);
+            if (!chainHead || committedAt > chainHead.timestamp
+              || chainHead.timestamp - committedAt > TRADE_PRECOMMIT_MAX_AGE_SEC) {
+              return res.status(409).json({ error: 'Commitment is too old to authorize a new order' });
+            }
             const sameCommitment =
               String(commitment.symbol) === canonicalSymbol &&
               Number(commitment.mode) === mode &&

@@ -36,7 +36,7 @@ begin
 
   if exists (select 1 from information_schema.columns
              where table_schema = 'public' and table_name = 'agent_cycles' and column_name = 'chain_id') then
-    update public.agent_cycles set chain_id = 196 where created_at < '2026-08-11'::timestamptz;
+    update public.agent_cycles set chain_id = 196 where started_at < '2026-08-11'::timestamptz;
   end if;
 end $$;
 
@@ -55,6 +55,7 @@ begin
     alter table public.hardness_agent_proofs
       add constraint hardness_agent_proofs_chain_id_known check (chain_id in (196, 8453, 84532));
   end if;
+
 end $$;
 
 -- ── 4. Indexes: every dashboard query becomes chain-scoped after the cutover ──

@@ -13,12 +13,17 @@ import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bo
 import { ethers } from 'ethers';
 import { recordHardnessActivity } from './_lib/hardness-registry.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
-import { DEFAULT_CHAIN, XLAYER_CHAIN_ID } from './_lib/chains.js';
+import { DEFAULT_CHAIN, PROTOCOL_CHAIN_NAME, XLAYER_CHAIN_ID } from './_lib/chains.js';
 import { assertProviderChain, legacyXLayerWritesAllowed } from './_lib/protocol-write-safety.js';
 import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
-import { internalAuthHeaders, requireInternalAuth, tradingAuthHeaders } from './_lib/request-security.js';
+import {
+  internalAuthHeaders,
+  requireInternalAuth,
+  requireLiveCycleAuth,
+  tradingAuthHeaders,
+} from './_lib/request-security.js';
 import { sendWithNonceRetry, waitForSuccessfulReceipt } from './_lib/chain-tx.js';
 
 export const config = { maxDuration: 300 };
@@ -642,10 +647,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
   }
 
-  // Every path can spend API quota and persist cycle output; live paths can
-  // additionally execute trades and write on-chain, so auth is fail-closed.
-  if (!requireInternalAuth(req, res)) return;
-
   const body = req.method === 'POST' ? (req.body || {}) : {};
   const language = body.language || 'es';
   const lang = language === 'es' ? 'es' : 'en';
@@ -653,6 +654,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestedMode = body.mode || kind;
   const yieldCandidates = resolveYieldCandidates(body.yieldCandidates);
   const challengeMode = resolveChallengeMode(req.method, requestedMode);
+  // Live cycles have their own capability boundary. Generic internal and
+  // BOBBY_CYCLE secrets may run paper/dry-run analysis but cannot escalate
+  // into OKX trading or recorder-wallet writes.
+  if (challengeMode === 'live') {
+    if (!requireLiveCycleAuth(req, res)) return;
+  } else if (!requireInternalAuth(req, res)) return;
   if (challengeMode === 'live' && process.env.PROTOCOL_CUTOVER_FREEZE === 'true') {
     return res.status(503).json({
       error: 'Live Bobby cycles are frozen during the protocol cutover',
@@ -735,6 +742,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ============================================================
     const cycle = await sbInsert('agent_cycles', {
       started_at: new Date().toISOString(),
+      chain_id: DEFAULT_CHAIN.id,
       status: 'running',
       signals_found: intel.meta?.signalsRaw || 0,
       signals_filtered: intel.meta?.signalsFiltered || 0,
@@ -1308,8 +1316,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                   amount: positionSizeUsd,
                   conviction,
                   mode: okxMode,
-                  skipOnchainCommit: true,
-                  precommitConfirmed: trackRecordCommitConfirmed,
+                  precommit: trackRecordCommitPayload,
                 },
               }, true);
 
@@ -1323,7 +1330,8 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                 // the settler marks break_even / win / loss based on the mark.
                 await sbInsert('agent_trades', {
                   cycle_id: cycleId || null,
-                  chain: 'xlayer',
+                  chain: PROTOCOL_CHAIN_NAME,
+                  chain_id: DEFAULT_CHAIN.id,
                   token_symbol: symbol,
                   token_address: `${symbol}-USDT-SWAP`,
                   direction,

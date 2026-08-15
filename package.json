@@ -16,11 +16,14 @@
     "test:risk-gate": "tsx scripts/test-risk-gate.mts",
     "test:track-record-v2": "tsx scripts/test-track-record-v2-adapter.mts",
     "test:protocol-write-safety": "tsx scripts/test-protocol-write-safety.mts",
+    "test:trade-execution-claims": "tsx scripts/test-trade-execution-claims.mts",
     "check:mainnet:predeploy": "tsx scripts/check-mainnet-readiness.mts --phase=predeploy",
     "check:mainnet:postdeploy": "tsx scripts/check-mainnet-readiness.mts --phase=postdeploy",
+    "check:mainnet:canary": "tsx scripts/check-mainnet-readiness.mts --phase=canary",
     "check:mainnet:cutover": "tsx scripts/check-mainnet-readiness.mts --phase=cutover",
     "finalize:base-manifest": "tsx scripts/finalize-base-manifest.mts",
-    "build:safe-launch-batch": "tsx scripts/build-safe-launch-batch.mts"
+    "build:safe-launch-batch": "tsx scripts/build-safe-launch-batch.mts",
+    "export:xlayer-track-record": "tsx scripts/export-xlayer-track-record.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

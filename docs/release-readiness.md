@@ -16,8 +16,10 @@ none of them independently authorize mainnet.
 | P1 invariant coverage | Complete | `763d765`; mutation reintroducing exploit makes invariant fail | Included in CI and final test run |
 | ABI and storage layout | Complete | 126-entry ABI match; struct-member layout gate | Deploy, backend and published ABI use the same artifact |
 | Contract size | Watch | 23,499 B runtime; 1,077 B below EIP-170 | No unreviewed runtime growth |
-| Deploy and verify scripts V2 | Complete | `4dee332` plus upgraded Sepolia parity check | Constructor, canonical Pyth set, Safe checks and manifest reconciliation pass |
+| Deploy and verify scripts V2 | Complete | `4461f80`; exact params, Safe owner set, receipt evidence and Pyth recovery checks | Constructor, canonical Pyth set, Safe checks and manifest reconciliation pass |
 | Backend V2 adapter | Code complete; canary pending | Chain-aware ABI/Pyth adapter; 53 focused checks | VERIFIED and ATTESTED writes/readbacks pass against the live canary |
+| Cutover write safety | Code complete; external review clean | Global freeze, chain-specific recorder keys, two-key Base latch, RPC chain assertion; no open P0/P1/P2 | Live frozen-write smoke pass |
+| Precommit execution binding | Code complete; migrations pending | Permanent `debate_hash` claim, deterministic OKX `clOrdId`, concurrent regression, forward-only provenance repair | Apply migrations `202608150001` and `202608150002`, pass the claims RPC gate, and prove one commitment cannot open two live orders |
 | Stop-breach watcher | Pending | Contract challenge path is tested; production worker is not wired | Historical stop scan runs before publishing WIN and challenges genuine breaches |
 | Pyth/Hermes production access | Human gate | Credential stays outside git | Authenticated price updates work from the production runtime before the provider cutoff |
 | Safe 2-of-3 | Blocked on owner setup | [`audit/safe-setup-runbook.md`](audit/safe-setup-runbook.md) | Threshold, owners, singleton, modules, guard and final ownership verified live |
@@ -25,19 +27,23 @@ none of them independently authorize mainnet.
 | Base mainnet funding | Human gate | — | Approved treasury receives bounded deployment gas |
 | Mainnet deployment | Blocked | — | Every gate in this document is checked with evidence |
 | Production web/API promotion | Blocked | — | Mainnet manifest, environment and public telemetry reconcile |
+| X Layer quiescence | Pending | Backend freeze exists; external/stale writers are not stopped by config alone | Disable crons/webhooks/deployments, revoke secrets/writer, drain in-flight work and prove a quiet period |
+| X Layer history archive | Baseline captured | Block `68,036,174`; SHA-256 `eecdee90…106de`; state-only provenance | Capture confirmed final block, prefer complete events, verify deterministically and anchor digest externally |
 
 ## Current verification evidence
 
 The release-preparation branch was checked locally through 2026-08-15 with:
 
 - production web build and API typecheck passing;
-- 214/214 Foundry tests passing with 1,000 fuzz runs;
+- 217/217 Foundry tests passing with 1,000 fuzz runs;
 - six TrackRecord V2 invariants exercised with explicit handler selectors;
 - storage and struct-member layout matching the frozen snapshot;
 - TrackRecord V2 runtime size of 23,499 B, leaving 1,077 B under EIP-170;
 - 26/26 API security checks and 11/11 record-auth checks passing;
 - 53/53 TrackRecord V2 adapter checks passing;
 - 32/32 risk-gate assertions and 261/261 playbook assertions passing;
+- independent adversarial reviews of the API execution path and final release
+  gates reporting no open P0, P1 or P2 findings after remediation;
 - no secrets detected by Gitleaks in the candidate source diff (ignored build
   artifacts excluded);
 - mobile and desktop browser checks passing on `/protocol`,
@@ -53,6 +59,34 @@ nonce races, commits only after the live risk gate passes, prevents paper or
 user-managed orders from spending the recorder wallet, and exposes VERIFIED
 and ATTESTED statistics separately. These are code-level results; they do not
 replace the real Sepolia rehearsal.
+
+The reconciled cutover layer additionally requires a chain-specific recorder
+key, confirms the RPC chain id before signing, separates trading and protocol
+automation secrets, and requires both `PROTOCOL_WRITES_ENABLED=true` and an
+exact `PROTOCOL_WRITE_CHAIN_ID`. `PROTOCOL_CUTOVER_FREEZE=true` is evaluated by
+the common write guard as well as the live trading path, so a direct
+authenticated TrackRecord request cannot bypass the maintenance freeze.
+
+This protects the candidate backend only. It does not stop a wallet, an old
+deployment, an external scheduler, a queued transaction or a leaked legacy
+secret. Launch therefore also requires the operational quiescence gate below.
+
+Live Bobby orders additionally consume their on-chain `debateHash` exactly once
+in `trade_execution_claims`. The unique database claim is acquired before the
+OKX request, binds chain/symbol/direction/size/leverage and persists the OKX
+order id. A deterministic `clOrdId` reconciles a lost HTTP response, while a
+concurrent loser never submits another order. Resolved commitments and pending
+commitments older than 15 minutes are rejected. The migration must be applied
+and exercised in the canary; source code alone does not create this guarantee.
+
+The mainnet checker is a **configuration/evidence checker**, not launch
+authorization. Canary/cutover now perform an authenticated Hermes fetch and a
+service-role RPC round trip that proves the claims ledger's RLS/grants and
+atomic insert-update-delete path, but those checks run from the operator
+machine and do not prove Vercel runtime egress, the Sepolia soak, the
+historical stop-breach watcher, the final archive digest/anchor, bounded
+funding or the human Safe ceremony. Production unfreeze requires explicit
+human approval after every release gate is reconciled.
 
 `npm audit --omit=dev` currently reports 11 moderate findings and no high or
 critical production findings. They all trace to old `uuid` versions inside the
@@ -154,6 +188,9 @@ freeze source + artifacts
   → run live deployment verifier
   → update backend environment
   → run read-only smoke tests
+  → disable every X Layer producer and revoke stale access
+  → drain in-flight operations and prove a quiet period
+  → capture/verify the confirmed X Layer archive and anchor its digest
   → enable bounded writes
   → update public website and manifests
   → publish deployment evidence
@@ -167,6 +204,8 @@ Stop the release if any of the following occurs:
 - any contract exceeds its expected size or verification fails;
 - a role, owner, Pyth address or feed ID differs from the manifest;
 - backend writes target more than one chain during cutover;
+- any legacy X Layer writer, deployment, cron or webhook remains capable of
+  submitting after the quiet period begins;
 - public telemetry labels legacy X Layer data as Base data;
 - canary results cannot be reproduced from explorer and Pyth evidence;
 - secrets appear in git status, build output or deployment artifacts;
@@ -182,6 +221,11 @@ failed gate. It does not mean deleting or rewriting on-chain history.
 - [ ] Explorer links point to verified Base contracts.
 - [ ] README and website no longer say mainnet is gated.
 - [ ] X Layer remains labeled legacy/archive.
+- [ ] X Layer producers are disabled, stale secrets/access are revoked,
+      in-flight operations are drained and the quiet period has zero writes.
+- [ ] Final X Layer archive uses a confirmed/final block, is replay-verified,
+      states whether event provenance is complete and has an externally signed
+      or Safe-anchored digest.
 - [ ] API heartbeat reports chain `8453`, native symbol `ETH` and expected block.
 - [ ] Security report includes commit hashes, test totals and known limitations.
 - [ ] GitHub branch and CI are green before production promotion.

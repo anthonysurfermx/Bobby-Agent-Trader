@@ -11,8 +11,18 @@ import { recordAuthHeaders } from './_lib/record-auth.js';
 import { isProtocolCutoverFrozen } from './_lib/protocol-write-safety.js';
 import { enforcePublicRateLimit, isTradingRequest, requireTradingAuth } from './_lib/request-security.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import {
+  acquireTradeExecutionClaim,
+  clientOrderIdForDebateHash,
+  markTradeExecutionFailed,
+  markTradeExecutionSubmitted,
+  tradeExecutionPayloadHash,
+  type TradeExecutionClaim,
+} from './_lib/trade-execution-claims.js';
 
 const OKX_BASE = 'https://www.okx.com';
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
 
 interface OKXCredentials {
   apiKey: string;
@@ -158,6 +168,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     && typeof credentials.passphrase === 'string' && credentials.passphrase.length >= 1,
   );
   const internalCaller = isTradingRequest(req);
+  if (hasUserCreds && params?.precommit) {
+    return res.status(400).json({
+      error: 'User-supplied OKX credentials cannot consume Bobby TrackRecord commitments',
+    });
+  }
 
   // Every action that touches an OKX account is private. Public callers may
   // only request market/leverage metadata. When user credentials are supplied,
@@ -326,6 +341,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const amountUSDT = params?.amount || 50; // USDT margin
     const instId = getInstId(symbol);
 
+    if (!['long', 'short'].includes(direction)) {
+      return res.status(400).json({ ok: false, error: 'Direction must be long or short' });
+    }
+
     try {
       // Step 1: Set leverage (isolated margin, long/short mode)
       await okxRequest('POST', '/api/v5/account/set-leverage', {
@@ -367,18 +386,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Step 5: Confirm the prediction on-chain BEFORE a live order. Paper
       // orders and public user-managed accounts do not write Bobby's production
-      // TrackRecord. Internal callers that own the precommit flow (bobby-cycle)
-      // must explicitly attest confirmation.
+      // TrackRecord. A supplied precommit is re-submitted idempotently to the
+      // recorder endpoint; caller-provided booleans are never proof.
       let precommitData: Record<string, unknown> | null = null;
-      const requiresTrackRecord = tradingMode === 'live' && internalCaller;
-      if (requiresTrackRecord && params?.skipOnchainCommit) {
-        if (params?.precommitConfirmed !== true) {
+      let executionClaim: TradeExecutionClaim | null = null;
+      let existingOrderId: string | null = null;
+      const requiresTrackRecord = tradingMode === 'live' && internalCaller && !hasUserCreds;
+      if (requiresTrackRecord) {
+        const suppliedPrecommit = params?.precommit && typeof params.precommit === 'object'
+          ? params.precommit as Record<string, unknown>
+          : null;
+        if (suppliedPrecommit) {
+          if (
+            String(suppliedPrecommit.symbol || '').toUpperCase() !== String(symbol).toUpperCase()
+            || String(suppliedPrecommit.direction || '').toLowerCase() !== String(direction).toLowerCase()
+          ) {
+            return res.status(409).json({
+              ok: false,
+              error: 'Supplied precommit does not match the requested order',
+            });
+          }
+        }
+        const precommitPayload = suppliedPrecommit || {
+          action: 'commit',
+          threadId: `perp-${symbol}-${randomUUID()}`,
+          symbol,
+          direction,
+          agent: 'cio',
+          conviction: params?.conviction || 7,
+          entryPrice: markPrice,
+          targetPrice: direction === 'long' ? markPrice * 1.05 : markPrice * 0.95,
+          stopPrice: direction === 'long' ? markPrice * 0.97 : markPrice * 1.03,
+        };
+        if (precommitPayload.action !== 'commit') {
           return res.status(409).json({
             ok: false,
-            error: 'Live execution requires a confirmed on-chain precommit',
+            error: 'Live execution requires a valid on-chain precommit payload',
           });
         }
-      } else if (requiresTrackRecord) {
         const selfHost = process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : 'https://bobbyprotocol.xyz';
@@ -390,17 +435,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ...recordAuthHeaders(),
             ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
           },
-          body: JSON.stringify({
-            action: 'commit',
-            threadId: `perp-${symbol}-${randomUUID()}`,
-            symbol,
-            direction,
-            agent: 'cio',
-            conviction: params?.conviction || 7,
-            entryPrice: markPrice,
-            targetPrice: direction === 'long' ? markPrice * 1.05 : markPrice * 0.95,
-            stopPrice: direction === 'long' ? markPrice * 0.97 : markPrice * 1.03,
-          }),
+          body: JSON.stringify(precommitPayload),
         });
         precommitData = await commitRes.json().catch(() => ({})) as Record<string, unknown>;
         if (!commitRes.ok || precommitData.ok !== true ||
@@ -410,19 +445,92 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             error: 'On-chain precommit failed; live order was not submitted',
           });
         }
+
+        const precommitResult = precommitData.data && typeof precommitData.data === 'object'
+          ? precommitData.data as Record<string, unknown>
+          : null;
+        const debateHash = String(precommitResult?.debateHash || '');
+        const clientOrderId = clientOrderIdForDebateHash(debateHash);
+        const payloadHash = tradeExecutionPayloadHash({
+          chainId: DEFAULT_CHAIN.id,
+          debateHash: debateHash.toLowerCase(),
+          instId,
+          direction,
+          leverage: String(leverage),
+          size: String(sizeRounded),
+          precommit: precommitPayload,
+        });
+        const claimResult = await acquireTradeExecutionClaim({
+          supabaseUrl: SUPABASE_URL,
+          serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+          debateHash,
+          chainId: DEFAULT_CHAIN.id,
+          symbol: String(symbol),
+          direction: direction === 'short' ? 'short' : 'long',
+          payloadHash,
+          clientOrderId,
+        });
+        executionClaim = claimResult.claim;
+
+        if (!claimResult.acquired) {
+          if (executionClaim.status === 'submitted' && executionClaim.okxOrderId) {
+            existingOrderId = executionClaim.okxOrderId;
+          } else if (executionClaim.status === 'claimed') {
+            // The winning request may have reached OKX before losing its HTTP
+            // response or before persisting ordId. Reconcile by deterministic
+            // clOrdId, but never let a losing/concurrent request place another
+            // order. An unsubmitted orphan remains fail-closed for operator
+            // review instead of silently reusing the commitment.
+            const queryPath = `/api/v5/trade/order?instId=${encodeURIComponent(instId)}`
+              + `&clOrdId=${encodeURIComponent(executionClaim.clientOrderId)}`;
+            const lookup = await okxRequest('GET', queryPath, null, creds);
+            const reconciledOrderId = lookup.code === '0' ? String(lookup.data?.[0]?.ordId || '') : '';
+            if (!reconciledOrderId) {
+              return res.status(409).json({
+                ok: false,
+                error: 'This on-chain commitment is already claimed by another order attempt',
+                debateHash,
+              });
+            }
+            executionClaim = await markTradeExecutionSubmitted({
+              supabaseUrl: SUPABASE_URL,
+              serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+              debateHash,
+              okxOrderId: reconciledOrderId,
+            });
+            existingOrderId = reconciledOrderId;
+          } else {
+            return res.status(409).json({
+              ok: false,
+              error: 'This on-chain commitment was already consumed by a failed order attempt',
+              debateHash,
+            });
+          }
+        }
       }
 
       // Step 6: Place market order only after the live precommit gate.
-      const orderResult = await okxRequest('POST', '/api/v5/trade/order', {
-        instId,
-        tdMode: 'isolated',
-        side: direction === 'long' ? 'buy' : 'sell',
-        posSide: direction === 'long' ? 'long' : 'short',
-        ordType: 'market',
-        sz: String(sizeRounded),
-      }, creds);
+      const orderResult = existingOrderId
+        ? { code: '0', data: [{ ordId: existingOrderId }], idempotent: true }
+        : await okxRequest('POST', '/api/v5/trade/order', {
+          instId,
+          tdMode: 'isolated',
+          side: direction === 'long' ? 'buy' : 'sell',
+          posSide: direction === 'long' ? 'long' : 'short',
+          ordType: 'market',
+          sz: String(sizeRounded),
+          ...(executionClaim ? { clOrdId: executionClaim.clientOrderId } : {}),
+        }, creds);
 
       if (orderResult.code !== '0') {
+        if (executionClaim) {
+          await markTradeExecutionFailed({
+            supabaseUrl: SUPABASE_URL,
+            serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+            debateHash: executionClaim.debateHash,
+            error: String(orderResult.data?.[0]?.sMsg || orderResult.msg || 'Order failed'),
+          }).catch((error) => console.error('[Perps] Could not persist failed execution claim:', error));
+        }
         return res.status(400).json({
           ok: false,
           error: orderResult.data?.[0]?.sMsg || orderResult.msg || 'Order failed',
@@ -431,6 +539,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const orderId = orderResult.data?.[0]?.ordId;
+      if (executionClaim && !existingOrderId) {
+        try {
+          executionClaim = await markTradeExecutionSubmitted({
+            supabaseUrl: SUPABASE_URL,
+            serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY,
+            debateHash: executionClaim.debateHash,
+            okxOrderId: String(orderId || ''),
+          });
+        } catch (error) {
+          // The permanent claim still blocks replay, and the deterministic
+          // clOrdId lets the next call reconcile the accepted OKX order. Do not
+          // hide a successful market order from the caller: it must continue
+          // immediately to attach TP/SL protection.
+          console.error('[Perps] CRITICAL: order accepted but claim reconciliation is pending:', error);
+        }
+      }
 
       return res.status(200).json({
         ok: true,
@@ -443,6 +567,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         size: `${sizeRounded} ${symbol}`,
         markPrice,
         orderId,
+        idempotent: Boolean(existingOrderId),
         instId,
         mode: tradingMode,
         simulated,

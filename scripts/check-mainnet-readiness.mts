@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { Contract, Interface, JsonRpcProvider, Wallet, getAddress, id, keccak256 } from 'ethers';
+import { fetchHermesPriceUpdate } from '../api/_lib/track-record-v2.js';
 
 type Phase = 'predeploy' | 'postdeploy' | 'canary' | 'cutover';
 
@@ -15,6 +16,15 @@ const passed: string[] = [];
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const OFFICIAL_BASE_PYTHS = [
+  '0xbc16aee60f64864882bc6c4e428e148fc0e272f5',
+  '0x8250f4af4b972684f7b336503e2d6dfedeb1487a',
+] as const;
+const OFFICIAL_BASE_FEEDS: Record<string, string> = {
+  BTC: '0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43',
+  ETH: '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace',
+  SOL: '0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d',
+};
 
 function pass(label: string) {
   passed.push(label);
@@ -354,6 +364,16 @@ if (manifest) {
     fail('manifest quorum.threshold does not match RESOLVER_THRESHOLD');
   } else pass('resolver threshold matches manifest');
 
+  const manifestPyths = Array.isArray(manifest.oracle?.pyths)
+    ? manifest.oracle.pyths.map((value: unknown) => String(value).toLowerCase())
+    : [];
+  if (JSON.stringify(manifestPyths) !== JSON.stringify(OFFICIAL_BASE_PYTHS)) {
+    fail('manifest oracle.pyths does not equal the pinned official Base set in canonical order');
+  } else pass('manifest pins the official upgraded Base Pyth and current fallback');
+  if (String(manifest.oracle?.activePyth || '').toLowerCase() !== OFFICIAL_BASE_PYTHS[0]) {
+    fail('manifest active Pyth is not the pinned official upgraded Base contract');
+  } else pass('manifest active Pyth is the official upgraded Base contract');
+
   const receiptEvidence = Array.isArray(manifest.transactions) ? manifest.transactions : [];
   if (receiptEvidence.length !== 15) {
     fail('manifest must contain exactly 15 receipts (7 creates, scorer call, 7 ownership handoffs)');
@@ -457,6 +477,56 @@ if (phase === 'canary' || phase === 'cutover') {
       fail('BASE_RECORDER_KEY is not a valid private key');
     }
   }
+
+  requireEnv('PYTH_HERMES_API_KEY');
+  const supabaseUrl = env('SUPABASE_URL') || env('VITE_SUPABASE_URL');
+  const supabaseServiceKey = env('SUPABASE_SERVICE_ROLE_KEY') || env('SUPABASE_SERVICE_KEY');
+  if (!supabaseUrl) fail('SUPABASE_URL or VITE_SUPABASE_URL is required for the execution-claim preflight');
+  if (!supabaseServiceKey) fail('SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_KEY is required for the execution-claim preflight');
+
+  if (env('PYTH_HERMES_API_KEY')) {
+    try {
+      const update = await fetchHermesPriceUpdate({
+        feedId: OFFICIAL_BASE_FEEDS.BTC,
+        kind: 'latest',
+        requireApiKey: true,
+        hermesUrl: process.env.PYTH_HERMES_URL || 'https://pyth.dourolabs.app/hermes',
+      });
+      if (update.feedId.toLowerCase() !== OFFICIAL_BASE_FEEDS.BTC || !update.updateData) {
+        fail('Hermes preflight returned unexpected BTC evidence');
+      } else pass('authenticated Hermes preflight returned canonical BTC evidence');
+    } catch (error) {
+      fail(`authenticated Hermes preflight failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (supabaseUrl && supabaseServiceKey) {
+    try {
+      const url = new URL('/rest/v1/rpc/verify_trade_execution_claims_gate', supabaseUrl);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: supabaseServiceKey,
+          Authorization: `Bearer ${supabaseServiceKey}`,
+        },
+        body: '{}',
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!response.ok) fail(`trade_execution_claims preflight failed (${response.status})`);
+      else {
+        const rows = await response.json() as Array<Record<string, unknown>>;
+        const result = rows[0];
+        if (!result || result.rls_enabled !== true || result.anon_denied !== true
+          || result.authenticated_denied !== true || result.service_privileges !== true
+          || result.round_trip !== true) {
+          fail('trade_execution_claims grants, RLS or transactional round trip failed');
+        } else pass('trade_execution_claims grants, RLS and insert/update/delete round trip passed');
+      }
+    } catch (error) {
+      fail(`trade_execution_claims preflight failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 
 if (phase === 'cutover') {
@@ -538,6 +608,23 @@ if (
       else pass(`${manifestKey} is live, Safe-owned and has no pending owner`);
     }
 
+    if (phase === 'canary' || phase === 'cutover') {
+      const pausableKeys = [
+        'trackRecord',
+        'convictionOracle',
+        'agentEconomyV2',
+        'adversarialBounties',
+        'hardnessRegistry',
+        'intentEscrow',
+      ];
+      for (const manifestKey of pausableKeys) {
+        const contractAddress = String(manifest.addresses?.[manifestKey] || '');
+        const pausable = new Contract(contractAddress, ['function paused() view returns (bool)'], provider);
+        if (await pausable.paused() as boolean) fail(`${manifestKey} is paused`);
+        else pass(`${manifestKey} is unpaused`);
+      }
+    }
+
     const hardness = new Contract(String(manifest.addresses?.hardnessRegistry || ''), [
       'function hardnessScorer() view returns (address)',
     ], provider);
@@ -552,13 +639,21 @@ if (
       'function activePyth() view returns (address)',
       'function approvedPyth(address) view returns (bool)',
       'function pythActivatableAt(address) view returns (uint64)',
+      'function feedOf(bytes32) view returns (bytes32)',
+      'function commitIndex(bytes32) view returns (uint256)',
+      'function tradeIndex(bytes32) view returns (uint256)',
+      'function getCommitment(uint256) view returns (tuple(bytes32 debateHash,uint96 entryPrice,uint96 targetPrice,uint64 committedAt,uint96 stopPrice,address recorder,uint64 minResolveAt,uint8 agent,uint8 conviction,bool resolved,uint8 mode,uint16 entryWindowSec,uint16 exitWindowSec,uint24 maxExitLagSec,uint24 challengeWindowSec,uint16 entryTolBps,uint16 exitTolBps,uint16 confMaxBps,tuple(bytes32 feedId,int64 price,uint64 conf,int32 expo,uint64 publishTime) entryEvidence,string symbol))',
+      'function getTrade(uint256) view returns (tuple(bytes32 debateHash,uint96 entryPrice,uint96 exitPrice,uint64 committedAt,uint64 resolvedAt,address recorder,uint8 agent,uint8 conviction,uint8 result,uint8 mode,int256 pnlBps,uint64 exitAt,uint64 challengeDeadline,bool stopChallenged,tuple(bytes32 feedId,int64 price,uint64 conf,int32 expo,uint64 publishTime) entryEvidence,tuple(bytes32 feedId,int64 price,uint64 conf,int32 expo,uint64 publishTime) exitEvidence,string symbol))',
     ], provider);
-    const [liveBobby, liveParams, liveActivePyth, latestBlock] = await Promise.all([
+    const [liveBobby, liveParams, liveActivePyth, latestBlockState] = await Promise.all([
       trackRecord.bobby() as Promise<string>,
       trackRecord.params() as Promise<readonly bigint[]>,
       trackRecord.activePyth() as Promise<string>,
-      provider.getBlockNumber(),
+      provider.getBlock('latest'),
     ]);
+    if (!latestBlockState) throw new Error('could not read latest Base block');
+    const latestBlock = latestBlockState.number;
+    const latestBlockTimestamp = BigInt(latestBlockState.timestamp);
     if (liveBobby.toLowerCase() !== env('BASE_RECORDER_ADDRESS').toLowerCase()) {
       fail('live TrackRecord bobby does not equal BASE_RECORDER_ADDRESS');
     } else pass('live TrackRecord authorizes the reviewed recorder');
@@ -569,11 +664,10 @@ if (
         fail(`live TrackRecord params.${key} does not match manifest`);
       } else pass(`live TrackRecord params.${key} matches manifest`);
     }
-    const manifestPyths = Array.isArray(manifest.oracle?.pyths) ? manifest.oracle.pyths.map(String) : [];
-    if (!manifestPyths.length || liveActivePyth.toLowerCase() !== String(manifest.oracle?.activePyth || '').toLowerCase()) {
-      fail('live active Pyth does not match the finalized manifest');
-    } else pass('live active Pyth matches the finalized manifest');
-    for (const pyth of manifestPyths) {
+    if (liveActivePyth.toLowerCase() !== OFFICIAL_BASE_PYTHS[0]) {
+      fail('live active Pyth is not the pinned official upgraded Base contract');
+    } else pass('live active Pyth is the official upgraded Base contract');
+    for (const pyth of OFFICIAL_BASE_PYTHS) {
       const [approved, activatableAt, code] = await Promise.all([
         trackRecord.approvedPyth(pyth) as Promise<boolean>,
         trackRecord.pythActivatableAt(pyth) as Promise<bigint>,
@@ -581,8 +675,13 @@ if (
       ]);
       if (code === '0x') fail(`canonical Pyth ${pyth} has no live code`);
       else if (!approved) fail(`canonical Pyth ${pyth} is not approved`);
-      else if (activatableAt > BigInt(Math.floor(Date.now() / 1000))) fail(`canonical Pyth ${pyth} is still timelocked`);
+      else if (activatableAt > latestBlockTimestamp) fail(`canonical Pyth ${pyth} is still timelocked`);
       else pass(`canonical Pyth ${pyth} is code-bearing, approved and immediately activatable`);
+    }
+    for (const [symbol, officialFeed] of Object.entries(OFFICIAL_BASE_FEEDS)) {
+      const liveFeed = String(await trackRecord.feedOf(id(symbol))).toLowerCase();
+      if (liveFeed !== officialFeed) fail(`live ${symbol} feed is not the pinned official Pyth feed id`);
+      else pass(`live ${symbol} feed matches the pinned official Pyth feed id`);
     }
 
     for (const receipt of manifest.transactions as Array<Record<string, unknown>>) {
@@ -600,11 +699,24 @@ if (
         'function commitTrade(bytes32,string,uint8,uint8,uint96,uint96,uint96,uint8,bytes[])',
         'function resolveTrade(bytes32,int256,uint8,uint96,uint64,bytes[])',
       ]);
+      const canaryConfigInterface = new Interface([
+        'event FeedSet(bytes32 indexed symbolHash,string symbol,bytes32 feedId)',
+        'event PythApproved(address indexed pyth,uint64 activatableAt)',
+        'event PythRevoked(address indexed pyth)',
+        'event PythActivated(address indexed pyth)',
+      ]);
+      const configTopics = [
+        'FeedSet',
+        'PythApproved',
+        'PythRevoked',
+        'PythActivated',
+      ].map((name) => canaryConfigInterface.getEvent(name)!.topicHash);
       const canaryRows = [
         { label: 'commit', hash: env('BASE_CANARY_COMMIT_TX_HASH'), selector: canaryInterface.getFunction('commitTrade')!.selector },
         { label: 'resolve', hash: env('BASE_CANARY_RESOLVE_TX_HASH'), selector: canaryInterface.getFunction('resolveTrade')!.selector },
       ];
       let debateHash = '';
+      let canarySymbol = '';
       let previousBlock = 0;
       for (const row of canaryRows) {
         const [receipt, transaction] = await Promise.all([
@@ -617,12 +729,42 @@ if (
         }
         const parsed = canaryInterface.parseTransaction({ data: transaction.data });
         const rowDebateHash = String(parsed?.args?.[0] || '').toLowerCase();
+        const evidenceIndex = row.label === 'commit' ? 8 : 5;
+        const evidence = parsed?.args?.[evidenceIndex] as readonly string[] | undefined;
+        const isVerifiedCommit = row.label !== 'commit' || Number(parsed?.args?.[7]) === 1;
+        const parsedSymbol = row.label === 'commit' ? String(parsed?.args?.[1] || '').toUpperCase() : '';
+        const isCanonicalSymbol = row.label !== 'commit' || ['BTC', 'ETH', 'SOL'].includes(parsedSymbol);
+        const effectiveSymbol = parsedSymbol || canarySymbol;
+        const [historicalPyth, historicalFeed, sameBlockConfigLogs] = effectiveSymbol
+          ? await Promise.all([
+            trackRecord.activePyth({ blockTag: receipt.blockNumber }) as Promise<string>,
+            trackRecord.feedOf(id(effectiveSymbol), { blockTag: receipt.blockNumber }) as Promise<string>,
+            provider.getLogs({
+              address: String(manifest.addresses?.trackRecord),
+              fromBlock: receipt.blockNumber,
+              toBlock: receipt.blockNumber,
+              topics: [configTopics],
+            }),
+          ])
+          : ['', '', []];
         if (
           transaction.to?.toLowerCase() !== String(manifest.addresses?.trackRecord).toLowerCase() ||
           transaction.from.toLowerCase() !== env('BASE_RECORDER_ADDRESS').toLowerCase() ||
           transaction.data.slice(0, 10).toLowerCase() !== row.selector.toLowerCase()
         ) {
           fail(`Base canary ${row.label} is not the reviewed recorder call to TrackRecordV2`);
+        } else if (!isVerifiedCommit) {
+          fail('Base canary commit is not VERIFIED mode');
+        } else if (!isCanonicalSymbol) {
+          fail('Base canary commit symbol is not a canonical BTC/ETH/SOL feed');
+        } else if (!evidence || evidence.length === 0) {
+          fail(`Base canary ${row.label} does not carry Pyth update evidence`);
+        } else if (sameBlockConfigLogs.length !== 0) {
+          fail(`Base canary ${row.label} shares a block with Pyth/feed configuration changes`);
+        } else if (historicalPyth.toLowerCase() !== OFFICIAL_BASE_PYTHS[0]) {
+          fail(`Base canary ${row.label} did not execute against the official upgraded Pyth contract`);
+        } else if (historicalFeed.toLowerCase() !== OFFICIAL_BASE_FEEDS[effectiveSymbol]) {
+          fail(`Base canary ${row.label} did not use the official ${effectiveSymbol} feed id`);
         } else if (latestBlock - receipt.blockNumber < 12) {
           fail(`Base canary ${row.label} has fewer than 12 confirmations`);
         } else if (previousBlock && receipt.blockNumber < previousBlock) {
@@ -631,8 +773,47 @@ if (
           fail('Base canary commit and resolve use different debate hashes');
         } else {
           debateHash = rowDebateHash;
+          if (parsedSymbol) canarySymbol = parsedSymbol;
           previousBlock = receipt.blockNumber;
           pass(`Base canary ${row.label} receipt is canonical and confirmed`);
+        }
+      }
+
+      if (BYTES32_RE.test(debateHash) && canarySymbol) {
+        const [commitPosition, tradePosition, configuredFeed] = await Promise.all([
+          trackRecord.commitIndex(debateHash) as Promise<bigint>,
+          trackRecord.tradeIndex(debateHash) as Promise<bigint>,
+          trackRecord.feedOf(id(canarySymbol)) as Promise<string>,
+        ]);
+        if (commitPosition === 0n || tradePosition === 0n) {
+          fail('Base canary is missing its stored commitment or trade');
+        } else {
+          const [storedCommitment, storedTrade] = await Promise.all([
+            trackRecord.getCommitment(commitPosition - 1n),
+            trackRecord.getTrade(tradePosition - 1n),
+          ]);
+          const commitmentFeed = String(storedCommitment.entryEvidence.feedId).toLowerCase();
+          const tradeEntryFeed = String(storedTrade.entryEvidence.feedId).toLowerCase();
+          const tradeExitFeed = String(storedTrade.exitEvidence.feedId).toLowerCase();
+          const expectedFeed = OFFICIAL_BASE_FEEDS[canarySymbol];
+          if (Number(storedCommitment.mode) !== 1 || Number(storedTrade.mode) !== 1) {
+            fail('Base canary stored lifecycle is not VERIFIED mode');
+          } else if (!storedCommitment.resolved) {
+            fail('Base canary stored commitment is not resolved');
+          } else if (String(storedCommitment.symbol) !== canarySymbol || String(storedTrade.symbol) !== canarySymbol) {
+            fail('Base canary stored symbol does not match transaction calldata');
+          } else if (!expectedFeed
+            || String(configuredFeed).toLowerCase() !== expectedFeed
+            || commitmentFeed !== expectedFeed
+            || tradeEntryFeed !== expectedFeed
+            || tradeExitFeed !== expectedFeed
+            || BigInt(storedCommitment.entryEvidence.publishTime) === 0n
+            || BigInt(storedTrade.entryEvidence.publishTime) === 0n
+            || BigInt(storedTrade.exitEvidence.publishTime) === 0n) {
+            fail('Base canary stored oracle evidence does not match the configured Pyth feed');
+          } else {
+            pass('Base canary stored VERIFIED lifecycle carries canonical Pyth evidence');
+          }
         }
       }
     }

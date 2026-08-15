@@ -9,6 +9,7 @@ import {
   internalAuthHeaders,
   isInternalRequest,
   protocolAutomationAuthHeaders,
+  requireLiveCycleAuth,
   requireProtocolAutomationAuth,
   requireInternalAuth,
   requireTradingAuth,
@@ -122,6 +123,16 @@ try {
     const { response, state } = responseRecorder();
     assert.equal(requireTradingAuth(internalRequest('trade-only-secret'), response), true);
     assert.equal(state.status, undefined);
+  }
+  for (const secret of ['trade-only-secret', 'cron-secret']) {
+    const { response, state } = responseRecorder();
+    assert.equal(requireLiveCycleAuth(internalRequest(secret), response), true);
+    assert.equal(state.status, undefined, `${secret} must be an explicit live-cycle capability`);
+  }
+  for (const secret of ['dedicated-internal-secret', 'cycle-secret']) {
+    const { response, state } = responseRecorder();
+    assert.equal(requireLiveCycleAuth(internalRequest(secret), response), false);
+    assert.equal(state.status, 401, `${secret} must not escalate into live trading`);
   }
   {
     const { response, state } = responseRecorder();

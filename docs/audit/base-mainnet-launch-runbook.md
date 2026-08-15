@@ -34,6 +34,13 @@ blocked until the TrackRecordV2 audit closes and the final artifact is merged.
    `BASE_RECORDER_KEY`. Never copy `BOBBY_RECORDER_KEY` into either. Remove the
    legacy key from Preview/Development and keep
    `ALLOW_NON_PROD_XLAYER_WRITES` unset or false.
+8. Before any Base write, apply and verify the reviewed forward migrations
+   `supabase/migrations/202608150001_chain_provenance_hardening.sql` and
+   `supabase/migrations/202608150002_trade_execution_claims.sql`. The former records
+   its one-time pre-cutover boundary and prevents old binaries from fabricating
+   Base provenance; the latter must deny anon/authenticated access and produce
+   exactly one winner for concurrent claims on one `debate_hash`. Do not enable
+   live trading if either migration or its preflight is absent.
 
 ## Saturday — exact Sepolia rehearsal
 
@@ -92,25 +99,44 @@ blocked until the TrackRecordV2 audit closes and the final artifact is merged.
    npm run check:mainnet:postdeploy
    ```
 
-9. Deploy read-only production first: `PROTOCOL_CHAIN=base`, writes disabled.
-   Smoke-test public reads, explorer links and balances.
-10. Arm the final deployment using all three values:
-    `PROTOCOL_CHAIN=base`, `PROTOCOL_WRITES_ENABLED=true`,
-    `PROTOCOL_WRITE_CHAIN_ID=8453`, plus `BASE_RECORDER_KEY`.
-11. Run the cutover gate before deploying/promoting:
+9. Deploy read-only production first with `PROTOCOL_CHAIN=base`,
+   `PROTOCOL_WRITES_ENABLED=false`, `PROTOCOL_WRITE_CHAIN_ID=8453` and
+   `PROTOCOL_CUTOVER_FREEZE=true`. Smoke-test public reads, explorer links and
+   balances.
+10. Run the canary-readiness gate against that frozen production state:
 
     ```bash
-   npm run check:mainnet:cutover
-   ```
+    npm run check:mainnet:canary
+    ```
+
+    A pass authorizes only the bounded direct on-chain canary. It does not
+    authorize automatic backend writers or production unfreeze. The gate also
+    performs authenticated Hermes and service-role execution-ledger preflights;
+    repeat both from the deployed frozen runtime before the human GO.
+11. With backend writers still disabled and frozen, submit one reviewed direct
+    `commitTrade` from the Base recorder, wait the protocol interval, then
+    submit its matching `resolveTrade`. Verify both receipts, events, public
+    readback and at least 12 confirmations. Record their hashes as
+    `BASE_CANARY_COMMIT_TX_HASH` and `BASE_CANARY_RESOLVE_TX_HASH`.
+12. Prepare, but do not promote, the exact target configuration:
+    `PROTOCOL_CHAIN=base`, `PROTOCOL_WRITES_ENABLED=true`,
+    `PROTOCOL_WRITE_CHAIN_ID=8453`, `PROTOCOL_CUTOVER_FREEZE=false`, plus the
+    dedicated `BASE_RECORDER_KEY` and both confirmed canary hashes.
+13. Run the cutover gate against that target environment before promotion:
+
+    ```bash
+    npm run check:mainnet:cutover
+    ```
 
    This gate independently reads Base mainnet and rechecks the pinned Safe
    codehash/singleton, exact 2-of-3 owner set, modules, guard, contract runtime
-   code, accepted ownership and cleared `pendingOwner` values.
+   code, accepted ownership, cleared `pendingOwner` values and the canonical
+   canary transactions. Its GO is configuration evidence, not launch approval.
 
-12. Send one bounded canary write and verify its receipt, emitted events and API
-    readback before enabling cron-driven writes.
-13. Only after the canary and monitoring checks pass, deploy
-    `PROTOCOL_CUTOVER_FREEZE=false` to resume live Bobby cycles.
+14. After the human GO reconciles every release gate, promote that exact target
+    configuration once. Verify a single live-cycle receipt before re-enabling
+    cron schedules, then monitor Hermes errors, recorder nonces, balances and
+    stop breaches continuously.
 
 ## Immediate rollback
 
@@ -139,5 +165,10 @@ blocked until the TrackRecordV2 audit closes and the final artifact is merged.
 - Base recorder key exists in a preview environment.
 - `PROTOCOL_WRITE_CHAIN_ID` is absent or differs from 8453.
 - Any legacy X Layer generator is able to run while `PROTOCOL_CHAIN=base`.
-- `PROTOCOL_CUTOVER_FREEZE` is not true during deploy/cutover.
+- The one-time `trade_execution_claims` ledger is absent, publicly accessible
+  or fails its concurrent-claim regression.
+- `PROTOCOL_CUTOVER_FREEZE` is not true during deploy, ownership handoff,
+  read-only smoke tests or the direct canary.
+- The final target configuration fails `check:mainnet:cutover`, or it is
+  promoted before a separate human GO.
 - Canary has less than 24 hours on the final bytecode.

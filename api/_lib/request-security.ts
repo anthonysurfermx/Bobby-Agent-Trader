@@ -95,6 +95,26 @@ export const requireProtocolAutomationAuth = (req: VercelRequest, res: VercelRes
 export const protocolAutomationAuthHeaders = () => capabilityAuthHeaders('PROTOCOL_AUTOMATION_SECRET');
 
 /**
+ * A live cycle may be invoked by the dedicated trading capability or by
+ * Vercel's dedicated cron capability. Generic internal/cycle secrets are
+ * intentionally excluded: they must never acquire trading power indirectly.
+ */
+export function requireLiveCycleAuth(req: VercelRequest, res: VercelResponse): boolean {
+  const configured = [process.env.TRADING_API_SECRET, process.env.CRON_SECRET]
+    .filter((value): value is string => Boolean(value));
+  if (configured.length === 0) {
+    res.status(503).json({ error: 'Live cycle authentication not configured' });
+    return false;
+  }
+  const provided = providedInternalSecret(req);
+  if (!provided || !configured.some((expected) => secretsMatch(provided, expected))) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return false;
+  }
+  return true;
+}
+
+/**
  * Layered public rate limit: a fast per-instance limit plus the existing
  * Supabase-backed cross-instance counter. The local limiter still protects a
  * warm function when the persistent store is unavailable.
