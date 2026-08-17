@@ -76,6 +76,10 @@ requireEnv('HARDNESS_SCORER_ADDRESS', validAddress);
 requireEnv('XLAYER_RECORD_SECRET');
 requireEnv('TRADING_API_SECRET');
 requireEnv('PROTOCOL_AUTOMATION_SECRET');
+// G5: Hermes went key-required on 2026-08-18. Without it the V2 recorder
+// cannot fetch signed updates, so every VERIFIED commit/resolve fails — the
+// deploy would land a contract the backend cannot feed. Hard NO-GO.
+requireEnv('PYTH_HERMES_API_KEY');
 if (env('PROTOCOL_CUTOVER_FREEZE') !== 'true') {
   fail('PROTOCOL_CUTOVER_FREEZE must equal true until the launch canary passes');
 } else {
@@ -388,6 +392,7 @@ if (phase === 'cutover') {
   requireEnv('XLAYER_RECORD_SECRET');
   requireEnv('TRADING_API_SECRET');
   requireEnv('PROTOCOL_AUTOMATION_SECRET');
+  requireEnv('PYTH_HERMES_API_KEY');
   if (env('BASE_RECORDER_KEY') && env('BASE_RECORDER_ADDRESS')) {
     try {
       if (new Wallet(env('BASE_RECORDER_KEY')).address.toLowerCase() !== env('BASE_RECORDER_ADDRESS').toLowerCase()) {

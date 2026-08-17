@@ -209,6 +209,28 @@ assert.match(readinessSource, /OWNER_SAFE_OWNERS/);
 assert.match(readinessSource, /hardnessScorer\(\)/);
 assert.match(readinessSource, /receipt\.inputHash/);
 
+// G5 gate — EXECUTION test, not a source grep: run the predeploy checker with
+// PYTH_HERMES_API_KEY absent and assert it is a hard NO-GO, then with it set
+// and assert that specific blocker clears. Without the key the V2 recorder
+// cannot fetch signed Hermes updates, so a deploy would be unfeedable.
+{
+  const { spawnSync } = await import('node:child_process');
+  const runChecker = (extraEnv: Record<string, string | undefined>) =>
+    spawnSync('npx', ['tsx', 'scripts/check-mainnet-readiness.mts', '--phase=predeploy'], {
+      encoding: 'utf8',
+      env: { ...process.env, PYTH_HERMES_API_KEY: undefined, ...extraEnv },
+    });
+
+  const withoutKey = runChecker({});
+  assert.notEqual(withoutKey.status, 0, 'predeploy must exit non-zero without the Hermes key');
+  assert.match(withoutKey.stdout, /PYTH_HERMES_API_KEY is missing/);
+  assert.match(withoutKey.stdout, /NO-GO/);
+
+  const withKey = runChecker({ PYTH_HERMES_API_KEY: 'test-key-not-real' });
+  assert.doesNotMatch(withKey.stdout, /PYTH_HERMES_API_KEY is missing/);
+  assert.match(withKey.stdout, /PYTH_HERMES_API_KEY configured/);
+}
+
 const finalizerSource = readFileSync('scripts/finalize-base-manifest.mts', 'utf8');
 assert.match(finalizerSource, /eth_getTransactionByHash/);
 assert.match(finalizerSource, /live calldata does not match/);
