@@ -8,8 +8,15 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
-import { DEFAULT_CHAIN, txUrl, addressUrl } from './_lib/chains.js';
+import { DEFAULT_CHAIN, XLAYER_CHAIN_ID, txUrl, addressUrl } from './_lib/chains.js';
 import { requireRecordAuth } from './_lib/record-auth.js';
+import { resolvePriceMode, PriceMode } from './_lib/trackrecord-v2.js';
+import { commitV2, resolveV2, readStatsV2 } from './_lib/trackrecord-v2-recorder.js';
+
+// V2 (oracle-verified, Pyth) runs on Base/Base-Sepolia; v1 (attested-only)
+// stays on X Layer. With PROTOCOL_CHAIN unset this is false and NOTHING in the
+// V2 path executes — production keeps the exact v1 behavior until the flip.
+const IS_V2_CHAIN = DEFAULT_CHAIN.id !== XLAYER_CHAIN_ID;
 
 // Chain-aware since the Sepolia canary: RPC and addresses follow PROTOCOL_CHAIN.
 // Legacy env vars remain as fallback for the X Layer production deployment.
@@ -87,6 +94,76 @@ function toDebateHash(threadId: string): string {
   return ethers.keccak256(ethers.toUtf8Bytes(threadId));
 }
 
+/**
+ * Non-blocking economy fee + oracle publish, used by the V2 commit path. These
+ * two contracts keep their v1 ABIs on Base (only TrackRecord became V2), so
+ * the semantics mirror the inline v1 code exactly. Deliberately duplicated
+ * rather than refactored out of the v1 path: v1 stays byte-identical until the
+ * cutover deletes it, so a bug here can never leak into X Layer production.
+ */
+async function broadcastSideEffects(p: {
+  debateHash: string;
+  symbol: string;
+  direction: string;
+  conviction: number;
+  agent: number;
+  entryPrice: number;
+  targetPrice: number;
+  stopPrice: number;
+}, startNonce?: number): Promise<{ economyTxHash: string | null; oracleTxHash: string | null }> {
+  let economyTxHash: string | null = null;
+  let oracleTxHash: string | null = null;
+  if (!RECORDER_KEY || (!ECONOMY_ADDRESS && !ORACLE_ADDRESS)) return { economyTxHash, oracleTxHash };
+
+  const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+  const wallet = new ethers.Wallet(RECORDER_KEY, provider);
+  // Prefer the caller's explicit chain (commit nonce + 1): re-reading 'pending'
+  // races the just-broadcast commit tx and dropped the fee on canary-002.
+  let nonce = startNonce ?? await provider.getTransactionCount(wallet.address, 'pending');
+
+  if (ECONOMY_ADDRESS) {
+    try {
+      const economyIface = new ethers.Interface(ECONOMY_ABI);
+      const data = economyIface.encodeFunctionData('payDebateFee', [p.debateHash]);
+      const economyContract = new ethers.Contract(ECONOMY_ADDRESS, ECONOMY_ABI, provider);
+      const feePerAgent = (await economyContract.debateFeePerAgent()) as bigint;
+      const gas = await wallet.estimateGas({ to: ECONOMY_ADDRESS, data, value: feePerAgent * 2n });
+      const tx = await wallet.sendTransaction({
+        to: ECONOMY_ADDRESS, data, value: feePerAgent * 2n,
+        gasLimit: (gas * 13n) / 10n, nonce: nonce++,
+      });
+      economyTxHash = tx.hash;
+      console.log(`[${DEFAULT_CHAIN.name}] Debate fee paid: ${tx.hash}`);
+    } catch (err: any) {
+      console.warn(`[${DEFAULT_CHAIN.name}] Economy payment failed (non-critical):`, err.message);
+    }
+  }
+
+  if (ORACLE_ADDRESS) {
+    try {
+      const oracleIface = new ethers.Interface(ORACLE_ABI);
+      const dir = DIRECTION_MAP[p.direction.toLowerCase()] ?? 0;
+      const data = oracleIface.encodeFunctionData('publishSignal', [{
+        symbol: p.symbol, direction: dir, conviction: p.conviction, agent: p.agent,
+        entryPrice: BigInt(Math.round(p.entryPrice * 1e8)),
+        targetPrice: BigInt(Math.round(p.targetPrice * 1e8)),
+        stopPrice: BigInt(Math.round(p.stopPrice * 1e8)),
+        debateHash: p.debateHash, ttl: 86400n, // 24h
+      }]);
+      const gas = await wallet.estimateGas({ to: ORACLE_ADDRESS, data });
+      const tx = await wallet.sendTransaction({
+        to: ORACLE_ADDRESS, data, gasLimit: (gas * 13n) / 10n, nonce: nonce++,
+      });
+      oracleTxHash = tx.hash;
+      console.log(`[${DEFAULT_CHAIN.name}] Oracle published: ${tx.hash}`);
+    } catch (err: any) {
+      console.warn(`[${DEFAULT_CHAIN.name}] Oracle publish failed (non-critical):`, err.message);
+    }
+  }
+
+  return { economyTxHash, oracleTxHash };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // ─── GET: Read on-chain stats ───
   if (req.method === 'GET') {
@@ -94,9 +171,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         ok: true,
         onchain: false,
-        message: 'Contract not deployed yet. Deploy BobbyTrackRecord.sol to X Layer.',
-        abi: 'commit-reveal (Audited v3)',
+        message: `Contract not deployed yet on ${DEFAULT_CHAIN.name}.`,
+        abi: IS_V2_CHAIN ? 'V2 oracle-verified (Pyth)' : 'commit-reveal (Audited v3)',
       });
+    }
+
+    // V2 reader: split ledgers, no combined win rate (D-1). The v1 selectors
+    // (getWinRate & friends) do not exist on V2 and would revert.
+    if (IS_V2_CHAIN) {
+      try {
+        const stats = await readStatsV2(DEFAULT_CHAIN);
+        return res.status(200).json({
+          ok: true,
+          onchain: true,
+          contracts: {
+            trackRecord: CONTRACT_ADDRESS,
+            convictionOracle: ORACLE_ADDRESS,
+            agentEconomy: ECONOMY_ADDRESS,
+          },
+          chain: `${DEFAULT_CHAIN.name} (${DEFAULT_CHAIN.id})`,
+          explorer: addressUrl(CONTRACT_ADDRESS),
+          version: 'V2 — oracle-verified track record (entry+exit Pyth)',
+          stats,
+        });
+      } catch (error) {
+        console.error('[XLayerRecord] V2 stats read failed:', error);
+        return res.status(500).json({ ok: false, error: 'Failed to read V2 on-chain stats' });
+      }
     }
 
     try {
@@ -200,6 +301,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const debateHash = toDebateHash(threadId);
       const agentEnum = AGENT_MAP[agent?.toLowerCase()] ?? 0;
+
+      // ── V2 commit (Base / Base-Sepolia): mode-resolved, Pyth-evidenced ──
+      if (IS_V2_CHAIN && CONTRACT_ADDRESS && RECORDER_KEY) {
+        try {
+          const convUint8 = conviction < 2 ? Math.round(conviction * 10) : Math.round(conviction);
+          const { symbol: canonical } = resolvePriceMode(symbol);
+          const result = await commitV2(DEFAULT_CHAIN, RECORDER_KEY, {
+            debateHash,
+            symbol: canonical,
+            agent: agentEnum,
+            conviction: convUint8,
+            entryPrice,
+            targetPrice: targetPrice || 0,
+            stopPrice: stopPrice || 0,
+          });
+
+          // Same non-blocking side-effects as v1 — economy fee + oracle signal.
+          const side = await broadcastSideEffects({
+            debateHash,
+            symbol: canonical,
+            direction: String(body.direction || ''),
+            conviction: convUint8,
+            agent: agentEnum,
+            entryPrice,
+            targetPrice: targetPrice || 0,
+            stopPrice: stopPrice || 0,
+          }, result.nonce + 1);
+
+          return res.status(200).json({
+            ok: true,
+            onchain: true,
+            broadcast: true,
+            action: 'commit',
+            mode: result.mode,
+            message: `V2 ${result.mode} commitment broadcast to ${DEFAULT_CHAIN.name}`,
+            txHash: result.txHash,
+            oracleTxHash: side.oracleTxHash,
+            economyTxHash: side.economyTxHash,
+            explorer: txUrl(result.txHash),
+            data: {
+              debateHash,
+              symbol: canonical,
+              agent: agentEnum,
+              conviction: convUint8,
+              oraclePriceE8: result.oraclePriceE8,
+              oraclePublishTime: result.oraclePublishTime,
+            },
+          });
+        } catch (err: any) {
+          console.error(`[${DEFAULT_CHAIN.name}] V2 commit error:`, err);
+          return res.status(500).json({ error: 'Failed to broadcast V2 commit: ' + err.message });
+        }
+      }
 
       if (!CONTRACT_ADDRESS || !RECORDER_KEY) {
         // Pre-deploy mode: return what WOULD be committed
@@ -336,6 +490,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const debateHash = toDebateHash(threadId);
       const resultEnum = RESULT_MAP[normalizedResult];
+
+      // ── V2 resolve (Base / Base-Sepolia): exit evidenced at a declared instant ──
+      if (IS_V2_CHAIN && CONTRACT_ADDRESS && RECORDER_KEY) {
+        // V2 needs the DECLARED exit instant: Hermes benchmark evidence is
+        // fetched AT this second and the contract checks it against exitAt.
+        // Default to "now" for attested symbols where no evidence is fetched.
+        const exitAtRaw = (body as { exitAt?: number }).exitAt;
+        const exitAt = typeof exitAtRaw === 'number' && Number.isFinite(exitAtRaw) && exitAtRaw > 0
+          ? Math.floor(exitAtRaw)
+          : Math.floor(Date.now() / 1000);
+
+        try {
+          // v1 resolve payloads carry no symbol, but V2 needs it to pick the
+          // evidence path (the on-chain commitment's mode is derived from it).
+          const rawSymbol = (body as { symbol?: string }).symbol;
+          if (typeof rawSymbol !== 'string' || rawSymbol.length === 0) {
+            return res.status(400).json({ error: 'V2 resolve requires symbol' });
+          }
+          const { symbol: canonical, mode } = resolvePriceMode(rawSymbol);
+          // A VERIFIED resolve without a real exit timestamp would anchor the
+          // benchmark at "now" — reject instead of proving the wrong instant.
+          if (mode === PriceMode.VERIFIED && (typeof exitAtRaw !== 'number' || !Number.isFinite(exitAtRaw))) {
+            return res.status(400).json({ error: 'VERIFIED resolve requires exitAt (unix seconds of the exit)' });
+          }
+          const result = await resolveV2(DEFAULT_CHAIN, RECORDER_KEY, {
+            debateHash,
+            symbol: canonical,
+            pnlBps: Math.round(pnlBps * 100),
+            result: resultEnum,
+            exitPrice,
+            exitAt,
+          });
+
+          return res.status(200).json({
+            ok: true,
+            onchain: true,
+            broadcast: true,
+            action: 'resolve',
+            mode: result.mode,
+            message: `V2 ${result.mode} resolution broadcast to ${DEFAULT_CHAIN.name}`,
+            txHash: result.txHash,
+            explorer: txUrl(result.txHash),
+            data: {
+              debateHash,
+              result: resultEnum,
+              oraclePriceE8: result.oraclePriceE8,
+              oraclePublishTime: result.oraclePublishTime,
+            },
+          });
+        } catch (err: any) {
+          console.error(`[${DEFAULT_CHAIN.name}] V2 resolve error:`, err);
+          return res.status(500).json({ error: 'Failed to broadcast V2 resolve: ' + err.message });
+        }
+      }
 
       // Coherence checks (mirrors contract invariants — Codex Audit)
       if (normalizedResult === 'win' && pnlBps <= 0) {

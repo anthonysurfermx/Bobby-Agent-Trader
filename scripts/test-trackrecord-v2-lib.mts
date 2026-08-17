@@ -71,5 +71,25 @@ threw = false;
 try { toE8(1n, 1); } catch { threw = true; }
 ok('toE8 rejects out-of-range expo', threw);
 
+// ============================================================
+// recorder pure parts (api/_lib/trackrecord-v2-recorder.ts)
+// ============================================================
+const { priceToE8, deviationBps } = await import('../api/_lib/trackrecord-v2-recorder.ts');
+
+// --- priceToE8: float quote → contract 1e8 fixed point ---
+eq('priceToE8 integer', priceToE8(63502).toString(), '6350200000000');
+eq('priceToE8 decimals', priceToE8(0.00001234).toString(), '1234');
+eq('priceToE8 rounds', priceToE8(1.000000005).toString(), '100000001');
+eq('priceToE8 zero', priceToE8(0).toString(), '0');
+
+// --- deviationBps: pre-flight tolerance banding ---
+eq('deviation identical = 0', deviationBps(100_00000000n, 100_00000000n), 0);
+eq('deviation 1% = 100 bps', deviationBps(101_00000000n, 100_00000000n), 100);
+eq('deviation symmetric', deviationBps(99_00000000n, 100_00000000n), 100);
+eq('deviation 0.5% = 50 bps', deviationBps(100_50000000n, 100_00000000n), 50);
+// floors toward zero — 99.999999 bps must NOT round up past the band
+eq('deviation floors', deviationBps(100_99999999n, 100_00000000n), 99);
+ok('deviation vs zero oracle = maxed', deviationBps(100n, 0n) === Number.MAX_SAFE_INTEGER);
+
 console.log(`\ntrackrecord-v2 lib: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

@@ -46,7 +46,12 @@ const TRACK_RECORD_INTERFACE = new Interface([
   'function totalTrades() view returns (uint256)',
   'function totalCommitments() view returns (uint256)',
   'function getWinRate() view returns (uint256)',
+  'function getVerifiedWinRate() view returns (uint256)',
 ]);
+
+// V2 (Base) splits the ledgers (D-1): the headline number is the VERIFIED win
+// rate; the v1 combined getWinRate selector no longer exists and would revert.
+const WIN_RATE_FN = DEFAULT_CHAIN.id === XLAYER_CHAIN_ID ? 'getWinRate' : 'getVerifiedWinRate';
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
   const res = await fetch(XLAYER_RPC_URL, {
@@ -169,13 +174,13 @@ async function getTrackRecordStats() {
       'latest',
     ]),
     rpcCall<string>('eth_call', [
-      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData('getWinRate') },
+      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData(WIN_RATE_FN) },
       'latest',
     ]),
   ]);
   const [totalTrades] = TRACK_RECORD_INTERFACE.decodeFunctionResult('totalTrades', totalTradesRaw);
   const [totalCommitments] = TRACK_RECORD_INTERFACE.decodeFunctionResult('totalCommitments', totalCommitmentsRaw);
-  const [winRate] = TRACK_RECORD_INTERFACE.decodeFunctionResult('getWinRate', winRateRaw);
+  const [winRate] = TRACK_RECORD_INTERFACE.decodeFunctionResult(WIN_RATE_FN, winRateRaw);
   return {
     totalTrades: totalTrades.toString(),
     totalCommitments: totalCommitments.toString(),
