@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "description": "Immutable archive of the Bobby Protocol track record on X Layer, exported before the Base cutover. All values are re-derivable on-chain at the anchored block.",
+    "chainId": 196,
+    "chainName": "X Layer",
+    "rpc": "https://rpc.xlayer.tech",
+    "anchorBlock": 68232615,
+    "anchorBlockHash": "0x72349775f152bdf0a1430b188eada12ede620977dd996f5f38e4701c31f71e86",
+    "anchorTimestamp": 1787001651,
+    "anchorTimeISO": "2026-08-17T21:20:51.000Z",
+    "contracts": {
+      "trackRecord": "0xF841b428E6d743187D7BE2242eccC1078fdE2395",
+      "convictionOracle": "0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A",
+      "agentEconomy": "0xD9540D770C8aF67e9E6412C92D78E34bc11ED871"
+    },
+    "explorer": "https://www.oklink.com/xlayer/address/0xF841b428E6d743187D7BE2242eccC1078fdE2395"
+  },
+  "totals": {
+    "totalCommitments": 2039,
+    "totalTrades": 1,
+    "pendingCount": 2038,
+    "wins": 1,
+    "losses": 0,
+    "winRateBps": 10000,
+    "totalPnlBps": "15000"
+  },
+  "agents": {
+    "CIO": {
+      "wins": 1,
+      "losses": 0,
+      "total": 1,
+      "winRateBps": 10000
+    },
+    "ALPHA": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "winRateBps": 0
+    },
+    "REDTEAM": {
+      "wins": 0,
+      "losses": 0,
+      "total": 0,
+      "winRateBps": 0
+    }
+  },
+  "economy": {
+    "totalDebates": 0,
+    "totalMCPCalls": 1,
+    "totalSignalAccesses": 0,
+    "totalVolumeWei": "1000000000000000",
+    "totalPayments": 1
+  },
+  "recentTrades": [
+    {
+      "debateHash": "0x6751feb7fe97ee16176739d0c063c4ed9c2c7f4b416396a37c665ee55f0c0f89",
+      "symbol": "BTC",
+      "agent": "CIO",
+      "conviction": 3,
+      "result": "WIN",
+      "entryPriceE8": "7069060000000",
+      "exitPriceE8": "8520000000000",
+      "pnlBps": "15000",
+      "committedAt": 1776070832,
+      "resolvedAt": 1776074804,
+      "recorder": "0x09a81ff70DdBC5E8b88F168B3eEF01384B6cDceA"
+    }
+  ]
+}
