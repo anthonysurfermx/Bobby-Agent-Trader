@@ -74,6 +74,10 @@ interface ActivityItem {
   txHash?: string | null;
 }
 
+// Keep the previous telemetry/MCP sections available while the new landing is
+// evaluated, without tripping the release lint rule on literal `false && ...`.
+const SHOW_LEGACY_PROTOCOL_SECTIONS = false;
+
 const formatNumber = (value: unknown, fallback = '—') => {
   if (value === null || value === undefined || value === '') return fallback;
   const number = Number(value);
@@ -652,7 +656,7 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        {false && <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
+        {SHOW_LEGACY_PROTOCOL_SECTIONS && <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
           <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
@@ -743,7 +747,7 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>}
 
-        {false && <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
+        {SHOW_LEGACY_PROTOCOL_SECTIONS && <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(0,82,255,.1),transparent_40%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">

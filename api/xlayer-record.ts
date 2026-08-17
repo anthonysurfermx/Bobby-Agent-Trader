@@ -12,6 +12,11 @@ import { DEFAULT_CHAIN, XLAYER_CHAIN_ID, txUrl, addressUrl } from './_lib/chains
 import { requireRecordAuth } from './_lib/record-auth.js';
 import { resolvePriceMode, PriceMode } from './_lib/trackrecord-v2.js';
 import { commitV2, resolveV2, readStatsV2 } from './_lib/trackrecord-v2-recorder.js';
+import {
+  assertProviderChain,
+  recorderKeyEnvForChain,
+  requireProtocolWriteSafety,
+} from './_lib/protocol-write-safety.js';
 
 // V2 (oracle-verified, Pyth) runs on Base/Base-Sepolia; v1 (attested-only)
 // stays on X Layer. With PROTOCOL_CHAIN unset this is false and NOTHING in the
@@ -24,7 +29,14 @@ const XLAYER_RPC = DEFAULT_CHAIN.rpcUrl;
 const CONTRACT_ADDRESS = DEFAULT_CHAIN.contracts.trackRecord || process.env.BOBBY_CONTRACT_ADDRESS || '';
 const ORACLE_ADDRESS = DEFAULT_CHAIN.contracts.convictionOracle || process.env.BOBBY_ORACLE_ADDRESS || '';
 const ECONOMY_ADDRESS = DEFAULT_CHAIN.contracts.agentEconomy || process.env.BOBBY_ECONOMY_ADDRESS || '';
-const RECORDER_KEY = process.env.BOBBY_RECORDER_KEY || '';
+const RECORDER_KEY_ENV = recorderKeyEnvForChain(DEFAULT_CHAIN.id);
+const RECORDER_KEY = process.env[RECORDER_KEY_ENV] || '';
+
+// The fail-closed 503 guard that used to live here (Codex, 282b534) is gone ON
+// PURPOSE: its removal condition — "replace CONTRACT_ABI and its payload
+// validation with the final V2 adapter" — is satisfied by the V2 branches
+// below (commitV2/resolveV2/readStatsV2 via api/_lib/trackrecord-v2-recorder).
+// requireProtocolWriteSafety still gates every write on non-X-Layer chains.
 
 // Agent enum matches contract: CIO=0, ALPHA=1, REDTEAM=2
 const AGENT_MAP: Record<string, number> = {
@@ -274,6 +286,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     // Fail-closed: signs txs with the recorder key — never publicly writable.
     if (!requireRecordAuth(req, res)) return;
+    // Chain-scoped write latch (Codex 282b534): 503s unless the selected
+    // chain's env is fully armed — gates the V2 paths below identically.
+    if (!requireProtocolWriteSafety(res, ['trackRecord'])) return;
 
     const body = (req.body || {}) as Record<string, unknown>;
     const action = typeof body.action === 'string' ? body.action.toLowerCase() : '';
@@ -376,6 +391,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+        await assertProviderChain(provider, DEFAULT_CHAIN.id);
         const wallet = new ethers.Wallet(RECORDER_KEY, provider);
         const iface = new ethers.Interface(CONTRACT_ABI);
         // Normalize conviction: if float (0.0-1.0), convert to uint8 (0-10)
@@ -573,6 +589,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+        await assertProviderChain(provider, DEFAULT_CHAIN.id);
         const wallet = new ethers.Wallet(RECORDER_KEY, provider);
         const iface = new ethers.Interface(CONTRACT_ABI);
         const txData = iface.encodeFunctionData('resolveTrade', [

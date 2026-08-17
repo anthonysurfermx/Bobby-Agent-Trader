@@ -14,6 +14,7 @@
 
 import { ethers } from 'ethers';
 import type { ChainConfig } from './chains.js';
+import { assertProviderChain } from './protocol-write-safety.js';
 import {
   PriceMode,
   resolvePriceMode,
@@ -71,8 +72,11 @@ export interface V2TxResult {
   nonce: number;
 }
 
-function recorderWallet(chain: ChainConfig, recorderKey: string): ethers.Wallet {
+async function recorderWallet(chain: ChainConfig, recorderKey: string): Promise<ethers.Wallet> {
   const provider = new ethers.JsonRpcProvider(chain.rpcUrl);
+  // Refuse to sign against an RPC answering for the wrong chain — same guard
+  // the v1 paths carry (Codex 282b534).
+  await assertProviderChain(provider, chain.id);
   return new ethers.Wallet(recorderKey, provider);
 }
 
@@ -87,7 +91,7 @@ export async function commitV2(
   p: V2CommitParams,
 ): Promise<V2TxResult> {
   const { mode, feedId } = resolvePriceMode(p.symbol);
-  const wallet = recorderWallet(chain, recorderKey);
+  const wallet = await recorderWallet(chain, recorderKey);
   const contract = chain.contracts.trackRecord;
   if (!contract) throw new Error(`trackRecord address empty for ${chain.name}`);
 
@@ -164,7 +168,7 @@ export async function resolveV2(
   p: V2ResolveParams,
 ): Promise<V2TxResult> {
   const { mode, feedId } = resolvePriceMode(p.symbol);
-  const wallet = recorderWallet(chain, recorderKey);
+  const wallet = await recorderWallet(chain, recorderKey);
   const contract = chain.contracts.trackRecord;
   if (!contract) throw new Error(`trackRecord address empty for ${chain.name}`);
 

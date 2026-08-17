@@ -4,6 +4,8 @@
 
 export const BASE_CHAIN_ID = 8453;
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
+const BASE_TREASURY = import.meta.env.VITE_TREASURY_ADDRESS_BASE || '';
+const BASE_SEPOLIA_TREASURY = import.meta.env.VITE_TREASURY_ADDRESS_BASE_SEPOLIA || '';
 
 export interface ChainTokens {
   /** Native gas token symbol */
@@ -31,7 +33,7 @@ export const BASE: ChainConfig = {
   rpcUrl: 'https://mainnet.base.org',
   explorerUrl: 'https://basescan.org',
   explorerName: 'Basescan',
-  treasury: '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
+  treasury: BASE_TREASURY,
   tokens: {
     native: 'ETH',
     stable: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', // native USDC on Base
@@ -47,7 +49,7 @@ export const BASE_SEPOLIA: ChainConfig = {
   rpcUrl: 'https://sepolia.base.org',
   explorerUrl: 'https://sepolia.basescan.org',
   explorerName: 'Basescan',
-  treasury: '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
+  treasury: BASE_SEPOLIA_TREASURY,
   tokens: {
     native: 'ETH',
     stable: '0x036cbd53842c5426634e7929541ec2318f3dcf7e', // USDC on Base Sepolia
