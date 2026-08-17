@@ -272,6 +272,19 @@ async function orchestrate() {
     throw new Error(`anvil at ${url} never came up`);
   };
 
+  // Reproducibility on a clean checkout: the harness needs forge artifacts.
+  // Build them if the mock is missing (fresh clone) — and let FORGE_BUILD=1
+  // force a rebuild after contract edits.
+  const needBuild = process.env.FORGE_BUILD === '1' || !(() => {
+    try { readFileSync('contracts/out/BobbyTrackRecordV2.t.sol/MockPyth.json'); return true; }
+    catch { return false; }
+  })();
+  if (needBuild) {
+    console.log('forge build (artifacts missing or FORGE_BUILD=1)…');
+    const fb = spawnSync('forge', ['build'], { cwd: 'contracts', stdio: 'inherit' });
+    if (fb.status !== 0) { console.error('forge build failed'); process.exit(1); }
+  }
+
   console.log('booting anvil x2 + hermes stub…');
   children.push(spawn('anvil', ['--port', String(V2_PORT), '--chain-id', '84532', '--silent'], { stdio: 'ignore' }));
   children.push(spawn('anvil', ['--port', String(V1_PORT), '--chain-id', '196', '--silent'], { stdio: 'ignore' }));
