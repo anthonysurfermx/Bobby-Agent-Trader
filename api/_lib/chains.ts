@@ -83,7 +83,9 @@ const XLAYER_CONTRACTS: ContractSet = {
   treasury: '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
   agentEconomy: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871',
   adversarialBounties: '0xa8005ab465a0e02cb14824cd0e7630391fba673d',
-  trackRecord: '0xF841b428E6d743187D7BE2242eccC1078fdE2395',
+  // Env override exists for the local E2E harness only (points v1 at an anvil
+  // deployment); unset in every real environment, so prod is unchanged.
+  trackRecord: process.env.XLAYER_TRACK_RECORD_ADDRESS || '0xF841b428E6d743187D7BE2242eccC1078fdE2395',
   hardnessRegistry: process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
   convictionOracle: process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A',
   agentRegistry: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b',

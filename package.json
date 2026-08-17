@@ -20,7 +20,8 @@
     "finalize:base-manifest": "tsx scripts/finalize-base-manifest.mts",
     "build:safe-launch-batch": "tsx scripts/build-safe-launch-batch.mts",
     "test:risk-gate": "tsx scripts/test-risk-gate.mts",
-    "test:trackrecord-v2": "tsx scripts/test-trackrecord-v2-lib.mts"
+    "test:trackrecord-v2": "tsx scripts/test-trackrecord-v2-lib.mts",
+    "test:e2e:trackrecord-v2": "tsx scripts/e2e-trackrecord-v2.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",
