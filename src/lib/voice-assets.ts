@@ -55,7 +55,7 @@ export const VOICE_ASSETS: VoiceAsset[] = [
   { symbol: 'SHIB', name: 'Shiba Inu', venue: 'okx', group: 'Cripto', aliases: ['shiba'] },
 
   // --- equities (Yahoo) ---
-  { symbol: 'NVDA', name: 'Nvidia', venue: 'equity', group: 'Acciones' },
+  { symbol: 'NVDA', name: 'Nvidia', venue: 'equity', group: 'Acciones', aliases: ['nvidia corporation', 'envidia', 'n vidia'] },
   { symbol: 'AAPL', name: 'Apple', venue: 'equity', group: 'Acciones' },
   { symbol: 'MSFT', name: 'Microsoft', venue: 'equity', group: 'Acciones' },
   { symbol: 'GOOGL', name: 'Alphabet', venue: 'equity', group: 'Acciones', aliases: ['google', 'goog'] },
