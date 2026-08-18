@@ -57,10 +57,42 @@ final class BobbyViewModel: ObservableObject {
 
     let voice = NeuralVoice()
     let profile = AgentProfile()
+    private let memory = DeskMemory()
+    static let defaultQuickAccess = ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]
+    @Published var streak = 0
+    @Published var quickAccess: [String] = BobbyViewModel.defaultQuickAccess
+
+    init() {
+        streak = memory.recordVisit()
+        quickAccess = memory.quickAccess(fallback: Self.defaultQuickAccess)
+    }
 
     func bootGreetingIfNeeded() {
         guard messages.isEmpty else { return }
         messages.append(ChatMessage(fromBobby: true, text: profile.greeting))
+
+        // Memory v1 recap: if the user asked about something on a previous
+        // day, follow up with its live daily move — real data or nothing.
+        guard let recap = memory.recapAsset() else { return }
+        Task {
+            let market = await BobbyAPI.market(recap.symbol)
+            let move: String
+            if let change = market.changePct {
+                move = " Hoy va \(change >= 0 ? "+" : "")\(String(format: "%.1f", change))%."
+            } else {
+                move = ""
+            }
+            let text: String
+            switch profile.vibe {
+            case .chill: text = "La última vez andabas viendo \(recap.symbol).\(move) ¿Le damos otra vuelta?"
+            case .directo: text = "Tu última consulta: \(recap.symbol).\(move) ¿Analizo de nuevo?"
+            case .pro: text = "Seguimiento de \(recap.symbol):\(move.isEmpty ? " sin dato intradía." : move) ¿Actualizo la lectura?"
+            }
+            guard messages.count == 1 else { return }
+            withAnimation(.spring(duration: 0.4)) {
+                messages.append(ChatMessage(fromBobby: true, text: text))
+            }
+        }
     }
 
     func ask(_ preset: String? = nil) {
@@ -81,6 +113,9 @@ final class BobbyViewModel: ObservableObject {
                 messages.append(ChatMessage(fromBobby: true, text: "No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro."))
                 return
             }
+
+            memory.recordQuery(symbol: asset.symbol, isEquity: asset.isEquity)
+            quickAccess = memory.quickAccess(fallback: Self.defaultQuickAccess)
 
             async let marketRequest = BobbyAPI.market(asset.symbol)
             async let candleRequest = BobbyAPI.candles(
@@ -144,6 +179,7 @@ struct ContentView: View {
     @StateObject private var vm = BobbyViewModel()
     @StateObject private var speech = SpeechInput()
     @FocusState private var focused: Bool
+    @State private var showAuraCard = false
 
     var body: some View {
         ZStack {
@@ -155,6 +191,19 @@ struct ContentView: View {
             }
         }
         .onAppear { vm.bootGreetingIfNeeded() }
+        .sheet(isPresented: $showAuraCard) {
+            AuraCardSheet(data: AuraCardData(
+                agentName: vm.profile.name,
+                auraText: vm.profile.auraText,
+                tint: vm.profile.auraTint,
+                tintSoft: vm.profile.auraTintSoft,
+                archetype: vm.profile.auraArchetype,
+                streak: vm.streak,
+                insight: vm.lastAnswer.flatMap { answer in
+                    vm.snapshot.map { ($0.symbol, answer.summary) }
+                }
+            ))
+        }
         .onChange(of: vm.profile.onboarded) {
             vm.messages = []
             vm.bootGreetingIfNeeded()
@@ -186,14 +235,33 @@ struct ContentView: View {
     private var deskHeader: some View {
         HStack(spacing: 10) {
             Circle()
-                .fill(Theme.accent)
+                .fill(vm.profile.auraTint)
                 .frame(width: 7, height: 7)
-                .shadow(color: Theme.accent, radius: 8)
+                .shadow(color: vm.profile.auraTint, radius: 8)
             Text("BOBBY // LIVE DESK")
                 .font(.mono(12, .bold))
                 .kerning(2.4)
                 .foregroundStyle(Theme.text.opacity(0.80))
             Spacer()
+            // Streak chip + aura share — the daily ritual made visible.
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showAuraCard = true
+            } label: {
+                HStack(spacing: 5) {
+                    Text(vm.streak >= 2 ? "🔥 DÍA \(vm.streak)" : "MI AURA")
+                        .font(.mono(9, .bold))
+                        .kerning(1.1)
+                        .foregroundStyle(vm.profile.auraTintSoft)
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(vm.profile.auraTintSoft)
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(vm.profile.auraTint.opacity(0.10)))
+                .overlay(Capsule().stroke(vm.profile.auraTint.opacity(0.30), lineWidth: 1))
+            }
             Text("READ ONLY")
                 .font(.mono(9, .bold))
                 .kerning(1.1)
@@ -285,7 +353,7 @@ struct ContentView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(["BTC", "NVDA", "ETH", "TSLA", "GOLD"], id: \.self) { ticker in
+                    ForEach(vm.quickAccess, id: \.self) { ticker in
                         Button {
                             vm.ask(ticker)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -590,11 +658,11 @@ struct ContentView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.accentSoft)
             VStack(alignment: .leading, spacing: 3) {
-                Text("PROOF ENGINE V2 // BASE SEPOLIA")
+                Text("BOBBY APRENDE EN PÚBLICO")
                     .font(.mono(9, .bold))
                     .kerning(1.1)
                     .foregroundStyle(Theme.accentSoft)
-                Text("Infraestructura canary activa · esta consulta aún no genera receipt individual")
+                Text("Sus calls se graban on-chain y cualquiera puede retarlas · esta consulta aún no genera receipt individual")
                     .font(.mono(8, .medium))
                     .foregroundStyle(Theme.muted)
             }

@@ -131,6 +131,22 @@ struct OnboardingView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }
 
+            // The aura as data: every energy maps to a trader archetype.
+            HStack(spacing: 8) {
+                Text(profile.auraArchetype.name)
+                    .font(.mono(10, .bold))
+                    .kerning(1.4)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(tint))
+                Text(profile.auraArchetype.motto)
+                    .font(.rounded(12, .medium))
+                    .foregroundStyle(Theme.muted)
+            }
+            .padding(.top, 6)
+            .animation(.easeOut(duration: 0.3), value: profile.auraText)
+
             Text("mantén presionado FORJAR para sellarla")
                 .font(.mono(9, .medium))
                 .kerning(1.1)

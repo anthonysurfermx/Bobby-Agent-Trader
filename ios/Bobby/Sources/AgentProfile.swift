@@ -62,6 +62,21 @@ enum AuraForge {
 
     /// Inspiration chips for the onboarding step.
     static let sparks = ["azul voltaje", "verde hacker", "violeta after midnight", "dorado golden hour", "rojo sin miedo"]
+
+    /// The aura as DATA, not decoration (Kimi red-team v3): each hue band maps
+    /// to a trader archetype — language the user can own and share.
+    static func archetype(hue: Double) -> (name: String, motto: String) {
+        switch hue {
+        case ..<0.06, 0.95...: return ("CONTRARIAN", "va contra la manada")
+        case ..<0.10: return ("SCALPER", "rápido y sin apego")
+        case ..<0.30: return ("SWING", "paciencia dorada")
+        case ..<0.47: return ("TREND RIDER", "surfea la tendencia")
+        case ..<0.56: return ("SNIPER", "espera el nivel exacto")
+        case ..<0.68: return ("SISTEMÁTICO", "datos sobre vibes")
+        case ..<0.82: return ("NIGHT OWL", "vive la sesión nocturna")
+        default: return ("SENTIMENT", "lee el mood del mercado")
+        }
+    }
 }
 
 enum AgentVibe: String, CaseIterable, Identifiable {
@@ -115,6 +130,7 @@ final class AgentProfile: ObservableObject {
     var auraHue: Double { AuraForge.hue(for: auraText) }
     var auraTint: Color { AuraForge.tint(hue: auraHue) }
     var auraTintSoft: Color { AuraForge.tintSoft(hue: auraHue) }
+    var auraArchetype: (name: String, motto: String) { AuraForge.archetype(hue: auraHue) }
 
     /// Vibe-flavored greeting for the first bubble.
     var greeting: String {
