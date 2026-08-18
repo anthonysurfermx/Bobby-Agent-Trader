@@ -1,0 +1,21 @@
+name: Bobby
+options:
+  bundleIdPrefix: xyz.bobbyprotocol
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  Bobby:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.bobbyprotocol.bobby
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Bobby te escucha para responder sobre cualquier activo."
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Bobby convierte tu voz en preguntas sobre los mercados."
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGNING_ALLOWED: "NO"
