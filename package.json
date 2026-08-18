@@ -22,7 +22,8 @@
     "test:risk-gate": "tsx scripts/test-risk-gate.mts",
     "test:trackrecord-v2": "tsx scripts/test-trackrecord-v2-lib.mts",
     "test:e2e:trackrecord-v2": "tsx scripts/e2e-trackrecord-v2.mts",
-    "test:voice-brief": "tsx scripts/test-voice-desk-brief.mts"
+    "test:voice-brief": "tsx scripts/test-voice-desk-brief.mts",
+    "test:tts-routing": "tsx scripts/test-tts-routing.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

@@ -49,10 +49,31 @@ const EDGE_VOICE_MENU = new Set([
   'en-US-GuyNeural',
 ]);
 
-async function edgeTTS(text: string, lang: string, agent = 'cio', edgeVoice?: string): Promise<SpeechResult> {
-  const voice = (edgeVoice && EDGE_VOICE_MENU.has(edgeVoice))
+type TtsProvider = SpeechResult['provider'];
+
+/**
+ * Resolve a client-selected Edge voice without ever passing arbitrary input to
+ * the synthesizer. An invalid selection deliberately returns Bobby's default
+ * identity instead of falling through to an unrelated paid provider voice.
+ */
+export function resolveEdgeVoice(lang: string, agent = 'cio', edgeVoice?: string): string {
+  return (edgeVoice && EDGE_VOICE_MENU.has(edgeVoice))
     ? edgeVoice
     : EDGE_VOICE[`${lang}:${agent}`] || EDGE_VOICE[`${lang}:cio`] || EDGE_VOICE['es:cio'];
+}
+
+/**
+ * A per-user Edge voice is an explicit product choice, so it takes precedence
+ * over the deployment-wide provider preference. Calls without a voice keep the
+ * existing provider order for Telegram and other legacy consumers.
+ */
+export function ttsProviderOrder(provider: string, edgeVoice?: string): TtsProvider[] {
+  if (edgeVoice) return ['edge', 'openai'];
+  return provider === 'openai' ? ['openai', 'edge'] : ['edge', 'openai'];
+}
+
+async function edgeTTS(text: string, lang: string, agent = 'cio', edgeVoice?: string): Promise<SpeechResult> {
+  const voice = resolveEdgeVoice(lang, agent, edgeVoice);
   const communicate = new Communicate(text.slice(0, MAX_CHARS), { voice });
   const chunks: Uint8Array[] = [];
   for await (const msg of communicate.stream()) {
@@ -118,7 +139,8 @@ export async function generateSpeech(
   if (!clean) return null;
 
   const provider = (process.env.TTS_PROVIDER || 'edge').toLowerCase();
-  const chain = provider === 'openai' ? [openaiTTS, edgeTTS] : [edgeTTS, openaiTTS];
+  const providers = { edge: edgeTTS, openai: openaiTTS } as const;
+  const chain = ttsProviderOrder(provider, opts.edgeVoice).map((name) => providers[name]);
 
   for (const fn of chain) {
     try {
