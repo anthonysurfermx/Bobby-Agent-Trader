@@ -8,6 +8,9 @@ struct BobbyOrb: View {
     var speaking = false
     var listening = false
     var level: CGFloat = 0
+    /// Aura tint — the orb inherits the agent's chosen energy.
+    var tint: Color = Theme.accent
+    var tintSoft: Color = Theme.accentSoft
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
@@ -22,7 +25,7 @@ struct BobbyOrb: View {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [Theme.accent.opacity((0.30 + energy * 0.42) * dim), Theme.accent.opacity(0.06), .clear],
+                            colors: [tint.opacity((0.30 + energy * 0.42) * dim), tint.opacity(0.06), .clear],
                             center: .center, startRadius: 0, endRadius: size * 0.74
                         )
                     )
@@ -35,7 +38,7 @@ struct BobbyOrb: View {
                     let x = cos(angle) * radius
                     let y = sin(angle) * radius * 0.82
                     Circle()
-                        .fill(Theme.accentSoft.opacity((0.16 + energy * 0.30) * dim))
+                        .fill(tintSoft.opacity((0.16 + energy * 0.30) * dim))
                         .frame(width: CGFloat(1 + index % 3), height: CGFloat(1 + index % 3))
                         .offset(x: x, y: y)
                 }
@@ -44,7 +47,7 @@ struct BobbyOrb: View {
                     let noise = (sin(Double(index) * 0.73 + t * 3.1) + sin(Double(index) * 1.9 - t * 2.2)) * 0.25 + 0.5
                     let bar = size * (0.018 + energy * CGFloat(0.115 + noise * 0.13))
                     Capsule()
-                        .fill((speaking ? Theme.accent : Theme.accentSoft).opacity((0.25 + energy * 0.72) * dim))
+                        .fill((speaking ? tint : tintSoft).opacity((0.25 + energy * 0.72) * dim))
                         .frame(width: max(1, size * 0.006), height: max(3, bar))
                         .offset(y: -(core * 1.50 + bar / 2))
                         .rotationEffect(.degrees(Double(index) / 64 * 360))
@@ -57,14 +60,14 @@ struct BobbyOrb: View {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [.white.opacity(0.92), Theme.accentSoft, Theme.accent],
+                            colors: [.white.opacity(0.92), tintSoft, tint],
                             center: UnitPoint(x: 0.34, y: 0.30), startRadius: 0, endRadius: core
                         )
                     )
                     .frame(width: core * 2, height: core * 2)
                     .scaleEffect(1 + energy * 0.18)
                     .overlay(Circle().stroke(.white.opacity(0.24 + energy * 0.36), lineWidth: 1))
-                    .shadow(color: Theme.accent.opacity(0.80), radius: 18 + energy * 30)
+                    .shadow(color: tint.opacity(0.80), radius: 18 + energy * 30)
             }
         }
         .frame(width: size, height: size)
@@ -73,7 +76,7 @@ struct BobbyOrb: View {
 
     private func orbit(width: CGFloat, height: CGFloat, rotation: Double, energy: CGFloat, dim: CGFloat) -> some View {
         Ellipse()
-            .stroke(Theme.accentSoft.opacity((0.16 + energy * 0.24) * dim), lineWidth: 0.8)
+            .stroke(tintSoft.opacity((0.16 + energy * 0.24) * dim), lineWidth: 0.8)
             .frame(width: width, height: height * (1 + energy * 0.14))
             .rotationEffect(.degrees(rotation))
             .overlay(alignment: .trailing) {

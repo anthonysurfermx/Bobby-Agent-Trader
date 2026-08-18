@@ -228,7 +228,9 @@ struct ContentView: View {
                     thinking: vm.thinking,
                     speaking: vm.voice.speaking,
                     listening: speech.listening,
-                    level: liveLevel
+                    level: liveLevel,
+                    tint: vm.profile.auraTint,
+                    tintSoft: vm.profile.auraTintSoft
                 )
                 .frame(height: 208)
                 .contentShape(Circle())
