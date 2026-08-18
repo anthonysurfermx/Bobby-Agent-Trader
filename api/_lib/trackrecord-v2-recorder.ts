@@ -18,7 +18,6 @@ import { assertProviderChain } from './protocol-write-safety.js';
 import {
   PriceMode,
   resolvePriceMode,
-  buildHermesLatestUrl,
   buildHermesBenchmarkUrl,
   fetchSignedUpdate,
   toE8,
@@ -100,8 +99,14 @@ export async function commitV2(
   let oraclePriceE8: bigint | undefined;
   let oraclePublishTime: number | undefined;
 
+  // A2-1: the entry anchors to a DECLARED instant (a few seconds back so the
+  // first tick at/after it already exists and clears chain-clock skew). The
+  // contract pins the evidence to the first tick at/after this anchor —
+  // Unique semantics — so the recorder cannot shop among in-window ticks.
+  const entryAt = mode === PriceMode.VERIFIED ? Math.floor(Date.now() / 1000) - 5 : 0;
+
   if (mode === PriceMode.VERIFIED && feedId) {
-    const update = await fetchSignedUpdate(buildHermesLatestUrl(feedId));
+    const update = await fetchSignedUpdate(buildHermesBenchmarkUrl(feedId, entryAt));
     updateData = [update.updateData];
     value = PYTH_FEE_BUFFER_WEI;
     oraclePriceE8 = toE8(update.price, update.expo);
@@ -126,6 +131,7 @@ export async function commitV2(
     priceToE8(p.targetPrice),
     priceToE8(p.stopPrice),
     mode,
+    entryAt,
     updateData,
   ]);
 

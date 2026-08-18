@@ -76,16 +76,10 @@ export function resolvePriceMode(rawSymbol: unknown): ResolvedMode {
     : { symbol, mode: PriceMode.ATTESTED };
 }
 
-/** Latest signed update — used at COMMIT (entry). The window ends at "now", so
- *  fetch a slightly-aged tick (~5 s) to avoid a publishTime ahead of the chain
- *  clock (spec §4.1 / PoC C-09). */
-export function buildHermesLatestUrl(feedId: string, ageSec = 5): string {
-  const at = Math.floor(Date.now() / 1000) - Math.max(0, ageSec);
-  return `${HERMES_BASE}/v2/updates/price/${at}?ids[]=${feedId}&encoding=hex`;
-}
-
-/** Historical signed update at a declared instant — used at RESOLVE (exit) and
- *  for stop-breach anchoring. Benchmarks return the tick for that publishTime. */
+/** Signed update at a declared instant — the ONLY fetch shape the recorder
+ *  uses (A2-1): entry anchors at entryAt, exit at exitAt, challenge at
+ *  anchorTs. Hermes benchmarks return the FIRST tick at/after that instant,
+ *  which is exactly what parsePriceFeedUpdatesUnique proves on-chain. */
 export function buildHermesBenchmarkUrl(feedId: string, publishTimeSec: number): string {
   return `${HERMES_BASE}/v2/updates/price/${Math.floor(publishTimeSec)}?ids[]=${feedId}&encoding=hex`;
 }
@@ -152,7 +146,7 @@ export const PYTH_FEE_BUFFER_WEI = BigInt(process.env.PYTH_FEE_BUFFER_WEI || '20
  *  never hand-drift. NOTE: getWinRate() (v1 selector 0x6f61e432) is GONE —
  *  D-1 splits it into getVerifiedWinRate/getAttestedWinRate. */
 export const TRACKRECORD_V2_ABI = [
-  'function commitTrade(bytes32 _debateHash, string _symbol, uint8 _agent, uint8 _conviction, uint96 _entryPrice, uint96 _targetPrice, uint96 _stopPrice, uint8 _declaredMode, bytes[] _entryUpdateData) payable',
+  'function commitTrade(bytes32 _debateHash, string _symbol, uint8 _agent, uint8 _conviction, uint96 _entryPrice, uint96 _targetPrice, uint96 _stopPrice, uint8 _declaredMode, uint64 _entryAt, bytes[] _entryUpdateData) payable',
   'function resolveTrade(bytes32 _debateHash, int256 _pnlBps, uint8 _result, uint96 _exitPrice, uint64 _exitAt, bytes[] _exitUpdateData) payable',
   'function challengeStopBreach(bytes32 _debateHash, uint64 _anchorTs, bytes[] _breachUpdateData) payable',
   'function expireCommitment(bytes32 _debateHash)',

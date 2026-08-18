@@ -424,6 +424,11 @@
         "internalType": "enum BobbyTrackRecordV2.PriceMode"
       },
       {
+        "name": "_entryAt",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
         "name": "_entryUpdateData",
         "type": "bytes[]",
         "internalType": "bytes[]"
@@ -2242,6 +2247,12 @@
         "type": "uint64",
         "indexed": false,
         "internalType": "uint64"
+      },
+      {
+        "name": "entryAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
       }
     ],
     "anonymous": false
@@ -2388,6 +2399,11 @@
   },
   {
     "type": "error",
+    "name": "AttestedNoEntryAnchor",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "AttestedNoEvidence",
     "inputs": []
   },
@@ -2423,7 +2439,17 @@
   },
   {
     "type": "error",
+    "name": "EntryInFuture",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "EntryProofRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EntryTooStale",
     "inputs": []
   },
   {

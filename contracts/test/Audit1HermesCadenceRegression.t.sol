@@ -116,9 +116,10 @@ contract Audit1HermesCadenceRegression is Test {
         // buildHermesLatestUrl(feedId, ageSec=5): tick at now-5, prev = now-6.
         uint64 pt = uint64(vm.getBlockTimestamp()) - 5;
         bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), pt);
+        uint64 anchor1_ = uint64(vm.getBlockTimestamp()) - 5;
         rec.commitTrade{value: 10}(
             keccak256("fresh-entry"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, d
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor1_, d
         );
         BobbyTrackRecordV2.Commitment memory c = rec.getCommitment(0);
         assertEq(c.entryEvidence.publishTime, pt, "fresh tick accepted as entry evidence");
@@ -128,10 +129,11 @@ contract Audit1HermesCadenceRegression is Test {
         // The bounded parse must still refuse a tick older than entryWindowSec.
         uint64 pt = uint64(vm.getBlockTimestamp()) - 61;
         bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), pt);
+        uint64 anchor2_ = uint64(vm.getBlockTimestamp()) - 5;
         vm.expectRevert(bytes("RealRulePyth: window"));
         rec.commitTrade{value: 10}(
             keccak256("stale-entry"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, d
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor2_, d
         );
     }
 
@@ -165,6 +167,40 @@ contract Audit1HermesCadenceRegression is Test {
         bytes[] memory db = _realUpdate(int64(uint64(61_000e8)), anchor);
         rec.challengeStopBreach{value: 10}(h, anchor, db);
         assertEq(rec.lossesVerified(), 1, "boundary-block challenge records the loss");
+    }
+
+    // ---- A2-1 regression: entry is Unique-anchored — no tick shopping ----
+
+    function test_A2_1_entryTickShoppingRejected() public {
+        // The recorder declares entryAt but presents a LATER in-window tick
+        // (prev >= entryAt proves an earlier tick existed after the anchor).
+        // Unique semantics must reject it — evidence is pinned to the FIRST
+        // tick at/after the declared anchor, killing retrospective selection.
+        uint64 anchor = uint64(vm.getBlockTimestamp()) - 40;
+        bytes[] memory shopped = _realUpdate(int64(uint64(ENTRY)), anchor + 20); // prev = anchor+19 >= anchor
+        vm.expectRevert(bytes("RealRulePyth: window"));
+        rec.commitTrade{value: 10}(
+            keccak256("shopped"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor, shopped
+        );
+    }
+
+    function test_A2_1_entryAnchorRecencyBounds() public {
+        // Anchor in the future → EntryInFuture; anchor older than the entry
+        // window → EntryTooStale. The anchor must pin the entry to the moment
+        // of commitment.
+        uint64 nowTs = uint64(vm.getBlockTimestamp());
+        bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), nowTs - 5);
+        vm.expectRevert(BobbyTrackRecordV2.EntryInFuture.selector);
+        rec.commitTrade{value: 10}(
+            keccak256("future"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, nowTs + 10, d
+        );
+        vm.expectRevert(BobbyTrackRecordV2.EntryTooStale.selector);
+        rec.commitTrade{value: 10}(
+            keccak256("stale"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, nowTs - 61, d
+        );
     }
 
     function test_A1_2_afterTTL_expiryWorks() public {

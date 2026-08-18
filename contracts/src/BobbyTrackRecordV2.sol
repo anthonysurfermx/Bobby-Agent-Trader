@@ -34,12 +34,6 @@ interface IPyth {
         uint64 minPublishTime,
         uint64 maxPublishTime
     ) external payable returns (PythStructs.PriceFeed[] memory);
-    function parsePriceFeedUpdates(
-        bytes[] calldata updateData,
-        bytes32[] calldata priceIds,
-        uint64 minPublishTime,
-        uint64 maxPublishTime
-    ) external payable returns (PythStructs.PriceFeed[] memory);
 }
 
 interface IAggregatorV3 {
@@ -118,6 +112,9 @@ contract BobbyTrackRecordV2 {
     error InvalidSymbol();
     error ModeMismatch();
     error EntryProofRequired();
+    error EntryInFuture();
+    error EntryTooStale();
+    error AttestedNoEntryAnchor();
     error StopRequiredForVerified();
     error InvalidDirection();
     error AttestedNoEvidence();
@@ -234,7 +231,8 @@ contract BobbyTrackRecordV2 {
     event TradeCommitted(
         uint256 indexed commitId, string symbol, Agent indexed agent, uint8 conviction,
         uint256 entryPrice, bytes32 indexed debateHash,
-        PriceMode mode, bytes32 feedId, uint256 entryOraclePrice1e8, uint64 entryPublishTime
+        PriceMode mode, bytes32 feedId, uint256 entryOraclePrice1e8, uint64 entryPublishTime,
+        uint64 entryAt
     );
     event TradeResolved(
         uint256 indexed tradeId, string symbol, Agent indexed agent, Result result,
@@ -356,6 +354,7 @@ contract BobbyTrackRecordV2 {
         uint96 entryPrice;
         uint96 targetPrice;
         uint96 stopPrice;
+        uint64 entryAt;
     }
 
     function commitTrade(
@@ -367,36 +366,45 @@ contract BobbyTrackRecordV2 {
         uint96 _targetPrice,
         uint96 _stopPrice,
         PriceMode _declaredMode,
+        uint64 _entryAt,
         bytes[] calldata _entryUpdateData
     ) external payable onlyBobby whenNotPaused nonReentrant {
-        require(_debateHash != bytes32(0), "Invalid debate hash");
-        require(commitIndex[_debateHash] == 0, "Already committed");
-        require(_conviction <= 10, "Conviction must be 0-10");
-        require(_entryPrice > 0, "Entry price required");
-        require(_targetPrice > 0 || _stopPrice > 0, "Target or stop required");
+        // Stack discipline (A2-1 param growth): pack the flat calldata into
+        // the args struct IMMEDIATELY so the 10 scalars stop occupying the
+        // frame, then dispatch. Flat external signature is kept on purpose —
+        // a tuple parameter would reshape the ABI for every consumer.
+        _commitDispatch(
+            CommitArgs(_debateHash, _symbol, _agent, _conviction, _entryPrice, _targetPrice, _stopPrice, _entryAt),
+            _declaredMode,
+            _entryUpdateData
+        );
+    }
 
-        bytes32 feedId = feedOf[_validSymbolHash(_symbol)];
+    function _commitDispatch(
+        CommitArgs memory a,
+        PriceMode _declaredMode,
+        bytes[] calldata _entryUpdateData
+    ) internal {
+        require(a.debateHash != bytes32(0), "Invalid debate hash");
+        require(commitIndex[a.debateHash] == 0, "Already committed");
+        require(a.conviction <= 10, "Conviction must be 0-10");
+        require(a.entryPrice > 0, "Entry price required");
+        require(a.targetPrice > 0 || a.stopPrice > 0, "Target or stop required");
+
+        bytes32 feedId = feedOf[_validSymbolHash(a.symbol)];
         // B-03: misclassification-by-naming is a loud revert, never a silent
         // downgrade. The mapping decides the mode; the caller must agree.
         if (feedId != bytes32(0)) {
             if (_declaredMode != PriceMode.VERIFIED) revert ModeMismatch();
-            _commitVerified(
-                CommitArgs(_debateHash, _symbol, _agent, _conviction, _entryPrice, _targetPrice, _stopPrice),
-                feedId,
-                _entryUpdateData
-            );
+            _commitVerified(a, feedId, _entryUpdateData);
         } else {
             if (_declaredMode != PriceMode.ATTESTED) revert ModeMismatch();
             // A-02: attested trades carry no decorative evidence or value.
             if (_entryUpdateData.length != 0) revert AttestedNoEvidence();
             if (msg.value != 0) revert AttestedNoValue();
+            if (a.entryAt != 0) revert AttestedNoEntryAnchor();
             OracleEvidence memory emptyEv;
-            _storeCommitment(
-                CommitArgs(_debateHash, _symbol, _agent, _conviction, _entryPrice, _targetPrice, _stopPrice),
-                PriceMode.ATTESTED,
-                bytes32(0),
-                emptyEv
-            );
+            _storeCommitment(a, PriceMode.ATTESTED, bytes32(0), emptyEv);
         }
     }
 
@@ -419,16 +427,18 @@ contract BobbyTrackRecordV2 {
         }
         if (_entryUpdateData.length == 0) revert EntryProofRequired();
 
-        // Entry window ends at now — never a future publishTime. Non-unique
-        // bounded parse (A1-1): minT here derives from the inclusion-time
-        // block.timestamp, which no off-chain fetch can anchor to the second,
-        // so Unique's prev<minT precondition is unsatisfiable on ~1 Hz feeds.
-        uint64 maxT = uint64(block.timestamp);
-        uint64 minT = block.timestamp > params.entryWindowSec
-            ? uint64(block.timestamp - params.entryWindowSec)
-            : 0;
-        (OracleEvidence memory entryEv, uint256 refund) =
-            _verifyAndPay(_entryUpdateData, feedId, minT, maxT, params.confMaxBps, false);
+        // A2-1: the entry anchors to a CALLER-DECLARED instant, same canonical
+        // benchmark pattern as exit and challenge. Unique semantics then pin
+        // the evidence to the FIRST tick at/after _entryAt — the recorder
+        // cannot retrospectively shop among in-window ticks (the A1-1 fix's
+        // regression). The anchor itself must be recent and never in the
+        // future, so the entry price is pinned to the moment of commitment
+        // within entryWindowSec.
+        if (a.entryAt > block.timestamp) revert EntryInFuture();
+        if (block.timestamp - a.entryAt > params.entryWindowSec) revert EntryTooStale();
+        (OracleEvidence memory entryEv, uint256 refund) = _verifyAndPay(
+            _entryUpdateData, feedId, a.entryAt, a.entryAt + params.entryWindowSec, params.confMaxBps
+        );
         uint256 entryOracle1e8 = _toE8(entryEv.price, entryEv.expo);
         _requireWithinBand(a.entryPrice, entryOracle1e8, params.entryTolBps);
 
@@ -491,7 +501,7 @@ contract BobbyTrackRecordV2 {
         pendingCount++;
         if (mode == PriceMode.VERIFIED) pendingVerified++; else pendingAttested++;
 
-        _emitCommitted(commitId, feedId);
+        _emitCommitted(commitId, feedId, a.entryAt);
     }
 
     // ============================================================
@@ -596,7 +606,7 @@ contract BobbyTrackRecordV2 {
         // block.timestamp. Causality: minResolveAt > committedAt ≥ entry
         // publishTime, so pt ≥ _exitAt ≥ minResolveAt is always post-entry.
         (exitEv, refund) = _verifyAndPay(
-            _exitUpdateData, c.entryEvidence.feedId, _exitAt, _exitAt + c.exitWindowSec, c.confMaxBps, true
+            _exitUpdateData, c.entryEvidence.feedId, _exitAt, _exitAt + c.exitWindowSec, c.confMaxBps
         );
         _requireWithinBand(_exitPrice, _toE8(exitEv.price, exitEv.expo), c.exitTolBps);
 
@@ -780,16 +790,19 @@ contract BobbyTrackRecordV2 {
             maxT = t.exitAt;
         }
 
-        // Fix (audit r1): the breach must have happened AFTER the position
-        // opened. `committedAt >= entryEvidence.publishTime` always (the entry
-        // window ends at commit), so anchoring at committedAt is the stricter,
-        // correct floor — it rejects ticks predating the commitment.
-        if (_anchorTs < c.committedAt || _anchorTs > maxT) {
+        // A2-1: the breach must have happened AFTER the position opened — and
+        // with the entry now Unique-anchored at a declared _entryAt, "opened"
+        // is the entry evidence's publishTime, not committedAt. Flooring at
+        // committedAt (audit r1) left the [entry tick, committedAt] interval
+        // unchallengeable; a genuine stop-cross there is a real oracle-loss
+        // because the commit gate already forces the stop onto the loss side
+        // of the ORACLE entry.
+        if (_anchorTs < c.entryEvidence.publishTime || _anchorTs > maxT) {
             revert ChallengeAnchorOutOfRange();
         }
 
         (OracleEvidence memory breachEv, uint256 refund) =
-            _verifyAndPay(_breachUpdateData, c.entryEvidence.feedId, _anchorTs, maxT, c.confMaxBps, true);
+            _verifyAndPay(_breachUpdateData, c.entryEvidence.feedId, _anchorTs, maxT, c.confMaxBps);
 
         uint256 breach1e8 = _toE8(breachEv.price, breachEv.expo);
         if (isLong ? breach1e8 > uint256(c.stopPrice) : breach1e8 < uint256(c.stopPrice)) {
@@ -938,25 +951,19 @@ contract BobbyTrackRecordV2 {
     /// @dev Parse exactly ONE update through the active Pyth, charge the exact
     ///      fee, enforce conf gate, and return the evidence + refund owed.
     ///
-    ///      Audit round 1 (A1-1): `uniqueFirstTick` selects the parse mode.
-    ///      Unique semantics ("first tick at/after minT", prevPublishTime <
-    ///      minT) are only satisfiable when minT is a CALLER-DECLARED anchor —
-    ///      the Hermes benchmark endpoint returns exactly that tick (exit,
-    ///      challenge). For the entry, minT is derived from block.timestamp at
-    ///      inclusion time, which the recorder cannot predict to the second;
-    ///      with ~1 Hz feeds Unique would reject every honest fresh tick
-    ///      (prev ≈ pt-1s is never < now-entryWindow). Entry therefore uses
-    ///      the bounded non-unique parse: signature + publishTime ∈
-    ///      [minT, maxT] + conf gate + tolerance band vs the reported entry.
-    ///      Determinism is not weakened in practice: the anchor choice inside
-    ///      the window always belonged to the recorder under Unique too.
+    ///      A1-1/A2-1: ALWAYS Unique semantics — "the first tick at/after
+    ///      minT" (prevPublishTime < minT). That is only satisfiable when minT
+    ///      is a CALLER-DECLARED anchor, which is exactly what the Hermes
+    ///      benchmark endpoint returns; deriving minT from block.timestamp is
+    ///      unsatisfiable on ~1 Hz feeds (prev ≈ pt-1s). All three surfaces
+    ///      now anchor this way: entry at _entryAt, exit at _exitAt, challenge
+    ///      at _anchorTs — deterministic evidence given the declared instant.
     function _verifyAndPay(
         bytes[] calldata updateData,
         bytes32 feedId,
         uint64 minT,
         uint64 maxT,
-        uint16 confMaxBps,
-        bool uniqueFirstTick
+        uint16 confMaxBps
     ) internal returns (OracleEvidence memory ev, uint256 refund) {
         address pyth = activePyth;
         if (pyth == address(0)) revert NoPythActive();
@@ -970,9 +977,8 @@ contract BobbyTrackRecordV2 {
 
         bytes32[] memory ids = new bytes32[](1);
         ids[0] = feedId;
-        PythStructs.PriceFeed[] memory feeds = uniqueFirstTick
-            ? IPyth(pyth).parsePriceFeedUpdatesUnique{value: fee}(updateData, ids, minT, maxT)
-            : IPyth(pyth).parsePriceFeedUpdates{value: fee}(updateData, ids, minT, maxT);
+        PythStructs.PriceFeed[] memory feeds =
+            IPyth(pyth).parsePriceFeedUpdatesUnique{value: fee}(updateData, ids, minT, maxT);
 
         // V-07: assert the returned feed is the requested one. An honest Pyth
         // guarantees this; a compromised one (the reason for the allowlist) is
@@ -1010,11 +1016,12 @@ contract BobbyTrackRecordV2 {
         );
     }
 
-    function _emitCommitted(uint256 commitId, bytes32 feedId) internal {
+    function _emitCommitted(uint256 commitId, bytes32 feedId, uint64 entryAt) internal {
         Commitment storage c = commitments[commitId];
         emit TradeCommitted(
             commitId, c.symbol, c.agent, c.conviction, c.entryPrice, c.debateHash,
-            c.mode, feedId, _ev1e8(c.entryEvidence), c.entryEvidence.publishTime
+            c.mode, feedId, _ev1e8(c.entryEvidence), c.entryEvidence.publishTime,
+            entryAt
         );
     }
 

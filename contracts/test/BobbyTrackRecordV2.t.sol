@@ -57,7 +57,9 @@ contract RejectingRecorder {
     BobbyTrackRecordV2 rec;
     constructor(BobbyTrackRecordV2 _rec) { rec = _rec; }
     function commit(bytes32 h, bytes[] calldata d, uint96 e, uint96 tg, uint96 s) external payable {
-        rec.commitTrade{value: msg.value}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, e, tg, s, BobbyTrackRecordV2.PriceMode.VERIFIED, d);
+        // anchor derived in-contract: keeps this frame under the stack limit
+        uint64 entryAt = uint64(block.timestamp) - 5;
+        rec.commitTrade{value: msg.value}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, e, tg, s, BobbyTrackRecordV2.PriceMode.VERIFIED, entryAt, d);
     }
     // no receive() → any refund .call reverts, forcing the retained path
 }
@@ -133,9 +135,10 @@ contract BobbyTrackRecordV2Test is Test {
         // prev = pt-1, the shape a live BTC/ETH/SOL feed actually produces.
         // Entry is the non-unique bounded parse, so this fresh tick passes.
         bytes[] memory d = _update(int64(uint64(ENTRY)), uint64(vm.getBlockTimestamp()) - 5, uint64(vm.getBlockTimestamp()) - 6);
+        uint64 anchor1_ = uint64(vm.getBlockTimestamp()) - 5;
         rec.commitTrade{value: 10}(
             hash, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, d
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor1_, d
         );
     }
 
@@ -177,12 +180,12 @@ contract BobbyTrackRecordV2Test is Test {
         bytes[] memory empty = new bytes[](0);
         rec.commitTrade(
             keccak256("a1"), "OKB", BobbyTrackRecordV2.Agent.ALPHA, 5, 50e8, 60e8, 0,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
         );
         vm.expectRevert(bytes("Already committed"));
         rec.commitTrade(
             keccak256("a1"), "OKB", BobbyTrackRecordV2.Agent.ALPHA, 5, 50e8, 60e8, 0,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
         );
     }
 
@@ -191,12 +194,13 @@ contract BobbyTrackRecordV2Test is Test {
         vm.expectRevert(BobbyTrackRecordV2.ModeMismatch.selector);
         rec.commitTrade(
             keccak256("m1"), "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
         );
+        uint64 anchor2_ = uint64(vm.getBlockTimestamp()) - 5;
         vm.expectRevert(BobbyTrackRecordV2.ModeMismatch.selector);
         rec.commitTrade(
             keccak256("m2"), "OKB", BobbyTrackRecordV2.Agent.CIO, 5, 50e8, 60e8, 0,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, empty
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor2_, empty
         );
     }
 
@@ -207,48 +211,53 @@ contract BobbyTrackRecordV2Test is Test {
             vm.expectRevert(BobbyTrackRecordV2.InvalidSymbol.selector);
             rec.commitTrade(
                 keccak256(abi.encode("s", i)), bad[i], BobbyTrackRecordV2.Agent.CIO, 5, 50e8, 60e8, 0,
-                BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+                BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
             );
         }
     }
 
     function test_commit_verified_requiresStopAndProof() public {
         bytes[] memory empty = new bytes[](0);
+        uint64 anchor3_ = uint64(vm.getBlockTimestamp()) - 5;
         vm.expectRevert(BobbyTrackRecordV2.StopRequiredForVerified.selector);
         rec.commitTrade(
             keccak256("v1"), "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, TARGET, 0,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, empty
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor3_, empty
         );
+        uint64 anchor4_ = uint64(vm.getBlockTimestamp()) - 5;
         vm.expectRevert(BobbyTrackRecordV2.EntryProofRequired.selector);
         rec.commitTrade(
             keccak256("v2"), "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, empty
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor4_, empty
         );
     }
 
     function test_commit_verified_invalidDirection() public {
         bytes[] memory d = _update(int64(uint64(ENTRY)), T0 - 5, T0 - 70);
         // target and stop on the same side (both below entry)
+        uint64 anchor5_ = uint64(vm.getBlockTimestamp()) - 5;
         vm.expectRevert(BobbyTrackRecordV2.InvalidDirection.selector);
         rec.commitTrade{value: 10}(
             keccak256("d1"), "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, 62_500e8, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, d
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor5_, d
         );
         // stop == entry
+        uint64 anchor6_ = uint64(vm.getBlockTimestamp()) - 5;
         vm.expectRevert(BobbyTrackRecordV2.InvalidDirection.selector);
         rec.commitTrade{value: 10}(
             keccak256("d2"), "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, TARGET, ENTRY,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, d
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor6_, d
         );
     }
 
     function test_commit_verified_entryBandEnforced() public {
         // oracle 63,000 but reported entry 64,000 → 158 bps > 100 tol
         bytes[] memory d = _update(int64(uint64(ENTRY)), T0 - 5, T0 - 70);
+        uint64 anchor7_ = uint64(vm.getBlockTimestamp()) - 5;
         vm.expectRevert(BobbyTrackRecordV2.PriceOutOfBand.selector);
         rec.commitTrade{value: 10}(
             keccak256("b1"), "BTC", BobbyTrackRecordV2.Agent.CIO, 5, 64_000e8, 66_000e8, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, d
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor7_, d
         );
     }
 
@@ -257,22 +266,23 @@ contract BobbyTrackRecordV2Test is Test {
         vm.expectRevert(BobbyTrackRecordV2.AttestedNoEvidence.selector);
         rec.commitTrade(
             keccak256("x1"), "OKB", BobbyTrackRecordV2.Agent.CIO, 5, 50e8, 60e8, 0,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, d
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, d
         );
         bytes[] memory empty = new bytes[](0);
         vm.expectRevert(BobbyTrackRecordV2.AttestedNoValue.selector);
         rec.commitTrade{value: 1}(
             keccak256("x2"), "OKB", BobbyTrackRecordV2.Agent.CIO, 5, 50e8, 60e8, 0,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
         );
     }
 
     function test_commit_refundsExcessFee() public {
         bytes[] memory d = _update(int64(uint64(ENTRY)), T0 - 5, T0 - 70);
         uint256 before = address(this).balance;
+        uint64 anchor8_ = uint64(vm.getBlockTimestamp()) - 5;
         rec.commitTrade{value: 1 ether}(
             keccak256("r1"), "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, d
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor8_, d
         );
         assertEq(before - address(this).balance, 10); // only the fee was kept
         assertEq(address(rec).balance, 0);
@@ -365,7 +375,7 @@ contract BobbyTrackRecordV2Test is Test {
         bytes[] memory empty = new bytes[](0);
         rec.commitTrade(
             h, "OKB", BobbyTrackRecordV2.Agent.ALPHA, 5, 50e8, 60e8, 0,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
         );
         vm.warp(T0 + 2 hours);
         // exit 55 > entry 50 (long) implies WIN; claiming LOSS hits v1 string
@@ -492,7 +502,7 @@ contract BobbyTrackRecordV2Test is Test {
         bytes[] memory empty = new bytes[](0);
         rec.commitTrade(
             h, "OKB", BobbyTrackRecordV2.Agent.ALPHA, 5, 50e8, 60e8, 40e8,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
         );
         bytes[] memory d = _update(39e8, T0 + 100, T0 + 90);
         vm.expectRevert(BobbyTrackRecordV2.ChallengeNotVerified.selector);
@@ -535,9 +545,10 @@ contract BobbyTrackRecordV2Test is Test {
         // Stop 1e8 unit below entry → naive bps truncates to 0; floor forces -1.
         bytes[] memory d = _update(int64(uint64(ENTRY)), T0 - 5, T0 - 70);
         bytes32 h = keccak256("v06");
+        uint64 anchor9_ = uint64(vm.getBlockTimestamp()) - 5;
         rec.commitTrade{value: 10}(
             h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, ENTRY + 1000e8, ENTRY - 1,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, d
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor9_, d
         );
         vm.warp(T0 + 3 hours);
         uint64 anchor = T0 + 1 hours;
@@ -610,14 +621,27 @@ contract BobbyTrackRecordV2Test is Test {
 
     // ============ Audit-round-2 (Kimi/Codex) regression ============
 
-    function test_r2_challengeRejectsTickBeforeCommittedAt() public {
+    function test_r2_challengeFloorIsEntryEvidence() public {
+        // A2-1: with the entry Unique-anchored at a declared entryAt, the
+        // challenge floor is the entry evidence's publishTime — the instant
+        // the position provably opened. A breach in [entry pt, committedAt]
+        // is a genuine oracle-loss (the commit gate already forces the stop
+        // onto the loss side of the ORACLE entry) and must be recordable;
+        // anything BEFORE the entry tick predates the position and must not.
         bytes32 h = keccak256("r2a");
         _commitVerified(h); // committedAt = T0, entryEvidence.publishTime = T0-5
         vm.warp(T0 + 3 hours);
-        // anchor between entry evidence (T0-5) and committedAt (T0): must reject.
-        bytes[] memory d = _update(61_900e8, T0 - 2, T0 - 20);
+
+        // anchor BEFORE the entry evidence: rejected.
+        bytes[] memory early = _update(61_900e8, T0 - 6, T0 - 20);
         vm.expectRevert(BobbyTrackRecordV2.ChallengeAnchorOutOfRange.selector);
+        rec.challengeStopBreach{value: 10}(h, T0 - 6, early);
+
+        // anchor between entry tick (T0-5) and committedAt (T0): a real
+        // breach there now lands as a verified LOSS.
+        bytes[] memory d = _update(61_900e8, T0 - 2, T0 - 20);
         rec.challengeStopBreach{value: 10}(h, T0 - 2, d);
+        assertEq(rec.lossesVerified(), 1);
     }
 
     function test_r2_reclassifyCarriesBreachEvidence() public {
@@ -648,7 +672,8 @@ contract BobbyTrackRecordV2Test is Test {
         // fresh pending commit at T0 again would clash on time; commit another
         // verified trade in the same block window
         bytes[] memory d = _update(int64(uint64(ENTRY)), uint64(vm.getBlockTimestamp()) - 5, uint64(vm.getBlockTimestamp()) - 70);
-        rec.commitTrade{value: 10}(hp, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP, BobbyTrackRecordV2.PriceMode.VERIFIED, d);
+        uint64 anchor10_ = uint64(vm.getBlockTimestamp()) - 5;
+        rec.commitTrade{value: 10}(hp, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor10_, d);
 
         (uint256 winRate, uint256 decided, uint256 resolved_, uint256 expired_, uint256 pending_, uint256 resolutionBps)
             = rec.getVerifiedScorecard();
@@ -733,7 +758,7 @@ contract BobbyTrackRecordV2Test is Test {
         bytes[] memory empty = new bytes[](0);
         rec.commitTrade(
             keccak256("p2"), "OKB", BobbyTrackRecordV2.Agent.ALPHA, 5, 50e8, 60e8, 0,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
         );
         vm.warp(vm.getBlockTimestamp() + 2 hours);
         rec.resolveTrade(keccak256("p2"), 1000, BobbyTrackRecordV2.Result.WIN, 55e8, 0, empty);
@@ -766,7 +791,7 @@ contract BobbyTrackRecordV2Test is Test {
         vm.expectRevert(bytes("Contract is paused"));
         rec.commitTrade(
             keccak256("z2"), "OKB", BobbyTrackRecordV2.Agent.CIO, 5, 50e8, 60e8, 0,
-            BobbyTrackRecordV2.PriceMode.ATTESTED, empty
+            BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty
         );
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;

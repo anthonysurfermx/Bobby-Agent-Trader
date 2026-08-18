@@ -5,7 +5,6 @@ import {
   VERIFIED_FEEDS,
   canonicalizeSymbol,
   resolvePriceMode,
-  buildHermesLatestUrl,
   buildHermesBenchmarkUrl,
   toE8,
 } from '../api/_lib/trackrecord-v2.ts';
@@ -49,15 +48,13 @@ for (const sym of ['OKB', 'NVDA', 'XAUT', 'PEPE']) {
 // a pair form still resolves to the verified base
 eq('BTC-USDT → VERIFIED', resolvePriceMode('btc-usdt').mode, PriceMode.VERIFIED);
 
-// --- Hermes URLs ---
-ok('latest url shape', /\/v2\/updates\/price\/\d+\?ids\[\]=0xe62df6c8.*&encoding=hex$/.test(
-  buildHermesLatestUrl(VERIFIED_FEEDS.BTC)));
+// --- Hermes URLs — benchmark-at-anchor is the ONLY fetch shape (A2-1) ---
 ok('benchmark url pins publishTime', buildHermesBenchmarkUrl(VERIFIED_FEEDS.ETH, 1786591762)
   .includes('/v2/updates/price/1786591762?'));
-ok('latest url is aged (<= now)', (() => {
-  const m = buildHermesLatestUrl(VERIFIED_FEEDS.SOL, 5).match(/price\/(\d+)\?/);
-  return !!m && Number(m[1]) <= Math.floor(Date.now() / 1000);
-})());
+ok('benchmark url shape', /\/v2\/updates\/price\/\d+\?ids\[\]=0xe62df6c8.*&encoding=hex$/.test(
+  buildHermesBenchmarkUrl(VERIFIED_FEEDS.BTC, 1786591762)));
+ok('benchmark floors fractional seconds', buildHermesBenchmarkUrl(VERIFIED_FEEDS.SOL, 1786591762.9)
+  .includes('/1786591762?'));
 
 // --- toE8 matches the contract normalization (real PoC values) ---
 eq('toE8 expo -8 identity', toE8(6350230500000n, -8).toString(), '6350230500000');

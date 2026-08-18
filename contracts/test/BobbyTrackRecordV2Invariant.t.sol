@@ -59,7 +59,8 @@ contract Handler is Test {
         uint96 tgt = ENTRY + (uint96(tgtDelta) + 1) * 1e8;
         uint64 ts = uint64(vm.getBlockTimestamp());
         bytes[] memory d = _update(int64(ENTRY), ts - 5, ts - 70);
-        try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, tgt, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, d) {} catch {}
+        uint64 anchor1_ = uint64(vm.getBlockTimestamp()) - 5;
+        try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, tgt, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor1_, d) {} catch {}
     }
 
     /// @dev Audit r2 external P2 (Codex/Kimi): the handler only generated LONGs
@@ -76,19 +77,21 @@ contract Handler is Test {
             // reported below oracle (inside band); stop strictly above BOTH.
             uint96 rep = ENTRY - off;
             uint96 stop = ENTRY + (uint96(stopDelta) % 2000 + 1) * 1e8;
-            try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.REDTEAM, 5, rep, 0, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, d) {} catch {}
+            uint64 anchor2_ = uint64(vm.getBlockTimestamp()) - 5;
+            try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.REDTEAM, 5, rep, 0, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor2_, d) {} catch {}
         } else {
             // reported above oracle (inside band); stop strictly below BOTH.
             uint96 rep = ENTRY + off;
             uint96 stop = ENTRY - (uint96(stopDelta) % 2000 + 1) * 1e8;
-            try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.ALPHA, 5, rep, 0, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, d) {} catch {}
+            uint64 anchor3_ = uint64(vm.getBlockTimestamp()) - 5;
+            try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.ALPHA, 5, rep, 0, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor3_, d) {} catch {}
         }
     }
 
     function commitAttested() external {
         bytes32 h = keccak256(abi.encode("a", nonce++));
         bytes[] memory empty = new bytes[](0);
-        try rec.commitTrade(h, "OKB", BobbyTrackRecordV2.Agent.ALPHA, 5, 50e8, 60e8, 40e8, BobbyTrackRecordV2.PriceMode.ATTESTED, empty) {} catch {}
+        try rec.commitTrade(h, "OKB", BobbyTrackRecordV2.Agent.ALPHA, 5, 50e8, 60e8, 40e8, BobbyTrackRecordV2.PriceMode.ATTESTED, 0, empty) {} catch {}
     }
 
     /// @dev Audit r2 external P2: ATTESTED resolution was never fuzzed.
@@ -152,7 +155,8 @@ contract Handler is Test {
         bytes32 h = keccak256(abi.encode("v", nonce++));
         uint64 ts = uint64(vm.getBlockTimestamp());
         bytes[] memory d = _update(int64(ENTRY), ts - 5, ts - 70);
-        try rec.commitTrade{value: 1 ether}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, ENTRY + 3000e8, ENTRY - 1000e8, BobbyTrackRecordV2.PriceMode.VERIFIED, d) {} catch {}
+        uint64 anchor4_ = uint64(vm.getBlockTimestamp()) - 5;
+        try rec.commitTrade{value: 1 ether}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, ENTRY + 3000e8, ENTRY - 1000e8, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor4_, d) {} catch {}
     }
 
     /// @dev Audit r2 P2: the random walk rarely lands a challenge inside a
@@ -166,7 +170,8 @@ contract Handler is Test {
         uint96 stop = ENTRY - (uint96(stopDelta) + 1) * 1e8;
         uint64 t0 = uint64(vm.getBlockTimestamp());
         bytes[] memory de = _update(int64(ENTRY), t0 - 5, t0 - 70);
-        try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, ENTRY + 3000e8, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, de) {} catch { return; }
+        uint64 anchor5_ = uint64(vm.getBlockTimestamp()) - 5;
+        try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, ENTRY + 3000e8, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor5_, de) {} catch { return; }
         vm.warp(vm.getBlockTimestamp() + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
         bytes[] memory dr = _update(int64(64_000e8), exitAt + 1, exitAt - 1);
@@ -188,7 +193,8 @@ contract Handler is Test {
         bytes32 h = keccak256(abi.encode("v", nonce++));
         uint64 t0 = uint64(vm.getBlockTimestamp());
         bytes[] memory de = _update(int64(ENTRY), t0 - 5, t0 - 70); // oracle 63,000
-        try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, 63_600e8, 66_000e8, 63_300e8, BobbyTrackRecordV2.PriceMode.VERIFIED, de) {} catch { return; }
+        uint64 anchor6_ = uint64(vm.getBlockTimestamp()) - 5;
+        try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, 63_600e8, 66_000e8, 63_300e8, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor6_, de) {} catch { return; }
         vm.warp(vm.getBlockTimestamp() + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
         bytes[] memory dr = _update(int64(64_000e8), exitAt + 1, exitAt - 1);
