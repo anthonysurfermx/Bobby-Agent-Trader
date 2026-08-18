@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               // could hear it, but the client never received the transcript
               // that switches the chart and starts the visual brief.
               transcription: {
-                model: 'whisper-1',
+                model: 'gpt-4o-mini-transcribe',
                 language: sessionLang,
                 prompt: sessionLang === 'es'
                   ? 'Español de México. Mercados: Nvidia, NVIDIA, NVDA, Bitcoin, Ethereum, BTC, ETH, SOL, Apple, Tesla, oro, long, short, stop, soporte, resistencia.'
