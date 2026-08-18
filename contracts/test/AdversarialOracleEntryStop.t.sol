@@ -19,6 +19,20 @@ contract OESMockPyth {
             out[i] = PythStructs.PriceFeed(id, PythStructs.Price(p, c, e, pt), PythStructs.Price(p, c, e, pt));
         }
     }
+
+    function parsePriceFeedUpdates(
+        bytes[] calldata u, bytes32[] calldata ids, uint64 minT, uint64 maxT
+    ) external payable returns (PythStructs.PriceFeed[] memory out) {
+        require(msg.value >= 10, "fee");
+        out = new PythStructs.PriceFeed[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            (bytes32 id, int64 p, uint64 c, int32 e, uint64 pt,) =
+                abi.decode(u[i], (bytes32, int64, uint64, int32, uint64, uint64));
+            require(id == ids[i], "id");
+            require(minT <= pt && pt <= maxT, "window");
+            out[i] = PythStructs.PriceFeed(id, PythStructs.Price(p, c, e, pt), PythStructs.Price(p, c, e, pt));
+        }
+    }
 }
 
 /// @dev Codex/Kimi r2 adversarial finding: challenge anchors stop+direction to
@@ -101,7 +115,7 @@ contract AdversarialOracleEntryStopTest is Test {
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
         // oracle exit 62,000 < oracle entry 63,000 → short WIN (+158 bps)
-        bytes[] memory dr = _u(int64(62_000e8), exitAt - 10, exitAt - 300);
+        bytes[] memory dr = _u(int64(62_000e8), exitAt + 1, exitAt - 1);
         rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 62_000e8, exitAt, dr);
         assertEq(rec.winsVerified(), 1);
 
@@ -126,7 +140,7 @@ contract AdversarialOracleEntryStopTest is Test {
         rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, REPORTED_ENTRY, TARGET, 62_000e8, BobbyTrackRecordV2.PriceMode.VERIFIED, de);
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        bytes[] memory dr = _u(int64(64_000e8), exitAt - 10, exitAt - 300);
+        bytes[] memory dr = _u(int64(64_000e8), exitAt + 1, exitAt - 1);
         rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, dr);
 
         vm.warp(T0 + 3 hours);

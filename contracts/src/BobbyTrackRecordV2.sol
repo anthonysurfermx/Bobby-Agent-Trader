@@ -34,6 +34,12 @@ interface IPyth {
         uint64 minPublishTime,
         uint64 maxPublishTime
     ) external payable returns (PythStructs.PriceFeed[] memory);
+    function parsePriceFeedUpdates(
+        bytes[] calldata updateData,
+        bytes32[] calldata priceIds,
+        uint64 minPublishTime,
+        uint64 maxPublishTime
+    ) external payable returns (PythStructs.PriceFeed[] memory);
 }
 
 interface IAggregatorV3 {
@@ -413,14 +419,16 @@ contract BobbyTrackRecordV2 {
         }
         if (_entryUpdateData.length == 0) revert EntryProofRequired();
 
-        // Entry window ends at now — never a future publishTime. Unique
-        // semantics make the valid update deterministic (PoC finding).
+        // Entry window ends at now — never a future publishTime. Non-unique
+        // bounded parse (A1-1): minT here derives from the inclusion-time
+        // block.timestamp, which no off-chain fetch can anchor to the second,
+        // so Unique's prev<minT precondition is unsatisfiable on ~1 Hz feeds.
         uint64 maxT = uint64(block.timestamp);
         uint64 minT = block.timestamp > params.entryWindowSec
             ? uint64(block.timestamp - params.entryWindowSec)
             : 0;
         (OracleEvidence memory entryEv, uint256 refund) =
-            _verifyAndPay(_entryUpdateData, feedId, minT, maxT, params.confMaxBps);
+            _verifyAndPay(_entryUpdateData, feedId, minT, maxT, params.confMaxBps, false);
         uint256 entryOracle1e8 = _toE8(entryEv.price, entryEv.expo);
         _requireWithinBand(a.entryPrice, entryOracle1e8, params.entryTolBps);
 
@@ -580,10 +588,15 @@ contract BobbyTrackRecordV2 {
         if (_exitAt > block.timestamp) revert ExitInFuture();
         if (block.timestamp - _exitAt > c.maxExitLagSec) revert ExitTooStale();
 
-        // M-02: the exit verifies against the feed snapshotted at commit,
-        // inside the causal window (S-05/C-05) ending at _exitAt (F-01).
+        // M-02 / A1-1: the exit verifies against the feed snapshotted at
+        // commit, as the FIRST tick at/after the declared _exitAt (canonical
+        // Pyth benchmark pattern — same shape the challenge already uses with
+        // its declared anchor). Unique semantics stay deterministic here
+        // because minT is the caller-declared instant, not derived from
+        // block.timestamp. Causality: minResolveAt > committedAt ≥ entry
+        // publishTime, so pt ≥ _exitAt ≥ minResolveAt is always post-entry.
         (exitEv, refund) = _verifyAndPay(
-            _exitUpdateData, c.entryEvidence.feedId, _exitWindowLower(c, _exitAt), _exitAt, c.confMaxBps
+            _exitUpdateData, c.entryEvidence.feedId, _exitAt, _exitAt + c.exitWindowSec, c.confMaxBps, true
         );
         _requireWithinBand(_exitPrice, _toE8(exitEv.price, exitEv.expo), c.exitTolBps);
 
@@ -596,16 +609,6 @@ contract BobbyTrackRecordV2 {
             _result,
             _pnlBps
         );
-    }
-
-    /// @dev Exit-window lower bound with causality clamps (S-05/C-05). Note:
-    ///      A-08 (minCommitAge > exitWindowSec) makes the committedAt/publishTime
-    ///      clamps redundant in the happy path — they stay as defense-in-depth
-    ///      against any future param regime that weakens A-08.
-    function _exitWindowLower(Commitment storage c, uint64 _exitAt) internal view returns (uint64 lower) {
-        lower = _exitAt - c.exitWindowSec;
-        if (lower < c.committedAt) lower = c.committedAt;
-        if (lower < c.entryEvidence.publishTime) lower = c.entryEvidence.publishTime;
     }
 
     /// @dev Oracle-derived classification + reported-PnL coherence, returning
@@ -686,7 +689,10 @@ contract BobbyTrackRecordV2 {
         uint256 cIdx = stored - 1;
         Commitment storage c = commitments[cIdx];
         require(!c.resolved, "Already resolved");
-        require(block.timestamp >= c.committedAt + MAX_COMMITMENT_TTL, "Not yet expired");
+        // A1-2: STRICTLY greater — at exactly TTL the pending-challenge branch
+        // is still open (it uses >), so an expiry tx can no longer front-run
+        // an in-flight challenge in the boundary block.
+        require(block.timestamp > c.committedAt + MAX_COMMITMENT_TTL, "Not yet expired");
 
         c.resolved = true;
         pendingCount--;
@@ -783,7 +789,7 @@ contract BobbyTrackRecordV2 {
         }
 
         (OracleEvidence memory breachEv, uint256 refund) =
-            _verifyAndPay(_breachUpdateData, c.entryEvidence.feedId, _anchorTs, maxT, c.confMaxBps);
+            _verifyAndPay(_breachUpdateData, c.entryEvidence.feedId, _anchorTs, maxT, c.confMaxBps, true);
 
         uint256 breach1e8 = _toE8(breachEv.price, breachEv.expo);
         if (isLong ? breach1e8 > uint256(c.stopPrice) : breach1e8 < uint256(c.stopPrice)) {
@@ -931,12 +937,26 @@ contract BobbyTrackRecordV2 {
 
     /// @dev Parse exactly ONE update through the active Pyth, charge the exact
     ///      fee, enforce conf gate, and return the evidence + refund owed.
+    ///
+    ///      Audit round 1 (A1-1): `uniqueFirstTick` selects the parse mode.
+    ///      Unique semantics ("first tick at/after minT", prevPublishTime <
+    ///      minT) are only satisfiable when minT is a CALLER-DECLARED anchor —
+    ///      the Hermes benchmark endpoint returns exactly that tick (exit,
+    ///      challenge). For the entry, minT is derived from block.timestamp at
+    ///      inclusion time, which the recorder cannot predict to the second;
+    ///      with ~1 Hz feeds Unique would reject every honest fresh tick
+    ///      (prev ≈ pt-1s is never < now-entryWindow). Entry therefore uses
+    ///      the bounded non-unique parse: signature + publishTime ∈
+    ///      [minT, maxT] + conf gate + tolerance band vs the reported entry.
+    ///      Determinism is not weakened in practice: the anchor choice inside
+    ///      the window always belonged to the recorder under Unique too.
     function _verifyAndPay(
         bytes[] calldata updateData,
         bytes32 feedId,
         uint64 minT,
         uint64 maxT,
-        uint16 confMaxBps
+        uint16 confMaxBps,
+        bool uniqueFirstTick
     ) internal returns (OracleEvidence memory ev, uint256 refund) {
         address pyth = activePyth;
         if (pyth == address(0)) revert NoPythActive();
@@ -950,8 +970,9 @@ contract BobbyTrackRecordV2 {
 
         bytes32[] memory ids = new bytes32[](1);
         ids[0] = feedId;
-        PythStructs.PriceFeed[] memory feeds =
-            IPyth(pyth).parsePriceFeedUpdatesUnique{value: fee}(updateData, ids, minT, maxT);
+        PythStructs.PriceFeed[] memory feeds = uniqueFirstTick
+            ? IPyth(pyth).parsePriceFeedUpdatesUnique{value: fee}(updateData, ids, minT, maxT)
+            : IPyth(pyth).parsePriceFeedUpdates{value: fee}(updateData, ids, minT, maxT);
 
         // V-07: assert the returned feed is the requested one. An honest Pyth
         // guarantees this; a compromised one (the reason for the allowlist) is

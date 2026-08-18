@@ -318,9 +318,11 @@ async function orchestrate() {
     const pt = Number(m[1]);
     const price = BigInt(stubPriceE8);
     const conf = price / 10_000n; // 10 bps — inside the 50 bps confMaxBps gate
+    // A1-3: realistic ~1 Hz cadence — prev = pt-1, the shape live BTC/ETH/SOL
+    // feeds actually produce. A prev of 0 would mask Unique-rule regressions.
     const updateData = coder.encode(
       ['bytes32', 'int64', 'uint64', 'int32', 'uint64', 'uint64'],
-      [feedId, price, conf, -8, pt, 0],
+      [feedId, price, conf, -8, pt, Math.max(0, pt - 1)],
     );
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
       binary: { data: [updateData.slice(2)] },

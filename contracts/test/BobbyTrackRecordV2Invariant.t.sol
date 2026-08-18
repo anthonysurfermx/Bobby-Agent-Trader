@@ -20,6 +20,20 @@ contract InvMockPyth {
             out[i] = PythStructs.PriceFeed(id, PythStructs.Price(price, conf, expo, pt), PythStructs.Price(price, conf, expo, pt));
         }
     }
+
+    function parsePriceFeedUpdates(
+        bytes[] calldata updateData, bytes32[] calldata priceIds, uint64 minT, uint64 maxT
+    ) external payable returns (PythStructs.PriceFeed[] memory out) {
+        require(msg.value >= 10, "fee");
+        out = new PythStructs.PriceFeed[](priceIds.length);
+        for (uint256 i = 0; i < priceIds.length; i++) {
+            (bytes32 id, int64 price, uint64 conf, int32 expo, uint64 pt,) =
+                abi.decode(updateData[i], (bytes32, int64, uint64, int32, uint64, uint64));
+            require(id == priceIds[i], "id");
+            require(minT <= pt && pt <= maxT, "window");
+            out[i] = PythStructs.PriceFeed(id, PythStructs.Price(price, conf, expo, pt), PythStructs.Price(price, conf, expo, pt));
+        }
+    }
 }
 
 /// @dev Bounded actor: commits, resolves, expires and challenges verified and
@@ -98,7 +112,7 @@ contract Handler is Test {
         int64 exitPx = win ? int64(64_000e8) : int64(62_500e8);
         int256 pnl = win ? int256(158) : int256(-79);
         BobbyTrackRecordV2.Result r = win ? BobbyTrackRecordV2.Result.WIN : BobbyTrackRecordV2.Result.LOSS;
-        bytes[] memory d = _update(exitPx, exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(exitPx, exitAt + 1, exitAt - 1);
         try rec.resolveTrade{value: 10}(h, pnl, r, uint96(uint64(exitPx)), exitAt, d) {} catch {}
     }
 
@@ -155,7 +169,7 @@ contract Handler is Test {
         try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, ENTRY + 3000e8, stop, BobbyTrackRecordV2.PriceMode.VERIFIED, de) {} catch { return; }
         vm.warp(vm.getBlockTimestamp() + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        bytes[] memory dr = _update(int64(64_000e8), exitAt - 10, exitAt - 300);
+        bytes[] memory dr = _update(int64(64_000e8), exitAt + 1, exitAt - 1);
         try rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, dr) {} catch { return; }
         // breach anchored inside (committedAt, exitAt]
         uint64 anchor = t0 + 1 hours;
@@ -177,7 +191,7 @@ contract Handler is Test {
         try rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, 63_600e8, 66_000e8, 63_300e8, BobbyTrackRecordV2.PriceMode.VERIFIED, de) {} catch { return; }
         vm.warp(vm.getBlockTimestamp() + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        bytes[] memory dr = _update(int64(64_000e8), exitAt - 10, exitAt - 300);
+        bytes[] memory dr = _update(int64(64_000e8), exitAt + 1, exitAt - 1);
         try rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, dr) {} catch { return; }
         uint64 anchor = t0 + 1 hours;
         bytes[] memory dc = _update(int64(63_200e8), anchor + 3, anchor - 10); // in-band breach

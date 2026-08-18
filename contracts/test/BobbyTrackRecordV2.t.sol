@@ -31,6 +31,25 @@ contract MockPyth {
             out[i] = PythStructs.PriceFeed(id, PythStructs.Price(price, conf, expo, pt), PythStructs.Price(price, conf, expo, pt));
         }
     }
+
+    /// @dev Non-unique bounded parse (A1-1): signature + publishTime range only,
+    ///      no first-tick-in-window precondition — mirrors the real IPyth.
+    function parsePriceFeedUpdates(
+        bytes[] calldata updateData,
+        bytes32[] calldata priceIds,
+        uint64 minPublishTime,
+        uint64 maxPublishTime
+    ) external payable returns (PythStructs.PriceFeed[] memory out) {
+        require(msg.value >= fee, "MockPyth: fee");
+        out = new PythStructs.PriceFeed[](priceIds.length);
+        for (uint256 i = 0; i < priceIds.length; i++) {
+            (bytes32 id, int64 price, uint64 conf, int32 expo, uint64 pt,) =
+                abi.decode(updateData[i], (bytes32, int64, uint64, int32, uint64, uint64));
+            require(id == priceIds[i], "MockPyth: id");
+            require(minPublishTime <= pt && pt <= maxPublishTime, "MockPyth: window");
+            out[i] = PythStructs.PriceFeed(id, PythStructs.Price(price, conf, expo, pt), PythStructs.Price(price, conf, expo, pt));
+        }
+    }
 }
 
 /// @dev Recorder that rejects ETH, to exercise the retained-refund path.
@@ -110,8 +129,10 @@ contract BobbyTrackRecordV2Test is Test {
     }
 
     function _commitVerified(bytes32 hash) internal {
-        // entry oracle == ENTRY exactly; pt just inside the 60s entry window
-        bytes[] memory d = _update(int64(uint64(ENTRY)), uint64(vm.getBlockTimestamp()) - 5, uint64(vm.getBlockTimestamp()) - 70);
+        // entry oracle == ENTRY exactly. A1-3: REALISTIC ~1 Hz cadence —
+        // prev = pt-1, the shape a live BTC/ETH/SOL feed actually produces.
+        // Entry is the non-unique bounded parse, so this fresh tick passes.
+        bytes[] memory d = _update(int64(uint64(ENTRY)), uint64(vm.getBlockTimestamp()) - 5, uint64(vm.getBlockTimestamp()) - 6);
         rec.commitTrade{value: 10}(
             hash, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
             BobbyTrackRecordV2.PriceMode.VERIFIED, d
@@ -121,7 +142,9 @@ contract BobbyTrackRecordV2Test is Test {
     function _resolveWin(bytes32 hash) internal returns (uint64 exitAt) {
         vm.warp(T0 + 2 hours);
         exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        bytes[] memory d = _update(64_000e8, exitAt - 10, exitAt - 300);
+        // A1-1: exit evidence is the FIRST tick at/after the declared exitAt
+        // (Hermes benchmark shape): pt >= exitAt, prev < exitAt, 1s cadence.
+        bytes[] memory d = _update(64_000e8, exitAt + 1, exitAt - 1);
         rec.resolveTrade{value: 10}(hash, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, d);
     }
 
@@ -278,7 +301,7 @@ contract BobbyTrackRecordV2Test is Test {
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
         // oracle says exit 64,000 (> entry, long) = WIN, recorder claims LOSS
-        bytes[] memory d = _update(64_000e8, exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(64_000e8, exitAt + 1, exitAt - 1);
         vm.expectRevert(BobbyTrackRecordV2.ResultContradictsOracle.selector);
         rec.resolveTrade{value: 10}(h, -50, BobbyTrackRecordV2.Result.LOSS, 64_000e8, exitAt, d);
     }
@@ -289,7 +312,7 @@ contract BobbyTrackRecordV2Test is Test {
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
         // verified pnl = +158 bps; reported +300 deviates 142 > 100
-        bytes[] memory d = _update(64_000e8, exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(64_000e8, exitAt + 1, exitAt - 1);
         vm.expectRevert(BobbyTrackRecordV2.PnlOutOfTolerance.selector);
         rec.resolveTrade{value: 10}(h, 300, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, d);
     }
@@ -311,15 +334,30 @@ contract BobbyTrackRecordV2Test is Test {
         rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, T0 + 90 minutes, d);
     }
 
-    function test_resolve_verified_windowRejectsEvidenceAfterExit() public {
+    function test_resolve_verified_windowRejectsEvidenceOutsideBenchmark() public {
+        // A1-1: exit evidence is the FIRST tick at/after the declared exitAt
+        // (benchmark semantics). A tick BEFORE exitAt fails min bound; a tick
+        // past exitAt+exitWindowSec fails the max bound; and a tick that is not
+        // the first-at/after (prev >= exitAt) fails Unique.
         bytes32 h = keccak256("w5");
         _commitVerified(h);
         vm.warp(T0 + 2 hours);
-        uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        // evidence published AFTER the declared exit (F-01)
-        bytes[] memory d = _update(64_000e8, exitAt + 5, exitAt - 300);
+        uint64 exitAt = uint64(vm.getBlockTimestamp()) - 300;
+
+        // tick before the declared exit — retroactive cherry-pick, rejected
+        bytes[] memory before_ = _update(64_000e8, exitAt - 5, exitAt - 6);
         vm.expectRevert(bytes("MockPyth: window"));
-        rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, d);
+        rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, before_);
+
+        // tick beyond the exit window — too far after the declared instant
+        bytes[] memory late = _update(64_000e8, exitAt + 121, exitAt - 1);
+        vm.expectRevert(bytes("MockPyth: window"));
+        rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, late);
+
+        // NOT the first tick at/after exitAt (an earlier in-window tick exists)
+        bytes[] memory notFirst = _update(64_000e8, exitAt + 60, exitAt + 30);
+        vm.expectRevert(bytes("MockPyth: window"));
+        rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, notFirst);
     }
 
     function test_resolve_attested_v1CoherenceVerbatim() public {
@@ -357,7 +395,7 @@ contract BobbyTrackRecordV2Test is Test {
         // Chainlink fresh but 5% away from the Pyth exit price
         agg.set(int256(uint256(61_000e8)), vm.getBlockTimestamp());
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        bytes[] memory d = _update(64_000e8, exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(64_000e8, exitAt + 1, exitAt - 1);
         vm.expectEmit(true, false, false, false);
         emit OracleDiscrepancy(h, 0, 0);
         rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, d);
@@ -470,7 +508,7 @@ contract BobbyTrackRecordV2Test is Test {
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
         // oracle exit 62,500 < entry 63,000 (long) → LOSS, -79 bps
-        bytes[] memory d = _update(62_500e8, exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(62_500e8, exitAt + 1, exitAt - 1);
         rec.resolveTrade{value: 10}(h, -79, BobbyTrackRecordV2.Result.LOSS, 62_500e8, exitAt, d);
 
         assertEq(rec.lossesVerified(), 1);
@@ -486,7 +524,7 @@ contract BobbyTrackRecordV2Test is Test {
         _commitVerified(h);
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        bytes[] memory d = _update(64_000e8, exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(64_000e8, exitAt + 1, exitAt - 1);
         rec.resolveTrade{value: 10}(h, 120, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, d);
         BobbyTrackRecordV2.Trade memory t = rec.getTrade(0);
         assertEq(t.pnlBps, 158); // oracle-derived, not the reported 120
@@ -517,7 +555,7 @@ contract BobbyTrackRecordV2Test is Test {
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
         // oracle exit == entry → BREAK_EVEN
-        bytes[] memory d = _update(int64(uint64(ENTRY)), exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(int64(uint64(ENTRY)), exitAt + 1, exitAt - 1);
         rec.resolveTrade{value: 10}(h, 0, BobbyTrackRecordV2.Result.BREAK_EVEN, ENTRY, exitAt, d);
         assertEq(rec.winsVerified(), 0);
         assertEq(rec.lossesVerified(), 0);
@@ -688,7 +726,7 @@ contract BobbyTrackRecordV2Test is Test {
         assertEq(rec.activePyth(), address(0));
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        bytes[] memory d = _update(64_000e8, exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(64_000e8, exitAt + 1, exitAt - 1);
         vm.expectRevert(BobbyTrackRecordV2.NoPythActive.selector);
         rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, d);
         // attested settlement unaffected (r5: settlement never pausable)
@@ -732,7 +770,7 @@ contract BobbyTrackRecordV2Test is Test {
         );
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;
-        bytes[] memory d = _update(64_000e8, exitAt - 10, exitAt - 300);
+        bytes[] memory d = _update(64_000e8, exitAt + 1, exitAt - 1);
         rec.resolveTrade{value: 10}(h, 158, BobbyTrackRecordV2.Result.WIN, 64_000e8, exitAt, d); // works while paused
     }
 }
