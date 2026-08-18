@@ -80,8 +80,10 @@ contract AdversarialOracleEntryStopTest is Test {
         // gain against the verified entry.
         bytes32 h = keccak256("oes");
         rec.announceCommit(h);
-        bytes[] memory de = _u(int64(uint64(ORACLE_ENTRY)), T0, T0 - 1);
-        uint64 anchor1_ = uint64(vm.getBlockTimestamp());
+        uint64 anchorD = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchorD);
+        bytes[] memory de = _u(int64(uint64(ORACLE_ENTRY)), anchorD, anchorD - 1);
+        uint64 anchor1_ = anchorD;
         vm.expectRevert(BobbyTrackRecordV2.InvalidDirection.selector);
         rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, REPORTED_ENTRY, TARGET, STOP, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor1_, de);
     }
@@ -92,8 +94,10 @@ contract AdversarialOracleEntryStopTest is Test {
         // same fabrication surface mirrored. Must be rejected at commit.
         bytes32 h = keccak256("oes-short");
         rec.announceCommit(h);
-        bytes[] memory de = _u(int64(uint64(ORACLE_ENTRY)), T0, T0 - 1);
-        uint64 anchor2_ = uint64(vm.getBlockTimestamp());
+        uint64 anchorD = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchorD);
+        bytes[] memory de = _u(int64(uint64(ORACLE_ENTRY)), anchorD, anchorD - 1);
+        uint64 anchor2_ = anchorD;
         vm.expectRevert(BobbyTrackRecordV2.InvalidDirection.selector);
         rec.commitTrade{value: 10}(
             h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7,
@@ -108,10 +112,12 @@ contract AdversarialOracleEntryStopTest is Test {
         // ABOVE the oracle entry reclassifies to LOSS with oracle-derived pnl.
         bytes32 h = keccak256("short-life");
         rec.announceCommit(h);
-        bytes[] memory de = _u(int64(uint64(ORACLE_ENTRY)), T0, T0 - 1);
+        uint64 anchorD = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchorD);
+        bytes[] memory de = _u(int64(uint64(ORACLE_ENTRY)), anchorD, anchorD - 1);
         // short: reported 63,100 (within band of 63,000), stop 64,000 (> both),
         // target 61,000 (< both)
-        uint64 anchor3_ = uint64(vm.getBlockTimestamp());
+        uint64 anchor3_ = anchorD;
         rec.commitTrade{value: 10}(
             h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7,
             63_100e8, 61_000e8, 64_000e8,
@@ -143,8 +149,10 @@ contract AdversarialOracleEntryStopTest is Test {
         // reclassify to LOSS, so the fix doesn't neuter the mechanism.
         bytes32 h = keccak256("real");
         rec.announceCommit(h);
-        bytes[] memory de = _u(int64(uint64(ORACLE_ENTRY)), T0, T0 - 1);
-        uint64 anchor4_ = uint64(vm.getBlockTimestamp());
+        uint64 anchorD = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchorD);
+        bytes[] memory de = _u(int64(uint64(ORACLE_ENTRY)), anchorD, anchorD - 1);
+        uint64 anchor4_ = anchorD;
         rec.commitTrade{value: 10}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, REPORTED_ENTRY, TARGET, 62_000e8, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor4_, de);
         vm.warp(T0 + 2 hours);
         uint64 exitAt = uint64(vm.getBlockTimestamp()) - 100;

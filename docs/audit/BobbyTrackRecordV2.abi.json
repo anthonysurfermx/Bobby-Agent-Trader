@@ -108,6 +108,19 @@
   },
   {
     "type": "function",
+    "name": "MIN_ENTRY_DELAY_SEC",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "PNL_TOLERANCE_BPS",
     "inputs": [],
     "outputs": [

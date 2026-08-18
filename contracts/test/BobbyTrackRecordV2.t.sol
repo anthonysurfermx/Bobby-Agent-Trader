@@ -56,10 +56,13 @@ contract MockPyth {
 contract RejectingRecorder {
     BobbyTrackRecordV2 rec;
     constructor(BobbyTrackRecordV2 _rec) { rec = _rec; }
-    function commit(bytes32 h, bytes[] calldata d, uint96 e, uint96 tg, uint96 s) external payable {
-        // A3-1: announce (same block) then commit with anchor == announcedAt.
+    function announce(bytes32 h) external {
         rec.announceCommit(h);
-        uint64 entryAt = uint64(block.timestamp);
+    }
+
+    function commit(bytes32 h, bytes[] calldata d, uint96 e, uint96 tg, uint96 s) external payable {
+        // A4-1: the caller announced earlier; anchor derives on-chain.
+        uint64 entryAt = rec.announcedAt(h) + rec.MIN_ENTRY_DELAY_SEC();
         rec.commitTrade{value: msg.value}(h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, e, tg, s, BobbyTrackRecordV2.PriceMode.VERIFIED, entryAt, d);
     }
     // no receive() → any refund .call reverts, forcing the retained path
@@ -132,11 +135,12 @@ contract BobbyTrackRecordV2Test is Test {
     }
 
     function _commitVerified(bytes32 hash) internal {
-        // A3-1 flow: announce fixes the anchor (this block's timestamp),
-        // commit consumes it. Evidence: FIRST tick at/after the anchor at
-        // realistic ~1 Hz cadence (prev = pt-1). Entry oracle == ENTRY.
+        // A4-1 flow: announce fixes a DERIVED FUTURE anchor
+        // (announcedAt + MIN_ENTRY_DELAY_SEC); the recorder waits for the
+        // anchor instant, then commits with its first tick (1 Hz cadence).
         rec.announceCommit(hash);
-        uint64 anchor = uint64(vm.getBlockTimestamp());
+        uint64 anchor = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor);
         bytes[] memory d = _update(int64(uint64(ENTRY)), anchor, anchor - 1);
         rec.commitTrade{value: 10}(
             hash, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
@@ -160,7 +164,7 @@ contract BobbyTrackRecordV2Test is Test {
         BobbyTrackRecordV2.Commitment memory c = rec.getCommitment(0);
         assertEq(uint8(c.mode), uint8(BobbyTrackRecordV2.PriceMode.VERIFIED));
         assertEq(c.entryEvidence.feedId, BTC_FEED);
-        assertEq(c.entryEvidence.publishTime, T0); // == announced anchor
+        assertEq(c.entryEvidence.publishTime, T0 + 10); // announcedAt + MIN_ENTRY_DELAY_SEC
         assertEq(c.entryWindowSec, 60);
         assertEq(c.challengeWindowSec, 7 days);
         (, , uint256 pending) = rec.getCoverage(BobbyTrackRecordV2.PriceMode.VERIFIED);
@@ -255,7 +259,8 @@ contract BobbyTrackRecordV2Test is Test {
     function test_commit_verified_entryBandEnforced() public {
         // oracle 63,000 but reported entry 64,000 → 158 bps > 100 tol
         rec.announceCommit(keccak256("b1"));
-        uint64 anchor7_ = uint64(vm.getBlockTimestamp());
+        uint64 anchor7_ = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor7_);
         bytes[] memory d = _update(int64(uint64(ENTRY)), anchor7_, anchor7_ - 1);
         vm.expectRevert(BobbyTrackRecordV2.PriceOutOfBand.selector);
         rec.commitTrade{value: 10}(
@@ -281,7 +286,8 @@ contract BobbyTrackRecordV2Test is Test {
 
     function test_commit_refundsExcessFee() public {
         rec.announceCommit(keccak256("r1"));
-        uint64 anchor8_ = uint64(vm.getBlockTimestamp());
+        uint64 anchor8_ = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor8_);
         bytes[] memory d = _update(int64(uint64(ENTRY)), anchor8_, anchor8_ - 1);
         uint256 before = address(this).balance;
         rec.commitTrade{value: 1 ether}(
@@ -549,7 +555,8 @@ contract BobbyTrackRecordV2Test is Test {
         // Stop 1e8 unit below entry → naive bps truncates to 0; floor forces -1.
         bytes32 h = keccak256("v06");
         rec.announceCommit(h);
-        uint64 anchor9_ = uint64(vm.getBlockTimestamp());
+        uint64 anchor9_ = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor9_);
         bytes[] memory d = _update(int64(uint64(ENTRY)), anchor9_, anchor9_ - 1);
         rec.commitTrade{value: 10}(
             h, "BTC", BobbyTrackRecordV2.Agent.CIO, 5, ENTRY, ENTRY + 1000e8, ENTRY - 1,
@@ -614,7 +621,9 @@ contract BobbyTrackRecordV2Test is Test {
         // A recorder contract that rejects ETH makes the refund fail → retained.
         RejectingRecorder rr = new RejectingRecorder(rec);
         rec.setBobby(address(rr));
-        bytes[] memory d = _update(int64(uint64(ENTRY)), T0, T0 - 1);
+        rr.announce(keccak256("rf1"));
+        vm.warp(T0 + 10); // reach the derived anchor
+        bytes[] memory d = _update(int64(uint64(ENTRY)), T0 + 10, T0 + 9);
         rr.commit{value: 1 ether}(keccak256("rf1"), d, ENTRY, TARGET, STOP);
         assertEq(rec.retainedFees(), 1 ether - 10);
         assertEq(address(rec).balance, 1 ether - 10);
@@ -637,7 +646,7 @@ contract BobbyTrackRecordV2Test is Test {
         // 30s later — so [entry pt, committedAt] = [T0, T0+30] is a real gap.
         bytes32 h = keccak256("r2a");
         rec.announceCommit(h);
-        uint64 anchor = uint64(vm.getBlockTimestamp()); // T0
+        uint64 anchor = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC(); // T0+10
         bytes[] memory de = _update(int64(uint64(ENTRY)), anchor, anchor - 1);
         vm.warp(T0 + 30);
         rec.commitTrade{value: 10}(
@@ -686,7 +695,8 @@ contract BobbyTrackRecordV2Test is Test {
         // fresh pending commit at T0 again would clash on time; commit another
         // verified trade in the same block window
         rec.announceCommit(hp);
-        uint64 anchor10_ = uint64(vm.getBlockTimestamp());
+        uint64 anchor10_ = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor10_);
         bytes[] memory d = _update(int64(uint64(ENTRY)), anchor10_, anchor10_ - 1);
         rec.commitTrade{value: 10}(hp, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP, BobbyTrackRecordV2.PriceMode.VERIFIED, anchor10_, d);
 

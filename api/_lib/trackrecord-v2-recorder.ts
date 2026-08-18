@@ -23,6 +23,7 @@ import {
   toE8,
   TRACKRECORD_V2_ABI,
   PYTH_FEE_BUFFER_WEI,
+  MIN_ENTRY_DELAY_SEC,
 } from './trackrecord-v2.js';
 
 const V2_IFACE = new ethers.Interface(TRACKRECORD_V2_ABI as unknown as string[]);
@@ -99,11 +100,12 @@ export async function commitV2(
   let oraclePriceE8: bigint | undefined;
   let oraclePublishTime: number | undefined;
 
-  // A3-1: two-step commit. The ANNOUNCEMENT fixes the anchor on-chain before
-  // its oracle evidence exists — the contract then requires
-  // entryAt == announcedAt, so the recorder can neither backdate nor shop.
-  // The commit must land within entryWindowSec of the announcement
-  // (EntryTooStale), which the immediate follow-up satisfies.
+  // A3-1/A4-1: two-step commit with a DERIVED FUTURE anchor. The announcement
+  // fixes announcedAt on-chain; the anchor is announcedAt + MIN_ENTRY_DELAY_SEC
+  // — strictly in the announce block's future, so its tick cannot exist (let
+  // alone be known) when the anchor is fixed. The recorder then WAITS for the
+  // anchor instant, fetches its first tick from Hermes, and commits within
+  // entryWindowSec.
   let entryAt = 0;
   let announceNonce: number | undefined;
   if (mode === PriceMode.VERIFIED) {
@@ -118,7 +120,12 @@ export async function commitV2(
     });
     const annReceipt = await annTx.wait();
     const annBlock = await wallet.provider!.getBlock(annReceipt!.blockNumber);
-    entryAt = Number(annBlock!.timestamp); // == announcedAt on-chain
+    entryAt = Number(annBlock!.timestamp) + MIN_ENTRY_DELAY_SEC; // derived anchor
+
+    // Wait until the anchor instant has passed (plus one tick of slack so
+    // the first tick at/after it exists on Hermes).
+    const waitMs = (entryAt + 1) * 1000 - Date.now();
+    if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
   }
 
   if (mode === PriceMode.VERIFIED && feedId) {

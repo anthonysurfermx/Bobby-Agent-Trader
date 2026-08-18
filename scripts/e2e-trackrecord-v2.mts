@@ -95,7 +95,7 @@ async function stubControl(path: string, payload: unknown): Promise<void> {
 // ─────────────────────────────────────────────────────────────
 async function runV2() {
   const { default: handler } = await import('../api/xlayer-record.ts');
-  const { TRACKRECORD_V2_ABI, buildHermesBenchmarkUrl, fetchSignedUpdate } =
+  const { TRACKRECORD_V2_ABI, buildHermesBenchmarkUrl, fetchSignedUpdate, MIN_ENTRY_DELAY_SEC } =
     await import('../api/_lib/trackrecord-v2.ts');
 
   const provider = new JsonRpcProvider(process.env.BASE_SEPOLIA_RPC_URL);
@@ -103,6 +103,7 @@ async function runV2() {
     process.env.BASE_SEPOLIA_TRACK_RECORD_ADDRESS!,
     [
       ...TRACKRECORD_V2_ABI,
+      'function MIN_ENTRY_DELAY_SEC() view returns (uint64)',
       'function pendingCount() view returns (uint256)',
       'function winsVerified() view returns (uint256)',
       'function lossesVerified() view returns (uint256)',
@@ -115,6 +116,10 @@ async function runV2() {
     await provider.send('evm_mine', []);
   };
   const now = async () => Number((await provider.getBlock('latest'))!.timestamp);
+
+  // ── A4-1 drift guard: backend delay constant MUST equal the contract's ──
+  check('MIN_ENTRY_DELAY_SEC parity (contract == backend)',
+    Number(await v2.MIN_ENTRY_DELAY_SEC()) === MIN_ENTRY_DELAY_SEC);
 
   // ── commit VERIFIED (BTC) through the handler ──
   await stubControl('/__price', { priceE8: (65000n * 10n ** 8n).toString() });

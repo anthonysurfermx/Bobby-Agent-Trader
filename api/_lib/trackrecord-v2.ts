@@ -139,6 +139,11 @@ export async function fetchSignedUpdate(
  * fee is ~4e12 wei (~$0.015); this buffer covers it with margin. Override via
  * env if a chain's fee ever rises.
  */
+/** A4-1: the entry anchor derives on-chain as announcedAt + this delay.
+ *  MUST equal the contract's MIN_ENTRY_DELAY_SEC — the E2E harness asserts
+ *  the two never drift. */
+export const MIN_ENTRY_DELAY_SEC = 10;
+
 export const PYTH_FEE_BUFFER_WEI = BigInt(process.env.PYTH_FEE_BUFFER_WEI || '20000000000000'); // 2e13 = 0.00002 ETH
 
 /** V2 write + read ABI (ethers human-readable). Generated to match the frozen

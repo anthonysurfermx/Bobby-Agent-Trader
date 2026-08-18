@@ -117,7 +117,8 @@ contract Audit1HermesCadenceRegression is Test {
         // benchmark at that instant — the FIRST tick at/after it (1s cadence).
         bytes32 h = keccak256("fresh-entry");
         rec.announceCommit(h);
-        uint64 anchor = uint64(vm.getBlockTimestamp());
+        uint64 anchor = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor); // the recorder waits for the derived anchor instant
         bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), anchor);
         rec.commitTrade{value: 10}(
             h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
@@ -132,7 +133,8 @@ contract Audit1HermesCadenceRegression is Test {
         // tick fails the Unique window even though it is signed and fresh-ish.
         bytes32 h = keccak256("stale-entry");
         rec.announceCommit(h);
-        uint64 anchor = uint64(vm.getBlockTimestamp());
+        uint64 anchor = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor);
         bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), anchor - 30);
         vm.expectRevert(bytes("RealRulePyth: window"));
         rec.commitTrade{value: 10}(
@@ -162,7 +164,7 @@ contract Audit1HermesCadenceRegression is Test {
         bytes32 h = keccak256("fresh-entry");
 
         // Exactly at committedAt + TTL: expiry must NOT be possible yet…
-        vm.warp(uint256(T0) + rec.MAX_COMMITMENT_TTL());
+        vm.warp(uint256(T0) + 10 + rec.MAX_COMMITMENT_TTL()); // committedAt (T0+10) + TTL exactly
         vm.expectRevert(bytes("Not yet expired"));
         rec.expireCommitment(h);
 
@@ -182,8 +184,8 @@ contract Audit1HermesCadenceRegression is Test {
         // tick at/after the declared anchor, killing retrospective selection.
         bytes32 h = keccak256("shopped");
         rec.announceCommit(h);
-        uint64 anchor = uint64(vm.getBlockTimestamp());
-        vm.warp(anchor + 40); // market observed for 40s after the announcement
+        uint64 anchor = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor + 40); // market observed for 40s after the anchor
         bytes[] memory shopped = _realUpdate(int64(uint64(ENTRY)), anchor + 20); // prev = anchor+19 >= anchor
         vm.expectRevert(bytes("RealRulePyth: window"));
         rec.commitTrade{value: 10}(
@@ -202,7 +204,8 @@ contract Audit1HermesCadenceRegression is Test {
             BobbyTrackRecordV2.PriceMode.VERIFIED, nowTs, d
         );
 
-        // Anchor != announcedAt (the backdating attempt) → EntryAnchorMismatch.
+        // Anchor != announcedAt + delay (any backdating attempt) →
+        // EntryAnchorMismatch.
         bytes32 h = keccak256("mismatch");
         rec.announceCommit(h);
         vm.warp(nowTs + 30);
@@ -218,19 +221,35 @@ contract Audit1HermesCadenceRegression is Test {
         // into observed price action).
         bytes32 h2 = keccak256("stale-announce");
         rec.announceCommit(h2);
-        uint64 ann2 = uint64(vm.getBlockTimestamp());
-        vm.warp(ann2 + 61);
-        bytes[] memory d2 = _realUpdate(int64(uint64(ENTRY)), ann2);
+        uint64 anchor2 = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        vm.warp(anchor2 + 61);
+        bytes[] memory d2 = _realUpdate(int64(uint64(ENTRY)), anchor2);
         vm.expectRevert(BobbyTrackRecordV2.EntryTooStale.selector);
         rec.commitTrade{value: 10}(
             h2, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, ann2, d2
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor2, d2
+        );
+    }
+
+    function test_A4_1_sameBlockAnnounceCommitReverts() public {
+        // The round-4 P1: packing announce+commit into ONE block would let a
+        // recorder who already holds this second's tick "announce" it. The
+        // derived future anchor makes that structurally impossible — the
+        // anchor instant has not arrived yet in the announce block.
+        bytes32 h = keccak256("same-block");
+        rec.announceCommit(h);
+        uint64 anchor = uint64(vm.getBlockTimestamp()) + rec.MIN_ENTRY_DELAY_SEC();
+        bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), anchor); // hypothetical future tick
+        vm.expectRevert(BobbyTrackRecordV2.EntryInFuture.selector);
+        rec.commitTrade{value: 10}(
+            h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor, d
         );
     }
 
     function test_A1_2_afterTTL_expiryWorks() public {
         test_A1_1_freshEntryTickCommits();
-        vm.warp(uint256(T0) + rec.MAX_COMMITMENT_TTL() + 1);
+        vm.warp(uint256(T0) + 10 + rec.MAX_COMMITMENT_TTL() + 1);
         rec.expireCommitment(keccak256("fresh-entry"));
         (, uint256 expired,) = rec.getCoverage(BobbyTrackRecordV2.PriceMode.VERIFIED);
         assertEq(expired, 1, "strictly-after-TTL expiry still functions");
