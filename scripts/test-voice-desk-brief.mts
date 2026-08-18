@@ -44,13 +44,14 @@ assert.match(english.risk, /184\.2/);
 
 const incomplete = buildDeskBrief({
   symbol: 'sol',
-  market: { price: 142.1 },
+  market: { price: 142.1, change_24h_pct: null },
   technicals: null,
   lang: 'es',
 });
 
 assert.equal(incomplete.bias, 'neutral');
+assert.equal(incomplete.change24hPct, null, 'missing 24h change must not be rendered as 0%');
 assert.match(incomplete.summary, /no hay suficientes velas/);
 assert.doesNotMatch(incomplete.summary, /alcista|bajista/);
 
-console.log('voice desk brief: 12/12 assertions passed');
+console.log('voice desk brief: 13/13 assertions passed');
