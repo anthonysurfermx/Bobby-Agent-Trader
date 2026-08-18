@@ -115,6 +115,9 @@ contract BobbyTrackRecordV2 {
     error EntryInFuture();
     error EntryTooStale();
     error AttestedNoEntryAnchor();
+    error AnnounceRequired();
+    error EntryAnchorMismatch();
+    error AlreadyCommitted();
     error StopRequiredForVerified();
     error InvalidDirection();
     error AttestedNoEvidence();
@@ -168,6 +171,15 @@ contract BobbyTrackRecordV2 {
 
     /// @dev commitIndex[hash] = arrayIndex + 1; 0 = "not committed" (v1).
     mapping(bytes32 => uint256) public commitIndex;
+
+    /// @dev A3-1: VERIFIED entries anchor at a PRE-ANNOUNCED instant. The
+    ///      announcement fixes the anchor BEFORE its oracle evidence exists,
+    ///      so the recorder cannot backdate an entry onto already-observed
+    ///      price action. commitTrade then requires entryAt == announcedAt
+    ///      (equality, not >=: a range would leave [announcedAt, commit]
+    ///      retrospectively selectable). Re-announcing only moves the anchor
+    ///      FORWARD (block.timestamp is monotonic), which is harmless.
+    mapping(bytes32 => uint64) public announcedAt;
     uint256 public pendingCount;
 
     /// @dev tradeIndex[hash] = tradesArrayIndex + 1; 0 = "no trade row yet".
@@ -248,6 +260,7 @@ contract BobbyTrackRecordV2 {
         uint64 breachPublishTime, uint256 breachPrice1e8, bool wasResolved
     );
     event CommitmentExpired(uint256 indexed commitId, bytes32 indexed debateHash, string symbol);
+    event CommitAnnounced(bytes32 indexed debateHash, uint64 announcedAt);
     event FeedSet(bytes32 indexed symbolHash, string symbol, bytes32 feedId);
     event SanityFeedSet(bytes32 indexed symbolHash, string symbol, address aggregator);
     event PythApproved(address indexed pyth, uint64 activatableAt);
@@ -357,6 +370,20 @@ contract BobbyTrackRecordV2 {
         uint64 entryAt;
     }
 
+    /// @notice A3-1: fix the entry anchor for a future VERIFIED commit. The
+    ///         anchor is this block's timestamp — chosen while its oracle
+    ///         evidence does not exist yet, which is what makes the later
+    ///         entry non-retrospective. Commit must follow within the entry
+    ///         window (EntryTooStale otherwise); re-announcing simply moves
+    ///         the anchor forward.
+    function announceCommit(bytes32 _debateHash) external onlyBobby whenNotPaused {
+        require(_debateHash != bytes32(0), "Invalid debate hash");
+        if (commitIndex[_debateHash] != 0) revert AlreadyCommitted();
+        uint64 ts = uint64(block.timestamp);
+        announcedAt[_debateHash] = ts;
+        emit CommitAnnounced(_debateHash, ts);
+    }
+
     function commitTrade(
         bytes32 _debateHash,
         string calldata _symbol,
@@ -427,13 +454,18 @@ contract BobbyTrackRecordV2 {
         }
         if (_entryUpdateData.length == 0) revert EntryProofRequired();
 
-        // A2-1: the entry anchors to a CALLER-DECLARED instant, same canonical
-        // benchmark pattern as exit and challenge. Unique semantics then pin
-        // the evidence to the FIRST tick at/after _entryAt — the recorder
-        // cannot retrospectively shop among in-window ticks (the A1-1 fix's
-        // regression). The anchor itself must be recent and never in the
-        // future, so the entry price is pinned to the moment of commitment
-        // within entryWindowSec.
+        // A2-1/A3-1: the entry anchors to the PRE-ANNOUNCED instant. Equality
+        // with announcedAt (not >=) closes bounded backdating: a range would
+        // leave [announcedAt, now] retrospectively selectable after observing
+        // the market. Unique semantics then pin the evidence to the FIRST
+        // tick at/after that anchor. Recency (EntryTooStale) forces the
+        // commit to land within entryWindowSec of the announcement, so the
+        // anchor can never be aged into observed price action.
+        {
+            uint64 ann = announcedAt[a.debateHash];
+            if (ann == 0) revert AnnounceRequired();
+            if (a.entryAt != ann) revert EntryAnchorMismatch();
+        }
         if (a.entryAt > block.timestamp) revert EntryInFuture();
         if (block.timestamp - a.entryAt > params.entryWindowSec) revert EntryTooStale();
         (OracleEvidence memory entryEv, uint256 refund) = _verifyAndPay(
@@ -460,6 +492,7 @@ contract BobbyTrackRecordV2 {
             }
         }
 
+        delete announcedAt[a.debateHash]; // consumed — gas refund + hygiene
         _storeCommitment(a, PriceMode.VERIFIED, feedId, entryEv);
         _refund(refund);
     }

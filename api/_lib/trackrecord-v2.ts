@@ -146,6 +146,7 @@ export const PYTH_FEE_BUFFER_WEI = BigInt(process.env.PYTH_FEE_BUFFER_WEI || '20
  *  never hand-drift. NOTE: getWinRate() (v1 selector 0x6f61e432) is GONE —
  *  D-1 splits it into getVerifiedWinRate/getAttestedWinRate. */
 export const TRACKRECORD_V2_ABI = [
+  'function announceCommit(bytes32 _debateHash)',
   'function commitTrade(bytes32 _debateHash, string _symbol, uint8 _agent, uint8 _conviction, uint96 _entryPrice, uint96 _targetPrice, uint96 _stopPrice, uint8 _declaredMode, uint64 _entryAt, bytes[] _entryUpdateData) payable',
   'function resolveTrade(bytes32 _debateHash, int256 _pnlBps, uint8 _result, uint96 _exitPrice, uint64 _exitAt, bytes[] _exitUpdateData) payable',
   'function challengeStopBreach(bytes32 _debateHash, uint64 _anchorTs, bytes[] _breachUpdateData) payable',

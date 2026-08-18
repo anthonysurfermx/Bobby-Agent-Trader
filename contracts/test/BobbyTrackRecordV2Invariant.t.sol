@@ -72,7 +72,8 @@ contract Handler is Test {
         bytes32 h = keccak256(abi.encode("v", nonce++));
         uint96 off = uint96((uint256(ENTRY) * (uint256(offBps) % 95)) / 10_000);
         uint64 ts = uint64(vm.getBlockTimestamp());
-        bytes[] memory d = _update(int64(ENTRY), ts - 5, ts - 70);
+        try rec.announceCommit(h) {} catch {}
+        bytes[] memory d = _update(int64(ENTRY), ts, ts - 1);
         if (short_) {
             // reported below oracle (inside band); stop strictly above BOTH.
             uint96 rep = ENTRY - off;

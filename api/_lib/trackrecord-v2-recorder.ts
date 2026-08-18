@@ -99,11 +99,27 @@ export async function commitV2(
   let oraclePriceE8: bigint | undefined;
   let oraclePublishTime: number | undefined;
 
-  // A2-1: the entry anchors to a DECLARED instant (a few seconds back so the
-  // first tick at/after it already exists and clears chain-clock skew). The
-  // contract pins the evidence to the first tick at/after this anchor —
-  // Unique semantics — so the recorder cannot shop among in-window ticks.
-  const entryAt = mode === PriceMode.VERIFIED ? Math.floor(Date.now() / 1000) - 5 : 0;
+  // A3-1: two-step commit. The ANNOUNCEMENT fixes the anchor on-chain before
+  // its oracle evidence exists — the contract then requires
+  // entryAt == announcedAt, so the recorder can neither backdate nor shop.
+  // The commit must land within entryWindowSec of the announcement
+  // (EntryTooStale), which the immediate follow-up satisfies.
+  let entryAt = 0;
+  let announceNonce: number | undefined;
+  if (mode === PriceMode.VERIFIED) {
+    const annData = V2_IFACE.encodeFunctionData('announceCommit', [p.debateHash]);
+    const [annGas, nonce0] = await Promise.all([
+      wallet.estimateGas({ to: contract, data: annData }),
+      wallet.provider!.getTransactionCount(wallet.address, 'pending'),
+    ]);
+    announceNonce = nonce0;
+    const annTx = await wallet.sendTransaction({
+      to: contract, data: annData, gasLimit: (annGas * 13n) / 10n, nonce: nonce0,
+    });
+    const annReceipt = await annTx.wait();
+    const annBlock = await wallet.provider!.getBlock(annReceipt!.blockNumber);
+    entryAt = Number(annBlock!.timestamp); // == announcedAt on-chain
+  }
 
   if (mode === PriceMode.VERIFIED && feedId) {
     const update = await fetchSignedUpdate(buildHermesBenchmarkUrl(feedId, entryAt));
@@ -135,10 +151,12 @@ export async function commitV2(
     updateData,
   ]);
 
-  const [gas, nonce] = await Promise.all([
-    wallet.estimateGas({ to: contract, data, value }),
-    wallet.provider!.getTransactionCount(wallet.address, 'pending'),
-  ]);
+  const gas = await wallet.estimateGas({ to: contract, data, value });
+  // Chain from the announce nonce when one was consumed — re-reading
+  // 'pending' right after a broadcast races the RPC (canary-002).
+  const nonce = announceNonce !== undefined
+    ? announceNonce + 1
+    : await wallet.provider!.getTransactionCount(wallet.address, 'pending');
   const tx = await wallet.sendTransaction({
     to: contract,
     data,

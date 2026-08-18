@@ -294,6 +294,38 @@
   },
   {
     "type": "function",
+    "name": "announceCommit",
+    "inputs": [
+      {
+        "name": "_debateHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "announcedAt",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "approvePyth",
     "inputs": [
       {
@@ -1846,6 +1878,25 @@
   },
   {
     "type": "event",
+    "name": "CommitAnnounced",
+    "inputs": [
+      {
+        "name": "debateHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "announcedAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "CommitmentExpired",
     "inputs": [
       {
@@ -2399,6 +2450,16 @@
   },
   {
     "type": "error",
+    "name": "AlreadyCommitted",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AnnounceRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "AttestedNoEntryAnchor",
     "inputs": []
   },
@@ -2435,6 +2496,11 @@
   {
     "type": "error",
     "name": "ConfTooWide",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EntryAnchorMismatch",
     "inputs": []
   },
   {

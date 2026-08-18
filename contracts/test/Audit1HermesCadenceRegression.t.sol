@@ -113,27 +113,31 @@ contract Audit1HermesCadenceRegression is Test {
     // ---- A1-1 regression: the recorder's REAL fetch shapes must pass ----
 
     function test_A1_1_freshEntryTickCommits() public {
-        // buildHermesLatestUrl(feedId, ageSec=5): tick at now-5, prev = now-6.
-        uint64 pt = uint64(vm.getBlockTimestamp()) - 5;
-        bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), pt);
-        uint64 anchor1_ = uint64(vm.getBlockTimestamp()) - 5;
+        // A3-1 flow: announce fixes the anchor; the evidence is the Hermes
+        // benchmark at that instant — the FIRST tick at/after it (1s cadence).
+        bytes32 h = keccak256("fresh-entry");
+        rec.announceCommit(h);
+        uint64 anchor = uint64(vm.getBlockTimestamp());
+        bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), anchor);
         rec.commitTrade{value: 10}(
-            keccak256("fresh-entry"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor1_, d
+            h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor, d
         );
         BobbyTrackRecordV2.Commitment memory c = rec.getCommitment(0);
-        assertEq(c.entryEvidence.publishTime, pt, "fresh tick accepted as entry evidence");
+        assertEq(c.entryEvidence.publishTime, anchor, "first tick at/after the announced anchor");
     }
 
-    function test_A1_1_entryTickOutsideWindowStillRejected() public {
-        // The bounded parse must still refuse a tick older than entryWindowSec.
-        uint64 pt = uint64(vm.getBlockTimestamp()) - 61;
-        bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), pt);
-        uint64 anchor2_ = uint64(vm.getBlockTimestamp()) - 5;
+    function test_A1_1_entryTickBeforeAnchorRejected() public {
+        // Evidence must be at/after the announced anchor — an older (backdated)
+        // tick fails the Unique window even though it is signed and fresh-ish.
+        bytes32 h = keccak256("stale-entry");
+        rec.announceCommit(h);
+        uint64 anchor = uint64(vm.getBlockTimestamp());
+        bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), anchor - 30);
         vm.expectRevert(bytes("RealRulePyth: window"));
         rec.commitTrade{value: 10}(
-            keccak256("stale-entry"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor2_, d
+            h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, anchor, d
         );
     }
 
@@ -176,30 +180,51 @@ contract Audit1HermesCadenceRegression is Test {
         // (prev >= entryAt proves an earlier tick existed after the anchor).
         // Unique semantics must reject it — evidence is pinned to the FIRST
         // tick at/after the declared anchor, killing retrospective selection.
-        uint64 anchor = uint64(vm.getBlockTimestamp()) - 40;
+        bytes32 h = keccak256("shopped");
+        rec.announceCommit(h);
+        uint64 anchor = uint64(vm.getBlockTimestamp());
+        vm.warp(anchor + 40); // market observed for 40s after the announcement
         bytes[] memory shopped = _realUpdate(int64(uint64(ENTRY)), anchor + 20); // prev = anchor+19 >= anchor
         vm.expectRevert(bytes("RealRulePyth: window"));
         rec.commitTrade{value: 10}(
-            keccak256("shopped"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
             BobbyTrackRecordV2.PriceMode.VERIFIED, anchor, shopped
         );
     }
 
-    function test_A2_1_entryAnchorRecencyBounds() public {
-        // Anchor in the future → EntryInFuture; anchor older than the entry
-        // window → EntryTooStale. The anchor must pin the entry to the moment
-        // of commitment.
+    function test_A3_1_announceGates() public {
+        // No announcement → AnnounceRequired.
         uint64 nowTs = uint64(vm.getBlockTimestamp());
-        bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), nowTs - 5);
-        vm.expectRevert(BobbyTrackRecordV2.EntryInFuture.selector);
+        bytes[] memory d = _realUpdate(int64(uint64(ENTRY)), nowTs);
+        vm.expectRevert(BobbyTrackRecordV2.AnnounceRequired.selector);
         rec.commitTrade{value: 10}(
-            keccak256("future"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, nowTs + 10, d
+            keccak256("unannounced"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, nowTs, d
         );
+
+        // Anchor != announcedAt (the backdating attempt) → EntryAnchorMismatch.
+        bytes32 h = keccak256("mismatch");
+        rec.announceCommit(h);
+        vm.warp(nowTs + 30);
+        bytes[] memory older = _realUpdate(int64(uint64(ENTRY)), nowTs - 20);
+        vm.expectRevert(BobbyTrackRecordV2.EntryAnchorMismatch.selector);
+        rec.commitTrade{value: 10}(
+            h, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, nowTs - 20, older
+        );
+
+        // Announcement aged past the entry window → EntryTooStale (announce
+        // and commit must be near-adjacent; a stale announce cannot be aged
+        // into observed price action).
+        bytes32 h2 = keccak256("stale-announce");
+        rec.announceCommit(h2);
+        uint64 ann2 = uint64(vm.getBlockTimestamp());
+        vm.warp(ann2 + 61);
+        bytes[] memory d2 = _realUpdate(int64(uint64(ENTRY)), ann2);
         vm.expectRevert(BobbyTrackRecordV2.EntryTooStale.selector);
         rec.commitTrade{value: 10}(
-            keccak256("stale"), "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
-            BobbyTrackRecordV2.PriceMode.VERIFIED, nowTs - 61, d
+            h2, "BTC", BobbyTrackRecordV2.Agent.CIO, 7, ENTRY, TARGET, STOP,
+            BobbyTrackRecordV2.PriceMode.VERIFIED, ann2, d2
         );
     }
 
