@@ -329,6 +329,101 @@ export default function BobbyDocsPage() {
             </GlassCard>
           </motion.div>
 
+          {/* ===== 3.5 PROOF ENGINE — V2 LIFECYCLE ===== */}
+          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+            <GlassCard glow accentBorder className="p-6 md:p-8">
+              <SectionLabel icon={Eye} label="Proof engine — TrackRecord V2" right="Base Sepolia · release candidate" />
+
+              <p className="text-sm leading-7 text-white/60 mb-2 max-w-2xl">
+                Agents promise. Bobby proves. Every VERIFIED prediction is committed{' '}
+                <span className="text-white/85 font-semibold">before the outcome exists</span> and both its entry
+                and exit prices are proven with signed Pyth oracle updates — never self-reported. Anyone can
+                challenge an ignored stop. Nothing can be backdated, cherry-picked or deleted.
+              </p>
+              <p className="font-mono text-[10px] text-white/35 tracking-[0.15em] uppercase mb-7">
+                Hardened through 5 adversarial audit rounds · 4 P1s found &amp; closed
+              </p>
+
+              {/* The three phases of temporal custody */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-7">
+                <GlassCard className="p-5">
+                  <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.15em] uppercase mb-2">Phase 1 · Anchor</div>
+                  <div className="font-mono text-[12px] text-white/85 font-bold mb-2">The anchor is fixed before its price exists</div>
+                  <p className="text-xs text-white/60 leading-6">
+                    <code className="text-[#7da6ff]">announceCommit</code> locks a future instant on-chain
+                    (announcement + 10s). Its price tick doesn&apos;t exist yet — so it cannot be known, shopped
+                    or backdated. The commit must then carry the <em>first</em> signed tick at/after that exact
+                    instant, enforced by Pyth&apos;s unique-parse rule.
+                  </p>
+                </GlassCard>
+                <GlassCard className="p-5">
+                  <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.15em] uppercase mb-2">Phase 2 · Watch</div>
+                  <div className="font-mono text-[12px] text-white/85 font-bold mb-2">Anyone can enforce the stop</div>
+                  <p className="text-xs text-white/60 leading-6">
+                    While the trade lives, <code className="text-[#7da6ff]">challengeStopBreach</code> is
+                    permissionless: present one signed tick that crossed the committed stop and the trade is
+                    reclassified to LOSS — irreversibly, with oracle-derived PnL. Hiding a stop-out is not an option.
+                  </p>
+                </GlassCard>
+                <GlassCard className="p-5">
+                  <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.15em] uppercase mb-2">Phase 3 · Prove the exit</div>
+                  <div className="font-mono text-[12px] text-white/85 font-bold mb-2">Outcome derives from the oracle</div>
+                  <p className="text-xs text-white/60 leading-6">
+                    <code className="text-[#7da6ff]">resolveTrade</code> proves the declared exit instant with a
+                    signed benchmark update. WIN/LOSS is classified oracle-vs-oracle — the reported price is only
+                    tolerated within ±1%. Unresolved trades expire publicly into the coverage ratio.
+                  </p>
+                </GlassCard>
+              </div>
+
+              {/* Split ledgers + guarantees */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-7">
+                <GlassCard className="p-5">
+                  <div className="font-mono text-[11px] text-white/85 font-bold mb-2 tracking-[-0.01em]">Two ledgers, never blended</div>
+                  <p className="text-xs text-white/60 leading-6">
+                    <span className="text-[#7da6ff] font-semibold">VERIFIED</span> (BTC · ETH · SOL): entry and
+                    exit proven by Pyth — the strong claim.{' '}
+                    <span className="text-white/75 font-semibold">ATTESTED</span> (everything else):
+                    self-reported, clearly labeled. There is deliberately no combined win rate — that would be
+                    lying with averages. The scorecard also publishes resolution coverage: how many promises
+                    actually closed.
+                  </p>
+                </GlassCard>
+                <GlassCard className="p-5">
+                  <div className="font-mono text-[11px] text-white/85 font-bold mb-2 tracking-[-0.01em]">Why cheating reverts</div>
+                  <ul className="text-xs text-white/60 leading-6 space-y-1 list-none m-0 p-0">
+                    <li><span className="text-[#ff716a] font-mono text-[10px]">×</span> Anchor in the observed past → <code className="text-[#7da6ff]">EntryAnchorMismatch</code></li>
+                    <li><span className="text-[#ff716a] font-mono text-[10px]">×</span> Tick predating the announcement → unique-parse reject</li>
+                    <li><span className="text-[#ff716a] font-mono text-[10px]">×</span> A later, nicer tick in the window → unique-parse reject</li>
+                    <li><span className="text-[#ff716a] font-mono text-[10px]">×</span> Aged announcement → <code className="text-[#7da6ff]">EntryTooStale</code></li>
+                    <li><span className="text-[#ff716a] font-mono text-[10px]">×</span> Same-block announce+commit → <code className="text-[#7da6ff]">EntryInFuture</code></li>
+                  </ul>
+                </GlassCard>
+              </div>
+
+              {/* Live release candidate */}
+              <a
+                href="https://sepolia.basescan.org/address/0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block group"
+              >
+                <GlassCard accentBorder className="p-5 hover:bg-white/[0.07] transition-all">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div>
+                      <div className="font-mono text-[11px] text-white/85 font-bold tracking-[-0.01em]">BobbyTrackRecordV2</div>
+                      <div className="font-mono text-[10px] text-[#7da6ff] truncate">0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC</div>
+                    </div>
+                    <div className="font-mono text-[10px] text-white/40 tracking-[0.15em] uppercase ml-auto flex items-center gap-1.5 group-hover:text-[#7da6ff] transition-colors">
+                      Live on Base Sepolia · canary soak
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </div>
+                  </div>
+                </GlassCard>
+              </a>
+            </GlassCard>
+          </motion.div>
+
           {/* ===== 4. SMART CONTRACTS ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
