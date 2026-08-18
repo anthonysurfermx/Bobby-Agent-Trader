@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { buildDeskBrief, type TechnicalSnapshot } from '../src/lib/voice-desk-brief.ts';
+import { matchAssetInText } from '../src/lib/voice-assets.ts';
 
 const bullish: TechnicalSnapshot = {
   price: 64_514,
@@ -54,4 +55,10 @@ assert.equal(incomplete.change24hPct, null, 'missing 24h change must not be rend
 assert.match(incomplete.summary, /no hay suficientes velas/);
 assert.doesNotMatch(incomplete.summary, /alcista|bajista/);
 
-console.log('voice desk brief: 13/13 assertions passed');
+assert.equal(matchAssetInText('Quiero revisar NVIDIA'), 'NVDA');
+assert.equal(matchAssetInText('¿Qué opinas de Nvidia hoy?'), 'NVDA');
+assert.equal(matchAssetInText('Háblame de envidia'), 'NVDA', 'Spanish phonetic transcription must resolve NVIDIA');
+assert.equal(matchAssetInText('Analyze NVDA for me'), 'NVDA');
+assert.equal(matchAssetInText('MBC 뉴스 이덕영입니다.'), null, 'unexpected Korean noise must not select an asset');
+
+console.log('voice desk brief: 18/18 assertions passed');

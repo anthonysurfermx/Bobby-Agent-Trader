@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 20, 600)) return;
 
-  const { text, voice = 'cio', lang = 'es' } = req.body as { text?: string; voice?: string; lang?: string };
+  const { text, voice = 'cio', lang = 'es', edgeVoice } = req.body as { text?: string; voice?: string; lang?: string; edgeVoice?: string };
 
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'text is required' });
@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const speech = await generateSpeech(text, { lang, voice });
+    const speech = await generateSpeech(text, { lang, voice, edgeVoice });
     if (!speech) {
       return res.status(502).json({ error: 'TTS synthesis failed' });
     }

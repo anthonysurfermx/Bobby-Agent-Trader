@@ -37,8 +37,43 @@ const EDGE_VOICE: Record<string, string> = {
 
 const MAX_CHARS = 4000;
 
-async function edgeTTS(text: string, lang: string, agent = 'cio'): Promise<SpeechResult> {
-  const voice = EDGE_VOICE[`${lang}:${agent}`] || EDGE_VOICE[`${lang}:cio`] || EDGE_VOICE['es:cio'];
+// Voice menu for per-user agent personalization (Bobby iOS "Configura tu
+// Bobby"). STRICT allowlist — the client names a voice, but only these ship
+// to edge-tts; anything else falls back to the Bobby identity above.
+const EDGE_VOICE_MENU = new Set([
+  'es-MX-DaliaNeural',
+  'es-MX-JorgeNeural',
+  'es-US-PalomaNeural',
+  'es-US-AlonsoNeural',
+  'en-US-AriaNeural',
+  'en-US-GuyNeural',
+]);
+
+type TtsProvider = SpeechResult['provider'];
+
+/**
+ * Resolve a client-selected Edge voice without ever passing arbitrary input to
+ * the synthesizer. An invalid selection deliberately returns Bobby's default
+ * identity instead of falling through to an unrelated paid provider voice.
+ */
+export function resolveEdgeVoice(lang: string, agent = 'cio', edgeVoice?: string): string {
+  return (edgeVoice && EDGE_VOICE_MENU.has(edgeVoice))
+    ? edgeVoice
+    : EDGE_VOICE[`${lang}:${agent}`] || EDGE_VOICE[`${lang}:cio`] || EDGE_VOICE['es:cio'];
+}
+
+/**
+ * A per-user Edge voice is an explicit product choice, so it takes precedence
+ * over the deployment-wide provider preference. Calls without a voice keep the
+ * existing provider order for Telegram and other legacy consumers.
+ */
+export function ttsProviderOrder(provider: string, edgeVoice?: string): TtsProvider[] {
+  if (edgeVoice) return ['edge', 'openai'];
+  return provider === 'openai' ? ['openai', 'edge'] : ['edge', 'openai'];
+}
+
+async function edgeTTS(text: string, lang: string, agent = 'cio', edgeVoice?: string): Promise<SpeechResult> {
+  const voice = resolveEdgeVoice(lang, agent, edgeVoice);
   const communicate = new Communicate(text.slice(0, MAX_CHARS), { voice });
   const chunks: Uint8Array[] = [];
   for await (const msg of communicate.stream()) {
@@ -54,7 +89,7 @@ async function edgeTTS(text: string, lang: string, agent = 'cio'): Promise<Speec
   };
 }
 
-async function openaiTTS(text: string, _lang: string): Promise<SpeechResult> {
+async function openaiTTS(text: string, _lang: string, _agent?: string, _edgeVoice?: string): Promise<SpeechResult> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('openai-tts: OPENAI_API_KEY missing');
   const model = process.env.TTS_OPENAI_MODEL || 'gpt-4o-mini-tts';
@@ -96,7 +131,7 @@ async function openaiTTS(text: string, _lang: string): Promise<SpeechResult> {
  */
 export async function generateSpeech(
   text: string,
-  opts: { lang?: string; voice?: string } = {},
+  opts: { lang?: string; voice?: string; edgeVoice?: string } = {},
 ): Promise<SpeechResult | null> {
   const lang = opts.lang || 'es';
   const agent = opts.voice === 'alpha' || opts.voice === 'red' ? opts.voice : 'cio';
@@ -104,11 +139,12 @@ export async function generateSpeech(
   if (!clean) return null;
 
   const provider = (process.env.TTS_PROVIDER || 'edge').toLowerCase();
-  const chain = provider === 'openai' ? [openaiTTS, edgeTTS] : [edgeTTS, openaiTTS];
+  const providers = { edge: edgeTTS, openai: openaiTTS } as const;
+  const chain = ttsProviderOrder(provider, opts.edgeVoice).map((name) => providers[name]);
 
   for (const fn of chain) {
     try {
-      return await fn(clean, lang, agent);
+      return await fn(clean, lang, agent, opts.edgeVoice);
     } catch (err) {
       console.error('[tts]', fn.name, err instanceof Error ? err.message : err);
     }
