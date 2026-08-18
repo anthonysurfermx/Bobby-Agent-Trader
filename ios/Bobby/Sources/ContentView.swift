@@ -53,6 +53,7 @@ final class BobbyViewModel: ObservableObject {
     @Published var lastAnswer: BobbyAnswer?
     @Published var speakEnabled = true
     @Published var phase: DeskPhase = .idle
+    @Published var timeframe: MarketTimeframe = .oneHour
 
     let voice = NeuralVoice()
     let profile = AgentProfile()
@@ -82,7 +83,11 @@ final class BobbyViewModel: ObservableObject {
             }
 
             async let marketRequest = BobbyAPI.market(asset.symbol)
-            async let candleRequest = BobbyAPI.candles(symbol: asset.symbol, isEquity: asset.isEquity)
+            async let candleRequest = BobbyAPI.candles(
+                symbol: asset.symbol,
+                isEquity: asset.isEquity,
+                timeframe: timeframe
+            )
             async let debateRequest = BobbyAPI.debate(asset.symbol)
 
             var snap = asset
@@ -114,6 +119,23 @@ final class BobbyViewModel: ObservableObject {
             messages.append(ChatMessage(fromBobby: true, text: text))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if speakEnabled { voice.speak(text, voiceId: profile.voiceId) }
+        }
+    }
+
+    func selectTimeframe(_ next: MarketTimeframe) {
+        guard next != timeframe else { return }
+        timeframe = next
+        candles = []
+        guard let snapshot else { return }
+
+        Task {
+            let rows = await BobbyAPI.candles(
+                symbol: snapshot.symbol,
+                isEquity: snapshot.isEquity,
+                timeframe: next
+            )
+            guard self.timeframe == next, self.snapshot?.symbol == snapshot.symbol else { return }
+            withAnimation(.easeOut(duration: 0.28)) { candles = rows }
         }
     }
 }
@@ -312,7 +334,7 @@ struct ContentView: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 6) {
-                        Text("1H // LIVE")
+                        Text("\(vm.timeframe.rawValue) // LIVE")
                             .font(.mono(9, .bold))
                             .foregroundStyle(Theme.muted)
                         if let change = snapshot.changePct {
@@ -320,6 +342,26 @@ struct ContentView: View {
                                 .font(.mono(13, .bold))
                                 .foregroundStyle(change >= 0 ? Theme.up : Theme.down)
                         }
+                    }
+                }
+
+                HStack(spacing: 5) {
+                    ForEach(MarketTimeframe.allCases) { timeframe in
+                        Button {
+                            vm.selectTimeframe(timeframe)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Text(timeframe.rawValue)
+                                .font(.mono(9, .bold))
+                                .foregroundStyle(vm.timeframe == timeframe ? Theme.bg : Theme.muted)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(vm.timeframe == timeframe ? Theme.text : Theme.cardSoft)
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
@@ -335,13 +377,26 @@ struct ContentView: View {
                                 .foregroundStyle(Theme.muted)
                         }
                     } else {
-                        ChartView(candles: vm.candles, answer: vm.lastAnswer)
+                        ChartView(
+                            candles: vm.candles,
+                            answer: vm.lastAnswer,
+                            timeframe: vm.timeframe
+                        )
                             .padding(.horizontal, 3)
                             .padding(.vertical, 8)
                     }
                 }
-                .frame(height: 222)
+                .frame(height: 294)
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.stroke, lineWidth: 1))
+
+                HStack {
+                    Text(snapshot.isEquity ? "YAHOO FINANCE · EQUITIES" : "OKX · CRYPTO MARKET")
+                    Spacer()
+                    Text("100 OHLCV · LIVE")
+                }
+                .font(.mono(7.5, .bold))
+                .kerning(0.7)
+                .foregroundStyle(Theme.muted.opacity(0.75))
 
                 if let answer = vm.lastAnswer {
                     indicatorStrip(answer)

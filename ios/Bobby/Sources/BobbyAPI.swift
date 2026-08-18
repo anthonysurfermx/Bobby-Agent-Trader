@@ -4,12 +4,42 @@
 import Foundation
 
 struct Candle: Identifiable {
-    let id = UUID()
+    var id: Date { time }
     let time: Date
     let open: Double
     let high: Double
     let low: Double
     let close: Double
+    let volume: Double
+}
+
+enum MarketTimeframe: String, CaseIterable, Identifiable {
+    case fifteenMinutes = "15M"
+    case oneHour = "1H"
+    case fourHours = "4H"
+    case oneDay = "1D"
+
+    var id: String { rawValue }
+
+    var cryptoBar: String {
+        switch self {
+        case .fifteenMinutes: return "15m"
+        case .oneHour: return "1H"
+        case .fourHours: return "4H"
+        case .oneDay: return "1D"
+        }
+    }
+
+    // Mirrors MarketCanvas on bobbyprotocol.xyz. Yahoo does not expose 4H
+    // candles, so the web desk deliberately expands those views to daily data.
+    var equityQuery: (range: String, interval: String) {
+        switch self {
+        case .fifteenMinutes: return ("7d", "15m")
+        case .oneHour: return ("7d", "1h")
+        case .fourHours: return ("30d", "1d")
+        case .oneDay: return ("90d", "1d")
+        }
+    }
 }
 
 struct MarketSnapshot {
@@ -176,10 +206,11 @@ enum BobbyAPI {
         return a
     }
 
-    static func candles(symbol: String, isEquity: Bool) async -> [Candle] {
+    static func candles(symbol: String, isEquity: Bool, timeframe: MarketTimeframe = .oneHour) async -> [Candle] {
+        let equity = timeframe.equityQuery
         let path = isEquity
-            ? "api/stock-candles?symbol=\(symbol)&range=5d&interval=60m"
-            : "api/okx-candles?instId=\(symbol)-USDT&bar=1H&limit=96"
+            ? "api/stock-candles?symbol=\(symbol)&range=\(equity.range)&interval=\(equity.interval)"
+            : "api/okx-candles?instId=\(symbol)-USDT&bar=\(timeframe.cryptoBar)&limit=100"
         guard let obj = try? await json(path) as? [String: Any] else { return [] }
         let rows = (obj["candles"] as? [[String: Any]]) ?? (obj["data"] as? [[String: Any]]) ?? []
         var out: [Candle] = []
@@ -191,7 +222,15 @@ enum BobbyAPI {
             }
             guard let ts = num("ts"), let o = num("open"), let h = num("high"),
                   let l = num("low"), let c = num("close") else { continue }
-            out.append(Candle(time: Date(timeIntervalSince1970: ts / 1000), open: o, high: h, low: l, close: c))
+            let volume = num("volume") ?? 0
+            out.append(Candle(
+                time: Date(timeIntervalSince1970: ts / 1000),
+                open: o,
+                high: h,
+                low: l,
+                close: c,
+                volume: volume
+            ))
         }
         return out.sorted { $0.time < $1.time }
     }
