@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { matchAssetInText, normalizeAssetSymbol } from '@/lib/voice-assets';
 
 export type VoiceState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
+export type VoiceInputMode = 'push-to-talk' | 'hands-free';
 
 export interface TranscriptLine {
   id: string;
@@ -104,7 +105,10 @@ function debateLevel(
   return [{ price, label, kind: 'level', agent, ...(priceTo === undefined ? {} : { priceTo }) }];
 }
 
-export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
+export function useRealtimeVoice(
+  lang: 'es' | 'en' = 'es',
+  inputMode: VoiceInputMode = 'push-to-talk',
+) {
   const [state, setState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<TranscriptLine[]>([]);
@@ -126,6 +130,8 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
   const rafRef = useRef<number | null>(null);
   const analysersRef = useRef<{ mic?: AnalyserNode; out?: AnalyserNode }>({});
   const stateRef = useRef<VoiceState>('idle');
+  const inputModeRef = useRef<VoiceInputMode>(inputMode);
+  const [micMuted, setMicMuted] = useState(inputMode === 'push-to-talk');
 
   // --- tool dispatch bookkeeping ---------------------------------------
   // Tools are fired the moment their arguments finish streaming, not when the
@@ -140,7 +146,16 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
   /** A tool finished mid-response, so we owe the model a response.create. */
   const responseOwedRef = useRef(false);
 
+  const setMicEnabled = useCallback((enabled: boolean) => {
+    micRef.current?.getAudioTracks().forEach((track) => { track.enabled = enabled; });
+    setMicMuted(!enabled);
+  }, []);
+
   useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => {
+    inputModeRef.current = inputMode;
+    if (micRef.current) setMicEnabled(inputMode === 'hands-free');
+  }, [inputMode, setMicEnabled]);
 
   const meter = useCallback(() => {
     const { mic, out } = analysersRef.current;
@@ -291,7 +306,11 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
     if (type === 'input_audio_buffer.speech_started') setState('listening');
     if (type === 'input_audio_buffer.speech_stopped') setState('thinking');
     if (type === 'response.created') responseActiveRef.current = true;
-    if (type === 'response.output_audio.delta') setState('speaking');
+    if (type === 'response.output_audio.delta') {
+      // In speaker mode Bobby must never feed his own audio back into the turn.
+      if (inputModeRef.current === 'push-to-talk') setMicEnabled(false);
+      setState('speaking');
+    }
     if (type === 'response.done' || type === 'response.output_audio.done') {
       setState((s) => (s === 'speaking' || s === 'thinking' ? 'listening' : s));
     }
@@ -357,7 +376,7 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
         send({ type: 'response.create' });
       }
     }
-  }, [dispatchTool, send]);
+  }, [dispatchTool, send, setMicEnabled]);
 
   const disconnect = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -414,9 +433,11 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
       };
 
       const mic = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       });
       micRef.current = mic;
+      mic.getAudioTracks().forEach((track) => { track.enabled = inputModeRef.current === 'hands-free'; });
+      setMicMuted(inputModeRef.current === 'push-to-talk');
       pc.addTrack(mic.getAudioTracks()[0], mic);
 
       const micAnalyser = ctx.createAnalyser();
@@ -433,7 +454,20 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
         // Ask for the human's transcript too — the model only returns its own by default.
         send({
           type: 'session.update',
-          session: { type: 'realtime', audio: { input: { transcription: { model: 'whisper-1' } } } },
+          session: {
+            type: 'realtime',
+            audio: {
+              input: {
+                transcription: {
+                  model: 'whisper-1',
+                  language: lang,
+                  prompt: lang === 'es'
+                    ? 'Español de México. Cripto: Bitcoin, Ethereum, BTC, ETH, SOL, long, short, stop, soporte, resistencia.'
+                    : 'English. Crypto: Bitcoin, Ethereum, BTC, ETH, SOL, long, short, stop, support, resistance.',
+                },
+              },
+            },
+          },
         });
         setState('listening');
       };
@@ -464,6 +498,21 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
 
   useEffect(() => () => disconnect(), [disconnect]);
 
+  /** Push-to-talk prevents room audio from becoming a new user turn while Bobby speaks. */
+  const startTalking = useCallback(() => {
+    if (inputModeRef.current !== 'push-to-talk') return;
+    if (stateRef.current === 'speaking' || stateRef.current === 'thinking') {
+      send({ type: 'response.cancel' });
+      send({ type: 'output_audio_buffer.clear' });
+    }
+    setMicEnabled(true);
+    setState('listening');
+  }, [send, setMicEnabled]);
+
+  const stopTalking = useCallback(() => {
+    if (inputModeRef.current === 'push-to-talk') setMicEnabled(false);
+  }, [setMicEnabled]);
+
   return {
     state,
     error,
@@ -478,6 +527,9 @@ export function useRealtimeVoice(lang: 'es' | 'en' = 'es') {
     debate,
     connect,
     disconnect,
+    startTalking,
+    stopTalking,
+    micMuted,
     setSymbol: (nextSymbol: string) => {
       const next = normalizeSymbol(nextSymbol);
       setSymbol(next);
