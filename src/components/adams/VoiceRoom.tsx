@@ -24,13 +24,23 @@ function assetLabel(symbol: string): string {
   return `${symbol}/USDT`;
 }
 
-const STATE_COPY: Record<VoiceState, { label: string; hint: string }> = {
-  idle: { label: 'En reposo', hint: 'Toca el micrófono y háblale a Bobby' },
-  connecting: { label: 'Conectando', hint: 'Abriendo sesión de voz segura…' },
-  listening: { label: 'Escuchando', hint: 'Habla normal — puedes interrumpirlo cuando quieras' },
-  thinking: { label: 'Procesando', hint: 'Cruzando datos mientras te responde' },
-  speaking: { label: 'Bobby habla', hint: 'Interrúmpelo si quieres' },
-  error: { label: 'Enlace caído', hint: 'Reintenta la conexión' },
+const STATE_COPY: Record<'es' | 'en', Record<VoiceState, { label: string; hint: string }>> = {
+  es: {
+    idle: { label: 'En reposo', hint: 'Toca el micrófono y háblale a Bobby' },
+    connecting: { label: 'Conectando', hint: 'Abriendo sesión de voz segura…' },
+    listening: { label: 'Escuchando', hint: 'Habla normal — puedes interrumpirlo cuando quieras' },
+    thinking: { label: 'Procesando', hint: 'Cruzando datos mientras te responde' },
+    speaking: { label: 'Bobby habla', hint: 'Interrúmpelo si quieres' },
+    error: { label: 'Enlace caído', hint: 'Reintenta la conexión' },
+  },
+  en: {
+    idle: { label: 'Idle', hint: 'Tap the microphone and talk to Bobby' },
+    connecting: { label: 'Connecting', hint: 'Opening a secure voice session…' },
+    listening: { label: 'Listening', hint: 'Speak naturally — interrupt whenever you want' },
+    thinking: { label: 'Processing', hint: 'Cross-checking data while Bobby responds' },
+    speaking: { label: 'Bobby is speaking', hint: 'Interrupt whenever you want' },
+    error: { label: 'Link down', hint: 'Try connecting again' },
+  },
 };
 
 const VERDICT_STYLE: Record<string, string> = {
@@ -68,6 +78,11 @@ function playActivationChime() {
   } catch { /* optional feedback */ }
 }
 
+function formatDeskNumber(value: number | null): string {
+  if (value === null) return '—';
+  return value.toLocaleString('en-US', { maximumFractionDigits: value < 10 ? 4 : 2 });
+}
+
 export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = {}) {
   const [voiceLang, setVoiceLang] = useState<'es' | 'en'>(() => {
     try { return localStorage.getItem('bobby_lang') === 'en' ? 'en' : 'es'; } catch { return 'es'; }
@@ -75,8 +90,9 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
   const [inputMode, setInputMode] = useState<'push-to-talk' | 'hands-free'>('push-to-talk');
   const {
     state, error, level, transcript, tools, proposal,
-    symbol, timeframe, levels, thesis, debate,
-    connect, disconnect, startTalking, stopTalking, micMuted, setSymbol, setTimeframe, dismissProposal,
+    symbol, timeframe, levels, thesis, debate, deskBrief, briefState,
+    connect, disconnect, startTalking, stopTalking, micMuted, setSymbol, setTimeframe,
+    dismissProposal, resetConversation,
   } = useRealtimeVoice(voiceLang, inputMode);
 
   const live = state !== 'idle' && state !== 'error';
@@ -93,16 +109,17 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
   }, [connect, disconnect, live]);
 
   const changeLanguage = (next: 'es' | 'en') => {
+    if (live) disconnect();
+    resetConversation();
     setVoiceLang(next);
     localStorage.setItem('bobby_lang', next);
-    if (live) disconnect();
   };
 
   useEffect(() => {
     railRef.current?.scrollTo({ top: railRef.current.scrollHeight, behavior: 'smooth' });
   }, [transcript]);
 
-  const copy = STATE_COPY[state];
+  const copy = STATE_COPY[voiceLang][state];
   const lastBobby = [...transcript].reverse().find((l) => l.role === 'bobby');
 
   return (
@@ -257,6 +274,71 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
             />
           </div>
 
+          <AnimatePresence mode="wait">
+            {!debate && briefState.status !== 'idle' && (
+              <motion.div
+                key={`${briefState.symbol}-${briefState.status}`}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                role="status"
+                aria-live="polite"
+                className="mt-3 shrink-0 rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/[0.07] p-3 backdrop-blur"
+              >
+                <div className="flex items-center justify-between gap-3 font-mono text-[9px] uppercase tracking-[0.14em]">
+                  <span className="flex items-center gap-2 text-[#7da6ff]">
+                    <span className={`h-1.5 w-1.5 rounded-full ${briefState.status === 'loading' ? 'animate-pulse bg-[#0052ff]' : briefState.status === 'error' ? 'bg-red-400' : 'bg-green-400'}`} />
+                    {voiceLang === 'es' ? 'Lectura técnica en vivo' : 'Live technical read'}
+                  </span>
+                  <span className="text-white/35">
+                    {briefState.status === 'ready' && briefState.elapsedMs !== null
+                      ? `${(briefState.elapsedMs / 1000).toFixed(1)}s · ${voiceLang === 'es' ? 'objetivo <60s' : 'target <60s'}`
+                      : briefState.status === 'loading'
+                        ? (voiceLang === 'es' ? 'gráfica lista · leyendo velas' : 'chart ready · reading candles')
+                        : (voiceLang === 'es' ? 'datos no disponibles' : 'data unavailable')}
+                  </span>
+                </div>
+
+                {briefState.status === 'loading' && (
+                  <p className="mt-2 text-sm leading-5 text-white/60">
+                    {voiceLang === 'es'
+                      ? `${briefState.symbol} ya está en pantalla. Cruzando precio, estructura y momentum…`
+                      : `${briefState.symbol} is already on screen. Cross-checking price, structure and momentum…`}
+                  </p>
+                )}
+
+                {briefState.status === 'error' && (
+                  <p className="mt-2 text-sm leading-5 text-white/60">
+                    {voiceLang === 'es'
+                      ? 'La gráfica sigue viva, pero la lectura técnica no respondió. Cambia de activo o reintenta.'
+                      : 'The chart is still live, but the technical read did not respond. Switch assets or retry.'}
+                  </p>
+                )}
+
+                {briefState.status === 'ready' && deskBrief && (
+                  <div className="mt-2 grid gap-3 sm:grid-cols-[1fr_auto]">
+                    <div>
+                      <p className="text-[13px] leading-5 text-white/80">{deskBrief.summary}</p>
+                      <p className="mt-1 text-[12px] leading-5 text-white/45">{deskBrief.risk}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-1">
+                      {[
+                        ['RSI', formatDeskNumber(deskBrief.rsi14)],
+                        [voiceLang === 'es' ? 'SOPORTE' : 'SUPPORT', formatDeskNumber(deskBrief.support)],
+                        [voiceLang === 'es' ? 'RESIST.' : 'RESIST.', formatDeskNumber(deskBrief.resistance)],
+                      ].map(([label, value]) => (
+                        <div key={label} className="min-w-24 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 font-mono">
+                          <div className="text-[8px] uppercase tracking-[0.12em] text-white/30">{label}</div>
+                          <div className="mt-0.5 text-[10px] text-white/75">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* The full debate stays readable beside the price; the spoken answer
               is deliberately only the executive summary. */}
           <AnimatePresence>
@@ -362,25 +444,25 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
         {thesis ? (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <span className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] ${VERDICT_STYLE[thesis.verdict] ?? VERDICT_STYLE.wait}`}>
-              {VERDICT_LABEL[thesis.verdict] ?? thesis.verdict}
+              {voiceLang === 'es' ? (VERDICT_LABEL[thesis.verdict] ?? thesis.verdict) : thesis.verdict}
             </span>
             {thesis.conviction !== null && (
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">Convicción</span>
+                <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">{voiceLang === 'es' ? 'Convicción' : 'Conviction'}</span>
                 <span className="font-mono text-sm font-bold text-white">{thesis.conviction}%</span>
               </div>
             )}
             <p className="min-w-0 flex-1 truncate text-sm text-white/70">{thesis.reason}</p>
             {thesis.invalidation && (
               <span className="hidden font-mono text-[10px] text-white/35 xl:inline">
-                Invalida: {thesis.invalidation}
+                {voiceLang === 'es' ? 'Invalida' : 'Invalidates'}: {thesis.invalidation}
               </span>
             )}
           </div>
         ) : (
           <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/30">
             <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
-            Sin veredicto todavía — pregúntale a Bobby por un activo
+            {voiceLang === 'es' ? 'Sin veredicto todavía — pregúntale a Bobby por un activo' : 'No verdict yet — ask Bobby about an asset'}
           </div>
         )}
       </footer>

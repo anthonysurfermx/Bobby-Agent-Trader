@@ -105,6 +105,9 @@ const CONTRACTS = [
   { name: 'BobbyAgentRegistry', addr: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', desc: 'Agent Identity NFTs', purpose: 'On-chain agent identity layer' },
 ];
 
+const BASE_SEPOLIA_TRACK_RECORD = '0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC';
+const BASE_SEPOLIA_SAFE = '0x8BE60853F27b944e11486285d95c3e06596553b4';
+
 const TOOL_ICONS: Record<string, React.ElementType> = {
   bobby_stats: BarChart3,
   bobby_ta: TrendingUp,
@@ -214,7 +217,7 @@ export default function BobbyDocsPage() {
               Connect your AI agent to Bobby in one command
             </h1>
             <p className="text-sm md:text-base leading-7 text-white/60 max-w-xl mx-auto">
-              Base-first agent infrastructure, 12 MCP tools, 70+ technical indicators, x402 payments
+              Base V2 proof canary, 12 MCP tools, 70+ technical indicators and a legacy x402 rail
             </p>
           </motion.div>
 
@@ -329,7 +332,47 @@ export default function BobbyDocsPage() {
             </GlassCard>
           </motion.div>
 
-          {/* ===== 4. SMART CONTRACTS ===== */}
+          {/* ===== 4. BASE V2 PROOF ENGINE ===== */}
+          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+            <GlassCard glow accentBorder className="p-6 md:p-8">
+              <SectionLabel icon={Shield} label="TrackRecord V2 proof engine" right="Base Sepolia canary · live" />
+              <p className="mb-7 max-w-3xl text-sm leading-7 text-white/60">
+                V2 fixes the time of entry before its price exists, verifies entry and exit through Pyth/Hermes, and keeps price-verified outcomes separate from attested claims. Five adversarial rounds found and closed four P1 integrity issues before the release was frozen.
+              </p>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {[
+                  ['01 · FUTURE ANCHOR', 'announceCommit fixes entryAt in the future. Same-block, tick-shopping and retrospective anchor selection revert.'],
+                  ['02 · ORACLE EVIDENCE', 'Unique Pyth updates prove the exact entry and exit instants. The recorder retries Hermes only inside the valid window.'],
+                  ['03 · OPEN RESOLUTION', 'Permissionless challenge, expiry and separate VERIFIED / ATTESTED ledgers prevent unproven claims from inflating the record.'],
+                ].map(([title, text]) => (
+                  <div key={title} className="rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/[0.07] p-5">
+                    <div className="font-mono text-[10px] font-bold tracking-[0.15em] text-[#7da6ff]">{title}</div>
+                    <p className="mt-3 text-xs leading-6 text-white/60">{text}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <a href={`https://sepolia.basescan.org/address/${BASE_SEPOLIA_TRACK_RECORD}`} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[#0052ff]/50">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">TrackRecord V2 · verified canary</div>
+                  <div className="mt-2 truncate font-mono text-[11px] text-[#7da6ff]">{BASE_SEPOLIA_TRACK_RECORD}</div>
+                </a>
+                <a href={`https://sepolia.basescan.org/address/${BASE_SEPOLIA_SAFE}`} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[#0052ff]/50">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">Safe rehearsal · 2 of 3</div>
+                  <div className="mt-2 truncate font-mono text-[11px] text-[#7da6ff]">{BASE_SEPOLIA_SAFE}</div>
+                </a>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5 font-mono text-[10px] uppercase tracking-[0.12em]">
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-emerald-300">Sepolia canary live</span>
+                <span className="rounded-full border border-rose-400/30 bg-rose-400/10 px-3 py-1 text-rose-300">Base mainnet gated</span>
+                <span className="text-white/35">Pending soak · production Safe · env · handoffs</span>
+              </div>
+            </GlassCard>
+          </motion.div>
+
+          {/* ===== 5. LEGACY SMART CONTRACTS ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
               <SectionLabel icon={Shield} label="Legacy on-chain deployment" right="X Layer archive · chain 196" />

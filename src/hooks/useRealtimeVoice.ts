@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { matchAssetInText, normalizeAssetSymbol } from '@/lib/voice-assets';
+import type { DeskBrief } from '@/lib/voice-desk-brief';
 
 export type VoiceState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 export type VoiceInputMode = 'push-to-talk' | 'hands-free';
@@ -68,6 +69,13 @@ export interface Thesis {
   invalidation: string | null;
 }
 
+export interface DeskBriefState {
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  symbol: string | null;
+  startedAt: number | null;
+  elapsedMs: number | null;
+}
+
 const TOOL_LABELS: Record<string, string> = {
   get_market: 'Leyendo mercado',
   run_debate: 'Debate de 3 agentes',
@@ -86,6 +94,12 @@ const UI_TOOLS = new Set(['set_chart', 'draw_levels', 'update_thesis', 'show_deb
  *  endpoint and this matcher can never disagree about what a ticker is. */
 const normalizeSymbol = normalizeAssetSymbol;
 const symbolMentioned = matchAssetInText;
+
+/** Whisper can occasionally hallucinate a non-Latin script from room noise.
+ *  Do not display that as if the human actually said it. */
+function hasUnexpectedScript(text: string): boolean {
+  return /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(text);
+}
 
 /** Pull one agent's level (or zone) out of a show_debate payload, or nothing. */
 function debateLevel(
@@ -119,6 +133,10 @@ export function useRealtimeVoice(
   const [levels, setLevels] = useState<ChartLevel[]>([]);
   const [thesis, setThesis] = useState<Thesis | null>(null);
   const [debate, setDebate] = useState<DebateSides | null>(null);
+  const [deskBrief, setDeskBrief] = useState<DeskBrief | null>(null);
+  const [briefState, setBriefState] = useState<DeskBriefState>({
+    status: 'idle', symbol: null, startedAt: null, elapsedMs: null,
+  });
   /** 0..1 — live amplitude of whoever is currently talking. Drives the orb. */
   const [level, setLevel] = useState(0);
 
@@ -130,6 +148,7 @@ export function useRealtimeVoice(
   const rafRef = useRef<number | null>(null);
   const analysersRef = useRef<{ mic?: AnalyserNode; out?: AnalyserNode }>({});
   const stateRef = useRef<VoiceState>('idle');
+  const symbolRef = useRef('BTC');
   const inputModeRef = useRef<VoiceInputMode>(inputMode);
   const [micMuted, setMicMuted] = useState(inputMode === 'push-to-talk');
 
@@ -145,6 +164,12 @@ export function useRealtimeVoice(
   const responseActiveRef = useRef(false);
   /** A tool finished mid-response, so we owe the model a response.create. */
   const responseOwedRef = useRef(false);
+  /** Same asset can be detected by transcription and by model tools. One live
+   *  promise feeds all of them, preventing duplicate market/intel requests. */
+  const briefRequestsRef = useRef<Map<string, { createdAt: number; promise: Promise<Record<string, unknown>> }>>(new Map());
+  /** Invalidates an old-language request after disconnect/reset even when the
+   *  next session happens to ask for the same symbol. */
+  const briefGenerationRef = useRef(0);
 
   const setMicEnabled = useCallback((enabled: boolean) => {
     micRef.current?.getAudioTracks().forEach((track) => { track.enabled = enabled; });
@@ -195,6 +220,75 @@ export function useRealtimeVoice(
     else send({ type: 'response.create' });
   }, [send]);
 
+  const requestAssetBrief = useCallback(async (nextSymbol: string, context?: string) => {
+    const next = normalizeSymbol(nextSymbol);
+    if (!next) return { error: 'symbol_required' } as Record<string, unknown>;
+    const generation = briefGenerationRef.current;
+
+    const changedAsset = symbolRef.current !== next;
+    symbolRef.current = next;
+    setSymbol(next);
+    if (changedAsset) {
+      setLevels([]);
+      setDebate(null);
+      setThesis(null);
+      setDeskBrief(null);
+    }
+
+    const startedAt = Date.now();
+    setBriefState({ status: 'loading', symbol: next, startedAt, elapsedMs: null });
+
+    const cacheKey = `${lang}:${next}`;
+    const cached = briefRequestsRef.current.get(cacheKey);
+    const request = cached && startedAt - cached.createdAt < 30_000
+      ? cached.promise
+      : (() => {
+          const controller = new AbortController();
+          const timeout = window.setTimeout(() => controller.abort(), 25_000);
+          return fetch('/api/voice-tool', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({ tool: 'run_debate', args: { symbol: next, context, lang } }),
+          }).then(async (response) => {
+            const payload = await response.json() as Record<string, unknown>;
+            if (!response.ok) throw new Error('brief_request_failed');
+            return payload;
+          }).finally(() => window.clearTimeout(timeout));
+        })();
+
+    if (!cached || startedAt - cached.createdAt >= 30_000) {
+      briefRequestsRef.current.set(cacheKey, { createdAt: startedAt, promise: request });
+      if (briefRequestsRef.current.size > 8) {
+        const oldest = [...briefRequestsRef.current.entries()]
+          .sort((a, b) => a[1].createdAt - b[1].createdAt)[0]?.[0];
+        if (oldest) briefRequestsRef.current.delete(oldest);
+      }
+    }
+
+    try {
+      const output = await request;
+      const quickBrief = output.quick_brief as DeskBrief | undefined;
+      if (!quickBrief) throw new Error('brief_unavailable');
+      if (briefGenerationRef.current === generation && symbolRef.current === next) {
+        setDeskBrief(quickBrief);
+        setBriefState({
+          status: 'ready',
+          symbol: next,
+          startedAt,
+          elapsedMs: Math.max(quickBrief.latencyMs, Date.now() - startedAt),
+        });
+      }
+      return output;
+    } catch {
+      briefRequestsRef.current.delete(cacheKey);
+      if (briefGenerationRef.current === generation && symbolRef.current === next) {
+        setBriefState({ status: 'error', symbol: next, startedAt, elapsedMs: Date.now() - startedAt });
+      }
+      return { error: 'tool_failed', symbol: next } as Record<string, unknown>;
+    }
+  }, [lang]);
+
   const runTool = useCallback(async (name: string, callId: string, rawArgs: string) => {
     const eventId = `${callId}-${name}`;
     setTools((prev) => [
@@ -210,13 +304,10 @@ export function useRealtimeVoice(
         // Resolved locally: these only move pixels, so they land instantly.
         if (name === 'set_chart') {
           if (args.symbol) {
-            setSymbol(normalizeSymbol(args.symbol));
-            // set_chart starts a fresh visual context. The model calls it
-            // before analysing an asset, so retaining a prior thesis here can
-            // put BTC levels and zones over NVDA candles until later tools land.
-            setLevels([]);
-            setDebate(null);
-            setThesis(null);
+            // The visible chart switches immediately. The evidence request is
+            // deliberately backgrounded so this UI tool can answer the model
+            // without adding another sequential wait.
+            void requestAssetBrief(String(args.symbol), 'Realtime asset switch');
           }
           if (args.timeframe) setTimeframe(String(args.timeframe));
           output = { ok: true, showing: args.symbol, timeframe: args.timeframe ?? 'unchanged' };
@@ -269,12 +360,16 @@ export function useRealtimeVoice(
         return;
       }
 
-      const response = await fetch('/api/voice-tool', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: name, args }),
-      });
-      output = await response.json();
+      if (name === 'run_debate' && args.symbol) {
+        output = await requestAssetBrief(String(args.symbol), args.context ? String(args.context) : undefined);
+      } else {
+        const response = await fetch('/api/voice-tool', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tool: name, args: { ...args, lang } }),
+        });
+        output = await response.json();
+      }
 
       if (name === 'propose_trade') {
         const p = (output as { proposal?: TradeProposal }).proposal;
@@ -287,7 +382,7 @@ export function useRealtimeVoice(
     }
 
     submitToolOutput(callId, output);
-  }, [submitToolOutput]);
+  }, [lang, requestAssetBrief, submitToolOutput]);
 
   /** Run a tool exactly once, whichever event surfaces it first. */
   const dispatchTool = useCallback((name: string | undefined, callId: string, args: string) => {
@@ -319,14 +414,15 @@ export function useRealtimeVoice(
     if (type === 'conversation.item.input_audio_transcription.completed') {
       const text = String(event.transcript ?? '').trim();
       if (text) {
-        const mentioned = symbolMentioned(text);
+        const rejectedNoise = hasUnexpectedScript(text);
+        const visibleText = rejectedNoise
+          ? (lang === 'es' ? 'Audio no reconocido — intenta de nuevo.' : 'Audio not recognized — please try again.')
+          : text;
+        const mentioned = rejectedNoise ? null : symbolMentioned(text);
         if (mentioned) {
-          setSymbol(mentioned);
-          setLevels([]);
-          setDebate(null);
-          setThesis(null);
+          void requestAssetBrief(mentioned, text);
         }
-        setTranscript((prev) => [...prev.slice(-20), { id: `u-${Date.now()}`, role: 'user', text, final: true }]);
+        setTranscript((prev) => [...prev.slice(-20), { id: `u-${Date.now()}`, role: 'user', text: visibleText, final: true }]);
       }
     }
     if (type === 'response.output_audio_transcript.delta') {
@@ -376,7 +472,7 @@ export function useRealtimeVoice(
         send({ type: 'response.create' });
       }
     }
-  }, [dispatchTool, send, setMicEnabled]);
+  }, [dispatchTool, lang, requestAssetBrief, send, setMicEnabled]);
 
   const disconnect = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -394,8 +490,23 @@ export function useRealtimeVoice(
     dispatchedRef.current.clear();
     responseActiveRef.current = false;
     responseOwedRef.current = false;
+    briefGenerationRef.current += 1;
+    briefRequestsRef.current.clear();
     setLevel(0);
     setState('idle');
+  }, []);
+
+  const resetConversation = useCallback(() => {
+    briefGenerationRef.current += 1;
+    setTranscript([]);
+    setTools([]);
+    setProposal(null);
+    setLevels([]);
+    setThesis(null);
+    setDebate(null);
+    setDeskBrief(null);
+    setBriefState({ status: 'idle', symbol: null, startedAt: null, elapsedMs: null });
+    briefRequestsRef.current.clear();
   }, []);
 
   const connect = useCallback(async () => {
@@ -525,18 +636,16 @@ export function useRealtimeVoice(
     levels,
     thesis,
     debate,
+    deskBrief,
+    briefState,
     connect,
     disconnect,
     startTalking,
     stopTalking,
     micMuted,
-    setSymbol: (nextSymbol: string) => {
-      const next = normalizeSymbol(nextSymbol);
-      setSymbol(next);
-      setLevels([]);
-      setDebate(null);
-      setThesis(null);
-    },
+    requestAssetBrief,
+    resetConversation,
+    setSymbol: (nextSymbol: string) => { void requestAssetBrief(nextSymbol, 'Manual asset switch'); },
     setTimeframe,
     dismissProposal: () => setProposal(null),
   };

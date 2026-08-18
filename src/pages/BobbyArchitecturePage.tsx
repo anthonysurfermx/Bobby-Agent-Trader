@@ -156,8 +156,8 @@ const LAYERS = [
     title: 'Proof layer',
     text: 'Every decision committed before its outcome.',
     items: [
-      ['X Layer · chain 196 — full record', 'live'],
-      ['Base Sepolia · 84532 — protocol rehearsal', 'canary'],
+      ['X Layer · chain 196 — legacy archive', 'live'],
+      ['Base Sepolia · 84532 — V2 oracle canary', 'canary'],
       ['Base mainnet · 8453 — behind hard gates', 'gated'],
     ] as const,
   },
@@ -184,8 +184,10 @@ const LAYERS = [
   },
 ] as const;
 
+const BASE_SEPOLIA_TRACK_RECORD = '0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC';
+
 const CONTRACT_ROLES = [
-  ['BobbyTrackRecord', 'trackRecord', 'Win/loss record resolved against reference prices. v2 will verify entry and exit.'],
+  ['BobbyTrackRecord V2', 'trackRecord', 'V2 anchors entry in the future and verifies entry/exit with Pyth; verified and attested ledgers never mix.'],
   ['BobbyConvictionOracle', 'convictionOracle', 'Conviction commitments published before execution. The no-take-backs ledger.'],
   ['BobbyAgentEconomyV2', 'agentEconomy', 'Debate fees and protocol economy, denominated in native gas.'],
   ['BobbyAgentRegistry', 'agentRegistry', 'Agent identities with a registration stake behind every name.'],
@@ -199,20 +201,20 @@ const CHAIN_STAGES = [
     status: 'live' as Status,
     name: 'X Layer',
     chainId: '196',
-    text: 'The production record. Thousands of commitments debated, committed and resolved in public since launch.',
+    text: 'The readable legacy archive. Thousands of commitments were debated, committed and resolved in public during the X Layer era.',
   },
   {
     status: 'canary' as Status,
     name: 'Base Sepolia',
     chainId: '84532',
-    text: 'Full-protocol rehearsal: seven contracts, live verification, win/loss cycles and a hardened API — burned in before real value moves.',
+    text: 'TrackRecord V2 canary: seven verified contracts, a real Pyth/Hermes commit→resolve cycle and a 2-of-3 Safe rehearsal. Five audit rounds closed four P1 findings.',
   },
   {
     status: 'gated' as Status,
     name: 'Base mainnet',
     chainId: '8453',
     text: 'Deliberately NO-GO until every gate closes. Shipping fast is easy; earning mainnet is the point.',
-    gates: ['Safe 2-of-3 owner — identity pinned on-chain', 'TrackRecord v2 — entry & exit oracle-verified', 'Security round M-02…M-05 closed', 'Full 3-round adversarial audit'],
+    gates: ['24–48h canary soak — clean scorecard', 'Base mainnet Safe 2-of-3 — create, audit and pin', 'Production environment — predeploy checker green', 'Signed deploy + seven Safe ownership handoffs'],
   },
 ];
 
@@ -459,8 +461,14 @@ export default function BobbyArchitecturePage() {
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {CONTRACT_ROLES.map(([name, key, description], index) => {
-                const address = stats?.contracts?.[key as keyof NonNullable<ProtocolStats['contracts']>]?.address;
+                const isBaseV2 = name === 'BobbyTrackRecord V2';
+                const address = isBaseV2
+                  ? BASE_SEPOLIA_TRACK_RECORD
+                  : stats?.contracts?.[key as keyof NonNullable<ProtocolStats['contracts']>]?.address;
                 const short = shortAddress(address);
+                const addressHref = isBaseV2
+                  ? `https://sepolia.basescan.org/address/${address}`
+                  : `${explorerAddressUrl}/${address}`;
                 return (
                   <motion.div
                     key={name}
@@ -477,7 +485,7 @@ export default function BobbyArchitecturePage() {
                     <p className="flex-1 text-[13px] leading-6 text-white/50">{description}</p>
                     <div className="mt-5 border-t border-white/10 pt-4 font-mono text-[11px]">
                       {short ? (
-                        <a href={`${explorerAddressUrl}/${address}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[#7da6ff] transition hover:text-white">
+                        <a href={addressHref} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[#7da6ff] transition hover:text-white">
                           {short} <ArrowUpRight className="h-3 w-3" />
                         </a>
                       ) : (
