@@ -52,6 +52,23 @@ const STOCK_TIMEFRAME: Record<Timeframe, { range: string; interval: string }> = 
 /** Fill/stroke for an agent zone — same hue as its line and its card. */
 const ZONE_FILL = { alpha: 'rgba(74,222,128,0.13)', red: 'rgba(255,113,106,0.13)', cio: 'rgba(250,204,21,0.13)' } as const;
 
+// Names people ask about that trade on NO public market (private companies),
+// mapped to their closest listed exposure. Config, not data: keeps the no-data
+// overlay honest ("SpaceX es privada") instead of a bare empty chart.
+const PRIVATE_COMPANIES: Record<string, string[]> = {
+  SPACEX: ['RKLB', 'TSLA'],
+  STARLINK: ['RKLB', 'TSLA'],
+  OPENAI: ['MSFT'],
+  ANTHROPIC: ['GOOGL', 'AMZN'],
+  XAI: ['TSLA'],
+  STRIPE: ['ADYEN', 'PYPL'],
+  BYTEDANCE: ['META'],
+  TIKTOK: ['META'],
+  DISCORD: ['RBLX'],
+  EPIC: ['RBLX', 'U'],
+  CANVA: ['ADBE'],
+};
+
 export function MarketCanvas({
   symbol,
   timeframe,
@@ -568,19 +585,36 @@ export function MarketCanvas({
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
         {noData && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[#050505]/80 text-center">
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50">
-              {language === 'es' ? `sin datos para ${symbol}` : `no data for ${symbol}`}
-            </span>
-            <span className="font-mono text-[9px] text-white/25">
-              {language === 'es'
-                ? (!getVoiceAsset(symbol)
-                    ? 'no hay velas en OKX ni Yahoo Finance para este activo'
-                    : `no hay velas en ${isStock ? 'Yahoo Finance' : 'OKX'} para este activo`)
-                : (!getVoiceAsset(symbol)
-                    ? 'no candles on OKX or Yahoo Finance for this asset'
-                    : `no candles on ${isStock ? 'Yahoo Finance' : 'OKX'} for this asset`)}
-            </span>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[#050505]/80 px-6 text-center">
+            {PRIVATE_COMPANIES[symbol] ? (
+              <>
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/60">
+                  {language === 'es'
+                    ? `${symbol} es una empresa privada — no cotiza en ningún mercado público`
+                    : `${symbol} is a private company — it does not trade on any public market`}
+                </span>
+                <span className="font-mono text-[9px] text-[#7da6ff]">
+                  {language === 'es'
+                    ? `exposición listada más cercana: ${PRIVATE_COMPANIES[symbol].join(' · ')}`
+                    : `closest listed exposure: ${PRIVATE_COMPANIES[symbol].join(' · ')}`}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50">
+                  {language === 'es' ? `sin datos para ${symbol}` : `no data for ${symbol}`}
+                </span>
+                <span className="font-mono text-[9px] text-white/25">
+                  {language === 'es'
+                    ? (!getVoiceAsset(symbol)
+                        ? 'no hay velas en OKX ni Yahoo Finance para este activo'
+                        : `no hay velas en ${isStock ? 'Yahoo Finance' : 'OKX'} para este activo`)
+                    : (!getVoiceAsset(symbol)
+                        ? 'no candles on OKX or Yahoo Finance for this asset'
+                        : `no candles on ${isStock ? 'Yahoo Finance' : 'OKX'} for this asset`)}
+                </span>
+              </>
+            )}
           </div>
         )}
       </div>
