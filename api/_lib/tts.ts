@@ -37,8 +37,22 @@ const EDGE_VOICE: Record<string, string> = {
 
 const MAX_CHARS = 4000;
 
-async function edgeTTS(text: string, lang: string, agent = 'cio'): Promise<SpeechResult> {
-  const voice = EDGE_VOICE[`${lang}:${agent}`] || EDGE_VOICE[`${lang}:cio`] || EDGE_VOICE['es:cio'];
+// Voice menu for per-user agent personalization (Bobby iOS "Configura tu
+// Bobby"). STRICT allowlist — the client names a voice, but only these ship
+// to edge-tts; anything else falls back to the Bobby identity above.
+const EDGE_VOICE_MENU = new Set([
+  'es-MX-DaliaNeural',
+  'es-MX-JorgeNeural',
+  'es-US-PalomaNeural',
+  'es-US-AlonsoNeural',
+  'en-US-AriaNeural',
+  'en-US-GuyNeural',
+]);
+
+async function edgeTTS(text: string, lang: string, agent = 'cio', edgeVoice?: string): Promise<SpeechResult> {
+  const voice = (edgeVoice && EDGE_VOICE_MENU.has(edgeVoice))
+    ? edgeVoice
+    : EDGE_VOICE[`${lang}:${agent}`] || EDGE_VOICE[`${lang}:cio`] || EDGE_VOICE['es:cio'];
   const communicate = new Communicate(text.slice(0, MAX_CHARS), { voice });
   const chunks: Uint8Array[] = [];
   for await (const msg of communicate.stream()) {
@@ -54,7 +68,7 @@ async function edgeTTS(text: string, lang: string, agent = 'cio'): Promise<Speec
   };
 }
 
-async function openaiTTS(text: string, _lang: string): Promise<SpeechResult> {
+async function openaiTTS(text: string, _lang: string, _agent?: string, _edgeVoice?: string): Promise<SpeechResult> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('openai-tts: OPENAI_API_KEY missing');
   const model = process.env.TTS_OPENAI_MODEL || 'gpt-4o-mini-tts';
@@ -96,7 +110,7 @@ async function openaiTTS(text: string, _lang: string): Promise<SpeechResult> {
  */
 export async function generateSpeech(
   text: string,
-  opts: { lang?: string; voice?: string } = {},
+  opts: { lang?: string; voice?: string; edgeVoice?: string } = {},
 ): Promise<SpeechResult | null> {
   const lang = opts.lang || 'es';
   const agent = opts.voice === 'alpha' || opts.voice === 'red' ? opts.voice : 'cio';
@@ -108,7 +122,7 @@ export async function generateSpeech(
 
   for (const fn of chain) {
     try {
-      return await fn(clean, lang, agent);
+      return await fn(clean, lang, agent, opts.edgeVoice);
     } catch (err) {
       console.error('[tts]', fn.name, err instanceof Error ? err.message : err);
     }
