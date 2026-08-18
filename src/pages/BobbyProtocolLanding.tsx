@@ -174,6 +174,16 @@ function SectionMedia({ name, className = '' }: { name: string; className?: stri
   );
 }
 
+/// CSS iPhone frame around a real simulator capture — no fabricated UI.
+function PhoneFrame({ src, alt, glow = false }: { src: string; alt: string; glow?: boolean }) {
+  return (
+    <div className={`relative rounded-[2.6rem] border border-white/15 bg-[#0a0a0f] p-[7px] ${glow ? 'shadow-[0_40px_120px_rgba(124,82,255,0.35)]' : 'shadow-[0_30px_80px_rgba(0,0,0,0.6)]'}`}>
+      <div className="pointer-events-none absolute left-1/2 top-[14px] z-10 h-[18px] w-[86px] -translate-x-1/2 rounded-full bg-black" />
+      <img src={src} alt={alt} loading="lazy" className="w-full rounded-[2.2rem]" />
+    </div>
+  );
+}
+
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="border-t border-white/15 pt-4">
@@ -260,6 +270,7 @@ export default function BobbyProtocolLanding() {
   ];
 
   const navItems = [
+    ['The app', '#app'],
     ['How it works', '#how-it-works'],
     ['Capabilities', '#capabilities'],
     ['For agents', '#for-agents'],
@@ -353,6 +364,77 @@ export default function BobbyProtocolLanding() {
             ))}
           </div>
         </div>
+
+        {/* The app — real simulator captures of the iOS build, framed in CSS. */}
+        <section className="relative overflow-hidden border-b border-white/10 bg-[#050505]" id="app">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(0,82,255,.16),transparent_50%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="grid items-center gap-14 lg:grid-cols-2">
+              <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }}>
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />Coming soon to iPhone
+                </div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">
+                  The protocol,<br />in your <span className="text-[#0052ff]">pocket.</span>
+                </h2>
+                <p className="mt-6 max-w-md text-lg leading-8 text-white/60">
+                  Talk to your agent. Forge its aura. Every call it makes is still
+                  anchored on-chain — the app just gives it a voice.
+                </p>
+                <ul className="mt-8 space-y-4">
+                  {[
+                    ['Forge your agent’s aura', 'Describe it in your own words — the orb absorbs the color live. Hold to forge; the interface detonates into your energy.'],
+                    ['A voice, not a chatbot', 'Ask about BTC, NVDA or gold out loud. Your agent answers with the voice and vibe you gave it.'],
+                    ['Receipts, not promises', 'The same on-chain track record this page reports — verifiable from your phone.'],
+                  ].map(([title, detail]) => (
+                    <li key={title} className="flex gap-4">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0052ff]" />
+                      <div>
+                        <div className="font-mono text-sm font-bold uppercase tracking-[0.12em] text-white">{title}</div>
+                        <div className="mt-1 text-sm leading-6 text-white/45">{detail}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+                  <a href="https://t.me/bobbyagentraderbot" target="_blank" rel="noreferrer" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">
+                    Get early access <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                  </a>
+                  <span className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white/55">TestFlight soon</span>
+                </div>
+              </motion.div>
+
+              <div className="relative mx-auto flex items-center justify-center">
+                <motion.div
+                  initial={{ opacity: 0, y: 26, rotate: -7 }}
+                  whileInView={{ opacity: 1, y: 0, rotate: -7 }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ delay: 0.15 }}
+                  className="hidden -mr-10 mt-16 w-[200px] shrink-0 md:block"
+                >
+                  <PhoneFrame src="/app/iphone-forge.png" alt="Describe your agent's aura — Bobby iOS onboarding" />
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, y: 26 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  className="z-10 w-[240px] shrink-0 md:w-[260px]"
+                >
+                  <PhoneFrame src="/app/iphone-desk.png" alt="Bobby Live Desk with a forged violet aura" glow />
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, y: 26, rotate: 7 }}
+                  whileInView={{ opacity: 1, y: 0, rotate: 7 }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ delay: 0.25 }}
+                  className="hidden -ml-10 mt-20 w-[200px] shrink-0 md:block"
+                >
+                  <PhoneFrame src="/app/iphone-aura.png" alt="Aura forged — the interface takes your energy" />
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="relative overflow-hidden bg-[#050505]" id="architecture">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(0,82,255,.12),transparent_45%)]" />
