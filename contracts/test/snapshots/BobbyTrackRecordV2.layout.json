@@ -1,272 +1,204 @@
 {
   "storage": [
     {
-      "astId": 280,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "owner",
       "offset": 0,
       "slot": "0",
       "type": "t_address"
     },
     {
-      "astId": 282,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "pendingOwner",
       "offset": 0,
       "slot": "1",
       "type": "t_address"
     },
     {
-      "astId": 284,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "bobby",
       "offset": 0,
       "slot": "2",
       "type": "t_address"
     },
     {
-      "astId": 286,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "paused",
       "offset": 20,
       "slot": "2",
       "type": "t_bool"
     },
     {
-      "astId": 289,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "minCommitAge",
       "offset": 0,
       "slot": "3",
       "type": "t_uint256"
     },
     {
-      "astId": 310,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "commitments",
       "offset": 0,
       "slot": "4",
       "type": "t_array(t_struct(Commitment)153_storage)dyn_storage"
     },
     {
-      "astId": 314,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "trades",
       "offset": 0,
       "slot": "5",
       "type": "t_array(t_struct(Trade)194_storage)dyn_storage"
     },
     {
-      "astId": 319,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "commitIndex",
       "offset": 0,
       "slot": "6",
       "type": "t_mapping(t_bytes32,t_uint256)"
     },
     {
-      "astId": 324,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "announcedAt",
       "offset": 0,
       "slot": "7",
       "type": "t_mapping(t_bytes32,t_uint64)"
     },
     {
-      "astId": 326,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "pendingCount",
       "offset": 0,
       "slot": "8",
       "type": "t_uint256"
     },
     {
-      "astId": 331,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "tradeIndex",
       "offset": 0,
       "slot": "9",
       "type": "t_mapping(t_bytes32,t_uint256)"
     },
     {
-      "astId": 336,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "feedOf",
       "offset": 0,
       "slot": "10",
       "type": "t_mapping(t_bytes32,t_bytes32)"
     },
     {
-      "astId": 341,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "approvedPyth",
       "offset": 0,
       "slot": "11",
       "type": "t_mapping(t_address,t_bool)"
     },
     {
-      "astId": 345,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "pythActivatableAt",
       "offset": 0,
       "slot": "12",
       "type": "t_mapping(t_address,t_uint64)"
     },
     {
-      "astId": 347,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "activePyth",
       "offset": 0,
       "slot": "13",
       "type": "t_address"
     },
     {
-      "astId": 355,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "sanityFeedOf",
       "offset": 0,
       "slot": "14",
       "type": "t_mapping(t_bytes32,t_address)"
     },
     {
-      "astId": 364,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "params",
       "offset": 0,
       "slot": "15",
       "type": "t_struct(VerificationParams)108_storage"
     },
     {
-      "astId": 367,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "winsVerified",
       "offset": 0,
       "slot": "16",
       "type": "t_uint256"
     },
     {
-      "astId": 369,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "lossesVerified",
       "offset": 0,
       "slot": "17",
       "type": "t_uint256"
     },
     {
-      "astId": 371,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "totalPnlBpsVerified",
       "offset": 0,
       "slot": "18",
       "type": "t_int256"
     },
     {
-      "astId": 373,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "winsAttested",
       "offset": 0,
       "slot": "19",
       "type": "t_uint256"
     },
     {
-      "astId": 375,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "lossesAttested",
       "offset": 0,
       "slot": "20",
       "type": "t_uint256"
     },
     {
-      "astId": 377,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "totalPnlBpsAttested",
       "offset": 0,
       "slot": "21",
       "type": "t_int256"
     },
     {
-      "astId": 379,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "resolvedVerified",
       "offset": 0,
       "slot": "22",
       "type": "t_uint256"
     },
     {
-      "astId": 381,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "resolvedAttested",
       "offset": 0,
       "slot": "23",
       "type": "t_uint256"
     },
     {
-      "astId": 383,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "expiredVerified",
       "offset": 0,
       "slot": "24",
       "type": "t_uint256"
     },
     {
-      "astId": 385,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "expiredAttested",
       "offset": 0,
       "slot": "25",
       "type": "t_uint256"
     },
     {
-      "astId": 387,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "pendingVerified",
       "offset": 0,
       "slot": "26",
       "type": "t_uint256"
     },
     {
-      "astId": 389,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "pendingAttested",
       "offset": 0,
       "slot": "27",
       "type": "t_uint256"
     },
     {
-      "astId": 397,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "agentWinsByMode",
       "offset": 0,
       "slot": "28",
       "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
     },
     {
-      "astId": 405,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "agentLossesByMode",
       "offset": 0,
       "slot": "29",
       "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
     },
     {
-      "astId": 413,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "agentTradesByMode",
       "offset": 0,
       "slot": "30",
       "type": "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))"
     },
     {
-      "astId": 416,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "retainedFees",
       "offset": 0,
       "slot": "31",
       "type": "t_uint256"
     },
     {
-      "astId": 419,
-      "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
       "label": "_lock",
       "offset": 0,
       "slot": "32",
@@ -275,571 +207,451 @@
   ],
   "types": {
     "t_address": {
-      "encoding": "inplace",
       "label": "address",
+      "members": [],
       "numberOfBytes": "20"
     },
     "t_array(t_struct(Commitment)153_storage)dyn_storage": {
-      "encoding": "dynamic_array",
       "label": "struct BobbyTrackRecordV2.Commitment[]",
-      "numberOfBytes": "32",
-      "base": "t_struct(Commitment)153_storage"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_array(t_struct(Trade)194_storage)dyn_storage": {
-      "encoding": "dynamic_array",
       "label": "struct BobbyTrackRecordV2.Trade[]",
-      "numberOfBytes": "32",
-      "base": "t_struct(Trade)194_storage"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_bool": {
-      "encoding": "inplace",
       "label": "bool",
+      "members": [],
       "numberOfBytes": "1"
     },
     "t_bytes32": {
-      "encoding": "inplace",
       "label": "bytes32",
+      "members": [],
       "numberOfBytes": "32"
     },
     "t_enum(Agent)76": {
-      "encoding": "inplace",
       "label": "enum BobbyTrackRecordV2.Agent",
+      "members": [],
       "numberOfBytes": "1"
     },
     "t_enum(PriceMode)80": {
-      "encoding": "inplace",
       "label": "enum BobbyTrackRecordV2.PriceMode",
+      "members": [],
       "numberOfBytes": "1"
     },
     "t_enum(Result)72": {
-      "encoding": "inplace",
       "label": "enum BobbyTrackRecordV2.Result",
+      "members": [],
       "numberOfBytes": "1"
     },
     "t_int256": {
-      "encoding": "inplace",
       "label": "int256",
+      "members": [],
       "numberOfBytes": "32"
     },
     "t_int32": {
-      "encoding": "inplace",
       "label": "int32",
+      "members": [],
       "numberOfBytes": "4"
     },
     "t_int64": {
-      "encoding": "inplace",
       "label": "int64",
+      "members": [],
       "numberOfBytes": "8"
     },
     "t_mapping(t_address,t_bool)": {
-      "encoding": "mapping",
-      "key": "t_address",
       "label": "mapping(address => bool)",
-      "numberOfBytes": "32",
-      "value": "t_bool"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_mapping(t_address,t_uint64)": {
-      "encoding": "mapping",
-      "key": "t_address",
       "label": "mapping(address => uint64)",
-      "numberOfBytes": "32",
-      "value": "t_uint64"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_mapping(t_bytes32,t_address)": {
-      "encoding": "mapping",
-      "key": "t_bytes32",
       "label": "mapping(bytes32 => address)",
-      "numberOfBytes": "32",
-      "value": "t_address"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_mapping(t_bytes32,t_bytes32)": {
-      "encoding": "mapping",
-      "key": "t_bytes32",
       "label": "mapping(bytes32 => bytes32)",
-      "numberOfBytes": "32",
-      "value": "t_bytes32"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_mapping(t_bytes32,t_uint256)": {
-      "encoding": "mapping",
-      "key": "t_bytes32",
       "label": "mapping(bytes32 => uint256)",
-      "numberOfBytes": "32",
-      "value": "t_uint256"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_mapping(t_bytes32,t_uint64)": {
-      "encoding": "mapping",
-      "key": "t_bytes32",
       "label": "mapping(bytes32 => uint64)",
-      "numberOfBytes": "32",
-      "value": "t_uint64"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_mapping(t_enum(Agent)76,t_mapping(t_enum(PriceMode)80,t_uint256))": {
-      "encoding": "mapping",
-      "key": "t_enum(Agent)76",
       "label": "mapping(enum BobbyTrackRecordV2.Agent => mapping(enum BobbyTrackRecordV2.PriceMode => uint256))",
-      "numberOfBytes": "32",
-      "value": "t_mapping(t_enum(PriceMode)80,t_uint256)"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_mapping(t_enum(PriceMode)80,t_uint256)": {
-      "encoding": "mapping",
-      "key": "t_enum(PriceMode)80",
       "label": "mapping(enum BobbyTrackRecordV2.PriceMode => uint256)",
-      "numberOfBytes": "32",
-      "value": "t_uint256"
+      "members": [],
+      "numberOfBytes": "32"
     },
     "t_string_storage": {
-      "encoding": "bytes",
       "label": "string",
+      "members": [],
       "numberOfBytes": "32"
     },
     "t_struct(Commitment)153_storage": {
-      "encoding": "inplace",
       "label": "struct BobbyTrackRecordV2.Commitment",
-      "numberOfBytes": "224",
       "members": [
         {
-          "astId": 111,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "debateHash",
           "offset": 0,
           "slot": "0",
           "type": "t_bytes32"
         },
         {
-          "astId": 113,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "entryPrice",
           "offset": 0,
           "slot": "1",
           "type": "t_uint96"
         },
         {
-          "astId": 115,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "targetPrice",
           "offset": 12,
           "slot": "1",
           "type": "t_uint96"
         },
         {
-          "astId": 117,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "committedAt",
           "offset": 24,
           "slot": "1",
           "type": "t_uint64"
         },
         {
-          "astId": 119,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "stopPrice",
           "offset": 0,
           "slot": "2",
           "type": "t_uint96"
         },
         {
-          "astId": 121,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "recorder",
           "offset": 12,
           "slot": "2",
           "type": "t_address"
         },
         {
-          "astId": 123,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "minResolveAt",
           "offset": 0,
           "slot": "3",
           "type": "t_uint64"
         },
         {
-          "astId": 126,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "agent",
           "offset": 8,
           "slot": "3",
           "type": "t_enum(Agent)76"
         },
         {
-          "astId": 128,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "conviction",
           "offset": 9,
           "slot": "3",
           "type": "t_uint8"
         },
         {
-          "astId": 130,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "resolved",
           "offset": 10,
           "slot": "3",
           "type": "t_bool"
         },
         {
-          "astId": 133,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "mode",
           "offset": 11,
           "slot": "3",
           "type": "t_enum(PriceMode)80"
         },
         {
-          "astId": 135,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "entryWindowSec",
           "offset": 12,
           "slot": "3",
           "type": "t_uint16"
         },
         {
-          "astId": 137,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "exitWindowSec",
           "offset": 14,
           "slot": "3",
           "type": "t_uint16"
         },
         {
-          "astId": 139,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "maxExitLagSec",
           "offset": 16,
           "slot": "3",
           "type": "t_uint24"
         },
         {
-          "astId": 141,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "challengeWindowSec",
           "offset": 19,
           "slot": "3",
           "type": "t_uint24"
         },
         {
-          "astId": 143,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "entryTolBps",
           "offset": 22,
           "slot": "3",
           "type": "t_uint16"
         },
         {
-          "astId": 145,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "exitTolBps",
           "offset": 24,
           "slot": "3",
           "type": "t_uint16"
         },
         {
-          "astId": 147,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "confMaxBps",
           "offset": 26,
           "slot": "3",
           "type": "t_uint16"
         },
         {
-          "astId": 150,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "entryEvidence",
           "offset": 0,
           "slot": "4",
           "type": "t_struct(OracleEvidence)92_storage"
         },
         {
-          "astId": 152,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "symbol",
           "offset": 0,
           "slot": "6",
           "type": "t_string_storage"
         }
-      ]
+      ],
+      "numberOfBytes": "224"
     },
     "t_struct(OracleEvidence)92_storage": {
-      "encoding": "inplace",
       "label": "struct BobbyTrackRecordV2.OracleEvidence",
-      "numberOfBytes": "64",
       "members": [
         {
-          "astId": 83,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "feedId",
           "offset": 0,
           "slot": "0",
           "type": "t_bytes32"
         },
         {
-          "astId": 85,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "price",
           "offset": 0,
           "slot": "1",
           "type": "t_int64"
         },
         {
-          "astId": 87,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "conf",
           "offset": 8,
           "slot": "1",
           "type": "t_uint64"
         },
         {
-          "astId": 89,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "expo",
           "offset": 16,
           "slot": "1",
           "type": "t_int32"
         },
         {
-          "astId": 91,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "publishTime",
           "offset": 20,
           "slot": "1",
           "type": "t_uint64"
         }
-      ]
+      ],
+      "numberOfBytes": "64"
     },
     "t_struct(Trade)194_storage": {
-      "encoding": "inplace",
       "label": "struct BobbyTrackRecordV2.Trade",
-      "numberOfBytes": "320",
       "members": [
         {
-          "astId": 156,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "debateHash",
           "offset": 0,
           "slot": "0",
           "type": "t_bytes32"
         },
         {
-          "astId": 158,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "entryPrice",
           "offset": 0,
           "slot": "1",
           "type": "t_uint96"
         },
         {
-          "astId": 160,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "exitPrice",
           "offset": 12,
           "slot": "1",
           "type": "t_uint96"
         },
         {
-          "astId": 162,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "committedAt",
           "offset": 24,
           "slot": "1",
           "type": "t_uint64"
         },
         {
-          "astId": 164,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "resolvedAt",
           "offset": 0,
           "slot": "2",
           "type": "t_uint64"
         },
         {
-          "astId": 166,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "recorder",
           "offset": 8,
           "slot": "2",
           "type": "t_address"
         },
         {
-          "astId": 169,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "agent",
           "offset": 28,
           "slot": "2",
           "type": "t_enum(Agent)76"
         },
         {
-          "astId": 171,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "conviction",
           "offset": 29,
           "slot": "2",
           "type": "t_uint8"
         },
         {
-          "astId": 174,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "result",
           "offset": 30,
           "slot": "2",
           "type": "t_enum(Result)72"
         },
         {
-          "astId": 177,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "mode",
           "offset": 31,
           "slot": "2",
           "type": "t_enum(PriceMode)80"
         },
         {
-          "astId": 179,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "pnlBps",
           "offset": 0,
           "slot": "3",
           "type": "t_int256"
         },
         {
-          "astId": 181,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "exitAt",
           "offset": 0,
           "slot": "4",
           "type": "t_uint64"
         },
         {
-          "astId": 183,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "challengeDeadline",
           "offset": 8,
           "slot": "4",
           "type": "t_uint64"
         },
         {
-          "astId": 185,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "stopChallenged",
           "offset": 16,
           "slot": "4",
           "type": "t_bool"
         },
         {
-          "astId": 188,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "entryEvidence",
           "offset": 0,
           "slot": "5",
           "type": "t_struct(OracleEvidence)92_storage"
         },
         {
-          "astId": 191,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "exitEvidence",
           "offset": 0,
           "slot": "7",
           "type": "t_struct(OracleEvidence)92_storage"
         },
         {
-          "astId": 193,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "symbol",
           "offset": 0,
           "slot": "9",
           "type": "t_string_storage"
         }
-      ]
+      ],
+      "numberOfBytes": "320"
     },
     "t_struct(VerificationParams)108_storage": {
-      "encoding": "inplace",
       "label": "struct BobbyTrackRecordV2.VerificationParams",
-      "numberOfBytes": "32",
       "members": [
         {
-          "astId": 95,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "entryWindowSec",
           "offset": 0,
           "slot": "0",
           "type": "t_uint16"
         },
         {
-          "astId": 97,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "exitWindowSec",
           "offset": 2,
           "slot": "0",
           "type": "t_uint16"
         },
         {
-          "astId": 99,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "maxExitLagSec",
           "offset": 4,
           "slot": "0",
           "type": "t_uint24"
         },
         {
-          "astId": 101,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "challengeWindowSec",
           "offset": 7,
           "slot": "0",
           "type": "t_uint24"
         },
         {
-          "astId": 103,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "entryTolBps",
           "offset": 10,
           "slot": "0",
           "type": "t_uint16"
         },
         {
-          "astId": 105,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "exitTolBps",
           "offset": 12,
           "slot": "0",
           "type": "t_uint16"
         },
         {
-          "astId": 107,
-          "contract": "src/BobbyTrackRecordV2.sol:BobbyTrackRecordV2",
           "label": "confMaxBps",
           "offset": 14,
           "slot": "0",
           "type": "t_uint16"
         }
-      ]
+      ],
+      "numberOfBytes": "32"
     },
     "t_uint16": {
-      "encoding": "inplace",
       "label": "uint16",
+      "members": [],
       "numberOfBytes": "2"
     },
     "t_uint24": {
-      "encoding": "inplace",
       "label": "uint24",
+      "members": [],
       "numberOfBytes": "3"
     },
     "t_uint256": {
-      "encoding": "inplace",
       "label": "uint256",
+      "members": [],
       "numberOfBytes": "32"
     },
     "t_uint64": {
-      "encoding": "inplace",
       "label": "uint64",
+      "members": [],
       "numberOfBytes": "8"
     },
     "t_uint8": {
-      "encoding": "inplace",
       "label": "uint8",
+      "members": [],
       "numberOfBytes": "1"
     },
     "t_uint96": {
-      "encoding": "inplace",
       "label": "uint96",
+      "members": [],
       "numberOfBytes": "12"
     }
   }
