@@ -11,7 +11,7 @@ import { matchAssetInText, normalizeAssetSymbol } from '@/lib/voice-assets';
 import type { DeskBrief } from '@/lib/voice-desk-brief';
 
 export type VoiceState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
-export type VoiceInputMode = 'push-to-talk' | 'hands-free';
+export type VoiceInputMode = 'tap-to-talk' | 'hands-free';
 
 export interface TranscriptLine {
   id: string;
@@ -121,7 +121,7 @@ function debateLevel(
 
 export function useRealtimeVoice(
   lang: 'es' | 'en' = 'es',
-  inputMode: VoiceInputMode = 'push-to-talk',
+  inputMode: VoiceInputMode = 'tap-to-talk',
 ) {
   const [state, setState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -150,7 +150,7 @@ export function useRealtimeVoice(
   const stateRef = useRef<VoiceState>('idle');
   const symbolRef = useRef('BTC');
   const inputModeRef = useRef<VoiceInputMode>(inputMode);
-  const [micMuted, setMicMuted] = useState(inputMode === 'push-to-talk');
+  const [micMuted, setMicMuted] = useState(inputMode === 'tap-to-talk');
 
   // --- tool dispatch bookkeeping ---------------------------------------
   // Tools are fired the moment their arguments finish streaming, not when the
@@ -403,7 +403,7 @@ export function useRealtimeVoice(
     if (type === 'response.created') responseActiveRef.current = true;
     if (type === 'response.output_audio.delta') {
       // In speaker mode Bobby must never feed his own audio back into the turn.
-      if (inputModeRef.current === 'push-to-talk') setMicEnabled(false);
+      if (inputModeRef.current === 'tap-to-talk') setMicEnabled(false);
       setState('speaking');
     }
     if (type === 'response.done' || type === 'response.output_audio.done') {
@@ -492,6 +492,7 @@ export function useRealtimeVoice(
     responseOwedRef.current = false;
     briefGenerationRef.current += 1;
     briefRequestsRef.current.clear();
+    setMicMuted(inputModeRef.current === 'tap-to-talk');
     setLevel(0);
     setState('idle');
   }, []);
@@ -547,8 +548,11 @@ export function useRealtimeVoice(
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       });
       micRef.current = mic;
-      mic.getAudioTracks().forEach((track) => { track.enabled = inputModeRef.current === 'hands-free'; });
-      setMicMuted(inputModeRef.current === 'push-to-talk');
+      // The activation click opens the microphone for the first question. On
+      // later turns tap-to-talk opens it again, and Bobby mutes it as soon as
+      // his answer starts so his own voice can never feed back into the room.
+      mic.getAudioTracks().forEach((track) => { track.enabled = true; });
+      setMicMuted(false);
       pc.addTrack(mic.getAudioTracks()[0], mic);
 
       const micAnalyser = ctx.createAnalyser();
@@ -562,24 +566,8 @@ export function useRealtimeVoice(
         try { handleEvent(JSON.parse(e.data)); } catch { /* ignore malformed frame */ }
       };
       dc.onopen = () => {
-        // Ask for the human's transcript too — the model only returns its own by default.
-        send({
-          type: 'session.update',
-          session: {
-            type: 'realtime',
-            audio: {
-              input: {
-                transcription: {
-                  model: 'whisper-1',
-                  language: lang,
-                  prompt: lang === 'es'
-                    ? 'Español de México. Cripto: Bitcoin, Ethereum, BTC, ETH, SOL, long, short, stop, soporte, resistencia.'
-                    : 'English. Crypto: Bitcoin, Ethereum, BTC, ETH, SOL, long, short, stop, support, resistance.',
-                },
-              },
-            },
-          },
-        });
+        // Input transcription is part of the minted session, so the first
+        // utterance cannot race a client-side session.update.
         setState('listening');
       };
 
@@ -609,19 +597,20 @@ export function useRealtimeVoice(
 
   useEffect(() => () => disconnect(), [disconnect]);
 
-  /** Push-to-talk prevents room audio from becoming a new user turn while Bobby speaks. */
+  /** Tap-to-talk prevents room audio from becoming a new user turn while Bobby speaks. */
   const startTalking = useCallback(() => {
-    if (inputModeRef.current !== 'push-to-talk') return;
+    if (inputModeRef.current !== 'tap-to-talk') return;
     if (stateRef.current === 'speaking' || stateRef.current === 'thinking') {
       send({ type: 'response.cancel' });
       send({ type: 'output_audio_buffer.clear' });
     }
+    send({ type: 'input_audio_buffer.clear' });
     setMicEnabled(true);
     setState('listening');
   }, [send, setMicEnabled]);
 
   const stopTalking = useCallback(() => {
-    if (inputModeRef.current === 'push-to-talk') setMicEnabled(false);
+    if (inputModeRef.current === 'tap-to-talk') setMicEnabled(false);
   }, [setMicEnabled]);
 
   return {

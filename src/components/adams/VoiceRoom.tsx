@@ -87,7 +87,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
   const [voiceLang, setVoiceLang] = useState<'es' | 'en'>(() => {
     try { return localStorage.getItem('bobby_lang') === 'en' ? 'en' : 'es'; } catch { return 'es'; }
   });
-  const [inputMode, setInputMode] = useState<'push-to-talk' | 'hands-free'>('push-to-talk');
+  const [inputMode, setInputMode] = useState<'tap-to-talk' | 'hands-free'>('tap-to-talk');
   const {
     state, error, level, transcript, tools, proposal,
     symbol, timeframe, levels, thesis, debate, deskBrief, briefState,
@@ -144,8 +144,8 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
           </label>
           <label className="hidden items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/45 sm:flex">
             <span>MIC</span>
-            <select value={inputMode} onChange={(event) => setInputMode(event.target.value as 'push-to-talk' | 'hands-free')} className="bg-transparent text-[#7da6ff] outline-none">
-              <option value="push-to-talk">{voiceLang === 'es' ? 'MANTÉN PARA HABLAR' : 'PUSH TO TALK'}</option>
+            <select value={inputMode} onChange={(event) => setInputMode(event.target.value as 'tap-to-talk' | 'hands-free')} className="bg-transparent text-[#7da6ff] outline-none">
+              <option value="tap-to-talk">{voiceLang === 'es' ? 'TOCA PARA HABLAR' : 'TAP TO TALK'}</option>
               <option value="hands-free">{voiceLang === 'es' ? 'AUDÍFONOS' : 'HEADSET'}</option>
             </select>
           </label>
@@ -220,25 +220,29 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
           {/* mic */}
           <div className="relative mt-4 flex shrink-0 flex-col items-center gap-2">
             <button
-              onClick={!live ? activateVoice : undefined}
-              onPointerDown={live && inputMode === 'push-to-talk' ? startTalking : undefined}
-              onPointerUp={live && inputMode === 'push-to-talk' ? stopTalking : undefined}
-              onPointerCancel={live && inputMode === 'push-to-talk' ? stopTalking : undefined}
-              onPointerLeave={live && inputMode === 'push-to-talk' ? stopTalking : undefined}
-              aria-label={!live ? 'Abrir sesión de voz' : inputMode === 'push-to-talk' ? 'Mantén para hablar' : 'Sesión de voz activa'}
+              onClick={!live
+                ? activateVoice
+                : inputMode === 'tap-to-talk'
+                  ? (micMuted ? startTalking : stopTalking)
+                  : undefined}
+              aria-label={!live
+                ? 'Abrir sesión de voz'
+                : inputMode === 'tap-to-talk'
+                  ? (micMuted ? 'Toca para hablar' : 'Silenciar micrófono')
+                  : 'Sesión de voz activa'}
               className={`group relative grid h-14 w-14 place-items-center rounded-full transition ${
                 live ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)] active:scale-95' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff] active:scale-95'
               }`}
             >
               <span className="pointer-events-none absolute inset-0 rounded-full border border-[#0052ff]/60"
                 style={{ transform: `scale(${1 + level * 0.8})`, opacity: live ? 0.9 - level * 0.5 : 0 }} />
-              {live && inputMode === 'push-to-talk' && !micMuted ? <Mic className="h-5 w-5" /> : live ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              {live && inputMode === 'tap-to-talk' && !micMuted ? <Mic className="h-5 w-5" /> : live ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </button>
             <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
               {!live
                 ? (voiceLang === 'es' ? 'TOCA PARA ACTIVAR · análisis, no asesoría' : 'TAP TO ACTIVATE · analysis, not advice')
-                : inputMode === 'push-to-talk'
-                  ? (micMuted ? (voiceLang === 'es' ? 'BOBBY HABLA · MANTÉN PARA HABLAR' : 'BOBBY TALKS · HOLD TO SPEAK') : (voiceLang === 'es' ? 'ESCUCHANDO · SUELTA AL TERMINAR' : 'LISTENING · RELEASE WHEN DONE'))
+                : inputMode === 'tap-to-talk'
+                  ? (micMuted ? (voiceLang === 'es' ? 'TOCA PARA TU SIGUIENTE PREGUNTA' : 'TAP FOR YOUR NEXT QUESTION') : (voiceLang === 'es' ? 'MICRÓFONO ABIERTO · HABLA NORMAL' : 'MIC OPEN · SPEAK NATURALLY'))
                   : (voiceLang === 'es' ? 'AUDÍFONOS · MANOS LIBRES' : 'HEADSET · HANDS FREE')}
             </p>
             {live && (
