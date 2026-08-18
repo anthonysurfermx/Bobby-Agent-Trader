@@ -1,8 +1,7 @@
 // Bobby — one screen. Ask about any asset; get the answer, the chart and
-// the levels. The protocol's complexity stays server-side; what the user
-// feels is: type (or dictate) → Bobby answers, smoothly.
+// the levels. Fun by design: a living orb, playful thinking states,
+// tappable suggestions — a compa with superpowers, not a bank form.
 import SwiftUI
-import AVFoundation
 
 struct ChatMessage: Identifiable, Equatable {
     let id = UUID()
@@ -12,34 +11,48 @@ struct ChatMessage: Identifiable, Equatable {
 
 @MainActor
 final class BobbyViewModel: ObservableObject {
-    @Published var messages: [ChatMessage] = [
-        ChatMessage(fromBobby: true, text: "Soy Bobby. Pregúntame de cualquier activo — bitcoin, NVIDIA, oro, lo que sea.")
-    ]
+    @Published var messages: [ChatMessage] = []
     @Published var input = ""
     @Published var thinking = false
+    @Published var thinkingPhrase = ""
     @Published var candles: [Candle] = []
     @Published var snapshot: MarketSnapshot?
     @Published var lastAnswer: BobbyAnswer?
     @Published var speakEnabled = true
 
-    private let voice = AVSpeechSynthesizer()
+    let voice = NeuralVoice()
+    let profile = AgentProfile()
 
-    func ask() {
-        let q = input.trimmingCharacters(in: .whitespacesAndNewlines)
+    private let thinkingPhrases = [
+        "leyendo velas 🕯️",
+        "interrogando al mercado…",
+        "contando los ticks…",
+        "revisando niveles clave…",
+        "consultando a los agentes…",
+    ]
+
+    func bootGreetingIfNeeded() {
+        guard messages.isEmpty else { return }
+        messages.append(ChatMessage(fromBobby: true, text: profile.greeting))
+    }
+
+    func ask(_ preset: String? = nil) {
+        let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !thinking else { return }
         input = ""
+        voice.stop()
         messages.append(ChatMessage(fromBobby: false, text: q))
         thinking = true
+        thinkingPhrase = thinkingPhrases.randomElement() ?? "analizando…"
 
         Task {
             defer { thinking = false }
 
             guard let asset = await BobbyAPI.resolveAsset(q) else {
-                messages.append(ChatMessage(fromBobby: true, text: "No encontré ese activo. Prueba con el nombre o el ticker — \"bitcoin\", \"NVDA\", \"oro\"."))
+                messages.append(ChatMessage(fromBobby: true, text: "Ese no lo tengo 🤔 — prueba con el nombre o ticker: \"bitcoin\", \"NVDA\", \"oro\"."))
                 return
             }
 
-            // Fire everything in parallel: price, chart, full analysis.
             async let mkt = BobbyAPI.market(asset.symbol)
             async let ch = BobbyAPI.candles(symbol: asset.symbol, isEquity: asset.isEquity)
             async let ans = BobbyAPI.debate(asset.symbol)
@@ -63,16 +76,8 @@ final class BobbyViewModel: ObservableObject {
             let text = answer.summary
             messages.append(ChatMessage(fromBobby: true, text: text))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            if speakEnabled { speak(text) }
+            if speakEnabled { voice.speak(text, voiceId: profile.voiceId) }
         }
-    }
-
-    private func speak(_ text: String) {
-        voice.stopSpeaking(at: .immediate)
-        let u = AVSpeechUtterance(string: text)
-        u.voice = AVSpeechSynthesisVoice(language: "es-MX") ?? AVSpeechSynthesisVoice(language: "es-ES")
-        u.rate = 0.52
-        voice.speak(u)
     }
 }
 
@@ -84,51 +89,69 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             Theme.bg.ignoresSafeArea()
-            VStack(spacing: 0) {
-                header
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 14) {
-                            if vm.snapshot != nil { assetCard }
-                            conversation
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-                        .padding(.bottom, 12)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: vm.messages) {
-                        if let last = vm.messages.last {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo(last.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
-                inputBar
+            if vm.profile.onboarded {
+                mainScreen
+                    .transition(.opacity)
+            } else {
+                OnboardingView(profile: vm.profile, voice: vm.voice)
+                    .transition(.opacity)
             }
+        }
+        .onAppear { vm.bootGreetingIfNeeded() }
+        .onChange(of: vm.profile.onboarded) {
+            vm.messages = []
+            vm.bootGreetingIfNeeded()
         }
     }
 
-    // ── header ──
-    private var header: some View {
-        HStack(spacing: 10) {
-            Text("BOBBY")
-                .font(.mono(17, .bold))
-                .kerning(3)
-                .foregroundStyle(Theme.text)
-            HStack(spacing: 5) {
-                Circle().fill(Theme.up).frame(width: 6, height: 6)
-                Text("prueba sus llamadas on-chain")
-                    .font(.rounded(11))
-                    .foregroundStyle(Theme.muted)
+    private var mainScreen: some View {
+        VStack(spacing: 0) {
+            header
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 14) {
+                        if vm.snapshot != nil { assetCard }
+                        conversation
+                        if vm.snapshot == nil && vm.messages.count <= 1 { suggestions }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .onChange(of: vm.messages) {
+                    if let last = vm.messages.last {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            proxy.scrollTo(last.id, anchor: .bottom)
+                        }
+                    }
+                }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Capsule().fill(Theme.card))
+            inputBar
+        }
+    }
+
+    // ── header: the orb IS the brand ──
+    private var header: some View {
+        HStack(spacing: 6) {
+            BobbyOrb(size: 34, thinking: vm.thinking, speaking: vm.voice.speaking)
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(vm.profile.name.uppercased())
+                    .font(.mono(15, .bold))
+                    .kerning(2)
+                    .foregroundStyle(Theme.text)
+                HStack(spacing: 4) {
+                    Circle().fill(Theme.up).frame(width: 5, height: 5)
+                    Text("prueba sus llamadas on-chain")
+                        .font(.rounded(10))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
             Spacer()
             Button {
                 vm.speakEnabled.toggle()
+                if !vm.speakEnabled { vm.voice.stop() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             } label: {
                 Image(systemName: vm.speakEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
@@ -139,7 +162,7 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 6)
     }
 
     // ── asset card: price + chart + levels ──
@@ -226,18 +249,34 @@ struct ContentView: View {
             }
             if vm.thinking {
                 HStack(spacing: 8) {
-                    ProgressView().tint(Theme.muted)
-                    Text("Bobby está analizando…")
-                        .font(.rounded(13))
+                    BobbyOrb(size: 20, thinking: true)
+                        .frame(width: 28, height: 28)
+                    Text(vm.thinkingPhrase)
+                        .font(.rounded(13, .medium))
                         .foregroundStyle(Theme.muted)
                     Spacer()
                 }
-                .padding(.leading, 6)
+                .padding(.leading, 4)
+                .transition(.opacity)
             }
         }
     }
 
-    // ── input: mic-first, WhatsApp-style ──
+    // ── empty-state: tap a suggestion, get magic ──
+    private var suggestions: some View {
+        VStack(spacing: 8) {
+            Text("o prueba con…")
+                .font(.rounded(12))
+                .foregroundStyle(Theme.muted)
+            FlowChips(items: ["¿cómo va bitcoin?", "NVDA hoy", "¿el oro rompe?", "solana en corto", "¿qué onda con TSLA?"]) { s in
+                vm.ask(s)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+        }
+        .padding(.top, 12)
+    }
+
+    // ── input: mic-first ──
     private var inputBar: some View {
         HStack(spacing: 10) {
             TextField(speech.listening ? "Te escucho…" : "Pregúntame de cualquier activo…", text: $vm.input)
@@ -259,9 +298,9 @@ struct ContentView: View {
                 )
 
             if vm.input.isEmpty && !vm.thinking {
-                // Mic — the primary way in. Tap, talk, pause: it sends itself.
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    vm.voice.stop()
                     speech.toggle(
                         onPartial: { vm.input = $0 },
                         onFinal: { text in
@@ -298,5 +337,34 @@ struct ContentView: View {
         .padding(.top, 8)
         .padding(.bottom, 10)
         .background(Theme.bg)
+    }
+}
+
+/// Simple wrapping chip row.
+struct FlowChips: View {
+    let items: [String]
+    let action: (String) -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                ForEach(items.prefix(3), id: \.self) { chipButton($0) }
+            }
+            HStack(spacing: 8) {
+                ForEach(items.dropFirst(3), id: \.self) { chipButton($0) }
+            }
+        }
+    }
+
+    private func chipButton(_ s: String) -> some View {
+        Button { action(s) } label: {
+            Text(s)
+                .font(.rounded(13, .medium))
+                .foregroundStyle(Theme.accent)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Theme.accent.opacity(0.10)))
+                .overlay(Capsule().stroke(Theme.accent.opacity(0.25), lineWidth: 1))
+        }
     }
 }
