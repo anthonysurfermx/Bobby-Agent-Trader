@@ -7,10 +7,12 @@ import AVFoundation
 @MainActor
 final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published var speaking = false
+    @Published var level: CGFloat = 0
 
     private var player: AVAudioPlayer?
     private let fallback = AVSpeechSynthesizer()
     private var generation = 0
+    private var meterTimer: Timer?
 
     func speak(_ text: String, voiceId: String) {
         stop()
@@ -36,9 +38,11 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 try? AVAudioSession.sharedInstance().setActive(true)
                 let p = try AVAudioPlayer(data: data)
                 p.delegate = self
+                p.isMeteringEnabled = true
                 self.player = p
                 self.speaking = true
                 p.play()
+                self.startMetering(p)
             } catch {
                 if gen == self.generation { self.speakFallback(text) }
             }
@@ -53,15 +57,33 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
         fallback.speak(u)
     }
 
+    private func startMetering(_ player: AVAudioPlayer) {
+        meterTimer?.invalidate()
+        meterTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { [weak self, weak player] _ in
+            guard let self, let player, player.isPlaying else { return }
+            player.updateMeters()
+            let power = player.averagePower(forChannel: 0)
+            self.level = min(1, max(0.04, CGFloat(pow(10, power / 20)) * 2.5))
+        }
+    }
+
     func stop() {
         generation += 1
         player?.stop()
         player = nil
+        meterTimer?.invalidate()
+        meterTimer = nil
         fallback.stopSpeaking(at: .immediate)
         speaking = false
+        level = 0
     }
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in self.speaking = false }
+        Task { @MainActor in
+            self.meterTimer?.invalidate()
+            self.meterTimer = nil
+            self.level = 0
+            self.speaking = false
+        }
     }
 }

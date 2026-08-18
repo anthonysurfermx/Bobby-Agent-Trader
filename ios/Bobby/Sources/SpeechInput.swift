@@ -10,6 +10,7 @@ import AVFoundation
 final class SpeechInput: NSObject, ObservableObject {
     @Published var listening = false
     @Published var authorized = true
+    @Published var level: CGFloat = 0
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "es-MX"))
         ?? SFSpeechRecognizer(locale: Locale(identifier: "es-ES"))
@@ -57,6 +58,13 @@ final class SpeechInput: NSObject, ObservableObject {
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             self?.request?.append(buffer)
+            guard let samples = buffer.floatChannelData?.pointee else { return }
+            let count = Int(buffer.frameLength)
+            guard count > 0 else { return }
+            var sum: Float = 0
+            for i in 0..<count { sum += samples[i] * samples[i] }
+            let normalized = min(1, CGFloat(sqrt(sum / Float(count)) * 11))
+            Task { @MainActor in self?.level = normalized }
         }
 
         engine.prepare()
@@ -86,6 +94,7 @@ final class SpeechInput: NSObject, ObservableObject {
     func finish() {
         guard listening else { return }
         listening = false
+        level = 0
         silenceTimer?.invalidate()
         engine.stop()
         engine.inputNode.removeTap(onBus: 0)

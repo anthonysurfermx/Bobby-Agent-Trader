@@ -1,7 +1,6 @@
-// "Configura tu Bobby" — 3 playful steps: voice, vibe, name. The voices
-// introduce THEMSELVES out loud when tapped; the vibes show how they'd
-// actually talk. Personalization is the product hook, so this moment has
-// to feel like character creation, not a settings form.
+// Identity boot sequence. Onboarding introduces the same live object the user
+// will talk to on the desk; it should feel like commissioning an agent, not
+// filling out a consumer settings form.
 import SwiftUI
 
 struct OnboardingView: View {
@@ -13,177 +12,243 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            Theme.bg.ignoresSafeArea()
+            KineticBackground()
             VStack(spacing: 0) {
-                // progress dots
+                bootHeader
+                ScrollView {
+                    Group {
+                        switch step {
+                        case 0: voiceStep
+                        case 1: vibeStep
+                        default: nameStep
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
+                    .padding(.bottom, 18)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                continueButton
+            }
+        }
+    }
+
+    private var bootHeader: some View {
+        VStack(spacing: 12) {
+            HStack {
                 HStack(spacing: 8) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Capsule()
-                            .fill(i <= step ? Theme.accent : Theme.cardSoft)
-                            .frame(width: i == step ? 26 : 8, height: 8)
-                    }
+                    Circle().fill(Theme.accent).frame(width: 7, height: 7).shadow(color: Theme.accent, radius: 7)
+                    Text("BOBBY // IDENTITY BOOT")
+                        .font(.mono(11, .bold))
+                        .kerning(1.9)
+                        .foregroundStyle(Theme.text.opacity(0.78))
                 }
-                .animation(.spring(duration: 0.4), value: step)
-                .padding(.top, 24)
-
-                Spacer(minLength: 12)
-
-                switch step {
-                case 0: voiceStep
-                case 1: vibeStep
-                default: nameStep
-                }
-
-                Spacer(minLength: 12)
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    if step < 2 {
-                        withAnimation(.spring(duration: 0.45)) { step += 1 }
-                    } else {
-                        if !name.trimmingCharacters(in: .whitespaces).isEmpty {
-                            profile.name = name.trimmingCharacters(in: .whitespaces)
-                        }
-                        voice.speak(profile.greeting, voiceId: profile.voiceId)
-                        withAnimation(.spring(duration: 0.5)) { profile.onboarded = true }
-                    }
-                } label: {
-                    Text(step < 2 ? "Siguiente" : "¡A darle!")
-                        .font(.rounded(17, .bold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Capsule().fill(Theme.accent))
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 28)
+                Spacer()
+                Text("0\(step + 1) / 03")
+                    .font(.mono(10, .bold))
+                    .foregroundStyle(Theme.accentSoft)
             }
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.cardSoft).frame(height: 2)
+                    Capsule()
+                        .fill(Theme.accent)
+                        .frame(width: geometry.size.width * CGFloat(step + 1) / 3, height: 2)
+                }
+            }
+            .frame(height: 2)
         }
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
-    // ── paso 1: la voz ──
     private var voiceStep: some View {
-        VStack(spacing: 18) {
-            BobbyOrb(size: 64, speaking: voice.speaking)
-            Text("Elige su voz")
-                .font(.rounded(28, .bold))
+        VStack(spacing: 14) {
+            BobbyOrb(size: 146, speaking: voice.speaking, level: voice.speaking ? max(0.08, voice.level) : 0.08)
+                .frame(height: 150)
+            sectionEyebrow("VOICE MATRIX")
+            Text("Elige la voz del desk")
+                .font(.rounded(26, .bold))
                 .foregroundStyle(Theme.text)
-            Text("Toca una y se presenta sola")
-                .font(.rounded(15))
+                .multilineTextAlignment(.center)
+            Text("Cada voz se presenta en vivo. La orbe responde al audio.")
+                .font(.rounded(13, .medium))
                 .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
 
-            VStack(spacing: 10) {
-                ForEach(AgentVoice.allCases) { v in
+            VStack(spacing: 8) {
+                ForEach(AgentVoice.allCases) { agentVoice in
                     Button {
-                        profile.voiceId = v.rawValue
+                        profile.voiceId = agentVoice.rawValue
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speak("Hola, soy \(v.label). Así sueno yo — ¿te late para hablar de mercados?", voiceId: v.rawValue)
+                        voice.speak("Hola, soy \(agentVoice.label). Estoy listo para abrir el desk y leer el mercado contigo.", voiceId: agentVoice.rawValue)
                     } label: {
-                        HStack {
-                            Text(v.label)
-                                .font(.rounded(17, .semibold))
-                                .foregroundStyle(Theme.text)
-                            Text(v.flavor)
-                                .font(.rounded(13))
-                                .foregroundStyle(Theme.muted)
-                            Spacer()
-                            Image(systemName: profile.voiceId == v.rawValue ? "checkmark.circle.fill" : "play.circle")
-                                .font(.system(size: 22))
-                                .foregroundStyle(profile.voiceId == v.rawValue ? Theme.up : Theme.muted)
-                        }
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(profile.voiceId == v.rawValue ? Theme.cardSoft : Theme.card)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(profile.voiceId == v.rawValue ? Theme.accent.opacity(0.6) : Theme.stroke, lineWidth: 1)
-                        )
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-        }
-    }
-
-    // ── paso 2: el vibe ──
-    private var vibeStep: some View {
-        VStack(spacing: 18) {
-            Text("¿Cómo te habla?")
-                .font(.rounded(28, .bold))
-                .foregroundStyle(Theme.text)
-            Text("Toca un estilo para escucharlo")
-                .font(.rounded(15))
-                .foregroundStyle(Theme.muted)
-
-            VStack(spacing: 10) {
-                ForEach(AgentVibe.allCases) { v in
-                    Button {
-                        profile.vibeId = v.rawValue
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speak(v.sample, voiceId: profile.voiceId)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(v.label)
-                                    .font(.rounded(17, .bold))
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(agentVoice.label.uppercased())
+                                    .font(.mono(12, .bold))
+                                    .kerning(1.2)
                                     .foregroundStyle(Theme.text)
-                                Spacer()
-                                if profile.vibeId == v.rawValue {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(Theme.up)
-                                }
+                                Text(agentVoice.flavor.uppercased())
+                                    .font(.mono(9, .medium))
+                                    .foregroundStyle(Theme.muted)
                             }
-                            Text(v.desc)
-                                .font(.rounded(13))
-                                .foregroundStyle(Theme.muted)
-                            Text("\u{201C}\(v.sample)\u{201D}")
-                                .font(.rounded(13))
-                                .italic()
-                                .foregroundStyle(Theme.accent.opacity(0.9))
-                                .padding(.top, 2)
+                            Spacer()
+                            Image(systemName: profile.voiceId == agentVoice.rawValue ? "checkmark" : "play.fill")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(profile.voiceId == agentVoice.rawValue ? Theme.up : Theme.accentSoft)
+                                .frame(width: 34, height: 34)
+                                .background(Circle().fill((profile.voiceId == agentVoice.rawValue ? Theme.up : Theme.accent).opacity(0.10)))
+                                .overlay(Circle().stroke((profile.voiceId == agentVoice.rawValue ? Theme.up : Theme.accent).opacity(0.25), lineWidth: 1))
                         }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(profile.vibeId == v.rawValue ? Theme.cardSoft : Theme.card)
-                        )
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        .background(Theme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(profile.vibeId == v.rawValue ? Theme.accent.opacity(0.6) : Theme.stroke, lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(profile.voiceId == agentVoice.rawValue ? Theme.accent.opacity(0.65) : Theme.stroke, lineWidth: 1)
                         )
                     }
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.top, 4)
         }
     }
 
-    // ── paso 3: el nombre ──
-    private var nameStep: some View {
-        VStack(spacing: 18) {
-            BobbyOrb(size: 64)
-            Text("Ponle nombre")
-                .font(.rounded(28, .bold))
+    private var vibeStep: some View {
+        VStack(spacing: 14) {
+            BobbyOrb(size: 124, speaking: voice.speaking, level: voice.speaking ? max(0.08, voice.level) : 0.08)
+                .frame(height: 128)
+            sectionEyebrow("VOICE DIRECTIVE")
+            Text("¿Cómo te habla?")
+                .font(.rounded(27, .bold))
                 .foregroundStyle(Theme.text)
-            Text("Es TU agente — bautízalo")
-                .font(.rounded(15))
+            Text("La personalidad cambia el tono; los datos no cambian.")
+                .font(.rounded(13, .medium))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+
+            VStack(spacing: 8) {
+                ForEach(AgentVibe.allCases) { vibe in
+                    Button {
+                        profile.vibeId = vibe.rawValue
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        voice.speak(vibe.sample, voiceId: profile.voiceId)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 7) {
+                            HStack {
+                                Text(vibe.label.uppercased())
+                                    .font(.mono(12, .bold))
+                                    .kerning(1.2)
+                                    .foregroundStyle(profile.vibeId == vibe.rawValue ? Theme.accentSoft : Theme.text)
+                                Spacer()
+                                Image(systemName: profile.vibeId == vibe.rawValue ? "checkmark.circle.fill" : "waveform.circle")
+                                    .foregroundStyle(profile.vibeId == vibe.rawValue ? Theme.up : Theme.muted)
+                            }
+                            Text(vibe.desc)
+                                .font(.rounded(13, .medium))
+                                .foregroundStyle(Theme.muted)
+                            Text("“\(vibe.sample)”")
+                                .font(.rounded(12, .medium))
+                                .foregroundStyle(Theme.text.opacity(0.72))
+                                .lineLimit(2)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(profile.vibeId == vibe.rawValue ? Theme.accent.opacity(0.07) : Theme.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(profile.vibeId == vibe.rawValue ? Theme.accent.opacity(0.55) : Theme.stroke, lineWidth: 1))
+                    }
+                }
+            }
+            .padding(.top, 5)
+        }
+    }
+
+    private var nameStep: some View {
+        VStack(spacing: 14) {
+            BobbyOrb(size: 150, level: 0.10).frame(height: 154)
+            sectionEyebrow("CALLSIGN")
+            Text("Bautiza tu agente")
+                .font(.rounded(27, .bold))
+                .foregroundStyle(Theme.text)
+            Text("Este nombre aparece en tu Live Desk.")
+                .font(.rounded(13, .medium))
                 .foregroundStyle(Theme.muted)
 
-            TextField("Bobby", text: $name)
-                .font(.rounded(24, .bold))
+            TextField("BOBBY", text: $name)
+                .font(.mono(22, .bold))
+                .kerning(2)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Theme.text)
                 .focused($nameFocused)
                 .autocorrectionDisabled(true)
-                .padding(.vertical, 16)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Theme.card))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(nameFocused ? Theme.accent.opacity(0.6) : Theme.stroke, lineWidth: 1))
-                .padding(.horizontal, 48)
+                .textInputAutocapitalization(.characters)
+                .padding(.vertical, 15)
+                .background(Theme.panel)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(nameFocused ? Theme.accent.opacity(0.7) : Theme.stroke, lineWidth: 1))
+                .padding(.top, 6)
                 .onAppear { nameFocused = true }
+
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "checkmark.shield.fill")
+                    .foregroundStyle(Theme.up)
+                Text("Bobby analiza mercados con datos en vivo. No administra tu dinero, no ejecuta operaciones ni emite recomendaciones personalizadas. Tú decides y asumes el riesgo.")
+                    .font(.mono(9, .medium))
+                    .foregroundStyle(Theme.muted)
+                    .lineSpacing(3)
+                Spacer(minLength: 0)
+            }
+            .padding(13)
+            .background(Theme.up.opacity(0.045))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.up.opacity(0.16), lineWidth: 1))
+            .padding(.top, 5)
         }
+    }
+
+    private func sectionEyebrow(_ text: String) -> some View {
+        Text(text)
+            .font(.mono(10, .bold))
+            .kerning(2.2)
+            .foregroundStyle(Theme.accentSoft)
+    }
+
+    private var continueButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            if step < 2 {
+                voice.stop()
+                withAnimation(.spring(duration: 0.42)) { step += 1 }
+            } else {
+                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { profile.name = trimmed }
+                voice.speak(profile.greeting, voiceId: profile.voiceId)
+                withAnimation(.spring(duration: 0.5)) { profile.onboarded = true }
+            }
+        } label: {
+            HStack {
+                Text(step < 2 ? "CONTINUE" : "OPEN LIVE DESK")
+                    .font(.mono(12, .bold))
+                    .kerning(1.7)
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 13, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .frame(height: 52)
+            .background(Theme.accent)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .shadow(color: Theme.accent.opacity(0.28), radius: 14, y: 4)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background(.ultraThinMaterial.opacity(0.65))
+        .overlay(alignment: .top) { Rectangle().fill(Theme.stroke).frame(height: 1) }
     }
 }

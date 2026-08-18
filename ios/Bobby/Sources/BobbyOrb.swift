@@ -1,58 +1,86 @@
-// The Bobby orb — the mascot. A living gradient blob that idles calmly,
-// spins while thinking and pulses while speaking. This is the emotional
-// anchor of the app: Bobby feels ALIVE, not like a form field.
+// The live desk orb. It mirrors the web experience: particle field, audio
+// spectrum, orbital paths and a luminous core driven by the real mic/TTS level.
 import SwiftUI
 
 struct BobbyOrb: View {
     var size: CGFloat = 44
     var thinking = false
     var speaking = false
+    var listening = false
+    var level: CGFloat = 0
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
-            let breathe = 1 + 0.04 * sin(t * 2)
-            let excited = speaking ? 1 + 0.10 * abs(sin(t * 9)) : 1.0
-            let spin = thinking ? Angle(radians: t * 3.2) : Angle(radians: t * 0.55)
+            let idle = CGFloat(0.10 + sin(t * 1.4) * 0.035)
+            let energy = max(idle, min(1, level))
+            let active = thinking || speaking || listening
+            let dim: CGFloat = active ? 1 : 0.72
+            let core = size * 0.29
 
             ZStack {
-                // aura
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [Theme.accent.opacity(speaking ? 0.5 : 0.25), .clear],
-                            center: .center, startRadius: 0, endRadius: size * 0.95
-                        )
-                    )
-                    .frame(width: size * 1.9, height: size * 1.9)
-                    .scaleEffect(breathe * excited)
-
-                // body
-                Circle()
-                    .fill(
-                        AngularGradient(
-                            colors: [
-                                Theme.accent,
-                                Color(red: 0.55, green: 0.35, blue: 1.0),   // violet
-                                Color(red: 0.15, green: 0.85, blue: 0.90),  // cyan
-                                Theme.accent,
-                            ],
-                            center: .center, angle: spin
+                            colors: [Theme.accent.opacity((0.30 + energy * 0.42) * dim), Theme.accent.opacity(0.06), .clear],
+                            center: .center, startRadius: 0, endRadius: size * 0.74
                         )
                     )
                     .frame(width: size, height: size)
-                    .scaleEffect(breathe * excited)
-                    .shadow(color: Theme.accent.opacity(0.55), radius: speaking ? 18 : 10)
+                    .blur(radius: size * 0.035)
 
-                // eye highlight — the "face"
+                ForEach(0..<32, id: \.self) { index in
+                    let angle = Double(index) * 2.399 + t * (thinking ? 0.34 : 0.10)
+                    let radius = size * (0.22 + CGFloat((index * 19) % 31) / 100)
+                    let x = cos(angle) * radius
+                    let y = sin(angle) * radius * 0.82
+                    Circle()
+                        .fill(Theme.accentSoft.opacity((0.16 + energy * 0.30) * dim))
+                        .frame(width: CGFloat(1 + index % 3), height: CGFloat(1 + index % 3))
+                        .offset(x: x, y: y)
+                }
+
+                ForEach(0..<64, id: \.self) { index in
+                    let noise = (sin(Double(index) * 0.73 + t * 3.1) + sin(Double(index) * 1.9 - t * 2.2)) * 0.25 + 0.5
+                    let bar = size * (0.018 + energy * CGFloat(0.115 + noise * 0.13))
+                    Capsule()
+                        .fill((speaking ? Theme.accent : Theme.accentSoft).opacity((0.25 + energy * 0.72) * dim))
+                        .frame(width: max(1, size * 0.006), height: max(3, bar))
+                        .offset(y: -(core * 1.50 + bar / 2))
+                        .rotationEffect(.degrees(Double(index) / 64 * 360))
+                }
+
+                orbit(width: size * 0.64, height: size * 0.23, rotation: t * 10, energy: energy, dim: dim)
+                orbit(width: size * 0.79, height: size * 0.29, rotation: -t * 7 + 61, energy: energy, dim: dim)
+                orbit(width: size * 0.91, height: size * 0.18, rotation: t * 4 + 128, energy: energy, dim: dim)
+
                 Circle()
-                    .fill(.white.opacity(0.9))
-                    .frame(width: size * 0.16, height: size * 0.16)
-                    .offset(x: -size * 0.14, y: -size * 0.16)
-                    .blur(radius: 0.4)
+                    .fill(
+                        RadialGradient(
+                            colors: [.white.opacity(0.92), Theme.accentSoft, Theme.accent],
+                            center: UnitPoint(x: 0.34, y: 0.30), startRadius: 0, endRadius: core
+                        )
+                    )
+                    .frame(width: core * 2, height: core * 2)
+                    .scaleEffect(1 + energy * 0.18)
+                    .overlay(Circle().stroke(.white.opacity(0.24 + energy * 0.36), lineWidth: 1))
+                    .shadow(color: Theme.accent.opacity(0.80), radius: 18 + energy * 30)
             }
         }
-        .frame(width: size * 1.9, height: size * 1.9)
+        .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+
+    private func orbit(width: CGFloat, height: CGFloat, rotation: Double, energy: CGFloat, dim: CGFloat) -> some View {
+        Ellipse()
+            .stroke(Theme.accentSoft.opacity((0.16 + energy * 0.24) * dim), lineWidth: 0.8)
+            .frame(width: width, height: height * (1 + energy * 0.14))
+            .rotationEffect(.degrees(rotation))
+            .overlay(alignment: .trailing) {
+                Circle()
+                    .fill(.white.opacity((0.55 + energy * 0.4) * dim))
+                    .frame(width: 4 + energy * 3, height: 4 + energy * 3)
+                    .offset(x: 1)
+            }
     }
 }
