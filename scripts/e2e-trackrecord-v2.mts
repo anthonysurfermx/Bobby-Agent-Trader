@@ -222,6 +222,36 @@ async function runV2() {
   });
   check('ATTESTED commit unaffected by missing key', cAttNoKey.statusCode === 200, cAttNoKey.body);
 
+  // ── A5-1 case 1: chain clock BEHIND the process clock ──
+  // evm_setTime rewinds anvil's clock; interval mining keeps it flowing from
+  // there. The recorder must wait on the CHAIN clock (a wall-clock wait would
+  // send early and revert EntryInFuture).
+  process.env.PYTH_HERMES_API_KEY = HERMES_KEY;
+  await stubControl('/__auth', { require: false });
+  // The stop-breach scenario above intentionally moved the oracle to 59k.
+  // Restore the normal entry price so this test exercises clock skew only.
+  await stubControl('/__price', { priceE8: (65000n * 10n ** 8n).toString() });
+  const chainNow = await now();
+  await provider.send('evm_setTime', [chainNow - 15]);
+  await provider.send('evm_mine', []);
+  const h5 = keccak256(toUtf8Bytes('e2e-btc-skew'));
+  const skew = await commitV2(DEFAULT_CHAIN, ACC0_KEY, {
+    debateHash: h5, symbol: 'BTC', agent: 0, conviction: 5,
+    entryPrice: 65000, targetPrice: 70000, stopPrice: 60000,
+  });
+  check('clock-skew commit lands (chain-clock wait)', skew.mode === 'VERIFIED' && !!skew.txHash);
+
+  // ── A5-1 case 2: Hermes serves the anchor's first tick LATE ──
+  await stubControl('/__late', { count: 3 }); // refuse the first 3 benchmark hits
+  const h6 = keccak256(toUtf8Bytes('e2e-btc-late-hermes'));
+  const late = await commitV2(DEFAULT_CHAIN, ACC0_KEY, {
+    debateHash: h6, symbol: 'BTC', agent: 1, conviction: 5,
+    entryPrice: 65000, targetPrice: 70000, stopPrice: 60000,
+  });
+  check('late-Hermes commit lands after retries', late.mode === 'VERIFIED' && !!late.txHash);
+  const stats = await (await fetch(`http://127.0.0.1:${STUB_PORT}/__stats`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })).json() as { lateRefused: number };
+  check('Hermes retry path actually exercised', stats.lateRefused >= 3, stats);
+
   console.log(`\nV2 path: ${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 }
@@ -291,7 +321,9 @@ async function orchestrate() {
   }
 
   console.log('booting anvil x2 + hermes stub…');
-  children.push(spawn('anvil', ['--port', String(V2_PORT), '--chain-id', '84532', '--silent'], { stdio: 'ignore' }));
+  // --block-time 1: the chain clock ticks on its own (like a real chain), so
+  // the recorder's chain-clock wait (A5-1) is exercised for real.
+  children.push(spawn('anvil', ['--port', String(V2_PORT), '--chain-id', '84532', '--block-time', '1', '--silent'], { stdio: 'ignore' }));
   children.push(spawn('anvil', ['--port', String(V1_PORT), '--chain-id', '196', '--silent'], { stdio: 'ignore' }));
   await waitRpc(`http://127.0.0.1:${V2_PORT}`);
   await waitRpc(`http://127.0.0.1:${V1_PORT}`);
@@ -300,6 +332,8 @@ async function orchestrate() {
   const coder = AbiCoder.defaultAbiCoder();
   let stubPriceE8 = (65000n * 10n ** 8n).toString();
   let requireAuth = false;
+  let lateRemaining = 0;   // A5-1: refuse this many benchmark requests (Hermes lag sim)
+  let lateRefused = 0;
   const stub = createServer((req, res) => {
     const url = new URL(req.url || '/', `http://127.0.0.1:${STUB_PORT}`);
     if (req.method === 'POST') {
@@ -309,12 +343,19 @@ async function orchestrate() {
         const body = JSON.parse(raw || '{}');
         if (url.pathname === '/__price') stubPriceE8 = String(body.priceE8);
         if (url.pathname === '/__auth') requireAuth = Boolean(body.require);
+        if (url.pathname === '/__late') { lateRemaining = Number(body.count) || 0; }
+        if (url.pathname === '/__stats') { res.writeHead(200, {'Content-Type':'application/json'}).end(JSON.stringify({ lateRefused })); return; }
         res.writeHead(200).end('{}');
       });
       return;
     }
     if (requireAuth && req.headers.authorization !== `Bearer ${HERMES_KEY}`) {
       res.writeHead(401).end('{"error":"missing key"}');
+      return;
+    }
+    if (lateRemaining > 0) {
+      lateRemaining--; lateRefused++;
+      res.writeHead(503).end('{"error":"benchmark not yet available"}');
       return;
     }
     const m = url.pathname.match(/\/v2\/updates\/price\/(\d+)$/);

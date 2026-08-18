@@ -33,6 +33,56 @@ const V2_IFACE = new ethers.Interface(TRACKRECORD_V2_ABI as unknown as string[])
 // change the env once and both sides move together.
 const ENTRY_TOL_BPS = Number(process.env.V2_ENTRY_TOL_BPS || 100);
 const EXIT_TOL_BPS = Number(process.env.V2_EXIT_TOL_BPS || 100);
+// Same env name as DeployBase._v2Params — bounds the Hermes retry loop to the
+// on-chain landing window.
+const ENTRY_WINDOW_SEC = Number(process.env.V2_ENTRY_WINDOW_SEC || 60);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** A5-1: fetch the anchor's first tick, retrying while Hermes has not yet
+ *  served it (benchmarks can lag the instant by more than a second). Auth
+ *  failures (401/403) fail fast — retrying cannot fix a missing key. The
+ *  loop is bounded by a wall-clock deadline. */
+async function fetchBenchmarkWithRetry(feedId: string, atSec: number, deadlineMs: number) {
+  for (;;) {
+    try {
+      return await fetchSignedUpdate(buildHermesBenchmarkUrl(feedId, atSec));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/Hermes 40[13]/.test(msg)) throw err; // auth — retrying is pointless
+      if (Date.now() >= deadlineMs) {
+        throw new Error(`Hermes evidence for t=${atSec} unavailable before the entry window closed: ${msg}`);
+      }
+      await sleep(1000);
+    }
+  }
+}
+
+/** A5-1: the contract decides EntryInFuture with block.timestamp, not our
+ *  clock. After a capped wall-clock sleep, wait until the RPC confirms that a
+ *  mined block reached the anchor. A local-clock prediction is not sufficient:
+ *  estimateGas executes against the latest block and would still revert while
+ *  that block's timestamp is below entryAt. Bounded — never hangs. */
+async function waitForAnchor(
+  provider: ethers.Provider,
+  entryAt: number,
+  deadlineMs: number,
+): Promise<void> {
+  const wallWait = Math.min(
+    Math.max((entryAt + 1) * 1000 - Date.now(), 0),
+    (MIN_ENTRY_DELAY_SEC + 5) * 1000,
+  );
+  if (wallWait > 0) await sleep(wallWait);
+  for (;;) {
+    const latest = await provider.getBlock('latest');
+    const chainTs = Number(latest!.timestamp);
+    if (chainTs >= entryAt) return;
+    if (Date.now() >= deadlineMs) {
+      throw new Error(`chain clock (${chainTs}) never reached the entry anchor (${entryAt}) before the window closed`);
+    }
+    await sleep(1000);
+  }
+}
 
 /** Reported price (float, quote units) → contract's uint96 1e8 fixed point. */
 export function priceToE8(price: number): bigint {
@@ -121,15 +171,14 @@ export async function commitV2(
     const annReceipt = await annTx.wait();
     const annBlock = await wallet.provider!.getBlock(annReceipt!.blockNumber);
     entryAt = Number(annBlock!.timestamp) + MIN_ENTRY_DELAY_SEC; // derived anchor
-
-    // Wait until the anchor instant has passed (plus one tick of slack so
-    // the first tick at/after it exists on Hermes).
-    const waitMs = (entryAt + 1) * 1000 - Date.now();
-    if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
   }
 
   if (mode === PriceMode.VERIFIED && feedId) {
-    const update = await fetchSignedUpdate(buildHermesBenchmarkUrl(feedId, entryAt));
+    // A5-1: everything below is bounded by one wall-clock deadline sized to
+    // the landing window (minus margin to actually land the tx).
+    const deadlineMs = Date.now() + (MIN_ENTRY_DELAY_SEC + ENTRY_WINDOW_SEC - 5) * 1000;
+    await waitForAnchor(wallet.provider!, entryAt, deadlineMs);
+    const update = await fetchBenchmarkWithRetry(feedId, entryAt, deadlineMs);
     updateData = [update.updateData];
     value = PYTH_FEE_BUFFER_WEI;
     oraclePriceE8 = toE8(update.price, update.expo);
@@ -171,6 +220,10 @@ export async function commitV2(
     gasLimit: (gas * 13n) / 10n,
     nonce,
   });
+  // A5-1: confirm inclusion before reporting success — a tx stuck in the
+  // mempool (or reverted at inclusion) must never read as a recorded entry.
+  const receipt = await tx.wait();
+  if (!receipt || receipt.status !== 1) throw new Error(`tx ${tx.hash} reverted on-chain`);
 
   return {
     txHash: tx.hash,
@@ -245,6 +298,10 @@ export async function resolveV2(
     gasLimit: (gas * 13n) / 10n,
     nonce,
   });
+  // A5-1: confirm inclusion before reporting success — a tx stuck in the
+  // mempool (or reverted at inclusion) must never read as a recorded entry.
+  const receipt = await tx.wait();
+  if (!receipt || receipt.status !== 1) throw new Error(`tx ${tx.hash} reverted on-chain`);
 
   return {
     txHash: tx.hash,
