@@ -3,7 +3,8 @@ pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {SafeOwnerGate} from "./SafeOwnerGate.sol";
-import {BobbyTrackRecord} from "../src/BobbyTrackRecord.sol";
+import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
+import {PythOracleGate} from "./PythOracleGate.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
 import {BobbyAdversarialBounties} from "../src/BobbyAdversarialBounties.sol";
@@ -147,7 +148,7 @@ contract VerifyBaseDeployment is Script {
     /// pendingOwner == expected). It FAILS in the state D-4 prohibits: the
     /// deployer EOA owning with no handoff in flight.
     function _verifyOwnership(Addrs memory a, address deployer, address expected) internal {
-        _checkOwner(BobbyTrackRecord(a.trackRecord).owner(), BobbyTrackRecord(a.trackRecord).pendingOwner(), deployer, expected, "trackRecord");
+        _checkOwner(BobbyTrackRecordV2(a.trackRecord).owner(), BobbyTrackRecordV2(a.trackRecord).pendingOwner(), deployer, expected, "trackRecord");
         _checkOwner(BobbyConvictionOracle(a.oracle).owner(), BobbyConvictionOracle(a.oracle).pendingOwner(), deployer, expected, "oracle");
         _checkOwner(BobbyAgentEconomyV2(payable(a.economy)).owner(), BobbyAgentEconomyV2(payable(a.economy)).pendingOwner(), deployer, expected, "economy");
         _checkOwner(BobbyAdversarialBounties(payable(a.bounties)).owner(), BobbyAdversarialBounties(payable(a.bounties)).pendingOwner(), deployer, expected, "bounties");
@@ -174,12 +175,29 @@ contract VerifyBaseDeployment is Script {
     }
 
     function _verifyEconomy(Addrs memory a, Roles memory r, string memory json) internal {
-        _ok(BobbyTrackRecord(a.trackRecord).bobby() == r.bobby, "trackRecord.bobby");
+        _ok(BobbyTrackRecordV2(a.trackRecord).bobby() == r.bobby, "trackRecord.bobby");
         _ok(BobbyConvictionOracle(a.oracle).bobby() == r.bobby, "oracle.bobby");
+        _verifyTrackRecordV2Oracle(a);
         BobbyAgentEconomyV2 eco = BobbyAgentEconomyV2(payable(a.economy));
         _ok(eco.alphaHunter() == r.alpha && eco.redTeam() == r.red && eco.cio() == r.cio, "economy agent roles");
         _ok(eco.mcpCallFee() == vm.parseJsonUint(json, ".fees.mcpCallFeeWei"), "economy.mcpCallFee");
         _ok(eco.debateFeePerAgent() == vm.parseJsonUint(json, ".fees.debateFeePerAgentWei"), "economy.debateFeePerAgent");
+    }
+
+    /// @dev TrackRecordV2 oracle wiring against LIVE mined state: the active
+    ///      Pyth is the chain's canonical index-0, all canonical addresses are
+    ///      approved (V-03 fallback real), and BTC/ETH/SOL feeds are seeded.
+    function _verifyTrackRecordV2Oracle(Addrs memory a) internal {
+        BobbyTrackRecordV2 tr = BobbyTrackRecordV2(a.trackRecord);
+        address[] memory want = PythOracleGate.canonicalPyths(block.chainid);
+        _ok(tr.activePyth() == want[0], "trackRecord.activePyth == canonical active");
+        for (uint256 i = 0; i < want.length; i++) {
+            _ok(tr.approvedPyth(want[i]), string.concat("canonical pyth approved ", vm.toString(want[i])));
+        }
+        (string[] memory syms, bytes32[] memory feeds) = PythOracleGate.verifiedFeeds();
+        for (uint256 i = 0; i < syms.length; i++) {
+            _ok(tr.feedOf(keccak256(bytes(syms[i]))) == feeds[i], string.concat("verified feed seeded ", syms[i]));
+        }
     }
 
     function _verifyBounties(Addrs memory a, Roles memory r, string memory json) internal {

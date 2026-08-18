@@ -13,7 +13,15 @@
     "test:playbooks": "tsx scripts/test-playbooks.mts",
     "test:api-security": "tsx scripts/test-api-security.mts",
     "test:record-auth": "tsx scripts/test-record-auth.mts",
-    "test:risk-gate": "tsx scripts/test-risk-gate.mts"
+    "test:protocol-write-safety": "tsx scripts/test-protocol-write-safety.mts",
+    "check:mainnet:predeploy": "tsx scripts/check-mainnet-readiness.mts --phase=predeploy",
+    "check:mainnet:postdeploy": "tsx scripts/check-mainnet-readiness.mts --phase=postdeploy",
+    "check:mainnet:cutover": "tsx scripts/check-mainnet-readiness.mts --phase=cutover",
+    "finalize:base-manifest": "tsx scripts/finalize-base-manifest.mts",
+    "build:safe-launch-batch": "tsx scripts/build-safe-launch-batch.mts",
+    "test:risk-gate": "tsx scripts/test-risk-gate.mts",
+    "test:trackrecord-v2": "tsx scripts/test-trackrecord-v2-lib.mts",
+    "test:e2e:trackrecord-v2": "tsx scripts/e2e-trackrecord-v2.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

@@ -8,8 +8,18 @@ out = "out"
 libs = ["lib"]
 fs_permissions = [{ access = "read-write", path = "./deployments" }]
 solc_version = "0.8.24"
+# Explicit — auto-inference from libs works in most setups, but a clean
+# checkout driven from another cwd (CI, scripted audits) failed without it.
+remappings = ["forge-std/=lib/forge-std/src/"]
 optimizer = true
 optimizer_runs = 1
+# TrackRecord v2 round: via-IR is REQUIRED — the oracle-verified v2 runtime is
+# ~30.1 KB with the legacy pipeline (over EIP-170's 24,576 B); via-IR brings it
+# under the limit. This changes bytecode for EVERY contract vs the r10.2
+# non-viaIR artifacts, so the v2 audit round (packaged with M-02..M-05) audits
+# the whole set under via-IR — that IS the mainnet deploy artifact. The r10.2
+# Sepolia canary stays on its already-deployed non-viaIR bytecode.
+via_ir = true
 
 [profile.default.fuzz]
 runs = 256

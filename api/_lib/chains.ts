@@ -54,7 +54,7 @@ export interface ChainConfig {
 // an empty string is a loud failure, which is what we want versus silently
 // reading an X Layer contract from a Base RPC.
 const BASE_CONTRACTS: ContractSet = {
-  treasury: process.env.TREASURY_ADDRESS_BASE || '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
+  treasury: process.env.TREASURY_ADDRESS_BASE || '',
   agentEconomy: process.env.BASE_AGENT_ECONOMY_ADDRESS || '',
   adversarialBounties: process.env.BASE_BOUNTIES_ADDRESS || '',
   trackRecord: process.env.BASE_TRACK_RECORD_ADDRESS || '',
@@ -83,7 +83,9 @@ const XLAYER_CONTRACTS: ContractSet = {
   treasury: '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
   agentEconomy: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871',
   adversarialBounties: '0xa8005ab465a0e02cb14824cd0e7630391fba673d',
-  trackRecord: '0xF841b428E6d743187D7BE2242eccC1078fdE2395',
+  // Env override exists for the local E2E harness only (points v1 at an anvil
+  // deployment); unset in every real environment, so prod is unchanged.
+  trackRecord: process.env.XLAYER_TRACK_RECORD_ADDRESS || '0xF841b428E6d743187D7BE2242eccC1078fdE2395',
   hardnessRegistry: process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
   convictionOracle: process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A',
   agentRegistry: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b',
@@ -155,12 +157,30 @@ export const XLAYER: ChainConfig = {
  * Flip to BASE (or set PROTOCOL_CHAIN=base) once the audited redeploy is live
  * and the addresses above are populated.
  */
-export const DEFAULT_CHAIN: ChainConfig =
-  process.env.PROTOCOL_CHAIN === 'base'
-    ? BASE
-    : process.env.PROTOCOL_CHAIN === 'base-sepolia'
-      ? BASE_SEPOLIA
-      : XLAYER;
+export type ProtocolChainName = 'xlayer' | 'base-sepolia' | 'base';
+
+/**
+ * Resolve the protocol chain strictly. A typo in PROTOCOL_CHAIN must never
+ * fall back to X Layer: on a writer that would sign a valid transaction on
+ * the wrong network with the same hot key.
+ */
+export function resolveProtocolChain(value: string | undefined): {
+  name: ProtocolChainName;
+  config: ChainConfig;
+} {
+  const normalized = (value || 'xlayer').trim().toLowerCase();
+  if (normalized === 'base') return { name: 'base', config: BASE };
+  if (normalized === 'base-sepolia') return { name: 'base-sepolia', config: BASE_SEPOLIA };
+  if (normalized === 'xlayer') return { name: 'xlayer', config: XLAYER };
+  throw new Error(
+    `Invalid PROTOCOL_CHAIN=${JSON.stringify(value)}; expected xlayer, base-sepolia, or base`,
+  );
+}
+
+const selectedProtocolChain = resolveProtocolChain(process.env.PROTOCOL_CHAIN);
+
+export const PROTOCOL_CHAIN_NAME = selectedProtocolChain.name;
+export const DEFAULT_CHAIN: ChainConfig = selectedProtocolChain.config;
 
 export const CHAINS: Record<number, ChainConfig> = {
   [BASE.id]: BASE,

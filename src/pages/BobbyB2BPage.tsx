@@ -35,15 +35,15 @@ const FEATURES = [
   { Icon: MessageSquare, title: 'Multi-Agent Debates', desc: 'Watch Alpha and Red Team clash while CIO decides the play.' },
   { Icon: Signal, title: 'Real-Time Signals', desc: 'Formatted alerts for entries, TPs, and stop losses without lag.' },
   { Icon: Radar, title: 'Market Scanning', desc: 'Deep scanning across DEXs and CEXs, identifying liquidity shifts.' },
-  { Icon: Shield, title: 'On-Chain Proof', desc: 'Every signal logged on X Layer blockchain. 100% accountability.' },
-  { Icon: CreditCard, title: 'x402 Payments', desc: 'Seamless community billing through the x402 protocol on X Layer.' },
+  { Icon: Shield, title: 'Decision record', desc: 'Every debate and decision leaves an inspectable on-chain record.' },
+  { Icon: CreditCard, title: 'x402 Payments', desc: 'Seamless community billing through the x402 protocol on the active Base deployment.' },
 ];
 
 const FAQ = [
   { q: 'Is this a trading bot?', a: 'Bobby is an intelligence layer, not an execution bot. It provides institutional-grade analysis, sentiment tracking, and risk assessment to help your group make better decisions. Zero custody.' },
   { q: 'What markets are covered?', a: 'Crypto (BTC, ETH, SOL, and more), US stocks (NVDA, TSLA, AAPL), and commodities (Gold, Silver). Configurable per group.' },
-  { q: 'Is it safe for my group?', a: 'Bobby only requires permission to read and send messages. It cannot access wallets or private data. All signals are verifiable on-chain.' },
-  { q: 'How do I pay?', a: 'Payment via x402 protocol on OKX X Layer. Connect your Web3 wallet, pay 8 USDT, and Bobby activates instantly. Zero gas on X Layer.' },
+  { q: 'Is it safe for my group?', a: 'Bobby only requires permission to read and send messages. It cannot access wallets or private data. The decision process and record are inspectable on-chain; market outcomes are never guaranteed.' },
+  { q: 'How do I pay?', a: 'Payment via the x402 protocol on Base. Connect your Web3 wallet and Bobby activates after the payment rail confirms.' },
 ];
 
 export default function BobbyB2BPage() {
@@ -51,9 +51,9 @@ export default function BobbyB2BPage() {
     <div className="min-h-screen bg-[#050505] text-white font-['Inter']">
       <Helmet>
         <title>Bobby Agent Trader for Telegram Groups | AI Trading Intelligence</title>
-        <meta name="description" content="Turn your Telegram group into an AI Trading Room. Three agents debate every market move. Voice notes, signals, on-chain proof." />
+        <meta name="description" content="Turn your Telegram group into an AI decision room. Three agents debate every market move, risk gets a veto, and decisions leave a proof trail." />
         <meta property="og:title" content="Bobby Agent Trader — Telegram Group Intelligence" />
-        <meta property="og:description" content="Three agents debate. Your community watches. Voice notes, signals, on-chain proof." />
+        <meta property="og:description" content="Three agents debate. Your community watches. Voice notes, risk gates and an inspectable decision record." />
         <meta property="og:image" content="https://defimexico.org/bobby-hero.png" />
         <meta name="twitter:card" content="summary_large_image" />
       </Helmet>
@@ -84,10 +84,10 @@ export default function BobbyB2BPage() {
               <span className="font-mono text-[9px] uppercase tracking-widest text-green-400">System Online</span>
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black leading-tight tracking-tight mb-6">
-              Turn Your Telegram Group Into an <span className="text-green-400 italic">AI Trading Room</span>
+              Make every market decision <span className="text-green-400 italic">earn it.</span>
             </h1>
             <p className="text-white/40 text-lg max-w-xl mb-10 leading-relaxed">
-              Three agents debate every market move. Your community watches in real-time. Voice notes, signals, and verifiable on-chain proof.
+              Three agents debate. Risk can say no. Your group sees the decision before capital moves.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <a href="https://t.me/Bobbyagentraderbot?startgroup=true" target="_blank" rel="noopener noreferrer"
@@ -203,7 +203,7 @@ export default function BobbyB2BPage() {
         <div className="flex flex-col md:flex-row gap-8">
           {[
             { n: '01', title: 'Add Bot', desc: 'Invite @Bobbyagentraderbot to your group.' },
-            { n: '02', title: 'Pay via x402', desc: '8 USDT on X Layer. Instant activation.' },
+            { n: '02', title: 'Pay via x402', desc: 'Base settlement. Instant activation.' },
             { n: '03', title: 'Start Debating', desc: 'Agents begin monitoring. Use /analyze to trigger.' },
           ].map(step => (
             <div key={step.n} className="flex-1 relative">
@@ -221,7 +221,7 @@ export default function BobbyB2BPage() {
           {[
             { value: '50+', label: 'Real Traders' },
             { value: '100+', label: 'Debates Generated' },
-            { value: 'X LAYER', label: 'Built on OKX' },
+            { value: 'BASE · 8453', label: 'Built for Base' },
           ].map(s => (
             <div key={s.label}>
               <div className="font-mono text-3xl font-black text-green-400 mb-1">{s.value}</div>
@@ -244,7 +244,7 @@ export default function BobbyB2BPage() {
             <span className="font-mono text-lg text-white/30 italic"> USD / 30 DAYS</span>
           </div>
           <ul className="text-left space-y-3 mb-8 text-sm border-y border-white/[0.06] py-6">
-            {['Unlimited market debates', 'Real-time voice notes', 'Custom market selection', 'X Layer on-chain proof'].map(f => (
+            {['Unlimited market debates', 'Real-time voice notes', 'Custom market selection', 'Base on-chain record'].map(f => (
               <li key={f} className="flex items-center gap-3 text-white/60">
                 <span className="text-green-400 text-xs">✓</span> {f}
               </li>
@@ -347,7 +347,7 @@ export default function BobbyB2BPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div>
             <div className="text-green-500 font-bold font-mono text-lg mb-1">BOBBY AGENT</div>
-            <div className="font-mono text-[9px] uppercase tracking-widest text-white/25">© 2026 Bobby Agent Trader · Built on OKX X Layer</div>
+            <div className="font-mono text-[9px] uppercase tracking-widest text-white/25">© 2026 Bobby Agent Trader · Built for Base</div>
           </div>
           <div className="flex gap-6">
             {['TERMINAL', 'TELEGRAM', 'GITHUB'].map(link => (

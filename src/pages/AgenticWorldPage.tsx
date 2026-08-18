@@ -97,7 +97,7 @@ export default function AgenticWorldPage() {
       dotGlow: 'shadow-[0_0_10px_#f59e0b]',
       iconBg: 'bg-amber-500/10 border-amber-500/20',
       iconColor: 'text-amber-400',
-      description: 'Bobby started with $100 of real money. Every trade committed to X Layer BEFORE the outcome. No cherry-picking. No hindsight. The most honest track record in crypto — verifiable on-chain.',
+      description: 'Bobby started with $100 of real money. Every decision is committed before the outcome. No cherry-picking. No hindsight. Inspect the process on-chain.',
       metric: `$${stats.equity.toFixed(2)} EQUITY`,
       metricColor: stats.return >= 0 ? 'text-green-400' : 'text-red-400',
       cta: 'SEE THE PROOF',
@@ -127,11 +127,11 @@ export default function AgenticWorldPage() {
     <div className="min-h-screen bg-[#050505] text-white font-['Inter']">
       <Helmet>
         <title>Deploy Your AI Trading Room | Bobby Agent Trader</title>
-        <meta name="description" content="Create your personal AI Trading Room. Three agents debate the markets for you — you decide. Built on OKX X Layer." />
+        <meta name="description" content="Create your personal AI decision room on Base. Three agents debate the markets for you — you decide." />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://defimexico.org/agentic-world" />
         <meta property="og:title" content="Deploy Your AI Trading Room | Bobby Agent Trader" />
-        <meta property="og:description" content="Three agents debate the markets for you — you decide. On-chain proof on OKX X Layer." />
+        <meta property="og:description" content="Three agents debate the markets for you — you decide. On-chain decision records on Base." />
         <meta property="og:image" content="https://defimexico.org/bobby-hero.png" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content="Deploy Your AI Trading Room | Bobby Agent Trader" />
@@ -160,14 +160,14 @@ export default function AgenticWorldPage() {
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 max-w-5xl">
           <div className="flex items-center gap-3 mb-6">
             <span className="h-px w-12 bg-green-500" />
-            <span className="font-mono text-green-400 text-xs tracking-[0.4em] uppercase">Not another trading bot — Built on OKX X Layer</span>
+            <span className="font-mono text-green-400 text-xs tracking-[0.4em] uppercase">Not another trading bot — Built for Base</span>
           </div>
 
           <h1 className="text-4xl md:text-6xl lg:text-8xl font-black tracking-tighter leading-none mb-4 uppercase text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-white/20">
-            A TRADING ROOM<br/>THAT <span className="text-green-400 italic">THINKS</span>
+            A DECISION ROOM<br/>THAT <span className="text-green-400 italic">THINKS</span>
           </h1>
           <p className="text-lg md:text-xl text-white/60 font-bold mb-4">
-            Not a bot. Not alerts. A metacognitive system where 3 AI agents debate every move before you see it.
+            Not a bot. Not alerts. Three agents debate before you act.
           </p>
 
           <p className="text-sm md:text-base text-white/30 max-w-2xl leading-relaxed mb-12 border-l-2 border-green-500/20 pl-8">
@@ -201,7 +201,7 @@ export default function AgenticWorldPage() {
           {[
             { value: '50+', label: 'REAL TRADERS' },
             { value: `${stats.trades}`, label: 'TRADES EXECUTED' },
-            { value: 'OKX X LAYER', label: 'ON-CHAIN VERIFIED' },
+            { value: 'BASE · 8453', label: 'DECISION RECORDS' },
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-3">
               {i > 0 && <div className="h-4 w-px bg-white/10 hidden sm:block" />}
@@ -273,12 +273,12 @@ export default function AgenticWorldPage() {
         </div>
       </section>
 
-      {/* Infrastructure on X Layer */}
+          {/* Base-first infrastructure */}
       <section className="px-6 md:px-12 lg:px-24 py-12 border-t border-white/5">
         <div className="max-w-[1600px] mx-auto">
           <div className="flex items-center gap-3 mb-6">
             <span className="h-px w-8 bg-green-500" />
-            <span className="font-mono text-green-400 text-[10px] tracking-[0.3em] uppercase">Infrastructure on X Layer</span>
+            <span className="font-mono text-green-400 text-[10px] tracking-[0.3em] uppercase">Base-first infrastructure</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
@@ -340,7 +340,7 @@ export default function AgenticWorldPage() {
       <footer className="w-full bg-[#050505] py-10 border-t border-green-900/20">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="font-mono text-[10px] text-white/20 uppercase tracking-widest">
-            © 2026 BOBBY AGENT TRADER — BUILT ON OKX X LAYER
+            © 2026 BOBBY AGENT TRADER — BUILT FOR BASE
           </div>
           <div className="flex gap-6">
             {[

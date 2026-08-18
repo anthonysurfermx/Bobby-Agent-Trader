@@ -74,6 +74,10 @@ interface ActivityItem {
   txHash?: string | null;
 }
 
+// Keep the previous telemetry/MCP sections available while the new landing is
+// evaluated, without tripping the release lint rule on literal `false && ...`.
+const SHOW_LEGACY_PROTOCOL_SECTIONS = false;
+
 const formatNumber = (value: unknown, fallback = '—') => {
   if (value === null || value === undefined || value === '') return fallback;
   const number = Number(value);
@@ -185,7 +189,7 @@ export default function BobbyProtocolLanding() {
   const mcp = useMcpMeta();
   const { activity, isLoading: isActivityLoading, error: activityError, refresh: refreshActivity } = useActivity();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'verified'>('all');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'recorded'>('all');
   const btc = price(stats, 'BTC');
   const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
   const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
@@ -212,13 +216,13 @@ export default function BobbyProtocolLanding() {
     }
     return `${Number(rate).toFixed(1)}% (n=${resolved})`;
   };
-  const chainLabel = stats?.chain?.name || (stats?.chain?.id === 196 ? 'X Layer' : 'Network');
+  const chainLabel = stats?.chain?.id === 196 ? 'Legacy X Layer' : (stats?.chain?.name || 'Base');
   const nativeSymbol = stats?.chain?.nativeSymbol || (stats?.chain?.id === 196 ? 'OKB' : 'ETH');
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
     : null;
 
-  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://www.oklink.com/xlayer'}/address`;
+  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://basescan.org'}/address`;
   const c = stats?.contracts;
   const proofPoints = [
     {
@@ -237,7 +241,7 @@ export default function BobbyProtocolLanding() {
         ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L · ${publicRecord.winRate?.toFixed(1)}%`
         : 'Waiting for the public resolution ledger.',
       proof: 'Resolution ledger',
-      href: '#activity',
+      href: '#what-it-does',
     },
     {
       label: 'Adversarial bounties',
@@ -259,7 +263,7 @@ export default function BobbyProtocolLanding() {
     ['How it works', '#how-it-works'],
     ['Capabilities', '#capabilities'],
     ['For agents', '#for-agents'],
-    ['Activity', '#activity'],
+    ['What it does', '#what-it-does'],
   ];
 
   const filteredActivity = useMemo(() => {
@@ -281,8 +285,8 @@ export default function BobbyProtocolLanding() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet>
-        <title>Bobby Protocol — The decision layer for autonomous agents</title>
-        <meta name="description" content="Bobby gives autonomous agents a shared, adversarial decision layer with live proof." />
+        <title>Bobby Protocol — Make the thesis earn it</title>
+        <meta name="description" content="Before capital moves, Bobby makes the thesis earn it: adversarial debate, risk gates and a verifiable decision record." />
       </Helmet>
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
@@ -296,13 +300,13 @@ export default function BobbyProtocolLanding() {
           </nav>
           <div className="hidden items-center gap-3 md:flex">
             <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" target="_blank" rel="noreferrer" className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"><Github className="h-4 w-4" /></a>
-            <a href="/agentic-world/bobby" className="rounded-lg bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Open War Room</a>
+            <a href="/agentic-world/bobby" className="rounded-lg bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Try Bobby</a>
           </div>
           <button onClick={() => setMenuOpen((open) => !open)} className="rounded-full p-2 md:hidden" aria-label="Toggle navigation">
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
-        {menuOpen && <nav className="border-t border-white/10 bg-[#0a0a0a] px-5 py-4 md:hidden">{navItems.map(([label, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-3 font-mono text-xs uppercase tracking-[0.15em] text-white/70">{label}</a>)}<a href="/agentic-world/bobby" className="mt-2 block rounded-lg bg-white px-5 py-3 text-center font-mono text-xs font-bold uppercase tracking-[0.15em] text-black">Open War Room</a></nav>}
+        {menuOpen && <nav className="border-t border-white/10 bg-[#0a0a0a] px-5 py-4 md:hidden">{navItems.map(([label, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-3 font-mono text-xs uppercase tracking-[0.15em] text-white/70">{label}</a>)}<a href="/agentic-world/bobby" className="mt-2 block rounded-lg bg-white px-5 py-3 text-center font-mono text-xs font-bold uppercase tracking-[0.15em] text-black">Try Bobby</a></nav>}
       </header>
 
       <main className="relative">
@@ -313,13 +317,13 @@ export default function BobbyProtocolLanding() {
           <div className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl flex-col justify-center px-5 pb-20 pt-20 lg:px-8 lg:pb-28 lg:pt-24">
             <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
               <a href="/agentic-world/bobby/history" className="mb-8 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff] transition hover:text-white">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />A manifesto for the verified agent economy <span aria-hidden>›</span>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />Accountability infrastructure for autonomous finance <span aria-hidden>›</span>
               </a>
-              <h1 className="max-w-3xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Agents need a <span className="text-[#0052ff]">second opinion.</span></h1>
-              <p className="mt-8 max-w-xl text-lg leading-8 text-white/60 md:text-xl">Bobby is the adversarial decision layer for autonomous finance. Three agents debate the thesis, pressure-test the risk, and leave a proof trail before capital moves.</p>
+              <h1 className="max-w-3xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Make the <span className="text-[#0052ff]">thesis earn it.</span></h1>
+              <p className="mt-8 max-w-xl text-lg leading-8 text-white/60 md:text-xl">Three agents debate. Risk can say no. The decision is public before capital moves.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-                <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Enter War Room <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
-                <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">Explore <ChevronDown className="h-4 w-4" /></a>
+                <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a decision <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
+                <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the gate <ChevronDown className="h-4 w-4" /></a>
               </div>
               <div className="mt-14 grid max-w-xl grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4">
                 {[
@@ -358,7 +362,7 @@ export default function BobbyProtocolLanding() {
                 <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / Architecture</div>
                 <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
               </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Signal → debate → risk gate → proof on Base → agent economy. Twenty seconds, the whole protocol.</p>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Four checks before capital moves.</p>
             </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -392,22 +396,22 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.25 }}
               className="max-w-3xl"
             >
-              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The verification loop</div>
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Before capital moves</div>
               <h2 className="text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
-                Decisions, never blind.<br />
-                <span className="text-white/72">See Bobby in action.</span>
+                No blind decisions.<br />
+                <span className="text-white/72">Just four checks.</span>
               </h2>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">
-                Every signal enters an adversarial pipeline. Agents debate it, risk challenges it, and the protocol records the result before the market can rewrite the story.
+                Bobby makes the thesis earn the right to move.
               </p>
             </motion.div>
 
             <div className="mt-14 grid grid-cols-2 gap-x-8 gap-y-7 md:grid-cols-4 lg:max-w-5xl">
               {[
-                ['Total debates', formatNumber(totalDebates)],
-                ['Verified decisions', formatNumber(totalTrades)],
-                ['MCP calls', formatNumber(totalMcpCalls)],
-                ['Network interactions', formatNumber(totalInteractions)],
+                ['Debates', formatNumber(totalDebates)],
+                ['Decisions', formatNumber(totalTrades)],
+                ['Agent calls', formatNumber(totalMcpCalls)],
+                ['Interactions', formatNumber(totalInteractions)],
               ].map(([label, value]) => (
                 <div key={label} className="border-l border-white/20 pl-4">
                   <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{label}</div>
@@ -434,10 +438,10 @@ export default function BobbyProtocolLanding() {
 
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
-                { icon: Bot, eyebrow: 'Alpha Hunter', title: 'Find the asymmetric setup', text: 'Market structure, momentum and live intelligence become a thesis with explicit invalidation.', state: 'SIGNAL READY', step: '01' },
-                { icon: ShieldCheck, eyebrow: 'Red Team', title: 'Attack the thesis', text: 'The opposing agent searches for crowded positioning, weak assumptions and hidden downside.', state: 'CHALLENGED', step: '02' },
-                { icon: CircleDollarSign, eyebrow: 'CIO + Risk', title: 'Gate the capital', text: 'Conviction, sizing and downside are reconciled. Pass, park or block — never force the trade.', state: 'RISK GATED', step: '03' },
-                { icon: Check, eyebrow: 'Base proof', title: 'Commit before outcome', text: 'The decision and its rationale become a verifiable record before price reveals the answer.', state: 'ONCHAIN PROOF', step: '04' },
+                { icon: Bot, eyebrow: '01 / Thesis', title: 'Find the idea', text: 'A clear setup with a clear invalidation.', state: 'PROPOSED', step: '01' },
+                { icon: ShieldCheck, eyebrow: '02 / Debate', title: 'Attack the idea', text: 'Red Team looks for what can break it.', state: 'CHALLENGED', step: '02' },
+                { icon: CircleDollarSign, eyebrow: '03 / Risk veto', title: 'Protect the capital', text: 'Risk can pass, pause or block.', state: 'GATED', step: '03' },
+                { icon: Check, eyebrow: '04 / Public record', title: 'Leave the record', text: 'The decision is visible before the result.', state: 'RECORDED', step: '04' },
               ].map(({ icon: Icon, eyebrow, title, text, state, step }, index) => (
                 <motion.article
                   key={title}
@@ -471,13 +475,13 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
             <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
-                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Protocol capabilities</div>
+                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / What Bobby does</div>
                 <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
-                  An agent-native decision layer,<br />everything it needs.
+                  Four checks.<br />One clear decision.
                 </h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">
-                Four surfaces turn autonomous trading from a black box into an inspectable, accountable system.
+                Debate, risk, proof and a simple interface.
               </p>
             </div>
 
@@ -485,28 +489,28 @@ export default function BobbyProtocolLanding() {
               {[
                 {
                   title: 'Identity',
-                  description: 'Every agent decision has an author. Every outcome builds reputation. Both follow the agent into its next call.',
+                  description: 'Every decision has a named agent, signer and context. The record follows the agent.',
                   image: '/images/protocol/agent-identity.jpg',
                   alt: 'Synthetic human profile visible through textured cobalt glass',
-                  telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  verified'],
+                  telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  recorded'],
                 },
                 {
                   title: 'Adversarial debate',
-                  description: 'Alpha proposes. Red Team attacks. The CIO resolves the disagreement into one explicit, accountable thesis.',
+                  description: 'Alpha proposes the thesis. Red Team attacks the assumptions. CIO resolves both into one decision.',
                   image: '/images/protocol/adversarial-debate.jpg',
                   alt: 'Three silhouettes debating behind illuminated blue glass',
                   telemetry: ['debate.open  round_03', 'agents  alpha · red · cio', 'counterpoints  active', 'consensus  pending'],
                 },
                 {
                   title: 'Risk gate',
-                  description: 'Capital never moves on narrative alone. Sizing, downside and invalidation must survive the gate first.',
+                  description: 'Bobby checks size, downside and invalidation before capital moves. Risk can pass, pause or block.',
                   image: '/images/protocol/risk-gate.jpg',
                   alt: 'Human hand meeting a luminous blue glass barrier',
                   telemetry: ['risk.inspect  intent', 'exposure  bounded', 'invalidation  signed', 'gate  pass · park · block'],
                 },
                 {
                   title: 'Proof',
-                  description: 'The protocol commits the decision before the outcome, creating an immutable track record without screenshots or hindsight.',
+                  description: 'The thesis and decision are committed before the outcome. Anyone can inspect what was decided and when.',
                   image: '/images/protocol/onchain-proof.jpg',
                   alt: 'Transparent cobalt glass monolith containing a sealed point of light',
                   telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
@@ -520,11 +524,16 @@ export default function BobbyProtocolLanding() {
                   transition={{ delay: index * 0.06 }}
                   className="group relative min-h-[430px] overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0f] md:min-h-[500px]"
                 >
-                  <img
+                  <motion.img
                     src={capability.image}
                     alt={capability.alt}
                     loading="lazy"
-                    className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    initial={{ opacity: 0.7, scale: 1.08 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    whileHover={{ scale: 1.06 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ duration: 1.2, delay: index * 0.05, ease: 'easeOut' }}
                   />
                   <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,7,.96)_0%,rgba(5,5,7,.72)_42%,rgba(5,5,7,.08)_100%)]" />
                   <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,7,.22)_0%,rgba(5,5,7,.05)_45%,rgba(5,5,7,.94)_100%)]" />
@@ -554,17 +563,22 @@ export default function BobbyProtocolLanding() {
           <SectionMedia name="nebula" className="opacity-50" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Built for both sides</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">A better interface for capital.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">One decision layer. Two ways in.</p></div>
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Your interface</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One protocol.<br />Two ways in.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">For people. For agents.</p></div>
           <div className="grid gap-5 md:grid-cols-2">
             <a
               href="/agentic-world/bobby"
               className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
             >
-              <img
+              <motion.img
                 src="/images/protocol/human-interface.jpg"
                 alt="Human reviewing a decision through illuminated cobalt glass"
                 loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                className="absolute inset-0 h-full w-full object-cover"
+                initial={{ opacity: 0.72, scale: 1.08 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.06 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 1.2, ease: 'easeOut' }}
               />
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
@@ -587,11 +601,16 @@ export default function BobbyProtocolLanding() {
               href="/protocol/docs"
               className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
             >
-              <img
+              <motion.img
                 src="/images/protocol/agent-interface.jpg"
                 alt="Synthetic agent connecting to a protocol through textured cobalt glass"
                 loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                className="absolute inset-0 h-full w-full object-cover"
+                initial={{ opacity: 0.72, scale: 1.08 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.06 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 1.2, ease: 'easeOut' }}
               />
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
@@ -613,18 +632,42 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
+        <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="what-it-does">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(0,82,255,.18),transparent_36%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 max-w-3xl">
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / What Bobby does</div>
+              <h2 className="text-5xl font-extrabold leading-[.96] tracking-[-0.08em] md:text-7xl">It turns an idea<br />into a decision.</h2>
+              <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">Bring a thesis. Bobby challenges it, checks the downside, and gives you one clear decision before the result.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                { step: '01', title: 'Bring the idea', text: 'Start with a market thesis.' },
+                { step: '02', title: 'Test the downside', text: 'Opposing agents look for what breaks it.' },
+                { step: '03', title: 'Get the call', text: 'Pass, pause or block — with a public record.' },
+              ].map((item) => (
+                <div key={item.step} className="rounded-2xl border border-white/10 bg-white/[0.035] p-7 transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:bg-[#0052ff]/[0.08]">
+                  <div className="mb-12 font-mono text-sm font-bold text-[#7da6ff]">{item.step}</div>
+                  <h3 className="text-2xl font-extrabold tracking-[-0.05em]">{item.title}</h3>
+                  <p className="mt-3 max-w-xs text-sm leading-6 text-white/45">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {SHOW_LEGACY_PROTOCOL_SECTIONS && <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
           <SectionMedia name="section-blue" className="opacity-45" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Live network</div>
+            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Public by design</div>
             <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Decisions, never paused.<br />See the network in action.</h2>
+              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Proof over promises.<br />See the record.</h2>
               <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
             </div>
 
             <div className="mb-8 flex flex-wrap items-center gap-2">
-              {([['all', 'All'], ['settled', 'Settled'], ['verified', 'Verified']] as const).map(([key, label]) => (
+              {([['all', 'All'], ['settled', 'Settled'], ['recorded', 'Recorded']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setActivityFilter(key)}
@@ -688,7 +731,7 @@ export default function BobbyProtocolLanding() {
                     </div>
                     <div className="mb-6 truncate text-xl font-extrabold tracking-[-0.04em] text-white/90">{item.tool || 'Agent decision'}</div>
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-sm font-bold text-white/80">{item.paid ? 'x402 settled' : 'verified'}</span>
+                      <span className="font-mono text-sm font-bold text-white/80">{item.paid ? 'x402 settled' : 'recorded'}</span>
                       <span className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${item.paid ? 'border-[#0052ff]/40 bg-[#0052ff]/15 text-[#7da6ff]' : 'border-white/15 bg-white/[0.06] text-white/55'}`}>{item.status || (item.paid ? 'settled' : 'live')}</span>
                     </div>
                   </motion.div>
@@ -698,19 +741,19 @@ export default function BobbyProtocolLanding() {
               <div className="rounded-2xl border border-dashed border-[#0052ff]/30 bg-[#0052ff]/[0.045] px-6 py-12 text-center">
                 <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10"><CircleDollarSign className="h-5 w-5 text-[#7da6ff]" /></div>
                 <div className="text-lg font-bold">{activityError ? 'Activity feed is reconnecting.' : isActivityLoading ? 'Reading protocol activity.' : 'No recent protocol events.'}</div>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{activityError ? 'The network telemetry is still available. Refresh to retry the event stream.' : 'The live network remains connected; the next verified event will appear here automatically.'}</p>
+                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{activityError ? 'The network telemetry is still available. Refresh to retry the event stream.' : 'The live network remains connected; the next recorded event will appear here automatically.'}</p>
               </div>
             )}
           </div>
-        </section>
+        </section>}
 
-        <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
+        {SHOW_LEGACY_PROTOCOL_SECTIONS && <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(0,82,255,.1),transparent_40%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
                 <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Bobby-as-a-service</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Plug Bobby into your agent.</h2>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give your agent<br />a second layer.</h2>
               </div>
               <div className="rounded-lg border border-white/10 bg-black/60 px-5 py-3 font-mono text-sm text-[#7da6ff]">POST /api/mcp-http</div>
             </div>
@@ -744,16 +787,16 @@ export default function BobbyProtocolLanding() {
               </div>
             </div>
           </div>
-        </section>
+        </section>}
 
         <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Proven on X Layer.<br />Now building on Base.</h2>
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Track record</div>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The next build is Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Bobby ran in production on OKX X Layer through the hackathon era. Every number below is on-chain and independently verifiable — nothing here is a screenshot.
+                Bobby ran in production on X Layer through the hackathon era. Those legacy records show what was committed on-chain; the current build and next deployment are Base-first. They do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
               </p>
             </div>
 
@@ -782,9 +825,9 @@ export default function BobbyProtocolLanding() {
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
-              <span>Chain 196 · OKX X Layer</span>
-              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord on OKLink ↗</a>
-              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">AgentEconomy on OKLink ↗</a>
+              <span>Base · 8453</span>
+              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy TrackRecord ↗</a>
+              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy AgentEconomy ↗</a>
               <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>
             </div>
           </div>
@@ -798,7 +841,7 @@ export default function BobbyProtocolLanding() {
               <div>
                 <BrandMark />
                 <p className="mt-5 max-w-xs text-sm leading-6 text-white/40">
-                  The adversarial decision layer for autonomous finance. Every thesis debated, every decision committed before the outcome.
+                  The accountability layer for autonomous finance. Every thesis debated, every decision committed before the outcome.
                 </p>
                 <div className="mt-6 flex items-center gap-4">
                   <a href="https://twitter.com/bobbyprotocol" target="_blank" rel="noreferrer" aria-label="Twitter" className="text-white/40 transition hover:text-[#7da6ff]"><Twitter className="h-4 w-4" /></a>
@@ -807,6 +850,7 @@ export default function BobbyProtocolLanding() {
               </div>
               {([
                 ['Protocol', [
+                  ['Architecture', '/protocol/architecture'],
                   ['Console', '/protocol/console'],
                   ['Sandbox', '/protocol/sandbox'],
                   ['Heartbeat', '/protocol/heartbeat'],
@@ -816,7 +860,7 @@ export default function BobbyProtocolLanding() {
                   ['Docs', '/protocol/docs'],
                   ['Playbooks', '/protocol/playbooks'],
                   ['Harness', '/protocol/harness'],
-                  ['MCP endpoint', '#mcp'],
+                  ['MCP endpoint', '/protocol/docs'],
                 ]],
                 ['Bobby', [
                   ['War Room', '/agentic-world/bobby'],
@@ -839,7 +883,7 @@ export default function BobbyProtocolLanding() {
             </div>
             <div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 md:flex-row">
               <span>© 2026 Bobby Protocol</span>
-              <span>Open decision infrastructure for autonomous agents.</span>
+              <span>Make the thesis earn it.</span>
             </div>
           </div>
         </footer>

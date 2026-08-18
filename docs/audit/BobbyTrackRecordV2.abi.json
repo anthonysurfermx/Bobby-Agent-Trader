@@ -1,0 +1,2669 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_bobby",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_params",
+        "type": "tuple",
+        "internalType": "struct BobbyTrackRecordV2.VerificationParams",
+        "components": [
+          {
+            "name": "entryWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxExitLagSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "challengeWindowSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "entryTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "confMaxBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          }
+        ]
+      },
+      {
+        "name": "_pyths",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "_symbols",
+        "type": "string[]",
+        "internalType": "string[]"
+      },
+      {
+        "name": "_feedIds",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "MAX_COMMITMENT_TTL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_RECENT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_COMMIT_AGE_FLOOR",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MIN_ENTRY_DELAY_SEC",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PNL_TOLERANCE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "int256",
+        "internalType": "int256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "PYTH_ACTIVATION_DELAY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "SANITY_BAND_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "SANITY_MAX_STALENESS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "_sanityProbe",
+    "inputs": [
+      {
+        "name": "agg",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "oracle1e8",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "discrepant",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "cl",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "acceptOwnership",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "activatePyth",
+    "inputs": [
+      {
+        "name": "_pyth",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "activePyth",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "agentLossesByMode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.Agent"
+      },
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.PriceMode"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "agentTradesByMode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.Agent"
+      },
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.PriceMode"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "agentWinsByMode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.Agent"
+      },
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.PriceMode"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "announceCommit",
+    "inputs": [
+      {
+        "name": "_debateHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "announcedAt",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "approvePyth",
+    "inputs": [
+      {
+        "name": "_pyth",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "approvedPyth",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "bobby",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "challengeStopBreach",
+    "inputs": [
+      {
+        "name": "_debateHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_anchorTs",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "_breachUpdateData",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "commitIndex",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "commitTrade",
+    "inputs": [
+      {
+        "name": "_debateHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_symbol",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "_agent",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.Agent"
+      },
+      {
+        "name": "_conviction",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "_entryPrice",
+        "type": "uint96",
+        "internalType": "uint96"
+      },
+      {
+        "name": "_targetPrice",
+        "type": "uint96",
+        "internalType": "uint96"
+      },
+      {
+        "name": "_stopPrice",
+        "type": "uint96",
+        "internalType": "uint96"
+      },
+      {
+        "name": "_declaredMode",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.PriceMode"
+      },
+      {
+        "name": "_entryAt",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "_entryUpdateData",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "expireCommitment",
+    "inputs": [
+      {
+        "name": "_debateHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "expiredAttested",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "expiredVerified",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "feedOf",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getAgentStats",
+    "inputs": [
+      {
+        "name": "_agent",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.Agent"
+      },
+      {
+        "name": "_mode",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.PriceMode"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "_wins",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_losses",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_total",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_winRate",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getAttestedDecidedCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getAttestedWinRate",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCommitment",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct BobbyTrackRecordV2.Commitment",
+        "components": [
+          {
+            "name": "debateHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "entryPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "targetPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "committedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "stopPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "recorder",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "minResolveAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "agent",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.Agent"
+          },
+          {
+            "name": "conviction",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "resolved",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "mode",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.PriceMode"
+          },
+          {
+            "name": "entryWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxExitLagSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "challengeWindowSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "entryTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "confMaxBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "entryEvidence",
+            "type": "tuple",
+            "internalType": "struct BobbyTrackRecordV2.OracleEvidence",
+            "components": [
+              {
+                "name": "feedId",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "price",
+                "type": "int64",
+                "internalType": "int64"
+              },
+              {
+                "name": "conf",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "expo",
+                "type": "int32",
+                "internalType": "int32"
+              },
+              {
+                "name": "publishTime",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "symbol",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCoverage",
+    "inputs": [
+      {
+        "name": "mode",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.PriceMode"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "resolved_",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expired_",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "pending_",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getRecentCommitments",
+    "inputs": [
+      {
+        "name": "_count",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "internalType": "struct BobbyTrackRecordV2.Commitment[]",
+        "components": [
+          {
+            "name": "debateHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "entryPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "targetPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "committedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "stopPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "recorder",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "minResolveAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "agent",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.Agent"
+          },
+          {
+            "name": "conviction",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "resolved",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "mode",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.PriceMode"
+          },
+          {
+            "name": "entryWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxExitLagSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "challengeWindowSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "entryTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "confMaxBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "entryEvidence",
+            "type": "tuple",
+            "internalType": "struct BobbyTrackRecordV2.OracleEvidence",
+            "components": [
+              {
+                "name": "feedId",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "price",
+                "type": "int64",
+                "internalType": "int64"
+              },
+              {
+                "name": "conf",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "expo",
+                "type": "int32",
+                "internalType": "int32"
+              },
+              {
+                "name": "publishTime",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "symbol",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getRecentTrades",
+    "inputs": [
+      {
+        "name": "_count",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "internalType": "struct BobbyTrackRecordV2.Trade[]",
+        "components": [
+          {
+            "name": "debateHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "entryPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "exitPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "committedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "resolvedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "recorder",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "agent",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.Agent"
+          },
+          {
+            "name": "conviction",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "result",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.Result"
+          },
+          {
+            "name": "mode",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.PriceMode"
+          },
+          {
+            "name": "pnlBps",
+            "type": "int256",
+            "internalType": "int256"
+          },
+          {
+            "name": "exitAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "challengeDeadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "stopChallenged",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "entryEvidence",
+            "type": "tuple",
+            "internalType": "struct BobbyTrackRecordV2.OracleEvidence",
+            "components": [
+              {
+                "name": "feedId",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "price",
+                "type": "int64",
+                "internalType": "int64"
+              },
+              {
+                "name": "conf",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "expo",
+                "type": "int32",
+                "internalType": "int32"
+              },
+              {
+                "name": "publishTime",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "exitEvidence",
+            "type": "tuple",
+            "internalType": "struct BobbyTrackRecordV2.OracleEvidence",
+            "components": [
+              {
+                "name": "feedId",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "price",
+                "type": "int64",
+                "internalType": "int64"
+              },
+              {
+                "name": "conf",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "expo",
+                "type": "int32",
+                "internalType": "int32"
+              },
+              {
+                "name": "publishTime",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "symbol",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getTrade",
+    "inputs": [
+      {
+        "name": "_id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct BobbyTrackRecordV2.Trade",
+        "components": [
+          {
+            "name": "debateHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "entryPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "exitPrice",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "committedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "resolvedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "recorder",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "agent",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.Agent"
+          },
+          {
+            "name": "conviction",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "result",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.Result"
+          },
+          {
+            "name": "mode",
+            "type": "uint8",
+            "internalType": "enum BobbyTrackRecordV2.PriceMode"
+          },
+          {
+            "name": "pnlBps",
+            "type": "int256",
+            "internalType": "int256"
+          },
+          {
+            "name": "exitAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "challengeDeadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "stopChallenged",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "entryEvidence",
+            "type": "tuple",
+            "internalType": "struct BobbyTrackRecordV2.OracleEvidence",
+            "components": [
+              {
+                "name": "feedId",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "price",
+                "type": "int64",
+                "internalType": "int64"
+              },
+              {
+                "name": "conf",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "expo",
+                "type": "int32",
+                "internalType": "int32"
+              },
+              {
+                "name": "publishTime",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "exitEvidence",
+            "type": "tuple",
+            "internalType": "struct BobbyTrackRecordV2.OracleEvidence",
+            "components": [
+              {
+                "name": "feedId",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "price",
+                "type": "int64",
+                "internalType": "int64"
+              },
+              {
+                "name": "conf",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "expo",
+                "type": "int32",
+                "internalType": "int32"
+              },
+              {
+                "name": "publishTime",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "symbol",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getVerifiedDecidedCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getVerifiedScorecard",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "winRateBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "decided",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "resolved_",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expired_",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "pending_",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "resolutionBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getVerifiedWinRate",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isFinal",
+    "inputs": [
+      {
+        "name": "_debateHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lossesAttested",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lossesVerified",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "minCommitAge",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "owner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "params",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "entryWindowSec",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "exitWindowSec",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "maxExitLagSec",
+        "type": "uint24",
+        "internalType": "uint24"
+      },
+      {
+        "name": "challengeWindowSec",
+        "type": "uint24",
+        "internalType": "uint24"
+      },
+      {
+        "name": "entryTolBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "exitTolBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "confMaxBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "paused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingAttested",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingOwner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pendingVerified",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pythActivatableAt",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "resolveTrade",
+    "inputs": [
+      {
+        "name": "_debateHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_pnlBps",
+        "type": "int256",
+        "internalType": "int256"
+      },
+      {
+        "name": "_result",
+        "type": "uint8",
+        "internalType": "enum BobbyTrackRecordV2.Result"
+      },
+      {
+        "name": "_exitPrice",
+        "type": "uint96",
+        "internalType": "uint96"
+      },
+      {
+        "name": "_exitAt",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "_exitUpdateData",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "resolvedAttested",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "resolvedVerified",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "retainedFees",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "revokePyth",
+    "inputs": [
+      {
+        "name": "_pyth",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "sanityFeedOf",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "setBobby",
+    "inputs": [
+      {
+        "name": "_newBobby",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setFeed",
+    "inputs": [
+      {
+        "name": "_symbol",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "_feedId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setMinCommitAge",
+    "inputs": [
+      {
+        "name": "_newAge",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setParams",
+    "inputs": [
+      {
+        "name": "_params",
+        "type": "tuple",
+        "internalType": "struct BobbyTrackRecordV2.VerificationParams",
+        "components": [
+          {
+            "name": "entryWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxExitLagSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "challengeWindowSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "entryTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "confMaxBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setSanityFeed",
+    "inputs": [
+      {
+        "name": "_symbol",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "_aggregator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "totalCommitments",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalPnlBpsAttested",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "int256",
+        "internalType": "int256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalPnlBpsVerified",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "int256",
+        "internalType": "int256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalTrades",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tradeIndex",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "transferOwnership",
+    "inputs": [
+      {
+        "name": "_newOwner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "unpause",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "winsAttested",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "winsVerified",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "withdrawStuckFees",
+    "inputs": [
+      {
+        "name": "_to",
+        "type": "address",
+        "internalType": "address payable"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "BobbyUpdated",
+    "inputs": [
+      {
+        "name": "oldBobby",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newBobby",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CommitAnnounced",
+    "inputs": [
+      {
+        "name": "debateHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "announcedAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CommitmentExpired",
+    "inputs": [
+      {
+        "name": "commitId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "debateHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "symbol",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FeedSet",
+    "inputs": [
+      {
+        "name": "symbolHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "symbol",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "feedId",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MinCommitAgeUpdated",
+    "inputs": [
+      {
+        "name": "oldAge",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newAge",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OracleDiscrepancy",
+    "inputs": [
+      {
+        "name": "debateHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "oracle1e8",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "chainlink1e8",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OwnershipTransferStarted",
+    "inputs": [
+      {
+        "name": "currentOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "pendingOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OwnershipTransferred",
+    "inputs": [
+      {
+        "name": "previousOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newOwner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ParamsUpdated",
+    "inputs": [
+      {
+        "name": "newParams",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct BobbyTrackRecordV2.VerificationParams",
+        "components": [
+          {
+            "name": "entryWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitWindowSec",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "maxExitLagSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "challengeWindowSec",
+            "type": "uint24",
+            "internalType": "uint24"
+          },
+          {
+            "name": "entryTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "exitTolBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "confMaxBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Paused",
+    "inputs": [
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PythActivated",
+    "inputs": [
+      {
+        "name": "pyth",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PythApproved",
+    "inputs": [
+      {
+        "name": "pyth",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "activatableAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PythRevoked",
+    "inputs": [
+      {
+        "name": "pyth",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RefundRetained",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SanityFeedSet",
+    "inputs": [
+      {
+        "name": "symbolHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "symbol",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "aggregator",
+        "type": "address",
+        "indexed": false,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "StopBreachChallenged",
+    "inputs": [
+      {
+        "name": "debateHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "challenger",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "breachPublishTime",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "breachPrice1e8",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "wasResolved",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "StuckFeesWithdrawn",
+    "inputs": [
+      {
+        "name": "to",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TradeCommitted",
+    "inputs": [
+      {
+        "name": "commitId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "symbol",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "agent",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum BobbyTrackRecordV2.Agent"
+      },
+      {
+        "name": "conviction",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "entryPrice",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "debateHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "mode",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum BobbyTrackRecordV2.PriceMode"
+      },
+      {
+        "name": "feedId",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "entryOraclePrice1e8",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "entryPublishTime",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "entryAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TradeReclassified",
+    "inputs": [
+      {
+        "name": "tradeId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "debateHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "oldResult",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum BobbyTrackRecordV2.Result"
+      },
+      {
+        "name": "newResult",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum BobbyTrackRecordV2.Result"
+      },
+      {
+        "name": "oldPnlBps",
+        "type": "int256",
+        "indexed": false,
+        "internalType": "int256"
+      },
+      {
+        "name": "newPnlBps",
+        "type": "int256",
+        "indexed": false,
+        "internalType": "int256"
+      },
+      {
+        "name": "reason",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TradeResolved",
+    "inputs": [
+      {
+        "name": "tradeId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "symbol",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "agent",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum BobbyTrackRecordV2.Agent"
+      },
+      {
+        "name": "result",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum BobbyTrackRecordV2.Result"
+      },
+      {
+        "name": "pnlBps",
+        "type": "int256",
+        "indexed": false,
+        "internalType": "int256"
+      },
+      {
+        "name": "conviction",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "debateHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "mode",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum BobbyTrackRecordV2.PriceMode"
+      },
+      {
+        "name": "exitAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "exitOraclePrice1e8",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "exitPublishTime",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Unpaused",
+    "inputs": [
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AlreadyChallenged",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AlreadyCommitted",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AnnounceRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AttestedNoEntryAnchor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AttestedNoEvidence",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AttestedNoValue",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ChallengeAnchorOutOfRange",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ChallengeNotApplicable",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ChallengeNotVerified",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ChallengeWindowClosed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ConfTooWide",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EntryAnchorMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EntryInFuture",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EntryProofRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EntryTooStale",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ExitBeforeMinResolve",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ExitInFuture",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ExitProofRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ExitTooStale",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientFee",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDirection",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidFeed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSymbol",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ModeMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoBreach",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoCodeAtPyth",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoPythActive",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NonPositivePrice",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ParamsOutOfBounds",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PnlOutOfTolerance",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PnlSignMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PriceOutOfBand",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ProofMustBeSingleUpdate",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PythNotApproved",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReentrantCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ResultContradictsOracle",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SanityFeedBadDecimals",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "StopRequiredForVerified",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TimelockNotElapsed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TimestampOverflow",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnexpectedExpo",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
+  }
+]
