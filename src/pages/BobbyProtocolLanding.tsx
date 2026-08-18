@@ -513,7 +513,7 @@ export default function BobbyProtocolLanding() {
                   description: 'The thesis and decision are committed before the outcome. Anyone can inspect what was decided and when.',
                   image: '/images/protocol/onchain-proof.jpg',
                   alt: 'Transparent cobalt glass monolith containing a sealed point of light',
-                  telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
+                  telemetry: ['proof.announce  future_anchor', 'oracle  pyth · hermes', 'chain  base sepolia · 84532', 'mainnet  gated'],
                 },
               ].map((capability, index) => (
                 <motion.article
@@ -794,9 +794,9 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Track record</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The next build is Base.</h2>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />V2 is proving itself on Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Bobby ran in production on X Layer through the hackathon era. Those legacy records show what was committed on-chain; the current build and next deployment are Base-first. They do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
+                X Layer remains the readable legacy archive. TrackRecord V2 has completed five adversarial audit rounds, closed four P1 findings and resolved its first real Pyth/Hermes-verified cycle on Base Sepolia. Base mainnet is still NO-GO until the soak, production Safe, environment gates and ownership handoffs close.
               </p>
             </div>
 
@@ -825,7 +825,9 @@ export default function BobbyProtocolLanding() {
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
-              <span>Base · 8453</span>
+              <span>Base Sepolia canary · 84532</span>
+              <a href="https://sepolia.basescan.org/address/0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC" target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord V2 ↗</a>
+              <span>Base mainnet · gated</span>
               <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy TrackRecord ↗</a>
               <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy AgentEconomy ↗</a>
               <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>

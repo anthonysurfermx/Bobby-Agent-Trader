@@ -10,6 +10,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { isEquitySymbol, normalizeAssetSymbol } from '../src/lib/voice-assets.js';
 import { analyzeCandles, analysisSummary, type Candle } from '../src/lib/market-indicators.js';
+import { buildDeskBrief, type DeskBriefLanguage } from '../src/lib/voice-desk-brief.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 60 };
@@ -21,7 +22,14 @@ type ToolName = 'get_market' | 'run_debate' | 'get_protocol_stats' | 'propose_tr
 const ALLOWED: ToolName[] = ['get_market', 'run_debate', 'get_protocol_stats', 'propose_trade'];
 
 async function getJson(url: string, init?: RequestInit) {
-  const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) } });
+  const response = await fetch(url, {
+    ...init,
+    // A partial brief is better than a silent desk. Independent sources fail
+    // closed after 15s so the whole parallel evidence packet stays well under
+    // the product's 60-second response budget.
+    signal: init?.signal ?? AbortSignal.timeout(15_000),
+    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+  });
   if (!response.ok) throw new Error(`${url} → ${response.status}`);
   return response.json();
 }
@@ -90,25 +98,38 @@ function pulseFor(intel: Record<string, unknown>, ticker: string) {
   };
 }
 
-async function runDebate(symbol: string, context?: string) {
+async function runDebate(symbol: string, context?: string, lang: DeskBriefLanguage = 'es') {
+  const startedAt = Date.now();
   const ticker = normalizeAssetSymbol(symbol);
   // The indicator read never depends on the intel service — it is computed from
   // the same candles the chart is drawing, so the two can never disagree.
-  const [intel, candles] = await Promise.all([
+  const [market, intel, candles] = await Promise.all([
+    getMarket(ticker).catch(() => ({ symbol: ticker, available: false })),
     getJson(`${SELF}/api/bobby-intel?symbol=${ticker}`).catch(() => ({}) as Record<string, unknown>),
     getCandles(ticker).catch(() => [] as Candle[]),
   ]);
   const technicals = candles.length ? analysisSummary(analyzeCandles(candles)) : null;
   const pulse = pulseFor(intel as Record<string, unknown>, ticker);
+  const quickBrief = buildDeskBrief({
+    symbol: ticker,
+    market,
+    technicals,
+    lang,
+    latencyMs: Date.now() - startedAt,
+  });
 
   return {
     symbol: ticker,
     context: context ?? null,
+    market,
     regime: (intel as Record<string, unknown>).regime ?? null,
     // Real readings off real candles — the anchors for the three agent zones.
     technicals,
     // Deeper multi-indicator scoring, only for the assets the intel desk covers.
     technical_pulse: pulse,
+    // Deterministic first paint: the client renders this immediately while the
+    // Realtime model turns the same evidence into the richer three-agent view.
+    quick_brief: quickBrief,
     how_to_use:
       'Anchor Alpha on the support/demand side, Red Team on the level that breaks the thesis, and the CIO on where you would actually act. Size each zone with atrPct. Never state a level that is not derived from these numbers.',
     note: 'Analysis only. Bobby does not execute trades.',
@@ -167,7 +188,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'run_debate':
         return res.status(200).json(
-          await runDebate(String(args?.symbol ?? ''), args?.context ? String(args.context) : undefined),
+          await runDebate(
+            String(args?.symbol ?? ''),
+            args?.context ? String(args.context) : undefined,
+            args?.lang === 'en' ? 'en' : 'es',
+          ),
         );
 
       case 'get_protocol_stats':

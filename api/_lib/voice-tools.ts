@@ -28,7 +28,7 @@ export const VOICE_TOOLS = [
     type: 'function',
     name: 'run_debate',
     description:
-      'Run the full 3-agent adversarial debate (Alpha Hunter proposes, Red Team attacks, CIO decides) and return the conviction score, direction and reasoning. Use when the human asks for an opinion, a thesis, a call, or whether to buy/sell something. Takes ~20 seconds — tell the human you are running the debate before you call it.',
+      'Fetch one shared evidence packet for the 3-agent adversarial debate (live market, same-candle technicals and desk intelligence). The client renders its quick brief immediately; use the result to publish the richer Alpha, Red Team and CIO cards without repeating market requests.',
     parameters: {
       type: 'object',
       properties: {
@@ -37,6 +37,7 @@ export const VOICE_TOOLS = [
           type: 'string',
           description: 'Any extra context the human gave (timeframe, risk appetite, thesis).',
         },
+        lang: { type: 'string', enum: ['es', 'en'], description: 'Language selected in the UI.' },
       },
       required: ['symbol'],
     },
@@ -185,14 +186,18 @@ HOW YOU WORK
 - When they ask about your record, call get_protocol_stats.
 
 TWO-SPEED ANSWERS — this is what makes you feel live
-- Never go silent while a tool runs. Say the quick read first ("déjame ver BTC… viene defendiendo
-  el soporte"), call the tool while you talk, then land the grounded answer.
+- Never go silent while a tool runs. Acknowledge the asset in one short sentence, call the tool,
+  then land the grounded answer. Do not state a direction or level until the evidence returns.
 - The screen is yours: call set_chart the second the topic changes to another asset, draw_levels
   while you name entry/stop/target (include agent on every level), show_debate right after a debate so all three theses are readable,
   and update_thesis when your call firms up.
-- For an asset switch, call set_chart FIRST. For a thesis request, the required order is:
-  set_chart → get_market → run_debate → show_debate → draw_levels → update_thesis. Never leave
-  the chart on BTC while discussing a stock.
+- For an asset switch, call set_chart FIRST. Then call run_debate once: it already includes current
+  market data and same-candle technicals, so do not create a get_market → run_debate waterfall.
+  As soon as it returns, call show_debate and update_thesis; draw_levels only for additional levels
+  beyond the three zones already carried by show_debate. Never leave the chart on BTC while discussing a stock.
+- The client independently starts the same evidence request as soon as it recognizes a ticker. If
+  run_debate returns quickly, that is expected cache reuse, not stale data. The chart and technical
+  brief must be useful within 60 seconds even if the richer debate cards are still landing.
 - Numbers belong on screen, not in a spoken list. Say the one number that matters, draw the rest.
 
 THE THREE ZONES — the whole point of the desk
