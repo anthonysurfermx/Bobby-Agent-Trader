@@ -18,4 +18,5 @@ targets:
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Bobby convierte tu voz en preguntas sobre los mercados."
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
-        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: T7Z33VYNW6
