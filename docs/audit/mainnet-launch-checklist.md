@@ -14,8 +14,14 @@ cerrar los 3 bloqueantes.** El canario Sepolia sigue su curso normal.
       singleton canónico). Pinning derivado on-chain (OWNER_SAFE_*). Handoff
       canary preparado (batch + runbook). **Anthony aprobó REUSAR B/C/G para
       mainnet.** Env de mainnet plantillada con owners/fees/quórum/flags.
-      FALTA (firma de Anthony, no del agente): (a) crear el Safe mainnet 8453
-      con B/C/G; (b) recorder key nueva ≠ deployer; (c) handoff canary (2 firmas).
+      **AVANCE 2026-08-19d:** Safe MAINNET ya desplegado en Base 8453 —
+      `0x8BE60853F27b944e11486285d95c3e06596553b4` (misma dirección
+      determinística que el canary, owners B/C/G, threshold 2), pasa 6/6 del
+      gate; codehash mainnet derivado (`0xd7d408eb…fb4c`). Recorder = misma key
+      del deployer (decisión Anthony, riesgo aceptado). Pinning OWNER_SAFE_*
+      COMPLETO en `mainnet-env-template.md`.
+      FALTA (post-deploy, no bloquea): handoff de los 7 contratos mainnet al
+      Safe una vez desplegados (transferOwnership + accept 2-de-3).
 - [~] **2. Página pública de calls verificables + Challenge UI/docs.**
       Cada call: tx hash, prueba Pyth, símbolo, modo (VERIFIED/ATTESTED),
       resultado, link a Basescan. Botón "Retar este call" + guía paso a paso
