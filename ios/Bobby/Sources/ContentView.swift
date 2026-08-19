@@ -748,7 +748,11 @@ struct ContentView: View {
     }
 
     private var statusHint: String {
-        if speech.listening { return "Habla normal · se envía cuando terminas" }
+        if speech.listening {
+            return vm.handsFree
+                ? "Manos libres · di tu siguiente pregunta"
+                : "Habla normal · se envía cuando terminas"
+        }
         if vm.voice.speaking { return "La orbe responde a la voz en tiempo real" }
         return vm.phase.hint
     }

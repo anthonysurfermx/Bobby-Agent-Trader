@@ -13,7 +13,10 @@ struct BobbyOrb: View {
     var tintSoft: Color = Theme.accentSoft
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+        // Battery: the idle orb breathes at 12fps; full 30fps only while the
+        // desk is actually doing something (Kimi red-team v3 perf note).
+        let fps: Double = (thinking || speaking || listening || level > 0.12) ? 30 : 12
+        return TimelineView(.animation(minimumInterval: 1.0 / fps)) { timeline in
             let t = timeline.date.timeIntervalSinceReferenceDate
             let idle = CGFloat(0.10 + sin(t * 1.4) * 0.035)
             let energy = max(idle, min(1, level))
