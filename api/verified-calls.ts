@@ -11,9 +11,11 @@ import { Contract, Interface, JsonRpcProvider, formatUnits } from 'ethers';
 
 export const config = { maxDuration: 30 };
 
-const RPC = process.env.BASE_SEPOLIA_RPC_URL || 'https://base-sepolia-rpc.publicnode.com';
-const TR = process.env.BASE_SEPOLIA_TRACK_RECORD_ADDRESS || '0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC';
-const DEPLOY_BLOCK = Number(process.env.BASE_SEPOLIA_TRACK_RECORD_BLOCK || 45644200);
+// Dedicated env names: the shared BASE_SEPOLIA_TRACK_RECORD_ADDRESS points
+// other endpoints at the v1 canary — this ledger only understands V2.
+const RPC = process.env.VERIFIED_CALLS_RPC_URL || 'https://base-sepolia-rpc.publicnode.com';
+const TR = process.env.VERIFIED_CALLS_ADDRESS || '0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC';
+const DEPLOY_BLOCK = Number(process.env.VERIFIED_CALLS_DEPLOY_BLOCK || 45644200);
 const EXPLORER = 'https://sepolia.basescan.org';
 const TTL_MS = 60_000;
 const LOG_CHUNK = 40_000;
