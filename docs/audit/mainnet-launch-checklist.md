@@ -6,9 +6,14 @@ cerrar los 3 bloqueantes.** El canario Sepolia sigue su curso normal.
 
 ## Bloqueantes (los 3 NO-GO)
 
-- [ ] **1. Safe 2-de-3 real** con pin de codehash/singleton, handoff ACEPTADO
+- [~] **1. Safe 2-de-3 real** con pin de codehash/singleton, handoff ACEPTADO
       de los 7 contratos, ownership verificable públicamente (link a
       app.safe.global + direcciones + roles). Ver `safe-setup-runbook.md`.
+      **AVANCE 2026-08-19:** tubería lista — SAFE_API_KEY provisionada y
+      verificada contra el Transaction Service (Codex), batch builder
+      accept/pause/unpause listo, runbook vigente. Verificado vía API: NO
+      existe Safe aún en Base/Base Sepolia con las wallets conocidas como
+      owner — FALTA solo la decisión de Anthony: los 3 signers.
 - [~] **2. Página pública de calls verificables + Challenge UI/docs.**
       Cada call: tx hash, prueba Pyth, símbolo, modo (VERIFIED/ATTESTED),
       resultado, link a Basescan. Botón "Retar este call" + guía paso a paso
@@ -25,9 +30,15 @@ cerrar los 3 bloqueantes.** El canario Sepolia sigue su curso normal.
       entrega updateData + cast command listos para mandar la tx real.
       FALTA: submit con wallet desde la página + el challenge ejemplo
       documentado (sale del ciclo canario 003).
-- [ ] **3. Bug bounty con premio real publicado.** Premios por challenges
+- [~] **3. Bug bounty con premio real publicado.** Premios por challenges
       válidos, bugs y reportes de frontrunning. Sin incentivo nadie audita
       gratis y "gran protocolo" suena a marketing.
+      **AVANCE 2026-08-19:** bobbyprotocol.xyz/protocol/bounty LIVE — pool
+      inicial $5,000 USDC: $2,500 crítico / $500 alto / $150 medio / $100
+      por challenge válido en mainnet; scope pineado al release congelado,
+      disclosure 90 días vía GitHub Advisories, challenge-tx-as-claim.
+      Montos aprobados por Anthony 2026-08-19. FALTA: fondear el pool al
+      lanzar el Safe (los términos ya aceptan reportes desde hoy).
 
 ## El resto del kit de anuncio (en orden)
 
