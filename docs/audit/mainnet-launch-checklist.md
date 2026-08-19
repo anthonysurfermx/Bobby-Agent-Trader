@@ -44,14 +44,12 @@ cerrar los 3 bloqueantes.** El canario Sepolia sigue su curso normal.
 
 ## El resto del kit de anuncio (en orden)
 
-- [ ] Auditorías publicadas completas (5 rondas, severidades y fixes — no hilos).
-- [ ] Risk/disclaimer page honesta: VERIFIED = BTC/ETH/SOL con oráculo;
-      ATTESTED = self-reported (NUNCA venderlo como inmanipulable); el
-      recorder key puede pausar pero no reescribir el pasado; smart contract risk.
+- [x] Auditorías publicadas completas — bobbyprotocol.xyz/protocol/audits LIVE (5 rondas, NO-GO→fix→re-audit, 4 P1s, links a informes).
+- [x] Risk/disclaimer page — bobbyprotocol.xyz/protocol/risk LIVE (VERIFIED vs ATTESTED, tabla de supuestos, never-claim list, disclaimer). Contenido red-teamed por Kimi.
 - [ ] Demo en video de 60s: un challenge real reclasificando WIN→LOSS.
 - [ ] 3 challenges públicos hechos por nosotros mismos ANTES del anuncio,
       documentados (mitigación del riesgo "fractura de credibilidad en CT").
-- [ ] Thread de respuesta preparado para el escrutinio hostil.
+- [x] Thread de defensa CT preparado — docs/strategy/ct-defense-thread.md (12 ataques + respuesta técnica). Falta solo sustituir links placeholder al publicar.
 
 ## Claims — lenguaje permitido
 
