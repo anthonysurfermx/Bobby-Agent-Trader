@@ -4,6 +4,24 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ArrowUpRight, ShieldCheck, Swords } from 'lucide-react';
+import { useAccount, useSwitchChain, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAppKit } from '@reown/appkit/react';
+
+const BASE_SEPOLIA_ID = 84532;
+const PYTH_FEE_BUFFER = 20_000_000_000_000n; // contract refunds the excess
+const CHALLENGE_ABI = [
+  {
+    type: 'function',
+    name: 'challengeStopBreach',
+    stateMutability: 'payable',
+    inputs: [
+      { name: '_debateHash', type: 'bytes32' },
+      { name: '_anchorTs', type: 'uint64' },
+      { name: '_breachUpdateData', type: 'bytes[]' },
+    ],
+    outputs: [],
+  },
+] as const;
 
 interface CallRow {
   debateHash: string;
@@ -68,10 +86,44 @@ export default function BobbyCallsPage() {
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<ScanResult | null>(null);
 
+  const { isConnected, chainId } = useAccount();
+  const { open: openWallet } = useAppKit();
+  const { switchChainAsync } = useSwitchChain();
+  const { writeContractAsync, isPending: submitting } = useWriteContract();
+  const [challengeTxHash, setChallengeTxHash] = useState<`0x${string}` | undefined>();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const receipt = useWaitForTransactionReceipt({ hash: challengeTxHash, chainId: BASE_SEPOLIA_ID });
+
   const openChallenge = (call: CallRow) => {
     setChallenging(call);
     setAnchorTs(call.entryPublishTime || Math.floor(Date.now() / 1000) - 600);
     setScan(null);
+    setChallengeTxHash(undefined);
+    setSubmitError(null);
+  };
+
+  /** Submit the REAL challenge from the visitor's wallet — permissionless. */
+  const submitChallenge = async () => {
+    if (!challenging || !scan?.updateData || !data) return;
+    setSubmitError(null);
+    try {
+      if (!isConnected) {
+        openWallet();
+        return;
+      }
+      if (chainId !== BASE_SEPOLIA_ID) await switchChainAsync({ chainId: BASE_SEPOLIA_ID });
+      const hash = await writeContractAsync({
+        address: data.contract as `0x${string}`,
+        abi: CHALLENGE_ABI,
+        functionName: 'challengeStopBreach',
+        args: [challenging.debateHash as `0x${string}`, BigInt(anchorTs), [scan.updateData as `0x${string}`]],
+        value: PYTH_FEE_BUFFER,
+        chainId: BASE_SEPOLIA_ID,
+      });
+      setChallengeTxHash(hash);
+    } catch (e) {
+      setSubmitError((e as Error)?.message?.split('\n')[0]?.slice(0, 160) || 'wallet rejected');
+    }
   };
 
   const runScan = async () => {
@@ -106,6 +158,11 @@ export default function BobbyCallsPage() {
     const t = window.setInterval(refresh, 60_000);
     return () => window.clearInterval(t);
   }, [refresh]);
+
+  // A mined challenge changes the ledger — re-read it.
+  useEffect(() => {
+    if (receipt.isSuccess) refresh();
+  }, [receipt.isSuccess, refresh]);
 
   const sc = data?.scorecard;
   const txUrl = (tx: string | null) => (tx && data ? `${data.explorer}/tx/${tx}` : undefined);
@@ -309,7 +366,26 @@ export default function BobbyCallsPage() {
                   <p className="mt-2 text-sm leading-6 text-white/70">{scan.detail || scan.error}</p>
                   {scan.verdict === 'BREACH' && scan.updateData && (
                     <div className="mt-3 space-y-2">
-                      <p className="text-xs text-white/50">Mándalo tú — el contrato reclasifica on-chain (fee Pyth ~10 wei + gas Sepolia):</p>
+                      {challengeTxHash ? (
+                        <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3">
+                          <div className="font-mono text-xs font-bold text-emerald-300">
+                            {receipt.isSuccess ? '✓ CHALLENGE MINADO — el call se reclasificó on-chain' : receipt.isError ? 'la tx revirtió — revisa en Basescan' : 'challenge enviado — esperando confirmación…'}
+                          </div>
+                          <a href={`https://sepolia.basescan.org/tx/${challengeTxHash}`} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 font-mono text-[11px] text-[#7da6ff] hover:text-white">
+                            {short(challengeTxHash)} <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={submitChallenge}
+                          disabled={submitting}
+                          className="w-full rounded-lg bg-red-400 px-6 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-red-300 disabled:opacity-40"
+                        >
+                          {submitting ? 'firma en tu wallet…' : isConnected ? (chainId === BASE_SEPOLIA_ID ? '⚡ mandar challenge on-chain' : '⚡ cambiar a base sepolia y mandar') : 'conectar wallet para retar'}
+                        </button>
+                      )}
+                      {submitError && <p className="font-mono text-[11px] text-red-300">{submitError}</p>}
+                      <p className="text-xs text-white/50">O mándalo tú por CLI — el contrato reclasifica igual (fee Pyth ~10 wei + gas Sepolia):</p>
                       <button
                         onClick={() => navigator.clipboard.writeText(scan.updateData || '')}
                         className="rounded border border-white/15 bg-white/5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/70 hover:text-white"
@@ -331,7 +407,7 @@ export default function BobbyCallsPage() {
             {data?.contract || '…'}
           </a>{' '}
           on {data?.chain.name || 'Base Sepolia'} · canary deployment — mainnet ships behind a 2-of-3 Safe.
-          Analysis, not investment advice.
+          Analysis, not investment advice · <a href="/protocol/risk" className="text-white/50 underline-offset-2 hover:underline">risk & claims</a>
         </p>
       </div>
     </div>

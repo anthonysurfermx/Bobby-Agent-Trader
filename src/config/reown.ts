@@ -1,7 +1,7 @@
 // src/config/reown.ts
 import { createAppKit } from '@reown/appkit/react'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { mainnet, polygon, arbitrum, optimism, base } from '@reown/appkit/networks'
+import { mainnet, polygon, arbitrum, optimism, base, baseSepolia } from '@reown/appkit/networks'
 import type { AppKitNetwork } from '@reown/appkit/networks'
 
 // 1. Get projectId from https://cloud.reown.com
@@ -19,7 +19,8 @@ const xlayer = {
 // 2. Set up Wagmi adapter
 // Base is the protocol's active network. Keep X Layer available for legacy
 // archive/swap surfaces, but never present it as the default connection.
-export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [base, xlayer, mainnet, polygon, arbitrum, optimism]
+// baseSepolia rides along for the canary challenge flow on /protocol/calls.
+export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [base, xlayer, mainnet, polygon, arbitrum, optimism, baseSepolia]
 
 export const wagmiAdapter = new WagmiAdapter({
   networks,
