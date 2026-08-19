@@ -47,10 +47,46 @@ function short(hash: string | null): string {
   return hash ? `${hash.slice(0, 10)}…${hash.slice(-6)}` : '—';
 }
 
+interface ScanResult {
+  verdict: string;
+  detail: string;
+  symbol?: string;
+  stopPrice?: string;
+  tickPrice?: string;
+  tickPublishTime?: number;
+  castCommand?: string;
+  updateData?: string;
+  error?: string;
+}
+
 export default function BobbyCallsPage() {
   const [data, setData] = useState<CallsPayload | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [challenging, setChallenging] = useState<CallRow | null>(null);
+  const [anchorTs, setAnchorTs] = useState(0);
+  const [scanning, setScanning] = useState(false);
+  const [scan, setScan] = useState<ScanResult | null>(null);
+
+  const openChallenge = (call: CallRow) => {
+    setChallenging(call);
+    setAnchorTs(call.entryPublishTime || Math.floor(Date.now() / 1000) - 600);
+    setScan(null);
+  };
+
+  const runScan = async () => {
+    if (!challenging) return;
+    setScanning(true);
+    setScan(null);
+    try {
+      const res = await fetch(`/api/challenge-scan?hash=${challenging.debateHash}&ts=${anchorTs}`);
+      setScan((await res.json()) as ScanResult);
+    } catch {
+      setScan({ verdict: 'ERROR', detail: 'scan failed — retry shortly' });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -166,6 +202,14 @@ export default function BobbyCallsPage() {
                         </a>
                       ) : null,
                     )}
+                    {c.mode === 'VERIFIED' && !c.reclassified && (
+                      <button
+                        onClick={() => openChallenge(c)}
+                        className="mt-1 inline-flex items-center gap-1 rounded border border-red-400/30 bg-red-400/10 px-2 py-1 font-bold text-red-300 transition hover:bg-red-400/20"
+                      >
+                        <Swords className="h-3 w-3" /> retar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -206,6 +250,80 @@ export default function BobbyCallsPage() {
             <p className="mt-3 text-xs text-white/35">One-click challenge UI is on the mainnet checklist — today the path is the contract itself.</p>
           </div>
         </div>
+
+        {challenging && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setChallenging(null)}>
+            <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-white/15 bg-[#0a0a0f] p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.2em] text-red-300">
+                  <Swords className="h-4 w-4" /> Retar {challenging.symbol}
+                </div>
+                <button onClick={() => setChallenging(null)} className="font-mono text-xs text-white/40 hover:text-white">cerrar ✕</button>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-white/55">
+                Elige un instante y el escáner busca el primer tick firmado de Pyth en ese punto,
+                y <b className="text-white/80">simula el challenge contra el contrato real</b> — el
+                veredicto lo da el contrato, no nosotros. Gratis, sin wallet, sin gas.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {([
+                  ['entrada', challenging.entryPublishTime || 0],
+                  ['+15 min', (challenging.entryPublishTime || 0) + 900],
+                  ['+1 h', (challenging.entryPublishTime || 0) + 3600],
+                  ['salida', challenging.exitPublishTime || 0],
+                ] as Array<[string, number]>).filter(([, v]) => v > 0).map(([label, value]) => (
+                  <button
+                    key={label}
+                    onClick={() => setAnchorTs(value)}
+                    className={`rounded-full border px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition ${anchorTs === value ? 'border-[#0052ff] bg-[#0052ff]/20 text-white' : 'border-white/15 bg-white/5 text-white/50 hover:text-white'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  value={anchorTs}
+                  onChange={(e) => setAnchorTs(Number(e.target.value))}
+                  className="w-40 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 font-mono text-xs text-white outline-none focus:border-[#0052ff]"
+                  aria-label="anchor unix timestamp"
+                />
+              </div>
+              <button
+                onClick={runScan}
+                disabled={scanning}
+                className="mt-4 w-full rounded-lg bg-white px-6 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white disabled:opacity-40"
+              >
+                {scanning ? 'escaneando la cadena…' : 'escanear tick y simular challenge'}
+              </button>
+
+              {scan && (
+                <div className={`mt-4 rounded-xl border p-4 ${scan.verdict === 'BREACH' ? 'border-red-400/40 bg-red-400/10' : scan.verdict === 'NO_BREACH' ? 'border-emerald-400/30 bg-emerald-400/10' : 'border-amber-400/30 bg-amber-400/10'}`}>
+                  <div className={`font-mono text-sm font-bold tracking-[0.1em] ${scan.verdict === 'BREACH' ? 'text-red-300' : scan.verdict === 'NO_BREACH' ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {scan.verdict === 'BREACH' ? '⚡ BREACH REAL' : scan.verdict === 'NO_BREACH' ? '✓ EL CALL AGUANTA' : scan.verdict}
+                  </div>
+                  {scan.tickPrice && (
+                    <div className="mt-2 font-mono text-xs text-white/60">
+                      tick ${Number(scan.tickPrice).toLocaleString('en-US')} @ pt {scan.tickPublishTime} · stop ${Number(scan.stopPrice).toLocaleString('en-US')}
+                    </div>
+                  )}
+                  <p className="mt-2 text-sm leading-6 text-white/70">{scan.detail || scan.error}</p>
+                  {scan.verdict === 'BREACH' && scan.updateData && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs text-white/50">Mándalo tú — el contrato reclasifica on-chain (fee Pyth ~10 wei + gas Sepolia):</p>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(scan.updateData || '')}
+                        className="rounded border border-white/15 bg-white/5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/70 hover:text-white"
+                      >
+                        copiar updateData ({Math.round((scan.updateData.length - 2) / 2)} bytes)
+                      </button>
+                      <pre className="overflow-x-auto rounded-lg bg-black/50 p-3 font-mono text-[10px] leading-4 text-white/60">{scan.castCommand}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <p className="mt-10 font-mono text-[11px] leading-5 text-white/30">
           Contract{' '}
