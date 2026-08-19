@@ -39,3 +39,17 @@ Este Safe es de ENSAYO en Sepolia. Para mainnet: Codex/Anthony deben decidir
 si reusan los mismos 3 owners o generan llaves nuevas (idealmente ≥2 hardware
 distintas de las de ensayo), crear el Safe en Base mainnet, y repetir
 pinning + handoff. La recorder key de mainnet debe ser ≠ deployer.
+
+## Valores de pinning DERIVADOS (2026-08-19, on-chain)
+
+Listos para las env `OWNER_SAFE_*` del gate en el deploy canary (chain 84532):
+
+```bash
+OWNER_SAFE_ADDRESS=0x8BE60853F27b944e11486285d95c3e06596553b4
+OWNER_SAFE_CODEHASH=0xd7d408ebcd99b2b70be43e20253d6d92a8ea8fab29bd3be7f55b10032331fb4c
+OWNER_SAFE_SINGLETON=0x29fcB43b46531BcA003ddC8FCB67FFE91900C762
+```
+
+Verificado: `safe.codehash == keccak256(runtime)`, `slot0 == singleton`, y el
+singleton coincide con SafeL2 1.4.1+L2 del registro oficial safe-deployments.
+Son valores PÚBLICOS (dirección + codehash), no secretos.
