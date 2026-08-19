@@ -7,13 +7,15 @@ cerrar los 3 bloqueantes.** El canario Sepolia sigue su curso normal.
 ## Bloqueantes (los 3 NO-GO)
 
 - [~] **1. Safe 2-de-3 real** con pin de codehash/singleton, handoff ACEPTADO
-      de los 7 contratos, ownership verificable públicamente (link a
-      app.safe.global + direcciones + roles). Ver `safe-setup-runbook.md`.
-      **AVANCE 2026-08-19:** tubería lista — SAFE_API_KEY provisionada y
-      verificada contra el Transaction Service (Codex), batch builder
-      accept/pause/unpause listo, runbook vigente. Verificado vía API: NO
-      existe Safe aún en Base/Base Sepolia con las wallets conocidas como
-      owner — FALTA solo la decisión de Anthony: los 3 signers.
+      de los 7 contratos, ownership verificable públicamente. Ver
+      `safe-setup-runbook.md`, `safe-canary-state.md`, `mainnet-env-template.md`.
+      **AVANCE 2026-08-19c (grande):** Safe CANARY ya existe y pasa 6/6 del gate
+      (`0x8BE60853F27b944e11486285d95c3e06596553b4`, owners B/C/G, threshold 2,
+      singleton canónico). Pinning derivado on-chain (OWNER_SAFE_*). Handoff
+      canary preparado (batch + runbook). **Anthony aprobó REUSAR B/C/G para
+      mainnet.** Env de mainnet plantillada con owners/fees/quórum/flags.
+      FALTA (firma de Anthony, no del agente): (a) crear el Safe mainnet 8453
+      con B/C/G; (b) recorder key nueva ≠ deployer; (c) handoff canary (2 firmas).
 - [~] **2. Página pública de calls verificables + Challenge UI/docs.**
       Cada call: tx hash, prueba Pyth, símbolo, modo (VERIFIED/ATTESTED),
       resultado, link a Basescan. Botón "Retar este call" + guía paso a paso
