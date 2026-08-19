@@ -17,8 +17,14 @@ cerrar los 3 bloqueantes.** El canario Sepolia sigue su curso normal.
       **AVANCE 2026-08-19:** bobbyprotocol.xyz/protocol/calls LIVE (canary):
       ledger on-chain con tx hashes commit/resolve/challenge, evidencia Pyth
       (precio + publishTime), scorecard V2, guía de verificación y docs del
-      challenge permissionless. FALTA: challenge UI de un clic + el challenge
-      ejemplo (sale del ciclo canario 003).
+      challenge permissionless.
+      **AVANCE 2026-08-19b:** breach scanner de un clic LIVE en la misma página
+      ("retar" por call): busca el tick firmado de Pyth en el anchor elegido y
+      SIMULA challengeStopBreach vía eth_call — el veredicto lo da el contrato
+      (BREACH / NoBreach / ventana cerrada), sin wallet ni gas; en BREACH
+      entrega updateData + cast command listos para mandar la tx real.
+      FALTA: submit con wallet desde la página + el challenge ejemplo
+      documentado (sale del ciclo canario 003).
 - [ ] **3. Bug bounty con premio real publicado.** Premios por challenges
       válidos, bugs y reportes de frontrunning. Sin incentivo nadie audita
       gratis y "gran protocolo" suena a marketing.
