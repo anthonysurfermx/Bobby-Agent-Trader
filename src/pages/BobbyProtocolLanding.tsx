@@ -270,10 +270,10 @@ export default function BobbyProtocolLanding() {
   ];
 
   const navItems = [
+    ['Verified calls', '/protocol/calls'],
     ['The app', '#app'],
     ['How it works', '#how-it-works'],
     ['Capabilities', '#capabilities'],
-    ['For agents', '#for-agents'],
     ['What it does', '#what-it-does'],
   ];
 
@@ -921,7 +921,7 @@ export default function BobbyProtocolLanding() {
 
         <footer className="border-t border-white/10 bg-[#050505]">
           <div className="mx-auto flex max-w-7xl flex-col gap-12 px-5 py-16 lg:px-8">
-            <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+            <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
               <div>
                 <BrandMark />
                 <p className="mt-5 max-w-xs text-sm leading-6 text-white/40">
@@ -939,6 +939,12 @@ export default function BobbyProtocolLanding() {
                   ['Sandbox', '/protocol/sandbox'],
                   ['Heartbeat', '/protocol/heartbeat'],
                   ['Network', '/protocol/network'],
+                ]],
+                ['Proof', [
+                  ['Verified calls', '/protocol/calls'],
+                  ['Audit trail', '/protocol/audits'],
+                  ['Risk & claims', '/protocol/risk'],
+                  ['Bug bounty', '/protocol/bounty'],
                 ]],
                 ['Build', [
                   ['Docs', '/protocol/docs'],
