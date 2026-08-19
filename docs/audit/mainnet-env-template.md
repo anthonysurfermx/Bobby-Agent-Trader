@@ -16,15 +16,15 @@ BASE_RPC_URL=<FILL: RPC de Base mainnet con buen rate limit>
 
 # --- Safe 2-de-3 (owners REUSADOS del canary, aprobado por Anthony) --------
 OWNER_SAFE_OWNERS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7,0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843,0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514
-OWNER_SAFE_ADDRESS=<FILL: dirección del Safe mainnet tras crearlo>
+OWNER_SAFE_ADDRESS=0x8BE60853F27b944e11486285d95c3e06596553b4   # ✅ desplegado en Base 8453, 6/6 gate
 OWNER_SAFE_SINGLETON=0x29fcB43b46531BcA003ddC8FCB67FFE91900C762   # SafeL2 1.4.1 canónico (igual en 8453)
-OWNER_SAFE_CODEHASH=<FILL: derivar del proxy mainnet — mismo método que canary si es 1.4.1>
+OWNER_SAFE_CODEHASH=0xd7d408ebcd99b2b70be43e20253d6d92a8ea8fab29bd3be7f55b10032331fb4c   # ✅ derivado on-chain (mainnet)
 
 # --- Roles económicos ------------------------------------------------------
-DEPLOYER_ADDRESS=<FILL: EOA que firma el broadcast (Wallet A). NO debe ser owner del Safe>
-BASE_RECORDER_ADDRESS=<FILL: dirección de la recorder key NUEVA de mainnet>
-BOBBY_ADDRESS=<FILL: = BASE_RECORDER_ADDRESS (el que comitea)>
-BASE_RECORDER_KEY=<FILL EN VERCEL: recorder key NUEVA, ≠ deployer (hallazgo Kimi)>
+DEPLOYER_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # Wallet A. NO es owner del Safe (B/C/G) ✅
+BASE_RECORDER_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # Anthony: MISMA recorder (= deployer). Riesgo aceptado, ver nota.
+BOBBY_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # = recorder
+BASE_RECORDER_KEY=<EN VERCEL: la MISMA key del deployer/recorder (decisión Anthony 2026-08-19)>
 ALPHA_ADDRESS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7      # reusa owner B (o define aparte)
 RED_ADDRESS=0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843        # reusa owner C
 CIO_ADDRESS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7
@@ -70,3 +70,12 @@ PROTOCOL_AUTOMATION_SECRET=<FILL EN VERCEL>
 - Owners y quórum resueltos (arriba). Fees decididos. Flags decididos.
 - Pinning del método probado en el canary (`safe-canary-state.md`).
 - Batch de handoff y runbook (`safe-canary-handoff-runbook.md`) — mismo patrón para mainnet.
+
+## Decisión de Anthony 2026-08-19 — recorder key
+"Deja la misma": la recorder key de mainnet = la del deployer (`0x821990…7302`),
+NO se genera una nueva. Esto ANULA la recomendación de Kimi ("recorder ≠ deployer").
+Riesgo aceptado y consciente: si la deployer/recorder se compromete, el atacante
+puede comitear dentro de la ventana announce+10s (NO reescribe el pasado; el Safe
+puede pausar). Mitigación operativa: monitoreo de la key + pausa vía Safe 2-de-3.
+Se puede rotar después con `transferOwnership` no aplica al recorder — el recorder
+se cambia con `setRecorder`/redeploy según el contrato; documentar rotación aparte.
