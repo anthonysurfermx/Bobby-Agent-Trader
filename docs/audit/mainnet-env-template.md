@@ -25,13 +25,13 @@ DEPLOYER_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # Wallet A. NO es 
 BASE_RECORDER_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # Anthony: MISMA recorder (= deployer). Riesgo aceptado, ver nota.
 BOBBY_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # = recorder
 BASE_RECORDER_KEY=<EN VERCEL: la MISMA key del deployer/recorder (decisión Anthony 2026-08-19)>
-ALPHA_ADDRESS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7      # reusa owner B (o define aparte)
-RED_ADDRESS=0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843        # reusa owner C
-CIO_ADDRESS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7
-ARBITER_ADDRESS=0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843
-KEEPER_ADDRESS=<FILL: keeper mainnet, ≠ deployer y ≠ recorder>
-RESOLVER_ADDRESS=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854
-HARDNESS_SCORER_ADDRESS=<FILL: scorer mainnet>
+ALPHA_ADDRESS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7      # = Safe owner B (Anthony: usar wallets del Safe)
+RED_ADDRESS=0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843        # = Safe owner C
+CIO_ADDRESS=0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514        # = Safe owner G (distinto de ALPHA/RED)
+ARBITER_ADDRESS=0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26     # resolver-quorum #2 (arbiter)
+KEEPER_ADDRESS=0x01b2a464b6Dc0Dc57Fd912d877a7C05502cf3D2e     # keeper (canary)
+RESOLVER_ADDRESS=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854   # resolver-quorum #1 (4º rol distinto — su rol natural)
+HARDNESS_SCORER_ADDRESS=0x09a81ff70DdBC5E8b88F168B3eEF01384B6cDceA  # treasury (scorer)
 
 # --- Quórum HardnessRegistry (reusado del canary) --------------------------
 RESOLVER_ADDRESSES=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854,0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26,0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514
@@ -43,9 +43,9 @@ FEE_DEBATE_PER_AGENT_WEI=2500000000000
 MIN_BOUNTY_WEI=25000000000000
 ABSOLUTE_MIN_BOUNTY_WEI=2500000000000
 REGISTRATION_STAKE_WEI=250000000000000
-BASE_HARDNESS_SERVICE_PRICE_WEI=<FILL: precio del servicio hardness en wei>
+BASE_HARDNESS_SERVICE_PRICE_WEI=25000000000000   # = fee mcp call (reusado)
 ESCROW_MAX_SIZE_USD=10000                    # 10,000 USD (18dp: 1e22)
-TREASURY_ADDRESS_BASE=<FILL: treasury mainnet (puede ser el Safe)>
+TREASURY_ADDRESS_BASE=0x8BE60853F27b944e11486285d95c3e06596553b4   # = el Safe 2-de-3
 
 # --- Secretos (SOLO en Vercel Production) ----------------------------------
 PYTH_HERMES_API_KEY=<ya en Vercel Production>
@@ -79,3 +79,11 @@ puede comitear dentro de la ventana announce+10s (NO reescribe el pasado; el Saf
 puede pausar). Mitigación operativa: monitoreo de la key + pausa vía Safe 2-de-3.
 Se puede rotar después con `transferOwnership` no aplica al recorder — el recorder
 se cambia con `setRecorder`/redeploy según el contrato; documentar rotación aparte.
+
+## Roles económicos FINALES (Anthony 2026-08-19 — "usar wallets del Safe")
+Validado en el dry-run (`mainnet-dryrun-result.md`, ALL PASSED):
+- ALPHA = Safe owner B · RED = Safe owner C · CIO = Safe owner G
+- RESOLVER = quórum resolver #1 (`0xba14…`, 4º distinto — su rol natural)
+- ARBITER = quórum resolver #2 (`0xf6C9…`) · KEEPER = `0x01b2…` · SCORER = treasury
+- BOBBY (recorder) = `0x8219…` (= deployer, decisión previa)
+Los 4 roles del check (ALPHA/RED/CIO/RESOLVER) son pairwise-distinct ✅.
