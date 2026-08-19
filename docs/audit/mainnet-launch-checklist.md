@@ -75,3 +75,6 @@ cerrar los 3 bloqueantes.** El canario Sepolia sigue su curso normal.
 - Hermes API key centralizada = single point of liveness para VERIFIED
   commits → fallback plan (segunda key / current contract como respaldo ya
   aprobado en el gate).
+
+## Pre-flight verificado (2026-08-19)
+Set canónico de Pyth mainnet (8453) confirmado on-chain (`mainnet-preflight-checks.md`): UPGRADED+CURRENT existen y el gate pasará. Safe canary 6/6. Falta solo lo gated por firma/deploy.
