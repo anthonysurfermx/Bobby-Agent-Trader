@@ -95,9 +95,14 @@ final class BobbyViewModel: ObservableObject {
         }
     }
 
-    func ask(_ preset: String? = nil) {
+    /// Hands-free mode: true while the conversation is voice-driven — after
+    /// Bobby finishes speaking an answer, the mic reopens on its own.
+    @Published var handsFree = false
+
+    func ask(_ preset: String? = nil, fromVoice: Bool = false) {
         let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !thinking else { return }
+        handsFree = fromVoice
         input = ""
         voice.stop()
         messages.append(ChatMessage(fromBobby: false, text: q))
@@ -191,6 +196,15 @@ struct ContentView: View {
             }
         }
         .onAppear { vm.bootGreetingIfNeeded() }
+        // Hands-free loop: when a voice-driven answer finishes speaking, the
+        // mic reopens on its own so the follow-up flows like a conversation.
+        .onChange(of: vm.voice.speaking) { wasSpeaking, isSpeaking in
+            guard wasSpeaking, !isSpeaking, vm.phase == .complete else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(420))
+                relistenHandsFree()
+            }
+        }
         .sheet(isPresented: $showAuraCard) {
             AuraCardSheet(data: AuraCardData(
                 agentName: vm.profile.name,
@@ -692,7 +706,7 @@ struct ContentView: View {
 
             Button {
                 if vm.input.isEmpty && !vm.thinking { toggleSpeech() }
-                else { speech.finish(); vm.ask() }
+                else { speech.finish(); vm.ask(fromVoice: true) }
             } label: {
                 Image(systemName: vm.input.isEmpty ? (speech.listening ? "waveform" : "mic.fill") : "arrow.up")
                     .font(.system(size: 16, weight: .bold))
@@ -753,11 +767,26 @@ struct ContentView: View {
     private func toggleSpeech() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         vm.voice.stop()
+        if speech.listening { vm.handsFree = false } // manual stop exits the loop
         speech.toggle(
             onPartial: { vm.input = $0 },
             onFinal: { text in
                 vm.input = text
-                vm.ask()
+                vm.ask(fromVoice: true)
+            }
+        )
+    }
+
+    /// The hands-free re-arm: called when Bobby finishes speaking a verdict in
+    /// a voice-driven conversation. Same capture pipeline as toggleSpeech,
+    /// without the toggle semantics.
+    private func relistenHandsFree() {
+        guard vm.handsFree, vm.speakEnabled, !speech.listening, !vm.thinking else { return }
+        speech.toggle(
+            onPartial: { vm.input = $0 },
+            onFinal: { text in
+                vm.input = text
+                vm.ask(fromVoice: true)
             }
         )
     }
