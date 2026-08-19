@@ -31,7 +31,7 @@ CIO_ADDRESS=0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514        # = Safe owner G (
 ARBITER_ADDRESS=0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26     # resolver-quorum #2 (arbiter)
 KEEPER_ADDRESS=0x01b2a464b6Dc0Dc57Fd912d877a7C05502cf3D2e     # keeper (canary)
 RESOLVER_ADDRESS=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854   # resolver-quorum #1 (4º rol distinto — su rol natural)
-HARDNESS_SCORER_ADDRESS=0x09a81ff70DdBC5E8b88F168B3eEF01384B6cDceA  # treasury (scorer)
+# HARDNESS_SCORER_ADDRESS  → OMITIR: default = BOBBY (Wallet A). No requiere wallet extra.
 
 # --- Quórum HardnessRegistry (reusado del canary) --------------------------
 RESOLVER_ADDRESSES=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854,0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26,0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514
@@ -87,3 +87,19 @@ Validado en el dry-run (`mainnet-dryrun-result.md`, ALL PASSED):
 - ARBITER = quórum resolver #2 (`0xf6C9…`) · KEEPER = `0x01b2…` · SCORER = treasury
 - BOBBY (recorder) = `0x8219…` (= deployer, decisión previa)
 Los 4 roles del check (ALPHA/RED/CIO/RESOLVER) son pairwise-distinct ✅.
+
+## Mapa DEFINITIVO de wallets (Anthony 2026-08-19 — sus 7 wallets A–G)
+Validado en 2º dry-run con exactamente estas 7 → ALL PASSED:
+| Rol | Wallet |
+|---|---|
+| BOBBY (recorder) | A `0x821990…` |
+| ALPHA | B `0x566c…` |
+| RED | C `0x1ed2…` |
+| CIO | G `0x7b0c…` |
+| RESOLVER | E `0xba14…` |
+| ARBITER | F `0xf6c9…` |
+| KEEPER | D `0x01b2…` |
+| HARDNESS_SCORER | A (default bobby, omitir env) |
+| Quórum resolvers (RESOLVER_ADDRESSES) | E, F, G · threshold 2 |
+| Safe owners 2-de-3 | B, C, G |
+No falta ninguna wallet. Todas las restricciones del deploy se cumplen.
