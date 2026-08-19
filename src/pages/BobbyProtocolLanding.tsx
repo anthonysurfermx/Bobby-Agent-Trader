@@ -251,7 +251,7 @@ export default function BobbyProtocolLanding() {
         ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L · ${publicRecord.winRate?.toFixed(1)}%`
         : 'Waiting for the public resolution ledger.',
       proof: 'Resolution ledger',
-      href: '#what-it-does',
+      href: '/protocol/calls',
     },
     {
       label: 'Adversarial bounties',

@@ -72,6 +72,7 @@ const BobbyB2BPage = lazy(() => import('@/pages/BobbyB2BPage'));
 const BobbyMetacognitionPage = lazy(() => import('@/pages/BobbyMetacognitionPage'));
 const BobbySignalsPage = lazy(() => import('@/pages/BobbySignalsPage'));
 const BobbyDocsPage = lazy(() => import('@/pages/BobbyDocsPage'));
+const BobbyCallsPage = lazy(() => import('@/pages/BobbyCallsPage'));
 const BobbyArchitecturePage = lazy(() => import('@/pages/BobbyArchitecturePage'));
 const BobbyMarketplacePage = lazy(() => import('@/pages/BobbyMarketplacePage'));
 const BobbyHeartbeatPage = lazyWithRetry(() => import('@/pages/BobbyHeartbeatPage'), 'protocol-heartbeat');
@@ -301,6 +302,14 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyDocsPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'protocol/calls',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyCallsPage />
             </Suspense>
           ),
         },
