@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "chainId": "84532",
+  "createdAt": 1787000000000,
+  "meta": {
+    "name": "Bobby V2 canary — accept ownership",
+    "description": "Safe accepts ownership of BobbyTrackRecordV2 (Base Sepolia canary). Run AFTER the deployer transferOwnership(Safe).",
+    "txBuilderVersion": "1.16.5"
+  },
+  "transactions": [
+    {
+      "to": "0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    }
+  ]
+}
