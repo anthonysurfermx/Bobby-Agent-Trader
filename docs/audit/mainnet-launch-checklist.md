@@ -9,11 +9,16 @@ cerrar los 3 bloqueantes.** El canario Sepolia sigue su curso normal.
 - [ ] **1. Safe 2-de-3 real** con pin de codehash/singleton, handoff ACEPTADO
       de los 7 contratos, ownership verificable públicamente (link a
       app.safe.global + direcciones + roles). Ver `safe-setup-runbook.md`.
-- [ ] **2. Página pública de calls verificables + Challenge UI/docs.**
+- [~] **2. Página pública de calls verificables + Challenge UI/docs.**
       Cada call: tx hash, prueba Pyth, símbolo, modo (VERIFIED/ATTESTED),
       resultado, link a Basescan. Botón "Retar este call" + guía paso a paso
       + UN CHALLENGE EJEMPLO EXITOSO documentado. Si retar requiere `cast`,
       no cuenta como abierto.
+      **AVANCE 2026-08-19:** bobbyprotocol.xyz/protocol/calls LIVE (canary):
+      ledger on-chain con tx hashes commit/resolve/challenge, evidencia Pyth
+      (precio + publishTime), scorecard V2, guía de verificación y docs del
+      challenge permissionless. FALTA: challenge UI de un clic + el challenge
+      ejemplo (sale del ciclo canario 003).
 - [ ] **3. Bug bounty con premio real publicado.** Premios por challenges
       válidos, bugs y reportes de frontrunning. Sin incentivo nadie audita
       gratis y "gran protocolo" suena a marketing.
