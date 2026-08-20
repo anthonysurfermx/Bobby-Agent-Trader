@@ -54,7 +54,7 @@ const ROUNDS: Round[] = [
     date: '2026-08-18',
     verdict: 'GO (frozen)',
     finding: 'Final pass over the round-4 commit: storage-layout snapshot pinned in CI, artifact hashes recorded, and a proof-of-concept exercising the full VERIFIED path (announce → commit → resolve → challenge) against the REAL Pyth contract with signed Hermes updates.',
-    fix: 'Release frozen at 11532f4 · 208/208 tests · viaIR 23,499 bytes (1,077 margin). The Sepolia canary you can inspect on the calls page runs this exact build.',
+    fix: 'Release frozen at 11532f4 · 216/216 tests (forge test, 0 skipped) · viaIR 23,499 bytes (1,077 margin). The Sepolia canary you can inspect on the calls page runs this exact build.',
     href: `${GH}/feat/trackrecord-v2/docs/audit/trackrecord-v2-freeze.md`,
   },
 ];
