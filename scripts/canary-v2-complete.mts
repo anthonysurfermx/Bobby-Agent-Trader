@@ -119,8 +119,15 @@ async function scorecard(): Promise<string> {
 const mode = process.argv[2] || 'status';
 if (mode === 'status') { log(`@${TR} — ${await scorecard()}`); process.exit(0); }
 
-const key = process.env.BASE_SEPOLIA_RECORDER_KEY || envFromSnapshot('BASE_SEPOLIA_RECORDER_KEY');
-if (!key) { console.error('export BASE_SEPOLIA_RECORDER_KEY first'); process.exit(1); }
+const rawKey = (process.env.BASE_SEPOLIA_RECORDER_KEY || envFromSnapshot('BASE_SEPOLIA_RECORDER_KEY') || '').trim();
+// Normalize: tolerate a pasted key with/without 0x, stray whitespace/newline.
+const key = rawKey && /^(0x)?[0-9a-fA-F]{64}$/.test(rawKey) ? (rawKey.startsWith('0x') ? rawKey : '0x' + rawKey) : '';
+if (!key) {
+  log(`ABORT: recorder key inválida (len=${rawKey.length}). Debe ser 64 hex (con o sin 0x). Re-corre: read -s BASE_SEPOLIA_RECORDER_KEY ; export BASE_SEPOLIA_RECORDER_KEY`);
+  process.exit(1);
+}
+const recorderAddr = new Wallet(key).address;
+log(`recorder ${recorderAddr}`);
 const st = load();
 
 // --- Step 1: resolve the stranded 002/003 with their real result
