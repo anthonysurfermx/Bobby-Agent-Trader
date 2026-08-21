@@ -85,6 +85,13 @@ export function evaluateProtocolWriteSafety(
     if (env.PROTOCOL_WRITE_CHAIN_ID !== String(chain.id)) {
       blockers.push(`PROTOCOL_WRITE_CHAIN_ID must equal ${chain.id}`);
     }
+    // Codex mainnet review P0-2: the cutover freeze must gate EVERY
+    // Base-family writer through this shared guard — previously only
+    // bobby-cycle checked it, leaving xlayer-record able to sign while
+    // "frozen". Freeze wins over every other latch.
+    if (env.PROTOCOL_CUTOVER_FREEZE === 'true') {
+      blockers.push('PROTOCOL_CUTOVER_FREEZE is active — writes are frozen during the cutover');
+    }
   }
 
   if (chain.id === BASE_CHAIN_ID && env.VERCEL_ENV !== 'production') {

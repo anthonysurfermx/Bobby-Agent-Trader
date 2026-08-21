@@ -9,7 +9,7 @@ key nueva, y el deploy. Los secretos van en Vercel (Production), NUNCA a git.
 # --- Chain / cutover flags -------------------------------------------------
 PROTOCOL_CHAIN=base
 PROTOCOL_WRITE_CHAIN_ID=8453
-PROTOCOL_WRITES_ENABLED=true
+PROTOCOL_WRITES_ENABLED=false   # P0-2 Codex: FALSE durante deploy+handoff; se sube a true SOLO tras handoff+verificación+canario+soak
 PROTOCOL_CUTOVER_FREEZE=true          # se mantiene true hasta que pase el canario mainnet
 VERCEL_ENV=production
 BASE_RPC_URL=<FILL: RPC de Base mainnet con buen rate limit>
@@ -31,7 +31,7 @@ CIO_ADDRESS=0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514        # = Safe owner G (
 ARBITER_ADDRESS=0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26     # resolver-quorum #2 (arbiter)
 KEEPER_ADDRESS=0x01b2a464b6Dc0Dc57Fd912d877a7C05502cf3D2e     # keeper (canary)
 RESOLVER_ADDRESS=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854   # resolver-quorum #1 (4º rol distinto — su rol natural)
-# HARDNESS_SCORER_ADDRESS  → OMITIR: default = BOBBY (Wallet A). No requiere wallet extra.
+HARDNESS_SCORER_ADDRESS=<= BOBBY_ADDRESS — EXPLÍCITO (P1 Codex: el checker lo exige; no omitir)>
 
 # --- Quórum HardnessRegistry (reusado del canary) --------------------------
 RESOLVER_ADDRESSES=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854,0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26,0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514
@@ -44,7 +44,7 @@ MIN_BOUNTY_WEI=25000000000000
 ABSOLUTE_MIN_BOUNTY_WEI=2500000000000
 REGISTRATION_STAKE_WEI=250000000000000
 BASE_HARDNESS_SERVICE_PRICE_WEI=25000000000000   # = fee mcp call (reusado)
-ESCROW_MAX_SIZE_USD=10000                    # 10,000 USD (18dp: 1e22)
+ESCROW_MAX_SIZE_USD=10000000000000000000000   # $10,000 en 18dp (P0-1 Codex: el contrato compara RAW — '10000' crudo = 1e-14 USD y brickea el escrow)
 TREASURY_ADDRESS_BASE=0x8BE60853F27b944e11486285d95c3e06596553b4   # = el Safe 2-de-3
 
 # --- Secretos (SOLO en Vercel Production) ----------------------------------
@@ -109,3 +109,19 @@ No falta ninguna wallet. Todas las restricciones del deploy se cumplen.
 (la vieja 0x821990 quedó QUEMADA: se expuso en texto plano). Distinta de los 7
 roles y del Safe. Dry-run con ella como --sender + BOBBY_ADDRESS = ALL PASSED.
 Aquí se deposita el gas del deploy (~0.02 ETH en Base mainnet).
+
+## Correcciones del red-team de Codex (2026-08-21) — NO-GO hasta cerrar
+1. **P0-1 CERRADO**: ESCROW_MAX_SIZE_USD ahora en 18dp (1e22) y el readiness
+   checker valida escala (mínimo 1e18 = $1). El default del script ya era
+   correcto (10_000e18); el bug era el env crudo pisándolo.
+2. **P0-2 CERRADO (código)**: PROTOCOL_CUTOVER_FREEZE integrado al guard común
+   `evaluateProtocolWriteSafety` — bloquea TODOS los escritores Base-family,
+   no solo bobby-cycle. Writes=false durante deploy/handoff.
+3. **P1 llaves**: separar deployer (hardware temporal) y recorder (hot dedicada
+   de alcance mínimo, rotable después vía setBobby() desde el Safe). La 0xC3F8
+   con nonce 37 NO es virgen — decisión de Anthony pendiente: ¿deployer hardware
+   nuevo + recorder hot nueva?
+4. **P1 SHA operativo**: congelar UN SHA de lanzamiento (contratos 11532f4 +
+   retry del recorder + snapshot) y demostrar bytecode idéntico.
+5. **P1 verificación**: runtime-bytecode de los 7 vs artefacto congelado
+   (con immutables) + registro de codehashes ANTES de abrir producción.

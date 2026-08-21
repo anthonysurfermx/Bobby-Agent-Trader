@@ -190,7 +190,12 @@ for (const name of [
 requireEnv('ESCROW_MAX_SIZE_USD', (value) => {
   if (!/^[1-9][0-9]*$/.test(value)) return false;
   try {
-    return BigInt(value) <= 100_000_000n * 10n ** 18n;
+    // Codex mainnet review P0-1: the contract compares intent.sizeUsd against
+    // this value RAW in 18-dp USD. A human-scale value like "10000" means
+    // ~1e-14 USD and bricks every legitimate intent with BadSize. Enforce the
+    // scale: minimum $1 (1e18), maximum $100M, both in 18-dp encoding.
+    const v = BigInt(value);
+    return v >= 10n ** 18n && v <= 100_000_000n * 10n ** 18n;
   } catch {
     return false;
   }
