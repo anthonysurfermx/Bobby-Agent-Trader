@@ -69,7 +69,10 @@ const reader = new Contract(TR, [
   'function getCoverage(uint8) view returns (uint256,uint256,uint256)',
 ], prov);
 
-const CHALLENGE = { id: 'canary-v2-005-challenge', symbol: 'BTC', stopPct: 0.9996, targetPct: 1.02 }; // stop −4 bps
+// stop −20 bps: wide enough that the ~15-25s anchor drift never pushes it above
+// the ORACLE entry (that was the −4bps InvalidDirection), tight enough that
+// BTC's normal intra-hour chop breaches it within the 4h watch window.
+const CHALLENGE = { id: 'canary-v2-005-challenge', symbol: 'BTC', stopPct: 0.998, targetPct: 1.02 }; // stop −20 bps
 const hashOf = (id: string) => keccak256(toUtf8Bytes(id));
 const sleep = (s: number) => new Promise((r) => setTimeout(r, s * 1000));
 const POLL = 20;
