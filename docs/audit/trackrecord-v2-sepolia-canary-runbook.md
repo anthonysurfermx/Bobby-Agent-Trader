@@ -5,7 +5,7 @@ correr un ciclo canario que ejercite la ruta VERIFIED (commit→resolve→challe
 con evidencia Pyth REAL, y dejarlo en soak 24h. Es el prerrequisito del NO-GO #3
 de mainnet ("redeploy Sepolia + canario 24h").
 
-**Estado del código:** `feat/trackrecord-v2` — 208/208 tests, viaIR 23,499 B
+**Estado del código:** `feat/trackrecord-v2` — 216/216 tests (forge test), viaIR 23,499 B
 (margen 1,077), P1 externo cerrado, layout gate en CI. Dry-run V2 en Sepolia:
 `post-deploy assertions: ALL PASSED`.
 

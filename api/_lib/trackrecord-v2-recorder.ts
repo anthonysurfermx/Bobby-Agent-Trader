@@ -169,8 +169,20 @@ export async function commitV2(
       to: contract, data: annData, gasLimit: (annGas * 13n) / 10n, nonce: nonce0,
     });
     const annReceipt = await annTx.wait();
-    const annBlock = await wallet.provider!.getBlock(annReceipt!.blockNumber);
-    entryAt = Number(annBlock!.timestamp) + MIN_ENTRY_DELAY_SEC; // derived anchor
+    if (!annReceipt) throw new Error(`announce transaction ${annTx.hash} was not mined`);
+    // Some public RPCs briefly return null for a block immediately after they
+    // return its receipt. The receipt is authoritative that the announce
+    // landed; retry the block lookup instead of dereferencing null and leaving
+    // a valid on-chain announcement stranded.
+    let annBlock: ethers.Block | null = null;
+    for (let attempt = 0; attempt < 10 && !annBlock; attempt++) {
+      annBlock = await wallet.provider!.getBlock(annReceipt.blockNumber);
+      if (!annBlock) await sleep(500);
+    }
+    if (!annBlock) {
+      throw new Error(`announce transaction ${annTx.hash} mined, but block ${annReceipt.blockNumber} was unavailable after retries`);
+    }
+    entryAt = Number(annBlock.timestamp) + MIN_ENTRY_DELAY_SEC; // derived anchor
   }
 
   if (mode === PriceMode.VERIFIED && feedId) {
