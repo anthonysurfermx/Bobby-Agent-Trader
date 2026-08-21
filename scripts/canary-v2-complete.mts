@@ -27,7 +27,9 @@ import { Contract, Interface, JsonRpcProvider, Network, Wallet, keccak256, toUtf
 
 process.env.PROTOCOL_CHAIN = 'base-sepolia';
 process.env.BASE_SEPOLIA_TRACK_RECORD_ADDRESS ||= '0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC';
-process.env.BASE_SEPOLIA_RPC_URL ||= 'https://base-sepolia.drpc.org';
+// publicnode was reliable for the original 002/003/004 commits; drpc raced on
+// getBlock (null block right after announce). Use publicnode for the recorder.
+process.env.BASE_SEPOLIA_RPC_URL ||= 'https://base-sepolia-rpc.publicnode.com';
 
 const MAIN_ENV = '/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.env.vercel.local';
 function envFromSnapshot(name: string): string | undefined {
