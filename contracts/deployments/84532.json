@@ -1,16 +1,19 @@
 {
   "addresses": {
-    "adversarialBounties": "0x3Cd9A8a9F6a60853CD60E72A82d4648317280137",
-    "agentEconomyV2": "0x96F64f997C5e3df922f9811E07991Ad9a77b382F",
-    "agentRegistry": "0xfea7046CEc9411c688F4f64F4a8A57C60Bd37C6B",
-    "convictionOracle": "0xEc423Bb7649757D09cb5E8D579D3B8ACbeB37564",
-    "hardnessRegistry": "0x9DE45730Ac13aBE5Ff36d2bAbFAcC0Eb1F656C06",
-    "intentEscrow": "0x43e926DB0D3A16133Bc326567ce3E1a72eA8320F",
-    "trackRecord": "0xE23c8E749BeEa116734d449F3F4631E0DaBf8Fe0"
+    "adversarialBounties": "0x859c257bCE0bf1f7106777A072B1CeFc448A3D57",
+    "agentEconomyV2": "0x9441915C259230c51aDf65AaB17D4E0B2d2BF4f9",
+    "agentRegistry": "0x5Be11E58AaBcb4ABc0AC466548d4867408ca962B",
+    "convictionOracle": "0x066a2Ffd0de4B0bB0fD4b8F2cE1D33Ddc9e232ED",
+    "hardnessRegistry": "0x9F41F87Ebe876EfC0b56bE16C840e2EF3D4D2846",
+    "intentEscrow": "0xCCbD1766920431B366E60729C7fA76DDF4f57068",
+    "trackRecord": "0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC"
   },
   "chainId": 84532,
-  "deployBlock": 45364125,
+  "deployBlock": 45644207,
   "deployer": "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
+  "expectedOwner": "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
+  "expectedOwnerCodehash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "expectedOwnerSingleton": "0x0000000000000000000000000000000000000000",
   "fees": {
     "absoluteMinBountyWei": 2500000000000,
     "debateFeePerAgentWei": 2500000000000,
@@ -37,79 +40,165 @@
     "red": "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
     "resolver": "0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854"
   },
-  "deployBlockNote": "real mined block from receipts (earlier value 45364116 was the simulation phase)",
   "transactions": [
     {
-      "hash": "0x63ae9b01988e1a9e8ea0505b3602cbabcb47e2e4a9d95af38b9db5ca74b74e01",
-      "block": 45364125,
-      "contractName": "BobbyTrackRecord",
-      "contractAddress": "0xe23c8e749beea116734d449f3f4631e0dabf8fe0",
+      "hash": "0xce0b92bafec6218ab2e4d83899989eba3306dc605fc9a08cfa74731026c71d41",
+      "block": 45644207,
+      "blockHash": "0xbb07a362b63a043757e371fd493c25dc0163135428705e38a3b49be1a306fe9a",
+      "transactionType": "CREATE",
+      "contractName": "BobbyTrackRecordV2",
+      "contractAddress": "0x4bfef46d920fd67c68046901f591fad0a2f7cadc",
+      "from": "0x821990bda0baa05f96506fd73ef439d0c2f17302",
+      "to": null,
       "function": null,
-      "gasUsed": 2755607,
+      "arguments": [
+        "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
+        "(60, 120, 600, 604800, 100, 100, 50)",
+        "[0xA2aa501b19aff244D90cc15a4Cf739D2725B5729]",
+        "[BTC, ETH, SOL]",
+        "[0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43, 0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace, 0xef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d]"
+      ],
+      "inputHash": "0x09ae5f55133920d7a8ab2b4310a24c58baf29222b2158214b7b83d8178becc01",
+      "gasUsed": 5580100,
       "status": "0x1"
     },
     {
-      "hash": "0x36f0d91bebd77c7b4cebca237d4f5e9ae9d09eeb17b50a565e2909525e103363",
-      "block": 45364125,
+      "hash": "0xdef04cb14e42cbd896180340824ab0845468f22f5d69857eac1a18f6933b800f",
+      "block": 45644207,
+      "blockHash": "0xbb07a362b63a043757e371fd493c25dc0163135428705e38a3b49be1a306fe9a",
+      "transactionType": "CREATE",
       "contractName": "BobbyConvictionOracle",
-      "contractAddress": "0xec423bb7649757d09cb5e8d579d3b8acbeb37564",
+      "contractAddress": "0x066a2ffd0de4b0bb0fd4b8f2ce1d33ddc9e232ed",
+      "from": "0x821990bda0baa05f96506fd73ef439d0c2f17302",
+      "to": null,
       "function": null,
-      "gasUsed": 1636905,
+      "arguments": [
+        "0x821990Bda0BAa05F96506fd73ef439D0C2f17302"
+      ],
+      "inputHash": "0xfa736caa99688a983f9b1670f51449980d2d29eac7fec847db6b43f9ec92db27",
+      "gasUsed": 1414912,
       "status": "0x1"
     },
     {
-      "hash": "0x4be97bcce77c9dafc4d975f1304785280dcece5dd59c019676d9ee83bbe11ceb",
-      "block": 45364125,
+      "hash": "0x77be1f9d27eb77590cb55a5d0205aff768bc59d7d3c1f4755058d1525f8d5353",
+      "block": 45644207,
+      "blockHash": "0xbb07a362b63a043757e371fd493c25dc0163135428705e38a3b49be1a306fe9a",
+      "transactionType": "CREATE",
       "contractName": "BobbyAgentEconomyV2",
-      "contractAddress": "0x96f64f997c5e3df922f9811e07991ad9a77b382f",
+      "contractAddress": "0x9441915c259230c51adf65aab17d4e0b2d2bf4f9",
+      "from": "0x821990bda0baa05f96506fd73ef439d0c2f17302",
+      "to": null,
       "function": null,
-      "gasUsed": 930873,
+      "arguments": [
+        "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
+        "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
+        "0x566C9c59D0FF98387BD098e66B7389A43a4D27D7",
+        "25000000000000",
+        "2500000000000"
+      ],
+      "inputHash": "0x7156f02d0a1df9cb9d458fc1a86fcfa6c8e8d2066f1f79f37566426f26f6cd79",
+      "gasUsed": 848130,
       "status": "0x1"
     },
     {
-      "hash": "0x9a89af9dfd7615159aa2a303f18d905bc4d55fec07cd07b242e9f9b41dd36a9f",
-      "block": 45364125,
+      "hash": "0xa6eb85ec4794d48075e6394b728341e830b6822a68151a6092a929b8d84862c6",
+      "block": 45644207,
+      "blockHash": "0xbb07a362b63a043757e371fd493c25dc0163135428705e38a3b49be1a306fe9a",
+      "transactionType": "CREATE",
       "contractName": "BobbyAdversarialBounties",
-      "contractAddress": "0x3cd9a8a9f6a60853cd60e72a82d4648317280137",
+      "contractAddress": "0x859c257bce0bf1f7106777a072b1cefc448a3d57",
+      "from": "0x821990bda0baa05f96506fd73ef439d0c2f17302",
+      "to": null,
       "function": null,
-      "gasUsed": 2064685,
+      "arguments": [
+        "0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854",
+        "2500000000000",
+        "25000000000000"
+      ],
+      "inputHash": "0x88a3d4519c800f46cb88a5cb68b9cbebc3ad4e03d3bb6b3beb873171abf25778",
+      "gasUsed": 1711194,
       "status": "0x1"
     },
     {
-      "hash": "0x0c16871510189fc4f35021d302fc0685e3856155f2f48cdafa08f55c79d0ca93",
-      "block": 45364125,
+      "hash": "0x327750845d906b0d0cb6a048bd7a80186f950a438a029f1389106b5348bc63b7",
+      "block": 45644207,
+      "blockHash": "0xbb07a362b63a043757e371fd493c25dc0163135428705e38a3b49be1a306fe9a",
+      "transactionType": "CREATE",
       "contractName": "HardnessRegistry",
-      "contractAddress": "0x9de45730ac13abe5ff36d2babfacc0eb1f656c06",
+      "contractAddress": "0x9f41f87ebe876efc0b56be16c840e2ef3d4d2846",
+      "from": "0x821990bda0baa05f96506fd73ef439d0c2f17302",
+      "to": null,
       "function": null,
-      "gasUsed": 5232687,
+      "arguments": [
+        "[0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854, 0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26, 0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514]",
+        "2",
+        "2500000000000",
+        "250000000000000",
+        "25000000000000"
+      ],
+      "inputHash": "0x90b9b6fff9b7e7baebc469ce95c59325b585d070908885d85df0b712f2e72c7e",
+      "gasUsed": 3946707,
       "status": "0x1"
     },
     {
-      "hash": "0xade59d5d216dee119c05422e5da34237e7ef6242675cd1c688594e3c3bd7bb94",
-      "block": 45364125,
+      "hash": "0x0114af1aa18f7c3ddcd20a1682fea1e112626e6b00017bd1b7ac7d418e9e51b1",
+      "block": 45644207,
+      "blockHash": "0xbb07a362b63a043757e371fd493c25dc0163135428705e38a3b49be1a306fe9a",
+      "transactionType": "CREATE",
       "contractName": "BobbyAgentRegistry",
-      "contractAddress": "0xfea7046cec9411c688f4f64f4a8a57c60bd37c6b",
+      "contractAddress": "0x5be11e58aabcb4abc0ac466548d4867408ca962b",
+      "from": "0x821990bda0baa05f96506fd73ef439d0c2f17302",
+      "to": null,
       "function": null,
-      "gasUsed": 1229455,
+      "arguments": [],
+      "inputHash": "0x56fd5be2f0e548f0a72ed115d491c42fd8b8b048857b9fe4f6b6a98e4690ffb2",
+      "gasUsed": 1131237,
       "status": "0x1"
     },
     {
-      "hash": "0xcf9e2986bb3a00f6b69d38d73c78a3365e77c3779ed8ce0fdd4dd75feb0b2256",
-      "block": 45364125,
+      "hash": "0x8db093ea18af8293eadf9a0e44a03a53bd6db84b61aefdd31335a3f397ed6226",
+      "block": 45644207,
+      "blockHash": "0xbb07a362b63a043757e371fd493c25dc0163135428705e38a3b49be1a306fe9a",
+      "transactionType": "CREATE",
       "contractName": "BobbyIntentEscrow",
-      "contractAddress": "0x43e926db0d3a16133bc326567ce3e1a72ea8320f",
+      "contractAddress": "0xccbd1766920431b366e60729c7fa76ddf4f57068",
+      "from": "0x821990bda0baa05f96506fd73ef439d0c2f17302",
+      "to": null,
       "function": null,
-      "gasUsed": 1687553,
+      "arguments": [
+        "84532",
+        "10000000000000000000000",
+        "0x821990Bda0BAa05F96506fd73ef439D0C2f17302",
+        "0x566C9c59D0FF98387BD098e66B7389A43a4D27D7",
+        "0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843",
+        "0x01b2a464b6Dc0Dc57Fd912d877a7C05502cf3D2e",
+        "0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854"
+      ],
+      "inputHash": "0xb533ea07097a5aff8481ea02205753ad4b898c1c7585abe6d1fc0f83cead81e2",
+      "gasUsed": 1428776,
       "status": "0x1"
     },
     {
-      "hash": "0x99c50d26d13513b55e7ae46165804de65d5dc58bede6d280dd40272167103b18",
-      "block": 45364125,
+      "hash": "0x4172e2aa21a7f3608617d21c3966dfc6d048b7f02ca735055a49d83b3be2847b",
+      "block": 45644207,
+      "blockHash": "0xbb07a362b63a043757e371fd493c25dc0163135428705e38a3b49be1a306fe9a",
+      "transactionType": "CALL",
       "contractName": "HardnessRegistry",
-      "contractAddress": "0x9de45730ac13abe5ff36d2babfacc0eb1f656c06",
+      "contractAddress": null,
+      "from": "0x821990bda0baa05f96506fd73ef439d0c2f17302",
+      "to": "0x9f41f87ebe876efc0b56be16c840e2ef3d4d2846",
       "function": "setHardnessScorer(address)",
-      "gasUsed": 46898,
+      "arguments": [
+        "0x821990Bda0BAa05F96506fd73ef439D0C2f17302"
+      ],
+      "inputHash": "0x008acede8ba15bb5436756be39e6f2625c09435d7a204083bd8336f7774d8465",
+      "gasUsed": 46800,
       "status": "0x1"
     }
-  ]
+  ],
+  "receiptEvidence": {
+    "source": "contracts/broadcast/DeployBase.s.sol/84532/run-latest.json",
+    "chainId": 84532,
+    "receiptCount": 8
+  }
 }

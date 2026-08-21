@@ -213,7 +213,9 @@ if (!key) { console.error('recorder key not found (env or snapshot)'); process.e
 const recorderAddr = new Wallet(key).address;
 const bal = await provider.getBalance(recorderAddr);
 log(`recorder ${recorderAddr} balance ${formatEther(bal)} ETH (Sepolia)`);
-if (bal < 2_000_000_000_000_000n) { log('ABORT: recorder below 0.002 ETH — top up Sepolia gas first'); process.exit(1); }
+// Base Sepolia gas runs ~0.006 gwei; the full matrix (~7 tx) costs <0.00004 ETH.
+// 0.0003 ETH is ~8x that with real margin — the old 0.002 floor was far too high.
+if (bal < 300_000_000_000_000n) { log('ABORT: recorder below 0.0003 ETH — top up Sepolia gas first'); process.exit(1); }
 
 const state = loadState();
 await ensureCommitted(key, state);
