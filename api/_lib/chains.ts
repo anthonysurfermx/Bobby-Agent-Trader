@@ -50,18 +50,17 @@ export interface ChainConfig {
   contracts: ContractSet;
 }
 
-// Deployed addresses. Base entries stay empty until the audited redeploy lands —
-// an empty string is a loud failure, which is what we want versus silently
-// reading an X Layer contract from a Base RPC.
-const BASE_CONTRACTS: ContractSet = {
+// Audited Base mainnet deployment. Environment overrides remain available for
+// controlled rehearsal/testing, but production has truthful public fallbacks.
+export const BASE_CONTRACTS: ContractSet = {
   treasury: process.env.TREASURY_ADDRESS_BASE || '',
-  agentEconomy: process.env.BASE_AGENT_ECONOMY_ADDRESS || '',
-  adversarialBounties: process.env.BASE_BOUNTIES_ADDRESS || '',
-  trackRecord: process.env.BASE_TRACK_RECORD_ADDRESS || '',
-  hardnessRegistry: process.env.BASE_HARDNESS_REGISTRY_ADDRESS || '',
-  convictionOracle: process.env.BASE_ORACLE_ADDRESS || '',
-  agentRegistry: process.env.BASE_AGENT_REGISTRY_ADDRESS || '',
-  intentEscrow: process.env.BASE_INTENT_ESCROW_ADDRESS || '',
+  agentEconomy: process.env.BASE_AGENT_ECONOMY_ADDRESS || '0x009de59e0e7f4109fF9E89E744A4412082AD2aaF',
+  adversarialBounties: process.env.BASE_BOUNTIES_ADDRESS || '0x73fD6c77ff0403Ea071e8721c76f88cE34ac9968',
+  trackRecord: process.env.BASE_TRACK_RECORD_ADDRESS || '0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321',
+  hardnessRegistry: process.env.BASE_HARDNESS_REGISTRY_ADDRESS || '0x15800F40b8988765AD3F46030B73bC8109A793f5',
+  convictionOracle: process.env.BASE_ORACLE_ADDRESS || '0x27f51D711171c830dd796D4B03914a8C6c46D75e',
+  agentRegistry: process.env.BASE_AGENT_REGISTRY_ADDRESS || '0xB3137D7afE26fbdBcAA95573C7A20be896efde93',
+  intentEscrow: process.env.BASE_INTENT_ESCROW_ADDRESS || '0x5D9d534419421B7Edfe9Bb509E4c48512256BC97',
 };
 
 // Testnet canary — its OWN env vars so Sepolia and mainnet addresses can never
@@ -100,7 +99,7 @@ export const BASE: ChainConfig = {
   explorerApiUrl: 'https://api.basescan.org/api',
   nativeSymbol: 'ETH',
   nativeDecimals: 18,
-  protocolDeploymentBlock: Number(process.env.BASE_PROTOCOL_DEPLOYMENT_BLOCK || 0),
+  protocolDeploymentBlock: Number(process.env.BASE_PROTOCOL_DEPLOYMENT_BLOCK || 50_275_770),
   // D-3: on-chain fees are native ETH (resized per deploy); USDC is ONLY the
   // x402/off-chain settlement rail. Keep these two rails separate forever.
   onchainFeeToken: 'native',

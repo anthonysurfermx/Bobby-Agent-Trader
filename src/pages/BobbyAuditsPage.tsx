@@ -80,6 +80,11 @@ export default function BobbyAuditsPage() {
           fix was re-audited. Four P1s found and killed — being wrong in public is part of the design.
         </p>
 
+        <div className="mt-7 rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/10 p-5">
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Release status · Base mainnet</div>
+          <p className="mt-2 text-sm leading-6 text-white/65">The audited seven-contract release is deployed on chain 8453. Ownership acceptance, runtime verification, mainnet canary and soak remain mandatory before public writes.</p>
+        </div>
+
         <div className="mt-10 space-y-5">
           {ROUNDS.map((r) => (
             <div key={r.name} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">

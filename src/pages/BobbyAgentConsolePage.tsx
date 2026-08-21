@@ -137,16 +137,18 @@ export default function BobbyAgentConsolePage() {
         {/* Contracts */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
           className="rounded-2xl border border-white/10 bg-white/[0.04] p-6">
-          <h3 className="mb-4 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#7da6ff]">Infrastructure on X Layer (196)</h3>
+          <h3 className="mb-4 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#7da6ff]">Proof infrastructure on Base (8453) · writes frozen</h3>
           <div className="space-y-2 font-mono text-[11px]">
             {[
-              { name: 'HardnessRegistry V1', addr: '0xD89c1721CD760984a31dE0325fD96cD27bB31040' },
-              { name: 'AgentEconomyV2', addr: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871' },
-              { name: 'ConvictionOracle', addr: '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A' },
-              { name: 'TrackRecord', addr: '0xF841b428E6d743187D7BE2242eccC1078fdE2395' },
-              { name: 'AdversarialBounties', addr: '0xa8005ab465a0e02cb14824cd0e7630391fba673d' },
+              { name: 'HardnessRegistry', addr: '0x15800F40b8988765AD3F46030B73bC8109A793f5' },
+              { name: 'AgentEconomyV2', addr: '0x009de59e0e7f4109fF9E89E744A4412082AD2aaF' },
+              { name: 'ConvictionOracle', addr: '0x27f51D711171c830dd796D4B03914a8C6c46D75e' },
+              { name: 'TrackRecord V2', addr: '0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321' },
+              { name: 'AdversarialBounties', addr: '0x73fD6c77ff0403Ea071e8721c76f88cE34ac9968' },
+              { name: 'AgentRegistry', addr: '0xB3137D7afE26fbdBcAA95573C7A20be896efde93' },
+              { name: 'IntentEscrow', addr: '0x5D9d534419421B7Edfe9Bb509E4c48512256BC97' },
             ].map(c => (
-              <a key={c.addr} href={`https://www.oklink.com/xlayer/address/${c.addr}`} target="_blank" rel="noopener noreferrer"
+              <a key={c.addr} href={`https://basescan.org/address/${c.addr}`} target="_blank" rel="noopener noreferrer"
                 className="group flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 transition hover:border-[#0052ff]/50 hover:bg-white/[0.05]">
                 <div className="flex items-center gap-2.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#0052ff] shadow-[0_0_10px_rgba(0,82,255,.8)]" />
@@ -160,7 +162,7 @@ export default function BobbyAgentConsolePage() {
 
         {/* Footer */}
         <div className="border-t border-white/10 pt-6 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-white/25">
-          Bobby Protocol — Financial Orchestration Infrastructure for AI Agents · X Layer
+          Bobby Protocol — Accountability infrastructure for autonomous finance · Base
         </div>
       </div>
     </div>

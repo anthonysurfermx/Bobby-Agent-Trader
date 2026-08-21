@@ -6,6 +6,7 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ArrowUpRight, ShieldCheck, Swords } from 'lucide-react';
 import { useAccount, useSwitchChain, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
+import { BOBBY_BASE_MAINNET, bobbyBaseAddressUrl } from '@/config/chains';
 
 const BASE_SEPOLIA_ID = 84532;
 const PYTH_FEE_BUFFER = 20_000_000_000_000n; // contract refunds the excess
@@ -194,6 +195,17 @@ export default function BobbyCallsPage() {
           ATTESTED (self-reported) are separate ledgers that never mix.
         </p>
 
+        <a
+          href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.trackRecord)}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-7 block rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/10 p-5 transition hover:border-[#7da6ff]"
+        >
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Base mainnet · chain 8453</div>
+          <p className="mt-2 text-sm leading-6 text-white/65">The seven-contract proof layer is deployed. This table intentionally preserves the completed Sepolia canary evidence while mainnet writes remain frozen for Safe acceptance, verification and soak.</p>
+          <div className="mt-3 font-mono text-[11px] text-white/45">TrackRecord V2 · {BOBBY_BASE_MAINNET.contracts.trackRecord}</div>
+        </a>
+
         <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
             ['Verified win rate', sc && sc.verified.decided > 0 ? `${(sc.verified.winRateBps / 100).toFixed(1)}% (n=${sc.verified.decided})` : '—'],
@@ -304,7 +316,7 @@ export default function BobbyCallsPage() {
             >
               Open contract on Basescan <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
-            <p className="mt-3 text-xs text-white/35">One-click challenge UI is on the mainnet checklist — today the path is the contract itself.</p>
+            <p className="mt-3 text-xs text-white/35">This challenge interface targets the completed Base Sepolia canary. Mainnet challenges unlock with production writes.</p>
           </div>
         </div>
 
@@ -406,7 +418,7 @@ export default function BobbyCallsPage() {
           <a href={`${data?.explorer || 'https://sepolia.basescan.org'}/address/${data?.contract || ''}`} target="_blank" rel="noreferrer" className="text-white/50 underline-offset-2 hover:underline">
             {data?.contract || '…'}
           </a>{' '}
-          on {data?.chain.name || 'Base Sepolia'} · canary deployment — mainnet ships behind a 2-of-3 Safe.
+          on {data?.chain.name || 'Base Sepolia'} · preserved canary evidence — Base mainnet contracts are deployed with writes frozen during controlled activation.
           Analysis, not investment advice · <a href="/protocol/risk" className="text-white/50 underline-offset-2 hover:underline">risk & claims</a>
         </p>
       </div>

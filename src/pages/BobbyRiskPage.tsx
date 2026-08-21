@@ -8,7 +8,7 @@ const TRUST_ROWS: Array<[string, string, string]> = [
   [
     'Recorder key is compromised',
     'Attacker could issue bad commits within the announce window; cannot rewrite past records.',
-    'Key monitoring and rotation runbook; contracts owned by a 2-of-3 Safe; pause path via Safe.',
+    'Key monitoring and rotation runbook; ownership handoff is pending to the published 2-of-3 Safe; writes stay frozen until acceptance.',
   ],
   [
     'Hermes / Pyth is down',

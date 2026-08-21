@@ -16,6 +16,7 @@ import {
   Twitter,
   X,
 } from 'lucide-react';
+import { BOBBY_BASE_MAINNET, bobbyBaseAddressUrl } from '@/config/chains';
 
 // Live protocol telemetry — same endpoint the landing consumes. The page keeps
 // working as an architecture overview when RPC data is unavailable.
@@ -80,10 +81,11 @@ function SectionMedia({ name, className = '' }: { name: string; className?: stri
   );
 }
 
-type Status = 'live' | 'canary' | 'spec' | 'gated';
+type Status = 'live' | 'deployed' | 'canary' | 'spec' | 'gated';
 
 const STATUS_STYLES: Record<Status, { dot: string; text: string; label: string }> = {
   live: { dot: 'bg-emerald-400', text: 'text-emerald-300', label: 'LIVE' },
+  deployed: { dot: 'bg-[#0052ff]', text: 'text-[#7da6ff]', label: 'DEPLOYED' },
   canary: { dot: 'bg-amber-400', text: 'text-amber-300', label: 'CANARY' },
   spec: { dot: 'bg-sky-400', text: 'text-sky-300', label: 'SPEC' },
   gated: { dot: 'bg-rose-400', text: 'text-rose-300', label: 'GATED' },
@@ -157,8 +159,8 @@ const LAYERS = [
     text: 'Every decision committed before its outcome.',
     items: [
       ['X Layer · chain 196 — legacy archive', 'live'],
-      ['Base Sepolia · 84532 — V2 oracle canary', 'canary'],
-      ['Base mainnet · 8453 — behind hard gates', 'gated'],
+      ['Base Sepolia · 84532 — completed V2 canary', 'canary'],
+      ['Base mainnet · 8453 — deployed · writes frozen', 'deployed'],
     ] as const,
   },
   {
@@ -184,8 +186,6 @@ const LAYERS = [
   },
 ] as const;
 
-const BASE_SEPOLIA_TRACK_RECORD = '0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC';
-
 const CONTRACT_ROLES = [
   ['BobbyTrackRecord V2', 'trackRecord', 'V2 anchors entry in the future and verifies entry/exit with Pyth; verified and attested ledgers never mix.'],
   ['BobbyConvictionOracle', 'convictionOracle', 'Conviction commitments published before execution. The no-take-backs ledger.'],
@@ -210,11 +210,11 @@ const CHAIN_STAGES = [
     text: 'TrackRecord V2 canary: seven verified contracts, a real Pyth/Hermes commit→resolve cycle and a 2-of-3 Safe rehearsal. Five audit rounds closed four P1 findings.',
   },
   {
-    status: 'gated' as Status,
+    status: 'deployed' as Status,
     name: 'Base mainnet',
     chainId: '8453',
-    text: 'Deliberately NO-GO until every gate closes. Shipping fast is easy; earning mainnet is the point.',
-    gates: ['24–48h canary soak — clean scorecard', 'Base mainnet Safe 2-of-3 — create, audit and pin', 'Production environment — predeploy checker green', 'Signed deploy + seven Safe ownership handoffs'],
+    text: 'Seven audited contracts are deployed. Public writes stay frozen until ownership, verification, canary and soak gates close.',
+    gates: ['Seven contracts deployed at block 50,275,770', 'Safe 2-of-3 pinned — ownership acceptance pending', 'Runtime verification + mainnet canary', '24–48h clean soak before writes'],
   },
 ];
 
@@ -262,7 +262,6 @@ export default function BobbyArchitecturePage() {
 
   const record = stats?.onchainRecord;
   const publicRecord = stats?.debateActivity;
-  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://basescan.org'}/address`;
 
   // Audit Base r4 rule, same as the landing: a rate over a tiny sample reads as
   // skill when it is noise — below the sample floor we show raw counts. All
@@ -461,14 +460,9 @@ export default function BobbyArchitecturePage() {
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {CONTRACT_ROLES.map(([name, key, description], index) => {
-                const isBaseV2 = name === 'BobbyTrackRecord V2';
-                const address = isBaseV2
-                  ? BASE_SEPOLIA_TRACK_RECORD
-                  : stats?.contracts?.[key as keyof NonNullable<ProtocolStats['contracts']>]?.address;
+                const address = BOBBY_BASE_MAINNET.contracts[key as keyof typeof BOBBY_BASE_MAINNET.contracts];
                 const short = shortAddress(address);
-                const addressHref = isBaseV2
-                  ? `https://sepolia.basescan.org/address/${address}`
-                  : `${explorerAddressUrl}/${address}`;
+                const addressHref = bobbyBaseAddressUrl(address);
                 return (
                   <motion.div
                     key={name}
@@ -504,8 +498,8 @@ export default function BobbyArchitecturePage() {
           <div className="mx-auto max-w-7xl px-5 lg:px-8">
             <SectionHeading
               eyebrow="Deployment pipeline"
-              title="Mainnet is earned, not shipped."
-              lede="The protocol moves chain by chain, each stage burning in before the next unlocks. The current NO-GO on Base mainnet is a feature of the process, not a delay."
+              title="Deployed on Base. Activation is earned."
+              lede="The contracts now exist on Base mainnet. The protocol still moves gate by gate: Safe ownership, runtime verification, controlled canary, clean soak, then public writes."
             />
             <div className="mt-14 grid gap-4 lg:grid-cols-3">
               {CHAIN_STAGES.map((stage, index) => (

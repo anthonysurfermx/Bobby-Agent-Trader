@@ -61,6 +61,27 @@ export const BASE_SEPOLIA: ChainConfig = {
 
 export const DEFAULT_CHAIN = BASE;
 
+export const BOBBY_BASE_MAINNET = {
+  chainId: BASE_CHAIN_ID,
+  deployBlock: 50_275_770,
+  explorerUrl: BASE.explorerUrl,
+  safe: '0x8BE60853F27b944e11486285d95c3e06596553b4',
+  recorder: '0xDf475D7D3e97c8988Fdff5AF7887403e4295F4EC',
+  contracts: {
+    trackRecord: '0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321',
+    convictionOracle: '0x27f51D711171c830dd796D4B03914a8C6c46D75e',
+    agentEconomy: '0x009de59e0e7f4109fF9E89E744A4412082AD2aaF',
+    adversarialBounties: '0x73fD6c77ff0403Ea071e8721c76f88cE34ac9968',
+    hardnessRegistry: '0x15800F40b8988765AD3F46030B73bC8109A793f5',
+    agentRegistry: '0xB3137D7afE26fbdBcAA95573C7A20be896efde93',
+    intentEscrow: '0x5D9d534419421B7Edfe9Bb509E4c48512256BC97',
+  },
+} as const;
+
+export function bobbyBaseAddressUrl(address: string): string {
+  return `${BOBBY_BASE_MAINNET.explorerUrl}/address/${address}`;
+}
+
 export const CHAINS: Record<number, ChainConfig> = {
   [BASE.id]: BASE,
   [BASE_SEPOLIA.id]: BASE_SEPOLIA,

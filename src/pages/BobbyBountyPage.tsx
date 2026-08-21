@@ -1,5 +1,5 @@
 // /protocol/bounty — real money for breaking Bobby (mainnet blocker #3).
-// Amounts approved 2026-08-19. Funding goes live with the mainnet Safe;
+// Amounts approved 2026-08-19. Funding goes live after the mainnet Safe handoff;
 // the terms are published now so hunters can start reading the code today.
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ArrowUpRight, Bug, Swords, Trophy } from 'lucide-react';
@@ -48,8 +48,8 @@ export default function BobbyBountyPage() {
         </div>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-white/55">
           Being wrong in public is part of the design — paying you to prove it is too.
-          <b className="text-white/85"> $5,000 USDC initial pool</b>, funded from the protocol treasury
-          when mainnet ships behind the 2-of-3 Safe. Terms are live now; start reading the code.
+          <b className="text-white/85"> $5,000 USDC initial pool</b>. The contracts are deployed on Base;
+          funding activates after the 2-of-3 Safe handoff and post-deploy gates. Terms are live now; start reading the code.
         </p>
 
         <div className="mt-10 space-y-4">
@@ -81,9 +81,7 @@ export default function BobbyBountyPage() {
         <div className="mt-12 flex items-start gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] p-5">
           <Trophy className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
           <p className="text-sm leading-6 text-white/60">
-            <b className="text-amber-200">Program status:</b> terms published, pool funds at mainnet
-            launch together with the Safe. Reports are accepted starting now — anything valid found
-            before funding still pays at launch.
+            <b className="text-amber-200">Program status:</b> contracts deployed; pool activation is staged behind Safe acceptance, verification and soak. Reports are accepted now — anything valid found before funding still pays when the pool activates.
           </p>
         </div>
 

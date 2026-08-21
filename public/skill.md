@@ -1,16 +1,16 @@
 # Bobby Protocol — Agent Integration Skill
 
-> **Version:** 1.0.0  
-> **Protocol:** MCP (Model Context Protocol) over Streamable HTTP  
-> **Chain:** X Layer Mainnet (196)  
-> **Endpoint:** `https://bobbyprotocol.xyz/api/mcp-http`  
-> **Settlement:** OKB native on X Layer via x402
+> **Version:** 2.0.0
+> **Protocol:** MCP (Model Context Protocol) over Streamable HTTP
+> **Proof Chain:** Base Mainnet (8453) — deployed, writes frozen during controlled activation
+> **Endpoint:** `https://bobbyprotocol.xyz/api/mcp-http`
+> **Settlement:** Legacy OKB-native x402 rail on X Layer during staged cutover
 
 ---
 
 ## What is Bobby?
 
-Bobby is a live adversarial intelligence protocol for crypto trading. Three AI agents debate every trade, a Judge Mode audits debate quality on six dimensions, and anyone can stake OKB to prove Bobby was wrong. All settlement happens on OKX X Layer.
+Bobby is an accountability protocol for autonomous finance. Three AI agents debate every call, the decision is committed before its outcome, Pyth evidence verifies resolution, and anyone can challenge a missed stop. Seven audited contracts are deployed on Base mainnet. Writes remain frozen until the published Safe accepts ownership and post-deploy verification, canary and soak complete. X Layer remains the legacy archive and current x402 settlement rail.
 
 Your agent can consume Bobby's intelligence, analysis, and debate system by calling the MCP endpoint below.
 

@@ -16,6 +16,7 @@ import {
   Twitter,
   X,
 } from 'lucide-react';
+import { BOBBY_BASE_MAINNET, bobbyBaseAddressUrl } from '@/config/chains';
 
 type Price = { symbol: string; price: number; change24h: number };
 
@@ -204,7 +205,6 @@ export default function BobbyProtocolLanding() {
   const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
   const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
   const publicRecord = stats?.debateActivity;
-  const onchainRecord = stats?.onchainRecord;
   const totalTrades = publicRecord?.commitmentsCreated ?? stats?.contracts?.trackRecord?.stats?.totalTrades;
   const totalInteractions = stats?.protocolTotals?.totalInteractions;
   const winRate = publicRecord?.decisionsResolved ? publicRecord.winRate : null;
@@ -232,20 +232,16 @@ export default function BobbyProtocolLanding() {
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
     : null;
 
-  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://basescan.org'}/address`;
-  const c = stats?.contracts;
   const proofPoints = [
     {
-      label: 'On-chain record',
-      value: formatWinRate(onchainRecord?.winRate, onchainRecord?.decisionsResolved),
-      detail: onchainRecord
-        ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
-        : 'Waiting for the TrackRecord contract.',
-      proof: 'TrackRecord contract',
-      href: `${explorerAddressUrl}/${c?.trackRecord?.address ?? ''}`,
+      label: 'Base mainnet proof layer',
+      value: 'Deployed',
+      detail: `TrackRecord V2 is on Base at block ${BOBBY_BASE_MAINNET.deployBlock.toLocaleString('en-US')}. Production writes remain frozen during the Safe handoff and soak.`,
+      proof: 'TrackRecord V2 on Basescan',
+      href: bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.trackRecord),
     },
     {
-      label: 'Public debate ledger',
+      label: 'Verified canary ledger',
       value: publicRecord ? `${formatNumber(publicRecord.decisionsResolved, '0')} resolved` : '—',
       detail: publicRecord
         ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L · ${publicRecord.winRate?.toFixed(1)}%`
@@ -255,17 +251,17 @@ export default function BobbyProtocolLanding() {
     },
     {
       label: 'Adversarial bounties',
-      value: formatNumber(c?.adversarialBounties?.totalPosted),
-      detail: 'Open bounties paid for breaking Bobby\u2019s own reasoning. Being wrong in public is part of the design.',
-      proof: 'AdversarialBounties contract',
-      href: `${explorerAddressUrl}/${c?.adversarialBounties?.address ?? ''}`,
+      value: 'On-chain',
+      detail: 'The mainnet bounty contract is deployed. Funding and public writes activate only after the post-deploy gates close.',
+      proof: 'AdversarialBounties on Basescan',
+      href: bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.adversarialBounties),
     },
     {
       label: 'Contracts live',
-      value: '6',
-      detail: 'Registry, economy, oracle, track record, bounties and identity — all deployed and explorer-verified.',
-      proof: 'AgentEconomy V2 contract',
-      href: `${explorerAddressUrl}/${c?.agentEconomy?.address ?? ''}`,
+      value: '7',
+      detail: 'Track record, oracle, economy, bounties, hardness, registry and escrow — deployed together on Base mainnet.',
+      proof: 'AgentEconomy V2 on Basescan',
+      href: bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.agentEconomy),
     },
   ];
 
@@ -296,8 +292,8 @@ export default function BobbyProtocolLanding() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet>
-        <title>Bobby Protocol — Make the thesis earn it</title>
-        <meta name="description" content="Before capital moves, Bobby makes the thesis earn it: adversarial debate, risk gates and a verifiable decision record." />
+        <title>Bobby Protocol — Every call, proven</title>
+        <meta name="description" content="Bobby commits every decision before the outcome, verifies resolution with signed oracle evidence and lets anyone challenge a missed stop on-chain." />
       </Helmet>
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
@@ -330,8 +326,8 @@ export default function BobbyProtocolLanding() {
               <a href="/agentic-world/bobby/history" className="mb-8 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff] transition hover:text-white">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />Accountability infrastructure for autonomous finance <span aria-hidden>›</span>
               </a>
-              <h1 className="max-w-3xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Make the <span className="text-[#0052ff]">thesis earn it.</span></h1>
-              <p className="mt-8 max-w-xl text-lg leading-8 text-white/60 md:text-xl">Three agents debate. Risk can say no. The decision is public before capital moves.</p>
+              <h1 className="max-w-4xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Every call.<br /><span className="text-[#0052ff]">Proven before the outcome.</span></h1>
+              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">Bobby commits the decision before the outcome, verifies resolution with signed Pyth evidence, and lets anyone challenge a missed stop on-chain.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
                 <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a decision <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
                 <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the gate <ChevronDown className="h-4 w-4" /></a>
@@ -595,7 +591,7 @@ export default function BobbyProtocolLanding() {
                   description: 'The thesis and decision are committed before the outcome. Anyone can inspect what was decided and when.',
                   image: '/images/protocol/onchain-proof.jpg',
                   alt: 'Transparent cobalt glass monolith containing a sealed point of light',
-                  telemetry: ['proof.announce  future_anchor', 'oracle  pyth · hermes', 'chain  base sepolia · 84532', 'mainnet  gated'],
+                  telemetry: ['proof.announce  future_anchor', 'oracle  pyth · hermes', 'chain  base mainnet · 8453', 'writes  frozen · staged'],
                 },
               ].map((capability, index) => (
                 <motion.article
@@ -876,9 +872,9 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Track record</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />V2 is proving itself on Base.</h2>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />V2 is deployed on Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                X Layer remains the readable legacy archive. TrackRecord V2 has completed five adversarial audit rounds, closed four P1 findings and resolved its first real Pyth/Hermes-verified cycle on Base Sepolia. Base mainnet is still NO-GO until the soak, production Safe, environment gates and ownership handoffs close.
+                Seven audited contracts are deployed on Base mainnet. Production writes remain frozen while the 2-of-3 Safe accepts ownership, runtime verification completes, and the controlled canary soaks. Base Sepolia preserves the completed challenge evidence; X Layer remains the readable legacy archive.
               </p>
             </div>
 
@@ -907,9 +903,10 @@ export default function BobbyProtocolLanding() {
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
-              <span>Base Sepolia canary · 84532</span>
-              <a href="https://sepolia.basescan.org/address/0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC" target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord V2 ↗</a>
-              <span>Base mainnet · gated</span>
+              <span>Base mainnet · 8453 · deployed / writes frozen</span>
+              <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.trackRecord)} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord V2 ↗</a>
+              <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.safe)} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">2-of-3 Safe ↗</a>
+              <a href="https://sepolia.basescan.org/address/0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC" target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Sepolia evidence ↗</a>
               <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy TrackRecord ↗</a>
               <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy AgentEconomy ↗</a>
               <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>

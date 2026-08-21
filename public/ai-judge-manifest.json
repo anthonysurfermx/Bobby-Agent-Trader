@@ -2,9 +2,12 @@
   "name": "Bobby Judge Mode",
   "version": "1.0.0",
   "description": "Adversarial audit of Bobby's 3-agent debate system. Evaluates debate quality, bias detection, conviction calibration, and decision integrity.",
-  "protocol": "Bobby Protocol — Intelligence Protocol on X Layer",
-  "chain_id": 196,
-  "conviction_oracle": "0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a",
+  "protocol": "Bobby Protocol — Accountability Layer on Base",
+  "chain_id": 8453,
+  "deployment_status": "deployed_writes_frozen",
+  "conviction_oracle": "0x27f51D711171c830dd796D4B03914a8C6c46D75e",
+  "track_record": "0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321",
+  "safe": "0x8BE60853F27b944e11486285d95c3e06596553b4",
   "agents_under_review": [
     {
       "id": "alpha",

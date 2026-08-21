@@ -216,14 +216,14 @@ export default function BobbyLandingPage() {
             <div className="grid lg:grid-cols-2 gap-24 items-center">
               <div>
                 <h2 className="text-5xl font-bold mb-8 tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Verifiable. Transparent. On-Chain.</h2>
-                <p className="text-xl text-[#999] mb-12 font-light leading-relaxed">TrackRecord V2 is live in a Base Sepolia canary: future-anchored entry, Pyth/Hermes evidence at entry and exit, permissionless challenges and separate verified/attested ledgers. Base mainnet remains deliberately gated.</p>
+                <p className="text-xl text-[#999] mb-12 font-light leading-relaxed">Seven audited contracts are deployed on Base mainnet: future-anchored entry, Pyth/Hermes evidence at entry and exit, permissionless challenges and separate verified/attested ledgers. Writes remain frozen during Safe acceptance, verification and soak.</p>
                 <div className="flex items-center gap-6 p-6 bg-white/[0.03] border border-white/[0.08] backdrop-blur-[20px] rounded-2xl border-white/10 w-fit hover:border-[#C1FF2C]/30 transition-all duration-300">
                   <div className="w-14 h-14 rounded-xl bg-[#C1FF2C] flex items-center justify-center text-[#1E3700]">
                     <span className="material-symbols-outlined font-bold" style={{ fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24" }}>account_tree</span>
                   </div>
                   <div>
                     <div className="font-bold text-lg" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Proving on Base</div>
-                    <div className="text-[10px] text-[#999] uppercase tracking-widest" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Sepolia canary live · mainnet gated</div>
+                    <div className="text-[10px] text-[#999] uppercase tracking-widest" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Base mainnet deployed · writes frozen</div>
                   </div>
                 </div>
               </div>
@@ -247,7 +247,7 @@ export default function BobbyLandingPage() {
                     <div className="text-white/40 italic pl-8">{'// announceCommit → future anchor...'}</div>
                     <div className="text-white/60 pl-8">[INFO] <span className="text-white">Entry evidence: Pyth / Hermes</span></div>
                     <div className="text-white/60 pl-8">[INFO] Exit evidence: Pyth / Hermes</div>
-                    <div className="text-white/60 pl-8">[INFO] Ledger: VERIFIED · Base Sepolia</div>
+                    <div className="text-white/60 pl-8">[INFO] Proof layer: Base mainnet · 8453</div>
                     <div className="bg-[#C1FF2C]/5 border-l-2 border-[#C1FF2C] py-2 px-4 mt-4">
                       <div className="text-[#C1FF2C] font-bold">[VERIFIED] First real oracle cycle resolved</div>
                       <div className="text-[#C1FF2C]/70 text-xs">5 audit rounds · 4 P1 findings closed</div>
