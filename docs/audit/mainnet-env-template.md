@@ -22,16 +22,16 @@ OWNER_SAFE_CODEHASH=0xd7d408ebcd99b2b70be43e20253d6d92a8ea8fab29bd3be7f55b100323
 
 # --- Roles económicos ------------------------------------------------------
 DEPLOYER_ADDRESS=0xC3F836EC06A2202af23e59997A613CA0722F35d1   # wallet NUEVA (hardware) — 0x821990 quedó QUEMADA (expuesta)
-BASE_RECORDER_ADDRESS=0xC3F836EC06A2202af23e59997A613CA0722F35d1   # wallet NUEVA — recorder de mainnet, nunca expuesta
-BOBBY_ADDRESS=0xC3F836EC06A2202af23e59997A613CA0722F35d1   # = recorder nuevo
-BASE_RECORDER_KEY=<EN VERCEL: la key de la wallet NUEVA 0xC3F8… (hardware, nunca en chat)>
+BASE_RECORDER_ADDRESS=0xDf475D7D3e97c8988Fdff5AF7887403e4295F4EC   # recorder hot dedicado, key ya en Vercel Production (sensitive)
+BOBBY_ADDRESS=0xDf475D7D3e97c8988Fdff5AF7887403e4295F4EC   # recorder DEDICADO nuevo (0xDf47) — separado del deployer (Codex P1)
+BASE_RECORDER_KEY=<YA EN VERCEL Production (sensitive) — recorder 0xDf47…F4EC, generada local, nunca en chat>
 ALPHA_ADDRESS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7      # = Safe owner B (Anthony: usar wallets del Safe)
 RED_ADDRESS=0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843        # = Safe owner C
 CIO_ADDRESS=0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514        # = Safe owner G (distinto de ALPHA/RED)
 ARBITER_ADDRESS=0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26     # resolver-quorum #2 (arbiter)
 KEEPER_ADDRESS=0x01b2a464b6Dc0Dc57Fd912d877a7C05502cf3D2e     # keeper (canary)
 RESOLVER_ADDRESS=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854   # resolver-quorum #1 (4º rol distinto — su rol natural)
-HARDNESS_SCORER_ADDRESS=<= BOBBY_ADDRESS — EXPLÍCITO (P1 Codex: el checker lo exige; no omitir)>
+HARDNESS_SCORER_ADDRESS=0xDf475D7D3e97c8988Fdff5AF7887403e4295F4EC   # = recorder (explícito)
 
 # --- Quórum HardnessRegistry (reusado del canary) --------------------------
 RESOLVER_ADDRESSES=0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854,0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26,0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514
@@ -125,3 +125,13 @@ Aquí se deposita el gas del deploy (~0.02 ETH en Base mainnet).
    retry del recorder + snapshot) y demostrar bytecode idéntico.
 5. **P1 verificación**: runtime-bytecode de los 7 vs artefacto congelado
    (con immutables) + registro de codehashes ANTES de abrir producción.
+
+## Set FINAL de llaves (2026-08-21, post-Codex P1)
+- **DEPLOYER** (firma broadcast+handoff, luego se retira): `0xC3F836…35d1`
+  — decisión de Anthony (no hardware; su key NO se ha expuesto; handoff con
+  writes=false + 2 signers + batch listo mitiga la ventana).
+- **RECORDER** (comitea calls, alcance mínimo, rotable vía setBobby desde el
+  Safe): `0xDf475D7D3e97c8988Fdff5AF7887403e4295F4EC` — generada local, key
+  YA en Vercel Production (sensitive). SEPARADA del deployer ✓ (Codex P1).
+- La treasury (0x09a81f) NO se usa como recorder (habría mezclado fondos).
+Dry-run final con esta separación + escrow 1e22 = ALL PASSED.
