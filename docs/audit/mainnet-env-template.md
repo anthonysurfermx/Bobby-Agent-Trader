@@ -21,10 +21,10 @@ OWNER_SAFE_SINGLETON=0x29fcB43b46531BcA003ddC8FCB67FFE91900C762   # SafeL2 1.4.1
 OWNER_SAFE_CODEHASH=0xd7d408ebcd99b2b70be43e20253d6d92a8ea8fab29bd3be7f55b10032331fb4c   # ✅ derivado on-chain (mainnet)
 
 # --- Roles económicos ------------------------------------------------------
-DEPLOYER_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # Wallet A. NO es owner del Safe (B/C/G) ✅
-BASE_RECORDER_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # Anthony: MISMA recorder (= deployer). Riesgo aceptado, ver nota.
-BOBBY_ADDRESS=0x821990Bda0BAa05F96506fd73ef439D0C2f17302   # = recorder
-BASE_RECORDER_KEY=<EN VERCEL: la MISMA key del deployer/recorder (decisión Anthony 2026-08-19)>
+DEPLOYER_ADDRESS=0xC3F836EC06A2202af23e59997A613CA0722F35d1   # wallet NUEVA (hardware) — 0x821990 quedó QUEMADA (expuesta)
+BASE_RECORDER_ADDRESS=0xC3F836EC06A2202af23e59997A613CA0722F35d1   # wallet NUEVA — recorder de mainnet, nunca expuesta
+BOBBY_ADDRESS=0xC3F836EC06A2202af23e59997A613CA0722F35d1   # = recorder nuevo
+BASE_RECORDER_KEY=<EN VERCEL: la key de la wallet NUEVA 0xC3F8… (hardware, nunca en chat)>
 ALPHA_ADDRESS=0x566C9c59D0FF98387BD098e66B7389A43a4D27D7      # = Safe owner B (Anthony: usar wallets del Safe)
 RED_ADDRESS=0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843        # = Safe owner C
 CIO_ADDRESS=0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514        # = Safe owner G (distinto de ALPHA/RED)
@@ -103,3 +103,9 @@ Validado en 2º dry-run con exactamente estas 7 → ALL PASSED:
 | Quórum resolvers (RESOLVER_ADDRESSES) | E, F, G · threshold 2 |
 | Safe owners 2-de-3 | B, C, G |
 No falta ninguna wallet. Todas las restricciones del deploy se cumplen.
+
+## Wallet fresca de mainnet (2026-08-21) — deployer + recorder
+`0xC3F836EC06A2202af23e59997A613CA0722F35d1` — generada nueva por Anthony
+(la vieja 0x821990 quedó QUEMADA: se expuso en texto plano). Distinta de los 7
+roles y del Safe. Dry-run con ella como --sender + BOBBY_ADDRESS = ALL PASSED.
+Aquí se deposita el gas del deploy (~0.02 ETH en Base mainnet).
