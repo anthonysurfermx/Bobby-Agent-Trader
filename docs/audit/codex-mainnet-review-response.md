@@ -55,3 +55,27 @@ Brief: `.ai/briefs/2026-08-21_codex-mainnet-launch-review.md`
 4. Broadcast (writes=false, freeze=true) → handoff → runtime-bytecode
    verification de los 7 → canario mainnet (script controlado, NO el
    endpoint público) → soak 24-48h → recién ahí levantar freeze y writes.
+
+## Cierre 2026-08-21 (segunda tanda) — listo para re-review
+- **P1 llaves SEPARADAS ✅**: recorder DEDICADO `0xDf475D7D3e97c8988Fdff5AF7887403e4295F4EC`
+  generado local, key en Vercel Production (sensitive, write-only), distinto de
+  TODO (roles/Safe/treasury/deployer/quemada). Deployer `0xC3F8` separado del
+  recorder. Dry-run final con la separación + escrow 1e22 = ALL PASSED.
+  (Deployer no-hardware: decisión de Anthony, mitigada con writes=false +
+  2 signers + batch listo en el handoff; se retira tras el handoff.)
+- **P1 tamaño real ✅**: re-medido = 24,094 B runtime (482 margen EIP-170).
+  Corregido el claim viejo (23,499) en la página pública /protocol/audits.
+- **P1 SHA operativo congelado ✅**: tag `mainnet-launch-candidate-2026-08-21`
+  (HEAD 8f0a591) — contratos 11532f4 + recorder retry + fixes Codex.
+  Codehash del runtime artefacto: 0xac1b415cc015dd11… (24,094 B).
+- **P1 scorer explícito ✅** en template.
+
+## Queda para DESPUÉS del broadcast (no bloquea la firma)
+- Verificación runtime-bytecode de los 7 contratos vs artefacto congelado
+  (contemplando immutables) + registro de codehashes ANTES de abrir writes.
+- Hardening del endpoint recorder (rate limit, idempotencia, mutex de nonce,
+  circuit breaker) ANTES de levantar el freeze.
+
+## Estado para el re-review de Codex
+Los 2 P0 cerrados con evidencia. Llaves separadas. SHA congelado. Config final
+validada en dry-run. Falta el re-review de Codex → GO → broadcast.
