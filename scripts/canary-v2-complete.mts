@@ -27,9 +27,9 @@ import { Contract, Interface, JsonRpcProvider, Network, Wallet, keccak256, toUtf
 
 process.env.PROTOCOL_CHAIN = 'base-sepolia';
 process.env.BASE_SEPOLIA_TRACK_RECORD_ADDRESS ||= '0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC';
-// publicnode was reliable for the original 002/003/004 commits; drpc raced on
-// getBlock (null block right after announce). Use publicnode for the recorder.
-process.env.BASE_SEPOLIA_RPC_URL ||= 'https://base-sepolia-rpc.publicnode.com';
+// FORCE publicnode (override any shell value): drpc returns intermittent 500s
+// and raced on getBlock. publicnode carried the original 002/003/004 commits.
+process.env.BASE_SEPOLIA_RPC_URL = 'https://base-sepolia-rpc.publicnode.com';
 
 const MAIN_ENV = '/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.env.vercel.local';
 function envFromSnapshot(name: string): string | undefined {
@@ -43,7 +43,7 @@ const { VERIFIED_FEEDS, buildHermesBenchmarkUrl, fetchSignedUpdate, toE8, PYTH_F
 
 const TR = process.env.BASE_SEPOLIA_TRACK_RECORD_ADDRESS!;
 const NET = new Network('base-sepolia', 84532);
-const RPCS = ['https://base-sepolia.drpc.org', 'https://base-sepolia-rpc.publicnode.com', 'https://sepolia.base.org'];
+const RPCS = ['https://base-sepolia-rpc.publicnode.com', 'https://base-sepolia.drpc.org', 'https://sepolia.base.org'];
 function provider(): JsonRpcProvider { return new JsonRpcProvider(RPCS[0], NET, { staticNetwork: NET }); }
 const prov = provider();
 
@@ -132,18 +132,32 @@ const recorderAddr = new Wallet(key).address;
 log(`recorder ${recorderAddr}`);
 const st = load();
 
+/** Retry a step against transient RPC blips (500/timeout/null) before giving up. */
+async function withRetry<T>(label: string, fn: () => Promise<T>, tries = 5): Promise<T> {
+  for (let i = 1; ; i++) {
+    try { return await fn(); }
+    catch (e) {
+      if (i >= tries) throw e;
+      log(`${label}: intento ${i} falló (${(e as Error).message?.slice(0, 100)}) — reintento en 4s`);
+      await sleep(4);
+    }
+  }
+}
+
 // --- Step 1: resolve the stranded 002/003 with their real result
-await resolveReal(key, 'canary-v2-002', 'ETH', st, 'resolve002');
-await resolveReal(key, 'canary-v2-003', 'SOL', st, 'resolve003');
+await withRetry('resolve-002', () => resolveReal(key, 'canary-v2-002', 'ETH', st, 'resolve002'));
+await withRetry('resolve-003', () => resolveReal(key, 'canary-v2-003', 'SOL', st, 'resolve003'));
 
 // --- Step 2: commit the tight-stop challenge cycle (if not yet)
-if (!(await commitment(CHALLENGE.id))) {
-  const t = await tick(CHALLENGE.symbol);
-  const px = Number(formatUnits(t.e8, 8));
-  log(`${CHALLENGE.id}: committing ${CHALLENGE.symbol} long @ ~${px.toFixed(2)} stop ${(px * CHALLENGE.stopPct).toFixed(2)} (−4bps) target ${(px * CHALLENGE.targetPct).toFixed(2)}`);
-  const res = await commitV2(DEFAULT_CHAIN, key, { debateHash: hashOf(CHALLENGE.id), symbol: CHALLENGE.symbol, agent: 0, conviction: 7, entryPrice: px, targetPrice: px * CHALLENGE.targetPct, stopPrice: px * CHALLENGE.stopPct });
-  st.commit005 = res.txHash; save(st);
-  log(`${CHALLENGE.id}: COMMIT OK ${res.txHash} | oracle ${formatUnits(BigInt(res.oraclePriceE8!), 8)} pt=${res.oraclePublishTime}`);
+if (!(await withRetry('check-005', () => commitment(CHALLENGE.id)))) {
+  await withRetry('commit-005', async () => {
+    const t = await tick(CHALLENGE.symbol);
+    const px = Number(formatUnits(t.e8, 8));
+    log(`${CHALLENGE.id}: committing ${CHALLENGE.symbol} long @ ~${px.toFixed(2)} stop ${(px * CHALLENGE.stopPct).toFixed(2)} (−4bps) target ${(px * CHALLENGE.targetPct).toFixed(2)}`);
+    const res = await commitV2(DEFAULT_CHAIN, key, { debateHash: hashOf(CHALLENGE.id), symbol: CHALLENGE.symbol, agent: 0, conviction: 7, entryPrice: px, targetPrice: px * CHALLENGE.targetPct, stopPrice: px * CHALLENGE.stopPct });
+    st.commit005 = res.txHash; save(st);
+    log(`${CHALLENGE.id}: COMMIT OK ${res.txHash} | oracle ${formatUnits(BigInt(res.oraclePriceE8!), 8)} pt=${res.oraclePublishTime}`);
+  });
 } else log(`${CHALLENGE.id}: ya comiteado`);
 
 // --- Step 3: watch for a breach, resolve WIN, then challenge → WIN→LOSS
