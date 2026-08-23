@@ -3,6 +3,7 @@ import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
   XLAYER_CHAIN_ID,
+  XLAYER_RPC_FALLBACK_URL,
   XLAYER_RPC_URL,
 } from './protocol-constants.js';
 import { DEFAULT_CHAIN } from './chains.js';
@@ -203,25 +204,29 @@ interface RpcEnvelope<T> {
 }
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(XLAYER_RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
+  const urls = [...new Set([XLAYER_RPC_URL, XLAYER_RPC_FALLBACK_URL].filter(Boolean))];
+  let lastError: unknown;
 
-  if (!res.ok) {
-    throw new Error(`${DEFAULT_CHAIN.name} RPC ${res.status}`);
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      });
+
+      if (!res.ok) throw new Error(`${DEFAULT_CHAIN.name} RPC ${res.status}`);
+
+      const json = await res.json() as RpcEnvelope<T>;
+      if (json.error) throw new Error(json.error.message || `${DEFAULT_CHAIN.name} RPC error`);
+      if (json.result == null) throw new Error(`${DEFAULT_CHAIN.name} RPC returned no result`);
+      return json.result;
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  const json = await res.json() as RpcEnvelope<T>;
-  if (json.error) {
-    throw new Error(json.error.message || `${DEFAULT_CHAIN.name} RPC error`);
-  }
-  if (json.result == null) {
-    throw new Error(`${DEFAULT_CHAIN.name} RPC returned no result`);
-  }
-
-  return json.result;
+  throw lastError instanceof Error ? lastError : new Error(`all ${DEFAULT_CHAIN.name} RPCs failed`);
 }
 
 export interface McpFee {
