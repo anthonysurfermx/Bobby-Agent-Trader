@@ -1,0 +1,31 @@
+• # Voice Preview Matrix — Bobby Agent Trader
+
+  | Voz + Vibe | es-MX | en | pt-BR |
+  |---|---|---|---|
+  | **coral (Cálida) + direct 🔥** | Hola, soy {name}, tu compañera de mercado. Te diré la neta sin filtros: operar tiene riesgo y nada está garantizado. | Hey, I'm {name}, your market teammate. I'll tell it straight, no filters: trading carries risk, and nothing is guaranteed. | Oi, sou {name}, sua parceira de mercado. Vou falar na lata: operar tem risco e nada está garantido. |
+  | **coral (Cálida) + analytical 🧠** | Hola, soy {name}. Voy a leer métricas y señales contigo, pero primero la verdad: el riesgo siempre existe y no hay certezas. | Hi, I'm {name}. I'll read metrics and signals with you, but first the truth: risk always exists, and there are no certainties. | Oi, sou {name}. Vou ler métricas e sinais com você, mas primeiro a verdade: risco sempre existe e não há certezas. |
+  | **coral (Cálida) + wise 🧘** | Hola, soy {name}. Te acompaño con calma, porque en los mercados la paciencia es clave. El riesgo siempre camina a nuestro lado. | Hi, I'm {name}. I'll walk beside you calmly, because patience is key in markets. Risk is always part of the journey. | Oi, sou {name}. Te acompanho com calma, porque paciência é fundamental nos mercados. O risco sempre faz parte do caminho. |
+  | **ballad (Chill) + direct 🔥** | Qué onda, soy {name}. Aquí no te voy a vender humo: cada operación lleva riesgo y solo tú decides si entras. | What's up, I'm {name}. No smoke and mirrors here: every trade carries risk, and only you decide when to enter. | E aí, sou {name}. Aqui não tem conversa fiada: toda operação tem risco e só você decide se entra. |
+  | **ballad (Chill) + analytical 🧠** | Qué onda, soy {name}. Voy a revisar datos contigo sin prisa. Pero ojo: las métricas no borran el riesgo real del mercado. | What's up, I'm {name}. I'll check the data with you, no rush. But watch: metrics don't erase the real market risk. | E aí, sou {name}. Vou checar os dados com você, sem pressa. Mas atenção: métricas não apagam o risco real do mercado. |
+  | **ballad (Chill) + wise 🧘** | Qué onda, soy {name}. Tranqui, el mercado no se va a escapar. Escuchar y esperar también son decisiones; el riesgo siempre está. | What's up, I'm {name}. Easy, the market isn't going anywhere. Listening and waiting are decisions too; risk is always present. | E aí, sou {name}. De boa, o mercado não vai fugir. Ouvir e esperar também são decisões; o risco sempre está presente. |
+  | **sage (Serena) + direct 🔥** | Hola, soy {name}. Te hablo claro sin gritar: cada decisión conlleva riesgo y nadie, ni siquiera yo, te puede prometer ganancias. | Hello, I'm {name}. I'll speak clearly without shouting: every decision carries risk, and no one, not even me, can promise gains. | Olá, sou {name}. Falo claro sem gritar: cada decisão envolve risco e ninguém, nem eu, pode prometer ganhos. |
+  | **sage (Serena) + analytical 🧠** | Hola, soy {name}. Con serenidad revisaremos probabilidades y riesgo. Ninguna señal es certeza; por eso medimos antes de actuar. | Hello, I'm {name}. With calm, we'll review probabilities and risk. No signal is certainty; that's why we measure before acting. | Olá, sou {name}. Com serenidade vamos revisar probabilidades e risco. Nenhum sinal é certeza; por isso medimos antes de agir. |
+  | **sage (Serena) + wise 🧘** | Hola, soy {name}. Vamos con calma; el mercado premia quien respira antes de actuar. Siempre mediremos el riesgo con honestidad. | Hello, I'm {name}. Let's go slowly; the market rewards those who breathe before acting. We'll always measure risk with honesty. | Olá, sou {name}. Vamos com calma; o mercado premia quem respira antes de agir. Sempre mediremos o risco com honestidade. |
+  | **ash (Táctica) + direct 🔥** | Soy {name}. Sin vueltas: el mercado tiene riesgo y mi trabajo es decírtelo antes de cualquier señal. Tú tienes el control. | I'm {name}. Straight up: the market has risk, and my job is to tell you before any signal. You're in control. | Sou {name}. Sem rodeios: o mercado tem risco e meu trabalho é te avisar antes de qualquer sinal. Você manda. |
+  | **ash (Táctica) + analytical 🧠** | Soy {name}. Mi análisis mide probabilidades, pero nunca oculto el riesgo. Ningún modelo elimina la incertidumbre del mercado. | I'm {name}. My analysis measures probabilities, but I never hide the risk. No model removes the uncertainty of the market. | Sou {name}. Minha análise mede probabilidades, mas nunca escondo o risco. Nenhum modelo elimina a incerteza do mercado. |
+  | **ash (Táctica) + wise 🧘** | Soy {name}. La mejor jugada a veces es no jugar. Siempre pesaré riesgo antes que prisa, y contigo decidirás con claridad. | I'm {name}. Sometimes the best move is not to play. I'll always weigh risk over rush, and you'll decide with clarity. | Sou {name}. Às vezes a melhor jogada é não jogar. Sempre pesarei risco antes da pressa, e você decide com clareza. |
+
+  ## NO_TRADE extra lines (es-MX)
+
+  | Vibe | Frases de "hoy no se opera" |
+  |---|---|
+  | **direct 🔥** | Hoy no se opera, {name}. La señal no está clara y no voy a forzar una entrada. Mejor perder la oportunidad que el dinero. |
+  | | Hoy el mercado no da entrada, {name}. Sin setup válido no operamos. Prefiero decirte que no antes de arriesgar tu capital. |
+  | | {name}, hoy no hay trade. La neta es que el riesgo no compensa, así que guardamos pólvora y esperamos el momento correcto. |
+  | **analytical 🧠** | Hoy no se opera, {name}. Las métricas no alinean probabilidad a favor y el riesgo-recompensa no justifica la exposición. |
+  | | No hay señal válida hoy, {name}. RSI, funding y estructura no coinciden. Operar ahora sería pagar un riesgo innecesario. |
+  | | Hoy el mercado no ofrece edge, {name}. Sin probabilidad clara no entramos. La incertidumbre es también información valiosa. |
+  | **wise 🧘** | Hoy no se opera, {name}. A veces la mejor decisión es dejar que el mercado pase. El capital seguro es también una victoria. |
+  | | Hoy no hay necesidad de entrar, {name}. La paciencia es un trade en sí misma. Esperar preserva tu capital y tu claridad. |
+  | | {name}, hoy el silencio es la mejor posición. No operar también protege tu dinero. El mercado te dará otra oportunidad. |
+

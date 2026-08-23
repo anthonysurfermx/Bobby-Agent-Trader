@@ -17,6 +17,8 @@ import { XLayerSwapCard } from './XLayerSwapCard';
 import PerpsTradeCard from './PerpsTradeCard';
 import TradingModeSelector, { type TradingMode } from './TradingModeSelector';
 import { VoiceOrb, type OrbState, type OrbMood } from './VoiceOrb';
+import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
+import { loadMascot } from '@/lib/mascot';
 import { IntelligenceFeed, type DebateData, type MetacognitionData, type SignalData, type PolyData } from './IntelligenceFeed';
 import { ConvictionBoard } from './ConvictionBoard';
 import { FeedbackWidget } from './FeedbackWidget';
@@ -703,7 +705,7 @@ function QuickActions({ onAction, disabled }: { onAction: (text: string) => void
 
 // ---- Main Component ----
 
-export function AdamsChat() {
+export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoice?: () => void; textOnly?: boolean } = {}) {
   const { profile, needsSetup, saveNewProfile, isConnected } = useAdvisorProfile();
   const { address } = useAccount();
   const { open: openWallet } = useAppKit();
@@ -2755,6 +2757,17 @@ export function AdamsChat() {
   const [activeAgent, setActiveAgent] = useState<'alpha' | 'redteam' | 'cio' | null>(null);
   const orbState: OrbState = isListening ? 'listening' : isSpeaking ? 'speaking' : isProcessing ? 'thinking' : 'idle';
   const orbMood = activeAgent || 'confident';
+  // Personal agents configured in the wizard show their mascot instead of the orb.
+  // One WebGL instance only — sized by viewport, never duplicated per breakpoint.
+  const mascotLook = useMemo(() => loadMascot(), []);
+  const [desktopViewport, setDesktopViewport] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)');
+    const onChange = (e: MediaQueryListEvent) => setDesktopViewport(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   // ---- HUD: Orbital data ring around the orb ----
   const [hudPositions, setHudPositions] = useState<Array<{ symbol: string; direction: string; pnl: number; pnlPct: number }>>([]);
@@ -2802,7 +2815,7 @@ export function AdamsChat() {
   const latestUser = [...messages].reverse().find(m => m.role === 'user');
 
   return (
-    <div className="relative h-full overflow-hidden bg-[#050505] text-white before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_50%_18%,rgba(0,82,255,.16),transparent_29%),linear-gradient(180deg,#050505_0%,#070913_48%,#050505_100%)]">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[#050505] text-white before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_50%_18%,rgba(0,82,255,.16),transparent_29%),linear-gradient(180deg,#050505_0%,#070913_48%,#050505_100%)]">
       {/* Step 1: Trading Mode Selection (first thing user sees) */}
       {!tradingMode && <TradingModeSelector onSelect={handleModeSelect} language={lang} onInitVoice={initVoiceContext} />}
 
@@ -2866,6 +2879,16 @@ export function AdamsChat() {
             <div><span className="block text-sm font-extrabold tracking-[-.04em]">Bobby</span><span className="font-mono text-[9px] uppercase tracking-[.18em] text-[#7da6ff]">Decision interface</span></div>
           </div>
           <div className="flex items-center gap-1">
+            {onSwitchToVoice && (
+              <button
+                onClick={onSwitchToVoice}
+                className="hidden items-center gap-1.5 rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#7da6ff] transition hover:bg-[#0052ff]/20 sm:flex"
+                title={lang === 'es' ? 'Cambiar a conversación por voz' : 'Switch to voice conversation'}
+              >
+                <Mic className="h-3 w-3" />
+                {lang === 'es' ? 'Voz' : 'Voice'}
+              </button>
+            )}
             {/* Stop button — visible when speaking or processing */}
             {(isSpeaking || isProcessing) && (
               <button onClick={stopAll}
@@ -3206,7 +3229,10 @@ export function AdamsChat() {
           </div>
         )}
 
-        {/* Orb center + orbital data */}
+        {/* Orb center + orbital data — hidden in textOnly: voice lives ONLY in
+            the LIVE DESK (VoiceRoom). Here "CHAT" must read as a text chat, not
+            a second voice room with a weaker TTS engine. */}
+        {!textOnly && (
         <div
           className="relative flex min-h-[250px] cursor-pointer select-none flex-col items-center justify-center overflow-hidden px-5 py-8 sm:min-h-[330px]"
           onClick={() => {
@@ -3230,8 +3256,14 @@ export function AdamsChat() {
             </div>
           )}
 
-          <div className="relative z-10 sm:hidden"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={108} /></div>
-          <div className="relative z-10 hidden sm:block"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={150} /></div>
+          {mascotLook ? (
+            <div className="relative z-10"><BobbyMascot3D look={mascotLook} state={orbState} analyser={analyser} size={desktopViewport ? 150 : 108} /></div>
+          ) : (
+            <>
+              <div className="relative z-10 sm:hidden"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={108} /></div>
+              <div className="relative z-10 hidden sm:block"><VoiceOrb analyser={analyser} state={orbState} mood={orbMood} size={150} /></div>
+            </>
+          )}
           <span className="relative z-10 mt-2 font-mono text-[9px] tracking-[.18em] text-[#7da6ff]">
             {orbState === 'listening' ? (lang === 'es' ? 'TOCA PARA PARAR · ESCUCHANDO...' : 'TAP TO STOP · LISTENING...') : orbState === 'thinking' ? (lang === 'es' ? 'PROCESANDO...' : 'PROCESSING...') : orbState === 'speaking' ? (activeAgent === 'alpha' ? '🟢 ALPHA HUNTER' : activeAgent === 'redteam' ? '🔴 RED TEAM' : activeAgent === 'cio' ? '🟡 BOBBY CIO' : (lang === 'es' ? 'TOCA PARA INTERRUMPIR' : 'TAP TO INTERRUPT')) : (lang === 'es' ? 'TOCA PARA HABLAR' : 'TAP TO TALK')}
           </span>
@@ -3253,6 +3285,7 @@ export function AdamsChat() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* ===== COMMAND CENTER: MIDDLE AREA (STAGE + TIMELINE) ===== */}

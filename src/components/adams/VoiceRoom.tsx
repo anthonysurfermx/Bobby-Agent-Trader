@@ -9,8 +9,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, ShieldCheck, X, ChevronDown } from 'lucide-react';
 import { useRealtimeVoice, type VoiceState } from '@/hooks/useRealtimeVoice';
+import { getVoiceAsset, isEquitySymbol } from '@/lib/voice-assets';
 import { LiveOrb } from './LiveOrb';
+import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
+import { loadMascot } from '@/lib/mascot';
 import { MarketCanvas, type Timeframe } from './MarketCanvas';
+
+/** How the desk labels the asset on screen: "Nvidia · NVDA" for equities,
+ *  "BTC/USDT" for crypto — never "NVDA/USDT" (equities aren't a USDT pair). */
+function assetLabel(symbol: string): string {
+  const asset = getVoiceAsset(symbol);
+  if (isEquitySymbol(symbol)) return asset ? `${asset.name} · ${symbol}` : symbol;
+  return `${symbol}/USDT`;
+}
 
 const STATE_COPY: Record<VoiceState, { label: string; hint: string }> = {
   idle: { label: 'En reposo', hint: 'Toca el micrófono y háblale a Bobby' },
@@ -60,13 +71,16 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
   const [voiceLang, setVoiceLang] = useState<'es' | 'en'>(() => {
     try { return localStorage.getItem('bobby_lang') === 'en' ? 'en' : 'es'; } catch { return 'es'; }
   });
+  const [inputMode, setInputMode] = useState<'push-to-talk' | 'hands-free'>('push-to-talk');
   const {
     state, error, level, transcript, tools, proposal,
     symbol, timeframe, levels, thesis, debate,
-    connect, disconnect, setSymbol, setTimeframe, dismissProposal,
-  } = useRealtimeVoice(voiceLang);
+    connect, disconnect, startTalking, stopTalking, micMuted, setSymbol, setTimeframe, dismissProposal,
+  } = useRealtimeVoice(voiceLang, inputMode);
 
   const live = state !== 'idle' && state !== 'error';
+  // The user's chosen mascot IS Bobby's face — it always replaces the orb
+  const [mascotLook] = useState(() => loadMascot());
   const debating = tools.some((t) => t.tool === 'run_debate' && t.status === 'running');
   const running = tools.filter((t) => t.status === 'running');
   const railRef = useRef<HTMLDivElement>(null);
@@ -112,6 +126,13 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
               <option value="en">EN · US</option>
             </select>
           </label>
+          <label className="hidden items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/45 sm:flex">
+            <span>{voiceLang === 'es' ? 'MIC' : 'MIC'}</span>
+            <select value={inputMode} onChange={(event) => setInputMode(event.target.value as 'push-to-talk' | 'hands-free')} className="bg-transparent text-[#7da6ff] outline-none">
+              <option value="push-to-talk">{voiceLang === 'es' ? 'ALTAVOZ' : 'SPEAKER'}</option>
+              <option value="hands-free">{voiceLang === 'es' ? 'AUDÍFONOS' : 'HEADSET'}</option>
+            </select>
+          </label>
           <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/45 backdrop-blur">
             <ShieldCheck className="h-3 w-3 text-[#7da6ff]" />
             <span className="hidden sm:inline">Bobby no ejecuta · tú confirmas</span>
@@ -120,9 +141,10 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
           {onSwitchToChat && (
             <button
               onClick={onSwitchToChat}
-              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/45 transition hover:text-white"
+              title={voiceLang === 'es' ? 'Usa texto si hay ruido alrededor' : 'Use text when the room is noisy'}
+              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/45 transition hover:border-[#0052ff]/40 hover:text-white"
             >
-              Chat
+              {voiceLang === 'es' ? 'Texto · ruido' : 'Text · noisy room'}
             </button>
           )}
         </div>
@@ -150,8 +172,17 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
             ))}
           </div>
 
-          <div className="relative h-[min(46vh,340px)] w-[min(46vh,340px)] shrink-0">
-            <LiveOrb state={state} level={level} />
+          <div className="relative flex h-[min(46vh,340px)] w-[min(46vh,340px)] shrink-0 items-center justify-center">
+            {mascotLook ? (
+              <BobbyMascot3D
+                look={mascotLook}
+                state={state === 'connecting' ? 'thinking' : state === 'error' ? 'idle' : state}
+                level={state === 'speaking' ? level : null}
+                size={260}
+              />
+            ) : (
+              <LiveOrb state={state} level={level} />
+            )}
           </div>
 
           {/* live caption */}
@@ -181,19 +212,32 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
           {/* mic */}
           <div className="relative mt-4 flex shrink-0 flex-col items-center gap-2">
             <button
-              onClick={activateVoice}
-              aria-label={live ? 'Cerrar sesión de voz' : 'Abrir sesión de voz'}
+              onClick={!live ? activateVoice : undefined}
+              onPointerDown={live && inputMode === 'push-to-talk' ? startTalking : undefined}
+              onPointerUp={live && inputMode === 'push-to-talk' ? stopTalking : undefined}
+              onPointerCancel={live && inputMode === 'push-to-talk' ? stopTalking : undefined}
+              onPointerLeave={live && inputMode === 'push-to-talk' ? stopTalking : undefined}
+              aria-label={!live ? 'Abrir sesión de voz' : inputMode === 'push-to-talk' ? 'Mantén para hablar' : 'Sesión de voz activa'}
               className={`group relative grid h-14 w-14 place-items-center rounded-full transition ${
-                live ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)] hover:bg-[#ff716a] hover:text-white' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff] active:scale-95'
+                live ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)] active:scale-95' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff] active:scale-95'
               }`}
             >
               <span className="pointer-events-none absolute inset-0 rounded-full border border-[#0052ff]/60"
                 style={{ transform: `scale(${1 + level * 0.8})`, opacity: live ? 0.9 - level * 0.5 : 0 }} />
-              {live ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              {live && inputMode === 'push-to-talk' && !micMuted ? <Mic className="h-5 w-5" /> : live ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </button>
             <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
-              {live ? (voiceLang === 'es' ? 'ACTIVO · toca para desconectar' : 'ACTIVE · tap to disconnect') : (voiceLang === 'es' ? 'TOCA PARA ACTIVAR · análisis, no asesoría' : 'TAP TO ACTIVATE · analysis, not advice')}
+              {!live
+                ? (voiceLang === 'es' ? 'TOCA PARA ACTIVAR · análisis, no asesoría' : 'TAP TO ACTIVATE · analysis, not advice')
+                : inputMode === 'push-to-talk'
+                  ? (micMuted ? (voiceLang === 'es' ? 'BOBBY HABLA · MANTÉN PARA HABLAR' : 'BOBBY TALKS · HOLD TO SPEAK') : (voiceLang === 'es' ? 'ESCUCHANDO · SUELTA AL TERMINAR' : 'LISTENING · RELEASE WHEN DONE'))
+                  : (voiceLang === 'es' ? 'AUDÍFONOS · MANOS LIBRES' : 'HEADSET · HANDS FREE')}
             </p>
+            {live && (
+              <button onClick={disconnect} className="font-mono text-[8px] uppercase tracking-[0.12em] text-white/30 transition hover:text-white">
+                {voiceLang === 'es' ? 'Cerrar voz' : 'End voice'}
+              </button>
+            )}
           </div>
         </section>
 
@@ -203,7 +247,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
             onClick={() => setChartOpenMobile((open) => !open)}
             className="mb-3 flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/60 lg:hidden"
           >
-            {symbol}/USDT · gráfica en vivo
+            {assetLabel(symbol)} · gráfica en vivo
             <ChevronDown className={`h-4 w-4 transition ${chartOpenMobile ? 'rotate-180' : ''}`} />
           </button>
           {/* The candles are the evidence — the debate cards below never get to
@@ -221,7 +265,8 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
             />
           </div>
 
-          {/* the debate, made readable next to the price it is about */}
+          {/* The full debate stays readable beside the price; the spoken answer
+              is deliberately only the executive summary. */}
           <AnimatePresence>
             {debate && (
               <motion.div
@@ -230,6 +275,14 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                 exit={{ opacity: 0 }}
                 className="mt-3 grid shrink-0 gap-2 sm:grid-cols-3"
               >
+                <div className="sm:col-span-3 flex items-center justify-between px-1">
+                  <span className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">
+                    Debate en 3 lecturas
+                  </span>
+                  <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">
+                    Resumen por Bobby · niveles en gráfica
+                  </span>
+                </div>
                 {([
                   {
                     key: 'alpha' as const,
@@ -276,7 +329,7 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
                     <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
                       {side.stance}
                     </div>
-                    <p className="line-clamp-4 min-h-[4rem] text-[13px] leading-5 text-white/75">{side.text || (voiceLang === 'es' ? 'Esperando análisis…' : 'Waiting for analysis…')}</p>
+                    <p className="line-clamp-3 min-h-[3.75rem] text-[13px] leading-5 text-white/75">{side.text || (voiceLang === 'es' ? 'Esperando análisis…' : 'Waiting for analysis…')}</p>
                     {/* Ties the card to the line of the same colour on the chart. */}
                     {(() => {
                       const line = debate.levels.find((level) => level.agent === side.key);

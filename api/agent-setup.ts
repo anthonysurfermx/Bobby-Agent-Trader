@@ -8,14 +8,40 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { verifyAgentRequest } from './_lib/agent-auth.js';
 import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
+import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 15 };
 
 const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const VALID_VOICES = ['male', 'female'];
+// Legacy male/female + voice personas (OpenAI TTS ids) from the wizard
+const VALID_VOICES = ['male', 'female', 'coral', 'ballad', 'sage', 'ash'];
 const VALID_PERSONALITIES = ['direct', 'analytical', 'wise'];
+// Mirror of src/lib/mascot.ts — the mascot's look, validated server-side
+const VALID_MASCOT_BODIES = ['matrix', 'plasma', 'lava', 'ice', 'gold', 'ghost'];
+const VALID_MASCOT_EYES = ['round', 'happy', 'focused', 'pixel'];
+const VALID_MASCOT_ACCESSORIES = ['none', 'visor', 'antenna', 'cap', 'headphones'];
+const VALID_MASCOT_AVATARS = ['bobby', 'byte', 'kora', 'zip', 'glitch', 'momo', 'flux', 'rook', 'axiom', 'halo'];
+
+function sanitizeMascot(m: unknown): { body: string; eyes: string; accessory: string; avatar?: string } | null {
+  if (!m || typeof m !== 'object') return null;
+  const c = m as Record<string, unknown>;
+  if (
+    typeof c.body === 'string' && VALID_MASCOT_BODIES.includes(c.body) &&
+    typeof c.eyes === 'string' && VALID_MASCOT_EYES.includes(c.eyes) &&
+    typeof c.accessory === 'string' && VALID_MASCOT_ACCESSORIES.includes(c.accessory)
+  ) {
+    const clean: { body: string; eyes: string; accessory: string; avatar?: string } = {
+      body: c.body, eyes: c.eyes, accessory: c.accessory,
+    };
+    // Premade 3D avatar id — strict allowlist so an invalid signed value
+    // can't persist and silently degrade to the procedural fallback
+    if (typeof c.avatar === 'string' && VALID_MASCOT_AVATARS.includes(c.avatar)) clean.avatar = c.avatar;
+    return clean;
+  }
+  return null;
+}
 const VALID_CADENCES = [4, 6, 12, 24];
 const VALID_MARKETS = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'NVDA', 'TSLA', 'AAPL', 'SPY', 'MSFT', 'XAUT', 'XAG'];
 const VALID_DELIVERY = ['web', 'telegram', 'email'];
@@ -32,14 +58,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = createClient(SB_URL, SB_SERVICE_KEY);
 
-  const { wallet_address, agent_name, voice, personality, cadence_hours, markets, delivery } = req.body || {};
+  const { wallet_address, agent_name, voice, personality, cadence_hours, markets, delivery, mascot } = req.body || {};
 
   // Validate wallet
   if (!wallet_address || !/^0x[a-fA-F0-9]{40}$/.test(wallet_address)) {
     return res.status(400).json({ error: 'Invalid wallet_address' });
   }
 
-  const authPayload = {
+  const authPayload: Record<string, unknown> = {
     wallet_address,
     agent_name,
     voice,
@@ -48,6 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     markets,
     delivery,
   };
+  if (mascot !== undefined) authPayload.mascot = mascot;
   const auth = await verifyAgentRequest(req, 'setup-agent', authPayload, wallet_address);
   if (!auth.ok) {
     return res.status(401).json({ error: auth.error });
@@ -91,25 +118,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: `Invalid delivery channels: ${invalidDelivery.join(', ')}` });
   }
 
+  // A provided-but-invalid mascot is a client bug or tampering — reject
+  // loudly instead of silently persisting a profile without companion
+  const cleanMascot = mascot !== undefined ? sanitizeMascot(mascot) : null;
+  if (mascot !== undefined && !cleanMascot) {
+    return res.status(400).json({ error: 'Invalid mascot' });
+  }
+
   try {
     const wallet = wallet_address.toLowerCase();
 
-    const { data: profile, error } = await supabase
+    const baseRow = {
+      wallet_address: wallet,
+      agent_name: agent_name.toUpperCase(),
+      voice,
+      personality,
+      cadence_hours,
+      markets,
+      delivery: delivery.includes('web') ? delivery : ['web', ...delivery],
+      status: 'deploying',
+      next_run_at: new Date().toISOString(),
+      last_error: null,
+    };
+
+    let mascotPersisted = !!cleanMascot;
+    let { data: profile, error } = await supabase
       .from('agent_profiles')
-      .upsert({
-        wallet_address: wallet,
-        agent_name: agent_name.toUpperCase(),
-        voice,
-        personality,
-        cadence_hours,
-        markets,
-        delivery: delivery.includes('web') ? delivery : ['web', ...delivery],
-        status: 'deploying',
-        next_run_at: new Date().toISOString(),
-        last_error: null,
-      }, { onConflict: 'wallet_address' })
+      .upsert(cleanMascot ? { ...baseRow, mascot: cleanMascot } : baseRow, { onConflict: 'wallet_address' })
       .select()
       .single();
+
+    // Migration guard: if the mascot column doesn't exist yet, retry without
+    // it but SAY SO in the response — the client keeps its local copy.
+    if (error && cleanMascot && /mascot/i.test(error.message || '')) {
+      console.error('[agent-setup] MIGRATION PENDING — mascot column missing. Run: ALTER TABLE agent_profiles ADD COLUMN IF NOT EXISTS mascot jsonb;');
+      mascotPersisted = false;
+      ({ data: profile, error } = await supabase
+        .from('agent_profiles')
+        .upsert(baseRow, { onConflict: 'wallet_address' })
+        .select()
+        .single());
+    }
 
     if (error) {
       console.error('[agent-setup] Supabase error:', error);
@@ -121,11 +170,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // For instant gratification, we also try to trigger it directly
     const authHeaders = internalAuthHeaders();
     if (Object.keys(authHeaders).length > 0) {
-      const baseUrl = req.headers.host?.includes('localhost')
-        ? `http://${req.headers.host}`
-        : 'https://defimexico.org';
-
-      fetch(`${baseUrl}/api/user-cycle`, {
+      fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/user-cycle`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -143,6 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ok: true,
       state: 'deploying',
       agent_profile: profile,
+      mascot_persisted: mascotPersisted,
       poll_after_ms: 3000,
     });
   } catch (err) {
