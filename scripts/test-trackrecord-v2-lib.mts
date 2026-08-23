@@ -8,6 +8,9 @@ import {
   buildHermesBenchmarkUrl,
   toE8,
 } from '../api/_lib/trackrecord-v2.ts';
+import { trackRecordWinRateFunction } from '../api/_lib/trackrecord-stats-adapter.ts';
+import { readFileSync } from 'node:fs';
+import { BASE } from '../api/_lib/chains.ts';
 
 let passed = 0;
 let failed = 0;
@@ -87,6 +90,15 @@ eq('deviation 0.5% = 50 bps', deviationBps(100_50000000n, 100_00000000n), 50);
 // floors toward zero — 99.999999 bps must NOT round up past the band
 eq('deviation floors', deviationBps(100_99999999n, 100_00000000n), 99);
 ok('deviation vs zero oracle = maxed', deviationBps(100n, 0n) === Number.MAX_SAFE_INTEGER);
+
+// --- public stats adapter: V1 only on canonical X Layer, V2 everywhere else ---
+eq('X Layer stats use V1 combined win rate', trackRecordWinRateFunction(196), 'getWinRate');
+eq('Base stats use V2 verified win rate', trackRecordWinRateFunction(8453), 'getVerifiedWinRate');
+eq('Base Sepolia stats use V2 verified win rate', trackRecordWinRateFunction(84532), 'getVerifiedWinRate');
+const protocolStatsSource = readFileSync('api/bobby-protocol-stats.ts', 'utf8');
+ok('public stats report the selected chain id', protocolStatsSource.includes('id: DEFAULT_CHAIN.id'));
+ok('public stats do not use a legacy chain-id alias', !protocolStatsSource.includes('id: XLAYER_CHAIN_ID'));
+ok('Base has an independent read fallback RPC', Boolean(BASE.rpcFallbackUrl));
 
 console.log(`\ntrackrecord-v2 lib: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

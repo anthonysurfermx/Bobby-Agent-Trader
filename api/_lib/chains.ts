@@ -95,6 +95,10 @@ export const BASE: ChainConfig = {
   id: BASE_CHAIN_ID,
   name: 'Base',
   rpcUrl: process.env.BASE_RPC_URL || 'https://mainnet.base.org',
+  // The public Base endpoint is rate-limited and explicitly unsuitable as a
+  // sole production dependency. Read paths fail over; writers still assert
+  // the expected chain before signing.
+  rpcFallbackUrl: process.env.BASE_RPC_FALLBACK_URL || 'https://base-rpc.publicnode.com',
   explorerUrl: 'https://basescan.org',
   explorerApiUrl: 'https://api.basescan.org/api',
   nativeSymbol: 'ETH',
