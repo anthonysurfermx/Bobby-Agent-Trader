@@ -117,27 +117,6 @@ const MARQUEE = [
   'It can tell you no',
 ];
 
-const LIFESTYLE_REELS = [
-  {
-    city: 'Seoul',
-    moment: 'The commute',
-    src: '/app/lifestyle/seoul.mp4',
-    tint: 'from-[#090b14]/15 via-transparent to-[#090b14]/80',
-  },
-  {
-    city: 'CDMX',
-    moment: 'The walk between plans',
-    src: '/app/lifestyle/cdmx.mp4',
-    tint: 'from-[#140d09]/15 via-transparent to-[#140d09]/80',
-  },
-  {
-    city: 'New York',
-    moment: 'The after-hours check',
-    src: '/app/lifestyle/nyc.mp4',
-    tint: 'from-[#090b14]/15 via-transparent to-[#090b14]/80',
-  },
-];
-
 // Aura presets shipped in the iOS build — the app's own vocabulary.
 const AURAS: Array<[string, string]> = [
   ['azul voltaje', '#2f6bff'],
@@ -231,7 +210,6 @@ export default function BobbyAppLanding() {
   const auraColor = AURAS[activeAura][1];
 
   const navItems: Array<[string, string]> = [
-    ['In the city', '#life'],
     ['The two eras', '#eras'],
     ['Your aura', '#aura'],
     ['The record', '#record'],
@@ -335,12 +313,12 @@ export default function BobbyAppLanding() {
                 </p>
               </motion.div>
 
-              <div className="relative mx-auto flex min-h-[460px] items-center justify-center md:min-h-[560px]">
+              <div className="relative mx-auto flex items-center justify-center">
                 <motion.div
                   initial={{ opacity: 0, y: 26, rotate: -7 }}
                   animate={{ opacity: 1, y: 0, rotate: -7 }}
                   transition={{ delay: 0.15, duration: 0.6 }}
-                  className="absolute -left-1 top-16 z-20 hidden w-[155px] md:block lg:-left-5"
+                  className="hidden -mr-10 mt-16 w-[180px] shrink-0 md:block"
                 >
                   <PhoneFrame src="/app/iphone-forge.png" alt="Describe your agent's aura — Bobby iOS onboarding" />
                 </motion.div>
@@ -348,27 +326,17 @@ export default function BobbyAppLanding() {
                   initial={{ opacity: 0, y: 26 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6 }}
-                  className="relative h-[450px] w-[253px] overflow-hidden rounded-[2rem] border border-white/20 bg-[#11121a] shadow-[0_35px_110px_rgba(0,0,0,.65)] md:h-[525px] md:w-[295px]"
+                  className="z-10 w-[230px] shrink-0 md:w-[250px]"
                 >
-                  <video autoPlay muted loop playsInline preload="auto" className="h-full w-full object-cover" aria-label="A person using Bobby while walking through Seoul">
-                    <source src="/app/lifestyle/seoul.mp4" type="video/mp4" />
-                  </video>
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/75" />
-                  <div className="absolute inset-x-5 bottom-5 flex items-end justify-between">
-                    <div>
-                      <div className="font-mono text-[9px] uppercase tracking-[.24em] text-white/60">In motion</div>
-                      <div className="mt-1 text-lg font-bold tracking-[-.04em]">Seoul, right now.</div>
-                    </div>
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-[#c3aaff] shadow-[0_0_14px_#c3aaff]" />
-                  </div>
+                  <PhoneFrame src="/app/iphone-desk.png" alt="Bobby Live Desk with a forged violet aura" glow eager />
                 </motion.div>
                 <motion.div
                   initial={{ opacity: 0, y: 26, rotate: 7 }}
                   animate={{ opacity: 1, y: 0, rotate: 7 }}
                   transition={{ delay: 0.25, duration: 0.6 }}
-                  className="absolute -right-1 bottom-16 z-20 hidden w-[155px] md:block lg:-right-5"
+                  className="hidden -ml-10 mt-20 w-[180px] shrink-0 md:block"
                 >
-                  <PhoneFrame src="/app/iphone-desk.png" alt="Bobby Live Desk with a forged violet aura" glow eager />
+                  <PhoneFrame src="/app/iphone-aura.png" alt="Aura forged — the interface takes your energy" />
                 </motion.div>
               </div>
             </div>
@@ -390,51 +358,13 @@ export default function BobbyAppLanding() {
           </div>
         </div>
 
-        {/* ── Life with Bobby ─────────────────────────────────────── */}
-        <section id="life" className="relative overflow-hidden border-b border-white/10 bg-[#0a0a0e]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(124,82,255,.24),transparent_34%),radial-gradient(circle_at_86%_70%,rgba(47,107,255,.16),transparent_36%)]" />
-          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">01 / In the city</div>
-                <h2 className="max-w-2xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Your day moves.<br /><span className="text-white/45">Your second opinion does too.</span></h2>
-              </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Not another terminal to stare at. A sharp voice in your pocket, when you are already on your way.</p>
-            </div>
-            <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto px-5 pb-3 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
-              {LIFESTYLE_REELS.map((reel, index) => (
-                <motion.article
-                  key={reel.city}
-                  initial={{ opacity: 0, y: 18 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ delay: index * 0.08 }}
-                  className="group relative aspect-[9/14] min-w-[72vw] snap-center overflow-hidden rounded-[1.8rem] border border-white/10 bg-black md:min-w-0"
-                >
-                  <video autoPlay muted loop playsInline preload="metadata" className="h-full w-full object-cover transition duration-700 group-hover:scale-105" aria-label={`${reel.city} lifestyle film`}>
-                    <source src={reel.src} type="video/mp4" />
-                  </video>
-                  <div className={`absolute inset-0 bg-gradient-to-b ${reel.tint}`} />
-                  <div className="absolute inset-x-6 bottom-6 flex items-end justify-between">
-                    <div>
-                      <div className="font-mono text-[10px] uppercase tracking-[.2em] text-white/55">{reel.moment}</div>
-                      <div className="mt-1 text-2xl font-bold tracking-[-.05em]">{reel.city}</div>
-                    </div>
-                    <span className="grid h-9 w-9 place-items-center rounded-full border border-white/25 bg-black/20 font-mono text-xs backdrop-blur">{String(index + 1).padStart(2, '0')}</span>
-                  </div>
-                </motion.article>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* ── 01 The two eras ─────────────────────────────────────── */}
         <section id="eras" className="relative overflow-hidden bg-[#08080a]">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,82,255,.14),transparent_46%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">02 / The two eras</div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">01 / The two eras</div>
                 <h2 className="max-w-2xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">
                   The first era was asking.<br />
                   <span className="text-white/45">The second is verifying.</span>
@@ -492,7 +422,7 @@ export default function BobbyAppLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="grid items-center gap-14 lg:grid-cols-2">
               <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">03 / Your aura</div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">02 / Your aura</div>
                 <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">
                   It looks like you,<br />
                   <span className="text-white/45">not like a bank app.</span>
@@ -551,7 +481,7 @@ export default function BobbyAppLanding() {
         <section className="relative overflow-hidden bg-[#08080a]">
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">04 / What you get</div>
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">03 / What you get</div>
               <h2 className="max-w-2xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">
                 Three things a chat window<br />
                 <span className="text-white/45">will never give you.</span>
@@ -590,7 +520,7 @@ export default function BobbyAppLanding() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(47,107,255,.18),transparent_44%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">05 / How a call is made</div>
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">04 / How a call is made</div>
               <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">
                 Four stages.<br />
                 <span className="text-white/45">The order is the guarantee.</span>
@@ -620,7 +550,7 @@ export default function BobbyAppLanding() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(124,82,255,.16),transparent_42%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">06 / The record</div>
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">05 / The record</div>
               <h2 className="max-w-3xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">
                 {formatNumber(published)} calls published<br />
                 <span className="text-white/45">before anyone knew the outcome.</span>
@@ -665,7 +595,7 @@ export default function BobbyAppLanding() {
         <section className="relative overflow-hidden border-y border-white/10 bg-[#050505]">
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-10">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">07 / What it does not do</div>
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#c3aaff]">06 / What it does not do</div>
               <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">
                 Bobby never touches<br />
                 <span className="text-white/45">your money.</span>
@@ -717,11 +647,7 @@ export default function BobbyAppLanding() {
       <footer className="border-t border-white/10 bg-[#050505]">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-10 font-mono text-[11px] uppercase tracking-[0.15em] text-white/35 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <span>© 2026 Bobby Protocol</span>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-            <a href="/privacy" className="transition hover:text-white">Privacy</a>
-            <a href="/terms" className="transition hover:text-white">Terms</a>
-            <span>Refuted before execution. Published before the outcome.</span>
-          </div>
+          <span>Refuted before execution. Published before the outcome.</span>
         </div>
       </footer>
     </div>
