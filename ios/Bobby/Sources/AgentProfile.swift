@@ -20,10 +20,10 @@ enum AgentVoice: String, CaseIterable, Identifiable {
     }
     var flavor: String {
         switch self {
-        case .dalia: return "cálida · MX"
-        case .jorge: return "grave · MX"
-        case .paloma: return "fresca · US"
-        case .alonso: return "joven · US"
+        case .dalia: return L.t("warm · MX", "cálida · MX")
+        case .jorge: return L.t("deep · MX", "grave · MX")
+        case .paloma: return L.t("bright · US", "fresca · US")
+        case .alonso: return L.t("young · US", "joven · US")
         }
     }
 }
@@ -67,14 +67,14 @@ enum AuraForge {
     /// to a trader archetype — language the user can own and share.
     static func archetype(hue: Double) -> (name: String, motto: String) {
         switch hue {
-        case ..<0.06, 0.95...: return ("CONTRARIAN", "va contra la manada")
-        case ..<0.10: return ("SCALPER", "rápido y sin apego")
-        case ..<0.30: return ("SWING", "paciencia dorada")
-        case ..<0.47: return ("TREND RIDER", "surfea la tendencia")
-        case ..<0.56: return ("SNIPER", "espera el nivel exacto")
-        case ..<0.68: return ("SISTEMÁTICO", "datos sobre vibes")
-        case ..<0.82: return ("NIGHT OWL", "vive la sesión nocturna")
-        default: return ("SENTIMENT", "lee el mood del mercado")
+        case ..<0.06, 0.95...: return ("CONTRARIAN", L.t("goes against the herd", "va contra la manada"))
+        case ..<0.10: return ("SCALPER", L.t("fast and unattached", "rápido y sin apego"))
+        case ..<0.30: return ("SWING", L.t("golden patience", "paciencia dorada"))
+        case ..<0.47: return ("TREND RIDER", L.t("surfs the trend", "surfea la tendencia"))
+        case ..<0.56: return ("SNIPER", L.t("waits for the exact level", "espera el nivel exacto"))
+        case ..<0.68: return (L.t("SYSTEMATIC", "SISTEMÁTICO"), L.t("data over vibes", "datos sobre vibes"))
+        case ..<0.82: return ("NIGHT OWL", L.t("lives the night session", "vive la sesión nocturna"))
+        default: return ("SENTIMENT", L.t("reads the market mood", "lee el mood del mercado"))
         }
     }
 }
@@ -92,16 +92,16 @@ enum AgentVibe: String, CaseIterable, Identifiable {
     }
     var desc: String {
         switch self {
-        case .chill: return "relajado, como tu compa que sí sabe"
-        case .directo: return "cero rodeos, puro dato"
-        case .pro: return "mesa de dinero, técnico"
+        case .chill: return L.t("laid back, like a friend who actually knows", "relajado, como tu compa que sí sabe")
+        case .directo: return L.t("no fluff, straight data", "cero rodeos, puro dato")
+        case .pro: return L.t("trading desk, technical", "mesa de dinero, técnico")
         }
     }
     var sample: String {
         switch self {
-        case .chill: return "Va — bitcoin anda en sesenta y cuatro mil, tranquilo el día."
-        case .directo: return "Bitcoin: sesenta y cuatro mil. Tendencia alcista. Punto."
-        case .pro: return "Bitcoin cotiza en sesenta y cuatro mil con estructura alcista intacta."
+        case .chill: return L.t("Alright — bitcoin is at sixty four thousand, quiet day.", "Va — bitcoin anda en sesenta y cuatro mil, tranquilo el día.")
+        case .directo: return L.t("Bitcoin: sixty four thousand. Uptrend. Period.", "Bitcoin: sesenta y cuatro mil. Tendencia alcista. Punto.")
+        case .pro: return L.t("Bitcoin trades at sixty four thousand with its bullish structure intact.", "Bitcoin cotiza en sesenta y cuatro mil con estructura alcista intacta.")
         }
     }
 }
@@ -135,9 +135,9 @@ final class AgentProfile: ObservableObject {
     /// Vibe-flavored greeting for the first bubble.
     var greeting: String {
         switch vibe {
-        case .chill: return "Qué onda — soy \(name). Pregúntame de cualquier activo: bitcoin, NVIDIA, oro, lo que traigas."
-        case .directo: return "Soy \(name). Dime un activo y te doy precio, niveles y lectura. Sin rodeos."
-        case .pro: return "Soy \(name), tu mesa de análisis. Consulta cualquier activo: cripto, acciones, commodities."
+        case .chill: return "Hey — I am \(name). Ask me about any asset: bitcoin, NVIDIA, gold, whatever you bring."
+        case .directo: return "I am \(name). Name an asset and I give you price, levels and the read. No fluff."
+        case .pro: return "I am \(name), your analysis desk. Query any asset: crypto, equities, commodities."
         }
     }
 }

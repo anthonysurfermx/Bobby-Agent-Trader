@@ -23,6 +23,7 @@ struct MascotGalleryView: View {
     @State private var secretPhrase: String?
     @State private var burst = 0            // particle burst trigger
     @State private var justChosen = false
+    @State private var emoteEvent: CompanionEmoteEvent?
 
     init(store: CompanionStore, voice: NeuralVoice? = nil, voiceId: String = AgentVoice.dalia.rawValue) {
         self.store = store
@@ -47,6 +48,9 @@ struct MascotGalleryView: View {
                 identityBlock
                     .padding(.top, 2)
                 ctaButton
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                emoteDeck
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                 squadRail
@@ -104,6 +108,7 @@ struct MascotGalleryView: View {
             MascotSceneView(
                 assetName: selected.id,
                 interactive: true,
+                emoteEvent: emoteEvent,
                 onLoading: { loading, failed in
                     stageLoading = loading
                     stageFailed = failed
@@ -131,7 +136,7 @@ struct MascotGalleryView: View {
                     Image(systemName: "cube.transparent")
                         .font(.system(size: 34))
                         .foregroundStyle(Theme.muted)
-                    Text("No se pudo cargar el modelo")
+                    Text(L.t("Could not load the model", "No se pudo cargar el modelo"))
                         .font(.mono(10, .regular))
                         .foregroundStyle(Theme.muted)
                 }
@@ -142,7 +147,7 @@ struct MascotGalleryView: View {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(Theme.text.opacity(0.8))
-                    Text("SE DESBLOQUEA EN NIVEL \(selected.requiredLevel)")
+                    Text(L.t("UNLOCKS AT LEVEL \(selected.requiredLevel)", "SE DESBLOQUEA EN NIVEL \(selected.requiredLevel)"))
                         .font(.mono(9, .bold))
                         .kerning(1.6)
                         .foregroundStyle(Theme.muted)
@@ -163,7 +168,7 @@ struct MascotGalleryView: View {
     private var identityBlock: some View {
         VStack(spacing: 4) {
             HStack(spacing: 8) {
-                Text(selected.label)
+                Text(isActive ? selected.name(at: store.level.number) : selected.label)
                     .font(.mono(22, .black))
                     .kerning(3.0)
                     .foregroundStyle(selected.tint)
@@ -199,9 +204,9 @@ struct MascotGalleryView: View {
                         Text("DISCIPLINE XP \(store.disciplineXP)")
                         Spacer()
                         if let next = store.nextLevel {
-                            Text("SIG: \(next.name) · \(next.minXP)")
+                            Text(L.t("NEXT: \(next.name) · \(next.minXP)", "SIG: \(next.name) · \(next.minXP)"))
                         } else {
-                            Text("MÁXIMO NIVEL")
+                            Text(L.t("MAX LEVEL", "NIVEL MÁXIMO"))
                         }
                     }
                     .font(.mono(7.5, .semibold))
@@ -211,7 +216,7 @@ struct MascotGalleryView: View {
                 .padding(.horizontal, 52)
                 .padding(.top, 8)
             } else {
-                Text("Arrastra para girarlo · toca para su reacción · mantén presionado…")
+                Text(L.t("Drag to spin · tap for a reaction · hold for a secret…", "Arrastra para girarlo · toca para su reacción · mantén presionado…"))
                     .font(.mono(8, .regular))
                     .foregroundStyle(Theme.muted.opacity(0.6))
                     .padding(.top, 8)
@@ -231,8 +236,8 @@ struct MascotGalleryView: View {
             voice?.speak(selected.selectLine, voiceId: voiceId)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { justChosen = false }
         } label: {
-            Text(isActive ? (justChosen ? "✓ AHORA ES TU COMPANION" : "✓ TU COMPANION") :
-                 isUnlocked ? "HACER MI COMPANION" : "🔒 NIVEL \(selected.requiredLevel) REQUERIDO")
+            Text(isActive ? (justChosen ? L.t("✓ YOUR COMPANION NOW", "✓ AHORA ES TU COMPANION") : L.t("✓ YOUR COMPANION", "✓ TU COMPANION")) :
+                 isUnlocked ? L.t("MAKE IT MY COMPANION", "HACER MI COMPANION") : L.t("🔒 LEVEL \(selected.requiredLevel) REQUIRED", "🔒 NIVEL \(selected.requiredLevel) REQUERIDO"))
                 .font(.mono(12, .black))
                 .kerning(2.0)
                 .frame(maxWidth: .infinity)
@@ -246,6 +251,50 @@ struct MascotGalleryView: View {
         }
         .disabled(!isUnlocked || isActive)
         .animation(.spring(duration: 0.3), value: justChosen)
+    }
+
+    // MARK: earned emotes
+
+    private var emoteDeck: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("EARNED EMOTES")
+                    .font(.mono(8, .bold))
+                    .kerning(1.4)
+                    .foregroundStyle(Theme.muted)
+                Spacer()
+                Text("DISCIPLINE, NOT SPEND")
+                    .font(.mono(7, .semibold))
+                    .foregroundStyle(selected.tintSoft.opacity(0.62))
+            }
+            HStack(spacing: 7) {
+                ForEach(CompanionEmote.allCases) { emote in
+                    let unlocked = store.level.number >= emote.requiredLevel
+                    Button {
+                        guard unlocked else {
+                            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                            return
+                        }
+                        emoteEvent = CompanionEmoteEvent(emote: emote)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: unlocked ? emote.symbol : "lock.fill")
+                                .font(.system(size: 12, weight: .bold))
+                            Text(unlocked ? emote.label : "LVL \(emote.requiredLevel)")
+                                .font(.mono(6.5, .bold))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(unlocked ? selected.tintSoft : Theme.muted.opacity(0.52))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 9).fill(unlocked ? selected.tint.opacity(0.08) : Theme.card))
+                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(unlocked ? selected.tint.opacity(0.28) : Theme.stroke, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     // MARK: squad rail (portraits)
@@ -290,7 +339,7 @@ struct MascotGalleryView: View {
                                 .font(.mono(8.5, .bold))
                                 .kerning(1.0)
                                 .foregroundStyle(selectedId == c.id ? c.tint : Theme.text.opacity(0.5))
-                            Text(unlocked ? c.role : "NIVEL \(c.requiredLevel)")
+                            Text(unlocked ? c.role : L.t("LEVEL \(c.requiredLevel)", "NIVEL \(c.requiredLevel)"))
                                 .font(.mono(6, .regular))
                                 .kerning(0.6)
                                 .foregroundStyle(Theme.muted.opacity(0.7))
@@ -335,6 +384,7 @@ private struct SelectionBurst: View {
 struct MascotSceneView: UIViewRepresentable {
     let assetName: String
     var interactive: Bool = true
+    var emoteEvent: CompanionEmoteEvent? = nil
     var onLoading: ((_ loading: Bool, _ failed: Bool) -> Void)? = nil
     var onSecretPhrase: (() -> Void)? = nil
 
@@ -366,6 +416,10 @@ struct MascotSceneView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.owner = self
+        if let event = emoteEvent, context.coordinator.lastEmoteId != event.id {
+            context.coordinator.lastEmoteId = event.id
+            context.coordinator.play(event.emote)
+        }
         guard context.coordinator.currentAsset != assetName else { return }
         load(into: view, coordinator: context.coordinator)
     }
@@ -379,6 +433,8 @@ struct MascotSceneView: UIViewRepresentable {
         weak var modelRoot: SCNNode?
         weak var view: SCNView?
         var initialCameraPosition = SCNVector3Zero
+        var lastEmoteId: UUID?
+        var modelRadius: Float = 1
 
         func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
 
@@ -389,15 +445,47 @@ struct MascotSceneView: UIViewRepresentable {
 
         // Tap = emote: quick squash-and-stretch + haptic
         @objc func onTap() {
-            guard let node = modelRoot else { return }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            let squash = SCNAction.sequence([
-                .scale(to: 1.1, duration: 0.09),
-                .scale(to: 0.94, duration: 0.09),
-                .scale(to: 1.0, duration: 0.16),
-            ])
-            squash.timingMode = .easeInEaseOut
-            node.runAction(squash)
+            play(.pulse)
+        }
+
+        func play(_ emote: CompanionEmote) {
+            guard let node = modelRoot else { return }
+            node.removeAction(forKey: "emote")
+            let action: SCNAction
+            switch emote {
+            case .pulse:
+                action = .sequence([
+                    .scale(to: 1.1, duration: 0.09),
+                    .scale(to: 0.94, duration: 0.09),
+                    .scale(to: 1.0, duration: 0.16),
+                ])
+            case .orbit:
+                action = .rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 0.62)
+            case .victory:
+                action = .sequence([
+                    .moveBy(x: 0, y: CGFloat(modelRadius * 0.18), z: 0, duration: 0.18),
+                    .rotateBy(x: 0, y: .pi, z: 0, duration: 0.24),
+                    .moveBy(x: 0, y: CGFloat(-modelRadius * 0.18), z: 0, duration: 0.22),
+                ])
+            case .shield:
+                action = .sequence([
+                    .fadeOpacity(to: 0.58, duration: 0.08),
+                    .scale(to: 1.14, duration: 0.16),
+                    .fadeOpacity(to: 1, duration: 0.12),
+                    .scale(to: 1, duration: 0.2),
+                ])
+            case .legend:
+                action = .group([
+                    .sequence([
+                        .scale(to: 1.16, duration: 0.18),
+                        .scale(to: 1, duration: 0.28),
+                    ]),
+                    .rotateBy(x: 0, y: 4 * .pi, z: 0, duration: 0.75),
+                ])
+            }
+            action.timingMode = .easeInEaseOut
+            node.runAction(action, forKey: "emote")
         }
 
         // Double tap = back to the initial pose, spin resumes
@@ -451,6 +539,7 @@ struct MascotSceneView: UIViewRepresentable {
 
                 let root = scene.rootNode
                 let (center, radius) = root.boundingSphere
+                coordinator.modelRadius = max(radius, 0.001)
                 root.childNodes.forEach { node in
                     node.position.x -= center.x
                     node.position.y -= center.y
@@ -469,6 +558,70 @@ struct MascotSceneView: UIViewRepresentable {
                 coordinator.startSpin()
                 self.onLoading?(false, false)
             }
+        }
+    }
+}
+
+// ---- Evolution moment ----------------------------------------
+// The payoff: discipline made the companion change form, name and tone.
+
+struct EvolutionOverlay: View {
+    let companion: Companion
+    let level: CompanionLevel
+    let onDismiss: () -> Void
+
+    @State private var appeared = false
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.88).ignoresSafeArea()
+                .onTapGesture { onDismiss() }
+
+            VStack(spacing: 18) {
+                Text(L.t("EVOLVED", "EVOLUCIONÓ"))
+                    .font(.mono(10, .black))
+                    .kerning(4.0)
+                    .foregroundStyle(companion.tintSoft)
+
+                MascotSceneView(assetName: companion.id, interactive: false)
+                    .frame(width: 240, height: 240)
+                    .scaleEffect(appeared ? 1 : 0.5)
+                    .shadow(color: companion.tint.opacity(0.6), radius: 40)
+
+                VStack(spacing: 6) {
+                    Text(companion.name(at: level.number))
+                        .font(.mono(28, .black))
+                        .kerning(3.0)
+                        .foregroundStyle(companion.tint)
+                        .shadow(color: companion.tint.opacity(0.7), radius: 14)
+                    Text("LEVEL \(level.number) · \(level.name)")
+                        .font(.mono(10, .bold))
+                        .kerning(2.4)
+                        .foregroundStyle(Theme.text.opacity(0.7))
+                    Text(L.t("Earned with discipline, never with volume.",
+                             "Ganado con disciplina, nunca con volumen."))
+                        .font(.mono(9, .regular))
+                        .foregroundStyle(Theme.muted)
+                        .padding(.top, 4)
+                }
+                .opacity(appeared ? 1 : 0)
+                .offset(y: appeared ? 0 : 14)
+
+                Button(action: onDismiss) {
+                    Text(L.t("CONTINUE", "SEGUIR"))
+                        .font(.mono(11, .black))
+                        .kerning(2.2)
+                        .foregroundStyle(Theme.bg)
+                        .padding(.horizontal, 34)
+                        .padding(.vertical, 12)
+                        .background(Capsule().fill(companion.tint))
+                }
+                .padding(.top, 6)
+                .opacity(appeared ? 1 : 0)
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(duration: 0.7, bounce: 0.4)) { appeared = true }
         }
     }
 }

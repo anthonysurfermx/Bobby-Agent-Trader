@@ -22,26 +22,33 @@ enum DeskPhase: Int, CaseIterable {
     var label: String {
         switch self {
         case .idle: return "DESK ONLINE"
-        case .resolving: return "LOCALIZANDO ACTIVO"
+        case .resolving: return L.t("RESOLVING ASSET", "LOCALIZANDO ACTIVO")
         case .alpha: return "ALPHA HUNTER"
         case .redTeam: return "RED TEAM"
-        case .cio: return "CIO DECIDE"
-        case .complete: return "VEREDICTO LISTO"
-        case .error: return "ENLACE INCOMPLETO"
+        case .cio: return L.t("CIO DECIDES", "CIO DECIDE")
+        case .complete: return L.t("VERDICT READY", "VEREDICTO LISTO")
+        case .error: return L.t("INCOMPLETE LINK", "ENLACE INCOMPLETO")
         }
     }
 
     var hint: String {
         switch self {
-        case .idle: return "Toca la orbe y nombra un activo"
-        case .resolving: return "Resolviendo ticker y venue"
-        case .alpha: return "Buscando la oportunidad"
-        case .redTeam: return "Atacando la tesis"
-        case .cio: return "Cruzando riesgo y convicción"
-        case .complete: return "Mercado, niveles y tesis sincronizados"
-        case .error: return "Prueba con el nombre o ticker"
+        case .idle: return L.t("Tap your companion and name an asset", "Toca a tu companion y nombra un activo")
+        case .resolving: return L.t("Resolving ticker and venue", "Resolviendo ticker y venue")
+        case .alpha: return L.t("Hunting the opportunity", "Buscando la oportunidad")
+        case .redTeam: return L.t("Attacking the thesis", "Atacando la tesis")
+        case .cio: return L.t("Weighing risk against conviction", "Cruzando riesgo y convicción")
+        case .complete: return L.t("Market, levels and thesis in sync", "Mercado, niveles y tesis sincronizados")
+        case .error: return L.t("Try the name or the ticker", "Prueba con el nombre o ticker")
         }
     }
+}
+
+struct NoTradeMoment: Identifiable, Equatable {
+    let id = UUID()
+    let symbol: String
+    let reason: String
+    let disciplineXP: Int
 }
 
 @MainActor
@@ -55,6 +62,7 @@ final class BobbyViewModel: ObservableObject {
     @Published var speakEnabled = true
     @Published var phase: DeskPhase = .idle
     @Published var timeframe: MarketTimeframe = .oneHour
+    @Published var noTradeMoment: NoTradeMoment? = nil
 
     let voice = NeuralVoice()
     let profile = AgentProfile()
@@ -78,9 +86,27 @@ final class BobbyViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// The companion IS the identity: its evolved name and its own voice.
+    /// Falls back to the onboarding profile when no companion is chosen.
+    var displayName: String {
+        companions.companion?.name(at: companions.level.number) ?? profile.name
+    }
+    var voicePersona: String? { companions.companion?.voicePersona }
+
+    /// Greeting in the companion's voice, with the tone its level earned.
+    var companionGreeting: String {
+        guard let comp = companions.companion else { return profile.greeting }
+        return L.t("I am \(displayName). I \(comp.personality).", "Soy \(displayName), \(comp.personality).")
+            + levelTone(companions.level.number)
+    }
+
+    func say(_ text: String) {
+        voice.speak(text, voiceId: profile.voiceId, persona: voicePersona)
+    }
+
     func bootGreetingIfNeeded() {
         guard messages.isEmpty else { return }
-        messages.append(ChatMessage(fromBobby: true, text: profile.greeting))
+        messages.append(ChatMessage(fromBobby: true, text: companionGreeting))
 
         // Memory v1 recap: if the user asked about something on a previous
         // day, follow up with its live daily move — real data or nothing.
@@ -89,15 +115,15 @@ final class BobbyViewModel: ObservableObject {
             let market = await BobbyAPI.market(recap.symbol)
             let move: String
             if let change = market.changePct {
-                move = " Hoy va \(change >= 0 ? "+" : "")\(String(format: "%.1f", change))%."
+                move = L.t(" It is \(change >= 0 ? "up " : "down ")\(String(format: "%.1f", abs(change)))% today.", " Hoy va \(change >= 0 ? "+" : "-")\(String(format: "%.1f", abs(change)))%.")
             } else {
                 move = ""
             }
             let text: String
             switch profile.vibe {
-            case .chill: text = "La última vez andabas viendo \(recap.symbol).\(move) ¿Le damos otra vuelta?"
-            case .directo: text = "Tu última consulta: \(recap.symbol).\(move) ¿Analizo de nuevo?"
-            case .pro: text = "Seguimiento de \(recap.symbol):\(move.isEmpty ? " sin dato intradía." : move) ¿Actualizo la lectura?"
+            case .chill: text = L.t("Last time you were watching \(recap.symbol).\(move) Want another look?", "La última vez andabas viendo \(recap.symbol).\(move) ¿Le damos otra vuelta?")
+            case .directo: text = L.t("Your last query: \(recap.symbol).\(move) Should I run it again?", "Tu última consulta: \(recap.symbol).\(move) ¿Analizo de nuevo?")
+            case .pro: text = L.t("Following up on \(recap.symbol):\(move.isEmpty ? " no intraday data." : move) Refresh the read?", "Seguimiento de \(recap.symbol):\(move.isEmpty ? " sin dato intradía." : move) ¿Actualizo la lectura?")
             }
             guard messages.count == 1 else { return }
             withAnimation(.spring(duration: 0.4)) {
@@ -120,13 +146,14 @@ final class BobbyViewModel: ObservableObject {
         thinking = true
         phase = .resolving
         lastAnswer = nil
+        noTradeMoment = nil
 
         Task {
             defer { thinking = false }
 
             guard let asset = await BobbyAPI.resolveAsset(q) else {
                 phase = .error
-                messages.append(ChatMessage(fromBobby: true, text: "No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro."))
+                messages.append(ChatMessage(fromBobby: true, text: L.t("I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.", "No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro.")))
                 return
             }
 
@@ -169,9 +196,20 @@ final class BobbyViewModel: ObservableObject {
             let text = answer.summary
             messages.append(ChatMessage(fromBobby: true, text: text))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            if speakEnabled { voice.speak(text, voiceId: profile.voiceId) }
-            // Discipline XP: reviewed a full debate to its verdict (capped daily)
-            if companions.awardDiscipline(10) { streak = companions.disciplineStreak }
+            if speakEnabled { say(text) }
+            // A full review earns discipline. Respecting a fail-closed verdict
+            // earns more because restraint is the behavior Bobby is teaching.
+            let earnedXP = answer.isNoTrade ? 20 : 10
+            if companions.awardDiscipline(earnedXP) { streak = companions.disciplineStreak }
+            if answer.isNoTrade {
+                withAnimation(.spring(duration: 0.52, bounce: 0.24)) {
+                    noTradeMoment = NoTradeMoment(
+                        symbol: answer.symbol,
+                        reason: answer.noTradeReason,
+                        disciplineXP: earnedXP
+                    )
+                }
+            }
         }
     }
 
@@ -208,6 +246,22 @@ struct ContentView: View {
             } else {
                 OnboardingView(profile: vm.profile, voice: vm.voice).transition(.opacity)
             }
+
+            // The evolution moment: name, tone and form change together
+            if let evo = vm.companions.pendingEvolution, let comp = vm.companions.companion {
+                EvolutionOverlay(companion: comp, level: evo) {
+                    vm.companions.pendingEvolution = nil
+                }
+                .transition(.opacity)
+                .zIndex(10)
+            }
+        }
+        .onChange(of: vm.companions.pendingEvolution?.number) { _, newLevel in
+            guard let newLevel, let comp = vm.companions.companion else { return }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let evolvedName = comp.name(at: newLevel)
+            vm.say(L.t("I evolved. Call me \(evolvedName) now.\(levelTone(newLevel))",
+                       "Evolucioné. Ahora dime \(evolvedName).\(levelTone(newLevel))"))
         }
         .onAppear { vm.bootGreetingIfNeeded() }
         // Hands-free loop: when a voice-driven answer finishes speaking, the
@@ -247,7 +301,11 @@ struct ContentView: View {
             deskHeader
             ScrollView {
                 LazyVStack(spacing: 12) {
-                    liveConsole
+                    if let moment = vm.noTradeMoment {
+                        noTradeSignature(moment)
+                    } else {
+                        liveConsole
+                    }
                     if vm.snapshot == nil && !vm.thinking { commandDeck }
                     if vm.snapshot != nil { marketSurface }
                     if vm.snapshot != nil || vm.thinking { debateRail }
@@ -301,7 +359,7 @@ struct ContentView: View {
                     .kerning(2.4)
                     .foregroundStyle(Theme.text.opacity(0.80))
                 if let comp = vm.companions.companion {
-                    Text("\(comp.label) · \(vm.companions.level.name)")
+                    Text("\(comp.name(at: vm.companions.level.number)) · \(vm.companions.level.name)")
                         .font(.mono(7.5, .semibold))
                         .kerning(1.2)
                         .foregroundStyle(comp.tintSoft.opacity(0.8))
@@ -325,12 +383,12 @@ struct ContentView: View {
                 Button {
                     showAuraCard = true
                 } label: {
-                    Label("Mi aura", systemImage: "sparkles")
+                    Label(L.t("My aura", "Mi aura"), systemImage: "sparkles")
                 }
                 Section {
-                    Label(vm.streak >= 1 ? "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥" : "Sin racha aún — revisa un análisis",
+                    Label(vm.streak >= 1 ? L.t("Discipline streak: \(vm.streak) day\(vm.streak == 1 ? "" : "s") 🔥", "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥") : L.t("No streak yet — review an analysis", "Sin racha aún — revisa un análisis"),
                           systemImage: "flame")
-                    Label("READ ONLY — Bobby no ejecuta", systemImage: "lock.shield")
+                    Label(L.t("READ ONLY — Bobby never executes", "READ ONLY — Bobby no ejecuta"), systemImage: "lock.shield")
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -407,6 +465,91 @@ struct ContentView: View {
         .padding(.bottom, 4)
     }
 
+    private func noTradeSignature(_ moment: NoTradeMoment) -> some View {
+        let halo = bobbyCompanions.first { $0.id == "halo" }!
+        return VStack(spacing: 8) {
+            HStack {
+                Text("HALO // RISK GATE")
+                    .font(.mono(9, .bold))
+                    .kerning(1.8)
+                    .foregroundStyle(halo.tintSoft)
+                Spacer()
+                Button {
+                    withAnimation(.easeOut(duration: 0.24)) { vm.noTradeMoment = nil }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Theme.cardSoft))
+                }
+                .accessibilityLabel("Dismiss no trade moment")
+            }
+
+            ZStack {
+                Circle()
+                    .fill(halo.tint.opacity(0.08))
+                    .frame(width: 224, height: 224)
+                    .overlay(Circle().stroke(halo.tint.opacity(0.28), lineWidth: 1))
+                    .shadow(color: halo.tint.opacity(0.34), radius: 32)
+                MascotSceneView(assetName: halo.id, interactive: false, emoteEvent: CompanionEmoteEvent(id: moment.id, emote: .shield))
+                    .allowsHitTesting(false)
+                    .frame(width: 206, height: 206)
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.system(size: 42, weight: .bold))
+                    .foregroundStyle(halo.tintSoft.opacity(0.92))
+                    .offset(y: 72)
+                    .shadow(color: halo.tint, radius: 14)
+                    .symbolEffect(.pulse, options: .repeating.speed(0.7))
+            }
+            .frame(height: 224)
+
+            Text("NO TRADE")
+                .font(.mono(24, .black))
+                .kerning(4)
+                .foregroundStyle(halo.tintSoft)
+            Text("No setup yet. Capital protected.")
+                .font(.rounded(16, .bold))
+                .foregroundStyle(Theme.text)
+            Text(moment.reason)
+                .font(.mono(9, .medium))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 18)
+
+            HStack(spacing: 10) {
+                Label("+\(moment.disciplineXP) DISCIPLINE XP", systemImage: "sparkles")
+                    .font(.mono(8.5, .bold))
+                    .foregroundStyle(halo.tintSoft)
+                Spacer()
+                HStack(spacing: 6) {
+                    Image(systemName: "seal.fill")
+                    Text("AXIOM · DISCIPLINE LOG")
+                }
+                .font(.mono(7.5, .bold))
+                .foregroundStyle(Color(hue: 0.115, saturation: 0.52, brightness: 1))
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 11)
+            .background(Theme.panel.opacity(0.74))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(halo.tint.opacity(0.18), lineWidth: 1))
+        }
+        .padding(14)
+        .background(
+            LinearGradient(
+                colors: [halo.tint.opacity(0.12), Theme.card, Color(hue: 0.115, saturation: 0.45, brightness: 0.18).opacity(0.35)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(halo.tint.opacity(0.32), lineWidth: 1))
+        .transition(.scale(scale: 0.92).combined(with: .opacity))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No trade for \(moment.symbol). Capital protected. Plus \(moment.disciplineXP) discipline XP.")
+    }
+
     private var commandDeck: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -430,7 +573,7 @@ struct ContentView: View {
                                 Text(ticker)
                                     .font(.mono(13, .bold))
                                     .foregroundStyle(Theme.text)
-                                Text("ANALIZAR  →")
+                                Text(L.t("ANALYZE  →", "ANALIZAR  →"))
                                     .font(.mono(8, .bold))
                                     .kerning(1)
                                     .foregroundStyle(Theme.accentSoft)
@@ -678,7 +821,7 @@ struct ContentView: View {
                         .font(.rounded(15, .semibold))
                         .foregroundStyle(Theme.text.opacity(0.90))
                         .lineSpacing(4)
-                    Text("Escenario técnico general · Bobby no ejecuta operaciones")
+                    Text(L.t("General technical context · Bobby never executes trades", "Escenario técnico general · Bobby no ejecuta operaciones"))
                         .font(.mono(8, .medium))
                         .foregroundStyle(Theme.muted)
                 }
@@ -726,11 +869,11 @@ struct ContentView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.accentSoft)
             VStack(alignment: .leading, spacing: 3) {
-                Text("BOBBY APRENDE EN PÚBLICO")
+                Text("BOBBY LEARNS IN PUBLIC")
                     .font(.mono(9, .bold))
                     .kerning(1.1)
                     .foregroundStyle(Theme.accentSoft)
-                Text("Sus calls se graban on-chain y cualquiera puede retarlas · esta consulta aún no genera receipt individual")
+                Text(L.t("His calls are recorded on-chain and anyone can challenge them · this query does not mint an individual receipt yet", "Sus calls se graban on-chain y cualquiera puede retarlas · esta consulta aún no genera receipt individual"))
                     .font(.mono(8, .medium))
                     .foregroundStyle(Theme.muted)
             }
@@ -744,7 +887,7 @@ struct ContentView: View {
 
     private var commandBar: some View {
         HStack(spacing: 10) {
-            TextField(speech.listening ? "Te escucho…" : "Pregunta por BTC, NVDA, oro…", text: $vm.input)
+            TextField(speech.listening ? L.t("Listening…", "Te escucho…") : L.t("Ask about BTC, NVDA, gold…", "Pregunta por BTC, NVDA, oro…"), text: $vm.input)
                 .font(.rounded(14, .medium))
                 .foregroundStyle(Theme.text)
                 .focused($focused)
@@ -796,8 +939,8 @@ struct ContentView: View {
     }
 
     private var statusLabel: String {
-        if speech.listening { return "ESCUCHANDO" }
-        if vm.voice.speaking { return "BOBBY HABLA" }
+        if speech.listening { return "LISTENING" }
+        if vm.voice.speaking { return L.t("SPEAKING", "BOBBY HABLA") }
         return vm.phase.label
     }
 
@@ -805,9 +948,9 @@ struct ContentView: View {
         if speech.listening {
             return vm.handsFree
                 ? "Manos libres · di tu siguiente pregunta"
-                : "Habla normal · se envía cuando terminas"
+                : L.t("Speak normally · it sends when you stop", "Habla normal · se envía cuando terminas")
         }
-        if vm.voice.speaking { return "La orbe responde a la voz en tiempo real" }
+        if vm.voice.speaking { return L.t("Your companion reacts to the voice in real time", "Tu companion reacciona a la voz en tiempo real") }
         return vm.phase.hint
     }
 

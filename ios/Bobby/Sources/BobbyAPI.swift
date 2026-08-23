@@ -68,6 +68,32 @@ struct BobbyAnswer {
     var rewardRisk: Double?
     var overview: String?
 
+    /// A setup is actionable only when the deterministic pulse agrees on a
+    /// direction, clears conviction and includes the complete risk plan.
+    /// Anything less fails closed into Bobby's signature NO TRADE state.
+    var isNoTrade: Bool {
+        let normalizedSignal = signal?.lowercased().replacingOccurrences(of: "-", with: "_") ?? ""
+        if normalizedSignal.contains("no_trade") || normalizedSignal.contains("neutral") || normalizedSignal.contains("wait") {
+            return true
+        }
+        guard let direction = direction?.lowercased(), ["long", "short"].contains(direction) else { return true }
+        guard let convictionPct, convictionPct >= 55 else { return true }
+        return entry == nil || stop == nil || target == nil
+    }
+
+    var noTradeReason: String {
+        guard isNoTrade else { return "" }
+        let normalizedSignal = signal?.lowercased() ?? ""
+        if normalizedSignal.contains("neutral") || normalizedSignal.contains("wait") {
+            return "No clean directional signal passed the desk."
+        }
+        if direction == nil { return "The agents did not reach directional consensus." }
+        if let convictionPct, convictionPct < 55 {
+            return "Conviction stayed below Bobby's 55% risk gate."
+        }
+        return "The setup did not include a complete entry, stop and target."
+    }
+
     /// The spoken/written summary — terminal-honest, never advice-flavored.
     var summary: String {
         var lines: [String] = []
@@ -90,6 +116,7 @@ struct BobbyAnswer {
             if let rr = rewardRisk { plan += " (R:R \(String(format: "%.1f", rr)))" }
             lines.append(plan + ".")
         }
+        if isNoTrade { lines.append("No setup yet. Capital protected.") }
         if lines.isEmpty { lines.append("No tengo datos suficientes de \(symbol) ahora mismo.") }
         return lines.joined(separator: " ")
     }

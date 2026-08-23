@@ -14,7 +14,10 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var generation = 0
     private var meterTimer: Timer?
 
-    func speak(_ text: String, voiceId: String) {
+    /// `persona` is the companion's own voice (coral/ballad/sage/ash) — the
+    /// backend reads `voice`, so this is what actually makes each companion
+    /// sound like itself. `voiceId` stays as the legacy Edge hint.
+    func speak(_ text: String, voiceId: String, persona: String? = nil) {
         stop()
         generation += 1
         let gen = generation
@@ -26,7 +29,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 req.timeoutInterval = 30
                 req.httpBody = try JSONSerialization.data(withJSONObject: [
-                    "text": text, "lang": "es", "voice": "cio", "edgeVoice": voiceId,
+                    "text": text, "lang": L.ttsLang, "voice": persona ?? "cio", "edgeVoice": voiceId,
                 ])
                 let (data, resp) = try await URLSession.shared.data(for: req)
                 guard gen == self.generation,
@@ -51,7 +54,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     private func speakFallback(_ text: String) {
         let u = AVSpeechUtterance(string: text)
-        u.voice = AVSpeechSynthesisVoice(language: "es-MX") ?? AVSpeechSynthesisVoice(language: "es-ES")
+        u.voice = AVSpeechSynthesisVoice(language: L.isSpanish ? "es-MX" : "en-US") ?? AVSpeechSynthesisVoice(language: "en-US")
         u.rate = 0.52
         speaking = true
         fallback.speak(u)
