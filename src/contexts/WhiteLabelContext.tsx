@@ -17,7 +17,6 @@ export interface WhiteLabelTheme {
   accentBorder: string;        // "border-amber-500" or "border-green-500"
   accentGlow: string;          // "rgba(248,207,44,0.1)" or "rgba(34,197,94,0.1)"
   markets: string[];           // ["SPY", "QQQ", "NVDA", ...] or ["BTC", "ETH", ...]
-  telegramChannel: string;     // "@protradingskills" or "@bobbyagentraderbot"
   language: string;            // "es" or "en"
   logoText: string;            // "DANY AGENT TRADER" or "BOBBY AGENT TRADER"
   isWhiteLabel: boolean;
@@ -35,7 +34,6 @@ const DEFAULT_THEME: WhiteLabelTheme = {
   accentBorder: 'border-green-500',
   accentGlow: 'rgba(34,197,94,0.1)',
   markets: ['BTC', 'ETH', 'SOL', 'NVDA', 'AAPL', 'TSLA'],
-  telegramChannel: '@bobbyagentraderbot',
   language: 'es',
   logoText: 'BOBBY AGENT TRADER',
   isWhiteLabel: false,
@@ -53,7 +51,6 @@ export const PTS_THEME: WhiteLabelTheme = {
   accentBorder: 'border-amber-500',
   accentGlow: 'rgba(248,207,44,0.1)',
   markets: ['SPY', 'QQQ', 'NVDA', 'AAPL', 'TSLA', 'META', 'BTC', 'ETH', 'EUR/USD', 'GOLD'],
-  telegramChannel: '@protradingskills',
   language: 'es',
   logoText: 'DANY AGENT TRADER',
   isWhiteLabel: true,

@@ -308,7 +308,6 @@ export default function BobbyLandingPage() {
               <h5 className="font-bold text-white mb-6 uppercase text-sm tracking-widest" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Community</h5>
               <ul className="space-y-4 text-sm">
                 <li><a className="text-gray-400 hover:text-[#C1FF2C] transition-all duration-300" href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-                <li><a className="text-gray-400 hover:text-[#C1FF2C] transition-all duration-300" href="https://t.me/bobbyagentraderbot" target="_blank" rel="noopener noreferrer">Telegram</a></li>
                 <li><a className="text-gray-400 hover:text-[#C1FF2C] transition-all duration-300" href="https://x.com/BobbyProtocol" target="_blank" rel="noopener noreferrer">Twitter / X</a></li>
               </ul>
             </div>

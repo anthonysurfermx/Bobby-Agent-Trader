@@ -17,8 +17,8 @@ import AdminLayout from '@/pages/admin/AdminLayout';
 import UserLayout from '@/pages/user/UserLayout';
 
 // Lazy load todas las páginas para mejor performance
-const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
+const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLanding'), 'app-landing');
 const BobbySubmissionPage = lazy(() => import('@/pages/BobbySubmissionPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
@@ -293,6 +293,14 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyProtocolLanding />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'app',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAppLanding />
             </Suspense>
           ),
         },
