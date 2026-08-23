@@ -520,7 +520,9 @@
   .animate-float-delayed-2,
   .animate-float-delayed-3,
   .animate-pan-bounce,
-  .animate-pulse-slow {
+  .animate-pulse-slow,
+  .animate-marquee,
+  .animate-pulse {
     animation: none;
   }
 }

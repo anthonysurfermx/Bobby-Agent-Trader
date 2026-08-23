@@ -9,7 +9,7 @@ Bobby Protocol
 X Layer Arena
 
 ## Contact
-@anthonysurfermx (GitHub) / @bobbyagentraderbot (Telegram)
+@anthonysurfermx (GitHub)
 
 ## Summary
 Bobby is a live adversarial intelligence protocol for crypto trading deployed on OKX X Layer. Three AI agents debate every trade, a Judge Mode audits debate quality on six dimensions, and anyone can stake OKB to prove Bobby was wrong — creating a high-integrity intelligence marketplace where losses become paid post-mortems.

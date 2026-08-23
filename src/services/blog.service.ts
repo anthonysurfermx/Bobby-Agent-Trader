@@ -679,8 +679,10 @@ class BlogService {
    * Generar excerpt automático si no existe
    */
   generateExcerpt(content: string, maxLength = 160): string {
-    return content
-      .replace(/<[^>]*>/g, '') // Remover HTML
+    const plainText = typeof DOMParser === 'undefined'
+      ? content
+      : new DOMParser().parseFromString(content, 'text/html').body.textContent || '';
+    return plainText
       .replace(/\s+/g, ' ')    // Normalizar espacios
       .trim()
       .slice(0, maxLength)

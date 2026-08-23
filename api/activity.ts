@@ -36,15 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const limit = Math.min(Number(req.query.limit) || 20, 50);
-  const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
-  const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'bobbyprotocol.xyz';
-  const baseUrl = `${proto}://${host}`;
-
   // Fetch from both sources in parallel
   const [events, heartbeatRes, txHistoryRes, bountyFallback] = await Promise.all([
     listAgentCommerceEvents(limit).catch(() => []),
-    fetchJsonWithTimeout<{ recentTxs?: any[] }>(`${baseUrl || BOBBY_PROTOCOL_BASE_URL}/api/protocol-heartbeat`, 2500),
-    fetchJsonWithTimeout<{ items?: any[] }>(`${baseUrl || BOBBY_PROTOCOL_BASE_URL}/api/protocol-tx-history?limit=${limit}`, 3500),
+    fetchJsonWithTimeout<{ recentTxs?: any[] }>(`${BOBBY_PROTOCOL_BASE_URL}/api/protocol-heartbeat`, 2500),
+    fetchJsonWithTimeout<{ items?: any[] }>(`${BOBBY_PROTOCOL_BASE_URL}/api/protocol-tx-history?limit=${limit}`, 3500),
     listRecentBounties(limit).catch(() => []),
   ]);
 

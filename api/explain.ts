@@ -551,22 +551,32 @@ VOICE RULES (THE 6AM PHONE CALL):
 Address ${userName || 'the user'} by name once.`;
 }
 
-const promptBuilders: Record<string, (data: any) => string> = {
-  'wallet': buildWalletPrompt,
-  'exchange-metrics': buildExchangeMetricsPrompt,
-  'latam-exchanges': buildLatamExchangesPrompt,
-  'market': buildMarketPrompt,
-  'smartmoney': buildSmartMoneyPrompt,
-  'smartmoney-signals': buildSmartMoneySignalsPrompt,
-  'smartmoney-edge': buildSmartMoneyEdgePrompt,
-  'smartmoney-portfolios': buildSmartMoneyPortfoliosPrompt,
-  'smartmoney-bonds': buildSmartMoneyBondsPrompt,
-  'smartmoney-alpha': buildSmartMoneyAlphaPrompt,
-  'chat-opportunity': buildChatOpportunityPrompt,
-  'chat-deep-analysis': buildChatDeepAnalysisPrompt,
-  'metacognition': buildMetacognitionPrompt,
-  'signals': buildSignalsPrompt,
-};
+const VALID_CONTEXTS = [
+  'wallet', 'exchange-metrics', 'latam-exchanges', 'market', 'smartmoney',
+  'smartmoney-signals', 'smartmoney-edge', 'smartmoney-portfolios',
+  'smartmoney-bonds', 'smartmoney-alpha', 'chat-opportunity',
+  'chat-deep-analysis', 'metacognition', 'signals',
+] as const;
+
+function buildPrompt(context: unknown, data: any): string | null {
+  switch (context) {
+    case 'wallet': return buildWalletPrompt(data);
+    case 'exchange-metrics': return buildExchangeMetricsPrompt(data);
+    case 'latam-exchanges': return buildLatamExchangesPrompt(data);
+    case 'market': return buildMarketPrompt(data);
+    case 'smartmoney': return buildSmartMoneyPrompt(data);
+    case 'smartmoney-signals': return buildSmartMoneySignalsPrompt(data);
+    case 'smartmoney-edge': return buildSmartMoneyEdgePrompt(data);
+    case 'smartmoney-portfolios': return buildSmartMoneyPortfoliosPrompt(data);
+    case 'smartmoney-bonds': return buildSmartMoneyBondsPrompt(data);
+    case 'smartmoney-alpha': return buildSmartMoneyAlphaPrompt(data);
+    case 'chat-opportunity': return buildChatOpportunityPrompt(data);
+    case 'chat-deep-analysis': return buildChatDeepAnalysisPrompt(data);
+    case 'metacognition': return buildMetacognitionPrompt(data);
+    case 'signals': return buildSignalsPrompt(data);
+    default: return null;
+  }
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -598,9 +608,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Missing context or data' });
   }
 
-  const builder = promptBuilders[context];
-  if (!builder) {
-    return res.status(400).json({ error: `Invalid context: ${context}. Valid: ${Object.keys(promptBuilders).join(', ')}` });
+  const userPrompt = buildPrompt(context, data);
+  if (userPrompt === null) {
+    return res.status(400).json({ error: `Invalid context. Valid: ${VALID_CONTEXTS.join(', ')}` });
   }
 
   // Metacognition gets its own system prompt — Bobby in post-mortem mode
@@ -670,8 +680,6 @@ When analyzing wallets with a STRATEGY CLASSIFICATION, explain what the strategy
 Reference the specific metrics (avgROI, sizeCV, directionalBias, bimodal) to support your analysis.
 
 After your analysis, output a single line starting with "TAGS:" followed by 2-4 comma-separated tags that classify this entity (e.g. "Market Maker, The House, 24/7 Operator" or "Sniper, Latency Arb, High ROI").`;
-
-  const userPrompt = builder(data);
 
   try {
     // Set up SSE streaming

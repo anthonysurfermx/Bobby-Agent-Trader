@@ -26,6 +26,23 @@ if (!SB_KEY) {
 }
 const READONLY_FALLBACK_HOSTS = [BOBBY_PROTOCOL_BASE_URL, 'https://defimexico.org', 'https://defi-mexico-hub.vercel.app'];
 
+function extractBoundedSection(source: string, openTag: string, closeTag: string, maxLength = 50_000): string {
+  const start = source.indexOf(openTag);
+  if (start === -1) return '';
+  const end = source.indexOf(closeTag, start + openTag.length);
+  if (end === -1) return '';
+  return source.slice(start, Math.min(end + closeTag.length, start + maxLength));
+}
+
+function extractPrefixedLine(source: string, prefix: string, maxLength = 220): string | null {
+  const start = source.indexOf(prefix);
+  if (start === -1) return null;
+  const valueStart = start + prefix.length;
+  const lineEnd = source.indexOf('\n', valueStart);
+  const valueEnd = Math.min(lineEnd === -1 ? source.length : lineEnd, valueStart + maxLength);
+  return source.slice(valueStart, valueEnd).trim() || null;
+}
+
 // ---- Supabase helpers ----
 
 async function sbInsert(table: string, data: Record<string, unknown>): Promise<Record<string, unknown> | null> {
@@ -431,11 +448,11 @@ function findYieldCandidate(candidates: YieldCandidate[], verdict: Partial<Yield
 }
 
 function parseYieldVerdict(cioPost: string, candidates: YieldCandidate[], idleCashUsd: number): YieldVerdict | null {
-  const verdictMatch = cioPost.match(/VERDICT:\s*(\{[\s\S]*?\})/);
-  if (!verdictMatch) return null;
+  const serializedVerdict = extractPrefixedLine(cioPost, 'VERDICT:', 4_000);
+  if (!serializedVerdict) return null;
 
   try {
-    const raw = JSON.parse(verdictMatch[1]);
+    const raw = JSON.parse(serializedVerdict);
     const deploy = raw.deploy === true;
     const keepCashPctRaw = parseNumeric(raw.keepCashPct);
     const keepCashPct = Math.max(0, Math.min(100, keepCashPctRaw ?? (deploy ? DEFAULT_YIELD_CASH_BUFFER_PCT : 100)));
@@ -839,8 +856,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Extract Layer 1, 3, 4 for the CIO
-    const layer1 = contextBlock.match(/<LAYER_1_REGIME>[\s\S]*?<\/LAYER_1_REGIME>/)?.[0] || '';
-    const layer3 = contextBlock.match(/<LAYER_3_METACOGNITION>[\s\S]*?<\/LAYER_3_METACOGNITION>/)?.[0] || '';
+    const layer1 = extractBoundedSection(contextBlock, '<LAYER_1_REGIME>', '</LAYER_1_REGIME>');
+    const layer3 = extractBoundedSection(contextBlock, '<LAYER_3_METACOGNITION>', '</LAYER_3_METACOGNITION>');
     const cioContext = analystPost
       ? `${layer1}\n${layer3}\n\nOPEN POSITIONS:\n${positionsBlock}\n\nANALYST EXECUTIVE SUMMARY:\n${analystPost}`
       : `${layer1}\n${layer3}\n\nOPEN POSITIONS:\n${positionsBlock}\n\nALPHA HUNTER:\n${alphaPost}\n\nRED TEAM:\n${redPost}`;
@@ -881,7 +898,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
     console.log(`[Cycle] Structured verdict: ${structuredVerdict.action} ${structuredVerdict.symbol} ${structuredVerdict.direction} conviction=${structuredVerdict.conviction}/10`);
     } // end else (non-test debate)
 
-    // Parse verdict — use structuredVerdict if available, fall back to regex for test mode
+    // Parse verdict from structured output or the authenticated structured test value.
     let symbol: string | null = null;
     let direction: string | null = null;
     let conviction: number | null = null;
@@ -908,38 +925,23 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
       entryPrice = typeof structuredVerdict.entry === 'number' ? structuredVerdict.entry : null;
       stopPrice = typeof structuredVerdict.stop === 'number' ? structuredVerdict.stop : null;
       targetPrice = typeof structuredVerdict.target === 'number' ? structuredVerdict.target : null;
-    } else {
-      // Fallback: regex parsing for testVerdict mode
-      const verdictMatch = cioPost.match(/VERDICT:\s*(\{[^}]+\})/);
-      if (verdictMatch) {
-        try {
-          const v = JSON.parse(verdictMatch[1]);
-          const action = v.action || (v.execute === true ? 'open' : 'none');
-          structuredExecuteRequested = action === 'open';
-          structuredCloseRequested = action === 'close';
-          conviction = typeof v.conviction === 'number' ? v.conviction / 10 : null;
-          symbol = v.symbol && v.symbol !== 'none' ? v.symbol.toUpperCase() : null;
-          direction = v.direction && v.direction !== 'none' ? v.direction.toLowerCase() : null;
-          entryPrice = typeof v.entry === 'number' ? v.entry : null;
-          stopPrice = typeof v.stop === 'number' ? v.stop : null;
-          targetPrice = typeof v.target === 'number' ? v.target : null;
-        } catch (e) {
-          console.warn('[Cycle] Failed to parse CIO VERDICT JSON:', e);
-          structuredVerdictRejectReason = 'Structured VERDICT JSON parse failed';
-        }
-      }
+    } else if (useTestVerdict && testVerdict) {
+      // The test verdict is already a structured, authenticated request value;
+      // never round-trip it through free-form text and regex parsing.
+      structuredExecuteRequested = testVerdict.execute === true;
+      conviction = typeof testVerdict.conviction === 'number' ? testVerdict.conviction / 10 : null;
+      symbol = testVerdict.symbol && testVerdict.symbol !== 'none' ? testVerdict.symbol.toUpperCase() : null;
+      direction = testVerdict.direction && testVerdict.direction !== 'none' ? testVerdict.direction.toLowerCase() : null;
+      entryPrice = typeof testVerdict.entry === 'number' ? testVerdict.entry : null;
+      stopPrice = typeof testVerdict.stop === 'number' ? testVerdict.stop : null;
+      targetPrice = typeof testVerdict.target === 'number' ? testVerdict.target : null;
     }
 
     // Parse VIBE_PHRASE from CIO output (for both paths)
-    const vibeMatch = cioPost.match(/VIBE_PHRASE:\s*(.+?)(?:\n|$)/);
-    const vibePhrase = vibeMatch ? vibeMatch[1].trim().slice(0, 220)
-      : (typeof structuredVerdict !== 'undefined' ? structuredVerdict.vibe_phrase?.slice(0, 220) : null);
+    const vibePhrase = extractPrefixedLine(cioPost, 'VIBE_PHRASE:')
+      || (typeof structuredVerdict !== 'undefined' ? structuredVerdict.vibe_phrase?.slice(0, 220) : null);
 
     // Regex fallback for display only (forum/digest) — NEVER for execution
-    if (conviction === null) {
-      const convMatch = cioPost.match(/(\d+)\s*\/\s*10/);
-      conviction = convMatch ? parseInt(convMatch[1]) / 10 : null;
-    }
     if (!symbol) {
       const symMatch = (alphaPost + cioPost).match(/\b(BTC|ETH|SOL)\b/i);
       symbol = symMatch ? symMatch[1].toUpperCase() : null;
@@ -1549,8 +1551,7 @@ VIBE_PHRASE: No edge in the market and no clean yield rail yet. Stay liquid.
       );
 
       yieldRecommendation = parseYieldVerdict(yieldCioPost, yieldCandidates, idleCashUsd);
-      const yieldVibeMatch = yieldCioPost.match(/VIBE_PHRASE:\s*(.+?)(?:\n|$)/);
-      const yieldVibePhrase = yieldVibeMatch ? yieldVibeMatch[1].trim().slice(0, 220) : null;
+      const yieldVibePhrase = extractPrefixedLine(yieldCioPost, 'VIBE_PHRASE:');
 
       const yieldTopic = `${lang === 'es' ? 'Yield Parking' : 'Yield Parking'} — ${topicDate}`;
       const yieldThread = await sbInsert('forum_threads', {

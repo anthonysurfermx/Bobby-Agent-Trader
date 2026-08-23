@@ -23,6 +23,7 @@ import {
   BOBBY_AGENT_REGISTRY,
   BOBBY_CONVICTION_ORACLE,
   BOBBY_HARDNESS_REGISTRY,
+  BOBBY_PROTOCOL_BASE_URL,
   BOBBY_TRACK_RECORD,
   BOBBY_TREASURY,
 } from './_lib/protocol-constants.js';
@@ -237,10 +238,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
-  const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'bobbyprotocol.xyz';
-  const baseUrl = `${proto}://${host}`;
-
   const [
     blockHexResult,
     treasuryHexResult,
@@ -287,7 +284,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }, false),
     safe(countAgents, 0),
     safe(
-      () => getPricesFromIntel(baseUrl),
+      () => getPricesFromIntel(BOBBY_PROTOCOL_BASE_URL),
       { prices: [], regime: null, xlayer: null }
     ),
   ]);

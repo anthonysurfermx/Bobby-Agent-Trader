@@ -188,7 +188,10 @@ export function AnalyzePanel({ onSwitchToAdvanced }: Props) {
               Full analysis →
             </button>
             <a
-              href={`https://polymarket.com/event/${polymarketService.parseMarketUrl(url) || url}`}
+              href={`https://polymarket.com/event/${encodeURIComponent(
+                polymarketService.parseMarketUrl(url)
+                  || (/^[a-z0-9-]{1,200}$/i.test(url) ? url : 'markets'),
+              )}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-[11px] text-neutral-600 hover:text-neutral-400 transition-colors"

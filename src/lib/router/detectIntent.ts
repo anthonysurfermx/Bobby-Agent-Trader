@@ -66,7 +66,8 @@ export function detectStocks(text: string): string[] {
   const lower = text.toLowerCase();
   const found: string[] = [];
   for (const [key, ticker] of Object.entries(STOCK_MAP)) {
-    if (new RegExp(`\\b${key.replace('&', '\\&')}\\b`).test(lower) && !found.includes(ticker)) {
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`\\b${escapedKey}\\b`).test(lower) && !found.includes(ticker)) {
       found.push(ticker);
     }
   }
@@ -183,4 +184,3 @@ export function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 
   // Default: ambiguous — show menu instead of burning tokens
   return 'ambiguous';
 }
-
