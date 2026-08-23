@@ -928,7 +928,11 @@ export default function BobbyProtocolLanding() {
             </div>
             <div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 md:flex-row">
               <span>© 2026 Bobby Protocol</span>
-              <span>Refuted before execution. Published before the outcome.</span>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <a href="/privacy" className="transition hover:text-white">Privacy</a>
+                <a href="/terms" className="transition hover:text-white">Terms</a>
+                <span>Refuted before execution. Published before the outcome.</span>
+              </div>
             </div>
           </div>
         </footer>
