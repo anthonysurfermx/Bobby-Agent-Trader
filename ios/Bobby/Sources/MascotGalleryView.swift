@@ -10,6 +10,17 @@
 import SwiftUI
 import SceneKit
 import GLTFKit2
+import Darwin.Mach
+
+struct MascotPerformanceMetrics: Equatable {
+    let assetName: String
+    let loadMilliseconds: Int
+    let assetBytes: Int64
+    let appFootprintBytes: UInt64
+    let footprintDeltaBytes: Int64
+    let nodeCount: Int
+    let geometryCount: Int
+}
 
 struct MascotGalleryView: View {
     @ObservedObject var store: CompanionStore
@@ -24,6 +35,7 @@ struct MascotGalleryView: View {
     @State private var burst = 0            // particle burst trigger
     @State private var justChosen = false
     @State private var emoteEvent: CompanionEmoteEvent?
+    @State private var performanceMetrics: MascotPerformanceMetrics?
 
     init(store: CompanionStore, voice: NeuralVoice? = nil, voiceId: String = AgentVoice.dalia.rawValue) {
         self.store = store
@@ -39,6 +51,10 @@ struct MascotGalleryView: View {
     private var isActive: Bool { store.companionId == selected.id }
     private var isUnlocked: Bool { store.isUnlocked(selected) }
 
+    private func megabytes<T: BinaryInteger>(_ bytes: T) -> String {
+        String(format: "%.1f", Double(Int64(bytes)) / 1_048_576)
+    }
+
     var body: some View {
         ZStack {
             Theme.bg.ignoresSafeArea()
@@ -47,6 +63,16 @@ struct MascotGalleryView: View {
                 stage
                 identityBlock
                     .padding(.top, 2)
+#if DEBUG
+                if let metrics = performanceMetrics {
+                    Text("LOAD \(metrics.loadMilliseconds)MS · ASSET \(megabytes(metrics.assetBytes))MB · ΔMEM \(megabytes(metrics.footprintDeltaBytes))MB · \(metrics.geometryCount) GEO")
+                        .font(.mono(6.5, .semibold))
+                        .kerning(0.5)
+                        .foregroundStyle(Theme.muted.opacity(0.55))
+                        .lineLimit(1)
+                        .padding(.horizontal, 16)
+                }
+#endif
                 ctaButton
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -113,6 +139,7 @@ struct MascotGalleryView: View {
                     stageLoading = loading
                     stageFailed = failed
                 },
+                onMetrics: { performanceMetrics = $0 },
                 onSecretPhrase: {
                     secretPhrase = selected.secretPhrase
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
@@ -386,6 +413,7 @@ struct MascotSceneView: UIViewRepresentable {
     var interactive: Bool = true
     var emoteEvent: CompanionEmoteEvent? = nil
     var onLoading: ((_ loading: Bool, _ failed: Bool) -> Void)? = nil
+    var onMetrics: ((MascotPerformanceMetrics) -> Void)? = nil
     var onSecretPhrase: (() -> Void)? = nil
 
     func makeUIView(context: Context) -> SCNView {
@@ -435,6 +463,8 @@ struct MascotSceneView: UIViewRepresentable {
         var initialCameraPosition = SCNVector3Zero
         var lastEmoteId: UUID?
         var modelRadius: Float = 1
+        var loadStartedAt: CFAbsoluteTime = 0
+        var footprintBeforeLoad: UInt64 = 0
 
         func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
 
@@ -519,6 +549,8 @@ struct MascotSceneView: UIViewRepresentable {
         coordinator.currentAsset = assetName
         coordinator.loadToken += 1
         coordinator.view = view
+        coordinator.loadStartedAt = CFAbsoluteTimeGetCurrent()
+        coordinator.footprintBeforeLoad = Self.appFootprintBytes()
         let token = coordinator.loadToken
         onLoading?(true, false)
 
@@ -556,9 +588,41 @@ struct MascotSceneView: UIViewRepresentable {
                 coordinator.modelRoot = root
                 coordinator.initialCameraPosition = cameraNode.position
                 coordinator.startSpin()
+                var nodeCount = 1
+                var geometryCount = root.geometry == nil ? 0 : 1
+                root.enumerateChildNodes { node, _ in
+                    nodeCount += 1
+                    if node.geometry != nil { geometryCount += 1 }
+                }
+                let footprint = Self.appFootprintBytes()
+                let assetBytes = ((try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? NSNumber)?.int64Value ?? 0
+                let metrics = MascotPerformanceMetrics(
+                    assetName: self.assetName,
+                    loadMilliseconds: Int((CFAbsoluteTimeGetCurrent() - coordinator.loadStartedAt) * 1_000),
+                    assetBytes: assetBytes,
+                    appFootprintBytes: footprint,
+                    footprintDeltaBytes: Int64(footprint) - Int64(coordinator.footprintBeforeLoad),
+                    nodeCount: nodeCount,
+                    geometryCount: geometryCount
+                )
+#if DEBUG
+                print("[MascotMetrics] \(metrics.assetName) load=\(metrics.loadMilliseconds)ms asset=\(metrics.assetBytes)B footprint=\(metrics.appFootprintBytes)B delta=\(metrics.footprintDeltaBytes)B nodes=\(metrics.nodeCount) geo=\(metrics.geometryCount)")
+#endif
+                self.onMetrics?(metrics)
                 self.onLoading?(false, false)
             }
         }
+    }
+
+    private static func appFootprintBytes() -> UInt64 {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? info.phys_footprint : 0
     }
 }
 
