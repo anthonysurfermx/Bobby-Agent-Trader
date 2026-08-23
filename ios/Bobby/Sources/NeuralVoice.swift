@@ -2,7 +2,7 @@
 // (free, no per-minute bill). The robotic AVSpeech stays only as an
 // offline fallback.
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 
 @MainActor
 final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
@@ -59,11 +59,15 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     private func startMetering(_ player: AVAudioPlayer) {
         meterTimer?.invalidate()
-        meterTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { [weak self, weak player] _ in
-            guard let self, let player, player.isPlaying else { return }
-            player.updateMeters()
-            let power = player.averagePower(forChannel: 0)
-            self.level = min(1, max(0.04, CGFloat(pow(10, power / 20)) * 2.5))
+        // The timer fires on the main run loop; hop to the main actor explicitly
+        // so mutating @Published level and touching the player are isolation-safe.
+        meterTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let player = self.player, player.isPlaying else { return }
+                player.updateMeters()
+                let power = player.averagePower(forChannel: 0)
+                self.level = min(1, max(0.04, CGFloat(pow(10, power / 20)) * 2.5))
+            }
         }
     }
 

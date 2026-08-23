@@ -2,6 +2,7 @@
 // live market surface with a voice-driven orb, adversarial review and an honest
 // proof boundary. Text is the desk log, not the product shell.
 import SwiftUI
+import Combine
 
 struct ChatMessage: Identifiable, Equatable {
     let id = UUID()
@@ -57,14 +58,24 @@ final class BobbyViewModel: ObservableObject {
 
     let voice = NeuralVoice()
     let profile = AgentProfile()
+    let companions = CompanionStore()
     private let memory = DeskMemory()
     static let defaultQuickAccess = ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]
     @Published var streak = 0
     @Published var quickAccess: [String] = BobbyViewModel.defaultQuickAccess
 
+    private var cancellables = Set<AnyCancellable>()
+
     init() {
-        streak = memory.recordVisit()
+        // Discipline streak, not an open-the-app streak: it only grows when
+        // the user does something process-quality (see awardDiscipline).
+        streak = companions.disciplineStreak
         quickAccess = memory.quickAccess(fallback: Self.defaultQuickAccess)
+        // Nested ObservableObject: forward the store's changes or the desk
+        // never reacts to picking a companion (same pitfall as AgentProfile).
+        companions.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     func bootGreetingIfNeeded() {
@@ -159,6 +170,8 @@ final class BobbyViewModel: ObservableObject {
             messages.append(ChatMessage(fromBobby: true, text: text))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if speakEnabled { voice.speak(text, voiceId: profile.voiceId) }
+            // Discipline XP: reviewed a full debate to its verdict (capped daily)
+            if companions.awardDiscipline(10) { streak = companions.disciplineStreak }
         }
     }
 
@@ -185,6 +198,7 @@ struct ContentView: View {
     @StateObject private var speech = SpeechInput()
     @FocusState private var focused: Bool
     @State private var showAuraCard = false
+    @State private var showSquad = false
 
     var body: some View {
         ZStack {
@@ -204,6 +218,9 @@ struct ContentView: View {
                 try? await Task.sleep(for: .milliseconds(420))
                 relistenHandsFree()
             }
+        }
+        .sheet(isPresented: $showSquad) {
+            MascotGalleryView(store: vm.companions, voice: vm.voice, voiceId: vm.profile.voiceId)
         }
         .sheet(isPresented: $showAuraCard) {
             AuraCardSheet(data: AuraCardData(
@@ -248,42 +265,49 @@ struct ContentView: View {
 
     private var deskHeader: some View {
         HStack(spacing: 10) {
-            Circle()
-                .fill(vm.profile.auraTint)
-                .frame(width: 7, height: 7)
-                .shadow(color: vm.profile.auraTint, radius: 8)
-            Text("BOBBY // LIVE DESK")
-                .font(.mono(12, .bold))
-                .kerning(2.4)
-                .foregroundStyle(Theme.text.opacity(0.80))
-            Spacer()
-            // Streak chip + aura share — the daily ritual made visible.
+            // Companion portrait + level — the bond lives top-left, opens SQUAD
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showAuraCard = true
+                showSquad = true
             } label: {
-                HStack(spacing: 5) {
-                    Text(vm.streak >= 2 ? "🔥 DÍA \(vm.streak)" : "MI AURA")
-                        .font(.mono(9, .bold))
-                        .kerning(1.1)
-                        .foregroundStyle(vm.profile.auraTintSoft)
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(vm.profile.auraTintSoft)
+                ZStack(alignment: .bottomTrailing) {
+                    if let comp = vm.companions.companion {
+                        CompanionThumb(companion: comp)
+                            .frame(width: 34, height: 34)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(comp.tint.opacity(0.6), lineWidth: 1.5))
+                        Text("\(vm.companions.level.number)")
+                            .font(.mono(8, .black))
+                            .foregroundStyle(Theme.bg)
+                            .frame(width: 14, height: 14)
+                            .background(Circle().fill(comp.tint))
+                            .offset(x: 3, y: 3)
+                    } else {
+                        Circle()
+                            .fill(vm.profile.auraTint.opacity(0.15))
+                            .frame(width: 34, height: 34)
+                            .overlay(Circle().stroke(vm.profile.auraTint.opacity(0.5), lineWidth: 1.5))
+                            .overlay(
+                                Image(systemName: "person.3.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(vm.profile.auraTintSoft)
+                            )
+                    }
                 }
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(vm.profile.auraTint.opacity(0.10)))
-                .overlay(Capsule().stroke(vm.profile.auraTint.opacity(0.30), lineWidth: 1))
             }
-            Text("READ ONLY")
-                .font(.mono(9, .bold))
-                .kerning(1.1)
-                .foregroundStyle(Theme.up)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Theme.up.opacity(0.08)))
-                .overlay(Capsule().stroke(Theme.up.opacity(0.22), lineWidth: 1))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("BOBBY // LIVE DESK")
+                    .font(.mono(12, .bold))
+                    .kerning(2.4)
+                    .foregroundStyle(Theme.text.opacity(0.80))
+                if let comp = vm.companions.companion {
+                    Text("\(comp.label) · \(vm.companions.level.name)")
+                        .font(.mono(7.5, .semibold))
+                        .kerning(1.2)
+                        .foregroundStyle(comp.tintSoft.opacity(0.8))
+                }
+            }
+            Spacer()
             Button {
                 vm.speakEnabled.toggle()
                 if !vm.speakEnabled { vm.voice.stop() }
@@ -292,6 +316,26 @@ struct ContentView: View {
                 Image(systemName: vm.speakEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(vm.speakEnabled ? Theme.accentSoft : Theme.muted)
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(Theme.card))
+                    .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+            }
+            // Aura, streak and read-only live in the menu — the header breathes
+            Menu {
+                Button {
+                    showAuraCard = true
+                } label: {
+                    Label("Mi aura", systemImage: "sparkles")
+                }
+                Section {
+                    Label(vm.streak >= 1 ? "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥" : "Sin racha aún — revisa un análisis",
+                          systemImage: "flame")
+                    Label("READ ONLY — Bobby no ejecuta", systemImage: "lock.shield")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.muted)
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(Theme.card))
                     .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
@@ -305,16 +349,26 @@ struct ContentView: View {
     private var liveConsole: some View {
         VStack(spacing: 4) {
             Button(action: toggleSpeech) {
-                BobbyOrb(
-                    size: 206,
-                    thinking: vm.thinking,
-                    speaking: vm.voice.speaking,
-                    listening: speech.listening,
-                    level: liveLevel,
-                    tint: vm.profile.auraTint,
-                    tintSoft: vm.profile.auraTintSoft
-                )
-                .frame(height: 208)
+                Group {
+                    if let comp = vm.companions.companion {
+                        // The chosen companion IS Bobby's face on the desk
+                        MascotSceneView(assetName: comp.id, interactive: false)
+                            .allowsHitTesting(false)
+                            .frame(width: 206, height: 208)
+                            .shadow(color: comp.tint.opacity(0.35), radius: 26)
+                    } else {
+                        BobbyOrb(
+                            size: 206,
+                            thinking: vm.thinking,
+                            speaking: vm.voice.speaking,
+                            listening: speech.listening,
+                            level: liveLevel,
+                            tint: vm.profile.auraTint,
+                            tintSoft: vm.profile.auraTintSoft
+                        )
+                        .frame(height: 208)
+                    }
+                }
                 .contentShape(Circle())
             }
             .buttonStyle(.plain)
