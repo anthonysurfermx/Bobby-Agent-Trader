@@ -284,7 +284,7 @@ const router = createBrowserRouter(
           index: true,
           element: (
             <Suspense fallback={<PageLoader />}>
-              <BobbyProtocolLanding />
+              <BobbyAppLanding />
             </Suspense>
           ),
         },
