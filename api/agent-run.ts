@@ -32,7 +32,7 @@ import {
 import { checkTokenRiskBatch } from './_lib/okx-security.js';
 import { callLlm } from './_lib/llm.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
-import { getClientIp } from './_lib/rate-limit.js';
+import { getClientIpKey } from './_lib/rate-limit.js';
 import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
 
 export const config = { maxDuration: 120 };
@@ -964,7 +964,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Manual runs stay public (UI "analyze" button) but each one costs
   // 3 LLM calls — cap them per IP and globally across all instances.
   if (isManual && !hasOperatorAuth) {
-    const ip = getClientIp(req);
+    const ip = getClientIpKey(req);
     const [ipLimit, globalLimit] = await Promise.all([
       checkPersistentLimit('agent-run-manual', ip, 3, 60 * 60),
       checkPersistentLimit('agent-run-manual', 'global', 12, 60 * 60),
