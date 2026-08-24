@@ -14,15 +14,15 @@
 - Privacy strings de micrófono y speech ya en Info.plist (project.yml).
 - Métricas de carga/memoria de mascotas instrumentadas (sesión paralela).
 
-## 🔴 BLOQUEANTE #1 — la voz (antes de cualquier build de tienda)
+## ✅ RESUELTO — la voz (era el bloqueante #1)
 
-**Merge del PR #41** (github.com/anthonysurfermx/Bobby-Agent-Trader/pull/41).
-Producción hoy devuelve **Ogg/Opus** que `AVAudioPlayer` NO reproduce → la app
-cae al fallback robótico de AVSpeech. El PR trae: **MP3** (reproducible), las
-**personas por companion** (coral/ballad/sage/ash — hoy el backend ignora el
-campo), instructions cálidas es/en y el breaker de gasto. Sin ese merge, las
-voces "buenas" no existen en el teléfono. Tras merge: probar 30s en la app
-(un análisis ES y uno EN) — debe sonar suave, no robótico.
+**PR #41 mergeado 2026-08-24.** Producción verificada: MP3 + persona OpenAI
+(`x-tts-provider: openai`) en es y en. Del lado iOS además se corrigió que la
+app mandaba `edgeVoice` legacy en cada request (forzaba la voz Edge española
+sobre la persona cálida): ya no se envía, la persona del companion siempre
+gana, y el paso de voz del onboarding ahora ofrece las personas reales
+(CORAL/BALLAD/SAGE/ASH) con migración de los ids Edge viejos. Falta solo tu
+prueba de oído de 30s en dispositivo (un análisis ES y uno EN).
 
 ## Pasos de publicación (requieren tu Apple ID — no automatizables desde CLI)
 
@@ -54,13 +54,27 @@ voces "buenas" no existen en el teléfono. Tras merge: probar 30s en la app
 9. **Edad**: 17+ ó 4+ con "Unrestricted Web Access: No"… contenido financiero
    → marcar categoría Finance; cuestionario de rating honesto.
 
+## ✅ Paquete de tienda listo (2026-08-24)
+
+- **Screenshots 6.9"** reales en `store-shots/` (rig de UI tests
+  `BobbyUITests/StoreShots` — regenerables; ver `ios-screenshot-storyboard.md`).
+- **Listing EN + ES-MX** copy-paste en `app-store-listing.md`.
+- **App Privacy** con respuestas verificadas contra código en
+  `app-privacy-answers.md` — válidas al mergear **PR #42** (hash de IP en
+  rate-limit). Falta publicar `bobbyprotocol.xyz/privacy`.
+- **Review notes** listas en `reviewer-notes.md`.
+- Momento **NO TRADE / Halo** ya existe y está capturado (09-verdict).
+- Localización barrida: onboarding (FORGE/NEXT/OPEN THE DESK/sparks),
+  saludo del desk, AuraCard, "TÚ/YOU" — cero español hardcodeado en EN.
+- Métricas de performance de la galería ocultas tras `-store-shots`
+  (⚠️ siguen visibles en builds normales — gate a #if DEBUG antes del
+  release público si molestan).
+
 ## ⚠️ Deuda consciente antes del release público (TestFlight OK sin esto)
 
-- Momento firma **NO TRADE / Halo** (escudo + XP + sello) — el diferenciador.
 - Sonido corto + partículas al seleccionar companion (háptico ya está).
 - Pausar el rAF/spin del SceneKit cuando la app pasa a background (batería).
-- `docs/app-store/ui-captures/` regenerar con el saludo nuevo.
-- Revisar retención de logs del backend antes de declarar App Privacy.
+- Publicar la página de privacidad en bobbyprotocol.xyz/privacy.
 
 ## Round 4 (Codex + Kimi, 2026-08-24) — estado
 

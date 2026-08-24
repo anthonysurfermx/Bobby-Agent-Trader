@@ -7,7 +7,33 @@ packages:
   GLTFKit2:
     url: https://github.com/warrenm/GLTFKit2
     from: "0.5.0"
+schemes:
+  Bobby:
+    build:
+      targets:
+        Bobby: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - BobbyUITests
 targets:
+  BobbyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: Bobby
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.bobbyprotocol.bobby.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: QZRTV6CMTT
+        TEST_TARGET_NAME: Bobby
   Bobby:
     type: application
     platform: iOS

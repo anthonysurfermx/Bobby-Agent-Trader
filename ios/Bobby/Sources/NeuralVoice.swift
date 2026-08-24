@@ -29,9 +29,10 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         Task { @MainActor in self.speaking = false }
     }
 
-    /// `persona` is the companion's own voice (coral/ballad/sage/ash) — the
-    /// backend reads `voice`, so this is what actually makes each companion
-    /// sound like itself. `voiceId` stays as the legacy Edge hint.
+    /// `persona` is the companion's own voice (coral/ballad/sage/ash) and wins
+    /// when present; `voiceId` is the persona picked in onboarding. No Edge
+    /// hint anymore — a valid `edgeVoice` would force the legacy robotic-ish
+    /// Edge chain server-side and silence the warm voices.
     func speak(_ text: String, voiceId: String, persona: String? = nil) {
         stop()
         generation += 1
@@ -44,7 +45,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 req.timeoutInterval = 30
                 req.httpBody = try JSONSerialization.data(withJSONObject: [
-                    "text": text, "lang": L.ttsLang, "voice": persona ?? "cio", "edgeVoice": voiceId,
+                    "text": text, "lang": L.ttsLang, "voice": persona ?? voiceId,
                 ])
                 let (data, resp) = try await URLSession.shared.data(for: req)
                 guard gen == self.generation,

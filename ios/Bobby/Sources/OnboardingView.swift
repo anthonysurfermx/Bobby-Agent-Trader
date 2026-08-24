@@ -106,7 +106,7 @@ struct OnboardingView: View {
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
 
-            TextField("azul voltaje", text: $profile.auraText, axis: .vertical)
+            TextField(L.t("electric blue", "azul voltaje"), text: $profile.auraText, axis: .vertical)
                 .font(.rounded(17, .semibold))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Theme.text)
@@ -175,7 +175,7 @@ struct OnboardingView: View {
                         .animation(.linear(duration: 0.05), value: progress)
                 }
                 HStack {
-                    Text(charging ? "FORJANDO…" : "FORJAR AURA")
+                    Text(charging ? L.t("FORGING…", "FORJANDO…") : L.t("FORGE AURA", "FORJAR AURA"))
                         .font(.mono(12, .bold))
                         .kerning(1.7)
                     Spacer()
@@ -232,7 +232,7 @@ struct OnboardingView: View {
         charging = false
         chargeStart = nil
         if profile.auraText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            profile.auraText = "azul voltaje"
+            profile.auraText = L.t("electric blue", "azul voltaje")
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         exploding = false
@@ -265,7 +265,7 @@ struct OnboardingView: View {
                     Button {
                         profile.voiceId = agentVoice.rawValue
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speak(L.t("Hi, I am \(agentVoice.label). Ready to open the desk and read the market with you.", "Hola, soy \(agentVoice.label). Estoy listo para abrir el desk y leer el mercado contigo."), voiceId: agentVoice.rawValue)
+                        voice.speak(L.t("This is my \(agentVoice.label) voice. Ready to open the desk and read the market with you.", "Así suena mi voz \(agentVoice.label). Lista para abrir el desk y leer el mercado contigo."), voiceId: agentVoice.rawValue)
                     } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -418,7 +418,7 @@ struct OnboardingView: View {
             }
         } label: {
             HStack {
-                Text(step < 3 ? "SIGUE" : "ABRIR EL DESK")
+                Text(step < 3 ? L.t("NEXT", "SIGUE") : L.t("OPEN THE DESK", "ABRIR EL DESK"))
                     .font(.mono(12, .bold))
                     .kerning(1.7)
                 Spacer()

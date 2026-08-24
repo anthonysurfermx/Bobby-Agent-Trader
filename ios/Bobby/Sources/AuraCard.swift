@@ -72,7 +72,7 @@ struct AuraCardView: View {
 
             if let insight = data.insight {
                 VStack(alignment: .leading, spacing: 6 * scale) {
-                    Text("ÚLTIMA LECTURA · \(insight.symbol)")
+                    Text(L.t("LAST READ · \(insight.symbol)", "ÚLTIMA LECTURA · \(insight.symbol)"))
                         .font(.mono(9 * scale, .bold))
                         .kerning(1.4 * scale)
                         .foregroundStyle(data.tintSoft)
@@ -98,7 +98,7 @@ struct AuraCardView: View {
                     .kerning(1.2 * scale)
                     .foregroundStyle(.white.opacity(0.5))
                 Spacer()
-                Text("ANÁLISIS, NO CONSEJO")
+                Text(L.t("ANALYSIS, NOT ADVICE", "ANÁLISIS, NO CONSEJO"))
                     .font(.mono(8 * scale, .medium))
                     .kerning(1 * scale)
                     .foregroundStyle(.white.opacity(0.3))
@@ -123,7 +123,7 @@ struct AuraCardSheet: View {
     var body: some View {
         VStack(spacing: 18) {
             HStack {
-                Text("MI AURA HOY")
+                Text(L.t("MY AURA TODAY", "MI AURA HOY"))
                     .font(.mono(12, .bold))
                     .kerning(2)
                     .foregroundStyle(data.tintSoft)
@@ -148,7 +148,7 @@ struct AuraCardSheet: View {
                 ) {
                     HStack {
                         Image(systemName: "square.and.arrow.up")
-                        Text("COMPARTIR")
+                        Text(L.t("SHARE", "COMPARTIR"))
                             .font(.mono(12, .bold))
                             .kerning(1.7)
                     }

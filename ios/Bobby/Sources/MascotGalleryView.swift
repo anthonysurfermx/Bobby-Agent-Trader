@@ -25,7 +25,7 @@ struct MascotPerformanceMetrics: Equatable {
 struct MascotGalleryView: View {
     @ObservedObject var store: CompanionStore
     var voice: NeuralVoice?
-    var voiceId: String = AgentVoice.dalia.rawValue
+    var voiceId: String = AgentVoice.coral.rawValue
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedId: String
@@ -37,7 +37,7 @@ struct MascotGalleryView: View {
     @State private var emoteEvent: CompanionEmoteEvent?
     @State private var performanceMetrics: MascotPerformanceMetrics?
 
-    init(store: CompanionStore, voice: NeuralVoice? = nil, voiceId: String = AgentVoice.dalia.rawValue) {
+    init(store: CompanionStore, voice: NeuralVoice? = nil, voiceId: String = AgentVoice.coral.rawValue) {
         self.store = store
         self.voice = voice
         self.voiceId = voiceId
@@ -64,7 +64,7 @@ struct MascotGalleryView: View {
                 identityBlock
                     .padding(.top, 2)
 #if DEBUG
-                if let metrics = performanceMetrics {
+                if let metrics = performanceMetrics, !ProcessInfo.processInfo.arguments.contains("-store-shots") {
                     Text("LOAD \(metrics.loadMilliseconds)MS · ASSET \(megabytes(metrics.assetBytes))MB · ΔMEM \(megabytes(metrics.footprintDeltaBytes))MB · \(metrics.geometryCount) GEO")
                         .font(.mono(6.5, .semibold))
                         .kerning(0.5)
@@ -122,6 +122,7 @@ struct MascotGalleryView: View {
                     .frame(width: 30, height: 30)
                     .background(Circle().fill(Theme.card))
             }
+            .accessibilityIdentifier("squad-close")
         }
         .padding(.horizontal, 16)
         .padding(.top, 14)

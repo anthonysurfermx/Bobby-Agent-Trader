@@ -373,6 +373,7 @@ struct ContentView: View {
                     }
                 }
             }
+            .accessibilityIdentifier("squad-portrait")
             VStack(alignment: .leading, spacing: 1) {
                 Text("BOBBY // LIVE DESK")
                     .font(.mono(12, .bold))
@@ -879,7 +880,7 @@ struct ContentView: View {
                 .padding(.bottom, 8)
             ForEach(vm.messages.suffix(3)) { message in
                 HStack(alignment: .top, spacing: 10) {
-                    Text(message.fromBobby ? "BOBBY" : "TÚ")
+                    Text(message.fromBobby ? "BOBBY" : L.t("YOU", "TÚ"))
                         .font(.mono(8, .bold))
                         .kerning(1)
                         .foregroundStyle(message.fromBobby ? Theme.accentSoft : Theme.muted)
@@ -930,6 +931,7 @@ struct ContentView: View {
                 .textInputAutocapitalization(.never)
                 .submitLabel(.send)
                 .onSubmit { vm.ask() }
+                .accessibilityIdentifier("ask-field")
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .background(Theme.panel)
