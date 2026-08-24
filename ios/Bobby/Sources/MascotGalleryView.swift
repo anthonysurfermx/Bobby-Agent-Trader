@@ -411,6 +411,11 @@ private struct SelectionBurst: View {
 struct MascotSceneView: UIViewRepresentable {
     let assetName: String
     var interactive: Bool = true
+    /// True while the companion is talking — drives the puppet-talk motion
+    /// (rhythmic nod + breathe pulse), scaled by `voiceLevel` when the
+    /// player meters audio, procedural when it does not (AVSpeech fallback).
+    var speaking: Bool = false
+    var voiceLevel: CGFloat = 0
     var emoteEvent: CompanionEmoteEvent? = nil
     var onLoading: ((_ loading: Bool, _ failed: Bool) -> Void)? = nil
     var onMetrics: ((MascotPerformanceMetrics) -> Void)? = nil
@@ -444,6 +449,7 @@ struct MascotSceneView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.owner = self
+        context.coordinator.setTalking(speaking, level: voiceLevel)
         if let event = emoteEvent, context.coordinator.lastEmoteId != event.id {
             context.coordinator.lastEmoteId = event.id
             context.coordinator.play(event.emote)
@@ -539,6 +545,46 @@ struct MascotSceneView: UIViewRepresentable {
             guard g.state == .began else { return }
             owner?.onSecretPhrase?()
         }
+
+        // ---- puppet talk: the companion MOVES while it speaks ----
+        private var talkLink: CADisplayLink?
+        private var talking = false
+        private var talkLevel: CGFloat = 0
+        private var talkStart: CFTimeInterval = 0
+
+        func setTalking(_ on: Bool, level: CGFloat) {
+            talkLevel = level
+            guard on != talking else { return }
+            talking = on
+            if on {
+                talkStart = CACurrentMediaTime()
+                let link = CADisplayLink(target: self, selector: #selector(talkTick))
+                link.add(to: .main, forMode: .common)
+                talkLink = link
+            } else {
+                talkLink?.invalidate()
+                talkLink = nil
+                guard let node = modelRoot else { return }
+                SCNTransaction.begin()
+                SCNTransaction.animationDuration = 0.3
+                node.scale = SCNVector3(1, 1, 1)
+                node.eulerAngles.x = 0
+                SCNTransaction.commit()
+            }
+        }
+
+        @objc private func talkTick() {
+            guard let node = modelRoot else { return }
+            let t = CACurrentMediaTime() - talkStart
+            // Metered level when the player provides one; procedural voice
+            // rhythm otherwise, so it still talks on the AVSpeech fallback.
+            let pulse = max(Double(talkLevel), 0.25 + 0.20 * abs(sin(t * 6.8)) + 0.12 * abs(sin(t * 11.3)))
+            let s = Float(1 + pulse * 0.055)
+            node.scale = SCNVector3(s, s, s)
+            node.eulerAngles.x = Float(sin(t * 8.6) * 0.05 * (0.35 + pulse))
+        }
+
+        deinit { talkLink?.invalidate() }
 
         func startSpin() {
             modelRoot?.runAction(.repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 14)), forKey: "spin")

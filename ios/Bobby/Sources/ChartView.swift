@@ -121,7 +121,7 @@ struct ChartView: View {
                     .contentShape(Rectangle())
             }
         }
-        .accessibilityLabel("Gráfica de velas \(timeframe.rawValue), con volumen, EMA 20 y EMA 50")
+        .accessibilityLabel(L.t("Candlestick chart \(timeframe.rawValue), with volume, EMA 20 and EMA 50", "Gráfica de velas \(timeframe.rawValue), con volumen, EMA 20 y EMA 50"))
     }
 
     @ChartContentBuilder

@@ -64,7 +64,7 @@ struct AuraCardView: View {
             .padding(.top, 14 * scale)
 
             if data.streak >= 2 {
-                Text("🔥 día \(data.streak) hablando con \(data.agentName)")
+                Text(L.t("🔥 day \(data.streak) with \(data.agentName)", "🔥 día \(data.streak) con \(data.agentName)"))
                     .font(.mono(11 * scale, .semibold))
                     .foregroundStyle(.white.opacity(0.7))
                     .padding(.top, 12 * scale)

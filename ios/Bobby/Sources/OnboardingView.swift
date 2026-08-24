@@ -98,10 +98,10 @@ struct OnboardingView: View {
                 .frame(height: 154)
                 .animation(.easeOut(duration: 0.5), value: profile.auraText)
             sectionEyebrow("AURA CHECK")
-            Text("Describe su aura")
+            Text(L.t("Describe its aura", "Describe su aura"))
                 .font(.rounded(27, .bold))
                 .foregroundStyle(Theme.text)
-            Text("Con tus palabras. El orbe la va absorbiendo mientras escribes — cada aura sale única.")
+            Text(L.t("In your own words. The orb absorbs it as you type — every aura comes out unique.", "Con tus palabras. El orbe la va absorbiendo mientras escribes — cada aura sale única."))
                 .font(.rounded(13, .medium))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
@@ -147,7 +147,7 @@ struct OnboardingView: View {
             .padding(.top, 6)
             .animation(.easeOut(duration: 0.3), value: profile.auraText)
 
-            Text("mantén presionado FORJAR para sellarla")
+            Text(L.t("press and hold FORGE to seal it", "mantén presionado FORJAR para sellarla"))
                 .font(.mono(9, .medium))
                 .kerning(1.1)
                 .foregroundStyle(Theme.muted.opacity(0.8))
@@ -251,11 +251,11 @@ struct OnboardingView: View {
             BobbyOrb(size: 146, speaking: voice.speaking, level: voice.speaking ? max(0.08, voice.level) : 0.08, tint: tint, tintSoft: tintSoft)
                 .frame(height: 150)
             sectionEyebrow("VOICE MATRIX")
-            Text("Ponle voz")
+            Text(L.t("Give it a voice", "Ponle voz"))
                 .font(.rounded(26, .bold))
                 .foregroundStyle(Theme.text)
                 .multilineTextAlignment(.center)
-            Text("Escúchalas en vivo — el orbe reacciona al audio.")
+            Text(L.t("Hear them live — the orb reacts to the audio.", "Escúchalas en vivo — el orbe reacciona al audio."))
                 .font(.rounded(13, .medium))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
@@ -265,7 +265,7 @@ struct OnboardingView: View {
                     Button {
                         profile.voiceId = agentVoice.rawValue
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speak("Hola, soy \(agentVoice.label). Estoy listo para abrir el desk y leer el mercado contigo.", voiceId: agentVoice.rawValue)
+                        voice.speak(L.t("Hi, I am \(agentVoice.label). Ready to open the desk and read the market with you.", "Hola, soy \(agentVoice.label). Estoy listo para abrir el desk y leer el mercado contigo."), voiceId: agentVoice.rawValue)
                     } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -307,10 +307,10 @@ struct OnboardingView: View {
             BobbyOrb(size: 124, speaking: voice.speaking, level: voice.speaking ? max(0.08, voice.level) : 0.08, tint: tint, tintSoft: tintSoft)
                 .frame(height: 128)
             sectionEyebrow("VOICE DIRECTIVE")
-            Text("¿Qué vibra trae?")
+            Text(L.t("What is its vibe?", "¿Qué vibra trae?"))
                 .font(.rounded(27, .bold))
                 .foregroundStyle(Theme.text)
-            Text("La personalidad cambia el tono; los datos no cambian.")
+            Text(L.t("Personality changes the tone; the data never changes.", "La personalidad cambia el tono; los datos no cambian."))
                 .font(.rounded(13, .medium))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
@@ -358,10 +358,10 @@ struct OnboardingView: View {
         VStack(spacing: 14) {
             BobbyOrb(size: 150, level: 0.10, tint: tint, tintSoft: tintSoft).frame(height: 154)
             sectionEyebrow("CALLSIGN")
-            Text("Bautízalo")
+            Text(L.t("Name it", "Bautízalo"))
                 .font(.rounded(27, .bold))
                 .foregroundStyle(Theme.text)
-            Text("El nombre que verás en tu Live Desk.")
+            Text(L.t("The name you will see on your Live Desk.", "El nombre que verás en tu Live Desk."))
                 .font(.rounded(13, .medium))
                 .foregroundStyle(Theme.muted)
 
@@ -383,7 +383,7 @@ struct OnboardingView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "checkmark.shield.fill")
                     .foregroundStyle(Theme.up)
-                Text("Bobby analiza mercados con datos en vivo. No administra tu dinero, no ejecuta operaciones ni emite recomendaciones personalizadas. Tú decides y asumes el riesgo.")
+                Text(L.t("Bobby analyzes markets with live data. It does not manage your money, execute trades or give personalized recommendations. You decide and you own the risk.", "Bobby analiza mercados con datos en vivo. No administra tu dinero, no ejecuta operaciones ni emite recomendaciones personalizadas. Tú decides y asumes el riesgo."))
                     .font(.mono(9, .medium))
                     .foregroundStyle(Theme.muted)
                     .lineSpacing(3)

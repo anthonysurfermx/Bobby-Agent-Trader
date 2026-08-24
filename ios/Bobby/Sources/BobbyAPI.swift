@@ -97,28 +97,54 @@ struct BobbyAnswer {
     /// The spoken/written summary — terminal-honest, never advice-flavored.
     var summary: String {
         var lines: [String] = []
-        if let p = price { lines.append("\(symbol) está en \(Self.money(p)).") }
+        if let p = price {
+            lines.append(L.t("\(symbol) is at \(Self.money(p)).",
+                             "\(symbol) está en \(Self.money(p))."))
+        }
         if let t = trend {
-            var s = "Tendencia \(t)"
-            if let m = momentum, m != "neutral" { s += ", momentum \(m)" }
+            let trendWord = Self.localizedTrend(t)
+            var s = L.t("Trend \(trendWord)", "Tendencia \(trendWord)")
+            if let m = momentum, m != "neutral" { s += L.t(", momentum \(m)", ", momentum \(m)") }
             if let r = rsi { s += ", RSI \(Int(r))" }
             lines.append(s + ".")
         }
         if let sup = support, let res = resistance {
-            lines.append("Soporte \(Self.money(sup)), resistencia \(Self.money(res)).")
+            lines.append(L.t("Support \(Self.money(sup)), resistance \(Self.money(res)).",
+                             "Soporte \(Self.money(sup)), resistencia \(Self.money(res))."))
         }
         if let d = direction, let c = convictionPct {
-            let dir = d == "long" ? "alcista" : d == "short" ? "bajista" : d
-            lines.append("Mi lectura: sesgo \(dir) con \(Int(c))% de convicción.")
+            let dirEn = d == "long" ? "bullish" : d == "short" ? "bearish" : d
+            let dirEs = d == "long" ? "alcista" : d == "short" ? "bajista" : d
+            lines.append(L.t("My read: \(dirEn) bias with \(Int(c))% conviction.",
+                             "Mi lectura: sesgo \(dirEs) con \(Int(c))% de convicción."))
         }
         if let e = entry, let st = stop, let tg = target {
-            var plan = "Plan de referencia: entrada \(Self.money(e)), stop \(Self.money(st)), objetivo \(Self.money(tg))"
+            var plan = L.t("Reference plan: entry \(Self.money(e)), stop \(Self.money(st)), target \(Self.money(tg))",
+                           "Plan de referencia: entrada \(Self.money(e)), stop \(Self.money(st)), objetivo \(Self.money(tg))")
             if let rr = rewardRisk { plan += " (R:R \(String(format: "%.1f", rr)))" }
             lines.append(plan + ".")
         }
-        if isNoTrade { lines.append("No setup yet. Capital protected.") }
-        if lines.isEmpty { lines.append("No tengo datos suficientes de \(symbol) ahora mismo.") }
+        if isNoTrade { lines.append(L.t("No setup yet. Capital protected.", "Sin setup todavía. Capital protegido.")) }
+        if lines.isEmpty {
+            lines.append(L.t("I do not have enough data on \(symbol) right now.",
+                             "No tengo datos suficientes de \(symbol) ahora mismo."))
+        }
         return lines.joined(separator: " ")
+    }
+
+    /// API trend values arrive in either language — normalize for the reader.
+    static func localizedTrend(_ raw: String) -> String {
+        let t = raw.lowercased()
+        if t.contains("alcista") || t.contains("bull") || t.contains("up") {
+            return L.t("bullish", "alcista")
+        }
+        if t.contains("bajista") || t.contains("bear") || t.contains("down") {
+            return L.t("bearish", "bajista")
+        }
+        if t.contains("lateral") || t.contains("range") || t.contains("side") {
+            return L.t("sideways", "lateral")
+        }
+        return raw
     }
 
     static func money(_ v: Double) -> String {

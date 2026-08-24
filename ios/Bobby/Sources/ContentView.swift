@@ -84,6 +84,10 @@ final class BobbyViewModel: ObservableObject {
         companions.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+        // Same for the voice: speaking/level drive the companion's talk motion
+        voice.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     /// The companion IS the identity: its evolved name and its own voice.
@@ -93,11 +97,11 @@ final class BobbyViewModel: ObservableObject {
     }
     var voicePersona: String? { companions.companion?.voicePersona }
 
-    /// Greeting in the companion's voice, with the tone its level earned.
+    /// Greeting in the companion's own words (selectLine is first person and
+    /// grammatical in both languages), with the tone its level earned.
     var companionGreeting: String {
         guard let comp = companions.companion else { return profile.greeting }
-        return L.t("I am \(displayName). I \(comp.personality).", "Soy \(displayName), \(comp.personality).")
-            + levelTone(companions.level.number)
+        return "\(displayName): \(comp.selectLine)" + levelTone(companions.level.number)
     }
 
     func say(_ text: String) {
@@ -410,7 +414,12 @@ struct ContentView: View {
                 Group {
                     if let comp = vm.companions.companion {
                         // The chosen companion IS Bobby's face on the desk
-                        MascotSceneView(assetName: comp.id, interactive: false)
+                        MascotSceneView(
+                            assetName: comp.id,
+                            interactive: false,
+                            speaking: vm.voice.speaking,
+                            voiceLevel: vm.voice.level
+                        )
                             .allowsHitTesting(false)
                             .frame(width: 206, height: 208)
                             .shadow(color: comp.tint.opacity(0.35), radius: 26)

@@ -13,6 +13,7 @@ targets:
     platform: iOS
     sources:
       - Sources
+      - Assets.xcassets
       - path: Resources/Mascots
         buildPhase: resources
     dependencies:
@@ -21,6 +22,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: xyz.bobbyprotocol.bobby
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Bobby
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "Bobby te escucha para responder sobre cualquier activo."
