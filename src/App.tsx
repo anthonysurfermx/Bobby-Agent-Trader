@@ -20,6 +20,7 @@ import UserLayout from '@/pages/user/UserLayout';
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLanding'), 'app-landing');
+const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
 const BobbySubmissionPage = lazy(() => import('@/pages/BobbySubmissionPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
@@ -307,6 +308,14 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAppLanding />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'privacy',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <PrivacyPage />
             </Suspense>
           ),
         },
