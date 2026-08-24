@@ -171,16 +171,32 @@ const HUMAN_ALIASES: Record<string, string[]> = {
   ARM: ['ARM HOLDINGS'],
   POPMART: ['POP MART'],
   SPCX: ['SPACEX', 'SPACE X'],
-  OPENAI: ['OPEN AI', 'CHATGPT'],
+  OPENAI: ['OPEN AI'],
   SPY: ['S&P500', 'SP500', 'SPX'],
   QQQ: ['NASDAQ'],
   IWM: ['RUSSELL'],
-  USO: ['OIL', 'PETROLEO', 'CRUDO', 'CRUDE OIL'],
-  UVXY: ['VIX'],
+  USO: ['US OIL FUND'],
   // ---- metals ----
-  XAUT: ['GOLD', 'XAU', 'ORO'],
-  PAXG: ['GOLD', 'PAX GOLD'],
+  XAUT: ['XAU', 'TETHER GOLD'],
+  PAXG: ['PAX GOLD'],
   XAG: ['SILVER', 'PLATA'],
+};
+
+/**
+ * Financial-proxy words: the user names a THING (gold, oil) and the closest
+ * tradable listing is a vehicle for it, not the thing itself. These resolve —
+ * but flagged `needsConfirmation`, so the client asks "did you mean…?" before
+ * analyzing. Sacred rule: better to ask once than to confidently analyze the
+ * wrong instrument. (VIX→UVXY and CHATGPT→OPENAI were dropped entirely: a
+ * levered ETF is not the index, and a product is not a company's stock.)
+ */
+const PROXY_ALIASES: Record<string, { symbol: string; note: string }> = {
+  GOLD: { symbol: 'XAUT', note: 'Tether Gold (XAUT), a tokenized gold product' },
+  ORO: { symbol: 'XAUT', note: 'Tether Gold (XAUT), oro tokenizado' },
+  OIL: { symbol: 'USO', note: 'United States Oil Fund (USO), an oil ETF — not spot oil' },
+  PETROLEO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot' },
+  CRUDO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot' },
+  'CRUDE OIL': { symbol: 'USO', note: 'United States Oil Fund (USO), an oil ETF — not spot oil' },
 };
 
 function normalizeQueryValue(value: string): string {
@@ -442,13 +458,18 @@ function browseName(symbol: string): string {
  * Equities hide the X-prefixed duplicate listings (XNVDA vs NVDA) and test
  * assets; crypto hides stablecoins.
  */
-export async function browseOkxAssets(limitPerClass = 80): Promise<Record<OkxAssetClass, OkxBrowseAsset[]>> {
+export async function browseOkxAssets(limitPerClass = 80): Promise<{
+  classes: Record<OkxAssetClass, OkxBrowseAsset[]>;
+  /** How many distinct bases the search can actually reach — the honest number. */
+  totalBases: number;
+}> {
   const [catalog, volumes] = await Promise.all([getOkxInstrumentCatalog(), getVolumeBySymbol()]);
 
   const bestBySymbol = new Map<string, OkxAssetInstrument>();
   for (const instrument of catalog) {
     if (!bestBySymbol.has(instrument.symbol)) bestBySymbol.set(instrument.symbol, instrument);
   }
+  const totalBases = bestBySymbol.size;
 
   const grouped: Record<OkxAssetClass, OkxBrowseAsset[]> = { crypto: [], equity: [], commodity: [], fx: [], other: [] };
   for (const [symbol, instrument] of bestBySymbol) {
@@ -474,21 +495,29 @@ export async function browseOkxAssets(limitPerClass = 80): Promise<Record<OkxAss
     grouped[assetClass].sort((a, b) => b.vol24hUsd - a.vol24hUsd);
     grouped[assetClass] = grouped[assetClass].slice(0, limitPerClass);
   }
-  return grouped;
+  return { classes: grouped, totalBases };
 }
 
-function expandTerms(query: string): string[] {
+/**
+ * Query terms split by trust: `direct` terms are the user's words plus their
+ * spoken-name expansions; `proxy` terms come from the financial-proxy map and
+ * always downgrade the match to needs-confirmation territory.
+ */
+function queryTerms(query: string): { direct: string[]; proxy: string[] } {
   const normalized = normalizeQueryValue(query);
-  if (!normalized) return [];
+  if (!normalized) return { direct: [], proxy: [] };
   const compact = compactQueryValue(query);
-  const expanded = new Set<string>([normalized, compact]);
+  const direct = new Set<string>([normalized, compact]);
   for (const [symbol, aliases] of Object.entries(HUMAN_ALIASES)) {
     if (symbol === normalized || aliases.some((alias) => normalizeQueryValue(alias) === normalized)) {
-      expanded.add(symbol);
-      aliases.forEach((alias) => expanded.add(normalizeQueryValue(alias)));
+      direct.add(symbol);
+      aliases.forEach((alias) => direct.add(normalizeQueryValue(alias)));
     }
   }
-  return Array.from(expanded).filter(Boolean);
+  const proxy = new Set<string>();
+  const proxyHit = PROXY_ALIASES[normalized];
+  if (proxyHit) proxy.add(proxyHit.symbol);
+  return { direct: Array.from(direct).filter(Boolean), proxy: Array.from(proxy) };
 }
 
 /**
@@ -535,30 +564,53 @@ function fuzzyTermsFor(normalized: string): string[] {
   return Array.from(seen);
 }
 
-function rankInstrument(instrument: OkxAssetInstrument, query: string): number {
+export type OkxMatchKind = 'exact' | 'partial' | 'proxy' | 'fuzzy';
+
+/**
+ * Score one instrument against a query and say HOW it matched. The kind is
+ * the safety signal: `exact` (ticker/spoken name) analyzes straight away,
+ * `proxy` (gold→XAUT, oil→USO) and `fuzzy` (typos, dictation mangles) must
+ * be confirmed by the user before any analysis runs.
+ */
+function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score: number; kind: OkxMatchKind } {
   const normalized = normalizeQueryValue(query);
   const compact = compactQueryValue(query);
-  if (!normalized) return 0;
+  if (!normalized) return { score: 0, kind: 'partial' };
 
   const searchText = instrument.searchText;
   const compactSearchText = compactQueryValue(searchText);
-  const expansions = expandTerms(query);
+  const { direct, proxy } = queryTerms(query);
 
   let score = 0;
+  let kind: OkxMatchKind = 'partial';
 
-  for (const term of expansions) {
-    if (!term) continue;
-    if (instrument.instId === term) score = Math.max(score, 1000);
-    if (instrument.symbol === term) score = Math.max(score, 960);
-    if (instrument.baseSymbol === term) score = Math.max(score, 940);
-    if (instrument.aliases.includes(term)) score = Math.max(score, 910);
-    if (instrument.instId.startsWith(term)) score = Math.max(score, 860);
-    if (instrument.symbol.startsWith(term)) score = Math.max(score, 840);
-    if (searchText.includes(term)) score = Math.max(score, 760);
+  const applyTerm = (term: string, asKind: OkxMatchKind) => {
+    let termScore = 0;
+    if (instrument.instId === term) termScore = 1000;
+    else if (instrument.symbol === term) termScore = 960;
+    else if (instrument.baseSymbol === term) termScore = 940;
+    else if (instrument.aliases.includes(term)) termScore = 910;
+    else if (instrument.instId.startsWith(term)) termScore = 860;
+    else if (instrument.symbol.startsWith(term)) termScore = 840;
+    else if (searchText.includes(term)) termScore = 760;
+    if (termScore > score) {
+      score = termScore;
+      kind = termScore >= 840 ? asKind : 'partial';
+    }
+  };
+
+  for (const term of direct) applyTerm(term, 'exact');
+  // Proxy terms score just under direct hits: an exact user word always wins
+  // over a proxy interpretation of the same query.
+  for (const term of proxy) {
+    const before = score;
+    applyTerm(term, 'proxy');
+    if (score > before) score -= 5;
   }
 
-  if (compact && compactSearchText.includes(compact)) {
-    score = Math.max(score, 700);
+  if (compact && compactSearchText.includes(compact) && score < 700) {
+    score = 700;
+    kind = 'partial';
   }
 
   // Fuzzy net: dictation and typos never match exactly ("SOLNA", "ETHERUM",
@@ -571,16 +623,20 @@ function rankInstrument(instrument: OkxAssetInstrument, query: string): number {
       if (!budget) continue;
       for (const alias of instrument.aliases) {
         const d = editDistanceAtMost(term, alias, budget);
-        if (d <= budget) {
-          score = Math.max(score, 620 - d * 40);
+        if (d <= budget && 620 - d * 40 > score) {
+          score = 620 - d * 40;
+          kind = 'fuzzy';
         }
       }
     }
   }
 
-  if (!score) return 0;
+  if (!score) return { score: 0, kind: 'partial' };
+  return { score: score + instrument.priority, kind };
+}
 
-  return score + instrument.priority;
+function rankInstrument(instrument: OkxAssetInstrument, query: string): number {
+  return scoreInstrument(instrument, query).score;
 }
 
 export async function searchOkxInstruments(
@@ -625,6 +681,110 @@ export async function resolveOkxInstrument(
 
   const results = await searchOkxInstruments(normalized, { ...options, limit: 1 });
   return results[0] || null;
+}
+
+// ---- Canonical free-text resolution (the ONE brain for phrases) ----
+
+// Conversational filler in both product languages — never an asset name.
+const QUERY_STOPWORDS = new Set([
+  'QUE', 'QUÉ', 'PASA', 'PASARA', 'PASARÁ', 'CON', 'EL', 'LA', 'LO', 'LOS', 'LAS', 'DE', 'DEL',
+  'UN', 'UNA', 'PARA', 'POR', 'COMO', 'CÓMO', 'VES', 'VA', 'VAN', 'HOY', 'MANANA', 'MAÑANA',
+  'AHORA', 'ANALIZA', 'ANALISIS', 'ANÁLISIS', 'PRECIO', 'DAME', 'DIME', 'SOBRE', 'Y', 'O',
+  'A', 'EN', 'ME', 'TE', 'SE', 'ES', 'ESTA', 'ESTÁ', 'BOBBY', 'SENAL', 'SEÑAL', 'HABLA',
+  'CUENTA', 'ACTUAL', 'VER', 'VEO', 'DEBO', 'HACER', 'COMPRAR', 'VENDER', 'BUENO', 'MALO',
+  'WHAT', 'ABOUT', 'WITH', 'THE', 'IS', 'PRICE', 'OF', 'HOW', 'NOW', 'TODAY', 'TOMORROW',
+]);
+
+export interface OkxResolvedAsset {
+  instrument: OkxAssetInstrument;
+  matchKind: OkxMatchKind;
+  matchedTerm: string;
+  /** Fuzzy and proxy matches must be confirmed by the user before analysis. */
+  needsConfirmation: boolean;
+  /** For proxy matches: what the instrument actually is, in plain words. */
+  proxyNote: string | null;
+}
+
+async function bestScoredMatch(
+  query: string,
+  allowedTypes: Set<OkxSearchInstType>,
+): Promise<{ instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind } | null> {
+  const catalog = await getOkxInstrumentCatalog();
+  let best: { instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind } | null = null;
+  for (const instrument of catalog) {
+    if (!allowedTypes.has(instrument.instType)) continue;
+    const { score, kind } = scoreInstrument(instrument, query);
+    if (score <= 0) continue;
+    if (!best || score > best.score || (score === best.score && instrument.priority > best.instrument.priority)) {
+      best = { instrument, score, kind };
+    }
+  }
+  return best;
+}
+
+/**
+ * Resolve free text ("que pasa con eterium", "taiwan semiconductor hoy") to
+ * one instrument with an honest match kind. Candidate order: the whole
+ * phrase first (multi-word names), then each non-stopword word. The first
+ * exact hit wins immediately; proxy beats fuzzy; fuzzy only if nothing else.
+ */
+export async function resolveOkxAssetFromText(
+  text: string,
+  options?: { instTypes?: OkxSearchInstType[] },
+): Promise<OkxResolvedAsset | null> {
+  const allowedTypes = new Set(options?.instTypes || OKX_SEARCH_INST_TYPES);
+  const upper = normalizeQueryValue(text).replace(/[¿?¡!.,;:]/g, '');
+  if (!upper) return null;
+
+  const words = upper.split(/\s+/).filter((w) => w.length >= 2 && !QUERY_STOPWORDS.has(w));
+  const candidates = upper.includes(' ') ? [upper, ...words] : [upper];
+
+  let fallback: OkxResolvedAsset | null = null;
+  for (const candidate of candidates) {
+    const hit = await bestScoredMatch(candidate, allowedTypes);
+    if (!hit) continue;
+    const resolved: OkxResolvedAsset = {
+      instrument: hit.instrument,
+      matchKind: hit.kind,
+      matchedTerm: candidate,
+      needsConfirmation: hit.kind === 'fuzzy' || hit.kind === 'proxy',
+      proxyNote: hit.kind === 'proxy' ? (PROXY_ALIASES[candidate]?.note ?? null) : null,
+    };
+    if (hit.kind === 'exact') return resolved;
+    const rankOf = (k: OkxMatchKind) => (k === 'proxy' ? 2 : k === 'partial' ? 1 : 0);
+    if (!fallback || rankOf(resolved.matchKind) > rankOf(fallback.matchKind)) fallback = resolved;
+  }
+  return fallback;
+}
+
+/** SPOT + SWAP venues for one base symbol, from the cached catalog. */
+export async function getBaseVenues(symbol: string): Promise<{ spotId: string | null; swapId: string | null }> {
+  const upper = normalizeQueryValue(symbol);
+  const catalog = await getOkxInstrumentCatalog();
+  let spotId: string | null = null;
+  let swapId: string | null = null;
+  for (const instrument of catalog) {
+    if (instrument.symbol !== upper) continue;
+    if (!spotId && instrument.instType === 'SPOT' && instrument.quoteSymbol === 'USDT') spotId = instrument.instId;
+    if (!swapId && instrument.instType === 'SWAP' && instrument.instId.includes('-USDT-')) swapId = instrument.instId;
+    if (spotId && swapId) break;
+  }
+  return { spotId, swapId };
+}
+
+// ---- Deterministic test hooks (fixtures instead of the network) ----
+
+/** Install a synthetic catalog; instruments go through the real normalizer. */
+export function __setTestCatalog(raw: RawOkxInstrument[]): void {
+  const instruments = raw
+    .map(normalizeInstrument)
+    .filter((item): item is OkxAssetInstrument => Boolean(item))
+    .sort((a, b) => b.priority - a.priority);
+  catalogCache = { fetchedAt: Date.now(), expiresAt: Date.now() + 1e12, instruments };
+}
+
+export function __setTestVolumes(entries: Array<[string, { volUsd: number; last: number | null }]>): void {
+  volumeCache = { expiresAt: Date.now() + 1e12, bySymbol: new Map(entries) };
 }
 
 export function getCatalogAgeMs(): number | null {

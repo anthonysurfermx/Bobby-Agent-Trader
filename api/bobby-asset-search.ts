@@ -3,7 +3,7 @@ import {
   browseOkxAssets,
   getCatalogAgeMs,
   OKX_SEARCH_INST_TYPES,
-  resolveOkxInstrument,
+  resolveOkxAssetFromText,
   searchOkxInstruments,
   type OkxSearchInstType,
 } from '../src/lib/okx-asset-search.js';
@@ -36,10 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // by real 24h volume — powers the in-app board and dictation vocabulary.
   if (String(req.query.browse || '') === '1') {
     try {
-      const browse = await browseOkxAssets();
+      const { classes, totalBases } = await browseOkxAssets();
       return res.status(200).json({
         ok: true,
-        browse,
+        browse: classes,
+        totalBases,
         source: 'OKX public instruments + tickers',
         catalogAgeMs: getCatalogAgeMs(),
       });
@@ -61,9 +62,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const [results, resolved] = await Promise.all([
+    const [results, resolution] = await Promise.all([
       searchOkxInstruments(q, { instTypes, limit }),
-      resolveOkxInstrument(q, { instTypes }),
+      resolveOkxAssetFromText(q, { instTypes }),
     ]);
 
     return res.status(200).json({
@@ -71,7 +72,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       query: q,
       instTypes,
       results,
-      resolved,
+      resolved: resolution?.instrument ?? null,
+      // Safety metadata: fuzzy/proxy matches must be user-confirmed before
+      // any analysis runs — better to ask once than to confidently analyze
+      // the wrong instrument.
+      resolution: resolution
+        ? {
+          matchKind: resolution.matchKind,
+          matchedTerm: resolution.matchedTerm,
+          needsConfirmation: resolution.needsConfirmation,
+          proxyNote: resolution.proxyNote,
+        }
+        : null,
       source: 'OKX public instruments',
       catalogAgeMs: getCatalogAgeMs(),
     });
