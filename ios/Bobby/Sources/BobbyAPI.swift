@@ -172,6 +172,81 @@ struct BobbyAnswer {
 enum BobbyAPI {
     static let base = URL(string: "https://bobbyprotocol.xyz")!
 
+    // MARK: - Asset discovery (search-as-you-type, board, dictation vocab)
+
+    struct AssetHit: Identifiable, Equatable {
+        let symbol: String
+        let name: String
+        let assetClass: String
+        var id: String { symbol }
+    }
+
+    struct BoardAsset: Identifiable, Equatable {
+        let symbol: String
+        let name: String
+        let last: Double?
+        var id: String { symbol }
+    }
+
+    private static func prettyName(_ raw: String, symbol: String) -> String {
+        guard raw != symbol, !raw.isEmpty else { return symbol }
+        if raw.rangeOfCharacter(from: CharacterSet(charactersIn: "&0123456789")) != nil { return raw }
+        return raw.lowercased().split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
+
+    /// Live search over the full OKX universe (621 bases) — one row per asset.
+    static func searchAssets(_ q: String, limit: Int = 4) async -> [AssetHit] {
+        let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
+        guard let obj = try? await json("api/bobby-asset-search?q=\(encoded)&limit=10") as? [String: Any],
+              let results = obj["results"] as? [[String: Any]] else { return [] }
+        var seen = Set<String>()
+        var hits: [AssetHit] = []
+        for r in results {
+            guard let sym = r["symbol"] as? String, !seen.contains(sym) else { continue }
+            seen.insert(sym)
+            let aliases = (r["aliases"] as? [String]) ?? []
+            let name = prettyName(aliases.first(where: { $0 != sym }) ?? sym, symbol: sym)
+            hits.append(.init(symbol: sym, name: name, assetClass: (r["assetClass"] as? String) ?? "crypto"))
+            if hits.count >= limit { break }
+        }
+        return hits
+    }
+
+    /// The explorable board: sections ranked by real 24h volume server-side.
+    static func browseBoard() async -> [(title: String, assets: [BoardAsset])] {
+        guard let obj = try? await json("api/bobby-asset-search?browse=1") as? [String: Any],
+              let browse = obj["browse"] as? [String: Any] else { return [] }
+        func parse(_ key: String) -> [BoardAsset] {
+            ((browse[key] as? [[String: Any]]) ?? []).compactMap { r in
+                guard let sym = r["symbol"] as? String else { return nil }
+                return BoardAsset(symbol: sym,
+                                  name: prettyName((r["name"] as? String) ?? sym, symbol: sym),
+                                  last: r["last"] as? Double)
+            }
+        }
+        var sections: [(String, [BoardAsset])] = []
+        let crypto = parse("crypto"); if !crypto.isEmpty { sections.append((L.t("CRYPTO", "CRIPTO"), crypto)) }
+        let equity = parse("equity"); if !equity.isEmpty { sections.append((L.t("STOCKS & ETFs", "ACCIONES Y ETFs"), equity)) }
+        let metals = parse("commodity"); if !metals.isEmpty { sections.append((L.t("METALS", "METALES"), metals)) }
+        return sections
+    }
+
+    /// Names + tickers the dictation should favor, from the live board.
+    static func dictationVocabulary() async -> [String] {
+        let sections = await browseBoard()
+        var words: [String] = []
+        var seen = Set<String>()
+        for (_, assets) in sections {
+            for a in assets {
+                for w in [a.name, a.symbol] where w.count >= 2 && !seen.contains(w) {
+                    seen.insert(w)
+                    words.append(w)
+                }
+            }
+        }
+        return Array(words.prefix(220))
+    }
+
     static func json(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Any {
         // NOT appendingPathComponent: it percent-encodes '?' and turns every
         // query string into a 404.

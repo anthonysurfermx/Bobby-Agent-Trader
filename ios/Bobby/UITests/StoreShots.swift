@@ -82,6 +82,34 @@ final class StoreShots: XCTestCase {
         if close.waitForExistence(timeout: 4) { close.tap() }
     }
 
+    /// Search-as-you-type suggestions + the asset board (needs onboarded state).
+    func test03_BoardAndSuggestions() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-store-shots"]
+        app.launch()
+
+        let ask = app.textFields["ask-field"]
+        XCTAssertTrue(ask.waitForExistence(timeout: 15))
+        sleep(3)
+
+        // Live suggestions while typing
+        ask.tap()
+        ask.typeText("sol")
+        sleep(3)
+        shot("07-suggestions")
+        ask.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 3))
+
+        // THE BOARD from the quick access rail
+        let open = app.buttons["board-open"]
+        if open.waitForExistence(timeout: 4) {
+            open.tap()
+            sleep(6)
+            shot("08-board")
+            let close = app.buttons["board-close"]
+            if close.waitForExistence(timeout: 4) { close.tap() }
+        }
+    }
+
     /// Ask a real question and capture verdict + (if XP was seeded just under
     /// a level boundary) the evolution overlay.
     func test02_VerdictAndEvolution() throws {

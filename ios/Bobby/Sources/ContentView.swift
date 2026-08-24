@@ -55,6 +55,8 @@ struct NoTradeMoment: Identifiable, Equatable {
 final class BobbyViewModel: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var input = ""
+    @Published var assetHits: [BobbyAPI.AssetHit] = []
+    private var suggestTask: Task<Void, Never>?
     @Published var thinking = false
     @Published var candles: [Candle] = []
     @Published var snapshot: MarketSnapshot?
@@ -145,7 +147,27 @@ final class BobbyViewModel: ObservableObject {
     /// Bobby finishes speaking an answer, the mic reopens on its own.
     @Published var handsFree = false
 
+    /// Search-as-you-type over the full universe: quiet, debounced, and it
+    /// never fires while a question is in flight.
+    func updateSuggestions() {
+        suggestTask?.cancel()
+        let q = input.trimmingCharacters(in: .whitespaces)
+        guard q.count >= 2, q.count <= 24, !q.contains(" ") else {
+            if !assetHits.isEmpty { assetHits = [] }
+            return
+        }
+        suggestTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 220_000_000)
+            guard !Task.isCancelled else { return }
+            let hits = await BobbyAPI.searchAssets(q)
+            guard !Task.isCancelled else { return }
+            self.assetHits = hits
+        }
+    }
+
     func ask(_ preset: String? = nil, fromVoice: Bool = false) {
+        suggestTask?.cancel()
+        assetHits = []
         let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !thinking else { return }
         handsFree = fromVoice
@@ -259,6 +281,7 @@ struct ContentView: View {
     @FocusState private var focused: Bool
     @State private var showAuraCard = false
     @State private var showSquad = false
+    @State private var showBoard = false
     /// The desk never shows an empty hole: if the companion GLB fails to
     /// load, fall back to the orb until the companion changes.
     @State private var deskModelFailed = false
@@ -289,6 +312,8 @@ struct ContentView: View {
                        "Evolucioné. Ahora dime \(evolvedName).\(levelTone(newLevel))"))
         }
         .onAppear { vm.bootGreetingIfNeeded() }
+        .task { await SpeechInput.refreshVocabularyIfStale() }
+        .onChange(of: vm.input) { vm.updateSuggestions() }
         // Hands-free loop: when a voice-driven answer finishes speaking, the
         // mic reopens on its own so the follow-up flows like a conversation.
         .onChange(of: vm.voice.speaking) { wasSpeaking, isSpeaking in
@@ -297,6 +322,9 @@ struct ContentView: View {
                 try? await Task.sleep(for: .milliseconds(420))
                 relistenHandsFree()
             }
+        }
+        .sheet(isPresented: $showBoard) {
+            AssetBoardView(vm: vm)
         }
         .sheet(isPresented: $showSquad) {
             MascotGalleryView(store: vm.companions, voice: vm.voice, voiceId: vm.profile.voiceId)
@@ -342,6 +370,9 @@ struct ContentView: View {
                 .padding(.bottom, 16)
             }
             .scrollDismissesKeyboard(.interactively)
+            if !vm.assetHits.isEmpty {
+                assetSuggestions
+            }
             commandBar
         }
     }
@@ -605,6 +636,26 @@ struct ContentView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showBoard = true
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(L.t("ALL", "TODOS"))
+                                .font(.mono(13, .bold))
+                                .foregroundStyle(Theme.accentSoft)
+                            Text(L.t("600+ ASSETS →", "600+ ACTIVOS →"))
+                                .font(.mono(8, .bold))
+                                .kerning(1)
+                                .foregroundStyle(Theme.muted)
+                        }
+                        .frame(width: 92, alignment: .leading)
+                        .padding(12)
+                        .background(Theme.accent.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.accent.opacity(0.30), lineWidth: 1))
+                    }
+                    .accessibilityIdentifier("board-open")
                     ForEach(vm.quickAccess, id: \.self) { ticker in
                         Button {
                             vm.ask(ticker)
@@ -924,6 +975,40 @@ struct ContentView: View {
         .background(Theme.accent.opacity(0.045))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.accent.opacity(0.15), lineWidth: 1))
+    }
+
+    /// Search-as-you-type: the universe answers while the user types.
+    private var assetSuggestions: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(vm.assetHits) { hit in
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        vm.input = ""
+                        vm.ask(hit.symbol)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(hit.symbol)
+                                .font(.mono(11, .bold))
+                                .foregroundStyle(Theme.text)
+                            if hit.name != hit.symbol {
+                                Text(hit.name)
+                                    .font(.rounded(11, .medium))
+                                    .foregroundStyle(Theme.muted)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 8)
+                        .background(Theme.card)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Theme.accent.opacity(0.30), lineWidth: 1))
+                    }
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+        .transition(.opacity)
     }
 
     private var commandBar: some View {

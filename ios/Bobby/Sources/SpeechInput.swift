@@ -14,14 +14,40 @@ final class SpeechInput: NSObject, ObservableObject {
 
     /// Ticker vocabulary the recognizer should favor. Without this, es-MX
     /// dictation turns "Ethereum" into a random English word ("Cherry") and
-    /// the desk analyzes the wrong thing — the words below bias recognition
-    /// toward what people actually ask a market desk.
-    private static let marketVocabulary = [
+    /// the desk analyzes the wrong thing. The static core always applies;
+    /// the dynamic list extends it with the LIVE tradable universe (fetched
+    /// from the board endpoint, cached a day) so any listed asset can be
+    /// said out loud — hundreds of names, not two.
+    private static let coreVocabulary = [
         "Bitcoin", "Ethereum", "Solana", "Cardano", "Dogecoin", "XRP", "Ripple",
         "BNB", "Avalanche", "Chainlink", "Polygon", "Tron", "Litecoin", "Sui",
         "NVIDIA", "Tesla", "Apple", "Microsoft", "Amazon", "Google", "Meta",
         "Nasdaq", "BTC", "ETH", "SOL", "oro", "plata", "gold", "silver",
     ]
+
+    private static var dynamicVocabulary: [String] =
+        UserDefaults.standard.stringArray(forKey: "speech.vocab") ?? []
+
+    static var vocabulary: [String] {
+        var seen = Set<String>()
+        var merged: [String] = []
+        for word in coreVocabulary + dynamicVocabulary where !seen.contains(word) {
+            seen.insert(word)
+            merged.append(word)
+        }
+        return Array(merged.prefix(250))
+    }
+
+    /// Refresh the dictation vocabulary from the live board at most daily.
+    static func refreshVocabularyIfStale() async {
+        let lastAt = UserDefaults.standard.double(forKey: "speech.vocabAt")
+        guard dynamicVocabulary.isEmpty || Date().timeIntervalSince1970 - lastAt > 86_400 else { return }
+        let words = await BobbyAPI.dictationVocabulary()
+        guard words.count > 40 else { return }   // keep the cache on a bad fetch
+        dynamicVocabulary = words
+        UserDefaults.standard.set(words, forKey: "speech.vocab")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "speech.vocabAt")
+    }
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: L.isSpanish ? "es-MX" : "en-US"))
         ?? SFSpeechRecognizer(locale: Locale(identifier: L.isSpanish ? "es-ES" : "en-GB"))
@@ -62,7 +88,7 @@ final class SpeechInput: NSObject, ObservableObject {
 
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
-        req.contextualStrings = Self.marketVocabulary
+        req.contextualStrings = Self.vocabulary
         request = req
 
         let input = engine.inputNode
