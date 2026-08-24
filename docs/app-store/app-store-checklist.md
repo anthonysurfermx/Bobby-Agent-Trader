@@ -61,3 +61,18 @@ voces "buenas" no existen en el teléfono. Tras merge: probar 30s en la app
 - Pausar el rAF/spin del SceneKit cuando la app pasa a background (batería).
 - `docs/app-store/ui-captures/` regenerar con el saludo nuevo.
 - Revisar retención de logs del backend antes de declarar App Privacy.
+
+## Round 4 (Codex + Kimi, 2026-08-24) — estado
+
+Corregidos: F1 fallo-backend≠NO-TRADE (isUnavailable, cero XP, mensaje honesto),
+F2 XP fantasma (awardDiscipline devuelve lo otorgado; "DAILY XP COMPLETE" al
+tope), F3 etiqueta honesta ("SAVED ON THIS DEVICE" hasta tener ledger real),
+F5 aritmética del día de gracia (1=+1, 2=mantener, >2=reset), F7 lifecycle 3D
+(dismantleUIView + teardown de display link/acciones), F8 persona en la frase
+de selección + delegate del fallback AVSpeech, F9 fallback del desk al orb si
+el GLB falla, F10 parcial (Reduce Motion en spin/talk/burst).
+
+Diferidos conscientemente a la fase de servidor-autoridad (arquitectura
+avatar-evolution): F4 XP con cycleId idempotente y acción de revisión
+explícita, F6 ledger firmado server-side (UserDefaults como caché). También
+pendiente: target de tests unitarios para XP/cap/gracia.

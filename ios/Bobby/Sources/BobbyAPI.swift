@@ -68,10 +68,20 @@ struct BobbyAnswer {
     var rewardRisk: Double?
     var overview: String?
 
+    /// True when the debate simply never came back — no market data and no
+    /// verdict of any kind. A backend failure must NEVER masquerade as a
+    /// disciplined NO TRADE (no Halo moment, no XP, no "capital protected").
+    var isUnavailable: Bool {
+        price == nil && trend == nil && signal == nil && direction == nil
+            && regime == nil && overview == nil
+    }
+
     /// A setup is actionable only when the deterministic pulse agrees on a
     /// direction, clears conviction and includes the complete risk plan.
-    /// Anything less fails closed into Bobby's signature NO TRADE state.
+    /// Anything less — WITH real data on the table — fails closed into
+    /// Bobby's signature NO TRADE state.
     var isNoTrade: Bool {
+        guard !isUnavailable else { return false }
         let normalizedSignal = signal?.lowercased().replacingOccurrences(of: "-", with: "_") ?? ""
         if normalizedSignal.contains("no_trade") || normalizedSignal.contains("neutral") || normalizedSignal.contains("wait") {
             return true

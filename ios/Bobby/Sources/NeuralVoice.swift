@@ -5,7 +5,7 @@ import Foundation
 @preconcurrency import AVFoundation
 
 @MainActor
-final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
+final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
     @Published var speaking = false
     @Published var level: CGFloat = 0
 
@@ -13,6 +13,21 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private let fallback = AVSpeechSynthesizer()
     private var generation = 0
     private var meterTimer: Timer?
+
+    override init() {
+        super.init()
+        // Without the delegate the AVSpeech fallback never flips `speaking`
+        // back to false — the companion would mouth silence forever.
+        fallback.delegate = self
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.speaking = false }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.speaking = false }
+    }
 
     /// `persona` is the companion's own voice (coral/ballad/sage/ash) — the
     /// backend reads `voice`, so this is what actually makes each companion

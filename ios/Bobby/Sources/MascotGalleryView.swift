@@ -260,7 +260,8 @@ struct MascotGalleryView: View {
             burst += 1
             justChosen = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            voice?.speak(selected.selectLine, voiceId: voiceId)
+            // In its OWN voice persona — the whole point of choosing it
+            voice?.speak(selected.selectLine, voiceId: voiceId, persona: selected.voicePersona)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { justChosen = false }
         } label: {
             Text(isActive ? (justChosen ? L.t("✓ YOUR COMPANION NOW", "✓ AHORA ES TU COMPANION") : L.t("✓ YOUR COMPANION", "✓ TU COMPANION")) :
@@ -399,7 +400,7 @@ private struct SelectionBurst: View {
             }
         }
         .onChange(of: trigger) {
-            guard trigger > 0 else { return }
+            guard trigger > 0, !UIAccessibility.isReduceMotionEnabled else { return }
             animating = false
             withAnimation(.easeOut(duration: 0.7)) { animating = true }
         }
@@ -459,6 +460,16 @@ struct MascotSceneView: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// SwiftUI recreates this view per companion (`.id(selected.id)`) — tear
+    /// the old scene down explicitly so stale display links, actions and
+    /// GLTF callbacks never outlive their view.
+    static func dismantleUIView(_ uiView: SCNView, coordinator: Coordinator) {
+        coordinator.loadToken += 1        // stale loads return early
+        coordinator.setTalking(false, level: 0)
+        coordinator.modelRoot?.removeAllActions()
+        uiView.scene = nil
+    }
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var owner: MascotSceneView?
@@ -575,6 +586,11 @@ struct MascotSceneView: UIViewRepresentable {
 
         @objc private func talkTick() {
             guard let node = modelRoot else { return }
+            if UIAccessibility.isReduceMotionEnabled {
+                // Static presence instead of rhythm — still visibly "on"
+                node.scale = SCNVector3(1.02, 1.02, 1.02)
+                return
+            }
             let t = CACurrentMediaTime() - talkStart
             // Metered level when the player provides one; procedural voice
             // rhythm otherwise, so it still talks on the AVSpeech fallback.
@@ -587,6 +603,9 @@ struct MascotSceneView: UIViewRepresentable {
         deinit { talkLink?.invalidate() }
 
         func startSpin() {
+            // Accessibility: an ever-spinning model is exactly what Reduce
+            // Motion asks us not to do.
+            guard !UIAccessibility.isReduceMotionEnabled else { return }
             modelRoot?.runAction(.repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 14)), forKey: "spin")
         }
     }

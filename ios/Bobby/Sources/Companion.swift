@@ -260,15 +260,17 @@ final class CompanionStore: ObservableObject {
     /// a single day keeps the streak; two or more resets it).
     private let maxDailyAwards = 3
 
+    /// Returns the points actually awarded — 0 when the daily cap already
+    /// rejected the award. The UI must show THIS number, never the intent.
     @discardableResult
-    func awardDiscipline(_ points: Int, now: Date = Date()) -> Bool {
+    func awardDiscipline(_ points: Int, now: Date = Date()) -> Int {
         let cal = Calendar.current
 
         // Daily cap
         var dailyCount = defaults.integer(forKey: Key.dailyAwards)
         if let day = defaults.object(forKey: Key.dailyAwardsDay) as? Date,
            cal.isDate(day, inSameDayAs: now) {
-            guard dailyCount < maxDailyAwards else { return false }
+            guard dailyCount < maxDailyAwards else { return 0 }
             dailyCount += 1
         } else {
             dailyCount = 1
@@ -281,18 +283,24 @@ final class CompanionStore: ObservableObject {
         // Evolution moment: name, voice tone and form change together
         if level.number > levelBefore { pendingEvolution = level }
 
-        // Discipline streak with one grace day
+        // Discipline streak with one grace day: consecutive day grows it,
+        // a single skipped day PRESERVES it (grace, no growth), longer
+        // gaps reset it.
         if let last = defaults.object(forKey: Key.lastDay) as? Date {
             if cal.isDate(last, inSameDayAs: now) {
                 // same day — streak unchanged
             } else {
                 let days = cal.dateComponents([.day], from: cal.startOfDay(for: last), to: cal.startOfDay(for: now)).day ?? 99
-                disciplineStreak = days <= 2 ? disciplineStreak + 1 : 1
+                switch days {
+                case 1: disciplineStreak += 1        // consecutive day
+                case 2: break                        // grace day — hold, don't grow
+                default: disciplineStreak = 1        // streak broken
+                }
             }
         } else {
             disciplineStreak = 1
         }
         defaults.set(now, forKey: Key.lastDay)
-        return true
+        return points
     }
 }

@@ -195,6 +195,17 @@ final class BobbyViewModel: ObservableObject {
                 phase = .cio
             }
 
+            // Backend hiccup: no data, no verdict → honest error, ZERO XP,
+            // and definitely no "capital protected" theater.
+            if answer.isUnavailable {
+                phase = .error
+                let msg = L.t("The desk did not answer for \(answer.symbol). Try again in a moment.",
+                              "El desk no respondió por \(answer.symbol). Inténtalo de nuevo en un momento.")
+                messages.append(ChatMessage(fromBobby: true, text: msg))
+                if speakEnabled { say(msg) }
+                return
+            }
+
             try? await Task.sleep(for: .milliseconds(360))
             phase = .complete
             let text = answer.summary
@@ -203,14 +214,16 @@ final class BobbyViewModel: ObservableObject {
             if speakEnabled { say(text) }
             // A full review earns discipline. Respecting a fail-closed verdict
             // earns more because restraint is the behavior Bobby is teaching.
-            let earnedXP = answer.isNoTrade ? 20 : 10
-            if companions.awardDiscipline(earnedXP) { streak = companions.disciplineStreak }
+            // awardedXP is what the daily cap ACTUALLY granted — the UI shows
+            // that number, never the intent.
+            let awardedXP = companions.awardDiscipline(answer.isNoTrade ? 20 : 10)
+            if awardedXP > 0 { streak = companions.disciplineStreak }
             if answer.isNoTrade {
                 withAnimation(.spring(duration: 0.52, bounce: 0.24)) {
                     noTradeMoment = NoTradeMoment(
                         symbol: answer.symbol,
                         reason: answer.noTradeReason,
-                        disciplineXP: earnedXP
+                        disciplineXP: awardedXP
                     )
                 }
             }
@@ -241,6 +254,9 @@ struct ContentView: View {
     @FocusState private var focused: Bool
     @State private var showAuraCard = false
     @State private var showSquad = false
+    /// The desk never shows an empty hole: if the companion GLB fails to
+    /// load, fall back to the orb until the companion changes.
+    @State private var deskModelFailed = false
 
     var body: some View {
         ZStack {
@@ -412,13 +428,16 @@ struct ContentView: View {
         VStack(spacing: 4) {
             Button(action: toggleSpeech) {
                 Group {
-                    if let comp = vm.companions.companion {
+                    if let comp = vm.companions.companion, !deskModelFailed {
                         // The chosen companion IS Bobby's face on the desk
                         MascotSceneView(
                             assetName: comp.id,
                             interactive: false,
                             speaking: vm.voice.speaking,
-                            voiceLevel: vm.voice.level
+                            voiceLevel: vm.voice.level,
+                            onLoading: { _, failed in
+                                if failed { deskModelFailed = true }
+                            }
                         )
                             .allowsHitTesting(false)
                             .frame(width: 206, height: 208)
@@ -440,6 +459,7 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
             .disabled(vm.thinking)
+            .onChange(of: vm.companions.companionId) { deskModelFailed = false }
 
             HStack(spacing: 7) {
                 Circle()
@@ -527,13 +547,19 @@ struct ContentView: View {
                 .padding(.horizontal, 18)
 
             HStack(spacing: 10) {
-                Label("+\(moment.disciplineXP) DISCIPLINE XP", systemImage: "sparkles")
+                // Show what the daily cap actually granted — never the intent
+                Label(moment.disciplineXP > 0
+                        ? "+\(moment.disciplineXP) DISCIPLINE XP"
+                        : L.t("DAILY XP COMPLETE", "XP DIARIO COMPLETO"),
+                      systemImage: moment.disciplineXP > 0 ? "sparkles" : "checkmark.circle")
                     .font(.mono(8.5, .bold))
                     .foregroundStyle(halo.tintSoft)
                 Spacer()
                 HStack(spacing: 6) {
                     Image(systemName: "seal.fill")
-                    Text("AXIOM · DISCIPLINE LOG")
+                    // Honest until the server/on-chain ledger exists: this
+                    // record lives only in this device's storage.
+                    Text(L.t("SAVED ON THIS DEVICE", "GUARDADO EN ESTE EQUIPO"))
                 }
                 .font(.mono(7.5, .bold))
                 .foregroundStyle(Color(hue: 0.115, saturation: 0.52, brightness: 1))
