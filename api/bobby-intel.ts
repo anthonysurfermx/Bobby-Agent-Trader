@@ -15,7 +15,7 @@ import {
 
 export const config = { maxDuration: 30 };
 
-import { createLimiter, getClientIp } from './_lib/rate-limit.js';
+import { createLimiter, getClientIpKey } from './_lib/rate-limit.js';
 import { getCache, setCache } from './_lib/api-cache.js';
 
 // Full-snapshot TTL: a cache hit answers from one Supabase read instead
@@ -1036,7 +1036,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const ip = getClientIp(req);
+  const ip = getClientIpKey(req);
   const rl = intelLimiter.check(ip);
   if (rl.limited) {
     const retryAfterSec = Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000));

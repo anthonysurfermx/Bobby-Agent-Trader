@@ -5,6 +5,7 @@
 // ============================================================
 
 import type { VercelRequest } from '@vercel/node';
+import { createHash } from 'node:crypto';
 
 interface Entry { count: number; resetAt: number; }
 
@@ -40,4 +41,17 @@ export function getClientIp(req: VercelRequest): string {
   if (typeof fwd === 'string') return fwd.split(',')[0]?.trim() || 'unknown';
   if (Array.isArray(fwd) && fwd.length > 0) return fwd[0].split(',')[0]?.trim() || 'unknown';
   return 'unknown';
+}
+
+/**
+ * Privacy-preserving rate-limit identity: a salted SHA-256 of the client IP.
+ * Counters behave identically, but persisted rows (Supabase api_cache keys)
+ * never contain a readable address — the raw IP stays in process memory only.
+ * Set RATE_LIMIT_SALT to make the mapping non-reproducible outside prod.
+ */
+export function getClientIpKey(req: VercelRequest): string {
+  const ip = getClientIp(req);
+  if (ip === 'unknown') return ip;
+  const salt = process.env.RATE_LIMIT_SALT || 'bobby-rl-v1';
+  return createHash('sha256').update(`${salt}:${ip}`).digest('hex').slice(0, 24);
 }

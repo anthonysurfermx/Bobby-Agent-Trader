@@ -8,7 +8,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash } from 'node:crypto';
 import { getCache, setCache } from './_lib/api-cache.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
-import { getClientIp } from './_lib/rate-limit.js';
+import { getClientIpKey } from './_lib/rate-limit.js';
 
 export const config = { maxDuration: 30 };
 
@@ -148,7 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'chat_unavailable' });
   if (process.env.APP_CHAT_KILL_SWITCH === 'true') return res.status(503).json({ error: 'chat_paused' });
 
-  const guard = await applyCostGuards(deviceId, getClientIp(req));
+  const guard = await applyCostGuards(deviceId, getClientIpKey(req));
   if (!guard.allowed) {
     res.setHeader('Retry-After', String(guard.retryAfter));
     return res.status(429).json({ error: guard.reason, retryAfter: guard.retryAfter });
