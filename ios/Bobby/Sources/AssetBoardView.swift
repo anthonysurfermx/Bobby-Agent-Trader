@@ -9,7 +9,9 @@ struct AssetBoardView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var sections: [(title: String, assets: [BobbyAPI.BoardAsset])] = []
+    @State private var totalBases = 0
     @State private var loading = true
+    @State private var loadFailed = false
     @State private var query = ""
     @State private var hits: [BobbyAPI.AssetHit] = []
     @State private var searchTask: Task<Void, Never>?
@@ -28,6 +30,8 @@ struct AssetBoardView: View {
                             ProgressView().tint(Theme.accent)
                                 .frame(maxWidth: .infinity)
                                 .padding(.top, 60)
+                        } else if loadFailed || sections.isEmpty {
+                            boardError
                         } else {
                             boardSections
                         }
@@ -37,20 +41,70 @@ struct AssetBoardView: View {
                 }
             }
         }
-        .task {
-            sections = await BobbyAPI.browseBoard()
-            loading = false
+        .task { await loadBoard() }
+    }
+
+    private func loadBoard() async {
+        loading = true
+        loadFailed = false
+        let board = await BobbyAPI.browseBoard()
+        sections = board.sections
+        totalBases = board.totalBases
+        loadFailed = board.sections.isEmpty
+        loading = false
+    }
+
+    /// The board can fail without taking search down with it — say so,
+    /// and offer a retry instead of an unexplained void.
+    private var boardError: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(Theme.muted)
+            Text(L.t("The board did not load.", "El tablero no cargó."))
+                .font(.rounded(14, .semibold))
+                .foregroundStyle(Theme.text)
+            Text(L.t("Search up top still works — try a name or ticker.",
+                     "La búsqueda de arriba sí funciona — prueba un nombre o ticker."))
+                .font(.rounded(12, .medium))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+            Button {
+                Task { await loadBoard() }
+            } label: {
+                Text(L.t("RETRY", "REINTENTAR"))
+                    .font(.mono(11, .bold))
+                    .kerning(1.4)
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(Theme.accent)
+                    .clipShape(Capsule())
+            }
         }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 48)
     }
 
     private var header: some View {
         HStack {
             HStack(spacing: 8) {
                 Circle().fill(Theme.accent).frame(width: 7, height: 7).shadow(color: Theme.accent, radius: 7)
-                Text(L.t("BOBBY // THE BOARD", "BOBBY // EL TABLERO"))
-                    .font(.mono(11, .bold))
-                    .kerning(1.9)
-                    .foregroundStyle(Theme.text.opacity(0.78))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L.t("BOBBY // THE BOARD", "BOBBY // EL TABLERO"))
+                        .font(.mono(11, .bold))
+                        .kerning(1.9)
+                        .foregroundStyle(Theme.text.opacity(0.78))
+                    // Honest copy: the lists below are the TOP by volume;
+                    // the search reaches every listed base.
+                    Text(totalBases > 0
+                         ? L.t("TOP BY 24H VOLUME · SEARCH REACHES ALL \(totalBases)",
+                               "TOP POR VOLUMEN 24H · LA BÚSQUEDA LLEGA A LOS \(totalBases)")
+                         : L.t("TOP BY 24H VOLUME", "TOP POR VOLUMEN 24H"))
+                        .font(.mono(8, .medium))
+                        .kerning(1)
+                        .foregroundStyle(Theme.muted)
+                }
             }
             Spacer()
             Button { dismiss() } label: {

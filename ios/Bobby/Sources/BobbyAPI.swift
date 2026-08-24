@@ -212,10 +212,12 @@ enum BobbyAPI {
         return hits
     }
 
-    /// The explorable board: sections ranked by real 24h volume server-side.
-    static func browseBoard() async -> [(title: String, assets: [BoardAsset])] {
+    /// The explorable board: sections ranked by real 24h volume server-side,
+    /// plus the honest total the search can actually reach.
+    static func browseBoard() async -> (sections: [(title: String, assets: [BoardAsset])], totalBases: Int) {
         guard let obj = try? await json("api/bobby-asset-search?browse=1") as? [String: Any],
-              let browse = obj["browse"] as? [String: Any] else { return [] }
+              let browse = obj["browse"] as? [String: Any] else { return ([], 0) }
+        let totalBases = (obj["totalBases"] as? Int) ?? 0
         func parse(_ key: String) -> [BoardAsset] {
             ((browse[key] as? [[String: Any]]) ?? []).compactMap { r in
                 guard let sym = r["symbol"] as? String else { return nil }
@@ -228,23 +230,29 @@ enum BobbyAPI {
         let crypto = parse("crypto"); if !crypto.isEmpty { sections.append((L.t("CRYPTO", "CRIPTO"), crypto)) }
         let equity = parse("equity"); if !equity.isEmpty { sections.append((L.t("STOCKS & ETFs", "ACCIONES Y ETFs"), equity)) }
         let metals = parse("commodity"); if !metals.isEmpty { sections.append((L.t("METALS", "METALES"), metals)) }
-        return sections
+        return (sections, totalBases)
     }
 
-    /// Names + tickers the dictation should favor, from the live board.
+    /// Words the dictation should favor, from the live board. Spoken NAMES
+    /// go first — they are what recognition mangles; tickers fill whatever
+    /// budget remains. ~300 phrases covers the top of every class; the
+    /// backend's fuzzy net catches the long tail beyond it.
     static func dictationVocabulary() async -> [String] {
-        let sections = await browseBoard()
-        var words: [String] = []
+        let (sections, _) = await browseBoard()
+        var names: [String] = []
+        var tickers: [String] = []
         var seen = Set<String>()
         for (_, assets) in sections {
             for a in assets {
-                for w in [a.name, a.symbol] where w.count >= 2 && !seen.contains(w) {
-                    seen.insert(w)
-                    words.append(w)
+                if a.name != a.symbol, a.name.count >= 2, !seen.contains(a.name) {
+                    seen.insert(a.name); names.append(a.name)
+                }
+                if a.symbol.count >= 2, !seen.contains(a.symbol) {
+                    seen.insert(a.symbol); tickers.append(a.symbol)
                 }
             }
         }
-        return Array(words.prefix(220))
+        return Array((names + tickers).prefix(300))
     }
 
     static func json(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Any {
@@ -272,22 +280,62 @@ enum BobbyAPI {
         "how", "is", "the", "whats", "what", "price", "of", "doing", "about", "tell", "me", "a"
     ]
 
-    /// "¿cómo va nvidia hoy?" → tries "nvidia" · "precio de bitcoin" → "bitcoin"
-    static func resolveAsset(_ query: String) async -> MarketSnapshot? {
+    /// One resolution with the server's safety verdict attached. Fuzzy and
+    /// proxy matches must be confirmed by a human before analysis runs —
+    /// better to ask once than to confidently analyze the wrong instrument.
+    struct AssetResolution {
+        let snapshot: MarketSnapshot
+        let needsConfirmation: Bool
+        let confirmName: String
+        let proxyNote: String?
+    }
+
+    /// "¿cómo va nvidia hoy?" → the SERVER resolves the phrase canonically
+    /// (spoken names, dictation mangles, fuzzy net, proxy safety). The
+    /// word-walk below stays only as a fallback for servers that predate
+    /// the `resolution` metadata.
+    static func resolveAsset(_ query: String) async -> AssetResolution? {
+        if let resolved = await resolveViaServer(query) { return resolved }
+
         let cleaned = query.lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty && !stopwords.contains($0) }
-        // Try the meaningful words joined, then each word from last to first —
-        // in "compara nvidia" the asset is usually the last content word.
         var candidates: [String] = []
         if !cleaned.isEmpty { candidates.append(cleaned.joined(separator: " ")) }
         candidates.append(contentsOf: cleaned.reversed())
         if candidates.isEmpty { candidates = [query] }
 
         for candidate in candidates {
-            if let snap = await searchAsset(candidate) { return snap }
+            if let snap = await searchAsset(candidate) {
+                return AssetResolution(snapshot: snap, needsConfirmation: false,
+                                       confirmName: snap.symbol, proxyNote: nil)
+            }
         }
         return nil
+    }
+
+    private static func resolveViaServer(_ query: String) async -> AssetResolution? {
+        let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        guard let obj = try? await json("api/bobby-asset-search?q=\(q)") as? [String: Any],
+              let resolution = obj["resolution"] as? [String: Any],
+              let resolved = obj["resolved"] as? [String: Any],
+              let symbol = (resolved["baseSymbol"] as? String) ?? (resolved["symbol"] as? String)
+        else { return nil }
+        let assetClass = (resolved["assetClass"] as? String) ?? "crypto"
+        let aliases = (resolved["aliases"] as? [String]) ?? []
+        let name = prettyName(aliases.first(where: { $0 != symbol }) ?? symbol, symbol: symbol)
+        let snapshot = MarketSnapshot(
+            symbol: symbol,
+            name: resolved["displayName"] as? String,
+            isEquity: assetClass == "equity",
+            price: nil, changePct: nil
+        )
+        return AssetResolution(
+            snapshot: snapshot,
+            needsConfirmation: (resolution["needsConfirmation"] as? Bool) ?? false,
+            confirmName: name,
+            proxyNote: resolution["proxyNote"] as? String
+        )
     }
 
     private static func searchAsset(_ term: String) async -> MarketSnapshot? {

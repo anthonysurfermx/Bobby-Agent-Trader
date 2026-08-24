@@ -35,7 +35,7 @@ final class SpeechInput: NSObject, ObservableObject {
             seen.insert(word)
             merged.append(word)
         }
-        return Array(merged.prefix(250))
+        return Array(merged.prefix(300))
     }
 
     /// Refresh the dictation vocabulary from the live board at most daily.

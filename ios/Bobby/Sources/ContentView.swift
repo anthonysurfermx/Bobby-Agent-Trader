@@ -152,7 +152,9 @@ final class BobbyViewModel: ObservableObject {
     func updateSuggestions() {
         suggestTask?.cancel()
         let q = input.trimmingCharacters(in: .whitespaces)
-        guard q.count >= 2, q.count <= 24, !q.contains(" ") else {
+        // Multi-word stays live: "taiwan semi…", "bitcoin cash" and "open ai"
+        // suggest just like single tickers — the backend understands phrases.
+        guard q.count >= 2, q.count <= 32 else {
             if !assetHits.isEmpty { assetHits = [] }
             return
         }
@@ -182,11 +184,32 @@ final class BobbyViewModel: ObservableObject {
         Task {
             defer { thinking = false }
 
-            guard let asset = await BobbyAPI.resolveAsset(q) else {
+            guard let resolution = await BobbyAPI.resolveAsset(q) else {
                 phase = .error
                 messages.append(ChatMessage(fromBobby: true, text: L.t("I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.", "No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro.")))
                 return
             }
+
+            // Sacred rule: a fuzzy or proxy match never analyzes on its own.
+            // Bobby asks once; the confirm chip re-asks with the exact ticker.
+            if resolution.needsConfirmation {
+                phase = .idle
+                let sym = resolution.snapshot.symbol
+                let display = resolution.confirmName == sym ? sym : "\(resolution.confirmName) (\(sym))"
+                var text = L.t("Did you mean \(display)?", "¿Te refieres a \(display)?")
+                if let note = resolution.proxyNote {
+                    text += " " + L.t("Heads up: that listing is \(note).", "Ojo: ese listado es \(note).")
+                }
+                text += " " + L.t("Tap the chip to confirm.", "Toca el chip para confirmar.")
+                messages.append(ChatMessage(fromBobby: true, text: text))
+                assetHits = [BobbyAPI.AssetHit(
+                    symbol: sym,
+                    name: resolution.confirmName,
+                    assetClass: resolution.snapshot.isEquity ? "equity" : "crypto"
+                )]
+                return
+            }
+            let asset = resolution.snapshot
 
             memory.recordQuery(symbol: asset.symbol, isEquity: asset.isEquity)
             quickAccess = memory.quickAccess(fallback: Self.defaultQuickAccess)
@@ -641,10 +664,10 @@ struct ContentView: View {
                         showBoard = true
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(L.t("ALL", "TODOS"))
+                            Text(L.t("EXPLORE", "EXPLORA"))
                                 .font(.mono(13, .bold))
                                 .foregroundStyle(Theme.accentSoft)
-                            Text(L.t("600+ ASSETS →", "600+ ACTIVOS →"))
+                            Text(L.t("TOP MARKETS →", "TOP MERCADOS →"))
                                 .font(.mono(8, .bold))
                                 .kerning(1)
                                 .foregroundStyle(Theme.muted)
