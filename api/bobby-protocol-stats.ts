@@ -11,7 +11,6 @@ import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
-  XLAYER_CHAIN_ID,
   XLAYER_RPC_URL,
   getEconomyStats,
   listRecentBounties,
@@ -27,6 +26,7 @@ import {
   BOBBY_TRACK_RECORD,
   BOBBY_TREASURY,
 } from './_lib/protocol-constants.js';
+import { trackRecordWinRateFunction } from './_lib/trackrecord-stats-adapter.js';
 
 export const config = { maxDuration: 30 };
 
@@ -47,17 +47,36 @@ const TRACK_RECORD_INTERFACE = new Interface([
   'function totalTrades() view returns (uint256)',
   'function totalCommitments() view returns (uint256)',
   'function getWinRate() view returns (uint256)',
+  'function getVerifiedWinRate() view returns (uint256)',
 ]);
 
+// V2 (Base) splits the ledgers (D-1): the headline number is the VERIFIED win
+// rate; the v1 combined getWinRate selector no longer exists and would revert.
+const WIN_RATE_FN = trackRecordWinRateFunction(DEFAULT_CHAIN.id);
+
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(XLAYER_RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  const json = (await res.json()) as { result?: T; error?: { message?: string } };
-  if (json.error) throw new Error(json.error.message || 'rpc error');
-  return json.result as T;
+  const urls = [...new Set([XLAYER_RPC_URL, DEFAULT_CHAIN.rpcFallbackUrl].filter(Boolean))] as string[];
+  let lastError: unknown;
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      });
+      if (!res.ok) throw new Error(`${DEFAULT_CHAIN.name} RPC ${res.status}`);
+
+      const json = (await res.json()) as { result?: T; error?: { message?: string } };
+      if (json.error) throw new Error(json.error.message || 'rpc error');
+      if (json.result === undefined) throw new Error('rpc response missing result');
+      return json.result;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('all protocol RPCs failed');
 }
 
 async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
@@ -170,13 +189,13 @@ async function getTrackRecordStats() {
       'latest',
     ]),
     rpcCall<string>('eth_call', [
-      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData('getWinRate') },
+      { to: TRACK_RECORD, data: TRACK_RECORD_INTERFACE.encodeFunctionData(WIN_RATE_FN) },
       'latest',
     ]),
   ]);
   const [totalTrades] = TRACK_RECORD_INTERFACE.decodeFunctionResult('totalTrades', totalTradesRaw);
   const [totalCommitments] = TRACK_RECORD_INTERFACE.decodeFunctionResult('totalCommitments', totalCommitmentsRaw);
-  const [winRate] = TRACK_RECORD_INTERFACE.decodeFunctionResult('getWinRate', winRateRaw);
+  const [winRate] = TRACK_RECORD_INTERFACE.decodeFunctionResult(WIN_RATE_FN, winRateRaw);
   return {
     totalTrades: totalTrades.toString(),
     totalCommitments: totalCommitments.toString(),
@@ -379,7 +398,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ok: true,
     fetchedAt: new Date().toISOString(),
     chain: {
-      id: XLAYER_CHAIN_ID,
+      id: DEFAULT_CHAIN.id,
       name: DEFAULT_CHAIN.name,
       nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
       explorerUrl: DEFAULT_CHAIN.explorerUrl,

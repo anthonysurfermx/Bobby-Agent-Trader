@@ -28,6 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { tier, lang, voice } = (req.body ?? {}) as { tier?: string; lang?: string; voice?: string };
+  const sessionLang = lang === 'en' ? 'en' : 'es';
   const model = tier === 'premium' && isInternalRequest(req) ? MODEL_PREMIUM : MODEL_STANDARD;
 
   // Honor the persona voice picked in onboarding — whitelisted, with the
@@ -48,12 +49,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         session: {
           type: 'realtime',
           model,
-          instructions: voiceInstructions(lang === 'en' ? 'en' : 'es'),
+          instructions: voiceInstructions(sessionLang),
           audio: {
             // Fast conversational mode: detect the pause, interrupt Bobby when
             // the human starts speaking, and answer without waiting for a
             // semantic end-of-thought pass.
             input: {
+              // Configure transcription before WebRTC connects. Doing this in
+              // a later session.update raced with the first user turn: Bobby
+              // could hear it, but the client never received the transcript
+              // that switches the chart and starts the visual brief.
+              transcription: {
+                model: 'gpt-4o-mini-transcribe',
+                language: sessionLang,
+                prompt: sessionLang === 'es'
+                  ? 'Español de México. Mercados: Nvidia, NVIDIA, NVDA, Bitcoin, Ethereum, BTC, ETH, SOL, Apple, Tesla, oro, long, short, stop, soporte, resistencia.'
+                  : 'English. Markets: Nvidia, NVIDIA, NVDA, Bitcoin, Ethereum, BTC, ETH, SOL, Apple, Tesla, gold, long, short, stop, support, resistance.',
+              },
               turn_detection: {
                 type: 'server_vad',
                 threshold: 0.48,

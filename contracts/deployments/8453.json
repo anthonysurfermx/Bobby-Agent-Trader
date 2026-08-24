@@ -1,0 +1,43 @@
+{
+  "addresses": {
+    "adversarialBounties": "0x73fD6c77ff0403Ea071e8721c76f88cE34ac9968",
+    "agentEconomyV2": "0x009de59e0e7f4109fF9E89E744A4412082AD2aaF",
+    "agentRegistry": "0xB3137D7afE26fbdBcAA95573C7A20be896efde93",
+    "convictionOracle": "0x27f51D711171c830dd796D4B03914a8C6c46D75e",
+    "hardnessRegistry": "0x15800F40b8988765AD3F46030B73bC8109A793f5",
+    "intentEscrow": "0x5D9d534419421B7Edfe9Bb509E4c48512256BC97",
+    "trackRecord": "0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321"
+  },
+  "chainId": 8453,
+  "deployBlock": 50275770,
+  "deployer": "0xC3F836EC06A2202af23e59997A613CA0722F35d1",
+  "expectedOwner": "0x8BE60853F27b944e11486285d95c3e06596553b4",
+  "expectedOwnerCodehash": "0xd7d408ebcd99b2b70be43e20253d6d92a8ea8fab29bd3be7f55b10032331fb4c",
+  "expectedOwnerSingleton": "0x29fcB43b46531BcA003ddC8FCB67FFE91900C762",
+  "fees": {
+    "absoluteMinBountyWei": 2500000000000,
+    "debateFeePerAgentWei": 2500000000000,
+    "escrowMaxSizeUsd18dp": "10000000000000000000000",
+    "mcpCallFeeWei": 25000000000000,
+    "minBountyWei": 25000000000000,
+    "registrationStakeWei": 250000000000000
+  },
+  "quorum": {
+    "resolvers": [
+      "0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854",
+      "0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26",
+      "0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514"
+    ],
+    "threshold": 2
+  },
+  "roles": {
+    "alpha": "0x566C9c59D0FF98387BD098e66B7389A43a4D27D7",
+    "arbiter": "0xf6C939182f0AA4e67D9cc953d12e58b71FAA6F26",
+    "bobby": "0xDf475D7D3e97c8988Fdff5AF7887403e4295F4EC",
+    "cio": "0x7b0c9e033fF7bC86c311C6F43F6Ac7D05d4db514",
+    "hardnessScorer": "0xDf475D7D3e97c8988Fdff5AF7887403e4295F4EC",
+    "keeper": "0x01b2a464b6Dc0Dc57Fd912d877a7C05502cf3D2e",
+    "red": "0x1ed20CfB49EECdA8969F3bb2B6FB07343d945843",
+    "resolver": "0xba1475d05a48C2eE602dd4cDcDA84e724f9b9854"
+  }
+}

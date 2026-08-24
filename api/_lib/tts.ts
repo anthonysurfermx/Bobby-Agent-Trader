@@ -33,6 +33,9 @@ export interface SpeechOptions {
   vibe?: string;
   /** opus → Telegram voice-note bubble; mp3 → web-safe playback */
   format?: 'opus' | 'mp3';
+  /** Legacy per-user Edge Neural voice (iOS "Configura tu Bobby" menu).
+   *  Strictly allowlisted; when valid it flips the chain to edge-first. */
+  edgeVoice?: string;
   /** Per-call provider override (e.g. degrade to free Edge when a global
    *  spend budget is exhausted). Beats TTS_PROVIDER and the key-based default. */
   provider?: 'openai' | 'edge';
@@ -96,8 +99,45 @@ const EDGE_VOICE: Record<string, string> = {
 
 const MAX_CHARS = 4000;
 
-async function edgeTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' | 'format'>>): Promise<SpeechResult> {
-  const voice = EDGE_VOICE[opts.lang] || EDGE_VOICE.es;
+// Voice menu for per-user agent personalization (Bobby iOS "Configura tu
+// Bobby"). STRICT allowlist — the client names a voice, but only these ship
+// to edge-tts; anything else falls back to the Bobby identity above.
+const EDGE_VOICE_MENU = new Set([
+  'es-MX-DaliaNeural',
+  'es-MX-JorgeNeural',
+  'es-US-PalomaNeural',
+  'es-US-AlonsoNeural',
+  'en-US-AriaNeural',
+  'en-US-GuyNeural',
+]);
+
+type TtsProvider = SpeechResult['provider'];
+
+/**
+ * Resolve a client-selected Edge voice without ever passing arbitrary input to
+ * the synthesizer. An invalid selection deliberately returns Bobby's default
+ * identity instead of falling through to an unrelated paid provider voice.
+ * All agents share one Edge identity per language, so `agent` is accepted for
+ * API stability but doesn't change the fallback.
+ */
+export function resolveEdgeVoice(lang: string, _agent = 'cio', edgeVoice?: string): string {
+  return (edgeVoice && EDGE_VOICE_MENU.has(edgeVoice))
+    ? edgeVoice
+    : EDGE_VOICE[lang] || EDGE_VOICE.es;
+}
+
+/**
+ * A per-user Edge voice is an explicit product choice, so it takes precedence
+ * over the deployment-wide provider preference. Calls without a voice keep the
+ * existing provider order for Telegram and other legacy consumers.
+ */
+export function ttsProviderOrder(provider: string, edgeVoice?: string): TtsProvider[] {
+  if (edgeVoice) return ['edge', 'openai'];
+  return provider === 'openai' ? ['openai', 'edge'] : ['edge', 'openai'];
+}
+
+async function edgeTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' | 'format'>> & Pick<SpeechOptions, 'voice' | 'edgeVoice'>): Promise<SpeechResult> {
+  const voice = resolveEdgeVoice(opts.lang, opts.voice, opts.edgeVoice);
   const communicate = new Communicate(text.slice(0, MAX_CHARS), { voice });
   const chunks: Uint8Array[] = [];
   for await (const msg of communicate.stream()) {
@@ -168,15 +208,20 @@ export async function generateSpeech(
     format: opts.format || 'opus' as const,
     voice: opts.voice,
     vibe: opts.vibe,
+    // Only honored when it's on the strict menu — invalid names are dropped
+    edgeVoice: opts.edgeVoice && EDGE_VOICE_MENU.has(opts.edgeVoice) ? opts.edgeVoice : undefined,
   };
 
   const provider = (opts.provider || process.env.TTS_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'edge')).toLowerCase();
-  // An explicit 'edge' override is a spend cap — never fall back to paid
-  const chain = provider === 'edge'
-    ? (opts.provider === 'edge'
-      ? [() => edgeTTS(clean, resolved)]
-      : [() => edgeTTS(clean, resolved), () => openaiTTS(clean, resolved)])
-    : [() => openaiTTS(clean, resolved), () => edgeTTS(clean, resolved)];
+  const makers: Record<TtsProvider, () => Promise<SpeechResult>> = {
+    edge: () => edgeTTS(clean, resolved),
+    openai: () => openaiTTS(clean, resolved),
+  };
+  // An explicit 'edge' override is a spend cap — never fall back to paid.
+  // Otherwise a valid per-user Edge voice flips the order to edge-first.
+  const chain = opts.provider === 'edge'
+    ? [makers.edge]
+    : ttsProviderOrder(provider, resolved.edgeVoice).map((name) => makers[name]);
 
   for (const fn of chain) {
     try {

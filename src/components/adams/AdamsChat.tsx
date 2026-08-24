@@ -782,6 +782,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       return stored === null ? true : stored === 'true'; // ON by default for first-time users
     } catch { return true; }
   });
+  // The compact chat is a deliberately silent fallback for the voice room.
+  // Preserve the user's saved voice preference without letting this view emit audio.
+  const voiceOutputEnabled = !textOnly && voiceEnabled;
   // Stable callback for TradingModeSelector — prevents re-render loop (Gemini P1 fix)
   const handleModeSelect = useCallback((mode: TradingMode) => {
     setTradingMode(mode);
@@ -832,18 +835,18 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
   const speakIfEnabled = useCallback((text: string) => {
     // Gate: don't speak until user has interacted (prevents autoplay block)
     if (!hasUserInteractedRef.current) return;
-    if (!voiceEnabled || !text || text === lastSpokenRef.current) return;
+    if (!voiceOutputEnabled || !text || text === lastSpokenRef.current) return;
     const clean = text.replace(/[-*_#>]/g, '').replace(/\n+/g, '. ').trim();
     if (clean.length < 10) return;
     lastSpokenRef.current = text;
     queueSentence(clean, 'cio', lang);
-  }, [voiceEnabled, queueSentence, lang]);
+  }, [voiceOutputEnabled, queueSentence, lang]);
 
   // Speak fillers via Edge TTS (same quality as main voice — no more robotic browser TTS)
   const speakFillerLocal = useCallback((text: string) => {
-    if (!voiceEnabled || !text) return;
+    if (!voiceOutputEnabled || !text) return;
     queueSentence(text, 'cio', lang);
-  }, [voiceEnabled, queueSentence, lang]);
+  }, [voiceOutputEnabled, queueSentence, lang]);
 
   // ---- Ambient thinking sound (Web Audio API — no external files) ----
   const thinkingAudioRef = useRef<{ osc: OscillatorNode; gain: GainNode; ctx: AudioContext } | null>(null);
@@ -1503,7 +1506,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // Mark user as interacted — unlocks Bobby's voice from this point on
     if (!hasUserInteractedRef.current) {
       hasUserInteractedRef.current = true;
-      initVoiceContext();
+      if (!textOnly) initVoiceContext();
     }
     // Voice interruption: stop Bobby speaking when user sends new message
     stopVoice();
@@ -1875,10 +1878,10 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       // eslint-disable-next-line no-unreachable
       setIsProcessing(true);
       setAnalysisPhases([]);
-      startThinkingSound();
+      if (!textOnly) startThinkingSound();
 
       // Bobby announces the full scan — ElevenLabs voice for consistency
-      if (voiceEnabled) {
+      if (voiceOutputEnabled) {
         const analyzeFillers = t('analyzeFillers') as readonly string[];
         queueSentence(analyzeFillers[Math.floor(Math.random() * analyzeFillers.length)], 'cio', lang);
       }
@@ -2012,11 +2015,11 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // ========================
     setIsProcessing(true);
     clearResponseAudio(); // Reset voice note accumulator for new response
-    startThinkingSound(); // ambient hum while thinking
+    if (!textOnly) startThinkingSound(); // ambient hum while thinking
 
     // Voice filler — Bobby "thinks out loud" while intelligence loads
     // Uses ElevenLabs (not Web Speech) so Bobby's voice is consistent
-    if (voiceEnabled) {
+    if (voiceOutputEnabled) {
       const fillers = t('chatFillers') as readonly string[];
       const filler = fillers[Math.floor(Math.random() * fillers.length)];
       queueSentence(filler, 'cio', lang);
@@ -2332,7 +2335,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         };
 
         const feedSentenceStream = (delta: string) => {
-          if (!voiceEnabled) return;
+          if (!voiceOutputEnabled) return;
           sentenceBuffer += delta;
           // Extract complete sentences
           const parts = sentenceBuffer.split(sentenceSplitter);
@@ -2410,7 +2413,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         }
 
         // Flush remaining sentence buffer to voice
-        if (voiceEnabled && sentenceBuffer.trim().length >= 8) {
+        if (voiceOutputEnabled && sentenceBuffer.trim().length >= 8) {
           queueSentence(sentenceBuffer.trim(), currentVoice, lang);
         }
         flushQueue();
@@ -2547,25 +2550,27 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               console.log(`[Bobby] 🤖 AUTO-EXECUTE: ${direction.toUpperCase()} ${symbol} ${leverage}x $${amount} — conviction ${conv}/10 (mark=${markPrice}, minMargin=${minMarginForOneContract})`);
 
               // Play execution sound
-              try {
-                const audioCtx = new AudioContext();
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.3);
-              } catch { }
+              if (!textOnly) {
+                try {
+                  const audioCtx = new AudioContext();
+                  const osc = audioCtx.createOscillator();
+                  const gain = audioCtx.createGain();
+                  osc.connect(gain);
+                  gain.connect(audioCtx.destination);
+                  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                  osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
+                  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                  osc.start();
+                  osc.stop(audioCtx.currentTime + 0.3);
+                } catch { }
+              }
 
               // Bobby announces the execution with his voice
               const execAnnouncement = lang === 'es'
                 ? `Ejecutando ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${leverage}x. Convicción ${conv} de diez.`
                 : `Executing ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${leverage}x. Conviction ${conv} out of ten.`;
-              queueSentence(execAnnouncement, 'cio', lang);
+              if (voiceOutputEnabled) queueSentence(execAnnouncement, 'cio', lang);
 
               setMessages(prev => [...prev, {
                 id: uid(), role: 'advisor', timestamp: Date.now(),
@@ -2616,25 +2621,27 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                 }
 
                 // Success sound — ascending tone
-                try {
-                  const audioCtx = new AudioContext();
-                  const osc = audioCtx.createOscillator();
-                  const gain = audioCtx.createGain();
-                  osc.connect(gain);
-                  gain.connect(audioCtx.destination);
-                  osc.frequency.setValueAtTime(523, audioCtx.currentTime);
-                  osc.frequency.exponentialRampToValueAtTime(1047, audioCtx.currentTime + 0.15);
-                  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-                  osc.start();
-                  osc.stop(audioCtx.currentTime + 0.4);
-                } catch { }
+                if (!textOnly) {
+                  try {
+                    const audioCtx = new AudioContext();
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.frequency.setValueAtTime(523, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1047, audioCtx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
+                  } catch { }
+                }
 
                 // Bobby confirms with voice
                 const confirmText = lang === 'es'
                   ? `Operación confirmada. ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${execData.leverage} a ${execData.markPrice?.toLocaleString()} dólares. El trade está vivo.`
                   : `Trade confirmed. ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${execData.leverage} at ${execData.markPrice?.toLocaleString()} dollars. The trade is live.`;
-                queueSentence(confirmText, 'cio', lang);
+                if (voiceOutputEnabled) queueSentence(confirmText, 'cio', lang);
 
                 setMessages(prev => [...prev, {
                   id: uid(), role: 'advisor', timestamp: Date.now(),
@@ -2712,7 +2719,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     }
     setIsProcessing(false);
 
-  }, [inputText, isProcessing, profile?.walletAddress, address, advisorName, speakIfEnabled, speakFillerLocal, scanAndHighlight, startThinkingSound, stopThinkingSound, stopVoice, typewriterText, lang, t, voiceEnabled, queueSentence, flushQueue, clearResponseAudio]);
+  }, [inputText, isProcessing, profile?.walletAddress, address, advisorName, speakIfEnabled, speakFillerLocal, scanAndHighlight, startThinkingSound, stopThinkingSound, stopVoice, typewriterText, lang, t, textOnly, voiceOutputEnabled, queueSentence, flushQueue, clearResponseAudio, initVoiceContext]);
 
   // Keep ref in sync for speech recognition callback
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
@@ -2817,7 +2824,13 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[#050505] text-white before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_50%_18%,rgba(0,82,255,.16),transparent_29%),linear-gradient(180deg,#050505_0%,#070913_48%,#050505_100%)]">
       {/* Step 1: Trading Mode Selection (first thing user sees) */}
-      {!tradingMode && <TradingModeSelector onSelect={handleModeSelect} language={lang} onInitVoice={initVoiceContext} />}
+      {!tradingMode && (
+        <TradingModeSelector
+          onSelect={handleModeSelect}
+          language={lang}
+          onInitVoice={textOnly ? undefined : initVoiceContext}
+        />
+      )}
 
       {/* Step 2: Advisor Setup (only if trading mode already selected AND needed) */}
       {tradingMode && showSetup && <AdvisorSetup onComplete={handleSetupComplete} />}
@@ -2882,7 +2895,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             {onSwitchToVoice && (
               <button
                 onClick={onSwitchToVoice}
-                className="hidden items-center gap-1.5 rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#7da6ff] transition hover:bg-[#0052ff]/20 sm:flex"
+                className="flex min-h-11 items-center gap-1.5 rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#7da6ff] transition hover:bg-[#0052ff]/20 sm:min-h-0"
                 title={lang === 'es' ? 'Cambiar a conversación por voz' : 'Switch to voice conversation'}
               >
                 <Mic className="h-3 w-3" />
@@ -2890,18 +2903,20 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               </button>
             )}
             {/* Stop button — visible when speaking or processing */}
-            {(isSpeaking || isProcessing) && (
+            {((!textOnly && isSpeaking) || isProcessing) && (
               <button onClick={stopAll}
                 className="p-1.5 text-red-400/70 hover:text-red-400 transition-colors animate-pulse"
                 title="Stop">
                 <Square className="w-3.5 h-3.5 fill-current" />
               </button>
             )}
-            <button onClick={toggleVoice}
-              className={`rounded-full border p-2 transition-colors ${voiceEnabled ? 'border-[#0052ff]/35 bg-[#0052ff]/10 text-[#7da6ff] hover:bg-[#0052ff]/20' : 'border-white/10 text-white/30 hover:text-white'}`}
-              title={voiceEnabled ? 'Voice ON' : 'Voice OFF'}>
-              {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-            </button>
+            {!textOnly && (
+              <button onClick={toggleVoice}
+                className={`rounded-full border p-2 transition-colors ${voiceEnabled ? 'border-[#0052ff]/35 bg-[#0052ff]/10 text-[#7da6ff] hover:bg-[#0052ff]/20' : 'border-white/10 text-white/30 hover:text-white'}`}
+                title={voiceEnabled ? 'Voice ON' : 'Voice OFF'}>
+                {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              </button>
+            )}
             <button onClick={toggleTradingRoom}
               className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[9px] font-mono font-bold tracking-wider transition-all sm:flex ${tradingRoom ? 'border border-[#0052ff]/30 bg-[#0052ff]/10 text-[#7da6ff]' : 'border border-white/10 bg-white/5 text-white/30 hover:text-white/50'}`}
               title={tradingRoom ? 'Trading Room ON' : 'Solo Trader'}>
@@ -3343,7 +3358,22 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             </AnimatePresence>
 
             {/* THE STAGE — Bobby's latest response + data panels */}
-            <div className="w-full flex-1 space-y-3 pb-4">
+            <div className={`w-full flex-1 space-y-3 pb-4 ${textOnly && !latestAdvisor && !isProcessing ? 'flex items-center' : ''}`}>
+              {textOnly && !latestAdvisor && !isProcessing && (
+                <div className="mx-auto w-full max-w-xl rounded-2xl border border-[#0052ff]/20 bg-[#0052ff]/[0.06] p-6 text-center shadow-[0_20px_70px_rgba(0,0,0,.25)] sm:p-8">
+                  <div className="font-mono text-[10px] font-bold uppercase tracking-[.22em] text-[#7da6ff]">
+                    {lang === 'es' ? 'Canal de texto' : 'Text channel'}
+                  </div>
+                  <h1 className="mt-3 text-2xl font-extrabold tracking-[-.05em] text-white sm:text-3xl">
+                    {lang === 'es' ? 'Escribe antes de actuar.' : 'Type before you act.'}
+                  </h1>
+                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">
+                    {lang === 'es'
+                      ? 'Plantea tu tesis o pregunta. Bobby la contrasta con datos, riesgo y una decisión explicable.'
+                      : 'Share your thesis or question. Bobby will test it against data, risk, and an explainable decision.'}
+                  </p>
+                </div>
+              )}
               {/* Latest Bobby message — the main "stage" text */}
               {latestAdvisor && (
                 <motion.div
@@ -3594,13 +3624,15 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               </div>
             </div>
             <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-2 sm:px-6">
-              <button onClick={toggleListening} disabled={isProcessing}
-                className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border transition-all active:scale-[0.95] flex-shrink-0 rounded-full ${isListening
-                    ? 'animate-pulse border-[#0052ff] bg-[#0052ff]/25 text-white'
-                    : 'border-[#0052ff]/35 bg-[#0052ff]/10 text-[#7da6ff] hover:bg-[#0052ff]/20'
-                  }`}>
-                {isListening ? <Mic className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <MicOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
-              </button>
+              {!textOnly && (
+                <button onClick={toggleListening} disabled={isProcessing}
+                  className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border transition-all active:scale-[0.95] flex-shrink-0 rounded-full ${isListening
+                      ? 'animate-pulse border-[#0052ff] bg-[#0052ff]/25 text-white'
+                      : 'border-[#0052ff]/35 bg-[#0052ff]/10 text-[#7da6ff] hover:bg-[#0052ff]/20'
+                    }`}>
+                  {isListening ? <Mic className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <MicOff className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                </button>
+              )}
               {/* Quick Action Buttons — Stitch Redesign */}
               {!inputText && !isProcessing && messages.length < 3 && (
                 <div className="flex items-center gap-1 mr-1 overflow-x-auto no-scrollbar">
@@ -3631,7 +3663,11 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                     el?.scrollIntoView({ behavior: 'smooth', block: 'end' });
                   }, 300);
                 }}
-                placeholder={isListening ? t('listening') as string : `${lang === 'es' ? 'Habla con' : lang === 'pt' ? 'Fale com' : 'Talk to'} ${advisorName}...`}
+                placeholder={textOnly
+                  ? `${lang === 'es' ? 'Escribe a' : lang === 'pt' ? 'Escreva para' : 'Type to'} ${advisorName}...`
+                  : isListening
+                    ? t('listening') as string
+                    : `${lang === 'es' ? 'Habla con' : lang === 'pt' ? 'Fale com' : 'Talk to'} ${advisorName}...`}
                 className={`flex-1 rounded-xl border bg-white/[.035] px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 outline-none transition-colors ${isListening ? 'border-[#0052ff]/60' : 'border-white/10 focus:border-[#0052ff]/60'
                   }`}
                 disabled={isProcessing} />

@@ -52,11 +52,29 @@ const STOCK_TIMEFRAME: Record<Timeframe, { range: string; interval: string }> = 
 /** Fill/stroke for an agent zone — same hue as its line and its card. */
 const ZONE_FILL = { alpha: 'rgba(74,222,128,0.13)', red: 'rgba(255,113,106,0.13)', cio: 'rgba(250,204,21,0.13)' } as const;
 
+// Names people ask about that trade on NO public market (private companies),
+// mapped to their closest listed exposure. Config, not data: keeps the no-data
+// overlay honest ("SpaceX es privada") instead of a bare empty chart.
+const PRIVATE_COMPANIES: Record<string, string[]> = {
+  SPACEX: ['RKLB', 'TSLA'],
+  STARLINK: ['RKLB', 'TSLA'],
+  OPENAI: ['MSFT'],
+  ANTHROPIC: ['GOOGL', 'AMZN'],
+  XAI: ['TSLA'],
+  STRIPE: ['ADYEN', 'PYPL'],
+  BYTEDANCE: ['META'],
+  TIKTOK: ['META'],
+  DISCORD: ['RBLX'],
+  EPIC: ['RBLX', 'U'],
+  CANVA: ['ADBE'],
+};
+
 export function MarketCanvas({
   symbol,
   timeframe,
   levels,
   debate,
+  language,
   onSymbolChange,
   onTimeframeChange,
 }: {
@@ -69,6 +87,7 @@ export function MarketCanvas({
     indicators: string[];
     levels: ChartLevel[];
   } | null;
+  language: 'es' | 'en';
   onSymbolChange: (symbol: string) => void;
   onTimeframeChange: (tf: Timeframe) => void;
 }) {
@@ -80,6 +99,7 @@ export function MarketCanvas({
   const ema50Ref = useRef<ISeriesApi<'Line'> | null>(null);
   const zoneRefs = useRef<ISeriesApi<'Baseline'>[]>([]);
   const lineRefs = useRef<IPriceLine[]>([]);
+  const previousSymbolRef = useRef(symbol);
   /** Time range the zones span. State, not a ref — the zone effect must re-run
    *  once candles arrive, otherwise a debate that lands first never gets drawn. */
   const [span, setSpan] = useState<{ from: number; to: number } | null>(null);
@@ -207,6 +227,35 @@ export function MarketCanvas({
   // --- load + poll candles ---
   useEffect(() => {
     let cancelled = false;
+    let hasRenderedRows = false;
+    const symbolChanged = previousSymbolRef.current !== symbol;
+    previousSymbolRef.current = symbol;
+
+    // Price lines belong to the symbol that produced them. Clear them on an
+    // asset switch so a BTC thesis can never remain visible on an equity chart.
+    // A timeframe switch keeps the levels because the underlying asset is the
+    // same; new levels will be restored by the dedicated effect below.
+    if (symbolChanged && candleRef.current) {
+      lineRefs.current.forEach((line) => {
+        try {
+          candleRef.current?.removePriceLine(line);
+        } catch {
+          // The chart may be tearing down during a fast route/symbol change.
+        }
+      });
+      lineRefs.current = [];
+    }
+
+    const clearMarketState = () => {
+      candleRef.current?.setData([] as never);
+      volumeRef.current?.setData([] as never);
+      ema20Ref.current?.setData([] as never);
+      ema50Ref.current?.setData([] as never);
+      setAnalysis(null);
+      setLast(null);
+      setSpan(null);
+      setUpdatedAt(null);
+    };
     // Registry symbols know their venue up front. For an uncurated ticker we
     // discover it on the first successful fetch and reuse it, so the 15s poll
     // stops re-probing both venues once one has answered.
@@ -214,10 +263,16 @@ export function MarketCanvas({
     // Best-guess label the instant the symbol changes, corrected once the fetch
     // resolves the real venue (matters for uncurated tickers probed on OKX).
     setResolvedVenue(cachedVenue ?? 'okx');
+    // Clear synchronously on every symbol/timeframe change. Otherwise the old
+    // candles are briefly displayed under the new ticker while fetch is pending.
+    clearMarketState();
+    setNoData(false);
+    setError(false);
 
     const load = async () => {
       try {
         const stockConfig = STOCK_TIMEFRAME[timeframe];
+        let hadFetchError = false;
         // Both OKX and Yahoo return the same normalized candle shape here, so
         // the chart behaves identically for crypto and equities. Oldest first;
         // raw OKX arrays are tolerated as a fallback.
@@ -241,12 +296,20 @@ export function MarketCanvas({
             .sort((a: Candle, b: Candle) => a.time - b.time);
 
         const fetchFrom = async (venue: AssetVenue): Promise<Candle[]> => {
-          const url = venue === 'equity'
-            ? `/api/stock-candles?symbol=${encodeURIComponent(symbol)}&range=${stockConfig.range}&interval=${stockConfig.interval}`
-            : `/api/okx-candles?instId=${encodeURIComponent(symbol)}-USDT&bar=${timeframe}&limit=100`;
-          const response = await fetch(url, { cache: 'no-store' });
-          if (!response.ok) return [];
-          return parseRows(await response.json());
+          try {
+            const url = venue === 'equity'
+              ? `/api/stock-candles?symbol=${encodeURIComponent(symbol)}&range=${stockConfig.range}&interval=${stockConfig.interval}`
+              : `/api/okx-candles?instId=${encodeURIComponent(symbol)}-USDT&bar=${timeframe}&limit=100`;
+            const response = await fetch(url, { cache: 'no-store' });
+            if (!response.ok) {
+              hadFetchError = true;
+              return [];
+            }
+            return parseRows(await response.json());
+          } catch {
+            hadFetchError = true;
+            return [];
+          }
         };
 
         let venue: AssetVenue;
@@ -273,18 +336,20 @@ export function MarketCanvas({
         // asset never shows the PREVIOUS symbol's candles under a new label
         // (the "TSM/USDT with BTC's price" bug). Show an explicit empty state.
         if (!rows.length) {
-          candleRef.current.setData([] as never);
-          volumeRef.current?.setData([] as never);
-          ema20Ref.current?.setData([] as never);
-          ema50Ref.current?.setData([] as never);
-          setAnalysis(null);
-          setLast(null);
-          setSpan(null);
-          setNoData(true);
-          setError(false);
+          if (hasRenderedRows) {
+            // A polling blip must not erase a valid chart. Keep the last candles
+            // for this SAME symbol and mark them stale in the footer.
+            setNoData(false);
+            setError(true);
+          } else {
+            clearMarketState();
+            setNoData(!hadFetchError);
+            setError(hadFetchError);
+          }
           return;
         }
         setNoData(false);
+        hasRenderedRows = true;
 
         candleRef.current.setData(rows as never);
         volumeRef.current?.setData(
@@ -318,7 +383,11 @@ export function MarketCanvas({
         setUpdatedAt(new Date());
         setError(false);
       } catch {
-        if (!cancelled) setError(true);
+        if (!cancelled) {
+          if (!hasRenderedRows) clearMarketState();
+          setNoData(false);
+          setError(true);
+        }
       }
     };
 
@@ -516,21 +585,51 @@ export function MarketCanvas({
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" />
         {noData && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[#050505]/80 text-center">
-            <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50">
-              sin datos para {symbol}
-            </span>
-            <span className="font-mono text-[9px] text-white/25">
-              no hay velas en {isStock ? 'Yahoo Finance' : 'OKX'} para este activo
-            </span>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 bg-[#050505]/80 px-6 text-center">
+            {PRIVATE_COMPANIES[symbol] ? (
+              <>
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/60">
+                  {language === 'es'
+                    ? `${symbol} es una empresa privada — no cotiza en ningún mercado público`
+                    : `${symbol} is a private company — it does not trade on any public market`}
+                </span>
+                <span className="font-mono text-[9px] text-[#7da6ff]">
+                  {language === 'es'
+                    ? `exposición listada más cercana: ${PRIVATE_COMPANIES[symbol].join(' · ')}`
+                    : `closest listed exposure: ${PRIVATE_COMPANIES[symbol].join(' · ')}`}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50">
+                  {language === 'es' ? `sin datos para ${symbol}` : `no data for ${symbol}`}
+                </span>
+                <span className="font-mono text-[9px] text-white/25">
+                  {language === 'es'
+                    ? (!getVoiceAsset(symbol)
+                        ? 'no hay velas en OKX ni Yahoo Finance para este activo'
+                        : `no hay velas en ${isStock ? 'Yahoo Finance' : 'OKX'} para este activo`)
+                    : (!getVoiceAsset(symbol)
+                        ? 'no candles on OKX or Yahoo Finance for this asset'
+                        : `no candles on ${isStock ? 'Yahoo Finance' : 'OKX'} for this asset`)}
+                </span>
+              </>
+            )}
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
-        <span>{isStock ? 'Yahoo Finance · mercado accionario' : 'OKX · mercado cripto'}</span>
+        <span>{isStock
+          ? (language === 'es' ? 'Yahoo Finance · mercado accionario' : 'Yahoo Finance · equities')
+          : (language === 'es' ? 'OKX · mercado cripto' : 'OKX · crypto market')}
+        </span>
         <span className={error ? 'text-red-400' : undefined}>
-          {error ? 'sin datos' : updatedAt ? `actualizado ${updatedAt.toLocaleTimeString('es-MX')}` : 'cargando…'}
+          {error
+            ? (language === 'es' ? 'sin datos' : 'no data')
+            : updatedAt
+              ? `${language === 'es' ? 'actualizado' : 'updated'} ${updatedAt.toLocaleTimeString(language === 'es' ? 'es-MX' : 'en-US')}`
+              : (language === 'es' ? 'cargando…' : 'loading…')}
         </span>
       </div>
     </div>

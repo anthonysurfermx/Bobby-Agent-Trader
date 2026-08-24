@@ -256,6 +256,7 @@ export default function BobbyProtocolLanding() {
   ];
 
   const navItems = [
+    ['Verified calls', '/protocol/calls'],
     ['The rules', '#rules'],
     ['The procedure', '#how-it-works'],
     ['Integration', '#for-agents'],
@@ -674,139 +675,6 @@ export default function BobbyProtocolLanding() {
             </div>
           </div>
         </section>
-
-        {false && <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
-          <SectionMedia name="section-blue" className="opacity-45" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
-          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Public by design</div>
-            <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Proof over promises.<br />See the record.</h2>
-              <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
-            </div>
-
-            <div className="mb-8 flex flex-wrap items-center gap-2">
-              {([['all', 'All'], ['settled', 'Settled'], ['recorded', 'Recorded']] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setActivityFilter(key)}
-                  className={`rounded-lg px-4 py-2 font-mono text-xs uppercase tracking-[0.15em] transition ${activityFilter === key ? 'bg-white text-black' : 'border border-white/15 bg-white/[0.06] text-white/60 hover:bg-white/[0.12] hover:text-white'}`}
-                >
-                  {label}
-                </button>
-              ))}
-              <div className="ml-auto flex items-center gap-4">
-                <button onClick={refreshActivity} className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/45 transition hover:text-white" aria-label="Refresh network activity">
-                  <RefreshCw className={`h-3.5 w-3.5 ${isActivityLoading ? 'animate-spin' : ''}`} /> Refresh
-                </button>
-                <span className="hidden items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#7da6ff] md:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#7da6ff]" /> Online</span>
-              </div>
-            </div>
-
-            <div className="mb-5 grid overflow-hidden rounded-2xl border border-white/10 bg-[#080912]/85 backdrop-blur-xl lg:grid-cols-[1.25fr_.75fr]">
-              <div className="relative min-h-[220px] overflow-hidden border-b border-white/10 p-6 sm:p-8 lg:border-b-0 lg:border-r">
-                <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(0,82,255,.22)_1px,transparent_1px),linear-gradient(90deg,rgba(0,82,255,.22)_1px,transparent_1px)] [background-size:28px_28px]" />
-                <div className="absolute -left-20 top-1/2 h-44 w-44 -translate-y-1/2 rounded-full bg-[#0052ff]/30 blur-3xl" />
-                <div className="relative">
-                  <div className="mb-8 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] text-white/45"><span>Network telemetry</span><span className="text-[#7da6ff]">Live read</span></div>
-                  <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-3 text-center sm:gap-5">
-                    {[['RPC', chainLabel], ['Treasury', stats?.treasury?.balanceNative ? `${Number(stats.treasury.balanceNative).toFixed(3)} ${nativeSymbol}` : 'Syncing'], ['Proof', activity.length ? `${activity.length} events` : 'Standby']].map(([label, value], index) => (
-                      <div key={label} className="contents">
-                        <div className="min-w-0 rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/10 px-2 py-4 shadow-[0_0_32px_rgba(0,82,255,.14)]">
-                          <span className="mx-auto mb-2 block h-2.5 w-2.5 rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,1)]" />
-                          <div className="truncate font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">{label}</div>
-                          <div className="mt-1 truncate text-xs font-bold text-white/85">{value}</div>
-                        </div>
-                        {index < 2 && <div className="h-px min-w-3 bg-gradient-to-r from-[#0052ff] to-[#0052ff]/15" />}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-7 font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{telemetryUpdatedAt ? `Snapshot fetched ${telemetryUpdatedAt}` : 'Connecting to protocol telemetry'}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-px bg-white/10">
-                <div className="bg-[#080912]/90 p-5 sm:p-6"><Database className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Latest block</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{formatNumber(stats?.chain?.blockNumber)}</div><div className="mt-1 text-xs text-white/40">{chainLabel}</div></div>
-                <div className="bg-[#080912]/90 p-5 sm:p-6"><ShieldCheck className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Feed status</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{activityError ? 'Retry' : isActivityLoading ? 'Syncing' : 'Live'}</div><div className="mt-1 text-xs text-white/40">updates every 30s</div></div>
-              </div>
-            </div>
-
-            {filteredActivity.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredActivity.map((item, index) => (
-                  <motion.div
-                    key={`${item.tool}-${index}`}
-                    initial={{ opacity: 0, y: 12 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05 }}
-                    className="group rounded-2xl border border-white/10 bg-[#0a0a14]/80 p-6 backdrop-blur transition hover:-translate-y-1 hover:border-[#0052ff]/50"
-                  >
-                    <div className="mb-5 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="grid h-7 w-7 place-items-center rounded-full bg-[#0052ff]/25 font-mono text-[10px] font-bold text-[#7da6ff]">{(item.agent || 'B')[0]}</span>
-                        <span className="text-sm text-white/60">{item.agent || 'Bobby network'}</span>
-                      </div>
-                      <span className="font-mono text-[10px] text-white/30">{item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}</span>
-                    </div>
-                    <div className="mb-6 truncate text-xl font-extrabold tracking-[-0.04em] text-white/90">{item.tool || 'Agent decision'}</div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-sm font-bold text-white/80">{item.paid ? 'x402 settled' : 'recorded'}</span>
-                      <span className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${item.paid ? 'border-[#0052ff]/40 bg-[#0052ff]/15 text-[#7da6ff]' : 'border-white/15 bg-white/[0.06] text-white/55'}`}>{item.status || (item.paid ? 'settled' : 'live')}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-[#0052ff]/30 bg-[#0052ff]/[0.045] px-6 py-12 text-center">
-                <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10"><CircleDollarSign className="h-5 w-5 text-[#7da6ff]" /></div>
-                <div className="text-lg font-bold">{activityError ? 'Activity feed is reconnecting.' : isActivityLoading ? 'Reading protocol activity.' : 'No recent protocol events.'}</div>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{activityError ? 'The network telemetry is still available. Refresh to retry the event stream.' : 'The live network remains connected; the next recorded event will appear here automatically.'}</p>
-              </div>
-            )}
-          </div>
-        </section>}
-
-        {false && <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(0,82,255,.1),transparent_40%)]" />
-          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Bobby-as-a-service</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give your agent<br />a second layer.</h2>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/60 px-5 py-3 font-mono text-sm text-[#7da6ff]">POST /api/mcp-http</div>
-            </div>
-            <div className="grid gap-5 md:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-7">
-                <div className="mb-5 flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-white/60">Free tier</span>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{mcp?.pricing?.free?.length ?? '—'} tools</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(mcp?.pricing?.free ?? []).map((tool) => (
-                    <span key={tool} className="rounded-md border border-white/10 bg-white/[0.06] px-3 py-1.5 font-mono text-xs text-white/70">{tool}</span>
-                  ))}
-                  {!mcp && <span className="font-mono text-xs text-white/40">loading tool registry…</span>}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/[0.08] p-7">
-                <div className="mb-5 flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Premium — x402</span>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">{mcp?.pricing?.premium?.price ?? '—'}</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(mcp?.pricing?.premium?.tools ?? []).map((tool) => (
-                    <span key={tool} className="rounded-md border border-[#0052ff]/40 bg-[#0052ff]/20 px-3 py-1.5 font-mono text-xs text-white/90">{tool}</span>
-                  ))}
-                  {!mcp && <span className="font-mono text-xs text-white/40">loading tool registry…</span>}
-                </div>
-                {mcp?.pricing?.premium?.settlementContract && (
-                  <div className="mt-6 border-t border-[#0052ff]/20 pt-4 font-mono text-[11px] text-white/45">settlement {mcp.pricing.premium.settlementContract}</div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>}
 
         <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />

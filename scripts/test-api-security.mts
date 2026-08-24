@@ -35,6 +35,8 @@ const previousEnv = {
   internal: process.env.INTERNAL_API_SECRET,
   cycle: process.env.BOBBY_CYCLE_SECRET,
   cron: process.env.CRON_SECRET,
+  trading: process.env.TRADING_API_SECRET,
+  freeze: process.env.PROTOCOL_CUTOVER_FREEZE,
   liveKey: process.env.OKX_CEX_API_KEY,
   liveSecret: process.env.OKX_CEX_SECRET_KEY,
   livePassphrase: process.env.OKX_CEX_PASSPHRASE,
@@ -42,6 +44,8 @@ const previousEnv = {
 
 try {
   process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+  process.env.TRADING_API_SECRET = 'test-trading-secret';
+  process.env.PROTOCOL_CUTOVER_FREEZE = 'true';
   delete process.env.BOBBY_CYCLE_SECRET;
   delete process.env.CRON_SECRET;
   process.env.OKX_CEX_API_KEY = 'server-api-key';
@@ -90,6 +94,19 @@ try {
     await perpsHandler(request({ action: 'balance', params: { mode: 'live' } }), response);
     assert.equal(state.status, 401, 'server OKX account data must require internal auth');
     assert.equal(fetchCalls, 0, 'rejected OKX account reads must not call OKX');
+  }
+
+  {
+    const { response, state } = responseRecorder();
+    await perpsHandler(
+      request(
+        { action: 'open_position', params: { mode: 'live', symbol: 'BTC' } },
+        { 'x-internal-secret': 'test-trading-secret' },
+      ),
+      response,
+    );
+    assert.equal(state.status, 503, 'cutover freeze must block Bobby server-account live mutations');
+    assert.equal(fetchCalls, 0, 'frozen live mutations must not call OKX');
   }
 
   {
@@ -225,6 +242,8 @@ try {
   restore('INTERNAL_API_SECRET', previousEnv.internal);
   restore('BOBBY_CYCLE_SECRET', previousEnv.cycle);
   restore('CRON_SECRET', previousEnv.cron);
+  restore('TRADING_API_SECRET', previousEnv.trading);
+  restore('PROTOCOL_CUTOVER_FREEZE', previousEnv.freeze);
   restore('OKX_CEX_API_KEY', previousEnv.liveKey);
   restore('OKX_CEX_SECRET_KEY', previousEnv.liveSecret);
   restore('OKX_CEX_PASSPHRASE', previousEnv.livePassphrase);

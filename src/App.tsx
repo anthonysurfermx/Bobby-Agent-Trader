@@ -74,6 +74,10 @@ const BobbyB2BPage = lazy(() => import('@/pages/BobbyB2BPage'));
 const BobbyMetacognitionPage = lazy(() => import('@/pages/BobbyMetacognitionPage'));
 const BobbySignalsPage = lazy(() => import('@/pages/BobbySignalsPage'));
 const BobbyDocsPage = lazy(() => import('@/pages/BobbyDocsPage'));
+const BobbyCallsPage = lazy(() => import('@/pages/BobbyCallsPage'));
+const BobbyRiskPage = lazy(() => import('@/pages/BobbyRiskPage'));
+const BobbyAuditsPage = lazy(() => import('@/pages/BobbyAuditsPage'));
+const BobbyBountyPage = lazy(() => import('@/pages/BobbyBountyPage'));
 const BobbyArchitecturePage = lazy(() => import('@/pages/BobbyArchitecturePage'));
 const BobbyMarketplacePage = lazy(() => import('@/pages/BobbyMarketplacePage'));
 const BobbyHeartbeatPage = lazyWithRetry(() => import('@/pages/BobbyHeartbeatPage'), 'protocol-heartbeat');
@@ -311,6 +315,38 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyDocsPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'protocol/calls',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyCallsPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'protocol/risk',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyRiskPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'protocol/audits',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAuditsPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'protocol/bounty',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyBountyPage />
             </Suspense>
           ),
         },

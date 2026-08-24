@@ -7,7 +7,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
-import { requireInternalAuth } from './_lib/request-security.js';
+import { requireProtocolAutomationAuth } from './_lib/request-security.js';
+import { assertProviderChain, requireLegacyXLayerMode } from './_lib/protocol-write-safety.js';
+import { XLAYER_CHAIN_ID } from './_lib/chains.js';
 
 export const config = { maxDuration: 30 };
 
@@ -45,7 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!requireInternalAuth(req, res)) return;
+  if (!requireProtocolAutomationAuth(req, res)) return;
+  if (!requireLegacyXLayerMode(res, 'auto-bounty')) return;
 
   const recorderKey = process.env.BOBBY_RECORDER_KEY;
   if (!recorderKey) {
@@ -63,6 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+    await assertProviderChain(provider, XLAYER_CHAIN_ID);
     const wallet = new ethers.Wallet(recorderKey, provider);
     const iface = new ethers.Interface(BOUNTY_ABI);
 

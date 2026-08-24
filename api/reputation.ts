@@ -40,7 +40,19 @@ const TRACK_RECORD_INTERFACE = new Interface([
   'function losses() view returns (uint256)',
   'function totalPnlBps() view returns (int256)',
   'function pendingCount() view returns (uint256)',
+  // V2 (Base) splits ledgers per D-1 — the v1 combined selectors above do not
+  // exist there. Reputation reports the VERIFIED ledger (the strong claim).
+  'function getVerifiedWinRate() view returns (uint256)',
+  'function winsVerified() view returns (uint256)',
+  'function lossesVerified() view returns (uint256)',
+  'function totalPnlBpsVerified() view returns (int256)',
 ]);
+
+const IS_V2_CHAIN = DEFAULT_CHAIN.id !== XLAYER_CHAIN_ID;
+const FN_WIN_RATE = IS_V2_CHAIN ? 'getVerifiedWinRate' : 'getWinRate';
+const FN_WINS = IS_V2_CHAIN ? 'winsVerified' : 'wins';
+const FN_LOSSES = IS_V2_CHAIN ? 'lossesVerified' : 'losses';
+const FN_PNL = IS_V2_CHAIN ? 'totalPnlBpsVerified' : 'totalPnlBps';
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
   const res = await fetch(XLAYER_RPC_URL, {
@@ -88,10 +100,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   ] = await Promise.all([
     safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'totalTrades'), BigInt(0)),
     safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'totalCommitments'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'getWinRate'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'wins'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'losses'), BigInt(0)),
-    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'totalPnlBps'), BigInt(0)),
+    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, FN_WIN_RATE), BigInt(0)),
+    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, FN_WINS), BigInt(0)),
+    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, FN_LOSSES), BigInt(0)),
+    safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, FN_PNL), BigInt(0)),
     safe(() => callView(TRACK_RECORD, TRACK_RECORD_INTERFACE, 'pendingCount'), BigInt(0)),
     safe(() => callView(CONVICTION_ORACLE, ORACLE_INTERFACE, 'symbolCount'), BigInt(0)),
     safe(getEconomyStats, {

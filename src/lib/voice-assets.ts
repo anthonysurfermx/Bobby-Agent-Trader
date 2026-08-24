@@ -55,7 +55,7 @@ export const VOICE_ASSETS: VoiceAsset[] = [
   { symbol: 'SHIB', name: 'Shiba Inu', venue: 'okx', group: 'Cripto', aliases: ['shiba'] },
 
   // --- equities (Yahoo) ---
-  { symbol: 'NVDA', name: 'Nvidia', venue: 'equity', group: 'Acciones', aliases: ['nvidia corporation'] },
+  { symbol: 'NVDA', name: 'Nvidia', venue: 'equity', group: 'Acciones', aliases: ['nvidia corporation', 'envidia', 'n vidia'] },
   { symbol: 'AAPL', name: 'Apple', venue: 'equity', group: 'Acciones' },
   { symbol: 'MSFT', name: 'Microsoft', venue: 'equity', group: 'Acciones' },
   { symbol: 'GOOGL', name: 'Alphabet', venue: 'equity', group: 'Acciones', aliases: ['google', 'goog'] },
@@ -65,7 +65,6 @@ export const VOICE_ASSETS: VoiceAsset[] = [
   { symbol: 'AMD', name: 'AMD', venue: 'equity', group: 'Acciones' },
   { symbol: 'AVGO', name: 'Broadcom', venue: 'equity', group: 'Acciones' },
   { symbol: 'MU', name: 'Micron', venue: 'equity', group: 'Acciones' },
-  { symbol: 'TSM', name: 'TSMC', venue: 'equity', group: 'Acciones', aliases: ['tscm', 'taiwan semiconductor', 'taiwan semiconductor manufacturing'] },
   { symbol: 'INTC', name: 'Intel', venue: 'equity', group: 'Acciones' },
   { symbol: 'QCOM', name: 'Qualcomm', venue: 'equity', group: 'Acciones' },
   { symbol: 'SMCI', name: 'Supermicro', venue: 'equity', group: 'Acciones' },

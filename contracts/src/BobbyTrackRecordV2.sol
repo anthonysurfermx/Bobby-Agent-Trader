@@ -115,6 +115,9 @@ contract BobbyTrackRecordV2 {
     error EntryInFuture();
     error EntryTooStale();
     error AttestedNoEntryAnchor();
+    error AnnounceRequired();
+    error EntryAnchorMismatch();
+    error AlreadyCommitted();
     error StopRequiredForVerified();
     error InvalidDirection();
     error AttestedNoEvidence();
@@ -158,6 +161,12 @@ contract BobbyTrackRecordV2 {
     uint256 public minCommitAge = 1 hours;
     uint256 public constant MIN_COMMIT_AGE_FLOOR = 10 minutes;
     uint256 public constant MAX_COMMITMENT_TTL = 30 days;
+    /// @dev A4-1: the entry anchor is DERIVED from the announcement as
+    ///      announcedAt + MIN_ENTRY_DELAY_SEC — strictly in the announce
+    ///      block's future. Same-block announce+commit therefore reverts
+    ///      EntryInFuture, and no signed tick for the anchor instant can
+    ///      exist (let alone be known) when the anchor is fixed.
+    uint64 public constant MIN_ENTRY_DELAY_SEC = 10;
     int256 public constant PNL_TOLERANCE_BPS = 100;
     uint256 public constant MAX_RECENT = 100;
 
@@ -168,6 +177,15 @@ contract BobbyTrackRecordV2 {
 
     /// @dev commitIndex[hash] = arrayIndex + 1; 0 = "not committed" (v1).
     mapping(bytes32 => uint256) public commitIndex;
+
+    /// @dev A3-1: VERIFIED entries anchor at a PRE-ANNOUNCED instant. The
+    ///      announcement fixes the anchor BEFORE its oracle evidence exists,
+    ///      so the recorder cannot backdate an entry onto already-observed
+    ///      price action. commitTrade then requires entryAt == announcedAt
+    ///      (equality, not >=: a range would leave [announcedAt, commit]
+    ///      retrospectively selectable). Re-announcing only moves the anchor
+    ///      FORWARD (block.timestamp is monotonic), which is harmless.
+    mapping(bytes32 => uint64) public announcedAt;
     uint256 public pendingCount;
 
     /// @dev tradeIndex[hash] = tradesArrayIndex + 1; 0 = "no trade row yet".
@@ -248,6 +266,7 @@ contract BobbyTrackRecordV2 {
         uint64 breachPublishTime, uint256 breachPrice1e8, bool wasResolved
     );
     event CommitmentExpired(uint256 indexed commitId, bytes32 indexed debateHash, string symbol);
+    event CommitAnnounced(bytes32 indexed debateHash, uint64 announcedAt);
     event FeedSet(bytes32 indexed symbolHash, string symbol, bytes32 feedId);
     event SanityFeedSet(bytes32 indexed symbolHash, string symbol, address aggregator);
     event PythApproved(address indexed pyth, uint64 activatableAt);
@@ -357,6 +376,21 @@ contract BobbyTrackRecordV2 {
         uint64 entryAt;
     }
 
+    /// @notice A3-1/A4-1: fix the entry anchor for a future VERIFIED commit.
+    ///         The anchor is DERIVED, strictly future: announcedAt +
+    ///         MIN_ENTRY_DELAY_SEC. Announcing in the same block as (or after
+    ///         observing) the anchor's tick is impossible — the tick does not
+    ///         exist yet when the anchor is fixed. Commit must land in
+    ///         [entryAt, entryAt + entryWindowSec]; re-announcing simply
+    ///         moves the anchor forward.
+    function announceCommit(bytes32 _debateHash) external onlyBobby whenNotPaused {
+        require(_debateHash != bytes32(0), "Invalid debate hash");
+        if (commitIndex[_debateHash] != 0) revert AlreadyCommitted();
+        uint64 ts = uint64(block.timestamp);
+        announcedAt[_debateHash] = ts;
+        emit CommitAnnounced(_debateHash, ts);
+    }
+
     function commitTrade(
         bytes32 _debateHash,
         string calldata _symbol,
@@ -427,13 +461,21 @@ contract BobbyTrackRecordV2 {
         }
         if (_entryUpdateData.length == 0) revert EntryProofRequired();
 
-        // A2-1: the entry anchors to a CALLER-DECLARED instant, same canonical
-        // benchmark pattern as exit and challenge. Unique semantics then pin
-        // the evidence to the FIRST tick at/after _entryAt — the recorder
-        // cannot retrospectively shop among in-window ticks (the A1-1 fix's
-        // regression). The anchor itself must be recent and never in the
-        // future, so the entry price is pinned to the moment of commitment
-        // within entryWindowSec.
+        // A2-1/A3-1/A4-1: the entry anchors to the instant DERIVED from the
+        // announcement: announcedAt + MIN_ENTRY_DELAY_SEC. Exact equality (not
+        // >=) leaves no temporal choice, and the future offset means the
+        // anchor's tick cannot exist — let alone be known — when the anchor
+        // is fixed, killing the same-block announce+commit bypass. The commit
+        // must then land inside [entryAt, entryAt + entryWindowSec]:
+        // EntryInFuture until the anchor instant arrives, EntryTooStale after
+        // the window — an announcement can never be aged into observed price
+        // action. Unique semantics pin the evidence to the FIRST tick
+        // at/after the anchor.
+        {
+            uint64 ann = announcedAt[a.debateHash];
+            if (ann == 0) revert AnnounceRequired();
+            if (a.entryAt != ann + MIN_ENTRY_DELAY_SEC) revert EntryAnchorMismatch();
+        }
         if (a.entryAt > block.timestamp) revert EntryInFuture();
         if (block.timestamp - a.entryAt > params.entryWindowSec) revert EntryTooStale();
         (OracleEvidence memory entryEv, uint256 refund) = _verifyAndPay(
@@ -460,6 +502,7 @@ contract BobbyTrackRecordV2 {
             }
         }
 
+        delete announcedAt[a.debateHash]; // consumed — gas refund + hygiene
         _storeCommitment(a, PriceMode.VERIFIED, feedId, entryEv);
         _refund(refund);
     }

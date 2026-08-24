@@ -20,15 +20,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 15, 600)) return;
 
-  const body = req.body as { text?: string; voice?: string; lang?: string; vibe?: string };
+  const body = req.body as { text?: string; voice?: string; lang?: string; vibe?: string; edgeVoice?: string };
   const text = body.text;
-  // Whitelist every steering param — this endpoint is public
+  // Whitelist every steering param — this endpoint is public. edgeVoice
+  // (the iOS "Configura tu Bobby" menu) is validated inside the TTS layer
+  // against its own strict allowlist.
   const VALID_VOICES = ['alpha', 'red', 'cio', 'male', 'female', 'coral', 'ballad', 'sage', 'ash'];
   const VALID_LANGS = ['es', 'en', 'pt'];
   const VALID_VIBES = ['direct', 'analytical', 'wise'];
   const voice = VALID_VOICES.includes(body.voice || '') ? body.voice : 'cio';
   const lang = VALID_LANGS.includes(body.lang || '') ? body.lang : 'es';
   const vibe = VALID_VIBES.includes(body.vibe || '') ? body.vibe : undefined;
+  const edgeVoice = typeof body.edgeVoice === 'string' ? body.edgeVoice : undefined;
 
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'text is required' });
@@ -44,9 +47,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // working but degrades to free Edge voices instead of paid synthesis
     const budget = await checkPersistentLimit('tts-global', 'global', 3000, 86400);
 
-    // mp3: Safari iOS can't play opus in <audio> — web always gets MP3
+    // mp3: AVAudioPlayer/Safari can't play opus — apps always get MP3
     const speech = await generateSpeech(text, {
-      lang, voice, vibe, format: 'mp3',
+      lang, voice, vibe, edgeVoice, format: 'mp3',
       provider: budget.limited ? 'edge' : undefined,
     });
     if (!speech) {

@@ -118,8 +118,13 @@ const economyIface = new Interface([
 
 const trackRecordIface = new Interface([
   'function getWinRate() view returns (uint256)',
+  'function getVerifiedWinRate() view returns (uint256)',
   'function totalTrades() view returns (uint256)',
 ]);
+
+// V2 (Base) has no combined getWinRate (D-1); the heartbeat's headline is the
+// VERIFIED win rate there. On X Layer the v1 selector stays.
+const HEARTBEAT_WIN_RATE_FN = DEFAULT_CHAIN.id === XLAYER_CHAIN_ID ? 'getWinRate' : 'getVerifiedWinRate';
 
 const bountiesIface = new Interface([
   'function nextBountyId() view returns (uint256)',
@@ -298,7 +303,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Agent Economy — single call returns all 5 stats
       ethCall(AGENT_ECONOMY, economyIface.encodeFunctionData('getEconomyStats')),
       // Track Record
-      ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData('getWinRate')),
+      ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData(HEARTBEAT_WIN_RATE_FN)),
       ethCall(TRACK_RECORD, trackRecordIface.encodeFunctionData('totalTrades')),
       // Bounties
       ethCall(BOUNTIES, bountiesIface.encodeFunctionData('nextBountyId')),
@@ -344,10 +349,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let winRateBps = '0';
     let totalTrades = '0';
     try {
-      const [wr] = trackRecordIface.decodeFunctionResult('getWinRate', String(winRateHex));
+      const [wr] = trackRecordIface.decodeFunctionResult(HEARTBEAT_WIN_RATE_FN, String(winRateHex));
       winRateBps = wr.toString();
     } catch {
-      console.error('[ProtocolHeartbeat] Failed to decode getWinRate');
+      console.error(`[ProtocolHeartbeat] Failed to decode ${HEARTBEAT_WIN_RATE_FN}`);
     }
     try {
       const [tt] = trackRecordIface.decodeFunctionResult('totalTrades', String(totalTradesHex));

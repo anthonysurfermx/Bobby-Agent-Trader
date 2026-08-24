@@ -5,9 +5,9 @@ node_modules/
 dist/
 .vercel/
 
-# Env
-.env
-.env.local
+# Env — `vercel env pull .env.production` must never create a committable key file.
+.env*
+!.env.example
 *.local
 .env*.local.*
 

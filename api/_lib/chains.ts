@@ -50,18 +50,17 @@ export interface ChainConfig {
   contracts: ContractSet;
 }
 
-// Deployed addresses. Base entries stay empty until the audited redeploy lands —
-// an empty string is a loud failure, which is what we want versus silently
-// reading an X Layer contract from a Base RPC.
-const BASE_CONTRACTS: ContractSet = {
-  treasury: process.env.TREASURY_ADDRESS_BASE || '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
-  agentEconomy: process.env.BASE_AGENT_ECONOMY_ADDRESS || '',
-  adversarialBounties: process.env.BASE_BOUNTIES_ADDRESS || '',
-  trackRecord: process.env.BASE_TRACK_RECORD_ADDRESS || '',
-  hardnessRegistry: process.env.BASE_HARDNESS_REGISTRY_ADDRESS || '',
-  convictionOracle: process.env.BASE_ORACLE_ADDRESS || '',
-  agentRegistry: process.env.BASE_AGENT_REGISTRY_ADDRESS || '',
-  intentEscrow: process.env.BASE_INTENT_ESCROW_ADDRESS || '',
+// Audited Base mainnet deployment. Environment overrides remain available for
+// controlled rehearsal/testing, but production has truthful public fallbacks.
+export const BASE_CONTRACTS: ContractSet = {
+  treasury: process.env.TREASURY_ADDRESS_BASE || '',
+  agentEconomy: process.env.BASE_AGENT_ECONOMY_ADDRESS || '0x009de59e0e7f4109fF9E89E744A4412082AD2aaF',
+  adversarialBounties: process.env.BASE_BOUNTIES_ADDRESS || '0x73fD6c77ff0403Ea071e8721c76f88cE34ac9968',
+  trackRecord: process.env.BASE_TRACK_RECORD_ADDRESS || '0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321',
+  hardnessRegistry: process.env.BASE_HARDNESS_REGISTRY_ADDRESS || '0x15800F40b8988765AD3F46030B73bC8109A793f5',
+  convictionOracle: process.env.BASE_ORACLE_ADDRESS || '0x27f51D711171c830dd796D4B03914a8C6c46D75e',
+  agentRegistry: process.env.BASE_AGENT_REGISTRY_ADDRESS || '0xB3137D7afE26fbdBcAA95573C7A20be896efde93',
+  intentEscrow: process.env.BASE_INTENT_ESCROW_ADDRESS || '0x5D9d534419421B7Edfe9Bb509E4c48512256BC97',
 };
 
 // Testnet canary — its OWN env vars so Sepolia and mainnet addresses can never
@@ -83,7 +82,9 @@ const XLAYER_CONTRACTS: ContractSet = {
   treasury: '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea',
   agentEconomy: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871',
   adversarialBounties: '0xa8005ab465a0e02cb14824cd0e7630391fba673d',
-  trackRecord: '0xF841b428E6d743187D7BE2242eccC1078fdE2395',
+  // Env override exists for the local E2E harness only (points v1 at an anvil
+  // deployment); unset in every real environment, so prod is unchanged.
+  trackRecord: process.env.XLAYER_TRACK_RECORD_ADDRESS || '0xF841b428E6d743187D7BE2242eccC1078fdE2395',
   hardnessRegistry: process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
   convictionOracle: process.env.BOBBY_ORACLE_ADDRESS || '0x03FA39B3a5B316B7cAcDabD3442577EE32Ab5f3A',
   agentRegistry: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b',
@@ -94,11 +95,15 @@ export const BASE: ChainConfig = {
   id: BASE_CHAIN_ID,
   name: 'Base',
   rpcUrl: process.env.BASE_RPC_URL || 'https://mainnet.base.org',
+  // The public Base endpoint is rate-limited and explicitly unsuitable as a
+  // sole production dependency. Read paths fail over; writers still assert
+  // the expected chain before signing.
+  rpcFallbackUrl: process.env.BASE_RPC_FALLBACK_URL || 'https://base-rpc.publicnode.com',
   explorerUrl: 'https://basescan.org',
   explorerApiUrl: 'https://api.basescan.org/api',
   nativeSymbol: 'ETH',
   nativeDecimals: 18,
-  protocolDeploymentBlock: Number(process.env.BASE_PROTOCOL_DEPLOYMENT_BLOCK || 0),
+  protocolDeploymentBlock: Number(process.env.BASE_PROTOCOL_DEPLOYMENT_BLOCK || 50_275_770),
   // D-3: on-chain fees are native ETH (resized per deploy); USDC is ONLY the
   // x402/off-chain settlement rail. Keep these two rails separate forever.
   onchainFeeToken: 'native',
@@ -155,12 +160,30 @@ export const XLAYER: ChainConfig = {
  * Flip to BASE (or set PROTOCOL_CHAIN=base) once the audited redeploy is live
  * and the addresses above are populated.
  */
-export const DEFAULT_CHAIN: ChainConfig =
-  process.env.PROTOCOL_CHAIN === 'base'
-    ? BASE
-    : process.env.PROTOCOL_CHAIN === 'base-sepolia'
-      ? BASE_SEPOLIA
-      : XLAYER;
+export type ProtocolChainName = 'xlayer' | 'base-sepolia' | 'base';
+
+/**
+ * Resolve the protocol chain strictly. A typo in PROTOCOL_CHAIN must never
+ * fall back to X Layer: on a writer that would sign a valid transaction on
+ * the wrong network with the same hot key.
+ */
+export function resolveProtocolChain(value: string | undefined): {
+  name: ProtocolChainName;
+  config: ChainConfig;
+} {
+  const normalized = (value || 'xlayer').trim().toLowerCase();
+  if (normalized === 'base') return { name: 'base', config: BASE };
+  if (normalized === 'base-sepolia') return { name: 'base-sepolia', config: BASE_SEPOLIA };
+  if (normalized === 'xlayer') return { name: 'xlayer', config: XLAYER };
+  throw new Error(
+    `Invalid PROTOCOL_CHAIN=${JSON.stringify(value)}; expected xlayer, base-sepolia, or base`,
+  );
+}
+
+const selectedProtocolChain = resolveProtocolChain(process.env.PROTOCOL_CHAIN);
+
+export const PROTOCOL_CHAIN_NAME = selectedProtocolChain.name;
+export const DEFAULT_CHAIN: ChainConfig = selectedProtocolChain.config;
 
 export const CHAINS: Record<number, ChainConfig> = {
   [BASE.id]: BASE,

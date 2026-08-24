@@ -12,6 +12,7 @@ import {
   AlertTriangle, Wallet, MessageSquare, TrendingUp, Lock, Eye
 } from 'lucide-react';
 import KineticShell from '@/components/kinetic/KineticShell';
+import { BOBBY_BASE_MAINNET, bobbyBaseAddressUrl } from '@/config/chains';
 
 // --------------- Shared Components ---------------
 
@@ -99,10 +100,13 @@ function Badge({ type }: { type: 'free' | 'x402' }) {
 // --------------- Data ---------------
 
 const CONTRACTS = [
-  { name: 'BobbyTrackRecord', addr: '0xf841b428e6d743187d7be2242eccc1078fde2395', desc: 'Commit-reveal predictions', purpose: 'Immutable on-chain prediction history' },
-  { name: 'BobbyConvictionOracle', addr: '0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a', desc: 'Conviction feed for protocols', purpose: 'Real-time conviction data feed' },
-  { name: 'BobbyAgentEconomy', addr: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871', desc: 'Agent-to-agent payments', purpose: 'x402 payment settlement' },
-  { name: 'BobbyAgentRegistry', addr: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', desc: 'Agent Identity NFTs', purpose: 'On-chain agent identity layer' },
+  { name: 'BobbyTrackRecord V2', addr: BOBBY_BASE_MAINNET.contracts.trackRecord, purpose: 'Future-anchored, Pyth-verified decision history' },
+  { name: 'BobbyConvictionOracle', addr: BOBBY_BASE_MAINNET.contracts.convictionOracle, purpose: 'Conviction commitments before execution' },
+  { name: 'BobbyAgentEconomyV2', addr: BOBBY_BASE_MAINNET.contracts.agentEconomy, purpose: 'Native-fee protocol economy' },
+  { name: 'BobbyAdversarialBounties', addr: BOBBY_BASE_MAINNET.contracts.adversarialBounties, purpose: 'On-chain rewards for breaking a thesis' },
+  { name: 'HardnessRegistry', addr: BOBBY_BASE_MAINNET.contracts.hardnessRegistry, purpose: 'Difficulty-weighted decision scoring' },
+  { name: 'BobbyAgentRegistry', addr: BOBBY_BASE_MAINNET.contracts.agentRegistry, purpose: 'Staked on-chain agent identities' },
+  { name: 'BobbyIntentEscrow', addr: BOBBY_BASE_MAINNET.contracts.intentEscrow, purpose: 'Attested intent ledger, isolated from verified calls' },
 ];
 
 const TOOL_ICONS: Record<string, React.ElementType> = {
@@ -214,7 +218,7 @@ export default function BobbyDocsPage() {
               Connect your AI agent to Bobby in one command
             </h1>
             <p className="text-sm md:text-base leading-7 text-white/60 max-w-xl mx-auto">
-              Base-first agent infrastructure, 12 MCP tools, 70+ technical indicators, x402 payments
+              Base V2 proof canary, 12 MCP tools, 70+ technical indicators and a legacy x402 rail
             </p>
           </motion.div>
 
@@ -329,16 +333,56 @@ export default function BobbyDocsPage() {
             </GlassCard>
           </motion.div>
 
-          {/* ===== 4. SMART CONTRACTS ===== */}
+          {/* ===== 4. BASE V2 PROOF ENGINE ===== */}
+          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
+            <GlassCard glow accentBorder className="p-6 md:p-8">
+              <SectionLabel icon={Shield} label="TrackRecord V2 proof engine" right="Base mainnet · deployed" />
+              <p className="mb-7 max-w-3xl text-sm leading-7 text-white/60">
+                V2 fixes the time of entry before its price exists, verifies entry and exit through Pyth/Hermes, and keeps price-verified outcomes separate from attested claims. Five adversarial rounds found and closed four P1 integrity issues before the release was frozen.
+              </p>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {[
+                  ['01 · FUTURE ANCHOR', 'announceCommit fixes entryAt in the future. Same-block, tick-shopping and retrospective anchor selection revert.'],
+                  ['02 · ORACLE EVIDENCE', 'Unique Pyth updates prove the exact entry and exit instants. The recorder retries Hermes only inside the valid window.'],
+                  ['03 · OPEN RESOLUTION', 'Permissionless challenge, expiry and separate VERIFIED / ATTESTED ledgers prevent unproven claims from inflating the record.'],
+                ].map(([title, text]) => (
+                  <div key={title} className="rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/[0.07] p-5">
+                    <div className="font-mono text-[10px] font-bold tracking-[0.15em] text-[#7da6ff]">{title}</div>
+                    <p className="mt-3 text-xs leading-6 text-white/60">{text}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.trackRecord)} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[#0052ff]/50">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">TrackRecord V2 · Base mainnet</div>
+                  <div className="mt-2 truncate font-mono text-[11px] text-[#7da6ff]">{BOBBY_BASE_MAINNET.contracts.trackRecord}</div>
+                </a>
+                <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.safe)} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-white/10 bg-black/30 p-4 transition hover:border-[#0052ff]/50">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">Production Safe · 2 of 3</div>
+                  <div className="mt-2 truncate font-mono text-[11px] text-[#7da6ff]">{BOBBY_BASE_MAINNET.safe}</div>
+                </a>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5 font-mono text-[10px] uppercase tracking-[0.12em]">
+                <span className="rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-3 py-1 text-[#7da6ff]">Base mainnet deployed</span>
+                <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-amber-300">Writes frozen</span>
+                <span className="text-white/35">Pending Safe acceptance · runtime verification · canary · soak</span>
+              </div>
+            </GlassCard>
+          </motion.div>
+
+          {/* ===== 5. BASE MAINNET SMART CONTRACTS ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
-              <SectionLabel icon={Shield} label="Legacy on-chain deployment" right="X Layer archive · chain 196" />
+              <SectionLabel icon={Shield} label="Base mainnet contracts" right="7 deployed · chain 8453" />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {CONTRACTS.map(c => (
                   <a
                     key={c.name}
-                    href={`https://www.oklink.com/xlayer/address/${c.addr}`}
+                    href={bobbyBaseAddressUrl(c.addr)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block group"
@@ -348,7 +392,7 @@ export default function BobbyDocsPage() {
                       <div className="font-mono text-[10px] text-[#7da6ff] mb-3 truncate">{c.addr}</div>
                       <p className="text-xs text-white/60 leading-6 mb-4">{c.purpose}</p>
                       <div className="font-mono text-[10px] text-white/40 group-hover:text-[#7da6ff] transition-colors tracking-[0.15em] uppercase flex items-center gap-1.5">
-                        View legacy deployment
+                        View on Basescan
                         <ExternalLink className="w-2.5 h-2.5" />
                       </div>
                     </GlassCard>

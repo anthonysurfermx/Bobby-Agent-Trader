@@ -9,6 +9,7 @@ import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Crosshair, BarChart3, Swords } from 'lucide-react';
+import { BOBBY_BASE_MAINNET, bobbyBaseAddressUrl } from '@/config/chains';
 
 export default function AgenticWorldPage() {
   // Fetch real stats
@@ -282,7 +283,7 @@ export default function AgenticWorldPage() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[
-              { label: 'SMART CONTRACTS', value: '4', sub: 'Deployed on Chain 196' },
+              { label: 'SMART CONTRACTS', value: '7', sub: 'Base mainnet · 8453' },
               { label: 'MCP TOOLS', value: '12', sub: 'Free + Premium (x402)' },
               { label: 'AGENT NFTs', value: '3', sub: 'On-chain Identity' },
               { label: 'AI MODELS', value: '5', sub: 'Claude + GPT + Gemini' },
@@ -296,12 +297,15 @@ export default function AgenticWorldPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
             {[
-              { name: 'TrackRecord', addr: '0xf841b428e6d743187d7be2242eccc1078fde2395', desc: 'Commit-reveal predictions' },
-              { name: 'ConvictionOracle', addr: '0x03fa39b3a5b316b7cacdabd3442577ee32ab5f3a', desc: 'Conviction feed for protocols' },
-              { name: 'AgentEconomy', addr: '0xD9540D770C8aF67e9E6412C92D78E34bc11ED871', desc: 'Agent-to-agent payments' },
-              { name: 'AgentRegistry', addr: '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', desc: 'Agent Identity NFTs' },
+              { name: 'TrackRecord V2', addr: BOBBY_BASE_MAINNET.contracts.trackRecord, desc: 'Pyth-verified decisions' },
+              { name: 'ConvictionOracle', addr: BOBBY_BASE_MAINNET.contracts.convictionOracle, desc: 'Pre-execution conviction' },
+              { name: 'AgentEconomyV2', addr: BOBBY_BASE_MAINNET.contracts.agentEconomy, desc: 'Protocol economy' },
+              { name: 'AdversarialBounties', addr: BOBBY_BASE_MAINNET.contracts.adversarialBounties, desc: 'Bounty settlement' },
+              { name: 'HardnessRegistry', addr: BOBBY_BASE_MAINNET.contracts.hardnessRegistry, desc: 'Difficulty scoring' },
+              { name: 'AgentRegistry', addr: BOBBY_BASE_MAINNET.contracts.agentRegistry, desc: 'Staked identities' },
+              { name: 'IntentEscrow', addr: BOBBY_BASE_MAINNET.contracts.intentEscrow, desc: 'Attested intent ledger' },
             ].map(c => (
-              <a key={c.name} href={`https://www.oklink.com/xlayer/address/${c.addr}`} target="_blank" rel="noopener noreferrer"
+              <a key={c.name} href={bobbyBaseAddressUrl(c.addr)} target="_blank" rel="noopener noreferrer"
                 className="bg-white/[0.01] border border-white/[0.04] rounded-lg px-3 py-2 flex items-center justify-between hover:border-green-500/20 transition-all group">
                 <div>
                   <div className="font-mono text-[9px] text-white/50 font-bold">{c.name}</div>

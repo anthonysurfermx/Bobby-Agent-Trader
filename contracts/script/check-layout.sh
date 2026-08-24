@@ -32,27 +32,18 @@ python3 - "$RAW" > "$TMP" <<'PYEOF'
 import json, sys
 
 d = json.load(open(sys.argv[1]))
-types = d.get("types", {})
-
-# Solidity assigns internal type names such as `t_struct(Commitment)170_storage`
-# from AST ids. Those ids are not storage layout and vary across compiler
-# versions, so resolve them to their stable human-readable labels before
-# comparing the snapshot.
-def stable_type(type_id):
-    return types.get(type_id, {}).get("label", type_id)
-
 out = {
     "storage": [
-        {"label": s["label"], "slot": s["slot"], "offset": s["offset"], "type": stable_type(s["type"])}
+        {"label": s["label"], "slot": s["slot"], "offset": s["offset"], "type": s["type"]}
         for s in d["storage"]
     ],
     # Full member layouts: every struct field's slot/offset/type is frozen.
     "types": {
-        t.get("label", name): {
+        name: {
             "label": t.get("label"),
             "numberOfBytes": t.get("numberOfBytes"),
             "members": [
-                {"label": m["label"], "slot": m["slot"], "offset": m["offset"], "type": stable_type(m["type"])}
+                {"label": m["label"], "slot": m["slot"], "offset": m["offset"], "type": m["type"]}
                 for m in t.get("members", [])
             ],
         }

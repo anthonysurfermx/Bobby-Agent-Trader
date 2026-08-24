@@ -3,6 +3,12 @@ import {
   BOBBY_PROTOCOL_BASE_URL,
   XLAYER_RPC_URL,
 } from './protocol-constants.js';
+import { DEFAULT_CHAIN } from './chains.js';
+import {
+  assertProviderChain,
+  evaluateProtocolWriteSafety,
+  recorderKeyEnvForChain,
+} from './protocol-write-safety.js';
 
 const XLAYER_RPC = XLAYER_RPC_URL;
 export const HARDNESS_REGISTRY_ADDRESS = BOBBY_HARDNESS_REGISTRY;
@@ -10,6 +16,7 @@ export const HARDNESS_REGISTRY_ADDRESS = BOBBY_HARDNESS_REGISTRY;
 const HARDNESS_REGISTRY_ABI = [
   'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, string metadataURI)',
   'function getService(string serviceId) view returns ((address owner,address recipient,uint128 priceWei,uint128 totalRevenue,uint64 totalCalls,uint64 createdAt,bool active,string serviceId))',
+  'function REGISTRATION_STAKE() view returns (uint96)',
   'function registerAgent(string metadataURI) payable',
   'function registerService(string serviceId, uint256 priceWei, address recipient)',
   'function commitPrediction(bytes32 predictionHash, string symbol, uint8 conviction, uint96 entry, uint96 target, uint96 stop)',
@@ -20,13 +27,33 @@ const HARDNESS_REGISTRY_ABI = [
 const DEFAULT_AGENT_METADATA_URI =
   process.env.BOBBY_HARDNESS_AGENT_METADATA_URI || `${BOBBY_PROTOCOL_BASE_URL}/api/agent-identity`;
 
-export const HARDNESS_PREMIUM_SERVICES = [
-  { serviceId: 'bobby_analyze', priceWei: '1000000000000000' },
-  { serviceId: 'bobby_debate', priceWei: '1000000000000000' },
-  { serviceId: 'bobby_judge', priceWei: '1000000000000000' },
-  { serviceId: 'bobby_security_scan', priceWei: '1000000000000000' },
-  { serviceId: 'bobby_wallet_portfolio', priceWei: '1000000000000000' },
-];
+const HARDNESS_SERVICE_IDS = [
+  'bobby_analyze',
+  'bobby_debate',
+  'bobby_judge',
+  'bobby_security_scan',
+  'bobby_wallet_portfolio',
+] as const;
+
+function servicePriceEnvForChain(): string | null {
+  if (DEFAULT_CHAIN.id === 8453) return 'BASE_HARDNESS_SERVICE_PRICE_WEI';
+  if (DEFAULT_CHAIN.id === 84532) return 'BASE_SEPOLIA_HARDNESS_SERVICE_PRICE_WEI';
+  return null;
+}
+
+function configuredServicePriceWei(): bigint | null {
+  const envName = servicePriceEnvForChain();
+  // Preserve the historical X Layer service price. ETH-denominated networks
+  // must opt into their own reviewed value; an OKB literal must never migrate.
+  const raw = envName ? process.env[envName] : '1000000000000000';
+  if (!raw || !/^[1-9][0-9]*$/.test(raw)) return null;
+  try {
+    const value = BigInt(raw);
+    return value <= ((1n << 128n) - 1n) ? value : null;
+  } catch {
+    return null;
+  }
+}
 
 let lastSetupAt = 0;
 
@@ -69,7 +96,12 @@ function directionToEnum(direction: HardnessDirection): number {
 }
 
 export function isHardnessRegistryConfigured(): boolean {
-  return Boolean(HARDNESS_REGISTRY_ADDRESS && process.env.BOBBY_RECORDER_KEY);
+  const writeSafety = evaluateProtocolWriteSafety(
+    DEFAULT_CHAIN,
+    process.env,
+    ['hardnessRegistry'],
+  );
+  return writeSafety.ok && configuredServicePriceWei() !== null;
 }
 
 export function computeHardnessScore(dimensions: Record<string, number>): number {
@@ -91,10 +123,12 @@ export function computeHardnessScore(dimensions: Record<string, number>): number
 }
 
 async function getSigner() {
-  const key = process.env.BOBBY_RECORDER_KEY || '';
+  if (!isHardnessRegistryConfigured()) return null;
+  const key = process.env[recorderKeyEnvForChain(DEFAULT_CHAIN.id)] || '';
   if (!key || !HARDNESS_REGISTRY_ADDRESS) return null;
   const { ethers } = await import('ethers');
   const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+  await assertProviderChain(provider, DEFAULT_CHAIN.id);
   return new ethers.Wallet(key, provider);
 }
 
@@ -103,32 +137,37 @@ async function ensureBobbySetup(contract: any, signer: any, metadataURI?: string
   if (now - lastSetupAt < 15 * 60 * 1000) return;
   const { ethers } = await import('ethers');
 
-  const { ethers: eth } = await import('ethers');
   const profile = await contract.agentProfiles(signer.address);
   if (!profile.registered) {
+    const registrationStake = (await contract.REGISTRATION_STAKE()) as bigint;
     const tx = await contract.registerAgent(metadataURI || DEFAULT_AGENT_METADATA_URI, {
       gasLimit: 250000n,
-      value: eth.parseEther('0.01'), // 0.01 OKB stake required by contract
+      value: registrationStake,
     });
     await tx.wait();
   }
 
+  const servicePriceWei = configuredServicePriceWei();
+  if (servicePriceWei === null) {
+    const envName = servicePriceEnvForChain();
+    throw new Error(`${envName || 'Hardness service price'} must be a positive uint128 value`);
+  }
   const payoutRecipient = recipient || signer.address;
-  for (const service of HARDNESS_PREMIUM_SERVICES) {
+  for (const serviceId of HARDNESS_SERVICE_IDS) {
     try {
-      const existing = await contract.getService(service.serviceId);
+      const existing = await contract.getService(serviceId);
       if (existing.owner === ethers.ZeroAddress) {
-        const tx = await contract.registerService(service.serviceId, BigInt(service.priceWei), payoutRecipient, { gasLimit: 300000n });
+        const tx = await contract.registerService(serviceId, servicePriceWei, payoutRecipient, { gasLimit: 300000n });
         await tx.wait();
       } else if (
         existing.owner.toLowerCase() === signer.address.toLowerCase() &&
-        (!existing.active || existing.recipient.toLowerCase() !== payoutRecipient.toLowerCase() || existing.priceWei !== BigInt(service.priceWei))
+        (!existing.active || existing.recipient.toLowerCase() !== payoutRecipient.toLowerCase() || existing.priceWei !== servicePriceWei)
       ) {
-        const tx = await contract.registerService(service.serviceId, BigInt(service.priceWei), payoutRecipient, { gasLimit: 300000n });
+        const tx = await contract.registerService(serviceId, servicePriceWei, payoutRecipient, { gasLimit: 300000n });
         await tx.wait();
       }
     } catch (error) {
-      console.warn(`[Hardness] Service sync skipped for ${service.serviceId}:`, error instanceof Error ? error.message : error);
+      console.warn(`[Hardness] Service sync skipped for ${serviceId}:`, error instanceof Error ? error.message : error);
     }
   }
 

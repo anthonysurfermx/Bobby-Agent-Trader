@@ -50,6 +50,9 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
   const [showSelector, setShowSelector] = useState(true);
   const [lang, setLang] = useState(language);
   const isEs = lang === 'es';
+  // AdamsChat omits the audio initializer in its text-only fallback. Use that
+  // signal to keep first-run onboarding honest about the interaction mode.
+  const textOnly = !onInitVoice;
 
   useEffect(() => {
     const saved = localStorage.getItem('bobby_trading_mode');
@@ -92,7 +95,9 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
                 </div>
                 <div>
                   <h1 className="text-white font-extrabold text-base tracking-[-.04em]">Bobby</h1>
-                  <span className="text-[9px] font-mono text-[#7da6ff] tracking-[.18em]">VOICE DECISION ROOM</span>
+                  <span className="text-[9px] font-mono text-[#7da6ff] tracking-[.18em]">
+                    {textOnly ? 'TEXT DECISION ROOM' : 'VOICE DECISION ROOM'}
+                  </span>
                 </div>
               </div>
               <button onClick={() => setLang(l => l === 'es' ? 'en' : 'es')}
@@ -102,7 +107,9 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
             </div>
 
             <h2 className="text-white text-xl font-bold mt-5 mb-1">
-              {isEs ? 'Habla antes de actuar.' : 'Talk before you act.'}
+              {textOnly
+                ? (isEs ? 'Escribe antes de actuar.' : 'Type before you act.')
+                : (isEs ? 'Habla antes de actuar.' : 'Talk before you act.')}
             </h2>
             <p className="text-white/40 text-xs leading-relaxed">
               {isEs
@@ -200,7 +207,7 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
 
             {/* System status footer */}
             <div className="mt-4 flex items-center gap-4 text-[8px] font-mono text-white/15">
-              <span>VOICE_READY: TRUE</span>
+              <span>{textOnly ? 'TEXT_READY: TRUE' : 'VOICE_READY: TRUE'}</span>
               <span>HUMAN_IN_LOOP</span>
               <span>AGENTS: {selected ? '3' : '0'}</span>
             </div>
