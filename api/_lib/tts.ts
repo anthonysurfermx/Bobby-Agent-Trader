@@ -43,27 +43,50 @@ export interface SpeechOptions {
 
 // ---- Voice persona mapping ----
 
-const OPENAI_VOICES = ['coral', 'ballad', 'sage', 'ash', 'alloy', 'echo', 'shimmer', 'verse'];
+const OPENAI_VOICES = ['coral', 'ballad', 'sage', 'ash', 'alloy', 'echo', 'shimmer', 'verse', 'nova'];
+
+/**
+ * Gen Z tuning (user-validated bake-off, 2026-08-24): persona ids stay
+ * stable for every client, but each maps to the YOUNGEST natural voice in
+ * the catalog — nova/shimmer (fem) and verse/echo (masc) beat the older-
+ * sounding defaults with the native-speaker instructions below.
+ */
+const PERSONA_VOICE: Record<string, string> = {
+  coral: 'nova',      // warm · close → young bright fem
+  sage: 'shimmer',    // calm · wise → young light fem
+  ash: 'verse',       // steady · direct → young energetic masc
+  ballad: 'echo',     // chill · smooth → young relaxed masc
+};
+
+/** Feminine-voiced personas get feminine-gendered Spanish instructions. */
+const FEM_VOICES = new Set(['nova', 'shimmer', 'coral', 'sage', 'alloy']);
 
 function resolveOpenAIVoice(voice?: string): string {
+  if (voice && PERSONA_VOICE[voice]) return PERSONA_VOICE[voice];
   if (voice && OPENAI_VOICES.includes(voice)) return voice;
   switch (voice) {
-    case 'female': return 'coral';
-    case 'male': return 'ash';
-    case 'alpha': return 'verse';   // opportunity hunter — lively
-    case 'red': return 'sage';      // risk voice — calm, firm
-    case 'cio': return 'ash';       // the boss — sober, warm
-    default: return process.env.TTS_OPENAI_VOICE || 'coral';
+    case 'female': return PERSONA_VOICE.coral;
+    case 'male': return PERSONA_VOICE.ash;
+    case 'alpha': return PERSONA_VOICE.ash;   // opportunity hunter — lively
+    case 'red': return PERSONA_VOICE.sage;    // risk voice — calm, firm
+    case 'cio': return PERSONA_VOICE.ballad;  // the boss — young but grounded
+    default: return process.env.TTS_OPENAI_VOICE || PERSONA_VOICE.coral;
   }
 }
 
 // ---- Delivery style instructions (the anti-robot layer) ----
+// Gen Z native-speaker persona: a 22-year-old talking with their best
+// friend. The native-accent line is what killed the "foreigner speaking
+// Spanish" feel in the bake-off; the age is what makes it land with the
+// audience. Gendered variants match the voice actually speaking.
 
 const BASE_INSTRUCTIONS: Record<string, string> = {
-  es: 'Habla en español mexicano neutral. Suena como una amistad de confianza: voz cálida, cercana, suave y segura. Ritmo conversacional relajado, con pausas breves y naturales. Sonríe sutilmente al saludar o celebrar; baja el tono y habla más despacio al mencionar riesgo o pérdidas. Pronuncia siglas y números con claridad. Evita por completo el tono de locutor, de asistente corporativo o de robot. Sin muletillas.',
-  en: 'Speak like a trusted friend: warm, close, soft and confident. Relaxed conversational pace with brief natural pauses. Smile subtly when greeting or celebrating; lower your tone and slow down when mentioning risk or losses. Pronounce tickers and numbers clearly. Never sound like an announcer, a corporate assistant, or a robot. No filler words.',
-  pt: 'Fale em português brasileiro. Soe como uma amizade de confiança: voz calorosa, próxima, suave e segura. Ritmo de conversa relaxado, com pausas breves e naturais. Sorria sutilmente ao cumprimentar; abaixe o tom ao falar de risco. Nunca soe como locutor, assistente corporativo ou robô.',
+  es: 'Eres una chava mexicana de 22 años de la CDMX platicando con tu mejor amiga. Voz joven, fresca y con energía natural — pero relajada y segura, nada de caricatura ni ánimo forzado. Español mexicano nativo auténtico; JAMÁS suenes como extranjera. Habla como Gen Z real: fluida, cercana, con confianza. Baja un poco el tono al hablar de riesgo, como cuidando a tu amiga. Pronuncia siglas y números con naturalidad. Cero robot, cero locutora, sin muletillas.',
+  en: 'You are a 22-year-old talking with your best friend. Young, fresh, naturally energetic — but relaxed and confident, never cartoonish or forced. Native American English. Talk like real Gen Z: fluid, close, self-assured. Lower your tone a bit when mentioning risk, like you are looking out for them. Pronounce tickers and numbers naturally. Zero robot, zero announcer, no filler words.',
+  pt: 'Você é um jovem brasileiro de 22 anos conversando com seu melhor amigo. Voz jovem, fresca e com energia natural — mas relaxada e segura, nada de caricatura. Português brasileiro nativo autêntico. Fale como Gen Z de verdade: fluido, próximo, confiante. Abaixe um pouco o tom ao falar de risco. Zero robô, zero locutor.',
 };
+
+const BASE_INSTRUCTIONS_MASC_ES = 'Eres un chavo mexicano de 23 años de la CDMX platicando con tu mejor amigo. Voz joven, fresca y con energía natural — pero relajado y seguro, nada de caricatura ni ánimo forzado. Español mexicano nativo auténtico; JAMÁS suenes como extranjero. Habla como Gen Z real: fluido, cercano, con confianza. Baja un poco el tono al hablar de riesgo, como cuidando a tu amigo. Pronuncia siglas y números con naturalidad. Cero robot, cero locutor, sin muletillas.';
 
 const VIBE_INSTRUCTIONS: Record<string, Record<string, string>> = {
   direct: {
@@ -83,8 +106,13 @@ const VIBE_INSTRUCTIONS: Record<string, Record<string, string>> = {
   },
 };
 
-function buildInstructions(lang: string, vibe?: string): string {
-  const base = process.env.TTS_INSTRUCTIONS || BASE_INSTRUCTIONS[lang] || BASE_INSTRUCTIONS.es;
+function buildInstructions(lang: string, vibe?: string, resolvedVoice?: string): string {
+  let base = process.env.TTS_INSTRUCTIONS || BASE_INSTRUCTIONS[lang] || BASE_INSTRUCTIONS.es;
+  // Spanish is gendered: a masculine voice reading feminine self-references
+  // ("una chava... extranjera") breaks the illusion instantly.
+  if (!process.env.TTS_INSTRUCTIONS && lang === 'es' && resolvedVoice && !FEM_VOICES.has(resolvedVoice)) {
+    base = BASE_INSTRUCTIONS_MASC_ES;
+  }
   const extra = vibe && VIBE_INSTRUCTIONS[vibe] ? (VIBE_INSTRUCTIONS[vibe][lang] || VIBE_INSTRUCTIONS[vibe].es) : '';
   return base + extra;
 }
@@ -159,15 +187,16 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('openai-tts: OPENAI_API_KEY missing');
   const model = process.env.TTS_OPENAI_MODEL || 'gpt-4o-mini-tts';
+  const resolvedVoice = resolveOpenAIVoice(opts.voice);
   const body: Record<string, unknown> = {
     model,
-    voice: resolveOpenAIVoice(opts.voice),
+    voice: resolvedVoice,
     input: text.slice(0, MAX_CHARS),
     response_format: opts.format,
   };
   // gpt-4o-mini-tts steers delivery via `instructions`; tts-1 only has `speed`.
   if (model.includes('gpt-4o')) {
-    body.instructions = buildInstructions(opts.lang, opts.vibe);
+    body.instructions = buildInstructions(opts.lang, opts.vibe, resolvedVoice);
   } else {
     body.speed = Number(process.env.TTS_SPEED || '1.0');
   }
