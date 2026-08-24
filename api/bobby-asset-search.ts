@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
+  browseOkxAssets,
   getCatalogAgeMs,
   OKX_SEARCH_INST_TYPES,
   resolveOkxInstrument,
@@ -30,6 +31,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const instTypes = parseInstTypes(req.query.instTypes);
 
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=1800');
+
+  // Browse mode: the whole explorable universe grouped by class and ranked
+  // by real 24h volume — powers the in-app board and dictation vocabulary.
+  if (String(req.query.browse || '') === '1') {
+    try {
+      const browse = await browseOkxAssets();
+      return res.status(200).json({
+        ok: true,
+        browse,
+        source: 'OKX public instruments + tickers',
+        catalogAgeMs: getCatalogAgeMs(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Browse unavailable';
+      return res.status(503).json({ error: message });
+    }
+  }
 
   if (!q) {
     return res.status(200).json({
