@@ -1,7 +1,7 @@
 # Plan de migración: Bobby Protocol → Base (Chain 8453) — v2
 
 **Fecha:** 2026-08-10 (v2 tras auditoría de alcance de Codex) · **Ejecutores:** Claude (arquitecto/contratos), Codex (refactor), Kimi (auditoría/QA)
-**Decisiones de Anthony:** cutover total de X Layer · Uniswap nativo en Base · USDC (6 dec) · misma treasury, fondear ~0.01 ETH.
+**Decisiones de Anthony:** cutover total de X Layer · **Uniswap v4** nativo en Base (decisión 2026-08-12: todo el rail DEX sobre v4 — PoolManager + Universal Router + V4Quoter; pools **hookless pineados** (`hooks = address(0)`) en v1; hook de attestations = visión fase 2) · USDC (6 dec) · misma treasury, fondear ~0.01 ETH.
 **Estimación revisada: 2–3 semanas** (la v1 decía 5–7 días; subestimaba contratos, pagos y droplet).
 
 ## Estado por bloque (auditoría v2)
@@ -26,7 +26,7 @@
 ## Matriz de dependencias (inicial — checklist viva)
 | Endpoint/módulo | Contrato(s) | Token | Proveedor externo | Esfuerzo |
 |---|---|---|---|---|
-| dex-quote / dex-swap / dex-approve | — | OKB/USDT → ETH/USDC | OKX DEX Aggregator → **Uniswap QuoterV2 + Universal Router** | Alto |
+| dex-quote / dex-swap / dex-approve | — | OKB/USDT → ETH/USDC | OKX DEX Aggregator → **Uniswap v4 (V4Quoter + Universal Router, pools hookless)** | Alto |
 | xlayer-trade → chain-trade | — | OKB → ETH | **Droplet** `/api/xlayer` | Bloqueante |
 | xlayer-record → chain-record | TrackRecord, ConvictionOracle | OKB gas | RPC X Layer → Base | Alto |
 | mcp-bobby / mcp-http / premium-signal | — (pagos x402) | OKB wei → USDC (6 dec) | xlayer-payments.ts | Alto |
@@ -44,7 +44,7 @@
 - 3 rondas de auditoría obligatorias (Claude → Kimi adversarial → Codex diff) **antes** de cada deploy. Sepolia primero, mainnet después.
 
 ## Fase 2 — Backend (Codex, 4–6 días)
-- DEX: reescritura sobre QuoterV2/Universal Router (viem). `mcp-uniswap-quote.ts` se reescribe de verdad, no se reutiliza.
+- DEX: reescritura sobre **Uniswap v4** — V4Quoter para quotes, Universal Router para swaps (viem), PoolKey explícito con `hooks = address(0)` pineado (rechazar cualquier pool con hook en v1). ETH nativo directo (v4 no exige WETH wrap — alinea con fees nativos D-3). `mcp-uniswap-quote.ts` se reescribe de verdad, no se reutiliza.
 - Pagos: `xlayer-payments.ts` → `base-payments.ts` (USDC ERC-20: transferencia, validación de `chainId 8453`, 6 decimales, nuevos montos de fee — definir tabla de precios USD).
 - Registro: `xlayer-record.ts` → `chain-record.ts` (RPC Base, direcciones nuevas de contratos, mensajes).
 - Resto de la matriz vía chains.ts; grep residual `196|xlayer|oklink|OKB` como gate de PR.
@@ -64,7 +64,7 @@ Como v1: reown sin xlayer (Base default), ChainSwapCard genérico, copys, explor
 1. **Migración parcial peligrosa:** UI en Base con pagos/commits aún en X Layer → la matriz es el control; no se mergea con filas a medias.
 2. **Decimales 18→6** en toda conversión de montos (swap card, pagos, fees, contratos).
 3. **Pérdida de estado on-chain** en redeploy: aceptada, con snapshot documentado.
-4. **Pruebas engañosas:** verificar que los quotes vienen de QuoterV2 real (assert de dirección del router en tests), no de un wrapper.
+4. **Pruebas engañosas:** verificar que los quotes vienen del V4Quoter real contra el PoolManager canónico (assert de direcciones en tests), no de un wrapper. Assert adicional: toda PoolKey usada tiene `hooks = address(0)`.
 5. **Droplet:** bloqueo hasta confirmar acceso; su refactor incluye endurecimiento de seguridad (auth, allowlist de actions).
 6. **Config triplicada:** protocol-constants.ts debe morir; una sola fuente por lado (src/api).
 7. Trades reales y deploys los ejecuta Anthony (regla simulation-only del agente).

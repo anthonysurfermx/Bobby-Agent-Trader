@@ -397,7 +397,7 @@ export const polymarketService = {
   parseMarketUrl(url: string): string | null {
     try {
       const u = new URL(url);
-      if (!u.hostname.includes('polymarket.com')) return null;
+      if (u.protocol !== 'https:' || !['polymarket.com', 'www.polymarket.com'].includes(u.hostname.toLowerCase())) return null;
       // URL formats:
       // /event/slug-name OR /event/slug-name/sub-market-slug
       // /es/event/slug-name (with locale prefix)
@@ -416,7 +416,7 @@ export const polymarketService = {
   parseEventSlug(url: string): string | null {
     try {
       const u = new URL(url);
-      if (!u.hostname.includes('polymarket.com')) return null;
+      if (u.protocol !== 'https:' || !['polymarket.com', 'www.polymarket.com'].includes(u.hostname.toLowerCase())) return null;
       const parts = u.pathname.split('/').filter(Boolean);
       const eventIdx = parts.indexOf('event');
       if (eventIdx !== -1 && parts.length > eventIdx + 1) {

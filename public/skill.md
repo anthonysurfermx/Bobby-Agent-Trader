@@ -211,7 +211,6 @@ POST /api/mcp-http (JSON-RPC 2.0)
 - **Submission:** https://bobbyprotocol.xyz/submission
 - **GitHub:** https://github.com/anthonysurfermx/Bobby-Agent-Trader
 - **Judge Manifest:** https://bobbyprotocol.xyz/ai-judge-manifest.json
-- **Telegram Bot:** https://t.me/bobbyagentraderbot
 
 ---
 

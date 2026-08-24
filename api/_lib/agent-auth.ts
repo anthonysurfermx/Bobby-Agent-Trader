@@ -38,7 +38,9 @@ export async function verifyAgentRequest(
   }
 
   const tsMs = Date.parse(timestamp);
-  if (!Number.isFinite(tsMs) || Math.abs(Date.now() - tsMs) > AUTH_WINDOW_MS) {
+  const age = Date.now() - tsMs;
+  // Past window bounds replay; future timestamps only get clock-skew room
+  if (!Number.isFinite(tsMs) || age > AUTH_WINDOW_MS || age < -60_000) {
     return { ok: false, error: 'Stale or invalid x-agent-timestamp' };
   }
 

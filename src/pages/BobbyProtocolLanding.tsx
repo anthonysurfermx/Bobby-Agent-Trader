@@ -16,7 +16,6 @@ import {
   Twitter,
   X,
 } from 'lucide-react';
-import { BOBBY_BASE_MAINNET, bobbyBaseAddressUrl } from '@/config/chains';
 
 type Price = { symbol: string; price: number; change24h: number };
 
@@ -74,10 +73,6 @@ interface ActivityItem {
   source?: 'commerce' | 'onchain' | 'bounty' | string;
   txHash?: string | null;
 }
-
-// Keep the previous telemetry/MCP sections available while the new landing is
-// evaluated, without tripping the release lint rule on literal `false && ...`.
-const SHOW_LEGACY_PROTOCOL_SECTIONS = false;
 
 const formatNumber = (value: unknown, fallback = '—') => {
   if (value === null || value === undefined || value === '') return fallback;
@@ -175,16 +170,6 @@ function SectionMedia({ name, className = '' }: { name: string; className?: stri
   );
 }
 
-/// CSS iPhone frame around a real simulator capture — no fabricated UI.
-function PhoneFrame({ src, alt, glow = false }: { src: string; alt: string; glow?: boolean }) {
-  return (
-    <div className={`relative rounded-[2.6rem] border border-white/15 bg-[#0a0a0f] p-[7px] ${glow ? 'shadow-[0_40px_120px_rgba(124,82,255,0.35)]' : 'shadow-[0_30px_80px_rgba(0,0,0,0.6)]'}`}>
-      <div className="pointer-events-none absolute left-1/2 top-[14px] z-10 h-[18px] w-[86px] -translate-x-1/2 rounded-full bg-black" />
-      <img src={src} alt={alt} loading="lazy" className="w-full rounded-[2.2rem]" />
-    </div>
-  );
-}
-
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="border-t border-white/15 pt-4">
@@ -205,6 +190,7 @@ export default function BobbyProtocolLanding() {
   const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
   const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
   const publicRecord = stats?.debateActivity;
+  const onchainRecord = stats?.onchainRecord;
   const totalTrades = publicRecord?.commitmentsCreated ?? stats?.contracts?.trackRecord?.stats?.totalTrades;
   const totalInteractions = stats?.protocolTotals?.totalInteractions;
   const winRate = publicRecord?.decisionsResolved ? publicRecord.winRate : null;
@@ -232,45 +218,50 @@ export default function BobbyProtocolLanding() {
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
     : null;
 
+  const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://basescan.org'}/address`;
+  const c = stats?.contracts;
   const proofPoints = [
     {
-      label: 'Base mainnet proof layer',
-      value: 'Deployed',
-      detail: `TrackRecord V2 is on Base at block ${BOBBY_BASE_MAINNET.deployBlock.toLocaleString('en-US')}. Production writes remain frozen during the Safe handoff and soak.`,
-      proof: 'TrackRecord V2 on Basescan',
-      href: bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.trackRecord),
+      label: 'On-chain record',
+      value: formatWinRate(onchainRecord?.winRate, onchainRecord?.decisionsResolved),
+      detail: onchainRecord
+        ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
+        : 'Waiting for the TrackRecord contract.',
+      proof: 'TrackRecord contract',
+      href: `${explorerAddressUrl}/${c?.trackRecord?.address ?? ''}`,
     },
     {
-      label: 'Verified canary ledger',
+      label: 'Public debate ledger',
       value: publicRecord ? `${formatNumber(publicRecord.decisionsResolved, '0')} resolved` : '—',
       detail: publicRecord
         ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L · ${publicRecord.winRate?.toFixed(1)}%`
         : 'Waiting for the public resolution ledger.',
       proof: 'Resolution ledger',
-      href: '/protocol/calls',
+      href: '#what-it-does',
     },
     {
       label: 'Adversarial bounties',
-      value: 'On-chain',
-      detail: 'The mainnet bounty contract is deployed. Funding and public writes activate only after the post-deploy gates close.',
-      proof: 'AdversarialBounties on Basescan',
-      href: bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.adversarialBounties),
+      value: formatNumber(c?.adversarialBounties?.totalPosted),
+      detail: 'Open bounties paid for breaking Bobby\u2019s own reasoning. Being wrong in public is part of the design.',
+      proof: 'AdversarialBounties contract',
+      href: `${explorerAddressUrl}/${c?.adversarialBounties?.address ?? ''}`,
     },
     {
       label: 'Contracts live',
-      value: '7',
-      detail: 'Track record, oracle, economy, bounties, hardness, registry and escrow — deployed together on Base mainnet.',
-      proof: 'AgentEconomy V2 on Basescan',
-      href: bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.agentEconomy),
+      value: '6',
+      detail: 'Registry, economy, oracle, track record, bounties and identity — all deployed and explorer-verified.',
+      proof: 'AgentEconomy V2 contract',
+      href: `${explorerAddressUrl}/${c?.agentEconomy?.address ?? ''}`,
     },
   ];
 
   const navItems = [
     ['Verified calls', '/protocol/calls'],
-    ['The app', '#app'],
-    ['How it works', '#how-it-works'],
-    ['Capabilities', '#capabilities'],
-    ['What it does', '#what-it-does'],
+    ['The rules', '#rules'],
+    ['The procedure', '#how-it-works'],
+    ['Integration', '#for-agents'],
+    ['The record', '#contracts'],
+    ['The app', '/app'],
   ];
 
   const filteredActivity = useMemo(() => {
@@ -292,8 +283,8 @@ export default function BobbyProtocolLanding() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet>
-        <title>Bobby Protocol — Every call, proven</title>
-        <meta name="description" content="Bobby commits every decision before the outcome, verifies resolution with signed oracle evidence and lets anyone challenge a missed stop on-chain." />
+        <title>Bobby Protocol — Refuted before execution</title>
+        <meta name="description" content="The verification layer for financial intelligence. Every decision is refuted before execution and published before its outcome is known." />
       </Helmet>
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
@@ -324,13 +315,13 @@ export default function BobbyProtocolLanding() {
           <div className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl flex-col justify-center px-5 pb-20 pt-20 lg:px-8 lg:pb-28 lg:pt-24">
             <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
               <a href="/agentic-world/bobby/history" className="mb-8 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff] transition hover:text-white">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />Accountability infrastructure for autonomous finance <span aria-hidden>›</span>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />The verification layer for financial intelligence <span aria-hidden>›</span>
               </a>
-              <h1 className="max-w-4xl text-[clamp(3.3rem,7vw,6.9rem)] font-extrabold leading-[.92] tracking-[-0.09em]">Every call.<br /><span className="text-[#0052ff]">Proven before the outcome.</span></h1>
-              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">Bobby commits the decision before the outcome, verifies resolution with signed Pyth evidence, and lets anyone challenge a missed stop on-chain.</p>
+              <h1 className="max-w-4xl text-[clamp(2.4rem,5.2vw,5rem)] font-extrabold leading-[.96] tracking-[-0.085em]">No decision is approved<br />without being <span className="text-[#0052ff]">refuted.</span></h1>
+              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">Every idea follows a fixed procedure — case, refutation, risk gate and verdict — and the verdict is published before any outcome exists to justify it.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-                <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a decision <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
-                <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the gate <ChevronDown className="h-4 w-4" /></a>
+                <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a verdict <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
+                <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the procedure <ChevronDown className="h-4 w-4" /></a>
               </div>
               <div className="mt-14 grid max-w-xl grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4">
                 {[
@@ -361,74 +352,25 @@ export default function BobbyProtocolLanding() {
           </div>
         </div>
 
-        {/* The app — real simulator captures of the iOS build, framed in CSS. */}
-        <section className="relative overflow-hidden border-b border-white/10 bg-[#050505]" id="app">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(0,82,255,.16),transparent_50%)]" />
-          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="grid items-center gap-14 lg:grid-cols-2">
-              <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }}>
-                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff]">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />Coming soon to iPhone
-                </div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">
-                  The protocol,<br />in your <span className="text-[#0052ff]">pocket.</span>
-                </h2>
-                <p className="mt-6 max-w-md text-lg leading-8 text-white/60">
-                  Talk to your agent. Forge its aura. Every call it makes is still
-                  anchored on-chain — the app just gives it a voice.
-                </p>
-                <ul className="mt-8 space-y-4">
-                  {[
-                    ['Forge your agent’s aura', 'Describe it in your own words — the orb absorbs the color live. Hold to forge; the interface detonates into your energy.'],
-                    ['A voice, not a chatbot', 'Ask about BTC, NVDA or gold out loud. Your agent answers with the voice and vibe you gave it.'],
-                    ['Receipts, not promises', 'The same on-chain track record this page reports — verifiable from your phone.'],
-                  ].map(([title, detail]) => (
-                    <li key={title} className="flex gap-4">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#0052ff]" />
-                      <div>
-                        <div className="font-mono text-sm font-bold uppercase tracking-[0.12em] text-white">{title}</div>
-                        <div className="mt-1 text-sm leading-6 text-white/45">{detail}</div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-                  <a href="https://t.me/bobbyagentraderbot" target="_blank" rel="noreferrer" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">
-                    Get early access <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
-                  </a>
-                  <span className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white/55">TestFlight soon</span>
-                </div>
-              </motion.div>
 
-              <div className="relative mx-auto flex items-center justify-center">
-                <motion.div
-                  initial={{ opacity: 0, y: 26, rotate: -7 }}
-                  whileInView={{ opacity: 1, y: 0, rotate: -7 }}
-                  viewport={{ once: true, amount: 0.3 }}
-                  transition={{ delay: 0.15 }}
-                  className="hidden -mr-10 mt-16 w-[200px] shrink-0 md:block"
-                >
-                  <PhoneFrame src="/app/iphone-forge.png" alt="Describe your agent's aura — Bobby iOS onboarding" />
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, y: 26 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.3 }}
-                  className="z-10 w-[240px] shrink-0 md:w-[260px]"
-                >
-                  <PhoneFrame src="/app/iphone-desk.png" alt="Bobby Live Desk with a forged violet aura" glow />
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, y: 26, rotate: 7 }}
-                  whileInView={{ opacity: 1, y: 0, rotate: 7 }}
-                  viewport={{ once: true, amount: 0.3 }}
-                  transition={{ delay: 0.25 }}
-                  className="hidden -ml-10 mt-20 w-[200px] shrink-0 md:block"
-                >
-                  <PhoneFrame src="/app/iphone-aura.png" alt="Aura forged — the interface takes your energy" />
-                </motion.div>
-              </div>
+        <section id="rules" className="relative overflow-hidden border-b border-white/10 bg-[#050505]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.10),transparent_44%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-20">
+            <div className="mb-8 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">The two rules</div>
+            <div className="border-t border-white/15">
+              {[
+                ['I', 'No idea is approved without an independent system working against it.'],
+                ['II', 'No verdict is published after its outcome is known.'],
+              ].map(([numeral, rule]) => (
+                <div key={numeral} className="grid grid-cols-[3rem_1fr] gap-4 border-b border-white/10 py-6 md:grid-cols-[5rem_1fr]">
+                  <span className="font-mono text-xs uppercase tracking-[0.18em] text-white/35">{numeral}</span>
+                  <p className="max-w-3xl text-lg leading-8 tracking-[-0.01em] text-white/85 md:text-xl">{rule}</p>
+                </div>
+              ))}
             </div>
+            <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.16em] text-white/35">
+              Refuted before execution. Published before the outcome.
+            </p>
           </div>
         </section>
 
@@ -437,8 +379,8 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / Architecture</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One pipeline,<br />end to end.</h2>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / The procedure</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One procedure,<br />end to end.</h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">Four checks before capital moves.</p>
             </div>
@@ -480,7 +422,7 @@ export default function BobbyProtocolLanding() {
                 <span className="text-white/72">Just four checks.</span>
               </h2>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">
-                Bobby makes the thesis earn the right to move.
+                Every idea must survive its own refutation before it moves capital.
               </p>
             </motion.div>
 
@@ -553,7 +495,7 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
             <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
-                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / What Bobby does</div>
+                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Capabilities</div>
                 <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
                   Four checks.<br />One clear decision.
                 </h2>
@@ -591,7 +533,7 @@ export default function BobbyProtocolLanding() {
                   description: 'The thesis and decision are committed before the outcome. Anyone can inspect what was decided and when.',
                   image: '/images/protocol/onchain-proof.jpg',
                   alt: 'Transparent cobalt glass monolith containing a sealed point of light',
-                  telemetry: ['proof.announce  future_anchor', 'oracle  pyth · hermes', 'chain  base mainnet · 8453', 'writes  frozen · staged'],
+                  telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
                 },
               ].map((capability, index) => (
                 <motion.article
@@ -641,40 +583,8 @@ export default function BobbyProtocolLanding() {
           <SectionMedia name="nebula" className="opacity-50" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Your interface</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One protocol.<br />Two ways in.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">For people. For agents.</p></div>
-          <div className="grid gap-5 md:grid-cols-2">
-            <a
-              href="/agentic-world/bobby"
-              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
-            >
-              <motion.img
-                src="/images/protocol/human-interface.jpg"
-                alt="Human reviewing a decision through illuminated cobalt glass"
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover"
-                initial={{ opacity: 0.72, scale: 1.08 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.06 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: 1.2, ease: 'easeOut' }}
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
-              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
-              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
-                <div className="flex items-start justify-between">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Bot className="h-5 w-5 text-[#7da6ff]" /></span>
-                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                </div>
-                <div className="mt-auto">
-                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Human interface</div>
-                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For humans</h3>
-                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Open the War Room, watch the debate, and approve the move when the thesis earns it.</p>
-                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">Enter War Room →</div>
-                </div>
-              </div>
-            </a>
-
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Integration</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give any agent<br />a second layer.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">Connect over MCP.</p></div>
+          <div className="grid items-start gap-5 md:grid-cols-[1.55fr_1fr]">
             <a
               href="/protocol/docs"
               className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
@@ -706,6 +616,38 @@ export default function BobbyProtocolLanding() {
                 </div>
               </div>
             </a>
+
+            <a
+              href="/app"
+              className="group relative min-h-[380px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
+            >
+              <motion.img
+                src="/images/protocol/human-interface.jpg"
+                alt="A person reading a verdict on the Bobby iPhone app"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover"
+                initial={{ opacity: 0.72, scale: 1.08 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.06 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 1.2, ease: 'easeOut' }}
+              />
+              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
+              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
+              <div className="relative z-10 flex min-h-[380px] max-w-[76%] flex-col p-8 md:p-10">
+                <div className="flex items-start justify-between">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Bot className="h-5 w-5 text-[#7da6ff]" /></span>
+                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+                </div>
+                <div className="mt-auto">
+                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">The app</div>
+                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">Bobby, on iPhone</h3>
+                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">The same record, in a voice you can talk to.</p>
+                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">See the app →</div>
+                </div>
+              </div>
+            </a>
           </div>
           </div>
         </section>
@@ -714,7 +656,7 @@ export default function BobbyProtocolLanding() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(0,82,255,.18),transparent_36%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 max-w-3xl">
-              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / What Bobby does</div>
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / The outcome</div>
               <h2 className="text-5xl font-extrabold leading-[.96] tracking-[-0.08em] md:text-7xl">It turns an idea<br />into a decision.</h2>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">Bring a thesis. Bobby challenges it, checks the downside, and gives you one clear decision before the result.</p>
             </div>
@@ -734,147 +676,14 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        {SHOW_LEGACY_PROTOCOL_SECTIONS && <section className="relative isolate overflow-hidden bg-[#050505] text-white" id="activity">
-          <SectionMedia name="section-blue" className="opacity-45" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/55 to-[#050505]" />
-          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-6 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Public by design</div>
-            <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-              <h2 className="max-w-lg text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Proof over promises.<br />See the record.</h2>
-              <a href="/protocol/heartbeat" className="inline-flex items-center gap-2 font-mono text-sm font-bold uppercase tracking-[0.12em] text-[#7da6ff] transition hover:text-white">View protocol health <ArrowRight className="h-4 w-4" /></a>
-            </div>
-
-            <div className="mb-8 flex flex-wrap items-center gap-2">
-              {([['all', 'All'], ['settled', 'Settled'], ['recorded', 'Recorded']] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setActivityFilter(key)}
-                  className={`rounded-lg px-4 py-2 font-mono text-xs uppercase tracking-[0.15em] transition ${activityFilter === key ? 'bg-white text-black' : 'border border-white/15 bg-white/[0.06] text-white/60 hover:bg-white/[0.12] hover:text-white'}`}
-                >
-                  {label}
-                </button>
-              ))}
-              <div className="ml-auto flex items-center gap-4">
-                <button onClick={refreshActivity} className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-white/45 transition hover:text-white" aria-label="Refresh network activity">
-                  <RefreshCw className={`h-3.5 w-3.5 ${isActivityLoading ? 'animate-spin' : ''}`} /> Refresh
-                </button>
-                <span className="hidden items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#7da6ff] md:flex"><span className="h-2 w-2 animate-pulse rounded-full bg-[#7da6ff]" /> Online</span>
-              </div>
-            </div>
-
-            <div className="mb-5 grid overflow-hidden rounded-2xl border border-white/10 bg-[#080912]/85 backdrop-blur-xl lg:grid-cols-[1.25fr_.75fr]">
-              <div className="relative min-h-[220px] overflow-hidden border-b border-white/10 p-6 sm:p-8 lg:border-b-0 lg:border-r">
-                <div className="absolute inset-0 opacity-35 [background-image:linear-gradient(rgba(0,82,255,.22)_1px,transparent_1px),linear-gradient(90deg,rgba(0,82,255,.22)_1px,transparent_1px)] [background-size:28px_28px]" />
-                <div className="absolute -left-20 top-1/2 h-44 w-44 -translate-y-1/2 rounded-full bg-[#0052ff]/30 blur-3xl" />
-                <div className="relative">
-                  <div className="mb-8 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] text-white/45"><span>Network telemetry</span><span className="text-[#7da6ff]">Live read</span></div>
-                  <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-3 text-center sm:gap-5">
-                    {[['RPC', chainLabel], ['Treasury', stats?.treasury?.balanceNative ? `${Number(stats.treasury.balanceNative).toFixed(3)} ${nativeSymbol}` : 'Syncing'], ['Proof', activity.length ? `${activity.length} events` : 'Standby']].map(([label, value], index) => (
-                      <div key={label} className="contents">
-                        <div className="min-w-0 rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/10 px-2 py-4 shadow-[0_0_32px_rgba(0,82,255,.14)]">
-                          <span className="mx-auto mb-2 block h-2.5 w-2.5 rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,1)]" />
-                          <div className="truncate font-mono text-[9px] uppercase tracking-[0.14em] text-white/45">{label}</div>
-                          <div className="mt-1 truncate text-xs font-bold text-white/85">{value}</div>
-                        </div>
-                        {index < 2 && <div className="h-px min-w-3 bg-gradient-to-r from-[#0052ff] to-[#0052ff]/15" />}
-                      </div>
-                    ))}
-                  </div>
-                  <p className="mt-7 font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{telemetryUpdatedAt ? `Snapshot fetched ${telemetryUpdatedAt}` : 'Connecting to protocol telemetry'}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-px bg-white/10">
-                <div className="bg-[#080912]/90 p-5 sm:p-6"><Database className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Latest block</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{formatNumber(stats?.chain?.blockNumber)}</div><div className="mt-1 text-xs text-white/40">{chainLabel}</div></div>
-                <div className="bg-[#080912]/90 p-5 sm:p-6"><ShieldCheck className="mb-5 h-5 w-5 text-[#7da6ff]" /><div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Feed status</div><div className="mt-2 text-xl font-extrabold tracking-[-0.05em]">{activityError ? 'Retry' : isActivityLoading ? 'Syncing' : 'Live'}</div><div className="mt-1 text-xs text-white/40">updates every 30s</div></div>
-              </div>
-            </div>
-
-            {filteredActivity.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredActivity.map((item, index) => (
-                  <motion.div
-                    key={`${item.tool}-${index}`}
-                    initial={{ opacity: 0, y: 12 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05 }}
-                    className="group rounded-2xl border border-white/10 bg-[#0a0a14]/80 p-6 backdrop-blur transition hover:-translate-y-1 hover:border-[#0052ff]/50"
-                  >
-                    <div className="mb-5 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="grid h-7 w-7 place-items-center rounded-full bg-[#0052ff]/25 font-mono text-[10px] font-bold text-[#7da6ff]">{(item.agent || 'B')[0]}</span>
-                        <span className="text-sm text-white/60">{item.agent || 'Bobby network'}</span>
-                      </div>
-                      <span className="font-mono text-[10px] text-white/30">{item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : ''}</span>
-                    </div>
-                    <div className="mb-6 truncate text-xl font-extrabold tracking-[-0.04em] text-white/90">{item.tool || 'Agent decision'}</div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-sm font-bold text-white/80">{item.paid ? 'x402 settled' : 'recorded'}</span>
-                      <span className={`rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${item.paid ? 'border-[#0052ff]/40 bg-[#0052ff]/15 text-[#7da6ff]' : 'border-white/15 bg-white/[0.06] text-white/55'}`}>{item.status || (item.paid ? 'settled' : 'live')}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-[#0052ff]/30 bg-[#0052ff]/[0.045] px-6 py-12 text-center">
-                <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10"><CircleDollarSign className="h-5 w-5 text-[#7da6ff]" /></div>
-                <div className="text-lg font-bold">{activityError ? 'Activity feed is reconnecting.' : isActivityLoading ? 'Reading protocol activity.' : 'No recent protocol events.'}</div>
-                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">{activityError ? 'The network telemetry is still available. Refresh to retry the event stream.' : 'The live network remains connected; the next recorded event will appear here automatically.'}</p>
-              </div>
-            )}
-          </div>
-        </section>}
-
-        {SHOW_LEGACY_PROTOCOL_SECTIONS && <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="mcp">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(0,82,255,.1),transparent_40%)]" />
-          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Bobby-as-a-service</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give your agent<br />a second layer.</h2>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/60 px-5 py-3 font-mono text-sm text-[#7da6ff]">POST /api/mcp-http</div>
-            </div>
-            <div className="grid gap-5 md:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-7">
-                <div className="mb-5 flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-white/60">Free tier</span>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">{mcp?.pricing?.free?.length ?? '—'} tools</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(mcp?.pricing?.free ?? []).map((tool) => (
-                    <span key={tool} className="rounded-md border border-white/10 bg-white/[0.06] px-3 py-1.5 font-mono text-xs text-white/70">{tool}</span>
-                  ))}
-                  {!mcp && <span className="font-mono text-xs text-white/40">loading tool registry…</span>}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/[0.08] p-7">
-                <div className="mb-5 flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Premium — x402</span>
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-[#7da6ff]">{mcp?.pricing?.premium?.price ?? '—'}</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(mcp?.pricing?.premium?.tools ?? []).map((tool) => (
-                    <span key={tool} className="rounded-md border border-[#0052ff]/40 bg-[#0052ff]/20 px-3 py-1.5 font-mono text-xs text-white/90">{tool}</span>
-                  ))}
-                  {!mcp && <span className="font-mono text-xs text-white/40">loading tool registry…</span>}
-                </div>
-                {mcp?.pricing?.premium?.settlementContract && (
-                  <div className="mt-6 border-t border-[#0052ff]/20 pt-4 font-mono text-[11px] text-white/45">settlement {mcp.pricing.premium.settlementContract}</div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>}
-
         <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Track record</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />V2 is deployed on Base.</h2>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The next build is Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Seven audited contracts are deployed on Base mainnet. Production writes remain frozen while the 2-of-3 Safe accepts ownership, runtime verification completes, and the controlled canary soaks. Base Sepolia preserves the completed challenge evidence; X Layer remains the readable legacy archive.
+                Bobby ran in production on X Layer through the hackathon era. Those legacy records show what was committed on-chain; the current build and next deployment are Base-first. They do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
               </p>
             </div>
 
@@ -903,10 +712,7 @@ export default function BobbyProtocolLanding() {
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
-              <span>Base mainnet · 8453 · deployed / writes frozen</span>
-              <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.contracts.trackRecord)} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord V2 ↗</a>
-              <a href={bobbyBaseAddressUrl(BOBBY_BASE_MAINNET.safe)} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">2-of-3 Safe ↗</a>
-              <a href="https://sepolia.basescan.org/address/0x4bfEF46d920fd67C68046901f591Fad0a2F7cadC" target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Sepolia evidence ↗</a>
+              <span>Base · 8453</span>
               <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy TrackRecord ↗</a>
               <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy AgentEconomy ↗</a>
               <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>
@@ -914,15 +720,38 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:grid-cols-8 lg:px-8"><Metric label="Compromisos" value={formatNumber(publicRecord?.commitmentsCreated ?? totalTrades)} detail="creados" /><Metric label="Resueltas" value={formatNumber(publicRecord?.decisionsResolved)} detail="decisiones" /><Metric label="Pendientes" value={formatNumber(publicRecord?.pending)} detail="sin resultado" /><Metric label="Expiradas" value={formatNumber(publicRecord?.expired)} detail="sin liquidación" /><Metric label="Wins / losses" value={publicRecord ? `${publicRecord.wins} / ${publicRecord.losses}` : '—'} detail="resueltas decisivas" /><Metric label="Win rate" value={formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)} detail={publicRecord?.decisionsResolved && publicRecord.decisionsResolved < WIN_RATE_MIN_SAMPLE ? `muestra chica (n=${publicRecord.decisionsResolved})` : 'sobre resueltas'} /><Metric label="Resolución" value={publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'} detail="compromisos con resultado" /><Metric label="Interacciones" value={formatNumber(totalInteractions)} detail="network" /></div></section>
+
+        <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="limits">
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
+            <div className="mb-10">
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Scope and limits</div>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">What the protocol<br />does not do.</h2>
+            </div>
+            <ul className="border-t border-white/10">
+              {[
+                'It holds no funds and accesses no third-party accounts.',
+                'It places no orders. Execution belongs to whoever trades.',
+                'It is not investment advice and promises no returns.',
+                'A favorable verdict is not a buy recommendation. It is the record of an idea that survived its own refutation.',
+              ].map((limit) => (
+                <li key={limit} className="grid grid-cols-[3rem_1fr] gap-4 border-b border-white/10 py-5">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#ff7a63]">No</span>
+                  <span className="max-w-3xl text-sm leading-6 text-white/60">{limit}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:grid-cols-8 lg:px-8"><Metric label="Commitments" value={formatNumber(publicRecord?.commitmentsCreated ?? totalTrades)} detail="created" /><Metric label="Resolved" value={formatNumber(publicRecord?.decisionsResolved)} detail="decisions" /><Metric label="Pending" value={formatNumber(publicRecord?.pending)} detail="no outcome yet" /><Metric label="Expired" value={formatNumber(publicRecord?.expired)} detail="never settled" /><Metric label="Wins / losses" value={publicRecord ? `${publicRecord.wins} / ${publicRecord.losses}` : '—'} detail="decisive outcomes" /><Metric label="Win rate" value={formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)} detail={publicRecord?.decisionsResolved && publicRecord.decisionsResolved < WIN_RATE_MIN_SAMPLE ? `small sample (n=${publicRecord.decisionsResolved})` : 'over resolved'} /><Metric label="Resolution" value={publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'} detail="commitments with an outcome" /><Metric label="Interactions" value={formatNumber(totalInteractions)} detail="network" /></div></section>
 
         <footer className="border-t border-white/10 bg-[#050505]">
           <div className="mx-auto flex max-w-7xl flex-col gap-12 px-5 py-16 lg:px-8">
-            <div className="grid gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
+            <div className="grid gap-10 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
               <div>
                 <BrandMark />
                 <p className="mt-5 max-w-xs text-sm leading-6 text-white/40">
-                  The accountability layer for autonomous finance. Every thesis debated, every decision committed before the outcome.
+                  The verification layer for financial intelligence. Every idea refuted before execution, every verdict published before its outcome.
                 </p>
                 <div className="mt-6 flex items-center gap-4">
                   <a href="https://twitter.com/bobbyprotocol" target="_blank" rel="noreferrer" aria-label="Twitter" className="text-white/40 transition hover:text-[#7da6ff]"><Twitter className="h-4 w-4" /></a>
@@ -936,12 +765,6 @@ export default function BobbyProtocolLanding() {
                   ['Sandbox', '/protocol/sandbox'],
                   ['Heartbeat', '/protocol/heartbeat'],
                   ['Network', '/protocol/network'],
-                ]],
-                ['Proof', [
-                  ['Verified calls', '/protocol/calls'],
-                  ['Audit trail', '/protocol/audits'],
-                  ['Risk & claims', '/protocol/risk'],
-                  ['Bug bounty', '/protocol/bounty'],
                 ]],
                 ['Build', [
                   ['Docs', '/protocol/docs'],
@@ -960,7 +783,7 @@ export default function BobbyProtocolLanding() {
                   <div className="mb-5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">{group}</div>
                   <ul className="space-y-3">
                     {links.map(([label, href]) => (
-                      <li key={href}>
+                      <li key={`${label}-${href}`}>
                         <a href={href} className="text-sm text-white/60 transition hover:text-[#7da6ff]">{label}</a>
                       </li>
                     ))}
@@ -970,7 +793,7 @@ export default function BobbyProtocolLanding() {
             </div>
             <div className="flex flex-col justify-between gap-3 border-t border-white/10 pt-6 text-xs text-white/40 md:flex-row">
               <span>© 2026 Bobby Protocol</span>
-              <span>Make the thesis earn it.</span>
+              <span>Refuted before execution. Published before the outcome.</span>
             </div>
           </div>
         </footer>

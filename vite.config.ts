@@ -44,7 +44,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 8080,
+    // PORT env lets tooling assign a free port (multi-session dev); 8080 stays the default
+    port: Number(process.env.PORT) || 8080,
     host: true,
     proxy: {
       '/api/polymarket-gamma': {

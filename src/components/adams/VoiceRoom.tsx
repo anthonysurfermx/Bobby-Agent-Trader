@@ -11,6 +11,8 @@ import { Mic, MicOff, ShieldCheck, X, ChevronDown } from 'lucide-react';
 import { useRealtimeVoice, type VoiceState } from '@/hooks/useRealtimeVoice';
 import { getVoiceAsset, isEquitySymbol } from '@/lib/voice-assets';
 import { LiveOrb } from './LiveOrb';
+import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
+import { loadMascot } from '@/lib/mascot';
 import { MarketCanvas, type Timeframe } from './MarketCanvas';
 
 /** How the desk labels the asset on screen: "Nvidia · NVDA" for equities,
@@ -94,6 +96,9 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
     connect, disconnect, startTalking, stopTalking, micMuted, setSymbol, setTimeframe,
     dismissProposal, resetConversation,
   } = useRealtimeVoice(voiceLang, inputMode);
+
+  // The user's chosen mascot IS Bobby's face — it always replaces the orb
+  const [mascotLook] = useState(() => loadMascot());
 
   const live = state !== 'idle' && state !== 'error';
   const debating = tools.some((t) => t.tool === 'run_debate' && t.status === 'running');
@@ -189,8 +194,17 @@ export function VoiceRoom({ onSwitchToChat }: { onSwitchToChat?: () => void } = 
             ))}
           </div>
 
-          <div className="relative h-[min(46vh,340px)] w-[min(46vh,340px)] shrink-0">
-            <LiveOrb state={state} level={level} />
+          <div className="relative flex h-[min(46vh,340px)] w-[min(46vh,340px)] shrink-0 items-center justify-center">
+            {mascotLook ? (
+              <BobbyMascot3D
+                look={mascotLook}
+                state={state === 'connecting' ? 'thinking' : state === 'error' ? 'idle' : state}
+                level={state === 'speaking' ? level : null}
+                size={260}
+              />
+            ) : (
+              <LiveOrb state={state} level={level} />
+            )}
           </div>
 
           {/* live caption */}

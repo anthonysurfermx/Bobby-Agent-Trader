@@ -19,6 +19,7 @@ import UserLayout from '@/pages/user/UserLayout';
 // Lazy load todas las páginas para mejor performance
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
+const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLanding'), 'app-landing');
 const BobbySubmissionPage = lazy(() => import('@/pages/BobbySubmissionPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
@@ -68,6 +69,7 @@ const BobbyPortfolioPage = lazy(() => import('@/pages/BobbyPortfolioPage'));
 const BobbyTelegramPage = lazy(() => import('@/pages/BobbyTelegramPage'));
 const AgentForumPage = lazy(() => import('@/pages/AgentForumPage'));
 const DeployAgentPage = lazy(() => import('@/pages/DeployAgentPage'));
+const MascotShowcasePage = lazy(() => import('@/pages/MascotShowcasePage'));
 const BobbyB2BPage = lazy(() => import('@/pages/BobbyB2BPage'));
 const BobbyMetacognitionPage = lazy(() => import('@/pages/BobbyMetacognitionPage'));
 const BobbySignalsPage = lazy(() => import('@/pages/BobbySignalsPage'));
@@ -297,6 +299,14 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyProtocolLanding />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'app',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAppLanding />
             </Suspense>
           ),
         },
@@ -725,6 +735,16 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <DeployAgentPage />
+            </Suspense>
+          ),
+        },
+
+        // MASCOT SHOWCASE — visor 3D del squad (SIN LAYOUT)
+        {
+          path: 'mascots',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <MascotShowcasePage />
             </Suspense>
           ),
         },

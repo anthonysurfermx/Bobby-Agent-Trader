@@ -161,13 +161,46 @@ try {
     assert.equal(fetchCalls, 1, 'rejected signals must not reach execution dependencies');
   }
 
-  const [orchestrateSource, registerSource, controlPlaneSource, forumRegisterSource, voiceAssetsSource, executorSource] = await Promise.all([
+  const [
+    orchestrateSource,
+    registerSource,
+    controlPlaneSource,
+    forumRegisterSource,
+    voiceAssetsSource,
+    executorSource,
+    securityWorkflowSource,
+    activitySource,
+    agentSetupSource,
+    protocolStatsSource,
+    userCycleSource,
+    okxSignalSource,
+    explainSource,
+    bobbyCycleSource,
+    adminAdvocatesSource,
+    polymarketSource,
+    analyzePanelSource,
+    detectIntentSource,
+    blogServiceSource,
+  ] = await Promise.all([
     readFile(new URL('../api/orchestrate.ts', import.meta.url), 'utf8'),
     readFile(new URL('../api/agents/register.ts', import.meta.url), 'utf8'),
     readFile(new URL('../api/_lib/hardness-control-plane.ts', import.meta.url), 'utf8'),
     readFile(new URL('../api/forum-agent-register.ts', import.meta.url), 'utf8'),
     readFile(new URL('../src/lib/voice-assets.ts', import.meta.url), 'utf8'),
     readFile(new URL('../services/executor/index.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../.github/workflows/security.yml', import.meta.url), 'utf8'),
+    readFile(new URL('../api/activity.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../api/agent-setup.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../api/bobby-protocol-stats.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../api/user-cycle.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../api/okx-signal.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../api/explain.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../api/bobby-cycle.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/pages/admin/AdminAdvocates.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/services/polymarket.service.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/components/agent-radar/AnalyzePanel.tsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/lib/router/detectIntent.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../src/services/blog.service.ts', import.meta.url), 'utf8'),
   ]);
   assert.match(orchestrateSource, /const commitOnchain = internalRequest &&/, 'public orchestration must not spend recorder gas');
   assert.match(orchestrateSource, /body as unknown as Record<string, unknown>/, 'orchestration signatures must cover the full request');
@@ -177,8 +210,29 @@ try {
   assert.doesNotMatch(voiceAssetsSource, /USDT\?\|USDC\|PERP\|SWAP/, 'asset normalization must not use the vulnerable suffix regex');
   assert.match(executorSource, /Object\.hasOwn\(ACTIONS, action\)/, 'executor actions must use own-property allowlisting');
   assert.match(executorSource, /console\.error\('\[executor\] action failed:', action, message\)/, 'executor logs must use a constant format string');
+  assert.match(securityWorkflowSource, /build-mode: none/, 'CodeQL must scan source without generating untracked bundles');
+  assert.match(securityWorkflowSource, /paths-ignore:[\s\S]*- dist\/\*\*/, 'CodeQL must ignore generated distribution assets');
+  assert.doesNotMatch(activitySource, /x-forwarded-host/, 'activity self-fetches must not trust forwarded hosts');
+  assert.match(activitySource, /BOBBY_PROTOCOL_BASE_URL.*protocol-heartbeat/, 'activity self-fetches must use the fixed Bobby origin');
+  assert.match(agentSetupSource, /BOBBY_PROTOCOL_BASE_URL.*api\/user-cycle/, 'agent setup must use the fixed Bobby origin');
+  assert.match(protocolStatsSource, /getPricesFromIntel\(BOBBY_PROTOCOL_BASE_URL\)/, 'protocol stats must use a fixed intelligence origin');
+  assert.doesNotMatch(userCycleSource, /req\.headers\.host/, 'user cycle intelligence must not trust the request host');
+  assert.match(userCycleSource, /BOBBY_PROTOCOL_BASE_URL.*api\/bobby-intel/, 'user cycle intelligence must use allowlisted origins');
+  assert.match(okxSignalSource, /console\.error\('\[OKX Signal\] Chain request failed:', chainIndex, msg\)/, 'OKX signal logs must use a constant format string');
+  assert.match(explainSource, /switch \(context\)/, 'explain prompts must use explicit context dispatch');
+  assert.doesNotMatch(explainSource, /promptBuilders\s*\[/, 'user input must not select an object method dynamically');
+  assert.match(bobbyCycleSource, /extractBoundedSection\(contextBlock/, 'cycle context extraction must use bounded string operations');
+  assert.match(bobbyCycleSource, /extractPrefixedLine\(cioPost, 'VERDICT:', 4_000\)/, 'yield verdict JSON must use bounded line extraction');
+  assert.doesNotMatch(bobbyCycleSource, /cioPost\.match\(\/VERDICT:/, 'cycle verdicts must not use polynomial regex parsing');
+  assert.doesNotMatch(bobbyCycleSource, /\.match\(\/VIBE_PHRASE:/, 'cycle vibe extraction must not use polynomial regex parsing');
+  assert.equal(bobbyCycleSource.includes('cioPost.match(/(\\d+)\\s*\\/\\s*10/)'), false, 'cycle conviction must not use a polynomial regex fallback');
+  assert.match(adminAdvocatesSource, /allowedHosts\.has\(parsed\.hostname\.toLowerCase\(\)\)/, 'profile URLs must use exact host allowlisting');
+  assert.match(polymarketSource, /\['polymarket\.com', 'www\.polymarket\.com'\]\.includes\(u\.hostname\.toLowerCase\(\)\)/, 'Polymarket URLs must use an exact HTTPS host allowlist');
+  assert.match(analyzePanelSource, /encodeURIComponent\(/, 'market slugs must be encoded before reaching a DOM URL sink');
+  assert.match(detectIntentSource, /const escapedKey = key\.replace/, 'dynamic regular-expression keys must be fully escaped');
+  assert.match(blogServiceSource, /new DOMParser\(\)\.parseFromString/, 'blog excerpts must use an HTML parser instead of incomplete regex sanitization');
 
-  console.log('api-security: 26/26 checks passed');
+  console.log('api-security: 47/47 checks passed');
 } finally {
   globalThis.fetch = originalFetch;
   const restore = (name: string, value: string | undefined) => {

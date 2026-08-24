@@ -38,7 +38,6 @@ src/components/kinetic/KineticShell.tsx — Terminal frame + nav + ticker
 - X Layer Chain ID: 196
 - USDT on X Layer: 0x1E4a5963aBFD975d8c9021ce480b42188849D41d
 - Bobby treasury wallet: 0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea
-- Bobby Telegram bot: @bobbyagentraderbot
 
 ## Commands
 - `npm run dev` — local dev server

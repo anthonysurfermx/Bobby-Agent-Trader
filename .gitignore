@@ -9,6 +9,7 @@ dist/
 .env*
 !.env.example
 *.local
+.env*.local.*
 
 # OS
 .DS_Store
@@ -45,3 +46,5 @@ trading-journal.md
 # Local research/download artifacts
 public/logos/
 src/types/register.ts
+.claude/supabase-bobby-protocol.env
+supabase/.temp/

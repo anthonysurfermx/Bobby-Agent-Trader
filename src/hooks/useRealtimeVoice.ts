@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { matchAssetInText, normalizeAssetSymbol } from '@/lib/voice-assets';
+import { getConfiguredVoice } from '@/lib/agent-voice';
 import type { DeskBrief } from '@/lib/voice-desk-brief';
 
 export type VoiceState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
@@ -519,7 +520,7 @@ export function useRealtimeVoice(
       const sessionRes = await fetch('/api/realtime-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lang }),
+        body: JSON.stringify({ lang, voice: getConfiguredVoice() ?? undefined }),
       });
       const session = await sessionRes.json();
       if (!sessionRes.ok || !session.client_secret) {

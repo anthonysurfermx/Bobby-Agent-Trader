@@ -98,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return { chainIndex, signals: data, error: null };
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
-          console.error(`[OKX Signal] Chain ${chainIndex} error:`, msg);
+          console.error('[OKX Signal] Chain request failed:', chainIndex, msg);
           return { chainIndex, signals: [], error: msg };
         }
       })

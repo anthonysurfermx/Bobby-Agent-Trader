@@ -27,9 +27,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(503).json({ error: 'Realtime voice is not configured' });
   }
 
-  const { tier, lang } = (req.body ?? {}) as { tier?: string; lang?: string };
+  const { tier, lang, voice } = (req.body ?? {}) as { tier?: string; lang?: string; voice?: string };
   const sessionLang = lang === 'en' ? 'en' : 'es';
   const model = tier === 'premium' && isInternalRequest(req) ? MODEL_PREMIUM : MODEL_STANDARD;
+
+  // Honor the persona voice picked in onboarding — whitelisted, with the
+  // env default as fallback. Legacy male/female map to their personas.
+  const REALTIME_VOICES = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
+  const LEGACY_VOICE_MAP: Record<string, string> = { male: 'ash', female: 'coral' };
+  const requestedVoice = LEGACY_VOICE_MAP[voice || ''] || voice || '';
+  const sessionVoice = REALTIME_VOICES.includes(requestedVoice) ? requestedVoice : (process.env.REALTIME_VOICE || 'marin');
 
   try {
     const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
@@ -68,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 interrupt_response: true,
               },
             },
-            output: { voice: process.env.REALTIME_VOICE || 'marin' },
+            output: { voice: sessionVoice },
           },
           tools: VOICE_TOOLS,
           tool_choice: 'auto',

@@ -18,6 +18,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
+import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 120 };
 
@@ -32,7 +33,7 @@ const PERSONALITY_INSTRUCTIONS: Record<string, string> = {
   wise: 'Be philosophical, contextual, consider macro implications.',
 };
 
-type SupportedVoice = 'male' | 'female';
+type SupportedVoice = 'male' | 'female' | 'coral' | 'ballad' | 'sage' | 'ash';
 type SupportedPersonality = 'direct' | 'analytical' | 'wise';
 type SupportedStatus = 'active' | 'paused' | 'deploying';
 
@@ -134,7 +135,7 @@ function normalizeProfile(row: Record<string, unknown>): AgentProfile | null {
     id,
     wallet_address: wallet,
     agent_name: agentName.slice(0, 20),
-    voice: (voice === 'female' ? 'female' : 'male') as SupportedVoice,
+    voice: (['male', 'female', 'coral', 'ballad', 'sage', 'ash'].includes(voice) ? voice : 'male') as SupportedVoice,
     personality: (['direct', 'analytical', 'wise'].includes(personality) ? personality : 'analytical') as SupportedPersonality,
     cadence_hours: [4, 6, 12, 24].includes(cadenceHours) ? cadenceHours : 6,
     markets,
@@ -213,12 +214,12 @@ function buildMarketContext(profile: AgentProfile, intel: IntelSnapshot): string
   ].join('\n');
 }
 
-async function fetchIntel(req: VercelRequest): Promise<IntelSnapshot | null> {
+async function fetchIntel(): Promise<IntelSnapshot | null> {
   const urls = [
+    `${BOBBY_PROTOCOL_BASE_URL}/api/bobby-intel`,
     'https://defimexico.org/api/bobby-intel',
-    req.headers.host ? `${req.headers.host.includes('localhost') ? 'http' : 'https'}://${req.headers.host}/api/bobby-intel` : null,
     'https://defi-mexico-hub.vercel.app/api/bobby-intel',
-  ].filter(Boolean) as string[];
+  ];
 
   for (const url of urls) {
     try {
@@ -629,7 +630,7 @@ async function processBatch(
     return void res.status(200).json({ ok: true, processed: 0, results: [] });
   }
 
-  const intel = await fetchIntel(req);
+  const intel = await fetchIntel();
   if (!intel?.briefing) {
     return void res.status(503).json({ error: 'Could not fetch shared market snapshot' });
   }
@@ -701,7 +702,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(409).json({ error: 'Agent profile is paused' });
     }
 
-    const intel = await fetchIntel(req);
+    const intel = await fetchIntel();
     if (!intel?.briefing) {
       return res.status(503).json({ error: 'Could not fetch shared market snapshot' });
     }

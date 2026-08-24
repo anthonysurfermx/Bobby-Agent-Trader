@@ -73,6 +73,20 @@ const trackLabels: Record<string, string> = {
   other: "Otro",
 };
 
+function getProfileUsername(rawUrl: string, allowedHosts: ReadonlySet<string>, usernamePattern: RegExp): string | null {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:' || !allowedHosts.has(parsed.hostname.toLowerCase())) return null;
+    const username = parsed.pathname.split('/').filter(Boolean)[0] || '';
+    return usernamePattern.test(username) ? username : null;
+  } catch {
+    return null;
+  }
+}
+
+const GITHUB_HOSTS = new Set(['github.com', 'www.github.com']);
+const TWITTER_HOSTS = new Set(['twitter.com', 'www.twitter.com', 'x.com', 'www.x.com']);
+
 const AdminAdvocates = () => {
   const { getRoles } = useAuth();
   const userRoles = getRoles?.() || [];
@@ -115,34 +129,14 @@ const AdminAdvocates = () => {
 
   // Helper para obtener avatar de GitHub
   const getGitHubAvatar = (githubUrl: string): string | null => {
-    try {
-      const username = githubUrl.split('github.com/')[1]?.split('/')[0];
-      if (username) {
-        return `https://github.com/${username}.png?size=200`;
-      }
-      return null;
-    } catch {
-      return null;
-    }
+    const username = getProfileUsername(githubUrl, GITHUB_HOSTS, /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/);
+    return username ? `https://github.com/${encodeURIComponent(username)}.png?size=200` : null;
   };
 
   // Helper para obtener avatar de Twitter/X
   const getTwitterAvatar = (twitterUrl: string): string | null => {
-    try {
-      // Soporta tanto twitter.com como x.com
-      let username = twitterUrl.split('twitter.com/')[1]?.split('/')[0];
-      if (!username) {
-        username = twitterUrl.split('x.com/')[1]?.split('/')[0];
-      }
-      if (username) {
-        username = username.replace('@', '');
-        // Usar API de unavatar que obtiene avatares de varias plataformas
-        return `https://unavatar.io/twitter/${username}`;
-      }
-      return null;
-    } catch {
-      return null;
-    }
+    const username = getProfileUsername(twitterUrl, TWITTER_HOSTS, /^[A-Za-z0-9_]{1,15}$/);
+    return username ? `https://unavatar.io/twitter/${encodeURIComponent(username)}` : null;
   };
 
   // Auto-obtener avatar cuando se agrega GitHub o Twitter URL
@@ -494,18 +488,9 @@ const AdminAdvocates = () => {
         let avatar_url = advocate.avatar_url || "";
         if (!avatar_url) {
           if (advocate.github_url) {
-            const username = advocate.github_url.split('github.com/')[1]?.split('/')[0];
-            if (username) {
-              avatar_url = `https://github.com/${username}.png?size=200`;
-            }
+            avatar_url = getGitHubAvatar(advocate.github_url) || '';
           } else if (advocate.twitter_url) {
-            let username = advocate.twitter_url.split('twitter.com/')[1]?.split('/')[0];
-            if (!username) {
-              username = advocate.twitter_url.split('x.com/')[1]?.split('/')[0];
-            }
-            if (username) {
-              avatar_url = `https://unavatar.io/twitter/${username}`;
-            }
+            avatar_url = getTwitterAvatar(advocate.twitter_url) || '';
           }
         }
 
@@ -1096,14 +1081,12 @@ const AdminAdvocates = () => {
                       setFormData({ ...formData, twitter_url: newUrl });
 
                       // Auto-obtener avatar si no hay uno y la URL es válida
-                      if (newUrl && !formData.avatar_url && (newUrl.includes('twitter.com/') || newUrl.includes('x.com/'))) {
-                        const avatar = getTwitterAvatar(newUrl);
-                        if (avatar) {
-                          setTimeout(() => {
-                            setFormData(prev => ({ ...prev, avatar_url: avatar }));
-                            toast.success("✨ Avatar obtenido de Twitter");
-                          }, 500);
-                        }
+                      const avatar = !formData.avatar_url ? getTwitterAvatar(newUrl) : null;
+                      if (avatar) {
+                        setTimeout(() => {
+                          setFormData(prev => ({ ...prev, avatar_url: avatar }));
+                          toast.success("✨ Avatar obtenido de Twitter");
+                        }, 500);
                       }
                     }}
                     placeholder="https://x.com/usuario o https://twitter.com/usuario"
@@ -1127,14 +1110,12 @@ const AdminAdvocates = () => {
                       setFormData({ ...formData, github_url: newUrl });
 
                       // Auto-obtener avatar si no hay uno y la URL es válida
-                      if (newUrl && !formData.avatar_url && newUrl.includes('github.com/')) {
-                        const avatar = getGitHubAvatar(newUrl);
-                        if (avatar) {
-                          setTimeout(() => {
-                            setFormData(prev => ({ ...prev, avatar_url: avatar }));
-                            toast.success("✨ Avatar obtenido de GitHub");
-                          }, 500);
-                        }
+                      const avatar = !formData.avatar_url ? getGitHubAvatar(newUrl) : null;
+                      if (avatar) {
+                        setTimeout(() => {
+                          setFormData(prev => ({ ...prev, avatar_url: avatar }));
+                          toast.success("✨ Avatar obtenido de GitHub");
+                        }, 500);
                       }
                     }}
                     placeholder="https://github.com/usuario"

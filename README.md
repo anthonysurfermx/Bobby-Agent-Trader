@@ -101,7 +101,7 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
 │                      ENTRY LAYER                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │  Humans (web)       Telegram bot        AI Agents (MCP)         │
-│  bobbyprotocol.xyz  @bobbyagentraderbot POST /api/mcp-http      │
+│  bobbyprotocol.xyz  configured bot      POST /api/mcp-http      │
 └────────────┬─────────────────┬──────────────────┬───────────────┘
              │                 │                  │
              ▼                 ▼                  ▼

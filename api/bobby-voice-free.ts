@@ -10,6 +10,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { generateSpeech } from './_lib/tts.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 
 export const config = { maxDuration: 30 };
 
@@ -17,25 +18,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 20, 600)) return;
+  if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 15, 600)) return;
 
-  const { text, voice = 'cio', lang = 'es', edgeVoice } = req.body as { text?: string; voice?: string; lang?: string; edgeVoice?: string };
+  const body = req.body as { text?: string; voice?: string; lang?: string; vibe?: string; edgeVoice?: string };
+  const text = body.text;
+  // Whitelist every steering param — this endpoint is public. edgeVoice
+  // (the iOS "Configura tu Bobby" menu) is validated inside the TTS layer
+  // against its own strict allowlist.
+  const VALID_VOICES = ['alpha', 'red', 'cio', 'male', 'female', 'coral', 'ballad', 'sage', 'ash'];
+  const VALID_LANGS = ['es', 'en', 'pt'];
+  const VALID_VIBES = ['direct', 'analytical', 'wise'];
+  const voice = VALID_VOICES.includes(body.voice || '') ? body.voice : 'cio';
+  const lang = VALID_LANGS.includes(body.lang || '') ? body.lang : 'es';
+  const vibe = VALID_VIBES.includes(body.vibe || '') ? body.vibe : undefined;
+  const edgeVoice = typeof body.edgeVoice === 'string' ? body.edgeVoice : undefined;
 
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ error: 'text is required' });
   }
-  if (text.length > 2_000) {
-    return res.status(413).json({ error: 'text exceeds 2000 characters' });
+  // Sentence-level TTS: the app streams short sentences and ~120-char
+  // previews. A tight cap bounds worst-case paid synthesis per request.
+  if (text.length > 800) {
+    return res.status(413).json({ error: 'text exceeds 800 characters' });
   }
 
   try {
-    const speech = await generateSpeech(text, { lang, voice, edgeVoice });
+    // Global daily spend circuit breaker: past the budget the endpoint keeps
+    // working but degrades to free Edge voices instead of paid synthesis
+    const budget = await checkPersistentLimit('tts-global', 'global', 3000, 86400);
+
+    // mp3: AVAudioPlayer/Safari can't play opus — apps always get MP3
+    const speech = await generateSpeech(text, {
+      lang, voice, vibe, edgeVoice, format: 'mp3',
+      provider: budget.limited ? 'edge' : undefined,
+    });
     if (!speech) {
       return res.status(502).json({ error: 'TTS synthesis failed' });
     }
 
     res.setHeader('Content-Type', speech.mime);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    // Personalized audio — never publicly cacheable (client caches in IndexedDB)
+    res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('X-TTS-Provider', speech.provider);
     return res.status(200).send(speech.audio);
   } catch (error) {

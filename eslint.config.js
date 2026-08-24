@@ -16,6 +16,8 @@ export default tseslint.config(
       'dist/**',
       'node_modules/**',
       'output/**',
+      // Vendored third-party assets served as-is (e.g. the Draco decoder)
+      'public/**',
       'services/**',
     ],
   },
