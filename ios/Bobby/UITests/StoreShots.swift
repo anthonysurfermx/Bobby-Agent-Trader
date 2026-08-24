@@ -28,68 +28,58 @@ final class StoreShots: XCTestCase {
         }
     }
 
-    /// Fresh install → onboarding (aura, voice, vibe, name) → desk → SQUAD →
-    /// pick a companion. Uninstall the app before running for a clean slate.
+    /// Fresh install → companion-first onboarding (choose, vibe, pact) →
+    /// desk with the chosen companion → SQUAD gallery. Uninstall the app
+    /// before running for a clean slate.
     func test01_OnboardingAndCompanion() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-store-shots"]
         app.launch()
 
-        // 01 — aura forge
-        let forge = app.staticTexts["FORGE AURA"]
-        XCTAssertTrue(forge.waitForExistence(timeout: 12))
-        sleep(2)
-        shot("01-forge-aura")
-        forge.press(forDuration: 1.9)
+        // 01 — choose your companion (3D stage + roster)
+        let cta = app.staticTexts["MAKE IT MY COMPANION"]
+        XCTAssertTrue(cta.waitForExistence(timeout: 15))
+        sleep(7)   // let the GLB stage settle
+        shot("01-choose-companion")
 
-        // 02 — warm voice personas
-        XCTAssertTrue(app.staticTexts["Give it a voice"].waitForExistence(timeout: 8))
-        sleep(1)
-        shot("02-voice-personas")
-        tapLabeled(app, "NEXT")
+        // Meet another one, come back to BYTE (its select line plays)
+        let kora = app.buttons["KORA"].firstMatch
+        if kora.waitForExistence(timeout: 3) {
+            kora.tap()
+            sleep(4)
+            shot("02-companion-kora")
+        }
+        let byte = app.buttons["BYTE"].firstMatch
+        if byte.waitForExistence(timeout: 3) {
+            byte.tap()
+            sleep(3)
+        }
+        tapLabeled(app, "MAKE IT MY COMPANION")
 
-        // 03 — vibe
-        XCTAssertTrue(app.staticTexts["What is its vibe?"].waitForExistence(timeout: 8))
+        // 03 — vibe, heard in the companion's own voice
+        XCTAssertTrue(app.staticTexts["NEXT"].waitForExistence(timeout: 8))
         sleep(1)
         shot("03-vibe")
         tapLabeled(app, "NEXT")
 
-        // 04 — name + disclaimer, then open the desk
-        XCTAssertTrue(app.staticTexts["Name it"].waitForExistence(timeout: 8))
+        // 04 — the pact
+        XCTAssertTrue(app.staticTexts["OPEN THE DESK"].waitForExistence(timeout: 8))
         sleep(1)
-        let nameField = app.textFields.firstMatch
-        if nameField.waitForExistence(timeout: 4) {
-            nameField.typeText("BOBBY")
-        }
-        shot("04-name")
+        shot("04-pact")
         tapLabeled(app, "OPEN THE DESK")
 
-        // 05 — fresh desk (aura portrait, no companion yet)
-        sleep(6)
-        shot("05-desk-fresh")
+        // 05 — desk with the living companion (chosen in onboarding)
+        sleep(10)
+        shot("05-desk-companion")
 
-        // 06 — SQUAD gallery (give the 3D squad time to load)
+        // 06 — SQUAD gallery
         let portrait = app.buttons["squad-portrait"]
         XCTAssertTrue(portrait.waitForExistence(timeout: 8))
         portrait.tap()
         sleep(8)
         shot("06-squad")
-
-        // Pick BYTE if its card is visible, else keep the focused one
-        let byte = app.staticTexts["BYTE"].firstMatch
-        if byte.waitForExistence(timeout: 3) {
-            byte.tap()
-            sleep(3)
-        }
-        shot("07-companion-detail")
-        tapLabeled(app, "MAKE IT MY COMPANION")
-        sleep(4)
-
-        // 08 — back on the desk with the living companion
         let close = app.buttons["squad-close"]
         if close.waitForExistence(timeout: 4) { close.tap() }
-        sleep(10)
-        shot("08-desk-companion")
     }
 
     /// Ask a real question and capture verdict + (if XP was seeded just under

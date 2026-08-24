@@ -88,6 +88,11 @@ final class BobbyViewModel: ObservableObject {
         voice.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
+        // And the profile: flipping onboarded must swap onboarding → desk.
+        // The old wizard only re-rendered because a speak() fired alongside.
+        profile.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     /// The companion IS the identity: its evolved name and its own voice.
@@ -264,7 +269,7 @@ struct ContentView: View {
             if vm.profile.onboarded {
                 mainScreen.transition(.opacity)
             } else {
-                OnboardingView(profile: vm.profile, voice: vm.voice).transition(.opacity)
+                CompanionOnboarding(profile: vm.profile, companions: vm.companions, voice: vm.voice).transition(.opacity)
             }
 
             // The evolution moment: name, tone and form change together

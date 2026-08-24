@@ -81,6 +81,21 @@ enum AuraForge {
         L.t("fearless red", "rojo sin miedo"),
     ]
 
+    /// Spark keyword whose hue lands closest to a target (circular distance).
+    /// Lets a chosen companion re-tint the legacy aura accents so the whole
+    /// app shares its color world.
+    static func keyword(nearest target: Double) -> String {
+        var best = sparks[0]
+        var bestDist = 2.0
+        for spark in sparks {
+            let h = hue(for: spark)
+            let d = abs(h - target)
+            let dist = min(d, 1 - d)
+            if dist < bestDist { bestDist = dist; best = spark }
+        }
+        return best
+    }
+
     /// The aura as DATA, not decoration (Kimi red-team v3): each hue band maps
     /// to a trader archetype — language the user can own and share.
     static func archetype(hue: Double) -> (name: String, motto: String) {

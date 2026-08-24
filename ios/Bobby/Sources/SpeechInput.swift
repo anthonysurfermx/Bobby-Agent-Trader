@@ -1,7 +1,7 @@
-// Voice input — on-device speech recognition (es-MX). Tap the mic, talk,
-// tap again (or pause) and the question sends itself. This plus Bobby's
-// spoken answers closes the full voice loop with zero per-minute API cost;
-// the OpenAI Realtime full-duplex desk stays as a premium upgrade path.
+// Voice input — on-device speech recognition in the device language. Tap the
+// mic, talk, tap again (or pause) and the question sends itself. This plus
+// Bobby's spoken answers closes the full voice loop with zero per-minute API
+// cost; the OpenAI Realtime full-duplex desk stays as a premium upgrade path.
 import Foundation
 import Speech
 import AVFoundation
@@ -12,8 +12,19 @@ final class SpeechInput: NSObject, ObservableObject {
     @Published var authorized = true
     @Published var level: CGFloat = 0
 
-    private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "es-MX"))
-        ?? SFSpeechRecognizer(locale: Locale(identifier: "es-ES"))
+    /// Ticker vocabulary the recognizer should favor. Without this, es-MX
+    /// dictation turns "Ethereum" into a random English word ("Cherry") and
+    /// the desk analyzes the wrong thing — the words below bias recognition
+    /// toward what people actually ask a market desk.
+    private static let marketVocabulary = [
+        "Bitcoin", "Ethereum", "Solana", "Cardano", "Dogecoin", "XRP", "Ripple",
+        "BNB", "Avalanche", "Chainlink", "Polygon", "Tron", "Litecoin", "Sui",
+        "NVIDIA", "Tesla", "Apple", "Microsoft", "Amazon", "Google", "Meta",
+        "Nasdaq", "BTC", "ETH", "SOL", "oro", "plata", "gold", "silver",
+    ]
+
+    private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: L.isSpanish ? "es-MX" : "en-US"))
+        ?? SFSpeechRecognizer(locale: Locale(identifier: L.isSpanish ? "es-ES" : "en-GB"))
     private let engine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
@@ -51,6 +62,7 @@ final class SpeechInput: NSObject, ObservableObject {
 
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
+        req.contextualStrings = Self.marketVocabulary
         request = req
 
         let input = engine.inputNode
