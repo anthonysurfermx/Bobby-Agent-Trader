@@ -46,6 +46,17 @@ const ALIASES: Record<string, string> = {
   // metals / commodities / forex
   ORO: 'XAUT', GOLD: 'XAUT', XAU: 'XAUT', PLATA: 'XAG', SILVER: 'XAG',
   PETROLEO: 'OIL', OIL: 'OIL', CRUDO: 'OIL', EURO: 'EUR',
+  // Dictation mangles — what es-MX/en-US speech recognition actually outputs
+  // when people SAY a ticker (observed in the iOS app: "Ethereum" spoken with
+  // a Spanish accent came back as "Cherry"). Resolving a mangled major beats
+  // failing or matching an exotic token. Aliases deliberately outrank bare
+  // ticker matches here, so these words map to the major even if OKX ever
+  // lists an identically-named token.
+  ETHERIUM: 'ETH', ETERIUM: 'ETH', ITERIUM: 'ETH', ETERIO: 'ETH', ETEREO: 'ETH',
+  CHERIUM: 'ETH', CHERRY: 'ETH',
+  ENVIDIA: 'NVDA', INVIDIA: 'NVDA',
+  VITCOIN: 'BTC', BITCOM: 'BTC', BITCON: 'BTC',
+  DOGUECOIN: 'DOGE', DOGCOIN: 'DOGE',
 };
 
 const STOPWORDS = new Set([
