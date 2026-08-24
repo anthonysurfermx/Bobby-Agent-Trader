@@ -19,7 +19,7 @@ import UserLayout from '@/pages/user/UserLayout';
 // Lazy load todas las páginas para mejor performance
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
-const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLanding'), 'app-landing');
+const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
 const BobbySubmissionPage = lazy(() => import('@/pages/BobbySubmissionPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
