@@ -1111,6 +1111,12 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
     //   confirmed    — real receipt (ok && onchain && txHash): may execute.
     //   blocked      — policy rejected it, the recorder failed, or the
     //                  response has no real receipt: OKX must not run.
+    //
+    // HardnessRegistry sync is intentionally NOT here (decision 2026-08-26):
+    // the old helper opened its own wallet and managed nonces separately,
+    // which can collide with the recorder's commit -> economy -> oracle
+    // sequence. Reintroduce it later behind a single wallet/nonce
+    // coordinator inside the recorder — never from this cycle.
     let onchainCommitTx: string | null = null;
     let onchainCommitError: string | null = null;
     let commitState: 'not_required' | 'confirmed' | 'blocked';
