@@ -161,8 +161,16 @@ assert.match(retiredDeploySource, /status\(410\)/);
 assert.doesNotMatch(retiredDeploySource, /BOBBY_RECORDER_KEY|ContractFactory|sendTransaction/);
 
 const cycleSource = readFileSync('api/bobby-cycle.ts', 'utf8');
-assert.match(cycleSource, /DEFAULT_CHAIN\.id === XLAYER_CHAIN_ID/);
-assert.match(cycleSource, /legacyXLayerWritesAllowed\(\)/);
+// The legacy inline X Layer writer was removed entirely (stronger invariant
+// than gating it): bobby-cycle must never sign or send transactions itself.
+// All on-chain writes go through the authenticated, latch-guarded recorder
+// endpoint (/api/xlayer-record) via a single awaited call site.
+assert.doesNotMatch(cycleSource, /sendTransaction|new ethers\.Wallet|JsonRpcProvider/);
+assert.doesNotMatch(cycleSource, /rpc\.xlayer\.tech/);
+assert.equal((cycleSource.match(/action: 'commit'/g) || []).length, 1);
+assert.match(cycleSource, /await fetchLocalApi\('\/api\/xlayer-record'/);
+assert.match(cycleSource, /evaluateCommitPolicy\(/);
+assert.match(cycleSource, /executionBlockedByCommitFailure\(/);
 assert.match(cycleSource, /PROTOCOL_CUTOVER_FREEZE/);
 assert.match(cycleSource, /tradingAuthHeaders\(\)/);
 assert.match(cycleSource, /recordAuthHeaders\(\)/);

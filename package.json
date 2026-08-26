@@ -14,6 +14,7 @@
     "test:api-security": "tsx scripts/test-api-security.mts",
     "test:record-auth": "tsx scripts/test-record-auth.mts",
     "test:protocol-write-safety": "tsx scripts/test-protocol-write-safety.mts",
+    "test:commit-policy": "tsx scripts/test-commit-policy.mts",
     "check:mainnet:predeploy": "tsx scripts/check-mainnet-readiness.mts --phase=predeploy",
     "check:mainnet:postdeploy": "tsx scripts/check-mainnet-readiness.mts --phase=postdeploy",
     "check:mainnet:cutover": "tsx scripts/check-mainnet-readiness.mts --phase=cutover",
