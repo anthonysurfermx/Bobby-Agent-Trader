@@ -11,7 +11,7 @@ import { canOpenPosition, getPositionSize } from '../src/lib/onchainos/risk-mana
 import type { TradeParams } from '../src/lib/onchainos/types.js';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bobby-technical.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
-import { evaluateCommitPolicy, executionBlockedByCommitFailure, digestKind } from './_lib/commit-policy.js';
+import { evaluateCommitPolicy, assessCommitReceipt, digestKind } from './_lib/commit-policy.js';
 import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
@@ -1072,11 +1072,6 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
     });
     const threadId = thread?.id as string | undefined;
 
-    // Unified on-chain commit state (see PHASE 3c below)
-    let onchainCommitTx: string | null = null;
-    let onchainCommitError: string | null = null;
-    let onchainCommitAttempted = false;
-
     // Save debate posts immediately
     if (threadId) {
       const snapshot = {
@@ -1097,53 +1092,73 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
         content: post.content,
         data_snapshot: snapshot,
       })));
+    }
 
-      // ============================================================
-      // PHASE 3c: Unified on-chain commit (TrackRecordV2 via recorder API)
-      // ============================================================
-      // Single chain-neutral path: /api/xlayer-record selects the active
-      // chain, applies the protocol write latches, and runs the V2
-      // announce -> Pyth anchor -> commitTrade sequence. Awaited on purpose:
-      // an orphaned promise can die when the serverless function returns,
-      // and a live trade must never exist without its on-chain proof.
-      const frozenMarketPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price ?? null;
-      const commitDecision = evaluateCommitPolicy({
-        challengeMode,
-        cioSaysExecute,
-        direction,
-        conviction,
-        threadId,
-        marketPrice: frozenMarketPrice,
-        stopPrice,
-        targetPrice,
-      });
-      if (commitDecision.commit) {
-        onchainCommitAttempted = true;
-        try {
-          const commitRes = await fetchLocalApi('/api/xlayer-record', {
-            action: 'commit',
-            threadId,
-            symbol,
-            agent: 'cio',
-            direction,
-            conviction: Math.min(10, Math.max(0, Math.round((conviction ?? 0) * 10))),
-            entryPrice: commitDecision.entryPrice,
-            stopPrice: commitDecision.stopPrice,
-            ...(commitDecision.targetPrice !== null ? { targetPrice: commitDecision.targetPrice } : {}),
-          }, true);
-          if (commitRes?.ok) {
-            onchainCommitTx = commitRes.txHash || null;
-            console.log(`[Cycle] On-chain commit confirmed: ${onchainCommitTx || 'prepared (no contract)'}`);
-          } else {
-            onchainCommitError = commitRes?.error || 'commit rejected';
-            console.error('[Cycle] On-chain commit FAILED — live execution will be blocked:', onchainCommitError);
-          }
-        } catch (e: any) {
-          onchainCommitError = e?.message || 'commit exception';
-          console.error('[Cycle] On-chain commit exception — live execution will be blocked:', onchainCommitError);
+    // ============================================================
+    // PHASE 3c: Unified on-chain commit (TrackRecordV2 via recorder API)
+    // ============================================================
+    // Single chain-neutral path: /api/xlayer-record selects the active
+    // chain, applies the protocol write latches, and runs the V2
+    // announce -> Pyth anchor -> commitTrade sequence. Awaited on purpose:
+    // an orphaned promise can die when the serverless function returns,
+    // and a live trade must never exist without its on-chain proof.
+    //
+    // Three states, fail-closed. Runs OUTSIDE the threadId guard: a failed
+    // thread insert on a live actionable thesis must resolve to 'blocked'
+    // (policy: invalid), never silently skip the commit.
+    //   not_required — neutral/paper/dryrun/low conviction: execution
+    //                  follows its own gates.
+    //   confirmed    — real receipt (ok && onchain && txHash): may execute.
+    //   blocked      — policy rejected it, the recorder failed, or the
+    //                  response has no real receipt: OKX must not run.
+    let onchainCommitTx: string | null = null;
+    let onchainCommitError: string | null = null;
+    let commitState: 'not_required' | 'confirmed' | 'blocked';
+    const frozenMarketPrice = (intel.prices || []).find((p: any) => p.symbol === symbol)?.price ?? null;
+    const commitRequirement = evaluateCommitPolicy({
+      challengeMode,
+      cioSaysExecute,
+      direction,
+      conviction,
+      threadId,
+      marketPrice: frozenMarketPrice,
+      stopPrice,
+      targetPrice,
+    });
+    if (commitRequirement.state === 'not_required') {
+      commitState = 'not_required';
+      console.log(`[Cycle] No on-chain commit needed: ${commitRequirement.reason}`);
+    } else if (commitRequirement.state === 'invalid') {
+      commitState = 'blocked';
+      onchainCommitError = commitRequirement.reason;
+      console.error('[Cycle] Commit required but thesis is uncommittable — live execution will be blocked:', onchainCommitError);
+    } else {
+      try {
+        const commitRes = await fetchLocalApi('/api/xlayer-record', {
+          action: 'commit',
+          threadId,
+          symbol,
+          agent: 'cio',
+          direction,
+          conviction: Math.min(10, Math.max(0, Math.round((conviction ?? 0) * 10))),
+          entryPrice: commitRequirement.entryPrice,
+          stopPrice: commitRequirement.stopPrice,
+          ...(commitRequirement.targetPrice !== null ? { targetPrice: commitRequirement.targetPrice } : {}),
+        }, true);
+        const receipt = assessCommitReceipt(commitRes);
+        if (receipt.confirmed) {
+          commitState = 'confirmed';
+          onchainCommitTx = receipt.txHash;
+          console.log(`[Cycle] On-chain commit confirmed: ${onchainCommitTx}`);
+        } else {
+          commitState = 'blocked';
+          onchainCommitError = receipt.reason;
+          console.error('[Cycle] On-chain commit not confirmed — live execution will be blocked:', onchainCommitError);
         }
-      } else {
-        console.log(`[Cycle] No on-chain commit: ${commitDecision.reason}`);
+      } catch (e: any) {
+        commitState = 'blocked';
+        onchainCommitError = e?.message || 'commit exception';
+        console.error('[Cycle] On-chain commit exception — live execution will be blocked:', onchainCommitError);
       }
     }
 
@@ -1172,10 +1187,12 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
       } catch { /* non-blocking */ }
     }
 
-    if (executionBlockedByCommitFailure(onchainCommitAttempted, onchainCommitError)) {
-      // A live thesis whose on-chain commit failed must NOT open a position:
-      // there would be a real trade without its published proof.
-      tradeRejectedReason = `On-chain commit failed — execution blocked: ${onchainCommitError}`;
+    if (commitState === 'blocked') {
+      // A live actionable thesis without a CONFIRMED on-chain commit must NOT
+      // open a position: there would be a real trade without its published
+      // proof. This covers policy-invalid theses, recorder failures, and
+      // success-shaped responses that carry no real receipt.
+      tradeRejectedReason = `On-chain commit required but not confirmed — execution blocked: ${onchainCommitError}`;
       console.error(`[Cycle] ${tradeRejectedReason}`);
     } else if (!isDryRun && cioSaysExecute && symbol && direction && conviction !== null && conviction >= 0.35) {
       try {
@@ -2018,6 +2035,7 @@ Return ONLY valid JSON, no markdown, no explanation:
       executed: !!executionResult,
       tradeRejectedReason,
       txHash,
+      commitState,
       onchainCommitTx,
       onchainCommitError,
       cycleCloseOk,
