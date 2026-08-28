@@ -54,7 +54,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "Bobby listens so you can ask about any asset out loud."
-        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Bobby turns your voice into questions about the markets."
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Bobby turns your voice into questions about the markets. Audio is processed by Apple's speech recognition."
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
