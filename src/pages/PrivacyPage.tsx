@@ -90,9 +90,12 @@ export default function PrivacyPage() {
 
         <Section title="Microphone and speech recognition">
           <p>
-            Both are optional and requested only when you tap the microphone. Dictation is
-            transcribed with Apple’s on-device speech services; your audio is not uploaded to our
-            servers. The entire app works by typing if you prefer to never grant either permission.
+            Both are optional and requested only when you tap the microphone. Dictation uses
+            Apple’s on-device speech recognition whenever your device and language support it.
+            Where on-device recognition is unavailable, Apple transcribes the audio on its own
+            servers. Either way the audio never reaches Bobby’s servers — we receive only the
+            transcribed text. The entire app works by typing if you prefer to never grant either
+            permission.
           </p>
         </Section>
 
