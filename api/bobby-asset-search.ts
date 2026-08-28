@@ -22,19 +22,33 @@ function parseInstTypes(raw: unknown): OkxSearchInstType[] {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const q = String(req.query.q || '').trim();
-  const limit = Math.min(Math.max(Number(req.query.limit || 8) || 8, 1), 20);
-  const instTypes = parseInstTypes(req.query.instTypes);
+  // POST carries the phrase in the body so a user's raw question never rides in
+  // a URL. Query strings land in platform runtime logs, and data readable there
+  // after the request is served is exactly what Apple counts as "collected".
+  // GET stays for the web app and the browse board, which send no user prose.
+  const src: Record<string, unknown> =
+    req.method === 'POST'
+      ? ((req.body ?? {}) as Record<string, unknown>)
+      : (req.query as unknown as Record<string, unknown>);
 
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=1800');
+  const q = String(src.q || '').trim();
+  const limit = Math.min(Math.max(Number(src.limit || 8) || 8, 1), 20);
+  const instTypes = parseInstTypes(src.instTypes);
+
+  // Only the shared GET responses are cacheable; a POST body is per-caller.
+  if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=1800');
+  } else {
+    res.setHeader('Cache-Control', 'no-store');
+  }
 
   // Browse mode: the whole explorable universe grouped by class and ranked
   // by real 24h volume — powers the in-app board and dictation vocabulary.
-  if (String(req.query.browse || '') === '1') {
+  if (String(src.browse || '') === '1') {
     try {
       const { classes, totalBases } = await browseOkxAssets();
       return res.status(200).json({
