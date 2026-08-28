@@ -858,9 +858,9 @@ struct ContentView: View {
                     .foregroundStyle(vm.thinking ? Theme.accentSoft : Theme.up)
             }
             HStack(spacing: 7) {
-                agentCard(name: "ALPHA", role: "busca", phase: .alpha, color: Theme.up)
-                agentCard(name: "RED TEAM", role: "ataca", phase: .redTeam, color: Theme.down)
-                agentCard(name: "CIO", role: "decide", phase: .cio, color: Theme.cio)
+                agentCard(name: "ALPHA", role: L.t("hunts", "busca"), phase: .alpha, color: Theme.up)
+                agentCard(name: "RED TEAM", role: L.t("attacks", "ataca"), phase: .redTeam, color: Theme.down)
+                agentCard(name: "CIO", role: L.t("decides", "decide"), phase: .cio, color: Theme.cio)
             }
         }
         .padding(13)
