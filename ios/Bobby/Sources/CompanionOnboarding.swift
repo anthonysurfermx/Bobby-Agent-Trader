@@ -226,6 +226,13 @@ struct CompanionOnboarding: View {
                 .font(.mono(9, .medium))
                 .kerning(0.8)
                 .foregroundStyle(Theme.muted)
+            Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
+                Text(L.t("Privacy Policy", "Aviso de privacidad"))
+                    .font(.mono(9, .medium))
+                    .kerning(0.8)
+                    .underline()
+                    .foregroundStyle(Theme.muted)
+            }
         }
     }
 

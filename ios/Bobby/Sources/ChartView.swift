@@ -273,14 +273,14 @@ struct ChartView: View {
 
     private func axisLabel(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_MX")
+        formatter.locale = Locale(identifier: L.isSpanish ? "es_MX" : "en_US")
         formatter.dateFormat = timeframe == .oneDay || timeframe == .fourHours ? "d MMM" : "E HH"
         return formatter.string(from: date).uppercased()
     }
 
     private func formatTimestamp(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_MX")
+        formatter.locale = Locale(identifier: L.isSpanish ? "es_MX" : "en_US")
         formatter.dateFormat = "d MMM · HH:mm"
         return formatter.string(from: date).uppercased()
     }
