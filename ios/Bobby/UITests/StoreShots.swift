@@ -33,7 +33,9 @@ final class StoreShots: XCTestCase {
     /// before running for a clean slate.
     func test01_OnboardingAndCompanion() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-store-shots"]
+        // Force English so the App Store captures are deterministic instead of
+        // inheriting whatever language the simulator happens to be set to.
+        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         // 01 — choose your companion (3D stage + roster)
@@ -85,7 +87,9 @@ final class StoreShots: XCTestCase {
     /// Search-as-you-type suggestions + the asset board (needs onboarded state).
     func test03_BoardAndSuggestions() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-store-shots"]
+        // Force English so the App Store captures are deterministic instead of
+        // inheriting whatever language the simulator happens to be set to.
+        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         let ask = app.textFields["ask-field"]
@@ -114,7 +118,9 @@ final class StoreShots: XCTestCase {
     /// a level boundary) the evolution overlay.
     func test02_VerdictAndEvolution() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-store-shots"]
+        // Force English so the App Store captures are deterministic instead of
+        // inheriting whatever language the simulator happens to be set to.
+        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         let ask = app.textFields["ask-field"]

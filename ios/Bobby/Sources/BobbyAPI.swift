@@ -196,8 +196,8 @@ enum BobbyAPI {
 
     /// Live search over the full OKX universe (621 bases) — one row per asset.
     static func searchAssets(_ q: String, limit: Int = 4) async -> [AssetHit] {
-        let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q
-        guard let obj = try? await json("api/bobby-asset-search?q=\(encoded)&limit=10") as? [String: Any],
+        guard let obj = try? await json("api/bobby-asset-search", method: "POST",
+                                        body: ["q": q, "limit": 10]) as? [String: Any],
               let results = obj["results"] as? [[String: Any]] else { return [] }
         var seen = Set<String>()
         var hits: [AssetHit] = []
@@ -315,8 +315,8 @@ enum BobbyAPI {
     }
 
     private static func resolveViaServer(_ query: String) async -> AssetResolution? {
-        let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        guard let obj = try? await json("api/bobby-asset-search?q=\(q)") as? [String: Any],
+        guard let obj = try? await json("api/bobby-asset-search", method: "POST",
+                                        body: ["q": query]) as? [String: Any],
               let resolution = obj["resolution"] as? [String: Any],
               let resolved = obj["resolved"] as? [String: Any],
               let symbol = (resolved["baseSymbol"] as? String) ?? (resolved["symbol"] as? String)
@@ -339,8 +339,8 @@ enum BobbyAPI {
     }
 
     private static func searchAsset(_ term: String) async -> MarketSnapshot? {
-        let q = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? term
-        guard let obj = try? await json("api/bobby-asset-search?q=\(q)") as? [String: Any],
+        guard let obj = try? await json("api/bobby-asset-search", method: "POST",
+                                        body: ["q": term]) as? [String: Any],
               let results = obj["results"] as? [[String: Any]],
               let top = results.first else { return nil }
         let symbol = (top["baseSymbol"] as? String) ?? (top["symbol"] as? String) ?? term.uppercased()

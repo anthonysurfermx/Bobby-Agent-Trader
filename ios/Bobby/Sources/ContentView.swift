@@ -470,6 +470,12 @@ struct ContentView: View {
                           systemImage: "flame")
                     Label(L.t("READ ONLY — Bobby never executes", "READ ONLY — Bobby no ejecuta"), systemImage: "lock.shield")
                 }
+                Section {
+                    // Reachable from every screen, not just first-run onboarding.
+                    Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
+                        Label(L.t("Privacy Policy", "Aviso de privacidad"), systemImage: "hand.raised")
+                    }
+                }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 13, weight: .bold))

@@ -89,6 +89,13 @@ final class SpeechInput: NSObject, ObservableObject {
         let req = SFSpeechAudioBufferRecognitionRequest()
         req.shouldReportPartialResults = true
         req.contextualStrings = Self.vocabulary
+        // Keep dictation on the phone wherever the device and language allow
+        // it — that is what the privacy policy promises. Where Apple has no
+        // on-device model, it falls back to Apple's servers on its own, which
+        // the policy and the permission prompt both say out loud.
+        if recognizer.supportsOnDeviceRecognition {
+            req.requiresOnDeviceRecognition = true
+        }
         request = req
 
         let input = engine.inputNode
