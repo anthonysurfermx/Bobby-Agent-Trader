@@ -222,8 +222,7 @@ enum BobbyAPI {
 
     /// Live search over the full OKX universe (621 bases) — one row per asset.
     static func searchAssets(_ q: String, limit: Int = 4) async -> [AssetHit] {
-        guard let obj = try? await json("api/bobby-asset-search", method: "POST",
-                                        body: ["q": q, "limit": 10]) as? [String: Any],
+        guard let obj = await assetSearch(q, limit: 10),
               let results = obj["results"] as? [[String: Any]] else { return [] }
         var seen = Set<String>()
         var hits: [AssetHit] = []
@@ -259,6 +258,36 @@ enum BobbyAPI {
         return (sections, totalBases)
     }
 
+    struct Mover: Identifiable, Equatable {
+        let symbol: String
+        let name: String
+        let changePct: Double
+        var id: String { symbol }
+    }
+
+    /// The hottest assets of the last 24h, biggest absolute move first. Reads
+    /// the board's `movers` when the server provides them; otherwise the
+    /// public ticker feed, so the greeting always has a real number.
+    static func topMovers(limit: Int = 2) async -> [Mover] {
+        var out: [Mover] = []
+        if let obj = try? await json("api/bobby-asset-search?browse=1") as? [String: Any],
+           let rows = obj["movers"] as? [[String: Any]] {
+            for r in rows {
+                guard let sym = r["symbol"] as? String, let chg = r["change24h"] as? Double else { continue }
+                out.append(.init(symbol: sym, name: prettyName((r["name"] as? String) ?? sym, symbol: sym), changePct: chg))
+            }
+        }
+        if out.isEmpty, let obj = try? await json("api/okx-tickers") as? [String: Any],
+           let rows = obj["tickers"] as? [[String: Any]] {
+            for r in rows {
+                guard let sym = r["symbol"] as? String, let chg = r["change24h"] as? Double else { continue }
+                out.append(.init(symbol: sym, name: sym, changePct: chg))
+            }
+            out.sort { abs($0.changePct) > abs($1.changePct) }
+        }
+        return Array(out.prefix(limit))
+    }
+
     /// Words the dictation should favor, from the live board. Spoken NAMES
     /// go first — they are what recognition mangles; tickers fill whatever
     /// budget remains. ~300 phrases covers the top of every class; the
@@ -281,7 +310,21 @@ enum BobbyAPI {
         return Array((names + tickers).prefix(300))
     }
 
-    static func json(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> Any {
+    /// Asset search with a transport fallback: the server accepts POST, but a
+    /// deploy that predates it answers 405 — and the app went "could not
+    /// resolve" for every asset. GET with the same fields is always there.
+    static func assetSearch(_ q: String, limit: Int? = nil) async -> [String: Any]? {
+        var body: [String: Any] = ["q": q]
+        if let limit { body["limit"] = limit }
+        if let obj = try? await json("api/bobby-asset-search", method: "POST", body: body, allowedStatus: 200...299) as? [String: Any] {
+            return obj
+        }
+        var query = "api/bobby-asset-search?q=" + (q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)
+        if let limit { query += "&limit=\(limit)" }
+        return try? await json(query) as? [String: Any]
+    }
+
+    static func json(_ path: String, method: String = "GET", body: [String: Any]? = nil, allowedStatus: ClosedRange<Int>? = nil) async throws -> Any {
         // NOT appendingPathComponent: it percent-encodes '?' and turns every
         // query string into a 404.
         guard let url = URL(string: base.absoluteString + "/" + path) else {
@@ -294,7 +337,10 @@ enum BobbyAPI {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let allowedStatus, let http = response as? HTTPURLResponse, !allowedStatus.contains(http.statusCode) {
+            throw URLError(.badServerResponse)
+        }
         return try JSONSerialization.jsonObject(with: data)
     }
 
@@ -341,8 +387,7 @@ enum BobbyAPI {
     }
 
     private static func resolveViaServer(_ query: String) async -> AssetResolution? {
-        guard let obj = try? await json("api/bobby-asset-search", method: "POST",
-                                        body: ["q": query]) as? [String: Any],
+        guard let obj = await assetSearch(query),
               let resolution = obj["resolution"] as? [String: Any],
               let resolved = obj["resolved"] as? [String: Any],
               let symbol = (resolved["baseSymbol"] as? String) ?? (resolved["symbol"] as? String)
@@ -365,8 +410,7 @@ enum BobbyAPI {
     }
 
     private static func searchAsset(_ term: String) async -> MarketSnapshot? {
-        guard let obj = try? await json("api/bobby-asset-search", method: "POST",
-                                        body: ["q": term]) as? [String: Any],
+        guard let obj = await assetSearch(term),
               let results = obj["results"] as? [[String: Any]],
               let top = results.first else { return nil }
         let symbol = (top["baseSymbol"] as? String) ?? (top["symbol"] as? String) ?? term.uppercased()

@@ -218,15 +218,11 @@ struct CompanionOnboarding: View {
                 withAnimation(.spring(duration: 0.42)) { step = 2 }
             default:
                 guard loadoutReady else { return }
-                // The payoff: the spawned companion drops into the desk out
-                // loud, in its own voice — short, light, carried across the
-                // transition. The desk itself stays quiet so nothing overlaps.
+                // The payoff happens on the desk: one greeting, in the
+                // companion's own voice, with today's real movers. Nothing is
+                // spoken here so the two lines never overlap.
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                let name = selected.name(at: 1)
-                voice.speak(
-                    L.t("\(name) is in. Ready for the market — welcome to the desk. Let's go, with a cool head.",
-                        "\(name) está dentro. Listo para el mercado: bienvenido al desk. A darle con todo, con cabeza fría."),
-                    voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: profile.vibe.rawValue, essential: false)
+                voice.stop()
                 withAnimation(.spring(duration: 0.5)) { profile.onboarded = true }
             }
         } label: {

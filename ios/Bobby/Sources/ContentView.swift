@@ -115,9 +115,57 @@ final class BobbyViewModel: ObservableObject {
         voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue)
     }
 
+    /// Greetings and flavor lines: the companion's voice or nothing — never
+    /// the robotic system voice.
+    func sayAmbient(_ text: String) {
+        voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue, essential: false)
+    }
+
+    /// The desk opens hyped: the companion names what is actually moving right
+    /// now, with the real 24h number, so the first feeling is "there is
+    /// something happening today" — not a lobby.
+    private func hypeGreeting(_ movers: [BobbyAPI.Mover]) -> String {
+        let name = displayName
+        func pct(_ m: BobbyAPI.Mover) -> String {
+            let sign = m.changePct >= 0 ? "+" : "-"
+            return "\(sign)\(String(format: "%.1f", abs(m.changePct)))%"
+        }
+        guard let first = movers.first else {
+            return L.t("\(name): I'm in. Welcome to the desk — name an asset and we go.",
+                       "\(name): Ya estoy dentro. Bienvenido al desk: nombra un activo y le entramos.")
+        }
+        let firstUp = first.changePct >= 0
+        let tail: String = movers.dropFirst().first.map { " \($0.symbol) \(pct($0))." } ?? ""
+        switch profile.vibe {
+        case .chill:
+            return firstUp
+                ? L.t("\(name): Yo, we're live. \(first.symbol) is up \(pct(first)) in 24h.\(tail) Wanna take a look?",
+                      "\(name): Ey, ya estamos en vivo. \(first.symbol) subió \(pct(first)) en 24 horas.\(tail) ¿Le echamos un ojo?")
+                : L.t("\(name): Yo, we're live. \(first.symbol) dropped \(pct(first)) in 24h.\(tail) Wanna see if it's a chance?",
+                      "\(name): Ey, ya estamos en vivo. \(first.symbol) cayó \(pct(first)) en 24 horas.\(tail) ¿Vemos si es oportunidad?")
+        case .directo:
+            return L.t("\(name): Desk open. Biggest move: \(first.symbol) \(pct(first)) in 24h.\(tail) Say the word.",
+                       "\(name): Desk abierto. Mayor movimiento: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Tú dices.")
+        case .pro:
+            return L.t("\(name): Session open. Lead mover \(first.symbol) \(pct(first)) over 24h.\(tail) Pick one and I run the desk.",
+                       "\(name): Sesión abierta. Líder del día: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Elige uno y corro el desk.")
+        }
+    }
+
     func bootGreetingIfNeeded() {
         guard messages.isEmpty else { return }
         messages.append(ChatMessage(fromBobby: true, text: companionGreeting))
+
+        // Live movers make the greeting: real numbers, spoken in the
+        // companion's own voice, once. Replaces the static line as soon as
+        // the tickers arrive (~300 ms) so the desk never opens flat.
+        Task {
+            let movers = await BobbyAPI.topMovers(limit: 2)
+            guard messages.count == 1 else { return }
+            let hype = hypeGreeting(movers)
+            withAnimation(.spring(duration: 0.35)) { messages[0] = ChatMessage(fromBobby: true, text: hype) }
+            if speakEnabled { sayAmbient(hype) }
+        }
 
         // Memory v1 recap: if the user asked about something on a previous
         // day, follow up with its live daily move — real data or nothing.
