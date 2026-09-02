@@ -345,6 +345,9 @@ export default function CompanionDesk() {
 
   // Worn gear (pieces still in the loot queue are not worn yet — they fly on
   // when the human taps EQUIP IT) plus the pet at the feet.
+  const desktop = useMediaQuery('(min-width: 1024px)');
+  const mascotSize = desktop ? 440 : 260;
+
   const attachments = useMemo(() => {
     const pending = new Set(drops.map((d) => `${d.companionId}-${d.tier}`));
     const items: Array<{ url: string; slot: string; spin?: boolean; glow?: string }> = wornGear(companion.id, progress.xp)
@@ -357,7 +360,8 @@ export default function CompanionDesk() {
   }, [companion.id, progress.xp, drops]);
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-4 pb-28 space-y-4">
+    <div className="mx-auto max-w-2xl px-4 py-4 pb-28 space-y-4 lg:max-w-none lg:px-10 xl:px-16 lg:pb-10 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-10 lg:space-y-0 lg:items-start">
+      <div className="space-y-4 lg:sticky lg:top-20">
       {/* header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -401,12 +405,12 @@ export default function CompanionDesk() {
 
       {/* stage */}
       <div className="flex flex-col items-center py-2" style={{ background: `radial-gradient(circle at 50% 40%, ${tintFor(companion, 0.16)}, transparent 60%)` }}>
-        <div ref={stageRef} className="relative" style={{ width: 260, height: 260 }}>
+        <div ref={stageRef} className="relative" style={{ width: mascotSize, height: mascotSize }}>
           <BobbyMascot3D
             look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }}
             state={mascotState}
             level={voice.speaking ? voice.level : null}
-            size={260}
+            size={mascotSize}
             attachments={attachments}
             equipUrl={equip.url}
             equipToken={equip.token}
@@ -418,7 +422,9 @@ export default function CompanionDesk() {
         <div className="text-[10px] font-mono text-white/45 mt-1 min-h-[16px]">{statusHint}</div>
         <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={() => { sfxTock(); setSheet('world'); }} /></div>
       </div>
+      </div>
 
+      <div className="space-y-4 lg:pt-2">
       {/* confirm */}
       {phase === 'confirm' && pending && (
         <div className="rounded-xl p-4 bg-white/[0.02] border border-amber-400/30 text-sm text-white/80">
@@ -505,13 +511,14 @@ export default function CompanionDesk() {
       </div>
 
       {/* composer */}
-      <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
+      <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-transparent p-4 lg:static lg:bg-none lg:p-0 lg:pt-2">
         <div className="mx-auto max-w-2xl flex gap-2">
           <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about BTC, NVDA, gold…', 'Pregunta por BTC, NVDA, oro…')} className="flex-1 rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none focus:border-sky-400/50" />
           {canDictate && <button type="button" onClick={toggleDictation} className={`h-12 w-12 rounded-xl flex items-center justify-center ${listening ? 'bg-red-400 text-black' : 'bg-sky-500 text-white'}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>}
           <button type="submit" className="h-12 px-4 rounded-xl bg-green-400 text-black font-mono text-xs tracking-[0.15em]">{t('ASK', 'PREGUNTA')}</button>
         </div>
       </form>
+      </div>
 
       {/* sheets & overlays */}
       <AnimatePresence>
@@ -643,4 +650,17 @@ function SquadSheet({ current, level, onPick, onClose }: { current: Companion; l
       </AnimatePresence>
     </motion.div>
   );
+}
+
+/** True when the viewport matches; the desk goes two-column from lg up. */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => (typeof window !== 'undefined' ? window.matchMedia(query).matches : false));
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
 }

@@ -101,7 +101,7 @@ export default function BobbyAppLandingExperience() {
   const [signupState, setSignupState] = useState<SignupState>('idle');
   const [signupMessage, setSignupMessage] = useState('');
 
-  const pageTitle = t('Bobby — Vibe trading. Farm aura.', 'Bobby — Vibe trading. Farmea aura.');
+  const pageTitle = t('Bobby — Vibe trading. Farm market aura.', 'Bobby — Vibe trading. Farmea aura del mercado.');
   useEffect(() => { document.title = pageTitle; }, [pageTitle]);
 
   const record = stats?.debateActivity;
@@ -134,7 +134,7 @@ export default function BobbyAppLandingExperience() {
   const moments = [
     { step: '01', eyebrow: t('Ask out loud', 'Pregunta en voz alta'), title: t('Say the ticker. The desk wakes up.', 'Di el ticker. El desk despierta.'), text: t('BTC, NVDA, gold and 600+ more, by voice or text. Live candles, not recycled takes. Your companion answers in its own voice, wearing the gear you earned.', 'BTC, NVDA, oro y más de 600 activos, por voz o texto. Velas en vivo, no opiniones recicladas. Tu companion contesta con su propia voz, con el equipo que te ganaste.'), image: '/app/shot-desk.webp', alt: t('The Live Desk with Byte wearing his gear and Bit the dog', 'El Live Desk con Byte usando su equipo y Bit el perro'), accent: GREEN },
     { step: '02', eyebrow: t('NO TRADE is a win', 'NO TRADE es una victoria'), title: t('Three agents fight. When there is no edge, the gate closes.', 'Tres agentes se pelean. Si no hay ventaja, la puerta se cierra.'), text: t('Alpha Hunter finds the setup, Red Team tears it apart, the CIO decides. No clean signal? Halo\'s risk gate says NO TRADE and pays you +20 discipline XP for listening.', 'Alpha Hunter busca el setup, Red Team lo destroza, el CIO decide. ¿Sin señal limpia? La puerta de riesgo de Halo dice NO TRADE y te paga +20 XP de disciplina por escuchar.'), image: '/app/shot-notrade.webp', alt: t('A real NO TRADE verdict on BTC with +20 discipline XP and the live chart', 'Un NO TRADE real en BTC con +20 XP de disciplina y la gráfica en vivo'), accent: '#7ea6ff' },
-    { step: '03', eyebrow: t('Farm aura', 'Farmea aura'), title: t('Aura becomes gear your companion actually wears.', 'El aura se vuelve equipo que tu companion sí se pone.'), text: t('Goggles on the face, a radio on the hip, a golden codex in the hand, a pet at the feet. Hold any item to preview it on its owner. Discipline only, never volume.', 'Gafas en la cara, radio en la cadera, un códice dorado en la mano, una mascota a los pies. Mantén presionado cualquier item para verlo puesto. Solo disciplina, nunca volumen.'), image: '/app/shot-preview.webp', alt: t('Gear preview: Bobby wearing a piece earned with discipline', 'Preview de equipo: Bobby usando una pieza ganada con disciplina'), accent: GOLD },
+    { step: '03', eyebrow: t('Farm market aura', 'Farmea aura del mercado'), title: t('Aura becomes gear your companion actually wears.', 'El aura se vuelve equipo que tu companion sí se pone.'), text: t('Goggles on the face, a radio on the hip, a golden codex in the hand, a pet at the feet. Hold any item to preview it on its owner. Discipline only, never volume.', 'Gafas en la cara, radio en la cadera, un códice dorado en la mano, una mascota a los pies. Mantén presionado cualquier item para verlo puesto. Solo disciplina, nunca volumen.'), image: '/app/shot-preview.webp', alt: t('Gear preview: Bobby wearing a piece earned with discipline', 'Preview de equipo: Bobby usando una pieza ganada con disciplina'), accent: GOLD },
   ];
 
   const auraRules = [
@@ -182,7 +182,7 @@ export default function BobbyAppLandingExperience() {
         <title>{pageTitle}</title>
         <meta name="description" content={t('Vibe trading: talk to the market, watch three agents debate your idea, take the NO TRADE when there is no edge, and farm aura — gear, pets and a world earned with discipline, never volume.', 'Vibe trading: háblale al mercado, mira a tres agentes debatir tu idea, toma el NO TRADE cuando no hay ventaja y farmea aura: equipo, mascotas y un mundo ganados con disciplina, nunca con volumen.')} />
         <meta property="og:title" content={pageTitle} />
-        <meta property="og:description" content={t('Farm aura, not losses. Bobby is the market companion you talk to.', 'Farmea aura, no pérdidas. Bobby es el companion de mercado con el que hablas.')} />
+        <meta property="og:description" content={t('Farm market aura. Bobby is the market companion you talk to.', 'Farmea aura del mercado. Bobby es el companion de mercado con el que hablas.')} />
         <meta property="og:image" content="https://bobbyprotocol.xyz/favicon-bobby-v3.png" />
       </Helmet>
 
@@ -225,8 +225,8 @@ export default function BobbyAppLandingExperience() {
               </div>
               <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-[#5cff91]">Vibe trading</div>
               <h1 className="max-w-3xl text-[clamp(2.85rem,7vw,6.4rem)] font-black leading-[0.88] tracking-[-0.078em]">
-                {t('Farm aura,', 'Farmea aura,')}{' '}
-                <span className="bg-[linear-gradient(100deg,#F5C542_0%,#5cff91_55%,#76d6ff_100%)] bg-clip-text text-transparent">{t('not losses.', 'no pérdidas.')}</span>
+                {t('Farm', 'Farmea')}{' '}
+                <span className="bg-[linear-gradient(100deg,#F5C542_0%,#5cff91_55%,#76d6ff_100%)] bg-clip-text text-transparent">{t('market aura.', 'aura del mercado.')}</span>
               </h1>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/58 sm:text-lg sm:leading-8">
                 {t('Bobby is the market companion you talk to. Ask anything out loud, watch three agents fight over it, take the NO TRADE when there is no edge, and level up your aura: gear, pets and a whole world, earned with discipline, never with volume.', 'Bobby es el companion de mercado con el que hablas. Pregunta lo que sea en voz alta, mira a tres agentes pelearse por tu idea, toma el NO TRADE cuando no hay ventaja y sube tu aura: equipo, mascotas y un mundo entero, ganados con disciplina, nunca con volumen.')}
@@ -263,7 +263,7 @@ export default function BobbyAppLandingExperience() {
           <div className="flex min-w-max animate-marquee items-center gap-9 font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-white/55 motion-reduce:animate-none">
             {[0, 1].map((duplicate) => (
               <div key={duplicate} className="flex shrink-0 items-center gap-9">
-                {['Vibe trading', t('Farm aura', 'Farmea aura'), t('Three-agent debate', 'Debate de tres agentes'), t('NO TRADE is a win', 'NO TRADE es una victoria'), t('Gear, pets & a world', 'Equipo, mascotas y un mundo'), t('Never touches your money', 'Nunca toca tu dinero')].map((label) => (
+                {['Vibe trading', t('Farm market aura', 'Farmea aura del mercado'), t('Three-agent debate', 'Debate de tres agentes'), t('NO TRADE is a win', 'NO TRADE es una victoria'), t('Gear, pets & a world', 'Equipo, mascotas y un mundo'), t('Never touches your money', 'Nunca toca tu dinero')].map((label) => (
                   <span key={`${duplicate}-${label}`} className="flex items-center gap-9"><span>{label}</span><span className="text-[#F5C542]">✦</span></span>
                 ))}
               </div>

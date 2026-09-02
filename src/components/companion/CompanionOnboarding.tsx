@@ -26,6 +26,7 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
   const autoRef = useRef<number[]>([]);
   const tint = tintFor(selected);
   const ready = equipped.length === LOADOUT_GEAR.length;
+  const desktop = useMediaQuery('(min-width: 1024px)');
 
   // Loadout: the forge hums, slots equip themselves one by one (each a step
   // higher); any tap jumps ahead.
@@ -69,25 +70,26 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
   const title = step === 2 ? t('BOBBY // PREPPING AURA', 'BOBBY // PREPARANDO AURA') : t('BOBBY // MEET YOUR SQUAD', 'BOBBY // CONOCE AL SQUAD');
 
   return (
-    <div className="mx-auto max-w-xl px-5 py-6 flex flex-col min-h-[calc(100vh-80px)]">
-      <div className="flex items-center justify-between text-[11px] font-mono tracking-[0.2em]">
+    <div className="mx-auto max-w-xl px-5 py-6 flex flex-col min-h-[calc(100vh-80px)] lg:max-w-none lg:px-12 xl:px-20 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:gap-x-12 lg:items-center">
+      <div className="flex items-center justify-between text-[11px] font-mono tracking-[0.2em] lg:col-span-2">
         <div className="flex items-center gap-2 text-white/75"><span className="h-1.5 w-1.5 rounded-full" style={{ background: tint, boxShadow: `0 0 8px ${tint}` }} />{title}</div>
         <div style={{ color: tint }}>0{step + 1} / 03</div>
       </div>
-      <div className="mt-3 h-0.5 bg-white/[0.06] rounded-full"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 3) * 100}%`, background: tint }} /></div>
+      <div className="mt-3 h-0.5 bg-white/[0.06] rounded-full lg:col-span-2"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 3) * 100}%`, background: tint }} /></div>
 
-      <div className="flex-1 flex items-center justify-center py-4" style={{ background: step === 2 ? 'none' : `radial-gradient(circle at 50% 50%, ${tintFor(selected, 0.14)}, transparent 60%)` }}>
+      <div className="flex-1 flex items-center justify-center py-4 lg:col-start-1 lg:row-start-3 lg:min-h-[72vh]" style={{ background: step === 2 ? 'none' : `radial-gradient(circle at 50% 50%, ${tintFor(selected, 0.14)}, transparent 60%)` }}>
         {step === 2 ? (
-          <AuraForgeStage tint={tint} charged={equipped.length} ready={ready}>
-            <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: selected.palette, avatar: selected.id }} state={voice.speaking ? 'speaking' : 'idle'} level={voice.speaking ? voice.level : null} size={230} />
+          <AuraForgeStage tint={tint} charged={equipped.length} ready={ready} scale={desktop ? 1.45 : 1}>
+            <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: selected.palette, avatar: selected.id }} state={voice.speaking ? 'speaking' : 'idle'} level={voice.speaking ? voice.level : null} size={Math.round(230 * (desktop ? 1.45 : 1))} />
           </AuraForgeStage>
         ) : (
-          <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: selected.palette, avatar: selected.id }} state={voice.speaking ? 'speaking' : 'idle'} level={voice.speaking ? voice.level : null} size={280} />
+          <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: selected.palette, avatar: selected.id }} state={voice.speaking ? 'speaking' : 'idle'} level={voice.speaking ? voice.level : null} size={desktop ? 480 : 280} />
         )}
       </div>
 
       {/* No exit animation on purpose: rapid step changes must never leave a
           stale step on screen (AnimatePresence "wait" could). */}
+      <div className="lg:col-start-2 lg:row-start-3 lg:self-center">
       <div>
         <motion.div key={step} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
           {step === 0 && (
@@ -175,6 +177,7 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
         {step === 0 ? t('MAKE IT MY COMPANION', 'HACER MI COMPANION') : step === 1 ? t('NEXT', 'SIGUE') : ready ? t('DROP INTO THE DESK', 'ENTRAR AL DESK') : t('EQUIPPING…', 'EQUIPANDO…')}
         {step === 2 ? <ArrowRight size={14} /> : <Check size={14} />}
       </button>
+      </div>
       <div className="sr-only">{vibe.id}</div>
     </div>
   );
@@ -194,19 +197,19 @@ function Burst({ tint }: { tint: string }) {
 /** The aura forge: the machine (Higgsfield render) with the companion standing
  *  on its platform. Rings spin, a beam scans, the platform charges with every
  *  piece equipped — no video, all live. */
-function AuraForgeStage({ tint, charged, ready, children }: { tint: string; charged: number; ready: boolean; children: ReactNode }) {
-  const W = 300;
-  const H = 400;
+function AuraForgeStage({ tint, charged, ready, scale = 1, children }: { tint: string; charged: number; ready: boolean; scale?: number; children: ReactNode }) {
+  const W = Math.round(300 * scale);
+  const H = Math.round(400 * scale);
   return (
     <div className="relative mx-auto overflow-hidden rounded-3xl border border-white/[0.06]" style={{ width: W, height: H, boxShadow: `0 0 40px ${tint}${ready ? '55' : '22'}` }}>
       <motion.img src="/world/aura-forge.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" animate={{ scale: [1.04, 1, 1.04] }} transition={{ repeat: Infinity, duration: 12, ease: 'easeInOut' }} />
-      <motion.div className="absolute left-1/2 rounded-full pointer-events-none" style={{ width: 230, height: 76, top: H * 0.72 - 38, x: '-50%', background: `radial-gradient(ellipse, ${tint}, transparent 70%)`, filter: 'blur(12px)' }} animate={{ opacity: 0.22 + charged * 0.16, scale: [1, 1.1, 1] }} transition={{ opacity: { duration: 0.4 }, scale: { repeat: Infinity, duration: 2, ease: 'easeInOut' } }} />
-      <motion.div className="absolute left-1/2 pointer-events-none" style={{ width: 160, height: 5, x: '-50%', background: `linear-gradient(90deg, transparent, ${tint}, transparent)`, boxShadow: `0 0 18px ${tint}` }} animate={{ top: [H * 0.26, H * 0.74, H * 0.26], opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }} />
-      <div className="absolute left-1/2 pointer-events-none" style={{ top: H * 0.72 - 100, x: '-50%', width: 200, height: 200, perspective: 500, transform: 'translateX(-50%)' }}>
+      <motion.div className="absolute left-1/2 rounded-full pointer-events-none" style={{ width: 230 * scale, height: 76 * scale, top: H * 0.72 - 38 * scale, x: '-50%', background: `radial-gradient(ellipse, ${tint}, transparent 70%)`, filter: 'blur(12px)' }} animate={{ opacity: 0.22 + charged * 0.16, scale: [1, 1.1, 1] }} transition={{ opacity: { duration: 0.4 }, scale: { repeat: Infinity, duration: 2, ease: 'easeInOut' } }} />
+      <motion.div className="absolute left-1/2 pointer-events-none" style={{ width: 160 * scale, height: 5, x: '-50%', background: `linear-gradient(90deg, transparent, ${tint}, transparent)`, boxShadow: `0 0 18px ${tint}` }} animate={{ top: [H * 0.26, H * 0.74, H * 0.26], opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }} />
+      <div className="absolute left-1/2 pointer-events-none" style={{ top: H * 0.72 - 100 * scale, x: '-50%', width: 200 * scale, height: 200 * scale, perspective: 500, transform: 'translateX(-50%)' }}>
         <motion.div className="absolute inset-0 rounded-full" style={{ border: `2px dashed ${tint}`, opacity: 0.7, rotateX: 72 }} animate={{ rotateZ: 360 }} transition={{ repeat: Infinity, duration: 8, ease: 'linear' }} />
         <motion.div className="absolute inset-4 rounded-full" style={{ border: `1px solid ${tint}`, opacity: 0.5, rotateX: 72 }} animate={{ rotateZ: -360 }} transition={{ repeat: Infinity, duration: 5, ease: 'linear' }} />
       </div>
-      <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 92 }}>{children}</div>
+      <div className="absolute left-1/2 -translate-x-1/2" style={{ top: Math.round(92 * scale) }}>{children}</div>
       <AnimatePresence>
         {ready && (
           <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="absolute left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-mono tracking-[0.3em] text-black" style={{ top: 14, background: tint, boxShadow: `0 0 20px ${tint}` }}>{t('AURA · MAX', 'AURA · MÁXIMA')}</motion.div>
@@ -214,4 +217,17 @@ function AuraForgeStage({ tint, charged, ready, children }: { tint: string; char
       </AnimatePresence>
     </div>
   );
+}
+
+/** True when the viewport matches; the onboarding goes two-column from lg up. */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => (typeof window !== 'undefined' ? window.matchMedia(query).matches : false));
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, [query]);
+  return matches;
 }
