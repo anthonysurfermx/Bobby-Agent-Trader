@@ -14,8 +14,8 @@ import { levelProgress, progressStore, useProgress } from '@/lib/companions/prog
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import RiskNotice from './RiskNotice';
-import { EvolutionOverlay, GearCatalog, NoTradeCard, ToolBelt, ToolDetail, ToolUnlockOverlay, WornGear } from './CompanionOverlays';
-import { PET_UNLOCK_XP, petFor, petUnlocked, wornGear } from '@/lib/companions/data';
+import { EvolutionOverlay, GearCatalog, NoTradeCard, ToolBelt, ToolDetail, ToolUnlockOverlay } from './CompanionOverlays';
+import { PET_UNLOCK_XP, petArt, petFor, petUnlocked, toolSlot, wornGear } from '@/lib/companions/data';
 
 // ---- API (mirrors BobbyAPI.swift) ----
 
@@ -187,6 +187,7 @@ export default function CompanionDesk() {
   const [menu, setMenu] = useState(false);
   const [sheet, setSheet] = useState<'none' | 'board' | 'squad' | 'risk' | 'catalog' | 'pet'>('none');
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const [equip, setEquip] = useState<{ url: string; token: number }>({ url: '', token: 0 });
   const [muted, setMuted] = useState(sfxMuted());
   const [speakEnabled, setSpeakEnabled] = useState(true);
   const [listening, setListening] = useState(false);
@@ -342,6 +343,19 @@ export default function CompanionDesk() {
 
   const chart = useMemo(() => buildChart(series, answer), [series, answer]);
 
+  // Worn gear (pieces still in the loot queue are not worn yet — they fly on
+  // when the human taps EQUIP IT) plus the pet at the feet.
+  const attachments = useMemo(() => {
+    const pending = new Set(drops.map((d) => `${d.companionId}-${d.tier}`));
+    const items: Array<{ url: string; slot: string; spin?: boolean; glow?: string }> = wornGear(companion.id, progress.xp)
+      .filter((tool) => !pending.has(`${tool.companionId}-${tool.tier}`) && toolHasArt(tool))
+      .map((tool) => ({ url: toolArt(tool), slot: toolSlot(tool) as string, glow: tool.tier === 3 ? '#F5C542' : undefined }));
+    const pet = petUnlocked(progress.xp) ? petFor(companion.id) : null;
+    const art = pet ? petArt(companion.id) : null;
+    if (pet && art) items.push({ url: art, slot: 'pet', spin: pet.spins, glow: undefined });
+    return items;
+  }, [companion.id, progress.xp, drops]);
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-4 pb-28 space-y-4">
       {/* header */}
@@ -385,9 +399,16 @@ export default function CompanionDesk() {
 
       {/* stage */}
       <div className="flex flex-col items-center py-2" style={{ background: `radial-gradient(circle at 50% 40%, ${tintFor(companion, 0.16)}, transparent 60%)` }}>
-        <div ref={stageRef} className="relative" style={{ width: 240, height: 240 }}>
-          <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }} state={mascotState} level={voice.speaking ? voice.level : null} size={240} />
-          <WornGear companion={companion} xp={progress.xp} size={240} />
+        <div ref={stageRef} className="relative" style={{ width: 260, height: 260 }}>
+          <BobbyMascot3D
+            look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }}
+            state={mascotState}
+            level={voice.speaking ? voice.level : null}
+            size={260}
+            attachments={attachments}
+            equipUrl={equip.url}
+            equipToken={equip.token}
+          />
         </div>
         <div className="mt-2 flex items-center gap-2 text-[11px] font-mono tracking-[0.25em]" style={{ color: listening ? '#34D399' : voice.speaking ? '#7ea6ff' : phase === 'error' ? '#f87171' : phase === 'complete' ? '#34D399' : '#7ea6ff' }}>
           <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor]" />{statusLabel}
@@ -508,7 +529,7 @@ export default function CompanionDesk() {
         )}
         {inspected && <ToolDetail companion={companion} tool={inspected} xp={progress.xp} onClose={() => setInspected(null)} />}
         {evolution && <EvolutionOverlay companion={companion} level={evolution} onDone={() => { const name = companionName(companion, evolution.number); say(t(`I evolved. Call me ${name} now.`, `Evolucioné. Ahora dime ${name}.`), false); setEvolution(null); }} />}
-        {!evolution && drops[0] && <ToolUnlockOverlay companion={companion} tool={drops[0]} onDone={() => setDrops((d) => d.slice(1))} />}
+        {!evolution && drops[0] && <ToolUnlockOverlay companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 80); }} />}
       </AnimatePresence>
     </div>
   );

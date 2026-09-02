@@ -21,9 +21,14 @@ interface BobbyMascot3DProps {
   reactKey?: number;
   size?: number;
   className?: string;
+  /** Gear worn on the body + pet, as sprites anchored to the character. */
+  attachments?: Array<{ url: string; slot: string; spin?: boolean; glow?: string }>;
+  /** Bump with `equipUrl` set to replay the equip flight for that attachment. */
+  equipUrl?: string | null;
+  equipToken?: number;
 }
 
-export default function BobbyMascot3D({ look, state = 'idle', analyser = null, level = null, reactKey, size = 160, className }: BobbyMascot3DProps) {
+export default function BobbyMascot3D({ look, state = 'idle', analyser = null, level = null, reactKey, size = 160, className, attachments, equipUrl, equipToken }: BobbyMascot3DProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<MascotScene | null>(null);
   const [webglFailed, setWebglFailed] = useState(false);
@@ -75,6 +80,9 @@ export default function BobbyMascot3D({ look, state = 'idle', analyser = null, l
   useEffect(() => { sceneRef.current?.setState(state as MascotState); }, [state]);
   useEffect(() => { sceneRef.current?.setAnalyser(analyser); }, [analyser]);
   useEffect(() => { sceneRef.current?.setLevel(level); }, [level]);
+  const attachmentsKey = (attachments ?? []).map((a) => `${a.url}@${a.slot}${a.spin ? '~' : ''}${a.glow ?? ''}`).join('|');
+  useEffect(() => { sceneRef.current?.setAttachments(attachments ?? []); }, [attachmentsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (equipUrl && equipToken) sceneRef.current?.playEquip(equipUrl); }, [equipToken]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (reactKey !== undefined && reactKey > 0) sceneRef.current?.bounce(); }, [reactKey]);
   useEffect(() => { sceneRef.current?.resize(size); }, [size]);
 

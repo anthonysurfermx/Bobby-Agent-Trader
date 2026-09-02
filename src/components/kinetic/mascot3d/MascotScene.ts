@@ -10,7 +10,7 @@ import {
   WebGLRenderer, Scene, PerspectiveCamera, Group, Mesh, Color,
   SphereGeometry, CylinderGeometry, TorusGeometry, BoxGeometry,
   MeshStandardMaterial, AmbientLight, DirectionalLight, PointLight,
-  MathUtils, Box3, Vector3, PMREMGenerator, ACESFilmicToneMapping,
+  MathUtils, Box3, Vector3, PMREMGenerator, ACESFilmicToneMapping, Sprite, SpriteMaterial, TextureLoader, SRGBColorSpace,
   Texture, type Object3D, type Material,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -74,6 +74,12 @@ export class MascotScene {
   private camera = new PerspectiveCamera(38, 1, 0.1, 100);
   private root = new Group();       // bob + bounce
   private character = new Group();  // rotates toward cursor
+  /** Gear worn on the body + the pet: sprites parented to the character so
+   *  they turn and bob with it. Keyed so re-applying the same set is a no-op. */
+  private gearGroup = new Group();
+  private gearKey = '';
+  private gearTextures: Texture[] = [];
+  private spinners: Sprite[] = [];
   private pupils: Mesh[] = [];
   private eyeGroup = new Group();
   private mouth: Mesh | null = null;
@@ -206,6 +212,7 @@ export class MascotScene {
         const center = box.getCenter(new Vector3()).multiplyScalar(s);
         model.position.set(-center.x, -center.y + (avatar.yOffset ?? 0), -center.z);
         this.character.add(model);
+        this.character.add(this.gearGroup);
       }, undefined, err => {
         console.warn('[MascotScene] GLB load failed, falling back to procedural:', err);
         if (version === this.lookVersion) this.buildProcedural(look);
@@ -217,6 +224,8 @@ export class MascotScene {
   }
 
   private clearCharacter(): void {
+    // Worn gear survives a model swap: detach it before disposing the body.
+    this.character.remove(this.gearGroup);
     disposeObject(this.character);
     this.character.clear();
     this.pupils = [];
@@ -360,6 +369,83 @@ export class MascotScene {
 
   private externalLevel: number | null = null;
 
+  /**
+   * Wear items on the body. Slots are in normalized character units (the model
+   * is ~2.2 tall, centered): face / headset / head / hand / hip / shoulder /
+   * chest, plus `pet` at the feet. `spin` twirls the sprite in-plane.
+   */
+  setAttachments(items: Array<{ url: string; slot: string; spin?: boolean; glow?: string }>): void {
+    const key = items.map((i) => `${i.url}@${i.slot}${i.spin ? '~' : ''}`).join('|');
+    if (key === this.gearKey) return;
+    this.gearKey = key;
+    this.gearGroup.clear();
+    this.gearTextures.forEach((t) => t.dispose());
+    this.gearTextures = [];
+    this.spinners = [];
+    if (!this.gearGroup.parent) this.character.add(this.gearGroup);
+    const R = 1.1; // half of the normalized height
+    const anchors: Record<string, { p: [number, number, number]; size: number }> = {
+      face:     { p: [0, 0.40 * R, 0.80 * R], size: 0.92 * R },
+      headset:  { p: [0, 0.62 * R, 0.70 * R], size: 0.95 * R },
+      head:     { p: [0, 1.22 * R, 0], size: 0.62 * R },
+      hand:     { p: [0.80 * R, -0.42 * R, 0.50 * R], size: 0.46 * R },
+      hip:      { p: [0.36 * R, -0.12 * R, 0.70 * R], size: 0.36 * R },
+      shoulder: { p: [-0.60 * R, 0.50 * R, 0.42 * R], size: 0.44 * R },
+      chest:    { p: [0, 0.12 * R, 0.86 * R], size: 0.44 * R },
+      pet:      { p: [-0.92 * R, -0.72 * R, 0.55 * R], size: 0.70 * R },
+    };
+    const loader = new TextureLoader();
+    items.forEach((item, i) => {
+      const a = anchors[item.slot] ?? anchors.hand;
+      const tex = loader.load(item.url);
+      tex.colorSpace = SRGBColorSpace;
+      this.gearTextures.push(tex);
+      const mat = new SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+      const sprite = new Sprite(mat);
+      sprite.position.set(a.p[0], a.p[1], a.p[2]);
+      sprite.scale.set(a.size, a.size, 1);
+      sprite.renderOrder = 10 + i;
+      sprite.userData = { slot: item.slot, baseY: a.p[1], spin: !!item.spin, phase: i * 0.7, url: item.url, target: a.p, size: a.size };
+      if (item.spin) this.spinners.push(sprite);
+      this.gearGroup.add(sprite);
+      if (item.glow) {
+        const glowMat = new SpriteMaterial({ map: tex, transparent: true, depthWrite: false, color: new Color(item.glow), opacity: 0.35 });
+        const glow = new Sprite(glowMat);
+        glow.scale.set(a.size * 1.35, a.size * 1.35, 1);
+        glow.position.set(a.p[0], a.p[1], a.p[2] - 0.01);
+        glow.renderOrder = 9;
+        this.gearGroup.add(glow);
+      }
+    });
+  }
+
+  /**
+   * The skin moment: the piece for `url` appears big in front of the
+   * companion, flies to its slot and snaps with a pop; the body squashes.
+   */
+  playEquip(url: string): void {
+    const sprite = this.gearGroup.children.find((c) => (c.userData as { url?: string }).url === url) as Sprite | undefined;
+    if (!sprite) return;
+    const d = sprite.userData as { baseY: number; target: [number, number, number]; size: number };
+    const start = performance.now();
+    const from: [number, number, number] = [0, 0.35 * 1.1, 1.5 * 1.1];
+    const dur = 620;
+    const step = () => {
+      const k = Math.min(1, (performance.now() - start) / dur);
+      const e = k < 0.3 ? k / 0.3 : 1; // appear
+      const f = k < 0.3 ? 0 : (k - 0.3) / 0.7; // fly
+      const ease = 1 - Math.pow(1 - f, 3);
+      sprite.position.set(from[0] + (d.target[0] - from[0]) * ease, from[1] + (d.target[1] - from[1]) * ease, from[2] + (d.target[2] - from[2]) * ease);
+      const pop = f > 0.85 ? 1 + Math.sin((f - 0.85) / 0.15 * Math.PI) * 0.35 : 1;
+      const sc = d.size * (2.2 - 1.2 * ease) * pop;
+      sprite.scale.set(sc, sc, 1);
+      sprite.material.opacity = e;
+      if (k >= 1) { sprite.scale.set(d.size, d.size, 1); sprite.position.set(...d.target); sprite.material.opacity = 1; this.bounce(); return; }
+      requestAnimationFrame(step);
+    };
+    step();
+  }
+
   /** Normalized 0..1 voice level from sources without an AnalyserNode
    *  (e.g. the realtime WebRTC desk). Takes priority over the procedural
    *  mouth but not over a live analyser. */
@@ -398,6 +484,14 @@ export class MascotScene {
     }
 
     // Idle bob + breathing
+    // Worn gear: the piece above the head hovers, pets that spin, spin.
+    const tNow = performance.now() / 1000;
+    for (const child of this.gearGroup.children) {
+      const d = child.userData as { slot?: string; baseY?: number; spin?: boolean; phase?: number };
+      if (d.slot === 'head' && typeof d.baseY === 'number') child.position.y = d.baseY + Math.sin(tNow * 2.2 + (d.phase ?? 0)) * 0.05;
+      if (d.slot === 'pet' && !d.spin && typeof d.baseY === 'number') child.position.y = d.baseY + Math.max(0, Math.sin(tNow * 3.1)) * 0.06;
+      if (d.spin && child instanceof Sprite) child.material.rotation = tNow * 2.9;
+    }
     const bobSpeed = this.state === 'speaking' ? 6 : 1.6;
     const bobAmp = this.state === 'speaking' ? 0.03 : 0.05;
     this.root.position.y = Math.sin(t * bobSpeed) * bobAmp;

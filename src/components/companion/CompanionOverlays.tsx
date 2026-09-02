@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, PawPrint, Plus, ShieldCheck, Sparkles } from 'lucide-react';
-import { COMPANIONS, PET_UNLOCK_XP, type Companion, type CompanionLevel, type CompanionTool, companionName, petFor, petUnlocked, tintFor, toolArt, toolHasArt, toolTierLabel, toolUnlockXP, toolsFor, LEVEL_TONE } from '@/lib/companions/data';
+import { COMPANIONS, PET_UNLOCK_XP, type Companion, type CompanionLevel, type CompanionTool, companionName, petArt, petFor, petUnlocked, tintFor, toolArt, toolHasArt, toolTierLabel, toolUnlockXP, toolsFor, LEVEL_TONE } from '@/lib/companions/data';
 import { pick, t } from '@/lib/companions/i18n';
 import { sfxLevelUp, sfxLoot } from '@/lib/companions/sfx';
 
@@ -75,7 +75,7 @@ export function ToolBelt({ companion, xp, onTap, onPet, onPlus }: { companion: C
       })}
       {pet && (
         <button onClick={onPet} title={hasPet ? pick(pet.name) : `${pick(pet.name)} · ${PET_UNLOCK_XP} XP`} className="h-11 w-11 rounded-full flex items-center justify-center" style={{ background: hasPet ? tintFor(companion, 0.13) : 'rgba(255,255,255,0.035)', border: `1px solid ${hasPet ? tintFor(companion, 0.6) : 'rgba(255,255,255,0.08)'}` }}>
-          {hasPet ? <span className="text-lg">{pet.emoji}</span> : <PawPrint size={13} className="text-white/35" />}
+          {hasPet ? (petArt(companion.id) ? <img src={petArt(companion.id)!} alt="" className="h-9 w-9 object-contain" /> : <span className="text-lg">{pet.emoji}</span>) : <PawPrint size={13} className="text-white/35" />}
         </button>
       )}
       <button onClick={onPlus} title={t('What else you can earn', 'Qué más puedes conseguir')} className="h-11 w-11 rounded-full flex items-center justify-center border border-dashed border-white/20 text-white/50"><Plus size={14} /></button>
@@ -130,7 +130,7 @@ export function GearCatalog({ current, xp, level, onClose }: { current: Companio
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/95 overflow-y-auto">
       <div className="mx-auto max-w-2xl p-4 space-y-4">
         <div className="flex items-center justify-between"><div><div className="text-white font-mono tracking-[0.2em]">{t('STILL TO EARN', 'POR CONSEGUIR')}</div><div className="text-[10px] font-mono text-white/40 tracking-[0.15em]">{t('DISCIPLINE XP ONLY · NEVER VOLUME', 'SOLO XP DE DISCIPLINA · NUNCA VOLUMEN')}</div></div><button onClick={onClose} className="h-9 w-9 rounded-full bg-white/[0.05] text-white/70">✕</button></div>
-        {myPet && (<div className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]"><div className="text-[10px] font-mono tracking-[0.2em] text-white/50 mb-1">{t('YOUR PET', 'TU MASCOTA')}</div>{row('mypet', null, myPet.emoji, pick(myPet.name), myPet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.'), PET_UNLOCK_XP, null, tintFor(current))}</div>)}
+        {myPet && (<div className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]"><div className="text-[10px] font-mono tracking-[0.2em] text-white/50 mb-1">{t('YOUR PET', 'TU MASCOTA')}</div>{row('mypet', petArt(current.id), myPet.emoji, pick(myPet.name), myPet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.'), PET_UNLOCK_XP, null, tintFor(current))}</div>)}
         <div className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t("OTHER COMPANIONS' GEAR", 'EQUIPO DE OTROS COMPAÑEROS')}</div>
         {COMPANIONS.filter((c) => c.id !== current.id).map((c) => {
           const needLevel = level < c.requiredLevel ? c.requiredLevel : null;
@@ -139,7 +139,7 @@ export function GearCatalog({ current, xp, level, onClose }: { current: Companio
             <div key={c.id} className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]">
               <div className="flex items-center gap-2 mb-1"><img src={`/mascots/${c.id}.webp`} alt="" className="h-7 w-7 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} /><span className="font-mono text-xs tracking-[0.15em]" style={{ color: tintFor(c) }}>{c.label}</span>{needLevel !== null && <span className="text-[9px] font-mono text-white/40 tracking-[0.1em]">{t(`LEVEL ${needLevel} TO UNLOCK`, `NIVEL ${needLevel} PARA DESBLOQUEAR`)}</span>}</div>
               {toolsFor(c.id).map((tool) => row(`${c.id}-${tool.tier}`, toolHasArt(tool) ? toolArt(tool) : null, tool.glyph, pick(tool.name), pick(tool.lore), toolUnlockXP(tool.tier), needLevel, tool.tier === 3 ? GOLD : tintFor(c)))}
-              {pet && row(`${c.id}-pet`, null, pet.emoji, pick(pet.name), t('Pet', 'Mascota'), PET_UNLOCK_XP, needLevel, tintFor(c))}
+              {pet && row(`${c.id}-pet`, petArt(c.id), pet.emoji, pick(pet.name), t('Pet', 'Mascota'), PET_UNLOCK_XP, needLevel, tintFor(c))}
             </div>
           );
         })}

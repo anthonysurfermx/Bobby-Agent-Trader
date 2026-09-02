@@ -156,6 +156,24 @@ export const TOOLS: Record<string, CompanionTool[]> = {
 };
 
 export function toolsFor(companionId: string): CompanionTool[] { return TOOLS[companionId] ?? []; }
+
+/** Where each piece sits on the body — goggles on the face, radio on the hip, codex in the hand, halo above the head. */
+export type BodySlot = 'face' | 'headset' | 'head' | 'hand' | 'hip' | 'shoulder' | 'chest';
+export const TOOL_SLOTS: Record<string, BodySlot> = {
+  'orb-1': 'hand', 'orb-2': 'chest', 'orb-3': 'head',
+  'byte-1': 'hip', 'byte-2': 'face', 'byte-3': 'hand',
+  'kora-1': 'headset', 'kora-2': 'shoulder', 'kora-3': 'hand',
+  'zip-1': 'hand', 'zip-2': 'shoulder', 'zip-3': 'head',
+  'glitch-1': 'hand', 'glitch-2': 'hand', 'glitch-3': 'chest',
+  'momo-1': 'hand', 'momo-2': 'face', 'momo-3': 'head',
+  'flux-1': 'hand', 'flux-2': 'chest', 'flux-3': 'head',
+  'rook-1': 'chest', 'rook-2': 'head', 'rook-3': 'hand',
+  'halo-1': 'chest', 'halo-2': 'shoulder', 'halo-3': 'head',
+  'axiom-1': 'hand', 'axiom-2': 'chest', 'axiom-3': 'head',
+};
+export function toolSlot(tool: CompanionTool): BodySlot { return TOOL_SLOTS[`${tool.companionId}-${tool.tier}`] ?? 'hand'; }
+export const PET_ART_AVAILABLE = new Set(['orb', 'byte', 'kora', 'zip']);
+export function petArt(companionId: string): string | null { return PET_ART_AVAILABLE.has(companionId) ? `/pets/pet_${companionId}.png` : null; }
 export function newlyUnlockedTools(companionId: string, fromXP: number, toXP: number): CompanionTool[] {
   return toolsFor(companionId).filter((tool) => fromXP < toolUnlockXP(tool.tier) && toXP >= toolUnlockXP(tool.tier));
 }
