@@ -1152,7 +1152,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
           ...(commitRequirement.targetPrice !== null ? { targetPrice: commitRequirement.targetPrice } : {}),
         }, true);
         const receipt = assessCommitReceipt(commitRes);
-        if (receipt.confirmed) {
+        if (receipt.confirmed === true) {
           commitState = 'confirmed';
           onchainCommitTx = receipt.txHash;
           console.log(`[Cycle] On-chain commit confirmed: ${onchainCommitTx}`);

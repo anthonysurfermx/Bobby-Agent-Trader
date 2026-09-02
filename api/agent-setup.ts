@@ -144,7 +144,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let mascotPersisted = !!cleanMascot;
     let { data: profile, error } = await supabase
       .from('agent_profiles')
-      .upsert(cleanMascot ? { ...baseRow, mascot: cleanMascot } : baseRow, { onConflict: 'wallet_address' })
+      // The deployed database may already have the additive mascot column
+      // while the generated client types lag behind that migration.
+      .upsert((cleanMascot ? { ...baseRow, mascot: cleanMascot } : baseRow) as any, { onConflict: 'wallet_address' })
       .select()
       .single();
 

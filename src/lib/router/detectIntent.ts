@@ -3,6 +3,8 @@
 // Used by AdamsChat.tsx and potentially by backend
 // ============================================================
 
+import { VOICE_ASSETS } from '../voice-assets';
+
 export const TOKEN_MAP: Record<string, string> = {
   btc: 'BTC-USDT', bitcoin: 'BTC-USDT',
   eth: 'ETH-USDT', ethereum: 'ETH-USDT', ether: 'ETH-USDT',
@@ -29,7 +31,7 @@ export function detectTokens(text: string): string[] {
 // ---- Stock symbol detection ----
 // Bobby also understands traditional finance — stocks, ETFs, indices
 
-export const STOCK_MAP: Record<string, string> = {
+const LEGACY_STOCK_MAP: Record<string, string> = {
   // Tech
   nvidia: 'NVDA', nvda: 'NVDA',
   apple: 'AAPL', aapl: 'AAPL',
@@ -62,12 +64,44 @@ export const STOCK_MAP: Record<string, string> = {
   dow: 'DIA', 'dow jones': 'DIA', dia: 'DIA',
 };
 
+// Keep typed chat aligned with the mobile voice picker. The hand-written map
+// had drifted to 21 symbols while the demo exposed 52 equities/ETFs, so names
+// such as Broadcom, Robinhood and Uber silently fell through to generic chat.
+export const STOCK_MAP: Record<string, string> = {
+  ...Object.fromEntries(
+    VOICE_ASSETS
+      .filter((asset) => asset.venue === 'equity')
+      .flatMap((asset) =>
+        [asset.symbol, asset.name, ...(asset.aliases ?? [])]
+          .map((name) => [name.toLowerCase(), asset.symbol]),
+      ),
+  ),
+  ...LEGACY_STOCK_MAP,
+};
+
+const AMBIGUOUS_STOCK_WORDS = new Set([
+  'meta', 'strategy', 'coin', 'ko', 'dia', 'uso', 'ton', 'cat', 'arm', 'sei', 'sui', 'op', 'ada',
+  'ma', 'v', 'ba', 'gs', 'uni', 'salud', 'energía', 'tecnología', 'financieras', 'near', 'ark', 'dow',
+  'oro', 'gold', 'plata', 'silver', 'oil', 'petróleo', 'crudo',
+]);
+const ETF_ONLY_WORDS = new Set(['oro', 'gold', 'plata', 'silver', 'oil', 'petróleo', 'crudo']);
+
 export function detectStocks(text: string): string[] {
   const lower = text.toLowerCase();
   const found: string[] = [];
   for (const [key, ticker] of Object.entries(STOCK_MAP)) {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (new RegExp(`\\b${escapedKey}\\b`).test(lower) && !found.includes(ticker)) {
+    const matches = new RegExp(`\\b${escapedKey}\\b`).test(lower);
+    if (!matches) continue;
+    if (AMBIGUOUS_STOCK_WORDS.has(key)) {
+      const escapedTicker = ticker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const explicitTicker = new RegExp(`(?:\\$${escapedTicker}\\b|\\b${escapedTicker}\\b)`).test(text);
+      const marketContext = /\b(stock|ticker|acci[oó]n|etf|precio|cotiz\w*|analiz\w*|compr\w*|vend\w*|invert\w*|trade|trading|opini[oó]n|compar\w*|versus|vs\.?)\b/i.test(text);
+      const explicitEtfContext = /\b(etf|fondo|stock|ticker|acci[oó]n)\b/i.test(text);
+      if (ETF_ONLY_WORDS.has(key) && !explicitTicker && !explicitEtfContext) continue;
+      if (!explicitTicker && !marketContext) continue;
+    }
+    if (!found.includes(ticker)) {
       found.push(ticker);
     }
   }
@@ -144,8 +178,13 @@ export function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 
   // contains words like "análisis" or token names.
   const isOpinionQuestion = /\b(opin|piens|crees|think|deberi|should|recomiend|recommend|tell me|dime|explica|explain|por ?qu[eé]|why|como ves|how do you see|que onda|what.?s your|cual es tu|an[aá]lisis|analysis|outlook|perspectiv|pronos|predict|forecast|va a (subir|bajar)|will .* (go|rise|fall|drop|pump|dump)|esta semana|this week|este mes|this month|próxim[oa]|next|futuro|future|qué har[ií]as|what would you|cómo est[aá]|how.?s the|sentiment|sentimiento|mercado va|market going|afectar[aá]?|impact|affect|benefici|perjudic|compar[ae]|versus|vs\.?|entre|between|conviene|mejor|worse|better|riesg|risk|oportunid|opportunity|estrategi|strategy|jugada|play|movida|move)\b/i.test(l);
 
+  const detectedStocks = detectStocks(text);
   // Also route to chat if stocks are detected (any stock question needs Bobby's brain)
-  if ((isOpinionQuestion && wordCount > 3) || (detectStocks(text).length > 0 && wordCount > 2)) return 'chat';
+  if ((isOpinionQuestion && wordCount > 3) || (detectedStocks.length > 0 && wordCount > 2)) return 'chat';
+
+  // A bare ticker/company name is the stock equivalent of typing "BTC". It
+  // should paint a price card, not fall through to the ambiguous-help menu.
+  if (detectedStocks.length > 0 && wordCount <= 2) return 'price';
 
   // RULE 2: Short, direct commands → specific handlers
   if (/\b(pric|precio|coti|cuanto|how much|what.?s .* at|dame .* precio)\b/i.test(l) && wordCount <= 5) return 'price';

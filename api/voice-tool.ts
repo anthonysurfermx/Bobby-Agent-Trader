@@ -24,6 +24,19 @@ type ToolName = 'get_market' | 'run_debate' | 'get_protocol_stats' | 'propose_tr
 
 const ALLOWED: ToolName[] = ['get_market', 'run_debate', 'get_protocol_stats', 'propose_trade'];
 
+interface VoiceMarketResult {
+  symbol: string;
+  available: boolean;
+  assetType?: 'crypto' | 'equity';
+  currency?: string;
+  marketStatus?: string;
+  price?: number;
+  change_24h_pct?: number | null;
+  high_24h?: number;
+  low_24h?: number;
+  funding_rate?: number | null;
+}
+
 async function getJson(url: string, init?: RequestInit) {
   const response = await fetch(url, {
     ...init,
@@ -74,7 +87,7 @@ function okxTickerToMarket(ticker: string, t: Record<string, string>, funding?: 
     change_24h_pct: changePct,
     high_24h: Number(t.high24h),
     low_24h: Number(t.low24h),
-    funding_rate: funding?.fundingRate ? Number(funding.fundingRate) : null,
+    funding_rate: Number.isFinite(Number(funding?.rate ?? funding?.fundingRate)) && funding ? Number(funding.rate ?? funding.fundingRate) : null,
   };
 }
 
@@ -109,23 +122,10 @@ async function getMarket(symbol: string, venue?: AssetVenue) {
   const data = await getJson(`${SELF}/api/okx-market?instId=${ticker}-USDT&type=all`);
   const t = (data as { ticker?: Record<string, string> }).ticker;
   const funding = (data as { funding?: Record<string, string> }).funding;
-  if (!t?.last) return { symbol: ticker, available: false, price: null };
-  return okxTickerToMarket(ticker, t, funding);
+  if (!t?.last) return { symbol: ticker, available: false, assetType: 'crypto', price: null };
+  return okxTickerToMarket(ticker, t, funding, { assetType: 'crypto', available: true });
 }
 
-function legacyOkxMarketShape(t: Record<string, string>, ticker: string, funding?: Record<string, string>) {
-  const last = Number(t.last);
-  const open = Number(t.open24h);
-  return {
-    symbol: ticker,
-    price: last,
-    change_24h_pct: open ? Number((((last - open) / open) * 100).toFixed(2)) : null,
-    high_24h: Number(t.high24h),
-    low_24h: Number(t.low24h),
-    funding_rate: funding?.fundingRate ? Number(funding.fundingRate) : null,
-  };
-}
-void legacyOkxMarketShape;
 
 function normalizeCandles(payload: { candles?: Array<Record<string, number | string>> }): Candle[] {
   return (payload.candles ?? [])

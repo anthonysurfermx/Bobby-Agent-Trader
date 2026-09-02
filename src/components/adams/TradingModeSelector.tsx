@@ -33,15 +33,6 @@ const MODES = [
     tag: 'BALANCED',
     tagColor: '#7da6ff',
   },
-  {
-    id: 'auto' as TradingMode,
-    titleEs: 'Ejecución AI',
-    titleEn: 'AI Execution',
-    descEs: 'Autonomía total. Bobby ejecuta 24/7 basado en lógica neural.',
-    descEn: 'Full autonomy. Bobby executes 24/7 based on neural logic.',
-    tag: 'AUTONOMOUS',
-    tagColor: '#7da6ff',
-  },
 ];
 
 export default function TradingModeSelector({ onSelect, language = 'es', onInitVoice }: TradingModeSelectorProps) {
@@ -57,7 +48,12 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
   useEffect(() => {
     const saved = localStorage.getItem('bobby_trading_mode');
     if (saved === 'paper' || saved === 'confirm' || saved === 'auto') {
-      onSelect(saved);
+      // Autonomous execution is no longer a public product mode. Migrate old
+      // browser state to explicit human confirmation instead of silently
+      // preserving a capability the current product does not offer.
+      const safeMode: TradingMode = saved === 'auto' ? 'confirm' : saved;
+      if (safeMode !== saved) localStorage.setItem('bobby_trading_mode', safeMode);
+      onSelect(safeMode);
       setShowSelector(false);
     }
   }, [onSelect]);

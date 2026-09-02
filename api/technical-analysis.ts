@@ -7,6 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { resolveAssetFromText } from './_lib/assets.js';
+import { isEquitySymbol, normalizeAssetSymbol } from '../src/lib/voice-assets.js';
 
 interface Candle {
   ts: number;
@@ -206,19 +207,60 @@ async function fetchCandles(instId: string, bar: string = '1H', limit: number = 
   })).reverse(); // OKX returns newest first
 }
 
+// Equities shown by the mobile chart are priced by Yahoo. Computing their
+// indicators from the same venue avoids two classes of demo failure: several
+// curated stocks have no OKX swap, and tokenized-stock swaps can diverge from
+// the cash-market chart the user is looking at.
+async function fetchEquityCandles(symbol: string): Promise<Candle[]> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1mo&interval=1h`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BobbyAgentTrader/1.0)' },
+  });
+  if (!res.ok) return [];
+  const json = await res.json() as {
+    chart?: { result?: Array<{
+      timestamp?: number[];
+      indicators?: { quote?: Array<{
+        open?: Array<number | null>; high?: Array<number | null>;
+        low?: Array<number | null>; close?: Array<number | null>;
+        volume?: Array<number | null>;
+      }> };
+    }> };
+  };
+  const result = json.chart?.result?.[0];
+  const quote = result?.indicators?.quote?.[0];
+  if (!result?.timestamp || !quote) return [];
+  return result.timestamp.map((ts, index) => ({
+    ts: ts * 1000,
+    o: Number(quote.open?.[index]),
+    h: Number(quote.high?.[index]),
+    l: Number(quote.low?.[index]),
+    c: Number(quote.close?.[index]),
+    vol: Number(quote.volume?.[index] ?? 0),
+  })).filter((c) => [c.ts, c.o, c.h, c.l, c.c].every(Number.isFinite) && c.c > 0);
+}
+
 // ---- Handler ----
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const symbol = (req.query.symbol as string || 'BTC').toUpperCase();
+  const requestedSymbol = (req.query.symbol as string || 'BTC').trim().toUpperCase().slice(0, 128);
   // Multi-asset: resolve the real OKX instId (SWAP for stocks/metals like
   // NVDA-USDT-SWAP, SPOT for crypto). Falls back to spot for unknowns.
-  const resolved = await resolveAssetFromText(symbol);
+  // Curated symbols win before fuzzy search. Short equity tickers such as V,
+  // MA, BA and GS otherwise resemble longer crypto names and could silently
+  // resolve to VELO, MAGIC, BABY or DOGS — a dangerous wrong-asset result.
+  const normalizedRequested = normalizeAssetSymbol(requestedSymbol);
+  const requestedIsEquity = isEquitySymbol(normalizedRequested);
+  const resolved = requestedIsEquity ? null : await resolveAssetFromText(requestedSymbol);
+  const symbol = requestedIsEquity ? normalizedRequested : (resolved?.base || normalizedRequested);
   const instId = resolved?.instId || `${symbol}-USDT`;
 
   try {
-    const candles = await fetchCandles(instId, '1H', 168); // 7 days of hourly candles
+    const candles = requestedIsEquity || resolved?.kind === 'stock'
+      ? await fetchEquityCandles(symbol)
+      : await fetchCandles(instId, '1H', 168); // 7 days of hourly candles
     if (candles.length < 50) return res.status(404).json({ error: `Not enough candle data for ${symbol}` });
 
     const closes = candles.map(c => c.c);

@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { getCache, setCache } from './_lib/api-cache.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIpKey } from './_lib/rate-limit.js';
+import { matchAssetInText, normalizeAssetSymbol } from '../src/lib/voice-assets.js';
 
 export const config = { maxDuration: 30 };
 
@@ -52,12 +53,19 @@ function normalizeMessages(raw: unknown): ChatMessage[] | null {
 }
 
 function normalizeSymbol(value: unknown, messages: ChatMessage[]): string {
-  if (typeof value === 'string' && /^[A-Za-z0-9]{2,15}$/.test(value.trim())) return value.trim().toUpperCase();
-  // Conservative convenience only: follow-ups retain an explicitly supplied
-  // symbol; first turns may use common asset tickers without adding a resolver.
-  const text = messages.filter((m) => m.role === 'user').map((m) => m.content).join(' ');
-  const match = text.match(/\b(BTC|ETH|SOL|OKB|XRP|DOGE|AVAX|LINK|BNB)\b/i);
-  return match?.[1]?.toUpperCase() || 'BTC';
+  if (typeof value === 'string' && value.trim()) {
+    const normalized = normalizeAssetSymbol(value);
+    if (/^[A-Z0-9]{1,12}$/.test(normalized)) return normalized;
+  }
+  // Read the newest turn first. The shared voice registry understands company
+  // names and spoken aliases too ("Apple" -> AAPL, "envidia" -> NVDA), while
+  // its homonym guard prevents phrases such as "mi meta es..." becoming META.
+  for (const message of [...messages].reverse()) {
+    if (message.role !== 'user') continue;
+    const match = matchAssetInText(message.content);
+    if (match) return match;
+  }
+  return 'BTC';
 }
 
 function tone(vibe: Vibe): string {
