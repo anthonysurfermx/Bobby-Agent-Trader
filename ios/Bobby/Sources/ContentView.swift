@@ -360,6 +360,7 @@ struct ContentView: View {
     @State private var showSquad = false
     @State private var showBoard = false
     @State private var showRiskNotice = false
+    @State private var inspectedTool: CompanionTool?
     /// The desk never shows an empty hole: if the companion GLB fails to
     /// load, fall back to the orb until the companion changes.
     @State private var deskModelFailed = false
@@ -385,6 +386,16 @@ struct ContentView: View {
                 .transition(.opacity)
                 .zIndex(10)
             }
+            // The loot moment: gear drops after the evolution card, one at a time.
+            if vm.companions.pendingEvolution == nil,
+               let drop = vm.companions.pendingToolUnlocks.first,
+               let comp = vm.companions.companion {
+                ToolUnlockOverlay(companion: comp, tool: drop) {
+                    withAnimation(.easeOut(duration: 0.3)) { _ = vm.companions.pendingToolUnlocks.removeFirst() }
+                }
+                .transition(.opacity)
+                .zIndex(11)
+            }
         }
         .onChange(of: vm.companions.pendingEvolution?.number) { _, newLevel in
             guard let newLevel, let comp = vm.companions.companion else { return }
@@ -407,6 +418,11 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showBoard) {
             AssetBoardView(vm: vm)
+        }
+        .sheet(item: $inspectedTool) { tool in
+            ToolDetailSheet(companion: vm.companions.companion ?? bobbyCompanions[0], tool: tool, xp: vm.companions.disciplineXP)
+                .presentationDetents([.medium])
+                .presentationBackground(Theme.bg)
         }
         .sheet(isPresented: $showRiskNotice) {
             RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
@@ -632,6 +648,16 @@ struct ContentView: View {
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
                 .frame(minHeight: 18)
+
+            // The gear belt: three slots that fill with discipline — first
+            // read, then every 100 XP, the last one golden.
+            if let comp = vm.companions.companion, !speech.listening {
+                ToolBelt(companion: comp, xp: vm.companions.disciplineXP) { tool in
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    inspectedTool = tool
+                }
+                .padding(.top, 4)
+            }
 
             if speech.listening && !vm.input.isEmpty {
                 Text("“\(vm.input)”")

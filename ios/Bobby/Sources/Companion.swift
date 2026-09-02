@@ -228,6 +228,9 @@ final class CompanionStore: ObservableObject {
     /// Set when discipline just pushed the companion into a new level —
     /// the UI consumes it to play the evolution moment, then clears it.
     @Published var pendingEvolution: CompanionLevel?
+    /// Gear that just crossed its XP threshold (first read, then every 100 XP).
+    /// The UI plays the unlock moment for each, in order, then clears it.
+    @Published var pendingToolUnlocks: [CompanionTool] = []
 
     init() {
         companionId = defaults.string(forKey: Key.companion)
@@ -279,9 +282,15 @@ final class CompanionStore: ObservableObject {
         defaults.set(now, forKey: Key.dailyAwardsDay)
 
         let levelBefore = level.number
+        let xpBefore = disciplineXP
         disciplineXP += points
         // Evolution moment: name, voice tone and form change together
         if level.number > levelBefore { pendingEvolution = level }
+        // Loot moment: a tool drops the first time XP crosses its threshold.
+        if let companionId {
+            let drops = CompanionToolkit.newlyUnlocked(companionId: companionId, from: xpBefore, to: disciplineXP)
+            if !drops.isEmpty { pendingToolUnlocks.append(contentsOf: drops) }
+        }
 
         // Discipline streak with one grace day: consecutive day grows it,
         // a single skipped day PRESERVES it (grace, no growth), longer
