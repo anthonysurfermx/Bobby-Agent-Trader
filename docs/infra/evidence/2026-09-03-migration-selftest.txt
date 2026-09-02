@@ -1,10 +1,15 @@
 OK     t0-manifest: missing table → exit 1, no manifest  — exit=1
 OK     t0-manifest: count ≠ streamed → exit 1, no manifest  — exit=1
 OK     t0-manifest: clean run → exit 0, manifest written  — exit=0 
-OK     export: count ≠ exported → exit 1, no index.json  — exit=1
+OK     export: count ≠ exported → exit 1, directory removed (no private residue)  — exit=1 dir=gone
+OK     export: clean run → index.json  — exit=0
+OK     import: complete, untampered export → dry-run plan ok  — exit=0
+OK     import: table missing from the index → refused, nothing written  — exit=1
+OK     import: tampered NDJSON → refused before any write  — exit=1 upserts=0
 OK     replay: invalid --from refused  — exit=2
 OK     replay: source == target refused  — exit=2
 OK     replay: trigger set ≠ approved list refused  — exit=1
+OK     replay: trigger armed with the wrong pk columns refused  — exit=1
 OK     replay: refuses without freeze on both sides  — exit=1
 OK     replay: drains 5,432 pending entries across pages to zero  — exit=0 upserts=5432 left=0
 OK     replay: writes that keep landing after every drain → exit 1 (do not unfreeze)  — exit=1

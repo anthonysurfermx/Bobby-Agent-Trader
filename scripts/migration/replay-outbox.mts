@@ -12,7 +12,7 @@
 //     (bobby_outbox_status) or the replay refuses to start
 //   npx tsx scripts/migration/replay-outbox.mts --from target [--dry-run]
 // ============================================================
-import { APPROVED_TABLES, spec } from './tables.js';
+import { APPROVED_TABLES, outboxPlan, spec } from './tables.js';
 import { headers, log, project, rpc, type Side } from './lib.js';
 
 const args = process.argv.slice(2);
@@ -48,13 +48,15 @@ async function pending(p: typeof src): Promise<Entry[]> {
 (async () => {
   log(`replay outbox · ${src.ref} → ${dst.ref}${dryRun ? ' (dry run)' : ''}`);
   // 1. triggers cover exactly the approved tables on the journaling side
-  const status = await rpc<Array<{ table_name: string }>>(src, 'bobby_outbox_status');
+  const status = await rpc<Array<{ table_name: string; pk_columns: string | null }>>(src, 'bobby_outbox_status');
   if (status.status !== 200 || !Array.isArray(status.body)) { console.error(`bobby_outbox_status unavailable on ${src.ref} (HTTP ${status.status}) — apply the outbox migration first`); process.exit(1); }
-  const covered = new Set(status.body.map((r) => r.table_name));
-  const missing = [...approved].filter((t) => !covered.has(t));
-  const extra = [...covered].filter((t) => !approved.has(t));
-  if (missing.length || extra.length) { console.error(`outbox triggers do not match the approved list: missing=[${missing.join(',')}] extra=[${extra.join(',')}] (expected exactly ${approved.size})`); process.exit(1); }
-  log(`outbox triggers: ${covered.size}/${approved.size} approved tables covered`);
+  const plan = outboxPlan();
+  const armed = new Map(status.body.map((r) => [r.table_name, r.pk_columns || '']));
+  const missing = Object.keys(plan).filter((t) => !armed.has(t));
+  const extra = [...armed.keys()].filter((t) => !(t in plan));
+  const wrongPk = Object.entries(plan).filter(([t, pk]) => armed.has(t) && armed.get(t) !== pk).map(([t, pk]) => `${t}(${armed.get(t)}≠${pk})`);
+  if (missing.length || extra.length || wrongPk.length) { console.error(`outbox triggers do not match the approved plan: missing=[${missing.join(',')}] extra=[${extra.join(',')}] wrongPk=[${wrongPk.join(',')}] (expected exactly ${approved.size})`); process.exit(1); }
+  log(`outbox triggers: ${armed.size}/${approved.size} approved tables covered with the right pk columns`);
   // 2. both sides frozen
   if (!unsafe) {
     const [fs, fd] = await Promise.all([frozen(src), frozen(dst)]);

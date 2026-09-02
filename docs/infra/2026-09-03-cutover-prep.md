@@ -23,15 +23,35 @@ is dead; nothing of it, of DeFi México or of Polymarket travels.
 | 7 | PII in Git | pii tables record `sha256(pk bounds)` instead of values; the offending branch was replaced, the remote branch deleted. Evidence files scanned: no ids, no emails. | this branch's history starts clean |
 | 8 | Disk | 7.0 GiB free after cleaning regenerable caches; the remaining 10 G (codex-runtimes, huggingface, DerivedData) is Anthony's call. | — |
 
+## Codex round-3 pendings → what changed (commit after `7962249`)
+
+| # | Pending | Fix | Demonstrated by |
+|---|---------|-----|-----------------|
+| 1 | Failed export left partial NDJSON with private rows | On any failure `export` **removes the whole directory** before exiting 1 | selftest: "directory removed (no private residue)" |
+| 2 | Import skipped absent tables and never validated the files | `import` requires **every approved table in the index**, refuses unknown tables, and **re-reads and re-hashes every NDJSON** (rows + sha256 must equal the index) before the first write; `--dry-run` runs the same checks | selftest: missing index entry → refused; tampered file → refused with 0 writes |
+| 3 | Receipt success did not bind the proof | `verify-proofs` now requires, per row: tx **mined**, `to` == the **expected contract on that chain**, and for Hardness the calldata **decodes** to `commitPrediction(prediction_hash …)` / `publishSignal(symbol …)` / a resolve referencing the hash; `agent_events.payment_tx/trade_tx` (contract from `meta.contract`), `agent_trades`, `forum_threads.resolution_tx_hash` (thread id in calldata) and `mcp_payment_receipts` (`response_hash` in logs) are covered | run against legacy, see findings below |
+| 4 | Outbox checked names, not pk columns | `bobby_outbox_status()` returns the **pk columns each trigger was armed with** (`pg_trigger.tgargs`); `replay` and `verify --expect-outbox` compare them with `outboxPlan()` | selftest: wrong pk → refused |
+| 5 | Sequences / schema / outbox not exercised for real | still blocked on the destination schema (legacy DB password) | — |
+| 6 | aigts-bot could still write `telegram_connections` if it points at legacy | Not deleted (Codex). Its URL is a Vercel Secret and cannot be read here; evidence it is **not** legacy: it writes `bot_users`, `signals`, `price_alerts`, `processed_updates` on every update and none of those tables exist on legacy (a legacy-pointed bot would have been broken for months). Reversible action for the window: disable its cron/webhook from the aigts-bot dashboard, or confirm `SUPABASE_URL` there. `telegram_connections` has 0 rows on legacy, so even a stray write is caught by T0 ≠ verify | — |
+| 7 | Disk 5.7 GiB, 99 % | selftest now removes its temp dir; the export rehearsal was deleted; the rest is Anthony's caches | — |
+| — | `e2e-test-agent` | **Shared exclusion filter** (`exclusions.ts`): the agent, its sessions and their proofs are removed from T0, export, verify and verify-proofs by the same PostgREST predicate; both manifests record the exclusion set and `verify` checks they match and that no excluded row exists on the target | T0 source now 33/33, **26,159 rows** (3 fewer) |
+
 ## Findings on legacy data (from `verify-proofs.mts`, read-only)
 
-- The **only** Hardness proof on legacy belongs to `e2e-test-agent` (2026-04-12, X Layer):
-  its `signal_tx_hash` **reverted** on chain 196 (receipt status `0x0`, 0 logs, block
-  57,259,733) and its `prediction_hash` came from a `debateId` the session does not
-  store, so it cannot be recomputed. It is test data, not a real track-record proof.
-  **Decision needed:** exclude `e2e-test-agent` rows from the copy (recommended) or
-  copy them byte-exact and accept a permanent proof failure on both sides.
-- `agent_trades` and `mcp_payment_receipts` carry no tx hashes (0 rows).
+- `e2e-test-agent` (2026-04-12, X Layer): signal tx **reverted**, prediction hash not
+  recomputable → **excluded by decision** (shared filter). 0 Hardness proofs remain.
+- `agent_events`: 11 `onchain_tx` rows written by `generate-activity` on 2026-04-14 (X Layer,
+  demo activity). **7 are mined and bound** to the contract named in `meta.contract`
+  (TrackRecord, AdversarialBounties, ConvictionOracle, HardnessRegistry). **4 reverted**:
+  two HardnessRegistry calls and two rows labelled AgentEconomy whose `to` is an
+  unrelated address (`0xa4704e92…`). Full list in
+  `docs/infra/evidence/2026-09-03-legacy-proofs-check.txt`. **Decision needed:** copy them
+  byte-exact (history, the same 4 failures will show on both sides and `verify` still
+  passes because it compares values) or drop them via `EXCLUDED_AGENT_EVENT_IDS` in
+  `exclusions.ts` (one line, applied everywhere). Recommendation: drop — they are
+  synthetic demo rows, not decisions.
+- `agent_trades`, `forum_threads.resolution_tx_hash` and `mcp_payment_receipts` carry no
+  tx hashes (0 rows) — the checks are in place for the Base era.
 
 ## External writers
 

@@ -31,11 +31,11 @@ export async function count(p: Project, table: string, filter = ''): Promise<num
 }
 
 /** Every row, in a stable order, page by page. */
-export async function* rows<T = Record<string, unknown>>(p: Project, table: string, orderBy: string[], select = '*', pageSize = 1000): AsyncGenerator<T[]> {
+export async function* rows<T = Record<string, unknown>>(p: Project, table: string, orderBy: string[], select = '*', pageSize = 1000, filter = ''): AsyncGenerator<T[]> {
   const order = orderBy.map((c) => `${c}.asc`).join(',');
   let offset = 0;
   for (;;) {
-    const r = await fetch(`${p.url}/rest/v1/${table}?select=${encodeURIComponent(select)}&order=${order}&offset=${offset}&limit=${pageSize}`, { headers: headers(p) });
+    const r = await fetch(`${p.url}/rest/v1/${table}?select=${encodeURIComponent(select)}&order=${order}&offset=${offset}&limit=${pageSize}${filter}`, { headers: headers(p) });
     if (!r.ok) throw new Error(`${table}: page HTTP ${r.status} ${await r.text()}`);
     const page = (await r.json()) as T[];
     if (!page.length) return;

@@ -12,12 +12,12 @@
 // ============================================================
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { APPROVED_TABLES } from './tables.js';
 
-type Mode = { missing?: string; mismatch?: string; freeze?: boolean; triggers?: 'all' | 'partial'; pending?: number; leak?: boolean };
+type Mode = { missing?: string; mismatch?: string; freeze?: boolean; triggers?: 'all' | 'partial' | 'wrongpk'; pending?: number; leak?: boolean };
 let mode: Mode = {};
 let outboxPending: Array<{ id: number; table_name: string; op: string; pk: Record<string, unknown>; row_data: Record<string, unknown> }> = [];
 let upserts = 0;
@@ -26,13 +26,14 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://x');
   const table = url.pathname.replace('/rest/v1/', '');
   const json = (code: number, body: unknown, headers: Record<string, string> = {}) => { res.writeHead(code, { 'Content-Type': 'application/json', ...headers }); res.end(JSON.stringify(body)); };
-  if (table === 'rpc/bobby_outbox_status') return json(200, (mode.triggers === 'partial' ? APPROVED_TABLES.slice(0, 5) : APPROVED_TABLES).map((t) => ({ table_name: t.name })));
+  if (table === 'rpc/bobby_outbox_status') return json(200, (mode.triggers === 'partial' ? APPROVED_TABLES.slice(0, 5) : APPROVED_TABLES).map((t) => ({ table_name: t.name, pk_columns: mode.triggers === 'wrongpk' && t.name === 'agent_market_snapshots' ? 'symbol' : t.pk.join(',') })));
   if (table === 'bobby_control' && url.searchParams.get('select') === 'write_freeze') return json(200, [{ write_freeze: mode.freeze === true }]);
   if (table === 'migration_outbox') {
     if (req.method === 'PATCH') { const id = Number(url.searchParams.get('id')?.replace('eq.', '')); outboxPending = outboxPending.filter((e) => e.id !== id); if (mode.leak && outboxPending.length === 0) { outboxPending.push({ id: 900000 + Math.floor(Math.random() * 1e5), table_name: 'agent_config', op: 'INSERT', pk: { key: 'late' }, row_data: { key: 'late', value: 'x' } }); } return json(204, null); }
     const limit = Number(url.searchParams.get('limit') || 1000);
     return json(200, outboxPending.slice(0, limit));
   }
+  if (table === 'hardness_agent_sessions' && url.searchParams.get('select') === 'session_id') return json(200, []);
   if (req.method === 'POST') { upserts += 1; return json(201, null); }
   if (mode.missing === table) return json(404, { message: 'relation does not exist' });
   const total = 3;
@@ -76,7 +77,23 @@ server.listen(0, async () => {
   // 3. export mismatch
   mode = { mismatch: 'forum_threads' };
   r = await run('export.mts', ['--dir', join(dir, 'exp')], A);
-  line(r.status === 1 && !existsSync(join(dir, 'exp', 'index.json')) && /EXPORT FAILED/.test(r.stderr), 'export: count ≠ exported → exit 1, no index.json', `exit=${r.status}`);
+  line(r.status === 1 && !existsSync(join(dir, 'exp')) && /EXPORT FAILED/.test(r.stderr), 'export: count ≠ exported → exit 1, directory removed (no private residue)', `exit=${r.status} dir=${existsSync(join(dir, 'exp')) ? 'STILL THERE' : 'gone'}`);
+  // 3b. a clean export, then import checks: incomplete index, tampered file
+  mode = {};
+  r = await run('export.mts', ['--dir', join(dir, 'exp2')], A);
+  line(r.status === 0 && existsSync(join(dir, 'exp2', 'index.json')), 'export: clean run → index.json', `exit=${r.status}`);
+  const B2 = { ...A, TARGET_SUPABASE_URL: base.replace('127.0.0.1', 'localhost') };
+  r = await run('import.mts', ['--dir', join(dir, 'exp2'), '--dry-run'], B2);
+  line(r.status === 0 && /plan ok/.test(r.stdout), 'import: complete, untampered export → dry-run plan ok', `exit=${r.status}`);
+  const idx = JSON.parse(readFileSync(join(dir, 'exp2', 'index.json'), 'utf8'));
+  const saved = JSON.stringify(idx);
+  delete idx.tables.forum_posts; writeFileSync(join(dir, 'exp2', 'index.json'), JSON.stringify(idx));
+  r = await run('import.mts', ['--dir', join(dir, 'exp2'), '--dry-run'], B2);
+  line(r.status === 1 && /forum_posts: not in the export index/.test(r.stderr) && upserts === 0, 'import: table missing from the index → refused, nothing written', `exit=${r.status}`);
+  writeFileSync(join(dir, 'exp2', 'index.json'), saved);
+  writeFileSync(join(dir, 'exp2', 'agent_config.ndjson'), readFileSync(join(dir, 'exp2', 'agent_config.ndjson'), 'utf8').replace('"value":"1"', '"value":"tampered"'));
+  r = await run('import.mts', ['--dir', join(dir, 'exp2')], B2);
+  line(r.status === 1 && /agent_config: file does not match the index/.test(r.stderr) && upserts === 0, 'import: tampered NDJSON → refused before any write', `exit=${r.status} upserts=${upserts}`);
   // 4. replay guards
   r = await run('replay-outbox.mts', ['--from', 'nowhere'], A);
   line(r.status === 2, 'replay: invalid --from refused', `exit=${r.status}`);
@@ -86,6 +103,9 @@ server.listen(0, async () => {
   mode = { triggers: 'partial', freeze: true };
   r = await run('replay-outbox.mts', ['--from', 'target'], B);
   line(r.status === 1 && /triggers do not match/.test(r.stderr), 'replay: trigger set ≠ approved list refused', `exit=${r.status}`);
+  mode = { triggers: 'wrongpk', freeze: true };
+  r = await run('replay-outbox.mts', ['--from', 'target'], B);
+  line(r.status === 1 && /wrongPk=\[agent_market_snapshots/.test(r.stderr), 'replay: trigger armed with the wrong pk columns refused', `exit=${r.status}`);
   mode = { triggers: 'all', freeze: false };
   r = await run('replay-outbox.mts', ['--from', 'target'], B);
   line(r.status === 1 && /writeFreeze must be ON/.test(r.stderr), 'replay: refuses without freeze on both sides', `exit=${r.status}`);
@@ -101,6 +121,7 @@ server.listen(0, async () => {
   r = await run('replay-outbox.mts', ['--from', 'target'], { ...B, REPLAY_MAX_PASSES: '5' });
   line(r.status === 1 && /REPLAY INCOMPLETE/.test(r.stderr), 'replay: writes that keep landing after every drain → exit 1 (do not unfreeze)', `exit=${r.status}`);
   server.close();
+  rmSync(dir, { recursive: true, force: true });
   console.log(failures ? `\nSELFTEST FAILED: ${failures}` : '\nSELFTEST PASSED: fail-closed behaviour demonstrated.');
   process.exit(failures ? 1 : 0);
 });

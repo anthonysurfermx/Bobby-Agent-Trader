@@ -1,8 +1,17 @@
 {
   "side": "source",
   "ref": "egpixaunlnzauztbrnuz",
-  "takenAt": "2026-09-02T22:58:51.012Z",
+  "takenAt": "2026-09-02T23:18:06.466Z",
   "allowMissing": false,
+  "exclusions": {
+    "agentIds": [
+      "e2e-test-agent"
+    ],
+    "sessionIds": [
+      "hs_f28ab882-c18c-401e-ac24-49eb1a54f29d"
+    ],
+    "agentEventIds": []
+  },
   "tables": [
     {
       "table": "agent_config",
@@ -117,12 +126,8 @@
     {
       "table": "hardness_agents",
       "exists": true,
-      "rows": 1,
-      "sha256": "3dd873146263f5659fa223a956bb095029c8a291e11947c3721e0efabf447be9",
-      "pkMin": "1",
-      "pkMax": "1",
-      "createdMin": "2026-04-12T21:18:20.838562+00:00",
-      "createdMax": "2026-04-12T21:18:20.838562+00:00"
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "table": "indicator_cache",
@@ -191,38 +196,30 @@
     {
       "table": "hardness_agent_sessions",
       "exists": true,
-      "rows": 1,
-      "sha256": "f6483caa9b291231249fdbbd8422bf547d5b1dc94a22268d4a07d26dab5be42b",
-      "pkMin": "1",
-      "pkMax": "1",
-      "createdMin": "2026-04-12T21:18:37.26477+00:00",
-      "createdMax": "2026-04-12T21:18:37.26477+00:00"
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "table": "hardness_agent_proofs",
       "exists": true,
-      "rows": 1,
-      "sha256": "5648fd7100eee416c4b1167da1bc1600853b7eba0b78625c4ebc663dd88fa4bc",
-      "pkMin": "1",
-      "pkMax": "1",
-      "createdMin": "2026-04-12T21:19:28.003479+00:00",
-      "createdMax": "2026-04-12T21:19:28.003479+00:00",
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "proofs": {
         "prediction_hash": {
-          "nonNull": 1,
-          "sha256": "a7e20601238c03d601398c4520134b9432ead93704cb86a134d092dd64d55c1e"
+          "nonNull": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         "commit_tx_hash": {
           "nonNull": 0,
-          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         "signal_tx_hash": {
-          "nonNull": 1,
-          "sha256": "c99433489fbcfefd1a15ed1aeddc07faaa1b87d12531d710bcf435379f3535e1"
+          "nonNull": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
         "resolve_tx_hash": {
           "nonNull": 0,
-          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         }
       }
     },
@@ -313,5 +310,5 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   ],
-  "totalRows": 26162
+  "totalRows": 26159
 }

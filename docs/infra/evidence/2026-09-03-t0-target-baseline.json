@@ -1,8 +1,15 @@
 {
   "side": "target",
   "ref": "qbvdqkknnuweatptjohi",
-  "takenAt": "2026-09-02T22:58:57.219Z",
+  "takenAt": "2026-09-02T23:18:12.871Z",
   "allowMissing": true,
+  "exclusions": {
+    "agentIds": [
+      "e2e-test-agent"
+    ],
+    "sessionIds": [],
+    "agentEventIds": []
+  },
   "tables": [
     {
       "table": "agent_config",

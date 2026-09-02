@@ -66,10 +66,15 @@ begin
   return v_n;
 end $$;
 -- Which tables carry the capture trigger right now (replay/verify compare it with the approved list).
-create or replace function public.bobby_outbox_status() returns table (table_name text)
+-- Which tables carry the capture trigger and WITH WHICH pk columns (the
+-- trigger argument), so replay/verify can compare against the approved plan.
+create or replace function public.bobby_outbox_status() returns table (table_name text, pk_columns text)
 language sql security definer set search_path = public, pg_catalog stable as $$
-  select event_object_table::text from information_schema.triggers
-  where trigger_name = 'bobby_outbox' and trigger_schema = 'public' group by event_object_table order by 1;
+  select c.relname::text as table_name,
+         (select string_agg(a, ',') from unnest(string_to_array(encode(t.tgargs, 'escape'), E'\\000')) a where a <> '') as pk_columns
+  from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
+  where t.tgname = 'bobby_outbox' and n.nspname = 'public' and not t.tgisinternal
+  order by 1;
 $$;
 -- Identity sequences vs max(id): a REAL nextval() must land strictly above max(id).
 -- (nextval is non-transactional: each call burns one value — harmless.)

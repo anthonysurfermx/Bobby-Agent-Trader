@@ -21,6 +21,7 @@ import { dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { APPROVED_TABLES } from './tables.js';
 import { canonical, count, log, project, RollingHash, rows, sha256, type Side } from './lib.js';
+import { exclusionFilter, resolveExclusions } from './exclusions.js';
 
 const args = process.argv.slice(2);
 const sideArg = args[args.indexOf('--side') + 1];
@@ -42,8 +43,11 @@ export interface TableManifest {
   const tables: TableManifest[] = [];
   let total = 0;
   const problems: string[] = [];
+  const ex = await resolveExclusions(p);
+  log(`exclusions: agents=[${ex.agentIds.join(',')}] sessions=${ex.sessionIds.length}`);
   for (const t of APPROVED_TABLES) {
-    const n = await count(p, t.name);
+    const filter = exclusionFilter(t.name, ex);
+    const n = await count(p, t.name, filter);
     if (n === null) {
       tables.push({ table: t.name, exists: false, rows: 0, sha256: null });
       log(`${t.name.padEnd(30)} MISSING`);
@@ -55,7 +59,7 @@ export interface TableManifest {
     const proofNonNull: Record<string, number> = {};
     for (const c of t.proofColumns || []) { proofHashes[c] = createHash('sha256'); proofNonNull[c] = 0; }
     let pkMin: string | undefined; let pkMax: string | undefined; let createdMin: string | undefined; let createdMax: string | undefined;
-    for await (const page of rows(p, t.name, t.pk)) {
+    for await (const page of rows(p, t.name, t.pk, '*', 1000, filter)) {
       for (const row of page) {
         hash.add(row);
         const k = t.pk.map((c) => String(row[c])).join('|');
@@ -80,7 +84,7 @@ export interface TableManifest {
     console.error(`\nT0 MANIFEST FAILED — nothing written:\n  ${problems.join('\n  ')}`);
     process.exit(1);
   }
-  const manifest = { side, ref: p.ref, takenAt: new Date().toISOString(), allowMissing, tables, totalRows: total };
+  const manifest = { side, ref: p.ref, takenAt: new Date().toISOString(), allowMissing, exclusions: ex, tables, totalRows: total };
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(manifest, null, 2));
   log(`total ${total} rows across ${tables.filter((t) => t.exists).length}/${tables.length} tables → ${out}`);
