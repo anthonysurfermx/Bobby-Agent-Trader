@@ -3,21 +3,43 @@
 // touches the database. Phase 0 replaced the browser's direct PostgREST
 // writes (anon key) with these endpoints, so each one must carry its own
 // protection: freeze switch, method, origin, body size, schema validation,
-// per-IP and per-subject rate limits.
-//
-// Wallet ownership is NOT proven here (no signature yet). The limits and
-// the schema blunt abuse; proving the wallet is the next step and is
-// tracked in docs/infra.
+// per-IP and per-subject rate limits — and, for anything that belongs to a
+// wallet, PROOF that the caller owns that wallet (session token, see
+// wallet-session.ts). Origin and rate limits are defense in depth, never
+// authorization.
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { ZodTypeAny, z } from 'zod';
 import { checkPersistentLimit } from './rate-limit-persistent.js';
 import { createLimiter, getClientIpKey } from './rate-limit.js';
 import { requireWritesOpen } from './control.js';
-
-const ALLOWED_ORIGIN_SUFFIXES = ['bobbyprotocol.xyz', 'localhost', '127.0.0.1', '.vercel.app'];
+import { requireWalletSession, type WalletSession } from './wallet-session.js';
 
 export const WALLET_RE = /^0x[0-9a-fA-F]{40}$/;
+
+/**
+ * Exact hosts only (Codex review: a suffix match on .vercel.app lets any
+ * Vercel deployment pass). Production hosts are fixed; the deployment's own
+ * host (VERCEL_URL / VERCEL_BRANCH_URL) is added so previews work; extra
+ * hosts come from BOBBY_ALLOWED_ORIGINS (comma separated); localhost is
+ * accepted outside production only.
+ */
+export function allowedOriginHosts(env: NodeJS.ProcessEnv = process.env): Set<string> {
+  const hosts = new Set<string>(['bobbyprotocol.xyz', 'www.bobbyprotocol.xyz']);
+  for (const name of ['VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL']) {
+    const value = (env[name] || '').trim().toLowerCase();
+    if (value) hosts.add(value.replace(/^https?:\/\//, '').split('/')[0]);
+  }
+  for (const raw of (env.BOBBY_ALLOWED_ORIGINS || '').split(',')) {
+    const host = raw.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
+    if (host) hosts.add(host);
+  }
+  if (env.VERCEL_ENV !== 'production') {
+    hosts.add('localhost');
+    hosts.add('127.0.0.1');
+  }
+  return hosts;
+}
 
 export interface WriteGuardOptions<S extends ZodTypeAny> {
   /** Accepted HTTP methods, e.g. ['POST']. */
@@ -28,24 +50,36 @@ export interface WriteGuardOptions<S extends ZodTypeAny> {
   /** Per-IP cap: hits per window (seconds). */
   perIp: { limit: number; windowSec: number };
   /** Optional per-subject cap (wallet, token…) computed from the parsed body. */
-  perSubject?: { key: (body: z.infer<S>) => string | null; limit: number; windowSec: number };
+  perSubject?: { key: (body: z.infer<S>, wallet: string | null) => string | null; limit: number; windowSec: number };
   /** Max raw body size in bytes (default 16 KB). */
   maxBodyBytes?: number;
+  /**
+   * 'wallet' (default): a valid wallet session is required and, when the
+   * body carries `wallet`, it must be the session's wallet.
+   * 'none': anonymous endpoint (e.g. an email form) — say so explicitly.
+   */
+  auth?: 'wallet' | 'none';
+  /** Skip the origin check (server-to-server callers). Default false. */
+  allowNoOrigin?: boolean;
 }
 
 export interface WriteGuardResult<S extends ZodTypeAny> {
   body: z.infer<S>;
   ipKey: string;
+  /** Proven wallet (lower-case) when auth === 'wallet', else null. */
+  wallet: string | null;
+  session: WalletSession | null;
 }
 
 const localLimiters = new Map<string, ReturnType<typeof createLimiter>>();
 
 function originAllowed(req: VercelRequest): boolean {
   const raw = (req.headers.origin as string | undefined) || (req.headers.referer as string | undefined) || '';
-  if (!raw) return false; // browsers always send Origin on cross-site POST; same-site fetch sends it too
+  if (!raw) return false; // browsers always send Origin on POST/PATCH/DELETE
   try {
-    const host = new URL(raw).hostname.toLowerCase();
-    return ALLOWED_ORIGIN_SUFFIXES.some((s) => (s.startsWith('.') ? host.endsWith(s) : host === s || host.endsWith(`.${s}`)));
+    const host = new URL(raw).host.toLowerCase(); // host, not hostname: port matters for localhost
+    const hosts = allowedOriginHosts();
+    return hosts.has(host) || hosts.has(host.replace(/:\d+$/, ''));
   } catch {
     return false;
   }
@@ -53,8 +87,9 @@ function originAllowed(req: VercelRequest): boolean {
 
 /**
  * Runs the full checklist. Returns the validated body, or null after having
- * written the error response. Order: method → freeze → origin → size →
- * schema → per-IP limit (memory then persistent) → per-subject limit.
+ * written the error response. Order: method → freeze → origin → session →
+ * size → schema → wallet match → per-IP limit (memory then persistent) →
+ * per-subject limit.
  */
 export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: VercelResponse, opts: WriteGuardOptions<S>): Promise<WriteGuardResult<S> | null> {
   if (!opts.methods.includes(req.method || '')) {
@@ -63,9 +98,15 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
     return null;
   }
   if (!(await requireWritesOpen(res))) return null;
-  if (!originAllowed(req)) {
+  if (!opts.allowNoOrigin && !originAllowed(req)) {
     res.status(403).json({ error: 'Origin not allowed' });
     return null;
+  }
+  const auth = opts.auth ?? 'wallet';
+  let session: WalletSession | null = null;
+  if (auth === 'wallet') {
+    session = requireWalletSession(req, res);
+    if (!session) return null;
   }
   const maxBytes = opts.maxBodyBytes ?? 16 * 1024;
   const declared = Number(req.headers['content-length'] || 0);
@@ -81,6 +122,12 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
   const parsed = opts.schema.safeParse(raw ?? {});
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid payload', issues: parsed.error.issues.slice(0, 5).map((i) => ({ path: i.path.join('.'), message: i.message })) });
+    return null;
+  }
+  const wallet = session?.wallet ?? null;
+  const bodyWallet = (parsed.data as { wallet?: unknown }).wallet;
+  if (session && typeof bodyWallet === 'string' && bodyWallet.toLowerCase() !== session.wallet) {
+    res.status(403).json({ error: 'Wallet does not match the session' });
     return null;
   }
 
@@ -100,18 +147,18 @@ export async function guardWrite<S extends ZodTypeAny>(req: VercelRequest, res: 
     res.status(429).json({ error: 'Too many requests' });
     return null;
   }
-  if (opts.perSubject) {
-    const subject = opts.perSubject.key(parsed.data);
-    if (subject) {
-      const subjectLimit = await checkPersistentLimit(`${opts.scope}:subject`, subject, opts.perSubject.limit, opts.perSubject.windowSec);
-      if (subjectLimit.limited) {
-        res.setHeader('Retry-After', String(Math.max(1, Math.ceil((subjectLimit.resetAt - Date.now()) / 1000))));
-        res.status(429).json({ error: 'Too many requests for this wallet' });
-        return null;
-      }
+  const subject = opts.perSubject ? opts.perSubject.key(parsed.data, wallet) : wallet;
+  if (subject) {
+    const limit = opts.perSubject?.limit ?? opts.perIp.limit;
+    const windowSec = opts.perSubject?.windowSec ?? opts.perIp.windowSec;
+    const subjectLimit = await checkPersistentLimit(`${opts.scope}:subject`, subject, limit, windowSec);
+    if (subjectLimit.limited) {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((subjectLimit.resetAt - Date.now()) / 1000))));
+      res.status(429).json({ error: 'Too many requests for this wallet' });
+      return null;
     }
   }
-  return { body: parsed.data, ipKey };
+  return { body: parsed.data, ipKey, wallet, session };
 }
 
 /** Lower-cased, validated wallet or null. */

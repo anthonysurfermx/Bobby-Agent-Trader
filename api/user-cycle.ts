@@ -20,6 +20,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { getBobbyControl, requireWritesOpen } from './_lib/control.js';
+import { externalEffectsAllowed, noteSuppressedEffect } from './_lib/effects.js';
 
 export const config = { maxDuration: 120 };
 
@@ -574,9 +576,13 @@ async function runSingleProfile(
 
   await markRunSuccess(supabase, profile, now);
 
-  // Fire-and-forget: deliver to Telegram (DMs + Groups)
+  // Fire-and-forget: deliver to Telegram (DMs + Groups) — never in canary.
   const threadId = typeof thread.id === 'string' ? thread.id : null;
-  if (threadId) {
+  const control = await getBobbyControl();
+  const effects = { mode: 'live' as const, canary: control.canary };
+  if (threadId && !externalEffectsAllowed(effects)) {
+    noteSuppressedEffect('telegram', effects, `user-cycle ${profile.id}`);
+  } else if (threadId) {
     fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/telegram-deliver`, {
       method: 'POST',
       headers: {
@@ -663,6 +669,7 @@ async function processBatch(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

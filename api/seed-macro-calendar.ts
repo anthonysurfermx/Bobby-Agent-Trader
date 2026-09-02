@@ -5,12 +5,15 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireInternalAuth } from './_lib/request-security.js';
-import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
+import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 10 };
 
 const SB_URL = bobbyDbUrl();
-const SB_KEY = bobbyReadKey();
+// Writers never fall back to the anon key (Codex review): with RLS on, an
+// anon write fails silently. Missing service role → explicit 503 below.
+const SB_KEY = bobbyServiceKeyOptional();
 
 // FOMC meetings 2026 (from federalreserve.gov/monetarypolicy/fomccalendars.htm)
 // CPI release dates 2026 (from bls.gov/schedule/news_release/cpi.htm)
@@ -45,6 +48,8 @@ const MACRO_EVENTS_2026 = [
 ];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!SB_KEY) return res.status(503).json({ error: 'Service-role key not configured (BOBBY_SUPABASE_SERVICE_ROLE_KEY)' });
+  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (!requireInternalAuth(req, res)) return;
   if (!SB_KEY) return res.status(500).json({ error: 'No Supabase key' });

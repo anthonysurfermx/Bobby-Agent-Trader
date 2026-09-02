@@ -1,4 +1,5 @@
-import { bobbyDbUrl, bobbyReadKey } from './bobby-db.js';
+import { bobbyDbUrl, bobbyServiceKeyOptional } from './bobby-db.js';
+import { writeFreezeSync } from './control.js';
 // ============================================================
 // Unified Harness Event Logger
 // Every decision, payment, execution, and risk gate fires an
@@ -7,7 +8,8 @@ import { bobbyDbUrl, bobbyReadKey } from './bobby-db.js';
 // ============================================================
 
 const SB_URL = bobbyDbUrl();
-const SB_KEY = bobbyReadKey();
+const SB_KEY = bobbyServiceKeyOptional();
+if (!SB_KEY) console.error('[harness-events] service-role key missing — harness events will not be recorded');
 
 // ── Harness Verdict ──
 // Standard decision object for all Bobby flows.
@@ -46,7 +48,7 @@ export interface AgentEvent {
 // Fire-and-forget insert into agent_events table.
 // Never blocks the caller — failures are logged but swallowed.
 export function logHarnessEvent(event: AgentEvent): void {
-  if (!SB_KEY) return;
+  if (!SB_KEY || writeFreezeSync()) return;
 
   const row = {
     ...event,
@@ -146,7 +148,7 @@ export function distillEpisode(params: {
   vibePhrase?: string;
   runId: string;
 }): void {
-  if (!SB_KEY) return;
+  if (!SB_KEY || writeFreezeSync()) return;
 
   const { threadId, symbol, direction, regime, conviction, verdict, executed, yieldTriggered, vibePhrase, runId } = params;
   const conv = conviction ?? 0;

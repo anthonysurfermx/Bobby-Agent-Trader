@@ -10,6 +10,7 @@ import { verifyAgentRequest } from './_lib/agent-auth.js';
 import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWalletSession } from './_lib/wallet-session.js';
 
 export const config = { maxDuration: 15 };
 
@@ -48,6 +49,22 @@ const VALID_MARKETS = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'NVDA', 'TSLA', 'AAPL
 const VALID_DELIVERY = ['web', 'telegram', 'email'];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'GET') {
+    // The browser can no longer read agent_profiles with the anon key; it
+    // asks here with its wallet session and gets only its own row.
+    const session = requireWalletSession(req, res);
+    if (!session) return;
+    const supabaseRead = createClient(SB_URL, SB_SERVICE_KEY);
+    const { data, error } = await supabaseRead
+      .from('agent_profiles')
+      .select('id,wallet_address,agent_name,personality,markets,cadence_hours,delivery,status,last_run_at,next_run_at,voice,language,mascot')
+      .eq('wallet_address', session.wallet)
+      .limit(1)
+      .maybeSingle();
+    if (error) return res.status(502).json({ error: 'Could not load profile' });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ ok: true, profile: data ?? null });
+  }
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
   }

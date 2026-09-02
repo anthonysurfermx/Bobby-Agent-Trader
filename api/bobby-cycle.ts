@@ -18,15 +18,14 @@ import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
 import { internalAuthHeaders, requireInternalAuth, requireOpsAuth, tradingAuthHeaders } from './_lib/request-security.js';
-import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
+import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 300 };
 
 const SB_URL = bobbyDbUrl();
-const SB_KEY = bobbyReadKey();
-if (!SB_KEY) {
-  console.error('[Cycle] FATAL: no Supabase key in env (SUPABASE_SERVICE_KEY / SUPABASE_SERVICE_ROLE_KEY / VITE_SUPABASE_ANON_KEY all missing)');
-}
+// Writers never fall back to the anon key (Codex review): with RLS on, an
+// anon write fails silently. Missing service role → explicit 503 below.
+const SB_KEY = bobbyServiceKeyOptional();
 const READONLY_FALLBACK_HOSTS = [BOBBY_PROTOCOL_BASE_URL];
 
 function extractBoundedSection(source: string, openTag: string, closeTag: string, maxLength = 50_000): string {
@@ -651,6 +650,7 @@ async function getRecentContradictions(): Promise<{ contradictions: Contradictio
 // ---- Main handler ----
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!SB_KEY) return res.status(503).json({ error: 'Service-role key not configured (BOBBY_SUPABASE_SERVICE_ROLE_KEY)' });
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

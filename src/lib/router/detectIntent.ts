@@ -1,3 +1,4 @@
+import { sessionFetch } from '@/lib/bobby-session';
 // ============================================================
 // Semantic Router — extracted to shared module
 // Used by AdamsChat.tsx and potentially by backend
@@ -124,10 +125,10 @@ async function saveInterestTags(wallet: string, tokens: string[], context: strin
   // Phase 0: interests are saved through the API (validated, rate limited);
   // the browser never writes to the database directly.
   try {
-    await fetch('/api/user-interests', {
+    await sessionFetch(wallet, '/api/user-interests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wallet, assets: tokens.slice(0, 10), context: String(context || '').slice(0, 500) }),
+      body: JSON.stringify({ assets: tokens.slice(0, 10), context: String(context || '').slice(0, 500) }),
     });
   } catch { /* silent */ }
 }

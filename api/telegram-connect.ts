@@ -1,7 +1,6 @@
 // POST /api/telegram-connect — start a Telegram DM connection: the server
-// mints the one-time connect token and stores the pending row. Replaces the
-// browser's direct PostgREST insert on telegram_connections (which also
-// carried a hardcoded key). The token is what the user sends to the bot.
+// mints the one-time connect token and stores the pending row for the
+// SESSION wallet. An optional agentProfileId must belong to that wallet.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -21,17 +20,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     scope: 'telegram-connect',
     schema: Body,
     perIp: { limit: 5, windowSec: 3600 },
-    perSubject: { key: (b) => b.wallet?.toLowerCase() ?? null, limit: 10, windowSec: 86400 },
+    perSubject: { key: (_b, wallet) => wallet, limit: 10, windowSec: 86400 },
   });
-  if (!guarded) return;
-  const token = randomUUID().replace(/-/g, '').slice(0, 12);
+  if (!guarded || !guarded.wallet) return;
+  const wallet = guarded.wallet;
+  let agentProfileId: string | null = null;
   try {
+    if (guarded.body.agentProfileId) {
+      const check = await fetch(bobbyRest(`agent_profiles?id=eq.${guarded.body.agentProfileId}&wallet_address=eq.${wallet}&select=id&limit=1`), { headers: bobbyServiceHeaders() });
+      const rows = check.ok ? ((await check.json()) as Array<{ id: string }>) : [];
+      if (rows.length === 0) return res.status(403).json({ error: 'Agent profile does not belong to this wallet' });
+      agentProfileId = rows[0].id;
+    }
+    const token = randomUUID().replace(/-/g, '').slice(0, 12);
     const r = await fetch(bobbyRest('telegram_connections'), {
       method: 'POST',
       headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }),
       body: JSON.stringify({
-        wallet_address: guarded.body.wallet?.toLowerCase() ?? null,
-        agent_profile_id: guarded.body.agentProfileId ?? null,
+        wallet_address: wallet,
+        agent_profile_id: agentProfileId,
         telegram_user_id: 0,
         telegram_chat_id: 0,
         connect_token: token,

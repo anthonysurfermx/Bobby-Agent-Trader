@@ -2,10 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
-
-const SB_URL = BOBBY_DB_URL;
-const SB_KEY = BOBBY_DB_ANON;
+import { sessionFetch } from '@/lib/bobby-session';
+import { useBobbySession } from '@/hooks/useBobbySession';
 
 const POLL_INTERVAL = 30_000; // 30s
 
@@ -22,6 +20,7 @@ export function ProactiveNotification({ walletAddress }: { walletAddress?: strin
   const [alerts, setAlerts] = useState<ProactiveAlert[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
+  const { ready: sessionReady } = useBobbySession({ auto: false });
 
   // Read user language preference
   const lang = (() => {
@@ -31,17 +30,14 @@ export function ProactiveNotification({ walletAddress }: { walletAddress?: strin
   const fetchUnread = useCallback(async () => {
     if (!walletAddress) return;
     try {
-      const res = await fetch(
-        `${SB_URL}/rest/v1/agent_messages?wallet_address=eq.${walletAddress}&read=eq.false&order=created_at.desc&limit=3`,
-        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-      );
-      if (!res.ok) return;
+      const res = await sessionFetch(walletAddress, '/api/agent-messages?unread=1&limit=3&order=desc');
+      if (!res || !res.ok) return;
       const data = await res.json();
       if (Array.isArray(data)) {
         setAlerts(data.filter((a: ProactiveAlert) => !dismissed.has(a.id)));
       }
     } catch { /* silent */ }
-  }, [walletAddress, dismissed]);
+  }, [walletAddress, dismissed, sessionReady]);
 
   // Poll every 30s
   useEffect(() => {
@@ -54,10 +50,10 @@ export function ProactiveNotification({ walletAddress }: { walletAddress?: strin
     setDismissed(prev => new Set(prev).add(id));
     setAlerts(prev => prev.filter(a => a.id !== id));
     try {
-      await fetch('/api/agent-messages', {
+      await sessionFetch(walletAddress, '/api/agent-messages', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wallet: walletAddress, id }),
+        body: JSON.stringify({ id }),
       });
     } catch { /* silent */ }
   };

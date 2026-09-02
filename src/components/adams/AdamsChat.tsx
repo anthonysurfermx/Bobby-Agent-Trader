@@ -25,6 +25,8 @@ import { ExecutionTimeline } from './ExecutionTimeline';
 import { STOCK_MAP, TOKEN_MAP, detectIntent, detectStocks, detectTokens } from '@/lib/router/detectIntent';
 import { useBobbyVoice } from '@/hooks/useBobbyVoice';
 import { useAuth } from '@/hooks/useAuth';
+import { useBobbySession } from '@/hooks/useBobbySession';
+import { sessionFetch } from '@/lib/bobby-session';
 import { clearStoredVibe, getStoredVibe, inferUserVibe, saveStoredVibe, shouldClearStoredVibe } from '@/lib/bobby-vibe';
 import { ResponsiveContainer, AreaChart, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
@@ -45,11 +47,9 @@ interface DBMessage {
 
 async function fetchDBMessages(wallet: string): Promise<DBMessage[]> {
   try {
-    const res = await fetch(
-      `${SB_URL}/rest/v1/agent_messages?wallet_address=eq.${wallet}&order=created_at.asc&limit=50`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-    );
-    if (!res.ok) return [];
+    // The inbox is private: read through the API with the wallet session.
+    const res = await sessionFetch(wallet, '/api/agent-messages?limit=50&order=asc');
+    if (!res || !res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   } catch { return []; }
@@ -71,10 +71,10 @@ async function saveInterestTags(wallet: string, tokens: string[], context: strin
   // Phase 0: writes go through the API (validated, rate limited); the browser
   // never carries a key that can write.
   try {
-    await fetch('/api/user-interests', {
+    await sessionFetch(wallet, '/api/user-interests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wallet, assets: tokens.slice(0, 10), context: context.slice(0, 500) }),
+      body: JSON.stringify({ assets: tokens.slice(0, 10), context: context.slice(0, 500) }),
     });
   } catch { /* silent — don't block chat for interest tracking */ }
 }
@@ -681,6 +681,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
   const { address } = useAccount();
   const { open: openWallet } = useAppKit();
   const { isAuthenticated, signOut } = useAuth();
+  const { ready: sessionReady, ensureSession } = useBobbySession({ auto: true });
   const navigate = useNavigate();
 
   // Guest Pass: 2 free messages before requiring login
@@ -906,11 +907,14 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // Clear Supabase messages for this wallet
     if (profile?.walletAddress) {
       try {
-        await fetch('/api/agent-messages', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wallet: profile.walletAddress }),
-        });
+        const session = await ensureSession();
+        if (session) {
+          await sessionFetch(profile.walletAddress, '/api/agent-messages', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+        }
       } catch { }
     }
     // Reset UI
@@ -918,7 +922,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     setConfirmClear(false);
     setShowMenu(false);
     stopAll();
-  }, [profile?.walletAddress, stopAll]);
+  }, [profile?.walletAddress, stopAll, ensureSession]);
 
   // ---- Logout ----
   const handleLogout = useCallback(async () => {
@@ -2444,11 +2448,10 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               } else {
                 const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-                const publishRes = await fetch('/api/forum-publish', {
+                const publishRes = (await sessionFetch(profile?.walletAddress, '/api/forum-publish', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    wallet: profile?.walletAddress || undefined,
                     language: lang,
                     topic,
                     symbol,
@@ -2459,7 +2462,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                     target_price: targetPrice ?? null,
                     posts: posts.slice(0, 6).map((post) => ({ agent: post.agent, content: post.content.slice(0, 4000) })),
                   }),
-                });
+                })) ?? new Response(null, { status: 401 }); // no wallet session → not published
                 if (publishRes.ok) {
                   const published = await publishRes.json();
                   console.log('[Bobby] ✅ Debate published to forum:', published.threadId);
@@ -2753,15 +2756,12 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
   // ---- Latest personal debate (for left panel) ----
   const [latestPersonalDebate, setLatestPersonalDebate] = useState<{ topic: string; conviction: number; symbol: string } | null>(null);
   useEffect(() => {
-    if (!address || advisorName === 'Bobby') return;
-    const SB = BOBBY_DB_URL;
-    const KEY = BOBBY_DB_ANON;
-    fetch(`${SB}/rest/v1/forum_threads?scope=eq.private&owner_wallet=eq.${address.toLowerCase()}&order=created_at.desc&limit=1&select=id,topic,conviction_score,symbol`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
-    }).then(r => r.json()).then(d => {
+    if (!address || advisorName === 'Bobby' || !sessionReady) return;
+    // Private debates are served to the proven owner only.
+    sessionFetch(address, '/api/my-threads?limit=1&select=compact').then(r => r ? r.json() : []).then(d => {
       if (Array.isArray(d) && d.length > 0) setLatestPersonalDebate({ topic: d[0].topic, conviction: d[0].conviction_score, symbol: d[0].symbol });
     }).catch(() => {});
-  }, [address, advisorName]);
+  }, [address, advisorName, sessionReady]);
 
   // Fetch positions + equity for HUD (every 30s when idle)
   useEffect(() => {
@@ -3126,12 +3126,13 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             try {
               const agentProfile = localStorage.getItem('agent_profile');
               const profileId = agentProfile ? JSON.parse(agentProfile).id : null;
-              const r = await fetch('/api/telegram-connect', {
+              const session = await ensureSession(); // explicit gesture: prompt if needed
+              const r = session ? await sessionFetch(address, '/api/telegram-connect', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ wallet: address?.toLowerCase() || undefined, agentProfileId: profileId || undefined }),
-              });
-              if (r.ok) token = (await r.json()).token || '';
+                body: JSON.stringify({ agentProfileId: profileId || undefined }),
+              }) : null;
+              if (r?.ok) token = (await r.json()).token || '';
             } catch {}
             if (!token) { console.warn('[Bobby] Telegram connect unavailable'); return; }
             window.open(`https://t.me/Bobbyagentraderbot?start=connect_${token}`, '_blank');

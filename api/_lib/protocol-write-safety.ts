@@ -1,5 +1,5 @@
 import type { VercelResponse } from '@vercel/node';
-import { lastKnownControl } from './control.js';
+import { getBobbyControl, writeFreezeSync } from './control.js';
 import {
   BASE_CHAIN_ID,
   BASE_SEPOLIA_CHAIN_ID,
@@ -25,8 +25,22 @@ function isConfiguredAddress(value: string): boolean {
   return ADDRESS_RE.test(value) && value.toLowerCase() !== ZERO_ADDRESS;
 }
 
+/**
+ * Fail-closed: the static latch, OR the dynamic switch. When the dynamic
+ * source is configured but has not been read by this lambda yet, this
+ * reports FROZEN (Codex review: writers must not depend on a previous
+ * request having loaded the control row). Async callers should prefer
+ * isProtocolCutoverFrozenAsync(), which loads the snapshot first.
+ */
 export function isProtocolCutoverFrozen(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.PROTOCOL_CUTOVER_FREEZE === 'true' || lastKnownControl()?.writeFreeze === true;
+  return env.PROTOCOL_CUTOVER_FREEZE === 'true' || writeFreezeSync();
+}
+
+/** Load the dynamic control snapshot, then answer the freeze question. */
+export async function isProtocolCutoverFrozenAsync(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  if (env.PROTOCOL_CUTOVER_FREEZE === 'true') return true;
+  const control = await getBobbyControl();
+  return control.writeFreeze;
 }
 
 /**
@@ -124,10 +138,13 @@ export function evaluateProtocolWriteSafety(
   };
 }
 
-export function requireProtocolWriteSafety(
+export async function requireProtocolWriteSafety(
   res: VercelResponse,
   requiredContracts: WritableContract[],
-): ProtocolWriteSafetyResult | null {
+): Promise<ProtocolWriteSafetyResult | null> {
+  // Read the dynamic switch BEFORE evaluating, so the sync latch below sees
+  // a fresh snapshot instead of failing closed on a cold lambda.
+  await getBobbyControl();
   const result = evaluateProtocolWriteSafety(DEFAULT_CHAIN, process.env, requiredContracts);
   if (result.ok) return result;
 
@@ -140,7 +157,11 @@ export function requireProtocolWriteSafety(
 }
 
 /** Guard an endpoint that intentionally remains X-Layer-only during cutover. */
-export function requireLegacyXLayerMode(res: VercelResponse, surface: string): boolean {
+export async function requireLegacyXLayerMode(res: VercelResponse, surface: string): Promise<boolean> {
+  if (await isProtocolCutoverFrozenAsync()) {
+    res.status(503).json({ error: `${surface} is frozen (write freeze active)`, chainId: DEFAULT_CHAIN.id });
+    return false;
+  }
   if (DEFAULT_CHAIN.id === XLAYER_CHAIN_ID && legacyXLayerWritesAllowed()) return true;
   if (DEFAULT_CHAIN.id === XLAYER_CHAIN_ID) {
     res.status(503).json({

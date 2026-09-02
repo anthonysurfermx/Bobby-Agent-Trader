@@ -14,7 +14,8 @@ import { ethers } from 'ethers';
 import { requireProtocolAutomationAuth } from './_lib/request-security.js';
 import { assertProviderChain, requireLegacyXLayerMode } from './_lib/protocol-write-safety.js';
 import { XLAYER_CHAIN_ID } from './_lib/chains.js';
-import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
+import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 60 };
 
@@ -61,7 +62,9 @@ const DIMENSIONS = [
 
 // Supabase for fetching real debate threads
 const SB_URL = bobbyDbUrl();
-const SB_KEY = bobbyReadKey();
+// Writers never fall back to the anon key (Codex review): with RLS on, an
+// anon write fails silently. Missing service role → explicit 503 below.
+const SB_KEY = bobbyServiceKeyOptional();
 
 interface TxResult {
   type: string;
@@ -150,12 +153,14 @@ async function sendTxSafe(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!SB_KEY) return res.status(503).json({ error: 'Service-role key not configured (BOBBY_SUPABASE_SERVICE_ROLE_KEY)' });
+  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
   }
 
   if (!requireProtocolAutomationAuth(req, res)) return;
-  if (!requireLegacyXLayerMode(res, 'generate-activity')) return;
+  if (!(await requireLegacyXLayerMode(res, 'generate-activity'))) return;
 
   const recorderKey = process.env[RECORDER_KEY_ENV];
   if (!recorderKey) {

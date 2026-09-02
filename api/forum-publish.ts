@@ -1,8 +1,10 @@
 // POST /api/forum-publish — publish a user debate from the chat to the public
 // forum (thread + agent posts). Replaces the browser's direct PostgREST
-// inserts on forum_threads / forum_posts. Server fixes the provenance
-// (trigger_reason, expiry) and validates every field; the client cannot
-// set status, resolution, prices at creation or ids.
+// inserts on forum_threads / forum_posts. The server fixes the provenance
+// (trigger_reason, expiry, owner_wallet = the session wallet) and validates
+// every field; the client cannot set status, resolution, prices at creation
+// or ids. Requires a wallet session: an anonymous caller could otherwise
+// publish posts impersonating cio / red_team / bobby.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
@@ -34,10 +36,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     scope: 'forum-publish',
     schema: Body,
     perIp: { limit: 6, windowSec: 3600 },
-    perSubject: { key: (b) => b.wallet?.toLowerCase() ?? null, limit: 12, windowSec: 86400 },
+    perSubject: { key: (_b, wallet) => wallet, limit: 12, windowSec: 86400 },
     maxBodyBytes: 40 * 1024,
   });
-  if (!guarded) return;
+  if (!guarded || !guarded.wallet) return;
   const b = guarded.body;
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   try {
@@ -47,6 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         topic: b.topic,
         trigger_reason: 'User debate in Bobby Chat',
+        trigger_data: { source: 'bobby-chat', published_by: guarded.wallet },
         language: b.language,
         conviction_score: b.conviction_score,
         price_at_creation: {},
@@ -56,6 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         stop_price: b.stop_price ?? null,
         target_price: b.target_price ?? null,
         expires_at: expiresAt,
+        scope: 'public',
+        owner_wallet: guarded.wallet,
       }),
     });
     if (!threadRes.ok) {

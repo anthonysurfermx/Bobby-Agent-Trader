@@ -34,6 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     methods: ['POST'],
     scope: 'bobby-early-access',
     schema: Body,
+    auth: 'none', // email form: no wallet to prove; rate limits + consent text are the guard
     perIp: { limit: 8, windowSec: 3600 },
     perSubject: { key: (b) => b.email, limit: 3, windowSec: 86400 },
   });

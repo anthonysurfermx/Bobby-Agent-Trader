@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!requireProtocolAutomationAuth(req, res)) return;
-  if (!requireLegacyXLayerMode(res, 'auto-bounty')) return;
+  if (!(await requireLegacyXLayerMode(res, 'auto-bounty'))) return;
 
   const recorderKey = process.env.BOBBY_RECORDER_KEY;
   if (!recorderKey) {

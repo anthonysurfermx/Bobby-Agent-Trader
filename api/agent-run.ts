@@ -35,6 +35,7 @@ import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIpKey } from './_lib/rate-limit.js';
 import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 120 };
 
@@ -949,6 +950,7 @@ async function logToSupabase(data: Record<string, unknown>) {
 // HANDLER
 // ============================================================
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

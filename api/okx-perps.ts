@@ -8,7 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
 import { recordAuthHeaders } from './_lib/record-auth.js';
-import { isProtocolCutoverFrozen } from './_lib/protocol-write-safety.js';
+import { isProtocolCutoverFrozenAsync } from './_lib/protocol-write-safety.js';
 import { enforcePublicRateLimit, isTradingRequest, requireTradingAuth } from './_lib/request-security.js';
 
 const OKX_BASE = 'https://www.okx.com';
@@ -190,7 +190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     !hasUserCreds &&
     tradingMode === 'live' &&
     serverLiveMutations.has(action) &&
-    isProtocolCutoverFrozen()
+    (await isProtocolCutoverFrozenAsync())
   ) {
     return res.status(503).json({ error: 'Bobby live trading is frozen for the protocol cutover' });
   }

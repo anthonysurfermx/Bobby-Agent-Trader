@@ -35,6 +35,8 @@ export interface BobbyControl {
 }
 
 const CACHE_MS = 10_000;
+/** A hung control source must not eat the function's whole budget (Codex review). */
+const FETCH_TIMEOUT_MS = 2_500;
 let cached: BobbyControl | null = null;
 
 function fromEnv(env: NodeJS.ProcessEnv = process.env): BobbyControl {
@@ -55,6 +57,7 @@ function failClosed(reason: string): BobbyControl {
 async function fromTable(): Promise<BobbyControl> {
   const res = await fetch(bobbyRest('bobby_control?id=eq.global&select=write_freeze,canary,note&limit=1'), {
     headers: bobbyServiceHeaders(),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) return failClosed(`bobby_control HTTP ${res.status}`);
   const rows = (await res.json()) as Array<{ write_freeze?: boolean; canary?: boolean; note?: string | null }>;
@@ -74,7 +77,9 @@ async function fromEdgeConfig(): Promise<BobbyControl> {
   const match = conn.match(/^https:\/\/edge-config\.vercel\.com\/([^?]+)\?token=(.+)$/);
   if (!match) return failClosed('EDGE_CONFIG connection string is missing or malformed');
   const [, id, token] = match;
-  const res = await fetch(`https://edge-config.vercel.com/${id}/item/bobby_control?token=${encodeURIComponent(token)}`);
+  const res = await fetch(`https://edge-config.vercel.com/${id}/item/bobby_control?token=${encodeURIComponent(token)}`, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
   if (!res.ok) return failClosed(`edge config HTTP ${res.status}`);
   const item = (await res.json()) as { write_freeze?: boolean; canary?: boolean; note?: string | null } | null;
   if (!item || typeof item !== 'object') return failClosed('edge config item "bobby_control" is missing');
@@ -103,6 +108,18 @@ export async function getBobbyControl(): Promise<BobbyControl> {
 /** Last control snapshot seen by this lambda (sync consumers such as the write latch). */
 export function lastKnownControl(): BobbyControl | null {
   return cached ?? (process.env.BOBBY_CONTROL_SOURCE ? null : fromEnv());
+}
+
+/**
+ * Synchronous, fail-closed view of the freeze for code that cannot await:
+ * when a dynamic source is configured and this lambda has not read it yet,
+ * the answer is "frozen". Writers should call getBobbyControl() first so the
+ * snapshot exists; this is the backstop for the ones that forget.
+ */
+export function writeFreezeSync(): boolean {
+  const snapshot = lastKnownControl();
+  if (!snapshot) return Boolean(process.env.BOBBY_CONTROL_SOURCE);
+  return snapshot.writeFreeze;
 }
 
 /**

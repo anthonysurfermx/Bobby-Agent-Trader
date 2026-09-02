@@ -88,3 +88,123 @@ SUPABASE_URL=https://egpixaunlnzauztbrnuz.supabase.co SUPABASE_ANON_KEY=<anon> B
   que ese endpoint lea `getBobbyControl()` al inicio.
 - Las decisiones de producto abiertas (foro/Agentic World, VPS del bot,
   tablas ambiguas, newsletter) no bloquean esta fase.
+
+---
+
+## Séptimo commit — respuesta a la revisión de Codex (2026-09-02, tarde)
+
+Codex encontró cinco bloqueos y dos ajustes en la fase 0. Todos quedan
+cerrados en este commit; nada se ha desplegado ni aplicado a ninguna base.
+
+### 1. Gate adversarial sin falsos positivos
+`scripts/infra/rls-adversarial.mts` v2 ya no infiere "rechazado" de
+"0 filas afectadas". Ahora tiene tres partes y **exige la service key**
+(sin ella el veredicto es INCOMPLETE, exit 2):
+
+- **A. Matriz de políticas** leída de `pg_policies` vía las funciones
+  `bobby_rls_matrix()` y `bobby_rls_status()` (security definer, solo
+  service_role; las crea la migración). Falla si alguna tabla protegida
+  tiene RLS apagado, si alguna política está concedida a `public`, o si
+  anon/authenticated aparece en algo que no sea SELECT (más INSERT en
+  `user_feedback`), o aparece en las tablas privadas.
+- **B. Filas canario** reales: la service role las planta con un marcador
+  único en `agent_cycles`, `forum_threads` (pública y privada),
+  `forum_posts`, `agent_trades`, `agent_messages`, `user_interests`,
+  `user_digests`, `mcp_payment_challenges`. Con la anon key se intenta
+  SELECT (las privadas deben estar ocultas), UPDATE y DELETE sobre esos ids
+  exactos; después la service role comprueba que la fila sigue intacta.
+  INSERT anónimo debe fallar con 401/403; un 400 cuenta como INCONCLUSO y
+  falla el gate. Los canarios se borran al final, también si algo falla.
+- **C. Camino legítimo** con una wallet desechable generada en el momento:
+  firma → `/api/wallet-session` → `POST /api/user-interests` escribe una fila
+  y `GET` la devuelve. La misma llamada sin sesión da 401 y con otra wallet
+  en el cuerpo da 403. `DELETE /api/agent-messages` nombrando otra wallet
+  da 403.
+
+```bash
+SUPABASE_URL=… SUPABASE_ANON_KEY=… SUPABASE_SERVICE_KEY=… \
+BOBBY_API=https://<preview-o-prod> npx tsx scripts/infra/rls-adversarial.mts
+```
+
+### 2. Datos privados fuera del alcance de la anon key
+La migración `20260902_bobby_rls_hardening.sql` ahora deja como **solo
+service role** a `agent_messages`, `user_interests`, `user_digests`,
+`sandbox_runs` y `agent_profiles`. `forum_threads` solo es legible
+públicamente cuando `scope <> 'private'`, y `forum_posts` solo cuando su
+hilo es público. Lo privado lo sirve el API al dueño probado:
+
+| Antes (anon key directo)                         | Ahora                                   |
+|--------------------------------------------------|-----------------------------------------|
+| `agent_messages?wallet_address=eq.…`             | `GET /api/agent-messages` (sesión)      |
+| `user_interests?wallet_address=eq.…`             | `GET /api/user-interests` (sesión)      |
+| `forum_threads?scope=eq.private&…`               | `GET /api/my-threads` (sesión)          |
+| `agent_profiles?wallet_address=eq.…`             | `GET /api/agent-setup` (sesión)         |
+
+`AgentDashboard` (agent-radar) leía los últimos 20 `agent_messages` de
+todas las wallets; con el RLS nuevo recibe `[]`. Es un panel legado; queda
+documentado, no se toca.
+
+### 3. Prueba de propiedad de la wallet (sesión firmada)
+- `src/lib/wallet-session-message.ts`: el texto que firma el usuario
+  (compartido navegador/API).
+- `api/_lib/wallet-session.ts` + `POST /api/wallet-session`: verifica la
+  firma (`recoverMessageAddress`, ventana de 10 min) y emite un token HMAC
+  (`BOBBY_SESSION_SECRET`, 7 días, sin estado). `requireWalletSession()` lo
+  exige; `guardWrite()` lo exige por defecto (`auth: 'wallet'`) y rechaza
+  con 403 cualquier `wallet` del cuerpo distinta a la de la sesión. Solo
+  `bobby-early-access` declara `auth: 'none'` (formulario de email).
+- `telegram-connect` además verifica que `agentProfileId` pertenezca a la
+  wallet de la sesión. `forum-publish` fija `owner_wallet` desde la sesión.
+- Navegador: `src/lib/bobby-session.ts` guarda el token en localStorage por
+  wallet, `useBobbySession()` pide la firma **una vez** al conectar (si el
+  usuario la rechaza no se insiste hasta un gesto explícito: borrar chat,
+  conectar Telegram). Las lecturas privadas sin sesión devuelven vacío; las
+  escrituras silenciosas (intereses) se omiten.
+- Límite conocido: solo EOAs. Smart wallets (EIP-1271) no pueden firmar
+  así todavía; se registra como siguiente paso.
+- Autoprueba offline: `npx tsx scripts/infra/wallet-session-selftest.mts`.
+
+### 4. Kill switch global
+`requireWritesOpen()` al inicio de `user-cycle`, `forum-resolve`,
+`forum-morning`, `generate-activity`, `seed-macro-calendar`, `feedback`,
+`agent-run`, `sandbox-run` (además de `bobby-cycle`, `settle-trades` y los
+cuatro endpoints públicos). `telegram-deliver` respeta freeze y canary;
+`user-cycle` no manda Telegram en canary; `telegram-webhook` en freeze
+responde 200 y no procesa (para que Telegram no reintente).
+Escritores on-chain: `requireProtocolWriteSafety()` y
+`requireLegacyXLayerMode()` ahora son async y **leen el control antes** de
+evaluar; `isProtocolCutoverFrozen()` (sync) falla cerrado cuando hay fuente
+dinámica configurada y el lambda aún no la leyó. `harness-events` no escribe
+en freeze.
+
+### 5. Ningún escritor acepta la anon key como respaldo
+`bobby-cycle`, `forum-resolve`, `forum-morning`, `generate-activity`,
+`seed-macro-calendar`, `feedback` y `_lib/harness-events` usan
+`bobbyServiceKeyOptional()` y responden **503 explícito** si falta la
+service role (antes: escritura silenciosamente rechazada por RLS).
+`bobbyReadKey()` queda solo en lectores.
+
+### Ajustes
+- Allowlist de origen con **hosts exactos**: `bobbyprotocol.xyz`,
+  `www.bobbyprotocol.xyz`, el host del propio deployment (`VERCEL_URL`,
+  `VERCEL_BRANCH_URL`), lo que diga `BOBBY_ALLOWED_ORIGINS` y `localhost`
+  solo fuera de producción. Sigue siendo defensa secundaria.
+- Lecturas de `bobby_control` con timeout de 2.5 s (fail-closed).
+
+### Variables nuevas
+| Variable                 | Dónde      | Nota                                                  |
+|--------------------------|------------|-------------------------------------------------------|
+| `BOBBY_SESSION_SECRET`   | Vercel     | ≥ 32 caracteres aleatorios. Rotarla cierra sesiones.  |
+| `BOBBY_ALLOWED_ORIGINS`  | Vercel     | Opcional, hosts extra separados por coma (previews).  |
+
+### Cambio visible para el usuario
+Al conectar la wallet, Bobby pide **una firma gratuita** ("Sign in to prove
+you own this wallet…"). Sin ella el chat sigue funcionando, pero no hay
+inbox, intereses, debates privados ni publicación al foro.
+
+### Cobertura de tipos
+`tsconfig.api.json` solo cubría 14 archivos del API. Ahora incluye todo lo
+nuevo y lo editado que compila limpio. Quedan fuera, con errores previos
+ajenos a este trabajo (`res.json()` tipado como `unknown`): `bobby-cycle`,
+`forum-morning`, `forum-resolve`, `generate-activity`, `okx-perps`,
+`xlayer-record`, `auto-bounty`, `agent-run`. Pendiente de una limpieza aparte.

@@ -15,6 +15,7 @@ import { resolveBot } from './_lib/telegram-bots.js';
 import { getChartImage } from './_lib/chart.js';
 import { okxButtonText } from './_lib/okx-link.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { getBobbyControl } from './_lib/control.js';
 
 // Higher budget: DM voice analysis (OKX fetch + LLM + TTS) runs in waitUntil
 // after we ack Telegram, so the function must stay warm long enough.
@@ -53,6 +54,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const update = req.body;
   if (!update) return res.status(200).json({ ok: true });
+
+  // Kill switch: while writes are frozen the bot acknowledges (200, so
+  // Telegram does not retry) and processes nothing — no rows, no replies.
+  const control = await getBobbyControl();
+  if (control.writeFreeze) {
+    console.log('[telegram-webhook] write freeze active — update ignored', control.source, control.note || '');
+    return res.status(200).json({ ok: true, frozen: true });
+  }
 
   const supabase = SB_SERVICE_KEY ? createClient(SB_URL, SB_SERVICE_KEY) : null;
 

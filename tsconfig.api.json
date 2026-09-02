@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023"],
+    "lib": [
+      "ES2023"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -12,7 +14,9 @@
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "api/_lib/protocol-constants.ts",
@@ -28,6 +32,30 @@
     "api/protocol-heartbeat.ts",
     "api/protocol-tx-history.ts",
     "api/registry.ts",
-    "api/reputation.ts"
+    "api/reputation.ts",
+    "api/_lib/bobby-db.ts",
+    "api/_lib/control.ts",
+    "api/_lib/effects.ts",
+    "api/_lib/write-guard.ts",
+    "api/_lib/wallet-session.ts",
+    "api/_lib/protocol-write-safety.ts",
+    "api/_lib/harness-events.ts",
+    "api/_lib/request-security.ts",
+    "api/wallet-session.ts",
+    "api/agent-messages.ts",
+    "api/user-interests.ts",
+    "api/forum-publish.ts",
+    "api/telegram-connect.ts",
+    "api/my-threads.ts",
+    "api/agent-setup.ts",
+    "api/bobby-early-access.ts",
+    "api/user-cycle.ts",
+    "api/telegram-deliver.ts",
+    "api/telegram-webhook.ts",
+    "api/seed-macro-calendar.ts",
+    "api/feedback.ts",
+    "api/sandbox-run.ts",
+    "api/settle-trades.ts",
+    "api/bobby-health.ts"
   ]
 }

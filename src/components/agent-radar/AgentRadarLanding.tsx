@@ -3,6 +3,7 @@
 // With personalized AI advisor onboarding + greeting messages
 // ============================================================
 
+import { sessionFetch } from '@/lib/bobby-session';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, TrendingUp, Search, Zap, Bot, ChevronRight, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -32,11 +33,8 @@ interface GreetingMessage {
 
 async function fetchGreetings(wallet: string): Promise<GreetingMessage[]> {
   try {
-    const res = await fetch(
-      `${SB_URL}/rest/v1/agent_messages?wallet_address=eq.${wallet}&order=created_at.desc&limit=5`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-    );
-    if (!res.ok) return [];
+    const res = await sessionFetch(wallet, '/api/agent-messages?limit=5&order=desc');
+    if (!res || !res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   } catch { return []; }

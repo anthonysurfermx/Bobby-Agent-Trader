@@ -6,11 +6,9 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useAccount } from 'wagmi';
-import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
+import { useBobbySession } from '@/hooks/useBobbySession';
+import { sessionFetch } from '@/lib/bobby-session';
 
-const SB = BOBBY_DB_URL;
-const KEY = BOBBY_DB_ANON;
-const HEADERS = { apikey: KEY, Authorization: `Bearer ${KEY}` };
 
 export interface AgentProfile {
   id: string;
@@ -93,6 +91,8 @@ const DEFAULT_COLORS = {
 
 export function TradingRoomProvider({ children }: { children: ReactNode }) {
   const { address, isConnected } = useAccount();
+  // One signature per wallet per week proves ownership for personal data.
+  const { ready: sessionReady } = useBobbySession({ auto: true });
   const [profile, setProfile] = useState<AgentProfile | null>(null);
   const [roomMode, setRoomMode] = useState<RoomMode>('global');
   const [loading, setLoading] = useState(true);
@@ -108,11 +108,12 @@ export function TradingRoomProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const res = await fetch(
-        `${SB}/rest/v1/agent_profiles?wallet_address=eq.${wallet}&select=id,wallet_address,agent_name,personality,markets,cadence_hours,delivery,status,last_run_at,next_run_at&limit=1`,
-        { headers: HEADERS }
-      );
-      const rows = await res.json();
+      // agent_profiles is no longer readable with the anon key: the API
+      // returns only the session wallet's own row.
+      const res = await sessionFetch(wallet, '/api/agent-setup');
+      if (!res) { setLoading(false); return; } // no session yet — retried when it arrives
+      const data = await res.json();
+      const rows = data && data.profile ? [data.profile] : [];
       if (Array.isArray(rows) && rows.length > 0) {
         setProfile(rows[0]);
         // Auto-switch to personal if agent exists
@@ -135,7 +136,7 @@ export function TradingRoomProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+  }, [fetchProfile, sessionReady]);
 
   // Reset when wallet disconnects
   useEffect(() => {

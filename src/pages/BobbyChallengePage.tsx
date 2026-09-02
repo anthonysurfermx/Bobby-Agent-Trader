@@ -4,6 +4,7 @@
 // All data is REAL from /api/bobby-pnl + Supabase debates
 // ============================================================
 
+import { sessionFetch } from '@/lib/bobby-session';
 import { useEffect, useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
@@ -193,15 +194,16 @@ export default function BobbyChallengePage() {
     if (roomMode !== 'personal' || !profile?.wallet_address) return;
     const wallet = profile.wallet_address;
     // Fetch user_interests (tracked assets + conviction)
-    fetch(`${SB}/rest/v1/user_interests?wallet_address=eq.${wallet}&active=eq.true&order=created_at.desc&limit=8&select=asset,context,last_conviction,target_threshold`, { headers })
-      .then(r => r.json())
+    // Interests and private debates are owner-scoped: API + wallet session.
+    sessionFetch(wallet, '/api/user-interests?limit=8')
+      .then(r => (r ? r.json() : []))
       .then(async (interests: any[]) => {
         if (!Array.isArray(interests)) return;
         // Fetch latest private debates for each asset
         let debates: any[] = [];
         if (profileId) {
-          const debRes = await fetch(`${SB}/rest/v1/forum_threads?scope=eq.private&agent_profile_id=eq.${profileId}&order=created_at.desc&limit=10&select=symbol,direction,conviction_score,status,created_at`, { headers });
-          debates = await debRes.json().catch(() => []);
+          const debRes = await sessionFetch(wallet, `/api/my-threads?agent_profile_id=${profileId}&limit=10&select=compact`);
+          debates = debRes ? await debRes.json().catch(() => []) : [];
         }
         const convictions: UserConviction[] = interests.map(i => ({
           asset: i.asset,

@@ -7,11 +7,14 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireInternalAuth } from './_lib/request-security.js';
-import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
+import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = bobbyDbUrl();
-const SB_KEY = bobbyReadKey();
+// Writers never fall back to the anon key (Codex review): with RLS on, an
+// anon write fails silently. Missing service role → explicit 503 below.
+const SB_KEY = bobbyServiceKeyOptional();
 
 // Model mapping: Anthropic → OpenAI
 const OPENAI_MODEL_MAP: Record<string, string> = {
@@ -60,6 +63,8 @@ async function getTrackRecord(): Promise<{ wins: number; losses: number; winRate
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!SB_KEY) return res.status(503).json({ error: 'Service-role key not configured (BOBBY_SUPABASE_SERVICE_ROLE_KEY)' });
+  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requireInternalAuth(req, res)) return;
   if (!OPENAI_API_KEY) return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });

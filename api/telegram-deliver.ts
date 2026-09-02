@@ -11,6 +11,8 @@ import { tgSendVoiceAnalysis } from './_lib/telegram.js';
 import { requireInternalAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
+import { getBobbyControl } from './_lib/control.js';
+import { externalEffectsAllowed, noteSuppressedEffect } from './_lib/effects.js';
 
 export const config = { maxDuration: 60 };
 
@@ -70,6 +72,12 @@ function renderGroupMessage(posts: any, conviction: number, symbol: string | nul
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const control = await getBobbyControl();
+  if (control.writeFreeze) return res.status(503).json({ error: 'Bobby writes are frozen', source: control.source });
+  if (!externalEffectsAllowed({ mode: 'live', canary: control.canary })) {
+    noteSuppressedEffect('telegram', { mode: 'live', canary: control.canary }, 'telegram-deliver');
+    return res.status(200).json({ ok: true, suppressed: true, reason: 'canary' });
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   if (!requireInternalAuth(req, res)) return;

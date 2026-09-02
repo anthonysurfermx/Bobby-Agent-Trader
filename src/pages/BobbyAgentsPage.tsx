@@ -3,6 +3,7 @@
 // Agent performance index with real stats from bobby-pnl
 // ============================================================
 
+import { sessionFetch } from '@/lib/bobby-session';
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
@@ -11,7 +12,7 @@ import { useTradingRoom } from '@/hooks/useTradingRoom';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 export default function BobbyAgentsPage() {
-  const { profile, profileId, hasAgent, roomMode, accentColor, accentBg, accentBorder, accentGlow } = useTradingRoom();
+  const { wallet, profile, profileId, hasAgent, roomMode, accentColor, accentBg, accentBorder, accentGlow } = useTradingRoom();
   const [summary, setSummary] = useState<any>(null);
   const [decisions, setDecisions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,11 +29,11 @@ export default function BobbyAgentsPage() {
     const KEY = BOBBY_DB_ANON;
     const headers = { apikey: KEY, Authorization: `Bearer ${KEY}` };
     // Fetch debates: personal if agent exists, global otherwise
-    const debateFilter = roomMode === 'personal' && profileId
-      ? `scope=eq.private&agent_profile_id=eq.${profileId}`
-      : `or=(scope.is.null,scope.eq.public)`;
-    fetch(`${SB}/rest/v1/forum_threads?${debateFilter}&order=created_at.desc&limit=10&select=id,symbol,direction,conviction_score,status,created_at`, { headers })
-      .then(r => r.json())
+    const personal = roomMode === 'personal' && profileId;
+    const debates = personal
+      ? sessionFetch(wallet, `/api/my-threads?agent_profile_id=${profileId}&limit=10&select=compact`).then(r => (r ? r.json() : []))
+      : fetch(`${SB}/rest/v1/forum_threads?or=(scope.is.null,scope.eq.public)&order=created_at.desc&limit=10&select=id,symbol,direction,conviction_score,status,created_at`, { headers }).then(r => r.json());
+    debates
       .then(d => { if (Array.isArray(d)) setDecisions(d); })
       .catch(() => {});
 

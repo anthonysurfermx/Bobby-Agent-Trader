@@ -288,7 +288,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!requireRecordAuth(req, res)) return;
     // Chain-scoped write latch (Codex 282b534): 503s unless the selected
     // chain's env is fully armed — gates the V2 paths below identically.
-    if (!requireProtocolWriteSafety(res, ['trackRecord'])) return;
+    if (!(await requireProtocolWriteSafety(res, ['trackRecord']))) return;
 
     const body = (req.body || {}) as Record<string, unknown>;
     const action = typeof body.action === 'string' ? body.action.toLowerCase() : '';

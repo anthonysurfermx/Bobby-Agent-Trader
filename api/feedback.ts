@@ -6,10 +6,13 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
-import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
+import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 const SB_URL = bobbyDbUrl();
-const SB_KEY = bobbyReadKey();
+// Writers never fall back to the anon key (Codex review): with RLS on, an
+// anon write fails silently. Missing service role → explicit 503 below.
+const SB_KEY = bobbyServiceKeyOptional();
 const NOTIFY_EMAIL = 'anthochavez.ra@gmail.com';
 const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 
@@ -55,6 +58,8 @@ async function sendEmailNotification(feedback: Record<string, unknown>): Promise
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!SB_KEY) return res.status(503).json({ error: 'Service-role key not configured (BOBBY_SUPABASE_SERVICE_ROLE_KEY)' });
+  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'POST only' });
   }

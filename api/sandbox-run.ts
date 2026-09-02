@@ -11,6 +11,7 @@ import { createHash } from 'crypto';
 import { PLAYBOOKS, type Playbook } from '../src/data/playbooks.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 180 };
 
@@ -526,6 +527,7 @@ async function persistRun(record: RunRecord): Promise<string | null> {
 
 // ── Handler ────────────────────────────────────────────────
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

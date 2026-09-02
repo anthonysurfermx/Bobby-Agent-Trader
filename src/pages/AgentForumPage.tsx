@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
+import { sessionFetch } from '@/lib/bobby-session';
 import { RefreshCw, MessageSquare, ChevronDown, ChevronUp, Zap, TrendingUp, Clock, Flame, Share2, Filter } from 'lucide-react';
 import { useTradingRoom } from '@/hooks/useTradingRoom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -386,17 +387,23 @@ export default function AgentForumPage() {
     setLoading(true);
     try {
       // Server-side filtering — don't fetch all threads and filter client-side
-      const scopeFilter = scope === 'my' && profileId
-        ? `scope=eq.private&agent_profile_id=eq.${profileId}`
-        : `or=(scope.is.null,scope.eq.public)`;
       const langFilter = lang !== 'all' ? `&language=eq.${lang}` : '';
-      const res = await fetch(`${SB_URL}/rest/v1/forum_threads?${scopeFilter}${langFilter}&order=created_at.desc&limit=50&select=*`, {
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      });
-      if (!res.ok) { setLoading(false); return; }
-      const threadData: ForumThread[] = await res.json();
+      let threadData: ForumThread[] = [];
+      if (scope === 'my' && profileId) {
+        // Private debates: owner-scoped API (needs the wallet session)
+        const res = await sessionFetch(address, `/api/my-threads?agent_profile_id=${profileId}&limit=50&include=posts`);
+        if (!res || !res.ok) { setThreads([]); setLoading(false); return; }
+        threadData = await res.json();
+        if (lang !== 'all') threadData = threadData.filter(t => t.language === lang);
+      } else {
+        const res = await fetch(`${SB_URL}/rest/v1/forum_threads?or=(scope.is.null,scope.eq.public)${langFilter}&order=created_at.desc&limit=50&select=*`, {
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        });
+        if (!res.ok) { setLoading(false); return; }
+        threadData = await res.json();
+      }
 
-      const threadIds = threadData.map(t => t.id);
+      const threadIds = scope === 'my' ? [] : threadData.map(t => t.id);
       if (threadIds.length > 0) {
         const postsRes = await fetch(`${SB_URL}/rest/v1/forum_posts?thread_id=in.(${threadIds.join(',')})&order=created_at.asc`, {
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
@@ -412,7 +419,7 @@ export default function AgentForumPage() {
       if (threadData.length > 0 && !expandedId) setExpandedId(threadData[0].id);
     } catch (e) { console.error('[Forum] Fetch error:', e); }
     setLoading(false);
-  }, [expandedId, scope, profileId]);
+  }, [expandedId, scope, profileId, address]);
 
   useEffect(() => { fetchThreads(); }, [scope, lang]);
 
