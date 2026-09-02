@@ -1,7 +1,7 @@
 {
   "side": "source",
   "ref": "egpixaunlnzauztbrnuz",
-  "takenAt": "2026-09-02T23:18:06.466Z",
+  "takenAt": "2026-09-02T23:35:34.063Z",
   "allowMissing": false,
   "exclusions": {
     "agentIds": [
@@ -10,7 +10,12 @@
     "sessionIds": [
       "hs_f28ab882-c18c-401e-ac24-49eb1a54f29d"
     ],
-    "agentEventIds": []
+    "agentEventIds": [
+      "61081ec2-1a7b-4be0-bfa2-d100e63af740",
+      "f5bcb642-71f6-428a-a763-afa5ef562f0d",
+      "38e5baad-4c45-4392-a204-ce00adff047c",
+      "e31dc690-8e09-4d80-b889-d32b809b6a1d"
+    ]
   },
   "tables": [
     {
@@ -30,8 +35,8 @@
     {
       "table": "agent_events",
       "exists": true,
-      "rows": 7256,
-      "sha256": "592af3614313b85ec994df5fa25a8573cb12e5c36b198dda0dfe7fb5567ae383",
+      "rows": 7252,
+      "sha256": "20cbc106a077da25504bd4f421d3f64dbb0cc20817228c72abd0f34a77e075e4",
       "pkMin": "0001539c-832d-47da-a7fe-e1b83a889caf",
       "pkMax": "fffacf94-acb4-4ea1-93c5-d10fac450716",
       "createdMin": "2026-04-13T21:16:03.47+00:00",
@@ -39,11 +44,11 @@
       "proofs": {
         "payment_tx": {
           "nonNull": 0,
-          "sha256": "cb7322887702bcfe9a79fdd95f5199ae3b25d008a034c9d00af68a7846e124e8"
+          "sha256": "a9b217e53f87f020555e4c7bec229337340f12736d050219451b0b4c47a18de5"
         },
         "trade_tx": {
-          "nonNull": 11,
-          "sha256": "985e258cd25a08c719a5f479d5ec86be7094b6360304f91338b93aa3562e3f5e"
+          "nonNull": 7,
+          "sha256": "0af33a8d79307db30896e082049fb2dd31e03c5f9236ec857b960674dbf1e4be"
         }
       }
     },
@@ -310,5 +315,5 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   ],
-  "totalRows": 26159
+  "totalRows": 26155
 }

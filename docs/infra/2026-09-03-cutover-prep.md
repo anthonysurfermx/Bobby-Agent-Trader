@@ -36,6 +36,40 @@ is dead; nothing of it, of DeFi México or of Polymarket travels.
 | 7 | Disk 5.7 GiB, 99 % | selftest now removes its temp dir; the export rehearsal was deleted; the rest is Anthony's caches | — |
 | — | `e2e-test-agent` | **Shared exclusion filter** (`exclusions.ts`): the agent, its sessions and their proofs are removed from T0, export, verify and verify-proofs by the same PostgREST predicate; both manifests record the exclusion set and `verify` checks they match and that no excluded row exists on the target | T0 source now 33/33, **26,159 rows** (3 fewer) |
 
+## Exact schema — produced and dry-run (2026-09-03 23:30 UTC)
+
+Anthony stored the legacy DB password in the macOS Keychain
+(`bobby/LEGACY_DB_PASSWORD`; never in chat, never in the repo). With it:
+
+- `pg_dump 18.4 --schema-only --no-owner --no-privileges --no-comments -n public`
+  of legacy (direct host, PostgreSQL 17.4): 725 objects, 72 tables.
+- `scripts/migration/filter-schema.mts` reduces it verbatim to Bobby:
+  **251 objects kept / 474 dropped** — 34 tables (33 + `api_cache`), 42 constraints,
+  10 FKs (the two to `auth.users` kept: 0 legacy rows use them), 65 indexes, 7
+  sequences (4 serial + 3 identity), 4 defaults, 34 RLS states, 44 policies, 2 triggers
+  (`bobby_control_touch`, `trg_agent_profiles_updated_at`) and the functions they call,
+  the 3 Bobby RPCs. Dropped: every DeFi México table, 26 functions, 5 types, 1 view, 13
+  triggers, 128 policies. It also emits the one extension the DDL needs:
+  **`vector` in schema `public`** (pgvector 0.8, `agent_memory.embedding` + ivfflat index),
+  which the destination did not have. Report: `docs/infra/evidence/2026-09-03-schema-filter-report.txt`.
+  Result: `supabase/bobby-protocol/supabase/migrations/20260903000004_bobby_schema_exact.sql`.
+- **Dry run on the destination inside `BEGIN … ROLLBACK`** (psql, nothing persisted):
+  `0002_reset_baseline` → `0004_bobby_schema_exact` → `0003_migration_outbox` apply
+  cleanly → 35 public tables, RLS on 35, 45 policies; `bobby_sequence_check()` reports
+  a real `nextval` above `max(id)` for the 7 identity tables; `bobby_outbox_enable`
+  arms 2 sample tables, `bobby_outbox_status()` returns their pk columns,
+  `bobby_outbox_disable` removes them. Destination afterwards: still 4 tables.
+  Evidence: `docs/infra/evidence/2026-09-03-destination-dryrun-rollback.txt`.
+  Two real defects were caught by this dry run before any apply: the missing
+  `vector` extension and identity columns being dropped by the filter (pg_dump emits
+  them as `SEQUENCE` objects without `OWNED BY`).
+
+Decisions taken by Anthony (2026-09-03): the four reverted demo `agent_events` are
+**excluded** (`EXCLUDED_AGENT_EVENT_IDS`, shared filter → T0 source now **26,155 rows**,
+`verify-proofs` on legacy = **PROOFS VERIFIED**, 7 bound tx, 0 failures);
+**aigts-bot paused** in Vercel (reversible: `POST /v1/projects/<id>/unpause`), so it
+cannot write anywhere during the preparation.
+
 ## Findings on legacy data (from `verify-proofs.mts`, read-only)
 
 - `e2e-test-agent` (2026-04-12, X Layer): signal tx **reverted**, prediction hash not
@@ -82,6 +116,13 @@ Rehearsal 2026-09-03 (read-only, real legacy): strict T0 **33/33 tables, 26,162 
 destination baseline 3/33 (`--allow-missing`); T0 on the destination *without* the
 flag fails closed (no file written); selftest 10/10; proofs check surfaces the two
 legacy findings above. Evidence in `docs/infra/evidence/2026-09-03-*`.
+
+## What is still NOT done (needs Codex's GO to apply)
+
+- Apply `0002 → 0004 → 0003` to the destination for real (the dry run proves they apply).
+- Restore rehearsal: export → import → sequences → T0 target → verify → verify-proofs
+  → gate + canaries against a preview on the destination.
+- Freeze window and cut-over.
 
 ## Runbook to the GO (unchanged order, refined)
 

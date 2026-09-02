@@ -1,0 +1,8 @@
+extensions: CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+kept 251: FUNCTION=5 TABLE=34 SEQUENCE=7 SEQUENCE OWNED BY=4 DEFAULT=4 CONSTRAINT=42 INDEX=65 TRIGGER=2 FK CONSTRAINT=10 ROW SECURITY=34 POLICY=44
+dropped 474: SCHEMA=1 TYPE=5 FUNCTION=26 TABLE=38 VIEW=1 CONSTRAINT=62 INDEX=117 TRIGGER=13 FK CONSTRAINT=45 POLICY=128 ROW SECURITY=38
+functions kept: bobby_control_touch, bobby_publish_debate, bobby_rls_matrix, bobby_rls_status, set_updated_at
+triggers kept: bobby_control bobby_control_touch, agent_profiles trg_agent_profiles_updated_at
+types kept: none
+fk dropped (other side not kept): none
+→ supabase/bobby-protocol/supabase/migrations/20260903000004_bobby_schema_exact.sql

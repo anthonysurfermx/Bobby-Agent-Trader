@@ -1,0 +1,47 @@
+# Dry run of the destination migration chain inside BEGIN … ROLLBACK (2026-09-02T23:36Z)
+# reset_baseline → bobby_schema_exact → migration_outbox, then checks; nothing persisted
+BEGIN
+ public_tables 
+---------------
+            35
+(1 row)
+ rls_on 
+--------
+     35
+(1 row)
+ policies 
+----------
+       45
+(1 row)
+ functions 
+-----------
+       128
+(1 row)
+ table_name | pk_columns 
+------------+------------
+(0 rows)
+       table_name        | max_id | last_value | next_value | ok 
+-------------------------+--------+------------+------------+----
+ agent_memory            |        |          1 |          1 | t
+ cycle_transitions       |        |          1 |          1 | t
+ llm_calls               |        |          1 |          1 | t
+ hardness_agents         |        |          1 |          1 | t
+ hardness_agent_sessions |        |          1 |          1 | t
+ hardness_agent_proofs   |        |          1 |          1 | t
+ trade_intents           |        |          1 |          1 | t
+(7 rows)
+ armed 
+-------
+     2
+(1 row)
+       table_name       |   pk_columns    
+------------------------+-----------------
+ agent_config           | key
+ agent_market_snapshots | symbol,venue,ts
+(2 rows)
+ disarmed 
+----------
+        2
+(1 row)
+ROLLBACK
+# destination public tables after the run: 4 (unchanged)

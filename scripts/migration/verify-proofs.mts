@@ -138,8 +138,10 @@ function bound(t: Tx, expectedTo: string, what: string, hash: string, extra = ''
     const id = String(r.id); const refs = t.input.toLowerCase().includes(keccak256(toUtf8Bytes(id)).slice(2)) || t.input.toLowerCase().includes(Buffer.from(id).toString('hex'));
     bound(t, getChain(chainId).contracts.trackRecord, `forum_threads ${id.slice(0, 8)}: resolution tx references the thread`, String(r.resolution_tx_hash), refs ? '' : ' thread id NOT in calldata'); if (!refs) failures += 1;
   }
-  for await (const page of rows<Record<string, unknown>>(p, 'mcp_payment_receipts', ['tx_hash'], 'tx_hash,response_hash,chain_id,created_at')) for (const r of page) {
-    n += 1; const chainId = Number(r.chain_id) || 196; const t = await tx(chainId, String(r.tx_hash));
+  for await (const page of rows<Record<string, unknown>>(p, 'mcp_payment_receipts', ['tx_hash'], 'tx_hash,response_hash,explorer_url,verified_at')) for (const r of page) {
+    // no chain column: the explorer host names the chain, the verification date is the fallback
+    const ex = String(r.explorer_url || ''); const chainId = /xlayer|oklink/i.test(ex) ? 196 : /basescan/i.test(ex) ? 8453 : chainFor(r.verified_at);
+    n += 1; const t = await tx(chainId, String(r.tx_hash));
     const rh = lower(r.response_hash).replace(/^0x/, ''); const inLogs = !rh || t.logs.some((l) => (l.data + l.topics.join('')).toLowerCase().includes(rh));
     bound(t, getChain(chainId).contracts.agentEconomy, `mcp_payment_receipts ${String(r.tx_hash).slice(0, 10)}: bound to AgentEconomy(${chainId})`, String(r.tx_hash), inLogs ? '' : ' response_hash NOT in logs'); if (!inLogs) failures += 1;
   }

@@ -11,13 +11,15 @@
 import { headers, type Project } from './lib.js';
 
 export const EXCLUDED_HARDNESS_AGENTS = ['e2e-test-agent'];
-/**
- * agent_events rows to leave behind, by id. Empty by default: the 2026-04-14
- * `generate-activity` demo rows include 4 REVERTED X Layer transactions
- * (verify-proofs report); whether that synthetic history travels is a
- * product decision — add the ids here and every tool applies it.
- */
-export const EXCLUDED_AGENT_EVENT_IDS: string[] = [];
+/** agent_events rows to leave behind, by id — applied by every tool through exclusionFilter(). */
+export const EXCLUDED_AGENT_EVENT_IDS: string[] = [
+  // Decision (Anthony, 2026-09-03): the four 2026-04-14 demo rows whose X Layer
+  // transaction REVERTED (verify-proofs evidence) do not travel.
+  '61081ec2-1a7b-4be0-bfa2-d100e63af740', // 0x45c97be398… HardnessRegistry, reverted
+  'f5bcb642-71f6-428a-a763-afa5ef562f0d', // 0x5f35a16213… HardnessRegistry, reverted
+  '38e5baad-4c45-4392-a204-ce00adff047c', // 0x8403251f3d… "AgentEconomy" to unrelated address, reverted
+  'e31dc690-8e09-4d80-b889-d32b809b6a1d', // 0xd17892a120… "AgentEconomy" to unrelated address, reverted
+];
 
 export interface ExclusionSet { agentIds: string[]; sessionIds: string[]; agentEventIds: string[] }
 
