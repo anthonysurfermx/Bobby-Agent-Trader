@@ -60,5 +60,5 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "10"
+        CURRENT_PROJECT_VERSION: "11"
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
