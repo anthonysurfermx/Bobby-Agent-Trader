@@ -115,6 +115,8 @@ struct ToolBelt: View {
     let companion: Companion
     let xp: Int
     var onTap: ((CompanionTool) -> Void)? = nil
+    var onPet: (() -> Void)? = nil
+    var onPlus: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -144,6 +146,32 @@ struct ToolBelt: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(unlocked ? tool.name : L.t("\(tool.name), unlocks at \(tool.unlockXP) XP", "\(tool.name), se desbloquea con \(tool.unlockXP) XP"))
             }
+            // The pet slot: the companion's own animal, at 300 XP.
+            if let pet = CompanionToolkit.pet(for: companion.id) {
+                let has = CompanionToolkit.petUnlocked(companionId: companion.id, xp: xp)
+                Button { onPet?() } label: {
+                    ZStack {
+                        Circle().fill(has ? companion.tint.opacity(0.12) : Theme.card)
+                        Circle().stroke(has ? companion.tint.opacity(0.6) : Theme.stroke, lineWidth: 1)
+                        if has { Text(pet.emoji).font(.system(size: 18)) } else {
+                            Image(systemName: "pawprint.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.muted.opacity(0.6))
+                        }
+                    }
+                    .frame(width: 38, height: 38)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(has ? pet.name : L.t("Pet, unlocks at \(CompanionPet.unlockXP) XP", "Mascota, se desbloquea con \(CompanionPet.unlockXP) XP"))
+            }
+            // "+": everything still out there, priced in XP.
+            Button { onPlus?() } label: {
+                ZStack {
+                    Circle().stroke(Theme.stroke, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.muted)
+                }
+                .frame(width: 38, height: 38)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L.t("What else you can earn", "Qué más puedes conseguir"))
         }
     }
 }
@@ -189,7 +217,12 @@ struct ToolUnlockOverlay: View {
                 Text(tool.name)
                     .font(.rounded(26, .bold))
                     .foregroundStyle(Theme.text)
-                Text("\(tool.tierLabel) · \(companion.name(at: 1)) · \(tool.unlockXP) XP")
+                HStack(spacing: 8) {
+                    CompanionThumb(companion: companion).frame(width: 26, height: 26).clipShape(Circle())
+                    Text(L.t("equipped on \(companion.name(at: 1))", "equipado en \(companion.name(at: 1))"))
+                        .font(.rounded(13, .medium)).foregroundStyle(Theme.text.opacity(0.8))
+                }
+                Text("\(tool.tierLabel) · \(tool.unlockXP) XP")
                     .font(.mono(10, .bold))
                     .kerning(1.4)
                     .foregroundStyle(Theme.muted)
@@ -269,5 +302,200 @@ struct ToolDetailSheet: View {
             Spacer(minLength: 0)
         }
         .padding(.bottom, 16)
+    }
+}
+
+
+// MARK: - Pets (the next level: one per companion, the panda spins)
+
+struct CompanionPet: Identifiable, Equatable {
+    let companionId: String
+    let name: String
+    let emoji: String
+    let spins: Bool
+    var id: String { "pet-\(companionId)" }
+    static let unlockXP = 300
+}
+
+extension CompanionToolkit {
+    static func pet(for companionId: String) -> CompanionPet? {
+        switch companionId {
+        case "orb": return CompanionPet(companionId: companionId, name: L.t("Spin the panda", "Panda giratorio"), emoji: "🐼", spins: true)
+        case "byte": return CompanionPet(companionId: companionId, name: L.t("Bit the dog", "Bit el perro"), emoji: "🐶", spins: false)
+        case "kora": return CompanionPet(companionId: companionId, name: L.t("Nova the cat", "Nova la gata"), emoji: "🐱", spins: false)
+        case "zip": return CompanionPet(companionId: companionId, name: L.t("Turbo the monkey", "Turbo el mono"), emoji: "🐵", spins: false)
+        case "glitch": return CompanionPet(companionId: companionId, name: L.t("Bug the gecko", "Bug el geco"), emoji: "🦎", spins: false)
+        case "momo": return CompanionPet(companionId: companionId, name: L.t("Ink the octopus", "Ink el pulpo"), emoji: "🐙", spins: false)
+        case "flux": return CompanionPet(companionId: companionId, name: L.t("Echo the parrot", "Echo el loro"), emoji: "🦜", spins: false)
+        case "rook": return CompanionPet(companionId: companionId, name: L.t("Sage the owl", "Sage el búho"), emoji: "🦉", spins: false)
+        case "halo": return CompanionPet(companionId: companionId, name: L.t("Peace the dove", "Paz la paloma"), emoji: "🕊️", spins: false)
+        case "axiom": return CompanionPet(companionId: companionId, name: L.t("Ledger the turtle", "Ledger la tortuga"), emoji: "🐢", spins: false)
+        default: return nil
+        }
+    }
+    static func petUnlocked(companionId: String, xp: Int) -> Bool { xp >= CompanionPet.unlockXP }
+    static func wornGear(companionId: String, xp: Int) -> [CompanionTool] {
+        tools(for: companionId).filter { unlocked($0, xp: xp) }
+    }
+}
+
+/// The "+" slot: what is still out there — your pet and the other companions'
+/// gear — with the exact points it takes. Aspiration, priced honestly.
+struct GearCatalogSheet: View {
+    let current: Companion
+    let xp: Int
+    let level: Int
+
+    private var gold: Color { Color(red: 0.96, green: 0.77, blue: 0.26) }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Capsule().fill(Theme.stroke).frame(width: 36, height: 4).frame(maxWidth: .infinity).padding(.top, 8)
+                Text(L.t("STILL TO EARN", "POR CONSEGUIR"))
+                    .font(.mono(11, .bold)).kerning(1.8).foregroundStyle(Theme.muted)
+                Text(L.t("Discipline XP only. Reads and coming back — never volume.", "Solo XP de disciplina. Lecturas y volver — nunca volumen."))
+                    .font(.rounded(13, .medium)).foregroundStyle(Theme.text.opacity(0.7))
+
+                if let pet = CompanionToolkit.pet(for: current.id) {
+                    section(L.t("YOUR PET", "TU MASCOTA"))
+                    row(glyph: pet.emoji, title: pet.name,
+                        subtitle: pet.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu companion."),
+                        needXP: CompanionPet.unlockXP, needLevel: nil, tint: current.tint)
+                }
+
+                section(L.t("OTHER COMPANIONS' GEAR", "EQUIPO DE OTROS COMPAÑEROS"))
+                ForEach(bobbyCompanions.filter { $0.id != current.id }) { comp in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            CompanionThumb(companion: comp).frame(width: 28, height: 28).clipShape(Circle())
+                            Text(comp.label).font(.mono(11, .bold)).kerning(1.2).foregroundStyle(comp.tint)
+                            if level < comp.requiredLevel {
+                                Text(L.t("LEVEL \(comp.requiredLevel) TO UNLOCK", "NIVEL \(comp.requiredLevel) PARA DESBLOQUEAR"))
+                                    .font(.mono(9, .bold)).kerning(1).foregroundStyle(Theme.muted)
+                            }
+                        }
+                        ForEach(CompanionToolkit.tools(for: comp.id)) { tool in
+                            row(glyph: nil, symbol: tool.symbol, art: tool.hasArt ? tool.assetName : nil, title: tool.name, subtitle: tool.lore,
+                                needXP: tool.unlockXP, needLevel: level < comp.requiredLevel ? comp.requiredLevel : nil, tint: tool.isGolden ? gold : comp.tint)
+                        }
+                        if let pet = CompanionToolkit.pet(for: comp.id) {
+                            row(glyph: pet.emoji, title: pet.name, subtitle: L.t("Pet", "Mascota"), needXP: CompanionPet.unlockXP,
+                                needLevel: level < comp.requiredLevel ? comp.requiredLevel : nil, tint: comp.tint)
+                        }
+                    }
+                    .padding(12)
+                    .background(Theme.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 24)
+        }
+    }
+
+    private func section(_ title: String) -> some View {
+        Text(title).font(.mono(10, .bold)).kerning(1.6).foregroundStyle(Theme.muted)
+    }
+
+    private func row(glyph: String?, symbol: String? = nil, art: String? = nil, title: String, subtitle: String, needXP: Int, needLevel: Int?, tint: Color) -> some View {
+        let have = xp >= needXP && needLevel == nil
+        let missing = max(0, needXP - xp)
+        return HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(tint.opacity(have ? 0.16 : 0.06)).frame(width: 40, height: 40)
+                Circle().stroke(tint.opacity(have ? 0.7 : 0.25), lineWidth: 1).frame(width: 40, height: 40)
+                if let art {
+                    Image(art).resizable().scaledToFit().frame(width: 34, height: 34).clipShape(Circle()).saturation(have ? 1 : 0.2)
+                } else if let glyph {
+                    Text(glyph).font(.system(size: 20)).saturation(have ? 1 : 0.2)
+                } else if let symbol {
+                    Image(systemName: symbol).font(.system(size: 14, weight: .bold)).foregroundStyle(have ? tint : Theme.muted)
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.rounded(13, .bold)).foregroundStyle(Theme.text)
+                Text(subtitle).font(.rounded(11, .medium)).foregroundStyle(Theme.text.opacity(0.6)).lineLimit(2)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                if have {
+                    Text(L.t("YOURS", "TUYO")).font(.mono(9, .bold)).kerning(1).foregroundStyle(Theme.up)
+                } else {
+                    Text("+\(missing) XP").font(.mono(11, .bold)).foregroundStyle(tint)
+                    if let needLevel { Text(L.t("LVL \(needLevel)", "NVL \(needLevel)")).font(.mono(9, .bold)).foregroundStyle(Theme.muted) }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Share my skin
+
+enum SkinCard {
+    /// Composes the share card: the live scene snapshot, the companion's name,
+    /// level, worn gear and pet. 1080×1350 (Instagram portrait).
+    static func render(snapshot: UIImage, companion: Companion, level: CompanionLevel, gear: [CompanionTool], pet: CompanionPet?, xp: Int) -> UIImage {
+        let size = CGSize(width: 1080, height: 1350)
+        return UIGraphicsImageRenderer(size: size).image { ctx in
+            let c = ctx.cgContext
+            UIColor(red: 0.01, green: 0.012, blue: 0.019, alpha: 1).setFill()
+            c.fill(CGRect(origin: .zero, size: size))
+            let tint = UIColor(hue: companion.hue, saturation: 0.7, brightness: 0.95, alpha: 1)
+            let glowColors = [tint.withAlphaComponent(0.35).cgColor, tint.withAlphaComponent(0).cgColor] as CFArray
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: glowColors, locations: [0, 1]) {
+                c.drawRadialGradient(gradient, startCenter: CGPoint(x: 540, y: 560), startRadius: 0, endCenter: CGPoint(x: 540, y: 560), endRadius: 620, options: [])
+            }
+            let mono = UIFont.monospacedSystemFont(ofSize: 30, weight: .bold)
+            let head = NSAttributedString(string: "BOBBY // \(L.t("MY SKIN", "MI SKIN"))", attributes: [.font: mono, .foregroundColor: UIColor.white.withAlphaComponent(0.75), .kern: 6])
+            head.draw(at: CGPoint(x: 72, y: 72))
+            let aspect = snapshot.size.width / max(snapshot.size.height, 1)
+            let shotH: CGFloat = 760
+            let shotW = shotH * aspect
+            snapshot.draw(in: CGRect(x: (size.width - shotW) / 2, y: 150, width: shotW, height: shotH))
+            let name = NSAttributedString(string: companion.name(at: level.number), attributes: [.font: UIFont.systemFont(ofSize: 76, weight: .bold), .foregroundColor: UIColor.white, .kern: 4])
+            let nameW = name.size().width
+            name.draw(at: CGPoint(x: (size.width - nameW) / 2, y: 930))
+            let sub = NSAttributedString(string: "\(L.t("LEVEL", "NIVEL")) \(level.number) · \(level.name) · \(xp) XP", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 26, weight: .bold), .foregroundColor: tint, .kern: 4])
+            sub.draw(at: CGPoint(x: (size.width - sub.size().width) / 2, y: 1024))
+            var line = gear.map { $0.name }
+            if let pet { line.append(pet.name) }
+            let gearText = line.isEmpty ? L.t("No gear yet — first read drops the first tool.", "Sin equipo aún — la primera lectura suelta la primera herramienta.") : line.joined(separator: " · ")
+            let gearAttr = NSAttributedString(string: gearText, attributes: [.font: UIFont.systemFont(ofSize: 28, weight: .medium), .foregroundColor: UIColor.white.withAlphaComponent(0.8)])
+            let gearRect = CGRect(x: 90, y: 1090, width: size.width - 180, height: 120)
+            gearAttr.draw(with: gearRect, options: [.usesLineFragmentOrigin], context: nil)
+            let foot = NSAttributedString(string: "bobbyprotocol.xyz · \(L.t("earned with discipline, never volume", "ganado con disciplina, nunca volumen"))", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 22, weight: .medium), .foregroundColor: UIColor.white.withAlphaComponent(0.4), .kern: 2])
+            foot.draw(at: CGPoint(x: (size.width - foot.size().width) / 2, y: 1270))
+        }
+    }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+
+/// The pet slot, tapped: what it is, or what it takes.
+struct PetDetailSheet: View {
+    let companion: Companion
+    let xp: Int
+    var body: some View {
+        let pet = CompanionToolkit.pet(for: companion.id)
+        let has = CompanionToolkit.petUnlocked(companionId: companion.id, xp: xp)
+        VStack(spacing: 12) {
+            Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
+            Text(pet?.emoji ?? "🐾").font(.system(size: 96)).saturation(has ? 1 : 0.15)
+            Text(pet?.name ?? "").font(.rounded(22, .bold)).foregroundStyle(Theme.text)
+            Text(has
+                 ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu companion."))
+                 : L.t("Unlocks at \(CompanionPet.unlockXP) XP · you have \(xp). Discipline only.", "Se desbloquea a \(CompanionPet.unlockXP) XP · llevas \(xp). Solo disciplina."))
+                .font(.rounded(14, .medium)).foregroundStyle(Theme.text.opacity(0.75)).multilineTextAlignment(.center).padding(.horizontal, 28)
+            Spacer()
+        }
     }
 }

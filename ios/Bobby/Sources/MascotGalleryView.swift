@@ -422,6 +422,13 @@ struct MascotSceneView: UIViewRepresentable {
     var onLoading: ((_ loading: Bool, _ failed: Bool) -> Void)? = nil
     var onMetrics: ((MascotPerformanceMetrics) -> Void)? = nil
     var onSecretPhrase: (() -> Void)? = nil
+    /// Unlocked gear worn on the body (the Fortnite effect) and the pet at
+    /// its feet. Attached to the model root so they turn with the companion.
+    var gear: [CompanionTool] = []
+    var pet: CompanionPet? = nil
+    /// Bump to receive a rendered snapshot of the scene (share my skin).
+    var snapshotToken: Int = 0
+    var onSnapshot: ((UIImage) -> Void)? = nil
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
@@ -452,6 +459,11 @@ struct MascotSceneView: UIViewRepresentable {
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.owner = self
         context.coordinator.setTalking(speaking, level: voiceLevel)
+        context.coordinator.applyGearIfNeeded(gear, pet: pet)
+        if snapshotToken != context.coordinator.lastSnapshotToken {
+            context.coordinator.lastSnapshotToken = snapshotToken
+            if snapshotToken > 0 { onSnapshot?(view.snapshot()) }
+        }
         if let event = emoteEvent, context.coordinator.lastEmoteId != event.id {
             context.coordinator.lastEmoteId = event.id
             context.coordinator.play(event.emote)
@@ -483,6 +495,118 @@ struct MascotSceneView: UIViewRepresentable {
         var modelRadius: Float = 1
         var loadStartedAt: CFAbsoluteTime = 0
         var footprintBeforeLoad: UInt64 = 0
+        weak var gearRoot: SCNNode?
+        var appliedGearKey = ""
+        var lastSnapshotToken = 0
+
+        /// Worn gear + pet. Re-applied only when the set changes or the model reloads.
+        func applyGearIfNeeded(_ tools: [CompanionTool], pet: CompanionPet?, force: Bool = false) {
+            let key = tools.map { $0.id }.joined(separator: ",") + "|" + (pet?.id ?? "")
+            guard force || key != appliedGearKey, let root = modelRoot else { return }
+            appliedGearKey = key
+            gearRoot?.removeFromParentNode()
+            let holder = SCNNode()
+            holder.name = "gear"
+            let r = CGFloat(modelRadius)
+            // Slots on the body: hip (common), shoulder (rare), halo above the head (golden).
+            let spots: [Int: SCNVector3] = [
+                1: SCNVector3(Float(r * 0.82), Float(-r * 0.05), Float(r * 0.45)),
+                2: SCNVector3(Float(-r * 0.84), Float(r * 0.58), Float(r * 0.40)),
+                3: SCNVector3(0, Float(r * 1.28), Float(r * 0.05)),
+            ]
+            for tool in tools {
+                let tint = tool.isGolden ? UIColor(red: 0.96, green: 0.77, blue: 0.26, alpha: 1) : UIColor(hue: 0.415, saturation: 0.7, brightness: 0.95, alpha: 1)
+                let image = UIImage(named: tool.assetName) ?? Self.glyphImage(tool.symbol, tint: tint, symbolic: true)
+                let size = r * (tool.isGolden ? 0.62 : 0.5)
+                let plane = SCNPlane(width: size, height: size)
+                plane.cornerRadius = size * 0.5
+                plane.firstMaterial?.diffuse.contents = image
+                plane.firstMaterial?.isDoubleSided = true
+                plane.firstMaterial?.lightingModel = .constant
+                plane.firstMaterial?.transparencyMode = .aOne
+                let node = SCNNode(geometry: plane)
+                node.position = spots[tool.tier] ?? SCNVector3Zero
+                node.constraints = [SCNBillboardConstraint()]
+                let bob = SCNAction.sequence([
+                    .moveBy(x: 0, y: r * 0.04, z: 0, duration: 1.1 + Double(tool.tier) * 0.15),
+                    .moveBy(x: 0, y: -r * 0.04, z: 0, duration: 1.1 + Double(tool.tier) * 0.15),
+                ])
+                bob.timingMode = .easeInEaseOut
+                node.runAction(.repeatForever(bob))
+                if tool.isGolden {
+                    let glow = SCNPlane(width: size * 1.6, height: size * 1.6)
+                    glow.cornerRadius = size * 0.8
+                    glow.firstMaterial?.diffuse.contents = Self.glowImage(tint)
+                    glow.firstMaterial?.lightingModel = .constant
+                    glow.firstMaterial?.transparencyMode = .aOne
+                    glow.firstMaterial?.writesToDepthBuffer = false
+                    let g = SCNNode(geometry: glow)
+                    g.position = SCNVector3(0, 0, -0.001)
+                    node.addChildNode(g)
+                }
+                holder.addChildNode(node)
+            }
+            if let pet {
+                let size = r * 0.58
+                let plane = SCNPlane(width: size, height: size)
+                plane.firstMaterial?.diffuse.contents = Self.glyphImage(pet.emoji, tint: .white, symbolic: false)
+                plane.firstMaterial?.isDoubleSided = true
+                plane.firstMaterial?.lightingModel = .constant
+                plane.firstMaterial?.transparencyMode = .aOne
+                let node = SCNNode(geometry: plane)
+                node.position = SCNVector3(Float(-r * 0.98), Float(-r * 0.62), Float(r * 0.5))
+                let billboard = SCNBillboardConstraint()
+                billboard.freeAxes = .Y
+                node.constraints = [billboard]
+                if pet.spins {
+                    // The spinning panda: an in-plane twirl, forever.
+                    node.runAction(.repeatForever(.rotateBy(x: 0, y: 0, z: 2 * .pi, duration: 2.2)))
+                } else {
+                    let hop = SCNAction.sequence([
+                        .moveBy(x: 0, y: r * 0.06, z: 0, duration: 0.35),
+                        .moveBy(x: 0, y: -r * 0.06, z: 0, duration: 0.35),
+                        .wait(duration: 1.4),
+                    ])
+                    node.runAction(.repeatForever(hop))
+                }
+                holder.addChildNode(node)
+            }
+            root.addChildNode(holder)
+            gearRoot = holder
+        }
+
+        /// Emoji / symbol rendered to a texture with a soft dark disc behind it.
+        static func glyphImage(_ glyph: String, tint: UIColor, symbolic: Bool) -> UIImage {
+            let side: CGFloat = 256
+            return UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { ctx in
+                if symbolic {
+                    UIColor.black.withAlphaComponent(0.72).setFill()
+                    ctx.cgContext.fillEllipse(in: CGRect(x: 8, y: 8, width: side - 16, height: side - 16))
+                    tint.withAlphaComponent(0.9).setStroke()
+                    ctx.cgContext.setLineWidth(6)
+                    ctx.cgContext.strokeEllipse(in: CGRect(x: 8, y: 8, width: side - 16, height: side - 16))
+                }
+                if symbolic, let symbol = UIImage(systemName: glyph)?.withTintColor(tint, renderingMode: .alwaysOriginal) {
+                    let inset = side * 0.26
+                    symbol.draw(in: CGRect(x: inset, y: inset, width: side - inset * 2, height: side - inset * 2))
+                } else {
+                    let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: side * 0.7)]
+                    let str = NSAttributedString(string: glyph, attributes: attrs)
+                    let bounds = str.boundingRect(with: CGSize(width: side, height: side), options: .usesLineFragmentOrigin, context: nil)
+                    str.draw(at: CGPoint(x: (side - bounds.width) / 2, y: (side - bounds.height) / 2))
+                }
+            }
+        }
+
+        static func glowImage(_ tint: UIColor) -> UIImage {
+            let side: CGFloat = 256
+            return UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { ctx in
+                let colors = [tint.withAlphaComponent(0.55).cgColor, tint.withAlphaComponent(0).cgColor] as CFArray
+                if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                    ctx.cgContext.drawRadialGradient(gradient, startCenter: CGPoint(x: side / 2, y: side / 2), startRadius: 0, endCenter: CGPoint(x: side / 2, y: side / 2), endRadius: side / 2, options: [])
+                }
+            }
+        }
 
         func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
 
@@ -653,6 +777,7 @@ struct MascotSceneView: UIViewRepresentable {
                 view.pointOfView = cameraNode
                 coordinator.modelRoot = root
                 coordinator.initialCameraPosition = cameraNode.position
+                if let owner = coordinator.owner { coordinator.applyGearIfNeeded(owner.gear, pet: owner.pet, force: true) }
                 coordinator.startSpin()
                 var nodeCount = 1
                 var geometryCount = root.geometry == nil ? 0 : 1

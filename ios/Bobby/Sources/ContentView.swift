@@ -361,6 +361,10 @@ struct ContentView: View {
     @State private var showBoard = false
     @State private var showRiskNotice = false
     @State private var inspectedTool: CompanionTool?
+    @State private var showCatalog = false
+    @State private var petDetail = false
+    @State private var skinSnapshotToken = 0
+    @State private var skinCard: UIImage?
     /// The desk never shows an empty hole: if the companion GLB fails to
     /// load, fall back to the orb until the companion changes.
     @State private var deskModelFailed = false
@@ -404,7 +408,7 @@ struct ContentView: View {
             vm.say(L.t("I evolved. Call me \(evolvedName) now.\(levelTone(newLevel))",
                        "Evolucioné. Ahora dime \(evolvedName).\(levelTone(newLevel))"))
         }
-        .onAppear { vm.bootGreetingIfNeeded() }
+        .onAppear { if vm.profile.acceptedRiskNotice && vm.profile.onboarded { vm.bootGreetingIfNeeded() } }
         .task { await SpeechInput.refreshVocabularyIfStale() }
         .onChange(of: vm.input) { vm.updateSuggestions() }
         // Hands-free loop: when a voice-driven answer finishes speaking, the
@@ -423,6 +427,19 @@ struct ContentView: View {
             ToolDetailSheet(companion: vm.companions.companion ?? bobbyCompanions[0], tool: tool, xp: vm.companions.disciplineXP)
                 .presentationDetents([.medium])
                 .presentationBackground(Theme.bg)
+        }
+        .sheet(isPresented: $showCatalog) {
+            GearCatalogSheet(current: vm.companions.companion ?? bobbyCompanions[0], xp: vm.companions.disciplineXP, level: vm.companions.level.number)
+                .presentationDetents([.large])
+                .presentationBackground(Theme.bg)
+        }
+        .sheet(isPresented: $petDetail) {
+            PetDetailSheet(companion: vm.companions.companion ?? bobbyCompanions[0], xp: vm.companions.disciplineXP)
+                .presentationDetents([.medium])
+                .presentationBackground(Theme.bg)
+        }
+        .sheet(item: $skinCard) { card in
+            ShareSheet(items: [card, L.t("My Bobby skin — earned with discipline, never volume. bobbyprotocol.xyz", "Mi skin de Bobby — ganada con disciplina, nunca volumen. bobbyprotocol.xyz")])
         }
         .sheet(isPresented: $showRiskNotice) {
             RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
@@ -572,6 +589,9 @@ struct ContentView: View {
                 }
                 Section {
                     // Reachable from every screen, not just first-run onboarding.
+                    Button { skinSnapshotToken += 1 } label: {
+                        Label(L.t("Share my skin", "Compartir mi skin"), systemImage: "square.and.arrow.up")
+                    }
                     Button { showRiskNotice = true } label: {
                         Label(L.t("Risk notice", "Aviso de riesgo"), systemImage: "exclamationmark.triangle")
                     }
@@ -606,6 +626,17 @@ struct ContentView: View {
                             voiceLevel: vm.voice.level,
                             onLoading: { _, failed in
                                 if failed { deskModelFailed = true }
+                            },
+                            // Worn gear and the pet ride on the body — the Fortnite effect.
+                            gear: CompanionToolkit.wornGear(companionId: comp.id, xp: vm.companions.disciplineXP),
+                            pet: CompanionToolkit.petUnlocked(companionId: comp.id, xp: vm.companions.disciplineXP) ? CompanionToolkit.pet(for: comp.id) : nil,
+                            snapshotToken: skinSnapshotToken,
+                            onSnapshot: { shot in
+                                skinCard = SkinCard.render(
+                                    snapshot: shot, companion: comp, level: vm.companions.level,
+                                    gear: CompanionToolkit.wornGear(companionId: comp.id, xp: vm.companions.disciplineXP),
+                                    pet: CompanionToolkit.petUnlocked(companionId: comp.id, xp: vm.companions.disciplineXP) ? CompanionToolkit.pet(for: comp.id) : nil,
+                                    xp: vm.companions.disciplineXP)
                             }
                         )
                             .allowsHitTesting(false)
@@ -652,10 +683,16 @@ struct ContentView: View {
             // The gear belt: three slots that fill with discipline — first
             // read, then every 100 XP, the last one golden.
             if let comp = vm.companions.companion, !speech.listening {
-                ToolBelt(companion: comp, xp: vm.companions.disciplineXP) { tool in
+                ToolBelt(companion: comp, xp: vm.companions.disciplineXP, onTap: { tool in
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     inspectedTool = tool
-                }
+                }, onPet: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    petDetail = true
+                }, onPlus: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showCatalog = true
+                })
                 .padding(.top, 4)
             }
 
@@ -1268,4 +1305,9 @@ struct ContentView: View {
             }
         )
     }
+}
+
+
+extension UIImage: @retroactive Identifiable {
+    public var id: ObjectIdentifier { ObjectIdentifier(self) }
 }
