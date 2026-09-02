@@ -96,7 +96,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'agent_messages','user_interests','user_digests','sandbox_runs',
+    'agent_messages','user_interests','user_digests','sandbox_runs','forum_publish_receipts',
     'mcp_payment_challenges','mcp_payment_receipts',
     'hardness_agents','hardness_agent_sessions',
     'memory_objects','agent_config','agent_macro_events','agent_market_snapshots',

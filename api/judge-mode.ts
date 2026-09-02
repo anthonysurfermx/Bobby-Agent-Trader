@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 60, memory: 512 };
 
@@ -162,6 +163,7 @@ function computeOverallScore(dimensions: Record<string, number>): number {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

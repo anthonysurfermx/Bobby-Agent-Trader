@@ -26,7 +26,7 @@ import { STOCK_MAP, TOKEN_MAP, detectIntent, detectStocks, detectTokens } from '
 import { useBobbyVoice } from '@/hooks/useBobbyVoice';
 import { useAuth } from '@/hooks/useAuth';
 import { useBobbySession } from '@/hooks/useBobbySession';
-import { sessionFetch } from '@/lib/bobby-session';
+import { sessionFetch, sessionHeaders } from '@/lib/bobby-session';
 import { clearStoredVibe, getStoredVibe, inferUserVibe, saveStoredVibe, shouldClearStoredVibe } from '@/lib/bobby-vibe';
 import { ResponsiveContainer, AreaChart, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
@@ -2204,7 +2204,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       const abortCtrl = new AbortController();
       const res = await fetch('/api/openclaw-chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // The session (when present) binds the debate receipt to this wallet.
+        headers: { 'Content-Type': 'application/json', ...sessionHeaders(address?.toLowerCase() || profile?.walletAddress) },
         signal: abortCtrl.signal,
         body: JSON.stringify({
           message: enrichedMessage,
@@ -2277,6 +2278,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         let fullText = '';
         // Receipt signed by the server over the exact transcript (needed to publish to the forum)
         let bobbyReceipt = '';
+        let bobbyPublishable = false;
         const replyId = uid();
 
         // ---- Sentence-level TTS streaming ----
@@ -2368,7 +2370,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
-              if (typeof parsed.bobby_receipt === 'string') { bobbyReceipt = parsed.bobby_receipt; continue; }
+              if (typeof parsed.bobby_receipt === 'string') { bobbyReceipt = parsed.bobby_receipt; bobbyPublishable = parsed.bobby_publishable === true; continue; }
               const delta = parsed.choices?.[0]?.delta?.content;
               if (delta) {
                 fullText += delta;
@@ -2444,12 +2446,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
 
               // Codex P1: FAIL-CLOSED — persist only if minimum fields are present
               // Require: conviction + symbol + direction. Entry price is optional (Bobby may say "sitting out")
-              if (!convScore || !symbol || !direction) {
-                console.warn('[Bobby] ⚠️ Debate not published — missing structured fields:', {
-                  convScore, symbol, entryPrice, direction,
-                });
-              } else if (!bobbyReceipt) {
-                console.warn('[Bobby] ⚠️ Debate not published — no transcript receipt from the server');
+              // The server parsed the trade fields itself and said whether this debate is publishable.
+              if (!bobbyReceipt || !bobbyPublishable) {
+                console.warn('[Bobby] ⚠️ Debate not published — server receipt missing or not publishable', { convScore, symbol, direction });
               } else {
                 const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
@@ -2457,19 +2456,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                 const publishRes = (await sessionFetch(address?.toLowerCase() || profile?.walletAddress, '/api/forum-publish', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    language: lang,
-                    topic,
-                    symbol,
-                    direction,
-                    conviction_score: Math.round(convScore),
-                    entry_price: entryPrice ?? null,
-                    stop_price: stopPrice ?? null,
-                    target_price: targetPrice ?? null,
-                    // The server re-parses the posts from this transcript and verifies the receipt.
-                    transcript: fullText,
-                    receipt: bobbyReceipt,
-                  }),
+                  // Text and trade fields both come from the receipt the server issued;
+                  // nothing parsed in the browser is sent.
+                  body: JSON.stringify({ language: lang, transcript: fullText, receipt: bobbyReceipt }),
                 })) ?? new Response(null, { status: 401 }); // no wallet session → not published
                 if (publishRes.ok) {
                   const published = await publishRes.json();

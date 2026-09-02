@@ -48,20 +48,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(403).json({ error: 'Invalid webhook secret' });
   }
 
-  // Bot-scoped message sender (uses this bot's token).
-  const sendTelegramMessage = (chatId: number, text: string, parseMode = 'HTML') =>
-    tgSendMessage(BOT_TOKEN, chatId, text, { parseMode });
-
-  const update = req.body;
-  if (!update) return res.status(200).json({ ok: true });
-
-  // Kill switch: while writes are frozen the bot acknowledges (200, so
+  // Kill switch FIRST: while writes are frozen the bot acknowledges (200, so
   // Telegram does not retry) and processes nothing — no rows, no replies.
   const control = await getBobbyControl();
   if (control.writeFreeze) {
     console.log('[telegram-webhook] write freeze active — update ignored', control.source, control.note || '');
     return res.status(200).json({ ok: true, frozen: true });
   }
+
+  // Bot-scoped message sender (uses this bot's token).
+  const sendTelegramMessage = (chatId: number, text: string, parseMode = 'HTML') =>
+    tgSendMessage(BOT_TOKEN, chatId, text, { parseMode });
+
+  const update = req.body;
+  if (!update) return res.status(200).json({ ok: true });
 
   const supabase = SB_SERVICE_KEY ? createClient(SB_URL, SB_SERVICE_KEY) : null;
 

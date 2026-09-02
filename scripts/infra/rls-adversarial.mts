@@ -52,8 +52,8 @@ const line = (ok: boolean, label: string, detail = '') => {
 const PROTECTED = ['agent_cycles', 'agent_events', 'agent_trades', 'agent_positions', 'agent_signals', 'hardness_agent_proofs',
   'forum_threads', 'forum_posts', 'user_feedback', 'api_cache', 'indicator_cache',
   'agent_messages', 'user_interests', 'user_digests', 'sandbox_runs', 'mcp_payment_challenges', 'mcp_payment_receipts',
-  'agent_profiles', 'telegram_connections', 'memory_objects', 'agent_config', 'hardness_agents', 'hardness_agent_sessions', 'bobby_control'];
-const PRIVATE = new Set(['agent_messages', 'user_interests', 'user_digests', 'sandbox_runs', 'mcp_payment_challenges', 'mcp_payment_receipts', 'agent_profiles', 'telegram_connections', 'memory_objects', 'agent_config', 'hardness_agents', 'hardness_agent_sessions', 'bobby_control']);
+  'agent_profiles', 'telegram_connections', 'memory_objects', 'agent_config', 'hardness_agents', 'hardness_agent_sessions', 'bobby_control', 'forum_publish_receipts'];
+const PRIVATE = new Set(['agent_messages', 'user_interests', 'user_digests', 'sandbox_runs', 'mcp_payment_challenges', 'mcp_payment_receipts', 'agent_profiles', 'telegram_connections', 'memory_objects', 'agent_config', 'hardness_agents', 'hardness_agent_sessions', 'bobby_control', 'forum_publish_receipts']);
 
 interface Policy { tablename: string; policyname: string; cmd: string; roles: string[]; qual: string | null; with_check: string | null }
 
@@ -213,6 +213,28 @@ async function legitimatePath(): Promise<void> {
   line(read.ok && rows.some((r) => r.asset === 'RLSTEST' && r.context === MARK), 'GET /api/user-interests returns the row just written', `HTTP ${read.status} rows=${Array.isArray(rows) ? rows.length : 'n/a'}`);
   const inboxNoSession = await fetch(`${API}/api/agent-messages?limit=1`);
   line(inboxNoSession.status === 401, 'GET /api/agent-messages without session → 401', `HTTP ${inboxNoSession.status}`);
+  // Forum publication: one receipt → one thread; the same receipt again → 409 (atomic RPC, PK on receipt id)
+  if (process.env.BOBBY_TRANSCRIPT_SECRET || process.env.BOBBY_SESSION_SECRET) {
+    const { issueTranscriptReceipt } = await import('../../api/_lib/transcript-receipt.js');
+    const transcript = `**ALPHA HUNTER:** ${MARK} RLSTEST looks strong.\n\n**RED TEAM:** crowded.\n\n**MY VERDICT:** Long BTC at 62,000, stop 60,500, target 66,000. Conviction 7/10.\n\n`;
+    const rc = issueTranscriptReceipt(transcript, { wallet, userQuestion: 'BTC?' });
+    if (rc) {
+      const pub1 = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: rc.token }) });
+      const pub1Json = (await pub1.json().catch(() => ({}))) as { threadId?: string; error?: string };
+      line(pub1.ok && Boolean(pub1Json.threadId), 'POST /api/forum-publish with a valid receipt → thread created atomically', `HTTP ${pub1.status} ${pub1Json.error || ''}`);
+      const pub2 = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: rc.token }) });
+      line(pub2.status === 409, 'SAME receipt again → 409 (single use)', `HTTP ${pub2.status}`);
+      const edited = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript: transcript + ' (edited)', receipt: rc.token }) });
+      line(edited.status === 403, 'edited transcript with the old receipt → 403', `HTTP ${edited.status}`);
+      if (pub1Json.threadId) {
+        await fetch(`${URL_}/rest/v1/forum_posts?thread_id=eq.${pub1Json.threadId}`, { method: 'DELETE', headers: { ...svcHeaders, Prefer: 'return=minimal' } });
+        await fetch(`${URL_}/rest/v1/forum_threads?id=eq.${pub1Json.threadId}`, { method: 'DELETE', headers: { ...svcHeaders, Prefer: 'return=minimal' } });
+        await fetch(`${URL_}/rest/v1/forum_publish_receipts?receipt_id=eq.${rc.payload.id}`, { method: 'DELETE', headers: { ...svcHeaders, Prefer: 'return=minimal' } });
+      }
+    }
+  } else {
+    line(false, 'forum-publish single-use proof', 'set BOBBY_TRANSCRIPT_SECRET (same value as the deployment) so the gate can mint a receipt');
+  }
   const threads = await fetch(`${API}/api/my-threads?limit=1`, { headers: authed });
   line(threads.ok, 'GET /api/my-threads with session → 200', `HTTP ${threads.status}`);
   const del = await fetch(`${API}/api/agent-messages`, { method: 'DELETE', headers: authed, body: JSON.stringify({ wallet: CANARY_WALLET }) });

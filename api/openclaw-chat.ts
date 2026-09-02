@@ -10,6 +10,7 @@ import { detectAdviceMode, type AdviceMode } from '../src/lib/advice-mode.js';
 import { matchInvestorEdgeCasePolicy, type InvestorEdgeCasePolicy } from '../src/lib/investor-edge-cases.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { issueTranscriptReceipt } from './_lib/transcript-receipt.js';
+import { walletSessionFromRequest } from './_lib/wallet-session.js';
 
 const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || '';
 const OPENCLAW_TOKEN = process.env.OPENCLAW_TOKEN || '';
@@ -765,6 +766,7 @@ async function runMultiCallDebate(
   message: string,
   language: string,
   res: VercelResponse,
+  sessionWallet: string | null = null,
 ): Promise<void> {
   const startMs = Date.now();
 
@@ -857,8 +859,10 @@ ${finalCallInstruction}`;
     console.log(`[Debate] Multi-call complete: Alpha=${alphaMs}ms, Total=${totalMs}ms`);
 
     sendChunk(`\n\n`);
-    const receipt = issueTranscriptReceipt(transcript);
-    if (receipt) res.write(`data: ${JSON.stringify({ bobby_receipt: receipt })}\n\n`);
+    // Structured, single-use receipt: transcript hash + server-parsed trade
+    // fields + the wallet that asked. forum-publish trusts nothing else.
+    const receipt = issueTranscriptReceipt(transcript, { wallet: sessionWallet, userQuestion });
+    if (receipt) res.write(`data: ${JSON.stringify({ bobby_receipt: receipt.token, bobby_receipt_fields: receipt.payload.f, bobby_publishable: receipt.payload.p })}\n\n`);
     res.write('data: [DONE]\n\n');
   } catch (err) {
     console.error('[Debate] Multi-call failed:', err);
@@ -873,6 +877,7 @@ async function runSimpleInvestDebate(
   message: string,
   language: string,
   res: VercelResponse,
+  sessionWallet: string | null = null,
 ): Promise<void> {
   const { contextXml, userQuestion, detectedAdvice, debateMode, edgeCasePolicy } = resolveDebateMode(message);
 
@@ -896,7 +901,7 @@ async function runSimpleInvestDebate(
     res.end();
   } catch (err) {
     console.warn('[Chat] Simple invest path failed, falling back to multi-call debate:', err);
-    return await runMultiCallDebate(message, language, res);
+    return await runMultiCallDebate(message, language, res, sessionWallet);
   }
 }
 
@@ -931,6 +936,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const hasXMLContext = /<([A-Z_]+)(?:\s+[^>]*)?>[\s\S]*?<\/\1>/.test(message);
   const resolved = resolveDebateMode(message);
+  // Optional wallet session: binds the debate receipt to the wallet that asked.
+  const sessionWallet = walletSessionFromRequest(req)?.wallet ?? null;
 
   if (
     hasXMLContext &&
@@ -939,17 +946,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     shouldUseSimpleInvestPath(resolved.userQuestion, resolved.debateMode, resolved.edgeCasePolicy)
   ) {
     console.log('[Chat] Simple invest path activated from XML context');
-    return await runSimpleInvestDebate(message, userLang, res);
+    return await runSimpleInvestDebate(message, userLang, res, sessionWallet);
   }
 
   // ── MULTI-CALL DEBATE: When Trading Room is active
   if (isDebateRequest(message) && OPENAI_API_KEY) {
     if (shouldUseSimpleInvestPath(resolved.userQuestion, resolved.debateMode, resolved.edgeCasePolicy)) {
       console.log('[Chat] Simple invest path activated');
-      return await runSimpleInvestDebate(message, userLang, res);
+      return await runSimpleInvestDebate(message, userLang, res, sessionWallet);
     }
     console.log('[Chat] Multi-call debate mode activated');
-    return await runMultiCallDebate(message, userLang, res);
+    return await runMultiCallDebate(message, userLang, res, sessionWallet);
   }
 
   // ── SINGLE-CALL: Normal Bobby conversation

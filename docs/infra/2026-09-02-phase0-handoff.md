@@ -309,3 +309,56 @@ key y exige 2xx; luego lo borra con la service role.
 5. Solo entonces `20260902_bobby_rls_hardening.sql` y
    `rls-adversarial.mts` hasta `GATE PASSED` (exit 0). Aplicar la migración
    antes del código rompe chat, foro y lecturas privadas.
+
+---
+
+## Noveno commit — tercera revisión de Codex (2026-09-02, noche)
+
+Tres bloqueos de integridad, todos cerrados. Sigue sin deploy y sin
+migración aplicada.
+
+### 1. Guardias MCP antes del primer `fetch`
+`createChallenge`, `atomicConsumeChallenge` y `storeReceipt` llaman
+`assertWritesOpen()` como **primera sentencia**. (La versión anterior las
+había insertado dentro del manejo de error, después de la escritura.)
+
+### 2. Recibo estructurado, ligado y de un solo uso
+`btr2.<payload>.<hmac>` con `id` (uuid), `iat`, `wallet` de la sesión que
+pidió el debate (o null si fue invitado), `th` = sha256 de la transcripción,
+`f` = campos del trade **parseados en el servidor** desde la sección del
+CIO (símbolo, dirección, convicción, entrada, stop, objetivo) y `p` =
+publicable. El navegador ya no manda ningún metadato: `forum-publish` recibe
+solo `transcript` + `receipt` + `language`, verifica MAC, hash y wallet, y
+usa los campos del recibo. El chat manda la sesión al pedir el debate para
+que el recibo quede ligado a la wallet.
+
+### 3. Publicación atómica
+Nueva migración `20260902_bobby_forum_publish_rpc.sql`: tabla
+`forum_publish_receipts` (PK = id del recibo, service-role only) y función
+`bobby_publish_debate(receipt_id, wallet, thread, posts)` que registra el
+recibo, crea el hilo e inserta los posts en **una transacción**. Un segundo
+uso del mismo recibo viola la PK y aborta todo → 409. No se altera ninguna
+tabla existente.
+
+### Pruebas por comportamiento (offline, sin red)
+- `scripts/infra/freeze-behavior-selftest.mts`: con `BOBBY_WRITE_FREEZE=true`
+  y `fetch` stub que registra cada llamada no-GET, cada librería lanza y
+  cada handler responde 503 (el webhook de Telegram, 200 + `frozen`) **sin
+  una sola escritura**. 25 casos en verde. Los contadores de rate limit en
+  `api_cache` están exentos por diseño.
+- `wallet-session-selftest.mts`: + campos parseados en servidor, recibo
+  ligado a wallet, transcripción editada rechazada por hash, campos
+  alterados rechazados por MAC, expiración.
+- Gate C (`rls-adversarial.mts`, con `BOBBY_TRANSCRIPT_SECRET` del
+  deployment): publica una vez → 200; **mismo recibo otra vez → 409**;
+  transcripción editada → 403. Limpia hilo, posts y recibo.
+
+### Inventario por orden, no por nombre
+`writer-inventory.mts` localiza la función que contiene cada escritura y
+exige una guardia **antes** de la escritura dentro de esa función (o, para
+helpers declarados, que el handler guarde antes del primer uso). Detectó
+`judge-mode` (ahora cubierto). 36 archivos escritores, 0 sin guardar.
+
+### Orden de migraciones (ahora tres pequeñas + RLS)
+`bobby_control`, `bobby_early_access`, `bobby_forum_publish_rpc` → deploy
+contra legacy → regresión → `bobby_rls_hardening` → gate.

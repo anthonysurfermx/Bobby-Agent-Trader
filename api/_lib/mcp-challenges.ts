@@ -43,6 +43,7 @@ export async function createChallenge(
   requestHash?: string,
   externalAgent?: string,
 ): Promise<{ challengeId: string; expiresAt: string }> {
+  await assertWritesOpen('mcp createChallenge'); // FIRST statement: nothing is written while frozen
   const res = await fetch(`${SB_URL}/rest/v1/mcp_payment_challenges`, {
     method: 'POST',
     headers: {
@@ -60,7 +61,6 @@ export async function createChallenge(
   });
 
   if (!res.ok) {
-  await assertWritesOpen('mcp createChallenge');
     const err = await res.text().catch(() => 'unknown');
     throw new Error(`Failed to create challenge: ${err}`);
   }
@@ -83,6 +83,7 @@ export async function atomicConsumeChallenge(
   txHash: string,
   payerAddress: string,
 ): Promise<{ consumed: boolean; challenge: Challenge | null }> {
+  await assertWritesOpen('mcp atomicConsumeChallenge'); // FIRST statement: nothing is written while frozen
   // Atomic UPDATE: only succeeds if status is still 'pending' and not expired
   const res = await fetch(
     `${SB_URL}/rest/v1/mcp_payment_challenges?challenge_id=eq.${challengeId}&status=eq.pending&expires_at=gt.${new Date().toISOString()}`,
@@ -104,7 +105,6 @@ export async function atomicConsumeChallenge(
   );
 
   if (!res.ok) {
-  await assertWritesOpen('mcp atomicConsumeChallenge');
     console.error('[atomicConsumeChallenge]', await res.text().catch(() => ''));
     return { consumed: false, challenge: null };
   }
@@ -131,7 +131,7 @@ export async function storeReceipt(receipt: {
   valueOkb: string;
   responseHash?: string;
 }): Promise<void> {
-  await assertWritesOpen('mcp storeReceipt');
+  await assertWritesOpen('mcp storeReceipt'); // FIRST statement: nothing is written while frozen
   const explorerUrl = `https://www.oklink.com/xlayer/tx/${receipt.txHash}`;
 
   await fetch(`${SB_URL}/rest/v1/mcp_payment_receipts`, {
