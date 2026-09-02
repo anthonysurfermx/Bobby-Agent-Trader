@@ -5,7 +5,7 @@
 // explore board, risk notice. Bobby never executes anything.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Globe, Grid2x2, Lock, Map as MapIcon, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, Users, Volume2, VolumeX } from 'lucide-react';
+import { Globe, Grid2x2, Lock, Map as MapIcon, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, ShieldCheck, Users, Volume2, VolumeX } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, LEVEL_TONE, companionName, getCompanion, getVibe, levelFor, nextLevelFor, tintFor, toolArt, toolHasArt, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -14,6 +14,7 @@ import { levelProgress, progressStore, useProgress } from '@/lib/companions/prog
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import RiskNotice from './RiskNotice';
+import { MarketCanvas, type ChartLevel, type Timeframe } from '@/components/adams/MarketCanvas';
 import { EvolutionOverlay, GearCatalog, NoTradeCard, ToolBelt, ToolDetail, ToolUnlockOverlay, WorldMapTeaser } from './CompanionOverlays';
 import { PET_UNLOCK_XP, petArt, petFor, petUnlocked, toolSlot, wornGear } from '@/lib/companions/data';
 
@@ -346,7 +347,11 @@ export default function CompanionDesk() {
   // Worn gear (pieces still in the loot queue are not worn yet — they fly on
   // when the human taps EQUIP IT) plus the pet at the feet.
   const desktop = useMediaQuery('(min-width: 1024px)');
-  const mascotSize = desktop ? 440 : 260;
+  const mascotSize = desktop ? 400 : 260;
+  const [chartSymbol, setChartSymbol] = useState('BTC');
+  const [chartTimeframe, setChartTimeframe] = useState<Timeframe>('15m');
+  useEffect(() => { if (snapshot?.symbol) setChartSymbol(snapshot.symbol); }, [snapshot?.symbol]);
+  const chartLevels = useMemo<ChartLevel[]>(() => !answer ? [] : ([['entry', answer.entry, t('entry', 'entrada')], ['stop', answer.stop, 'stop'], ['target', answer.target, t('target', 'objetivo')]] as Array<[ChartLevel['kind'], number | null, string]>).filter(([, v]) => v !== null).map(([kind, v, label]) => ({ kind, price: v as number, label })), [answer]);
 
   const attachments = useMemo(() => {
     const pending = new Set(drops.map((d) => `${d.companionId}-${d.tier}`));
@@ -359,9 +364,12 @@ export default function CompanionDesk() {
     return items;
   }, [companion.id, progress.xp, drops]);
 
-  return (
-    <div className="mx-auto max-w-2xl px-4 py-4 pb-28 space-y-4 lg:max-w-none lg:px-10 xl:px-16 lg:pb-10 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-10 lg:space-y-0 lg:items-start">
-      <div className="space-y-4 lg:sticky lg:top-20">
+  // The pieces of the desk, composed twice: the phone layout (one column,
+  // composer pinned to the bottom) and the production desktop layout (agents
+  // top-left, companion centered, mic below, the live chart on the right,
+  // status bar at the bottom).
+  const headerNode = (
+    <>
       {/* header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -377,6 +385,17 @@ export default function CompanionDesk() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <label className="hidden lg:flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/50">
+            <span>LANG</span>
+            <select value={isSpanish() ? 'es' : 'en'} onChange={(e) => { try { localStorage.setItem('bobby_lang', e.target.value); } catch { /* private mode */ } window.location.reload(); }} className="bg-transparent text-[#7da6ff] outline-none">
+              <option value="es">ES · MX</option>
+              <option value="en">EN · US</option>
+            </select>
+          </label>
+          <div className="hidden lg:flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/50">
+            <ShieldCheck className="h-3 w-3 text-[#7da6ff]" />
+            <span>{t('Bobby never executes · you confirm', 'Bobby no ejecuta · tú confirmas')}</span>
+          </div>
           <button onClick={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-sky-300">{speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
           <div className="relative">
             <button onClick={() => setMenu((m) => !m)} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/70"><MoreHorizontal size={16} /></button>
@@ -403,6 +422,10 @@ export default function CompanionDesk() {
         </div>
       </div>
 
+    </>
+  );
+  const stageNode = (
+    <>
       {/* stage */}
       <div className="flex flex-col items-center py-2" style={{ background: `radial-gradient(circle at 50% 40%, ${tintFor(companion, 0.16)}, transparent 60%)` }}>
         <div ref={stageRef} className="relative" style={{ width: mascotSize, height: mascotSize }}>
@@ -422,9 +445,10 @@ export default function CompanionDesk() {
         <div className="text-[10px] font-mono text-white/45 mt-1 min-h-[16px]">{statusHint}</div>
         <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={() => { sfxTock(); setSheet('world'); }} /></div>
       </div>
-      </div>
-
-      <div className="space-y-4 lg:pt-2">
+    </>
+  );
+  const confirmNode = (
+    <>
       {/* confirm */}
       {phase === 'confirm' && pending && (
         <div className="rounded-xl p-4 bg-white/[0.02] border border-amber-400/30 text-sm text-white/80">
@@ -438,9 +462,17 @@ export default function CompanionDesk() {
         </div>
       )}
 
+    </>
+  );
+  const noTradeNode = (
+    <>
       {/* NO TRADE halo */}
       {noTrade && <NoTradeCard symbol={noTrade.symbol} reason={noTrade.reason} xp={noTrade.xp} onClose={() => setNoTrade(null)} />}
 
+    </>
+  );
+  const marketNode = (
+    <>
       {/* market card */}
       {snapshot && answer && (
         <div className="rounded-2xl p-4 bg-white/[0.02] border border-white/[0.05] space-y-3">
@@ -482,6 +514,10 @@ export default function CompanionDesk() {
         </div>
       )}
 
+    </>
+  );
+  const quickNode = (
+    <>
       {/* quick access */}
       {!snapshot && phase !== 'confirm' && (
         <div className="rounded-2xl p-4 bg-white/[0.02] border border-white/[0.05]">
@@ -495,6 +531,10 @@ export default function CompanionDesk() {
         </div>
       )}
 
+    </>
+  );
+  const logNode = (
+    <>
       {/* desk log */}
       <div className="rounded-2xl p-4 bg-white/[0.02] border border-white/[0.05]">
         <div className="text-[10px] font-mono tracking-[0.2em] text-white/50">DESK LOG</div>
@@ -510,16 +550,139 @@ export default function CompanionDesk() {
         {t('His calls are recorded on-chain and anyone can challenge them · this query does not mint an individual receipt yet', 'Sus calls se graban on-chain y cualquiera puede retarlas · esta consulta aún no genera receipt individual')}
       </div>
 
+    </>
+  );
+  const composerNode = (
+    <>
       {/* composer */}
-      <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-transparent p-4 lg:static lg:bg-none lg:p-0 lg:pt-2">
+      <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
         <div className="mx-auto max-w-2xl flex gap-2">
           <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about BTC, NVDA, gold…', 'Pregunta por BTC, NVDA, oro…')} className="flex-1 rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none focus:border-sky-400/50" />
           {canDictate && <button type="button" onClick={toggleDictation} className={`h-12 w-12 rounded-xl flex items-center justify-center ${listening ? 'bg-red-400 text-black' : 'bg-sky-500 text-white'}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>}
           <button type="submit" className="h-12 px-4 rounded-xl bg-green-400 text-black font-mono text-xs tracking-[0.15em]">{t('ASK', 'PREGUNTA')}</button>
         </div>
       </form>
-      </div>
+    </>
+  );
 
+  if (desktop) {
+    const agents: Array<[string, string, Phase]> = [['ALPHA HUNTER', t('finds the setup', 'busca el setup'), 'alpha'], ['RED TEAM', t('attacks the thesis', 'ataca la tesis'), 'redTeam'], ['CIO', t('decides', 'decide'), 'cio']];
+    const statusBar = snapshot && answer ? `${snapshot.symbol}: ${summary(answer)}` : noTrade ? `NO TRADE · ${noTrade.symbol} · ${noTrade.reason}` : t('NO VERDICT YET — ASK BOBBY ABOUT AN ASSET', 'SIN VEREDICTO TODAVÍA — PREGÚNTALE A BOBBY POR UN ACTIVO');
+    return (
+      <div className="flex min-h-[calc(100vh-80px)] flex-col text-white">
+        <div className="border-b border-white/10 px-6 py-3">{headerNode}</div>
+        <div className="grid min-h-0 flex-1 grid-cols-2">
+          {/* companion side */}
+          <section className="relative flex min-h-0 flex-col items-center justify-center overflow-hidden px-5 py-6" style={{ background: `radial-gradient(circle at 50% 45%, ${tintFor(companion, 0.12)}, transparent 62%)` }}>
+            <div className="absolute left-4 top-4 z-20 flex flex-col gap-2">
+              {agents.map(([name, role, key]) => (
+                <motion.div key={name} animate={phase === key ? { opacity: [0.4, 1, 0.4] } : { opacity: phase === 'complete' ? 0.7 : 0.4 }} transition={phase === key ? { duration: 1.2, repeat: Infinity } : undefined} className="rounded-lg border border-white/10 bg-[#0b0b12]/70 px-3 py-2 backdrop-blur">
+                  <div className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7da6ff]">{name}</div>
+                  <div className="font-mono text-[9px] text-white/30">{role}</div>
+                  <div className="mt-1 font-mono text-[8px] text-white/20">{displayName} · {t('own voice', 'voz propia')}</div>
+                </motion.div>
+              ))}
+            </div>
+            <div className="relative mt-6 flex flex-col items-center">
+        <div ref={stageRef} className="relative" style={{ width: mascotSize, height: mascotSize }}>
+          <BobbyMascot3D
+            look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }}
+            state={mascotState}
+            level={voice.speaking ? voice.level : null}
+            size={mascotSize}
+            attachments={attachments}
+            equipUrl={equip.url}
+            equipToken={equip.token}
+          />
+        </div>
+        <div className="mt-2 flex items-center gap-2 text-[11px] font-mono tracking-[0.25em]" style={{ color: listening ? '#34D399' : voice.speaking ? '#7ea6ff' : phase === 'error' ? '#f87171' : phase === 'complete' ? '#34D399' : '#7ea6ff' }}>
+          <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor]" />{statusLabel}
+        </div>
+        <div className="text-[10px] font-mono text-white/45 mt-1 min-h-[16px]">{statusHint}</div>
+            </div>
+            <div className="relative mt-5 flex shrink-0 flex-col items-center gap-2">
+              <button type="button" onClick={canDictate ? toggleDictation : () => document.querySelector<HTMLInputElement>('input[data-desk-input]')?.focus()} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Tap to talk', 'Toca para hablar')} className={`relative grid h-14 w-14 place-items-center rounded-full transition ${listening ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)]' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff]'}`}>
+                {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              </button>
+              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">{listening ? t('LISTENING · SPEAK NORMALLY', 'ESCUCHANDO · HABLA NORMAL') : t('TAP TO ACTIVATE · analysis, not advice', 'TOCA PARA ACTIVAR · análisis, no asesoría')}</p>
+            </div>
+            <div className="relative mt-5">
+        <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={() => { sfxTock(); setSheet('world'); }} /></div>
+            </div>
+          </section>
+
+          {/* market side */}
+          <section className="flex min-h-0 flex-col gap-3 border-l border-white/10 p-4">
+            {!snapshot && phase !== 'confirm' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">QUICK ACCESS</span>
+                <button onClick={() => setSheet('board')} className="rounded-lg border border-sky-400/40 bg-sky-400/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-sky-300">{t('Explore · top markets', 'Explora · top mercados')}</button>
+                {progress.quickAccess.slice(0, 2).map((sym) => (
+                  <button key={sym} onClick={() => void ask(sym)} className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/80">{sym} · {t('analyze', 'analizar')}</button>
+                ))}
+              </div>
+            )}
+            <div className="min-h-[360px] flex-1">
+              <MarketCanvas symbol={chartSymbol} timeframe={chartTimeframe} levels={chartLevels} language={isSpanish() ? 'es' : 'en'} onSymbolChange={(sym) => setChartSymbol(sym)} onTimeframeChange={(tf) => setChartTimeframe(tf)} />
+            </div>
+            <div className="max-h-[38vh] space-y-3 overflow-y-auto pr-1">
+              {confirmNode}
+              {noTradeNode}
+              {snapshot && answer && (
+                <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] p-4">
+                  <div className="flex justify-between text-[10px] font-mono tracking-[0.2em]"><span className="text-amber-300">CIO // {t('VERDICT', 'VEREDICTO')} · {snapshot.symbol}</span><span className="text-white/40">{t('REFERENCE ONLY', 'SOLO REFERENCIA')}</span></div>
+                  <div className="mt-2 text-white text-base leading-snug">{summary(answer)}</div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center rounded-lg bg-black/40 p-3">
+                    {[[t('ENTRY', 'ENTRADA'), answer.entry, '#7ea6ff'], [t('STOP', 'STOP'), answer.stop, '#f87171'], [t('TARGET', 'OBJETIVO'), answer.target, '#34D399']].map(([label, v, color]) => (
+                      <div key={String(label)}><div className="text-[9px] font-mono tracking-[0.2em] text-white/40">{label as string}</div><div className="font-mono text-sm" style={{ color: v === null ? 'rgba(255,255,255,0.4)' : (color as string) }}>{v === null ? '—' : money(v as number)}</div></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {logNode}
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="flex gap-2 pt-1">
+              <input data-desk-input value={input} onChange={(e) => setInput(e.target.value)} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about BTC, NVDA, gold…', 'Pregunta por BTC, NVDA, oro…')} className="flex-1 rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none focus:border-sky-400/50" />
+              <button type="submit" className="h-12 px-5 rounded-xl bg-green-400 text-black font-mono text-xs tracking-[0.15em]">{t('ASK', 'PREGUNTA')}</button>
+            </form>
+          </section>
+        </div>
+        <div className="flex items-center gap-3 border-t border-white/10 px-6 py-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/40"><span className="h-1.5 w-1.5 rounded-full bg-white/30" />{statusBar}</div>
+      {/* sheets & overlays */}
+      <AnimatePresence>
+        {sheet === 'board' && <BoardSheet onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
+        {sheet === 'squad' && <SquadSheet current={companion} level={level.number} onPick={(c) => { progressStore.setCompanion(c.id); setSheet('none'); void voice.speak(pick(c.selectLine), { voice: c.voicePersona, essential: false }); }} onClose={() => setSheet('none')} />}
+        {sheet === 'catalog' && <GearCatalog current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
+        {sheet === 'world' && <WorldMapTeaser xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
+        {sheet === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end md:items-center justify-center bg-black/70" onClick={() => setSheet('none')}>
+            <div className="w-full max-w-md bg-[#0a0a0c] border border-white/[0.06] rounded-t-2xl md:rounded-2xl p-6 text-center space-y-3" onClick={(e) => e.stopPropagation()}>
+              <div className="text-7xl" style={{ filter: has ? 'none' : 'grayscale(1)' }}>{pet.emoji}</div>
+              <div className="text-2xl font-semibold text-white">{pick(pet.name)}</div>
+              <div className="text-sm text-white/75">{has ? (pet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.')) : t(`Unlocks at ${PET_UNLOCK_XP} XP · you have ${progress.xp}. Discipline only.`, `Se desbloquea a ${PET_UNLOCK_XP} XP · llevas ${progress.xp}. Solo disciplina.`)}</div>
+            </div>
+          </motion.div>) : null; })()}
+        {sheet === 'risk' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/90 overflow-y-auto"><RiskNotice readOnly onClose={() => setSheet('none')} /></motion.div>
+        )}
+        {inspected && <ToolDetail companion={companion} tool={inspected} xp={progress.xp} onClose={() => setInspected(null)} />}
+        {evolution && <EvolutionOverlay companion={companion} level={evolution} onDone={() => { const name = companionName(companion, evolution.number); say(t(`I evolved. Call me ${name} now.`, `Evolucioné. Ahora dime ${name}.`), false); setEvolution(null); }} />}
+        {!evolution && drops[0] && <ToolUnlockOverlay companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 80); }} />}
+      </AnimatePresence>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl px-4 py-4 pb-28 space-y-4">
+      {headerNode}
+      {stageNode}
+      {confirmNode}
+      {noTradeNode}
+      {marketNode}
+      {quickNode}
+      {logNode}
+      {composerNode}
       {/* sheets & overlays */}
       <AnimatePresence>
         {sheet === 'board' && <BoardSheet onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
