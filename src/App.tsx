@@ -162,8 +162,8 @@ function PageLoader() {
           </div>
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-foreground">Cargando</p>
-          <p className="text-xs text-muted-foreground">DeFi México Hub</p>
+          <p className="text-sm font-medium text-foreground">Loading</p>
+          <p className="text-xs text-muted-foreground">Bobby Protocol</p>
         </div>
       </div>
     </div>

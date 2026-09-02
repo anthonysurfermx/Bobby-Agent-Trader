@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { useProtocolTxHistory, type OnChainTx } from '@/hooks/useProtocolTxHistory';
+import { DEFAULT_CHAIN } from '@/config/chains';
 
 interface HeartbeatData {
   ok: boolean;
@@ -170,10 +171,10 @@ export default function BobbyHeartbeatPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Chain-aware labels — served by the API, fallback to X Layer legacy
-  const chainName = data?.chain?.name || 'X Layer';
-  const chainId = data?.chain?.id ?? 196;
-  const sym = data?.chain?.nativeSymbol || data?.revenue?.nativeSymbol || 'OKB';
+  // Chain-aware labels — served by the API, fallback to the live chain (Base)
+  const chainName = data?.chain?.name || DEFAULT_CHAIN.name;
+  const chainId = data?.chain?.id ?? DEFAULT_CHAIN.id;
+  const sym = data?.chain?.nativeSymbol || data?.revenue?.nativeSymbol || DEFAULT_CHAIN.tokens.native;
   const explorerUrl = data?.chain?.explorerUrl || 'https://www.oklink.com/xlayer';
 
   return (

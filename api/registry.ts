@@ -13,11 +13,16 @@ import {
   BOBBY_HARDNESS_REGISTRY,
   BOBBY_PROTOCOL_BASE_URL,
   BOBBY_TRACK_RECORD,
-  XLAYER_CHAIN_ID,
-  XLAYER_RPC_FALLBACK_URL,
 } from './_lib/protocol-constants.js';
+import { BASE_SEPOLIA, DEFAULT_CHAIN, XLAYER } from './_lib/chains.js';
+import { readMcpCallFee } from './_lib/xlayer-payments.js';
 
-export const config = { maxDuration: 5 };
+export const config = { maxDuration: 10 };
+
+// The premium tools are paid in the live chain's native token; the exact
+// amount is read from AgentEconomy.mcpCallFee at request time (see `mcpFee`
+// in the response) instead of being hardcoded to the X Layer-era 0.001 OKB.
+const PREMIUM_COST = `on-chain MCP fee (${DEFAULT_CHAIN.onchainFeeSymbol} on ${DEFAULT_CHAIN.name}, see mcpFee)`;
 
 const AGENTS = [
   {
@@ -71,31 +76,31 @@ const TOOLS = {
     {
       name: 'bobby_analyze',
       description: 'Full market analysis with conviction score',
-      cost: '0.001 OKB',
+      cost: PREMIUM_COST,
       breakdown: ['Alpha Hunter (thesis)', 'Red Team (attack)', 'CIO (verdict)'],
     },
     {
       name: 'bobby_debate',
       description: '3-agent debate on any trading question',
-      cost: '0.001 OKB',
+      cost: PREMIUM_COST,
       breakdown: ['Alpha Hunter (bull case)', 'Red Team (bear case)', 'CIO (synthesis)'],
     },
     {
       name: 'bobby_judge',
       description: 'Judge Mode audit on 6 dimensions',
-      cost: '0.001 OKB',
+      cost: PREMIUM_COST,
       breakdown: ['Data', 'Adversarial', 'Logic', 'Risk', 'Calibration', 'Novelty'],
     },
     {
       name: 'bobby_security_scan',
       description: 'Token contract honeypot/rug risk scan',
-      cost: '0.001 OKB',
+      cost: PREMIUM_COST,
       breakdown: ['Contract analysis', 'Liquidity check', 'Risk scoring'],
     },
     {
       name: 'bobby_wallet_portfolio',
       description: 'Portfolio analysis (multi-chain)',
-      cost: '0.001 OKB',
+      cost: PREMIUM_COST,
       breakdown: ['Token balances', 'DeFi positions', 'Risk assessment'],
     },
   ],
@@ -105,12 +110,46 @@ const TOOLS = {
   ],
 };
 
+// Every address below lives on DEFAULT_CHAIN (Base mainnet in production).
 const CONTRACTS = {
-  hardnessRegistry: { address: BOBBY_HARDNESS_REGISTRY, purpose: 'Public hardness layer for agents, services, predictions, signals and bounties' },
-  agentEconomy: { address: BOBBY_AGENT_ECONOMY, purpose: 'x402 payment settlement' },
-  convictionOracle: { address: BOBBY_CONVICTION_ORACLE, purpose: 'Real-time conviction feed' },
-  trackRecord: { address: BOBBY_TRACK_RECORD, purpose: 'Commit-reveal track record' },
-  adversarialBounties: { address: BOBBY_ADVERSARIAL_BOUNTIES, purpose: 'Pay-to-challenge bounties', verified: true },
+  hardnessRegistry: { address: BOBBY_HARDNESS_REGISTRY, chainId: DEFAULT_CHAIN.id, purpose: 'Public hardness layer for agents, services, predictions, signals and bounties' },
+  agentEconomy: { address: BOBBY_AGENT_ECONOMY, chainId: DEFAULT_CHAIN.id, purpose: 'x402 payment settlement' },
+  convictionOracle: { address: BOBBY_CONVICTION_ORACLE, chainId: DEFAULT_CHAIN.id, purpose: 'Real-time conviction feed' },
+  trackRecord: { address: BOBBY_TRACK_RECORD, chainId: DEFAULT_CHAIN.id, purpose: 'Commit-reveal track record' },
+  adversarialBounties: { address: BOBBY_ADVERSARIAL_BOUNTIES, chainId: DEFAULT_CHAIN.id, purpose: 'Pay-to-challenge bounties', verified: true },
+};
+
+// Where each on-chain surface actually reads from. Three chains appear in
+// the product and that is deliberate — but it must be machine-readable, not
+// something an integrator has to infer from mismatched labels (Codex review).
+const PROVENANCE = {
+  live: {
+    chainId: DEFAULT_CHAIN.id,
+    name: DEFAULT_CHAIN.name,
+    role: 'protocol contracts, MCP settlement, bounties, track record — /api/bobby-protocol-stats',
+  },
+  canary: {
+    chainId: BASE_SEPOLIA.id,
+    name: BASE_SEPOLIA.name,
+    role: 'completed TrackRecord v2 canary with Pyth evidence — /api/verified-calls (labelled canary in the payload)',
+    explorer: BASE_SEPOLIA.explorerUrl,
+  },
+  archive: {
+    chainId: XLAYER.id,
+    name: XLAYER.name,
+    role: 'read-only historical record from the hackathon era; no new writes',
+    explorer: XLAYER.explorerUrl,
+    contracts: {
+      agentEconomy: XLAYER.contracts.agentEconomy,
+      adversarialBounties: XLAYER.contracts.adversarialBounties,
+      trackRecord: XLAYER.contracts.trackRecord,
+      hardnessRegistry: XLAYER.contracts.hardnessRegistry,
+      convictionOracle: XLAYER.contracts.convictionOracle,
+    },
+  },
+  ledger: {
+    role: 'public resolution ledger (debates, decisions, win rate) spanning every era — /api/bobby-protocol-stats debateActivity',
+  },
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -118,11 +157,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const mcpFee = await readMcpCallFee().catch((error) => {
+    console.error('[Registry] mcpCallFee read failed', error);
+    return null;
+  });
+
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
   return res.status(200).json({
     protocol: 'Bobby Protocol',
-    version: '3.0.0',
-    chain: { id: XLAYER_CHAIN_ID, name: 'X Layer', rpc: XLAYER_RPC_FALLBACK_URL },
+    version: '3.1.0',
+    chain: {
+      id: DEFAULT_CHAIN.id,
+      name: DEFAULT_CHAIN.name,
+      nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+      rpc: DEFAULT_CHAIN.publicRpcUrl,
+      explorer: DEFAULT_CHAIN.explorerUrl,
+    },
+    provenance: PROVENANCE,
+    mcpFee,
     agents: AGENTS,
     tools: TOOLS,
     contracts: CONTRACTS,

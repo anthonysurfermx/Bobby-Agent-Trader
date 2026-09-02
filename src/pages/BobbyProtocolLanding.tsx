@@ -34,6 +34,7 @@ interface ProtocolStats {
   protocolTotals?: { totalInteractions?: number; mcpPayments?: number };
   onchainRecord?: { commitmentsCreated?: number; decisionsResolved?: number; pending?: number; winRate?: number | null };
   debateActivity?: {
+    totalDebates?: number;
     commitmentsCreated?: number;
     decisionsResolved?: number;
     expired?: number;
@@ -187,9 +188,15 @@ export default function BobbyProtocolLanding() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'recorded'>('all');
   const btc = price(stats, 'BTC');
-  const totalDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
-  const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
+  // Provenance (Codex review): debates, decisions and win rate come from the
+  // public resolution ledger, which spans every era (X Layer included). MCP
+  // calls and interactions come from AgentEconomy on the LIVE chain (Base
+  // mainnet). Mixing the two in one row read as a contradiction — "0 debates,
+  // 864 decisions" — so each row now states where its numbers come from.
   const publicRecord = stats?.debateActivity;
+  const totalDebates = publicRecord?.totalDebates ?? stats?.contracts?.agentEconomy?.stats?.totalDebates;
+  const liveChainDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
+  const totalMcpCalls = stats?.contracts?.agentEconomy?.stats?.totalMcpCalls;
   const onchainRecord = stats?.onchainRecord;
   const totalTrades = publicRecord?.commitmentsCreated ?? stats?.contracts?.trackRecord?.stats?.totalTrades;
   const totalInteractions = stats?.protocolTotals?.totalInteractions;
@@ -213,6 +220,7 @@ export default function BobbyProtocolLanding() {
     return `${Number(rate).toFixed(1)}% (n=${resolved})`;
   };
   const chainLabel = stats?.chain?.id === 196 ? 'Legacy X Layer' : (stats?.chain?.name || 'Base');
+  const provenanceNote = `Debates, decisions and win rate: public resolution ledger, all eras. MCP calls and interactions: AgentEconomy on ${chainLabel}${liveChainDebates !== undefined ? ` (${formatNumber(liveChainDebates, '0')} debates settled there so far)` : ''}.`;
   const nativeSymbol = stats?.chain?.nativeSymbol || (stats?.chain?.id === 196 ? 'OKB' : 'ETH');
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
@@ -336,6 +344,7 @@ export default function BobbyProtocolLanding() {
                   </div>
                 ))}
               </div>
+              <p className="mt-4 max-w-xl font-mono text-[10px] leading-5 tracking-[0.04em] text-white/35">{provenanceNote}</p>
             </motion.div>
           </div>
         </section>
@@ -439,6 +448,7 @@ export default function BobbyProtocolLanding() {
                 </div>
               ))}
             </div>
+            <p className="mt-4 max-w-3xl font-mono text-[10px] leading-5 tracking-[0.04em] text-white/35">{provenanceNote}</p>
 
             <div className="mt-20 flex flex-col gap-4 border-t border-white/10 pt-6 lg:mt-24 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">

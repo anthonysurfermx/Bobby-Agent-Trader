@@ -127,3 +127,16 @@ DeFi México del repo). Cada paso con su propio GO.
   requisito de Codex para el corte (paso 6), no para producción.
 - Residuos en legacy tras las tres corridas: 0 en todas las tablas
   (canarios, recibos, feedback, nonces, flags).
+
+## Addendum (Codex post-deploy review, 2026-09-02 ~21:30 UTC)
+
+Findings 1–5 and 7 of the Codex review are addressed in code — see
+`docs/infra/2026-09-02-codex-feedback-fixes.md`. Two operational notes:
+
+- **Gate + rate limit.** Section C spends exactly the 6/h per-IP budget of
+  `/api/forum-publish`. A full `GATE PASSED` needs a fresh window or a fresh
+  deployment; the script now says so explicitly when 429s are the only
+  failures. Run it once right after the next deploy.
+- **SHA on CLI deploys.** Use `scripts/deploy-prod.sh` instead of a bare
+  `vercel --prod` from the worktree; it injects `BOBBY_BUILD_SHA` and verifies
+  `/api/bobby-health` reports HEAD before exiting 0.

@@ -404,7 +404,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
       explorerUrl: DEFAULT_CHAIN.explorerUrl,
       blockNumber,
-      rpc: XLAYER_RPC_URL,
+      rpc: DEFAULT_CHAIN.publicRpcUrl,
     },
     treasury: {
       address: BOBBY_TREASURY,

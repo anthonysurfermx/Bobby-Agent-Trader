@@ -55,8 +55,15 @@ const MARK = `RLS-CANARY-${Date.now()}-${randomBytes(3).toString('hex')}`;
 const CANARY_WALLET = `0x${randomBytes(20).toString('hex')}`;
 
 let failures = 0;
+// /api/forum-publish is rate-limited to 6 per IP per hour (fixed window, in
+// memory per instance) and section C spends EXACTLY six calls on it. A 429
+// therefore means the window is already spent by an earlier run — not a
+// security failure — but it still voids the verdict: the refusal semantics
+// (403/409) were not observed. Count them separately so the summary says so.
+let rateLimited = 0;
 const line = (ok: boolean, label: string, detail = '') => {
   if (!ok) failures += 1;
+  if (!ok && /HTTP 429/.test(detail)) rateLimited += 1;
   console.log(`${(ok ? 'OK' : 'FAIL').padEnd(6)} ${label}${detail ? `  — ${detail.replace(/\s+/g, ' ').slice(0, 140)}` : ''}`);
 };
 
@@ -291,6 +298,10 @@ async function legitimatePath(): Promise<void> {
   }
   if (SECTIONS.has('C')) await legitimatePath();
   if (SECTIONS.size < 3) console.log(`\n(partial run: sections ${[...SECTIONS].join('')} — a full GATE PASSED requires ABC)`);
+  if (rateLimited > 0 && rateLimited === failures) {
+    const retryAt = new Date(Date.now() + 3600_000).toISOString().slice(11, 16);
+    console.log(`\nRATE-LIMITED: the only failures are ${rateLimited} HTTP 429 from /api/forum-publish (6/h per IP, in-memory per instance).\nNot a security finding, but not a verdict either — rerun ONCE after ${retryAt} UTC or right after a fresh deployment (new instances start at zero).`);
+  }
   const full = SECTIONS.size === 3;
   console.log(failures === 0
     ? (full ? '\nGATE PASSED: policy matrix exact, canaries untouched, legitimate path proven.' : `\nSECTION(S) ${[...SECTIONS].join('')} PASSED — not a full gate verdict.`)

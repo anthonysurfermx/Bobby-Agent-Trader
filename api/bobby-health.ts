@@ -12,6 +12,12 @@ export const config = { maxDuration: 10 };
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const control = await getBobbyControl();
+  // Git-integrated deploys expose VERCEL_GIT_COMMIT_SHA. CLI deploys from a
+  // worktree (`.git` is a file there) ship no git metadata, so
+  // scripts/deploy-prod.sh injects BOBBY_BUILD_SHA / BOBBY_BUILD_REF instead.
+  const gitSha = process.env.VERCEL_GIT_COMMIT_SHA || '';
+  const cliSha = process.env.BOBBY_BUILD_SHA || '';
+  const deploySha = gitSha || cliSha;
   res.setHeader('Cache-Control', 'no-store');
   return res.status(200).json({
     ok: true,
@@ -24,7 +30,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       note: control.note,
     },
     ops: { manualRunsEnabled: Boolean(process.env.BOBBY_OPS_SECRET) },
-    deployment: { env: process.env.VERCEL_ENV || 'local', sha: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7) || null },
+    deployment: {
+      env: process.env.VERCEL_ENV || 'local',
+      sha: deploySha ? deploySha.slice(0, 7) : null,
+      fullSha: deploySha || null,
+      ref: process.env.VERCEL_GIT_COMMIT_REF || process.env.BOBBY_BUILD_REF || null,
+      shaSource: gitSha ? 'vercel-git' : cliSha ? 'deploy-script' : null,
+      deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
+    },
     checkedAt: new Date().toISOString(),
   });
 }

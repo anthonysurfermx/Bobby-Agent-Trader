@@ -26,6 +26,9 @@ export interface ChainConfig {
   name: string;
   rpcUrl: string;
   rpcFallbackUrl?: string;
+  /** Static public RPC safe to advertise in public metadata — never the env
+   *  override, which may carry a provider key. */
+  publicRpcUrl: string;
   explorerUrl: string;
   explorerApiUrl: string;
   nativeSymbol: string;
@@ -99,6 +102,7 @@ export const BASE: ChainConfig = {
   // sole production dependency. Read paths fail over; writers still assert
   // the expected chain before signing.
   rpcFallbackUrl: process.env.BASE_RPC_FALLBACK_URL || 'https://base-rpc.publicnode.com',
+  publicRpcUrl: 'https://mainnet.base.org',
   explorerUrl: 'https://basescan.org',
   explorerApiUrl: 'https://api.basescan.org/api',
   nativeSymbol: 'ETH',
@@ -124,6 +128,7 @@ export const BASE_SEPOLIA: ChainConfig = {
   id: BASE_SEPOLIA_CHAIN_ID,
   name: 'Base Sepolia',
   rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
+  publicRpcUrl: 'https://sepolia.base.org',
   explorerUrl: 'https://sepolia.basescan.org',
   explorerApiUrl: 'https://api-sepolia.basescan.org/api',
   protocolDeploymentBlock: 45_364_125,
@@ -137,6 +142,7 @@ export const XLAYER: ChainConfig = {
   name: 'X Layer',
   rpcUrl: process.env.XLAYER_RPC_URL || 'https://rpc.xlayer.tech',
   rpcFallbackUrl: 'https://xlayerrpc.okx.com',
+  publicRpcUrl: 'https://rpc.xlayer.tech',
   explorerUrl: 'https://www.oklink.com/xlayer',
   explorerApiUrl: 'https://www.oklink.com/api/v5/explorer/xlayer',
   nativeSymbol: 'OKB',
