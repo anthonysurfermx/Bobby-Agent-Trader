@@ -5,6 +5,7 @@
 // shield, the lock that never touches money, the discipline core. No generic
 // AI sparkle — every icon is a piece of kit.
 import SwiftUI
+import AVFoundation
 import AudioToolbox
 
 struct LoadoutGear: Identifiable {
@@ -120,8 +121,8 @@ struct LoadoutStep: View {
         .overlay(alignment: .top) {
             if burst { SpawnBurst(tint: tint).allowsHitTesting(false) }
         }
-        .onAppear { startAutoEquip() }
-        .onDisappear { autoTask?.cancel() }
+        .onAppear { ForgeAudio.shared.startHum(); startAutoEquip() }
+        .onDisappear { autoTask?.cancel(); ForgeAudio.shared.stopHum() }
         .accessibilityElement(children: .contain)
     }
 
@@ -248,11 +249,11 @@ struct LoadoutStep: View {
             return
         }
         UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 0.9)
-        AudioServicesPlaySystemSound(item.sound)
         popping = item.id
         withAnimation(.spring(duration: 0.35, bounce: 0.4)) {
             _ = equipped.insert(item.id)
         }
+        ForgeAudio.shared.charge(equipped.count)
         onCharge?(equipped.count)
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 260_000_000)
@@ -264,7 +265,7 @@ struct LoadoutStep: View {
     private func spawn() {
         autoTask?.cancel()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        AudioServicesPlaySystemSound(1016)
+        ForgeAudio.shared.auraMax()
         withAnimation(.spring(duration: 0.5, bounce: 0.35)) {
             burst = true
             ready = true
@@ -399,5 +400,57 @@ struct AuraForgeStage<Content: View>: View {
         .shadow(color: tint.opacity(ready ? 0.35 : 0.15), radius: 24)
         .animation(.spring(duration: 0.5, bounce: 0.35), value: ready)
         .onAppear { spin = true; beam = true; pulse = true }
+    }
+}
+
+/// The forge's soundscape: a low hum while the machine runs, a rising charge
+/// per equipped piece (each a step higher) and the bright hit when the aura
+/// maxes out. Procedural WAVs shipped as data assets, played with AVAudioPlayer.
+final class ForgeAudio {
+    static let shared = ForgeAudio()
+    private var hum: AVAudioPlayer?
+    private var oneShots: [AVAudioPlayer] = []
+
+    private func player(_ asset: String) -> AVAudioPlayer? {
+        guard let data = NSDataAsset(name: asset)?.data else { return nil }
+        return try? AVAudioPlayer(data: data, fileTypeHint: "wav")
+    }
+
+    func startHum() {
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        guard hum == nil, let p = player("sfx_forge_hum") else { return }
+        p.numberOfLoops = -1
+        p.volume = 0
+        p.prepareToPlay()
+        p.play()
+        p.setVolume(0.35, fadeDuration: 0.8)
+        hum = p
+    }
+
+    func stopHum() {
+        guard let p = hum else { return }
+        p.setVolume(0, fadeDuration: 0.6)
+        hum = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { p.stop() }
+    }
+
+    func charge(_ index: Int) {
+        play("sfx_forge_charge_\(max(1, min(4, index)))", volume: 0.8)
+    }
+
+    func auraMax() {
+        play("sfx_aura_max", volume: 0.9)
+        // The hum settles once the aura is done.
+        hum?.setVolume(0.18, fadeDuration: 1.2)
+    }
+
+    private func play(_ asset: String, volume: Float) {
+        guard let p = player(asset) else { return }
+        p.volume = volume
+        p.prepareToPlay()
+        p.play()
+        oneShots.append(p)
+        oneShots.removeAll { !$0.isPlaying && $0 !== p }
     }
 }
