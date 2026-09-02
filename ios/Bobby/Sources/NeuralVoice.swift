@@ -37,6 +37,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         stop()
         generation += 1
         let gen = generation
+        fallbackPersona = persona ?? voiceId
 
         Task {
             do {
@@ -94,10 +95,42 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         }
     }
 
+    /// Persona of the voice currently requested; the offline fallback picks a
+    /// system voice of the same gender so companions stay distinguishable even
+    /// when the network voice is unavailable.
+    private var fallbackPersona: String = "coral"
+
+    private static let feminineVoices: Set<String> = ["coral", "sage", "nova", "shimmer", "marin", "alloy", "fable", "female"]
+
+    /// Best on-device voice for the language: premium > enhanced > default,
+    /// gender-matched to the companion. Never the compact robotic default when
+    /// a natural one is installed.
+    private func bestSystemVoice() -> AVSpeechSynthesisVoice? {
+        let prefix = L.isSpanish ? "es" : "en"
+        let preferred = L.isSpanish ? "es-MX" : "en-US"
+        let wantsFeminine = Self.feminineVoices.contains(fallbackPersona)
+        let candidates = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix(prefix) }
+        func rank(_ v: AVSpeechSynthesisVoice) -> Int {
+            var score = 0
+            switch v.quality {
+            case .premium: score += 300
+            case .enhanced: score += 200
+            default: score += 100
+            }
+            if v.language == preferred { score += 50 }
+            if v.gender == (wantsFeminine ? .female : .male) { score += 20 }
+            return score
+        }
+        return candidates.max { rank($0) < rank($1) }
+            ?? AVSpeechSynthesisVoice(language: preferred)
+            ?? AVSpeechSynthesisVoice(language: "en-US")
+    }
+
     private func speakFallback(_ text: String) {
         let u = AVSpeechUtterance(string: text)
-        u.voice = AVSpeechSynthesisVoice(language: L.isSpanish ? "es-MX" : "en-US") ?? AVSpeechSynthesisVoice(language: "en-US")
-        u.rate = 0.52
+        u.voice = bestSystemVoice()
+        u.rate = 0.5
+        u.pitchMultiplier = Self.feminineVoices.contains(fallbackPersona) ? 1.05 : 0.95
         speaking = true
         fallback.speak(u)
     }
