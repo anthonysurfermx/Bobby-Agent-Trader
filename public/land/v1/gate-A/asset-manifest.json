@@ -1,0 +1,239 @@
+{
+  "gate": "A",
+  "date": "2026-09-02",
+  "contract": "albedo/glow/shadow/thumb + contentBounds/anchor/footprint/connectors/occlusionHeight/orientations",
+  "items": [
+    {
+      "id": "aura_core_stage0",
+      "state": "stage0",
+      "district": "core",
+      "footprint": "2x2",
+      "source": "aura_core_stage0_albedo.png",
+      "contentBounds_2048": [
+        540,
+        312,
+        1510,
+        1789
+      ],
+      "anchor_2048": [
+        1025,
+        1789
+      ],
+      "ghost_dark_pixels_outside_bounds_before_cleanup": 1947,
+      "contact_shadow_pixels_removed": 5755,
+      "ghost_dark_pixels_outside_bounds": 0,
+      "bright_halo_pixels": 0,
+      "shadow_hypothesis": "PASS",
+      "glow_coverage_pct": 0.23,
+      "occlusionHeight_px": 1477,
+      "orientations": [
+        "ne"
+      ],
+      "connectors": {
+        "n": false,
+        "e": false,
+        "s": false,
+        "w": false
+      }
+    },
+    {
+      "id": "aura_core_stage1",
+      "state": "stage1",
+      "district": "core",
+      "footprint": "2x2",
+      "source": "aura_core_stage1_albedo.png",
+      "contentBounds_2048": [
+        492,
+        304,
+        1553,
+        1823
+      ],
+      "anchor_2048": [
+        1022,
+        1823
+      ],
+      "ghost_dark_pixels_outside_bounds_before_cleanup": 0,
+      "contact_shadow_pixels_removed": 0,
+      "ghost_dark_pixels_outside_bounds": 0,
+      "bright_halo_pixels": 0,
+      "shadow_hypothesis": "PASS",
+      "glow_coverage_pct": 6.83,
+      "occlusionHeight_px": 1519,
+      "orientations": [
+        "ne"
+      ],
+      "connectors": {
+        "n": false,
+        "e": false,
+        "s": false,
+        "w": false
+      }
+    },
+    {
+      "id": "evidence_mines_crystal_vein_rock",
+      "state": "bloom",
+      "district": "evidence_mines",
+      "footprint": "1x1",
+      "source": "evidence_mines_crystal_vein_rock_bloom_albedo.png",
+      "contentBounds_2048": [
+        472,
+        522,
+        1565,
+        1640
+      ],
+      "anchor_2048": [
+        1018,
+        1640
+      ],
+      "ghost_dark_pixels_outside_bounds_before_cleanup": 5526,
+      "contact_shadow_pixels_removed": 16888,
+      "ghost_dark_pixels_outside_bounds": 0,
+      "bright_halo_pixels": 133,
+      "shadow_hypothesis": "PASS",
+      "glow_coverage_pct": 4.31,
+      "occlusionHeight_px": 1118,
+      "orientations": [
+        "ne"
+      ],
+      "connectors": {
+        "n": false,
+        "e": false,
+        "s": false,
+        "w": false
+      },
+      "seed_derived": true
+    },
+    {
+      "id": "axiom_archive_return_path",
+      "state": "bloom",
+      "district": "axiom_archive",
+      "footprint": "1x1",
+      "source": "axiom_archive_return_path_bloom_albedo.png",
+      "contentBounds_2048": [
+        324,
+        519,
+        1720,
+        1606
+      ],
+      "anchor_2048": [
+        1022,
+        1606
+      ],
+      "ghost_dark_pixels_outside_bounds_before_cleanup": 0,
+      "contact_shadow_pixels_removed": 0,
+      "ghost_dark_pixels_outside_bounds": 0,
+      "bright_halo_pixels": 0,
+      "shadow_hypothesis": "PASS",
+      "glow_coverage_pct": 3.46,
+      "occlusionHeight_px": 1087,
+      "orientations": [
+        "ne"
+      ],
+      "connectors": {
+        "n": true,
+        "e": false,
+        "s": true,
+        "w": false
+      }
+    },
+    {
+      "id": "risk_reef_dual_orbit_antenna",
+      "state": "bloom",
+      "district": "risk_reef",
+      "footprint": "1x1",
+      "source": "risk_reef_dual_orbit_antenna_bloom_albedo.png",
+      "contentBounds_2048": [
+        651,
+        592,
+        1387,
+        1485
+      ],
+      "anchor_2048": [
+        1019,
+        1485
+      ],
+      "ghost_dark_pixels_outside_bounds_before_cleanup": 6366,
+      "contact_shadow_pixels_removed": 12764,
+      "ghost_dark_pixels_outside_bounds": 0,
+      "bright_halo_pixels": 0,
+      "shadow_hypothesis": "PASS",
+      "glow_coverage_pct": 2.22,
+      "occlusionHeight_px": 893,
+      "orientations": [
+        "ne"
+      ],
+      "connectors": {
+        "n": false,
+        "e": false,
+        "s": false,
+        "w": false
+      }
+    },
+    {
+      "id": "evidence_mines_evidence_workshop",
+      "state": "bloom",
+      "district": "evidence_mines",
+      "footprint": "2x1",
+      "source": "evidence_mines_evidence_workshop_bloom_albedo.png",
+      "contentBounds_2048": [
+        492,
+        398,
+        1553,
+        1823
+      ],
+      "anchor_2048": [
+        1022,
+        1823
+      ],
+      "ghost_dark_pixels_outside_bounds_before_cleanup": 0,
+      "contact_shadow_pixels_removed": 785,
+      "ghost_dark_pixels_outside_bounds": 0,
+      "bright_halo_pixels": 197,
+      "shadow_hypothesis": "PASS",
+      "glow_coverage_pct": 3.27,
+      "occlusionHeight_px": 1425,
+      "orientations": [
+        "ne"
+      ],
+      "connectors": {
+        "n": false,
+        "e": false,
+        "s": false,
+        "w": false
+      }
+    },
+    {
+      "id": "thesis_citadel_three_gate_citadel",
+      "state": "bloom",
+      "district": "thesis_citadel",
+      "footprint": "2x2",
+      "source": "thesis_citadel_three_gate_citadel_bloom_albedo.png",
+      "contentBounds_2048": [
+        250,
+        363,
+        1794,
+        1749
+      ],
+      "anchor_2048": [
+        1022,
+        1749
+      ],
+      "ghost_dark_pixels_outside_bounds_before_cleanup": 0,
+      "contact_shadow_pixels_removed": 0,
+      "ghost_dark_pixels_outside_bounds": 0,
+      "bright_halo_pixels": 233,
+      "shadow_hypothesis": "PASS",
+      "glow_coverage_pct": 2.85,
+      "occlusionHeight_px": 1386,
+      "orientations": [
+        "ne"
+      ],
+      "connectors": {
+        "n": false,
+        "e": false,
+        "s": false,
+        "w": false
+      }
+    }
+  ]
+}
