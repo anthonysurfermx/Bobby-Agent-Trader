@@ -48,3 +48,4 @@ public/logos/
 src/types/register.ts
 .claude/supabase-bobby-protocol.env
 supabase/.temp/
+.vercel
