@@ -10,6 +10,19 @@
 const API = (process.env.BOBBY_API || '').replace(/\/+$/, '');
 if (!API) { console.error('BOBBY_API is required'); process.exit(2); }
 const origin = new URL(API).host;
+// Vercel Deployment Protection: previews answer 302 → SSO unless the
+// automation bypass secret is presented (Project → Settings → Deployment
+// Protection → Protection Bypass for Automation).
+const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
+const bypassHeaders: Record<string, string> = BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {};
+const realFetch = globalThis.fetch;
+globalThis.fetch = ((input: string | URL | Request, init: RequestInit = {}) =>
+  realFetch(input, { ...init, redirect: 'manual', headers: { ...(init.headers as Record<string, string> | undefined), ...bypassHeaders } })) as typeof fetch;
+const guard = await fetch(`${API}/api/bobby-health`);
+if (guard.status === 302 || guard.status === 401 && !BYPASS) {
+  console.error(`Deployment is protected (HTTP ${guard.status}). Set VERCEL_AUTOMATION_BYPASS_SECRET or disable Vercel Authentication for this preview.`);
+  process.exit(2);
+}
 let failures = 0;
 const line = (ok: boolean, label: string, detail = '') => { if (!ok) failures += 1; console.log(`${(ok ? 'OK' : 'FAIL').padEnd(6)} ${label}${detail ? `  — ${detail.slice(0, 140)}` : ''}`); };
 const j = async (r: Response) => (await r.json().catch(() => ({}))) as Record<string, unknown>;
