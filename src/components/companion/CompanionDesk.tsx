@@ -5,7 +5,7 @@
 // explore board, risk notice. Bobby never executes anything.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Grid2x2, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, Users, Volume2, VolumeX } from 'lucide-react';
+import { Grid2x2, Lock, Map as MapIcon, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, Users, Volume2, VolumeX } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, LEVEL_TONE, companionName, getCompanion, getVibe, levelFor, nextLevelFor, tintFor, toolArt, toolHasArt, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -14,7 +14,7 @@ import { levelProgress, progressStore, useProgress } from '@/lib/companions/prog
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import RiskNotice from './RiskNotice';
-import { EvolutionOverlay, GearCatalog, NoTradeCard, ToolBelt, ToolDetail, ToolUnlockOverlay } from './CompanionOverlays';
+import { EvolutionOverlay, GearCatalog, NoTradeCard, ToolBelt, ToolDetail, ToolUnlockOverlay, WorldMapTeaser } from './CompanionOverlays';
 import { PET_UNLOCK_XP, petArt, petFor, petUnlocked, toolSlot, wornGear } from '@/lib/companions/data';
 
 // ---- API (mirrors BobbyAPI.swift) ----
@@ -185,7 +185,7 @@ export default function CompanionDesk() {
   const [drops, setDrops] = useState<CompanionTool[]>([]);
   const [inspected, setInspected] = useState<CompanionTool | null>(null);
   const [menu, setMenu] = useState(false);
-  const [sheet, setSheet] = useState<'none' | 'board' | 'squad' | 'risk' | 'catalog' | 'pet'>('none');
+  const [sheet, setSheet] = useState<'none' | 'board' | 'squad' | 'risk' | 'catalog' | 'pet' | 'world'>('none');
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [equip, setEquip] = useState<{ url: string; token: number }>({ url: '', token: 0 });
   const [muted, setMuted] = useState(sfxMuted());
@@ -382,6 +382,7 @@ export default function CompanionDesk() {
                   {[
                     { icon: <Grid2x2 size={14} />, label: t('Explore markets', 'Explorar mercados'), act: () => setSheet('board') },
                     { icon: <Users size={14} />, label: t('My squad', 'Mi squad'), act: () => setSheet('squad') },
+                    { icon: <MapIcon size={14} />, label: t('Bobby World · soon', 'Mundo Bobby · pronto'), act: () => setSheet('world') },
                     { icon: <Share2 size={14} />, label: t('Share my skin', 'Compartir mi skin'), act: () => void shareSkin() },
                     { icon: <ShieldAlert size={14} />, label: t('Risk notice', 'Aviso de riesgo'), act: () => setSheet('risk') },
                     { icon: muted ? <VolumeX size={14} /> : <Volume2 size={14} />, label: muted ? t('Sounds off', 'Sonidos apagados') : t('Sounds on', 'Sonidos encendidos'), act: () => { setSfxMuted(!muted); setMuted(!muted); } },
@@ -414,7 +415,7 @@ export default function CompanionDesk() {
           <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor]" />{statusLabel}
         </div>
         <div className="text-[10px] font-mono text-white/45 mt-1 min-h-[16px]">{statusHint}</div>
-        <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} /></div>
+        <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={() => { sfxTock(); setSheet('world'); }} /></div>
       </div>
 
       {/* confirm */}
@@ -516,6 +517,7 @@ export default function CompanionDesk() {
         {sheet === 'board' && <BoardSheet onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
         {sheet === 'squad' && <SquadSheet current={companion} level={level.number} onPick={(c) => { progressStore.setCompanion(c.id); setSheet('none'); void voice.speak(pick(c.selectLine), { voice: c.voicePersona, essential: false }); }} onClose={() => setSheet('none')} />}
         {sheet === 'catalog' && <GearCatalog current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
+        {sheet === 'world' && <WorldMapTeaser xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
         {sheet === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end md:items-center justify-center bg-black/70" onClick={() => setSheet('none')}>
             <div className="w-full max-w-md bg-[#0a0a0c] border border-white/[0.06] rounded-t-2xl md:rounded-2xl p-6 text-center space-y-3" onClick={(e) => e.stopPropagation()}>
@@ -599,20 +601,45 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
 }
 
 function SquadSheet({ current, level, onPick, onClose }: { current: Companion; level: number; onPick: (c: Companion) => void; onClose: () => void }) {
+  // Locked companions stay visible — grey, behind a lock — and can be
+  // previewed in 3D. Looking is free; choosing takes the level.
+  const [preview, setPreview] = useState<Companion | null>(null);
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/95 overflow-y-auto">
       <div className="mx-auto max-w-2xl p-4 space-y-4">
         <div className="flex items-center justify-between"><div className="text-white font-mono tracking-[0.2em]">BOBBY // {t('MY SQUAD', 'MI SQUAD')}</div><button onClick={onClose} className="h-9 w-9 rounded-full bg-white/[0.05] text-white/70">✕</button></div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {COMPANIONS.map((c) => { const unlocked = level >= c.requiredLevel; const active = c.id === current.id; return (
-            <button key={c.id} disabled={!unlocked} onClick={() => onPick(c)} className="rounded-xl p-3 border text-left transition disabled:opacity-60" style={{ borderColor: active ? tintFor(c, 0.7) : 'rgba(255,255,255,0.06)', background: active ? tintFor(c, 0.08) : 'rgba(255,255,255,0.02)' }}>
-              <img src={`/mascots/${c.id}.webp`} alt="" className="h-24 w-full object-cover rounded-lg" style={{ filter: unlocked ? 'none' : 'grayscale(1)' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+            <button key={c.id} onClick={() => { if (unlocked) onPick(c); else { sfxTock(); setPreview(c); } }} className="rounded-xl p-3 border text-left transition" style={{ borderColor: active ? tintFor(c, 0.7) : 'rgba(255,255,255,0.06)', background: active ? tintFor(c, 0.08) : 'rgba(255,255,255,0.02)' }}>
+              <div className="relative">
+                <img src={`/mascots/${c.id}.webp`} alt="" className="h-24 w-full object-cover rounded-lg" style={{ filter: unlocked ? 'none' : 'grayscale(1) brightness(0.75)' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+                {!unlocked && <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/35"><span className="h-9 w-9 rounded-full bg-black/80 border border-white/15 flex items-center justify-center text-white/90"><Lock size={14} /></span></div>}
+              </div>
               <div className="mt-2 font-mono text-xs tracking-[0.15em]" style={{ color: unlocked ? tintFor(c) : 'rgba(255,255,255,0.5)' }}>{c.label}</div>
               <div className="text-[10px] text-white/50">{unlocked ? pick(c.role) : t(`LEVEL ${c.requiredLevel}`, `NIVEL ${c.requiredLevel}`)}</div>
             </button>
           ); })}
         </div>
       </div>
+      <AnimatePresence>
+        {preview && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => setPreview(null)}>
+            <motion.div initial={{ scale: 0.9, y: 16 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-sm rounded-3xl bg-[#0a0a0c] border border-white/[0.08] p-5 text-center" onClick={(e) => e.stopPropagation()}>
+              <div className="text-[10px] font-mono tracking-[0.3em] text-white/50">{preview.label} · {t('LOCKED', 'BLOQUEADO')}</div>
+              <div className="relative mx-auto mt-2" style={{ width: 240, height: 240, filter: 'grayscale(1) brightness(0.65)' }}>
+                <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: preview.palette, avatar: preview.id }} state="idle" size={240} />
+              </div>
+              <div className="-mt-24 relative mx-auto inline-flex flex-col items-center gap-1 rounded-2xl bg-black/70 border border-white/10 px-5 py-3">
+                <Lock size={26} className="text-white/90" />
+                <div className="text-[10px] font-mono tracking-[0.2em] text-white/85">{t(`UNLOCKS AT LEVEL ${preview.requiredLevel}`, `SE DESBLOQUEA EN NIVEL ${preview.requiredLevel}`)}</div>
+                <div className="text-[11px] text-white/55">{t('Discipline gets you there, never volume.', 'La disciplina te lleva, nunca el volumen.')}</div>
+              </div>
+              <div className="mt-6 text-sm text-white/75">{pick(preview.role)}</div>
+              <button onClick={() => setPreview(null)} className="mt-4 w-full py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: tintFor(preview) }}>{t(`YOU ARE LEVEL ${level} · KEEP GOING`, `VAS EN NIVEL ${level} · SIGUE`)}</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

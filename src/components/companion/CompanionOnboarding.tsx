@@ -3,8 +3,8 @@
 // choose its vibe (you hear it live), then the LOADOUT — four pieces of kit
 // equip one by one with sound and vibration, the companion is ready, and
 // you drop into the desk.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Check, Volume2 } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
@@ -64,7 +64,7 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
     }
   };
 
-  const title = step === 2 ? t('BOBBY // PREPPING YOUR TRADER VIBE', 'BOBBY // PREPARANDO TU VIBRA DE TRADER') : t('BOBBY // MEET YOUR SQUAD', 'BOBBY // CONOCE AL SQUAD');
+  const title = step === 2 ? t('BOBBY // PREPPING AURA', 'BOBBY // PREPARANDO AURA') : t('BOBBY // MEET YOUR SQUAD', 'BOBBY // CONOCE AL SQUAD');
 
   return (
     <div className="mx-auto max-w-xl px-5 py-6 flex flex-col min-h-[calc(100vh-80px)]">
@@ -74,8 +74,14 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
       </div>
       <div className="mt-3 h-0.5 bg-white/[0.06] rounded-full"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${((step + 1) / 3) * 100}%`, background: tint }} /></div>
 
-      <div className="flex-1 flex items-center justify-center py-4" style={{ background: `radial-gradient(circle at 50% 50%, ${tintFor(selected, 0.14)}, transparent 60%)` }}>
-        <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: selected.palette, avatar: selected.id }} state={voice.speaking ? 'speaking' : 'idle'} level={voice.speaking ? voice.level : null} size={step === 2 ? 220 : 280} />
+      <div className="flex-1 flex items-center justify-center py-4" style={{ background: step === 2 ? 'none' : `radial-gradient(circle at 50% 50%, ${tintFor(selected, 0.14)}, transparent 60%)` }}>
+        {step === 2 ? (
+          <AuraForgeStage tint={tint} charged={equipped.length} ready={ready}>
+            <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: selected.palette, avatar: selected.id }} state={voice.speaking ? 'speaking' : 'idle'} level={voice.speaking ? voice.level : null} size={230} />
+          </AuraForgeStage>
+        ) : (
+          <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: selected.palette, avatar: selected.id }} state={voice.speaking ? 'speaking' : 'idle'} level={voice.speaking ? voice.level : null} size={280} />
+        )}
       </div>
 
       {/* No exit animation on purpose: rapid step changes must never leave a
@@ -133,10 +139,10 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
             <div className="relative space-y-3">
               {burst && <Burst tint={tint} />}
               <div className="flex items-baseline justify-between text-[11px] font-mono tracking-[0.15em]">
-                <span style={{ color: ready ? '#34D399' : tint }}>{ready ? t(`${companionName(selected, 1)} IS READY`, `${companionName(selected, 1)} ESTÁ LISTO`) : t(`PREPPING ${companionName(selected, 1)}'S TRADER VIBE…`, `PREPARANDO LA VIBRA DE TRADER DE ${companionName(selected, 1)}…`)}</span>
-                <span className="text-white/45">{t('LOADOUT', 'EQUIPO')} {equipped.length}/{LOADOUT_GEAR.length}</span>
+                <span style={{ color: ready ? '#34D399' : tint }}>{ready ? t(`${companionName(selected, 1)} · AURA READY`, `${companionName(selected, 1)} · AURA LISTA`) : t(`PREPPING ${companionName(selected, 1)}'S AURA…`, `PREPARANDO AURA DE ${companionName(selected, 1)}…`)}</span>
+                <span className="text-white/45">{t('AURA', 'AURA')} {equipped.length}/{LOADOUT_GEAR.length}</span>
               </div>
-              <p className="text-center text-sm text-white/80">{pick(ORIGIN_STORY[selected.id])}</p>
+              <p className="text-center text-sm text-white/80">{ready ? t('You just built the avatar with the best aura in the market. Now go farm it.', 'Acabas de crear el avatar con mejor aura del mercado. Ahora a farmearla.') : pick(ORIGIN_STORY[selected.id])}</p>
               <div className="grid grid-cols-2 gap-2">
                 {LOADOUT_GEAR.map((g) => {
                   const on = equipped.includes(g.id);
@@ -179,6 +185,31 @@ function Burst({ tint }: { tint: string }) {
       {parts.map((p, i) => (
         <motion.span key={i} initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }} animate={{ x: Math.cos(p.a) * p.d, y: Math.sin(p.a) * p.d * 0.75 + 30, opacity: 0, rotate: 180 }} transition={{ duration: 1.1, ease: 'easeOut' }} className="absolute block rounded-sm" style={{ width: p.s, height: p.s, background: tint }} />
       ))}
+    </div>
+  );
+}
+
+/** The aura forge: the machine (Higgsfield render) with the companion standing
+ *  on its platform. Rings spin, a beam scans, the platform charges with every
+ *  piece equipped — no video, all live. */
+function AuraForgeStage({ tint, charged, ready, children }: { tint: string; charged: number; ready: boolean; children: ReactNode }) {
+  const W = 300;
+  const H = 400;
+  return (
+    <div className="relative mx-auto overflow-hidden rounded-3xl border border-white/[0.06]" style={{ width: W, height: H, boxShadow: `0 0 40px ${tint}${ready ? '55' : '22'}` }}>
+      <motion.img src="/world/aura-forge.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" animate={{ scale: [1.04, 1, 1.04] }} transition={{ repeat: Infinity, duration: 12, ease: 'easeInOut' }} />
+      <motion.div className="absolute left-1/2 rounded-full pointer-events-none" style={{ width: 230, height: 76, top: H * 0.72 - 38, x: '-50%', background: `radial-gradient(ellipse, ${tint}, transparent 70%)`, filter: 'blur(12px)' }} animate={{ opacity: 0.22 + charged * 0.16, scale: [1, 1.1, 1] }} transition={{ opacity: { duration: 0.4 }, scale: { repeat: Infinity, duration: 2, ease: 'easeInOut' } }} />
+      <motion.div className="absolute left-1/2 pointer-events-none" style={{ width: 160, height: 5, x: '-50%', background: `linear-gradient(90deg, transparent, ${tint}, transparent)`, boxShadow: `0 0 18px ${tint}` }} animate={{ top: [H * 0.26, H * 0.74, H * 0.26], opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }} />
+      <div className="absolute left-1/2 pointer-events-none" style={{ top: H * 0.72 - 100, x: '-50%', width: 200, height: 200, perspective: 500, transform: 'translateX(-50%)' }}>
+        <motion.div className="absolute inset-0 rounded-full" style={{ border: `2px dashed ${tint}`, opacity: 0.7, rotateX: 72 }} animate={{ rotateZ: 360 }} transition={{ repeat: Infinity, duration: 8, ease: 'linear' }} />
+        <motion.div className="absolute inset-4 rounded-full" style={{ border: `1px solid ${tint}`, opacity: 0.5, rotateX: 72 }} animate={{ rotateZ: -360 }} transition={{ repeat: Infinity, duration: 5, ease: 'linear' }} />
+      </div>
+      <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 92 }}>{children}</div>
+      <AnimatePresence>
+        {ready && (
+          <motion.div initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="absolute left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-mono tracking-[0.3em] text-black" style={{ top: 14, background: tint, boxShadow: `0 0 20px ${tint}` }}>{t('AURA · MAX', 'AURA · MÁXIMA')}</motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

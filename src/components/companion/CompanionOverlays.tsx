@@ -2,12 +2,16 @@
 // Ported from EvolutionOverlay / ToolUnlockOverlay / ToolBelt / NoTrade card in iOS.
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, PawPrint, Plus, ShieldCheck, Sparkles } from 'lucide-react';
+import { Lock, Map as MapIcon, PawPrint, Plus, ShieldCheck, Sparkles } from 'lucide-react';
 import { COMPANIONS, PET_UNLOCK_XP, type Companion, type CompanionLevel, type CompanionTool, companionName, petArt, petFor, petUnlocked, tintFor, toolArt, toolHasArt, toolTierLabel, toolUnlockXP, toolsFor, LEVEL_TONE } from '@/lib/companions/data';
 import { pick, t } from '@/lib/companions/i18n';
 import { sfxLevelUp, sfxLoot } from '@/lib/companions/sfx';
 
 const GOLD = '#F5C542';
+
+/** Bobby World — the Focus-Tree-style world we build next. Teaser only. */
+export const WORLD_MAP_ART = '/world/bobby-world.jpg';
+const WORLD_REGIONS = ['CRYPTO BAY', 'GOLD MINES', 'WALL STREET CITADEL', 'RISK REEF'];
 
 export function EvolutionOverlay({ companion, level, onDone }: { companion: Companion; level: CompanionLevel; onDone: () => void }) {
   useEffect(() => { sfxLevelUp(); }, []);
@@ -48,7 +52,7 @@ export function ToolUnlockOverlay({ companion, tool, onDone }: { companion: Comp
   );
 }
 
-export function ToolBelt({ companion, xp, onTap, onPet, onPlus }: { companion: Companion; xp: number; onTap?: (tool: CompanionTool) => void; onPet?: () => void; onPlus?: () => void }) {
+export function ToolBelt({ companion, xp, onTap, onPet, onPlus, onWorld }: { companion: Companion; xp: number; onTap?: (tool: CompanionTool) => void; onPet?: () => void; onPlus?: () => void; onWorld?: () => void }) {
   const pet = petFor(companion.id);
   const hasPet = petUnlocked(xp);
   return (
@@ -79,7 +83,49 @@ export function ToolBelt({ companion, xp, onTap, onPet, onPlus }: { companion: C
         </button>
       )}
       <button onClick={onPlus} title={t('What else you can earn', 'Qué más puedes conseguir')} className="h-11 w-11 rounded-full flex items-center justify-center border border-dashed border-white/20 text-white/50"><Plus size={14} /></button>
+      {/* The world slot: the map we are building next, fog of war and all. */}
+      <button onClick={onWorld} title={t('Bobby World · soon', 'Mundo Bobby · pronto')} className="relative h-11 w-11 rounded-full flex items-center justify-center overflow-visible" style={{ border: `1px solid ${GOLD}99`, backgroundImage: `url(${WORLD_MAP_ART})`, backgroundSize: '300%', backgroundPosition: '50% 58%' }}>
+        <span className="absolute inset-0 rounded-full bg-black/45" />
+        <motion.span className="absolute inset-0 rounded-full" style={{ border: `1px solid ${GOLD}` }} animate={{ scale: [1, 1.45], opacity: [0.8, 0] }} transition={{ repeat: Infinity, duration: 1.7, ease: 'easeOut' }} />
+        <MapIcon size={14} className="relative" style={{ color: GOLD }} />
+      </button>
     </div>
+  );
+}
+
+/** The popup: an Age-of-Empires-style world under fog of war, SOON, and the
+ *  promise that discipline XP carries over. Nothing here is playable yet. */
+export function WorldMapTeaser({ xp, level, onClose }: { xp: number; level: number; onClose: () => void }) {
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-3 overflow-y-auto" onClick={onClose}>
+      <motion.div initial={{ scale: 0.92, y: 18 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', bounce: 0.35, duration: 0.6 }} className="relative w-full max-w-md rounded-3xl overflow-hidden bg-[#07090c] my-auto" style={{ border: `1px solid ${GOLD}40`, boxShadow: `0 0 60px ${GOLD}22` }} onClick={(e) => e.stopPropagation()}>
+        <div className="relative aspect-[3/4] overflow-hidden">
+          <motion.img src={WORLD_MAP_ART} alt="" className="absolute inset-0 h-full w-full object-cover" animate={{ scale: [1.08, 1, 1.08] }} transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut' }} />
+          <motion.div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 30% 22%, rgba(130,140,160,0.38), transparent 55%)' }} animate={{ x: [-24, 24, -24], y: [0, 14, 0] }} transition={{ repeat: Infinity, duration: 14, ease: 'easeInOut' }} />
+          <div className="absolute inset-x-0 top-0 p-4 flex items-center justify-between">
+            <div className="text-[10px] font-mono tracking-[0.3em] text-white/85 bg-black/45 backdrop-blur px-3 py-1 rounded-full">{t('BOBBY WORLD', 'MUNDO BOBBY')}</div>
+            <button onClick={onClose} aria-label="close" className="h-9 w-9 rounded-full bg-black/55 text-white/85">✕</button>
+          </div>
+          <div className="absolute inset-x-0 bottom-0 p-5 pt-20 bg-gradient-to-t from-[#07090c] via-[#07090c]/85 to-transparent">
+            <motion.div animate={{ scale: [1, 1.07, 1] }} transition={{ repeat: Infinity, duration: 1.6 }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-[0.3em] text-black" style={{ background: GOLD, boxShadow: `0 0 24px ${GOLD}88` }}><Lock size={11} /> {t('SOON', 'PRONTO')}</motion.div>
+            <div className="mt-3 text-2xl font-semibold text-white leading-tight">{t('Your world is built with discipline.', 'Tu mundo se construye con disciplina.')}</div>
+            <div className="mt-2 text-sm text-white/75">{t('Every full read and every NO TRADE raises your base camp. Regions open with XP, never with volume.', 'Cada lectura completa y cada NO TRADE levanta tu campamento. Las regiones se abren con XP, nunca con volumen.')}</div>
+          </div>
+        </div>
+        <div className="p-5 pt-4 space-y-3">
+          <div className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-white/[0.06] px-4 py-3">
+            <div><div className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t('ALREADY COUNTED', 'YA CUENTA')}</div><div className="text-white font-semibold">{xp} XP · {t('level', 'nivel')} {level}</div></div>
+            <div className="text-[10px] font-mono tracking-[0.15em]" style={{ color: GOLD }}>{t('CARRIES OVER', 'SE CONSERVA')}</div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {WORLD_REGIONS.map((name) => (
+              <div key={name} className="flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2 text-[10px] font-mono tracking-[0.12em] text-white/55"><Lock size={10} />{name}</div>
+            ))}
+          </div>
+          <button onClick={onClose} className="w-full py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: GOLD }}>{t('BACK TO THE DESK', 'VOLVER AL DESK')}</button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
