@@ -151,3 +151,12 @@ Findings 1–5 and 7 of the Codex review are addressed in code — see
   `/api/openclaw-chat` like the browser and never signs anything. Running it
   needs no signing secret — only the Supabase URL/keys, `GATE_EXPECTED_SHA`
   and the rate-limit salt from the Keychain.
+- **Paso 5 CERRADO (2026-09-02 22:20 UTC)**: gate completo, una sola corrida
+  contra producción `11ff84b` (deploy por integración Git, `fullSha`
+  verificado): **158/158 OK, 0 FAIL, exit 0, `GATE PASSED`**, sin exportar
+  ningún secreto de firma (recibo obtenido vía `/api/openclaw-chat`), residuo
+  0 en todas las tablas. Evidencia: `docs/infra/evidence/2026-09-02-gate-passed-11ff84b.txt`.
+  Producción reporta `rateLimitSaltConfigured=true`, `transcriptSecretSeparate=true`,
+  `writeFreeze=false`, `canary=false`. Siguiente: GO separado para el corte
+  (paso 6). Este commit de evidencia vive solo en la rama; `main` se queda en
+  `11ff84b` para que el SHA verificado por el gate siga siendo el desplegado.
