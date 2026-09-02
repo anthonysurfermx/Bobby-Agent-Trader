@@ -68,3 +68,26 @@ prompt, modelo, job id, fecha y créditos.
 
 Código, schema, Vercel, Supabase, marcas o rutas de DeFi México, personajes o
 gear nuevos fuera del catálogo, ni subir assets a producción.
+
+## 5. Resultado del lote de validación (2026-09-02, 8 créditos)
+
+- **Golden scene A — dirección aprobada.** Esfera flotando dentro del aro y
+  visible, cinco regiones legibles (velas holográficas, cristales y drones,
+  fortaleza de puertas, faro y arrecife, anillo de archivo), Byte a escala
+  1×1, un solo dorado, niebla en el borde. Correcciones: la isla lee ~10×10
+  (debe ser 8×8), las raíces se extienden por media isla (pasan a ser una capa
+  decal de suelo; el tronco ocupa 2×2) y las torres-vela son demasiado
+  literales.
+- **Golden scene B — descartada como escena, útil como base del árbol.** El
+  grid 8×8 exacto y el árbol contenido en un anillo 2×2 son correctos; la
+  muralla es medieval, el faro naturalista y la pieza dorada parece una
+  moneda (prohibido).
+- **Style sheet — materiales y luz aprobados.** El sello dorado salió como
+  moneda y el "data dock" como laptop: se corrigen en los prompts.
+- **Escala — aprobada** (Byte cabe en un rombo 1×1, edificio 2×2 correcto).
+  **El árbol falló**: el modelo lo volvió un árbol frondoso; la mascota se
+  volvió un perro. Confirma el cambio de nombre a **Aura Core** y una pasada
+  dedicada sin follaje antes del catálogo.
+
+Manifiesto con job ids y prompts: `docs/trader-land/art/validation-manifest-2026-09-02.json`.
+Los PNG de validación viven fuera del repo hasta aprobar el catálogo.

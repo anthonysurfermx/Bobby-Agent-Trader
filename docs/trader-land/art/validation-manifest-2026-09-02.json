@@ -1,0 +1,15 @@
+{
+  "batch": "validation",
+  "date": "2026-09-02",
+  "model": "nano_banana_pro (served as nano_banana_2)",
+  "resolution": "2k",
+  "reference_media": { "byte": "19946239-1193-4164-9838-9d3954dc0ed6" },
+  "creditsUsed": 8,
+  "items": [
+    { "id": "golden_scene_a", "job_id": "24d52f73-aedd-4048-ad06-a96b2c2c0253", "aspect": "4:3", "size": "2400x1792", "verdict": "APPROVED direction: sphere visible inside ring, five regions legible, Byte at 1x1, single gold tile, edge fog. Fix: island reads ~10x10 (needs 8x8), tree footprint sprawls beyond 2x2 (roots must become a ground decal layer), candle towers slightly literal." },
+    { "id": "golden_scene_b", "job_id": "c57edd6c-c46e-4581-a62f-670c737ed785", "aspect": "4:3", "size": "2400x1792", "verdict": "REJECTED as scene, KEEP tree base: exact 8x8 grid and contained 2x2 tree ring are right; castle wall is medieval-fantasy, lighthouse naturalistic, gold piece reads as a coin (forbidden)." },
+    { "id": "style_sheet", "job_id": "67b5cf3c-9f95-48ba-ad3d-566d4ebfd787", "aspect": "16:9", "size": "2752x1536", "verdict": "APPROVED materials + lighting rows. Fix: sapling seal rendered as a coin, data dock rendered as a laptop; silhouettes row usable as reference only." },
+    { "id": "scale_reference", "job_id": "d6f7a4c2-5e3b-476d-8fd5-2916f7a4d396", "aspect": "16:9", "size": "2752x1536", "verdict": "APPROVED scale (Byte fits a 1x1 diamond, fortress 2x2 correct). REJECTED tree: became a leafy natural tree; pet became a realistic dog. Confirms the tree needs its own pass as 'Aura Core' with no foliage." }
+  ],
+  "gate": "Golden scene A approved as direction; Aura Core pass required before First Light / 25-lot catalog."
+}
