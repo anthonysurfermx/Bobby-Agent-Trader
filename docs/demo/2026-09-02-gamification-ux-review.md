@@ -182,7 +182,7 @@ cuenta, local solo como caché".
   modelo 3D: cadera (común), hombro (raro) y halo sobre la cabeza (dorado, con brillo).
   Flotan, giran con el personaje y salen en la captura. El overlay de loot muestra en quién
   quedó equipado.
-- **Mascotas.** Una por personaje, a **300 XP**: Bobby → panda que gira, Byte → perro, Kora →
+- **Mascotas.** Una por personaje, a **500 XP**: Bobby → panda que gira, Byte → perro, Kora →
   gata, Zip → mono (y una para cada desbloqueable). Viven a los pies del personaje. Hoy son
   emoji animados; el arte 3D queda para cuando decidamos gastar créditos.
 - **Slot "+".** Bajo el cinturón: abre el catálogo de lo que falta (tu mascota y el equipo de

@@ -314,7 +314,7 @@ struct CompanionPet: Identifiable, Equatable {
     let emoji: String
     let spins: Bool
     var id: String { "pet-\(companionId)" }
-    static let unlockXP = 300
+    static let unlockXP = 500
 }
 
 extension CompanionToolkit {
