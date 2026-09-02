@@ -49,3 +49,5 @@ src/types/register.ts
 .claude/supabase-bobby-protocol.env
 supabase/.temp/
 .vercel
+# migration exports contain private rows — never commit
+.ai/migration/export/
