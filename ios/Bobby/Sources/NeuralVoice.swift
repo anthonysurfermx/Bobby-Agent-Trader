@@ -33,7 +33,11 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// when present; `voiceId` is the persona picked in onboarding. No Edge
     /// hint anymore — a valid `edgeVoice` would force the legacy robotic-ish
     /// Edge chain server-side and silence the warm voices.
-    func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil) {
+    /// `essential` lines (an analysis the human is waiting for) may fall back
+    /// to the system voice when the network voice fails. Ambient lines —
+    /// greetings, onboarding previews — retry once and then stay silent: a
+    /// robotic voice breaking the companion's identity is worse than no voice.
+    func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true) {
         stop()
         generation += 1
         let gen = generation
@@ -41,6 +45,10 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
 
         Task {
             do {
+                var attempt = 0
+                var payload: (Data, URLResponse)? = nil
+                while attempt < 2 {
+                    attempt += 1
                 var req = URLRequest(url: URL(string: "https://bobbyprotocol.xyz/api/bobby-voice-free")!)
                 req.httpMethod = "POST"
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -56,10 +64,16 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 // it on every real answer after onboarding.
                 if let serverVibe = Self.serverVibe(vibe) { body["vibe"] = serverVibe }
                 req.httpBody = try JSONSerialization.data(withJSONObject: body)
-                let (data, resp) = try await URLSession.shared.data(for: req)
-                guard gen == self.generation,
-                      (resp as? HTTPURLResponse)?.statusCode == 200, data.count > 500 else {
-                    if gen == self.generation { self.speakFallback(text) }
+                    let result = try await URLSession.shared.data(for: req)
+                    guard gen == self.generation else { return }
+                    let status = (result.1 as? HTTPURLResponse)?.statusCode ?? 0
+                    if status == 200 && result.0.count > 500 { payload = result; break }
+                    // Throttled or a hiccup: one short retry before deciding.
+                    if attempt < 2 { try? await Task.sleep(nanoseconds: 1_200_000_000) }
+                }
+                guard gen == self.generation else { return }
+                guard let (data, _) = payload else {
+                    if essential { self.speakFallback(text) } else { self.speaking = false }
                     return
                 }
                 try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
@@ -77,7 +91,9 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 }
                 self.startMetering(p)
             } catch {
-                if gen == self.generation { self.speakFallback(text) }
+                if gen == self.generation {
+                    if essential { self.speakFallback(text) } else { self.speaking = false }
+                }
             }
         }
     }

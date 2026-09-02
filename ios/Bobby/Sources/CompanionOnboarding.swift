@@ -14,6 +14,7 @@ struct CompanionOnboarding: View {
     @State private var selected: Companion = bobbyCompanions.first(where: { $0.id != "orb" }) ?? bobbyCompanions[0]
     @State private var sceneLoading = false
     @State private var sceneFailed = false
+    @State private var loadoutReady = false
 
     private var starters: [Companion] { bobbyCompanions.filter { $0.requiredLevel == 1 } }
     private var tint: Color { selected.tint }
@@ -57,7 +58,7 @@ struct CompanionOnboarding: View {
                     switch step {
                     case 0: chooseStep
                     case 1: vibeStep
-                    default: pactStep
+                    default: LoadoutStep(companion: selected, tint: tint, ready: $loadoutReady)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -125,7 +126,7 @@ struct CompanionOnboarding: View {
                             guard comp.id != selected.id else { return }
                             selected = comp
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            voice.speak(comp.selectLine, voiceId: comp.voicePersona, persona: comp.voicePersona)
+                            voice.speak(comp.selectLine, voiceId: comp.voicePersona, persona: comp.voicePersona, essential: false)
                         } label: {
                             VStack(spacing: 5) {
                                 CompanionThumb(companion: comp)
@@ -175,7 +176,7 @@ struct CompanionOnboarding: View {
                     Button {
                         profile.vibeId = vibe.rawValue
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speak(vibe.sample, voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: vibe.rawValue)
+                        voice.speak(vibe.sample, voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: vibe.rawValue, essential: false)
                     } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
@@ -203,52 +204,6 @@ struct CompanionOnboarding: View {
         }
     }
 
-    // MARK: step 2 — the pact (honesty as the closing moment)
-
-    private var pactStep: some View {
-        VStack(spacing: 10) {
-            Text(L.t("The pact", "El pacto"))
-                .font(.rounded(22, .bold))
-                .foregroundStyle(Theme.text)
-            VStack(alignment: .leading, spacing: 10) {
-                pactLine("chart.line.uptrend.xyaxis", L.t("\(selected.name(at: 1)) analyzes markets with live data.", "\(selected.name(at: 1)) analiza mercados con datos en vivo."))
-                pactLine("checkmark.shield.fill", L.t("It never touches your money and never executes trades.", "Nunca toca tu dinero y nunca ejecuta operaciones."))
-                pactLine("hand.raised.fill", L.t("When there is no clean setup, it says NO TRADE — and that also counts.", "Cuando no hay setup limpio, dice NO TRADE — y eso también cuenta."))
-                pactLine("sparkles", L.t("It evolves with your discipline, never with your volume.", "Evoluciona con tu disciplina, nunca con tu volumen."))
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.up.opacity(0.045))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.up.opacity(0.16), lineWidth: 1))
-            Text(L.t("Analysis, not advice. You decide and you own the risk.",
-                     "Análisis, no asesoría. Tú decides y asumes el riesgo."))
-                .font(.mono(9, .medium))
-                .kerning(0.8)
-                .foregroundStyle(Theme.muted)
-            Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
-                Text(L.t("Privacy Policy", "Aviso de privacidad"))
-                    .font(.mono(9, .medium))
-                    .kerning(0.8)
-                    .underline()
-                    .foregroundStyle(Theme.muted)
-            }
-        }
-    }
-
-    private func pactLine(_ icon: String, _ text: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Theme.up)
-                .frame(width: 18)
-            Text(text)
-                .font(.rounded(13, .medium))
-                .foregroundStyle(Theme.text.opacity(0.82))
-            Spacer(minLength: 0)
-        }
-    }
-
     // MARK: CTA
 
     private var cta: some View {
@@ -262,19 +217,24 @@ struct CompanionOnboarding: View {
                 voice.stop()
                 withAnimation(.spring(duration: 0.42)) { step = 2 }
             default:
-                // The payoff: the chosen companion opens the desk out loud,
-                // in its own voice — the sound carries across the transition.
+                guard loadoutReady else { return }
+                // The payoff: the spawned companion drops into the desk out
+                // loud, in its own voice — short, light, carried across the
+                // transition. The desk itself stays quiet so nothing overlaps.
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                let name = selected.name(at: 1)
                 voice.speak(
-                    L.t("Desk online. Ask me about bitcoin, NVIDIA, gold — whatever you bring.",
-                        "Desk en línea. Pregúntame por bitcoin, NVIDIA, oro — lo que traigas."),
-                    voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: profile.vibe.rawValue)
+                    L.t("\(name) is in. Ready for the market — welcome to the desk. Let's go, with a cool head.",
+                        "\(name) está dentro. Listo para el mercado: bienvenido al desk. A darle con todo, con cabeza fría."),
+                    voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: profile.vibe.rawValue, essential: false)
                 withAnimation(.spring(duration: 0.5)) { profile.onboarded = true }
             }
         } label: {
             HStack {
                 Text(step == 0
                      ? L.t("MAKE IT MY COMPANION", "HACER MI COMPANION")
-                     : step == 1 ? L.t("NEXT", "SIGUE") : L.t("OPEN THE DESK", "ABRIR EL DESK"))
+                     : step == 1 ? L.t("NEXT", "SIGUE")
+                     : loadoutReady ? L.t("DROP INTO THE DESK", "ENTRAR AL DESK") : L.t("EQUIPPING…", "EQUIPANDO…"))
                     .font(.mono(12, .bold))
                     .kerning(1.7)
                 Spacer()
@@ -287,7 +247,10 @@ struct CompanionOnboarding: View {
             .background(tint)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .shadow(color: tint.opacity(0.30), radius: 14, y: 4)
+            .opacity(step == 2 && !loadoutReady ? 0.45 : 1)
+            .animation(.easeOut(duration: 0.3), value: loadoutReady)
         }
+        .disabled(step == 2 && !loadoutReady)
         .padding(.horizontal, 18)
         .padding(.top, 8)
         .padding(.bottom, 10)
