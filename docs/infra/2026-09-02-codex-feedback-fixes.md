@@ -139,9 +139,10 @@ hashes in `api_cache` were enumerable from any list of addresses.
 - A random 32-byte salt now exists in Vercel for **Production**, and a
   different one for **Preview (branch `feat/phase0-hardening`)**. Created by
   piping `openssl rand` into `vercel env add`; the values were never printed
-  and are not in this repo. They are non-sensitive on purpose so the operator
-  can `vercel env pull` them for the gate. (The CLI's non-interactive "all
-  Preview branches" path is broken in 54.10.3, hence the branch scope.)
+  and are not in this repo. (The CLI's non-interactive "all Preview branches"
+  path is broken in 54.10.3, hence the branch scope.) *Superseded by round 4:
+  they were first created as readable Config variables and have since been
+  rotated as Secrets.*
 - `api/_lib/rate-limit.ts`: in production a missing or short salt now
   **throws** (`RateLimitConfigError`) — no public fallback. Local/preview keep
   a development default (`bobby-rl-dev`).
@@ -158,3 +159,31 @@ hashes in `api_cache` were enumerable from any list of addresses.
 because it is not deployed yet — expected. The first deployment of this commit
 will start with fresh limiter keys (new salt ⇒ new hashes), which also means
 the gate's first run after it does not inherit the old window.
+
+---
+
+## Round 4 — Codex NO-GO on moving `main` (salt must be a Secret), closed
+
+**Finding.** A Config variable stays readable by authorised members; a Secret
+is write-only. Since the salt is what stops IP hashes from being rebuilt, it
+must be a Secret.
+
+**Done.**
+- Both salts **rotated** with new random values and re-created with
+  `--sensitive`: Production and Preview (branch `feat/phase0-hardening`),
+  different values. Verified write-only: `vercel env pull --environment=production`
+  returns `RATE_LIMIT_SALT` empty.
+- Operator copies stored in the **macOS Keychain** (`security add-generic-password`,
+  services `bobby/RATE_LIMIT_SALT/production` and `bobby/RATE_LIMIT_SALT/preview`),
+  never in the repo, never printed. Rotation procedure: generate → Keychain →
+  `vercel env rm` + `vercel env add --sensitive`, in one shell so the value
+  is never echoed.
+- The gate takes `RATE_LIMIT_SALT` from the environment or, failing that,
+  from the Keychain (`GATE_SALT_KEYCHAIN_SERVICE` / `GATE_TARGET_ENV`
+  override); it no longer suggests `vercel env pull`.
+- The gate now **requires `GATE_EXPECTED_SHA`** (full 40-hex) and compares
+  it with `deployment.fullSha` exactly, instead of only checking that a SHA
+  is present. Run it as `GATE_EXPECTED_SHA=$(git rev-parse HEAD)`.
+
+**Note.** Rotating the salt invalidates the limiter keys written under the
+previous value; the first gate run after deploying starts on a clean window.

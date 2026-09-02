@@ -22,11 +22,15 @@
 // Usage:
 //   SUPABASE_URL=https://xxx.supabase.co SUPABASE_ANON_KEY=eyJ... \
 //   SUPABASE_SERVICE_KEY=eyJ... BOBBY_API=https://bobbyprotocol.xyz \
+//   GATE_EXPECTED_SHA=$(git rev-parse HEAD) \
 //   npx tsx scripts/infra/rls-adversarial.mts
+// RATE_LIMIT_SALT comes from the env or the macOS Keychain
+// (bobby/RATE_LIMIT_SALT/production) — it is a Vercel Secret, not pullable.
 // Exit 0 = GATE PASSED. Anything else = do not cut over.
 // The service key is REQUIRED: without it the verdict is INCOMPLETE (exit 2).
 // ============================================================
 import { randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { privateKeyToAccount } from 'viem/accounts';
 
 const URL_ = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
@@ -36,11 +40,27 @@ const API = (process.env.BOBBY_API || 'https://bobbyprotocol.xyz').replace(/\/+$
 const ORIGIN = process.env.BOBBY_ORIGIN || 'https://bobbyprotocol.xyz';
 if (!URL_ || !ANON) { console.error('SUPABASE_URL and SUPABASE_ANON_KEY are required'); process.exit(2); }
 if (!SERVICE) { console.error('SUPABASE_SERVICE_KEY is required: the gate cannot reach a PASS verdict without the policy matrix and canary rows. Verdict: INCOMPLETE'); process.exit(2); }
-// Same salt as the target deployment (vercel env pull): without it the gate
-// cannot locate its own persisted forum-publish window, and a public default
-// would defeat the point of hashing IPs. Verdict: INCOMPLETE.
-const RATE_LIMIT_SALT = process.env.RATE_LIMIT_SALT || '';
-if (RATE_LIMIT_SALT.length < 16) { console.error('RATE_LIMIT_SALT (the deployment\'s salt, ≥16 chars) is required: pull it with `vercel env pull --environment=production`. Verdict: INCOMPLETE'); process.exit(2); }
+// Same salt as the target deployment. It is a Vercel SECRET (write-only, so
+// `vercel env pull` returns nothing): the operator copy lives in the macOS
+// Keychain (service bobby/RATE_LIMIT_SALT/<environment>) or is passed in a
+// temporary environment. Without it the gate cannot locate its own persisted
+// forum-publish window, and a public default would defeat the point of
+// hashing IPs. Verdict: INCOMPLETE.
+function saltFromKeychain(): string {
+  if (process.platform !== 'darwin') return '';
+  const service = process.env.GATE_SALT_KEYCHAIN_SERVICE || `bobby/RATE_LIMIT_SALT/${process.env.GATE_TARGET_ENV || 'production'}`;
+  try {
+    return execFileSync('security', ['find-generic-password', '-s', service, '-w'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return '';
+  }
+}
+const RATE_LIMIT_SALT = process.env.RATE_LIMIT_SALT || saltFromKeychain();
+if (RATE_LIMIT_SALT.length < 16) { console.error('RATE_LIMIT_SALT (the deployment\'s salt, ≥16 chars) is required: export it from your temporary environment or store it in the macOS Keychain as bobby/RATE_LIMIT_SALT/production (`security add-generic-password -s bobby/RATE_LIMIT_SALT/production -a $USER -w`). It is a Vercel Secret, so `vercel env pull` cannot provide it. Verdict: INCOMPLETE'); process.exit(2); }
+// The exact commit the target must be running: compared against
+// deployment.fullSha, never just "some sha is present".
+const EXPECTED_SHA = (process.env.GATE_EXPECTED_SHA || '').trim().toLowerCase();
+if (!/^[0-9a-f]{40}$/.test(EXPECTED_SHA)) { console.error('GATE_EXPECTED_SHA (full 40-hex commit, e.g. `GATE_EXPECTED_SHA=$(git rev-parse HEAD)`) is required so the verdict is bound to one deployment. Verdict: INCOMPLETE'); process.exit(2); }
 
 // Which sections to run: A (policy matrix), B (canaries), C (legitimate path). Default all.
 const SECTIONS = new Set((process.env.GATE_SECTIONS || 'ABC').toUpperCase().split(''));
@@ -352,9 +372,10 @@ async function legitimatePath(): Promise<void> {
   line(pub.ok, 'anon SELECT forum_threads (public read) still works', `HTTP ${pub.status}`);
   const health = await fetch(`${API}/api/bobby-health`);
   line(health.ok, 'GET /api/bobby-health', `HTTP ${health.status}`);
-  const healthJson = (await health.json().catch(() => ({}))) as { ops?: { rateLimitSaltConfigured?: boolean }; deployment?: { sha?: string | null } };
+  const healthJson = (await health.json().catch(() => ({}))) as { ops?: { rateLimitSaltConfigured?: boolean }; deployment?: { sha?: string | null; fullSha?: string | null; shaSource?: string | null } };
   line(healthJson.ops?.rateLimitSaltConfigured === true, 'deployment runs with a real RATE_LIMIT_SALT (IP hashes not enumerable)', `rateLimitSaltConfigured=${healthJson.ops?.rateLimitSaltConfigured}`);
-  line(Boolean(healthJson.deployment?.sha), 'deployment reports its commit SHA', `sha=${healthJson.deployment?.sha ?? 'null'}`);
+  const fullSha = (healthJson.deployment?.fullSha || '').toLowerCase();
+  line(fullSha === EXPECTED_SHA, `deployment.fullSha === GATE_EXPECTED_SHA (${EXPECTED_SHA.slice(0, 7)})`, `fullSha=${fullSha || 'null'} source=${healthJson.deployment?.shaSource ?? 'null'}`);
 }
 
 (async () => {
