@@ -26,20 +26,37 @@ DISTRICT_BG = {'crypto_bay': (10, 28, 40), 'evidence_mines': (10, 34, 30), 'thes
 # id, district, footprint (cols, rows), kind, orientations: {orient: {state: raw file, 'connectors': {...}}}
 PIECES = [
   ('aura_core', 'core', (2, 2), 'core', {'ne': {'stage0': 'aura_core_stage0_albedo.png', 'stage1': 'aura_core_stage1_albedo.png', 'connectors': {}}}),
+  # ---- Crypto Bay ----
+  ('crypto_bay_data_dock', 'crypto_bay', (1, 1), 'ground', {'ne': {'bloom': 'crypto_bay_data_dock_bloom_albedo.png', 'connectors': {}}}),
+  ('crypto_bay_water_walkway', 'crypto_bay', (1, 1), 'path_pavement', {'ne': {'bloom': 'crypto_bay_water_walkway_bloom_albedo.png', 'connectors': {'note': 'pavement only; filament procedural'}}}),
+  ('crypto_bay_context_buoy', 'crypto_bay', (1, 1), 'decor', {'ne': {'bloom': 'crypto_bay_context_buoy_bloom_albedo.png', 'connectors': {}}}),
+  ('crypto_bay_candle_tower', 'crypto_bay', (2, 1), 'building', {'ne': {'bloom': 'crypto_bay_candle_tower_bloom_albedo.png', 'connectors': {}}}),
+  ('crypto_bay_waiting_lighthouse', 'crypto_bay', (2, 2), 'landmark', {'ne': {'bloom': 'crypto_bay_waiting_lighthouse_bloom_albedo.png', 'connectors': {}}}),
+  # ---- Evidence Mines ----
   ('evidence_mines_crystal_vein_rock', 'evidence_mines', (1, 1), 'ground', {'ne': {'bloom': 'evidence_mines_crystal_vein_rock_bloom_albedo.png', 'connectors': {}}}),
-  # Path family: STRAIGHT pieces with compatible connectors (Codex gate A). The curved original bloom is kept as a
-  # separate decor-like piece ("return_path_curve") and is NOT an orientation of the straight piece.
-  ('axiom_archive_path_straight', 'axiom_archive', (1, 1), 'path', {
-      'ne_sw': {'bloom': 'axiom_archive_path_straight_ne_sw_bloom_albedo.png', 'connectors': {'ne': True, 'sw': True, 'nw': False, 'se': False}},
-      # nw_se: NOT producible by the generator (two attempts, both came back SW→NE — see art/trader-land/gate-A/diag/).
-      # Proposal (Codex to confirm): paths become DATA — one blank stone tile + a procedural emerald filament drawn by
-      # the renderer along any connector set (straight, curve, junction), using ne_sw as the visual reference.
-      'nw_se': {'bloom': None, 'connectors': {'nw': True, 'se': True, 'ne': False, 'sw': False},
-                'status': 'BLOCKED: generator bias; see procedural-filament proposal in GATE-A-REPORT.md'}}),
-  ('axiom_archive_return_path_curve', 'axiom_archive', (1, 1), 'path', {'curve_a': {'bloom': 'axiom_archive_return_path_bloom_albedo.png', 'connectors': {'note': 'double curve — connectors to be defined; not part of gate A'}}}),
-  ('risk_reef_dual_orbit_antenna', 'risk_reef', (1, 1), 'decor', {'ne': {'bloom': 'risk_reef_dual_orbit_antenna_bloom_albedo.png', 'connectors': {}}}),
+  ('evidence_mines_open_tunnel', 'evidence_mines', (1, 1), 'path_pavement', {'ne': {'bloom': 'evidence_mines_open_tunnel_bloom_albedo.png', 'connectors': {'note': 'pavement only; filament procedural'}}}),
+  ('evidence_mines_lantern_drone', 'evidence_mines', (1, 1), 'decor', {'ne': {'bloom': 'evidence_mines_lantern_drone_bloom_albedo.png', 'connectors': {}}}),
   ('evidence_mines_evidence_workshop', 'evidence_mines', (2, 1), 'building', {'ne': {'bloom': 'evidence_mines_evidence_workshop_bloom_albedo.png', 'connectors': {}}}),
+  ('evidence_mines_mother_crystal', 'evidence_mines', (2, 2), 'landmark', {'ne': {'bloom': 'evidence_mines_mother_crystal_bloom_albedo.png', 'connectors': {}}}),
+  # ---- Thesis Citadel ----
+  ('thesis_citadel_wall_slab', 'thesis_citadel', (1, 1), 'ground', {'ne': {'bloom': 'thesis_citadel_wall_slab_bloom_albedo.png', 'connectors': {}}}),
+  ('thesis_citadel_fortified_ramp', 'thesis_citadel', (1, 1), 'path_pavement', {'ne': {'bloom': 'thesis_citadel_fortified_ramp_bloom_albedo.png', 'connectors': {'note': 'pavement only; filament procedural'}}}),
+  ('thesis_citadel_risk_shield', 'thesis_citadel', (1, 1), 'decor', {'ne': {'bloom': 'thesis_citadel_risk_shield_bloom_albedo.png', 'connectors': {}}}),
+  ('thesis_citadel_double_gate', 'thesis_citadel', (2, 1), 'building', {'ne': {'bloom': 'thesis_citadel_double_gate_bloom_albedo.png', 'connectors': {}}}),
   ('thesis_citadel_three_gate_citadel', 'thesis_citadel', (2, 2), 'landmark', {'ne': {'bloom': 'thesis_citadel_three_gate_citadel_bloom_albedo.png', 'connectors': {}}}),
+  # ---- Risk Reef ----
+  ('risk_reef_reef_tile', 'risk_reef', (1, 1), 'ground', {'ne': {'bloom': 'risk_reef_reef_tile_bloom_albedo.png', 'connectors': {}}}),
+  ('risk_reef_blue_sluice', 'risk_reef', (1, 1), 'path_pavement', {'ne': {'bloom': 'risk_reef_blue_sluice_bloom_albedo.png', 'connectors': {'note': 'pavement only; filament procedural'}}}),
+  ('risk_reef_dual_orbit_antenna', 'risk_reef', (1, 1), 'decor', {'ne': {'bloom': 'risk_reef_dual_orbit_antenna_bloom_albedo.png', 'connectors': {}}}),
+  ('risk_reef_red_team_observatory', 'risk_reef', (2, 1), 'building', {'ne': {'bloom': 'risk_reef_red_team_observatory_bloom_albedo.png', 'connectors': {}}}),
+  ('risk_reef_double_bridge', 'risk_reef', (2, 2), 'landmark', {'ne': {'bloom': 'risk_reef_double_bridge_bloom_albedo.png', 'connectors': {}}}),
+  # ---- Axiom Archive ----
+  ('axiom_archive_archive_ring_tile', 'axiom_archive', (1, 1), 'ground', {'ne': {'bloom': 'axiom_archive_archive_ring_tile_bloom_albedo.png', 'connectors': {}}}),
+  ('axiom_archive_path_straight', 'axiom_archive', (1, 1), 'path_pavement', {'ne_sw': {'bloom': 'axiom_archive_path_straight_ne_sw_bloom_albedo.png', 'connectors': {'note': 'reference for the procedural filament look; renderer owns topology'}}}),
+  ('axiom_archive_return_path_curve', 'axiom_archive', (1, 1), 'decor', {'curve_a': {'bloom': 'axiom_archive_return_path_bloom_albedo.png', 'connectors': {'note': 'kept as decor; not a path'}}}),
+  ('axiom_archive_aura_flower', 'axiom_archive', (1, 1), 'decor', {'ne': {'bloom': 'axiom_archive_aura_flower_bloom_albedo.png', 'connectors': {}}}),
+  ('axiom_archive_lit_archive', 'axiom_archive', (2, 1), 'building', {'ne': {'bloom': 'axiom_archive_lit_archive_bloom_albedo.png', 'connectors': {}}}),
+  ('axiom_archive_base_ring_seal', 'axiom_archive', (2, 2), 'landmark', {'ne': {'bloom': 'axiom_archive_base_ring_seal_bloom_albedo.png', 'connectors': {}}}),
 ]
 
 def label_regions(mask):
@@ -118,6 +135,9 @@ def sheet(albedo, glow, shadow, district, out_path):
 
 def norm(v): return round(v / CANVAS, 4)
 
+# Seed samples derived before deriving all (Codex: validate a high-silhouette one too)
+SEED_SAMPLES = None  # None = derive a seed for every bloom (approved after the rock + antenna samples)
+
 manifest = {'gate': 'A', 'version': 2, 'date': '2026-09-02', 'canvas_master_px': CANVAS, 'tile_px_at_master': [TILE_W, TILE_H],
             'coordinate_space': 'all anchor/contentBounds/occlusionHeight values are fractions 0-1 of the sprite canvas; multiply by the variant width/height',
             'items': []}
@@ -149,7 +169,7 @@ for pid, district, fp, kind, orients in PIECES:
                       'variants': {'albedo_1024': {'url': rel(f'{base}_albedo_1024.png'), 'w': 1024, 'h': 1024}, 'albedo_512': {'url': rel(f'{base}_albedo_512.webp'), 'w': 512, 'h': 512},
                                    'glow_1024': {'url': rel(f'{base}_glow_1024.png'), 'w': 1024, 'h': 1024}, 'shadow_1024': {'url': rel(f'{odir}/shadow_1024.png'), 'w': 1024, 'h': 1024},
                                    'thumb_256': {'url': rel(f'{base}_thumb_256.png'), 'w': 256, 'h': 256}}}
-            if pid == 'evidence_mines_crystal_vein_rock' and state == 'bloom':
+            if state == 'bloom' and (SEED_SAMPLES is None or pid in SEED_SAMPLES):
                 seed = derive_seed(rgba, glow); seed.resize((1024, 1024), Image.LANCZOS).save(f'{odir}/seed_albedo_1024.png')
                 sheet(seed, Image.new('L', im.size, 0), shadow, district, f'{ART}/sheets/{pid}_{orient}_seed_derived.png')
                 sentry['derived_seed'] = {'url': rel(f'{odir}/seed_albedo_1024.png'), 'w': 1024, 'h': 1024, 'method': 'bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry'}

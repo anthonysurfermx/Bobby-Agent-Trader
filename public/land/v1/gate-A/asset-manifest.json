@@ -129,6 +129,363 @@
       }
     },
     {
+      "id": "crypto_bay_data_dock",
+      "district": "crypto_bay",
+      "kind": "ground",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "crypto_bay_data_dock_bloom_albedo.png",
+              "contentBounds": [
+                0.1455,
+                0.2871,
+                0.8511,
+                0.8149
+              ],
+              "anchor": [
+                0.498,
+                0.8149
+              ],
+              "occlusionHeight": 0.5278,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 8,
+                "glow_coverage_pct": 3.05,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_data_dock/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/crypto_bay_data_dock/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_data_dock/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_data_dock/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/crypto_bay_data_dock/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/crypto_bay_data_dock/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "crypto_bay_water_walkway",
+      "district": "crypto_bay",
+      "kind": "path_pavement",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {
+            "note": "pavement only; filament procedural"
+          },
+          "states": {
+            "bloom": {
+              "source": "crypto_bay_water_walkway_bloom_albedo.png",
+              "contentBounds": [
+                0.1587,
+                0.2886,
+                0.8423,
+                0.7715
+              ],
+              "anchor": [
+                0.5005,
+                0.7715
+              ],
+              "occlusionHeight": 0.4829,
+              "qa": {
+                "contact_shadow_px_before": 472,
+                "contact_shadow_px_removed": 4279,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 3,
+                "glow_coverage_pct": 2.82,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_water_walkway/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/crypto_bay_water_walkway/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_water_walkway/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_water_walkway/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/crypto_bay_water_walkway/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/crypto_bay_water_walkway/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "crypto_bay_context_buoy",
+      "district": "crypto_bay",
+      "kind": "decor",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "crypto_bay_context_buoy_bloom_albedo.png",
+              "contentBounds": [
+                0.3149,
+                0.2866,
+                0.6826,
+                0.7314
+              ],
+              "anchor": [
+                0.4985,
+                0.7314
+              ],
+              "occlusionHeight": 0.4448,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 199,
+                "glow_coverage_pct": 5.6,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_context_buoy/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/crypto_bay_context_buoy/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_context_buoy/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_context_buoy/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/crypto_bay_context_buoy/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/crypto_bay_context_buoy/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "crypto_bay_candle_tower",
+      "district": "crypto_bay",
+      "kind": "building",
+      "footprint": {
+        "cols": 2,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "crypto_bay_candle_tower_bloom_albedo.png",
+              "contentBounds": [
+                0.2471,
+                0.188,
+                0.751,
+                0.8242
+              ],
+              "anchor": [
+                0.499,
+                0.8242
+              ],
+              "occlusionHeight": 0.6362,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 2,
+                "glow_coverage_pct": 2.68,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_candle_tower/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/crypto_bay_candle_tower/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_candle_tower/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_candle_tower/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/crypto_bay_candle_tower/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/crypto_bay_candle_tower/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "crypto_bay_waiting_lighthouse",
+      "district": "crypto_bay",
+      "kind": "landmark",
+      "footprint": {
+        "cols": 2,
+        "rows": 2
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "crypto_bay_waiting_lighthouse_bloom_albedo.png",
+              "contentBounds": [
+                0.1509,
+                0.1313,
+                0.8755,
+                0.894
+              ],
+              "anchor": [
+                0.5132,
+                0.894
+              ],
+              "occlusionHeight": 0.7627,
+              "qa": {
+                "contact_shadow_px_before": 2581,
+                "contact_shadow_px_removed": 6437,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 7,
+                "glow_coverage_pct": 5.12,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_waiting_lighthouse/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/crypto_bay_waiting_lighthouse/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_waiting_lighthouse/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/crypto_bay_waiting_lighthouse/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/crypto_bay_waiting_lighthouse/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/crypto_bay_waiting_lighthouse/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "id": "evidence_mines_crystal_vein_rock",
       "district": "evidence_mines",
       "kind": "ground",
@@ -200,146 +557,72 @@
       }
     },
     {
-      "id": "axiom_archive_path_straight",
-      "district": "axiom_archive",
-      "kind": "path",
+      "id": "evidence_mines_open_tunnel",
+      "district": "evidence_mines",
+      "kind": "path_pavement",
       "footprint": {
         "cols": 1,
         "rows": 1
       },
       "orientations": {
-        "ne_sw": {
+        "ne": {
           "connectors": {
-            "ne": true,
-            "sw": true,
-            "nw": false,
-            "se": false
+            "note": "pavement only; filament procedural"
           },
           "states": {
             "bloom": {
-              "source": "axiom_archive_path_straight_ne_sw_bloom_albedo.png",
+              "source": "evidence_mines_open_tunnel_bloom_albedo.png",
               "contentBounds": [
-                0.1587,
-                0.2534,
-                0.8398,
-                0.7847
+                0.2407,
+                0.2642,
+                0.7358,
+                0.7163
               ],
               "anchor": [
-                0.499,
-                0.7847
+                0.4883,
+                0.7163
               ],
-              "occlusionHeight": 0.5312,
+              "occlusionHeight": 0.4521,
               "qa": {
                 "contact_shadow_px_before": 0,
-                "contact_shadow_px_removed": 0,
-                "contact_shadow_px_after": 0,
-                "bright_halo_px": 2,
-                "glow_coverage_pct": 2.46,
-                "verdict": "PASS"
-              },
-              "variants": {
-                "albedo_1024": {
-                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_albedo_1024.png",
-                  "w": 1024,
-                  "h": 1024
-                },
-                "albedo_512": {
-                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_albedo_512.webp",
-                  "w": 512,
-                  "h": 512
-                },
-                "glow_1024": {
-                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_glow_1024.png",
-                  "w": 1024,
-                  "h": 1024
-                },
-                "shadow_1024": {
-                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/shadow_1024.png",
-                  "w": 1024,
-                  "h": 1024
-                },
-                "thumb_256": {
-                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_thumb_256.png",
-                  "w": 256,
-                  "h": 256
-                }
-              }
-            }
-          }
-        },
-        "nw_se": {
-          "connectors": {
-            "nw": true,
-            "se": true,
-            "ne": false,
-            "sw": false
-          },
-          "states": {},
-          "status": "BLOCKED: generator bias; see procedural-filament proposal in GATE-A-REPORT.md"
-        }
-      }
-    },
-    {
-      "id": "axiom_archive_return_path_curve",
-      "district": "axiom_archive",
-      "kind": "path",
-      "footprint": {
-        "cols": 1,
-        "rows": 1
-      },
-      "orientations": {
-        "curve_a": {
-          "connectors": {
-            "note": "double curve \u2014 connectors to be defined; not part of gate A"
-          },
-          "states": {
-            "bloom": {
-              "source": "axiom_archive_return_path_bloom_albedo.png",
-              "contentBounds": [
-                0.1582,
-                0.2534,
-                0.8398,
-                0.7842
-              ],
-              "anchor": [
-                0.499,
-                0.7842
-              ],
-              "occlusionHeight": 0.5308,
-              "qa": {
-                "contact_shadow_px_before": 0,
-                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_removed": 41,
                 "contact_shadow_px_after": 0,
                 "bright_halo_px": 0,
-                "glow_coverage_pct": 3.46,
+                "glow_coverage_pct": 0.62,
                 "verdict": "PASS"
               },
               "variants": {
                 "albedo_1024": {
-                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_albedo_1024.png",
+                  "url": "/land/v1/gate-A/evidence_mines_open_tunnel/ne/bloom_albedo_1024.png",
                   "w": 1024,
                   "h": 1024
                 },
                 "albedo_512": {
-                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_albedo_512.webp",
+                  "url": "/land/v1/gate-A/evidence_mines_open_tunnel/ne/bloom_albedo_512.webp",
                   "w": 512,
                   "h": 512
                 },
                 "glow_1024": {
-                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_glow_1024.png",
+                  "url": "/land/v1/gate-A/evidence_mines_open_tunnel/ne/bloom_glow_1024.png",
                   "w": 1024,
                   "h": 1024
                 },
                 "shadow_1024": {
-                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/shadow_1024.png",
+                  "url": "/land/v1/gate-A/evidence_mines_open_tunnel/ne/shadow_1024.png",
                   "w": 1024,
                   "h": 1024
                 },
                 "thumb_256": {
-                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_thumb_256.png",
+                  "url": "/land/v1/gate-A/evidence_mines_open_tunnel/ne/bloom_thumb_256.png",
                   "w": 256,
                   "h": 256
                 }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/evidence_mines_open_tunnel/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
               }
             }
           }
@@ -347,8 +630,8 @@
       }
     },
     {
-      "id": "risk_reef_dual_orbit_antenna",
-      "district": "risk_reef",
+      "id": "evidence_mines_lantern_drone",
+      "district": "evidence_mines",
       "kind": "decor",
       "footprint": {
         "cols": 1,
@@ -359,52 +642,58 @@
           "connectors": {},
           "states": {
             "bloom": {
-              "source": "risk_reef_dual_orbit_antenna_bloom_albedo.png",
+              "source": "evidence_mines_lantern_drone_bloom_albedo.png",
               "contentBounds": [
-                0.3179,
-                0.2891,
-                0.6772,
-                0.7251
+                0.4004,
+                0.3237,
+                0.5981,
+                0.6338
               ],
               "anchor": [
-                0.4976,
-                0.7251
+                0.499,
+                0.6338
               ],
-              "occlusionHeight": 0.436,
+              "occlusionHeight": 0.3101,
               "qa": {
-                "contact_shadow_px_before": 6366,
-                "contact_shadow_px_removed": 12764,
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 136,
                 "contact_shadow_px_after": 0,
-                "bright_halo_px": 0,
-                "glow_coverage_pct": 2.22,
+                "bright_halo_px": 1,
+                "glow_coverage_pct": 1.51,
                 "verdict": "PASS"
               },
               "variants": {
                 "albedo_1024": {
-                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_albedo_1024.png",
+                  "url": "/land/v1/gate-A/evidence_mines_lantern_drone/ne/bloom_albedo_1024.png",
                   "w": 1024,
                   "h": 1024
                 },
                 "albedo_512": {
-                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_albedo_512.webp",
+                  "url": "/land/v1/gate-A/evidence_mines_lantern_drone/ne/bloom_albedo_512.webp",
                   "w": 512,
                   "h": 512
                 },
                 "glow_1024": {
-                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_glow_1024.png",
+                  "url": "/land/v1/gate-A/evidence_mines_lantern_drone/ne/bloom_glow_1024.png",
                   "w": 1024,
                   "h": 1024
                 },
                 "shadow_1024": {
-                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/shadow_1024.png",
+                  "url": "/land/v1/gate-A/evidence_mines_lantern_drone/ne/shadow_1024.png",
                   "w": 1024,
                   "h": 1024
                 },
                 "thumb_256": {
-                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_thumb_256.png",
+                  "url": "/land/v1/gate-A/evidence_mines_lantern_drone/ne/bloom_thumb_256.png",
                   "w": 256,
                   "h": 256
                 }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/evidence_mines_lantern_drone/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
               }
             }
           }
@@ -470,6 +759,369 @@
                   "w": 256,
                   "h": 256
                 }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/evidence_mines_evidence_workshop/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "evidence_mines_mother_crystal",
+      "district": "evidence_mines",
+      "kind": "landmark",
+      "footprint": {
+        "cols": 2,
+        "rows": 2
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "evidence_mines_mother_crystal_bloom_albedo.png",
+              "contentBounds": [
+                0.2485,
+                0.189,
+                0.7617,
+                0.8296
+              ],
+              "anchor": [
+                0.5049,
+                0.8296
+              ],
+              "occlusionHeight": 0.6406,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 21,
+                "glow_coverage_pct": 8.51,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/evidence_mines_mother_crystal/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/evidence_mines_mother_crystal/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/evidence_mines_mother_crystal/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/evidence_mines_mother_crystal/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/evidence_mines_mother_crystal/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/evidence_mines_mother_crystal/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "thesis_citadel_wall_slab",
+      "district": "thesis_citadel",
+      "kind": "ground",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "thesis_citadel_wall_slab_bloom_albedo.png",
+              "contentBounds": [
+                0.2158,
+                0.2715,
+                0.7822,
+                0.7314
+              ],
+              "anchor": [
+                0.499,
+                0.7314
+              ],
+              "occlusionHeight": 0.46,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 15,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 1.15,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_wall_slab/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/thesis_citadel_wall_slab/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_wall_slab/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_wall_slab/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/thesis_citadel_wall_slab/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/thesis_citadel_wall_slab/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "thesis_citadel_fortified_ramp",
+      "district": "thesis_citadel",
+      "kind": "path_pavement",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {
+            "note": "pavement only; filament procedural"
+          },
+          "states": {
+            "bloom": {
+              "source": "thesis_citadel_fortified_ramp_bloom_albedo.png",
+              "contentBounds": [
+                0.2095,
+                0.2324,
+                0.7783,
+                0.7554
+              ],
+              "anchor": [
+                0.4937,
+                0.7554
+              ],
+              "occlusionHeight": 0.5229,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 33,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 2.24,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_fortified_ramp/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/thesis_citadel_fortified_ramp/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_fortified_ramp/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_fortified_ramp/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/thesis_citadel_fortified_ramp/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/thesis_citadel_fortified_ramp/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "thesis_citadel_risk_shield",
+      "district": "thesis_citadel",
+      "kind": "decor",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "thesis_citadel_risk_shield_bloom_albedo.png",
+              "contentBounds": [
+                0.3862,
+                0.23,
+                0.6123,
+                0.7783
+              ],
+              "anchor": [
+                0.499,
+                0.7783
+              ],
+              "occlusionHeight": 0.5483,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 0.39,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_risk_shield/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/thesis_citadel_risk_shield/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_risk_shield/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_risk_shield/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/thesis_citadel_risk_shield/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/thesis_citadel_risk_shield/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "thesis_citadel_double_gate",
+      "district": "thesis_citadel",
+      "kind": "building",
+      "footprint": {
+        "cols": 2,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "thesis_citadel_double_gate_bloom_albedo.png",
+              "contentBounds": [
+                0.1768,
+                0.1587,
+                0.7842,
+                0.8306
+              ],
+              "anchor": [
+                0.4805,
+                0.8306
+              ],
+              "occlusionHeight": 0.6719,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 4.74,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_double_gate/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/thesis_citadel_double_gate/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_double_gate/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/thesis_citadel_double_gate/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/thesis_citadel_double_gate/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/thesis_citadel_double_gate/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
               }
             }
           }
@@ -535,6 +1187,799 @@
                   "w": 256,
                   "h": 256
                 }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/thesis_citadel_three_gate_citadel/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "risk_reef_reef_tile",
+      "district": "risk_reef",
+      "kind": "ground",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "risk_reef_reef_tile_bloom_albedo.png",
+              "contentBounds": [
+                0.1382,
+                0.2446,
+                0.8599,
+                0.7363
+              ],
+              "anchor": [
+                0.499,
+                0.7363
+              ],
+              "occlusionHeight": 0.4917,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 72,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 1.36,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_reef_tile/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/risk_reef_reef_tile/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_reef_tile/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_reef_tile/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/risk_reef_reef_tile/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/risk_reef_reef_tile/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "risk_reef_blue_sluice",
+      "district": "risk_reef",
+      "kind": "path_pavement",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {
+            "note": "pavement only; filament procedural"
+          },
+          "states": {
+            "bloom": {
+              "source": "risk_reef_blue_sluice_bloom_albedo.png",
+              "contentBounds": [
+                0.1973,
+                0.2056,
+                0.8008,
+                0.7891
+              ],
+              "anchor": [
+                0.499,
+                0.7891
+              ],
+              "occlusionHeight": 0.5835,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 2.68,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_blue_sluice/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/risk_reef_blue_sluice/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_blue_sluice/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_blue_sluice/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/risk_reef_blue_sluice/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/risk_reef_blue_sluice/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "risk_reef_dual_orbit_antenna",
+      "district": "risk_reef",
+      "kind": "decor",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "risk_reef_dual_orbit_antenna_bloom_albedo.png",
+              "contentBounds": [
+                0.3179,
+                0.2891,
+                0.6772,
+                0.7251
+              ],
+              "anchor": [
+                0.4976,
+                0.7251
+              ],
+              "occlusionHeight": 0.436,
+              "qa": {
+                "contact_shadow_px_before": 6366,
+                "contact_shadow_px_removed": 12764,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 2.22,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "risk_reef_red_team_observatory",
+      "district": "risk_reef",
+      "kind": "building",
+      "footprint": {
+        "cols": 2,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "risk_reef_red_team_observatory_bloom_albedo.png",
+              "contentBounds": [
+                0.1167,
+                0.1128,
+                0.8804,
+                0.8784
+              ],
+              "anchor": [
+                0.4985,
+                0.8784
+              ],
+              "occlusionHeight": 0.7656,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 4.79,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_red_team_observatory/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/risk_reef_red_team_observatory/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_red_team_observatory/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_red_team_observatory/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/risk_reef_red_team_observatory/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/risk_reef_red_team_observatory/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "risk_reef_double_bridge",
+      "district": "risk_reef",
+      "kind": "landmark",
+      "footprint": {
+        "cols": 2,
+        "rows": 2
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "risk_reef_double_bridge_bloom_albedo.png",
+              "contentBounds": [
+                0.1743,
+                0.2593,
+                0.833,
+                0.7573
+              ],
+              "anchor": [
+                0.5034,
+                0.7573
+              ],
+              "occlusionHeight": 0.498,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 74,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 4.05,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_double_bridge/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/risk_reef_double_bridge/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_double_bridge/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/risk_reef_double_bridge/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/risk_reef_double_bridge/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/risk_reef_double_bridge/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "axiom_archive_archive_ring_tile",
+      "district": "axiom_archive",
+      "kind": "ground",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "axiom_archive_archive_ring_tile_bloom_albedo.png",
+              "contentBounds": [
+                0.1328,
+                0.252,
+                0.8647,
+                0.7715
+              ],
+              "anchor": [
+                0.4985,
+                0.7715
+              ],
+              "occlusionHeight": 0.5195,
+              "qa": {
+                "contact_shadow_px_before": 66,
+                "contact_shadow_px_removed": 677,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 2.4,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_archive_ring_tile/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/axiom_archive_archive_ring_tile/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_archive_ring_tile/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_archive_ring_tile/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/axiom_archive_archive_ring_tile/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/axiom_archive_archive_ring_tile/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "axiom_archive_path_straight",
+      "district": "axiom_archive",
+      "kind": "path_pavement",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne_sw": {
+          "connectors": {
+            "note": "reference for the procedural filament look; renderer owns topology"
+          },
+          "states": {
+            "bloom": {
+              "source": "axiom_archive_path_straight_ne_sw_bloom_albedo.png",
+              "contentBounds": [
+                0.1587,
+                0.2534,
+                0.8398,
+                0.7847
+              ],
+              "anchor": [
+                0.499,
+                0.7847
+              ],
+              "occlusionHeight": 0.5312,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 2,
+                "glow_coverage_pct": 2.46,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/axiom_archive_path_straight/ne_sw/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "axiom_archive_return_path_curve",
+      "district": "axiom_archive",
+      "kind": "decor",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "curve_a": {
+          "connectors": {
+            "note": "kept as decor; not a path"
+          },
+          "states": {
+            "bloom": {
+              "source": "axiom_archive_return_path_bloom_albedo.png",
+              "contentBounds": [
+                0.1582,
+                0.2534,
+                0.8398,
+                0.7842
+              ],
+              "anchor": [
+                0.499,
+                0.7842
+              ],
+              "occlusionHeight": 0.5308,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 3.46,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "axiom_archive_aura_flower",
+      "district": "axiom_archive",
+      "kind": "decor",
+      "footprint": {
+        "cols": 1,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "axiom_archive_aura_flower_bloom_albedo.png",
+              "contentBounds": [
+                0.3394,
+                0.2095,
+                0.6597,
+                0.771
+              ],
+              "anchor": [
+                0.4995,
+                0.771
+              ],
+              "occlusionHeight": 0.5615,
+              "qa": {
+                "contact_shadow_px_before": 76,
+                "contact_shadow_px_removed": 463,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 61,
+                "glow_coverage_pct": 3.42,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_aura_flower/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/axiom_archive_aura_flower/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_aura_flower/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_aura_flower/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/axiom_archive_aura_flower/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/axiom_archive_aura_flower/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "axiom_archive_lit_archive",
+      "district": "axiom_archive",
+      "kind": "building",
+      "footprint": {
+        "cols": 2,
+        "rows": 1
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "axiom_archive_lit_archive_bloom_albedo.png",
+              "contentBounds": [
+                0.3149,
+                0.2534,
+                0.7588,
+                0.7095
+              ],
+              "anchor": [
+                0.5366,
+                0.7095
+              ],
+              "occlusionHeight": 0.4561,
+              "qa": {
+                "contact_shadow_px_before": 0,
+                "contact_shadow_px_removed": 0,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 0,
+                "glow_coverage_pct": 1.46,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_lit_archive/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/axiom_archive_lit_archive/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_lit_archive/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_lit_archive/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/axiom_archive_lit_archive/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/axiom_archive_lit_archive/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "axiom_archive_base_ring_seal",
+      "district": "axiom_archive",
+      "kind": "landmark",
+      "footprint": {
+        "cols": 2,
+        "rows": 2
+      },
+      "orientations": {
+        "ne": {
+          "connectors": {},
+          "states": {
+            "bloom": {
+              "source": "axiom_archive_base_ring_seal_bloom_albedo.png",
+              "contentBounds": [
+                0.1519,
+                0.293,
+                0.8462,
+                0.8076
+              ],
+              "anchor": [
+                0.499,
+                0.8076
+              ],
+              "occlusionHeight": 0.5146,
+              "qa": {
+                "contact_shadow_px_before": 73,
+                "contact_shadow_px_removed": 468,
+                "contact_shadow_px_after": 0,
+                "bright_halo_px": 39,
+                "glow_coverage_pct": 5.87,
+                "verdict": "PASS"
+              },
+              "variants": {
+                "albedo_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_base_ring_seal/ne/bloom_albedo_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "albedo_512": {
+                  "url": "/land/v1/gate-A/axiom_archive_base_ring_seal/ne/bloom_albedo_512.webp",
+                  "w": 512,
+                  "h": 512
+                },
+                "glow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_base_ring_seal/ne/bloom_glow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "shadow_1024": {
+                  "url": "/land/v1/gate-A/axiom_archive_base_ring_seal/ne/shadow_1024.png",
+                  "w": 1024,
+                  "h": 1024
+                },
+                "thumb_256": {
+                  "url": "/land/v1/gate-A/axiom_archive_base_ring_seal/ne/bloom_thumb_256.png",
+                  "w": 256,
+                  "h": 256
+                }
+              },
+              "derived_seed": {
+                "url": "/land/v1/gate-A/axiom_archive_base_ring_seal/ne/seed_albedo_1024.png",
+                "w": 1024,
+                "h": 1024,
+                "method": "bloom albedo: emissives x0.15 via glow mask, 45% desaturation, particles removed; same alpha and geometry"
               }
             }
           }
