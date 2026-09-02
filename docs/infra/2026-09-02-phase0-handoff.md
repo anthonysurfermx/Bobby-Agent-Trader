@@ -554,8 +554,10 @@ Cerrado:
   `bobbyprotocol.xyz/api/telegram-webhook` antes del deploy.
 - **On-chain (lectura)**: producción lee Base (8453): 1 commitment
   resuelto. El preview leía X Layer porque `PROTOCOL_CHAIN` es de
-  Production; se añadió `PROTOCOL_CHAIN=base` a la rama y se redesplegó para
-  comparar lecturas idénticas. Escribir en Base desde preview es imposible
+  Production; se añadió `PROTOCOL_CHAIN=base` a la rama y se redesplegó
+  (`bobby-agent-trader-g5eruff64…`): **lecturas idénticas** a producción
+  (Base 8453, 1 commitment, 1 resuelto, 100 % win rate, totales MCP/bounty
+  iguales) y smoke PASSED de nuevo. Escribir en Base desde preview es imposible
   (`Base mainnet writes require VERCEL_ENV=production`).
 - **Rollback compatible**: `supabase/rollback/20260902_rls_restore_previous_policies.sql`
   restaura exactamente las políticas capturadas hoy (incluye volver a apagar
