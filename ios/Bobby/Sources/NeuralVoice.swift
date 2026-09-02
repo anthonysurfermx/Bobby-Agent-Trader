@@ -33,7 +33,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// when present; `voiceId` is the persona picked in onboarding. No Edge
     /// hint anymore — a valid `edgeVoice` would force the legacy robotic-ish
     /// Edge chain server-side and silence the warm voices.
-    func speak(_ text: String, voiceId: String, persona: String? = nil) {
+    func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil) {
         stop()
         generation += 1
         let gen = generation
@@ -44,9 +44,17 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 req.httpMethod = "POST"
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 req.timeoutInterval = 30
-                req.httpBody = try JSONSerialization.data(withJSONObject: [
-                    "text": text, "lang": L.ttsLang, "voice": persona ?? voiceId,
-                ])
+                var body = [
+                    "text": text,
+                    "lang": L.ttsLang,
+                    "voice": persona ?? voiceId,
+                ]
+                // The onboarding promise is that the selected vibe changes
+                // how Bobby sounds, not only the preview sentence. The TTS
+                // endpoint already supports this delivery hint; keep sending
+                // it on every real answer after onboarding.
+                if let vibe, !vibe.isEmpty { body["vibe"] = vibe }
+                req.httpBody = try JSONSerialization.data(withJSONObject: body)
                 let (data, resp) = try await URLSession.shared.data(for: req)
                 guard gen == self.generation,
                       (resp as? HTTPURLResponse)?.statusCode == 200, data.count > 500 else {
@@ -60,7 +68,12 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 p.isMeteringEnabled = true
                 self.player = p
                 self.speaking = true
-                p.play()
+                guard p.play() else {
+                    self.player = nil
+                    self.speaking = false
+                    self.speakFallback(text)
+                    return
+                }
                 self.startMetering(p)
             } catch {
                 if gen == self.generation { self.speakFallback(text) }

@@ -112,7 +112,7 @@ final class BobbyViewModel: ObservableObject {
     }
 
     func say(_ text: String) {
-        voice.speak(text, voiceId: profile.voiceId, persona: voicePersona)
+        voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue)
     }
 
     func bootGreetingIfNeeded() {
@@ -368,6 +368,19 @@ struct ContentView: View {
         .onChange(of: vm.profile.onboarded) {
             vm.messages = []
             vm.bootGreetingIfNeeded()
+        }
+        .alert(item: $speech.issue) { issue in
+            Alert(
+                title: Text(L.t("Voice input unavailable", "Entrada de voz no disponible")),
+                message: Text(issue.message),
+                primaryButton: issue.canOpenSettings
+                    ? .default(Text(L.t("Open Settings", "Abrir Ajustes"))) {
+                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
+                    }
+                    : .default(Text(L.t("Try again", "Reintentar"))),
+                secondaryButton: .cancel()
+            )
         }
         .animation(.easeOut(duration: 0.35), value: vm.profile.onboarded)
     }

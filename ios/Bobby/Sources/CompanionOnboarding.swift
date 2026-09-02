@@ -175,7 +175,7 @@ struct CompanionOnboarding: View {
                     Button {
                         profile.vibeId = vibe.rawValue
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speak(vibe.sample, voiceId: selected.voicePersona, persona: selected.voicePersona)
+                        voice.speak(vibe.sample, voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: vibe.rawValue)
                     } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
@@ -267,7 +267,7 @@ struct CompanionOnboarding: View {
                 voice.speak(
                     L.t("Desk online. Ask me about bitcoin, NVIDIA, gold — whatever you bring.",
                         "Desk en línea. Pregúntame por bitcoin, NVIDIA, oro — lo que traigas."),
-                    voiceId: selected.voicePersona, persona: selected.voicePersona)
+                    voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: profile.vibe.rawValue)
                 withAnimation(.spring(duration: 0.5)) { profile.onboarded = true }
             }
         } label: {

@@ -6,11 +6,40 @@ import Foundation
 import Speech
 import AVFoundation
 
+enum SpeechInputIssue: String, Identifiable {
+    case speechPermission
+    case microphonePermission
+    case recognizerUnavailable
+    case audioCapture
+
+    var id: String { rawValue }
+    var canOpenSettings: Bool {
+        self == .speechPermission || self == .microphonePermission
+    }
+    var message: String {
+        switch self {
+        case .speechPermission:
+            return L.t("Allow Speech Recognition in Settings so Bobby can turn your voice into a market question.",
+                       "Permite Reconocimiento de voz en Ajustes para que Bobby convierta tu voz en una pregunta de mercado.")
+        case .microphonePermission:
+            return L.t("Allow microphone access in Settings so Bobby can hear your question.",
+                       "Permite acceso al micrófono en Ajustes para que Bobby escuche tu pregunta.")
+        case .recognizerUnavailable:
+            return L.t("Apple Speech Recognition is temporarily unavailable. You can keep using text and try voice again.",
+                       "El reconocimiento de voz de Apple no está disponible temporalmente. Puedes seguir usando texto e intentar voz de nuevo.")
+        case .audioCapture:
+            return L.t("The microphone could not start. Check your audio route and try again.",
+                       "El micrófono no pudo iniciar. Revisa la salida de audio e inténtalo de nuevo.")
+        }
+    }
+}
+
 @MainActor
 final class SpeechInput: NSObject, ObservableObject {
     @Published var listening = false
     @Published var authorized = true
     @Published var level: CGFloat = 0
+    @Published var issue: SpeechInputIssue?
 
     /// Ticker vocabulary the recognizer should favor. Without this, es-MX
     /// dictation turns "Ethereum" into a random English word ("Cherry") and
@@ -66,10 +95,20 @@ final class SpeechInput: NSObject, ObservableObject {
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             Task { @MainActor in
                 guard let self else { return }
-                guard status == .authorized else { self.authorized = false; return }
+                guard status == .authorized else {
+                    self.authorized = false
+                    self.issue = .speechPermission
+                    return
+                }
                 AVAudioApplication.requestRecordPermission { granted in
                     Task { @MainActor in
-                        guard granted else { self.authorized = false; return }
+                        guard granted else {
+                            self.authorized = false
+                            self.issue = .microphonePermission
+                            return
+                        }
+                        self.authorized = true
+                        self.issue = nil
                         self.begin(onPartial: onPartial, onFinal: onFinal)
                     }
                 }
@@ -78,7 +117,10 @@ final class SpeechInput: NSObject, ObservableObject {
     }
 
     private func begin(onPartial: @escaping (String) -> Void, onFinal: @escaping (String) -> Void) {
-        guard let recognizer, recognizer.isAvailable else { authorized = false; return }
+        guard let recognizer, recognizer.isAvailable else {
+            issue = .recognizerUnavailable
+            return
+        }
         self.onFinal = onFinal
         latest = ""
 
@@ -113,7 +155,13 @@ final class SpeechInput: NSObject, ObservableObject {
         }
 
         engine.prepare()
-        guard (try? engine.start()) != nil else { authorized = false; return }
+        guard (try? engine.start()) != nil else {
+            input.removeTap(onBus: 0)
+            request = nil
+            self.onFinal = nil
+            issue = .audioCapture
+            return
+        }
         listening = true
 
         task = recognizer.recognitionTask(with: req) { [weak self] result, error in
