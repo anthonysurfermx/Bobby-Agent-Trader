@@ -13,6 +13,27 @@ export const RISK_NOTICE_VERSION = 1;
 const KEY = 'bobby.companion.progress.v1';
 const MAX_DAILY_AWARDS = 3;
 
+/** Mirror of api/_lib/progress-rules.ts — the server is the authority. */
+export const AWARD_POINTS = { read_complete: 10, no_trade_respected: 20 } as const;
+export type AwardKind = keyof typeof AWARD_POINTS;
+
+/** An award the server has not acknowledged yet (offline / not signed in). */
+export interface PendingEvent { id: string; kind: AwardKind; at: string; tzOffsetMin: number }
+
+/** What /api/progress returns; applied on top of local state. */
+export interface ServerProgress {
+  companionId: string | null;
+  vibeId: string;
+  onboarded: boolean;
+  riskNoticeVersion: number;
+  xp: number;
+  streak: number;
+  lastDay: string | null;
+  dailyAwards: number;
+  dailyAwardsDay: string | null;
+  quickAccess: string[];
+}
+
 export interface Progress {
   companionId: string | null;
   vibeId: string;
@@ -25,6 +46,9 @@ export interface Progress {
   dailyAwards: number;
   dailyAwardsDay: string | null;
   quickAccess: string[];
+  pendingEvents: PendingEvent[];
+  /** ISO time of the last successful server reconcile; null = local only. */
+  syncedAt: string | null;
 }
 
 const DEFAULT: Progress = {
@@ -38,6 +62,8 @@ const DEFAULT: Progress = {
   dailyAwards: 0,
   dailyAwardsDay: null,
   quickAccess: ['BTC', 'NVDA', 'ETH'],
+  pendingEvents: [],
+  syncedAt: null,
 };
 
 let state: Progress = load();
@@ -95,8 +121,33 @@ export const progressStore = {
   /** Dev/reset: back to a fresh install. */
   reset() { commit({ ...DEFAULT }); },
 
+  /**
+   * Server state wins on the counters (xp, streak, cap); the device keeps its
+   * choices when the server has none yet. Pending events are cleared by the
+   * caller once the server acknowledged them.
+   */
+  applyServer(server: ServerProgress, acknowledged: string[] = []) {
+    const ack = new Set(acknowledged);
+    commit({
+      ...state,
+      companionId: server.companionId ?? state.companionId,
+      vibeId: server.vibeId || state.vibeId,
+      onboarded: state.onboarded || server.onboarded,
+      riskNoticeVersion: Math.max(state.riskNoticeVersion, server.riskNoticeVersion),
+      xp: server.xp,
+      streak: server.streak,
+      lastDay: server.lastDay,
+      dailyAwards: server.dailyAwards,
+      dailyAwardsDay: server.dailyAwardsDay,
+      quickAccess: state.quickAccess.length ? state.quickAccess : server.quickAccess,
+      pendingEvents: state.pendingEvents.filter((e) => !ack.has(e.id)),
+      syncedAt: new Date().toISOString(),
+    });
+  },
+
   /** Returns what was ACTUALLY awarded (0 when the daily cap said no). */
-  awardDiscipline(points: number, now = new Date()): AwardResult {
+  awardDiscipline(kind: AwardKind, now = new Date()): AwardResult {
+    const points = AWARD_POINTS[kind];
     const today = dayKey(now);
     let dailyAwards = state.dailyAwardsDay === today ? state.dailyAwards : 0;
     if (dailyAwards >= MAX_DAILY_AWARDS) return { awarded: 0, evolvedTo: null, drops: [] };
@@ -119,7 +170,10 @@ export const progressStore = {
       streak = 1;
     }
 
-    commit({ ...state, xp, streak, lastDay: today, dailyAwards, dailyAwardsDay: today });
+    // Queue for the server: it re-applies the same rules and is the authority.
+    const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const pendingEvents = [...state.pendingEvents, { id, kind, at: now.toISOString(), tzOffsetMin: now.getTimezoneOffset() }].slice(-50);
+    commit({ ...state, xp, streak, lastDay: today, dailyAwards, dailyAwardsDay: today, pendingEvents });
     return { awarded: points, evolvedTo, drops };
   },
 };
