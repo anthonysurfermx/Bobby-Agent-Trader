@@ -102,3 +102,16 @@ DeFi México del repo). Cada paso con su propio GO.
   `CompanionDesk` y `BobbyAgentTraderPage`.
 - Rollback en esta etapa: Vercel → Promote del deployment anterior
   (`bobby-agent-trader-r13m1j4ab…`, `feat/web-companion@3ccd8b18`).
+- Paso 4 hecho (21:08 UTC): `20260902_bobby_rls_hardening` aplicada en
+  legacy. Verificado por SQL: 0 tablas protegidas con RLS apagado, 0
+  políticas concedidas a `public` en tablas de Bobby, 36 políticas nuevas.
+  Las únicas políticas anon no-SELECT restantes son de tablas del producto
+  DeFi México (fuera de alcance hasta el paso 7). Lecturas anónimas tras
+  RLS: foro público 3 filas, foro privado 0, `agent_cycles` 3,
+  `agent_messages`/`user_interests`/`agent_profiles`/`memory_objects` 0,
+  `hardness_agent_proofs` 1. Smoke de producción de nuevo 21/21; `/`,
+  `/agentic-world/bobby`, `/voice-room`, `/agentic-world/forum`, `/desk` → 200.
+- Paso 5: primera corrida del gate completo contra producción: 145 OK y 2
+  fallos **del script** (fixture de `agent_trades` contra el CHECK de la
+  tabla; INSERT anónimo de `user_feedback` pidiendo la fila de vuelta sin
+  política SELECT). Corregidos en `8e04de7`; segunda corrida en curso.

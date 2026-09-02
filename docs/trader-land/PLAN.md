@@ -1,5 +1,10 @@
 # Trader Land — plan v0.1 (2026-09-02)
 
+> **Documento histórico.** La especificación activa es
+> [`SYSTEM-DESIGN-v0.2.md`](./SYSTEM-DESIGN-v0.2.md). El brief de producción
+> para Claude + Higgsfield está en
+> [`HIGGSFIELD-ASSET-BRIEF-v0.2.md`](./HIGGSFIELD-ASSET-BRIEF-v0.2.md).
+
 > Focus Tree earns you tiles for attention. Trader Land earns you tiles for
 > **discipline**. The world is a picture of how you behave in the market, not
 > of how much you trade or how much you made.
