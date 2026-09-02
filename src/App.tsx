@@ -62,6 +62,7 @@ const ConsensusPage = lazy(() => import('@/pages/ConsensusPage'));
 const ClawTraderPage = lazy(() => import('@/pages/ClawTraderPage'));
 const ClawTraderChatPage = lazy(() => import('@/pages/ClawTraderChatPage'));
 const BobbyAgentTraderPage = lazy(() => import('@/pages/BobbyAgentTraderPage'));
+const TokenizedStocksPage = lazy(() => import('@/pages/TokenizedStocksPage'));
 const BobbyChallengePage = lazy(() => import('@/pages/BobbyChallengePage'));
 const BobbyAnalyticsPage = lazy(() => import('@/pages/BobbyAnalyticsPage'));
 const BobbyHistoryPage = lazy(() => import('@/pages/BobbyHistoryPage'));
@@ -421,6 +422,15 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAgentTraderPage />
+            </Suspense>
+          ),
+        },
+        // Base Builder Quest: Bobby debates tokenized stocks, the human signs the swap.
+        {
+          path: 'base/stocks',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <TokenizedStocksPage />
             </Suspense>
           ),
         },

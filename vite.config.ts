@@ -69,6 +69,12 @@ export default defineConfig({
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
       },
+      // Tokenized stocks: the B20 quote endpoint is not deployed yet, so local
+      // previews hit the shim in scripts/b20/dev-api.mts (port 3999) instead.
+      '/api/b20-quote': {
+        target: process.env.B20_DEV_API || 'http://localhost:3999',
+        changeOrigin: true,
+      },
       '/api/bobby-protocol-stats': {
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
