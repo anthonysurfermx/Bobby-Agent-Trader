@@ -4,6 +4,50 @@ Fecha: 2026-09-02. Estado: diagnóstico verificado con acceso de solo lectura
 (Supabase MCP, Vercel CLI, código de los dos repos, API de Telegram). Nada se
 ha movido todavía.
 
+## 0. Incidente de hoy (urgente, verificado 17:50)
+
+El worktree `feat/web-companion` tenía `.vercel/project.json` apuntando a
+**`defi-mexico-hub`**, no a `bobby-agent-trader`. Los `vercel --prod` de hoy
+desde ese worktree (4 deploys de producción en `defi-mexico-hub` en la última
+hora: 4m, 17m, 56m y 1h; el anterior tenía 36 días) publicaron la web de Bobby
+en el proyecto de DeFi México. Evidencia: `www.bobbyprotocol.xyz` (dominio
+asignado a `defi-mexico-hub`) sirve el build nuevo (favicon v3), mientras
+`bobbyprotocol.xyz` (`bobby-agent-trader`, último prod hace 4 h) sigue en el
+build anterior (favicon v2). Los dos últimos prod salieron con `gitDirty=1`
+(hallazgo de Codex).
+
+Ya corregí el link local: `.claude/worktrees/web-companion/.vercel/project.json`
+apunta a `bobby-agent-trader` (`prj_2mZTeXALvWwHIbfA6H4hYKWeS6iR`). Es un
+archivo local ignorado por git; no toca Vercel.
+
+Atenuante verificado: **defimexico.org no está en Vercel hoy.** Su DNS
+apunta a 76.223.67.189 / 13.248.213.45 y responde una página de
+estacionamiento de GoDaddy (`/lander`, servidor openresty). Es decir, los
+deploys equivocados no tumbaron un sitio vivo de DeFi México; el efecto
+visible fue solo en `www.bobbyprotocol.xyz`. Aun así conviene regresar
+`defi-mexico-hub` a su build real para no dejar el proyecto contaminado, y
+revisar por qué el dominio defimexico.org está estacionado (¿expiró o se
+cambió el DNS?).
+
+Remediación (la ejecuta Anthony, en este orden):
+
+```bash
+# 1. Regresar defimexico.org al último build real de DeFi México (36 días)
+cd /Users/mrrobot/Documents/GitHub/defi-mexico-hub && vercel rollback https://defi-mexico-h9hkrmh2c-anthonysurfermxs-projects.vercel.app
+```
+
+```bash
+# 2. Publicar la web nueva de Bobby en el proyecto correcto (verificar el link antes)
+cd /Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.claude/worktrees/web-companion && cat .vercel/project.json && vercel --prod
+```
+
+3. En el dashboard de Vercel: quitar `www.bobbyprotocol.xyz` de
+   `defi-mexico-hub` y agregarlo en `bobby-agent-trader` con redirect 308 a
+   `bobbyprotocol.xyz`. Hasta entonces, `www` y el apex sirven builds distintos.
+4. Regla desde hoy: antes de cualquier `vercel --prod`, `cat .vercel/project.json`
+   debe decir `bobby-agent-trader`; y no deployar con el árbol sucio
+   (`git status` limpio, o `vercel --prod` solo desde un commit).
+
 ## 1. Lo que hay hoy (verificado)
 
 ### Cuentas y proyectos
@@ -108,15 +152,58 @@ usuarios de `auth.users` (son de DeFi México; Bobby aún no tiene login).
 **Dudosas (decides tú):** `game_progress` (10 filas, abril), `scan_counter`,
 `pro_waitlist` (5 filas, febrero), `activity_log`.
 
+## 2b. Correcciones de Codex (cruce read-only, integradas al plan)
+
+1. **Vercel.** `www.bobbyprotocol.xyz` sigue asignado a `defi-mexico-hub`, sin
+   redirect; el apex está en `bobby-agent-trader`. Hay que mover `www` y
+   dejar redirect 308 al apex. Ver sección 0.
+2. **Env de Supabase.** No cambiar `VITE_SUPABASE_*` ni `SUPABASE_URL` de
+   forma global mientras el monolito (repo Bobby) todavía compila y sirve las
+   páginas de DeFi México. Introducir variables separadas:
+   `BOBBY_SUPABASE_URL`, `BOBBY_SUPABASE_SERVICE_KEY` (server-side, en los 84
+   endpoints) y `VITE_BOBBY_SUPABASE_URL` / `VITE_BOBBY_SUPABASE_ANON_KEY` solo
+   si el navegador realmente necesita leer directo (hoy el desk pasa por
+   `/api/*`). Las variables viejas siguen apuntando a `egpix…` para lo que aún
+   sea DeFi México.
+3. **Baseline `bobby-protocol`.** Está incompleto: faltan `agent_cycles`,
+   `agent_trades`, `agent_events`, `agent_messages`, `agent_memory` y la
+   extensión `vector` (en `egpix…` `agent_memory.embedding` es `vector`; en
+   `bobby-protocol` la extensión no existe y hay 0 funciones). La migración de
+   esquema debe incluir `create extension vector`, las funciones/triggers que
+   usa Bobby (de las 145 en `public` de `egpix…`, identificar cuáles son
+   nuestras) y los índices.
+4. **No migrar:** `api_cache` (se regenera), Auth de DeFi México (50 usuarios,
+   no son de Bobby), storage (`blog-covers`, `content-machine-audio`),
+   contadores (`scan_counter`, `api_daily_counts`) y sesiones expiradas de
+   Telegram (`telegram_activation_sessions` con `valid_until` vencido).
+5. **Integridad de datos.** Preservar IDs y FKs tal cual (las tablas Bobby no
+   tienen FKs entre sí ni hacia tablas DeFi, verificado: 0). Por lote:
+   conteo origen/destino, huérfanos y checksum (`md5(string_agg(...))` por
+   tabla ordenada por id). Canary con dual-read por grupos (foro → ciclos →
+   eventos) antes de cortar; rollback por env/routing, y outbox para lo que
+   se escriba durante la ventana.
+6. **Git.** El estado real: iOS solo existe en `ios/companion-bond`; la web en
+   `feat/web-companion`; el backend "bueno" en `fix/unified-onchain-commit`;
+   20 worktrees, 4 con cambios sin commit (`app-soon`, `infallible-haibt`,
+   `nervous-haibt`, `trackrecord-v2`). Antes de extraer repos (Bobby app /
+   protocolo / DeFi México) congelar los heads: tag por rama, commit o
+   descarte explícito de lo sucio, y una rama `main` nueva que integre las
+   tres ramas vivas.
+7. **Legacy intocable en esta fase.** Ni revocar, ni escribir, ni borrar nada
+   en `egpix…` hasta que el canary pase y Anthony lo apruebe. La fase 3
+   (limpieza) se mueve al final y con ventana propia.
+
 ## 3. Plan de migración (en orden, sin downtime)
 
 ### Fase 0 — hoy, sin mover datos (yo lo hago en código)
 1. Cambiar las 5 llamadas a defimexico.org por bobbyprotocol.xyz (o rutas
    internas). Arregla la entrega por Telegram del ciclo y el fallback de
    `bobby-intel`.
-2. Sustituir los 46 fallbacks `egpixaunlnzauztbrnuz` por
-   `process.env.SUPABASE_URL` obligatorio (falla ruidoso si falta), para que
-   el cambio de base sea un cambio de env y no de código.
+2. Sustituir los 46 fallbacks `egpixaunlnzauztbrnuz` por un único helper
+   `bobbySupabase()` que lea `BOBBY_SUPABASE_URL` / `BOBBY_SUPABASE_SERVICE_KEY`
+   (obligatorias, falla ruidoso si faltan). Mientras no existan en Vercel, el
+   helper cae a las variables actuales, así que el paso es inocuo hasta que
+   se decida el corte.
 3. Endpoint `bobby-early-access` → tabla propia `bobby_early_access` (en el
    proyecto bobby-protocol) en lugar de `newsletter_subscribers`.
 
