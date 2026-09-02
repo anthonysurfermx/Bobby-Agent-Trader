@@ -163,7 +163,7 @@ export default function BobbyAppLandingExperience() {
     setSignupMessage('');
     const website = new FormData(form).get('website');
     try {
-      const response = await fetch('/api/bobby-early-access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, website }) });
+      const response = await fetch('/api/bobby-early-access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, website, language: isSpanish() ? 'es' : 'en', page: '/app', referrer: document.referrer ? document.referrer.slice(0, 300) : undefined }) });
       if (!response.ok) throw new Error('Signup failed');
       setSignupState('success');
       setSignupMessage(t("You're on the list. We only email when Bobby is ready for you.", 'Estás en la lista. Solo escribimos cuando Bobby esté listo para ti.'));
