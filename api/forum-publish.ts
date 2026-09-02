@@ -39,13 +39,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const verified = verifyTranscriptReceipt(b.transcript, b.receipt);
   if (verified.ok !== true) return res.status(403).json({ error: `Transcript not accepted: ${(verified as { error: string }).error}` });
   const { payload } = verified;
-  if (payload.wallet && payload.wallet !== guarded.wallet) return res.status(403).json({ error: 'Receipt belongs to another wallet' });
+  if (!payload.wallet) return res.status(403).json({ error: 'Receipt was issued without a wallet session and cannot be published' });
+  if (payload.wallet !== guarded.wallet) return res.status(403).json({ error: 'Receipt belongs to another wallet' });
   if (!payload.p) return res.status(400).json({ error: 'Debate has no publishable trade fields' });
   const posts = parseDebateSections(b.transcript);
   if (posts.length < 2) return res.status(400).json({ error: 'Transcript has no debate sections' });
 
   const f = payload.f;
-  const topic = `${f.symbol} ${f.direction === 'short' ? 'short' : f.direction === 'long' ? 'long' : 'call'} · ${f.conviction_score}%`;
+  if (typeof f.conviction_score !== 'number' || f.conviction_score < 0 || f.conviction_score > 1) return res.status(400).json({ error: 'Conviction out of range (expected 0..1)' });
+  const topic = `${f.symbol} ${f.direction === 'short' ? 'short' : f.direction === 'long' ? 'long' : 'call'} · ${Math.round(f.conviction_score * 100)}%`; // display only; stored value stays 0..1
   try {
     const r = await fetch(bobbyRest('rpc/bobby_publish_debate'), {
       method: 'POST',

@@ -36,8 +36,9 @@ t(requestOriginHost({ origin: 'https://evil.vercel.app' }) === null && requestOr
 const { issueTranscriptReceipt, verifyTranscriptReceipt, parseDebateFields, parseDebateSections } = await import('../../api/_lib/transcript-receipt.ts');
 const transcript = '**ALPHA HUNTER:** BTC looks strong, buy at 62,000.\n\n**RED TEAM:** Funding is crowded.\n\n**MY VERDICT:** Long BTC at 62,000, stop 60,500, target 66,000. Conviction 7/10.\n\n';
 const tradeFields = parseDebateFields(transcript, 'que opinas de BTC?');
-t(tradeFields.symbol === 'BTC' && tradeFields.direction === 'long' && tradeFields.conviction_score === 70 && tradeFields.stop_price === 60500 && tradeFields.target_price === 66000, 'trade fields parsed server-side from the CIO section');
+t(tradeFields.symbol === 'BTC' && tradeFields.direction === 'long' && tradeFields.conviction_score === 0.7 && tradeFields.stop_price === 60500 && tradeFields.target_price === 66000, 'trade fields parsed server-side from the CIO section');
 t(parseDebateSections(transcript).map((s) => s.agent).join(',') === 'alpha,redteam,cio', 'sections attributed by the server');
+t(issueTranscriptReceipt(transcript, { wallet: null }) === null, 'no receipt without a wallet (guest debates are not publishable)');
 const rcpt = issueTranscriptReceipt(transcript, { wallet: acct.address, userQuestion: 'que opinas de BTC?' });
 t(Boolean(rcpt && rcpt.payload.p && rcpt.payload.wallet === acct.address.toLowerCase()), 'receipt issued: publishable, bound to the wallet');
 const v = verifyTranscriptReceipt(transcript, rcpt!.token);

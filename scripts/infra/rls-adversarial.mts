@@ -215,13 +215,29 @@ async function legitimatePath(): Promise<void> {
   line(inboxNoSession.status === 401, 'GET /api/agent-messages without session → 401', `HTTP ${inboxNoSession.status}`);
   // Forum publication: one receipt → one thread; the same receipt again → 409 (atomic RPC, PK on receipt id)
   if (process.env.BOBBY_TRANSCRIPT_SECRET || process.env.BOBBY_SESSION_SECRET) {
-    const { issueTranscriptReceipt } = await import('../../api/_lib/transcript-receipt.js');
+    const { issueTranscriptReceipt, signReceiptPayload, transcriptHash } = await import('../../api/_lib/transcript-receipt.js');
     const transcript = `**ALPHA HUNTER:** ${MARK} RLSTEST looks strong.\n\n**RED TEAM:** crowded.\n\n**MY VERDICT:** Long BTC at 62,000, stop 60,500, target 66,000. Conviction 7/10.\n\n`;
     const rc = issueTranscriptReceipt(transcript, { wallet, userQuestion: 'BTC?' });
     if (rc) {
       const pub1 = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: rc.token }) });
       const pub1Json = (await pub1.json().catch(() => ({}))) as { threadId?: string; error?: string };
       line(pub1.ok && Boolean(pub1Json.threadId), 'POST /api/forum-publish with a valid receipt → thread created atomically', `HTTP ${pub1.status} ${pub1Json.error || ''}`);
+      if (pub1Json.threadId) {
+        const stored = await fetch(`${URL_}/rest/v1/forum_threads?id=eq.${pub1Json.threadId}&select=conviction_score,owner_wallet,scope`, { headers: svcHeaders });
+        const row = ((await stored.json().catch(() => [])) as Array<{ conviction_score: number; owner_wallet: string; scope: string }>)[0];
+        line(Boolean(row) && Math.abs(row.conviction_score - 0.7) < 1e-6, '"7/10" is stored as conviction_score 0.7 (protocol scale)', `stored=${row?.conviction_score}`);
+        line(Boolean(row) && row.owner_wallet === wallet && row.scope === 'public', 'thread owned by the session wallet, public scope', `owner=${row?.owner_wallet}`);
+      }
+      // guest receipt (wallet null) crafted with the secret → must be refused
+      const guest = signReceiptPayload({ id: '00000000-0000-4000-8000-00000000c0de', iat: Date.now(), wallet: null, th: transcriptHash(transcript), f: rc.payload.f, p: true });
+      const pubGuest = guest ? await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: guest }) }) : null;
+      line(pubGuest?.status === 403, 'receipt without wallet (guest) → 403', `HTTP ${pubGuest?.status}`);
+      const other = issueTranscriptReceipt(transcript, { wallet: CANARY_WALLET, userQuestion: 'BTC?' });
+      const pubOther = other ? await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: other.token }) }) : null;
+      line(pubOther?.status === 403, "another wallet's receipt → 403", `HTTP ${pubOther?.status}`);
+      const badConv = signReceiptPayload({ ...rc.payload, id: '00000000-0000-4000-8000-0000000000c1', f: { ...rc.payload.f, conviction_score: 70 } });
+      const pubBad = badConv ? await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: badConv }) }) : null;
+      line(pubBad?.status === 403 || pubBad?.status === 400, 'receipt with conviction 70 (wrong scale) → rejected', `HTTP ${pubBad?.status}`);
       const pub2 = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: rc.token }) });
       line(pub2.status === 409, 'SAME receipt again → 409 (single use)', `HTTP ${pub2.status}`);
       const edited = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript: transcript + ' (edited)', receipt: rc.token }) });

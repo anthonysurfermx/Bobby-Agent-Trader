@@ -362,3 +362,32 @@ helpers declarados, que el handler guarde antes del primer uso). Detectó
 ### Orden de migraciones (ahora tres pequeñas + RLS)
 `bobby_control`, `bobby_early_access`, `bobby_forum_publish_rpc` → deploy
 contra legacy → regresión → `bobby_rls_hardening` → gate.
+
+---
+
+## Décimo commit — cuarta revisión de Codex (2026-09-02, noche)
+
+Dos bloqueos nuevos, cerrados. Sin deploy, sin migración aplicada.
+
+1. **Convicción en escala 0…1.** El parser del CIO convierte `7/10` en
+   `0.7` (antes `70`). Judge Mode, checkpoint, calibración y los ciclos
+   multiplican por 10 para mostrar; el valor almacenado es el del protocolo.
+   Validación de rango en tres capas: al verificar el recibo (`0..1`), en
+   `forum-publish` (400 fuera de rango) y en el RPC `bobby_publish_debate`
+   (excepción SQL). El `70%` del título del hilo es solo presentación.
+2. **Recibo siempre ligado a una wallet.** `issueTranscriptReceipt()`
+   devuelve null sin wallet; `openclaw-chat` solo emite recibo cuando la
+   petición trae sesión (si no, manda `bobby_publishable:false` con la
+   razón). `forum-publish` rechaza explícitamente `wallet` null (403) y
+   exige `payload.wallet === guarded.wallet`. El RPC valida el formato de
+   la wallet.
+
+Pruebas añadidas:
+- Gate C: `7/10` termina almacenado como `0.7`; hilo con `owner_wallet` de
+  la sesión y `scope` público; recibo de invitado (wallet null, fabricado
+  con el secreto) → 403; recibo de otra wallet → 403; recibo con convicción
+  `70` → rechazado.
+- `wallet-session-selftest`: sin wallet no hay recibo; convicción `0.7`.
+- `freeze-behavior-selftest`: + `xlayer-record`, `generate-activity`,
+  `auto-bounty`, `judge-mode`, `bobby-asset-cache`, `agent-run`,
+  `bobby-cycle` (los escritores on-chain responden 503 sin firmar).

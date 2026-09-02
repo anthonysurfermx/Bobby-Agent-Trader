@@ -35,6 +35,13 @@ begin
   if p_receipt_id is null or p_wallet is null or p_thread is null or jsonb_typeof(p_posts) <> 'array' or jsonb_array_length(p_posts) < 2 then
     raise exception 'bobby_publish_debate: invalid arguments' using errcode = '22023';
   end if;
+  if p_wallet !~ '^0x[0-9a-fA-F]{40}$' then
+    raise exception 'bobby_publish_debate: invalid wallet' using errcode = '22023';
+  end if;
+  -- conviction is stored on the protocol scale 0..1 (judge-mode / checkpoint / cycles multiply by 10 for display)
+  if (p_thread->>'conviction_score') is null or (p_thread->>'conviction_score')::real < 0 or (p_thread->>'conviction_score')::real > 1 then
+    raise exception 'bobby_publish_debate: conviction_score must be within 0..1' using errcode = '22023';
+  end if;
 
   -- single use: duplicate receipt → unique_violation → whole call rolls back
   insert into public.forum_publish_receipts (receipt_id, wallet) values (p_receipt_id, lower(p_wallet));

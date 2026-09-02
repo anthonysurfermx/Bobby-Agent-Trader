@@ -23,7 +23,7 @@ const PREFIX = 'btr2';
 export interface DebateFields {
   symbol: string | null;
   direction: 'long' | 'short' | 'neutral' | null;
-  conviction_score: number | null; // 0..100
+  conviction_score: number | null; // 0..1 — the protocol scale (judge-mode, checkpoint and cycles multiply by 10 for display)
   entry_price: number | null;
   stop_price: number | null;
   target_price: number | null;
@@ -91,7 +91,7 @@ function num(s: string | undefined): number | null {
 export function parseDebateFields(transcript: string, userQuestion = ''): DebateFields {
   const cio = parseDebateSections(transcript).find((s) => s.agent === 'cio')?.content || '';
   const convM = cio.match(/(\d+)\s*\/\s*10/);
-  const conviction = convM ? Math.min(100, Math.max(0, parseInt(convM[1], 10) * 10)) : null;
+  const conviction = convM ? Math.min(1, Math.max(0, parseInt(convM[1], 10) / 10)) : null;
   const entryM = cio.match(/(?:entry|entr[ao]|buy(?:ing)?|short(?:ear)?|comprar?)\s+(?:\w+\s+)*?(?:en|at|a)\s*\$?([\d,]+(?:\.\d+)?)/i)
     || cio.match(/(?:en|at)\s*\$?([\d,]+(?:\.\d+)?)\s*[-–]\s*\$?([\d,]+)/i)
     || cio.match(/(?:Long|Short)\s+\w+\s+\$?([\d,]+(?:\.\d+)?)/i);
@@ -112,21 +112,35 @@ export function parseDebateFields(transcript: string, userQuestion = ''): Debate
   };
 }
 
-/** Build and sign the receipt for a finished debate. Null when no secret is configured. */
-export function issueTranscriptReceipt(transcript: string, opts: { wallet: string | null; userQuestion?: string; now?: number }): { token: string; payload: ReceiptPayload } | null {
+const WALLET_RE = /^0x[0-9a-f]{40}$/;
+
+/** Low-level: sign an arbitrary payload. Exported for the adversarial gate only; product code uses issueTranscriptReceipt(). */
+export function signReceiptPayload(payload: ReceiptPayload): string | null {
   const k = key();
   if (!k) return null;
+  const b64 = Buffer.from(stable(payload)).toString('base64url');
+  return `${PREFIX}.${b64}.${mac(b64, k).toString('base64url')}`;
+}
+
+/**
+ * Build and sign the receipt for a finished debate. Requires the wallet
+ * that asked (Codex review #4: a guest receipt could be claimed by any
+ * signed-in wallet). Null when no secret is configured or no wallet.
+ */
+export function issueTranscriptReceipt(transcript: string, opts: { wallet: string | null; userQuestion?: string; now?: number }): { token: string; payload: ReceiptPayload } | null {
+  const wallet = (opts.wallet || '').toLowerCase();
+  if (!WALLET_RE.test(wallet)) return null;
   const f = parseDebateFields(transcript, opts.userQuestion || '');
   const payload: ReceiptPayload = {
     id: randomUUID(),
     iat: opts.now ?? Date.now(),
-    wallet: opts.wallet ? opts.wallet.toLowerCase() : null,
+    wallet,
     th: transcriptHash(transcript),
     f,
-    p: Boolean(f.symbol && f.direction && f.conviction_score !== null && f.conviction_score > 0),
+    p: Boolean(f.symbol && f.direction && f.conviction_score !== null && f.conviction_score > 0 && f.conviction_score <= 1),
   };
-  const b64 = Buffer.from(stable(payload)).toString('base64url');
-  return { token: `${PREFIX}.${b64}.${mac(b64, k).toString('base64url')}`, payload };
+  const token = signReceiptPayload(payload);
+  return token ? { token, payload } : null;
 }
 
 /** Verify MAC + age + transcript hash. Wallet binding is the caller's decision (it knows the session). */
@@ -142,6 +156,7 @@ export function verifyTranscriptReceipt(transcript: string, receipt: string, now
   let payload: ReceiptPayload;
   try { payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as ReceiptPayload; } catch { return { ok: false, error: 'Malformed receipt' }; }
   if (typeof payload.id !== 'string' || typeof payload.iat !== 'number' || typeof payload.th !== 'string' || !payload.f) return { ok: false, error: 'Malformed receipt' };
+  if (payload.f.conviction_score !== null && (typeof payload.f.conviction_score !== 'number' || payload.f.conviction_score < 0 || payload.f.conviction_score > 1)) return { ok: false, error: 'Conviction out of range (expected 0..1)' };
   if (payload.iat > now + 60_000 || now - payload.iat > TRANSCRIPT_RECEIPT_TTL_MS) return { ok: false, error: 'Receipt expired' };
   if (payload.th !== transcriptHash(transcript)) return { ok: false, error: 'Transcript does not match receipt' };
   return { ok: true, payload };

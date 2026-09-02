@@ -861,8 +861,11 @@ ${finalCallInstruction}`;
     sendChunk(`\n\n`);
     // Structured, single-use receipt: transcript hash + server-parsed trade
     // fields + the wallet that asked. forum-publish trusts nothing else.
-    const receipt = issueTranscriptReceipt(transcript, { wallet: sessionWallet, userQuestion });
+    // Only a signed-in wallet gets a receipt: a guest debate can never be
+    // published by someone else later (Codex review #4).
+    const receipt = sessionWallet ? issueTranscriptReceipt(transcript, { wallet: sessionWallet, userQuestion }) : null;
     if (receipt) res.write(`data: ${JSON.stringify({ bobby_receipt: receipt.token, bobby_receipt_fields: receipt.payload.f, bobby_publishable: receipt.payload.p })}\n\n`);
+    else res.write(`data: ${JSON.stringify({ bobby_publishable: false, bobby_publish_reason: sessionWallet ? 'receipt-unavailable' : 'no-wallet-session' })}\n\n`);
     res.write('data: [DONE]\n\n');
   } catch (err) {
     console.error('[Debate] Multi-call failed:', err);
@@ -936,7 +939,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const hasXMLContext = /<([A-Z_]+)(?:\s+[^>]*)?>[\s\S]*?<\/\1>/.test(message);
   const resolved = resolveDebateMode(message);
-  // Optional wallet session: binds the debate receipt to the wallet that asked.
+  // Wallet session (optional for chatting, REQUIRED to get a publishable receipt).
   const sessionWallet = walletSessionFromRequest(req)?.wallet ?? null;
 
   if (
