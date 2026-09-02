@@ -359,6 +359,7 @@ struct ContentView: View {
     @State private var showAuraCard = false
     @State private var showSquad = false
     @State private var showBoard = false
+    @State private var showRiskNotice = false
     /// The desk never shows an empty hole: if the companion GLB fails to
     /// load, fall back to the orb until the companion changes.
     @State private var deskModelFailed = false
@@ -366,7 +367,11 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             KineticBackground()
-            if vm.profile.onboarded {
+            if !vm.profile.acceptedRiskNotice {
+                // The risk notice is the first screen, every install: nothing in
+                // Bobby is investment advice, and the human says so by hand.
+                RiskNoticeView(profile: vm.profile).transition(.opacity)
+            } else if vm.profile.onboarded {
                 mainScreen.transition(.opacity)
             } else {
                 CompanionOnboarding(profile: vm.profile, companions: vm.companions, voice: vm.voice).transition(.opacity)
@@ -403,6 +408,9 @@ struct ContentView: View {
         .sheet(isPresented: $showBoard) {
             AssetBoardView(vm: vm)
         }
+        .sheet(isPresented: $showRiskNotice) {
+            RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
+        }
         .sheet(isPresented: $showSquad) {
             MascotGalleryView(store: vm.companions, voice: vm.voice, voiceId: vm.profile.voiceId)
         }
@@ -437,6 +445,7 @@ struct ContentView: View {
             )
         }
         .animation(.easeOut(duration: 0.35), value: vm.profile.onboarded)
+        .animation(.easeOut(duration: 0.35), value: vm.profile.acceptedRiskNotice)
     }
 
     private var mainScreen: some View {
@@ -547,6 +556,9 @@ struct ContentView: View {
                 }
                 Section {
                     // Reachable from every screen, not just first-run onboarding.
+                    Button { showRiskNotice = true } label: {
+                        Label(L.t("Risk notice", "Aviso de riesgo"), systemImage: "exclamationmark.triangle")
+                    }
                     Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
                         Label(L.t("Privacy Policy", "Aviso de privacidad"), systemImage: "hand.raised")
                     }

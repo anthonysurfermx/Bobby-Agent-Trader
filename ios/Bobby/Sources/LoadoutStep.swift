@@ -126,7 +126,7 @@ struct LoadoutStep: View {
         HStack(alignment: .firstTextBaseline) {
             Text(ready
                  ? L.t("\(companion.name(at: 1)) IS READY", "\(companion.name(at: 1)) ESTÁ LISTO")
-                 : L.t("EQUIP \(companion.name(at: 1))", "EQUIPA A \(companion.name(at: 1))"))
+                 : L.t("PREPPING \(companion.name(at: 1))'S TRADER VIBE…", "PREPARANDO LA VIBRA DE TRADER DE \(companion.name(at: 1))…"))
                 .font(.mono(11, .bold))
                 .kerning(1.6)
                 .foregroundStyle(ready ? Theme.up : tint)

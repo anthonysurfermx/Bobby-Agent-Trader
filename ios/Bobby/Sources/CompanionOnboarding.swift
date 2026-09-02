@@ -76,7 +76,9 @@ struct CompanionOnboarding: View {
             HStack {
                 HStack(spacing: 8) {
                     Circle().fill(tint).frame(width: 7, height: 7).shadow(color: tint, radius: 7)
-                    Text(L.t("BOBBY // MEET YOUR SQUAD", "BOBBY // CONOCE AL SQUAD"))
+                    Text(step == 2
+                         ? L.t("BOBBY // PREPPING YOUR TRADER VIBE", "BOBBY // PREPARANDO TU VIBRA DE TRADER")
+                         : L.t("BOBBY // MEET YOUR SQUAD", "BOBBY // CONOCE AL SQUAD"))
                         .font(.mono(11, .bold))
                         .kerning(1.9)
                         .foregroundStyle(Theme.text.opacity(0.78))

@@ -148,6 +148,9 @@ final class AgentProfile: ObservableObject {
     @Published var voiceId: String { didSet { UserDefaults.standard.set(voiceId, forKey: "agent.voice") } }
     @Published var vibeId: String { didSet { UserDefaults.standard.set(vibeId, forKey: "agent.vibe") } }
     @Published var auraText: String { didSet { UserDefaults.standard.set(auraText, forKey: "agent.auraText") } }
+    /// Version of the risk notice the human acknowledged; 0 = never.
+    @Published var riskNoticeVersion: Int { didSet { UserDefaults.standard.set(riskNoticeVersion, forKey: "agent.riskNoticeVersion") } }
+    var acceptedRiskNotice: Bool { riskNoticeVersion >= RiskNotice.currentVersion }
 
     init() {
         let d = UserDefaults.standard
@@ -156,6 +159,7 @@ final class AgentProfile: ObservableObject {
         voiceId = AgentVoice.normalized(d.string(forKey: "agent.voice") ?? AgentVoice.coral.rawValue)
         vibeId = d.string(forKey: "agent.vibe") ?? AgentVibe.directo.rawValue
         auraText = d.string(forKey: "agent.auraText") ?? L.t("electric blue", "azul voltaje")
+        riskNoticeVersion = d.integer(forKey: "agent.riskNoticeVersion")
     }
 
     var voice: AgentVoice { AgentVoice(rawValue: voiceId) ?? .coral }
