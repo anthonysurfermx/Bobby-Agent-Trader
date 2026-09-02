@@ -88,6 +88,7 @@ const BobbyNetworkConsolePage = lazyWithRetry(() => import('@/pages/BobbyNetwork
 const BobbyHarnessConsolePage = lazyWithRetry(() => import('@/pages/BobbyHarnessConsolePage'), 'protocol-harness');
 const BobbyPlaybooksPage = lazyWithRetry(() => import('@/pages/BobbyPlaybooksPage'), 'protocol-playbooks');
 const BobbySandboxPage = lazyWithRetry(() => import('@/pages/BobbySandboxPage'), 'protocol-sandbox');
+const TraderLandGatePage = lazy(() => import('@/pages/TraderLandGatePage'));
 
 
 // Auth pages
@@ -441,6 +442,14 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <CompanionDeskPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'internal/trader-land-gate-a',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <TraderLandGatePage />
             </Suspense>
           ),
         },
