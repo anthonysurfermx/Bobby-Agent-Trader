@@ -4,7 +4,7 @@
 // equip one by one with sound and vibration, the companion is ready, and
 // you drop into the desk.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { ArrowRight, Check, Volume2 } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
@@ -78,8 +78,10 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
         <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: selected.palette, avatar: selected.id }} state={voice.speaking ? 'speaking' : 'idle'} level={voice.speaking ? voice.level : null} size={step === 2 ? 220 : 280} />
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div key={step} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="space-y-3">
+      {/* No exit animation on purpose: rapid step changes must never leave a
+          stale step on screen (AnimatePresence "wait" could). */}
+      <div>
+        <motion.div key={step} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
           {step === 0 && (
             <>
               <div className="text-center">
@@ -154,7 +156,7 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
             </div>
           )}
         </motion.div>
-      </AnimatePresence>
+      </div>
 
       <button
         onClick={next}
