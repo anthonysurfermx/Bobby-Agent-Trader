@@ -1,3 +1,4 @@
+import { bobbyDbUrlOptional, bobbyServiceKeyOptional } from './bobby-db.js';
 // ============================================================
 // rate-limit-persistent — cross-instance rate limiter backed by the
 // `api_cache` table. Complements _lib/rate-limit.ts (in-memory, per
@@ -11,8 +12,8 @@
 // Fails open: if Supabase is unreachable, callers are not limited.
 // ============================================================
 
-const SB_URL = process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL = bobbyDbUrlOptional();
+const SB_KEY = bobbyServiceKeyOptional();
 
 function headers() {
   return {

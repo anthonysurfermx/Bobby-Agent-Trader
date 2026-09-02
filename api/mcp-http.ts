@@ -44,6 +44,7 @@ import {
 } from './_lib/b1nary.js';
 import { evaluateWheel } from './_lib/wheel-verdict.js';
 import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 60 };
 
@@ -174,8 +175,8 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_brief') {
     // One-shot compact briefing: signal + record + guardrails in ~400 tokens
-    const SB_URL_MCP = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-    const SB_KEY_MCP = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+    const SB_URL_MCP = bobbyDbUrl();
+    const SB_KEY_MCP = bobbyReadKey();
     const symbolFilter = args.symbol ? `&symbol=eq.${(args.symbol as string).toUpperCase()}` : '';
 
     const [threadRes, repRes, intelRes] = await Promise.all([
@@ -256,8 +257,8 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
   }
 
   if (name === 'bobby_recommend') {
-    const SB_URL_MCP = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-    const SB_KEY_MCP = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+    const SB_URL_MCP = bobbyDbUrl();
+    const SB_KEY_MCP = bobbyReadKey();
     const symbolFilter = args.symbol ? `&symbol=eq.${args.symbol.toUpperCase()}` : '';
     const threadsRes = await fetch(
       `${SB_URL_MCP}/rest/v1/forum_threads?resolution=eq.pending&entry_price=not.is.null&order=created_at.desc&limit=5${symbolFilter}&select=symbol,direction,conviction_score,entry_price,stop_price,target_price,trigger_reason,created_at,expires_at,debate_quality`,

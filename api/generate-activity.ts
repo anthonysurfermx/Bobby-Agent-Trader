@@ -14,6 +14,7 @@ import { ethers } from 'ethers';
 import { requireProtocolAutomationAuth } from './_lib/request-security.js';
 import { assertProviderChain, requireLegacyXLayerMode } from './_lib/protocol-write-safety.js';
 import { XLAYER_CHAIN_ID } from './_lib/chains.js';
+import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 60 };
 
@@ -59,8 +60,8 @@ const DIMENSIONS = [
 ] as const;
 
 // Supabase for fetching real debate threads
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyReadKey();
 
 interface TxResult {
   type: string;

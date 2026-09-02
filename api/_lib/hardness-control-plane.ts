@@ -1,10 +1,8 @@
+import { bobbyDbUrl, bobbyServiceKey } from './bobby-db.js';
 const SB_URL =
-  process.env.SUPABASE_URL ||
-  process.env.VITE_SUPABASE_URL ||
-  'https://egpixaunlnzauztbrnuz.supabase.co';
+  bobbyDbUrl();
 const SB_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
+  bobbyServiceKey() ||
   '';
 
 function headers(prefer?: string) {

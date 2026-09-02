@@ -12,9 +12,10 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceL
 import { useTradingRoom } from '@/hooks/useTradingRoom';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '@/lib/bobby-technical';
 import KineticShell from '@/components/kinetic/KineticShell';
+import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
-const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
-const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+const SB = BOBBY_DB_URL;
+const KEY = BOBBY_DB_ANON;
 const headers = { apikey: KEY, Authorization: `Bearer ${KEY}` };
 
 // On-chain stat reader — calls X Layer RPC directly

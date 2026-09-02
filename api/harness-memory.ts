@@ -5,11 +5,12 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 10 };
 
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyReadKey();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {

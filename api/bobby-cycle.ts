@@ -16,11 +16,12 @@ import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
 import { internalAuthHeaders, requireInternalAuth, tradingAuthHeaders } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 300 };
 
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyReadKey();
 if (!SB_KEY) {
   console.error('[Cycle] FATAL: no Supabase key in env (SUPABASE_SERVICE_KEY / SUPABASE_SERVICE_ROLE_KEY / VITE_SUPABASE_ANON_KEY all missing)');
 }

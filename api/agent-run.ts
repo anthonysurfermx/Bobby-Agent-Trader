@@ -34,6 +34,7 @@ import { callLlm } from './_lib/llm.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIpKey } from './_lib/rate-limit.js';
 import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 120 };
 
@@ -295,8 +296,8 @@ OUTPUT: Call execute_decisions. Set confidence as conviction_score (0.0-1.0). Ma
 // ---- Prompt Self-Optimization ----
 // Analyzes last N cycles' outcomes and generates an improved system prompt
 async function fetchStoredPrompt(): Promise<string | null> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) return null;
   try {
     const res = await fetch(
@@ -310,8 +311,8 @@ async function fetchStoredPrompt(): Promise<string | null> {
 }
 
 async function persistOptimizedPrompt(prompt: string): Promise<void> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) return;
   try {
     // Upsert: insert or update on conflict
@@ -376,8 +377,8 @@ RULES:
 
 // ---- Fetch recent cycles for self-optimization ----
 async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: string; trades_executed: number; trades_successful: number; status: string; total_usd_deployed?: number }>> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) return [];
 
   try {
@@ -398,8 +399,8 @@ async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: str
 //   2. >=3 consecutive settled losses with no intervening win.
 // Fails open on DB error — per-cycle risk gate still bounds downside.
 async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string; detail?: string }> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) {
     console.warn('[CircuitBreaker] SUPABASE_URL/SERVICE_ROLE_KEY missing — breaker disabled (fail-open). Per-cycle risk gate still bounds downside.');
     return { halted: false };
@@ -474,8 +475,8 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
 // ---- Fetch USD currently at risk in open (unsettled) positions ----
 // Prevents cumulative over-exposure when multiple cycles fire before settlement.
 async function fetchOpenExposureUsd(): Promise<number> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) return 0;
   try {
     const q = `${url}/rest/v1/agent_trades?status=eq.open&select=amount_usd`;
@@ -506,8 +507,8 @@ interface AdvisorProfile {
 }
 
 async function fetchAdvisorProfiles(): Promise<AdvisorProfile[]> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) return [];
 
   try {
@@ -810,8 +811,8 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
 
 // ---- Save greeting messages to Supabase ----
 async function saveGreetings(greetings: Array<{ wallet_address: string; advisor_name: string; message: string }>) {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key || greetings.length === 0) return;
 
   try {
@@ -842,8 +843,8 @@ interface LastGreeting {
 }
 
 async function fetchLastGreeting(wallet: string): Promise<LastGreeting | null> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) return null;
 
   try {
@@ -924,8 +925,8 @@ async function buildMemoryFollowUp(lastGreeting: LastGreeting): Promise<MemoryFo
 
 // ---- Supabase logging ----
 async function logToSupabase(data: Record<string, unknown>) {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) return;
 
   try {

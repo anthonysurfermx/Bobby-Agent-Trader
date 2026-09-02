@@ -1,3 +1,4 @@
+import { bobbyDbUrl, bobbyReadKey } from './bobby-db.js';
 // ============================================================
 // Unified Harness Event Logger
 // Every decision, payment, execution, and risk gate fires an
@@ -5,8 +6,8 @@
 // powers the Finance Harness Console.
 // ============================================================
 
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyReadKey();
 
 // ── Harness Verdict ──
 // Standard decision object for all Bobby flows.

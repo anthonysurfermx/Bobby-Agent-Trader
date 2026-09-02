@@ -1,3 +1,4 @@
+import { bobbyDbUrlOptional, bobbyServiceKeyOptional } from './bobby-db.js';
 // ============================================================
 // api-cache — thin TTL wrapper over Supabase `api_cache` table.
 // Designed for responses that are safe to share across agents and across
@@ -8,8 +9,8 @@
 // fall through to the live fetch. Never throws.
 // ============================================================
 
-const SB_URL = process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SB_URL = bobbyDbUrlOptional();
+const SB_KEY = bobbyServiceKeyOptional();
 
 function hasCreds(): boolean {
   return Boolean(SB_URL && SB_KEY);

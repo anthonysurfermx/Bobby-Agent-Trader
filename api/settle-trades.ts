@@ -19,11 +19,12 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireInternalAuth } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 60 };
 
-const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyServiceKey();
 
 interface OpenTrade {
   id: string;

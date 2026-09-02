@@ -27,11 +27,12 @@ import { useBobbyVoice } from '@/hooks/useBobbyVoice';
 import { useAuth } from '@/hooks/useAuth';
 import { clearStoredVibe, getStoredVibe, inferUserVibe, saveStoredVibe, shouldClearStoredVibe } from '@/lib/bobby-vibe';
 import { ResponsiveContainer, AreaChart, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
+import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 // ---- Supabase ----
 
-const SB_URL = import.meta.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+const SB_URL = BOBBY_DB_URL;
+const SB_KEY = BOBBY_DB_ANON || BOBBY_DB_ANON;
 
 interface DBMessage {
   id: string;
@@ -2171,8 +2172,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         // Gemini: Temporal memory — inject last 5 debate summaries for coherence
         // Bobby needs to know what he said recently to avoid contradictions
         try {
-          const SB_URL = import.meta.env.VITE_SUPABASE_URL;
-          const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+          const SB_URL = BOBBY_DB_URL;
+          const SB_KEY = BOBBY_DB_ANON;
           if (SB_URL && SB_KEY) {
             const recentRes = await fetch(
               `${SB_URL}/rest/v1/forum_threads?select=topic,symbol,direction,conviction_score,created_at,status&order=created_at.desc&limit=5`,
@@ -2784,8 +2785,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
   const [latestPersonalDebate, setLatestPersonalDebate] = useState<{ topic: string; conviction: number; symbol: string } | null>(null);
   useEffect(() => {
     if (!address || advisorName === 'Bobby') return;
-    const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
-    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+    const SB = BOBBY_DB_URL;
+    const KEY = BOBBY_DB_ANON;
     fetch(`${SB}/rest/v1/forum_threads?scope=eq.private&owner_wallet=eq.${address.toLowerCase()}&order=created_at.desc&limit=1&select=id,topic,conviction_score,symbol`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
     }).then(r => r.json()).then(d => {
@@ -3154,8 +3155,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             const token = crypto.randomUUID().slice(0, 12);
             // Save pending connection to Supabase
             try {
-              const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
-              const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+              const SB = BOBBY_DB_URL;
+              const KEY = BOBBY_DB_ANON;
               const agentProfile = localStorage.getItem('agent_profile');
               const profileId = agentProfile ? JSON.parse(agentProfile).id : null;
               await fetch(`${SB}/rest/v1/telegram_connections`, {

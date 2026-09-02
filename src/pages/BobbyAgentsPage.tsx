@@ -8,6 +8,7 @@ import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import KineticShell from '@/components/kinetic/KineticShell';
 import { useTradingRoom } from '@/hooks/useTradingRoom';
+import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 export default function BobbyAgentsPage() {
   const { profile, profileId, hasAgent, roomMode, accentColor, accentBg, accentBorder, accentGlow } = useTradingRoom();
@@ -23,8 +24,8 @@ export default function BobbyAgentsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
-    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+    const SB = BOBBY_DB_URL;
+    const KEY = BOBBY_DB_ANON;
     const headers = { apikey: KEY, Authorization: `Bearer ${KEY}` };
     // Fetch debates: personal if agent exists, global otherwise
     const debateFilter = roomMode === 'personal' && profileId

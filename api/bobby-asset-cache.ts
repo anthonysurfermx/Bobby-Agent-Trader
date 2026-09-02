@@ -5,13 +5,14 @@ import {
 } from '../src/lib/okx-asset-technical.js';
 import { resolveOkxInstrument, type OkxAssetInstrument } from '../src/lib/okx-asset-search.js';
 import { requireInternalAuth } from './_lib/request-security.js';
+import { bobbyAnonKey, bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 15 };
 
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
-  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
-const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_KEY || SB_ANON_KEY;
+const SB_URL = bobbyDbUrl();
+const SB_ANON_KEY = bobbyAnonKey()
+  || bobbyAnonKey();
+const SB_WRITE_KEY = bobbyServiceKey() || SB_ANON_KEY;
 
 const memoryCache = new Map<string, any>();
 

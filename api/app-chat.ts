@@ -10,6 +10,7 @@ import { getCache, setCache } from './_lib/api-cache.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIpKey } from './_lib/rate-limit.js';
 import { matchAssetInText, normalizeAssetSymbol } from '../src/lib/voice-assets.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 30 };
 
@@ -118,7 +119,7 @@ ${JSON.stringify(args.market)}`;
 }
 
 function canUsePersistentLimits(): boolean {
-  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(bobbyDbUrl() && bobbyServiceKey());
 }
 
 function opaqueQuotaId(value: string): string {

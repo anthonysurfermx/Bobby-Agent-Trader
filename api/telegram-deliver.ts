@@ -9,11 +9,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { tgSendVoiceAnalysis } from './_lib/telegram.js';
 import { requireInternalAuth } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 60 };
 
-const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_SERVICE_KEY = bobbyServiceKey();
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const BASE_URL = 'https://defimexico.org';
 

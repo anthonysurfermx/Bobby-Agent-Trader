@@ -14,13 +14,14 @@ import { runDmAnalysis } from './_lib/dm-analysis.js';
 import { resolveBot } from './_lib/telegram-bots.js';
 import { getChartImage } from './_lib/chart.js';
 import { okxButtonText } from './_lib/okx-link.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 // Higher budget: DM voice analysis (OKX fetch + LLM + TTS) runs in waitUntil
 // after we ack Telegram, so the function must stay warm long enough.
 export const config = { maxDuration: 30 };
 
-const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_SERVICE_KEY = bobbyServiceKey();
 const BASE_URL = 'https://bobbyprotocol.xyz';
 
 // Voice delivery is handled by the unified TTS layer (api/_lib/tts.ts +

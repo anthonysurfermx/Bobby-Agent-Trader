@@ -6,11 +6,12 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 10 };
 
-const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
+const SB_URL = bobbyDbUrl() || '';
+const SB_KEY = bobbyServiceKey();
 
 async function sbQuery(path: string) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {

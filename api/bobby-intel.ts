@@ -17,6 +17,7 @@ export const config = { maxDuration: 30 };
 
 import { createLimiter, getClientIpKey } from './_lib/rate-limit.js';
 import { getCache, setCache } from './_lib/api-cache.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 // Full-snapshot TTL: a cache hit answers from one Supabase read instead
 // of fanning out to 18 external sources. 5 min is fresh enough for a
@@ -402,8 +403,8 @@ async function collectPolymarketIntelligence(): Promise<SmartMoneyConsensus[]> {
 
 // ---- Supabase: Recent Cycles (performance history) ----
 async function fetchRecentCycles(limit = 5): Promise<CycleRecord[]> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   if (!url || !key) return [];
 
   try {
@@ -459,8 +460,8 @@ interface CalibrationData {
 }
 
 async function fetchCalibrationCurve(): Promise<CalibrationData> {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = bobbyDbUrl();
+  const key = bobbyServiceKey();
   const defaultData: CalibrationData = {
     curve: [], calibrationError: 0, isOverconfident: false, adjustment: 1.0, sampleSize: 0, breakEvenCount: 0,
   };

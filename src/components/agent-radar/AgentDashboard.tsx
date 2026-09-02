@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 import {
   Bot, Activity, TrendingUp, TrendingDown, Shield, Clock, Zap,
   Brain, Target, AlertCircle, CheckCircle, FlaskConical, ChevronDown,
@@ -71,8 +72,8 @@ interface AgentMessage {
 
 // ---- Supabase ----
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+const SUPABASE_URL = BOBBY_DB_URL;
+const SUPABASE_KEY = BOBBY_DB_ANON || BOBBY_DB_ANON;
 
 async function fetchSupabase<T>(path: string): Promise<T[]> {
   if (!SUPABASE_URL || !SUPABASE_KEY) return [];

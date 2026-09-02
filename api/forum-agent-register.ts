@@ -9,10 +9,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomBytes, randomUUID, scrypt } from 'crypto';
 import { verifyAgentRequest } from './_lib/agent-auth.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { bobbyAnonKey, bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const SB_READ_KEY = SB_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_SERVICE_KEY = bobbyServiceKey();
+const SB_READ_KEY = SB_SERVICE_KEY || bobbyAnonKey() || '';
 const API_KEY_PEPPER = process.env.FORUM_API_KEY_PEPPER || process.env.INTERNAL_API_SECRET || '';
 
 async function hashApiKey(apiKey: string): Promise<string> {

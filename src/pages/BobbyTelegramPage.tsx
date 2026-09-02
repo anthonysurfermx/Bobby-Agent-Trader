@@ -13,6 +13,7 @@ import { parseUnits } from 'viem';
 import { useAppKit } from '@reown/appkit/react';
 import { Check, Loader2, AlertTriangle } from 'lucide-react';
 import KineticShell from '@/components/kinetic/KineticShell';
+import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 // Payment config — X Layer (Chain 196)
 // Bobby treasury wallet (NOT the user's wallet)
@@ -101,8 +102,8 @@ export default function BobbyTelegramPage() {
         }
       })
       .catch(() => {});
-    const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
-    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+    const SB = BOBBY_DB_URL;
+    const KEY = BOBBY_DB_ANON;
     fetch(`${SB}/rest/v1/telegram_groups?telegram_group_id=eq.${activateGroupId}&select=telegram_group_name,bot_status`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
     }).then(r => r.json()).then(d => {

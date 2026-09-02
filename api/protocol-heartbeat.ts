@@ -6,6 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Interface, formatEther } from 'ethers';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -23,8 +24,8 @@ export const config = { maxDuration: 25 };
 
 const XLAYER_RPC = XLAYER_RPC_FALLBACK_URL;
 const XLAYER_RPC_FALLBACK = XLAYER_RPC_URL;
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyReadKey();
 
 const AGENT_ECONOMY = BOBBY_AGENT_ECONOMY;
 const BOUNTIES = BOBBY_ADVERSARIAL_BOUNTIES;

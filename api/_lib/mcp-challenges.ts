@@ -1,11 +1,12 @@
+import { bobbyDbUrl, bobbyServiceKey } from './bobby-db.js';
 /**
  * MCP Payment Challenge Manager
  * Handles creation, atomic consumption, and expiry of payment challenges.
  * Uses Supabase with atomic UPDATE to prevent double fulfillment (Codex R1 P0).
  */
 
-const SB_URL = process.env.SB_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SB_URL = bobbyDbUrl() || '';
+const SB_KEY = bobbyServiceKey();
 
 interface Challenge {
   challenge_id: string;

@@ -7,11 +7,12 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
+import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 15 };
 
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyReadKey();
 
 async function sbQuery(table: string, query: string): Promise<unknown[]> {
   try {

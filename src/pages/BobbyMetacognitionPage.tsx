@@ -20,11 +20,12 @@ import {
 import { Brain, AlertTriangle, Activity, Shield, TrendingDown } from 'lucide-react';
 import KineticShell from '@/components/kinetic/KineticShell';
 import { AIInsightsTerminal } from '@/components/agentic/AIInsightsTerminal';
+import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 // ---- Supabase direct (same pattern as BobbyChallengePage) ----
-const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
+const SB = BOBBY_DB_URL;
 const KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+  BOBBY_DB_ANON;
 const SB_HEADERS = { apikey: KEY, Authorization: `Bearer ${KEY}` };
 
 // ---- Types ----

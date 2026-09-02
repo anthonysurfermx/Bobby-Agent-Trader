@@ -6,11 +6,12 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireInternalAuth } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 10 };
 
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_SERVICE_KEY = bobbyServiceKey() || '';
 
 const MIGRATION_SQL = `
 CREATE TABLE IF NOT EXISTS agent_events (

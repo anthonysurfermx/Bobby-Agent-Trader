@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Crosshair, BarChart3, Swords } from 'lucide-react';
 import { BOBBY_BASE_MAINNET, bobbyBaseAddressUrl } from '@/config/chains';
+import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 export default function AgenticWorldPage() {
   // Fetch real stats
@@ -31,8 +32,8 @@ export default function AgenticWorldPage() {
       .catch(() => {});
 
     // Fetch debate count
-    const SB = 'https://egpixaunlnzauztbrnuz.supabase.co';
-    const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4';
+    const SB = BOBBY_DB_URL;
+    const KEY = BOBBY_DB_ANON;
     fetch(`${SB}/rest/v1/forum_threads?select=id`, { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } })
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setStats(prev => ({ ...prev, debates: d.length })); })

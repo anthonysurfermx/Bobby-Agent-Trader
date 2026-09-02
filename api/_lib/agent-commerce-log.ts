@@ -1,9 +1,7 @@
-const SB_URL = process.env.SUPABASE_URL
-  || process.env.VITE_SUPABASE_URL
-  || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
-  || process.env.SUPABASE_SERVICE_KEY
-  || process.env.VITE_SUPABASE_ANON_KEY
+import { bobbyAnonKey, bobbyDbUrl, bobbyServiceKeyOptional } from './bobby-db.js';
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyServiceKeyOptional()
+  || bobbyAnonKey()
   || '';
 
 function hasSupabaseConfig() {

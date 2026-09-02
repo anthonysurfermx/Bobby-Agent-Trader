@@ -7,10 +7,11 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireInternalAuth } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const SB_URL = process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_SERVICE_KEY = bobbyServiceKey();
 
 // Model mapping: Anthropic → OpenAI
 const OPENAI_MODEL_MAP: Record<string, string> = {

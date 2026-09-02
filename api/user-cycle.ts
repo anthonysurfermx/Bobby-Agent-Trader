@@ -19,12 +19,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { internalAuthHeaders, requireInternalAuth } from './_lib/request-security.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 120 };
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_SERVICE_KEY = bobbyServiceKey();
 const HAIKU_MODEL = 'gpt-4o-mini';
 
 const PERSONALITY_INSTRUCTIONS: Record<string, string> = {

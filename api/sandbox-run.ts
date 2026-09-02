@@ -10,14 +10,15 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHash } from 'crypto';
 import { PLAYBOOKS, type Playbook } from '../src/data/playbooks.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 180 };
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = 'gpt-4o-mini';
 const OKX_BASE = 'https://www.okx.com';
-const SB_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://egpixaunlnzauztbrnuz.supabase.co';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SB_URL = bobbyDbUrl();
+const SB_KEY = bobbyServiceKey();
 const BOBBY_INTEL_BASE = process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprotocol.xyz';
 
 // ── Rate limit (soft, best-effort) ─────────────────────────

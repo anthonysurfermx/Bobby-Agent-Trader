@@ -8,12 +8,13 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 60, memory: 512 };
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const SB_URL = process.env.SB_URL || process.env.SUPABASE_URL || '';
-const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SB_URL = bobbyDbUrl() || '';
+const SB_KEY = bobbyServiceKey();
 
 // Dimension weights from ai-judge-manifest.json
 const DIMENSIONS = {
