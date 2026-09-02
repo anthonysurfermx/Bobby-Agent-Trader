@@ -17,6 +17,7 @@ import {
 } from 'viem';
 import { base } from 'viem/chains';
 import { B20_ALLOWLIST, B20_LIMITS, BASE_USDC, findB20, type B20Listing } from '../../src/lib/b20/allowlist.js';
+import { verifyB20Attestation } from './b20-attestation.js';
 
 /** Aerodrome Slipstream, "Gauges V3" deployment — the factory that owns every
  *  B20/USDC pool at launch (verified on-chain: pool.factory() == this). */
@@ -50,6 +51,14 @@ const FEED_ABI = parseAbi([
 
 const QUOTER_ABI = parseAbi([
   'function quoteExactInputSingle((address tokenIn, address tokenOut, uint256 amountIn, int24 tickSpacing, uint160 sqrtPriceLimitX96) params) returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)',
+]);
+
+const FACTORY_ABI = parseAbi([
+  'function getPool(address tokenA, address tokenB, int24 tickSpacing) view returns (address)',
+]);
+
+const TRANSFER_ABI = parseAbi([
+  'function transfer(address to, uint256 amount) returns (bool)',
 ]);
 
 const ROUTER_ABI = parseAbi([
@@ -91,6 +100,8 @@ export interface B20Status {
   /** Transfer-level pause (feature 0). When true nothing can move. */
   transferPaused: boolean;
   reference: B20Reference;
+  /** Names of on-chain reads that failed. Any failure means: no calldata. */
+  failedReads: string[];
 }
 
 export async function getB20Status(listing: B20Listing): Promise<B20Status> {
@@ -109,6 +120,8 @@ export async function getB20Status(listing: B20Listing): Promise<B20Status> {
     ] as const,
   });
   const val = <T,>(i: number): T | null => (results[i].status === 'success' ? (results[i].result as T) : null);
+  const readNames = ['token.decimals', 'token.multiplier', 'token.pausedFeatures', 'token.isPaused', 'feed.latestRoundData', 'feed.decimals'];
+  const failedReads = readNames.filter((_, i) => results[i].status !== 'success');
 
   const decimals = val<number>(0) ?? 8;
   const multiplierRaw = val<bigint>(1);
@@ -138,6 +151,7 @@ export async function getB20Status(listing: B20Listing): Promise<B20Status> {
       stale: price === null || ageSec === null || ageSec > B20_LIMITS.maxFeedAgeSec,
       feed,
     },
+    failedReads,
   };
 }
 
@@ -151,8 +165,8 @@ export interface B20QuoteInput {
   slippagePct?: number;
   /** Wallet that receives the output and signs. Required for calldata. */
   recipient?: string;
-  /** True once the human attested eligibility in the UI; enforced with geo below. */
-  attested?: boolean;
+  /** EIP-712 attestation signed by `recipient` (see b20-attestation.ts). Required for calldata. */
+  attestation?: unknown;
   /** ISO country from the edge (`x-vercel-ip-country`), for the US exclusion. */
   country?: string | null;
 }
@@ -160,6 +174,8 @@ export interface B20QuoteInput {
 export interface B20Quote {
   token: B20Status;
   side: B20Side;
+  /** Wallet the calldata was built for; the client must re-quote if it changes. */
+  recipient: Address | null;
   amountIn: string;
   amountInRaw: string;
   amountOut: string;
@@ -212,6 +228,7 @@ export async function quoteB20(input: B20QuoteInput): Promise<B20Quote> {
   if (input.side === 'buy' && input.amount > B20_LIMITS.maxTicketUsdc) txWithheld.push(`ticket above the ${B20_LIMITS.maxTicketUsdc} USDC demo limit`);
   if (input.side === 'buy' && input.amount < B20_LIMITS.minTicketUsdc) txWithheld.push(`ticket below the ${B20_LIMITS.minTicketUsdc} USDC minimum`);
   if (input.side === 'sell' && usdValue > B20_LIMITS.maxTicketUsdc) txWithheld.push(`ticket above the ${B20_LIMITS.maxTicketUsdc} USDC demo limit`);
+  if (input.side === 'sell' && (status.reference.price === null || usdValue < B20_LIMITS.minTicketUsdc)) txWithheld.push(`ticket below the ${B20_LIMITS.minTicketUsdc} USDC minimum`);
 
   const sim = await c.simulateContract({
     address: AERODROME_SLIPSTREAM.quoter,
@@ -230,7 +247,10 @@ export async function quoteB20(input: B20QuoteInput): Promise<B20Quote> {
   const ref = status.reference.price;
   const deviationPct = ref ? ((executionPrice - ref) / ref) * 100 * (input.side === 'buy' ? 1 : -1) : null;
 
-  if (status.reference.stale) warnings.push('Chainlink reference is stale (market closed or corporate action); DEX price is the only live number');
+  // Fail closed. A risk read that did not happen is not a pass, and a stale
+  // reference is not a reference (Base: apply staleness bounds before use).
+  if (status.failedReads.length) txWithheld.push(`on-chain risk read failed: ${status.failedReads.join(', ')}`);
+  if (status.reference.stale) txWithheld.push('Chainlink reference is stale (market closed or corporate action); calldata resumes when the feed updates');
   if (deviationPct !== null && Math.abs(deviationPct) > B20_LIMITS.maxOracleDeviationPct) {
     txWithheld.push(`DEX price is ${deviationPct.toFixed(2)}% from the Chainlink reference (limit ${B20_LIMITS.maxOracleDeviationPct}%)`);
   }
@@ -239,9 +259,22 @@ export async function quoteB20(input: B20QuoteInput): Promise<B20Quote> {
   else if (status.pausedFeatures !== '0') warnings.push('issuer has paused some token features (mint/redeem side); secondary trading still open');
   if (status.multiplier !== 1) warnings.push(`multiplier is ${status.multiplier}: one token is ${status.multiplier} shares`);
 
-  if (input.country && input.country.toUpperCase() === 'US') txWithheld.push('Coinbase tokenized stocks are not available to US persons');
-  if (!input.attested) txWithheld.push('eligibility attestation required');
+  if (!input.country) txWithheld.push('viewer country unavailable; cannot confirm eligibility');
+  else if (input.country.toUpperCase() === 'US') txWithheld.push('Coinbase tokenized stocks are not available to US persons');
   if (!isAddress(input.recipient)) txWithheld.push('recipient wallet required');
+  else {
+    const verdict = await verifyB20Attestation(input.attestation, { wallet: input.recipient, country: input.country ?? null });
+    txWithheld.push(...verdict.reasons);
+  }
+
+  // B20 policies gate transfers, not approve(): a blocked wallet could pay for
+  // an approval it can never use. Prove the transfer path with an eth_call
+  // before returning any approval — against the pool for buys (can the wallet
+  // receive?) and from the wallet for sells (can it send?).
+  if (isAddress(input.recipient) && txWithheld.length === 0) {
+    const policyReason = await transferPolicyReason(status.address, input.recipient, input.side, amountInRaw);
+    if (policyReason) txWithheld.push(policyReason);
+  }
 
   const minAmountOutRaw = (amountOutRaw * BigInt(Math.round((100 - slippagePct) * 1000))) / 100_000n;
   const deadline = Math.floor(Date.now() / 1000) + 20 * 60;
@@ -282,9 +315,13 @@ export async function quoteB20(input: B20QuoteInput): Promise<B20Quote> {
     };
   }
 
+  // Several guards can name the same problem; the human reads each once.
+  const withheld = Array.from(new Set(txWithheld));
+
   return {
     token: status,
     side: input.side,
+    recipient: isAddress(input.recipient) ? input.recipient : null,
     amountIn: input.amount.toString(),
     amountInRaw: amountInRaw.toString(),
     amountOut: amountOut.toString(),
@@ -297,10 +334,36 @@ export async function quoteB20(input: B20QuoteInput): Promise<B20Quote> {
     slippagePct,
     venue: { name: 'Aerodrome Slipstream', router: AERODROME_SLIPSTREAM.router, quoter: AERODROME_SLIPSTREAM.quoter, tickSpacing: AERODROME_SLIPSTREAM.tickSpacing },
     tx,
-    txWithheld,
+    txWithheld: withheld,
     warnings,
     limits: B20_LIMITS,
   };
+}
+
+/**
+ * Returns a withhold reason when the issuer policy (or a missing balance) would
+ * make the swap's transfer leg revert; null when the transfer path simulates.
+ */
+async function transferPolicyReason(token: Address, wallet: Address, side: B20Side, amountInRaw: bigint): Promise<string | null> {
+  const c = baseClient();
+  const pool = await c
+    .readContract({ address: AERODROME_SLIPSTREAM.factory, abi: FACTORY_ABI, functionName: 'getPool', args: [BASE_USDC as Address, token, AERODROME_SLIPSTREAM.tickSpacing] })
+    .catch(() => null);
+  if (!pool || pool === '0x0000000000000000000000000000000000000000') return 'no Aerodrome pool for this token';
+  try {
+    if (side === 'buy') {
+      // Can the wallet RECEIVE the token? The pool is the sender in a real swap.
+      await c.simulateContract({ address: token, abi: TRANSFER_ABI, functionName: 'transfer', args: [wallet, 1n], account: pool });
+    } else {
+      const balance = await c.readContract({ address: token, abi: ERC20_ABI, functionName: 'balanceOf', args: [wallet] });
+      if (balance < amountInRaw) return 'wallet balance is below the amount to sell';
+      // Can the wallet SEND the token to the pool?
+      await c.simulateContract({ address: token, abi: TRANSFER_ABI, functionName: 'transfer', args: [pool, 1n], account: wallet });
+    }
+    return null;
+  } catch {
+    return 'issuer policy blocks this wallet for this token (transfer simulation reverted)';
+  }
 }
 
 /** Featured board: status + a 100 USDC indicative quote per token. */
@@ -309,7 +372,7 @@ export async function listB20(sampleUsdc = 100) {
   const rows = await Promise.all(
     featured.map(async (listing) => {
       try {
-        const q = await quoteB20({ token: listing.symbol, amount: sampleUsdc, side: 'buy', attested: false });
+        const q = await quoteB20({ token: listing.symbol, amount: sampleUsdc, side: 'buy' });
         return {
           ...q.token,
           dexPrice: q.executionPrice,

@@ -107,12 +107,26 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title="Tokenized stocks on the website">
+          <p>
+            The web page at /base/stocks can prepare a token swap on the Base network for you to
+            review and sign in your own wallet. To build that transaction our quote endpoint
+            receives your wallet address and a short eligibility statement you sign with it; both
+            are used for that request only and are not kept beyond standard, short-lived server
+            logs. Your keys never leave your wallet, Bobby never signs, holds or moves funds, and
+            nothing is executed unless you approve it in your wallet. The iOS app has no such
+            feature and never sends a wallet address.
+          </p>
+        </Section>
+
         <Section title="What Bobby is not">
           <p>
             Bobby is an educational market-analysis companion. It does not execute trades, hold
             funds or keys, connect to your exchange accounts, or give personalized investment
-            advice. Because there are no financial accounts, we never ask for — and cannot
-            receive — financial credentials.
+            advice. The website can prepare a transaction for your own wallet to sign
+            (non-custodial, user-signed execution); Bobby itself never executes anything.
+            Because there are no financial accounts, we never ask for — and cannot receive —
+            financial credentials.
           </p>
         </Section>
 

@@ -3,18 +3,19 @@
 // The desk debates the underlying (Alpha / Red Team / CIO), the human decides,
 // and if they want exposure the page prepares a USDC ⇄ B20 swap on Aerodrome
 // that THEY sign in their own wallet. Bobby never holds keys or funds. Every
-// guard (allowlist, ticket cap, oracle deviation, pause flags, US exclusion)
-// lives server-side in /api/b20-quote; this page only renders its verdict.
+// guard (allowlist, ticket cap, oracle deviation and staleness, pause flags,
+// transfer-policy simulation, US exclusion, signed eligibility) lives
+// server-side in /api/b20-quote; this page only renders its verdict.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
-import { useAccount, useSendTransaction, useSwitchChain, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
+import { useAccount, useSendTransaction, useSignTypedData, useSwitchChain, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import type { Hex } from 'viem';
 import KineticShell from '@/components/kinetic/KineticShell';
 
 const BASE_CHAIN_ID = 8453;
-const ATTEST_KEY = 'bobby.b20.attested';
+const ATTESTATION_KEY = 'bobby.b20.attestation';
 
 interface TokenRow {
   address: string;
@@ -25,15 +26,28 @@ interface TokenRow {
   multiplier?: number;
   pausedFeatures?: string;
   transferPaused?: boolean;
+  failedReads?: string[];
   reference?: { price: number | null; ageSec: number | null; stale: boolean };
   dexPrice: number | null;
   deviationPct: number | null;
   warnings: string[];
 }
 
+interface AttestationSpec {
+  termsVersion: number;
+  domain: { name: string; version: string; chainId: number };
+  types: { Attestation: { name: string; type: string }[] };
+}
+
+interface SignedAttestation {
+  message: { wallet: string; termsVersion: number; notUsPerson: boolean; country: string; issuedAt: number; expiresAt: number };
+  signature: string;
+}
+
 interface Quote {
   token: TokenRow;
   side: 'buy' | 'sell';
+  recipient: string | null;
   amountIn: string;
   amountOut: string;
   minAmountOut: string;
@@ -69,11 +83,27 @@ type Step = 'idle' | 'quoting' | 'quoted' | 'approving' | 'swapping' | 'done' | 
 
 const fmt = (n: number | null | undefined, d = 2) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d }));
 
+function loadAttestation(): SignedAttestation | null {
+  try {
+    const raw = localStorage.getItem(ATTESTATION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SignedAttestation;
+    if (!parsed?.message?.expiresAt || parsed.message.expiresAt <= Math.floor(Date.now() / 1000)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export default function TokenizedStocksPage() {
   const [rows, setRows] = useState<TokenRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [attested, setAttested] = useState(false);
+  const [viewerCountry, setViewerCountry] = useState<string | null>(null);
+  const [spec, setSpec] = useState<AttestationSpec | null>(null);
+  const [checks, setChecks] = useState<[boolean, boolean, boolean]>([false, false, false]);
+  const [attestation, setAttestation] = useState<SignedAttestation | null>(null);
+  const [signing, setSigning] = useState(false);
   const [selected, setSelected] = useState<string>('NVDAc');
   const [side, setSide] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState('100');
@@ -88,12 +118,27 @@ export default function TokenizedStocksPage() {
   const { open: openWallet } = useAppKit();
   const { switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
+  const { signTypedDataAsync } = useSignTypedData();
   const publicClient = usePublicClient({ chainId: BASE_CHAIN_ID });
   const receipt = useWaitForTransactionReceipt({ hash: txHash, chainId: BASE_CHAIN_ID });
 
+  useEffect(() => { setAttestation(loadAttestation()); }, []);
+
+  // The attestation is bound to a wallet. A different wallet means a new
+  // signature, and any quote built for the old recipient is dead.
   useEffect(() => {
-    try { setAttested(localStorage.getItem(ATTEST_KEY) === '1'); } catch { /* private mode */ }
-  }, []);
+    setQuote(null);
+    setStep('idle');
+    setTxHash(undefined);
+    setStepError(null);
+  }, [address]);
+
+  const attestationValid = useMemo(() => {
+    if (!attestation || !address) return false;
+    return attestation.message.wallet.toLowerCase() === address.toLowerCase()
+      && attestation.message.expiresAt > Math.floor(Date.now() / 1000)
+      && (!spec || attestation.message.termsVersion === spec.termsVersion);
+  }, [attestation, address, spec]);
 
   const loadBoard = useCallback(async () => {
     setLoading(true);
@@ -103,6 +148,8 @@ export default function TokenizedStocksPage() {
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || `board ${res.status}`);
       setRows(data.tokens as TokenRow[]);
+      setViewerCountry(data.viewerCountry ?? null);
+      setSpec(data.attestation ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'board unavailable');
     } finally {
@@ -113,6 +160,31 @@ export default function TokenizedStocksPage() {
   useEffect(() => { void loadBoard(); }, [loadBoard]);
 
   const current = useMemo(() => rows.find((r) => r.symbol === selected) ?? rows[0], [rows, selected]);
+  const allChecked = checks.every(Boolean);
+
+  const signAttestation = useCallback(async () => {
+    if (!address || !spec || !viewerCountry) return;
+    setSigning(true);
+    setStepError(null);
+    try {
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const message = { wallet: address, termsVersion: spec.termsVersion, notUsPerson: true, country: viewerCountry, issuedAt, expiresAt: issuedAt + 24 * 3600 };
+      const signature = await signTypedDataAsync({
+        account: address,
+        domain: spec.domain,
+        types: spec.types,
+        primaryType: 'Attestation',
+        message: { ...message, termsVersion: BigInt(message.termsVersion), issuedAt: BigInt(message.issuedAt), expiresAt: BigInt(message.expiresAt) },
+      });
+      const signed: SignedAttestation = { message, signature };
+      try { localStorage.setItem(ATTESTATION_KEY, JSON.stringify(signed)); } catch { /* private mode */ }
+      setAttestation(signed);
+    } catch (e) {
+      setStepError(e instanceof Error ? e.message.split('\n')[0].slice(0, 200) : 'signature rejected');
+    } finally {
+      setSigning(false);
+    }
+  }, [address, spec, viewerCountry, signTypedDataAsync]);
 
   const askDesk = useCallback(async (row: TokenRow) => {
     setDebates((d) => ({ ...d, [row.symbol]: { loading: true } }));
@@ -137,10 +209,18 @@ export default function TokenizedStocksPage() {
     setQuote(null);
     setTxHash(undefined);
     try {
-      const params = new URLSearchParams({ token: current.symbol, amount, side, slippage });
-      if (address) params.set('recipient', address);
-      if (attested) params.set('attest', '1');
-      const res = await fetch(`/api/b20-quote?${params}`);
+      const res = await fetch('/api/b20-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: current.symbol,
+          amount,
+          side,
+          slippage,
+          recipient: address ?? undefined,
+          attestation: attestationValid ? attestation : undefined,
+        }),
+      });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || `quote ${res.status}`);
       setQuote(data as Quote);
@@ -149,7 +229,7 @@ export default function TokenizedStocksPage() {
       setStepError(e instanceof Error ? e.message : 'quote failed');
       setStep('error');
     }
-  }, [current, amount, side, slippage, address, attested]);
+  }, [current, amount, side, slippage, address, attestation, attestationValid]);
 
   const ensureBase = useCallback(async () => {
     if (chain?.id !== BASE_CHAIN_ID) await switchChainAsync({ chainId: BASE_CHAIN_ID });
@@ -158,6 +238,14 @@ export default function TokenizedStocksPage() {
   const signSwap = useCallback(async () => {
     if (!quote?.tx || !address || !publicClient) return;
     setStepError(null);
+    // The calldata names a recipient. If the connected wallet is not that
+    // wallet, nothing is signed — re-quote instead.
+    if (!quote.recipient || quote.recipient.toLowerCase() !== address.toLowerCase()) {
+      setStepError('Wallet changed since this quote. Get a new quote for the connected wallet.');
+      setStep('error');
+      setQuote(null);
+      return;
+    }
     try {
       await ensureBase();
       if (quote.tx.approve) {
@@ -179,10 +267,11 @@ export default function TokenizedStocksPage() {
     }
   }, [quote, address, publicClient, ensureBase, sendTransactionAsync]);
 
-  const attest = () => {
-    try { localStorage.setItem(ATTEST_KEY, '1'); } catch { /* ignore */ }
-    setAttested(true);
-  };
+  const eligibilityStatements = [
+    'I am not a US person and I am not located in the United States.',
+    "I am eligible to hold these tokens in my jurisdiction and I have read the issuer's terms.",
+    'I understand Bobby prepares transactions and never executes, holds, or custodies anything.',
+  ];
 
   return (
     <KineticShell minimalNav>
@@ -198,24 +287,57 @@ export default function TokenizedStocksPage() {
           </p>
         </motion.header>
 
-        {!attested && (
-          <section className="bg-white/[0.02] border border-amber-400/30 rounded-xl p-5 space-y-3">
-            <div className="text-amber-300 font-mono text-xs tracking-widest">ELIGIBILITY</div>
-            <p className="text-sm text-white/75">
-              Coinbase tokenized stocks are offered under Regulation S and are <span className="text-white">not available to US persons</span> or in
-              restricted jurisdictions. Quotes are informational for everyone; swap calldata is only prepared after you confirm the statements below.
-              This is analysis, not advice. You decide and you own the risk.
+        <section className={`rounded-xl p-5 space-y-3 border ${attestationValid ? 'bg-green-400/[0.04] border-green-400/30' : 'bg-white/[0.02] border-amber-400/30'}`}>
+          <div className="flex items-center justify-between">
+            <div className={`font-mono text-xs tracking-widest ${attestationValid ? 'text-green-300' : 'text-amber-300'}`}>
+              {attestationValid ? 'ELIGIBILITY · SIGNED BY YOUR WALLET' : 'ELIGIBILITY'}
+            </div>
+            <div className="text-[11px] font-mono text-white/40">
+              {viewerCountry ? `connection: ${viewerCountry}` : 'connection country unknown'}
+            </div>
+          </div>
+          {attestationValid && attestation ? (
+            <p className="text-sm text-white/70">
+              Signed by {attestation.message.wallet.slice(0, 6)}…{attestation.message.wallet.slice(-4)} for {attestation.message.country}, valid until{' '}
+              {new Date(attestation.message.expiresAt * 1000).toLocaleString()}. Quotes are informational; calldata is prepared only while this statement is valid.
             </p>
-            <ul className="text-sm text-white/70 list-disc pl-5 space-y-1">
-              <li>I am not a US person and I am not located in the United States.</li>
-              <li>I am eligible to hold these tokens in my jurisdiction and I have read the issuer's terms.</li>
-              <li>I understand Bobby prepares transactions and never executes, holds, or custodies anything.</li>
-            </ul>
-            <button onClick={attest} className="px-4 py-2 rounded-lg bg-amber-400/15 border border-amber-400/40 text-amber-200 text-sm hover:bg-amber-400/25 transition">
-              I confirm all three
-            </button>
-          </section>
-        )}
+          ) : (
+            <>
+              <p className="text-sm text-white/75">
+                Coinbase tokenized stocks are offered under Regulation S and are <span className="text-white">not available to US persons</span> or in
+                restricted jurisdictions. Quotes are informational for everyone. Swap calldata is prepared only after your wallet signs the three
+                statements below (an EIP-712 message, no gas, valid 24 hours, tied to this wallet and this connection's country). This is analysis, not advice.
+              </p>
+              <ul className="space-y-2">
+                {eligibilityStatements.map((text, i) => (
+                  <li key={text}>
+                    <button
+                      onClick={() => setChecks((c) => { const n = [...c] as [boolean, boolean, boolean]; n[i] = !n[i]; return n; })}
+                      className="flex items-start gap-3 text-left text-sm text-white/75"
+                    >
+                      <span className={`mt-0.5 h-4 w-4 rounded border flex-shrink-0 ${checks[i] ? 'bg-green-400 border-green-400' : 'border-white/30'}`} />
+                      <span>{text}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {viewerCountry?.toUpperCase() === 'US' && (
+                <div className="text-xs text-red-300 font-mono">This connection is in the United States. Quotes stay informational; no calldata will be prepared.</div>
+              )}
+              {!isConnected ? (
+                <button onClick={() => openWallet()} className="px-4 py-2 rounded-lg bg-green-400 text-black text-sm font-semibold">Connect wallet to sign</button>
+              ) : (
+                <button
+                  onClick={() => void signAttestation()}
+                  disabled={!allChecked || signing || !viewerCountry || viewerCountry.toUpperCase() === 'US'}
+                  className="px-4 py-2 rounded-lg bg-amber-400/15 border border-amber-400/40 text-amber-200 text-sm hover:bg-amber-400/25 transition disabled:opacity-40"
+                >
+                  {signing ? 'Check your wallet…' : 'Sign the three statements with my wallet'}
+                </button>
+              )}
+            </>
+          )}
+        </section>
 
         {error && <div className="text-red-400 text-sm font-mono">{error}</div>}
 
@@ -225,6 +347,7 @@ export default function TokenizedStocksPage() {
             const active = current?.symbol === row.symbol;
             const debate = debates[row.symbol];
             const pulse = debate?.data?.technical_pulse;
+            const live = !row.transferPaused && !row.reference?.stale && !(row.failedReads?.length);
             return (
               <motion.div
                 key={row.address}
@@ -251,8 +374,9 @@ export default function TokenizedStocksPage() {
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {row.transferPaused && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-500/30">TRANSFERS PAUSED</span>}
-                  {row.reference?.stale && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/30">FEED STALE</span>}
-                  {!row.transferPaused && !row.reference?.stale && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-400/10 text-green-300 border border-green-400/30">LIVE</span>}
+                  {row.reference?.stale && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/30">FEED STALE · NO CALLDATA</span>}
+                  {!!row.failedReads?.length && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-300 border border-red-500/30">RISK READ FAILED</span>}
+                  {live && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-400/10 text-green-300 border border-green-400/30">LIVE</span>}
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); void askDesk(row); }}
@@ -290,7 +414,7 @@ export default function TokenizedStocksPage() {
               {!isConnected ? (
                 <button onClick={() => openWallet()} className="text-xs px-3 py-1.5 rounded-lg bg-green-400 text-black font-semibold">Connect wallet</button>
               ) : (
-                <div className="text-xs font-mono text-white/60">{address?.slice(0, 6)}…{address?.slice(-4)} · {chain?.id === BASE_CHAIN_ID ? 'Base' : `switch to Base`}</div>
+                <div className="text-xs font-mono text-white/60">{address?.slice(0, 6)}…{address?.slice(-4)} · {chain?.id === BASE_CHAIN_ID ? 'Base' : 'switch to Base'}</div>
               )}
             </div>
 
@@ -346,7 +470,9 @@ export default function TokenizedStocksPage() {
                     >
                       {step === 'approving' ? 'APPROVE IN WALLET…' : step === 'swapping' ? 'SIGN SWAP IN WALLET…' : quote.tx.approve ? 'APPROVE + SWAP IN MY WALLET' : 'SWAP IN MY WALLET'}
                     </button>
-                    <span className="text-[11px] text-white/40 font-mono">router {quote.venue.router.slice(0, 8)}… · deadline 20 min · simulated with your address before signing</span>
+                    <span className="text-[11px] text-white/40 font-mono">
+                      for {quote.recipient?.slice(0, 6)}…{quote.recipient?.slice(-4)} · router {quote.venue.router.slice(0, 8)}… · deadline 20 min · dry-run with your address before signing
+                    </span>
                   </div>
                 )}
                 {txHash && (

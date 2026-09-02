@@ -1,6 +1,6 @@
 # Bobby × Tokenized Stocks on Base — Builder Quest entry
 
-**Live page:** `https://bobbyprotocol.xyz/base/stocks` (branch `feat/base-builder-quest`)
+**Route:** `/base/stocks` on branch `feat/base-builder-quest` (not deployed yet; local preview via `scripts/b20/dev.sh`)
 **Chain:** Base mainnet (8453) · **Assets:** Coinbase B20 tokenized stocks · **Venue:** Aerodrome Slipstream
 
 ## What it does
@@ -48,6 +48,11 @@ Human wallet (wagmi / AppKit, Base)           ▼
   quoter (`0x514c…9259`) and router (`0x698C…A92F`, the Gauges V3 deployment that owns every
   launch pool — verified with `pool.factory()`).
 - **The iOS app stays read-only.** This flow is web-only by design.
+- **Every guard fails closed.** A failed on-chain read, a stale Chainlink feed, a paused
+  token, a missing viewer country, an unsigned or mismatched attestation, or a transfer
+  simulation that reverts (B20 policies gate transfers, not `approve()`) all mean: no
+  calldata. Eligibility is an EIP-712 statement signed by the wallet itself, bound to the
+  terms version, the country the edge observed, and a 24-hour expiry.
 
 ## Verified on Base mainnet (2026-09-02)
 
@@ -57,6 +62,9 @@ Human wallet (wagmi / AppKit, Base)           ▼
 | NVDAc | $218.26 | $217.69 | +0.26 % | ~$1.7 M |
 | METAc | $577.74 | $577.10 | +0.11 % | — |
 | GOOGLc | $334.98 | $334.95 | +0.01 % | — |
+
+Pool liquidity is quoted from DexScreener on 2026-09-02 for pairs `0xA3b1…94F0` (AAPLc/USDC)
+and `0x853F…7ab9` (NVDAc/USDC); the code does not compute it.
 
 Calldata smoke (`scripts/b20/smoke.mts`): buy 100 USDC → 0.45817 NVDAc, sell 0.5 AAPLc →
 163.46 USDC, US country → calldata withheld, 900 USDC → withheld (cap), TSLAc → no Slipstream
