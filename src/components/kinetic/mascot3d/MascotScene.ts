@@ -385,8 +385,8 @@ export class MascotScene {
     if (!this.gearGroup.parent) this.character.add(this.gearGroup);
     const R = 1.1; // half of the normalized height
     const anchors: Record<string, { p: [number, number, number]; size: number }> = {
-      face:     { p: [0, 0.40 * R, 0.80 * R], size: 0.92 * R },
-      headset:  { p: [0, 0.62 * R, 0.70 * R], size: 0.95 * R },
+      face:     { p: [0, 0.42 * R, 0.80 * R], size: 0.62 * R },
+      headset:  { p: [0, 0.62 * R, 0.70 * R], size: 0.72 * R },
       head:     { p: [0, 1.22 * R, 0], size: 0.62 * R },
       hand:     { p: [0.80 * R, -0.42 * R, 0.50 * R], size: 0.46 * R },
       hip:      { p: [0.36 * R, -0.12 * R, 0.70 * R], size: 0.36 * R },
