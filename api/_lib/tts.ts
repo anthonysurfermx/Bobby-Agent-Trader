@@ -43,7 +43,8 @@ export interface SpeechOptions {
 
 // ---- Voice persona mapping ----
 
-const OPENAI_VOICES = ['coral', 'ballad', 'sage', 'ash', 'alloy', 'echo', 'shimmer', 'verse', 'nova'];
+// Every gpt-4o-mini-tts voice, so each squad companion can own a distinct one.
+const OPENAI_VOICES = ['coral', 'ballad', 'sage', 'ash', 'alloy', 'echo', 'shimmer', 'verse', 'nova', 'marin', 'cedar', 'onyx', 'fable'];
 
 /**
  * Gen Z tuning (user-validated bake-off, 2026-08-24): persona ids stay
@@ -59,7 +60,7 @@ const PERSONA_VOICE: Record<string, string> = {
 };
 
 /** Feminine-voiced personas get feminine-gendered Spanish instructions. */
-const FEM_VOICES = new Set(['nova', 'shimmer', 'coral', 'sage', 'alloy']);
+const FEM_VOICES = new Set(['nova', 'shimmer', 'coral', 'sage', 'alloy', 'marin', 'fable']);
 
 function resolveOpenAIVoice(voice?: string): string {
   if (voice && PERSONA_VOICE[voice]) return PERSONA_VOICE[voice];

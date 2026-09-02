@@ -27,7 +27,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Whitelist every steering param — this endpoint is public. edgeVoice
   // (the iOS "Configura tu Bobby" menu) is validated inside the TTS layer
   // against its own strict allowlist.
-  const VALID_VOICES = ['alpha', 'red', 'cio', 'male', 'female', 'coral', 'ballad', 'sage', 'ash'];
+  // Personas plus raw OpenAI voice ids: the 10-companion squad needs 10 voices.
+  const VALID_VOICES = ['alpha', 'red', 'cio', 'male', 'female', 'coral', 'ballad', 'sage', 'ash',
+    'nova', 'echo', 'shimmer', 'verse', 'alloy', 'marin', 'cedar', 'onyx', 'fable'];
   const VALID_LANGS = ['es', 'en', 'pt'];
   const VALID_VIBES = ['direct', 'analytical', 'wise'];
   const voice = VALID_VOICES.includes(body.voice || '') ? body.voice : 'cio';
