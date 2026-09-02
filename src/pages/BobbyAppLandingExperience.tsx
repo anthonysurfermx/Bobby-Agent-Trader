@@ -1,134 +1,23 @@
+// /app — the landing for the Bobby app. Core message: VIBE TRADING and AURA.
+// You talk to the market, three agents fight over your idea, NO TRADE is a
+// win, and your aura (discipline XP) unlocks gear, pets and a world. Every
+// number and name on this page comes from the companion data pack or the
+// live protocol stats — nothing is invented for the pitch.
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
-import {
-  Apple,
-  ArrowRight,
-  Check,
-  ChevronRight,
-  Loader2,
-  Menu,
-  Mic,
-  ShieldCheck,
-  Sparkles,
-  Trophy,
-  Volume2,
-  X,
-  Zap,
-} from 'lucide-react';
+import { Apple, ArrowRight, Check, ChevronRight, Flame, Loader2, Lock, Map as MapIcon, Menu, Mic, PawPrint, ShieldCheck, Sparkles, Trophy, Volume2, X, Zap } from 'lucide-react';
+import { COMPANIONS, LEVELS, PET_UNLOCK_XP, VIBES, petArt, petFor, tintFor, toolArt, toolHasArt, toolUnlockXP, toolsFor } from '@/lib/companions/data';
+import { isSpanish, pick, t } from '@/lib/companions/i18n';
 
-interface DebateActivity {
-  commitmentsCreated?: number;
-  decisionsResolved?: number;
-  wins?: number;
-  losses?: number;
-  breakEven?: number;
-  pending?: number;
-  winRate?: number;
-}
-
-interface ProtocolStats {
-  debateActivity?: DebateActivity;
-}
-
+interface DebateActivity { commitmentsCreated?: number; decisionsResolved?: number; wins?: number; losses?: number; breakEven?: number; pending?: number; winRate?: number }
+interface ProtocolStats { debateActivity?: DebateActivity }
 type SignupState = 'idle' | 'loading' | 'success' | 'error';
 
-const PAGE_TITLE = 'Bobby — Your financial AI companion';
 const TRY_IT_URL = '/agentic-world/bobby';
 const WIN_RATE_MIN_SAMPLE = 20;
-
-const COMPANIONS = [
-  {
-    id: 'byte',
-    name: 'Byte',
-    role: 'The straight-talker',
-    image: '/mascots/byte.webp',
-    color: '#5cff91',
-    line: 'I keep the market simple, never watered down.',
-  },
-  {
-    id: 'kora',
-    name: 'Kora',
-    role: 'The calm strategist',
-    image: '/mascots/kora.webp',
-    color: '#66e8ff',
-    line: 'We slow down, read the setup and protect the plan.',
-  },
-  {
-    id: 'glitch',
-    name: 'Glitch',
-    role: 'The challenger',
-    image: '/mascots/glitch.webp',
-    color: '#b488ff',
-    line: 'I question the trade before the market gets the chance.',
-  },
-  {
-    id: 'halo',
-    name: 'Halo',
-    role: 'The risk guardian',
-    image: '/mascots/halo.webp',
-    color: '#8dc9ff',
-    line: 'No setup yet. Capital protected.',
-  },
-] as const;
-
-const PRODUCT_MOMENTS = [
-  {
-    step: '01',
-    eyebrow: 'Ask naturally',
-    title: 'Name a market. Bobby gets to work.',
-    text: 'Speak or type BTC, NVDA, gold and hundreds more. Live market context replaces generic explanations.',
-    image: '/app/live-desk-byte.webp',
-    alt: 'Bobby Live Desk with Byte ready for a spoken or typed market question',
-    accent: '#5cff91',
-  },
-  {
-    step: '02',
-    eyebrow: 'Watch it think',
-    title: 'Your idea gets challenged, not validated.',
-    text: 'Specialized agents test the thesis, attack its weak spots and pass it through a fixed risk gate.',
-    image: '/app/live-desk-glitch.webp',
-    alt: 'Bobby Live Desk with Glitch, the companion that challenges a market thesis',
-    accent: '#b488ff',
-  },
-  {
-    step: '03',
-    eyebrow: 'Make the call',
-    title: 'When there is no edge, Bobby says so.',
-    text: 'A clear NO TRADE explains why waiting can protect your capital — and rewards the discipline to do it.',
-    image: '/app/no-trade-halo.webp',
-    alt: 'Bobby NO TRADE verdict with Halo and a Discipline XP reward',
-    accent: '#8dc9ff',
-  },
-] as const;
-
-const LIFESTYLE_CARDS = [
-  {
-    title: 'Build a better streak.',
-    text: 'Opening the app earns nothing. Reviewing the debate and respecting the risk does.',
-    image: '/app/lifestyle-subway.webp',
-    label: 'Discipline XP',
-  },
-  {
-    title: 'Your companion evolves as you do.',
-    text: 'New names, emotes and forms unlock through useful behavior — never by spending more.',
-    image: '/app/lifestyle-evolve.webp',
-    label: 'Companion evolution',
-  },
-  {
-    title: 'Serious finance. Zero banking vibe.',
-    text: 'Live data, clear risk and a companion you actually want to come back to.',
-    image: '/app/lifestyle-rooftop.webp',
-    label: 'Built for your world',
-  },
-] as const;
-
-const BOUNDARIES = [
-  { icon: ShieldCheck, title: 'No custody', text: 'Bobby never holds funds or connects to your accounts.' },
-  { icon: Zap, title: 'No execution', text: 'It places no orders. The final decision always stays with you.' },
-  { icon: Volume2, title: 'No fake certainty', text: 'A favorable verdict is not a promise or a buy recommendation.' },
-  { icon: Trophy, title: 'No pay-to-win', text: 'Companion progress comes from better process, not spending more.' },
-] as const;
+const GOLD = '#F5C542';
+const GREEN = '#5cff91';
 
 const formatNumber = (value: unknown, fallback = '—') => {
   if (value === null || value === undefined || value === '') return fallback;
@@ -138,7 +27,6 @@ const formatNumber = (value: unknown, fallback = '—') => {
 
 function useProtocolStats() {
   const [stats, setStats] = useState<ProtocolStats | null>(null);
-
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
@@ -148,44 +36,47 @@ function useProtocolStats() {
         if (!response.ok) return;
         const payload = (await response.json()) as ProtocolStats;
         if (active) setStats(payload);
-      } catch {
-        // The product story remains complete when live protocol stats are unavailable.
-      }
+      } catch { /* the page stays complete without live stats */ }
     };
-
     void refresh();
     const interval = window.setInterval(refresh, 60_000);
-    return () => {
-      active = false;
-      controller.abort();
-      window.clearInterval(interval);
-    };
+    return () => { active = false; controller.abort(); window.clearInterval(interval); };
   }, []);
-
   return stats;
+}
+
+function setLang(next: 'en' | 'es') {
+  try { localStorage.setItem('bobby_lang', next); } catch { /* private mode */ }
+  window.location.reload();
 }
 
 function BrandMark() {
   return (
     <a href="/app" className="flex items-center gap-2.5 text-white" aria-label="Bobby home">
-      <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[13px] border border-[#5cff91]/30 bg-[#0b1511] shadow-[0_0_28px_rgba(92,255,145,.16)]">
-        <img src="/mascots/byte.webp" alt="" className="h-11 w-11 object-cover" />
+      <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[13px] border border-[#F5C542]/40 bg-[#0b0a06] shadow-[0_0_28px_rgba(245,197,66,.22)]">
+        <img src="/favicon-bobby-v3.png" alt="" className="h-10 w-10 object-cover" />
       </span>
       <span className="text-[15px] font-black tracking-[-0.04em]">BOBBY</span>
     </a>
   );
 }
 
+function LangToggle() {
+  const es = isSpanish();
+  return (
+    <div className="inline-flex overflow-hidden rounded-full border border-white/12 font-mono text-[9px] font-bold uppercase tracking-[0.12em]">
+      <button type="button" onClick={() => setLang('es')} className={`px-3 py-2 transition ${es ? 'bg-white text-black' : 'text-white/55 hover:text-white'}`}>ES</button>
+      <button type="button" onClick={() => setLang('en')} className={`px-3 py-2 transition ${!es ? 'bg-white text-black' : 'text-white/55 hover:text-white'}`}>EN</button>
+    </div>
+  );
+}
+
 function ComingSoonBadge({ compact = false }: { compact?: boolean }) {
   return (
-    <div
-      className={`inline-flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] text-left shadow-[inset_0_1px_rgba(255,255,255,.08)] ${compact ? 'px-4 py-2.5' : 'px-5 py-3.5'}`}
-      role="img"
-      aria-label="Coming soon on the App Store"
-    >
+    <div className={`inline-flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] text-left shadow-[inset_0_1px_rgba(255,255,255,.08)] ${compact ? 'px-4 py-2.5' : 'px-5 py-3.5'}`} role="img" aria-label="Coming soon on the App Store">
       <Apple className={compact ? 'h-6 w-6' : 'h-8 w-8'} strokeWidth={1.7} aria-hidden="true" />
       <span className="leading-none">
-        <span className="block font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-white/45">Coming soon on the</span>
+        <span className="block font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-white/45">{t('Coming soon on the', 'Muy pronto en el')}</span>
         <span className={`${compact ? 'text-sm' : 'text-lg'} mt-1 block font-semibold tracking-[-0.03em]`}>App Store</span>
       </span>
     </div>
@@ -196,12 +87,7 @@ function PhoneFrame({ src, alt, priority = false }: { src: string; alt: string; 
   return (
     <div className="relative overflow-hidden rounded-[2.25rem] border border-white/15 bg-[#080a0d] p-[6px] shadow-[0_32px_90px_rgba(0,0,0,.65)]">
       <div className="pointer-events-none absolute left-1/2 top-[12px] z-10 h-[17px] w-[82px] -translate-x-1/2 rounded-full bg-black" />
-      <img
-        src={src}
-        alt={alt}
-        loading={priority ? 'eager' : 'lazy'}
-        className="h-auto w-full rounded-[1.95rem]"
-      />
+      <img src={src} alt={alt} loading={priority ? 'eager' : 'lazy'} className="h-auto w-full rounded-[1.95rem]" />
     </div>
   );
 }
@@ -210,14 +96,13 @@ export default function BobbyAppLandingExperience() {
   const stats = useProtocolStats();
   const reduceMotion = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeCompanion, setActiveCompanion] = useState(0);
+  const [activeCompanion, setActiveCompanion] = useState(1);
   const [email, setEmail] = useState('');
   const [signupState, setSignupState] = useState<SignupState>('idle');
   const [signupMessage, setSignupMessage] = useState('');
 
-  useEffect(() => {
-    document.title = PAGE_TITLE;
-  }, []);
+  const pageTitle = t('Bobby — Vibe trading. Farm aura.', 'Bobby — Vibe trading. Farmea aura.');
+  useEffect(() => { document.title = pageTitle; }, [pageTitle]);
 
   const record = stats?.debateActivity;
   const resolved = Number(record?.decisionsResolved);
@@ -232,12 +117,37 @@ export default function BobbyAppLandingExperience() {
     return Number.isFinite(winRate) ? `${winRate.toFixed(1)}%` : '—';
   }, [record?.losses, record?.wins, resolved, winRate]);
 
-  const companion = COMPANIONS[activeCompanion];
-  const navItems = [
-    ['How it feels', '#product'],
-    ['Companions', '#companions'],
-    ['The record', '#record'],
-    ['Early access', '#early-access'],
+  const companion = COMPANIONS[activeCompanion] ?? COMPANIONS[0];
+  const starters = COMPANIONS.filter((c) => c.requiredLevel === 1);
+  const maxLevel = LEVELS[LEVELS.length - 1];
+  const showcaseTools = toolsFor('byte');
+  const showcasePet = petFor('byte');
+
+  const navItems: Array<[string, string]> = [
+    [t('The vibe', 'La vibra'), '#vibe'],
+    ['Aura', '#aura'],
+    ['Squad', '#squad'],
+    ['Trader Land', '#trader-land'],
+    [t('The record', 'El historial'), '#record'],
+  ];
+
+  const moments = [
+    { step: '01', eyebrow: t('Ask out loud', 'Pregunta en voz alta'), title: t('Say the ticker. The desk wakes up.', 'Di el ticker. El desk despierta.'), text: t('BTC, NVDA, gold and 600+ more, by voice or text. Live candles, not recycled takes. Your companion answers in its own voice, wearing the gear you earned.', 'BTC, NVDA, oro y más de 600 activos, por voz o texto. Velas en vivo, no opiniones recicladas. Tu companion contesta con su propia voz, con el equipo que te ganaste.'), image: '/app/shot-desk.webp', alt: t('The Live Desk with Byte wearing his gear and Bit the dog', 'El Live Desk con Byte usando su equipo y Bit el perro'), accent: GREEN },
+    { step: '02', eyebrow: t('NO TRADE is a win', 'NO TRADE es una victoria'), title: t('Three agents fight. When there is no edge, the gate closes.', 'Tres agentes se pelean. Si no hay ventaja, la puerta se cierra.'), text: t('Alpha Hunter finds the setup, Red Team tears it apart, the CIO decides. No clean signal? Halo\'s risk gate says NO TRADE and pays you +20 discipline XP for listening.', 'Alpha Hunter busca el setup, Red Team lo destroza, el CIO decide. ¿Sin señal limpia? La puerta de riesgo de Halo dice NO TRADE y te paga +20 XP de disciplina por escuchar.'), image: '/app/shot-notrade.webp', alt: t('A real NO TRADE verdict on BTC with +20 discipline XP and the live chart', 'Un NO TRADE real en BTC con +20 XP de disciplina y la gráfica en vivo'), accent: '#7ea6ff' },
+    { step: '03', eyebrow: t('Farm aura', 'Farmea aura'), title: t('Aura becomes gear your companion actually wears.', 'El aura se vuelve equipo que tu companion sí se pone.'), text: t('Goggles on the face, a radio on the hip, a golden codex in the hand, a pet at the feet. Hold any item to preview it on its owner. Discipline only, never volume.', 'Gafas en la cara, radio en la cadera, un códice dorado en la mano, una mascota a los pies. Mantén presionado cualquier item para verlo puesto. Solo disciplina, nunca volumen.'), image: '/app/shot-preview.webp', alt: t('Gear preview: Bobby wearing a piece earned with discipline', 'Preview de equipo: Bobby usando una pieza ganada con disciplina'), accent: GOLD },
+  ];
+
+  const auraRules = [
+    { icon: Check, title: t('Counts', 'Cuenta'), lines: [t('Reading the full analysis', 'Leer el análisis completo'), t('Accepting a NO TRADE', 'Aceptar un NO TRADE'), t('Coming back tomorrow (streak)', 'Volver mañana (racha)')] , tone: GREEN },
+    { icon: X, title: t('Never counts', 'Nunca cuenta'), lines: [t('How much you trade', 'Cuánto operas'), t('How often you trade', 'Qué tan seguido operas'), t('Your P&L', 'Tu P&L')], tone: '#ff8f83' },
+    { icon: Lock, title: t('Capped', 'Con tope'), lines: [t('3 awards a day, for everyone', '3 premios al día, para todos'), t('One grace day on the streak', 'Un día de gracia en la racha'), t('No pay-to-win, ever', 'Sin pay-to-win, nunca')], tone: '#8dc9ff' },
+  ];
+
+  const boundaries = [
+    { icon: ShieldCheck, title: t('No custody', 'Sin custodia'), text: t('Bobby never holds funds or connects to your accounts.', 'Bobby nunca guarda fondos ni se conecta a tus cuentas.') },
+    { icon: Zap, title: t('No execution', 'Sin ejecución'), text: t('It places no orders. The call is always yours.', 'No pone órdenes. La decisión siempre es tuya.') },
+    { icon: Volume2, title: t('No fake certainty', 'Sin certezas falsas'), text: t('A favorable verdict is analysis, not a promise or advice.', 'Un veredicto favorable es análisis, no una promesa ni asesoría.') },
+    { icon: Trophy, title: t('No pay-to-win', 'Sin pay-to-win'), text: t('Aura comes from better process, never from spending more.', 'El aura viene de un mejor proceso, nunca de gastar más.') },
   ];
 
   const submitEarlyAccess = async (event: FormEvent<HTMLFormElement>) => {
@@ -246,124 +156,103 @@ export default function BobbyAppLandingExperience() {
     const normalizedEmail = email.trim().toLowerCase();
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
       setSignupState('error');
-      setSignupMessage('Enter a valid email so we know where to find you.');
+      setSignupMessage(t('Enter a valid email so we know where to find you.', 'Escribe un correo válido para saber dónde encontrarte.'));
       return;
     }
-
     setSignupState('loading');
     setSignupMessage('');
     const website = new FormData(form).get('website');
-
     try {
-      const response = await fetch('/api/bobby-early-access', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail, website }),
-      });
+      const response = await fetch('/api/bobby-early-access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, website }) });
       if (!response.ok) throw new Error('Signup failed');
       setSignupState('success');
-      setSignupMessage("You're on the list. We'll only email when Bobby is ready for you.");
+      setSignupMessage(t("You're on the list. We only email when Bobby is ready for you.", 'Estás en la lista. Solo escribimos cuando Bobby esté listo para ti.'));
       setEmail('');
     } catch {
       setSignupState('error');
-      setSignupMessage("We couldn't save your spot right now. Please try again in a moment.");
+      setSignupMessage(t("We couldn't save your spot right now. Try again in a moment.", 'No pudimos guardar tu lugar ahora. Intenta en un momento.'));
     }
   };
 
-  const reveal = reduceMotion
-    ? {}
-    : {
-        initial: { opacity: 0, y: 20 },
-        whileInView: { opacity: 1, y: 0 },
-        viewport: { once: true, amount: 0.18 },
-      };
+  const reveal = reduceMotion ? {} : { initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.18 } };
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#050706] font-sans text-white antialiased selection:bg-[#5cff91] selection:text-[#041009]">
       <Helmet>
-        <title>{PAGE_TITLE}</title>
-        <meta name="description" content="Meet Bobby: live market intelligence, three-agent debate, clear risk and a 3D financial companion that evolves with your discipline. Coming soon to iPhone." />
-        <meta property="og:title" content={PAGE_TITLE} />
-        <meta property="og:description" content="Serious finance without the banking vibe. Join Bobby's iPhone early access." />
-        <meta property="og:image" content="https://defimexico.org/bobby-hero.png" />
+        <title>{pageTitle}</title>
+        <meta name="description" content={t('Vibe trading: talk to the market, watch three agents debate your idea, take the NO TRADE when there is no edge, and farm aura — gear, pets and a world earned with discipline, never volume.', 'Vibe trading: háblale al mercado, mira a tres agentes debatir tu idea, toma el NO TRADE cuando no hay ventaja y farmea aura: equipo, mascotas y un mundo ganados con disciplina, nunca con volumen.')} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={t('Farm aura, not losses. Bobby is the market companion you talk to.', 'Farmea aura, no pérdidas. Bobby es el companion de mercado con el que hablas.')} />
+        <meta property="og:image" content="https://bobbyprotocol.xyz/favicon-bobby-v3.png" />
       </Helmet>
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050706]/88 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
           <BrandMark />
-          <nav className="hidden items-center gap-7 md:flex" aria-label="Main navigation">
+          <nav className="hidden items-center gap-6 md:flex" aria-label="Main navigation">
             {navItems.map(([label, href]) => (
               <a key={href} href={href} className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-white/48 transition hover:text-white">{label}</a>
             ))}
           </nav>
-          <a href="#early-access" className="hidden rounded-full bg-[#5cff91] px-5 py-2.5 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white md:inline-flex">Get early access</a>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.04] md:hidden"
-            aria-label="Toggle navigation"
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
+          <div className="flex items-center gap-3">
+            <LangToggle />
+            <a href={TRY_IT_URL} className="hidden rounded-full bg-[#5cff91] px-5 py-2.5 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white md:inline-flex">{t('Open the desk', 'Abrir el desk')}</a>
+            <button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.04] md:hidden" aria-label="Toggle navigation" aria-expanded={menuOpen}>
+              {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         {menuOpen && (
           <nav className="border-t border-white/10 bg-[#080a09] px-5 py-4 md:hidden" aria-label="Mobile navigation">
             {navItems.map(([label, href]) => (
               <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block border-b border-white/[0.06] py-4 font-mono text-xs uppercase tracking-[0.14em] text-white/70">{label}</a>
             ))}
+            <a href={TRY_IT_URL} className="block py-4 font-mono text-xs uppercase tracking-[0.14em] text-[#5cff91]">{t('Open the desk', 'Abrir el desk')}</a>
           </nav>
         )}
       </header>
 
       <main>
+        {/* HERO — the core message */}
         <section className="relative isolate overflow-hidden border-b border-white/10">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_74%_38%,rgba(92,255,145,.17),transparent_34%),radial-gradient(circle_at_87%_25%,rgba(52,121,255,.23),transparent_40%),radial-gradient(circle_at_18%_70%,rgba(180,136,255,.13),transparent_38%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_74%_38%,rgba(245,197,66,.14),transparent_34%),radial-gradient(circle_at_87%_25%,rgba(92,255,145,.18),transparent_40%),radial-gradient(circle_at_18%_70%,rgba(52,121,255,.14),transparent_38%)]" />
           <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:linear-gradient(rgba(255,255,255,.5)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.5)_1px,transparent_1px)] [background-size:44px_44px]" />
           <div className="relative mx-auto grid min-h-[calc(100svh-69px)] max-w-7xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1.02fr_.98fr] lg:px-8 lg:py-20">
             <motion.div initial={reduceMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.55 }} className="relative z-10">
               <div className="mb-7 flex flex-wrap items-center gap-3">
                 <ComingSoonBadge compact />
-                <span className="rounded-full border border-[#5cff91]/25 bg-[#5cff91]/[0.08] px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#8dffad]">iPhone early access</span>
+                <span className="rounded-full border border-[#F5C542]/30 bg-[#F5C542]/[0.08] px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#F5C542]">{t('iPhone early access', 'Acceso anticipado iPhone')}</span>
               </div>
+              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-[#5cff91]">Vibe trading</div>
               <h1 className="max-w-3xl text-[clamp(2.85rem,7vw,6.4rem)] font-black leading-[0.88] tracking-[-0.078em]">
-                Your financial AI should do more than{' '}
-                <span className="bg-[linear-gradient(100deg,#5cff91_0%,#76d6ff_55%,#b488ff_100%)] bg-clip-text text-transparent">agree with you.</span>
+                {t('Farm aura,', 'Farmea aura,')}{' '}
+                <span className="bg-[linear-gradient(100deg,#F5C542_0%,#5cff91_55%,#76d6ff_100%)] bg-clip-text text-transparent">{t('not losses.', 'no pérdidas.')}</span>
               </h1>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/58 sm:text-lg sm:leading-8">
-                Bobby reads live markets, puts every idea through a three-agent debate and shows you the risk before you make the call — with a companion that grows alongside your discipline.
+                {t('Bobby is the market companion you talk to. Ask anything out loud, watch three agents fight over it, take the NO TRADE when there is no edge, and level up your aura: gear, pets and a whole world, earned with discipline, never with volume.', 'Bobby es el companion de mercado con el que hablas. Pregunta lo que sea en voz alta, mira a tres agentes pelearse por tu idea, toma el NO TRADE cuando no hay ventaja y sube tu aura: equipo, mascotas y un mundo entero, ganados con disciplina, nunca con volumen.')}
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <a href="#early-access" className="group inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-[#5cff91] px-7 font-mono text-xs font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white">Join early access <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
-                <a href={TRY_IT_URL} className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]">Try the live desk</a>
+                <a href="#early-access" className="group inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-[#5cff91] px-7 font-mono text-xs font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white">{t('Join early access', 'Quiero acceso anticipado')} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
+                <a href={TRY_IT_URL} className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]">{t('Try the live desk', 'Prueba el live desk')}</a>
               </div>
               <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 font-mono text-[9px] uppercase tracking-[0.12em] text-white/38">
-                <span className="inline-flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-[#5cff91]" /> Voice or text</span>
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> No custody</span>
-                <span className="inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-[#b488ff]" /> Companion evolution</span>
+                <span className="inline-flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-[#5cff91]" /> {t('Voice or text', 'Voz o texto')}</span>
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> {t('Never touches your money', 'Nunca toca tu dinero')}</span>
+                <span className="inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-[#F5C542]" /> {t('Gear, pets & a world', 'Equipo, mascotas y un mundo')}</span>
               </div>
             </motion.div>
 
             <div className="relative mx-auto flex w-full max-w-[440px] items-center justify-center lg:max-w-[500px]">
-              <div className="absolute h-[72%] w-[72%] rounded-full bg-[#5cff91]/15 blur-[85px]" />
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, y: 28, rotate: 2 }}
-                animate={{ opacity: 1, y: 0, rotate: 2 }}
-                transition={{ duration: reduceMotion ? 0 : 0.7, delay: 0.1 }}
-                className="relative z-10 w-[72%] max-w-[310px]"
-              >
-                <PhoneFrame src="/app/live-desk-byte.webp" alt="Bobby iOS Live Desk with Byte" priority />
+              <div className="absolute h-[72%] w-[72%] rounded-full bg-[#F5C542]/15 blur-[85px]" />
+              <motion.div initial={reduceMotion ? false : { opacity: 0, y: 28, rotate: 2 }} animate={{ opacity: 1, y: 0, rotate: 2 }} transition={{ duration: reduceMotion ? 0 : 0.7, delay: 0.1 }} className="relative z-10 w-[72%] max-w-[310px]">
+                <PhoneFrame src="/app/shot-desk.webp" alt={t('Bobby Live Desk on iPhone: Byte wearing his gear with Bit the dog', 'Bobby Live Desk en iPhone: Byte con su equipo y Bit el perro')} priority />
               </motion.div>
-              {COMPANIONS.slice(1).map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  initial={reduceMotion ? false : { opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1, y: reduceMotion ? 0 : [0, -7, 0] }}
-                  transition={{ opacity: { delay: 0.35 + index * 0.1 }, scale: { delay: 0.35 + index * 0.1 }, y: { duration: 3.6 + index, repeat: Infinity, ease: 'easeInOut' } }}
-                  className={`absolute z-20 grid h-20 w-20 place-items-center rounded-3xl border border-white/15 bg-[#0a0d0b]/90 p-1 shadow-2xl backdrop-blur-xl sm:h-24 sm:w-24 ${index === 0 ? '-left-1 top-[15%] -rotate-6' : index === 1 ? '-right-1 top-[34%] rotate-6' : 'bottom-[8%] left-[2%] rotate-3'}`}
-                  style={{ boxShadow: `0 18px 50px rgba(0,0,0,.5), 0 0 30px ${item.color}18` }}
-                >
-                  <img src={item.image} alt={`${item.name} companion`} className="h-full w-full rounded-[1.2rem] object-cover" />
+              <motion.div initial={reduceMotion ? false : { opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1, y: reduceMotion ? 0 : [0, -8, 0] }} transition={{ opacity: { delay: 0.3 }, scale: { delay: 0.3 }, y: { duration: 4, repeat: Infinity, ease: 'easeInOut' } }} className="absolute -left-1 top-[12%] z-20 h-24 w-24 -rotate-6 overflow-hidden rounded-3xl border border-[#F5C542]/40 shadow-2xl sm:h-28 sm:w-28" style={{ boxShadow: `0 18px 50px rgba(0,0,0,.5), 0 0 40px ${GOLD}33` }}>
+                <img src="/favicon-bobby-v3.png" alt={t('Golden Byte — the max level', 'Byte dorado — el nivel máximo')} className="h-full w-full object-cover" />
+              </motion.div>
+              {starters.filter((c) => c.id !== 'byte').slice(0, 3).map((item, index) => (
+                <motion.div key={item.id} initial={reduceMotion ? false : { opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1, y: reduceMotion ? 0 : [0, -7, 0] }} transition={{ opacity: { delay: 0.4 + index * 0.1 }, scale: { delay: 0.4 + index * 0.1 }, y: { duration: 3.6 + index, repeat: Infinity, ease: 'easeInOut' } }} className={`absolute z-20 grid h-20 w-20 place-items-center rounded-3xl border border-white/15 bg-[#0a0d0b]/90 p-1 shadow-2xl backdrop-blur-xl sm:h-24 sm:w-24 ${index === 0 ? '-right-1 top-[30%] rotate-6' : index === 1 ? 'bottom-[10%] left-[2%] rotate-3' : '-right-2 bottom-[4%] -rotate-3'}`} style={{ boxShadow: `0 18px 50px rgba(0,0,0,.5), 0 0 30px ${tintFor(item, 0.12)}` }}>
+                  <img src={`/mascots/${item.id}.webp`} alt={`${item.label}, ${pick(item.role)}`} className="h-full w-full rounded-[1.2rem] object-cover" />
                 </motion.div>
               ))}
             </div>
@@ -374,28 +263,28 @@ export default function BobbyAppLandingExperience() {
           <div className="flex min-w-max animate-marquee items-center gap-9 font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-white/55 motion-reduce:animate-none">
             {[0, 1].map((duplicate) => (
               <div key={duplicate} className="flex shrink-0 items-center gap-9">
-                {['Ask out loud', 'Live market context', 'Three-agent debate', 'Risk can veto', 'No trade is a win', 'Your companion evolves'].map((label) => (
-                  <span key={`${duplicate}-${label}`} className="flex items-center gap-9"><span>{label}</span><span className="text-[#5cff91]">✦</span></span>
+                {['Vibe trading', t('Farm aura', 'Farmea aura'), t('Three-agent debate', 'Debate de tres agentes'), t('NO TRADE is a win', 'NO TRADE es una victoria'), t('Gear, pets & a world', 'Equipo, mascotas y un mundo'), t('Never touches your money', 'Nunca toca tu dinero')].map((label) => (
+                  <span key={`${duplicate}-${label}`} className="flex items-center gap-9"><span>{label}</span><span className="text-[#F5C542]">✦</span></span>
                 ))}
               </div>
             ))}
           </div>
         </div>
 
-        <section id="product" className="bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+        {/* THE VIBE — three moments */}
+        <section id="vibe" className="bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="mx-auto max-w-7xl">
             <motion.div {...reveal} className="mb-12 max-w-3xl">
-              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">The Bobby moment</div>
-              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-5xl lg:text-7xl">Ask. Watch the debate.<br /><span className="text-white/38">Decide with your eyes open.</span></h2>
-              <p className="mt-6 max-w-xl text-base leading-7 text-white/48">Not another empty chat box. Bobby turns a market question into a visible process you can understand, challenge and remember.</p>
+              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">{t('The vibe', 'La vibra')}</div>
+              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-5xl lg:text-7xl">{t('Talk to the market.', 'Háblale al mercado.')}<br /><span className="text-white/38">{t('Watch it argue back.', 'Míralo discutir contigo.')}</span></h2>
+              <p className="mt-6 max-w-xl text-base leading-7 text-white/48">{t('Not a chat box. A desk with a face, a voice and three agents that disagree in front of you, so you decide with your eyes open.', 'No es un chat. Es un desk con cara, voz y tres agentes que discrepan frente a ti, para que decidas con los ojos abiertos.')}</p>
             </motion.div>
-
             <div className="grid gap-5 lg:grid-cols-3">
-              {PRODUCT_MOMENTS.map((moment, index) => (
+              {moments.map((moment, index) => (
                 <motion.article key={moment.step} {...reveal} transition={{ delay: reduceMotion ? 0 : index * 0.07 }} className="group overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0d100e]">
                   <div className="relative h-[420px] overflow-hidden border-b border-white/10 sm:h-[480px] lg:h-[430px]">
                     <div className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 50% 50%, ${moment.accent}45, transparent 55%)` }} />
-                    <img src={moment.image} alt={moment.alt} loading="lazy" className="relative mx-auto w-[72%] transition duration-500 group-hover:scale-[1.025]" />
+                    <img src={moment.image} alt={moment.alt} loading="lazy" className="relative mx-auto w-[64%] rounded-[1.4rem] border border-white/10 transition duration-500 group-hover:scale-[1.025]" />
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0d100e] to-transparent" />
                   </div>
                   <div className="p-6 sm:p-7">
@@ -409,41 +298,129 @@ export default function BobbyAppLandingExperience() {
           </div>
         </section>
 
-        <section id="companions" className="relative overflow-hidden border-y border-white/10 bg-[#050706]">
-          <img src="/app/lifestyle-squad.webp" alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-center opacity-20" />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,#050706_0%,rgba(5,7,6,.88)_48%,rgba(5,7,6,.72)_100%)]" />
-          <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[.88fr_1.12fr] lg:px-8 lg:py-28">
-            <motion.div {...reveal}>
-              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#b488ff]">Meet your companion</div>
-              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">Same intelligence.<br /><span className="text-white/38">Your kind of aura.</span></h2>
-              <p className="mt-6 max-w-lg text-base leading-7 text-white/52">Pick the face, voice and personality that make you want to come back. Every companion sees the same data and follows the same risk rules — only the way it reaches you changes.</p>
-              <div className="mt-8 rounded-2xl border border-white/10 bg-black/30 p-5 backdrop-blur-xl">
-                <div className="flex items-center gap-4">
-                  <img src={companion.image} alt="" className="h-16 w-16 rounded-2xl border border-white/10 bg-black/40 object-cover" />
-                  <div>
-                    <div className="font-mono text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: companion.color }}>{companion.name} · {companion.role}</div>
-                    <p className="mt-2 text-sm text-white/70">“{companion.line}”</p>
+        {/* AURA — the economy, straight from the data pack */}
+        <section id="aura" className="relative overflow-hidden border-y border-white/10 bg-[#050706] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(245,197,66,.12),transparent_40%)]" />
+          <div className="relative mx-auto max-w-7xl">
+            <motion.div {...reveal} className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:items-center">
+              <div>
+                <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#F5C542]">Aura</div>
+                <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Aura is discipline', 'El aura es disciplina')}<br /><span className="text-white/38">{t('you can wear.', 'que se lleva puesta.')}</span></h2>
+                <p className="mt-6 max-w-lg text-base leading-7 text-white/52">{t('Every full read, every NO TRADE you accept, every day you come back adds aura. Aura unlocks gear your companion actually wears, a pet at its feet and, soon, a world. Volume, frequency and P&L give you nothing. Ever.', 'Cada lectura completa, cada NO TRADE que aceptas, cada día que vuelves suma aura. El aura desbloquea equipo que tu companion sí se pone, una mascota a sus pies y, pronto, un mundo. El volumen, la frecuencia y el P&L no te dan nada. Nunca.')}</p>
+                <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                  {auraRules.map(({ icon: Icon, title, lines, tone }) => (
+                    <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-[0.16em]" style={{ color: tone }}><Icon className="h-3.5 w-3.5" />{title}</div>
+                      <ul className="mt-3 space-y-1.5 text-xs leading-5 text-white/60">{lines.map((line) => <li key={line}>{line}</li>)}</ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="rounded-[1.75rem] border border-white/10 bg-[#0d100e] p-5 sm:p-6">
+                  <div className="mb-4 flex items-center justify-between font-mono text-[9px] font-bold uppercase tracking-[0.18em]"><span className="text-[#5cff91]">{t('Levels', 'Niveles')}</span><span className="text-white/35">{t('discipline XP', 'XP de disciplina')}</span></div>
+                  <ol className="space-y-2">
+                    {LEVELS.map((level) => {
+                      const golden = level.number === maxLevel.number;
+                      return (
+                        <li key={level.number} className="flex items-center gap-3 rounded-xl border px-3 py-2.5" style={{ borderColor: golden ? `${GOLD}66` : 'rgba(255,255,255,0.06)', background: golden ? `${GOLD}12` : 'rgba(255,255,255,0.02)' }}>
+                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-[10px] font-black" style={{ background: golden ? GOLD : 'rgba(255,255,255,0.08)', color: golden ? '#000' : '#fff' }}>{level.number}</span>
+                          <span className="flex-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: golden ? GOLD : 'rgba(255,255,255,0.85)' }}>{level.name}</span>
+                          <span className="font-mono text-[10px] text-white/45">{level.minXP} XP</span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+                <div className="rounded-[1.75rem] border border-white/10 bg-[#0d100e] p-5 sm:p-6">
+                  <div className="mb-4 flex items-center justify-between font-mono text-[9px] font-bold uppercase tracking-[0.18em]"><span className="text-[#F5C542]">{t('What aura unlocks', 'Qué desbloquea el aura')}</span><span className="text-white/35">BYTE</span></div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {showcaseTools.map((tool) => (
+                      <div key={tool.tier} className="rounded-2xl border border-white/10 bg-black/40 p-2 text-center" style={tool.tier === 3 ? { borderColor: `${GOLD}66`, boxShadow: `0 0 18px ${GOLD}33` } : undefined}>
+                        {toolHasArt(tool) ? <img src={toolArt(tool)} alt={pick(tool.name)} className="mx-auto h-14 w-14 object-contain" /> : <div className="mx-auto grid h-14 w-14 place-items-center text-2xl">{tool.glyph}</div>}
+                        <div className="mt-1 truncate font-mono text-[8px] uppercase tracking-[0.1em] text-white/70">{pick(tool.name)}</div>
+                        <div className="font-mono text-[8px] text-white/40">{toolUnlockXP(tool.tier)} XP</div>
+                      </div>
+                    ))}
+                    {showcasePet && (
+                      <div className="rounded-2xl border border-white/10 bg-black/40 p-2 text-center">
+                        {petArt('byte') ? <img src={petArt('byte')!} alt={pick(showcasePet.name)} className="mx-auto h-14 w-14 object-contain" /> : <div className="mx-auto grid h-14 w-14 place-items-center text-2xl">{showcasePet.emoji}</div>}
+                        <div className="mt-1 truncate font-mono text-[8px] uppercase tracking-[0.1em] text-white/70">{pick(showcasePet.name)}</div>
+                        <div className="font-mono text-[8px] text-white/40">{PET_UNLOCK_XP} XP</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: `${GOLD}55`, background: `${GOLD}0d` }}>
+                    <img src="/favicon-bobby-v3.png" alt="" className="h-12 w-12 rounded-xl object-cover" />
+                    <div>
+                      <div className="font-mono text-[9px] font-black uppercase tracking-[0.16em]" style={{ color: GOLD }}>{maxLevel.name} · {maxLevel.minXP} XP</div>
+                      <div className="mt-1 text-xs text-white/60">{t('The golden skin. The level everyone is farming for.', 'La skin dorada. El nivel por el que todos farmean.')}</div>
+                    </div>
                   </div>
                 </div>
               </div>
             </motion.div>
+          </div>
+        </section>
 
-            <motion.div {...reveal} className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
+        {/* PREPPING AURA — the forge */}
+        <section className="bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
+            <motion.div {...reveal} className="relative mx-auto flex w-full max-w-[520px] items-end justify-center gap-4">
+              <div className="absolute inset-0 rounded-full bg-[#5cff91]/15 blur-[80px]" />
+              <div className="relative w-[44%] -rotate-3 opacity-90"><PhoneFrame src="/app/shot-vibe.webp" alt={t('Pick the vibe: chill, direct or pro, and hear it live', 'Elige la vibra: chill, directo o pro, y escúchala en vivo')} /></div>
+              <div className="relative w-[56%]"><PhoneFrame src="/app/shot-forge.webp" alt={t('Prepping aura: Byte inside the aura forge', 'Preparando aura: Byte dentro de la máquina de aura')} /></div>
+            </motion.div>
+            <motion.div {...reveal}>
+              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">{t('Prepping aura', 'Preparando aura')}</div>
+              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Build the avatar', 'Crea el avatar')}<br /><span className="text-white/38">{t('with the best aura in the market.', 'con la mejor aura del mercado.')}</span></h2>
+              <p className="mt-6 max-w-lg text-base leading-7 text-white/52">{t('Pick your companion. Pick its vibe and hear it live. Then step into the forge: four pieces of kit lock in one by one, with sound, haptics and a machine that charges as you go. Sixty seconds and your aura is ready to farm.', 'Elige tu companion. Elige su vibra y escúchala en vivo. Luego entra a la máquina: cuatro piezas de equipo se fijan una por una, con sonido, vibración y una máquina que se carga contigo. Sesenta segundos y tu aura está lista para farmear.')}</p>
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                {VIBES.map((vibe) => (
+                  <div key={vibe.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <div className="font-mono text-[10px] font-black uppercase tracking-[0.16em] text-white">{pick(vibe.label)}</div>
+                    <div className="mt-2 text-xs leading-5 text-white/55">{pick(vibe.desc)}</div>
+                    <div className="mt-3 text-xs italic text-white/70">“{pick(vibe.sample)}”</div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* SQUAD — every companion, locked ones included */}
+        <section id="squad" className="relative overflow-hidden border-y border-white/10 bg-[#050706]">
+          <img src="/app/lifestyle-squad.webp" alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-center opacity-20" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,#050706_0%,rgba(5,7,6,.9)_48%,rgba(5,7,6,.78)_100%)]" />
+          <div className="relative mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[.8fr_1.2fr] lg:px-8 lg:py-28">
+            <motion.div {...reveal}>
+              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#b488ff]">{t('Your squad', 'Tu squad')}</div>
+              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Same desk.', 'Mismo desk.')}<br /><span className="text-white/38">{t('Your kind of aura.', 'Tu tipo de aura.')}</span></h2>
+              <p className="mt-6 max-w-lg text-base leading-7 text-white/52">{t(`${COMPANIONS.length} companions, one set of risk rules. ${starters.length} are yours from day one; the rest unlock with levels, and you can preview every one of them, locked or not.`, `${COMPANIONS.length} companions, un solo reglamento de riesgo. ${starters.length} son tuyos desde el día uno; el resto se desbloquea con niveles, y puedes ver a todos en 3D, bloqueados o no.`)}</p>
+              <div className="mt-8 rounded-2xl border border-white/10 bg-black/30 p-5 backdrop-blur-xl">
+                <div className="flex items-center gap-4">
+                  <img src={`/mascots/${companion.id}.webp`} alt="" className="h-16 w-16 rounded-2xl border border-white/10 bg-black/40 object-cover" style={{ filter: companion.requiredLevel > 1 ? 'grayscale(1)' : 'none' }} />
+                  <div>
+                    <div className="font-mono text-[9px] font-bold uppercase tracking-[0.18em]" style={{ color: tintFor(companion) }}>{companion.label} · {pick(companion.role)}</div>
+                    <p className="mt-2 text-sm text-white/70">“{pick(companion.selectLine)}”</p>
+                    <p className="mt-1 text-xs text-white/45">{companion.requiredLevel > 1 ? t(`Unlocks at level ${companion.requiredLevel}`, `Se desbloquea en nivel ${companion.requiredLevel}`) : t('Available from day one', 'Disponible desde el día uno')}</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            <motion.div {...reveal} className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {COMPANIONS.map((item, index) => {
                 const active = index === activeCompanion;
+                const locked = item.requiredLevel > 1;
                 return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveCompanion(index)}
-                    aria-pressed={active}
-                    className={`group relative min-h-[190px] overflow-hidden rounded-3xl border p-3 text-left transition sm:min-h-[220px] ${active ? 'border-white/35 bg-white/[0.1]' : 'border-white/10 bg-black/30 hover:border-white/25 hover:bg-white/[0.06]'}`}
-                    style={active ? { boxShadow: `0 20px 60px rgba(0,0,0,.35), 0 0 36px ${item.color}22` } : undefined}
-                  >
-                    <img src={item.image} alt={`${item.name}, ${item.role}`} loading="lazy" className="mx-auto h-28 w-28 rounded-2xl object-cover transition duration-300 group-hover:scale-105 sm:h-36 sm:w-36" />
-                    <div className="mt-3 flex items-end justify-between">
-                      <div><div className="text-sm font-black uppercase">{item.name}</div><div className="mt-1 font-mono text-[8px] uppercase tracking-[0.12em] text-white/38">{item.role}</div></div>
-                      {active && <Check className="h-4 w-4" style={{ color: item.color }} />}
+                  <button key={item.id} type="button" onClick={() => setActiveCompanion(index)} aria-pressed={active} className={`group relative overflow-hidden rounded-3xl border p-3 text-left transition ${active ? 'border-white/35 bg-white/[0.1]' : 'border-white/10 bg-black/30 hover:border-white/25 hover:bg-white/[0.06]'}`} style={active ? { boxShadow: `0 20px 60px rgba(0,0,0,.35), 0 0 36px ${tintFor(item, 0.15)}` } : undefined}>
+                    <div className="relative">
+                      <img src={`/mascots/${item.id}.webp`} alt={`${item.label}, ${pick(item.role)}`} loading="lazy" className="mx-auto h-24 w-24 rounded-2xl object-cover transition duration-300 group-hover:scale-105" style={{ filter: locked ? 'grayscale(1) brightness(0.75)' : 'none' }} />
+                      {locked && <span className="absolute inset-0 grid place-items-center"><span className="grid h-8 w-8 place-items-center rounded-full bg-black/80 text-white/90"><Lock className="h-3.5 w-3.5" /></span></span>}
+                    </div>
+                    <div className="mt-3">
+                      <div className="text-xs font-black uppercase">{item.label}</div>
+                      <div className="mt-1 font-mono text-[8px] uppercase tracking-[0.12em] text-white/38">{locked ? t(`Level ${item.requiredLevel}`, `Nivel ${item.requiredLevel}`) : pick(item.role)}</div>
                     </div>
                   </button>
                 );
@@ -452,44 +429,39 @@ export default function BobbyAppLandingExperience() {
           </div>
         </section>
 
-        <section className="bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <div className="mx-auto max-w-7xl">
-            <motion.div {...reveal} className="mb-12 max-w-3xl">
-              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">Finance you want to return to</div>
-              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">It feels alive because<br /><span className="text-white/38">your progress is real.</span></h2>
+        {/* TRADER LAND — the world */}
+        <section id="trader-land" className="relative overflow-hidden bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.1fr_.9fr] lg:items-center">
+            <motion.div {...reveal} className="relative overflow-hidden rounded-[2rem] border" style={{ borderColor: `${GOLD}40`, boxShadow: `0 0 80px ${GOLD}1a` }}>
+              <img src="/world/bobby-world.jpg" alt={t('Trader Land, the world you build with discipline', 'Trader Land, el mundo que construyes con disciplina')} loading="lazy" className="h-full w-full object-cover" />
+              <div className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-white/85 backdrop-blur">Trader Land</div>
+              <div className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.3em] text-black" style={{ background: GOLD, boxShadow: `0 0 24px ${GOLD}88` }}><Lock className="h-3 w-3" /> {t('Soon', 'Pronto')}</div>
             </motion.div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {LIFESTYLE_CARDS.map((card, index) => (
-                <motion.article key={card.title} {...reveal} transition={{ delay: reduceMotion ? 0 : index * 0.07 }} className="group relative min-h-[560px] overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#090b0a] sm:min-h-[620px] md:min-h-[680px]">
-                  <img src={card.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-[1.025]" />
-                  <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-[#030504]" />
-                  <div className="absolute inset-x-0 bottom-0 p-7">
-                    <div className="mb-4 font-mono text-[9px] font-bold uppercase tracking-[0.19em] text-[#8dffad]">{card.label}</div>
-                    <h3 className="text-3xl font-black leading-[0.98] tracking-[-0.05em]">{card.title}</h3>
-                    <p className="mt-4 text-sm leading-6 text-white/62">{card.text}</p>
-                  </div>
-                </motion.article>
-              ))}
-            </div>
+            <motion.div {...reveal}>
+              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: GOLD }}><MapIcon className="mr-2 inline h-3.5 w-3.5" />{t('Coming next', 'Lo que sigue')}</div>
+              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Your world,', 'Tu mundo,')}<br /><span className="text-white/38">{t('built with discipline.', 'construido con disciplina.')}</span></h2>
+              <p className="mt-6 max-w-lg text-base leading-7 text-white/52">{t('Every desk session drops a piece for your land. Regions open with aura, never with volume: Crypto Bay, Gold Mines, Wall Street Citadel, Risk Reef. Your squad builds a base together. The XP you earn today already counts.', 'Cada sesión de desk deja una pieza para tu tierra. Las regiones se abren con aura, nunca con volumen: Crypto Bay, Gold Mines, Wall Street Citadel, Risk Reef. Tu squad construye una base en equipo. El XP que ganas hoy ya cuenta.')}</p>
+              <div className="mt-8 flex flex-wrap gap-2">
+                {['CRYPTO BAY', 'GOLD MINES', 'WALL STREET CITADEL', 'RISK REEF'].map((region) => (
+                  <span key={region} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-mono text-[9px] tracking-[0.14em] text-white/55"><Lock className="h-3 w-3" />{region}</span>
+                ))}
+              </div>
+            </motion.div>
           </div>
         </section>
 
+        {/* THE PUBLIC RECORD — live numbers */}
         <section id="record" className="relative overflow-hidden border-y border-white/10 bg-[#050706] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_22%,rgba(92,255,145,.11),transparent_42%)]" />
           <div className="relative mx-auto max-w-7xl">
             <motion.div {...reveal} className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-end">
               <div>
-                <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">The public record</div>
-                <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">Bobby remembers<br /><span className="text-white/38">the misses too.</span></h2>
-                <p className="mt-6 max-w-lg text-base leading-7 text-white/50">Calls are published before the outcome. Wins, losses and flat results live on the same page, so confidence has consequences.</p>
+                <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">{t('The public record', 'El historial público')}</div>
+                <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Bobby remembers', 'Bobby recuerda')}<br /><span className="text-white/38">{t('the misses too.', 'también los fallos.')}</span></h2>
+                <p className="mt-6 max-w-lg text-base leading-7 text-white/50">{t('Calls are published before the outcome. Wins, losses and flat results live on the same page, so confidence has consequences.', 'Las llamadas se publican antes del resultado. Aciertos, fallos y empates viven en la misma página, para que la confianza tenga consecuencias.')}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {[
-                  ['Published', formatNumber(record?.commitmentsCreated)],
-                  ['Resolved', formatNumber(record?.decisionsResolved)],
-                  ['Wrong', formatNumber(record?.losses)],
-                  ['Record', hitRate],
-                ].map(([label, value]) => (
+                {[[t('Published', 'Publicadas'), formatNumber(record?.commitmentsCreated)], [t('Resolved', 'Resueltas'), formatNumber(record?.decisionsResolved)], [t('Wrong', 'Fallidas'), formatNumber(record?.losses)], [t('Record', 'Récord'), hitRate]].map(([label, value]) => (
                   <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.035] p-5">
                     <div className="font-mono text-[8px] font-bold uppercase tracking-[0.17em] text-white/35">{label}</div>
                     <div className="mt-3 font-mono text-2xl font-black tracking-[-0.05em] sm:text-3xl">{value}</div>
@@ -497,18 +469,20 @@ export default function BobbyAppLandingExperience() {
                 ))}
               </div>
             </motion.div>
-            <a href="/agentic-world/bobby/history" className="group mt-9 inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-white/55 transition hover:text-white">Inspect the full track record <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" /></a>
+            <a href="/agentic-world/bobby/history" className="group mt-9 inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-white/55 transition hover:text-white">{t('Inspect the full track record', 'Revisa el historial completo')} <ChevronRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" /></a>
           </div>
         </section>
 
+        {/* BOUNDARIES */}
         <section className="bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
           <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
             <motion.div {...reveal}>
-              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#8dc9ff]">Clear boundaries</div>
-              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">Your companion.<br /><span className="text-white/38">Not your broker.</span></h2>
+              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#8dc9ff]">{t('Clear boundaries', 'Límites claros')}</div>
+              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Your companion.', 'Tu companion.')}<br /><span className="text-white/38">{t('Not your broker.', 'No tu bróker.')}</span></h2>
+              <p className="mt-6 max-w-lg text-sm leading-6 text-white/45">{t('Analysis, not advice. You decide and you own the risk. Markets move against you and you can lose money.', 'Análisis, no asesoría. Tú decides y asumes el riesgo. Los mercados se mueven en tu contra y puedes perder dinero.')}</p>
             </motion.div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {BOUNDARIES.map(({ icon: Icon, title, text }) => (
+              {boundaries.map(({ icon: Icon, title, text }) => (
                 <div key={title} className="rounded-2xl border border-white/10 bg-[#0d100e] p-6">
                   <Icon className="h-5 w-5 text-[#8dc9ff]" />
                   <h3 className="mt-5 font-mono text-[10px] font-black uppercase tracking-[0.16em]">{title}</h3>
@@ -519,13 +493,13 @@ export default function BobbyAppLandingExperience() {
           </div>
         </section>
 
+        {/* EARLY ACCESS */}
         <section id="early-access" className="relative overflow-hidden border-t border-white/10 bg-[#050706] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(92,255,145,.2),transparent_50%),radial-gradient(circle_at_82%_24%,rgba(180,136,255,.14),transparent_38%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(245,197,66,.16),transparent_50%),radial-gradient(circle_at_82%_24%,rgba(92,255,145,.12),transparent_38%)]" />
           <motion.div {...reveal} className="relative mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.045] p-6 text-center shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-xl sm:p-10 lg:p-14">
             <div className="mx-auto mb-7 flex w-fit"><ComingSoonBadge /></div>
-            <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">Be there when<br /><span className="text-[#5cff91]">Bobby lands on iPhone.</span></h2>
-            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">Join the early-access list for TestFlight openings, launch news and your first chance to choose a companion.</p>
-
+            <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Be there when', 'Llega primero cuando')}<br /><span className="text-[#F5C542]">{t('Bobby lands on iPhone.', 'Bobby aterrice en iPhone.')}</span></h2>
+            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t('Join the early-access list for TestFlight openings, launch news and your first chance to pick a companion.', 'Únete a la lista de acceso anticipado para cupos de TestFlight, noticias del lanzamiento y tu primera oportunidad de elegir companion.')}</p>
             {signupState === 'success' ? (
               <div className="mx-auto mt-9 flex max-w-xl items-center justify-center gap-3 rounded-2xl border border-[#5cff91]/25 bg-[#5cff91]/10 px-5 py-5 text-left text-sm text-[#baffcc]" role="status">
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#5cff91] text-[#041009]"><Check className="h-4 w-4" /></span>
@@ -533,35 +507,19 @@ export default function BobbyAppLandingExperience() {
               </div>
             ) : (
               <form onSubmit={submitEarlyAccess} className="mx-auto mt-9 max-w-xl" noValidate>
-                <label className="sr-only" aria-hidden="true">
-                  Website
-                  <input name="website" type="text" tabIndex={-1} autoComplete="off" />
-                </label>
+                <label className="sr-only" aria-hidden="true">Website<input name="website" type="text" tabIndex={-1} autoComplete="off" /></label>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <label htmlFor="early-access-email" className="sr-only">Email address</label>
-                  <input
-                    id="early-access-email"
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(event) => { setEmail(event.target.value); if (signupState === 'error') setSignupState('idle'); }}
-                    placeholder="you@email.com"
-                    disabled={signupState === 'loading'}
-                    aria-describedby="signup-note signup-message"
-                    aria-invalid={signupState === 'error'}
-                    className="min-h-14 flex-1 rounded-xl border border-white/15 bg-black/35 px-5 text-base text-white outline-none transition placeholder:text-white/25 focus:border-[#5cff91]/65 focus:ring-4 focus:ring-[#5cff91]/10 disabled:opacity-60"
-                  />
+                  <label htmlFor="early-access-email" className="sr-only">{t('Email address', 'Correo electrónico')}</label>
+                  <input id="early-access-email" type="email" inputMode="email" autoComplete="email" value={email} onChange={(event) => { setEmail(event.target.value); if (signupState === 'error') setSignupState('idle'); }} placeholder={t('you@email.com', 'tu@correo.com')} disabled={signupState === 'loading'} aria-describedby="signup-note signup-message" aria-invalid={signupState === 'error'} className="min-h-14 flex-1 rounded-xl border border-white/15 bg-black/35 px-5 text-base text-white outline-none transition placeholder:text-white/25 focus:border-[#5cff91]/65 focus:ring-4 focus:ring-[#5cff91]/10 disabled:opacity-60" />
                   <button type="submit" disabled={signupState === 'loading'} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#5cff91] px-7 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white disabled:cursor-wait disabled:opacity-70">
-                    {signupState === 'loading' ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving</> : <>Save my spot <ArrowRight className="h-4 w-4" /></>}
+                    {signupState === 'loading' ? <><Loader2 className="h-4 w-4 animate-spin" /> {t('Saving', 'Guardando')}</> : <>{t('Save my spot', 'Aparta mi lugar')} <ArrowRight className="h-4 w-4" /></>}
                   </button>
                 </div>
                 <p id="signup-message" className={`mt-3 min-h-5 text-left text-xs ${signupState === 'error' ? 'text-[#ff8f83]' : 'text-transparent'}`} role={signupState === 'error' ? 'alert' : undefined}>{signupMessage || ' '}</p>
-                <p id="signup-note" className="mt-1 text-center font-mono text-[8px] uppercase tracking-[0.13em] text-white/28">Early-access updates only · Unsubscribe anytime · No spam</p>
+                <p id="signup-note" className="mt-1 text-center font-mono text-[8px] uppercase tracking-[0.13em] text-white/28">{t('Early-access updates only · Unsubscribe anytime · No spam', 'Solo avisos de acceso anticipado · Cancela cuando quieras · Sin spam')}</p>
               </form>
             )}
-
-            <a href={TRY_IT_URL} className="mt-8 inline-flex items-center gap-2 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-white/42 transition hover:text-white">Can’t wait? Try Bobby on the web <ChevronRight className="h-3.5 w-3.5" /></a>
+            <a href={TRY_IT_URL} className="mt-8 inline-flex items-center gap-2 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-white/42 transition hover:text-white">{t("Can't wait? Open the desk on the web", '¿No aguantas? Abre el desk en la web')} <ChevronRight className="h-3.5 w-3.5" /></a>
           </motion.div>
         </section>
       </main>
@@ -570,11 +528,11 @@ export default function BobbyAppLandingExperience() {
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <BrandMark />
           <div className="flex flex-wrap gap-x-6 gap-y-3 font-mono text-[9px] font-bold uppercase tracking-[0.13em] text-white/55">
-            <a href="/privacy" className="transition hover:text-white">Privacy</a>
+            <a href="/privacy" className="transition hover:text-white">{t('Privacy', 'Privacidad')}</a>
             <a href="/protocol" className="transition hover:text-white">Bobby Protocol</a>
-            <a href="/agentic-world/bobby/history" className="transition hover:text-white">Track record</a>
+            <a href="/agentic-world/bobby/history" className="transition hover:text-white">{t('Track record', 'Historial')}</a>
           </div>
-          <span className="font-mono text-[9px] uppercase tracking-[0.13em] text-white/55">© 2026 Bobby · Refuted before execution</span>
+          <span className="inline-flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.13em] text-white/55"><Flame className="h-3 w-3 text-[#F5C542]" /><PawPrint className="h-3 w-3 text-[#5cff91]" /> © 2026 Bobby · {t('Refuted before execution', 'Refutado antes de ejecutar')}</span>
         </div>
       </footer>
     </div>

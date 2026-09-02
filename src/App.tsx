@@ -416,9 +416,19 @@ const router = createBrowserRouter(
             </Suspense>
           ),
         },
-        // Voice experience is a focused, full-screen Bobby surface.
+        // The Live Desk is the iPhone experience on the web: risk notice →
+        // squad → desk with gear, pets, the forge and Trader Land.
         {
           path: 'agentic-world/bobby',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <CompanionDeskPage />
+            </Suspense>
+          ),
+        },
+        // The previous voice-first room stays reachable for reference.
+        {
+          path: 'agentic-world/bobby/voice-room',
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAgentTraderPage />

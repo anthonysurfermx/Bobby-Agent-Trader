@@ -5,7 +5,7 @@
 // explore board, risk notice. Bobby never executes anything.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Grid2x2, Lock, Map as MapIcon, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, Users, Volume2, VolumeX } from 'lucide-react';
+import { Globe, Grid2x2, Lock, Map as MapIcon, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, Users, Volume2, VolumeX } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, LEVEL_TONE, companionName, getCompanion, getVibe, levelFor, nextLevelFor, tintFor, toolArt, toolHasArt, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -385,6 +385,7 @@ export default function CompanionDesk() {
                     { icon: <MapIcon size={14} />, label: t('Trader Land · soon', 'Trader Land · pronto'), act: () => setSheet('world') },
                     { icon: <Share2 size={14} />, label: t('Share my skin', 'Compartir mi skin'), act: () => void shareSkin() },
                     { icon: <ShieldAlert size={14} />, label: t('Risk notice', 'Aviso de riesgo'), act: () => setSheet('risk') },
+                    { icon: <Globe size={14} />, label: isSpanish() ? 'English' : 'Español', act: () => { try { localStorage.setItem('bobby_lang', isSpanish() ? 'en' : 'es'); } catch { /* private mode */ } window.location.reload(); } },
                     { icon: muted ? <VolumeX size={14} /> : <Volume2 size={14} />, label: muted ? t('Sounds off', 'Sonidos apagados') : t('Sounds on', 'Sonidos encendidos'), act: () => { setSfxMuted(!muted); setMuted(!muted); } },
                     { icon: <RotateCcw size={14} />, label: t('Reset companion', 'Reiniciar companion'), act: () => { if (window.confirm(t('Reset XP, gear and companion on this browser?', '¿Reiniciar XP, equipo y companion en este navegador?'))) progressStore.reset(); } },
                   ].map((item) => (
