@@ -171,16 +171,25 @@ export function ToolDetail({ companion, tool, xp, onClose }: { companion: Compan
 export function NoTradeCard({ symbol, reason, xp, onClose }: { symbol: string; reason: string; xp: number; onClose: () => void }) {
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="rounded-2xl p-6 border border-sky-300/30 bg-gradient-to-br from-sky-400/10 via-white/[0.02] to-transparent relative">
-        <button onClick={onClose} className="absolute right-4 top-4 text-white/50 text-xs font-mono">✕</button>
-        <div className="text-[10px] font-mono tracking-[0.25em] text-sky-300">HALO // RISK GATE</div>
-        <div className="mt-6 mx-auto h-28 w-28 rounded-full border-4 border-white/80 flex items-center justify-center relative">
-          <ShieldCheck className="text-sky-300 absolute -bottom-3" size={34} />
+      <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="rounded-2xl px-6 pt-5 pb-6 border border-sky-300/30 relative overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 30%, rgba(125,211,252,0.14), rgba(255,255,255,0.02) 55%, transparent 80%)' }}>
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] font-mono tracking-[0.25em] text-sky-300">HALO // RISK GATE</div>
+          <button onClick={onClose} className="h-7 w-7 rounded-full bg-white/[0.05] text-white/60 text-xs font-mono" aria-label="close">✕</button>
         </div>
-        <div className="mt-6 text-center text-4xl font-mono tracking-[0.2em] text-sky-200">NO TRADE</div>
-        <div className="text-center text-white mt-2 text-lg">{t('No setup yet. Capital protected.', 'Sin setup todavía. Capital protegido.')}</div>
-        <div className="text-center text-white/50 text-xs font-mono mt-1">{reason}</div>
-        <div className="mt-5 flex items-center justify-between text-[11px] font-mono border border-white/[0.08] rounded-lg px-3 py-2">
+        {/* The halo: HALO's own face inside the ring, the shield as its badge — the same beat as the iOS card. */}
+        <div className="relative mx-auto mt-6 h-36 w-36">
+          <div className="absolute inset-0 rounded-full" style={{ boxShadow: '0 0 48px rgba(125,211,252,0.35)' }} />
+          <div className="absolute inset-0 rounded-full border-[5px] border-white/85 overflow-hidden bg-black/60">
+            <img src="/mascots/halo.webp" alt="" className="h-full w-full object-cover scale-110" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+          </div>
+          <div className="absolute left-1/2 -bottom-4 -translate-x-1/2 h-11 w-11 rounded-full bg-[#0b1220] border border-sky-300/60 flex items-center justify-center" style={{ boxShadow: '0 0 18px rgba(125,211,252,0.55)' }}>
+            <ShieldCheck className="text-sky-300" size={22} />
+          </div>
+        </div>
+        <div className="mt-8 text-center text-4xl md:text-5xl font-mono tracking-[0.22em] text-sky-200">NO TRADE</div>
+        <div className="mt-3 text-center text-white text-lg md:text-xl font-medium">{t('No setup yet. Capital protected.', 'Sin setup todavía. Capital protegido.')}</div>
+        <div className="mt-1 text-center text-white/55 text-xs font-mono">{reason}</div>
+        <div className="mt-5 flex items-center justify-between text-[11px] font-mono border border-white/[0.08] rounded-lg px-3 py-2 bg-black/30">
           <span className="text-amber-300 flex items-center gap-1"><Sparkles size={12} /> {xp > 0 ? t(`+${xp} DISCIPLINE XP`, `+${xp} XP DE DISCIPLINA`) : t('DAILY CAP REACHED', 'TOPE DIARIO ALCANZADO')}</span>
           <span className="text-white/40">{symbol}</span>
         </div>
