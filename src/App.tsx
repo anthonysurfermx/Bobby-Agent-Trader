@@ -62,6 +62,7 @@ const ConsensusPage = lazy(() => import('@/pages/ConsensusPage'));
 const ClawTraderPage = lazy(() => import('@/pages/ClawTraderPage'));
 const ClawTraderChatPage = lazy(() => import('@/pages/ClawTraderChatPage'));
 const BobbyAgentTraderPage = lazy(() => import('@/pages/BobbyAgentTraderPage'));
+const CompanionDeskPage = lazy(() => import('@/pages/CompanionDeskPage'));
 const BobbyChallengePage = lazy(() => import('@/pages/BobbyChallengePage'));
 const BobbyAnalyticsPage = lazy(() => import('@/pages/BobbyAnalyticsPage'));
 const BobbyHistoryPage = lazy(() => import('@/pages/BobbyHistoryPage'));
@@ -421,6 +422,15 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAgentTraderPage />
+            </Suspense>
+          ),
+        },
+        // The iPhone experience on the web: risk notice → squad → live desk.
+        {
+          path: 'desk',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <CompanionDeskPage />
             </Suspense>
           ),
         },

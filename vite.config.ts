@@ -69,6 +69,10 @@ export default defineConfig({
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
       },
+      // Companion desk on the web: same voice, search and ticker routes the app uses.
+      '/api/bobby-voice-free': { target: 'https://bobbyprotocol.xyz', changeOrigin: true },
+      '/api/bobby-asset-search': { target: 'https://bobbyprotocol.xyz', changeOrigin: true },
+      '/api/okx-tickers': { target: 'https://bobbyprotocol.xyz', changeOrigin: true },
       '/api/bobby-protocol-stats': {
         target: 'https://bobbyprotocol.xyz',
         changeOrigin: true,
