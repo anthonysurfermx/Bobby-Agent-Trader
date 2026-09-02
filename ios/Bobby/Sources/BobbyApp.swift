@@ -6,8 +6,18 @@ import SwiftUI
 struct BobbyApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .preferredColorScheme(.dark)
+            Group {
+#if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-qa-skin") {
+                    GearSkinQAFixtureView()
+                } else {
+                    ContentView()
+                }
+#else
+                ContentView()
+#endif
+            }
+            .preferredColorScheme(.dark)
         }
     }
 }

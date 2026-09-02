@@ -8,7 +8,7 @@ import SwiftUI
 import AudioToolbox
 
 /// Where a piece of gear sits on the body. Positions are relative to the
-/// model's bounding radius so every companion wears it in the same place.
+/// model's normalized bounding-box unit so every companion wears it in the same place.
 enum BodySlot: String {
     case face, headset, head, hand, hip, shoulder, chest
     /// Where it sits, for previews: "ON THE FACE" / "EN LA CARA".

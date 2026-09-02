@@ -443,6 +443,8 @@ struct MascotSceneView: UIViewRepresentable {
     /// Bump to receive a rendered snapshot of the scene (share my skin).
     var snapshotToken: Int = 0
     var onSnapshot: ((UIImage) -> Void)? = nil
+    /// Deterministic pose for the DEBUG attachment matrix: no spin, bob or hop.
+    var staticPose = false
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
@@ -511,6 +513,9 @@ struct MascotSceneView: UIViewRepresentable {
         var initialCameraPosition = SCNVector3Zero
         var lastEmoteId: UUID?
         var modelRadius: Float = 1
+        /// Half of the model's largest bounding-box dimension. Unlike the
+        /// sphere radius, this is not inflated by tails/depth and matches web.
+        var attachmentUnit: Float = 1
         var loadStartedAt: CFAbsoluteTime = 0
         var footprintBeforeLoad: UInt64 = 0
         weak var gearRoot: SCNNode?
@@ -523,7 +528,7 @@ struct MascotSceneView: UIViewRepresentable {
         /// and the companion reacts. Fortnite energy, SceneKit budget.
         func playEquip(toolId: String) {
             guard let holder = gearRoot, let node = holder.childNode(withName: toolId, recursively: false), let body = modelRoot else { return }
-            let r = CGFloat(modelRadius)
+            let r = CGFloat(attachmentUnit)
             let target = node.position
             let targetScale = node.scale
             node.removeAction(forKey: "equip")
@@ -565,11 +570,11 @@ struct MascotSceneView: UIViewRepresentable {
             gearRoot?.removeFromParentNode()
             let holder = SCNNode()
             holder.name = "gear"
-            let r = CGFloat(modelRadius)
-            // Body anchors, relative to the bounding radius. Every GLB has a
-            // different silhouette, so companion-specific profiles keep the
-            // gear on the actual face/body instead of floating beside it.
-            func anchor(_ slot: BodySlot) -> (SCNVector3, CGFloat) {
+            let r = CGFloat(attachmentUnit)
+            // Body anchors use half of the largest bounding-box dimension, the
+            // same unit as web. Item overrides handle intentional two-handed
+            // loadouts without weakening the companion/slot defaults.
+            func anchor(_ tool: CompanionTool) -> (SCNVector3, CGFloat) {
                 let defaults: [BodySlot: (CGFloat, CGFloat, CGFloat, CGFloat)] = [
                     .face: (0, 0.42, 0.80, 0.62), .headset: (0, 0.62, 0.70, 0.72),
                     .head: (0, 1.22, 0, 0.62), .hand: (0.80, -0.42, 0.50, 0.46),
@@ -579,7 +584,7 @@ struct MascotSceneView: UIViewRepresentable {
                 let profiles: [String: [BodySlot: (CGFloat, CGFloat, CGFloat, CGFloat)]] = [
                     "orb": [.hand: (0.45,-0.18,0.76,0.34), .chest: (0,0.02,0.94,0.38), .head: (0,0.96,0.08,0.42)],
                     "byte": [.hip: (0.32,-0.18,0.76,0.30), .face: (0,0.45,0.92,0.62), .hand: (0.53,-0.42,0.68,0.34)],
-                    "kora": [.headset: (0,0.54,0.72,0.68), .shoulder: (-0.22,0.14,0.78,0.28), .hand: (0.24,-0.46,0.80,0.30)],
+                    "kora": [.headset: (0,0.58,0.64,0.68), .shoulder: (-0.22,0.14,0.78,0.28), .hand: (0.24,-0.46,0.80,0.30)],
                     "zip": [.hand: (0.38,-0.40,0.76,0.29), .shoulder: (-0.32,0.20,0.72,0.29), .head: (0,1.02,0.08,0.38)],
                     "glitch": [.hand: (0.62,-0.34,0.60,0.38), .chest: (0,0.05,0.92,0.36)],
                     "momo": [.hand: (0.58,-0.22,0.62,0.36), .face: (0,0.20,0.94,0.58), .head: (0,0.98,0.08,0.40)],
@@ -588,7 +593,16 @@ struct MascotSceneView: UIViewRepresentable {
                     "halo": [.chest: (0,0,0.94,0.40), .shoulder: (-0.66,0.10,0.56,0.34), .head: (0,0.96,0.08,0.40)],
                     "axiom": [.hand: (0.62,-0.28,0.62,0.34), .chest: (0,0.04,0.94,0.34), .head: (0,1.00,0.08,0.38)],
                 ]
-                let a = profiles[owner?.assetName ?? ""]?[slot] ?? defaults[slot] ?? defaults[.hand]!
+                let itemOverrides: [String: (CGFloat, CGFloat, CGFloat, CGFloat)] = [
+                    // Glitch dual-wields: keep the hammer and blade visible on
+                    // opposite hands in the full skin instead of stacking them.
+                    "glitch-1": (0.36,-0.34,0.60,0.38),
+                    "glitch-2": (-0.36,-0.34,0.60,0.38),
+                ]
+                let a = itemOverrides[tool.id]
+                    ?? profiles[owner?.assetName ?? ""]?[tool.slot]
+                    ?? defaults[tool.slot]
+                    ?? defaults[.hand]!
                 return (SCNVector3(Float(r * a.0), Float(r * a.1), Float(r * a.2)), r * a.3)
             }
             for tool in tools {
@@ -596,7 +610,7 @@ struct MascotSceneView: UIViewRepresentable {
                 // Cutout art (transparent PNG) when we have it; otherwise a small badge.
                 let art = UIImage(named: tool.assetName)
                 let image = art ?? Self.glyphImage(tool.symbol, tint: tint, symbolic: true)
-                let (position, size) = anchor(tool.slot)
+                let (position, size) = anchor(tool)
                 let plane = SCNPlane(width: size, height: size)
                 plane.cornerRadius = art == nil ? size * 0.5 : 0
                 plane.firstMaterial?.diffuse.contents = image
@@ -611,7 +625,7 @@ struct MascotSceneView: UIViewRepresentable {
                 node.renderingOrder = 10 + tool.tier
                 // No billboard constraint: the plane inherits the GLB's
                 // rotation and stays physically attached while the user spins.
-                if tool.slot == .head {
+                if tool.slot == .head && !(owner?.staticPose ?? false) {
                     // The golden piece hovers above the head with a slow bob.
                     let bob = SCNAction.sequence([
                         .moveBy(x: 0, y: r * 0.05, z: 0, duration: 1.3),
@@ -650,7 +664,9 @@ struct MascotSceneView: UIViewRepresentable {
                 let billboard = SCNBillboardConstraint()
                 billboard.freeAxes = .Y
                 node.constraints = [billboard]
-                if pet.spins {
+                if owner?.staticPose == true {
+                    // Snapshot fixture: keep the pet on its physical anchor.
+                } else if pet.spins {
                     // The spinning panda: an in-plane twirl, forever.
                     node.runAction(.repeatForever(.rotateBy(x: 0, y: 0, z: 2 * .pi, duration: 2.2)))
                 } else {
@@ -822,7 +838,7 @@ struct MascotSceneView: UIViewRepresentable {
         func startSpin() {
             // Accessibility: an ever-spinning model is exactly what Reduce
             // Motion asks us not to do.
-            guard !UIAccessibility.isReduceMotionEnabled else { return }
+            guard !UIAccessibility.isReduceMotionEnabled, owner?.staticPose != true else { return }
             modelRoot?.runAction(.repeatForever(.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 14)), forKey: "spin")
         }
     }
@@ -852,8 +868,16 @@ struct MascotSceneView: UIViewRepresentable {
                 scene.background.contents = UIColor.clear
 
                 let root = scene.rootNode
-                let (center, radius) = root.boundingSphere
+                let (minimum, maximum) = root.boundingBox
+                let center = SCNVector3(
+                    (minimum.x + maximum.x) / 2,
+                    (minimum.y + maximum.y) / 2,
+                    (minimum.z + maximum.z) / 2
+                )
+                let maxExtent = max(maximum.x - minimum.x, maximum.y - minimum.y, maximum.z - minimum.z)
+                let (_, radius) = root.boundingSphere
                 coordinator.modelRadius = max(radius, 0.001)
+                coordinator.attachmentUnit = max(maxExtent / 2, 0.001)
                 root.childNodes.forEach { node in
                     node.position.x -= center.x
                     node.position.y -= center.y
@@ -908,6 +932,93 @@ struct MascotSceneView: UIViewRepresentable {
         return result == KERN_SUCCESS ? info.phys_footprint : 0
     }
 }
+
+#if DEBUG
+/// Direct, backend-free fixture for the complete skin matrix. One launch
+/// renders the exact desk and preview sizes side by side for the same loadout.
+struct GearSkinQAFixtureView: View {
+    private let companion: Companion
+    private let caseId: String
+    private let tools: [CompanionTool]
+    private let pet: CompanionPet?
+    @State private var deskReady = false
+    @State private var previewReady = false
+    @State private var failed = false
+
+    init(arguments: [String] = ProcessInfo.processInfo.arguments) {
+        func value(after flag: String) -> String? {
+            guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
+            return arguments[index + 1]
+        }
+        let companionId = value(after: "-qa-companion") ?? "orb"
+        let requestedCase = value(after: "-qa-item") ?? "full"
+        let selected = bobbyCompanions.first { $0.id == companionId } ?? bobbyCompanions[0]
+        companion = selected
+        caseId = requestedCase
+        if requestedCase == "full" {
+            tools = CompanionToolkit.tools(for: selected.id)
+            pet = CompanionToolkit.pet(for: selected.id)
+        } else if requestedCase == "pet" {
+            tools = []
+            pet = CompanionToolkit.pet(for: selected.id)
+        } else {
+            tools = CompanionToolkit.tools(for: selected.id).filter { $0.id == requestedCase }
+            pet = nil
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("SKIN QA // \(companion.id.uppercased()) // \(caseId.uppercased())")
+                .font(.mono(12, .bold)).kerning(1.4).foregroundStyle(companion.tintSoft)
+                .padding(.top, 8)
+
+            qaStage(label: "DESK · 206×208", width: 206, height: 208) { loading, didFail in
+                if !loading { deskReady = !didFail }
+                failed = failed || didFail
+            }
+
+            qaStage(label: "PREVIEW · 340 PT", width: nil, height: 340) { loading, didFail in
+                if !loading { previewReady = !didFail }
+                failed = failed || didFail
+            }
+
+            Text(failed ? "FAILED" : (deskReady && previewReady ? "READY" : "LOADING"))
+                .font(.mono(11, .bold))
+                .foregroundStyle(failed ? Theme.down : Theme.up)
+                .accessibilityIdentifier(failed ? "qa-skin-failed" : (deskReady && previewReady ? "qa-skin-ready" : "qa-skin-loading"))
+            Spacer(minLength: 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(KineticBackground())
+        .preferredColorScheme(.dark)
+    }
+
+    private func qaStage(
+        label: String,
+        width: CGFloat?,
+        height: CGFloat,
+        onLoading: @escaping (Bool, Bool) -> Void
+    ) -> some View {
+        VStack(spacing: 4) {
+            Text(label).font(.mono(9, .bold)).foregroundStyle(Theme.muted)
+            MascotSceneView(
+                assetName: companion.id,
+                interactive: false,
+                onLoading: onLoading,
+                gear: tools,
+                pet: pet,
+                staticPose: true
+            )
+            .frame(width: width, height: height)
+            .background(companion.tint.opacity(0.06))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(companion.tint.opacity(0.30), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+#endif
 
 // ---- Evolution moment ----------------------------------------
 // The payoff: discipline made the companion change form, name and tone.

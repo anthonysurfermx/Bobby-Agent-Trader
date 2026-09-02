@@ -134,6 +134,27 @@ final class StoreShots: XCTestCase {
         XCTAssertTrue(more.waitForExistence(timeout: 5))
     }
 
+    /// Complete Fortnite-style attachment matrix. Each capture contains the
+    /// exact desk and preview dimensions for one isolated item or full loadout.
+    func test05_GearAttachmentMatrix() throws {
+        let companions = ["orb", "byte", "kora", "zip", "glitch", "momo", "flux", "rook", "halo", "axiom"]
+        for companion in companions {
+            for item in ["\(companion)-1", "\(companion)-2", "\(companion)-3", "pet", "full"] {
+                let app = XCUIApplication()
+                app.launchArguments = [
+                    "-qa-skin", "-qa-companion", companion, "-qa-item", item,
+                    "-AppleLanguages", "(en)", "-AppleLocale", "en_US"
+                ]
+                app.launch()
+
+                let ready = app.staticTexts["qa-skin-ready"]
+                XCTAssertTrue(ready.waitForExistence(timeout: 15), "Fixture failed to load: \(companion)/\(item)")
+                shot("gear-\(companion)-\(item)")
+                app.terminate()
+            }
+        }
+    }
+
     /// Ask a real question and capture verdict + (if XP was seeded just under
     /// a level boundary) the evolution overlay.
     func test02_VerdictAndEvolution() throws {
