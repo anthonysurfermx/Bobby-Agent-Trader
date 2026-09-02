@@ -267,7 +267,7 @@ struct MascotGalleryView: View {
             justChosen = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             // In its OWN voice persona — the whole point of choosing it
-            voice?.speak(selected.selectLine, voiceId: voiceId, persona: selected.voicePersona)
+            voice?.speak(selected.selectLine, voiceId: voiceId, persona: selected.voicePersona, playbackRate: 1.12)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { justChosen = false }
         } label: {
             Text(isActive ? (justChosen ? L.t("✓ YOUR COMPANION NOW", "✓ AHORA ES TU COMPANION") : L.t("✓ YOUR COMPANION", "✓ TU COMPANION")) :

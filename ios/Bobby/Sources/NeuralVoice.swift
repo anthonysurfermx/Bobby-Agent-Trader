@@ -37,11 +37,12 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// to the system voice when the network voice fails. Ambient lines —
     /// greetings, onboarding previews — retry once and then stay silent: a
     /// robotic voice breaking the companion's identity is worse than no voice.
-    func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true) {
+    func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true, playbackRate: Float = 1.0) {
         stop()
         generation += 1
         let gen = generation
         fallbackPersona = persona ?? voiceId
+        fallbackPlaybackRate = playbackRate
 
         Task {
             do {
@@ -81,6 +82,11 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 let p = try AVAudioPlayer(data: data)
                 p.delegate = self
                 p.isMeteringEnabled = true
+                // Short character introductions need a little more momentum
+                // than data-heavy analysis. Keep the default at 1× and let
+                // onboarding/squad previews opt into the livelier cadence.
+                p.enableRate = playbackRate != 1.0
+                p.rate = min(1.25, max(0.85, playbackRate))
                 self.player = p
                 self.speaking = true
                 guard p.play() else {
@@ -115,6 +121,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// system voice of the same gender so companions stay distinguishable even
     /// when the network voice is unavailable.
     private var fallbackPersona: String = "coral"
+    private var fallbackPlaybackRate: Float = 1.0
 
     private static let feminineVoices: Set<String> = ["coral", "sage", "nova", "shimmer", "marin", "alloy", "fable", "female"]
 
@@ -145,7 +152,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     private func speakFallback(_ text: String) {
         let u = AVSpeechUtterance(string: text)
         u.voice = bestSystemVoice()
-        u.rate = 0.5
+        u.rate = min(AVSpeechUtteranceMaximumSpeechRate, max(AVSpeechUtteranceMinimumSpeechRate, 0.5 * fallbackPlaybackRate))
         u.pitchMultiplier = Self.feminineVoices.contains(fallbackPersona) ? 1.05 : 0.95
         speaking = true
         fallback.speak(u)

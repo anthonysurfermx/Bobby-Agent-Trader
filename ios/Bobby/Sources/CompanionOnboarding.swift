@@ -144,7 +144,7 @@ struct CompanionOnboarding: View {
                             guard comp.id != selected.id else { return }
                             selected = comp
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            voice.speak(comp.selectLine, voiceId: comp.voicePersona, persona: comp.voicePersona, essential: false)
+                            voice.speak(comp.selectLine, voiceId: comp.voicePersona, persona: comp.voicePersona, essential: false, playbackRate: 1.12)
                         } label: {
                             VStack(spacing: 5) {
                                 CompanionThumb(companion: comp)
@@ -194,7 +194,7 @@ struct CompanionOnboarding: View {
                     Button {
                         profile.vibeId = vibe.rawValue
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speak(vibe.sample, voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: vibe.rawValue, essential: false)
+                        voice.speak(vibe.sample, voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: vibe.rawValue, essential: false, playbackRate: 1.12)
                     } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
