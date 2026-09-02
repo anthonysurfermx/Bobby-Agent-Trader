@@ -175,3 +175,21 @@ herramientas. Propuesta para llevar la misma experiencia, en este orden:
 Estimación: 1 semana para 1–3 (backend + escena), 1 semana para 4–5. Riesgo principal: dos
 fuentes de XP (local y servidor) divergiendo; resolver con "el servidor manda cuando existe
 cuenta, local solo como caché".
+
+## 9. Ampliaciones decididas la misma tarde (build 10 iOS · web `/desk`)
+
+- **Equipo sobre el cuerpo (efecto Fortnite).** Cada herramienta desbloqueada se ancla al
+  modelo 3D: cadera (común), hombro (raro) y halo sobre la cabeza (dorado, con brillo).
+  Flotan, giran con el personaje y salen en la captura. El overlay de loot muestra en quién
+  quedó equipado.
+- **Mascotas.** Una por personaje, a **300 XP**: Bobby → panda que gira, Byte → perro, Kora →
+  gata, Zip → mono (y una para cada desbloqueable). Viven a los pies del personaje. Hoy son
+  emoji animados; el arte 3D queda para cuando decidamos gastar créditos.
+- **Slot "+".** Bajo el cinturón: abre el catálogo de lo que falta (tu mascota y el equipo de
+  los demás compañeros) con los **XP exactos que faltan** y el nivel que desbloquea al
+  compañero. Aspiración, con precio honesto.
+- **Compartir skin.** Tarjeta 1080×1350 con la escena en vivo, nombre evolucionado, nivel, equipo
+  y mascota → hoja de compartir (iOS) / Web Share o descarga (web). Es el "mira mi skin".
+- **Fix.** El saludo del desk ya no suena mientras se lee el aviso de riesgo.
+- **Web.** La ruta `/desk` replica la experiencia completa con progreso en el navegador
+  (misma regla de XP). Pendiente: progreso compartido app↔web vía Supabase.
