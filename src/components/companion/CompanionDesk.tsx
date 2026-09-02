@@ -14,6 +14,7 @@ import { levelProgress, progressStore, useProgress } from '@/lib/companions/prog
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import RiskNotice from './RiskNotice';
+import ProgressSync from './ProgressSync';
 import { MarketCanvas, type ChartLevel, type Timeframe } from '@/components/adams/MarketCanvas';
 import { EvolutionOverlay, GearCatalog, NoTradeCard, ToolBelt, ToolDetail, ToolUnlockOverlay, WorldMapTeaser } from './CompanionOverlays';
 import { PET_UNLOCK_XP, petArt, petFor, petUnlocked, toolSlot, wornGear } from '@/lib/companions/data';
@@ -251,7 +252,7 @@ export default function CompanionDesk() {
     if (noTradeNow) sfxShield(); else sfxSuccess();
     // A full review earns discipline; respecting NO TRADE earns more. The
     // number shown is what the daily cap ACTUALLY granted.
-    const result = progressStore.awardDiscipline(noTradeNow ? 20 : 10);
+    const result = progressStore.awardDiscipline(noTradeNow ? 'no_trade_respected' : 'read_complete');
     if (noTradeNow) setNoTrade({ symbol: snap.symbol, reason: noTradeReason(a), xp: result.awarded });
     if (result.evolvedTo) setEvolution(result.evolvedTo);
     if (result.drops.length) setDrops((d) => [...d, ...result.drops]);
@@ -396,6 +397,7 @@ export default function CompanionDesk() {
             <ShieldCheck className="h-3 w-3 text-[#7da6ff]" />
             <span>{t('Bobby never executes · you confirm', 'Bobby no ejecuta · tú confirmas')}</span>
           </div>
+          <ProgressSync />
           <button onClick={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-sky-300">{speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
           <div className="relative">
             <button onClick={() => setMenu((m) => !m)} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/70"><MoreHorizontal size={16} /></button>
