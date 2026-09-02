@@ -426,6 +426,10 @@ struct MascotSceneView: UIViewRepresentable {
     /// its feet. Attached to the model root so they turn with the companion.
     var gear: [CompanionTool] = []
     var pet: CompanionPet? = nil
+    /// Tool id that was just equipped: it flies from the front onto its body
+    /// slot with a pop. Bump `equipToken` to replay.
+    var equipToolId: String? = nil
+    var equipToken: Int = 0
     /// Bump to receive a rendered snapshot of the scene (share my skin).
     var snapshotToken: Int = 0
     var onSnapshot: ((UIImage) -> Void)? = nil
@@ -460,6 +464,10 @@ struct MascotSceneView: UIViewRepresentable {
         context.coordinator.owner = self
         context.coordinator.setTalking(speaking, level: voiceLevel)
         context.coordinator.applyGearIfNeeded(gear, pet: pet)
+        if equipToken != context.coordinator.lastEquipToken {
+            context.coordinator.lastEquipToken = equipToken
+            if let equipToolId { context.coordinator.playEquip(toolId: equipToolId) }
+        }
         if snapshotToken != context.coordinator.lastSnapshotToken {
             context.coordinator.lastSnapshotToken = snapshotToken
             if snapshotToken > 0 { onSnapshot?(view.snapshot()) }
@@ -498,6 +506,46 @@ struct MascotSceneView: UIViewRepresentable {
         weak var gearRoot: SCNNode?
         var appliedGearKey = ""
         var lastSnapshotToken = 0
+        var lastEquipToken = 0
+
+        /// The skin moment: the new piece appears big in front of the
+        /// companion, flies to its slot, snaps with a squash-and-stretch pop,
+        /// and the companion reacts. Fortnite energy, SceneKit budget.
+        func playEquip(toolId: String) {
+            guard let holder = gearRoot, let node = holder.childNode(withName: toolId, recursively: false), let body = modelRoot else { return }
+            let r = CGFloat(modelRadius)
+            let target = node.position
+            let targetScale = node.scale
+            node.removeAction(forKey: "equip")
+            node.position = SCNVector3(0, Float(r * 0.35), Float(r * 1.5))
+            node.scale = SCNVector3(2.4, 2.4, 2.4)
+            node.opacity = 0
+            let appear = SCNAction.group([.fadeIn(duration: 0.18), .scale(to: 2.0, duration: 0.18)])
+            let fly = SCNAction.group([
+                .move(to: target, duration: 0.42),
+                .scale(to: CGFloat(targetScale.x), duration: 0.42),
+            ])
+            fly.timingMode = .easeInEaseOut
+            let pop = SCNAction.sequence([
+                .scale(to: CGFloat(targetScale.x) * 1.35, duration: 0.09),
+                .scale(to: CGFloat(targetScale.x) * 0.92, duration: 0.09),
+                .scale(to: CGFloat(targetScale.x), duration: 0.14),
+            ])
+            node.runAction(.sequence([appear, .wait(duration: 0.12), fly, pop]), forKey: "equip")
+            // The companion feels it: a little squash when the piece lands.
+            body.removeAction(forKey: "emote")
+            let react = SCNAction.sequence([
+                .wait(duration: 0.72),
+                .scale(to: 1.08, duration: 0.09),
+                .scale(to: 0.96, duration: 0.09),
+                .scale(to: 1.0, duration: 0.16),
+            ])
+            react.timingMode = .easeInEaseOut
+            body.runAction(react, forKey: "emote")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.72) {
+                UIImpactFeedbackGenerator(style: .rigid).impactOccurred(intensity: 1)
+            }
+        }
 
         /// Worn gear + pet. Re-applied only when the set changes or the model reloads.
         func applyGearIfNeeded(_ tools: [CompanionTool], pet: CompanionPet?, force: Bool = false) {
@@ -508,53 +556,74 @@ struct MascotSceneView: UIViewRepresentable {
             let holder = SCNNode()
             holder.name = "gear"
             let r = CGFloat(modelRadius)
-            // Slots on the body: hip (common), shoulder (rare), halo above the head (golden).
-            let spots: [Int: SCNVector3] = [
-                1: SCNVector3(Float(r * 0.82), Float(-r * 0.05), Float(r * 0.45)),
-                2: SCNVector3(Float(-r * 0.84), Float(r * 0.58), Float(r * 0.40)),
-                3: SCNVector3(0, Float(r * 1.28), Float(r * 0.05)),
-            ]
+            // Body anchors, relative to the bounding radius. In front of the
+            // body so the billboards never sink into the mesh.
+            func anchor(_ slot: BodySlot) -> (SCNVector3, CGFloat) {
+                switch slot {
+                case .face:     return (SCNVector3(0, Float(r * 0.40), Float(r * 0.80)), r * 0.92)
+                case .headset:  return (SCNVector3(0, Float(r * 0.62), Float(r * 0.70)), r * 0.95)
+                case .head:     return (SCNVector3(0, Float(r * 1.22), 0), r * 0.62)
+                case .hand:     return (SCNVector3(Float(r * 0.80), Float(-r * 0.42), Float(r * 0.50)), r * 0.46)
+                case .hip:      return (SCNVector3(Float(r * 0.36), Float(-r * 0.12), Float(r * 0.70)), r * 0.36)
+                case .shoulder: return (SCNVector3(Float(-r * 0.60), Float(r * 0.50), Float(r * 0.42)), r * 0.44)
+                case .chest:    return (SCNVector3(0, Float(r * 0.12), Float(r * 0.86)), r * 0.44)
+                }
+            }
             for tool in tools {
                 let tint = tool.isGolden ? UIColor(red: 0.96, green: 0.77, blue: 0.26, alpha: 1) : UIColor(hue: 0.415, saturation: 0.7, brightness: 0.95, alpha: 1)
-                let image = UIImage(named: tool.assetName) ?? Self.glyphImage(tool.symbol, tint: tint, symbolic: true)
-                let size = r * (tool.isGolden ? 0.62 : 0.5)
+                // Cutout art (transparent PNG) when we have it; otherwise a small badge.
+                let art = UIImage(named: tool.assetName)
+                let image = art ?? Self.glyphImage(tool.symbol, tint: tint, symbolic: true)
+                let (position, size) = anchor(tool.slot)
                 let plane = SCNPlane(width: size, height: size)
-                plane.cornerRadius = size * 0.5
+                plane.cornerRadius = art == nil ? size * 0.5 : 0
                 plane.firstMaterial?.diffuse.contents = image
                 plane.firstMaterial?.isDoubleSided = true
                 plane.firstMaterial?.lightingModel = .constant
                 plane.firstMaterial?.transparencyMode = .aOne
+                plane.firstMaterial?.blendMode = .alpha
+                plane.firstMaterial?.writesToDepthBuffer = false
                 let node = SCNNode(geometry: plane)
-                node.position = spots[tool.tier] ?? SCNVector3Zero
+                node.name = tool.id
+                node.position = position
+                node.renderingOrder = 10 + tool.tier
                 node.constraints = [SCNBillboardConstraint()]
-                let bob = SCNAction.sequence([
-                    .moveBy(x: 0, y: r * 0.04, z: 0, duration: 1.1 + Double(tool.tier) * 0.15),
-                    .moveBy(x: 0, y: -r * 0.04, z: 0, duration: 1.1 + Double(tool.tier) * 0.15),
-                ])
-                bob.timingMode = .easeInEaseOut
-                node.runAction(.repeatForever(bob))
+                if tool.slot == .head {
+                    // The golden piece hovers above the head with a slow bob.
+                    let bob = SCNAction.sequence([
+                        .moveBy(x: 0, y: r * 0.05, z: 0, duration: 1.3),
+                        .moveBy(x: 0, y: -r * 0.05, z: 0, duration: 1.3),
+                    ])
+                    bob.timingMode = .easeInEaseOut
+                    node.runAction(.repeatForever(bob))
+                }
                 if tool.isGolden {
-                    let glow = SCNPlane(width: size * 1.6, height: size * 1.6)
-                    glow.cornerRadius = size * 0.8
+                    let glow = SCNPlane(width: size * 1.7, height: size * 1.7)
+                    glow.cornerRadius = size * 0.85
                     glow.firstMaterial?.diffuse.contents = Self.glowImage(tint)
                     glow.firstMaterial?.lightingModel = .constant
                     glow.firstMaterial?.transparencyMode = .aOne
+                    glow.firstMaterial?.blendMode = .add
                     glow.firstMaterial?.writesToDepthBuffer = false
                     let g = SCNNode(geometry: glow)
-                    g.position = SCNVector3(0, 0, -0.001)
+                    g.position = SCNVector3(0, 0, -0.002)
+                    g.renderingOrder = 9
                     node.addChildNode(g)
                 }
                 holder.addChildNode(node)
             }
             if let pet {
-                let size = r * 0.58
+                let size = r * 0.70
                 let plane = SCNPlane(width: size, height: size)
-                plane.firstMaterial?.diffuse.contents = Self.glyphImage(pet.emoji, tint: .white, symbolic: false)
+                plane.firstMaterial?.diffuse.contents = UIImage(named: pet.assetName) ?? Self.glyphImage(pet.emoji, tint: .white, symbolic: false)
                 plane.firstMaterial?.isDoubleSided = true
                 plane.firstMaterial?.lightingModel = .constant
                 plane.firstMaterial?.transparencyMode = .aOne
+                plane.firstMaterial?.blendMode = .alpha
+                plane.firstMaterial?.writesToDepthBuffer = false
                 let node = SCNNode(geometry: plane)
-                node.position = SCNVector3(Float(-r * 0.98), Float(-r * 0.62), Float(r * 0.5))
+                node.position = SCNVector3(Float(-r * 0.92), Float(-r * 0.72), Float(r * 0.55))
+                node.renderingOrder = 14
                 let billboard = SCNBillboardConstraint()
                 billboard.freeAxes = .Y
                 node.constraints = [billboard]

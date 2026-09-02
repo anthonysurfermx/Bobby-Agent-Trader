@@ -7,12 +7,19 @@
 import SwiftUI
 import AudioToolbox
 
+/// Where a piece of gear sits on the body. Positions are relative to the
+/// model's bounding radius so every companion wears it in the same place.
+enum BodySlot: String {
+    case face, headset, head, hand, hip, shoulder, chest
+}
+
 struct CompanionTool: Identifiable, Equatable {
     let companionId: String
     let tier: Int          // 1, 2, 3
     let name: String
     let lore: String
     let symbol: String     // SF Symbol fallback
+    var slot: BodySlot = .hand
 
     var id: String { "\(companionId)-\(tier)" }
     var isGolden: Bool { tier == 3 }
@@ -32,7 +39,8 @@ struct CompanionTool: Identifiable, Equatable {
 enum CompanionToolkit {
     static func tools(for companionId: String) -> [CompanionTool] {
         func t(_ tier: Int, _ symbol: String, _ en: String, _ es: String, _ loreEn: String, _ loreEs: String) -> CompanionTool {
-            CompanionTool(companionId: companionId, tier: tier, name: L.t(en, es), lore: L.t(loreEn, loreEs), symbol: symbol)
+            CompanionTool(companionId: companionId, tier: tier, name: L.t(en, es), lore: L.t(loreEn, loreEs), symbol: symbol,
+                          slot: slots["\(companionId)-\(tier)"] ?? .hand)
         }
         switch companionId {
         case "orb":
@@ -100,6 +108,21 @@ enum CompanionToolkit {
         }
     }
 
+    /// Body slot per tool — the Fortnite part: goggles on the face, a radio on
+    /// the hip, a codex in the hand, a halo above the head.
+    static let slots: [String: BodySlot] = [
+        "orb-1": .hand, "orb-2": .chest, "orb-3": .head,
+        "byte-1": .hip, "byte-2": .face, "byte-3": .hand,
+        "kora-1": .headset, "kora-2": .shoulder, "kora-3": .hand,
+        "zip-1": .hand, "zip-2": .shoulder, "zip-3": .head,
+        "glitch-1": .hand, "glitch-2": .hand, "glitch-3": .chest,
+        "momo-1": .hand, "momo-2": .face, "momo-3": .head,
+        "flux-1": .hand, "flux-2": .chest, "flux-3": .head,
+        "rook-1": .chest, "rook-2": .head, "rook-3": .hand,
+        "halo-1": .chest, "halo-2": .shoulder, "halo-3": .head,
+        "axiom-1": .hand, "axiom-2": .chest, "axiom-3": .head,
+    ]
+
     static func unlocked(_ tool: CompanionTool, xp: Int) -> Bool { xp >= tool.unlockXP }
 
     /// Tools that crossed their threshold between two XP values, lowest tier first.
@@ -153,7 +176,8 @@ struct ToolBelt: View {
                     ZStack {
                         Circle().fill(has ? companion.tint.opacity(0.12) : Theme.card)
                         Circle().stroke(has ? companion.tint.opacity(0.6) : Theme.stroke, lineWidth: 1)
-                        if has { Text(pet.emoji).font(.system(size: 18)) } else {
+                        if has, pet.hasArt { Image(pet.assetName).resizable().scaledToFit().frame(width: 30, height: 30) }
+                        else if has { Text(pet.emoji).font(.system(size: 18)) } else {
                             Image(systemName: "pawprint.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.muted.opacity(0.6))
                         }
                     }
@@ -315,6 +339,8 @@ struct CompanionPet: Identifiable, Equatable {
     let spins: Bool
     var id: String { "pet-\(companionId)" }
     static let unlockXP = 500
+    var assetName: String { "pet_\(companionId)" }
+    var hasArt: Bool { UIImage(named: assetName) != nil }
 }
 
 extension CompanionToolkit {
@@ -359,7 +385,7 @@ struct GearCatalogSheet: View {
 
                 if let pet = CompanionToolkit.pet(for: current.id) {
                     section(L.t("YOUR PET", "TU MASCOTA"))
-                    row(glyph: pet.emoji, title: pet.name,
+                    row(glyph: pet.hasArt ? nil : pet.emoji, art: pet.hasArt ? pet.assetName : nil, title: pet.name,
                         subtitle: pet.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu companion."),
                         needXP: CompanionPet.unlockXP, needLevel: nil, tint: current.tint)
                 }
@@ -380,7 +406,7 @@ struct GearCatalogSheet: View {
                                 needXP: tool.unlockXP, needLevel: level < comp.requiredLevel ? comp.requiredLevel : nil, tint: tool.isGolden ? gold : comp.tint)
                         }
                         if let pet = CompanionToolkit.pet(for: comp.id) {
-                            row(glyph: pet.emoji, title: pet.name, subtitle: L.t("Pet", "Mascota"), needXP: CompanionPet.unlockXP,
+                            row(glyph: pet.hasArt ? nil : pet.emoji, art: pet.hasArt ? pet.assetName : nil, title: pet.name, subtitle: L.t("Pet", "Mascota"), needXP: CompanionPet.unlockXP,
                                 needLevel: level < comp.requiredLevel ? comp.requiredLevel : nil, tint: comp.tint)
                         }
                     }
@@ -489,7 +515,11 @@ struct PetDetailSheet: View {
         let has = CompanionToolkit.petUnlocked(companionId: companion.id, xp: xp)
         VStack(spacing: 12) {
             Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
-            Text(pet?.emoji ?? "🐾").font(.system(size: 96)).saturation(has ? 1 : 0.15)
+            if let pet, pet.hasArt {
+                Image(pet.assetName).resizable().scaledToFit().frame(width: 150, height: 150).saturation(has ? 1 : 0.15)
+            } else {
+                Text(pet?.emoji ?? "🐾").font(.system(size: 96)).saturation(has ? 1 : 0.15)
+            }
             Text(pet?.name ?? "").font(.rounded(22, .bold)).foregroundStyle(Theme.text)
             Text(has
                  ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu companion."))

@@ -365,6 +365,8 @@ struct ContentView: View {
     @State private var petDetail = false
     @State private var skinSnapshotToken = 0
     @State private var skinCard: UIImage?
+    @State private var equipToolId: String?
+    @State private var equipToken = 0
     /// The desk never shows an empty hole: if the companion GLB fails to
     /// load, fall back to the orb until the companion changes.
     @State private var deskModelFailed = false
@@ -396,6 +398,9 @@ struct ContentView: View {
                let comp = vm.companions.companion {
                 ToolUnlockOverlay(companion: comp, tool: drop) {
                     withAnimation(.easeOut(duration: 0.3)) { _ = vm.companions.pendingToolUnlocks.removeFirst() }
+                    // Now it is worn: play the equip flight on the desk scene.
+                    equipToolId = drop.id
+                    equipToken += 1
                 }
                 .transition(.opacity)
                 .zIndex(11)
@@ -628,8 +633,13 @@ struct ContentView: View {
                                 if failed { deskModelFailed = true }
                             },
                             // Worn gear and the pet ride on the body — the Fortnite effect.
-                            gear: CompanionToolkit.wornGear(companionId: comp.id, xp: vm.companions.disciplineXP),
+                            // Pieces still waiting in the loot queue are not worn yet: they
+                            // fly onto the body when the human taps EQUIP IT.
+                            gear: CompanionToolkit.wornGear(companionId: comp.id, xp: vm.companions.disciplineXP)
+                                .filter { tool in !vm.companions.pendingToolUnlocks.contains(where: { $0.id == tool.id }) },
                             pet: CompanionToolkit.petUnlocked(companionId: comp.id, xp: vm.companions.disciplineXP) ? CompanionToolkit.pet(for: comp.id) : nil,
+                            equipToolId: equipToolId,
+                            equipToken: equipToken,
                             snapshotToken: skinSnapshotToken,
                             onSnapshot: { shot in
                                 skinCard = SkinCard.render(
