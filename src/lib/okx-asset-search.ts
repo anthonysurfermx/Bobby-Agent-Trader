@@ -809,8 +809,14 @@ export function __setTestCatalog(raw: RawOkxInstrument[]): void {
   catalogCache = { fetchedAt: Date.now(), expiresAt: Date.now() + 1e12, instruments };
 }
 
-export function __setTestVolumes(entries: Array<[string, { volUsd: number; last: number | null }]>): void {
-  volumeCache = { expiresAt: Date.now() + 1e12, bySymbol: new Map(entries) };
+export function __setTestVolumes(
+  entries: Array<[string, { volUsd: number; last: number | null; change24h?: number | null }]>,
+): void {
+  const normalized = entries.map(([symbol, value]) => [
+    symbol,
+    { ...value, change24h: value.change24h ?? null },
+  ] as const);
+  volumeCache = { expiresAt: Date.now() + 1e12, bySymbol: new Map(normalized) };
 }
 
 export function getCatalogAgeMs(): number | null {
