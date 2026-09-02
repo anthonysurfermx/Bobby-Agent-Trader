@@ -1,75 +1,80 @@
+import CoreImage
 import SwiftUI
 import UIKit
-import CoreImage
 
-private enum LandOrientation: String, Codable {
-    case neSW = "ne_sw"
-    case nwSE = "nw_se"
+private enum LandOrientation: String, Codable { case neSW = "ne_sw", nwSE = "nw_se" }
+private enum Connector: String, Codable, Hashable { case NE, SE, SW, NW }
+
+private struct Footprint: Codable { let cols: Int; let rows: Int }
+private struct ArtVariant: Codable { let url: String; let w: Int; let h: Int; let method: String? }
+private struct ArtState: Codable {
+    let contentBounds: [CGFloat]
+    let anchor: [CGFloat]
+    let variants: [String: ArtVariant]
+    let derivedSeed: ArtVariant?
+    enum CodingKeys: String, CodingKey { case contentBounds, anchor, variants; case derivedSeed = "derived_seed" }
 }
-
-private enum LandPiece: String, CaseIterable, Codable {
-    case path, rock, antenna, workshop, citadel
-
-    var footprint: (columns: Int, rows: Int) {
-        switch self {
-        case .workshop: return (2, 1)
-        case .citadel: return (2, 2)
-        default: return (1, 1)
-        }
-    }
-
-    var imagePath: String? {
-        switch self {
-        case .path: return nil
-        case .rock: return "gate-A/evidence_mines_crystal_vein_rock/ne/bloom_albedo_1024.png"
-        case .antenna: return "gate-A/risk_reef_dual_orbit_antenna/ne/bloom_albedo_1024.png"
-        case .workshop: return "gate-A/evidence_mines_evidence_workshop/ne/bloom_albedo_1024.png"
-        case .citadel: return "gate-A/thesis_citadel_three_gate_citadel/ne/bloom_albedo_1024.png"
-        }
-    }
-
-    var layerDirectory: String? {
-        switch self {
-        case .path: return nil
-        case .rock: return "gate-A/evidence_mines_crystal_vein_rock/ne"
-        case .antenna: return "gate-A/risk_reef_dual_orbit_antenna/ne"
-        case .workshop: return "gate-A/evidence_mines_evidence_workshop/ne"
-        case .citadel: return "gate-A/thesis_citadel_three_gate_citadel/ne"
-        }
-    }
-
-    var displayName: String { rawValue.capitalized }
-}
-
-private struct LandPlacement: Identifiable, Codable, Equatable {
+private struct ArtOrientation: Codable { let states: [String: ArtState] }
+private struct ManifestItem: Codable, Identifiable {
     let id: String
-    let piece: LandPiece
-    let column: Int
-    let row: Int
-    var orientation: LandOrientation?
-}
+    let district: String
+    let kind: String
+    let footprint: Footprint
+    let orientations: [String: ArtOrientation]
 
-private let gateInitialPlacements: [LandPlacement] = [
-    .init(id: "workshop", piece: .workshop, column: 1, row: 2),
-    .init(id: "antenna", piece: .antenna, column: 5, row: 1),
-    .init(id: "rock", piece: .rock, column: 1, row: 5),
-    .init(id: "citadel", piece: .citadel, column: 5, row: 5),
-    .init(id: "path-a", piece: .path, column: 3, row: 2, orientation: .neSW),
-    .init(id: "path-b", piece: .path, column: 4, row: 3, orientation: .nwSE),
-]
+    var artState: ArtState? {
+        guard let orientation = orientations.values.first else { return nil }
+        return orientation.states["stage1"] ?? orientation.states["bloom"] ?? orientation.states.values.first
+    }
+}
+private struct AssetManifest: Codable { let items: [ManifestItem] }
+
+private struct LandPlacement: Codable, Identifiable, Equatable {
+    let uid: String
+    let itemId: String
+    let col: Int
+    let row: Int
+    let orientation: LandOrientation?
+    var id: String { uid }
+}
+private struct CorePlacement: Codable { let itemId: String; let col: Int; let row: Int }
+private struct WorldFixture: Codable {
+    let version: Int
+    let gridSize: Int
+    let focusLevel: Int
+    let core: CorePlacement
+    let placements: [LandPlacement]
+    let expectedPathConnectors: [String: [Connector]]
+}
+private struct SavedWorld: Codable { let placements: [LandPlacement]; let focusLevel: Int }
+
+private enum RuntimeBundle {
+    static let manifest: AssetManifest = decode(path: "gate-A/asset-manifest.json")
+    static let fixture: WorldFixture = decode(path: "world-snapshot-v01.json")
+
+    private static func decode<T: Decodable>(path: String) -> T {
+        guard let url = Bundle.main.resourceURL?.appendingPathComponent(path),
+              let data = try? Data(contentsOf: url),
+              let value = try? JSONDecoder().decode(T.self, from: data) else {
+            fatalError("Trader Land runtime resource missing or invalid: \(path)")
+        }
+        return value
+    }
+
+    static func bundlePath(_ manifestURL: String) -> String {
+        manifestURL.replacingOccurrences(of: "/land/v1/", with: "")
+    }
+}
 
 private enum GateLayout {
-    static let grid = 8
     static let tileWidth: CGFloat = 92
     static let tileHeight: CGFloat = 46
-    static let origin = CGPoint(x: 430, y: 76)
-    static let canvas = CGSize(width: 860, height: 520)
+    static let origin = CGPoint(x: 430, y: 230)
+    static let canvas = CGSize(width: 860, height: 720)
 
     static func iso(column: CGFloat, row: CGFloat) -> CGPoint {
-        CGPoint(
-            x: origin.x + (column - row) * tileWidth / 2,
-            y: origin.y + (column + row) * tileHeight / 2
-        )
+        CGPoint(x: origin.x + (column - row) * tileWidth / 2,
+                y: origin.y + (column + row) * tileHeight / 2)
     }
 }
 
@@ -85,54 +90,34 @@ private struct Diamond: Shape {
     }
 }
 
-private struct ProceduralLandPath: View {
-    let orientation: LandOrientation
-
-    var body: some View {
-        ZStack {
-            Diamond()
-                .fill(Color(red: 0.07, green: 0.10, blue: 0.13))
-                .overlay(Diamond().stroke(Color(red: 0.15, green: 0.22, blue: 0.29), lineWidth: 2))
-            Capsule()
-                .fill(Color(red: 0.33, green: 1, blue: 0.75).opacity(0.2))
-                .frame(width: orientation == .nwSE ? 76 : 34, height: orientation == .nwSE ? 13 : 38)
-                .blur(radius: 5)
-            Capsule()
-                .fill(Color(red: 0.33, green: 1, blue: 0.75))
-                .frame(width: orientation == .nwSE ? 76 : 4, height: orientation == .nwSE ? 4 : 38)
-        }
-        .frame(width: GateLayout.tileWidth, height: GateLayout.tileHeight)
-        .accessibilityLabel("Procedural path \(orientation.rawValue)")
-    }
-}
-
 private struct GateBundleImage: View {
     let path: String
-
     var body: some View {
         Group {
-            if let url = Bundle.main.resourceURL?.appendingPathComponent(path),
-               let image = UIImage(contentsOfFile: url.path) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
+            if let url = Bundle.main.resourceURL?.appendingPathComponent(path), let image = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: image).resizable().scaledToFit()
             } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.red.opacity(0.3))
-                    .overlay(Text("Missing asset").font(.caption2))
+                RoundedRectangle(cornerRadius: 8).fill(.red.opacity(0.35)).overlay(Text("Missing").font(.caption2))
             }
         }
     }
 }
 
-private struct GateShadowImage: View {
+private struct LuminanceBundleImage: View {
     let path: String
+    let glow: Bool
 
     private var image: UIImage? {
-        guard let url = Bundle.main.resourceURL?.appendingPathComponent(path),
-              let input = CIImage(contentsOf: url),
-              let filter = CIFilter(name: "CIMaskToAlpha") else { return nil }
+        guard let url = Bundle.main.resourceURL?.appendingPathComponent(path), let input = CIImage(contentsOf: url) else { return nil }
+        let filterName = glow ? "CIColorMatrix" : "CIMaskToAlpha"
+        guard let filter = CIFilter(name: filterName) else { return nil }
         filter.setValue(input, forKey: kCIInputImageKey)
+        if glow {
+            filter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
+            filter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
+            filter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
+            filter.setValue(CIVector(x: 0.2126, y: 0.7152, z: 0.0722, w: 0), forKey: "inputAVector")
+        }
         guard let output = filter.outputImage,
               let cgImage = CIContext(options: nil).createCGImage(output, from: output.extent) else { return nil }
         return UIImage(cgImage: cgImage)
@@ -143,305 +128,233 @@ private struct GateShadowImage: View {
             if let image {
                 Image(uiImage: image)
                     .resizable()
-                    .renderingMode(.template)
-                    .foregroundStyle(.black)
+                    .renderingMode(glow ? .original : .template)
+                    .foregroundStyle(glow ? .white : .black)
                     .scaledToFit()
+                    .blendMode(glow ? .screen : .normal)
+                    .opacity(glow ? 1 : 0.55)
             }
         }
     }
 }
 
-private struct GateGlowImage: View {
-    let path: String
-
-    private var image: UIImage? {
-        guard let url = Bundle.main.resourceURL?.appendingPathComponent(path),
-              let input = CIImage(contentsOf: url),
-              let filter = CIFilter(name: "CIColorMatrix") else { return nil }
-        filter.setValue(input, forKey: kCIInputImageKey)
-        filter.setValue(CIVector(x: 1, y: 0, z: 0, w: 0), forKey: "inputRVector")
-        filter.setValue(CIVector(x: 0, y: 1, z: 0, w: 0), forKey: "inputGVector")
-        filter.setValue(CIVector(x: 0, y: 0, z: 1, w: 0), forKey: "inputBVector")
-        filter.setValue(CIVector(x: 0.2126, y: 0.7152, z: 0.0722, w: 0), forKey: "inputAVector")
-        guard let output = filter.outputImage,
-              let cgImage = CIContext(options: nil).createCGImage(output, from: output.extent) else { return nil }
-        return UIImage(cgImage: cgImage)
-    }
+private struct LayeredManifestImage: View {
+    let item: ManifestItem
+    let seed: Bool
 
     var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
+        if let state = item.artState,
+           let bloom = state.variants["albedo_512"] ?? state.variants["albedo_1024"] {
+            let albedo = seed ? (state.derivedSeed ?? bloom) : bloom
+            ZStack {
+                if let shadow = state.variants["shadow_1024"] {
+                    LuminanceBundleImage(path: RuntimeBundle.bundlePath(shadow.url), glow: false)
+                }
+                GateBundleImage(path: RuntimeBundle.bundlePath(albedo.url))
+                if !seed, let glow = state.variants["glow_1024"] {
+                    LuminanceBundleImage(path: RuntimeBundle.bundlePath(glow.url), glow: true)
+                }
             }
         }
     }
 }
 
-private struct LayeredGateBundleImage: View {
-    let albedo: String
-    let glow: String
-    let shadow: String
-    var showGlow = true
+private struct ProceduralFilament: View {
+    let connectors: Set<Connector>
+    let dimmed: Bool
 
     var body: some View {
-        ZStack {
-            GateShadowImage(path: shadow)
-                .opacity(0.55)
-            GateBundleImage(path: albedo)
-            if showGlow {
-                GateGlowImage(path: glow)
-                    .blendMode(.screen)
+        Canvas { context, size in
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let points: [Connector: CGPoint] = [
+                .NE: CGPoint(x: size.width / 2, y: 2), .SE: CGPoint(x: size.width - 3, y: size.height / 2),
+                .SW: CGPoint(x: size.width / 2, y: size.height - 2), .NW: CGPoint(x: 3, y: size.height / 2),
+            ]
+            for connector in connectors {
+                guard let end = points[connector] else { continue }
+                var line = Path(); line.move(to: center); line.addLine(to: end)
+                context.stroke(line, with: .color(Color(red: 0.38, green: 1, blue: 0.77).opacity(dimmed ? 0.15 : 0.95)), lineWidth: dimmed ? 2 : 4)
             }
+            context.fill(Path(ellipseIn: CGRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)), with: .color(.mint.opacity(dimmed ? 0.15 : 1)))
         }
+        .frame(width: GateLayout.tileWidth, height: GateLayout.tileHeight)
     }
 }
 
 private struct GateCanvas: View {
+    let manifest: AssetManifest
+    let fixture: WorldFixture
     let placements: [LandPlacement]
-    let selectedPiece: LandPiece
-    let orientation: LandOrientation
-    let useSeed: Bool
+    let focusLevel: Int
+    let seed: Bool
     let place: (Int, Int) -> Void
 
-    private var orderedPlacements: [LandPlacement] {
-        placements.sorted {
-            let left = GateLayout.iso(column: CGFloat($0.column), row: CGFloat($0.row)).y
-            let right = GateLayout.iso(column: CGFloat($1.column), row: CGFloat($1.row)).y
-            return left < right
-        }
+    private var items: [String: ManifestItem] { Dictionary(uniqueKeysWithValues: manifest.items.map { ($0.id, $0) }) }
+    private func revealed(_ col: Int, _ row: Int) -> Bool {
+        max(abs(CGFloat(col) - 3.5), abs(CGFloat(row) - 3.5)) <= CGFloat(focusLevel) + 1.5
+    }
+    private func connectors(for placement: LandPlacement) -> Set<Connector> {
+        let pathCells = Set(placements.filter { items[$0.itemId]?.kind == "path_pavement" }.map { "\($0.col):\($0.row)" })
+        var result = Set<Connector>()
+        if pathCells.contains("\(placement.col):\(placement.row - 1)") { result.insert(.NE) }
+        if pathCells.contains("\(placement.col + 1):\(placement.row)") { result.insert(.SE) }
+        if pathCells.contains("\(placement.col):\(placement.row + 1)") { result.insert(.SW) }
+        if pathCells.contains("\(placement.col - 1):\(placement.row)") { result.insert(.NW) }
+        if result.isEmpty { result = placement.orientation == .nwSE ? [.NW, .SE] : [.NE, .SW] }
+        return result
     }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            RadialGradient(
-                colors: [Color(red: 0.07, green: 0.31, blue: 0.24).opacity(0.45), Color(red: 0.02, green: 0.03, blue: 0.05)],
-                center: .center,
-                startRadius: 12,
-                endRadius: 390
-            )
-
-            ForEach(0..<(GateLayout.grid * GateLayout.grid), id: \.self) { index in
-                let column = index % GateLayout.grid
-                let row = index / GateLayout.grid
-                let point = GateLayout.iso(column: CGFloat(column), row: CGFloat(row))
-                let blocked = (3...4).contains(column) && (3...4).contains(row)
-                Button { place(column, row) } label: {
-                    Diamond()
-                        .fill(blocked
-                              ? Color(red: 0.17, green: 0.96, blue: 0.64).opacity(0.12)
-                              : Color(red: 0.08, green: 0.16, blue: 0.19).opacity((column + row).isMultiple(of: 2) ? 0.82 : 0.68))
+            RadialGradient(colors: [Color.green.opacity(0.2), Color(red: 0.02, green: 0.03, blue: 0.05)], center: .center, startRadius: 20, endRadius: 390)
+            ForEach(0..<(fixture.gridSize * fixture.gridSize), id: \.self) { index in
+                let col = index % fixture.gridSize, row = index / fixture.gridSize
+                Button { place(col, row) } label: {
+                    Diamond().fill(Color(red: 0.08, green: 0.16, blue: 0.19).opacity((col + row).isMultiple(of: 2) ? 0.82 : 0.68))
                 }
-                .buttonStyle(.plain)
-                .frame(width: GateLayout.tileWidth, height: GateLayout.tileHeight)
-                .position(point)
-                .accessibilityIdentifier("land-tile-\(column)-\(row)")
+                .buttonStyle(.plain).frame(width: GateLayout.tileWidth, height: GateLayout.tileHeight)
+                .position(GateLayout.iso(column: CGFloat(col), row: CGFloat(row)))
+                .accessibilityIdentifier("land-tile-\(col)-\(row)")
             }
-
-            ForEach(orderedPlacements) { placement in
-                sprite(for: placement)
+            ForEach(placements) { placement in
+                if let item = items[placement.itemId] { sprite(item: item, placement: placement) }
             }
-
-            let corePoint = GateLayout.iso(column: 3.5, row: 3.5)
-            LayeredGateBundleImage(
-                albedo: "gate-A/aura_core/ne/stage1_albedo_1024.png",
-                glow: "gate-A/aura_core/ne/stage1_glow_1024.png",
-                shadow: "gate-A/aura_core/ne/shadow_1024.png"
-            )
-                .frame(width: 248, height: 248)
-                .position(x: corePoint.x, y: corePoint.y - 72)
-                .allowsHitTesting(false)
-                .accessibilityLabel("Aura Core")
+            if let core = items[fixture.core.itemId] {
+                sprite(item: core, placement: .init(uid: "aura-core", itemId: core.id, col: fixture.core.col, row: fixture.core.row, orientation: nil))
+            }
+            ForEach(0..<(fixture.gridSize * fixture.gridSize), id: \.self) { index in
+                let col = index % fixture.gridSize, row = index / fixture.gridSize
+                if !revealed(col, row) {
+                    Diamond().fill(Color(red: 0.02, green: 0.05, blue: 0.08).opacity(0.78))
+                        .frame(width: GateLayout.tileWidth, height: GateLayout.tileHeight)
+                        .position(GateLayout.iso(column: CGFloat(col), row: CGFloat(row))).zIndex(700)
+                        .allowsHitTesting(false)
+                }
+            }
         }
-        .frame(width: GateLayout.canvas.width, height: GateLayout.canvas.height)
-        .clipped()
+        .frame(width: GateLayout.canvas.width, height: GateLayout.canvas.height).clipped()
     }
 
-    @ViewBuilder
-    private func sprite(for placement: LandPlacement) -> some View {
-        let footprint = placement.piece.footprint
-        let anchor = GateLayout.iso(
-            column: CGFloat(placement.column) + CGFloat(footprint.columns - 1) / 2,
-            row: CGFloat(placement.row) + CGFloat(footprint.rows - 1) / 2
-        )
-        if placement.piece == .path {
-            ProceduralLandPath(orientation: placement.orientation ?? .neSW)
-                .position(anchor)
-                .allowsHitTesting(false)
-        } else if let path = placement.piece.imagePath,
-                  let directory = placement.piece.layerDirectory {
-            let resolvedPath = placement.piece == .rock && useSeed
-                ? "gate-A/evidence_mines_crystal_vein_rock/ne/seed_albedo_1024.png"
-                : path
-            let size: CGFloat = placement.piece == .citadel ? 230 : (placement.piece == .workshop ? 190 : 132)
-            LayeredGateBundleImage(
-                albedo: resolvedPath,
-                glow: "\(directory)/bloom_glow_1024.png",
-                shadow: "\(directory)/shadow_1024.png",
-                showGlow: !(placement.piece == .rock && useSeed)
-            )
+    @ViewBuilder private func sprite(item: ManifestItem, placement: LandPlacement) -> some View {
+        if let state = item.artState {
+            let center = GateLayout.iso(column: CGFloat(placement.col) + CGFloat(item.footprint.cols - 1) / 2,
+                                        row: CGFloat(placement.row) + CGFloat(item.footprint.rows - 1) / 2)
+            let visibleWidth = max(0.2, state.contentBounds[2] - state.contentBounds[0])
+            let footprintWidth = GateLayout.tileWidth * CGFloat(item.footprint.cols + item.footprint.rows) / 2
+            let size = min(360, footprintWidth * 0.9 / visibleWidth)
+            LayeredManifestImage(item: item, seed: seed)
                 .frame(width: size, height: size)
-                .position(x: anchor.x, y: anchor.y - size * 0.29)
-                .allowsHitTesting(false)
-                .accessibilityLabel(placement.piece.displayName)
+                .position(x: center.x, y: center.y + size * (0.5 - state.anchor[1]))
+                .zIndex(100 + center.y).allowsHitTesting(false).accessibilityLabel(item.id)
+            if item.kind == "path_pavement" {
+                let active = connectors(for: placement)
+                ProceduralFilament(connectors: active, dimmed: seed)
+                    .position(center).zIndex(560 + center.y).allowsHitTesting(false)
+                    .accessibilityIdentifier("path-\(placement.uid)-connectors-\(active.map(\.rawValue).sorted().joined(separator: "-"))")
+            }
         }
     }
 }
 
 struct TraderLandGateHarnessView: View {
-    private static let storageKey = "bobby.trader-land.gate-a.v1"
+    private static let storageKey = "bobby.trader-land.runtime-v03"
+    private let manifest = RuntimeBundle.manifest
+    private let fixture = RuntimeBundle.fixture
+    @State private var placements: [LandPlacement]
+    @State private var focusLevel: Int
+    @State private var selectedItemId: String
+    @State private var orientation = LandOrientation.neSW
+    @State private var seed = false
+    @State private var history: [SavedWorld] = []
+    @State private var notice = "Choose a blueprint, then tap a revealed tile."
 
-    @State private var placements: [LandPlacement] = Self.loadPlacements()
-    @State private var history: [[LandPlacement]] = []
-    @State private var selectedPiece: LandPiece = .path
-    @State private var orientation: LandOrientation = .neSW
-    @State private var useSeed = false
-    @State private var notice = "Tap a free tile to place the selected blueprint."
+    init() {
+        let fixture = RuntimeBundle.fixture
+        let saved = Self.load() ?? SavedWorld(placements: fixture.placements, focusLevel: fixture.focusLevel)
+        _placements = State(initialValue: saved.placements)
+        _focusLevel = State(initialValue: saved.focusLevel)
+        _selectedItemId = State(initialValue: "crypto_bay_data_dock")
+    }
+
+    private var items: [String: ManifestItem] { Dictionary(uniqueKeysWithValues: manifest.items.map { ($0.id, $0) }) }
+    private var selectedItem: ManifestItem? { items[selectedItemId] }
+    private var occupied: Set<String> {
+        var cells: Set<String> = ["3:3", "3:4", "4:3", "4:4"]
+        for placement in placements where items[placement.itemId] != nil {
+            let item = items[placement.itemId]!
+            for x in 0..<item.footprint.cols { for y in 0..<item.footprint.rows { cells.insert("\(placement.col + x):\(placement.row + y)") } }
+        }
+        return cells
+    }
+    private func revealed(_ col: Int, _ row: Int) -> Bool {
+        max(abs(CGFloat(col) - 3.5), abs(CGFloat(row) - 3.5)) <= CGFloat(focusLevel) + 1.5
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("TRADER LAND // GATE A")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .tracking(3)
-                            .foregroundStyle(Color(red: 0.45, green: 1, blue: 0.78))
-                        Text("One snapshot. Same rules everywhere.")
-                            .font(.title2.bold())
-                        Text("Native QA harness · no wallet, XP, API or production writes.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 18)
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("TRADER LAND // RUNTIME V01").font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(3).foregroundStyle(.mint)
+                        Text("Discipline becomes a world.").font(.title2.bold())
+                        Text("Shared fixture · no wallet, XP, API or production writes.").font(.caption).foregroundStyle(.secondary)
+                        Text("FOCUS \(focusLevel)/2 · \(placements.count + 1) PLACED").font(.system(size: 9, design: .monospaced)).tracking(1.4).accessibilityIdentifier("land-world-status")
+                    }.padding(.horizontal, 18)
 
-                    GateCanvas(
-                        placements: placements,
-                        selectedPiece: selectedPiece,
-                        orientation: orientation,
-                        useSeed: useSeed,
-                        place: place
-                    )
-                    .scaleEffect(0.42, anchor: .topLeading)
-                    .frame(
-                        width: GateLayout.canvas.width * 0.42,
-                        height: GateLayout.canvas.height * 0.42,
-                        alignment: .topLeading
-                    )
-                    .frame(maxWidth: .infinity)
-                    .background(Color.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.green.opacity(0.25)))
-                    .padding(.horizontal, 12)
+                    GateCanvas(manifest: manifest, fixture: fixture, placements: placements, focusLevel: focusLevel, seed: seed, place: place)
+                        .scaleEffect(0.42, anchor: .topLeading)
+                        .frame(width: GateLayout.canvas.width * 0.42, height: GateLayout.canvas.height * 0.42, alignment: .topLeading)
+                        .frame(maxWidth: .infinity).background(.black).clipShape(RoundedRectangle(cornerRadius: 24))
+                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.green.opacity(0.25))).padding(.horizontal, 12)
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("BLUEPRINT INVENTORY")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .tracking(2)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("BLUEPRINTS · \(manifest.items.count - 1)").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(.secondary)
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(LandPiece.allCases, id: \.self) { piece in
-                                    Button(piece.displayName) { selectedPiece = piece }
-                                        .font(.caption.bold())
-                                        .buttonStyle(.bordered)
-                                        .tint(selectedPiece == piece ? .green : .gray)
+                            HStack(spacing: 7) {
+                                ForEach(manifest.items.filter { $0.kind != "core" }) { item in
+                                    Button(item.id.replacingOccurrences(of: "_", with: " ")) { selectedItemId = item.id }
+                                        .font(.caption2.bold()).buttonStyle(.bordered).tint(selectedItemId == item.id ? .green : .gray)
+                                        .accessibilityIdentifier("blueprint-\(item.id)")
                                 }
                             }
                         }
                         HStack {
-                            Button("Rotate · \(orientation.rawValue)") {
-                                orientation = orientation == .neSW ? .nwSE : .neSW
-                            }
-                            Button(useSeed ? "Seed" : "Bloom") { useSeed.toggle() }
+                            Button("Rotate · \(orientation.rawValue)") { orientation = orientation == .neSW ? .nwSE : .neSW }
+                            Button(seed ? "Seed" : "Bloom") { seed.toggle() }
                             Button("Undo", action: undo)
                             Button("Restore", action: restore)
-                        }
-                        .font(.caption)
-                        .buttonStyle(.bordered)
-                        Text(notice)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
-                        Text("8×8 · \(placements.count + 1) PLACED · USERDEFAULTS")
-                            .font(.system(size: 9, design: .monospaced))
-                            .tracking(1.5)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(18)
+                        }.font(.caption).buttonStyle(.bordered)
+                        Button("Reveal next focus ring", action: reveal).buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
+                        Text(notice).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12).background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
+                    }.padding(18)
+                }.padding(.vertical, 18)
+            }.background(Color(red: 0.02, green: 0.03, blue: 0.04).ignoresSafeArea())
+                .onChange(of: placements) { _, _ in save() }.onChange(of: focusLevel) { _, _ in save() }
+                .overlay(alignment: .topTrailing) {
+                    Text("FOCUS \(focusLevel)/2 · \(placements.count + 1) PLACED")
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, 9).padding(.vertical, 6)
+                        .background(.black.opacity(0.82), in: Capsule())
+                        .padding(10)
+                        .accessibilityIdentifier("land-fixed-status")
                 }
-                .padding(.vertical, 18)
-            }
-            .background(Color(red: 0.02, green: 0.03, blue: 0.04).ignoresSafeArea())
-            .onChange(of: placements) { _, value in Self.save(value) }
         }
     }
 
-    private var occupiedCells: Set<String> {
-        Set(placements.flatMap { placement in
-            let footprint = placement.piece.footprint
-            return (0..<footprint.columns).flatMap { columnOffset in
-                (0..<footprint.rows).map { rowOffset in
-                    "\(placement.column + columnOffset):\(placement.row + rowOffset)"
-                }
-            }
-        })
+    private func place(_ col: Int, _ row: Int) {
+        guard let item = selectedItem else { return }
+        let cells = (0..<item.footprint.cols).flatMap { x in (0..<item.footprint.rows).map { y in (col + x, row + y) } }
+        let valid = col + item.footprint.cols <= fixture.gridSize && row + item.footprint.rows <= fixture.gridSize
+            && cells.allSatisfy { revealed($0.0, $0.1) && !occupied.contains("\($0.0):\($0.1)") }
+        guard valid else { notice = "Blocked · reveal the tile or clear the full footprint."; return }
+        checkpoint()
+        placements.append(.init(uid: "\(item.id)-\(UUID().uuidString)", itemId: item.id, col: col, row: row, orientation: item.kind == "path_pavement" ? orientation : nil))
+        notice = "Built · visual adjacency only."
     }
-
-    private func place(column: Int, row: Int) {
-        let footprint = selectedPiece.footprint
-        let cells = (0..<footprint.columns).flatMap { columnOffset in
-            (0..<footprint.rows).map { rowOffset in
-                (column + columnOffset, row + rowOffset)
-            }
-        }
-        let overlapsCore = cells.contains { (3...4).contains($0.0) && (3...4).contains($0.1) }
-        let outsideGrid = column + footprint.columns > GateLayout.grid || row + footprint.rows > GateLayout.grid
-        let overlapsPiece = cells.contains { occupiedCells.contains("\($0.0):\($0.1)") }
-        guard !overlapsCore && !outsideGrid && !overlapsPiece else {
-            notice = "Invalid position · footprint overlaps another piece or the Aura Core."
-            return
-        }
-        history.append(placements)
-        if history.count > 10 { history.removeFirst() }
-        placements.append(.init(
-            id: "\(selectedPiece.rawValue)-\(UUID().uuidString)",
-            piece: selectedPiece,
-            column: column,
-            row: row,
-            orientation: selectedPiece == .path ? orientation : nil
-        ))
-        notice = "Placed · snapshot persisted locally."
-    }
-
-    private func undo() {
-        guard let previous = history.popLast() else {
-            notice = "Nothing to undo."
-            return
-        }
-        placements = previous
-        notice = "Placement undone and persisted."
-    }
-
-    private func restore() {
-        history.append(placements)
-        placements = gateInitialPlacements
-        notice = "Gate snapshot restored."
-    }
-
-    private static func loadPlacements() -> [LandPlacement] {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let placements = try? JSONDecoder().decode([LandPlacement].self, from: data) else {
-            return gateInitialPlacements
-        }
-        return placements
-    }
-
-    private static func save(_ placements: [LandPlacement]) {
-        guard let data = try? JSONEncoder().encode(placements) else { return }
-        UserDefaults.standard.set(data, forKey: storageKey)
-    }
+    private func checkpoint() { history.append(.init(placements: placements, focusLevel: focusLevel)); if history.count > 10 { history.removeFirst() } }
+    private func undo() { guard let previous = history.popLast() else { notice = "Nothing to undo."; return }; placements = previous.placements; focusLevel = previous.focusLevel }
+    private func restore() { checkpoint(); placements = fixture.placements; focusLevel = fixture.focusLevel; notice = "Canonical fixture restored." }
+    private func reveal() { guard focusLevel < 2 else { notice = "Full island revealed."; return }; checkpoint(); focusLevel = 2; notice = "Focus expanded 6×6 → 8×8." }
+    private func save() { if let data = try? JSONEncoder().encode(SavedWorld(placements: placements, focusLevel: focusLevel)) { UserDefaults.standard.set(data, forKey: Self.storageKey) } }
+    private static func load() -> SavedWorld? { guard let data = UserDefaults.standard.data(forKey: storageKey) else { return nil }; return try? JSONDecoder().decode(SavedWorld.self, from: data) }
 }
