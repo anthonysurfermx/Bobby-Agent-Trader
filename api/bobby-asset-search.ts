@@ -50,11 +50,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // by real 24h volume — powers the in-app board and dictation vocabulary.
   if (String(src.browse || '') === '1') {
     try {
-      const { classes, totalBases } = await browseOkxAssets();
+      const { classes, totalBases, movers } = await browseOkxAssets();
       return res.status(200).json({
         ok: true,
         browse: classes,
         totalBases,
+        movers,
         source: 'OKX public instruments + tickers',
         catalogAgeMs: getCatalogAgeMs(),
       });

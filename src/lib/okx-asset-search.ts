@@ -388,16 +388,17 @@ let volumeCache:
   | { expiresAt: number; bySymbol: Map<string, { volUsd: number; last: number | null }> }
   | null = null;
 
-async function fetchTickerVolumes(instType: 'SPOT' | 'SWAP'): Promise<Array<{ instId: string; last: number | null; volCcy24h: number }>> {
+async function fetchTickerVolumes(instType: 'SPOT' | 'SWAP'): Promise<Array<{ instId: string; last: number | null; open24h: number | null; volCcy24h: number }>> {
   const res = await fetch(`${OKX_BASE}/api/v5/market/tickers?instType=${instType}`, {
     headers: { 'Content-Type': 'application/json' },
   });
   if (!res.ok) return [];
-  const payload = await res.json() as { code: string; data?: Array<{ instId: string; last?: string; volCcy24h?: string }> };
+  const payload = await res.json() as { code: string; data?: Array<{ instId: string; last?: string; open24h?: string; volCcy24h?: string }> };
   if (payload.code !== '0') return [];
   return (payload.data || []).map((t) => ({
     instId: t.instId,
     last: Number(t.last) || null,
+    open24h: Number(t.open24h) || null,
     volCcy24h: Number(t.volCcy24h) || 0,
   }));
 }
@@ -407,26 +408,30 @@ async function fetchTickerVolumes(instType: 'SPOT' | 'SWAP'): Promise<Array<{ in
  * SPOT USDT pairs report quote volume directly; USDT swaps report base
  * volume, converted via last price. Cached alongside the catalog TTL.
  */
-export async function getVolumeBySymbol(): Promise<Map<string, { volUsd: number; last: number | null }>> {
+export async function getVolumeBySymbol(): Promise<Map<string, { volUsd: number; last: number | null; change24h: number | null }>> {
   if (volumeCache && volumeCache.expiresAt > Date.now()) return volumeCache.bySymbol;
 
   const [spot, swap] = await Promise.all([fetchTickerVolumes('SPOT'), fetchTickerVolumes('SWAP')]);
-  const bySymbol = new Map<string, { volUsd: number; last: number | null }>();
+  const bySymbol = new Map<string, { volUsd: number; last: number | null; change24h: number | null }>();
+  const pctChange = (t: { last: number | null; open24h: number | null }) =>
+    t.last && t.open24h ? Number((((t.last - t.open24h) / t.open24h) * 100).toFixed(2)) : null;
 
   for (const t of spot) {
     const [base, quote] = t.instId.split('-');
     if (quote !== 'USDT' && quote !== 'USDC' && quote !== 'USD') continue;
-    const entry = bySymbol.get(base) || { volUsd: 0, last: null };
+    const entry = bySymbol.get(base) || { volUsd: 0, last: null, change24h: null };
     entry.volUsd += t.volCcy24h;                      // quote volume ≈ USD
     if (entry.last === null) entry.last = t.last;
+    if (entry.change24h === null) entry.change24h = pctChange(t);
     bySymbol.set(base, entry);
   }
   for (const t of swap) {
     const base = t.instId.split('-')[0];
     if (!t.instId.includes('-USDT-') && !t.instId.includes('-USD-')) continue;
-    const entry = bySymbol.get(base) || { volUsd: 0, last: null };
+    const entry = bySymbol.get(base) || { volUsd: 0, last: null, change24h: null };
     entry.volUsd += t.last ? t.volCcy24h * t.last : 0; // base volume × price
     if (entry.last === null) entry.last = t.last;
+    if (entry.change24h === null) entry.change24h = pctChange(t);
     bySymbol.set(base, entry);
   }
 
@@ -443,6 +448,8 @@ export interface OkxBrowseAsset {
   instId: string;
   last: number | null;
   vol24hUsd: number;
+  /** 24h move in percent from the primary listing, null when OKX has no open. */
+  change24h: number | null;
 }
 
 /** Stable-value bases nobody "analyzes"; they would top volume and add noise. */
@@ -468,6 +475,8 @@ export async function browseOkxAssets(limitPerClass = 80): Promise<{
   classes: Record<OkxAssetClass, OkxBrowseAsset[]>;
   /** How many distinct bases the search can actually reach — the honest number. */
   totalBases: number;
+  /** Biggest liquid 24h moves across classes, for the desk greeting. */
+  movers: OkxBrowseAsset[];
 }> {
   const [catalog, volumes] = await Promise.all([getOkxInstrumentCatalog(), getVolumeBySymbol()]);
 
@@ -494,6 +503,7 @@ export async function browseOkxAssets(limitPerClass = 80): Promise<{
       instId: instrument.instId,
       last: vol?.last ?? null,
       vol24hUsd: Math.round(vol?.volUsd ?? 0),
+      change24h: vol?.change24h ?? null,
     });
   }
 
@@ -501,7 +511,15 @@ export async function browseOkxAssets(limitPerClass = 80): Promise<{
     grouped[assetClass].sort((a, b) => b.vol24hUsd - a.vol24hUsd);
     grouped[assetClass] = grouped[assetClass].slice(0, limitPerClass);
   }
-  return { classes: grouped, totalBases };
+  // The day's movers: biggest 24h moves among liquid, non-stable assets across
+  // every class — what the desk greets the human with. Liquidity floor keeps
+  // a 3-trade micro-cap from headlining.
+  const movers = (Object.values(grouped) as OkxBrowseAsset[][])
+    .flat()
+    .filter((row) => row.change24h !== null && row.vol24hUsd >= 5_000_000)
+    .sort((a, b) => Math.abs(b.change24h!) - Math.abs(a.change24h!))
+    .slice(0, 6);
+  return { classes: grouped, totalBases, movers };
 }
 
 /**
