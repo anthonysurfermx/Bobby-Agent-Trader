@@ -122,7 +122,8 @@ async function plantCanaries(): Promise<void> {
   const privThread = await plant('forum_threads', { topic: `${MARK}-private`, trigger_reason: 'rls canary', scope: 'private', owner_wallet: CANARY_WALLET, symbol: 'RLSTEST', language: 'en' }, false, { topic: 'TAMPERED' });
   if (pubThread) await plant('forum_posts', { thread_id: pubThread, agent: 'cio', content: MARK }, true, { content: 'TAMPERED' });
   if (privThread) await plant('forum_posts', { thread_id: privThread, agent: 'cio', content: `${MARK}-private` }, false, { content: 'TAMPERED' });
-  await plant('agent_trades', { chain: 'rls-canary', token_address: '0x0000000000000000000000000000000000000000', token_symbol: 'RLSTEST', direction: 'long', amount_usd: 0, status: 'canary', llm_reasoning: MARK }, true, { llm_reasoning: 'TAMPERED' });
+  // agent_trades CHECKs: direction in (BUY, SELL), status in (pending, confirmed, failed, simulated)
+  await plant('agent_trades', { chain: 'rls-canary', token_address: '0x0000000000000000000000000000000000000000', token_symbol: 'RLSTEST', direction: 'BUY', amount_usd: 0, status: 'simulated', llm_reasoning: MARK }, true, { llm_reasoning: 'TAMPERED' });
   await plant('agent_messages', { wallet_address: CANARY_WALLET, advisor_name: 'rls-canary', message: MARK }, false, { message: 'TAMPERED' });
   await plant('user_interests', { wallet_address: CANARY_WALLET, asset: 'RLSTEST', context: MARK }, false, { context: 'TAMPERED' });
   await plant('user_digests', { wallet_address: CANARY_WALLET, summary: MARK }, false, { summary: 'TAMPERED' });
@@ -177,9 +178,13 @@ async function attackCanaries(): Promise<void> {
     }
   }
   // user_feedback: anon INSERT is the one allowed write
-  const fb = await fetch(`${URL_}/rest/v1/user_feedback`, { method: 'POST', headers: anonHeaders, body: JSON.stringify({ type: 'bug', message: MARK, page: '/rls-gate', context: { canary: true } }) });
-  line(fb.ok, 'anon INSERT user_feedback (valid payload) → succeeds by design', `HTTP ${fb.status} ${fb.ok ? '' : await fb.clone().text().catch(() => '')}`);
-  if (fb.ok) { try { const rows = (await fb.json()) as Array<{ id: string }>; for (const row of rows) await fetch(`${URL_}/rest/v1/user_feedback?id=eq.${row.id}`, { method: 'DELETE', headers: svcHeaders }); } catch { /* ignore */ } }
+  // The policy is INSERT-only for anon (no SELECT), so the insert must not ask for the row back.
+  const fb = await fetch(`${URL_}/rest/v1/user_feedback`, { method: 'POST', headers: { ...anonHeaders, Prefer: 'return=minimal' }, body: JSON.stringify({ type: 'bug', message: MARK, page: '/rls-gate', context: { canary: true } }) });
+  line(fb.ok, 'anon INSERT user_feedback (valid payload, return=minimal) → succeeds by design', `HTTP ${fb.status} ${fb.ok ? '' : await fb.clone().text().catch(() => '')}`);
+  const fbRows = await fetch(`${URL_}/rest/v1/user_feedback?message=eq.${encodeURIComponent(MARK)}&select=id`, { headers: svcHeaders });
+  const fbIds = fbRows.ok ? ((await fbRows.json()) as Array<{ id: string }>).map((r) => r.id) : [];
+  line(fbIds.length === (fb.ok ? 1 : 0), 'user_feedback row visible to the service role (and removed)', `rows=${fbIds.length}`);
+  for (const id of fbIds) await fetch(`${URL_}/rest/v1/user_feedback?id=eq.${id}`, { method: 'DELETE', headers: { ...svcHeaders, Prefer: 'return=minimal' } });
 }
 
 async function removeCanaries(): Promise<void> {
