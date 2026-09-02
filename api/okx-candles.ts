@@ -24,8 +24,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: `Invalid bar. Use: ${[...VALID_BARS].join(', ')}` });
   }
 
-  // Validate instId format (e.g. BTC-USDT, ETH-USDT)
-  if (!/^[A-Z0-9]+-[A-Z0-9]+$/i.test(instId)) {
+  // Validate instId format (e.g. BTC-USDT, ETH-USDT, NVDA-USDT-SWAP)
+  if (!/^[A-Z0-9]+-[A-Z0-9]+(?:-SWAP)?$/i.test(instId)) {
     return res.status(400).json({ error: 'Invalid instId format' });
   }
 

@@ -18,7 +18,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 15, 600)) return;
+  // Every companion/vibe tap and every answer is one call; a live walkthrough
+  // burns ~15 in five minutes, and venue Wi-Fi shares one IP across phones.
+  if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 60, 600)) return;
 
   const body = req.body as { text?: string; voice?: string; lang?: string; vibe?: string; edgeVoice?: string };
   const text = body.text;
@@ -30,7 +32,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const VALID_VIBES = ['direct', 'analytical', 'wise'];
   const voice = VALID_VOICES.includes(body.voice || '') ? body.voice : 'cio';
   const lang = VALID_LANGS.includes(body.lang || '') ? body.lang : 'es';
-  const vibe = VALID_VIBES.includes(body.vibe || '') ? body.vibe : undefined;
+  // The iOS onboarding ids (chill/directo/pro) map onto the delivery hints.
+  const VIBE_ALIASES: Record<string, string> = { chill: 'wise', directo: 'direct', pro: 'analytical' };
+  const vibeRequested = VIBE_ALIASES[body.vibe || ''] ?? body.vibe;
+  const vibe = VALID_VIBES.includes(vibeRequested || '') ? vibeRequested : undefined;
   const edgeVoice = typeof body.edgeVoice === 'string' ? body.edgeVoice : undefined;
 
   if (!text || typeof text !== 'string') {

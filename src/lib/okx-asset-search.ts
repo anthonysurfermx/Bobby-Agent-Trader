@@ -172,7 +172,9 @@ const HUMAN_ALIASES: Record<string, string[]> = {
   POPMART: ['POP MART'],
   SPCX: ['SPACEX', 'SPACE X'],
   OPENAI: ['OPEN AI'],
-  SPY: ['S&P500', 'SP500', 'SPX'],
+  // 'SPX' deliberately absent: it is also the SPX6900 memecoin's symbol and
+  // tied the bare query "SPY" to the wrong instrument.
+  SPY: ['S&P500', 'SP500'],
   QQQ: ['NASDAQ'],
   IWM: ['RUSSELL'],
   USO: ['US OIL FUND'],
@@ -197,6 +199,10 @@ const PROXY_ALIASES: Record<string, { symbol: string; note: string }> = {
   PETROLEO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot' },
   CRUDO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot' },
   'CRUDE OIL': { symbol: 'USO', note: 'United States Oil Fund (USO), an oil ETF — not spot oil' },
+  // ETF tickers that are not listed on OKX. Without these, "GLD" substring-
+  // matched AGLD (Adventure Gold) and analyzed a game token with no warning.
+  GLD: { symbol: 'XAUT', note: 'Tether Gold (XAUT), a tokenized gold product — GLD itself is not listed on OKX' },
+  SLV: { symbol: 'XAG', note: 'Silver (XAG) perpetual — SLV itself is not listed on OKX' },
 };
 
 function normalizeQueryValue(value: string): string {
@@ -736,7 +742,8 @@ export async function resolveOkxAssetFromText(
   const upper = normalizeQueryValue(text).replace(/[¿?¡!.,;:]/g, '');
   if (!upper) return null;
 
-  const words = upper.split(/\s+/).filter((w) => w.length >= 2 && !QUERY_STOPWORDS.has(w));
+  // Three characters minimum per word: "in video" must not resolve INJ via "IN".
+  const words = upper.split(/\s+/).filter((w) => w.length >= 3 && !QUERY_STOPWORDS.has(w));
   const candidates = upper.includes(' ') ? [upper, ...words] : [upper];
 
   let fallback: OkxResolvedAsset | null = null;
@@ -747,7 +754,8 @@ export async function resolveOkxAssetFromText(
       instrument: hit.instrument,
       matchKind: hit.kind,
       matchedTerm: candidate,
-      needsConfirmation: hit.kind === 'fuzzy' || hit.kind === 'proxy',
+      // Short substring hits ("GLD" inside AGLD) are guesses too — ask first.
+      needsConfirmation: hit.kind === 'fuzzy' || hit.kind === 'proxy' || (hit.kind === 'partial' && candidate.length <= 4),
       proxyNote: hit.kind === 'proxy' ? (PROXY_ALIASES[candidate]?.note ?? null) : null,
     };
     if (hit.kind === 'exact') return resolved;
