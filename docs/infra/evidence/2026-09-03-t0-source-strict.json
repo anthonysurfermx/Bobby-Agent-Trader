@@ -1,0 +1,317 @@
+{
+  "side": "source",
+  "ref": "egpixaunlnzauztbrnuz",
+  "takenAt": "2026-09-02T22:58:51.012Z",
+  "allowMissing": false,
+  "tables": [
+    {
+      "table": "agent_config",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "agent_cycles",
+      "exists": true,
+      "rows": 3402,
+      "sha256": "c425894fff42b06fbe21ea1d59e8fadd5f00a05a7de200852129826d67996505",
+      "pkMin": "000cb297-b210-4c69-b9f8-e23a80a572af",
+      "pkMax": "ffe363e7-54f3-46b0-b8fe-7bdd2ba94429"
+    },
+    {
+      "table": "agent_events",
+      "exists": true,
+      "rows": 7256,
+      "sha256": "592af3614313b85ec994df5fa25a8573cb12e5c36b198dda0dfe7fb5567ae383",
+      "pkMin": "0001539c-832d-47da-a7fe-e1b83a889caf",
+      "pkMax": "fffacf94-acb4-4ea1-93c5-d10fac450716",
+      "createdMin": "2026-04-13T21:16:03.47+00:00",
+      "createdMax": "2026-09-02T12:01:47.162+00:00",
+      "proofs": {
+        "payment_tx": {
+          "nonNull": 0,
+          "sha256": "cb7322887702bcfe9a79fdd95f5199ae3b25d008a034c9d00af68a7846e124e8"
+        },
+        "trade_tx": {
+          "nonNull": 11,
+          "sha256": "985e258cd25a08c719a5f479d5ec86be7094b6360304f91338b93aa3562e3f5e"
+        }
+      }
+    },
+    {
+      "table": "agent_macro_events",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "agent_market_snapshots",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "agent_memory",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "agent_messages",
+      "exists": true,
+      "rows": 356,
+      "sha256": "811fd71bc975675f56e158aea8c08b127aa1f32b091b66a33b7f65298a9e2c9d",
+      "pkMin": "00b72624-dad7-4972-8678-3a1b0ab5ecc8",
+      "pkMax": "ff487bd6-7c63-4211-ab24-01f905c28459",
+      "createdMin": "2026-03-20T22:15:02.932311+00:00",
+      "createdMax": "2026-04-22T05:30:03.208861+00:00"
+    },
+    {
+      "table": "agent_positions",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "agent_profiles",
+      "exists": true,
+      "rows": 2,
+      "sha256": "cb625dab0d27e66dd6e21e30bb653e5b7f40b18657dae9399045650f06d381ee",
+      "pkMin": "c116aff9-42c4-4cb9-8676-e305204d6faf",
+      "pkMax": "d719f58f-d409-46f1-a384-5082fc05a0ed",
+      "createdMin": "2026-03-22T19:17:44.342873+00:00",
+      "createdMax": "2026-03-22T19:53:16.565821+00:00"
+    },
+    {
+      "table": "agent_source_health",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "bobby_control",
+      "exists": true,
+      "rows": 1,
+      "sha256": "b6efb0605282c5b505d61a89508fa939d14368138892b311fcb8f5cd158c1b2c",
+      "pkMin": "global",
+      "pkMax": "global"
+    },
+    {
+      "table": "bobby_early_access",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "cycle_transitions",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "forum_publish_receipts",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "hardness_agents",
+      "exists": true,
+      "rows": 1,
+      "sha256": "3dd873146263f5659fa223a956bb095029c8a291e11947c3721e0efabf447be9",
+      "pkMin": "1",
+      "pkMax": "1",
+      "createdMin": "2026-04-12T21:18:20.838562+00:00",
+      "createdMax": "2026-04-12T21:18:20.838562+00:00"
+    },
+    {
+      "table": "indicator_cache",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "llm_calls",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "mcp_payment_challenges",
+      "exists": true,
+      "rows": 432,
+      "sha256": "8f20d055119ea97c0659cd7395b48b29ceeccf3da3d06784b119e777ae5df2f1",
+      "pkMin": "00ea1808-f102-4877-adef-0b25975c60d3",
+      "pkMax": "ff8609a0-a7e6-4844-a8de-b4e49f5158cf",
+      "createdMin": "2026-04-08T18:50:29.995953+00:00",
+      "createdMax": "2026-08-18T14:56:21.33851+00:00"
+    },
+    {
+      "table": "memory_objects",
+      "exists": true,
+      "rows": 221,
+      "sha256": "ccf7d8afef89a5d90f00d69cd9d92eae2796999347f00f945b212e4c293a6141",
+      "pkMin": "00fa2d4e-0dcb-4aa6-9b53-acf2985df985",
+      "pkMax": "ff313b3e-53df-4cb9-aced-cd7f7dac9316",
+      "createdMin": "2026-04-13T21:30:41.859+00:00",
+      "createdMax": "2026-08-30T12:00:55.091+00:00"
+    },
+    {
+      "table": "sandbox_runs",
+      "exists": true,
+      "rows": 15,
+      "sha256": "34666355ea44590c1b1557386af706861d648dfe246098c0c57ffec34be6bd9e",
+      "pkMin": "11fcc9fc-cf2b-4c0d-8864-20d6535b4268",
+      "pkMax": "fcfe86d3-0071-4809-929a-ab660a128015",
+      "createdMin": "2026-04-15T00:05:13.246562+00:00",
+      "createdMax": "2026-04-16T09:35:19.863791+00:00"
+    },
+    {
+      "table": "trade_intents",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "user_feedback",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "user_interests",
+      "exists": true,
+      "rows": 8,
+      "sha256": "83da4beccac8462b2a489ab43a4cf9699713b1c5d8fd59870c8f8452e8569248",
+      "pkMin": "2597dd3c-6d15-440b-b381-4df290eeb5fd",
+      "pkMax": "ffeef916-4c53-4ed8-b084-c5c428c44c55",
+      "createdMin": "2026-03-15T23:47:47.106919+00:00",
+      "createdMax": "2026-03-22T10:21:12.424597+00:00"
+    },
+    {
+      "table": "hardness_agent_sessions",
+      "exists": true,
+      "rows": 1,
+      "sha256": "f6483caa9b291231249fdbbd8422bf547d5b1dc94a22268d4a07d26dab5be42b",
+      "pkMin": "1",
+      "pkMax": "1",
+      "createdMin": "2026-04-12T21:18:37.26477+00:00",
+      "createdMax": "2026-04-12T21:18:37.26477+00:00"
+    },
+    {
+      "table": "hardness_agent_proofs",
+      "exists": true,
+      "rows": 1,
+      "sha256": "5648fd7100eee416c4b1167da1bc1600853b7eba0b78625c4ebc663dd88fa4bc",
+      "pkMin": "1",
+      "pkMax": "1",
+      "createdMin": "2026-04-12T21:19:28.003479+00:00",
+      "createdMax": "2026-04-12T21:19:28.003479+00:00",
+      "proofs": {
+        "prediction_hash": {
+          "nonNull": 1,
+          "sha256": "a7e20601238c03d601398c4520134b9432ead93704cb86a134d092dd64d55c1e"
+        },
+        "commit_tx_hash": {
+          "nonNull": 0,
+          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+        },
+        "signal_tx_hash": {
+          "nonNull": 1,
+          "sha256": "c99433489fbcfefd1a15ed1aeddc07faaa1b87d12531d710bcf435379f3535e1"
+        },
+        "resolve_tx_hash": {
+          "nonNull": 0,
+          "sha256": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed"
+        }
+      }
+    },
+    {
+      "table": "agent_signals",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "agent_trades",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "proofs": {
+        "tx_hash": {
+          "nonNull": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "intent_hash": {
+          "nonNull": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "table": "user_digests",
+      "exists": true,
+      "rows": 87,
+      "sha256": "052129a1de68211051e162f4326e9495a324ca6cf76e818d871251721e4abf58",
+      "pkMin": "000e7e09-c7e6-433c-8de6-bb3dc8ba0cb5",
+      "pkMax": "fda604bf-f6de-4108-b21b-346a8f26d768",
+      "createdMin": "2026-03-19T05:16:43.367321+00:00",
+      "createdMax": "2026-09-02T12:01:47.081451+00:00"
+    },
+    {
+      "table": "forum_threads",
+      "exists": true,
+      "rows": 3399,
+      "sha256": "3c6b35e39c05aef740164a5582c8c9ffc4c4cc70ad75b4f885012d057ea312d7",
+      "pkMin": "000cebf3-5d6c-44a4-9a96-f6efb5b1ec0b",
+      "pkMax": "ff92c082-6e4f-4730-8deb-dd8b9b5276c5",
+      "createdMin": "2026-03-16T23:36:35.634875+00:00",
+      "createdMax": "2026-09-02T12:01:45.228454+00:00",
+      "proofs": {
+        "resolution_tx_hash": {
+          "nonNull": 0,
+          "sha256": "37213b3763a32e9a38dc47720e00d77599b6eca8f6d7230a3bd40e9f7440552c"
+        }
+      }
+    },
+    {
+      "table": "forum_posts",
+      "exists": true,
+      "rows": 10980,
+      "sha256": "e8cdcb1b10c9bb2bb2922d48b6a1f85c3195d30088876cc5e216471dc76816df",
+      "pkMin": "000134a3-da02-4e82-999c-e1353548d723",
+      "pkMax": "ffffa59b-7dd0-4a9b-93f1-87d785b54542",
+      "createdMin": "2026-03-16T23:36:35.777159+00:00",
+      "createdMax": "2026-09-02T12:01:45.354368+00:00"
+    },
+    {
+      "table": "agent_position_rechecks",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "mcp_payment_receipts",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "proofs": {
+        "tx_hash": {
+          "nonNull": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "response_hash": {
+          "nonNull": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "table": "telegram_connections",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "totalRows": 26162
+}

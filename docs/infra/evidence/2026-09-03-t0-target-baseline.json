@@ -1,0 +1,213 @@
+{
+  "side": "target",
+  "ref": "qbvdqkknnuweatptjohi",
+  "takenAt": "2026-09-02T22:58:57.219Z",
+  "allowMissing": true,
+  "tables": [
+    {
+      "table": "agent_config",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_cycles",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_events",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_macro_events",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_market_snapshots",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_memory",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_messages",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_positions",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_profiles",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "agent_source_health",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "bobby_control",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "bobby_early_access",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "cycle_transitions",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "forum_publish_receipts",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "hardness_agents",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "indicator_cache",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "llm_calls",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "mcp_payment_challenges",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "memory_objects",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "sandbox_runs",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "trade_intents",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "user_feedback",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "user_interests",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "hardness_agent_sessions",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "hardness_agent_proofs",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_signals",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "agent_trades",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "user_digests",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "forum_threads",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "proofs": {
+        "resolution_tx_hash": {
+          "nonNull": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "table": "forum_posts",
+      "exists": true,
+      "rows": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "table": "agent_position_rechecks",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "mcp_payment_receipts",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    },
+    {
+      "table": "telegram_connections",
+      "exists": false,
+      "rows": 0,
+      "sha256": null
+    }
+  ],
+  "totalRows": 0
+}

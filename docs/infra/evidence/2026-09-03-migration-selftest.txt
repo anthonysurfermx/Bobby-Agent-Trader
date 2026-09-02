@@ -1,0 +1,12 @@
+OK     t0-manifest: missing table → exit 1, no manifest  — exit=1
+OK     t0-manifest: count ≠ streamed → exit 1, no manifest  — exit=1
+OK     t0-manifest: clean run → exit 0, manifest written  — exit=0 
+OK     export: count ≠ exported → exit 1, no index.json  — exit=1
+OK     replay: invalid --from refused  — exit=2
+OK     replay: source == target refused  — exit=2
+OK     replay: trigger set ≠ approved list refused  — exit=1
+OK     replay: refuses without freeze on both sides  — exit=1
+OK     replay: drains 5,432 pending entries across pages to zero  — exit=0 upserts=5432 left=0
+OK     replay: writes that keep landing after every drain → exit 1 (do not unfreeze)  — exit=1
+
+SELFTEST PASSED: fail-closed behaviour demonstrated.

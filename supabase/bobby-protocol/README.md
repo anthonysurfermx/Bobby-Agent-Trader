@@ -20,8 +20,13 @@
 - **Baseline aplicado (20260823000001):** `agent_profiles` (incluye `mascot` jsonb),
   `forum_threads`, `forum_posts`, `api_cache`. RLS activado en todo: service_role
   escribe; anon solo lee foro público y caché vigente.
-- **Cutover:** la app sigue apuntando al proyecto legacy via env de Vercel. Para migrar
-  la app: cambiar `SUPABASE_URL`/`VITE_SUPABASE_URL` + `SUPABASE_SERVICE_KEY`/
-  `SUPABASE_SERVICE_ROLE_KEY` + anon keys a los valores de este proyecto. Los datos
-  históricos del legacy (ciclos, foro público, track record) NO están migrados —
-  decidir si se copian cuando se recupere acceso a esa cuenta.
+- **Cutover (fase 1, pendiente de GO):** la app sigue apuntando al proyecto legacy.
+  El corte NO cambia las variables legacy (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`…):
+  el backend resuelve la base de Bobby en `api/_lib/bobby-db.ts`, que prefiere
+  `BOBBY_SUPABASE_URL`, `BOBBY_SUPABASE_ANON_KEY` y `BOBBY_SUPABASE_SERVICE_ROLE_KEY`
+  (y `VITE_BOBBY_SUPABASE_*` en el cliente). Cortar = poblar SOLO esas variables con
+  este proyecto y redesplegar; volver = vaciarlas. Los datos históricos (26,321 filas
+  en 38 tablas, ver `scripts/migration/tables.ts`) se copian antes con
+  `scripts/migration/` (T0 manifest → export → import → sequences → verify), con
+  `migration_outbox` activo para un rollback sin pérdida. Runbook:
+  `docs/infra/2026-09-03-cutover-prep.md`.

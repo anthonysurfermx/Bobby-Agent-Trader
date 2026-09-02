@@ -1,0 +1,8 @@
+[23:00:08] verify proofs · egpixaunlnzauztbrnuz
+FAIL   hardness proof #1: prediction_hash recomputes from a thread id  — no candidate among 1 ids
+FAIL   hardness proof #1: signal_tx_hash on chain 196  — 0x6c88a2a044a6… reverted
+[23:00:10] 1 hardness proof(s) checked
+[23:00:10] agent_trades: 0 tx hash(es) checked
+[23:00:10] mcp_payment_receipts: 0 tx hash(es) checked
+
+PROOFS FAILED: 2 problem(s).
