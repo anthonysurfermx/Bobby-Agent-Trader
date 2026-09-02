@@ -560,8 +560,8 @@ struct MascotSceneView: UIViewRepresentable {
             // body so the billboards never sink into the mesh.
             func anchor(_ slot: BodySlot) -> (SCNVector3, CGFloat) {
                 switch slot {
-                case .face:     return (SCNVector3(0, Float(r * 0.40), Float(r * 0.80)), r * 0.92)
-                case .headset:  return (SCNVector3(0, Float(r * 0.62), Float(r * 0.70)), r * 0.95)
+                case .face:     return (SCNVector3(0, Float(r * 0.42), Float(r * 0.80)), r * 0.62)
+                case .headset:  return (SCNVector3(0, Float(r * 0.62), Float(r * 0.70)), r * 0.72)
                 case .head:     return (SCNVector3(0, Float(r * 1.22), 0), r * 0.62)
                 case .hand:     return (SCNVector3(Float(r * 0.80), Float(-r * 0.42), Float(r * 0.50)), r * 0.46)
                 case .hip:      return (SCNVector3(Float(r * 0.36), Float(-r * 0.12), Float(r * 0.70)), r * 0.36)
