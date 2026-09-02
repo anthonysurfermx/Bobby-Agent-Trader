@@ -75,3 +75,20 @@ restore → `BOBBY_SUPABASE_*` y `VITE_BOBBY_SUPABASE_*` → destino → rebuild
 verificación total (conteos, IDs, proofs, vínculos on-chain) → freeze off →
 `legacy-reference-audit` a cero (paso 7 del plan: retirar el producto
 DeFi México del repo). Cada paso con su propio GO.
+
+## Addendum — qué corre producción realmente (verificado 2026-09-02 noche)
+- Producción se despliega con **`vercel --prod` desde local** (source `cli`),
+  no desde `main`. Último deploy: `feat/web-companion` @ `3ccd8b18`.
+- `main` está en `bb28ec3`, **46 commits por detrás de producción** y no se
+  usa. La rama de fase 0 contiene exactamente producción (`3ccd8b18`) + 3
+  commits de docs + 20 commits de fase 0: **no revierte ninguna feature**.
+- El Live Desk en `/agentic-world/bobby` (sin wallet, por diseño: "este
+  desk no se conecta a tu wallet") ya está en producción; el chat con
+  wallet y sesión firmada vive en `/agentic-world/bobby/voice-room`, y los
+  flujos firmados también en el foro y la página del challenge. No es una
+  regresión de la fase 0. Añadir una entrada de wallet al desk es una
+  decisión de producto aparte.
+- Mecanismo recomendado para el deploy del commit aprobado: `vercel --prod`
+  desde el worktree `phase0` en ese sha (mismo mecanismo de siempre, usa el
+  env de Production). Después, fast-forward de `main` a ese sha para acabar
+  con la deriva (requiere aprobación explícita: push a `main`).
