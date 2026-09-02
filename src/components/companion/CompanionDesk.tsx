@@ -382,7 +382,7 @@ export default function CompanionDesk() {
                   {[
                     { icon: <Grid2x2 size={14} />, label: t('Explore markets', 'Explorar mercados'), act: () => setSheet('board') },
                     { icon: <Users size={14} />, label: t('My squad', 'Mi squad'), act: () => setSheet('squad') },
-                    { icon: <MapIcon size={14} />, label: t('Bobby World · soon', 'Mundo Bobby · pronto'), act: () => setSheet('world') },
+                    { icon: <MapIcon size={14} />, label: t('Trader Land · soon', 'Trader Land · pronto'), act: () => setSheet('world') },
                     { icon: <Share2 size={14} />, label: t('Share my skin', 'Compartir mi skin'), act: () => void shareSkin() },
                     { icon: <ShieldAlert size={14} />, label: t('Risk notice', 'Aviso de riesgo'), act: () => setSheet('risk') },
                     { icon: muted ? <VolumeX size={14} /> : <Volume2 size={14} />, label: muted ? t('Sounds off', 'Sonidos apagados') : t('Sounds on', 'Sonidos encendidos'), act: () => { setSfxMuted(!muted); setMuted(!muted); } },

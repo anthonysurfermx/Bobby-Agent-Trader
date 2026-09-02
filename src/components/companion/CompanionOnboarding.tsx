@@ -11,7 +11,7 @@ import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, LOADOUT_GEAR, ORIGIN_STORY, VIBES, companionName, getVibe, tintFor, type Companion } from '@/lib/companions/data';
 import { pick, t } from '@/lib/companions/i18n';
 import { progressStore, useProgress } from '@/lib/companions/progress';
-import { sfxSpawn, sfxTock } from '@/lib/companions/sfx';
+import { sfxAuraMax, sfxForgeCharge, sfxForgeHum, sfxTock } from '@/lib/companions/sfx';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 
 export default function CompanionOnboarding({ onDone }: { onDone: () => void }) {
@@ -27,21 +27,23 @@ export default function CompanionOnboarding({ onDone }: { onDone: () => void }) 
   const tint = tintFor(selected);
   const ready = equipped.length === LOADOUT_GEAR.length;
 
-  // Loadout: slots equip themselves one by one; any tap jumps ahead.
+  // Loadout: the forge hums, slots equip themselves one by one (each a step
+  // higher); any tap jumps ahead.
   useEffect(() => {
     if (step !== 2) return;
+    const stopHum = sfxForgeHum();
     autoRef.current.forEach(clearTimeout);
     autoRef.current = LOADOUT_GEAR.map((g, i) => window.setTimeout(() => equip(g.id), 450 + i * 620));
-    return () => autoRef.current.forEach(clearTimeout);
+    return () => { autoRef.current.forEach(clearTimeout); stopHum(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   function equip(id: string) {
     setEquipped((prev) => {
       if (prev.includes(id)) { sfxTock(); return prev; }
-      sfxTock();
       const next = [...prev, id];
-      if (next.length === LOADOUT_GEAR.length) { sfxSpawn(); setBurst(true); setTimeout(() => setBurst(false), 1400); }
+      sfxForgeCharge(next.length);
+      if (next.length === LOADOUT_GEAR.length) { setTimeout(sfxAuraMax, 120); setBurst(true); setTimeout(() => setBurst(false), 1400); }
       return next;
     });
   }

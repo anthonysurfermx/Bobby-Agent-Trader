@@ -9,7 +9,7 @@ import { sfxLevelUp, sfxLoot } from '@/lib/companions/sfx';
 
 const GOLD = '#F5C542';
 
-/** Bobby World — the Focus-Tree-style world we build next. Teaser only. */
+/** Trader Land — the Focus-Tree-style world we build next. Teaser only. */
 export const WORLD_MAP_ART = '/world/bobby-world.jpg';
 const WORLD_REGIONS = ['CRYPTO BAY', 'GOLD MINES', 'WALL STREET CITADEL', 'RISK REEF'];
 
@@ -84,7 +84,7 @@ export function ToolBelt({ companion, xp, onTap, onPet, onPlus, onWorld }: { com
       )}
       <button onClick={onPlus} title={t('What else you can earn', 'Qué más puedes conseguir')} className="h-11 w-11 rounded-full flex items-center justify-center border border-dashed border-white/20 text-white/50"><Plus size={14} /></button>
       {/* The world slot: the map we are building next, fog of war and all. */}
-      <button onClick={onWorld} title={t('Bobby World · soon', 'Mundo Bobby · pronto')} className="relative h-11 w-11 rounded-full flex items-center justify-center overflow-visible" style={{ border: `1px solid ${GOLD}99`, backgroundImage: `url(${WORLD_MAP_ART})`, backgroundSize: '300%', backgroundPosition: '50% 58%' }}>
+      <button onClick={onWorld} title={t('Trader Land · soon', 'Trader Land · pronto')} className="relative h-11 w-11 rounded-full flex items-center justify-center overflow-visible" style={{ border: `1px solid ${GOLD}99`, backgroundImage: `url(${WORLD_MAP_ART})`, backgroundSize: '300%', backgroundPosition: '50% 58%' }}>
         <span className="absolute inset-0 rounded-full bg-black/45" />
         <motion.span className="absolute inset-0 rounded-full" style={{ border: `1px solid ${GOLD}` }} animate={{ scale: [1, 1.45], opacity: [0.8, 0] }} transition={{ repeat: Infinity, duration: 1.7, ease: 'easeOut' }} />
         <MapIcon size={14} className="relative" style={{ color: GOLD }} />
@@ -103,7 +103,7 @@ export function WorldMapTeaser({ xp, level, onClose }: { xp: number; level: numb
           <motion.img src={WORLD_MAP_ART} alt="" className="absolute inset-0 h-full w-full object-cover" animate={{ scale: [1.08, 1, 1.08] }} transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut' }} />
           <motion.div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 30% 22%, rgba(130,140,160,0.38), transparent 55%)' }} animate={{ x: [-24, 24, -24], y: [0, 14, 0] }} transition={{ repeat: Infinity, duration: 14, ease: 'easeInOut' }} />
           <div className="absolute inset-x-0 top-0 p-4 flex items-center justify-between">
-            <div className="text-[10px] font-mono tracking-[0.3em] text-white/85 bg-black/45 backdrop-blur px-3 py-1 rounded-full">{t('BOBBY WORLD', 'MUNDO BOBBY')}</div>
+            <div className="text-[10px] font-mono tracking-[0.3em] text-white/85 bg-black/45 backdrop-blur px-3 py-1 rounded-full">{t('TRADER LAND', 'TRADER LAND')}</div>
             <button onClick={onClose} aria-label="close" className="h-9 w-9 rounded-full bg-black/55 text-white/85">✕</button>
           </div>
           <div className="absolute inset-x-0 bottom-0 p-5 pt-20 bg-gradient-to-t from-[#07090c] via-[#07090c]/85 to-transparent">

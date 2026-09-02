@@ -60,3 +60,102 @@ export function sfxLoot(golden = false) {
 }
 /** Mission / spawn burst. */
 export function sfxSpawn() { [392, 523, 659, 784].forEach((f, i) => tone(f, 140, 'triangle', 0.09, i * 60)); vibrate([10, 20, 10, 20, 40]); }
+
+// ---- The aura forge (onboarding step 3): futuristic, all synthesized ----
+
+/** Low machine hum while the forge runs. Returns a stop function that fades out. */
+export function sfxForgeHum(): () => void {
+  const c = audio();
+  if (!c || sfxMuted()) return () => {};
+  const master = c.createGain();
+  master.gain.setValueAtTime(0.0001, c.currentTime);
+  master.gain.exponentialRampToValueAtTime(0.09, c.currentTime + 0.8);
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 420;
+  master.connect(lp).connect(c.destination);
+  const oscs: OscillatorNode[] = [];
+  const layer = (freq: number, type: OscillatorType, gain: number) => {
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = type; o.frequency.value = freq; g.gain.value = gain;
+    o.connect(g).connect(master); o.start(); oscs.push(o);
+    return o;
+  };
+  layer(55, 'sine', 1);
+  const mid = layer(110, 'triangle', 0.6);
+  layer(165, 'sine', 0.35);
+  // Slow wobble on the mid layer so it breathes.
+  const lfo = c.createOscillator();
+  const lfoGain = c.createGain();
+  lfo.frequency.value = 0.4; lfoGain.gain.value = 3;
+  lfo.connect(lfoGain).connect(mid.frequency); lfo.start(); oscs.push(lfo);
+  return () => {
+    const t = c.currentTime;
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value, t);
+    master.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    oscs.forEach((o) => o.stop(t + 0.65));
+  };
+}
+
+/** One piece equipped: a rising charge, each one a step higher (1..4). */
+export function sfxForgeCharge(index: number) {
+  const c = audio();
+  if (!c || sfxMuted()) return;
+  const i = Math.max(1, Math.min(4, index));
+  const t0 = c.currentTime;
+  const f0 = 240;
+  const f1 = 760 + 200 * i;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.16, t0 + 0.012);
+  g.gain.setValueAtTime(0.16, t0 + 0.3);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.42);
+  g.connect(c.destination);
+  const sweep = (type: OscillatorType, mult: number, gain: number) => {
+    const o = c.createOscillator();
+    const og = c.createGain();
+    o.type = type; og.gain.value = gain;
+    o.frequency.setValueAtTime(f0 * mult, t0);
+    o.frequency.exponentialRampToValueAtTime(f1 * mult, t0 + 0.42);
+    o.connect(og).connect(g); o.start(t0); o.stop(t0 + 0.45);
+  };
+  sweep('sine', 1, 1);
+  sweep('square', 2, 0.18);
+  sweep('sine', 3, 0.12);
+  vibrate([12, 20, 18]);
+}
+
+/** Aura maxed: a bright chord opening up, a shimmer arpeggio and an air burst. */
+export function sfxAuraMax() {
+  const c = audio();
+  if (!c || sfxMuted()) return;
+  const t0 = c.currentTime;
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(300, t0);
+  lp.frequency.exponentialRampToValueAtTime(6000, t0 + 0.35);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.14, t0 + 0.02);
+  g.gain.setValueAtTime(0.14, t0 + 0.7);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.5);
+  lp.connect(g).connect(c.destination);
+  [220, 277.18, 329.63, 440].forEach((f) => {
+    const o = c.createOscillator();
+    o.type = 'sawtooth'; o.frequency.value = f;
+    o.connect(lp); o.start(t0); o.stop(t0 + 1.55);
+  });
+  [1046.5, 1318.5, 1568, 2093].forEach((f, k) => tone(f, 500, 'sine', 0.08, 80 + k * 110));
+  // Air burst: a short noise hit.
+  const len = Math.floor(c.sampleRate * 0.18);
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let n = 0; n < len; n++) data[n] = (Math.random() * 2 - 1) * (1 - n / len) ** 2;
+  const src = c.createBufferSource();
+  const ng = c.createGain();
+  src.buffer = buf; ng.gain.value = 0.12;
+  src.connect(ng).connect(c.destination); src.start(t0);
+  vibrate([20, 30, 20, 30, 90]);
+}
