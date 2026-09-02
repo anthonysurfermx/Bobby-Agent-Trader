@@ -189,7 +189,7 @@ export const DEFAULT_QUICK_ACCESS = ['BTC', 'NVDA', 'ETH'];
 // ---- Pets: one per companion, unlock at 300 XP; the panda spins ----
 
 export interface CompanionPet { companionId: string; name: Bi; emoji: string; spins: boolean }
-export const PET_UNLOCK_XP = 300;
+export const PET_UNLOCK_XP = 500;
 export const PETS: Record<string, CompanionPet> = {
   orb: { companionId: 'orb', name: { en: 'Spin the panda', es: 'Panda giratorio' }, emoji: '🐼', spins: true },
   byte: { companionId: 'byte', name: { en: 'Bit the dog', es: 'Bit el perro' }, emoji: '🐶', spins: false },
