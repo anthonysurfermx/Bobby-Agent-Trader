@@ -127,3 +127,26 @@ Catálogo de prompts de los 25 lotes, dos estados cada uno:
 
 Resultados con job ids: `docs/trader-land/art/lot-catalog-v01-results.json`.
 Créditos usados hoy: 8 + 12 + 100 = 120; saldo ≈ 185.
+
+## 8. Entrega web (el mapa vive en bobbyprotocol.xyz primero)
+
+El vertical de v0.2 es web-first (PixiJS para tiles, Three.js solo para el
+companion), así que el empaquetado se diseña para el navegador y se reutiliza
+en iOS, no al revés.
+
+| Entregable | Formato | Regla |
+|---|---|---|
+| Master por pieza y estado | PNG 1024×1024 con alpha (fondo removido) | contenido centrado en el rombo 2:1, margen 8–12 %, anchor en el vértice inferior del footprint |
+| Variantes web | WebP 512 y 256 (calidad 85) + PNG de respaldo | ≤ 60 KB por sprite a 512; `srcset` por densidad (1×, 2×) |
+| Atlas | 1 atlas WebP por mundo (10 sprites: 5 lotes × seed/bloom) + JSON de frames | evita 50 requests; carga perezosa por región al levantar la niebla |
+| Aura Core | stage 0/1 como sprites separados + decal de raíces + esfera aislada | la esfera se anima en el navegador (flotación y halo), el aro se divide en front/back por máscara |
+| Glow | máscara en escala de grises por bloom | se compone con `blend: add` en PixiJS; nada de re-render para "encender" |
+| Manifiesto | `public/land/v1/asset-manifest.json` | id, versión, footprint, anchor, rotationMode, urls por tamaño/estado, `contentBounds`, `soundCue`, job id y créditos |
+
+Presupuesto de peso para la primera carga del mundo 8×8 en web: < 1.5 MB
+(atlas del centro + Crypto Bay; el resto bajo demanda). Fondo OLED `#05070A`
+y prueba de daltonismo sobre los cuatro terrenos, como pide el QA del brief.
+
+Regla de despliegue: los assets entran al repo en una rama de arte
+(`feat/trader-land-art`) y llegan a producción **solo con el vertical**, nunca
+sueltos en la rama de fase 0.
