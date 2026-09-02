@@ -64,7 +64,7 @@ OKX/Yahoo, Higgsfield, el archivo build 11.
 
 | # | Prueba | Esperado |
 |---|---|---|
-| 1 | `GET /api/bobby-protocol-stats` | Mismos números que antes del corte: 3,402 ciclos, 10,980 posts, mismo win rate |
+| 1 | `GET /api/bobby-protocol-stats` | Mismos números que antes del corte. Baseline 2026-09-02: 864 publicadas, 794 resueltas, 433 aciertos, 244 fallos, 54.5 %. A nivel tabla: 3,402 agent_cycles, 7,256 agent_events, 3,399 hilos, 10,980 posts |
 | 2 | `/agentic-world/bobby/history` y `/protocol` | Track record idéntico, enlaces a Base funcionando |
 | 3 | `/agentic-world` y el foro web | Hilos con las mismas fechas (2026-09-02 el último) |
 | 4 | `GET /api/verified-calls` y `protocol-tx-history` | Cada prueba on-chain resuelve a un hilo (0 huérfanos) |

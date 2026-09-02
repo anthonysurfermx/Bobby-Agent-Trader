@@ -29,7 +29,19 @@ visible fue solo en `www.bobbyprotocol.xyz`. Aun así conviene regresar
 revisar por qué el dominio defimexico.org está estacionado (¿expiró o se
 cambió el DNS?).
 
-Remediación (la ejecuta Anthony, en este orden):
+**Estado 2026-09-02, cerrado.** Anthony ejecutó los tres pasos desde el
+dashboard de Vercel y lo verifiqué de forma independiente: `bobbyprotocol.xyz`
+sirve el build nuevo (favicon v3, `/app`, `/agentic-world/bobby`, assets
+`/app/shot-*.webp` y `/world/bobby-world.jpg` en 200); `www.bobbyprotocol.xyz`
+redirige 307 al apex conservando la ruta; `defi-mexico-hub.vercel.app` vuelve
+a mostrar "DeFi México - Hub del Ecosistema Blockchain Mexicano" (promovido
+`dpl_8Ku7y24p14JEZHJTpndt3z9p8PBJ`, commit `dc94802`). Pendiente menor: el
+redirect de `www` es 307 (temporal); para SEO conviene 308 (permanente).
+`defimexico.org` sigue estacionado en GoDaddy, sin cambios de DNS. Baseline
+del historial público en ese momento: 864 publicadas, 794 resueltas, 433
+aciertos, 244 fallos, 54.5 %.
+
+Remediación original (ya ejecutada, se conserva como referencia):
 
 ```bash
 # 1. Regresar defimexico.org al último build real de DeFi México (36 días)
