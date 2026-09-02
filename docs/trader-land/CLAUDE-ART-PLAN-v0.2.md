@@ -103,3 +103,27 @@ dorado como moneda); el vertical solo necesita 0 y 1.
 
 Catálogo de prompts de los 25 lotes, dos estados cada uno:
 `docs/trader-land/art/lot-catalog-v01.json` (50 generaciones, ~100 créditos).
+
+## 7. Catálogo de 25 lotes (2026-09-02, 100 créditos)
+
+50 generaciones, 0 fallos. Resultado por mundo en las hojas de contacto
+(fila superior seed, inferior bloom). Veredicto:
+
+- **Bloom: 23 de 25 aprobados** como masters. Cámara, materiales y siluetas
+  consistentes entre los cinco mundos; el oro aparece solo como placa en el
+  hito de Axiom Archive (no moneda).
+- **A rehacer (2 blooms, 4 créditos):** `thesis_citadel_risk_shield` (salió
+  como esfera en pedestal, parece un mini Aura Core) y
+  `risk_reef_reef_tile` (energía tipo llama; debe ser calma).
+- **Hallazgo de proceso:** seed y bloom se generaron por separado y no
+  comparten geometría. Regla de producción: el **bloom es el master** y el
+  seed se **deriva** (desaturar, bajar emisivos, quitar partículas) o se
+  genera imagen-a-imagen desde el bloom. Los 25 seeds generados sirven solo
+  como referencia de "apagado"; uno (`axiom_archive_base_ring_seal`) salió
+  con fondo blanco y se descarta.
+- Siguiente: rehacer los 2 blooms, `remove_background` sobre los 25 masters,
+  derivar seeds, masters 1024 + thumbnails 256, y empaquetar en una rama de
+  arte aparte (no en la rama desplegada a producción).
+
+Resultados con job ids: `docs/trader-land/art/lot-catalog-v01-results.json`.
+Créditos usados hoy: 8 + 12 + 100 = 120; saldo ≈ 185.

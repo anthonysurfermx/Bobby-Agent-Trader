@@ -1,0 +1,236 @@
+{
+  "batch": "lot-catalog-v01",
+  "date": "2026-09-02",
+  "model": "nano_banana_pro (served as nano_banana_2)",
+  "resolution": "2k",
+  "aspect": "1:1",
+  "creditsUsed": 100,
+  "process_finding": "Seed and bloom were generated independently, so their geometry does not match (expected). Production rule: the BLOOM render is the master; the SEED state is derived from it (desaturate, dim emissives, drop particles) or generated image-to-image from the bloom. The 25 blooms are the real catalog.",
+  "items": [
+    {
+      "id": "crypto_bay_data_dock",
+      "world": "crypto_bay",
+      "kind": "ground",
+      "footprint": "1x1",
+      "seed_job": "c53c8892-6dae-49d9-90d5-104fb4d6d0c8",
+      "bloom_job": "e5f5ceb6-0b8c-43b4-92d2-b0028c151db3",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "crypto_bay_water_walkway",
+      "world": "crypto_bay",
+      "kind": "path",
+      "footprint": "1x1",
+      "seed_job": "054174b3-354e-4987-8a28-721f8fae3d0e",
+      "bloom_job": "e802fd15-6f5d-4795-a962-bc815f3e1d85",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "crypto_bay_context_buoy",
+      "world": "crypto_bay",
+      "kind": "decor",
+      "footprint": "1x1",
+      "seed_job": "4041c02a-9991-48b9-acdb-538067d8ff75",
+      "bloom_job": "bbb43014-86dc-4dae-b77e-cecdbe620c8b",
+      "verdict": "bloom APPROVED (dome lamp on ring base)"
+    },
+    {
+      "id": "crypto_bay_candle_tower",
+      "world": "crypto_bay",
+      "kind": "building",
+      "footprint": "2x1",
+      "seed_job": "9f8e9a73-87e9-4b98-9ede-69599e139a4f",
+      "bloom_job": "4912e627-6db0-4fb0-bf43-4b4ee0ffaf16",
+      "verdict": "bloom OK (holographic candle reads as intended); seed too literal a wax candle — derive seed from bloom"
+    },
+    {
+      "id": "crypto_bay_waiting_lighthouse",
+      "world": "crypto_bay",
+      "kind": "landmark",
+      "footprint": "2x2",
+      "seed_job": "bbe1cd58-2a52-4eec-a5f1-f12a6f94b0d1",
+      "bloom_job": "5f085ea7-db35-452a-9278-a9e232dbf9c9",
+      "verdict": "bloom APPROVED; seed geometry differs — derive from bloom"
+    },
+    {
+      "id": "evidence_mines_crystal_vein_rock",
+      "world": "evidence_mines",
+      "kind": "ground",
+      "footprint": "1x1",
+      "seed_job": "43cd4fee-71f8-44e0-b0d3-73adcfe4746e",
+      "bloom_job": "3c3f124f-20dc-4bfb-a4a3-542eb09abc53",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "evidence_mines_open_tunnel",
+      "world": "evidence_mines",
+      "kind": "path",
+      "footprint": "1x1",
+      "seed_job": "d82e8113-0822-4933-a662-efe778b4d059",
+      "bloom_job": "72200b21-a3aa-4821-b9b4-14ff4e79190a",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "evidence_mines_lantern_drone",
+      "world": "evidence_mines",
+      "kind": "decor",
+      "footprint": "1x1",
+      "seed_job": "0de29617-1a60-4612-9b7b-3d4ed0ed7916",
+      "bloom_job": "207c7f58-f214-449e-b0c8-8744fb83ba20",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "evidence_mines_evidence_workshop",
+      "world": "evidence_mines",
+      "kind": "building",
+      "footprint": "2x1",
+      "seed_job": "c5ecd57b-d86c-430d-8084-5d3a9b3f4b2b",
+      "bloom_job": "8ea58835-5bd9-41b3-aa2f-5918f2bfa83a",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "evidence_mines_mother_crystal",
+      "world": "evidence_mines",
+      "kind": "landmark",
+      "footprint": "2x2",
+      "seed_job": "db21d206-6082-4b65-a9c4-0a83868fbc0b",
+      "bloom_job": "1f22cd05-9de9-4b08-9a2b-4d12658e889c",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "thesis_citadel_wall_slab",
+      "world": "thesis_citadel",
+      "kind": "ground",
+      "footprint": "1x1",
+      "seed_job": "e4993465-da1c-41e9-a851-16a685ef00d9",
+      "bloom_job": "e8bcf9e3-be27-4b09-9147-822fd183bd2f",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "thesis_citadel_fortified_ramp",
+      "world": "thesis_citadel",
+      "kind": "path",
+      "footprint": "1x1",
+      "seed_job": "05d7c80e-7842-4349-ac49-c3ca83af1402",
+      "bloom_job": "57e849cd-772c-47a3-9ef4-0f351b55bbfb",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "thesis_citadel_risk_shield",
+      "world": "thesis_citadel",
+      "kind": "decor",
+      "footprint": "1x1",
+      "seed_job": "00bc7600-92dd-4bec-9906-2289b20e536f",
+      "bloom_job": "4bcd243d-4ef3-415f-8667-dadb3adfdebc",
+      "verdict": "bloom REDO: rendered as a sphere on a pedestal (reads like a mini Aura Core); must be a shield/beacon"
+    },
+    {
+      "id": "thesis_citadel_double_gate",
+      "world": "thesis_citadel",
+      "kind": "building",
+      "footprint": "2x1",
+      "seed_job": "525cfc6f-4b4f-44e6-87e8-afdf0ba96c7c",
+      "bloom_job": "4c28429b-fae2-456c-a1d8-808b7b85752a",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "thesis_citadel_three_gate_citadel",
+      "world": "thesis_citadel",
+      "kind": "landmark",
+      "footprint": "2x2",
+      "seed_job": "c558c51e-898a-4caf-ac9e-d9a7eb6a58d8",
+      "bloom_job": "24d41069-cb0c-4f28-8438-b07ed221dd1d",
+      "verdict": "bloom APPROVED (three blue-framed gates, modular, not medieval)"
+    },
+    {
+      "id": "risk_reef_reef_tile",
+      "world": "risk_reef",
+      "kind": "ground",
+      "footprint": "1x1",
+      "seed_job": "d3a004d2-6f79-4af7-8947-67d4aa025740",
+      "bloom_job": "9f102015-8b7a-488c-8df8-f5ead48ad3a8",
+      "verdict": "bloom REDO: green flame-like energy; must stay calm (ridge glow, no fire)"
+    },
+    {
+      "id": "risk_reef_blue_sluice",
+      "world": "risk_reef",
+      "kind": "path",
+      "footprint": "1x1",
+      "seed_job": "4fd8c02f-b71a-4ef0-864e-99cf148f5a1c",
+      "bloom_job": "77ff016a-f190-48d9-95a3-c6253f5f6d89",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "risk_reef_dual_orbit_antenna",
+      "world": "risk_reef",
+      "kind": "decor",
+      "footprint": "1x1",
+      "seed_job": "eb4125fe-08b9-42dd-87d3-f0c2416fc3ae",
+      "bloom_job": "74fa9990-b27d-4d24-9860-fab67b7f9166",
+      "verdict": "bloom APPROVED — matches the Red Team antenna of the golden scene"
+    },
+    {
+      "id": "risk_reef_red_team_observatory",
+      "world": "risk_reef",
+      "kind": "building",
+      "footprint": "2x1",
+      "seed_job": "905f5b41-e14a-493e-a210-9d845432c4d5",
+      "bloom_job": "015f65b5-cbbf-4558-ac04-67ea238bb5de",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "risk_reef_double_bridge",
+      "world": "risk_reef",
+      "kind": "landmark",
+      "footprint": "2x2",
+      "seed_job": "c327fe88-4ee0-4fb6-93ab-1eb53c84109b",
+      "bloom_job": "e1288bce-4ec2-4f4e-bf62-85141a4370c6",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "axiom_archive_archive_ring_tile",
+      "world": "axiom_archive",
+      "kind": "ground",
+      "footprint": "1x1",
+      "seed_job": "429d3b3d-8ad4-42f1-8c6c-3083d275b6fe",
+      "bloom_job": "56daddff-ba5f-4904-b2a6-b73c2afe375c",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "axiom_archive_return_path",
+      "world": "axiom_archive",
+      "kind": "path",
+      "footprint": "1x1",
+      "seed_job": "d7c0de56-6b5b-4cb1-a446-959cb09def3c",
+      "bloom_job": "6770a7d1-80b7-4edf-82a3-07b132d321bd",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "axiom_archive_aura_flower",
+      "world": "axiom_archive",
+      "kind": "decor",
+      "footprint": "1x1",
+      "seed_job": "eb04d2c7-65e0-40d1-ae59-c235ecb2cc87",
+      "bloom_job": "06136894-8b70-49a8-84d2-ee082ec8a4ff",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "axiom_archive_lit_archive",
+      "world": "axiom_archive",
+      "kind": "building",
+      "footprint": "2x1",
+      "seed_job": "42ad229d-7fa5-4bd9-b097-78bd78014bd0",
+      "bloom_job": "df1f1c2b-ae2b-4f5d-95e9-b0e5f608c1fe",
+      "verdict": "bloom APPROVED"
+    },
+    {
+      "id": "axiom_archive_base_ring_seal",
+      "world": "axiom_archive",
+      "kind": "landmark",
+      "footprint": "2x2",
+      "seed_job": "dfc014af-b17e-4c02-b972-52226b23605b",
+      "bloom_job": "bf731822-dffb-47e3-9a7e-f060c493c6c0",
+      "verdict": "bloom APPROVED (gold is a plate, not a coin); seed rendered on a WHITE background — discard, derive from bloom"
+    }
+  ]
+}
