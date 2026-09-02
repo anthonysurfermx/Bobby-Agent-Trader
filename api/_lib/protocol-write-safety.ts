@@ -87,6 +87,12 @@ export function evaluateProtocolWriteSafety(
     blockers.push(`unsupported protocol chain id ${chain.id}`);
   }
 
+  // Codex phase-0 review #2, blocker 1: the freeze applies to EVERY chain,
+  // X Layer included — it is evaluated before any per-chain latch.
+  if (isProtocolCutoverFrozen(env)) {
+    blockers.push('write freeze is active (PROTOCOL_CUTOVER_FREEZE or bobby_control) — writes are frozen');
+  }
+
   // Legacy X Layer remains operational during the cutover. Every Base-family
   // writer must opt in explicitly and confirm the exact destination chain.
   if (chain.id === XLAYER_CHAIN_ID) {
@@ -99,13 +105,6 @@ export function evaluateProtocolWriteSafety(
     }
     if (env.PROTOCOL_WRITE_CHAIN_ID !== String(chain.id)) {
       blockers.push(`PROTOCOL_WRITE_CHAIN_ID must equal ${chain.id}`);
-    }
-    // Codex mainnet review P0-2: the cutover freeze must gate EVERY
-    // Base-family writer through this shared guard — previously only
-    // bobby-cycle checked it, leaving xlayer-record able to sign while
-    // "frozen". Freeze wins over every other latch.
-    if (isProtocolCutoverFrozen(env)) {
-      blockers.push('write freeze is active (PROTOCOL_CUTOVER_FREEZE or bobby_control) — writes are frozen');
     }
   }
 

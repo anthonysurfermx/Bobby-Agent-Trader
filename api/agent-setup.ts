@@ -11,6 +11,7 @@ import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-secu
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { requireWalletSession } from './_lib/wallet-session.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 15 };
 
@@ -76,6 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabase = createClient(SB_URL, SB_SERVICE_KEY);
 
+  if (!(await requireWritesOpen(res))) return;
   const { wallet_address, agent_name, voice, personality, cadence_hours, markets, delivery, mascot } = req.body || {};
 
   // Validate wallet

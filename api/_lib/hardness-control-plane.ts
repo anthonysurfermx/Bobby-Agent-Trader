@@ -1,3 +1,4 @@
+import { assertWritesOpen } from './control.js';
 import { bobbyDbUrl, bobbyServiceKey } from './bobby-db.js';
 const SB_URL =
   bobbyDbUrl();
@@ -65,6 +66,7 @@ export interface AgentProofRecord {
 }
 
 export async function upsertAgent(agent: AgentRecord) {
+  await assertWritesOpen('hardness upsertAgent');
   if (!hasSupabase()) return null;
   const res = await fetch(`${SB_URL}/rest/v1/hardness_agents?on_conflict=agent_id`, {
     method: 'POST',
@@ -103,6 +105,7 @@ export async function getAgent(agentId: string) {
 }
 
 export async function createSession(session: AgentSessionRecord) {
+  await assertWritesOpen('hardness createSession');
   if (!hasSupabase()) return null;
   const res = await fetch(`${SB_URL}/rest/v1/hardness_agent_sessions`, {
     method: 'POST',
@@ -127,6 +130,7 @@ export async function createSession(session: AgentSessionRecord) {
 }
 
 export async function updateSession(sessionId: string, patch: Record<string, unknown>) {
+  await assertWritesOpen('hardness updateSession');
   if (!hasSupabase()) return false;
   const res = await fetch(`${SB_URL}/rest/v1/hardness_agent_sessions?session_id=eq.${sessionId}`, {
     method: 'PATCH',
@@ -140,6 +144,7 @@ export async function updateSession(sessionId: string, patch: Record<string, unk
 }
 
 export async function createProof(proof: AgentProofRecord) {
+  await assertWritesOpen('hardness createProof');
   if (!hasSupabase()) return null;
   const res = await fetch(`${SB_URL}/rest/v1/hardness_agent_proofs`, {
     method: 'POST',

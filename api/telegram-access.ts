@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 30 };
 
@@ -56,11 +57,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .limit(1)
       .maybeSingle();
 
+    const { data: group } = await supabase
+      .from('telegram_groups')
+      .select('telegram_group_name, bot_status')
+      .eq('telegram_group_id', Number(groupId))
+      .limit(1)
+      .maybeSingle();
+
     return res.status(200).json({
       active: !!sub,
       expires_at: sub?.expires_at || null,
+      group_name: group?.telegram_group_name || null,
+      bot_status: group?.bot_status || null,
     });
   }
+
+  // Everything below writes (activation sessions, subscriptions) or sends Telegram.
+  if (!(await requireWritesOpen(res))) return;
 
   // === Create session + return 402: GET /api/telegram-access?group_id=123&wallet=0x... ===
   if (req.method === 'GET') {

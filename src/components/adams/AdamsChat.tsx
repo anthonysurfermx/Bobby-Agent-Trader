@@ -2275,6 +2275,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       if (reader) {
         const decoder = new TextDecoder();
         let fullText = '';
+        // Receipt signed by the server over the exact transcript (needed to publish to the forum)
+        let bobbyReceipt = '';
         const replyId = uid();
 
         // ---- Sentence-level TTS streaming ----
@@ -2366,6 +2368,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
+              if (typeof parsed.bobby_receipt === 'string') { bobbyReceipt = parsed.bobby_receipt; continue; }
               const delta = parsed.choices?.[0]?.delta?.content;
               if (delta) {
                 fullText += delta;
@@ -2445,10 +2448,13 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                 console.warn('[Bobby] ⚠️ Debate not published — missing structured fields:', {
                   convScore, symbol, entryPrice, direction,
                 });
+              } else if (!bobbyReceipt) {
+                console.warn('[Bobby] ⚠️ Debate not published — no transcript receipt from the server');
               } else {
                 const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-                const publishRes = (await sessionFetch(profile?.walletAddress, '/api/forum-publish', {
+                // Publish under the CONNECTED wallet (falls back to the local advisor profile)
+                const publishRes = (await sessionFetch(address?.toLowerCase() || profile?.walletAddress, '/api/forum-publish', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -2460,7 +2466,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                     entry_price: entryPrice ?? null,
                     stop_price: stopPrice ?? null,
                     target_price: targetPrice ?? null,
-                    posts: posts.slice(0, 6).map((post) => ({ agent: post.agent, content: post.content.slice(0, 4000) })),
+                    // The server re-parses the posts from this transcript and verifies the receipt.
+                    transcript: fullText,
+                    receipt: bobbyReceipt,
                   }),
                 })) ?? new Response(null, { status: 401 }); // no wallet session → not published
                 if (publishRes.ok) {

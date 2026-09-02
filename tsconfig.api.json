@@ -56,6 +56,15 @@
     "api/feedback.ts",
     "api/sandbox-run.ts",
     "api/settle-trades.ts",
-    "api/bobby-health.ts"
+    "api/bobby-health.ts",
+    "api/_lib/origins.ts",
+    "api/_lib/transcript-receipt.ts",
+    "api/openclaw-chat.ts",
+    "api/agent-confirm.ts",
+    "api/harness-migrate.ts",
+    "api/bobby-asset-cache.ts",
+    "api/forum-agent-register.ts",
+    "api/_lib/mcp-challenges.ts",
+    "api/_lib/trackrecord-v2-recorder.ts"
   ]
 }

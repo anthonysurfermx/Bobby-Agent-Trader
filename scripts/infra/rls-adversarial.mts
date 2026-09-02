@@ -28,7 +28,6 @@
 // ============================================================
 import { randomBytes } from 'node:crypto';
 import { privateKeyToAccount } from 'viem/accounts';
-import { buildWalletSessionMessage } from '../../src/lib/wallet-session-message.js';
 
 const URL_ = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const ANON = process.env.SUPABASE_ANON_KEY || '';
@@ -107,7 +106,7 @@ async function plantCanaries(): Promise<void> {
     return id;
   };
   await plant('agent_cycles', { status: 'failed', error: MARK, llm_model: 'rls-canary' }, true, { error: 'TAMPERED' });
-  const pubThread = await plant('forum_threads', { topic: MARK, trigger_reason: 'rls canary', scope: 'public', symbol: 'RLSTEST', language: 'en' }, true, { topic: 'TAMPERED' });
+  const pubThread = await plant('forum_threads', { topic: MARK, trigger_reason: 'rls canary', scope: 'public', symbol: 'RLSTEST', language: 'en', expires_at: new Date(0).toISOString(), resolution: 'expired' }, true, { topic: 'TAMPERED' });
   const privThread = await plant('forum_threads', { topic: `${MARK}-private`, trigger_reason: 'rls canary', scope: 'private', owner_wallet: CANARY_WALLET, symbol: 'RLSTEST', language: 'en' }, false, { topic: 'TAMPERED' });
   if (pubThread) await plant('forum_posts', { thread_id: pubThread, agent: 'cio', content: MARK }, true, { content: 'TAMPERED' });
   if (privThread) await plant('forum_posts', { thread_id: privThread, agent: 'cio', content: `${MARK}-private` }, false, { content: 'TAMPERED' });
@@ -166,8 +165,8 @@ async function attackCanaries(): Promise<void> {
     }
   }
   // user_feedback: anon INSERT is the one allowed write
-  const fb = await fetch(`${URL_}/rest/v1/user_feedback`, { method: 'POST', headers: anonHeaders, body: JSON.stringify({ message: MARK, sentiment: 'neutral' }) });
-  line(fb.ok || fb.status === 400, 'anon INSERT user_feedback → allowed by design (or schema 400)', `HTTP ${fb.status}`);
+  const fb = await fetch(`${URL_}/rest/v1/user_feedback`, { method: 'POST', headers: anonHeaders, body: JSON.stringify({ type: 'bug', message: MARK, page: '/rls-gate', context: { canary: true } }) });
+  line(fb.ok, 'anon INSERT user_feedback (valid payload) → succeeds by design', `HTTP ${fb.status} ${fb.ok ? '' : await fb.clone().text().catch(() => '')}`);
   if (fb.ok) { try { const rows = (await fb.json()) as Array<{ id: string }>; for (const row of rows) await fetch(`${URL_}/rest/v1/user_feedback?id=eq.${row.id}`, { method: 'DELETE', headers: svcHeaders }); } catch { /* ignore */ } }
 }
 
@@ -184,14 +183,21 @@ async function legitimatePath(): Promise<void> {
   console.log('\nC. Legitimate path (throw-away wallet through the API)');
   const account = privateKeyToAccount(`0x${randomBytes(32).toString('hex')}`);
   const wallet = account.address.toLowerCase();
-  const timestamp = new Date().toISOString();
-  const signature = await account.signMessage({ message: buildWalletSessionMessage(wallet, timestamp) });
   const base = { Origin: ORIGIN, 'Content-Type': 'application/json' };
-  const sess = await fetch(`${API}/api/wallet-session`, { method: 'POST', headers: base, body: JSON.stringify({ address: wallet, timestamp, signature }) });
+  const ch = await fetch(`${API}/api/wallet-session?address=${wallet}`, { headers: base });
+  const chJson = (await ch.json().catch(() => ({}))) as { nonce?: string; message?: string; error?: string };
+  line(ch.ok && Boolean(chJson.nonce && chJson.message), 'GET /api/wallet-session?address= issues a single-use challenge', `HTTP ${ch.status} ${chJson.error || ''}`);
+  if (!chJson.nonce || !chJson.message) return;
+  const signature = await account.signMessage({ message: chJson.message });
+  const sess = await fetch(`${API}/api/wallet-session`, { method: 'POST', headers: base, body: JSON.stringify({ address: wallet, nonce: chJson.nonce, signature }) });
   const sessJson = (await sess.json().catch(() => ({}))) as { token?: string; error?: string };
   line(sess.ok && Boolean(sessJson.token), 'POST /api/wallet-session issues a token for a valid signature', `HTTP ${sess.status} ${sessJson.error || ''}`);
-  const bad = await fetch(`${API}/api/wallet-session`, { method: 'POST', headers: base, body: JSON.stringify({ address: CANARY_WALLET, timestamp, signature }) });
-  line(bad.status === 401, 'POST /api/wallet-session rejects a signature for another address', `HTTP ${bad.status}`);
+  const replay = await fetch(`${API}/api/wallet-session`, { method: 'POST', headers: base, body: JSON.stringify({ address: wallet, nonce: chJson.nonce, signature }) });
+  line(replay.status === 401, 'REPLAY of the same nonce + signature → 401 (nonce consumed)', `HTTP ${replay.status}`);
+  const ch2 = await fetch(`${API}/api/wallet-session?address=${CANARY_WALLET}`, { headers: base });
+  const ch2Json = (await ch2.json().catch(() => ({}))) as { nonce?: string };
+  const bad = ch2Json.nonce ? await fetch(`${API}/api/wallet-session`, { method: 'POST', headers: base, body: JSON.stringify({ address: CANARY_WALLET, nonce: ch2Json.nonce, signature }) }) : null;
+  line(bad?.status === 401, 'signature reused against a challenge for another address → 401', `HTTP ${bad?.status}`);
   if (!sessJson.token) return;
   const authed = { ...base, 'x-bobby-session': sessJson.token };
 

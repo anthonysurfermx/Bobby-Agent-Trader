@@ -43,9 +43,11 @@ begin
     'agent_cycles','agent_events','agent_trades','agent_positions','agent_signals',
     'hardness_agent_proofs'
   ] loop
-    perform public.bobby_rls_reset(t);
-    execute format('create policy %I on public.%I for select to anon, authenticated using (true)', t || '_public_read', t);
-    execute format('create policy %I on public.%I for all to service_role using (true) with check (true)', t || '_service_all', t);
+    if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = t) then
+      perform public.bobby_rls_reset(t);
+      execute format('create policy %I on public.%I for select to anon, authenticated using (true)', t || '_public_read', t);
+      execute format('create policy %I on public.%I for all to service_role using (true) with check (true)', t || '_service_all', t);
+    end if;
   end loop;
 end $$;
 
@@ -54,7 +56,7 @@ end $$;
 -- served by /api/my-threads to the proven owner only.
 select public.bobby_rls_reset('forum_threads');
 create policy forum_threads_public_read on public.forum_threads
-  for select to anon, authenticated using (coalesce(scope, 'public') <> 'private');
+  for select to anon, authenticated using (scope = 'public'); -- strict: any other scope stays private (Kimi review)
 create policy forum_threads_service_all on public.forum_threads
   for all to service_role using (true) with check (true);
 
@@ -63,7 +65,7 @@ create policy forum_posts_public_read on public.forum_posts
   for select to anon, authenticated using (
     exists (
       select 1 from public.forum_threads t
-      where t.id = forum_posts.thread_id and coalesce(t.scope, 'public') <> 'private'
+      where t.id = forum_posts.thread_id and t.scope = 'public'
     )
   );
 create policy forum_posts_service_all on public.forum_posts

@@ -10,6 +10,7 @@ import { randomBytes, randomUUID, scrypt } from 'crypto';
 import { verifyAgentRequest } from './_lib/agent-auth.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { bobbyAnonKey, bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 const SB_URL = bobbyDbUrl();
 const SB_SERVICE_KEY = bobbyServiceKey();
@@ -47,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'POST') {
+    if (!(await requireWritesOpen(res))) return;
     if (!SB_SERVICE_KEY || !API_KEY_PEPPER) {
       return res.status(503).json({ error: 'Forum registration is not configured' });
     }

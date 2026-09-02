@@ -9,6 +9,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAdviceMode, type AdviceMode } from '../src/lib/advice-mode.js';
 import { matchInvestorEdgeCasePolicy, type InvestorEdgeCasePolicy } from '../src/lib/investor-edge-cases.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { issueTranscriptReceipt } from './_lib/transcript-receipt.js';
 
 const OPENCLAW_GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || '';
 const OPENCLAW_TOKEN = process.env.OPENCLAW_TOKEN || '';
@@ -774,7 +775,11 @@ async function runMultiCallDebate(
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
+  // Every byte the client sees is accumulated here; the receipt signs it so
+  // forum-publish can prove the transcript is Bobby's (see transcript-receipt.ts).
+  let transcript = '';
   const sendChunk = (text: string) => {
+    transcript += text;
     const chunk = { choices: [{ delta: { content: text }, index: 0, finish_reason: null }] };
     res.write(`data: ${JSON.stringify(chunk)}\n\n`);
   };
@@ -852,6 +857,8 @@ ${finalCallInstruction}`;
     console.log(`[Debate] Multi-call complete: Alpha=${alphaMs}ms, Total=${totalMs}ms`);
 
     sendChunk(`\n\n`);
+    const receipt = issueTranscriptReceipt(transcript);
+    if (receipt) res.write(`data: ${JSON.stringify({ bobby_receipt: receipt })}\n\n`);
     res.write('data: [DONE]\n\n');
   } catch (err) {
     console.error('[Debate] Multi-call failed:', err);

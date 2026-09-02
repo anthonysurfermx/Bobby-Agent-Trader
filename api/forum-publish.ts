@@ -3,11 +3,13 @@
 // inserts on forum_threads / forum_posts. The server fixes the provenance
 // (trigger_reason, expiry, owner_wallet = the session wallet) and validates
 // every field; the client cannot set status, resolution, prices at creation
-// or ids. Requires a wallet session: an anonymous caller could otherwise
-// publish posts impersonating cio / red_team / bobby.
+// or ids. Requires a wallet session AND a transcript receipt: the posts and
+// the agent identities are parsed here from the transcript Bobby actually
+// streamed (HMAC-signed by openclaw-chat), never taken from the client.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
+import { parseDebateSections, verifyTranscriptReceipt } from './_lib/transcript-receipt.js';
 import { guardWrite, WALLET_RE } from './_lib/write-guard.js';
 
 export const config = { maxDuration: 15 };
@@ -24,10 +26,10 @@ const Body = z.object({
   entry_price: Price,
   stop_price: Price,
   target_price: Price,
-  posts: z.array(z.object({
-    agent: z.enum(['alpha_hunter', 'red_team', 'cio', 'alpha', 'red', 'bobby']),
-    content: z.string().trim().min(1).max(4000),
-  })).min(1).max(6),
+  /** The exact text streamed by /api/openclaw-chat … */
+  transcript: z.string().min(40).max(60_000),
+  /** … and the receipt it emitted for that text. */
+  receipt: z.string().min(20).max(200),
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -37,10 +39,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     schema: Body,
     perIp: { limit: 6, windowSec: 3600 },
     perSubject: { key: (_b, wallet) => wallet, limit: 12, windowSec: 86400 },
-    maxBodyBytes: 40 * 1024,
+    maxBodyBytes: 96 * 1024,
   });
   if (!guarded || !guarded.wallet) return;
   const b = guarded.body;
+  const verified = verifyTranscriptReceipt(b.transcript, b.receipt);
+  if (verified.ok !== true) return res.status(403).json({ error: `Transcript not accepted: ${(verified as { error: string }).error}` });
+  const posts = parseDebateSections(b.transcript);
+  if (posts.length < 2) return res.status(400).json({ error: 'Transcript has no debate sections' });
+  // Metadata is client-parsed from the CIO text; require the symbol to be in the transcript at least.
+  if (!b.transcript.toUpperCase().includes(b.symbol.toUpperCase())) return res.status(400).json({ error: 'Symbol not present in transcript' });
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
   try {
     const threadRes = await fetch(bobbyRest('forum_threads'), {
@@ -49,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         topic: b.topic,
         trigger_reason: 'User debate in Bobby Chat',
-        trigger_data: { source: 'bobby-chat', published_by: guarded.wallet },
+        trigger_data: { source: 'bobby-chat', published_by: guarded.wallet, transcript_receipt_issued_at: new Date(verified.issuedAt).toISOString(), fields_source: 'client-parsed-from-cio-text' },
         language: b.language,
         conviction_score: b.conviction_score,
         price_at_creation: {},
@@ -71,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const threadId = rows[0]?.id;
     if (!threadId) return res.status(502).json({ error: 'Thread id missing' });
     let posted = 0;
-    for (const post of b.posts) {
+    for (const post of posts) {
       const r = await fetch(bobbyRest('forum_posts'), {
         method: 'POST',
         headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }),

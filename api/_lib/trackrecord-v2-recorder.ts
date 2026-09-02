@@ -1,3 +1,4 @@
+import { assertWritesOpen } from './control.js';
 // ============================================================
 // trackrecord-v2-recorder — the chain-aware V2 writer/reader.
 //
@@ -140,6 +141,7 @@ export async function commitV2(
   recorderKey: string,
   p: V2CommitParams,
 ): Promise<V2TxResult> {
+  await assertWritesOpen('on-chain commitV2');
   const { mode, feedId } = resolvePriceMode(p.symbol);
   const wallet = await recorderWallet(chain, recorderKey);
   const contract = chain.contracts.trackRecord;
@@ -263,6 +265,7 @@ export async function resolveV2(
   recorderKey: string,
   p: V2ResolveParams,
 ): Promise<V2TxResult> {
+  await assertWritesOpen('on-chain resolveV2');
   const { mode, feedId } = resolvePriceMode(p.symbol);
   const wallet = await recorderWallet(chain, recorderKey);
   const contract = chain.contracts.trackRecord;

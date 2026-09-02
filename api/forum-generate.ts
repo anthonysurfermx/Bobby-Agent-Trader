@@ -8,6 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireInternalAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = bobbyDbUrl();
@@ -111,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   if (!requireInternalAuth(req, res)) return;
+  if (!(await requireWritesOpen(res))) return;
 
   if (!OPENAI_API_KEY || !SB_SERVICE_KEY) {
     return res.status(503).json({ error: 'Forum generation is not configured' });

@@ -122,6 +122,12 @@ export function writeFreezeSync(): boolean {
   return snapshot.writeFreeze;
 }
 
+/** For libraries called from many endpoints: throws when writes are frozen. */
+export async function assertWritesOpen(what: string): Promise<void> {
+  const control = await getBobbyControl();
+  if (control.writeFreeze) throw new Error(`Bobby writes are frozen (${what}; source=${control.source}${control.note ? `; ${control.note}` : ''})`);
+}
+
 /**
  * Gate for every Bobby endpoint that writes. Answers 503 with the reason when
  * writes are frozen. Returns true when the caller may proceed.

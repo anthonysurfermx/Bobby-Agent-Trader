@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireInternalAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -14,6 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // table used by risk and performance metrics. Only a trusted verifier may
   // record an execution until receipt verification is implemented here.
   if (!requireInternalAuth(req, res)) return;
+  if (!(await requireWritesOpen(res))) return;
 
   const { walletAddress, txHash, status, chain, tokenSymbol, amountUsd } = req.body || {};
 

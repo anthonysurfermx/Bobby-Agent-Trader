@@ -14,32 +14,11 @@ import { checkPersistentLimit } from './rate-limit-persistent.js';
 import { createLimiter, getClientIpKey } from './rate-limit.js';
 import { requireWritesOpen } from './control.js';
 import { requireWalletSession, type WalletSession } from './wallet-session.js';
+import { allowedOriginHosts, requestOriginHost } from './origins.js';
+
+export { allowedOriginHosts };
 
 export const WALLET_RE = /^0x[0-9a-fA-F]{40}$/;
-
-/**
- * Exact hosts only (Codex review: a suffix match on .vercel.app lets any
- * Vercel deployment pass). Production hosts are fixed; the deployment's own
- * host (VERCEL_URL / VERCEL_BRANCH_URL) is added so previews work; extra
- * hosts come from BOBBY_ALLOWED_ORIGINS (comma separated); localhost is
- * accepted outside production only.
- */
-export function allowedOriginHosts(env: NodeJS.ProcessEnv = process.env): Set<string> {
-  const hosts = new Set<string>(['bobbyprotocol.xyz', 'www.bobbyprotocol.xyz']);
-  for (const name of ['VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL']) {
-    const value = (env[name] || '').trim().toLowerCase();
-    if (value) hosts.add(value.replace(/^https?:\/\//, '').split('/')[0]);
-  }
-  for (const raw of (env.BOBBY_ALLOWED_ORIGINS || '').split(',')) {
-    const host = raw.trim().toLowerCase().replace(/^https?:\/\//, '').split('/')[0];
-    if (host) hosts.add(host);
-  }
-  if (env.VERCEL_ENV !== 'production') {
-    hosts.add('localhost');
-    hosts.add('127.0.0.1');
-  }
-  return hosts;
-}
 
 export interface WriteGuardOptions<S extends ZodTypeAny> {
   /** Accepted HTTP methods, e.g. ['POST']. */
@@ -74,15 +53,7 @@ export interface WriteGuardResult<S extends ZodTypeAny> {
 const localLimiters = new Map<string, ReturnType<typeof createLimiter>>();
 
 function originAllowed(req: VercelRequest): boolean {
-  const raw = (req.headers.origin as string | undefined) || (req.headers.referer as string | undefined) || '';
-  if (!raw) return false; // browsers always send Origin on POST/PATCH/DELETE
-  try {
-    const host = new URL(raw).host.toLowerCase(); // host, not hostname: port matters for localhost
-    const hosts = allowedOriginHosts();
-    return hosts.has(host) || hosts.has(host.replace(/:\d+$/, ''));
-  } catch {
-    return false;
-  }
+  return requestOriginHost(req.headers) !== null;
 }
 
 /**

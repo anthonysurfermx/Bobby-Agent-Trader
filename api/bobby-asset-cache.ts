@@ -6,6 +6,7 @@ import {
 import { resolveOkxInstrument, type OkxAssetInstrument } from '../src/lib/okx-asset-search.js';
 import { requireInternalAuth } from './_lib/request-security.js';
 import { bobbyAnonKey, bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 15 };
 
@@ -160,6 +161,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Prevent public callers from poisoning a cache shared by all visitors.
   if (!requireInternalAuth(req, res)) return;
+  if (!(await requireWritesOpen(res))) return;
 
   try {
     const body = parseBody(req);

@@ -1,3 +1,4 @@
+import { assertWritesOpen } from './control.js';
 import { bobbyDbUrl, bobbyServiceKey } from './bobby-db.js';
 /**
  * MCP Payment Challenge Manager
@@ -59,6 +60,7 @@ export async function createChallenge(
   });
 
   if (!res.ok) {
+  await assertWritesOpen('mcp createChallenge');
     const err = await res.text().catch(() => 'unknown');
     throw new Error(`Failed to create challenge: ${err}`);
   }
@@ -102,6 +104,7 @@ export async function atomicConsumeChallenge(
   );
 
   if (!res.ok) {
+  await assertWritesOpen('mcp atomicConsumeChallenge');
     console.error('[atomicConsumeChallenge]', await res.text().catch(() => ''));
     return { consumed: false, challenge: null };
   }
@@ -128,6 +131,7 @@ export async function storeReceipt(receipt: {
   valueOkb: string;
   responseHash?: string;
 }): Promise<void> {
+  await assertWritesOpen('mcp storeReceipt');
   const explorerUrl = `https://www.oklink.com/xlayer/tx/${receipt.txHash}`;
 
   await fetch(`${SB_URL}/rest/v1/mcp_payment_receipts`, {

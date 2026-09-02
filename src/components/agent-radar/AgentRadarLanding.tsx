@@ -17,6 +17,7 @@ import { AgentDashboard } from './AgentDashboard';
 import { AdvisorSetup, useAdvisorProfile } from './AdvisorSetup';
 import type { AdvisorProfile } from './AdvisorSetup';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
+import { useBobbySession } from '@/hooks/useBobbySession';
 
 // ---- Greeting message fetcher ----
 
@@ -117,6 +118,7 @@ interface Props {
 export function AgentRadarLanding({ onSwitchToAdvanced }: Props) {
   const scan = useSmartMoneyScan({ autoStart: true, walletCount: 50 });
   const { profile, needsSetup, saveNewProfile, isConnected } = useAdvisorProfile();
+  const { ready: sessionReady } = useBobbySession({ auto: true });
   const [showSetup, setShowSetup] = useState(false);
   const [greetings, setGreetings] = useState<GreetingMessage[]>([]);
   const [expandedGreeting, setExpandedGreeting] = useState<string | null>(null);
@@ -139,7 +141,7 @@ export function AgentRadarLanding({ onSwitchToAdvanced }: Props) {
         setTypewriterDone(false);
       }
     });
-  }, [profile?.walletAddress]);
+  }, [profile?.walletAddress, sessionReady]); // re-run once the wallet session exists
 
   const handleSetupComplete = (p: AdvisorProfile) => {
     saveNewProfile(p);

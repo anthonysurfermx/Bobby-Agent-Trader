@@ -96,21 +96,14 @@ export default function BobbyTelegramPage() {
     fetch(`/api/telegram-access?status&group_id=${activateGroupId}`)
       .then(r => r.json())
       .then(d => {
+        // telegram_groups is service-role only now; the status endpoint carries name + bot status.
+        if (d.group_name || d.bot_status) setGroupInfo({ name: d.group_name || 'Your Group', status: d.bot_status || (d.active ? 'active' : 'unknown') });
         if (d.active) {
-          setGroupInfo({ name: 'Group', status: 'active' });
+          if (!d.group_name) setGroupInfo({ name: 'Group', status: 'active' });
           setPaymentState('success');
         }
       })
       .catch(() => {});
-    const SB = BOBBY_DB_URL;
-    const KEY = BOBBY_DB_ANON;
-    fetch(`${SB}/rest/v1/telegram_groups?telegram_group_id=eq.${activateGroupId}&select=telegram_group_name,bot_status`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
-    }).then(r => r.json()).then(d => {
-      if (Array.isArray(d) && d.length > 0) {
-        setGroupInfo({ name: d[0].telegram_group_name || 'Your Group', status: d[0].bot_status });
-      }
-    }).catch(() => {});
   }, [activateGroupId]);
 
   // Update state when wallet connects (NO auto-trigger — explicit 2-step per Codex)

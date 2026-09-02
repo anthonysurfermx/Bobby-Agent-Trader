@@ -208,3 +208,104 @@ nuevo y lo editado que compila limpio. Quedan fuera, con errores previos
 ajenos a este trabajo (`res.json()` tipado como `unknown`): `bobby-cycle`,
 `forum-morning`, `forum-resolve`, `generate-activity`, `okx-perps`,
 `xlayer-record`, `auto-bounty`, `agent-run`. Pendiente de una limpieza aparte.
+
+---
+
+## Octavo commit — segunda revisión de Codex + revisión de Kimi K3 (2026-09-02, noche)
+
+Codex (segunda pasada sobre `60c386d`) marcó cuatro bloqueos y un detalle;
+Kimi K3 (revisión independiente, `.ai/reviews/kimi-phase0-commit7-review.md`)
+dio GO condicional para preview y tres regresiones de UI. Todo cerrado aquí.
+Sigue sin haber deploy ni migración aplicada.
+
+### 1. Freeze on-chain antes de la rama de cadena
+`evaluateProtocolWriteSafety()` evalúa `isProtocolCutoverFrozen()` **antes**
+de distinguir X Layer / Base. `xlayer-record` en producción con X Layer ya
+no puede firmar con `write_freeze=true`.
+
+### 2. Kill switch demostrablemente global
+`scripts/infra/writer-inventory.mts` escanea `api/**` buscando escrituras a
+Supabase (PostgREST, supabase-js, `bobbyRest`, rpc), envíos a Telegram/X y
+firmantes on-chain, y exige que cada archivo consulte el control
+(`requireWritesOpen`, `guardWrite`, `getBobbyControl`, `assertWritesOpen`,
+guards on-chain). Exenciones explícitas y justificadas (rate limit, caché,
+el propio control, nonces de sesión). Resultado: **35 escritores, 0 sin
+cubrir**. Cubiertos en este commit: `agent-confirm`, `agent-setup` (POST),
+`forum-generate`, `forum-agent-register`, `harness-migrate`,
+`bobby-asset-cache`, `telegram-access` (todo lo que crea sesiones o activa
+suscripciones; el `?status` de solo lectura sigue abierto), y las librerías
+`hardness-control-plane`, `mcp-challenges` y `trackrecord-v2-recorder`
+lanzan `assertWritesOpen()` (async: cargan el control ellas mismas).
+
+```bash
+npx tsx scripts/infra/writer-inventory.mts   # exit 1 si aparece un escritor sin switch
+```
+
+### 3. Sesión sin replay: challenge de un solo uso (EIP-4361)
+- `GET /api/wallet-session?address=0x…` guarda un nonce (18 bytes aleatorios)
+  con `domain`, `uri`, `chainId`, `issuedAt`, `expirationTime` (10 min) en
+  `api_cache` y devuelve el texto SIWE a firmar. El dominio sale del `Origin`
+  de la petición y debe estar en la allowlist exacta.
+- `POST /api/wallet-session { address, nonce, signature }`: **consume el
+  nonce atómicamente** (`DELETE … RETURNING` en una sola sentencia; el
+  segundo que llega recibe 0 filas), reconstruye el mensaje desde los campos
+  guardados, recupera el firmante y emite el token. El nonce se quema aunque
+  la firma sea inválida.
+- El navegador firma exactamente el texto que recibe; ya no construye
+  mensajes. `src/lib/wallet-session-message.ts` conserva el constructor
+  solo para el servidor, la autoprueba y el gate.
+- Gate C prueba el **replay**: mismo nonce + misma firma por segunda vez →
+  401; firma reutilizada contra un challenge de otra dirección → 401.
+- Sigue siendo EOA-only (EIP-1271 pendiente).
+
+### 4. El foro solo publica texto que Bobby generó
+- `api/_lib/transcript-receipt.ts`: `openclaw-chat` acumula cada byte que
+  emite en el debate multiagente y, antes de `[DONE]`, envía
+  `{"bobby_receipt": "btr1.<ts>.<hmac>"}` (HMAC sobre la transcripción,
+  24 h, clave `BOBBY_TRANSCRIPT_SECRET` o `BOBBY_SESSION_SECRET`).
+- `forum-publish` ya **no acepta `posts`**: recibe `transcript` + `receipt`,
+  verifica el HMAC, y parsea las secciones (Alpha / Red Team / CIO) **en el
+  servidor**. Sin recibo válido → 403. El símbolo declarado debe aparecer
+  en la transcripción. `conviction`, `entry/stop/target` siguen viniendo
+  del parseo del cliente sobre el texto del CIO; se registra como
+  `fields_source: 'client-parsed-from-cio-text'` en `trigger_data`.
+- El chat captura el recibo del stream y publica bajo la wallet
+  **conectada** (Kimi B4), con fallback al perfil local.
+
+### 5. Gate `user_feedback` real
+Inserta un payload válido (`type`, `message`, `page`, `context`) con la anon
+key y exige 2xx; luego lo borra con la service role.
+
+### Hallazgos de Kimi cerrados
+- `BobbyTelegramPage` leía `telegram_groups` con anon (ahora service-only):
+  `GET /api/telegram-access?status&group_id=` devuelve además `group_name`
+  y `bot_status`; la página usa eso.
+- `AgentRadarLanding` nunca pedía la sesión → ahora `useBobbySession({auto})`.
+- Política del foro estricta: `scope = 'public'` (no "todo lo que no sea
+  private"); un `scope` futuro no se filtra a anon.
+- Bucle de tablas públicas de la migración con `if exists` (no aborta si
+  falta una tabla en el proyecto destino).
+- `telegram-deliver` autentica antes de consultar el freeze (no filtra
+  estado a llamadas anónimas).
+- Canario público del gate nace con `expires_at` en el pasado y
+  `resolution: 'expired'` para no aparecer como activo durante la corrida.
+
+### Variable nueva (opcional)
+| Variable                   | Nota                                                            |
+|----------------------------|-----------------------------------------------------------------|
+| `BOBBY_TRANSCRIPT_SECRET`  | Opcional; si falta se usa `BOBBY_SESSION_SECRET`. ≥ 32 chars.   |
+
+### Orden de deploy (coincide Codex + Kimi)
+1. Revisión del commit 8.
+2. Aplicar `bobby_control` y `bobby_early_access` (tablas nuevas, sin tocar
+   existentes).
+3. Preview de Vercel con `BOBBY_SESSION_SECRET`, `BOBBY_OPS_SECRET`,
+   `BOBBY_CONTROL_SOURCE=table`, service role, y `BOBBY_ALLOWED_ORIGINS`
+   con cualquier dominio custom (Kimi: si falta, cada escritura 403).
+   **Contra la base legacy**, código nuevo primero.
+4. Regresión: firma → sesión → inbox / intereses / debates privados /
+   publicar al foro con recibo; kill switch (freeze y canary);
+   `writer-inventory` en verde.
+5. Solo entonces `20260902_bobby_rls_hardening.sql` y
+   `rls-adversarial.mts` hasta `GATE PASSED` (exit 0). Aplicar la migración
+   antes del código rompe chat, foro y lecturas privadas.

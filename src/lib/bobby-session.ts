@@ -7,7 +7,6 @@
 // profile) carries the token as `x-bobby-session`. Without it the API
 // answers 401 and the UI degrades to "nothing personal to show".
 // ============================================================
-import { buildWalletSessionMessage } from './wallet-session-message';
 
 export interface StoredSession { token: string; wallet: string; expiresAt: number }
 
@@ -74,12 +73,18 @@ export async function requestSession(
   if (pending) return pending;
   const run = (async () => {
     try {
-      const timestamp = new Date().toISOString();
-      const signature = await signMessage(buildWalletSessionMessage(w, timestamp));
+      // 1. single-use challenge from the server (EIP-4361 text, 10 min)
+      const ch = await fetch(`/api/wallet-session?address=${w}`);
+      if (!ch.ok) { console.warn('[bobby-session] challenge refused', ch.status); return null; }
+      const challenge = (await ch.json()) as { nonce?: string; message?: string };
+      if (!challenge.nonce || !challenge.message) return null;
+      // 2. sign exactly what the server built
+      const signature = await signMessage(challenge.message);
+      // 3. exchange (the nonce is consumed server-side; a replay is refused)
       const res = await fetch('/api/wallet-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: w, timestamp, signature }),
+        body: JSON.stringify({ address: w, nonce: challenge.nonce, signature }),
       });
       if (!res.ok) {
         console.warn('[bobby-session] session refused', res.status);
