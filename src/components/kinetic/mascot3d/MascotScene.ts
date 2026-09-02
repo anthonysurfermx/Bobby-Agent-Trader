@@ -11,7 +11,7 @@ import {
   SphereGeometry, CylinderGeometry, TorusGeometry, BoxGeometry,
   MeshStandardMaterial, AmbientLight, DirectionalLight, PointLight,
   MathUtils, Box3, Vector3, PMREMGenerator, ACESFilmicToneMapping, Sprite, SpriteMaterial, TextureLoader, SRGBColorSpace,
-  Texture, type Object3D, type Material,
+  Texture, PlaneGeometry, MeshBasicMaterial, DoubleSide, AdditiveBlending, type Object3D, type Material,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
@@ -79,7 +79,8 @@ export class MascotScene {
   private gearGroup = new Group();
   private gearKey = '';
   private gearTextures: Texture[] = [];
-  private spinners: Sprite[] = [];
+  private spinners: Object3D[] = [];
+  private avatarId = 'orb';
   private pupils: Mesh[] = [];
   private eyeGroup = new Group();
   private mouth: Mesh | null = null;
@@ -187,6 +188,7 @@ export class MascotScene {
 
   setLook(look: MascotLook): void {
     const version = ++this.lookVersion;
+    this.avatarId = look.avatar ?? 'orb';
 
     // Premade 3D avatar (Anthony's gallery) — load GLB instead of the
     // procedural blob. The charm layer (bob, cursor-follow, tap bounce)
@@ -392,16 +394,53 @@ export class MascotScene {
       hip:      { p: [0.36 * R, -0.12 * R, 0.70 * R], size: 0.36 * R },
       shoulder: { p: [-0.60 * R, 0.50 * R, 0.42 * R], size: 0.44 * R },
       chest:    { p: [0, 0.12 * R, 0.86 * R], size: 0.44 * R },
-      pet:      { p: [-0.92 * R, -0.72 * R, 0.55 * R], size: 0.70 * R },
+      pet:      { p: [-0.72 * R, -0.66 * R, 0.55 * R], size: 0.58 * R },
     };
+    // Each GLB has a radically different silhouette (sphere, cat, astronaut,
+    // bird, ring...). A single bounding-box anchor makes otherwise correct
+    // art float beside the body. These profiles are normalized to the same R
+    // used above and mirrored in MascotGalleryView.swift.
+    const profiles: Record<string, Partial<Record<string, { p: [number, number, number]; size: number }>>> = {
+      orb: {
+        hand: { p: [0.45 * R, -0.18 * R, 0.76 * R], size: 0.34 * R },
+        chest: { p: [0, 0.02 * R, 0.94 * R], size: 0.38 * R },
+        head: { p: [0, 0.96 * R, 0.08 * R], size: 0.42 * R },
+      },
+      byte: {
+        hip: { p: [0.32 * R, -0.18 * R, 0.76 * R], size: 0.30 * R },
+        face: { p: [0, 0.45 * R, 0.92 * R], size: 0.62 * R },
+        hand: { p: [0.53 * R, -0.42 * R, 0.68 * R], size: 0.34 * R },
+      },
+      kora: {
+        headset: { p: [0, 0.54 * R, 0.72 * R], size: 0.68 * R },
+        shoulder: { p: [-0.22 * R, 0.14 * R, 0.78 * R], size: 0.28 * R },
+        hand: { p: [0.24 * R, -0.46 * R, 0.80 * R], size: 0.30 * R },
+      },
+      zip: {
+        hand: { p: [0.38 * R, -0.40 * R, 0.76 * R], size: 0.29 * R },
+        shoulder: { p: [-0.32 * R, 0.20 * R, 0.72 * R], size: 0.29 * R },
+        head: { p: [0, 1.02 * R, 0.08 * R], size: 0.38 * R },
+      },
+      glitch: { hand: { p: [0.62 * R, -0.34 * R, 0.60 * R], size: 0.38 * R }, chest: { p: [0, 0.05 * R, 0.92 * R], size: 0.36 * R } },
+      momo: { hand: { p: [0.58 * R, -0.22 * R, 0.62 * R], size: 0.36 * R }, face: { p: [0, 0.20 * R, 0.94 * R], size: 0.58 * R }, head: { p: [0, 0.98 * R, 0.08 * R], size: 0.40 * R } },
+      flux: { hand: { p: [0.58 * R, -0.30 * R, 0.62 * R], size: 0.34 * R }, chest: { p: [0, -0.02 * R, 0.92 * R], size: 0.36 * R }, head: { p: [0, 1.10 * R, 0.08 * R], size: 0.38 * R } },
+      rook: { chest: { p: [0, 0.18 * R, 0.94 * R], size: 0.36 * R }, head: { p: [0, 1.06 * R, 0.08 * R], size: 0.38 * R }, hand: { p: [0.60 * R, -0.48 * R, 0.58 * R], size: 0.36 * R } },
+      halo: { chest: { p: [0, 0, 0.94 * R], size: 0.40 * R }, shoulder: { p: [-0.66 * R, 0.10 * R, 0.56 * R], size: 0.34 * R }, head: { p: [0, 0.96 * R, 0.08 * R], size: 0.40 * R } },
+      axiom: { hand: { p: [0.62 * R, -0.28 * R, 0.62 * R], size: 0.34 * R }, chest: { p: [0, 0.04 * R, 0.94 * R], size: 0.34 * R }, head: { p: [0, 1.00 * R, 0.08 * R], size: 0.38 * R } },
+    };
+    const profile = profiles[this.avatarId] ?? {};
     const loader = new TextureLoader();
     items.forEach((item, i) => {
-      const a = anchors[item.slot] ?? anchors.hand;
+      const a = profile[item.slot] ?? anchors[item.slot] ?? anchors.hand;
       const tex = loader.load(item.url);
       tex.colorSpace = SRGBColorSpace;
       this.gearTextures.push(tex);
-      const mat = new SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
-      const sprite = new Sprite(mat);
+      // A Sprite always faces the camera, which makes gear visibly detach as
+      // the companion turns. A double-sided plane keeps the same cheap PNG
+      // art but actually inherits the character's rotation like worn gear.
+      const sprite = item.slot === 'pet'
+        ? new Sprite(new SpriteMaterial({ map: tex, transparent: true, depthWrite: false }))
+        : new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: DoubleSide }));
       sprite.position.set(a.p[0], a.p[1], a.p[2]);
       sprite.scale.set(a.size, a.size, 1);
       sprite.renderOrder = 10 + i;
@@ -409,8 +448,8 @@ export class MascotScene {
       if (item.spin) this.spinners.push(sprite);
       this.gearGroup.add(sprite);
       if (item.glow) {
-        const glowMat = new SpriteMaterial({ map: tex, transparent: true, depthWrite: false, color: new Color(item.glow), opacity: 0.35 });
-        const glow = new Sprite(glowMat);
+        const glowMat = new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: DoubleSide, color: new Color(item.glow), opacity: 0.35, blending: AdditiveBlending });
+        const glow = new Mesh(new PlaneGeometry(1, 1), glowMat);
         glow.scale.set(a.size * 1.35, a.size * 1.35, 1);
         glow.position.set(a.p[0], a.p[1], a.p[2] - 0.01);
         glow.renderOrder = 9;
@@ -424,7 +463,7 @@ export class MascotScene {
    * companion, flies to its slot and snaps with a pop; the body squashes.
    */
   playEquip(url: string): void {
-    const sprite = this.gearGroup.children.find((c) => (c.userData as { url?: string }).url === url) as Sprite | undefined;
+    const sprite = this.gearGroup.children.find((c) => (c.userData as { url?: string }).url === url) as Mesh | Sprite | undefined;
     if (!sprite) return;
     const d = sprite.userData as { baseY: number; target: [number, number, number]; size: number };
     const start = performance.now();
@@ -490,7 +529,7 @@ export class MascotScene {
       const d = child.userData as { slot?: string; baseY?: number; spin?: boolean; phase?: number };
       if (d.slot === 'head' && typeof d.baseY === 'number') child.position.y = d.baseY + Math.sin(tNow * 2.2 + (d.phase ?? 0)) * 0.05;
       if (d.slot === 'pet' && !d.spin && typeof d.baseY === 'number') child.position.y = d.baseY + Math.max(0, Math.sin(tNow * 3.1)) * 0.06;
-      if (d.spin && child instanceof Sprite) child.material.rotation = tNow * 2.9;
+      if (d.spin) child.rotation.z = tNow * 2.9;
     }
     const bobSpeed = this.state === 'speaking' ? 6 : 1.6;
     const bobAmp = this.state === 'speaking' ? 0.03 : 0.05;

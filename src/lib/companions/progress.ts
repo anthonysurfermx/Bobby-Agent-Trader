@@ -45,6 +45,12 @@ const listeners = new Set<() => void>();
 
 function load(): Progress {
   try {
+    // Visual QA harness: /desk?skinQa=byte opens the complete loadout without
+    // touching saved progress. Vite removes this branch from production.
+    if (import.meta.env.DEV) {
+      const companionId = new URLSearchParams(window.location.search).get('skinQa');
+      if (companionId) return { ...DEFAULT, companionId, onboarded: true, riskNoticeVersion: RISK_NOTICE_VERSION, xp: 500 };
+    }
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...DEFAULT };
     return { ...DEFAULT, ...(JSON.parse(raw) as Partial<Progress>) };
