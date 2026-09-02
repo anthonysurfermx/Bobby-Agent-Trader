@@ -47,7 +47,7 @@ OKX/Yahoo, Higgsfield, el archivo build 11.
 | G | Tablas referenciadas que no existen en ninguna base: `forum_agents`, `agent_commerce_events`. | Ya roto hoy; crear o retirar código. | Baja |
 | H | Bot de Telegram en un VPS (`103.114.43.97.sslip.io`) sin identificar; `aigts-bot` (bot GTS, en Vercel) también apunta a `egpix…`. | Escritores externos fuera de control durante el corte. | Alta |
 | I | `bobby-cycle` y `user-cycle` llaman a `defimexico.org` (404). | Telegram del ciclo no llega. Fase 0. | Media |
-| J | `bobby-cycle` y `settle-trades` **no validan `CRON_SECRET` ni cabecera de cron**: cualquiera que conozca la URL dispara un ciclo (con envíos a Telegram y Twitter). | Efectos externos no controlados durante las pruebas. | Alta |
+| J | **Corregido en la fase 0:** los crons sí validaban `CRON_SECRET` / `x-internal-secret` con `timingSafeEqual` (`requireInternalAuth`); mi grep inicial no lo vio. Lo que faltaba era autorización independiente para ejecuciones manuales (`BOBBY_OPS_SECRET`, commit `feat(ops)`). | Sin la ops secret configurada, las ejecuciones manuales responden 503. | Resuelta |
 | K | `bobby-cycle` tiene `ChallengeMode = dryrun \| paper \| live` (por defecto `dryrun`), pero los envíos a Telegram (`sendMessage`) y Twitter no dependen de ese modo. | Un ciclo "de prueba" publica igual. | Alta para el canary |
 | L | `api_cache` no se migra. | Primer ciclo más lento. | Ninguna |
 | M | `agent_cycles.user_id` y `agent_profiles.user_id` en null en todas las filas. | Nada que remapear. | Ninguna |
