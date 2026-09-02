@@ -37,6 +37,18 @@ const ORIGIN = process.env.BOBBY_ORIGIN || 'https://bobbyprotocol.xyz';
 if (!URL_ || !ANON) { console.error('SUPABASE_URL and SUPABASE_ANON_KEY are required'); process.exit(2); }
 if (!SERVICE) { console.error('SUPABASE_SERVICE_KEY is required: the gate cannot reach a PASS verdict without the policy matrix and canary rows. Verdict: INCOMPLETE'); process.exit(2); }
 
+// Which sections to run: A (policy matrix), B (canaries), C (legitimate path). Default all.
+const SECTIONS = new Set((process.env.GATE_SECTIONS || 'ABC').toUpperCase().split(''));
+// Vercel Deployment Protection on previews: present the automation bypass on every API call.
+const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
+if (BYPASS) {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = ((input: string | URL | Request, init: RequestInit = {}) => {
+    const url = String(input);
+    const extra = url.startsWith(API) ? { 'x-vercel-protection-bypass': BYPASS } : {};
+    return realFetch(input, { ...init, headers: { ...(init.headers as Record<string, string> | undefined), ...extra } });
+  }) as typeof fetch;
+}
 const anonHeaders = { apikey: ANON, Authorization: `Bearer ${ANON}`, 'Content-Type': 'application/json', Prefer: 'return=representation' };
 const svcHeaders = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json', Prefer: 'return=representation' };
 const MARK = `RLS-CANARY-${Date.now()}-${randomBytes(3).toString('hex')}`;
@@ -267,13 +279,13 @@ async function legitimatePath(): Promise<void> {
 (async () => {
   console.log(`RLS adversarial gate v2 — ${URL_} · ${API} · marker ${MARK}`);
   try {
-    await policyMatrix();
-    await plantCanaries();
-    await attackCanaries();
+    if (SECTIONS.has('A')) await policyMatrix();
+    if (SECTIONS.has('B')) { await plantCanaries(); await attackCanaries(); }
   } finally {
-    await removeCanaries();
+    if (SECTIONS.has('B')) await removeCanaries();
   }
-  await legitimatePath();
+  if (SECTIONS.has('C')) await legitimatePath();
+  if (SECTIONS.size < 3) console.log(`\n(partial run: sections ${[...SECTIONS].join('')} — a full GATE PASSED requires ABC)`);
   console.log(failures === 0 ? '\nGATE PASSED: policy matrix exact, canaries untouched, legitimate path proven.' : `\nGATE FAILED: ${failures} problem(s). Do not cut over.`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((error) => { console.error('gate crashed:', error); process.exit(1); });

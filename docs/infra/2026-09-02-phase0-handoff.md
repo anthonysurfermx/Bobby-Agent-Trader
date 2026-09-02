@@ -451,3 +451,40 @@ del preview (se añade solo con `VERCEL_URL`).
    debates privados, publicar un debate al foro (recibo), freeze on/off en
    `bobby_control` (escrituras 503, webhook 200), canary (sin Telegram).
 4. Solo con 3 en verde: `bobby_rls_hardening` y el gate vivo.
+
+---
+
+## Ejecución del preview (2026-09-02, noche) — autorizada por Anthony
+
+**Paso 1 — hecho.** `bobby_control`, `bobby_early_access` y
+`bobby_forum_publish_rpc` aplicadas en legacy con `apply_migration`.
+Verificado: 3 tablas con RLS y solo service role, fila `global`
+(`write_freeze=false`, `canary=false`), funciones `bobby_publish_debate` y
+`bobby_control_touch` presentes. Producción (código viejo) no lee estas
+tablas: cero impacto.
+
+**Paso 2 — hecho.** Rama pusheada a `origin/feat/phase0-hardening`. 16
+variables creadas en Preview **acotadas a la rama** (`vercel env add NAME
+preview feat/phase0-hardening --yes --force`): las de base (legacy por
+ahora, en `BOBBY_SUPABASE_*` y `VITE_BOBBY_SUPABASE_*`), LLM, cron/cycle,
+`BOBBY_SESSION_SECRET`, `BOBBY_OPS_SECRET`, `BOBBY_CONTROL_SOURCE=table`.
+Notas operativas:
+- Vercel marca las variables de Preview como *sensitive*: `vercel env pull`
+  devuelve `""`. Los secretos generados se rotaron una vez por eso; la
+  única copia legible vive en el scratchpad de la sesión.
+- Los previews tienen Deployment Protection (302 → SSO). Ya existía un
+  secreto de *Protection Bypass for Automation* en el proyecto; los
+  scripts lo mandan en `x-vercel-protection-bypass` vía
+  `VERCEL_AUTOMATION_BYPASS_SECRET`. Sin él, el smoke se niega a medir.
+- `vercel redeploy` necesita `--scope anthonysurfermxs-projects`.
+- El bundle del preview lleva la URL de Supabase inyectada en el chunk
+  `bobby-db-client` (VITE_* en tiempo de build confirmado).
+
+**Paso 3 — smoke: PASSED (21/21)** contra
+`bobby-agent-trader-3ovclbxkc…vercel.app` (sha `143d5a4`): health con
+`db.ref=egpixaunlnzauztbrnuz`, `control.source=table`, challenge SIWE,
+nonce quemado, 401 sin sesión en las cuatro lecturas privadas, 403 por
+origen ajeno en las cuatro escrituras, manual `bobby-cycle` 401 sin ops.
+Pendiente en este mismo paso: freeze on/off por comportamiento y sección C
+del gate (firma → sesión → intereses → publicación con recibo → replay 409)
+contra el preview redesplegado.
