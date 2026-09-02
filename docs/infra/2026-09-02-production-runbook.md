@@ -92,3 +92,13 @@ DeFi México del repo). Cada paso con su propio GO.
   desde el worktree `phase0` en ese sha (mismo mecanismo de siempre, usa el
   env de Production). Después, fast-forward de `main` a ese sha para acabar
   con la deriva (requiere aprobación explícita: push a `main`).
+
+## Ejecución (2026-09-02, 21:02 UTC) — GO de Anthony
+- Paso 1 hecho: `vercel --prod` desde el worktree `phase0` en **`572389f`**
+  → `bobby-agent-trader-nf23ttnqv…` aliased a `https://bobbyprotocol.xyz`.
+  Build local previo en verde.
+- Paso 2 hecho: health `deployment.env=production`, `control.source=table`,
+  `db.ref=egpixaunlnzauztbrnuz`; smoke **21/21** en producción; bundle con
+  `CompanionDesk` y `BobbyAgentTraderPage`.
+- Rollback en esta etapa: Vercel → Promote del deployment anterior
+  (`bobby-agent-trader-r13m1j4ab…`, `feat/web-companion@3ccd8b18`).
