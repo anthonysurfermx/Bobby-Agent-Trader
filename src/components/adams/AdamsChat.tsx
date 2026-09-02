@@ -32,7 +32,7 @@ import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 // ---- Supabase ----
 
 const SB_URL = BOBBY_DB_URL;
-const SB_KEY = BOBBY_DB_ANON || BOBBY_DB_ANON;
+const SB_KEY = BOBBY_DB_ANON;
 
 interface DBMessage {
   id: string;
@@ -68,44 +68,15 @@ async function fetchStockPrices(symbols: string[]): Promise<Array<{ symbol: stri
 // Bobby silently saves what assets the user is watching to user_interests
 async function saveInterestTags(wallet: string, tokens: string[], context: string) {
   if (!wallet || tokens.length === 0) return;
-  for (const instId of tokens) {
-    const asset = instId.split('-')[0]; // BTC-USDT → BTC
-    try {
-      // Check if interest already exists
-      const checkRes = await fetch(
-        `${SB_URL}/rest/v1/user_interests?wallet_address=eq.${wallet}&asset=eq.${asset}&active=eq.true&select=id`,
-        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-      );
-      const existing = await checkRes.json();
-      if (Array.isArray(existing) && existing.length > 0) {
-        // Update context timestamp — user is still interested
-        await fetch(`${SB_URL}/rest/v1/user_interests?id=eq.${existing[0].id}`, {
-          method: 'PATCH',
-          headers: {
-            apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-            'Content-Type': 'application/json', Prefer: 'return=minimal',
-          },
-          body: JSON.stringify({ context, target_threshold: 0.75 }),
-        });
-      } else {
-        // Insert new interest
-        await fetch(`${SB_URL}/rest/v1/user_interests`, {
-          method: 'POST',
-          headers: {
-            apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-            'Content-Type': 'application/json', Prefer: 'return=minimal',
-          },
-          body: JSON.stringify({
-            wallet_address: wallet,
-            asset,
-            context,
-            target_threshold: 0.75,
-            active: true,
-          }),
-        });
-      }
-    } catch { /* silent — don't block chat for interest tracking */ }
-  }
+  // Phase 0: writes go through the API (validated, rate limited); the browser
+  // never carries a key that can write.
+  try {
+    await fetch('/api/user-interests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet, assets: tokens.slice(0, 10), context: context.slice(0, 500) }),
+    });
+  } catch { /* silent — don't block chat for interest tracking */ }
 }
 
 // ---- Chat message types ----
@@ -935,10 +906,11 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // Clear Supabase messages for this wallet
     if (profile?.walletAddress) {
       try {
-        await fetch(
-          `${SB_URL}/rest/v1/agent_messages?wallet_address=eq.${profile.walletAddress}`,
-          { method: 'DELETE', headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=minimal' } }
-        );
+        await fetch('/api/agent-messages', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet: profile.walletAddress }),
+        });
       } catch { }
     }
     // Reset UI
@@ -2472,30 +2444,27 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               } else {
                 const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-                const threadRes = await fetch(`${SB_URL}/rest/v1/forum_threads`, {
+                const publishRes = await fetch('/api/forum-publish', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=representation' },
+                  headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    topic, trigger_reason: 'User debate in Bobby Chat', language: lang,
-                    conviction_score: convScore, price_at_creation: {},
-                    symbol, direction, entry_price: entryPrice, stop_price: stopPrice,
-                    target_price: targetPrice, expires_at: expiresAt,
+                    wallet: profile?.walletAddress || undefined,
+                    language: lang,
+                    topic,
+                    symbol,
+                    direction,
+                    conviction_score: Math.round(convScore),
+                    entry_price: entryPrice ?? null,
+                    stop_price: stopPrice ?? null,
+                    target_price: targetPrice ?? null,
+                    posts: posts.slice(0, 6).map((post) => ({ agent: post.agent, content: post.content.slice(0, 4000) })),
                   }),
                 });
-                if (threadRes.ok) {
-                  const threadData = await threadRes.json();
-                  const threadId = threadData[0]?.id;
-                  if (threadId) {
-                    // Insert posts
-                    for (const post of posts) {
-                      await fetch(`${SB_URL}/rest/v1/forum_posts`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-                        body: JSON.stringify({ thread_id: threadId, agent: post.agent, content: post.content, data_snapshot: {} }),
-                      });
-                    }
-                    console.log('[Bobby] ✅ Debate published to forum:', threadId);
-                  }
+                if (publishRes.ok) {
+                  const published = await publishRes.json();
+                  console.log('[Bobby] ✅ Debate published to forum:', published.threadId);
+                } else {
+                  console.warn('[Bobby] ⚠️ Debate not published:', publishRes.status);
                 }
               } // end of fail-closed else block
             }
@@ -3152,26 +3121,19 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         <div className="mt-auto space-y-2">
           {/* B2C: Get DM reports */}
           <button onClick={async () => {
-            const token = crypto.randomUUID().slice(0, 12);
-            // Save pending connection to Supabase
+            // Phase 0: the server mints the token and stores the pending row.
+            let token = '';
             try {
-              const SB = BOBBY_DB_URL;
-              const KEY = BOBBY_DB_ANON;
               const agentProfile = localStorage.getItem('agent_profile');
               const profileId = agentProfile ? JSON.parse(agentProfile).id : null;
-              await fetch(`${SB}/rest/v1/telegram_connections`, {
+              const r = await fetch('/api/telegram-connect', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=minimal' },
-                body: JSON.stringify({
-                  wallet_address: address?.toLowerCase() || null,
-                  agent_profile_id: profileId,
-                  telegram_user_id: 0,
-                  telegram_chat_id: 0,
-                  connect_token: token,
-                  status: 'pending',
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ wallet: address?.toLowerCase() || undefined, agentProfileId: profileId || undefined }),
               });
+              if (r.ok) token = (await r.json()).token || '';
             } catch {}
+            if (!token) { console.warn('[Bobby] Telegram connect unavailable'); return; }
             window.open(`https://t.me/Bobbyagentraderbot?start=connect_${token}`, '_blank');
           }}
             className="block w-full bg-green-500/[0.06] border border-green-500/15 rounded p-3 hover:bg-green-500/[0.1] transition-all text-left">

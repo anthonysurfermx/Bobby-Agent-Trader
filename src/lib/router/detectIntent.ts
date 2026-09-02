@@ -121,44 +121,15 @@ async function fetchStockPrices(symbols: string[]): Promise<Array<{ symbol: stri
 // Bobby silently saves what assets the user is watching to user_interests
 async function saveInterestTags(wallet: string, tokens: string[], context: string) {
   if (!wallet || tokens.length === 0) return;
-  for (const instId of tokens) {
-    const asset = instId.split('-')[0]; // BTC-USDT → BTC
-    try {
-      // Check if interest already exists
-      const checkRes = await fetch(
-        `${SB_URL}/rest/v1/user_interests?wallet_address=eq.${wallet}&asset=eq.${asset}&active=eq.true&select=id`,
-        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-      );
-      const existing = await checkRes.json();
-      if (Array.isArray(existing) && existing.length > 0) {
-        // Update context timestamp — user is still interested
-        await fetch(`${SB_URL}/rest/v1/user_interests?id=eq.${existing[0].id}`, {
-          method: 'PATCH',
-          headers: {
-            apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-            'Content-Type': 'application/json', Prefer: 'return=minimal',
-          },
-          body: JSON.stringify({ context, target_threshold: 0.75 }),
-        });
-      } else {
-        // Insert new interest
-        await fetch(`${SB_URL}/rest/v1/user_interests`, {
-          method: 'POST',
-          headers: {
-            apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-            'Content-Type': 'application/json', Prefer: 'return=minimal',
-          },
-          body: JSON.stringify({
-            wallet_address: wallet,
-            asset,
-            context,
-            target_threshold: 0.75,
-            active: true,
-          }),
-        });
-      }
-    } catch { /* silent — don't block chat for interest tracking */ }
-  }
+  // Phase 0: interests are saved through the API (validated, rate limited);
+  // the browser never writes to the database directly.
+  try {
+    await fetch('/api/user-interests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet, assets: tokens.slice(0, 10), context: String(context || '').slice(0, 500) }),
+    });
+  } catch { /* silent */ }
 }
 
 export function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 'trending' | 'prices_all' | 'help' | 'chat' | 'greeting' | 'ambiguous' {

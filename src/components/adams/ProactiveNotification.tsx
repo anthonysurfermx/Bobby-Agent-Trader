@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 const SB_URL = BOBBY_DB_URL;
-const SB_KEY = BOBBY_DB_ANON || BOBBY_DB_ANON;
+const SB_KEY = BOBBY_DB_ANON;
 
 const POLL_INTERVAL = 30_000; // 30s
 
@@ -54,13 +54,10 @@ export function ProactiveNotification({ walletAddress }: { walletAddress?: strin
     setDismissed(prev => new Set(prev).add(id));
     setAlerts(prev => prev.filter(a => a.id !== id));
     try {
-      await fetch(`${SB_URL}/rest/v1/agent_messages?id=eq.${id}`, {
+      await fetch('/api/agent-messages', {
         method: 'PATCH',
-        headers: {
-          apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-          'Content-Type': 'application/json', Prefer: 'return=minimal',
-        },
-        body: JSON.stringify({ read: true }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet: walletAddress, id }),
       });
     } catch { /* silent */ }
   };
