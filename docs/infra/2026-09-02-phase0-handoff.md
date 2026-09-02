@@ -391,3 +391,63 @@ Pruebas añadidas:
 - `freeze-behavior-selftest`: + `xlayer-record`, `generate-activity`,
   `auto-bounty`, `judge-mode`, `bobby-asset-cache`, `agent-run`,
   `bobby-cycle` (los escritores on-chain responden 503 sin firmar).
+
+---
+
+## GO de Codex para preview controlado (quinta revisión, `4faf203`) — plan de ejecución
+
+Estado verificado en solo lectura antes de tocar nada:
+
+| Qué                         | Valor                                                                 |
+|-----------------------------|-----------------------------------------------------------------------|
+| Vercel producción           | proyecto `bobby-agent-trader` → https://bobbyprotocol.xyz             |
+| Supabase legacy (hoy)       | `egpixaunlnzauztbrnuz` (cuenta DeFi México). 36 tablas de Bobby.      |
+| Supabase destino            | `bobby-protocol` `qbvdqkknnuweatptjohi` (cuenta anthonysurfermx), us-east-1. Solo `agent_profiles`, `forum_threads`, `forum_posts`, `api_cache`, todas vacías. |
+| Rama                        | `feat/phase0-hardening` @ `4faf203`, **no pusheada** (sin preview aún) |
+| MCP de Supabase             | `execute_sql` corre en transacción de solo lectura: no puede escribir ni validar DDL. Las migraciones solo entran por `apply_migration`. |
+
+### Volumen a migrar (legacy → destino, para el manifiesto T0)
+`agent_cycles` 3 402 · `forum_threads` 3 399 · `forum_posts` 10 980 ·
+`agent_events` 7 256 · `agent_messages` 356 · `mcp_payment_challenges` 432 ·
+`memory_objects` 221 · `api_cache` 117 · `user_digests` 87 · `sandbox_runs` 15 ·
+`telegram_activation_sessions` 10 · `user_interests` 8 · resto ≤ 2 filas o vacías.
+
+### ⚠️ RLS apagado hoy en 15 tablas de Bobby (legacy)
+`user_interests`, `agent_config`, `telegram_groups`,
+`telegram_activation_sessions`, `telegram_subscriptions`, `indicator_cache`,
+`agent_market_snapshots`, `agent_macro_events`, `agent_source_health`,
+`agent_position_rechecks`, `hardness_agents`, `hardness_agent_sessions`,
+`hardness_agent_proofs`, `agent_events`, `memory_objects`. Con la anon key
+se puede leer o modificar cualquier fila. `20260902_bobby_rls_hardening.sql`
+las cubre todas (habilita RLS y deja solo service role, o lectura pública
+donde corresponde). No se aplica antes del paso 4 porque el código que
+lee esas tablas desde el navegador debe estar desplegado primero.
+
+### Hueco en Vercel: el entorno Preview casi no tiene variables
+`vercel env ls` muestra `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
+`CRON_SECRET`, `BOBBY_CYCLE_SECRET`, etc. solo en Production y Development.
+En Preview solo existe `BOBBY_RECORDER_KEY`. Un preview sin esas variables
+arranca sin base. Antes del push hay que crear en **Preview**:
+`BOBBY_SUPABASE_URL`, `BOBBY_SUPABASE_SERVICE_ROLE_KEY`,
+`BOBBY_SUPABASE_ANON_KEY`, `VITE_BOBBY_SUPABASE_URL`,
+`VITE_BOBBY_SUPABASE_ANON_KEY` (legacy por ahora), `INTERNAL_API_SECRET`,
+`BOBBY_OPS_SECRET`, `BOBBY_SESSION_SECRET`, `BOBBY_CONTROL_SOURCE=table`,
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, y los tokens de Telegram si se
+prueba el bot. `BOBBY_ALLOWED_ORIGINS` no hace falta para el propio host
+del preview (se añade solo con `VERCEL_URL`).
+
+### Pasos 1–3 (requieren OK explícito de Anthony; cada uno es reversible)
+1. `apply_migration` de las tres aditivas en **legacy**: `bobby_control`,
+   `bobby_early_access`, `bobby_forum_publish_rpc`. Crean 3 tablas y 2
+   funciones; no tocan ninguna tabla existente. Reversión: `drop table` /
+   `drop function`.
+2. Variables de Preview (arriba) y `git push origin feat/phase0-hardening`
+   → Vercel crea el preview automáticamente. Nada llega a producción.
+3. Contra el preview:
+   ```bash
+   BOBBY_API=https://<preview>.vercel.app npx tsx scripts/infra/preview-smoke.mts
+   ```
+   más la regresión manual: conectar wallet → firma → inbox, intereses,
+   debates privados, publicar un debate al foro (recibo), freeze on/off en
+   `bobby_control` (escrituras 503, webhook 200), canary (sin Telegram).
+4. Solo con 3 en verde: `bobby_rls_hardening` y el gate vivo.
