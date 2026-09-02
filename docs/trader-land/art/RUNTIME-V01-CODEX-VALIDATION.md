@@ -45,6 +45,16 @@ The implementation reads `asset-manifest.json` at runtime and fails closed when 
 - Path animation, sound, pinch zoom, pan, and production save/sync are the next vertical layer.
 - No atlas is produced until the final phone cell size is locked.
 
+## Claude review follow-up
+
+The non-blocking review notes were incorporated before the parity gate:
+
+- `world-snapshot-v01.json` is now the canonical initial state for both renderers.
+- The first load uses `albedo_512.webp`; 1024 PNG remains the fallback and future high-zoom source.
+- Sprite scale derives from normalized `contentBounds` and footprint width instead of fixed canvas sizes.
+- Derived seeds now use the manifest's actual single-variant shape; the earlier harness incorrectly expected a nested `variants` object and only appeared dimmer because glow was disabled.
+- A load-order race that could persist an empty world before the fixture arrived was caught and fixed. The fixture wins on first load; local persistence is enabled only after it is available.
+
 ## Suggested next gate
 
 Promote this renderer contract into a shared world-state model, then make web and iOS consume the same snapshot fixture. The next acceptance test should compare placement, fog, and connector outputs for that fixture on both platforms before adding persistence APIs or rewards.

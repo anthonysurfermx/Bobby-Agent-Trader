@@ -5,10 +5,11 @@ type District = 'crypto_bay' | 'evidence_mines' | 'thesis_citadel' | 'risk_reef'
 type PathOrientation = 'ne_sw' | 'nw_se';
 type Variant = { url: string; w: number; h: number };
 type ArtState = {
+  contentBounds: [number, number, number, number];
   anchor: [number, number];
   occlusionHeight: number;
   variants: Record<string, Variant>;
-  derived_seed?: { variants: Record<string, Variant> };
+  derived_seed?: Variant & { method?: string };
 };
 type ManifestItem = {
   id: string;
@@ -20,27 +21,28 @@ type ManifestItem = {
 type Manifest = { gate: string; version: number; layer_encoding: Record<string, string>; items: ManifestItem[] };
 type Placement = { uid: string; itemId: string; col: number; row: number; orientation?: PathOrientation };
 type Snapshot = { placements: Placement[]; focusLevel: number };
+type SnapshotFixture = Snapshot & {
+  version: number;
+  gridSize: number;
+  core: { itemId: string; col: number; row: number };
+  expectedPathConnectors: Record<string, Connector[]>;
+};
 
 const GRID = 8;
 const TILE_W = 92;
 const TILE_H = 46;
 const ORIGIN_X = 430;
-const ORIGIN_Y = 160;
-const STORAGE_KEY = 'bobby.trader-land.runtime-v01';
+const ORIGIN_Y = 230;
+const STORAGE_KEY = 'bobby.trader-land.runtime-v03';
 const districts: District[] = ['crypto_bay', 'evidence_mines', 'thesis_citadel', 'risk_reef', 'axiom_archive'];
 const districtNames: Record<District, string> = {
   crypto_bay: 'Crypto Bay', evidence_mines: 'Evidence Mines', thesis_citadel: 'Thesis Citadel',
   risk_reef: 'Risk Reef', axiom_archive: 'Axiom Archive',
 };
-const initialPlacements: Placement[] = [
-  { uid: 'context-buoy', itemId: 'crypto_bay_context_buoy', col: 2, row: 1 },
-  { uid: 'risk-antenna', itemId: 'risk_reef_dual_orbit_antenna', col: 5, row: 1 },
-  { uid: 'evidence-rock', itemId: 'evidence_mines_crystal_vein_rock', col: 1, row: 5 },
-  { uid: 'aura-flower', itemId: 'axiom_archive_aura_flower', col: 5, row: 6 },
-  { uid: 'risk-shield', itemId: 'thesis_citadel_risk_shield', col: 6, row: 4 },
-  { uid: 'path-a', itemId: 'axiom_archive_path_straight', col: 3, row: 2, orientation: 'ne_sw' },
-  { uid: 'path-b', itemId: 'axiom_archive_path_straight', col: 4, row: 2, orientation: 'ne_sw' },
-];
+const fallbackSnapshot: SnapshotFixture = {
+  version: 1, gridSize: GRID, focusLevel: 1, core: { itemId: 'aura_core', col: 3, row: 3 },
+  placements: [], expectedPathConnectors: {},
+};
 
 function iso(col: number, row: number) {
   return { x: ORIGIN_X + (col - row) * TILE_W / 2, y: ORIGIN_Y + (col + row) * TILE_H / 2 };
@@ -57,13 +59,13 @@ function cellsFor(item: ManifestItem, col: number, row: number) {
 function artFor(item: ManifestItem, seed: boolean) {
   const orientation = Object.values(item.orientations)[0];
   const state = orientation.states.stage1 ?? orientation.states.bloom ?? Object.values(orientation.states)[0];
-  const seedVariants = state.derived_seed?.variants ?? {};
   return {
-    albedo: (seed ? seedVariants.albedo_1024 ?? seedVariants.albedo_512 : undefined) ?? state.variants.albedo_1024 ?? state.variants.albedo_512,
+    albedo: (seed ? state.derived_seed : undefined) ?? state.variants.albedo_512 ?? state.variants.albedo_1024,
     glow: state.variants.glow_1024,
     shadow: state.variants.shadow_1024,
     thumb: state.variants.thumb_256,
     anchor: state.anchor,
+    contentBounds: state.contentBounds,
   };
 }
 
@@ -84,7 +86,9 @@ function LuminanceLayer({ src, mode, id }: { src?: string; mode: 'shadow' | 'glo
 function ArtSprite({ item, placement, seed, selected }: { item: ManifestItem; placement: Placement; seed: boolean; selected: boolean }) {
   const art = artFor(item, seed);
   const center = iso(placement.col + (item.footprint.cols - 1) / 2, placement.row + (item.footprint.rows - 1) / 2);
-  const size = item.kind === 'core' || item.kind === 'landmark' ? 230 : item.kind === 'building' ? 190 : 132;
+  const visibleWidth = Math.max(.2, art.contentBounds[2] - art.contentBounds[0]);
+  const footprintWidth = TILE_W * (item.footprint.cols + item.footprint.rows) / 2;
+  const size = Math.min(360, footprintWidth * .9 / visibleWidth);
   return (
     <div
       className="pointer-events-none absolute"
@@ -137,13 +141,10 @@ function pretty(value: string) {
 export default function TraderLandGatePage() {
   const scroller = useRef<HTMLDivElement>(null);
   const [manifest, setManifest] = useState<Manifest | null>(null);
+  const [fixture, setFixture] = useState<SnapshotFixture | null>(null);
   const [loadError, setLoadError] = useState('');
-  const saved = useMemo<Snapshot>(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') ?? { placements: initialPlacements, focusLevel: 1 }; }
-    catch { return { placements: initialPlacements, focusLevel: 1 }; }
-  }, []);
-  const [placements, setPlacements] = useState(saved.placements);
-  const [focusLevel, setFocusLevel] = useState(saved.focusLevel);
+  const [placements, setPlacements] = useState<Placement[]>([]);
+  const [focusLevel, setFocusLevel] = useState(1);
   const [history, setHistory] = useState<Snapshot[]>([]);
   const [district, setDistrict] = useState<District>('crypto_bay');
   const [selectedId, setSelectedId] = useState('crypto_bay_data_dock');
@@ -154,15 +155,31 @@ export default function TraderLandGatePage() {
   const [notice, setNotice] = useState('Choose a blueprint, then tap a revealed tile.');
 
   useEffect(() => {
-    fetch('/land/v1/gate-A/asset-manifest.json')
-      .then((response) => { if (!response.ok) throw new Error(`Manifest ${response.status}`); return response.json(); })
-      .then((value: Manifest) => {
-        if (!value.layer_encoding || value.items.length < 27) throw new Error('Incomplete runtime contract');
-        setManifest(value);
+    Promise.all([
+      fetch('/land/v1/gate-A/asset-manifest.json'),
+      fetch('/land/v1/world-snapshot-v01.json'),
+    ])
+      .then(async ([manifestResponse, fixtureResponse]) => {
+        if (!manifestResponse.ok || !fixtureResponse.ok) throw new Error('Runtime fixture unavailable');
+        return [await manifestResponse.json() as Manifest, await fixtureResponse.json() as SnapshotFixture] as const;
+      })
+      .then(([manifestValue, fixtureValue]) => {
+        if (!manifestValue.layer_encoding || manifestValue.items.length < 27 || fixtureValue.gridSize !== GRID) throw new Error('Incomplete runtime contract');
+        setManifest(manifestValue); setFixture(fixtureValue);
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          const parsed = stored ? JSON.parse(stored) as Snapshot : null;
+          const initial = parsed?.placements?.length ? parsed : fixtureValue;
+          setPlacements(initial.placements); setFocusLevel(initial.focusLevel);
+        } catch {
+          setPlacements(fixtureValue.placements); setFocusLevel(fixtureValue.focusLevel);
+        }
       })
       .catch((error) => setLoadError(String(error)));
   }, []);
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify({ placements, focusLevel })); }, [placements, focusLevel]);
+  useEffect(() => {
+    if (fixture) localStorage.setItem(STORAGE_KEY, JSON.stringify({ placements, focusLevel }));
+  }, [fixture, placements, focusLevel]);
   useEffect(() => {
     const node = scroller.current;
     if (node) node.scrollLeft = Math.max(0, (node.scrollWidth - node.clientWidth) / 2);
@@ -207,14 +224,14 @@ export default function TraderLandGatePage() {
     if (!previous) return setNotice('Nothing to undo.');
     setPlacements(previous.placements); setFocusLevel(previous.focusLevel); setHistory((value) => value.slice(0, -1)); setNotice('Last world change undone.');
   };
-  const restore = () => { checkpoint(); setPlacements(initialPlacements); setFocusLevel(1); setSelectedUid(null); setNotice('Canonical 8×8 snapshot restored.'); };
+  const restore = () => { checkpoint(); const source = fixture ?? fallbackSnapshot; setPlacements(source.placements); setFocusLevel(source.focusLevel); setSelectedUid(null); setNotice('Canonical 8×8 snapshot restored.'); };
   const reveal = () => {
     if (focusLevel >= 2) return setNotice('The full 8×8 island is already revealed.');
     checkpoint(); setFocusLevel(2); setNotice('Focus expanded the fog ring: 6×6 → 8×8.');
   };
 
   if (loadError) return <main className="min-h-screen bg-[#05070a] p-8 text-red-300">Trader Land contract failed closed: {loadError}</main>;
-  if (!manifest) return <main className="min-h-screen bg-[#05070a] p-8 font-mono text-emerald-300">LOADING · TRADER LAND</main>;
+  if (!manifest || !fixture) return <main className="min-h-screen bg-[#05070a] p-8 font-mono text-emerald-300">LOADING · TRADER LAND</main>;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#05070a] text-white">
@@ -226,7 +243,7 @@ export default function TraderLandGatePage() {
 
         <section className="mt-6 grid gap-4 xl:grid-cols-[1fr_300px]">
           <div ref={scroller} className="relative overflow-auto rounded-3xl border border-emerald-400/20 bg-[radial-gradient(circle_at_50%_42%,rgba(18,93,73,.24),transparent_48%),linear-gradient(#071019,#05070a)]">
-            <div className="relative mx-auto h-[640px] min-w-[860px]" data-testid="trader-land-grid">
+            <div className="relative mx-auto h-[720px] min-w-[860px]" data-testid="trader-land-grid">
               {Array.from({ length: GRID * GRID }, (_, index) => {
                 const col = index % GRID; const row = Math.floor(index / GRID); const p = iso(col, row);
                 return <button key={`${col}:${row}`} onClick={() => place(col, row)} onMouseEnter={() => setHovered({ col, row })} onMouseLeave={() => setHovered(null)} className="absolute transition hover:brightness-150 focus:outline-none" style={{ left: p.x - TILE_W / 2, top: p.y - TILE_H / 2, width: TILE_W, height: TILE_H, clipPath: 'polygon(50% 0,100% 50%,50% 100%,0 50%)', background: (col + row) % 2 ? 'rgba(24,44,53,.82)' : 'rgba(19,36,45,.82)', border: 0, zIndex: 1 + col + row }} aria-label={`Tile ${col},${row}`} />;
@@ -239,7 +256,7 @@ export default function TraderLandGatePage() {
               <ArtSprite item={itemsById.get('aura_core')!} placement={{ uid: 'aura-core', itemId: 'aura_core', col: 3, row: 3 }} seed={seed} selected={false} />
               {Array.from({ length: GRID * GRID }, (_, index) => { const col = index % GRID; const row = Math.floor(index / GRID); return !isRevealed(col, row) ? <Diamond key={`fog-${col}:${row}`} col={col} row={row} tone="fog" z={700 + col + row} /> : null; })}
               {hovered && previewCells.map((cell) => { const [col, row] = cell.split(':').map(Number); return <Diamond key={`preview-${cell}`} col={col} row={row} tone={previewValid ? 'valid' : 'invalid'} />; })}
-              <div className="pointer-events-none absolute left-[355px] top-[474px] z-[900] rounded-full border border-emerald-300/30 bg-black/70 px-3 py-1 font-mono text-[9px] uppercase tracking-[.18em] text-emerald-200">Aura Core · balance</div>
+              <div className="pointer-events-none absolute left-[355px] top-[544px] z-[900] rounded-full border border-emerald-300/30 bg-black/70 px-3 py-1 font-mono text-[9px] uppercase tracking-[.18em] text-emerald-200">Aura Core · balance</div>
             </div>
           </div>
 
