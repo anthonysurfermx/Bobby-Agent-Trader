@@ -286,6 +286,9 @@ async function legitimatePath(): Promise<void> {
   }
   if (SECTIONS.has('C')) await legitimatePath();
   if (SECTIONS.size < 3) console.log(`\n(partial run: sections ${[...SECTIONS].join('')} — a full GATE PASSED requires ABC)`);
-  console.log(failures === 0 ? '\nGATE PASSED: policy matrix exact, canaries untouched, legitimate path proven.' : `\nGATE FAILED: ${failures} problem(s). Do not cut over.`);
+  const full = SECTIONS.size === 3;
+  console.log(failures === 0
+    ? (full ? '\nGATE PASSED: policy matrix exact, canaries untouched, legitimate path proven.' : `\nSECTION(S) ${[...SECTIONS].join('')} PASSED — not a full gate verdict.`)
+    : `\nGATE FAILED: ${failures} problem(s). Do not cut over.`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((error) => { console.error('gate crashed:', error); process.exit(1); });

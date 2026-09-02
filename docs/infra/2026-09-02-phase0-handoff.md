@@ -488,3 +488,44 @@ origen ajeno en las cuatro escrituras, manual `bobby-cycle` 401 sin ops.
 Pendiente en este mismo paso: freeze on/off por comportamiento y sección C
 del gate (firma → sesión → intereses → publicación con recibo → replay 409)
 contra el preview redesplegado.
+
+**Paso 3 — regresión API: en verde** contra
+`bobby-agent-trader-5kab7xqyp…vercel.app` (secretos rotados, sha `143d5a4`):
+- **Freeze por comportamiento**: `bobby_control.write_freeze=true` (PATCH
+  con service role) → `user-interests`, `forum-publish`, `agent-messages`,
+  `feedback`, `agent-setup` responden **503** y el health muestra
+  `writeFreeze: true` con la nota; `bobby-cycle` sin ops responde 401
+  (autentica antes de revelar el estado). Flag de vuelta a `false` →
+  401 normales y health limpio. Producción no se enteró: el código viejo no
+  lee `bobby_control`.
+- **Gate sección C** (wallet desechable, 21/21): challenge SIWE, token,
+  replay de nonce 401, firma contra otro challenge 401, intereses 401/403/
+  200 + lectura, publicación con recibo 200 → `conviction_score` guardado
+  `0.7`, `owner_wallet` = sesión, `scope` público; recibo guest 403, recibo
+  de otra wallet 403, convicción `70` rechazada, **mismo recibo 409**,
+  transcripción editada 403, `my-threads` 200, borrar inbox ajeno 403.
+- Limpieza verificada en legacy: 0 filas de prueba en `user_interests`,
+  `forum_threads`, `forum_posts`, `forum_publish_receipts`,
+  `telegram_connections`, nonces en `api_cache`; flags en falso.
+
+**Lo que NO se probó en preview (decisión de Anthony):**
+- Web con wallet real (conectar → firmar → chat → publicar): requiere una
+  extensión de wallet; hacerlo a mano en el preview (URL con bypass).
+- Un ciclo (`bobby-cycle`) en canary: escribiría filas en `agent_cycles`
+  de la base legacy compartida con producción. Se propone correrlo solo
+  después de deploy a producción, o contra la base destino.
+- Bot de Telegram: el webhook apunta a producción; no se redirige a preview.
+- On-chain: el preview está configurado para Base Sepolia; no se firmó nada.
+
+### Lo que viene, en orden, y por qué el siguiente paso es producción
+La migración de RLS **rompe el código viejo** (el frontend de producción
+escribe hoy directo a Supabase con la anon key). Por eso el orden de Codex es:
+1. Deploy de esta rama a **producción** (merge a `main` → Vercel) con las
+   variables nuevas también en Production (`BOBBY_SESSION_SECRET`,
+   `BOBBY_OPS_SECRET`, `BOBBY_CONTROL_SOURCE=table`, `BOBBY_SUPABASE_*` y
+   `VITE_BOBBY_SUPABASE_*` = legacy por ahora).
+2. Verificar en producción: smoke, firma real, un ciclo real.
+3. `20260902_bobby_rls_hardening.sql` en legacy y gate completo (ABC).
+4. Corte a `bobby-protocol` (`qbvdqkknnuweatptjohi`): manifiesto T0,
+   backup, freeze, dump/restore, `BOBBY_SUPABASE_*` → destino, rebuild,
+   verificación de conteos/IDs/proofs, `legacy-reference-audit` en cero.
