@@ -115,3 +115,15 @@ DeFi México del repo). Cada paso con su propio GO.
   fallos **del script** (fixture de `agent_trades` contra el CHECK de la
   tabla; INSERT anónimo de `user_feedback` pidiendo la fila de vuelta sin
   política SELECT). Corregidos en `8e04de7`; segunda corrida en curso.
+- Paso 5 (21:10–21:35 UTC): tres corridas del gate completo contra
+  producción. Corrida 1: 145 OK, 2 fallos de fixture (corregidos, `8e04de7`),
+  con las 6 comprobaciones de `forum-publish` en verde (publicar 200,
+  `0.7` almacenado, guest 403, otra wallet 403, convicción 70 rechazada,
+  mismo recibo 409, transcripción editada 403). Corridas 2 y 3: 142 OK y
+  solo `forum-publish` en 429 — el rate limit de 6/h por IP (fijo, en memoria
+  por instancia) que la corrida 1 agotó. Unión de evidencia: **148/148
+  comprobaciones en verde**, ninguna falla de seguridad. Pendiente una
+  corrida única con `GATE PASSED` cuando expire la ventana (~22:15 UTC),
+  requisito de Codex para el corte (paso 6), no para producción.
+- Residuos en legacy tras las tres corridas: 0 en todas las tablas
+  (canarios, recibos, feedback, nonces, flags).
