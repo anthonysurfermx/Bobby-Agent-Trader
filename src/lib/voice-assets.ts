@@ -183,7 +183,24 @@ const SPOKEN_PATTERNS: Array<[RegExp, string]> = Object.entries(SPOKEN_TO_SYMBOL
     symbol,
   ]);
 
+// Ordinary words such as "meta" and "salud" are deliberately absent from the
+// broad matcher above. They are still unambiguous when the human supplies a
+// market cue ("analiza Meta", "$META", "ETF de salud"). Keeping this second,
+// contextual matcher closes those false negatives without bringing back the
+// original "mi meta es..." / "por salud..." false positives.
+const CONTEXTUAL_HOMONYM_PATTERNS: Array<[RegExp, string]> = Object.entries(SPOKEN_TO_SYMBOL)
+  .filter(([spoken]) => HOMONYMS.has(spoken))
+  .sort(([a], [b]) => b.length - a.length)
+  .map(([spoken, symbol]) => {
+    const escaped = spoken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const prefix = '(?:\\$|ticker\\s+|stock(?:\\s+de)?\\s+|acci[oó]n(?:es)?(?:\\s+de)?\\s+|etf(?:\\s+de)?\\s+|analiz(?:a|ar|ando)\\s+|precio(?:\\s+de)?\\s+)';
+    const suffix = '(?:\\s+(?:ticker|stock|acci[oó]n|etf))';
+    return [new RegExp(`(?:${prefix}${escaped}|${escaped}${suffix})(?![\\p{L}\\p{N}])`, 'iu'), symbol];
+  });
+
 export function matchAssetInText(text: string): string | null {
   if (!text) return null;
-  return SPOKEN_PATTERNS.find(([pattern]) => pattern.test(text))?.[1] ?? null;
+  return SPOKEN_PATTERNS.find(([pattern]) => pattern.test(text))?.[1]
+    ?? CONTEXTUAL_HOMONYM_PATTERNS.find(([pattern]) => pattern.test(text))?.[1]
+    ?? null;
 }

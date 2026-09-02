@@ -13,7 +13,6 @@ import { AdvisorSetup, useAdvisorProfile } from '@/components/agent-radar/Adviso
 import type { AdvisorProfile } from '@/components/agent-radar/AdvisorSetup';
 import { fetchTickers, fetchMarketDetail, formatVolume, type OKXTicker } from '@/services/okx-market.service';
 import { SwapConfirm, type TradeExecution } from './SwapConfirm';
-import { XLayerSwapCard } from './XLayerSwapCard';
 import PerpsTradeCard from './PerpsTradeCard';
 import TradingModeSelector, { type TradingMode } from './TradingModeSelector';
 import { VoiceOrb, type OrbState, type OrbMood } from './VoiceOrb';
@@ -3459,28 +3458,6 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                           language={lang}
                           tradingMode={(tradingMode === 'auto' || tradingMode === 'confirm') ? 'live' : 'paper'}
                           isOwner={isAuthenticated && address?.toLowerCase() === '0xc3f836ec06a2202af23e59997a613ca0722f35d1'}
-                        />
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  {/* X Layer Swap — spot swap on-chain (secondary option) */}
-                  {!isProcessing && latestAdvisor.text.length > 100 && (() => {
-                    const text = latestAdvisor.text;
-                    const convMatch = text.match(/(\d+)\s*\/\s*10/);
-                    const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
-                    const symMatch = text.match(/\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i);
-                    const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
-                    const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                    if (symMatch) {
-                      const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
-                      return (
-                        <XLayerSwapCard
-                          symbol={symMatch[1].toUpperCase()}
-                          direction={dir}
-                          conviction={conv}
-                          entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
                         />
                       );
                     }

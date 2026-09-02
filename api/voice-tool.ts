@@ -49,18 +49,27 @@ async function getMarket(symbol: string) {
     };
   }
   const data = await getJson(`${SELF}/api/okx-market?instId=${ticker}-USDT&type=all`);
-  const t = (data as { ticker?: Record<string, string> }).ticker;
-  const funding = (data as { funding?: Record<string, string> }).funding;
+  const t = (data as { ticker?: Record<string, string | number> }).ticker;
+  const funding = (data as { funding?: Record<string, string | number> }).funding;
   if (!t?.last) return { symbol: ticker, available: false };
   const last = Number(t.last);
-  const open = Number(t.open24h);
+  // /api/okx-market already normalizes the upstream response. Consume that
+  // public contract instead of reaching for the raw OKX field names here.
+  const normalizedChange = Number(t.change24h);
+  const rawOpen = Number(t.open24h);
+  const change24h = Number.isFinite(normalizedChange)
+    ? normalizedChange
+    : rawOpen > 0
+      ? Number((((last - rawOpen) / rawOpen) * 100).toFixed(2))
+      : null;
+  const normalizedFunding = Number(funding?.rate ?? funding?.fundingRate);
   return {
     symbol: ticker,
     price: last,
-    change_24h_pct: open ? Number((((last - open) / open) * 100).toFixed(2)) : null,
+    change_24h_pct: change24h,
     high_24h: Number(t.high24h),
     low_24h: Number(t.low24h),
-    funding_rate: funding?.fundingRate ? Number(funding.fundingRate) : null,
+    funding_rate: Number.isFinite(normalizedFunding) ? normalizedFunding : null,
   };
 }
 
