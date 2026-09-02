@@ -51,6 +51,9 @@ export const MASCOT_AVATARS: MascotAvatar[] = [
 export const VALID_MASCOT_AVATARS = MASCOT_AVATARS.map(a => a.id);
 
 export function getAvatar(id?: string): MascotAvatar | null {
+  // Companion ids and avatar ids drifted apart in one place: the core
+  // companion is 'orb' in the squad data but 'bobby' in this registry.
+  if (id === 'orb') id = 'bobby';
   if (!id) return null;
   return MASCOT_AVATARS.find(a => a.id === id) || null;
 }

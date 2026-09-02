@@ -172,6 +172,36 @@ export const TOOL_SLOTS: Record<string, BodySlot> = {
   'axiom-1': 'hand', 'axiom-2': 'chest', 'axiom-3': 'head',
 };
 export function toolSlot(tool: CompanionTool): BodySlot { return TOOL_SLOTS[`${tool.companionId}-${tool.tier}`] ?? 'hand'; }
+export const SLOT_LABEL: Record<BodySlot, Bi> = {
+  face: { en: 'ON THE FACE', es: 'EN LA CARA' },
+  headset: { en: 'ON THE EARS', es: 'EN LAS OREJAS' },
+  head: { en: 'ABOVE THE HEAD', es: 'SOBRE LA CABEZA' },
+  hand: { en: 'IN THE HAND', es: 'EN LA MANO' },
+  hip: { en: 'ON THE HIP', es: 'EN LA CADERA' },
+  shoulder: { en: 'ON THE SHOULDER', es: 'EN EL HOMBRO' },
+  chest: { en: 'ON THE CHEST', es: 'EN EL PECHO' },
+};
+/** A sprite for items without art: the glyph on a tinted disc, as a data URL (cached). */
+const glyphCache = new Map<string, string>();
+export function glyphSprite(glyph: string, tint: string): string {
+  const key = `${glyph}|${tint}`;
+  const hit = glyphCache.get(key);
+  if (hit) return hit;
+  if (typeof document === 'undefined') return '';
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  if (!g) return '';
+  g.beginPath(); g.arc(128, 128, 118, 0, Math.PI * 2);
+  g.fillStyle = `${tint}33`; g.fill();
+  g.lineWidth = 8; g.strokeStyle = tint; g.stroke();
+  g.font = '130px system-ui, "Apple Color Emoji", sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = tint; g.fillText(glyph, 128, 140);
+  const url = c.toDataURL('image/png');
+  glyphCache.set(key, url);
+  return url;
+}
 export const PET_ART_AVAILABLE = new Set(['orb', 'byte', 'kora', 'zip']);
 export function petArt(companionId: string): string | null { return PET_ART_AVAILABLE.has(companionId) ? `/pets/pet_${companionId}.png` : null; }
 export function newlyUnlockedTools(companionId: string, fromXP: number, toXP: number): CompanionTool[] {

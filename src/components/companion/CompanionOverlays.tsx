@@ -1,9 +1,11 @@
 // The moments: evolution card, loot drop, gear belt, NO TRADE halo.
 // Ported from EvolutionOverlay / ToolUnlockOverlay / ToolBelt / NoTrade card in iOS.
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, Map as MapIcon, PawPrint, Plus, ShieldCheck, Sparkles } from 'lucide-react';
-import { COMPANIONS, PET_UNLOCK_XP, type Companion, type CompanionLevel, type CompanionTool, companionName, petArt, petFor, petUnlocked, tintFor, toolArt, toolHasArt, toolTierLabel, toolUnlockXP, toolsFor, LEVEL_TONE } from '@/lib/companions/data';
+import { COMPANIONS, PET_UNLOCK_XP, SLOT_LABEL, type Companion, type CompanionLevel, type CompanionPet, type CompanionTool, companionName, glyphSprite, petArt, petFor, petUnlocked, tintFor, toolArt, toolHasArt, toolSlot, toolTierLabel, toolUnlockXP, toolsFor, LEVEL_TONE } from '@/lib/companions/data';
+import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
+import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { pick, t } from '@/lib/companions/i18n';
 import { sfxLevelUp, sfxLoot } from '@/lib/companions/sfx';
 
@@ -157,26 +159,87 @@ export function WornGear({ companion, xp, size }: { companion: Companion; xp: nu
 }
 
 /** The "+" slot: your pet and the other companions' gear, priced in XP. */
-export function GearCatalog({ current, xp, level, onClose }: { current: Companion; xp: number; level: number; onClose: () => void }) {
-  const row = (key: string, art: string | null, glyph: string | null, title: string, subtitle: string, needXP: number, needLevel: number | null, tint: string) => {
-    const have = xp >= needXP && needLevel === null;
-    const missing = Math.max(0, needXP - xp);
-    return (
-      <div key={key} className="flex items-center gap-3 py-2">
-        <div className="h-10 w-10 rounded-full flex items-center justify-center overflow-hidden shrink-0" style={{ background: `${tint}${have ? '29' : '0f'}`, border: `1px solid ${tint}${have ? 'b3' : '40'}`, filter: have ? 'none' : 'grayscale(0.8)' }}>
-          {art ? <img src={art} alt="" className="h-9 w-9 object-contain" /> : <span style={{ color: tint }}>{glyph}</span>}
-        </div>
-        <div className="flex-1 min-w-0"><div className="text-white text-sm font-semibold">{title}</div><div className="text-white/55 text-xs truncate">{subtitle}</div></div>
-        <div className="text-right shrink-0">{have ? <div className="text-[10px] font-mono text-green-400 tracking-[0.15em]">{t('YOURS', 'TUYO')}</div> : <><div className="font-mono text-xs" style={{ color: tint }}>+{missing} XP</div>{needLevel !== null && <div className="text-[9px] font-mono text-white/40">{t(`LVL ${needLevel}`, `NVL ${needLevel}`)}</div>}</>}</div>
-      </div>
-    );
+/** One thing you can still earn, with the companion that wears it. */
+export type CatalogItem = { kind: 'tool'; tool: CompanionTool; companion: Companion } | { kind: 'pet'; pet: CompanionPet; companion: Companion };
+
+/** Hold (or tap) a row to open the worn preview. Long press = 380 ms of pointer down. */
+function useLongPress(onFire: () => void) {
+  const timer = useRef<number | null>(null);
+  const fired = useRef(false);
+  const clear = () => { if (timer.current) { window.clearTimeout(timer.current); timer.current = null; } };
+  return {
+    onPointerDown: () => { fired.current = false; clear(); timer.current = window.setTimeout(() => { fired.current = true; onFire(); }, 380); },
+    onPointerUp: () => { clear(); if (!fired.current) onFire(); },
+    onPointerLeave: clear,
+    onPointerCancel: clear,
+    onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
   };
+}
+
+function CatalogRow({ art, glyph, title, subtitle, needXP, needLevel, tint, xp, item, onPreview }: { art: string | null; glyph: string | null; title: string; subtitle: string; needXP: number; needLevel: number | null; tint: string; xp: number; item: CatalogItem; onPreview: (item: CatalogItem) => void }) {
+  const have = xp >= needXP && needLevel === null;
+  const missing = Math.max(0, needXP - xp);
+  const press = useLongPress(() => onPreview(item));
+  return (
+    <div {...press} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onPreview(item); }} className="flex items-center gap-3 py-2 cursor-pointer select-none rounded-lg -mx-1 px-1 hover:bg-white/[0.03]" style={{ WebkitTouchCallout: 'none', touchAction: 'manipulation' }}>
+      <div className="h-10 w-10 rounded-full flex items-center justify-center overflow-hidden shrink-0" style={{ background: `${tint}${have ? '29' : '0f'}`, border: `1px solid ${tint}${have ? 'b3' : '40'}`, filter: have ? 'none' : 'grayscale(0.8)' }}>
+        {art ? <img src={art} alt="" className="h-9 w-9 object-contain" /> : <span style={{ color: tint }}>{glyph}</span>}
+      </div>
+      <div className="flex-1 min-w-0"><div className="text-white text-sm font-semibold">{title}</div><div className="text-white/55 text-xs truncate">{subtitle}</div></div>
+      <div className="text-right shrink-0">{have ? <div className="text-[10px] font-mono text-green-400 tracking-[0.15em]">{t('YOURS', 'TUYO')}</div> : <><div className="font-mono text-xs" style={{ color: tint }}>+{missing} XP</div>{needLevel !== null && <div className="text-[9px] font-mono text-white/40">{t(`LVL ${needLevel}`, `NVL ${needLevel}`)}</div>}</>}</div>
+    </div>
+  );
+}
+
+/** The preview: the companion wearing the item in 3D, what it is, where it
+ *  sits and what it takes. Works for every companion, art or glyph. */
+export function ItemPreview({ item, xp, level, onClose }: { item: CatalogItem; xp: number; level: number; onClose: () => void }) {
+  const companion = item.companion;
+  const golden = item.kind === 'tool' && item.tool.tier === 3;
+  const tint = golden ? GOLD : tintFor(companion);
+  const needXP = item.kind === 'tool' ? toolUnlockXP(item.tool.tier) : PET_UNLOCK_XP;
+  const needLevel = level < companion.requiredLevel ? companion.requiredLevel : null;
+  const have = xp >= needXP && needLevel === null;
+  const missing = Math.max(0, needXP - xp);
+  const title = item.kind === 'tool' ? pick(item.tool.name) : pick(item.pet.name);
+  const subtitle = item.kind === 'tool' ? `${pick(toolTierLabel(item.tool.tier))} · ${pick(SLOT_LABEL[toolSlot(item.tool)])}` : item.pet.spins ? t('PET · SPINS NEXT TO YOU', 'MASCOTA · GIRA A TU LADO') : t('PET · AT THE FEET', 'MASCOTA · A LOS PIES');
+  const lore = item.kind === 'tool' ? pick(item.tool.lore) : item.pet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.');
+  const attachments = item.kind === 'tool'
+    ? [{ url: toolHasArt(item.tool) ? toolArt(item.tool) : glyphSprite(item.tool.glyph, tint), slot: toolSlot(item.tool) as string, glow: golden ? GOLD : undefined }]
+    : [{ url: petArt(companion.id) ?? glyphSprite(item.pet.emoji, tint), slot: 'pet', spin: item.pet.spins }];
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 p-0 md:p-4" onClick={onClose}>
+      <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} className="w-full max-w-md bg-[#0a0a0c] border border-white/[0.06] rounded-t-3xl md:rounded-3xl p-5 text-center" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between text-[10px] font-mono tracking-[0.2em]">
+          <div className="flex items-center gap-2" style={{ color: tintFor(companion) }}><img src={`/mascots/${companion.id}.webp`} alt="" className="h-6 w-6 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />{t(`WORN BY ${companion.label}`, `LO LLEVA ${companion.label}`)}</div>
+          <div className="text-white/45">PREVIEW</div>
+        </div>
+        <div className="relative mx-auto mt-3 rounded-2xl overflow-hidden" style={{ width: 300, height: 300, background: `radial-gradient(circle at 50% 45%, ${tint}30, transparent 65%)`, border: `1px solid ${tint}55` }}>
+          <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }} state="idle" size={300} attachments={attachments} />
+          {!have && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/80 px-3 py-1.5 text-[10px] font-mono tracking-[0.15em] text-white/90" style={{ border: `1px solid ${tint}80` }}>
+              <Lock size={10} />{needLevel !== null ? t(`LEVEL ${needLevel} · +${missing} XP`, `NIVEL ${needLevel} · +${missing} XP`) : t(`+${missing} XP TO GO`, `FALTAN ${missing} XP`)}
+            </div>
+          )}
+        </div>
+        <div className="mt-4 text-2xl font-semibold text-white">{title}</div>
+        <div className="mt-1 text-[10px] font-mono tracking-[0.2em]" style={{ color: tint }}>{subtitle}</div>
+        <div className="mt-2 text-sm text-white/75">{lore}</div>
+        <div className="mt-3 text-[10px] font-mono tracking-[0.1em]" style={{ color: have ? '#4ade80' : 'rgba(255,255,255,0.4)' }}>{have ? t('YOURS', 'TUYO') : t('Discipline only: full reads and coming back. Never volume.', 'Solo disciplina: lecturas completas y volver. Nunca volumen.')}</div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+export function GearCatalog({ current, xp, level, onClose }: { current: Companion; xp: number; level: number; onClose: () => void }) {
+  const [preview, setPreview] = useState<CatalogItem | null>(null);
   const myPet = petFor(current.id);
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/95 overflow-y-auto">
       <div className="mx-auto max-w-2xl p-4 space-y-4">
         <div className="flex items-center justify-between"><div><div className="text-white font-mono tracking-[0.2em]">{t('STILL TO EARN', 'POR CONSEGUIR')}</div><div className="text-[10px] font-mono text-white/40 tracking-[0.15em]">{t('DISCIPLINE XP ONLY · NEVER VOLUME', 'SOLO XP DE DISCIPLINA · NUNCA VOLUMEN')}</div></div><button onClick={onClose} className="h-9 w-9 rounded-full bg-white/[0.05] text-white/70">✕</button></div>
-        {myPet && (<div className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]"><div className="text-[10px] font-mono tracking-[0.2em] text-white/50 mb-1">{t('YOUR PET', 'TU MASCOTA')}</div>{row('mypet', petArt(current.id), myPet.emoji, pick(myPet.name), myPet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.'), PET_UNLOCK_XP, null, tintFor(current))}</div>)}
+        <div className="text-[10px] font-mono tracking-[0.1em] text-white/45">{t('Hold any item to see it worn.', 'Mantén presionado un item para verlo puesto.')}</div>
+        {myPet && (<div className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]"><div className="text-[10px] font-mono tracking-[0.2em] text-white/50 mb-1">{t('YOUR PET', 'TU MASCOTA')}</div><CatalogRow art={petArt(current.id)} glyph={myPet.emoji} title={pick(myPet.name)} subtitle={myPet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.')} needXP={PET_UNLOCK_XP} needLevel={null} tint={tintFor(current)} xp={xp} item={{ kind: 'pet', pet: myPet, companion: current }} onPreview={setPreview} /></div>)}
         <div className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t("OTHER COMPANIONS' GEAR", 'EQUIPO DE OTROS COMPAÑEROS')}</div>
         {COMPANIONS.filter((c) => c.id !== current.id).map((c) => {
           const needLevel = level < c.requiredLevel ? c.requiredLevel : null;
@@ -184,12 +247,13 @@ export function GearCatalog({ current, xp, level, onClose }: { current: Companio
           return (
             <div key={c.id} className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]">
               <div className="flex items-center gap-2 mb-1"><img src={`/mascots/${c.id}.webp`} alt="" className="h-7 w-7 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} /><span className="font-mono text-xs tracking-[0.15em]" style={{ color: tintFor(c) }}>{c.label}</span>{needLevel !== null && <span className="text-[9px] font-mono text-white/40 tracking-[0.1em]">{t(`LEVEL ${needLevel} TO UNLOCK`, `NIVEL ${needLevel} PARA DESBLOQUEAR`)}</span>}</div>
-              {toolsFor(c.id).map((tool) => row(`${c.id}-${tool.tier}`, toolHasArt(tool) ? toolArt(tool) : null, tool.glyph, pick(tool.name), pick(tool.lore), toolUnlockXP(tool.tier), needLevel, tool.tier === 3 ? GOLD : tintFor(c)))}
-              {pet && row(`${c.id}-pet`, petArt(c.id), pet.emoji, pick(pet.name), t('Pet', 'Mascota'), PET_UNLOCK_XP, needLevel, tintFor(c))}
+              {toolsFor(c.id).map((tool) => <CatalogRow key={`${c.id}-${tool.tier}`} art={toolHasArt(tool) ? toolArt(tool) : null} glyph={tool.glyph} title={pick(tool.name)} subtitle={pick(tool.lore)} needXP={toolUnlockXP(tool.tier)} needLevel={needLevel} tint={tool.tier === 3 ? GOLD : tintFor(c)} xp={xp} item={{ kind: 'tool', tool, companion: c }} onPreview={setPreview} />)}
+              {pet && <CatalogRow key={`${c.id}-pet`} art={petArt(c.id)} glyph={pet.emoji} title={pick(pet.name)} subtitle={t('Pet', 'Mascota')} needXP={PET_UNLOCK_XP} needLevel={needLevel} tint={tintFor(c)} xp={xp} item={{ kind: 'pet', pet, companion: c }} onPreview={setPreview} />}
             </div>
           );
         })}
       </div>
+      <AnimatePresence>{preview && <ItemPreview item={preview} xp={xp} level={level} onClose={() => setPreview(null)} />}</AnimatePresence>
     </motion.div>
   );
 }
