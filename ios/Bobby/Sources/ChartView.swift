@@ -130,7 +130,8 @@ struct ChartView: View {
             RuleMark(y: .value("support", support))
                 .foregroundStyle(Color.white.opacity(0.25))
                 .lineStyle(StrokeStyle(lineWidth: 0.8, dash: [2, 4]))
-                .annotation(position: .top, alignment: .leading) {
+                .annotation(position: .top, alignment: .trailing,
+                            overflowResolution: .init(x: .fit, y: .disabled)) {
                     lineLabel("S", support, Theme.muted)
                 }
         }
@@ -138,7 +139,8 @@ struct ChartView: View {
             RuleMark(y: .value("resistance", resistance))
                 .foregroundStyle(Color.white.opacity(0.25))
                 .lineStyle(StrokeStyle(lineWidth: 0.8, dash: [2, 4]))
-                .annotation(position: .bottom, alignment: .leading) {
+                .annotation(position: .bottom, alignment: .trailing,
+                            overflowResolution: .init(x: .fit, y: .disabled)) {
                     lineLabel("R", resistance, Theme.muted)
                 }
         }
@@ -274,7 +276,8 @@ struct ChartView: View {
     private func axisLabel(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: L.isSpanish ? "es_MX" : "en_US")
-        formatter.dateFormat = timeframe == .oneDay || timeframe == .fourHours ? "d MMM" : "E HH"
+        // "TUE 03H" — the trailing H keeps an hour from reading like a date.
+        formatter.dateFormat = timeframe == .oneDay || timeframe == .fourHours ? "d MMM" : "E HH'h'"
         return formatter.string(from: date).uppercased()
     }
 

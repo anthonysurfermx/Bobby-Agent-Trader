@@ -53,7 +53,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 // how Bobby sounds, not only the preview sentence. The TTS
                 // endpoint already supports this delivery hint; keep sending
                 // it on every real answer after onboarding.
-                if let vibe, !vibe.isEmpty { body["vibe"] = vibe }
+                if let serverVibe = Self.serverVibe(vibe) { body["vibe"] = serverVibe }
                 req.httpBody = try JSONSerialization.data(withJSONObject: body)
                 let (data, resp) = try await URLSession.shared.data(for: req)
                 guard gen == self.generation,
@@ -78,6 +78,19 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
             } catch {
                 if gen == self.generation { self.speakFallback(text) }
             }
+        }
+    }
+
+    /// The app's vibe ids (chill/directo/pro) are not the TTS endpoint's
+    /// (direct/analytical/wise). Map them; unknown values are omitted so the
+    /// server never rejects the request over a delivery hint.
+    static func serverVibe(_ raw: String?) -> String? {
+        switch raw?.lowercased() {
+        case "chill": return "wise"
+        case "directo": return "direct"
+        case "pro": return "analytical"
+        case "direct", "analytical", "wise": return raw?.lowercased()
+        default: return nil
         }
     }
 

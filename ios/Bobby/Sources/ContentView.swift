@@ -239,14 +239,15 @@ final class BobbyViewModel: ObservableObject {
             }
 
             var answer = await debateRequest
-            if answer.price == nil { answer.price = market.price }
             withAnimation(.spring(duration: 0.38)) {
                 lastAnswer = answer
                 phase = .cio
             }
 
             // Backend hiccup: no data, no verdict → honest error, ZERO XP,
-            // and definitely no "capital protected" theater.
+            // and definitely no "capital protected" theater. Decided on the
+            // debate payload ALONE — a working quote must not rescue a
+            // failed debate into a disciplined NO TRADE.
             if answer.isUnavailable {
                 phase = .error
                 let msg = L.t("The desk did not answer for \(answer.symbol). Try again in a moment.",
@@ -254,6 +255,11 @@ final class BobbyViewModel: ObservableObject {
                 messages.append(ChatMessage(fromBobby: true, text: msg))
                 if speakEnabled { say(msg) }
                 return
+            }
+            // Only now back-fill the quote for display/speech.
+            if answer.price == nil, let quote = market.price {
+                answer.price = quote
+                lastAnswer = answer
             }
 
             try? await Task.sleep(for: .milliseconds(360))
@@ -473,6 +479,14 @@ struct ContentView: View {
             }
             // Aura, streak and read-only live in the menu — the header breathes
             Menu {
+                // The explore board must stay reachable after the first
+                // analysis (commandDeck hides once a snapshot exists).
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showBoard = true
+                } label: {
+                    Label(L.t("Explore markets", "Explorar mercados"), systemImage: "square.grid.2x2")
+                }
                 Button {
                     showAuraCard = true
                 } label: {
@@ -616,7 +630,7 @@ struct ContentView: View {
                 .font(.mono(24, .black))
                 .kerning(4)
                 .foregroundStyle(halo.tintSoft)
-            Text("No setup yet. Capital protected.")
+            Text(L.t("No setup yet. Capital protected.", "Sin setup todavía. Capital protegido."))
                 .font(.rounded(16, .bold))
                 .foregroundStyle(Theme.text)
             Text(moment.reason)
@@ -628,7 +642,7 @@ struct ContentView: View {
             HStack(spacing: 10) {
                 // Show what the daily cap actually granted — never the intent
                 Label(moment.disciplineXP > 0
-                        ? "+\(moment.disciplineXP) DISCIPLINE XP"
+                        ? L.t("+\(moment.disciplineXP) DISCIPLINE XP", "+\(moment.disciplineXP) XP DE DISCIPLINA")
                         : L.t("DAILY XP COMPLETE", "XP DIARIO COMPLETO"),
                       systemImage: moment.disciplineXP > 0 ? "sparkles" : "checkmark.circle")
                     .font(.mono(8.5, .bold))
@@ -829,7 +843,9 @@ struct ContentView: View {
     private func indicatorStrip(_ answer: BobbyAnswer) -> some View {
         HStack(spacing: 7) {
             if let trend = answer.trend {
-                deskChip(trend.uppercased(), trend == "alcista" ? Theme.up : trend == "bajista" ? Theme.down : Theme.muted)
+                // Color decides on the raw server value; the label is localized.
+                deskChip(BobbyAnswer.localizedTrend(trend).uppercased(),
+                         trend == "alcista" ? Theme.up : trend == "bajista" ? Theme.down : Theme.muted)
             }
             if let rsi = answer.rsi { deskChip("RSI \(Int(rsi))", Theme.accentSoft) }
             if let conviction = answer.convictionPct { deskChip("CONV \(Int(conviction))%", Theme.cio) }
@@ -921,13 +937,19 @@ struct ContentView: View {
     }
 
     private func agentDetail(_ phase: DeskPhase, fallback: String) -> String {
-        guard let answer = vm.lastAnswer else { return vm.phase == phase ? "procesando…" : fallback }
+        guard let answer = vm.lastAnswer else {
+            return vm.phase == phase ? L.t("processing…", "procesando…") : fallback
+        }
         switch phase {
         case .alpha:
-            return answer.trend.map { "tendencia \($0)" } ?? fallback
+            return answer.trend.map {
+                let word = BobbyAnswer.localizedTrend($0)
+                return L.t("trend \(word)", "tendencia \(word)")
+            } ?? fallback
         case .redTeam:
-            return answer.stop.map { "invalida \(BobbyAnswer.money($0))" }
-                ?? answer.support.map { "soporte \(BobbyAnswer.money($0))" } ?? fallback
+            return answer.stop.map { L.t("invalidates \(BobbyAnswer.money($0))", "invalida \(BobbyAnswer.money($0))") }
+                ?? answer.support.map { L.t("support \(BobbyAnswer.money($0))", "soporte \(BobbyAnswer.money($0))") }
+                ?? fallback
         case .cio:
             if let direction = answer.direction, let conviction = answer.convictionPct {
                 return "\(direction) \(Int(conviction))%"
@@ -1108,7 +1130,7 @@ struct ContentView: View {
     }
 
     private var statusLabel: String {
-        if speech.listening { return "LISTENING" }
+        if speech.listening { return L.t("LISTENING", "ESCUCHANDO") }
         if vm.voice.speaking { return L.t("SPEAKING", "BOBBY HABLA") }
         return vm.phase.label
     }
@@ -1116,7 +1138,7 @@ struct ContentView: View {
     private var statusHint: String {
         if speech.listening {
             return vm.handsFree
-                ? "Manos libres · di tu siguiente pregunta"
+                ? L.t("Hands-free · say your next question", "Manos libres · di tu siguiente pregunta")
                 : L.t("Speak normally · it sends when you stop", "Habla normal · se envía cuando terminas")
         }
         if vm.voice.speaking { return L.t("Your companion reacts to the voice in real time", "Tu companion reacciona a la voz en tiempo real") }

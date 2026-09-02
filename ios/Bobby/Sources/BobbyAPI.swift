@@ -71,9 +71,11 @@ struct BobbyAnswer {
     /// True when the debate simply never came back — no market data and no
     /// verdict of any kind. A backend failure must NEVER masquerade as a
     /// disciplined NO TRADE (no Halo moment, no XP, no "capital protected").
+    /// `regime` is deliberately NOT part of this check: it is a global
+    /// market string the server returns even for a bogus symbol.
     var isUnavailable: Bool {
         price == nil && trend == nil && signal == nil && direction == nil
-            && regime == nil && overview == nil
+            && overview == nil
     }
 
     /// A setup is actionable only when the deterministic pulse agrees on a
@@ -95,13 +97,19 @@ struct BobbyAnswer {
         guard isNoTrade else { return "" }
         let normalizedSignal = signal?.lowercased() ?? ""
         if normalizedSignal.contains("neutral") || normalizedSignal.contains("wait") {
-            return "No clean directional signal passed the desk."
+            return L.t("No clean directional signal passed the desk.",
+                       "Ninguna señal direccional limpia pasó el desk.")
         }
-        if direction == nil { return "The agents did not reach directional consensus." }
+        if direction == nil {
+            return L.t("The agents did not reach directional consensus.",
+                       "Los agentes no llegaron a consenso direccional.")
+        }
         if let convictionPct, convictionPct < 55 {
-            return "Conviction stayed below Bobby's 55% risk gate."
+            return L.t("Conviction stayed below Bobby's 55% risk gate.",
+                       "La convicción quedó debajo del filtro de riesgo de 55% de Bobby.")
         }
-        return "The setup did not include a complete entry, stop and target."
+        return L.t("The setup did not include a complete entry, stop and target.",
+                   "El setup no incluyó entrada, stop y objetivo completos.")
     }
 
     /// The spoken/written summary — terminal-honest, never advice-flavored.
@@ -114,7 +122,10 @@ struct BobbyAnswer {
         if let t = trend {
             let trendWord = Self.localizedTrend(t)
             var s = L.t("Trend \(trendWord)", "Tendencia \(trendWord)")
-            if let m = momentum, m != "neutral" { s += L.t(", momentum \(m)", ", momentum \(m)") }
+            if let m = momentum, m != "neutral" {
+                let momentumWord = Self.localizedMomentum(m)
+                s += L.t(", momentum \(momentumWord)", ", momentum \(momentumWord)")
+            }
             if let r = rsi { s += ", RSI \(Int(r))" }
             lines.append(s + ".")
         }
@@ -153,6 +164,21 @@ struct BobbyAnswer {
         }
         if t.contains("lateral") || t.contains("range") || t.contains("side") {
             return L.t("sideways", "lateral")
+        }
+        return raw
+    }
+
+    /// API momentum values are always Spanish (sobrecompra/sobreventa/neutral).
+    static func localizedMomentum(_ raw: String) -> String {
+        let m = raw.lowercased()
+        if m.contains("sobrecompra") || m.contains("overbought") {
+            return L.t("overbought", "sobrecompra")
+        }
+        if m.contains("sobreventa") || m.contains("oversold") {
+            return L.t("oversold", "sobreventa")
+        }
+        if m.contains("neutral") {
+            return L.t("neutral", "neutral")
         }
         return raw
     }
@@ -366,6 +392,11 @@ enum BobbyAPI {
         guard let obj = try? await json("api/voice-tool", method: "POST",
                                         body: ["tool": "run_debate", "args": ["symbol": symbol]]) as? [String: Any]
         else { return a }
+
+        // A server-side failure ships as { error: ... } (often alongside the
+        // global regime). That is NOT an answer — return the empty state so
+        // the UI renders an honest error instead of a NO TRADE.
+        if obj["error"] != nil { return a }
 
         a.regime = obj["regime"] as? String
         if let m = obj["market"] as? [String: Any] { a.price = m["price"] as? Double }

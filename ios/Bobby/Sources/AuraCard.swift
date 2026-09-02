@@ -34,20 +34,27 @@ struct AuraCardView: View {
                     .font(.mono(10 * scale, .bold))
                     .foregroundStyle(data.tintSoft)
             }
-            .padding(.bottom, 26 * scale)
+            .padding(.bottom, 14 * scale)
 
-            BobbyOrb(size: 190 * scale, level: 0.22, tint: data.tint, tintSoft: data.tintSoft)
-                .frame(height: 196 * scale)
-                .padding(.bottom, 20 * scale)
+            // Everything below is budgeted to fit the fixed 360×450 (4:5)
+            // card: orb + name + archetype + streak + insight + footer.
+            BobbyOrb(size: 140 * scale, level: 0.22, tint: data.tint, tintSoft: data.tintSoft)
+                .frame(height: 146 * scale)
+                .padding(.bottom, 10 * scale)
 
             Text(data.agentName.uppercased())
-                .font(.mono(30 * scale, .bold))
+                .font(.mono(26 * scale, .bold))
                 .kerning(3 * scale)
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text("“\(data.auraText)”")
-                .font(.rounded(15 * scale, .semibold))
+                .font(.rounded(14 * scale, .semibold))
                 .foregroundStyle(data.tintSoft)
-                .padding(.top, 5 * scale)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
+                .padding(.top, 4 * scale)
 
             HStack(spacing: 8 * scale) {
                 Text(data.archetype.name)
@@ -60,14 +67,16 @@ struct AuraCardView: View {
                 Text(data.archetype.motto)
                     .font(.rounded(12 * scale, .medium))
                     .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .padding(.top, 14 * scale)
+            .padding(.top, 10 * scale)
 
             if data.streak >= 2 {
                 Text(L.t("🔥 day \(data.streak) with \(data.agentName)", "🔥 día \(data.streak) con \(data.agentName)"))
                     .font(.mono(11 * scale, .semibold))
                     .foregroundStyle(.white.opacity(0.7))
-                    .padding(.top, 12 * scale)
+                    .padding(.top, 8 * scale)
             }
 
             if let insight = data.insight {
@@ -77,20 +86,20 @@ struct AuraCardView: View {
                         .kerning(1.4 * scale)
                         .foregroundStyle(data.tintSoft)
                     Text(insight.line)
-                        .font(.rounded(13 * scale, .medium))
+                        .font(.rounded(12.5 * scale, .medium))
                         .foregroundStyle(.white.opacity(0.82))
-                        .lineLimit(3)
+                        .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14 * scale)
+                .padding(11 * scale)
                 .background(Color.white.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 12 * scale))
                 .overlay(RoundedRectangle(cornerRadius: 12 * scale).stroke(data.tint.opacity(0.3), lineWidth: 1))
-                .padding(.top, 18 * scale)
+                .padding(.top, 12 * scale)
             }
 
-            Spacer(minLength: 12 * scale)
+            Spacer(minLength: 8 * scale)
 
             HStack {
                 Text("bobbyprotocol.xyz")
@@ -104,7 +113,8 @@ struct AuraCardView: View {
                     .foregroundStyle(.white.opacity(0.3))
             }
         }
-        .padding(28 * scale)
+        .padding(.horizontal, 24 * scale)
+        .padding(.vertical, 20 * scale)
         .frame(width: 360 * scale, height: 450 * scale)
         .background(
             ZStack {
@@ -136,10 +146,17 @@ struct AuraCardSheet: View {
                         .background(Circle().fill(Theme.card))
                 }
             }
-            AuraCardView(data: data)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                .shadow(color: data.tint.opacity(0.25), radius: 30, y: 10)
+            // Preview scales to the sheet so the whole 4:5 card is visible on
+            // every phone; the shared image still renders at 3× (1080×1350).
+            GeometryReader { geo in
+                let previewScale = min(1, geo.size.width / 360, geo.size.height / 450)
+                AuraCardView(data: data, scale: previewScale)
+                    .clipShape(RoundedRectangle(cornerRadius: 18 * previewScale))
+                    .overlay(RoundedRectangle(cornerRadius: 18 * previewScale).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .shadow(color: data.tint.opacity(0.25), radius: 30, y: 10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .aspectRatio(360.0 / 450.0, contentMode: .fit)
 
             if let image = renderCard() {
                 ShareLink(
