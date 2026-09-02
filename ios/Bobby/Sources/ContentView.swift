@@ -362,6 +362,7 @@ struct ContentView: View {
     @State private var showRiskNotice = false
     @State private var inspectedTool: CompanionTool?
     @State private var showCatalog = false
+    @State private var showWorld = false
     @State private var petDetail = false
     @State private var skinSnapshotToken = 0
     @State private var skinCard: UIImage?
@@ -435,6 +436,11 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showCatalog) {
             GearCatalogSheet(current: vm.companions.companion ?? bobbyCompanions[0], xp: vm.companions.disciplineXP, level: vm.companions.level.number)
+                .presentationDetents([.large])
+                .presentationBackground(Theme.bg)
+        }
+        .sheet(isPresented: $showWorld) {
+            WorldMapSheet(xp: vm.companions.disciplineXP, level: vm.companions.level.number)
                 .presentationDetents([.large])
                 .presentationBackground(Theme.bg)
         }
@@ -587,6 +593,11 @@ struct ContentView: View {
                 } label: {
                     Label(L.t("My aura", "Mi aura"), systemImage: "sparkles")
                 }
+                Button {
+                    showWorld = true
+                } label: {
+                    Label(L.t("Bobby World · soon", "Mundo Bobby · pronto"), systemImage: "map")
+                }
                 Section {
                     Label(vm.streak >= 1 ? L.t("Discipline streak: \(vm.streak) day\(vm.streak == 1 ? "" : "s") 🔥", "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥") : L.t("No streak yet — review an analysis", "Sin racha aún — revisa un análisis"),
                           systemImage: "flame")
@@ -702,6 +713,9 @@ struct ContentView: View {
                 }, onPlus: {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     showCatalog = true
+                }, onWorld: {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showWorld = true
                 })
                 .padding(.top, 4)
             }

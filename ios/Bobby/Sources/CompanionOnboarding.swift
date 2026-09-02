@@ -15,6 +15,7 @@ struct CompanionOnboarding: View {
     @State private var sceneLoading = false
     @State private var sceneFailed = false
     @State private var loadoutReady = false
+    @State private var auraCharge = 0
 
     private var starters: [Companion] { bobbyCompanions.filter { $0.requiredLevel == 1 } }
     private var tint: Color { selected.tint }
@@ -30,26 +31,15 @@ struct CompanionOnboarding: View {
             VStack(spacing: 0) {
                 header
 
-                // The companion IS the onboarding — always on stage
-                ZStack {
-                    MascotSceneView(
-                        assetName: selected.id,
-                        interactive: true,
-                        speaking: voice.speaking,
-                        voiceLevel: voice.level,
-                        onLoading: { loading, failed in
-                            sceneLoading = loading
-                            sceneFailed = failed
-                        }
-                    )
-                    .id(selected.id)
-                    if sceneLoading && !sceneFailed {
-                        ProgressView().tint(tint)
-                    }
-                    if sceneFailed {
-                        CompanionThumb(companion: selected)
-                            .frame(width: 160, height: 160)
-                            .clipShape(Circle())
+                // The companion IS the onboarding — always on stage. On the
+                // last step it stands inside the aura forge.
+                Group {
+                    if step == 2 {
+                        AuraForgeStage(tint: tint, charged: auraCharge, ready: loadoutReady) { stage }
+                            .padding(.horizontal, 36)
+                            .padding(.vertical, 6)
+                    } else {
+                        stage
                     }
                 }
                 .frame(maxHeight: .infinity)
@@ -58,13 +48,39 @@ struct CompanionOnboarding: View {
                     switch step {
                     case 0: chooseStep
                     case 1: vibeStep
-                    default: LoadoutStep(companion: selected, tint: tint, ready: $loadoutReady)
+                    default: LoadoutStep(companion: selected, tint: tint, ready: $loadoutReady, onCharge: { auraCharge = $0 })
                     }
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 6)
 
                 cta
+            }
+        }
+    }
+
+    // MARK: stage
+
+    private var stage: some View {
+        ZStack {
+            MascotSceneView(
+                assetName: selected.id,
+                interactive: true,
+                speaking: voice.speaking,
+                voiceLevel: voice.level,
+                onLoading: { loading, failed in
+                    sceneLoading = loading
+                    sceneFailed = failed
+                }
+            )
+            .id(selected.id)
+            if sceneLoading && !sceneFailed {
+                ProgressView().tint(tint)
+            }
+            if sceneFailed {
+                CompanionThumb(companion: selected)
+                    .frame(width: 160, height: 160)
+                    .clipShape(Circle())
             }
         }
     }
@@ -77,7 +93,7 @@ struct CompanionOnboarding: View {
                 HStack(spacing: 8) {
                     Circle().fill(tint).frame(width: 7, height: 7).shadow(color: tint, radius: 7)
                     Text(step == 2
-                         ? L.t("BOBBY // PREPPING YOUR TRADER VIBE", "BOBBY // PREPARANDO TU VIBRA DE TRADER")
+                         ? L.t("BOBBY // PREPPING AURA", "BOBBY // PREPARANDO AURA")
                          : L.t("BOBBY // MEET YOUR SQUAD", "BOBBY // CONOCE AL SQUAD"))
                         .font(.mono(11, .bold))
                         .kerning(1.9)

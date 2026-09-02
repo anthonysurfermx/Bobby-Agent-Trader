@@ -152,7 +152,7 @@ struct MascotGalleryView: View {
             .scaleEffect(stageLoading ? 0.72 : 1)
             .animation(.spring(duration: 0.5, bounce: 0.35), value: stageLoading)
             .saturation(isUnlocked ? 1 : 0)
-            .opacity(isUnlocked ? 1 : 0.5)
+            .opacity(isUnlocked ? 1 : 0.6)
 
             if stageLoading && !stageFailed {
                 ProgressView()
@@ -171,17 +171,22 @@ struct MascotGalleryView: View {
             }
 
             if !isUnlocked {
+                // Locked: you can still look — grey, behind a lock. That is the FOMO.
                 VStack(spacing: 8) {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 30, weight: .bold))
-                        .foregroundStyle(Theme.text.opacity(0.8))
+                        .foregroundStyle(Theme.text.opacity(0.85))
                     Text(L.t("UNLOCKS AT LEVEL \(selected.requiredLevel)", "SE DESBLOQUEA EN NIVEL \(selected.requiredLevel)"))
                         .font(.mono(9, .bold))
                         .kerning(1.6)
+                        .foregroundStyle(Theme.text.opacity(0.8))
+                    Text(L.t("Discipline gets you there, never volume.", "La disciplina te lleva, nunca el volumen."))
+                        .font(.rounded(11, .medium))
                         .foregroundStyle(Theme.muted)
                 }
                 .padding(18)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Theme.bg.opacity(0.55)))
+                .background(RoundedRectangle(cornerRadius: 16).fill(Theme.bg.opacity(0.6)))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.stroke, lineWidth: 1))
             }
 
             // Selection burst
@@ -343,7 +348,19 @@ struct MascotGalleryView: View {
                                     .frame(width: 62, height: 62)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .saturation(unlocked ? 1 : 0)
-                                    .opacity(unlocked ? 1 : 0.45)
+                                    .opacity(unlocked ? 1 : 0.8)
+                                    .overlay {
+                                        if !unlocked {
+                                            ZStack {
+                                                RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.35))
+                                                Image(systemName: "lock.fill")
+                                                    .font(.system(size: 15, weight: .bold))
+                                                    .foregroundStyle(Theme.text.opacity(0.9))
+                                                    .padding(7)
+                                                    .background(Circle().fill(Theme.bg.opacity(0.85)))
+                                            }
+                                        }
+                                    }
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12)
                                             .stroke(selectedId == c.id ? c.tint : (store.companionId == c.id ? c.tint.opacity(0.5) : Theme.stroke),
@@ -355,13 +372,6 @@ struct MascotGalleryView: View {
                                         .foregroundStyle(c.tint)
                                         .background(Circle().fill(Theme.bg))
                                         .offset(x: 4, y: 4)
-                                } else if !unlocked {
-                                    Image(systemName: "lock.fill")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(Theme.text.opacity(0.7))
-                                        .padding(4)
-                                        .background(Circle().fill(Theme.bg.opacity(0.9)))
-                                        .offset(x: 3, y: 3)
                                 }
                             }
                             Text(c.label)

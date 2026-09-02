@@ -86,6 +86,8 @@ struct LoadoutStep: View {
     let tint: Color
     /// Flips true once every slot is equipped; the CTA waits for it.
     @Binding var ready: Bool
+    /// Every equipped piece charges the aura forge behind the companion.
+    var onCharge: ((Int) -> Void)? = nil
 
     @State private var equipped: Set<String> = []
     @State private var popping: String?
@@ -97,7 +99,10 @@ struct LoadoutStep: View {
     var body: some View {
         VStack(spacing: 10) {
             header
-            Text(LoadoutKit.origin(for: companion))
+            Text(ready
+                 ? L.t("You just built the avatar with the best aura in the market. Now go farm it.",
+                       "Acabas de crear el avatar con mejor aura del mercado. Ahora a farmearla.")
+                 : LoadoutKit.origin(for: companion))
                 .font(.rounded(12.5, .medium))
                 .foregroundStyle(Theme.text.opacity(0.82))
                 .multilineTextAlignment(.center)
@@ -125,14 +130,14 @@ struct LoadoutStep: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(ready
-                 ? L.t("\(companion.name(at: 1)) IS READY", "\(companion.name(at: 1)) ESTÁ LISTO")
-                 : L.t("PREPPING \(companion.name(at: 1))'S TRADER VIBE…", "PREPARANDO LA VIBRA DE TRADER DE \(companion.name(at: 1))…"))
+                 ? L.t("\(companion.name(at: 1)) · AURA READY", "\(companion.name(at: 1)) · AURA LISTA")
+                 : L.t("PREPPING \(companion.name(at: 1))'S AURA…", "PREPARANDO AURA DE \(companion.name(at: 1))…"))
                 .font(.mono(11, .bold))
                 .kerning(1.6)
                 .foregroundStyle(ready ? Theme.up : tint)
                 .contentTransition(.numericText())
             Spacer()
-            Text(L.t("LOADOUT \(equipped.count)/\(gear.count)", "EQUIPO \(equipped.count)/\(gear.count)"))
+            Text(L.t("AURA \(equipped.count)/\(gear.count)", "AURA \(equipped.count)/\(gear.count)"))
                 .font(.mono(10, .medium))
                 .kerning(1.2)
                 .foregroundStyle(Theme.muted)
@@ -248,6 +253,7 @@ struct LoadoutStep: View {
         withAnimation(.spring(duration: 0.35, bounce: 0.4)) {
             _ = equipped.insert(item.id)
         }
+        onCharge?(equipped.count)
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 260_000_000)
             if popping == item.id { popping = nil }
@@ -311,5 +317,87 @@ private struct SpawnBurst: View {
         }
         .frame(height: 140)
         .transition(.opacity)
+    }
+}
+
+/// The aura forge: the machine (Higgsfield render) with the companion standing
+/// on its platform. Rings spin in perspective, a beam scans, the platform
+/// charges with every piece equipped — all live SwiftUI, no video.
+struct AuraForgeStage<Content: View>: View {
+    let tint: Color
+    let charged: Int
+    let ready: Bool
+    @ViewBuilder let content: () -> Content
+    @State private var spin = false
+    @State private var beam = false
+    @State private var pulse = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            ZStack {
+                Image("aura_forge")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: w, height: h)
+                    .scaleEffect(pulse ? 1.0 : 1.04)
+                    .animation(.easeInOut(duration: 12).repeatForever(autoreverses: true), value: pulse)
+                    .clipped()
+                // The platform charges: brighter with every piece.
+                Ellipse()
+                    .fill(RadialGradient(colors: [tint.opacity(0.22 + Double(charged) * 0.16), .clear],
+                                         center: .center, startRadius: 0, endRadius: w * 0.38))
+                    .frame(width: w * 0.76, height: h * 0.19)
+                    .blur(radius: 12)
+                    .scaleEffect(pulse ? 1.1 : 1)
+                    .position(x: w / 2, y: h * 0.72)
+                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: pulse)
+                    .animation(.easeOut(duration: 0.4), value: charged)
+                // Scan beam.
+                Rectangle()
+                    .fill(LinearGradient(colors: [.clear, tint, .clear], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: w * 0.53, height: 5)
+                    .shadow(color: tint, radius: 10)
+                    .opacity(0.9)
+                    .position(x: w / 2, y: beam ? h * 0.74 : h * 0.26)
+                    .animation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true), value: beam)
+                // Rings around the feet, in perspective.
+                Circle()
+                    .stroke(tint.opacity(0.7), style: StrokeStyle(lineWidth: 2, dash: [10, 8]))
+                    .frame(width: w * 0.66, height: w * 0.66)
+                    .rotationEffect(.degrees(spin ? 360 : 0))
+                    .rotation3DEffect(.degrees(72), axis: (x: 1, y: 0, z: 0))
+                    .position(x: w / 2, y: h * 0.72)
+                    .animation(.linear(duration: 8).repeatForever(autoreverses: false), value: spin)
+                Circle()
+                    .stroke(tint.opacity(0.45), lineWidth: 1)
+                    .frame(width: w * 0.54, height: w * 0.54)
+                    .rotationEffect(.degrees(spin ? -360 : 0))
+                    .rotation3DEffect(.degrees(72), axis: (x: 1, y: 0, z: 0))
+                    .position(x: w / 2, y: h * 0.72)
+                    .animation(.linear(duration: 5).repeatForever(autoreverses: false), value: spin)
+                // The companion on the platform.
+                content()
+                    .frame(width: w * 0.82, height: h * 0.62)
+                    .position(x: w / 2, y: h * 0.465)
+                if ready {
+                    Text(L.t("AURA · MAX", "AURA · MÁXIMA"))
+                        .font(.mono(10, .bold)).kerning(3)
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 12).padding(.vertical, 5)
+                        .background(Capsule().fill(tint))
+                        .shadow(color: tint, radius: 12)
+                        .position(x: w / 2, y: 22)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+        }
+        .aspectRatio(3 / 4, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
+        .shadow(color: tint.opacity(ready ? 0.35 : 0.15), radius: 24)
+        .animation(.spring(duration: 0.5, bounce: 0.35), value: ready)
+        .onAppear { spin = true; beam = true; pulse = true }
     }
 }

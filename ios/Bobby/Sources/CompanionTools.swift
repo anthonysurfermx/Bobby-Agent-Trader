@@ -140,6 +140,8 @@ struct ToolBelt: View {
     var onTap: ((CompanionTool) -> Void)? = nil
     var onPet: (() -> Void)? = nil
     var onPlus: (() -> Void)? = nil
+    var onWorld: (() -> Void)? = nil
+    @State private var worldPulse = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -196,7 +198,123 @@ struct ToolBelt: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(L.t("What else you can earn", "Qué más puedes conseguir"))
+            // The world: the map we build next (Focus-Tree style), fog of war and all.
+            Button { onWorld?() } label: {
+                ZStack {
+                    Image("world_map").resizable().scaledToFill().frame(width: 38, height: 38).clipShape(Circle())
+                    Circle().fill(Color.black.opacity(0.38))
+                    Circle().stroke(WorldMapSheet.gold.opacity(0.75), lineWidth: 1)
+                    Circle().stroke(WorldMapSheet.gold.opacity(0.7), lineWidth: 1)
+                        .scaleEffect(worldPulse ? 1.5 : 1)
+                        .opacity(worldPulse ? 0 : 0.8)
+                    Image(systemName: "map.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(WorldMapSheet.gold)
+                }
+                .frame(width: 38, height: 38)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L.t("Bobby World, coming soon", "Mundo Bobby, próximamente"))
         }
+        .onAppear {
+            withAnimation(.easeOut(duration: 1.7).repeatForever(autoreverses: false)) { worldPulse = true }
+        }
+    }
+}
+
+/// "Bobby World" — the Focus-Tree-style world we build next. A teaser: the
+/// map under fog of war, SOON, and the promise that discipline XP carries over.
+struct WorldMapSheet: View {
+    let xp: Int
+    let level: Int
+    @Environment(\.dismiss) private var dismiss
+    @State private var breathe = false
+    static let gold = Color(red: 0.96, green: 0.77, blue: 0.26)
+    static let regions = ["CRYPTO BAY", "GOLD MINES", "WALL STREET CITADEL", "RISK REEF"]
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 14) {
+                Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
+                map
+                    .padding(.horizontal, 16)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L.t("ALREADY COUNTED", "YA CUENTA")).font(.mono(10, .bold)).kerning(2).foregroundStyle(Theme.muted)
+                        Text("\(xp) XP · \(L.t("level", "nivel")) \(level)").font(.rounded(16, .bold)).foregroundStyle(Theme.text)
+                    }
+                    Spacer()
+                    Text(L.t("CARRIES OVER", "SE CONSERVA")).font(.mono(10, .bold)).kerning(1.5).foregroundStyle(Self.gold)
+                }
+                .padding(14)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.stroke, lineWidth: 1))
+                .padding(.horizontal, 16)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(Self.regions, id: \.self) { name in
+                        HStack(spacing: 6) {
+                            Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
+                            Text(name).font(.mono(9, .bold)).kerning(1.2)
+                            Spacer(minLength: 0)
+                        }
+                        .foregroundStyle(Theme.muted)
+                        .padding(.horizontal, 10).padding(.vertical, 9)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.card))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.stroke, lineWidth: 1))
+                    }
+                }
+                .padding(.horizontal, 16)
+                Button { dismiss() } label: {
+                    Text(L.t("BACK TO THE DESK", "VOLVER AL DESK")).font(.mono(12, .bold)).kerning(2)
+                        .foregroundStyle(.black).frame(maxWidth: .infinity).padding(.vertical, 14)
+                        .background(Capsule().fill(Self.gold))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16).padding(.bottom, 24)
+            }
+        }
+        .background(Theme.bg)
+        .onAppear { breathe = true }
+    }
+
+    private var map: some View {
+        ZStack(alignment: .bottomLeading) {
+            GeometryReader { geo in
+                Image("world_map").resizable().scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .scaleEffect(breathe ? 1.0 : 1.08)
+                    .animation(.easeInOut(duration: 16).repeatForever(autoreverses: true), value: breathe)
+                    .clipped()
+            }
+            LinearGradient(colors: [.clear, Theme.bg.opacity(0.88), Theme.bg], startPoint: .center, endPoint: .bottom)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.fill").font(.system(size: 10, weight: .bold))
+                    Text(L.t("SOON", "PRONTO")).font(.mono(11, .bold)).kerning(3)
+                }
+                .foregroundStyle(.black)
+                .padding(.horizontal, 12).padding(.vertical, 6)
+                .background(Capsule().fill(Self.gold))
+                .shadow(color: Self.gold.opacity(0.6), radius: 12)
+                .scaleEffect(breathe ? 1.06 : 1.0)
+                .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: breathe)
+                Text(L.t("Your world is built with discipline.", "Tu mundo se construye con disciplina."))
+                    .font(.rounded(24, .bold)).foregroundStyle(Theme.text)
+                Text(L.t("Every full read and every NO TRADE raises your base camp. Regions open with XP, never with volume.",
+                         "Cada lectura completa y cada NO TRADE levanta tu campamento. Las regiones se abren con XP, nunca con volumen."))
+                    .font(.rounded(13.5, .medium)).foregroundStyle(Theme.text.opacity(0.75))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(18)
+        }
+        .aspectRatio(3/4, contentMode: .fit)
+        .overlay(alignment: .topLeading) {
+            Text(L.t("BOBBY WORLD", "MUNDO BOBBY")).font(.mono(10, .bold)).kerning(3).foregroundStyle(Theme.text)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Capsule().fill(Color.black.opacity(0.5)))
+                .padding(14)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Self.gold.opacity(0.3), lineWidth: 1))
+        .shadow(color: Self.gold.opacity(0.15), radius: 30)
     }
 }
 
