@@ -114,6 +114,26 @@ final class StoreShots: XCTestCase {
         }
     }
 
+    /// Aura share preview: the live sheet opens from the desk menu and remains
+    /// dismissible after its orbital animation and sound have started.
+    func test04_AuraPreview() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        let more = app.buttons["More"]
+        XCTAssertTrue(more.waitForExistence(timeout: 15))
+        more.tap()
+        tapLabeled(app, "My aura")
+
+        XCTAssertTrue(app.staticTexts["MY AURA TODAY"].waitForExistence(timeout: 5))
+        sleep(2)
+        shot("11-aura-floating")
+
+        app.buttons["Close"].firstMatch.tap()
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+    }
+
     /// Ask a real question and capture verdict + (if XP was seeded just under
     /// a level boundary) the evolution overlay.
     func test02_VerdictAndEvolution() throws {

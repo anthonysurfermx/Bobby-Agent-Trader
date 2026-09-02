@@ -469,7 +469,7 @@ struct ContentView: View {
                 insight: vm.lastAnswer.flatMap { answer in
                     vm.snapshot.map { ($0.symbol, answer.summary) }
                 }
-            ))
+            ), soundEnabled: vm.speakEnabled)
         }
         .onChange(of: vm.profile.onboarded) {
             vm.messages = []

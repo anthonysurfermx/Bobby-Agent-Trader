@@ -3,6 +3,7 @@
 // ImageRenderer and shared as a 1080×1350 image. No fabricated data: the
 // insight line only appears when there IS a real last analysis.
 import SwiftUI
+import AVFoundation
 
 struct AuraCardData {
     let agentName: String
@@ -18,6 +19,7 @@ struct AuraCardData {
 struct AuraCardView: View {
     let data: AuraCardData
     var scale: CGFloat = 1
+    var animateOrb = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,7 +40,7 @@ struct AuraCardView: View {
 
             // Everything below is budgeted to fit the fixed 360×450 (4:5)
             // card: orb + name + archetype + streak + insight + footer.
-            BobbyOrb(size: 140 * scale, level: 0.22, tint: data.tint, tintSoft: data.tintSoft)
+            AuraOrbPreview(data: data, size: 140 * scale, animated: animateOrb)
                 .frame(height: 146 * scale)
                 .padding(.bottom, 10 * scale)
 
@@ -125,9 +127,42 @@ struct AuraCardView: View {
     }
 }
 
+/// The share preview should feel like a living aura, not a printed badge.
+/// Its exported card remains centered and still so the 1080×1350 image is crisp.
+private struct AuraOrbPreview: View {
+    let data: AuraCardData
+    let size: CGFloat
+    let animated: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        if animated && !reduceMotion {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                let lift = CGFloat(sin(t * 1.35))
+                ZStack {
+                    Ellipse()
+                        .fill(data.tint.opacity(0.16 + Double((lift + 1) * 0.035)))
+                        .frame(width: size * 0.54, height: size * 0.11)
+                        .blur(radius: size * 0.055)
+                        .offset(y: size * 0.42 - lift * size * 0.018)
+
+                    BobbyOrb(size: size, level: 0.34, tint: data.tint, tintSoft: data.tintSoft)
+                        .scaleEffect(1 + lift * 0.018)
+                        .offset(y: lift * size * 0.065)
+                        .shadow(color: data.tint.opacity(0.36), radius: size * 0.11)
+                }
+            }
+        } else {
+            BobbyOrb(size: size, level: 0.22, tint: data.tint, tintSoft: data.tintSoft)
+        }
+    }
+}
+
 /// Sheet with a live preview + share button. The card renders at 3× (1080×1350).
 struct AuraCardSheet: View {
     let data: AuraCardData
+    var soundEnabled = true
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -150,7 +185,7 @@ struct AuraCardSheet: View {
             // every phone; the shared image still renders at 3× (1080×1350).
             GeometryReader { geo in
                 let previewScale = min(1, geo.size.width / 360, geo.size.height / 450)
-                AuraCardView(data: data, scale: previewScale)
+                AuraCardView(data: data, scale: previewScale, animateOrb: true)
                     .clipShape(RoundedRectangle(cornerRadius: 18 * previewScale))
                     .overlay(RoundedRectangle(cornerRadius: 18 * previewScale).stroke(Color.white.opacity(0.1), lineWidth: 1))
                     .shadow(color: data.tint.opacity(0.25), radius: 30, y: 10)
@@ -180,6 +215,10 @@ struct AuraCardSheet: View {
         .padding(20)
         .presentationDetents([.large])
         .presentationBackground(Theme.bg)
+        .onAppear {
+            if soundEnabled { AuraAudio.shared.start() }
+        }
+        .onDisappear { AuraAudio.shared.stop() }
     }
 
     @MainActor
@@ -187,5 +226,34 @@ struct AuraCardSheet: View {
         let renderer = ImageRenderer(content: AuraCardView(data: data, scale: 3))
         renderer.scale = 1
         return renderer.uiImage
+    }
+}
+
+/// A restrained orbital engine loop for the Aura sheet. It mixes with other
+/// audio, fades at both edges of the sheet lifecycle and never survives dismiss.
+@MainActor
+private final class AuraAudio {
+    static let shared = AuraAudio()
+    private var player: AVAudioPlayer?
+
+    func start() {
+        stop()
+        guard let data = NSDataAsset(name: "sfx_aura_orbit")?.data,
+              let next = try? AVAudioPlayer(data: data, fileTypeHint: "wav") else { return }
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        next.numberOfLoops = -1
+        next.volume = 0
+        next.prepareToPlay()
+        next.play()
+        next.setVolume(0.28, fadeDuration: 0.7)
+        player = next
+    }
+
+    func stop() {
+        guard let current = player else { return }
+        player = nil
+        current.setVolume(0, fadeDuration: 0.35)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { current.stop() }
     }
 }
