@@ -126,6 +126,36 @@
             }
           }
         }
+      },
+      "animation_layers": {
+        "note": "derived from stage1 albedo (no generation): compose body \u2192 ring_back \u2192 sphere \u2192 ring_front; the sphere floats (sin, 6-8 s period, \u00b12% of height) with its glow; ring layers tilt/pulse slowly \u2014 do NOT rotate them (the ring interior is baked); orbit motes are runtime particles",
+        "layers": {
+          "body": {
+            "url": "/land/v1/gate-A/aura_core/ne/anim_body_1024.png",
+            "w": 1024,
+            "h": 1024
+          },
+          "ring_back": {
+            "url": "/land/v1/gate-A/aura_core/ne/anim_ring_back_1024.png",
+            "w": 1024,
+            "h": 1024
+          },
+          "sphere": {
+            "url": "/land/v1/gate-A/aura_core/ne/anim_sphere_1024.png",
+            "w": 1024,
+            "h": 1024
+          },
+          "ring_front": {
+            "url": "/land/v1/gate-A/aura_core/ne/anim_ring_front_1024.png",
+            "w": 1024,
+            "h": 1024
+          }
+        },
+        "sphere_centre": [
+          0.498,
+          0.3223
+        ],
+        "sphere_radius": 0.0864
       }
     },
     {
