@@ -3,13 +3,74 @@
   "date": "2026-09-02",
   "model": "nano_banana_pro (served as nano_banana_2)",
   "resolution": "2k",
-  "reference_media": { "byte": "19946239-1193-4164-9838-9d3954dc0ed6" },
+  "reference_media": {
+    "byte": "19946239-1193-4164-9838-9d3954dc0ed6"
+  },
   "creditsUsed": 8,
   "items": [
-    { "id": "golden_scene_a", "job_id": "24d52f73-aedd-4048-ad06-a96b2c2c0253", "aspect": "4:3", "size": "2400x1792", "verdict": "APPROVED direction: sphere visible inside ring, five regions legible, Byte at 1x1, single gold tile, edge fog. Fix: island reads ~10x10 (needs 8x8), tree footprint sprawls beyond 2x2 (roots must become a ground decal layer), candle towers slightly literal." },
-    { "id": "golden_scene_b", "job_id": "c57edd6c-c46e-4581-a62f-670c737ed785", "aspect": "4:3", "size": "2400x1792", "verdict": "REJECTED as scene, KEEP tree base: exact 8x8 grid and contained 2x2 tree ring are right; castle wall is medieval-fantasy, lighthouse naturalistic, gold piece reads as a coin (forbidden)." },
-    { "id": "style_sheet", "job_id": "67b5cf3c-9f95-48ba-ad3d-566d4ebfd787", "aspect": "16:9", "size": "2752x1536", "verdict": "APPROVED materials + lighting rows. Fix: sapling seal rendered as a coin, data dock rendered as a laptop; silhouettes row usable as reference only." },
-    { "id": "scale_reference", "job_id": "d6f7a4c2-5e3b-476d-8fd5-2916f7a4d396", "aspect": "16:9", "size": "2752x1536", "verdict": "APPROVED scale (Byte fits a 1x1 diamond, fortress 2x2 correct). REJECTED tree: became a leafy natural tree; pet became a realistic dog. Confirms the tree needs its own pass as 'Aura Core' with no foliage." }
+    {
+      "id": "golden_scene_a",
+      "job_id": "24d52f73-aedd-4048-ad06-a96b2c2c0253",
+      "aspect": "4:3",
+      "size": "2400x1792",
+      "verdict": "APPROVED direction: sphere visible inside ring, five regions legible, Byte at 1x1, single gold tile, edge fog. Fix: island reads ~10x10 (needs 8x8), tree footprint sprawls beyond 2x2 (roots must become a ground decal layer), candle towers slightly literal."
+    },
+    {
+      "id": "golden_scene_b",
+      "job_id": "c57edd6c-c46e-4581-a62f-670c737ed785",
+      "aspect": "4:3",
+      "size": "2400x1792",
+      "verdict": "REJECTED as scene, KEEP tree base: exact 8x8 grid and contained 2x2 tree ring are right; castle wall is medieval-fantasy, lighthouse naturalistic, gold piece reads as a coin (forbidden)."
+    },
+    {
+      "id": "style_sheet",
+      "job_id": "67b5cf3c-9f95-48ba-ad3d-566d4ebfd787",
+      "aspect": "16:9",
+      "size": "2752x1536",
+      "verdict": "APPROVED materials + lighting rows. Fix: sapling seal rendered as a coin, data dock rendered as a laptop; silhouettes row usable as reference only."
+    },
+    {
+      "id": "scale_reference",
+      "job_id": "d6f7a4c2-5e3b-476d-8fd5-2916f7a4d396",
+      "aspect": "16:9",
+      "size": "2752x1536",
+      "verdict": "APPROVED scale (Byte fits a 1x1 diamond, fortress 2x2 correct). REJECTED tree: became a leafy natural tree; pet became a realistic dog. Confirms the tree needs its own pass as 'Aura Core' with no foliage."
+    }
   ],
-  "gate": "Golden scene A approved as direction; Aura Core pass required before First Light / 25-lot catalog."
+  "gate": "Golden scene A approved as direction; Aura Core pass required before First Light / 25-lot catalog.",
+  "aura_core_pass": {
+    "creditsUsed": 12,
+    "items": [
+      {
+        "id": "aura_core_stage_0",
+        "job_id": "e3217b84-af36-4984-b771-19541e5e2dbc",
+        "verdict": "APPROVED (dormant: matte, dim sphere, 2x2 base)"
+      },
+      {
+        "id": "aura_core_stage_1",
+        "job_id": "13e60070-cca3-4fe6-9b74-9e6aaaa1c858",
+        "verdict": "APPROVED hero: sphere floats inside the ring and stays visible, five tendrils, 2x2 base with filaments"
+      },
+      {
+        "id": "aura_core_orbit_sheet",
+        "job_id": "d75e1440-3033-4b90-a0a7-aadc8108d20a",
+        "verdict": "PARTIAL: sphere usable; ring halves not cleanly split — derive front/back masks programmatically from stage 1 instead"
+      },
+      {
+        "id": "aura_core_roots_decal",
+        "job_id": "4f629f79-747d-4401-ac6f-a307431329d6",
+        "verdict": "APPROVED flat decal, five branches on the diamond grid"
+      },
+      {
+        "id": "aura_core_integration",
+        "job_id": "8d29ea19-2224-476c-9e3b-4b32e658b0df",
+        "verdict": "REFERENCE ONLY: model raised the roots again; in production stage 1 sprite + decal are composited, so not needed as an asset"
+      },
+      {
+        "id": "aura_core_stage_2",
+        "job_id": "90b60963-1949-4b1d-847d-13e835b1b092",
+        "verdict": "REDO later (not needed for the vertical): roots sprawl beyond 2x2 and the gold seal rendered as a coin"
+      }
+    ]
+  }
 }

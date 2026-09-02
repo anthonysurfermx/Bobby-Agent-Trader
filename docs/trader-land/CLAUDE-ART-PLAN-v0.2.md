@@ -91,3 +91,15 @@ gear nuevos fuera del catálogo, ni subir assets a producción.
 
 Manifiesto con job ids y prompts: `docs/trader-land/art/validation-manifest-2026-09-02.json`.
 Los PNG de validación viven fuera del repo hasta aprobar el catálogo.
+
+## 6. Pasada del Aura Core (2026-09-02, 12 créditos)
+
+Aprobados: **stage 0** (dormido) y **stage 1** (despierto: la esfera flota
+dentro del aro y no se oculta, cinco tendones, base 2×2 con filamentos) y el
+**decal de raíces** (plano, cinco ramas sobre el grid). Parcial: la hoja de
+órbitas (la esfera sirve; las mitades del aro se derivan por máscara desde el
+stage 1). A rehacer más adelante: **stage 2** (raíces fuera del 2×2 y sello
+dorado como moneda); el vertical solo necesita 0 y 1.
+
+Catálogo de prompts de los 25 lotes, dos estados cada uno:
+`docs/trader-land/art/lot-catalog-v01.json` (50 generaciones, ~100 créditos).
