@@ -1,49 +1,40 @@
-# Trader Land — Gate A: seis masters para validar en grid (2026-09-02)
+# Trader Land — Gate A v2 (respuesta al NO-GO técnico de Codex, 2026-09-02)
 
-Rama: `feat/trader-land-art` (nunca se despliega sola). Carpeta: `public/land/v1/gate-A/`.
-Créditos: 7 remociones de fondo + 1 generación (segunda orientación) ≈ 9. Sin generar nada más.
-Pipeline reproducible: `scripts/infra/trader-land-gate-a.py` (Python + Pillow + numpy).
+Rama `feat/trader-land-art`. Créditos de esta vuelta: 2 generaciones fallidas de la orientación NW-SE (4) + 1
+recorte de la recta NE-SW (1) ≈ 5. Total gate A ≈ 14.
 
-## Entregables por pieza (`gate-A/<id>/`)
-`<state>_albedo_1024.png` (recorte con alpha) · `<state>_albedo_512.webp` · `<state>_glow_1024.png`
-(máscara del emisivo) · `shadow_1024.png` (sombra sintética por footprint, mismo anchor, luz arriba-izquierda)
-· `<state>_thumb_256.png`. Manifest: `gate-A/asset-manifest.json` con `contentBounds_2048`,
-`anchor_2048`, `footprint`, `occlusionHeight_px`, `orientations`, `connectors`, métricas de QA y fuente.
+## Corregido (P1 de Codex)
+1. **Sombra desde el rombo del footprint, no del bounding box.** `footprint_shadow()` dibuja el rombo de
+   `cols×rows` celdas con celda fija `1024×512` a escala master, anclado en el vértice inferior del objeto
+   (`anchor`) y desplazado abajo-derecha. Todas las piezas de un mismo footprint comparten sombra idéntica.
+2. **Coordenadas normalizadas 0–1.** `anchor`, `contentBounds` y `occlusionHeight` son fracciones del canvas;
+   cada estado registra `variants` con `url`, `w`, `h` (albedo 1024 PNG, albedo 512 WebP, glow 1024,
+   shadow 1024, thumb 256). `coordinate_space` lo explica en el propio manifest.
+3. **Nada de QA dentro de `public`.** Raws, hojas y diagnósticos viven en `art/trader-land/gate-A/`
+   (Vite no lo copia). `public/land/v1/gate-A/` solo tiene runtime: 45 archivos, 4.0 MB (antes 55 y 43 MB).
+   Estructura: `<id>/<orientación>/<estado>_*.{png,webp}` + `shadow_1024.png` por orientación.
+4. **Familia de caminos definida con conectores.** `axiom_archive_path_straight` con orientaciones
+   `ne_sw` (conectores NE+SW) y `nw_se` (NW+SE). La curva original pasa a `axiom_archive_return_path_curve`
+   (`curve_a`), pieza aparte, fuera del gate.
+5. **Orientación registrada.** `ne_sw` está recortada, procesada y en el manifest (sombra 0 px, halo 2 px,
+   glow 2.46 %).
 
-| Pieza | Footprint | Sombra horneada (antes → después) | Halo claro | Glow % |
-|---|---:|---:|---:|---:|
-| aura_core_stage0 | 2×2 | 1 947 → 0 | 0 | 0.23 |
-| aura_core_stage1 | 2×2 | 0 → 0 | 0 | 6.83 |
-| evidence_mines_crystal_vein_rock (bloom) | 1×1 | 5 526 → 0 | 133 | 4.31 |
-| axiom_archive_return_path (bloom) | 1×1 | 0 → 0 | 0 | 3.46 |
-| risk_reef_dual_orbit_antenna (bloom) | 1×1 | 6 366 → 0 | 0 | 2.22 |
-| evidence_mines_evidence_workshop (bloom) | 2×1 | 0 → 0 | 197 | 3.27 |
-| thesis_citadel_three_gate_citadel (bloom) | 2×2 | 0 → 0 | 233 | 2.85 |
+## Bloqueo honesto: `nw_se` no sale del generador
+Dos intentos con prompts distintos (referencia de la recta + referencia de estilo del mundo, geometría
+explícita): ambos devolvieron el filamento SW→NE, el segundo además con otro estilo de bloques
+(`art/trader-land/gate-A/diag/path_straight_attempt2.png`). Es un sesgo del modelo; insistir cuesta
+créditos sin garantía. Descarto ambos.
 
-## Las tres correcciones de Anthony/Codex
-1. **Seed de muestra derivado del bloom** (sin créditos): `evidence_mines_crystal_vein_rock/seed_albedo_1024_derived.png`.
-   Misma geometría y alpha; emisivos atenuados vía la máscara de glow, desaturación parcial, partículas
-   eliminadas. Hoja: `sheet_evidence_mines_crystal_vein_rock_seed_derived.png`. Legible a 96 px y
-   distinguible del bloom. Quedan vetas azules tenues (el umbral de glow no las cubre): ajustar a 10 % si
-   Codex lo pide.
-2. **Segunda orientación isométrica real del camino** (1 generación con el bloom como referencia):
-   `raw/axiom_archive_return_path_bloom_orientation2_raw.png` + `sheet_path_orientations.png`. Conserva
-   bloques, luz y sombra; solo cambia la dirección del filamento → la re-orientación por referencia es
-   viable. Hallazgo: el bloom original es un **par de curvas** y la orientación 2 salió **recta**; antes
-   de los 19 hay que fijar por catálogo qué es "camino recto" y qué "curva" (conectores N/E/S/O).
-   Sigue con fondo (no estaba en el presupuesto de remoción): 1 crédito más si se aprueba.
-3. **Glow por luminancia + tono/saturación + regiones conectadas**: tono 120–250° (emerald→cyan→Base
-   blue), saturación > 0.30, luminancia > 0.42, regiones ≥ 12 px a 512, sin brillos blancos ni placas
-   doradas. Inspección sobre negro, gris 50 % y color de distrito a 512 y 96 px: `sheet_<id>_<state>.png`.
+**Propuesta (para que Codex decida):** el camino deja de ser imagen y pasa a ser **dato**. Se genera una
+sola loseta de piedra sin filamento por distrito (2 créditos + 1 recorte) y el renderer dibuja el canal
+emerald de forma procedural sobre ella según los conectores (`ne,sw` / `nw,se` / curvas / cruces), usando
+`ne_sw` como referencia de grosor, color y glow. Ventajas: cuatro orientaciones, curvas y uniones con un
+asset; el flujo de energía entre caminos adyacentes (adyacencia visual de v0.3) es trivial; seed/bloom del
+camino es solo intensidad. Si Codex prefiere sprites horneados, la alternativa es generar la loseta con el
+filamento en **vista frontal ortográfica** y proyectarla al rombo en el pipeline, no pedirle la
+diagonal al modelo.
 
-## Hipótesis de sombra: confirmada y resuelta
-`remove_background` **sí** conservó restos de la sombra de contacto en tres piezas (`diag_ghost.png`:
-rojo = píxeles oscuros semitransparentes fuera de `contentBounds`, naranja = antialiasing normal).
-Limpieza determinista y reproducible en el pipeline: fuera de los bounds, alpha a 0 para píxeles
-oscuros semitransparentes; dentro no se toca nada. Re-chequeo: 0 en las siete. El halo claro
-(133–233 px) es borde de emisivos y se elimina con erosión de 1 px si el grid lo muestra.
-
-## Para Codex
-Probar en el grid web/iOS: 96/160/256/512, OLED y cinco terrenos, occlusión frente al companion, tap
-target por `contentBounds`, seed→bloom sin salto, memoria/carga, colocación/rotación/undo/restore.
-Con GO: procesar los otros 19 + 2 redos (~23 créditos) con el mismo pipeline.
+## Sigue pendiente (no es de Claude)
+Grid ejecutable web/iOS con profundidad, conectores, undo y restore — Codex, según la división de trabajo
+de v0.3. Las hojas de `art/trader-land/gate-A/sheets/` prueban composición sobre negro, gris y color de
+distrito a 512 y 96 px.
