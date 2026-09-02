@@ -566,18 +566,30 @@ struct MascotSceneView: UIViewRepresentable {
             let holder = SCNNode()
             holder.name = "gear"
             let r = CGFloat(modelRadius)
-            // Body anchors, relative to the bounding radius. In front of the
-            // body so the billboards never sink into the mesh.
+            // Body anchors, relative to the bounding radius. Every GLB has a
+            // different silhouette, so companion-specific profiles keep the
+            // gear on the actual face/body instead of floating beside it.
             func anchor(_ slot: BodySlot) -> (SCNVector3, CGFloat) {
-                switch slot {
-                case .face:     return (SCNVector3(0, Float(r * 0.42), Float(r * 0.80)), r * 0.62)
-                case .headset:  return (SCNVector3(0, Float(r * 0.62), Float(r * 0.70)), r * 0.72)
-                case .head:     return (SCNVector3(0, Float(r * 1.22), 0), r * 0.62)
-                case .hand:     return (SCNVector3(Float(r * 0.80), Float(-r * 0.42), Float(r * 0.50)), r * 0.46)
-                case .hip:      return (SCNVector3(Float(r * 0.36), Float(-r * 0.12), Float(r * 0.70)), r * 0.36)
-                case .shoulder: return (SCNVector3(Float(-r * 0.60), Float(r * 0.50), Float(r * 0.42)), r * 0.44)
-                case .chest:    return (SCNVector3(0, Float(r * 0.12), Float(r * 0.86)), r * 0.44)
-                }
+                let defaults: [BodySlot: (CGFloat, CGFloat, CGFloat, CGFloat)] = [
+                    .face: (0, 0.42, 0.80, 0.62), .headset: (0, 0.62, 0.70, 0.72),
+                    .head: (0, 1.22, 0, 0.62), .hand: (0.80, -0.42, 0.50, 0.46),
+                    .hip: (0.36, -0.12, 0.70, 0.36), .shoulder: (-0.60, 0.50, 0.42, 0.44),
+                    .chest: (0, 0.12, 0.86, 0.44),
+                ]
+                let profiles: [String: [BodySlot: (CGFloat, CGFloat, CGFloat, CGFloat)]] = [
+                    "orb": [.hand: (0.45,-0.18,0.76,0.34), .chest: (0,0.02,0.94,0.38), .head: (0,0.96,0.08,0.42)],
+                    "byte": [.hip: (0.32,-0.18,0.76,0.30), .face: (0,0.45,0.92,0.62), .hand: (0.53,-0.42,0.68,0.34)],
+                    "kora": [.headset: (0,0.54,0.72,0.68), .shoulder: (-0.22,0.14,0.78,0.28), .hand: (0.24,-0.46,0.80,0.30)],
+                    "zip": [.hand: (0.38,-0.40,0.76,0.29), .shoulder: (-0.32,0.20,0.72,0.29), .head: (0,1.02,0.08,0.38)],
+                    "glitch": [.hand: (0.62,-0.34,0.60,0.38), .chest: (0,0.05,0.92,0.36)],
+                    "momo": [.hand: (0.58,-0.22,0.62,0.36), .face: (0,0.20,0.94,0.58), .head: (0,0.98,0.08,0.40)],
+                    "flux": [.hand: (0.58,-0.30,0.62,0.34), .chest: (0,-0.02,0.92,0.36), .head: (0,1.10,0.08,0.38)],
+                    "rook": [.chest: (0,0.18,0.94,0.36), .head: (0,1.06,0.08,0.38), .hand: (0.60,-0.48,0.58,0.36)],
+                    "halo": [.chest: (0,0,0.94,0.40), .shoulder: (-0.66,0.10,0.56,0.34), .head: (0,0.96,0.08,0.40)],
+                    "axiom": [.hand: (0.62,-0.28,0.62,0.34), .chest: (0,0.04,0.94,0.34), .head: (0,1.00,0.08,0.38)],
+                ]
+                let a = profiles[owner?.assetName ?? ""]?[slot] ?? defaults[slot] ?? defaults[.hand]!
+                return (SCNVector3(Float(r * a.0), Float(r * a.1), Float(r * a.2)), r * a.3)
             }
             for tool in tools {
                 let tint = tool.isGolden ? UIColor(red: 0.96, green: 0.77, blue: 0.26, alpha: 1) : UIColor(hue: 0.415, saturation: 0.7, brightness: 0.95, alpha: 1)
@@ -597,7 +609,8 @@ struct MascotSceneView: UIViewRepresentable {
                 node.name = tool.id
                 node.position = position
                 node.renderingOrder = 10 + tool.tier
-                node.constraints = [SCNBillboardConstraint()]
+                // No billboard constraint: the plane inherits the GLB's
+                // rotation and stays physically attached while the user spins.
                 if tool.slot == .head {
                     // The golden piece hovers above the head with a slow bob.
                     let bob = SCNAction.sequence([
@@ -632,7 +645,7 @@ struct MascotSceneView: UIViewRepresentable {
                 plane.firstMaterial?.blendMode = .alpha
                 plane.firstMaterial?.writesToDepthBuffer = false
                 let node = SCNNode(geometry: plane)
-                node.position = SCNVector3(Float(-r * 0.92), Float(-r * 0.72), Float(r * 0.55))
+                node.position = SCNVector3(Float(-r * 0.72), Float(-r * 0.66), Float(r * 0.55))
                 node.renderingOrder = 14
                 let billboard = SCNBillboardConstraint()
                 billboard.freeAxes = .Y
