@@ -175,7 +175,7 @@ export default function BobbyHeartbeatPage() {
   const chainName = data?.chain?.name || DEFAULT_CHAIN.name;
   const chainId = data?.chain?.id ?? DEFAULT_CHAIN.id;
   const sym = data?.chain?.nativeSymbol || data?.revenue?.nativeSymbol || DEFAULT_CHAIN.tokens.native;
-  const explorerUrl = data?.chain?.explorerUrl || 'https://www.oklink.com/xlayer';
+  const explorerUrl = data?.chain?.explorerUrl || DEFAULT_CHAIN.explorerUrl;
 
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">

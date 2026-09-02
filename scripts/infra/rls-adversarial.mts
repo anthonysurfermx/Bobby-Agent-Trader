@@ -55,12 +55,57 @@ const MARK = `RLS-CANARY-${Date.now()}-${randomBytes(3).toString('hex')}`;
 const CANARY_WALLET = `0x${randomBytes(20).toString('hex')}`;
 
 let failures = 0;
-// /api/forum-publish is rate-limited to 6 per IP per hour (fixed window, in
-// memory per instance) and section C spends EXACTLY six calls on it. A 429
-// therefore means the window is already spent by an earlier run — not a
-// security failure — but it still voids the verdict: the refusal semantics
-// (403/409) were not observed. Count them separately so the summary says so.
+// /api/forum-publish is rate-limited to 6 per IP per hour and section C
+// spends EXACTLY six calls on it. The window is a fixed hour from the first
+// hit and it is PERSISTED in api_cache (rl:forum-publish:<ip key>), so a new
+// deployment does NOT reset it — only the real expiry does. A 429 means the
+// window is already spent by an earlier run: not a security failure, but it
+// voids the verdict (the 403/409 semantics were not observed). The section
+// pre-flights the persisted row, waits for the real expiry when asked, and
+// otherwise honours Retry-After on the first 429 instead of burning calls.
 let rateLimited = 0;
+const FORUM_PUBLISH_LIMIT = 6;
+const WAIT_FOR_WINDOW = process.env.GATE_WAIT_FOR_RATE_LIMIT !== '0'; // default: wait
+const MAX_WAIT_MS = Number(process.env.GATE_MAX_WAIT_SEC || 3900) * 1000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const hhmm = (ms: number) => new Date(ms).toISOString().slice(11, 19);
+
+/**
+ * When does THIS caller's forum-publish window expire, according to the
+ * persisted limiter? Needs the public IP (api.ipify.org) and the same salt
+ * the API uses (RATE_LIMIT_SALT, default 'bobby-rl-v1'). Returns null when
+ * the row cannot be resolved — then the first 429's Retry-After is used.
+ */
+async function forumPublishWindow(): Promise<{ count: number; resetAt: number } | null> {
+  try {
+    const ip = (await (await fetch('https://api.ipify.org')).text()).trim();
+    if (!ip) return null;
+    const { createHash } = await import('node:crypto');
+    const salt = process.env.RATE_LIMIT_SALT || 'bobby-rl-v1';
+    const ipKey = createHash('sha256').update(`${salt}:${ip}`).digest('hex').slice(0, 24);
+    const key = `rl:forum-publish:${ipKey}`;
+    const r = await fetch(`${URL_}/rest/v1/api_cache?cache_key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=payload,expires_at&limit=1`, { headers: svcHeaders });
+    if (!r.ok) return null;
+    const rows = (await r.json()) as Array<{ payload: { count?: number }; expires_at: string }>;
+    if (!rows.length) return { count: 0, resetAt: 0 };
+    return { count: rows[0].payload?.count ?? 0, resetAt: Date.parse(rows[0].expires_at) };
+  } catch {
+    return null;
+  }
+}
+
+/** Wait until `resetAt` (plus a small margin) if allowed; false when we won't. */
+async function waitForWindow(resetAt: number, why: string): Promise<boolean> {
+  const waitMs = resetAt - Date.now() + 15_000;
+  if (waitMs <= 0) return true;
+  if (!WAIT_FOR_WINDOW || waitMs > MAX_WAIT_MS) {
+    console.log(`     forum-publish window (${why}) resets at ${hhmm(resetAt)} UTC — not waiting (GATE_WAIT_FOR_RATE_LIMIT=0 or beyond GATE_MAX_WAIT_SEC).`);
+    return false;
+  }
+  console.log(`     forum-publish window (${why}) resets at ${hhmm(resetAt)} UTC — waiting ${Math.ceil(waitMs / 60_000)} min so the verdict is a single run…`);
+  await sleep(waitMs);
+  return true;
+}
 const line = (ok: boolean, label: string, detail = '') => {
   if (!ok) failures += 1;
   if (!ok && /HTTP 429/.test(detail)) rateLimited += 1;
@@ -243,7 +288,24 @@ async function legitimatePath(): Promise<void> {
     const transcript = `**ALPHA HUNTER:** ${MARK} RLSTEST looks strong.\n\n**RED TEAM:** crowded.\n\n**MY VERDICT:** Long BTC at 62,000, stop 60,500, target 66,000. Conviction 7/10.\n\n`;
     const rc = issueTranscriptReceipt(transcript, { wallet, userQuestion: 'BTC?' });
     if (rc) {
-      const pub1 = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: rc.token }) });
+      // Pre-flight the persisted window: six calls follow and every one must land.
+      const win = await forumPublishWindow();
+      // Six calls need six free slots: ANY hit in the live window blocks a clean run.
+      if (win && win.count > 0 && win.resetAt > Date.now()) {
+        console.log(`     persisted limiter shows ${win.count} forum-publish hit(s) in the current window`);
+        await waitForWindow(win.resetAt, 'api_cache');
+      } else if (!win) {
+        console.log('     could not resolve the persisted forum-publish window (IP/salt) — relying on Retry-After');
+      }
+      let pub1 = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: rc.token }) });
+      if (pub1.status === 429) {
+        // First call already refused: nothing was spent on semantics yet, so
+        // wait for the real expiry (Retry-After is computed from api_cache) and
+        // try the sequence exactly once more.
+        const retryAfter = Number(pub1.headers.get('retry-after') || 0);
+        const ok = await waitForWindow(Date.now() + Math.max(1, retryAfter) * 1000, `Retry-After ${retryAfter}s`);
+        if (ok) pub1 = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript, receipt: rc.token }) });
+      }
       const pub1Json = (await pub1.json().catch(() => ({}))) as { threadId?: string; error?: string };
       line(pub1.ok && Boolean(pub1Json.threadId), 'POST /api/forum-publish with a valid receipt → thread created atomically', `HTTP ${pub1.status} ${pub1Json.error || ''}`);
       if (pub1Json.threadId) {
@@ -300,7 +362,7 @@ async function legitimatePath(): Promise<void> {
   if (SECTIONS.size < 3) console.log(`\n(partial run: sections ${[...SECTIONS].join('')} — a full GATE PASSED requires ABC)`);
   if (rateLimited > 0 && rateLimited === failures) {
     const retryAt = new Date(Date.now() + 3600_000).toISOString().slice(11, 16);
-    console.log(`\nRATE-LIMITED: the only failures are ${rateLimited} HTTP 429 from /api/forum-publish (6/h per IP, in-memory per instance).\nNot a security finding, but not a verdict either — rerun ONCE after ${retryAt} UTC or right after a fresh deployment (new instances start at zero).`);
+    console.log(`\nRATE-LIMITED: the only failures are ${rateLimited} HTTP 429 from /api/forum-publish (6/h per IP, persisted in api_cache — a new deployment does NOT reset it).\nNot a security finding, but not a verdict either — rerun ONCE after the window expires (about ${retryAt} UTC; the run waits by itself unless GATE_WAIT_FOR_RATE_LIMIT=0).`);
   }
   const full = SECTIONS.size === 3;
   console.log(failures === 0

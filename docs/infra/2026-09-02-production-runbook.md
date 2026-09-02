@@ -140,3 +140,9 @@ Findings 1–5 and 7 of the Codex review are addressed in code — see
 - **SHA on CLI deploys.** Use `scripts/deploy-prod.sh` instead of a bare
   `vercel --prod` from the worktree; it injects `BOBBY_BUILD_SHA` and verifies
   `/api/bobby-health` reports HEAD before exiting 0.
+- **Round 2 (Codex NO-GO on `e6b38bb`)**: `deploy-prod.sh` now deploys `git
+  archive HEAD` (no untracked files can leak) and requires `HEAD ==
+  origin/main`; the gate pre-flights the **persisted** forum-publish window
+  in `api_cache` and waits for its real expiry (a new deployment does NOT
+  reset it); Heartbeat explorer fallback moved to Basescan. Details in
+  `docs/infra/2026-09-02-codex-feedback-fixes.md` (round 2).

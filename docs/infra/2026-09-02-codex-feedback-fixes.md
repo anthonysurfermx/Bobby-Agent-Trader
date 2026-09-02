@@ -112,3 +112,17 @@ literal `GATE PASSED` line is the artefact Codex asked for.
 3. Run the RLS gate once against production → `GATE PASSED`.
 4. Ask for the separate GO for the Supabase `bobby-protocol` cut-over.
    Do **not** touch the final data migration before that.
+
+---
+
+## Round 2 — Codex NO-GO on `e6b38bb` (three blockers), closed
+
+| # | Blocker | Fix |
+|---|---------|-----|
+| P1 | `deploy-prod.sh` ignored untracked files and did not require `HEAD == origin/main`, so the reported SHA did not certify the deployed tree | The script now refuses any tracked **or untracked** change, fetches and requires `HEAD == origin/main` (explicit `DEPLOY_ALLOW_NON_MAIN=1` override, printed loudly), exports **`git archive HEAD`** to a temp dir, runs `npm ci && npm run build` there and deploys that directory with `--cwd`. Nothing outside the commit can reach Vercel, and the health check still has to report `fullSha === HEAD` before exit 0 |
+| P1 | A new deployment does not reset the forum-publish limit: it is persisted in `api_cache` (`rl:forum-publish:<sha256(salt:ip)[:24]>`, fixed hour from the first hit) | The gate no longer claims that. Before the six-call sequence it **pre-flights the persisted row** for its own IP (public IP via ipify + `RATE_LIMIT_SALT`, default `bobby-rl-v1`) and, when the window is live, **waits for the real expiry** (default on; `GATE_WAIT_FOR_RATE_LIMIT=0` to refuse, `GATE_MAX_WAIT_SEC` cap 3900). If the row cannot be resolved, the first 429 is not counted: the run honours **`Retry-After`** (computed from `api_cache`), waits, and retries the sequence exactly once. The RATE-LIMITED summary now states that a deploy does not reset the window |
+| P2 | Heartbeat `explorerUrl` still fell back to `https://www.oklink.com/xlayer` | Falls back to `DEFAULT_CHAIN.explorerUrl` (Basescan) like name, id and symbol |
+
+Verification: `bash -n scripts/deploy-prod.sh`, `npx tsx scripts/infra/rls-adversarial.mts` (parses, exits 2 without env as designed), `npm run build` (API type-check + Vite) green.
+
+Order after this commit, as Codex recommends: fast-forward + push `main` → prefer the Git-integrated deployment (SHA automatic) → confirm `deployment.fullSha === HEAD` → let the gate wait for the real window → one run to `GATE PASSED` → separate GO for the Supabase `bobby-protocol` cut-over.
