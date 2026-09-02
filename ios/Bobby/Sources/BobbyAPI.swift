@@ -133,11 +133,14 @@ struct BobbyAnswer {
             lines.append(L.t("Support \(Self.money(sup)), resistance \(Self.money(res)).",
                              "Soporte \(Self.money(sup)), resistencia \(Self.money(res))."))
         }
-        if let d = direction, let c = convictionPct {
-            let dirEn = d == "long" ? "bullish" : d == "short" ? "bearish" : d
-            let dirEs = d == "long" ? "alcista" : d == "short" ? "bajista" : d
+        if let d = direction, let c = convictionPct, d == "long" || d == "short" {
+            let dirEn = d == "long" ? "bullish" : "bearish"
+            let dirEs = d == "long" ? "alcista" : "bajista"
             lines.append(L.t("My read: \(dirEn) bias with \(Int(c))% conviction.",
                              "Mi lectura: sesgo \(dirEs) con \(Int(c))% de convicción."))
+        } else if direction == "none", let c = convictionPct {
+            lines.append(L.t("No directional edge right now (\(Int(c))% conviction).",
+                             "Sin sesgo direccional por ahora (\(Int(c))% de convicción)."))
         }
         if let e = entry, let st = stop, let tg = target {
             var plan = L.t("Reference plan: entry \(Self.money(e)), stop \(Self.money(st)), target \(Self.money(tg))",

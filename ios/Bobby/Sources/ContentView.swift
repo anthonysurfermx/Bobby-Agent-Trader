@@ -1075,7 +1075,8 @@ struct ContentView: View {
                 ?? fallback
         case .cio:
             if let direction = answer.direction, let conviction = answer.convictionPct {
-                return "\(direction) \(Int(conviction))%"
+                if direction == "long" || direction == "short" { return "\(direction) \(Int(conviction))%" }
+                return L.t("no edge \(Int(conviction))%", "sin sesgo \(Int(conviction))%")
             }
             return fallback
         default: return fallback
