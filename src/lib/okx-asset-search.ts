@@ -385,7 +385,7 @@ export async function getOkxInstrumentCatalog(forceRefresh = false): Promise<Okx
 // ---- 24h volume: real popularity ranking for the browse board ----
 
 let volumeCache:
-  | { expiresAt: number; bySymbol: Map<string, { volUsd: number; last: number | null }> }
+  | { expiresAt: number; bySymbol: Map<string, { volUsd: number; last: number | null; change24h: number | null }> }
   | null = null;
 
 async function fetchTickerVolumes(instType: 'SPOT' | 'SWAP'): Promise<Array<{ instId: string; last: number | null; open24h: number | null; volCcy24h: number }>> {
