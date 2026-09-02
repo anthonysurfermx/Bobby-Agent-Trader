@@ -529,3 +529,43 @@ escribe hoy directo a Supabase con la anon key). Por eso el orden de Codex es:
 4. Corte a `bobby-protocol` (`qbvdqkknnuweatptjohi`): manifiesto T0,
    backup, freeze, dump/restore, `BOBBY_SUPABASE_*` → destino, rebuild,
    verificación de conteos/IDs/proofs, `legacy-reference-audit` en cero.
+
+---
+
+## Preparación de producción (GO de Codex para preparar, no para desplegar)
+
+Cerrado:
+- **Production env**: 8 variables nuevas creadas (secretos propios de
+  producción, distintos a preview; sin redeploy, el código viejo las ignora).
+- **Enlace de producción**: `bobby-agent-trader` · team
+  `anthonysurfermxs-projects` · repo `anthonysurfermx/Bobby-Agent-Trader` ·
+  rama de producción `main` · dominios `bobbyprotocol.xyz`, `www`,
+  `bobby-agent-trader.vercel.app`.
+- **`bobby-cycle` en canary puro** contra el preview: `challengeMode=dryrun`,
+  `executionVenue=none`, `txHash=null`, `onchainCommitTx=null`, tweet
+  compuesto y no publicado, sin Telegram (preview sin token). Escribió 1
+  ciclo, 1 hilo público, 3 posts, 1 digest y 2 eventos en la base legacy;
+  **todo borrado por id** y verificado a cero. Lección: `echo` en zsh
+  interpreta `\n` y rompió el parseo de la respuesta; la limpieza se hizo a
+  mano con los ids devueltos.
+- **Bot**: el endpoint de producción responde 405 a GET (vivo); la API de
+  Telegram no es alcanzable desde este entorno, así que `getWebhookInfo` no
+  se pudo consultar. Verificar a mano que el webhook apunta a
+  `bobbyprotocol.xyz/api/telegram-webhook` antes del deploy.
+- **On-chain (lectura)**: producción lee Base (8453): 1 commitment
+  resuelto. El preview leía X Layer porque `PROTOCOL_CHAIN` es de
+  Production; se añadió `PROTOCOL_CHAIN=base` a la rama y se redesplegó para
+  comparar lecturas idénticas. Escribir en Base desde preview es imposible
+  (`Base mainnet writes require VERCEL_ENV=production`).
+- **Rollback compatible**: `supabase/rollback/20260902_rls_restore_previous_policies.sql`
+  restaura exactamente las políticas capturadas hoy (incluye volver a apagar
+  RLS en las 15 tablas). Runbook completo en
+  `docs/infra/2026-09-02-production-runbook.md`.
+- **790 referencias clasificadas** en
+  `docs/infra/2026-09-02-legacy-reference-classification.md`: 759 son
+  producto DeFi México que sale del repo, 19 en páginas Bobby (enlaces y
+  marca), 12 en el API (menciones). Plan de retirada en el paso 7.
+
+Pendiente de Anthony: wallet real + firma SIWE en el preview (abrir el
+preview logueado en Vercel, conectar wallet, aceptar la firma, comprobar
+inbox/intereses/debates privados y publicar un debate al foro).
