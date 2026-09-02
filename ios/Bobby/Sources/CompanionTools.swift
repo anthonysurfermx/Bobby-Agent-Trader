@@ -567,6 +567,7 @@ struct GearCatalogSheet: View {
         .sheet(item: $preview) { item in
             ItemPreviewSheet(item: item, xp: xp, level: level)
                 .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.bg)
         }
     }
@@ -626,6 +627,7 @@ struct ItemPreviewSheet: View {
     let item: CatalogItem
     let xp: Int
     let level: Int
+    @Environment(\.dismiss) private var dismiss
     @State private var loading = true
 
     private var gold: Color { Color(red: 0.96, green: 0.77, blue: 0.26) }
@@ -673,6 +675,18 @@ struct ItemPreviewSheet: View {
                 Text(L.t("WORN BY \(companion.label)", "LO LLEVA \(companion.label)")).font(.mono(10, .bold)).kerning(1.4).foregroundStyle(companion.tint)
                 Spacer()
                 Text("PREVIEW").font(.mono(10, .bold)).kerning(1.4).foregroundStyle(Theme.muted)
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Theme.text.opacity(0.8))
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Theme.card))
+                        .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L.t("Close preview", "Cerrar preview"))
             }
             .padding(.horizontal, 18)
 
