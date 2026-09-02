@@ -212,7 +212,7 @@ struct ToolBelt: View {
                 .frame(width: 38, height: 38)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(L.t("Bobby World, coming soon", "Mundo Bobby, próximamente"))
+            .accessibilityLabel(L.t("Trader Land, coming soon", "Trader Land, próximamente"))
         }
         .onAppear {
             withAnimation(.easeOut(duration: 1.7).repeatForever(autoreverses: false)) { worldPulse = true }
@@ -220,7 +220,7 @@ struct ToolBelt: View {
     }
 }
 
-/// "Bobby World" — the Focus-Tree-style world we build next. A teaser: the
+/// "Trader Land" — the Focus-Tree-style world we build next. A teaser: the
 /// map under fog of war, SOON, and the promise that discipline XP carries over.
 struct WorldMapSheet: View {
     let xp: Int
@@ -307,7 +307,7 @@ struct WorldMapSheet: View {
         }
         .aspectRatio(3/4, contentMode: .fit)
         .overlay(alignment: .topLeading) {
-            Text(L.t("BOBBY WORLD", "MUNDO BOBBY")).font(.mono(10, .bold)).kerning(3).foregroundStyle(Theme.text)
+            Text(L.t("TRADER LAND", "TRADER LAND")).font(.mono(10, .bold)).kerning(3).foregroundStyle(Theme.text)
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(Capsule().fill(Color.black.opacity(0.5)))
                 .padding(14)

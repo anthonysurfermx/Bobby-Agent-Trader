@@ -596,7 +596,7 @@ struct ContentView: View {
                 Button {
                     showWorld = true
                 } label: {
-                    Label(L.t("Bobby World · soon", "Mundo Bobby · pronto"), systemImage: "map")
+                    Label(L.t("Trader Land · soon", "Trader Land · pronto"), systemImage: "map")
                 }
                 Section {
                     Label(vm.streak >= 1 ? L.t("Discipline streak: \(vm.streak) day\(vm.streak == 1 ? "" : "s") 🔥", "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥") : L.t("No streak yet — review an analysis", "Sin racha aún — revisa un análisis"),
