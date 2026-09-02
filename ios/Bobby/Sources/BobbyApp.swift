@@ -8,7 +8,9 @@ struct BobbyApp: App {
         WindowGroup {
             Group {
 #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("-qa-skin") {
+                if ProcessInfo.processInfo.arguments.contains("-trader-land-gate") {
+                    TraderLandGateHarnessView()
+                } else if ProcessInfo.processInfo.arguments.contains("-qa-skin") {
                     GearSkinQAFixtureView()
                 } else {
                     ContentView()

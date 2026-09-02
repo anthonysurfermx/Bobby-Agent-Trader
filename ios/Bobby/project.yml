@@ -43,6 +43,9 @@ targets:
       - Assets.xcassets
       - path: Resources/Mascots
         buildPhase: resources
+      - path: ../../public/land/v1/gate-A
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: GLTFKit2
     settings:
