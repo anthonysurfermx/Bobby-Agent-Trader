@@ -36,6 +36,11 @@ const API = (process.env.BOBBY_API || 'https://bobbyprotocol.xyz').replace(/\/+$
 const ORIGIN = process.env.BOBBY_ORIGIN || 'https://bobbyprotocol.xyz';
 if (!URL_ || !ANON) { console.error('SUPABASE_URL and SUPABASE_ANON_KEY are required'); process.exit(2); }
 if (!SERVICE) { console.error('SUPABASE_SERVICE_KEY is required: the gate cannot reach a PASS verdict without the policy matrix and canary rows. Verdict: INCOMPLETE'); process.exit(2); }
+// Same salt as the target deployment (vercel env pull): without it the gate
+// cannot locate its own persisted forum-publish window, and a public default
+// would defeat the point of hashing IPs. Verdict: INCOMPLETE.
+const RATE_LIMIT_SALT = process.env.RATE_LIMIT_SALT || '';
+if (RATE_LIMIT_SALT.length < 16) { console.error('RATE_LIMIT_SALT (the deployment\'s salt, ≥16 chars) is required: pull it with `vercel env pull --environment=production`. Verdict: INCOMPLETE'); process.exit(2); }
 
 // Which sections to run: A (policy matrix), B (canaries), C (legitimate path). Default all.
 const SECTIONS = new Set((process.env.GATE_SECTIONS || 'ABC').toUpperCase().split(''));
@@ -73,7 +78,7 @@ const hhmm = (ms: number) => new Date(ms).toISOString().slice(11, 19);
 /**
  * When does THIS caller's forum-publish window expire, according to the
  * persisted limiter? Needs the public IP (api.ipify.org) and the same salt
- * the API uses (RATE_LIMIT_SALT, default 'bobby-rl-v1'). Returns null when
+ * the API uses (RATE_LIMIT_SALT, required — no default). Returns null when
  * the row cannot be resolved — then the first 429's Retry-After is used.
  */
 async function forumPublishWindow(): Promise<{ count: number; resetAt: number } | null> {
@@ -81,8 +86,7 @@ async function forumPublishWindow(): Promise<{ count: number; resetAt: number } 
     const ip = (await (await fetch('https://api.ipify.org')).text()).trim();
     if (!ip) return null;
     const { createHash } = await import('node:crypto');
-    const salt = process.env.RATE_LIMIT_SALT || 'bobby-rl-v1';
-    const ipKey = createHash('sha256').update(`${salt}:${ip}`).digest('hex').slice(0, 24);
+    const ipKey = createHash('sha256').update(`${RATE_LIMIT_SALT}:${ip}`).digest('hex').slice(0, 24);
     const key = `rl:forum-publish:${ipKey}`;
     const r = await fetch(`${URL_}/rest/v1/api_cache?cache_key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=payload,expires_at&limit=1`, { headers: svcHeaders });
     if (!r.ok) return null;
@@ -348,6 +352,9 @@ async function legitimatePath(): Promise<void> {
   line(pub.ok, 'anon SELECT forum_threads (public read) still works', `HTTP ${pub.status}`);
   const health = await fetch(`${API}/api/bobby-health`);
   line(health.ok, 'GET /api/bobby-health', `HTTP ${health.status}`);
+  const healthJson = (await health.json().catch(() => ({}))) as { ops?: { rateLimitSaltConfigured?: boolean }; deployment?: { sha?: string | null } };
+  line(healthJson.ops?.rateLimitSaltConfigured === true, 'deployment runs with a real RATE_LIMIT_SALT (IP hashes not enumerable)', `rateLimitSaltConfigured=${healthJson.ops?.rateLimitSaltConfigured}`);
+  line(Boolean(healthJson.deployment?.sha), 'deployment reports its commit SHA', `sha=${healthJson.deployment?.sha ?? 'null'}`);
 }
 
 (async () => {

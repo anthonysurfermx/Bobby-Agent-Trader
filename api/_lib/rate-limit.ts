@@ -43,15 +43,42 @@ export function getClientIp(req: VercelRequest): string {
   return 'unknown';
 }
 
+export class RateLimitConfigError extends Error {
+  constructor() {
+    super('RATE_LIMIT_SALT is required in production: a random secret of at least 16 characters, never the public development default');
+    this.name = 'RateLimitConfigError';
+  }
+}
+
+const DEV_SALT = 'bobby-rl-dev';
+
+/**
+ * The salt that makes IP hashes non-enumerable. In production it MUST come
+ * from the environment (Codex review: a public fallback meant anyone could
+ * recompute every persisted key from a list of IPs). Local and preview keep
+ * a development default so the app runs without secrets there.
+ */
+export function rateLimitSalt(): string {
+  const salt = process.env.RATE_LIMIT_SALT;
+  if (salt && salt.length >= 16) return salt;
+  if (process.env.VERCEL_ENV === 'production') throw new RateLimitConfigError();
+  return DEV_SALT;
+}
+
+/** True when a real (non-default) salt is configured — reported by health. */
+export function rateLimitSaltConfigured(): boolean {
+  const salt = process.env.RATE_LIMIT_SALT;
+  return Boolean(salt && salt.length >= 16 && salt !== DEV_SALT);
+}
+
 /**
  * Privacy-preserving rate-limit identity: a salted SHA-256 of the client IP.
  * Counters behave identically, but persisted rows (Supabase api_cache keys)
  * never contain a readable address — the raw IP stays in process memory only.
- * Set RATE_LIMIT_SALT to make the mapping non-reproducible outside prod.
+ * Throws RateLimitConfigError in production when RATE_LIMIT_SALT is missing.
  */
 export function getClientIpKey(req: VercelRequest): string {
   const ip = getClientIp(req);
   if (ip === 'unknown') return ip;
-  const salt = process.env.RATE_LIMIT_SALT || 'bobby-rl-v1';
-  return createHash('sha256').update(`${salt}:${ip}`).digest('hex').slice(0, 24);
+  return createHash('sha256').update(`${rateLimitSalt()}:${ip}`).digest('hex').slice(0, 24);
 }

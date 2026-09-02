@@ -126,3 +126,35 @@ literal `GATE PASSED` line is the artefact Codex asked for.
 Verification: `bash -n scripts/deploy-prod.sh`, `npx tsx scripts/infra/rls-adversarial.mts` (parses, exits 2 without env as designed), `npm run build` (API type-check + Vite) green.
 
 Order after this commit, as Codex recommends: fast-forward + push `main` → prefer the Git-integrated deployment (SHA automatic) → confirm `deployment.fullSha === HEAD` → let the gate wait for the real window → one run to `GATE PASSED` → separate GO for the Supabase `bobby-protocol` cut-over.
+
+---
+
+## Round 3 — Codex NO-GO on moving `main` (public salt), closed
+
+**Finding (P1).** `RATE_LIMIT_SALT` did not exist in Production, so the API
+and the gate both used the public default `bobby-rl-v1`: the persisted IP
+hashes in `api_cache` were enumerable from any list of addresses.
+
+**Done.**
+- A random 32-byte salt now exists in Vercel for **Production**, and a
+  different one for **Preview (branch `feat/phase0-hardening`)**. Created by
+  piping `openssl rand` into `vercel env add`; the values were never printed
+  and are not in this repo. They are non-sensitive on purpose so the operator
+  can `vercel env pull` them for the gate. (The CLI's non-interactive "all
+  Preview branches" path is broken in 54.10.3, hence the branch scope.)
+- `api/_lib/rate-limit.ts`: in production a missing or short salt now
+  **throws** (`RateLimitConfigError`) — no public fallback. Local/preview keep
+  a development default (`bobby-rl-dev`).
+- `/api/bobby-health` reports `ops.rateLimitSaltConfigured` (boolean, never
+  the value).
+- The gate **requires** `RATE_LIMIT_SALT` (exit 2 otherwise), uses it for the
+  persisted-window pre-flight, and adds two checks against the target: the
+  deployment runs with a real salt, and it reports its commit SHA.
+- The untracked `docs/trader-land/CODEX-SYSTEM-IMPROVEMENTS-v0.3.md` was moved
+  (not deleted) to branch `docs/trader-land-codex-v0.3` so the deploy script's
+  clean-tree rule holds.
+
+**Effect on the next deploy.** `ec3b511`'s production reports `sha: null`
+because it is not deployed yet — expected. The first deployment of this commit
+will start with fresh limiter keys (new salt ⇒ new hashes), which also means
+the gate's first run after it does not inherit the old window.
