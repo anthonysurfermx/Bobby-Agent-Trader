@@ -214,7 +214,7 @@ ajenos a este trabajo (`res.json()` tipado como `unknown`): `bobby-cycle`,
 ## Octavo commit — segunda revisión de Codex + revisión de Kimi K3 (2026-09-02, noche)
 
 Codex (segunda pasada sobre `60c386d`) marcó cuatro bloqueos y un detalle;
-Kimi K3 (revisión independiente, `.ai/reviews/kimi-phase0-commit7-review.md`)
+Kimi K3 (revisión independiente, `docs/infra/2026-09-02-kimi-review-commit7.md`)
 dio GO condicional para preview y tres regresiones de UI. Todo cerrado aquí.
 Sigue sin haber deploy ni migración aplicada.
 
