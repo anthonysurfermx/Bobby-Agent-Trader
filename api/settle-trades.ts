@@ -18,8 +18,9 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireInternalAuth } from './_lib/request-security.js';
+import { requireInternalAuth, requireOpsAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 60 };
 
@@ -200,6 +201,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!requireInternalAuth(req, res)) return;
+  if (req.method === 'POST' && !requireOpsAuth(req, res)) return;
+  if (!(await requireWritesOpen(res))) return;
 
   if (!SB_URL || !SB_KEY) {
     return res.status(500).json({ error: 'Supabase credentials not configured' });

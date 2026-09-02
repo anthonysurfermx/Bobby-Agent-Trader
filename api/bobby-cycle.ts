@@ -11,11 +11,13 @@ import { canOpenPosition, getPositionSize } from '../src/lib/onchainos/risk-mana
 import type { TradeParams } from '../src/lib/onchainos/types.js';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bobby-technical.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
+import { getBobbyControl } from './_lib/control.js';
+import { externalEffectsAllowed, noteSuppressedEffect } from './_lib/effects.js';
 import { evaluateCommitPolicy, assessCommitReceipt, digestKind } from './_lib/commit-policy.js';
 import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
-import { internalAuthHeaders, requireInternalAuth, tradingAuthHeaders } from './_lib/request-security.js';
+import { internalAuthHeaders, requireInternalAuth, requireOpsAuth, tradingAuthHeaders } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 300 };
@@ -25,7 +27,7 @@ const SB_KEY = bobbyReadKey();
 if (!SB_KEY) {
   console.error('[Cycle] FATAL: no Supabase key in env (SUPABASE_SERVICE_KEY / SUPABASE_SERVICE_ROLE_KEY / VITE_SUPABASE_ANON_KEY all missing)');
 }
-const READONLY_FALLBACK_HOSTS = [BOBBY_PROTOCOL_BASE_URL, 'https://defimexico.org', 'https://defi-mexico-hub.vercel.app'];
+const READONLY_FALLBACK_HOSTS = [BOBBY_PROTOCOL_BASE_URL];
 
 function extractBoundedSection(source: string, openTag: string, closeTag: string, maxLength = 50_000): string {
   const start = source.indexOf(openTag);
@@ -658,15 +660,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Every path can spend API quota and persist cycle output; live paths can
   // additionally execute trades and write on-chain, so auth is fail-closed.
+  // Scheduled runs (GET, Vercel cron) authenticate with the internal/cron
+  // secret; MANUAL runs (POST) need the independent ops secret on top.
   if (!requireInternalAuth(req, res)) return;
+  if (req.method === 'POST' && !requireOpsAuth(req, res)) return;
+
+  // Dynamic kill switches: a write freeze stops every cycle (not only live);
+  // canary forces dryrun with zero external effects.
+  const control = await getBobbyControl();
+  if (control.writeFreeze) {
+    return res.status(503).json({ error: 'Bobby writes are frozen', source: control.source, note: control.note });
+  }
+  const canary = control.canary || process.env.BOBBY_CYCLE_CANARY === '1';
 
   const body = req.method === 'POST' ? (req.body || {}) : {};
   const language = body.language || 'es';
   const lang = language === 'es' ? 'es' : 'en';
-  const kind = req.method === 'GET' ? 'cron' : (body.kind || 'manual');
+  const kind = canary ? 'canary' : (req.method === 'GET' ? 'cron' : (body.kind || 'manual'));
   const requestedMode = body.mode || kind;
   const yieldCandidates = resolveYieldCandidates(body.yieldCandidates);
-  const challengeMode = resolveChallengeMode(req.method, requestedMode);
+  const challengeMode: ChallengeMode = canary ? 'dryrun' : resolveChallengeMode(req.method, requestedMode);
   if (challengeMode === 'live' && process.env.PROTOCOL_CUTOVER_FREEZE === 'true') {
     return res.status(503).json({
       error: 'Live Bobby cycles are frozen during the protocol cutover',
@@ -674,7 +687,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   const okxMode = challengeMode === 'paper' ? 'paper' : 'live';
   const isDryRun = challengeMode === 'dryrun';
-  const shouldPublishTwitter = challengeMode === 'live';
+  const effects = { mode: challengeMode, canary };
+  const effectsAllowed = externalEffectsAllowed(effects);
+  if (!effectsAllowed) noteSuppressedEffect('all-external', effects, `kind=${kind}`);
+  const shouldPublishTwitter = challengeMode === 'live' && effectsAllowed;
   const startTime = Date.now();
   let cycleId: string | undefined;
 
@@ -697,7 +713,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchPositions(okxMode),
       getTrackRecord(),
       getRecentContradictions(),
-      fetch('https://defimexico.org/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5')
+      fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5`)
         .then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
 
@@ -1294,7 +1310,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
                       // Send emergency Telegram notification
                       const TG_BOT = process.env.TELEGRAM_BOT_TOKEN;
                       const TG_CHAT = process.env.TELEGRAM_CHAT_ID || '1026323121';
-                      if (TG_BOT) {
+                      if (TG_BOT && effectsAllowed) {
                         fetch(`https://api.telegram.org/bot${TG_BOT}/sendMessage`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
@@ -1346,7 +1362,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
           // Notify via Telegram
           const TG_BOT = process.env.TELEGRAM_BOT_TOKEN;
           const TG_CHAT = process.env.TELEGRAM_CHAT_ID || '1026323121';
-          if (TG_BOT) {
+          if (TG_BOT && effectsAllowed) {
             fetch(`https://api.telegram.org/bot${TG_BOT}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1814,8 +1830,9 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
     }
 
     // Deliver Bobby's public debate to active Telegram groups
-    if (threadId) {
-      fetch('https://defimexico.org/api/telegram-deliver', {
+    if (threadId && !effectsAllowed) noteSuppressedEffect('delivery', effects, `thread ${threadId}`);
+    if (threadId && effectsAllowed) {
+      fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/telegram-deliver`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

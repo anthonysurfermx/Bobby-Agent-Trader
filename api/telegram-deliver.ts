@@ -10,13 +10,14 @@ import { createClient } from '@supabase/supabase-js';
 import { tgSendVoiceAnalysis } from './_lib/telegram.js';
 import { requireInternalAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 60 };
 
 const SB_URL = bobbyDbUrl();
 const SB_SERVICE_KEY = bobbyServiceKey();
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const BASE_URL = 'https://defimexico.org';
+const BASE_URL = BOBBY_PROTOCOL_BASE_URL;
 
 // B2C: 100 free messages, then $1 USDT
 const FREE_MESSAGE_LIMIT = 100;

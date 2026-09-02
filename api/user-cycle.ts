@@ -218,8 +218,6 @@ function buildMarketContext(profile: AgentProfile, intel: IntelSnapshot): string
 async function fetchIntel(): Promise<IntelSnapshot | null> {
   const urls = [
     `${BOBBY_PROTOCOL_BASE_URL}/api/bobby-intel`,
-    'https://defimexico.org/api/bobby-intel',
-    'https://defi-mexico-hub.vercel.app/api/bobby-intel',
   ];
 
   for (const url of urls) {
@@ -579,7 +577,7 @@ async function runSingleProfile(
   // Fire-and-forget: deliver to Telegram (DMs + Groups)
   const threadId = typeof thread.id === 'string' ? thread.id : null;
   if (threadId) {
-    fetch('https://defimexico.org/api/telegram-deliver', {
+    fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/telegram-deliver`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

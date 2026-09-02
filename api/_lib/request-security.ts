@@ -50,6 +50,28 @@ export function requireInternalAuth(req: VercelRequest, res: VercelResponse): bo
   return true;
 }
 
+/**
+ * Independent authorization for MANUAL runs of scheduled jobs (a human or an
+ * ops script triggering bobby-cycle / settle-trades by hand). Requires its
+ * own secret, BOBBY_OPS_SECRET, presented as `x-bobby-ops` or Bearer, so a
+ * leaked cron secret cannot start cycles on demand. Fail-closed when the
+ * secret is not configured.
+ */
+export function requireOpsAuth(req: VercelRequest, res: VercelResponse): boolean {
+  const expected = process.env.BOBBY_OPS_SECRET || '';
+  if (!expected) {
+    res.status(503).json({ error: 'Manual runs are disabled: BOBBY_OPS_SECRET is not configured' });
+    return false;
+  }
+  const header = req.headers['x-bobby-ops'];
+  const provided = typeof header === 'string' ? header : providedInternalSecret(req);
+  if (!provided || !secretsMatch(provided, expected)) {
+    res.status(401).json({ error: 'Unauthorized (ops)' });
+    return false;
+  }
+  return true;
+}
+
 /** Header object for server-to-server calls to privileged endpoints. */
 export function internalAuthHeaders(): Record<string, string> {
   const secret = configuredInternalSecrets()[0] || '';

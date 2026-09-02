@@ -1,4 +1,5 @@
 import type { VercelResponse } from '@vercel/node';
+import { lastKnownControl } from './control.js';
 import {
   BASE_CHAIN_ID,
   BASE_SEPOLIA_CHAIN_ID,
@@ -25,7 +26,7 @@ function isConfiguredAddress(value: string): boolean {
 }
 
 export function isProtocolCutoverFrozen(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.PROTOCOL_CUTOVER_FREEZE === 'true';
+  return env.PROTOCOL_CUTOVER_FREEZE === 'true' || lastKnownControl()?.writeFreeze === true;
 }
 
 /**
@@ -89,8 +90,8 @@ export function evaluateProtocolWriteSafety(
     // Base-family writer through this shared guard — previously only
     // bobby-cycle checked it, leaving xlayer-record able to sign while
     // "frozen". Freeze wins over every other latch.
-    if (env.PROTOCOL_CUTOVER_FREEZE === 'true') {
-      blockers.push('PROTOCOL_CUTOVER_FREEZE is active — writes are frozen during the cutover');
+    if (isProtocolCutoverFrozen(env)) {
+      blockers.push('write freeze is active (PROTOCOL_CUTOVER_FREEZE or bobby_control) — writes are frozen');
     }
   }
 
