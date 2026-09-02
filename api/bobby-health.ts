@@ -7,6 +7,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { bobbyDbRef, bobbyDbConfigured } from './_lib/bobby-db.js';
 import { getBobbyControl } from './_lib/control.js';
 import { rateLimitSaltConfigured } from './_lib/rate-limit.js';
+import { transcriptSecretSeparate } from './_lib/transcript-receipt.js';
 
 export const config = { maxDuration: 10 };
 
@@ -30,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dynamic: control.source === 'table' || control.source === 'edge-config',
       note: control.note,
     },
-    ops: { manualRunsEnabled: Boolean(process.env.BOBBY_OPS_SECRET), rateLimitSaltConfigured: rateLimitSaltConfigured() },
+    ops: { manualRunsEnabled: Boolean(process.env.BOBBY_OPS_SECRET), rateLimitSaltConfigured: rateLimitSaltConfigured(), transcriptSecretSeparate: transcriptSecretSeparate() },
     deployment: {
       env: process.env.VERCEL_ENV || 'local',
       sha: deploySha ? deploySha.slice(0, 7) : null,

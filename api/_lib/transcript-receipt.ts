@@ -40,9 +40,25 @@ export interface ReceiptPayload {
 
 export interface DebateSection { agent: 'alpha' | 'redteam' | 'cio'; content: string }
 
+/**
+ * Receipts are signed with their OWN key. In production BOBBY_TRANSCRIPT_SECRET
+ * is required — falling back to BOBBY_SESSION_SECRET would let one secret
+ * mint both wallet sessions and debate receipts (Codex review). Outside
+ * production the session secret is still accepted so local dev needs one
+ * variable less.
+ */
 function key(): Buffer | null {
-  const raw = (process.env.BOBBY_TRANSCRIPT_SECRET || process.env.BOBBY_SESSION_SECRET || '').trim();
-  return raw.length >= 32 ? Buffer.from(raw, 'utf8') : null;
+  const own = (process.env.BOBBY_TRANSCRIPT_SECRET || '').trim();
+  if (own.length >= 32) return Buffer.from(own, 'utf8');
+  if (process.env.VERCEL_ENV === 'production') return null;
+  const shared = (process.env.BOBBY_SESSION_SECRET || '').trim();
+  return shared.length >= 32 ? Buffer.from(shared, 'utf8') : null;
+}
+
+/** True when receipts use a key of their own (never the session secret). */
+export function transcriptSecretSeparate(): boolean {
+  const own = (process.env.BOBBY_TRANSCRIPT_SECRET || '').trim();
+  return own.length >= 32 && own !== (process.env.BOBBY_SESSION_SECRET || '').trim();
 }
 
 export function transcriptHash(transcript: string): string {

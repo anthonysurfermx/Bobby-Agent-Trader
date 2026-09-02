@@ -146,3 +146,8 @@ Findings 1–5 and 7 of the Codex review are addressed in code — see
   in `api_cache` and waits for its real expiry (a new deployment does NOT
   reset it); Heartbeat explorer fallback moved to Basescan. Details in
   `docs/infra/2026-09-02-codex-feedback-fixes.md` (round 2).
+- **Round 5 (Codex)**: `BOBBY_TRANSCRIPT_SECRET` is now its own Secret and the
+  only receipt key in production; the gate exercises forum-publish through
+  `/api/openclaw-chat` like the browser and never signs anything. Running it
+  needs no signing secret — only the Supabase URL/keys, `GATE_EXPECTED_SHA`
+  and the rate-limit salt from the Keychain.

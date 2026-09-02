@@ -187,3 +187,39 @@ must be a Secret.
 
 **Note.** Rotating the salt invalidates the limiter keys written under the
 previous value; the first gate run after deploying starts on a clean window.
+
+---
+
+## Round 5 — the gate must not mint receipts; separate signing keys (closed)
+
+**Findings (P1 ×2).** (a) Section C imported `issueTranscriptReceipt` and
+needed the deployment's signing secret, so a `GATE PASSED` required exporting
+a production signing key — and the gate itself could forge arbitrary
+receipts. (b) Receipts fell back to `BOBBY_SESSION_SECRET`: one key minted
+both wallet sessions and debate receipts.
+
+**Done.**
+- `BOBBY_TRANSCRIPT_SECRET` created as an independent 32-byte **Secret** in
+  Production and Preview (branch `feat/phase0-hardening`). Not stored in the
+  Keychain, not extracted, never printed.
+- `api/_lib/transcript-receipt.ts`: in production only `BOBBY_TRANSCRIPT_SECRET`
+  signs receipts (no fallback); outside production the session secret is
+  still accepted for local dev. `/api/bobby-health` reports
+  `ops.transcriptSecretSeparate` (boolean). Redeploying invalidates only
+  receipts issued before the switch (24 h TTL); wallet sessions are untouched.
+- The gate's section C now follows the **browser flow** and holds no signing
+  capability: throw-away wallet A asks `/api/openclaw-chat` (same
+  `[MANDATORY TRADING ROOM DEBATE …]` trailer the web chat sends), the
+  transcript and the receipt are rebuilt from the SSE stream exactly like the
+  UI does, then with a second throw-away wallet B:
+  - B publishes A's receipt → 403
+  - A publishes its own → thread created, conviction stored in 0..1, owner A
+  - replay → 409
+  - edited transcript → 403
+  - forged signature → 403, missing receipt → 400
+  - the same request without a session → no receipt (`no-wallet-session`)
+  - conviction out of range → proven at the RPC directly with the service
+    role (`bobby_publish_debate` raises `22023`, no receipt row left), because
+    production must never sign such a receipt
+  Five `forum-publish` calls per run (within the 6/h budget); thread, posts and
+  the consumed receipt are removed at the end.
