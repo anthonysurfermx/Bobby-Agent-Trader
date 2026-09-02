@@ -1,0 +1,167 @@
+[23:46:54] verify · egpixaunlnzauztbrnuz → qbvdqkknnuweatptjohi
+OK     manifests come from two different projects  — egpixaunlnzauztbrnuz vs qbvdqkknnuweatptjohi
+OK     source manifest was taken fail-closed (no --allow-missing)
+OK     target manifest was taken fail-closed (no --allow-missing)
+OK     both manifests applied the same exclusion set  — ["e2e-test-agent"] vs ["e2e-test-agent"]
+OK     agent_config: exists on source
+OK     agent_config: exists on target
+OK     agent_config: row count 0 = 0
+OK     agent_config: row hash identical
+OK     agent_cycles: exists on source
+OK     agent_cycles: exists on target
+OK     agent_cycles: row count 3402 = 3402
+OK     agent_cycles: row hash identical
+OK     agent_events: exists on source
+OK     agent_events: exists on target
+OK     agent_events: row count 7252 = 7252
+OK     agent_events: row hash identical
+OK     agent_events.payment_tx: proof values identical (0 non-null)  — target 0 non-null, a9b217e53f87 vs a9b217e53f87
+OK     agent_events.trade_tx: proof values identical (7 non-null)  — target 7 non-null, 0af33a8d7930 vs 0af33a8d7930
+OK     agent_macro_events: exists on source
+OK     agent_macro_events: exists on target
+OK     agent_macro_events: row count 0 = 0
+OK     agent_macro_events: row hash identical
+OK     agent_market_snapshots: exists on source
+OK     agent_market_snapshots: exists on target
+OK     agent_market_snapshots: row count 0 = 0
+OK     agent_market_snapshots: row hash identical
+OK     agent_memory: exists on source
+OK     agent_memory: exists on target
+OK     agent_memory: row count 0 = 0
+OK     agent_memory: row hash identical
+OK     agent_messages: exists on source
+OK     agent_messages: exists on target
+OK     agent_messages: row count 356 = 356
+OK     agent_messages: row hash identical
+OK     agent_positions: exists on source
+OK     agent_positions: exists on target
+OK     agent_positions: row count 0 = 0
+OK     agent_positions: row hash identical
+OK     agent_profiles: exists on source
+OK     agent_profiles: exists on target
+OK     agent_profiles: row count 2 = 2
+OK     agent_profiles: row hash identical
+OK     agent_source_health: exists on source
+OK     agent_source_health: exists on target
+OK     agent_source_health: row count 0 = 0
+OK     agent_source_health: row hash identical
+OK     bobby_control: exists on source
+OK     bobby_control: exists on target
+OK     bobby_control: row count 1 = 1
+OK     bobby_control: row hash identical
+OK     bobby_early_access: exists on source
+OK     bobby_early_access: exists on target
+OK     bobby_early_access: row count 0 = 0
+OK     bobby_early_access: row hash identical
+OK     cycle_transitions: exists on source
+OK     cycle_transitions: exists on target
+OK     cycle_transitions: row count 0 = 0
+OK     cycle_transitions: row hash identical
+OK     forum_publish_receipts: exists on source
+OK     forum_publish_receipts: exists on target
+OK     forum_publish_receipts: row count 0 = 0
+OK     forum_publish_receipts: row hash identical
+OK     hardness_agents: exists on source
+OK     hardness_agents: exists on target
+OK     hardness_agents: row count 0 = 0
+OK     hardness_agents: row hash identical
+OK     indicator_cache: exists on source
+OK     indicator_cache: exists on target
+OK     indicator_cache: row count 0 = 0
+OK     indicator_cache: row hash identical
+OK     llm_calls: exists on source
+OK     llm_calls: exists on target
+OK     llm_calls: row count 0 = 0
+OK     llm_calls: row hash identical
+OK     mcp_payment_challenges: exists on source
+OK     mcp_payment_challenges: exists on target
+OK     mcp_payment_challenges: row count 432 = 432
+OK     mcp_payment_challenges: row hash identical
+OK     memory_objects: exists on source
+OK     memory_objects: exists on target
+OK     memory_objects: row count 221 = 221
+OK     memory_objects: row hash identical
+OK     sandbox_runs: exists on source
+OK     sandbox_runs: exists on target
+OK     sandbox_runs: row count 15 = 15
+OK     sandbox_runs: row hash identical
+OK     trade_intents: exists on source
+OK     trade_intents: exists on target
+OK     trade_intents: row count 0 = 0
+OK     trade_intents: row hash identical
+OK     user_feedback: exists on source
+OK     user_feedback: exists on target
+OK     user_feedback: row count 0 = 0
+OK     user_feedback: row hash identical
+OK     user_interests: exists on source
+OK     user_interests: exists on target
+OK     user_interests: row count 8 = 8
+OK     user_interests: row hash identical
+OK     hardness_agent_sessions: exists on source
+OK     hardness_agent_sessions: exists on target
+OK     hardness_agent_sessions: row count 0 = 0
+OK     hardness_agent_sessions: row hash identical
+OK     hardness_agent_proofs: exists on source
+OK     hardness_agent_proofs: exists on target
+OK     hardness_agent_proofs: row count 0 = 0
+OK     hardness_agent_proofs: row hash identical
+OK     hardness_agent_proofs.prediction_hash: proof values identical (0 non-null)  — target 0 non-null, e3b0c44298fc vs e3b0c44298fc
+OK     hardness_agent_proofs.commit_tx_hash: proof values identical (0 non-null)  — target 0 non-null, e3b0c44298fc vs e3b0c44298fc
+OK     hardness_agent_proofs.signal_tx_hash: proof values identical (0 non-null)  — target 0 non-null, e3b0c44298fc vs e3b0c44298fc
+OK     hardness_agent_proofs.resolve_tx_hash: proof values identical (0 non-null)  — target 0 non-null, e3b0c44298fc vs e3b0c44298fc
+OK     agent_signals: exists on source
+OK     agent_signals: exists on target
+OK     agent_signals: row count 0 = 0
+OK     agent_signals: row hash identical
+OK     agent_trades: exists on source
+OK     agent_trades: exists on target
+OK     agent_trades: row count 0 = 0
+OK     agent_trades: row hash identical
+OK     agent_trades.tx_hash: proof values identical (0 non-null)  — target 0 non-null, e3b0c44298fc vs e3b0c44298fc
+OK     agent_trades.intent_hash: proof values identical (0 non-null)  — target 0 non-null, e3b0c44298fc vs e3b0c44298fc
+OK     user_digests: exists on source
+OK     user_digests: exists on target
+OK     user_digests: row count 87 = 87
+OK     user_digests: row hash identical
+OK     forum_threads: exists on source
+OK     forum_threads: exists on target
+OK     forum_threads: row count 3399 = 3399
+OK     forum_threads: row hash identical
+OK     forum_threads.resolution_tx_hash: proof values identical (0 non-null)  — target 0 non-null, 37213b3763a3 vs 37213b3763a3
+OK     forum_posts: exists on source
+OK     forum_posts: exists on target
+OK     forum_posts: row count 10980 = 10980
+OK     forum_posts: row hash identical
+OK     agent_position_rechecks: exists on source
+OK     agent_position_rechecks: exists on target
+OK     agent_position_rechecks: row count 0 = 0
+OK     agent_position_rechecks: row hash identical
+OK     mcp_payment_receipts: exists on source
+OK     mcp_payment_receipts: exists on target
+OK     mcp_payment_receipts: row count 0 = 0
+OK     mcp_payment_receipts: row hash identical
+OK     mcp_payment_receipts.tx_hash: proof values identical (0 non-null)  — target 0 non-null, e3b0c44298fc vs e3b0c44298fc
+OK     mcp_payment_receipts.response_hash: proof values identical (0 non-null)  — target 0 non-null, e3b0c44298fc vs e3b0c44298fc
+OK     telegram_connections: exists on source
+OK     telegram_connections: exists on target
+OK     telegram_connections: row count 0 = 0
+OK     telegram_connections: row hash identical
+OK     hardness_agent_sessions.agent_id → hardness_agents.agent_id: no orphans  — 0 refs, 0 orphan(s)
+OK     hardness_agent_proofs.session_id → hardness_agent_sessions.session_id: no orphans  — 0 refs, 0 orphan(s)
+OK     agent_signals.cycle_id → agent_cycles.id: no orphans  — 0 refs, 0 orphan(s)
+OK     agent_trades.cycle_id → agent_cycles.id: no orphans  — 0 refs, 0 orphan(s)
+OK     user_digests.cycle_id → agent_cycles.id: no orphans  — 86 refs, 0 orphan(s)
+OK     forum_threads.agent_profile_id → agent_profiles.id: no orphans  — 2 refs, 0 orphan(s)
+OK     forum_posts.thread_id → forum_threads.id: no orphans  — 10980 refs, 0 orphan(s)
+OK     agent_position_rechecks.thread_id → forum_threads.id: no orphans  — 0 refs, 0 orphan(s)
+OK     mcp_payment_receipts.challenge_id → mcp_payment_challenges.challenge_id: no orphans  — 0 refs, 0 orphan(s)
+OK     telegram_connections.agent_profile_id → agent_profiles.id: no orphans  — 0 refs, 0 orphan(s)
+OK     agent_memory: sequence beyond max(id)  — max=null last=1 nextval=1
+OK     cycle_transitions: sequence beyond max(id)  — max=null last=1 nextval=1
+OK     hardness_agents: sequence beyond max(id)  — max=null last=1 nextval=1
+OK     llm_calls: sequence beyond max(id)  — max=null last=1 nextval=1
+OK     trade_intents: sequence beyond max(id)  — max=null last=1 nextval=1
+OK     hardness_agent_sessions: sequence beyond max(id)  — max=null last=1 nextval=1
+OK     hardness_agent_proofs: sequence beyond max(id)  — max=null last=1 nextval=1
+
+VERIFIED: counts, row hashes, proof values, references and sequences match.

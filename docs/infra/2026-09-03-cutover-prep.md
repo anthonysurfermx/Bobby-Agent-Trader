@@ -117,7 +117,41 @@ destination baseline 3/33 (`--allow-missing`); T0 on the destination *without* t
 flag fails closed (no file written); selftest 10/10; proofs check surfaces the two
 legacy findings above. Evidence in `docs/infra/evidence/2026-09-03-*`.
 
-## What is still NOT done (needs Codex's GO to apply)
+## Restore rehearsal on the destination — DONE (2026-09-03 23:45–23:55 UTC, Anthony's GO)
+
+Anthony (investor demo today) authorised applying to the destination and clearing the
+host caches (12 GiB free now). Executed, all read-only on legacy:
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| `0002 → 0004 → 0003` applied for real (one transaction) | 35 tables, RLS on 35, 45 policies, pgvector installed | psql output |
+| T0 source (fail-closed) + export | 33/33 tables, **26,155 rows**, 89 MB | `t0-source-strict.json` |
+| import (dry-run, then real) | index complete, every file re-hashed, 26,155 rows upserted in FK order | — |
+| `sequences.sql` | 7 sequences set | — |
+| T0 target + `verify` | **VERIFIED — 164/164**: counts, row hashes, proof-column hashes, 0 orphans on 10 FKs, `bobby_sequence_check` ok on 7 tables | `restore-verify-destination.txt`, `t0-target-after-restore.json` |
+| `verify-proofs --side target` | **PROOFS VERIFIED** (7 bound tx, 0 failures) | `destination-proofs-check.txt` |
+| gate sections **A + B** against the destination (policy matrix + canaries, service key of `bobby-protocol`) | **129 OK, 0 FAIL** | `gate-AB-destination.txt` |
+
+Section C of the gate (legitimate path through the API) needs an API that points at
+the destination: it runs immediately after the cut, before traffic is released.
+
+## Cut-over checklist (production change — waits for Anthony's explicit GO)
+
+Backend resolves `BOBBY_SUPABASE_URL` / `BOBBY_SUPABASE_ANON_KEY` /
+`BOBBY_SUPABASE_SERVICE_ROLE_KEY` first; the browser uses `VITE_BOBBY_SUPABASE_URL` /
+`VITE_BOBBY_SUPABASE_ANON_KEY` (build-time). None of them exist in Production yet.
+Freeze = `bobby_control.write_freeze` (row `global`), read by every writer within 10 s.
+
+1. **Freeze legacy**: PATCH `bobby_control` `write_freeze=true` (service key) → writers answer 503, reads keep working.
+2. **Delta copy**: T0 source → export → import (idempotent upsert) → sequences → T0 target → `verify` = VERIFIED (both manifests taken under freeze, so hashes must be identical).
+3. **Arm the journal** on the destination: `select bobby_outbox_enable(<outboxPlan>)`; `verify --expect-outbox` OK. Set the destination's copied `bobby_control` row to `write_freeze=true` too (it is a copy of the frozen row already).
+4. **Env** in Vercel Production: the five variables above (service key sensitive, the rest plain), values from `.claude/supabase-bobby-protocol.env`.
+5. **Deploy**: fast-forward `main` to this branch (no runtime change) and push → Git-integrated production build with the new env. Health must show `db.ref = qbvdqkknnuweatptjohi` and the new `fullSha`.
+6. **Gate C** against the new production (`GATE_EXPECTED_SHA` = new main) → `GATE PASSED` (A+B+C).
+7. **Unfreeze the destination** (`write_freeze=false`), smoke `/`, `/agentic-world/bobby`, `/agentic-world/forum`, `/desk`. Legacy stays frozen (read-only) as the rollback target.
+8. **Rollback** (any time): freeze destination → `replay-outbox --from target` → REPLAY COMPLETE → remove the five env vars → redeploy → unfreeze legacy.
+
+Expected freeze window: about 10 minutes (steps 1–7).
 
 - Apply `0002 → 0004 → 0003` to the destination for real (the dry run proves they apply).
 - Restore rehearsal: export → import → sequences → T0 target → verify → verify-proofs

@@ -1,0 +1,13 @@
+[23:47:22] verify proofs · qbvdqkknnuweatptjohi
+[23:47:22] 0 hardness proof(s) checked (excluded agents: e2e-test-agent)
+OK     agent_events 0f8a4402: trade_tx bound to TrackRecord(196)  — 0x1461f6425b… mined
+OK     agent_events 19b09c6d: trade_tx bound to AdversarialBounties(196)  — 0x3deaeca348… mined
+OK     agent_events 1b758a65: trade_tx bound to TrackRecord(196)  — 0x8868e12ab2… mined
+OK     agent_events 3f1aff89: trade_tx bound to HardnessRegistry(196)  — 0x6305cd1449… mined
+OK     agent_events 4e079b69: trade_tx bound to ConvictionOracle(196)  — 0x24cfa5593a… mined
+OK     agent_events 50f89f13: trade_tx bound to AdversarialBounties(196)  — 0x700f2ea1be… mined
+OK     agent_events b531682a: trade_tx bound to HardnessRegistry(196)  — 0x0598436685… mined
+[23:47:27] agent_events: 7 tx(s) checked
+[23:47:27] agent_trades / forum_threads / mcp_payment_receipts: 0 tx(s) checked
+
+PROOFS VERIFIED: every transaction is mined, at the expected contract, and bound to its row.
