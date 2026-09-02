@@ -10,6 +10,7 @@ export interface SpeakOptions {
   voice: string;
   vibe?: 'wise' | 'direct' | 'analytical';
   essential?: boolean;
+  playbackRate?: number;
 }
 
 export function useCompanionVoice() {
@@ -68,11 +69,11 @@ export function useCompanionVoice() {
     tick();
   };
 
-  const speakFallback = (text: string) => {
+  const speakFallback = (text: string, playbackRate: number) => {
     try {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = isSpanish() ? 'es-MX' : 'en-US';
-      u.rate = 1;
+      u.rate = playbackRate;
       u.onend = () => { setSpeaking(false); stopMeter(); };
       setSpeaking(true);
       window.speechSynthesis.speak(u);
@@ -83,6 +84,9 @@ export function useCompanionVoice() {
     stop();
     const gen = ++generation.current;
     const essential = opts.essential ?? true;
+    // Character intros and ambient personality lines should feel snappy;
+    // analytical answers keep their deliberate 1× cadence for clarity.
+    const playbackRate = Math.min(1.25, Math.max(0.85, opts.playbackRate ?? (essential ? 1 : 1.12)));
     const key = `${opts.voice}|${opts.vibe ?? ''}|${ttsLang()}|${text}`;
     try {
       let url = cache.current.get(key);
@@ -102,13 +106,15 @@ export function useCompanionVoice() {
           if (!blob && attempt === 0) await new Promise((r) => setTimeout(r, 1200));
         }
         if (gen !== generation.current) return;
-        if (!blob) { if (essential) speakFallback(text); return; }
+        if (!blob) { if (essential) speakFallback(text, playbackRate); return; }
         url = URL.createObjectURL(blob);
         if (cache.current.size > 40) { const first = cache.current.keys().next().value; if (first) { URL.revokeObjectURL(cache.current.get(first)!); cache.current.delete(first); } }
         cache.current.set(key, url);
       }
       const audio = ensureAudio();
       audio.src = url;
+      audio.playbackRate = playbackRate;
+      audio.preservesPitch = true;
       audio.onended = () => { if (gen === generation.current) { setSpeaking(false); stopMeter(); } };
       audio.onerror = () => { if (gen === generation.current) { setSpeaking(false); stopMeter(); } };
       await ctxRef.current?.resume?.();
@@ -117,7 +123,7 @@ export function useCompanionVoice() {
       setSpeaking(true);
       meter();
     } catch {
-      if (gen === generation.current && essential) speakFallback(text);
+      if (gen === generation.current && essential) speakFallback(text, playbackRate);
     }
   }, [stop]);
 
