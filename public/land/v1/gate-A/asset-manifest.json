@@ -8,6 +8,11 @@
     512
   ],
   "coordinate_space": "all anchor/contentBounds/occlusionHeight values are fractions 0-1 of the sprite canvas; multiply by the variant width/height",
+  "layer_encoding": {
+    "albedo": "straight alpha; normal composition",
+    "shadow": "opaque grayscale luminance mask; map luminance to alpha, tint black at 55% opacity",
+    "glow": "opaque RGB luminance carrier; map luminance to alpha, then screen/additive composition"
+  },
   "items": [
     {
       "id": "aura_core",
