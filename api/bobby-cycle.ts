@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { txUrl } from './_lib/chains.js';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bobby-technical.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { getBobbyControl } from './_lib/control.js';
@@ -15,7 +16,7 @@ import { evaluateCommitPolicy, assessCommitReceipt, digestKind } from './_lib/co
 import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
-import { internalAuthHeaders, requireInternalAuth, requireOpsAuth, tradingAuthHeaders } from './_lib/request-security.js';
+import { internalAuthHeaders, requireInternalAuth, requireOpsAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 300 };
@@ -194,11 +195,9 @@ async function callStructuredVerdict(system: string, userMsg: string, timeoutMs 
 // ---- Fetch local internal API ----
 // noFallback=true for mutant actions (open_position, close_position) — NEVER retry those
 async function fetchLocalApi(path: string, body: any, noFallback = false): Promise<any> {
-  const authHeaders = path === '/api/okx-perps'
-    ? tradingAuthHeaders()
-    : path === '/api/xlayer-record'
-      ? recordAuthHeaders()
-      : internalAuthHeaders();
+  const authHeaders = path === '/api/protocol-record'
+    ? recordAuthHeaders()
+    : internalAuthHeaders();
   // Sepolia canary fix: on preview/dev deployments self-calls MUST stay on THIS
   // deployment — routing through the production domain would make the cycle
   // write on-chain through prod (X Layer, old recorder). VERCEL_URL is the
@@ -254,7 +253,7 @@ function resolveChallengeMode(reqMethod: string, requestedMode: string): Challen
   return 'dryrun';
 }
 
-type YieldVenueType = 'defi_onchain' | 'okx_earn' | 'none';
+type YieldVenueType = 'defi_onchain' | 'none';
 
 interface YieldCandidate {
   investmentId: string | null;
@@ -396,7 +395,7 @@ function normalizeYieldCandidate(raw: any): YieldCandidate | null {
   const token = typeof raw.token === 'string' ? raw.token.trim().toUpperCase() : '';
   const apy = parseNumeric(raw.apy);
   if (!platform || !chain || !token || apy === null) return null;
-  const venueType = raw.venueType === 'okx_earn' ? 'okx_earn' : 'defi_onchain';
+  const venueType: YieldVenueType = 'defi_onchain'; // okx_earn retired 2026-09-03: on-chain venues only
   return {
     investmentId: raw.investmentId ? String(raw.investmentId) : null,
     platform,
@@ -562,7 +561,7 @@ function formatTechnicalPulseBlock(technicalPulse: TechnicalMarketSummary | null
       .join(' | ');
     return `${asset.symbol}: ${asset.signal.toUpperCase()} | score ${formatSigned(asset.compositeScore, 3)} | agreement ${(asset.agreement * 100).toFixed(0)}% | ${indicatorLines}`;
   }).join('\n');
-  return `\n<TECHNICAL_PULSE source="OKX Agent Trade Kit">\nREGIME: ${technicalPulse.regime}\n${leaderLine}\n${assetLines}\n</TECHNICAL_PULSE>`;
+  return `\n<TECHNICAL_PULSE source="market data (public)">\nREGIME: ${technicalPulse.regime}\n${leaderLine}\n${assetLines}\n</TECHNICAL_PULSE>`;
 }
 
 function directionMatchesTechnical(
@@ -701,8 +700,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       Promise.resolve([] as any[]), // OKX positions: retired 2026-09-03 (no account reads)
       getTrackRecord(),
       getRecentContradictions(),
-      fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5`)
-        .then(r => r.ok ? r.json() : null).catch(() => null),
+      Promise.resolve(null), // OKX OnchainOS smart-money leaderboard: retired 2026-09-03
     ]);
 
     const testState = body.testState as {
@@ -792,14 +790,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const technicalPulse = intel.technicalPulse as TechnicalMarketSummary | undefined;
     const indicatorBlock = formatTechnicalPulseBlock(technicalPulse);
 
-    // Smart money leaderboard block (OKX OnchainOS address analysis)
-    const smartMoneyBlock = smartMoney?.ok && Array.isArray(smartMoney.leaderboard) && smartMoney.leaderboard.length > 0
-      ? `\n<SMART_MONEY_LEADERBOARD source="OKX OnchainOS">\n${
-          smartMoney.leaderboard.slice(0, 5).map((w: any, i: number) =>
-            `${i + 1}. ${w.walletType} | ${w.tokenSymbol} | $${(w.amountUsd / 1000).toFixed(0)}K${w.pnl ? ` | PnL $${w.pnl.toFixed(0)}` : ''}${w.winRate ? ` | WR ${(w.winRate * 100).toFixed(0)}%` : ''} | ${w.address.slice(0, 10)}...`
-          ).join('\n')
-        }\n</SMART_MONEY_LEADERBOARD>`
-      : '';
+    // Smart-money leaderboard (OKX OnchainOS) retired 2026-09-03: no block.
+    const smartMoneyBlock = '';
+    void smartMoney;
 
     const contextBlock = `${intel.briefing}${indicatorBlock}${smartMoneyBlock}${memoryBlock}${positionsBlock}`;
 
@@ -831,7 +824,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Alpha Hunter (Haiku — cheap, aggressive, scans full market)
     alphaPost = await callClaude('claude-haiku-4-5-20251001',
-      `You are Alpha Hunter — a young hungry female trader. Scan ALL assets (crypto + stocks). Find the single BEST trade. Be SPECIFIC: entry, target, stop, leverage. You MUST reference the TECHNICAL_PULSE section — cite the composite score, the signal (BULLISH/BEARISH), and at least 2 specific indicators (RSI, MACD, BB, SuperTrend, AHR999) with their exact values from OKX Agent Trade Kit. If the technical score supports your thesis, say so explicitly.${contradictionNote} ${langRule} 2-3 short paragraphs.`,
+      `You are Alpha Hunter — a young hungry female trader. Scan ALL assets (crypto + stocks). Find the single BEST trade. Be SPECIFIC: entry, target, stop, leverage. You MUST reference the TECHNICAL_PULSE section — cite the composite score, the signal (BULLISH/BEARISH), and at least 2 specific indicators (RSI, MACD, BB, SuperTrend, AHR999) with their exact values from the TECHNICAL_PULSE block. If the technical score supports your thesis, say so explicitly.${contradictionNote} ${langRule} 2-3 short paragraphs.`,
       `MARKET SCAN:\n${contextBlock}`, 350
     );
 
@@ -854,7 +847,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       redTeamIntensity = `You are Red Team — 15-year risk veteran. Destroy Alpha's thesis. Attack data gaps, selection bias, timing. Every paragraph is a kill shot.`;
     }
     redPost = await callClaude('claude-haiku-4-5-20251001',
-      `${redTeamIntensity} Reference the TECHNICAL_PULSE composite score — if it contradicts Alpha, use it as ammunition. Cite specific indicator readings (RSI, MACD, BB, SuperTrend) from OKX Agent Trade Kit with exact numbers. ${langRule} 2-3 short paragraphs.${
+      `${redTeamIntensity} Reference the TECHNICAL_PULSE composite score — if it contradicts Alpha, use it as ammunition. Cite specific indicator readings (RSI, MACD, BB, SuperTrend) from the TECHNICAL_PULSE block with exact numbers. ${langRule} 2-3 short paragraphs.${
         hasContradictions ? ` Recent failures: ${corrections.block}` : ''}`,
       `MARKET DATA:\n${contextBlock}\n\nALPHA HUNTER'S THESIS:\n${alphaPost}`, 350
     );
@@ -1102,7 +1095,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
     // ============================================================
     // PHASE 3c: Unified on-chain commit (TrackRecordV2 via recorder API)
     // ============================================================
-    // Single chain-neutral path: /api/xlayer-record selects the active
+    // Single chain-neutral path: /api/protocol-record selects the active
     // chain, applies the protocol write latches, and runs the V2
     // announce -> Pyth anchor -> commitTrade sequence. Awaited on purpose:
     // an orphaned promise can die when the serverless function returns,
@@ -1145,7 +1138,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
       console.error('[Cycle] Commit required but thesis is uncommittable — live execution will be blocked:', onchainCommitError);
     } else {
       try {
-        const commitRes = await fetchLocalApi('/api/xlayer-record', {
+        const commitRes = await fetchLocalApi('/api/protocol-record', {
           action: 'commit',
           threadId,
           symbol,
@@ -1371,8 +1364,8 @@ VIBE_PHRASE: No edge in the market and no clean yield rail yet. Stay liquid.
           cycle_id: cycleId || null,
           thread_id: yieldThreadId,
           status: 'recommended',
-          venue_type: yieldRecommendation.venueType === 'okx_earn' ? 'okx_earn' : 'defi_onchain',
-          funding_source: 'okx_cex',
+          venue_type: 'defi_onchain',
+          funding_source: 'wallet', // no exchange account behind Bobby since 2026-09-03
           investment_id: yieldRecommendation.investmentId,
           platform: yieldRecommendation.platform,
           chain: yieldRecommendation.chain,
@@ -1473,7 +1466,7 @@ CIO VERDICT:
 ${cioPost}
 
 EXECUTION RESULT:
-${executionResult ? `TRADE EXECUTED ON OKX ${challengeMode === 'paper' ? 'DEMO' : '& COMMITTED ON X LAYER'}` : `NO TRADE. Reason: ${tradeRejectedReason}`}
+${executionResult ? 'TRADE EXECUTED' : `NO TRADE (cycle never executes; swaps are user-signed on Base). Reason: ${tradeRejectedReason}`}
 
 YIELD RESULT:
 ${yieldRecommendation?.deploy
@@ -1634,7 +1627,7 @@ ${executeStr}
 📈 Win rate: ${track.wins}/${totalTrades} trades (${track.winRate}%)
 ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit'}
 
-#BobbyTrader #VibeTrading #OKX`;
+#BobbyTrader #VibeTrading #Base`;
 
     if (TWITTER_BEARER && shouldPublishTwitter) {
       try {
@@ -1681,7 +1674,7 @@ ${txHash ? `🔗 On-chain: ${txHash.slice(0, 10)}...` : '🔗 No on-chain commit
             ? `**EXECUTED** ${direction?.toUpperCase()} ${symbol} @ $${entryPrice}`
             : `HOLD — Conviction ${convStr}/10 (threshold: 3.5)`;
           const txStr = txHash
-            ? `On-chain proof: [${txHash.slice(0, 14)}...](https://www.oklink.com/xlayer/tx/${txHash})`
+            ? `On-chain proof: [${txHash.slice(0, 14)}...](${txUrl(txHash)})`
             : '';
           const guardrailStr = executionResult
             ? 'All 11 guardrails passed. Stop loss set. Commit-reveal recorded.'

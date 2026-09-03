@@ -85,7 +85,7 @@ const handlers: Array<[string, string, string, unknown, Record<string, string>?]
   ['sandbox-run', '../../api/sandbox-run.ts', 'POST', { playbook: 'x', ticker: 'BTC' }],
   ['settle-trades', '../../api/settle-trades.ts', 'POST', {}],
   ['telegram-access', '../../api/telegram-access.ts', 'POST', { group_id: 1 }],
-  ['xlayer-record', '../../api/xlayer-record.ts', 'POST', { thread_id: '00000000-0000-4000-8000-000000000000' }],
+  ['protocol-record', '../../api/protocol-record.ts', 'POST', { thread_id: '00000000-0000-4000-8000-000000000000' }],
   ['generate-activity', '../../api/generate-activity.ts', 'POST', {}],
   ['auto-bounty', '../../api/auto-bounty.ts', 'POST', {}],
   ['judge-mode', '../../api/judge-mode.ts', 'POST', {}],

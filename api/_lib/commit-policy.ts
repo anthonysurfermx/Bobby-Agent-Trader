@@ -1,4 +1,4 @@
-// Commit policy for the unified on-chain commit path (TrackRecordV2 via /api/xlayer-record).
+// Commit policy for the unified on-chain commit path (TrackRecordV2 via /api/protocol-record).
 //
 // Three distinct states — the distinction is what keeps the path fail-CLOSED:
 //

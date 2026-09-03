@@ -1716,7 +1716,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
 
           let text = `**PERFORMANCE_ANALYTICS**\n\n`;
           text += `TOTAL_RETURN: ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n`;
-          text += `EQUITY: $${s.currentEquity.toFixed(2)} USDT\n`;
+          text += `EQUITY: $${Number(s.currentEquity || 0).toFixed(2)} USDC (Base)\n`;
           text += `WIN_RATE: ${s.winRate.toFixed(0)}% (${s.wins}W / ${s.losses}L)\n`;
           text += `TRADES: ${s.totalTrades}\n`;
 
@@ -2600,10 +2600,10 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         if (data.ok) {
           setHudEquity(data.summary?.totalEquity || null);
           setHudPositions((data.openPositions || []).map((p: any) => ({
-            symbol: p.instId?.replace('-USDT-SWAP', '') || '?',
-            direction: p.posSide === 'short' ? 'SHORT' : 'LONG',
-            pnl: parseFloat(p.upl || '0'),
-            pnlPct: parseFloat(p.uplRatio || '0') * 100,
+            symbol: p.symbol || '?',
+            direction: 'LONG',
+            pnl: Number(p.unrealizedPnl || 0),
+            pnlPct: Number(p.unrealizedPnlPct || 0),
           })));
         }
       } catch { }

@@ -1,7 +1,7 @@
 // ============================================================
 // TradeHistory — Bobby's trade history with real PnL data
 // Stitch "Agent Terminal" design — Bloomberg-style trade cards
-// Data: /api/bobby-pnl (real OKX trades)
+// Data: /api/bobby-pnl (Base swaps verified on-chain, aggregate)
 // ============================================================
 
 import { useEffect, useState } from 'react';

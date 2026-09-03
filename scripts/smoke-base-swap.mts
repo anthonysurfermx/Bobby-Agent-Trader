@@ -72,15 +72,24 @@ for (const [tokenIn, tokenOut, amount] of pairs) {
 // The cycle hands the human an INTENT: quote-only, cycle-tagged, no calldata, nothing recorded.
 {
   const { prepareBaseIntent } = await import('../api/_lib/dex-execution.js');
-  const p = await prepareBaseIntent({ tokenSymbol: 'NVDA', amountUsd: 20, cycleId: '00000000-0000-4000-8000-000000000001' });
+  process.env.BOBBY_SESSION_SECRET = process.env.BOBBY_SESSION_SECRET || 'smoke-secret-not-real-00000000000000000000';
+  const { verifyIntent } = await import('../api/_lib/dex-execution.js');
+  const p = await prepareBaseIntent({ tokenSymbol: 'NVDA', amountUsd: 20, cycleId: '00000000-0000-4000-8000-000000000001', wallet: empty });
   assert.equal(p.ok, true, p.reason);
   assert.equal(p.intent!.tokenOut, 'NVDAc');
   assert.equal(p.intent!.tokenIn, 'USDC');
   assert.ok(Number(p.intent!.preview.amountOut) > 0 && p.intent!.preview.stockReference!.usdPrice > 0);
   assert.ok(!('tx' in p.intent!.preview) && !('execution' in p), 'intent carries no calldata');
-  const crypto = await prepareBaseIntent({ tokenSymbol: 'cbBTC', amountUsd: 20, cycleId: '00000000-0000-4000-8000-000000000001' });
+  const i = p.intent!;
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt }, i.intentToken), true, 'intent token verifies for its own fields');
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: '0x1111111111111111111111111111111111111111', tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt }, i.intentToken), false, 'another wallet cannot use the token');
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: '500.00', expiresAt: i.expiresAt }, i.intentToken), false, 'another amount cannot use the token');
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt }, i.intentToken, i.expiresAt + 1), false, 'expired token is refused');
+  const crypto = await prepareBaseIntent({ tokenSymbol: 'cbBTC', amountUsd: 20, cycleId: '00000000-0000-4000-8000-000000000001', wallet: empty });
   assert.equal(crypto.ok, false, 'agent intents are tokenized stocks only');
-  console.log(`intent: NVDA $20 → ≈${p.intent!.preview.amountOut} NVDAc, ref $${p.intent!.preview.stockReference!.usdPrice.toFixed(2)}, cycle-tagged, no calldata`);
+  console.log(`intent: NVDA $20 → ≈${p.intent!.preview.amountOut} NVDAc, ref $${p.intent!.preview.stockReference!.usdPrice.toFixed(2)}, cycle-tagged + signed for the wallet, no calldata`);
+  const { fetchOnchainStockExposureUsd } = await import('../api/_lib/base-swap.js');
+  assert.equal(await fetchOnchainStockExposureUsd(empty), 0, 'a fresh wallet has no on-chain stock exposure');
 }
 
 // Keyless stock signals for the cycle: pools vs Chainlink + underlying momentum.

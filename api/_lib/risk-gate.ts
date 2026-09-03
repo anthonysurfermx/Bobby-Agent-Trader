@@ -76,18 +76,33 @@ export function applyRiskGate(
   bankroll = 500,
   isSafeMode = false,
   backendConvictions?: Map<string, number>, // symbol → dynamicConviction from backend
-  openExposureUsd = 0, // USD currently at risk in open (unsettled) positions — counts against caps.
+  openExposureUsd = 0, // USD currently at risk in open positions — counts against the exposure cap.
+  realizedLossTodayUsd = 0, // realized losses in the last 24h (positive number) — the daily loss budget.
 ): RiskGateResult {
   const approved: TradeDecision[] = [];
   let exposure = openExposureUsd;
   const maxExposurePct = isSafeMode ? 0.15 : 0.30;
   const maxExposure = bankroll * maxExposurePct;
   const confidenceThreshold = isSafeMode ? 0.8 : 0.7;
+  // The daily loss budget is about LOSSES already taken, not the size of the
+  // next position (which the exposure cap bounds). Comparing a Kelly size to
+  // 10% of bankroll blocked every normal-mode trade at $500.
   const maxDailyLoss = bankroll * 0.10;
   const maxPositions = 3;
   const recentSymbols = new Set<string>();
 
+  if (realizedLossTodayUsd >= maxDailyLoss) {
+    console.log(`[RiskGate] Daily loss budget spent: $${realizedLossTodayUsd.toFixed(2)} >= $${maxDailyLoss.toFixed(2)} — nothing approved`);
+    return { approved: [], blocked: decisions.length, sizingMethod: isSafeMode ? 'half-kelly-safe-mode' : 'half-kelly' };
+  }
+
   for (const d of decisions) {
+    // Only a deterministic conviction can approve: when a map is supplied, a
+    // ticker the pipeline never scored is one the LLM invented — blocked.
+    if (backendConvictions && !backendConvictions.has(d.tokenSymbol)) {
+      console.log(`[RiskGate] Blocked ${d.tokenSymbol}: not among the scored signals (LLM-only ticker)`);
+      continue;
+    }
     const deterministicConv = backendConvictions?.get(d.tokenSymbol) ?? d.confidence;
 
     if (deterministicConv < confidenceThreshold) {
@@ -103,10 +118,6 @@ export function applyRiskGate(
     const kellyAmount = kellySize(deterministicConv, bankroll, maxExposurePct);
     d.amountUsd = isSafeMode ? kellyAmount * 0.5 : kellyAmount;
 
-    if (exposure + d.amountUsd > maxDailyLoss) {
-      console.log(`[RiskGate] Blocked ${d.tokenSymbol}: would exceed maxDailyLoss ($${maxDailyLoss.toFixed(2)}), current exposure $${exposure.toFixed(2)}`);
-      continue;
-    }
     if (exposure + d.amountUsd > maxExposure) {
       console.log(`[RiskGate] Blocked ${d.tokenSymbol}: would exceed maxExposure ($${maxExposure.toFixed(2)}), current exposure $${exposure.toFixed(2)}`);
       continue;

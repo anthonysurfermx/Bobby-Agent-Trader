@@ -160,7 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let onchainOk = false;
         try {
           const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://bobbyprotocol.xyz';
-          const onchainRes = await fetch(`${host}/api/xlayer-record`, {
+          const onchainRes = await fetch(`${host}/api/protocol-record`, {
              method: 'POST',
              headers: { 'Content-Type': 'application/json', ...recordAuthHeaders() },
              body: JSON.stringify({

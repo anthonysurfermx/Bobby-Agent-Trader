@@ -1,5 +1,5 @@
 // ============================================================
-// POST /api/xlayer-record
+// POST /api/protocol-record (formerly xlayer-record; chain follows PROTOCOL_CHAIN, Base by default)
 // Commit-Reveal Track Record on the configured protocol chain
 // Phase 1 (commit): Records prediction BEFORE outcome is known
 // Phase 2 (resolve): Records outcome AFTER min time has elapsed

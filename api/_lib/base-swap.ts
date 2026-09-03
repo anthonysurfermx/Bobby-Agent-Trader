@@ -26,7 +26,7 @@ import {
 import { base } from 'viem/chains';
 import { BASE, UNISWAP_BASE } from './chains.js';
 import {
-  BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_USDC, BASE_WETH, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed, type BaseSwapToken,
+  BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, BASE_WETH, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed, type BaseSwapToken,
 } from '../../src/lib/base-swap/tokens.js';
 
 export const SWAP_ROUTER02: Address = getAddress(UNISWAP_BASE.swapRouter02);
@@ -866,6 +866,35 @@ export function toTradeExecution(q: BaseSwapQuote): TradeExecutionPayload | null
       note: 'Router and quoter are pinned Uniswap deployments. Approval is exact, but can remain if the swap is abandoned or reverts. Bobby never signs for you.',
     },
   };
+}
+
+/**
+ * What a wallet holds in tokenized stocks right now, in USD at the Chainlink
+ * reference. One multicall for balances, one per held stock for the feed.
+ * This is the exposure the risk gate reasons about: a lot sold is gone, a lot
+ * still held after the 48h scoring horizon is still money at risk.
+ */
+export async function fetchOnchainStockExposureUsd(wallet: string): Promise<number> {
+  const owner = getAddress(wallet);
+  const stocks = BASE_SWAP_TOKENS.filter((t) => t.assetClass === 'tokenized-stock' && t.referenceFeed);
+  if (!stocks.length) return 0;
+  const balances = (await multicallLoose(
+    stocks.map((t) => ({ address: getAddress(t.address), abi: ERC20_ABI, functionName: 'balanceOf', args: [owner] })),
+    false,
+  )) as bigint[];
+  let total = 0;
+  for (let i = 0; i < stocks.length; i++) {
+    const bal = balances[i] ?? 0n;
+    if (bal <= 0n) continue;
+    const feed = getAddress(stocks[i].referenceFeed as Address);
+    const [dec, round] = (await multicallLoose([
+      { address: feed, abi: CHAINLINK_ABI, functionName: 'decimals' },
+      { address: feed, abi: CHAINLINK_ABI, functionName: 'latestRoundData' },
+    ], false)) as [number, readonly [bigint, bigint, bigint, bigint, bigint]];
+    const price = round[1] > 0n ? Number(formatUnits(round[1], Number(dec))) : 0;
+    total += Number(formatUnits(bal, stocks[i].decimals)) * price;
+  }
+  return total;
 }
 
 /** Live check that the pinned contracts are what we think they are (smoke test / health). */

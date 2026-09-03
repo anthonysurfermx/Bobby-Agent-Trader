@@ -1,153 +1,122 @@
 // ============================================================
 // GET /api/bobby-pnl
-// Bobby's public aggregate PnL dashboard — reads directly from OKX CEX
-// but returns no position, liquidation, fill, or per-currency details.
+// Bobby's public aggregate PnL — from agent_trades on Base (swaps the
+// receipt verifier confirmed on-chain), never from an exchange account.
+// Aggregates only: no wallet addresses, no per-user rows.
+// Marks: the rail's own pool quote (what a wallet could sell for now).
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createHmac } from 'crypto';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { bobbyDbConfigured, bobbyRest, bobbyReadHeaders } from './_lib/bobby-db.js';
+import { quoteBaseSwap } from './_lib/base-swap.js';
+import { findBaseToken } from '../src/lib/base-swap/tokens.js';
 
-const OKX_BASE = 'https://www.okx.com';
-const API_KEY = process.env.OKX_CEX_API_KEY || process.env.OKX_API_KEY || '';
-const SECRET = process.env.OKX_CEX_SECRET_KEY || process.env.OKX_SECRET_KEY || '';
-const PASSPHRASE = process.env.OKX_CEX_PASSPHRASE || process.env.OKX_PASSPHRASE || '';
+export const config = { maxDuration: 20 };
 
-function signOKX(ts: string, method: string, path: string, body: string): string {
-  return createHmac('sha256', SECRET).update(ts + method.toUpperCase() + path + body).digest('base64');
+interface TradeRow {
+  token_symbol: string;
+  direction: 'BUY' | 'SELL';
+  amount_usd: number | null;
+  entry_price: number | null;
+  exit_price: number | null;
+  realized_pnl_pct: number | null;
+  outcome: string | null;
+  created_at: string;
+  settled_at: string | null;
 }
 
-async function okxGet(path: string): Promise<any> {
-  const ts = new Date().toISOString();
-  const sign = signOKX(ts, 'GET', path, '');
-  const res = await fetch(`${OKX_BASE}${path}`, {
-    headers: {
-      'OK-ACCESS-KEY': API_KEY,
-      'OK-ACCESS-SIGN': sign,
-      'OK-ACCESS-TIMESTAMP': ts,
-      'OK-ACCESS-PASSPHRASE': PASSPHRASE,
-    },
-  });
-  const data = (await res.json()) as { data?: any[]; code?: string; msg?: string };
-  return data.data || [];
+async function markPrice(symbol: string): Promise<number | null> {
+  const token = findBaseToken(symbol);
+  if (!token || token.stable) return null;
+  try {
+    const q = await quoteBaseSwap({ tokenIn: token.symbol, tokenOut: 'USDC', amount: token.decimals >= 8 ? '0.01' : '1' });
+    return q.executionPrice > 0 ? q.executionPrice : null;
+  } catch {
+    return null;
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
   if (!await enforcePublicRateLimit(req, res, 'bobby-pnl', 30, 600)) return;
-  if (!API_KEY) {
+  if (!bobbyDbConfigured()) {
     res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
-    return res.status(200).json({
-      ok: false,
-      message: 'OKX CEX API not configured. Set OKX_CEX_API_KEY env vars.',
-    });
+    return res.status(200).json({ ok: false, message: 'Database not configured' });
   }
 
   try {
-    // Fetch everything in parallel
-    const [balanceData, positionsData, historyData] = await Promise.all([
-      okxGet('/api/v5/account/balance'),
-      okxGet('/api/v5/account/positions?instType=SWAP'),
-      okxGet('/api/v5/account/positions-history?instType=SWAP&limit=50'),
-    ]);
+    const r = await fetch(bobbyRest("agent_trades?chain=eq.base&status=eq.confirmed&select=token_symbol,direction,amount_usd,entry_price,exit_price,realized_pnl_pct,outcome,created_at,settled_at&order=created_at.desc&limit=500"), { headers: bobbyReadHeaders() });
+    if (!r.ok) return res.status(502).json({ ok: false, error: 'Could not read trades' });
+    const rows = (await r.json()) as TradeRow[];
 
-    // ── Current Balance ──
-    const balance = balanceData[0] || {};
-    const totalEquity = parseFloat(balance.totalEq || '0');
-    // ── Open Positions (Live PnL) ──
-    const openPositions = positionsData
-      .filter((p: any) => parseFloat(p.pos || '0') !== 0)
-      .map((p: any) => ({
-        symbol: p.instId.split('-')[0],
-        instId: p.instId,
-        direction: parseFloat(p.pos) > 0 ? 'long' : 'short',
-        size: Math.abs(parseFloat(p.pos)),
-        leverage: `${p.lever}x`,
-        entryPrice: parseFloat(p.avgPx),
-        markPrice: parseFloat(p.markPx),
-        unrealizedPnl: parseFloat(p.upl),
-        unrealizedPnlPct: parseFloat(p.uplRatio || '0') * 100,
-        margin: parseFloat(p.margin || '0'),
-        liquidationPrice: parseFloat(p.liqPx || '0'),
-        openTime: p.cTime ? new Date(parseInt(p.cTime)).toISOString() : null,
-      }));
+    const open = rows.filter((t) => t.direction === 'BUY' && !t.settled_at);
+    const closed = rows.filter((t) => t.direction === 'BUY' && t.settled_at && t.outcome);
 
-    // ── Closed Positions (Historical PnL) ──
-    const closedPositions = historyData.map((p: any) => ({
-      symbol: p.instId.split('-')[0],
-      instId: p.instId,
-      direction: p.direction || (parseFloat(p.openAvgPx || '0') < parseFloat(p.closeAvgPx || '0') ? 'long' : 'short'),
-      entryPrice: parseFloat(p.openAvgPx || '0'),
-      exitPrice: parseFloat(p.closeAvgPx || '0'),
-      realizedPnl: parseFloat(p.realizedPnl || p.pnl || '0'),
-      pnlPct: parseFloat(p.pnlRatio || '0') * 100,
-      leverage: p.lever || '?',
-      openTime: p.cTime ? new Date(parseInt(p.cTime)).toISOString() : null,
-      closeTime: p.uTime ? new Date(parseInt(p.uTime)).toISOString() : null,
-      result: parseFloat(p.realizedPnl || p.pnl || '0') > 0 ? 'WIN' : parseFloat(p.realizedPnl || p.pnl || '0') < 0 ? 'LOSS' : 'BREAK_EVEN',
+    const symbols = Array.from(new Set(open.map((t) => t.token_symbol)));
+    const marks = new Map(await Promise.all(symbols.map(async (s) => [s, await markPrice(s)] as const)));
+
+    const openPositions = open.map((t) => {
+      const mark = marks.get(t.token_symbol) ?? null;
+      const entry = t.entry_price ?? null;
+      const pct = mark && entry ? (mark / entry - 1) * 100 : 0;
+      const usd = t.amount_usd ?? 0;
+      return {
+        symbol: t.token_symbol,
+        direction: 'long' as const,
+        amountUsd: usd,
+        entryPrice: entry,
+        markPrice: mark,
+        unrealizedPnl: Number(((pct / 100) * usd).toFixed(4)),
+        unrealizedPnlPct: Number(pct.toFixed(2)),
+        openTime: t.created_at,
+      };
+    });
+    const closedPositions = closed.map((t) => ({
+      symbol: t.token_symbol,
+      direction: 'long' as const,
+      entryPrice: t.entry_price,
+      exitPrice: t.exit_price,
+      realizedPnl: Number((((t.realized_pnl_pct ?? 0) / 100) * (t.amount_usd ?? 0)).toFixed(4)),
+      pnlPct: Number((t.realized_pnl_pct ?? 0).toFixed(2)),
+      result: t.outcome === 'win' ? 'WIN' : t.outcome === 'loss' ? 'LOSS' : 'BREAK_EVEN',
+      openTime: t.created_at,
+      closeTime: t.settled_at,
     }));
 
-    // ── Stats ──
-    const totalUnrealizedPnl = openPositions.reduce((sum: number, p: any) => sum + p.unrealizedPnl, 0);
-
-    // ── Starting capital estimation ──
-    // ── The $100 Challenge starts NOW — ignore pre-challenge test trades ──
-    const CHALLENGE_START = '2026-03-24T19:00:00.000Z'; // Challenge begins with $100 deposit
-    const startingCapital = 100;
-    const challengeTrades = closedPositions.filter((p: any) => p.closeTime && p.closeTime >= CHALLENGE_START);
-    const preChallengeTradeCount = closedPositions.length - challengeTrades.length;
-
-    // Stats only from challenge trades
-    const challengeWins = challengeTrades.filter((p: any) => p.result === 'WIN').length;
-    const challengeLosses = challengeTrades.filter((p: any) => p.result === 'LOSS').length;
-    const challengeRealizedPnl = challengeTrades.reduce((sum: number, p: any) => sum + p.realizedPnl, 0);
-
-    const currentValue = totalEquity;
-    const totalReturn = ((currentValue - startingCapital) / startingCapital) * 100;
+    const wins = closedPositions.filter((p) => p.result === 'WIN').length;
+    const losses = closedPositions.filter((p) => p.result === 'LOSS').length;
+    const realizedPnl = closedPositions.reduce((s, p) => s + p.realizedPnl, 0);
+    const unrealizedPnl = openPositions.reduce((s, p) => s + p.unrealizedPnl, 0);
+    const invested = rows.filter((t) => t.direction === 'BUY').reduce((s, t) => s + (t.amount_usd ?? 0), 0);
+    const openNotional = openPositions.reduce((s, p) => s + p.amountUsd, 0);
+    const equity = openNotional + unrealizedPnl;
+    const totalReturn = invested > 0 ? ((realizedPnl + unrealizedPnl) / invested) * 100 : 0;
 
     res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=60');
     return res.status(200).json({
       ok: true,
       timestamp: new Date().toISOString(),
       agent: 'Bobby Agent Trader',
-
-      // Summary
+      source: 'agent_trades (Base · Uniswap V3 · verified receipts)',
       summary: {
-        startingCapital,
-        currentEquity: totalEquity,
-        totalReturn: parseFloat(totalReturn.toFixed(2)),
-        realizedPnl: parseFloat(challengeRealizedPnl.toFixed(4)),
-        unrealizedPnl: parseFloat(totalUnrealizedPnl.toFixed(4)),
-        totalTrades: challengeTrades.length,
-        wins: challengeWins,
-        losses: challengeLosses,
-        winRate: challengeTrades.length > 0 ? parseFloat((challengeWins / challengeTrades.length * 100).toFixed(1)) : 0,
-        challengeStartedAt: CHALLENGE_START,
-        preChallengeTradesExcluded: preChallengeTradeCount,
+        totalTrades: closedPositions.length + openPositions.length,
+        wins,
+        losses,
+        winRate: closedPositions.length ? Number(((wins / closedPositions.length) * 100).toFixed(1)) : 0,
+        realizedPnl: Number(realizedPnl.toFixed(4)),
+        unrealizedPnl: Number(unrealizedPnl.toFixed(4)),
+        investedUsd: Number(invested.toFixed(2)),
+        currentEquity: Number(equity.toFixed(2)),
+        totalEquity: Number(equity.toFixed(2)),
+        totalReturn: Number(totalReturn.toFixed(2)),
+        openPositions: openPositions.length,
       },
-
-      // Public payload is AGGREGATES ONLY (security review 2026-09-03, Codex decision):
-      // no live positions, leverage, liquidation prices, fills or per-currency
-      // balances of the real account. The equity curve keeps only what a chart
-      // needs: when a challenge trade closed and its result.
-      openPositionsCount: openPositions.length,
-      equityCurve: challengeTrades.map((p: any) => ({
-        closedAt: p.closeTime,
-        symbol: p.symbol || null,
-        pnlPct: p.pnlPct ?? null,
-        outcome: p.result === 'WIN' ? 'win' : p.result === 'LOSS' ? 'loss' : 'break_even',
-      })),
-      // kept as empty arrays so older clients degrade to "no rows" instead of crashing
-      openPositions: [],
-      closedPositions: [],
-      preChallengePositions: [],
-      recentFills: [],
+      openPositions,
+      closedPositions: closedPositions.slice(0, 50),
     });
   } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      error: 'Failed to fetch Bobby PnL',
-      details: error instanceof Error ? error.message : 'Unknown',
-    });
+    console.error('[bobby-pnl]', error);
+    return res.status(500).json({ ok: false, error: 'PnL unavailable' });
   }
 }

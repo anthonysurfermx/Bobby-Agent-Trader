@@ -134,8 +134,10 @@ group('gate: exposure caps include open positions', () => {
   const fresh = applyRiskGate([decision('GGG', 0.75)], 3000, false, undefined, 0);
   assert(fresh.approved.length === 1, 'approves with no open exposure');
 
-  const loaded = applyRiskGate([decision('HHH', 0.75)], 3000, false, undefined, 250);
-  assert(loaded.approved.length === 0, 'blocks when open exposure + size exceeds daily loss cap');
+  const loaded = applyRiskGate([decision('HHH', 0.75)], 3000, false, undefined, 850);
+  assert(loaded.approved.length === 0, 'blocks when open exposure + size exceeds the exposure cap (30% of bankroll)');
+  const room = applyRiskGate([decision('HHH', 0.75)], 3000, false, undefined, 250);
+  assert(room.approved.length === 1, 'approves while exposure + size stays under the cap');
 });
 
 group('gate: safe mode halves position size', () => {
@@ -148,16 +150,26 @@ group('gate: safe mode halves position size', () => {
   );
 });
 
-group('gate: KNOWN QUIRK — default $500 bankroll blocks every normal-mode trade', () => {
-  // maxDailyLoss = 10% of 500 = $50, but Kelly sizes land in $62.50-$75
-  // (floor/cap band), so exposure + size always exceeds $50. Pinned here
-  // so a future fix has to update this test consciously — see repo notes.
+group('gate: default $500 bankroll approves a normal-mode trade (the daily-loss cap is about realized losses)', () => {
   const result = applyRiskGate([decision('KKK', 0.95)], 500);
-  assert(result.approved.length === 0, 'even 0.95 conviction is blocked at default bankroll');
-
-  // Safe mode halves the size (~$37.50 ≤ $50) so it ironically CAN trade.
+  assert(result.approved.length === 1, '0.95 conviction is approved at the default bankroll');
+  assert(result.approved[0].amountUsd <= 500 * 0.30, 'size bounded by the exposure cap');
   const safe = applyRiskGate([decision('LLL', 0.95)], 500, true);
-  assert(safe.approved.length === 1, 'safe mode passes at default bankroll');
+  assert(safe.approved.length === 1, 'safe mode still passes at default bankroll');
+});
+
+group('gate: realized daily loss budget spent → nothing approved', () => {
+  const spent = applyRiskGate([decision('MMM', 0.95)], 500, false, undefined, 0, 50);
+  assert(spent.approved.length === 0 && spent.blocked === 1, '$50 realized loss on $500 closes the day');
+  const almost = applyRiskGate([decision('NNN', 0.95)], 500, false, undefined, 0, 49);
+  assert(almost.approved.length === 1, '$49 realized loss still trades');
+});
+
+group('gate: a deterministic map blocks tickers the pipeline never scored', () => {
+  const conv = new Map<string, number>([['OOO', 0.9]]);
+  const result = applyRiskGate([decision('OOO', 0.2), decision('PPP', 0.99)], 3000, false, conv);
+  assert(result.approved.length === 1 && result.approved[0].tokenSymbol === 'OOO', 'scored ticker approved on the deterministic score, unscored ticker blocked whatever the LLM said');
+  assert(approx(result.approved[0].confidence, 0.9), 'confidence carried is the deterministic one');
 });
 
 // ── Report ─────────────────────────────────────────────────

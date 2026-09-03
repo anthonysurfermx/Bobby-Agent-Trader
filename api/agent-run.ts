@@ -14,6 +14,8 @@ import {
 } from './_lib/signals.js';
 import { prepareBaseIntent, TRADE_CHAIN_ID } from './_lib/dex-execution.js';
 import { collectStockSignals } from './_lib/stock-signals.js';
+import { fetchOnchainStockExposureUsd } from './_lib/base-swap.js';
+import { findBaseToken } from '../src/lib/base-swap/tokens.js';
 import {
   applyRiskGate,
   calculateDynamicConviction,
@@ -414,7 +416,8 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
     const recentUrl =
       `${url}/rest/v1/agent_trades` +
       `?settled_at=gte.${encodeURIComponent(sinceIso)}` +
-      `&status=eq.closed` +
+      `&status=eq.confirmed` +
+      `&outcome=not.is.null` +
       `&select=outcome,realized_pnl_pct,amount_usd,settled_at` +
       `&order=settled_at.desc&limit=100`;
     const recentRes = await fetch(recentUrl, {
@@ -472,27 +475,20 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
 
 // ---- Fetch USD currently at risk in open (unsettled) positions ----
 // Prevents cumulative over-exposure when multiple cycles fire before settlement.
-/**
- * Open exposure for ONE wallet: its confirmed, unsettled BUYs on Base. Never
- * global — one user's swaps must not throttle another's cycle — and never
- * sells, which reduce exposure. Cron cycles have no wallet and no exposure.
- */
-async function fetchOpenExposureUsd(wallet: string | null): Promise<number> {
+/** Realized losses (USD, positive) settled in the last 24h for ONE wallet — the daily loss budget. */
+async function fetchRealizedLossTodayUsd(wallet: string): Promise<number> {
   const url = bobbyDbUrl();
   const key = bobbyServiceKey();
-  if (!url || !key || !wallet) return 0;
+  if (!url || !key) return 0;
   try {
-    const q = `${url}/rest/v1/agent_trades?status=eq.confirmed&settled_at=is.null&direction=eq.BUY&owner_address=eq.${wallet.toLowerCase()}&select=amount_usd`;
+    const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const q = `${url}/rest/v1/agent_trades?owner_address=eq.${wallet.toLowerCase()}&settled_at=gte.${encodeURIComponent(sinceIso)}&outcome=eq.loss&select=amount_usd,realized_pnl_pct`;
     const res = await fetch(q, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-    if (!res.ok) {
-      console.warn(`[OpenExposure] HTTP ${res.status} — treating open exposure as 0`);
-      return 0;
-    }
-    const rows = (await res.json()) as Array<{ amount_usd: number | null }>;
+    if (!res.ok) return 0;
+    const rows = (await res.json()) as Array<{ amount_usd: number | null; realized_pnl_pct: number | null }>;
     if (!Array.isArray(rows)) return 0;
-    return rows.reduce((sum, r) => sum + (r.amount_usd || 0), 0);
-  } catch (err) {
-    console.warn('[OpenExposure] fetch error — treating as 0:', err);
+    return rows.reduce((sum, r) => sum + Math.max(0, -((r.realized_pnl_pct || 0) / 100) * (r.amount_usd || 0)), 0);
+  } catch {
     return 0;
   }
 }
@@ -1138,9 +1134,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Phase 5: Kelly Criterion Risk Gate (safe mode reduces exposure)
     // Pre-load open exposure so caps count unsettled positions from prior cycles.
-    const openExposure = await fetchOpenExposureUsd(isManual && walletAddress ? walletAddress : null);
-    if (openExposure > 0) console.log(`[Agent] Open exposure from prior cycles: $${openExposure.toFixed(2)}`);
-    const { approved, blocked, sizingMethod } = applyRiskGate(debate.decisions, 500, isSafeMode, undefined, openExposure);
+    // Exposure is what the wallet HOLDS on-chain, valued at the Chainlink
+    // reference — not what a table remembers. A sold lot is gone; a lot held
+    // past the 48h scoring horizon is still exposure.
+    const openExposure = isManual && walletAddress ? await fetchOnchainStockExposureUsd(walletAddress).catch(() => 0) : 0;
+    if (openExposure > 0) console.log(`[Agent] On-chain stock exposure: $${openExposure.toFixed(2)}`);
+    // Realized losses in the last 24h for this wallet: the daily loss budget.
+    const realizedLossToday = isManual && walletAddress ? await fetchRealizedLossTodayUsd(walletAddress) : 0;
+    // The deterministic conviction map: the same score the prompt showed, keyed
+    // by the symbol the pipeline scored. The gate refuses anything else.
+    const bestPolyEdge = polyConsensus.length > 0 ? Math.min(1, Math.max(0, polyConsensus[0].edgePct / 100)) : 0;
+    const convictionMap = new Map<string, number>();
+    for (const sig of filtered) convictionMap.set(sig.tokenSymbol, calculateDynamicConviction(sig.filterScore / 100, bestPolyEdge, signalAgeMs));
+    for (const d of debate.decisions) {
+      // The LLM may answer with the underlying ticker (NVDA); score lookups use the listed symbol (NVDAc).
+      const listed = findBaseToken(d.tokenSymbol)?.symbol;
+      if (listed && listed !== d.tokenSymbol && convictionMap.has(listed)) { d.tokenSymbol = listed; }
+    }
+    const { approved, blocked, sizingMethod } = applyRiskGate(debate.decisions, 500, isSafeMode, convictionMap, openExposure, realizedLossToday);
     console.log(`[Agent] ${approved.length} approved (${sizingMethod}), ${blocked} blocked`);
 
     // Phase 6: Intents. The cycle never builds calldata: it hands the human a
@@ -1152,7 +1163,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`[Agent] Preparing Base stock intents for wallet ${walletAddress.slice(0, 8)}...`);
       trades = [];
       for (const d of approved) {
-        const prepared = await prepareBaseIntent({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, cycleId });
+        const prepared = await prepareBaseIntent({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, cycleId, wallet: walletAddress });
         if (!prepared.ok) {
           console.warn(`[Agent] Abort ${d.tokenSymbol}: ${prepared.reason}`);
           trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: prepared.status, intent: undefined, abortReason: prepared.reason });

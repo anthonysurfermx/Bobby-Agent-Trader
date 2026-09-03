@@ -137,16 +137,16 @@ const previewBase = evaluateProtocolWriteSafety(
 assert.equal(previewBase.ok, false);
 assert.ok(previewBase.blockers.some((item) => item.includes('VERCEL_ENV=production')));
 
-const xlayerRecordSource = readFileSync('api/xlayer-record.ts', 'utf8');
-assert.match(xlayerRecordSource, /requireProtocolWriteSafety\(res, \['trackRecord'\]\)/);
-assert.match(xlayerRecordSource, /recorderKeyEnvForChain\(DEFAULT_CHAIN\.id\)/);
+const protocolRecordSource = readFileSync('api/protocol-record.ts', 'utf8');
+assert.match(protocolRecordSource, /requireProtocolWriteSafety\(res, \['trackRecord'\]\)/);
+assert.match(protocolRecordSource, /recorderKeyEnvForChain\(DEFAULT_CHAIN\.id\)/);
 // The interim 503 guard (requireCompatibleTrackRecordAdapter) was removed when
 // the V2 adapter landed — its own removal condition. Its successor invariants:
 // the endpoint must wire the V2 recorder, and the V2 recorder module must
 // carry the same wrong-chain RPC guard the v1 paths use.
-assert.match(xlayerRecordSource, /commitV2|resolveV2/);
-assert.match(xlayerRecordSource, /readStatsV2/);
-assert.doesNotMatch(xlayerRecordSource, /requireCompatibleTrackRecordAdapter/);
+assert.match(protocolRecordSource, /commitV2|resolveV2/);
+assert.match(protocolRecordSource, /readStatsV2/);
+assert.doesNotMatch(protocolRecordSource, /requireCompatibleTrackRecordAdapter/);
 assert.match(
   readFileSync('api/_lib/trackrecord-v2-recorder.ts', 'utf8'),
   /assertProviderChain\(provider, chain\.id\)/,
@@ -164,11 +164,11 @@ const cycleSource = readFileSync('api/bobby-cycle.ts', 'utf8');
 // The legacy inline X Layer writer was removed entirely (stronger invariant
 // than gating it): bobby-cycle must never sign or send transactions itself.
 // All on-chain writes go through the authenticated, latch-guarded recorder
-// endpoint (/api/xlayer-record) via a single awaited call site.
+// endpoint (/api/protocol-record) via a single awaited call site.
 assert.doesNotMatch(cycleSource, /sendTransaction|new ethers\.Wallet|JsonRpcProvider/);
 assert.doesNotMatch(cycleSource, /rpc\.xlayer\.tech/);
 assert.equal((cycleSource.match(/action: 'commit'/g) || []).length, 1);
-assert.match(cycleSource, /await fetchLocalApi\('\/api\/xlayer-record'/);
+assert.match(cycleSource, /await fetchLocalApi\('\/api\/protocol-record'/);
 assert.match(cycleSource, /evaluateCommitPolicy\(/);
 assert.match(cycleSource, /assessCommitReceipt\(/);
 assert.match(cycleSource, /commitState === 'blocked'/);

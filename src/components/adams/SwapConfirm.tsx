@@ -35,6 +35,9 @@ export interface TradeIntent {
   tokenOut: string;
   amount: string;
   cycleId: string;
+  wallet: string;
+  expiresAt: number;
+  intentToken: string;
   preview: {
     amountOut: string;
     minAmountOut: string;
@@ -150,7 +153,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
         amount: fromAmount,
         wallet,
         stockEligibilityConfirmed: acknowledged,
-        ...(trade.intent?.cycleId ? { cycleId: trade.intent.cycleId } : {}),
+        ...(trade.intent ? { cycleId: trade.intent.cycleId, intentToken: trade.intent.intentToken, intentExpiresAt: trade.intent.expiresAt } : {}),
       }),
     });
     const data = await res.json();

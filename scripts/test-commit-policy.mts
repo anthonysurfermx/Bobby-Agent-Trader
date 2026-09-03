@@ -111,7 +111,7 @@ assert.equal(digestKind('anything-else'), 'manual');
 // ── structural guards on bobby-cycle.ts ──
 const cycleSrc = readFileSync(new URL('../api/bobby-cycle.ts', import.meta.url), 'utf8');
 {
-  // exactly ONE call site sends action:'commit' to /api/xlayer-record
+  // exactly ONE call site sends action:'commit' to /api/protocol-record
   const commitCalls = cycleSrc.match(/action: 'commit'/g) || [];
   assert.equal(commitCalls.length, 1, `expected exactly 1 commit call site, found ${commitCalls.length}`);
   // the dead disabled block and the legacy inline writer are gone
@@ -119,7 +119,7 @@ const cycleSrc = readFileSync(new URL('../api/bobby-cycle.ts', import.meta.url),
   assert.ok(!cycleSrc.includes('rpc.xlayer.tech'), 'legacy inline X Layer writer must not exist');
   assert.ok(!cycleSrc.includes('bobby-cycle-${Date.now()}'), 'threadId must never be synthesized');
   // the commit is awaited (not fire-and-forget)
-  assert.ok(/await fetchLocalApi\('\/api\/xlayer-record'/.test(cycleSrc), 'commit call must be awaited');
+  assert.ok(/await fetchLocalApi\('\/api\/protocol-record'/.test(cycleSrc), 'commit call must be awaited');
   // receipt goes through the strict assessor and the gate uses the 3-state model
   assert.ok(/assessCommitReceipt\(commitRes\)/.test(cycleSrc), 'response must pass assessCommitReceipt');
   assert.ok(/commitState === 'blocked'/.test(cycleSrc), 'execution gate must check commitState blocked');

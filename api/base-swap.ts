@@ -15,6 +15,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { BaseSwapError, quoteBaseSwap, toTradeExecution } from './_lib/base-swap.js';
 import { recordBuiltSwap } from './_lib/swap-receipts.js';
+import { verifyIntent } from './_lib/dex-execution.js';
 import { resolveIdentity } from './_lib/user-identity.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { guardWrite, WALLET_RE } from './_lib/write-guard.js';
@@ -30,8 +31,10 @@ const PostSchema = z.object({
   slippagePct: z.number().min(0.05).max(3).optional(),
   wallet: z.string().regex(WALLET_RE),
   stockEligibilityConfirmed: z.boolean().optional(),
-  /** The agent cycle whose intent this builds; the receipt then lands on that cycle. */
+  /** The agent cycle whose intent this builds; only with a matching intentToken. */
   cycleId: z.string().uuid().optional(),
+  intentToken: z.string().min(16).max(256).optional(),
+  intentExpiresAt: z.number().int().positive().optional(),
 });
 
 /** ISO country stamped by Vercel's edge; absent locally, which fails closed for stocks. */
@@ -77,6 +80,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
   if (!guarded) return;
   const { body, wallet } = guarded;
+
+  // A cycle id is a public UUID. Linking a build to it requires the token the
+  // cycle minted for THIS wallet, THIS pair and THIS amount, unexpired.
+  // Anything else is refused outright rather than silently unlinked.
+  if (body.cycleId) {
+    const amount = typeof body.amount === 'number' ? body.amount.toFixed(2) : body.amount;
+    const ok = body.intentExpiresAt !== undefined && verifyIntent(
+      { cycleId: body.cycleId, wallet: (wallet ?? body.wallet).toLowerCase(), tokenIn: body.tokenIn, tokenOut: body.tokenOut, amount, expiresAt: body.intentExpiresAt },
+      body.intentToken,
+    );
+    if (!ok) return res.status(403).json({ ok: false, error: 'cycleId does not carry a valid intent token for this wallet, pair and amount', code: 'intent_invalid' });
+  }
 
   try {
     // guardWrite already proved body.wallet === session wallet; build for the proven one.

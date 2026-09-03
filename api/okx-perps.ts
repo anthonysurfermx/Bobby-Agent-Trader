@@ -400,7 +400,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!params?.skipOnchainCommit && isTradingRequest(req)) {
         try {
           const commitRes = await fetch(
-            `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-record`,
+            `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/protocol-record`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', ...recordAuthHeaders() },

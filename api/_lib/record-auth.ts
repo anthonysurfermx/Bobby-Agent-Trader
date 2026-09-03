@@ -1,6 +1,6 @@
 // ============================================================
 // Shared auth guard for endpoints that sign on-chain transactions
-// or mutate the track record (xlayer-record, forum-resolve).
+// or mutate the track record (protocol-record, forum-resolve).
 //
 // FAIL-CLOSED by design: if XLAYER_RECORD_SECRET is not configured
 // in the environment, mutations are refused with 503 — a missing

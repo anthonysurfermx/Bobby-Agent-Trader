@@ -59,7 +59,7 @@ const HELPERS_GUARDED_BY_HANDLER: Record<string, string[]> = {
   'api/telegram-deliver.ts': ['*'],
   'api/telegram-webhook.ts': ['*'],
   'api/telegram-access.ts': ['*'],
-  'api/xlayer-record.ts': ['*'],
+  'api/protocol-record.ts': ['*'],
   'api/auto-bounty.ts': ['*'],
   'api/bobby-asset-cache.ts': ['*'],
   'api/harness-migrate.ts': ['*'],

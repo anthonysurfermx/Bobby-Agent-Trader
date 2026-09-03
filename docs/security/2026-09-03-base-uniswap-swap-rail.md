@@ -100,6 +100,17 @@ Left as-is, on purpose: ESLint reports pre-existing warnings (0 errors) across f
 | — | Geogate on by default | `BASE_STOCK_SWAPS_ENABLED` must be exactly `"true"` or stock calldata is withheld (quotes still visible). Unset, `TRUE`, `1` = off. |
 | — | iOS | No swaps, no transactional wallet, no perps, no trade buttons, no links that look like a way around it. iOS stays analysis, learning, character and progress. `/api/swap-receipt` GET can feed a read-only history; nothing on iOS builds or signs. |
 
+## Review round 4 → what changed
+
+| # | Finding | Change |
+|---|---|---|
+| P1 | The cron cycle (`bobby-cycle`) still leaned on OKX/X Layer; `bobby-pnl` read the private CEX account | Cycle: OnchainOS smart-money leaderboard (`chains=196`) removed, OKX-earn yield venue and `okx_cex` funding source retired, execution/proof copy rewritten (Base explorer link, no OKX/X Layer wording), OKX auth branch dropped. The record endpoint is now `/api/protocol-record` (chain follows `PROTOCOL_CHAIN`, Base by default) — file, callers, tests, `vercel.json` renamed. `bobby-pnl` is rebuilt on `agent_trades` rows the receipt verifier confirmed on Base, marked at the rail's own pool quote; aggregates only, no exchange. **Remaining, declared:** `bobby-intel` still reads OKX *public market data* (prices, funding, indicators) for the briefing — data, not execution; replacing that provider is a separate product decision. |
+| P1 | Circuit breaker queried `status=closed` (not in the schema) | It reads `status=confirmed` with `outcome` set (settled rows). |
+| P1 | `cycleId` proved nothing | Intents are signed: the cycle mints `intentToken = HMAC(cycleId, wallet, pair, amount, expiresAt)` with `BOBBY_SESSION_SECRET` (1h TTL). `/api/base-swap` links a build to a cycle only when the token verifies for the **session** wallet, pair and amount; otherwise `403 intent_invalid`. No schema change needed. |
+| P1 | Risk gate trusted the LLM | `agent-run` builds the deterministic conviction map from the scored signals (same formula the prompt shows) and passes it; the gate refuses any ticker not in the map, and the carried confidence is the deterministic one. Underlying tickers the model may answer (`NVDA`) are normalized to the listed symbol. |
+| P1 | Gate blocked every normal trade at $500; SELL scored as a short; 48h expiry hid held lots | `maxDailyLoss` now means what it says: realized losses in the last 24h for the wallet (new gate input); position size is bounded by the exposure cap only. Exposure is **what the wallet holds on-chain** in tokenized stocks at the Chainlink reference (`fetchOnchainStockExposureUsd`) — a sold lot is gone, a held lot never expires. In the RPC a SELL is settled at confirm (a realization, not a position); `settle-trades` ignores it. Tests updated: the "KNOWN QUIRK" is gone. |
+| — | Apple | Unchanged and restated: iOS stays analysis, learning, character, progress. No swaps, no transactional wallet, no perps, no trade buttons, no links around it. `BASE_STOCK_SWAPS_ENABLED` stays `false` until the territorial questions are settled. |
+
 ## Verification run
 
 ```

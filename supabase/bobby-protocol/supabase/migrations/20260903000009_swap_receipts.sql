@@ -94,12 +94,15 @@ begin
   end if;
   select id into t_id from public.agent_trades where idempotency_key = 'swap:' || lower(p_tx_hash);
   if t_id is null then
+    -- A SELL realizes; it is not a position to score, so it is settled at once
+    -- (no outcome). Exposure is read from the wallet's on-chain balances, never from these rows.
     insert into public.agent_trades
       (cycle_id, chain, token_address, token_symbol, direction, amount_usd, entry_price, tx_hash, status,
-       signal_sources, owner_address, user_id, idempotency_key, expires_at)
+       signal_sources, owner_address, user_id, idempotency_key, expires_at, settled_at)
     values
       (r.cycle_id, 'base', p_token_address, p_token_symbol, p_direction, p_amount_usd, p_entry_price, lower(p_tx_hash), 'confirmed',
-       array['base-swap', 'uniswap-v3-swaprouter02'], lower(p_wallet), coalesce(p_identity_id, r.identity_id), 'swap:' || lower(p_tx_hash), now() + interval '48 hours')
+       array['base-swap', 'uniswap-v3-swaprouter02'], lower(p_wallet), coalesce(p_identity_id, r.identity_id), 'swap:' || lower(p_tx_hash), now() + interval '48 hours',
+       case when p_direction = 'SELL' then now() else null end)
     returning id into t_id;
     if r.cycle_id is not null then
       update public.agent_cycles

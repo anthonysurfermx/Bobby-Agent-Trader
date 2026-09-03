@@ -94,7 +94,7 @@ async function stubControl(path: string, payload: unknown): Promise<void> {
 // --run=v2 — Base-Sepolia path through the real handler
 // ─────────────────────────────────────────────────────────────
 async function runV2() {
-  const { default: handler } = await import('../api/xlayer-record.ts');
+  const { default: handler } = await import('../api/protocol-record.ts');
   const { TRACKRECORD_V2_ABI, buildHermesBenchmarkUrl, fetchSignedUpdate, MIN_ENTRY_DELAY_SEC } =
     await import('../api/_lib/trackrecord-v2.ts');
 
@@ -260,7 +260,7 @@ async function runV2() {
 // --run=v1 — X Layer legacy path stays intact
 // ─────────────────────────────────────────────────────────────
 async function runV1() {
-  const { default: handler } = await import('../api/xlayer-record.ts');
+  const { default: handler } = await import('../api/protocol-record.ts');
   const provider = new JsonRpcProvider(process.env.XLAYER_RPC_URL);
   const v1 = new Contract(
     process.env.XLAYER_TRACK_RECORD_ADDRESS!,

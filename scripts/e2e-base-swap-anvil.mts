@@ -17,6 +17,7 @@ process.env.BASE_RPC_FALLBACK_URL = ANVIL;
 process.env.BOBBY_SUPABASE_URL = 'https://db.e2e.invalid';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'e2e-service-key-not-real-0000000000';
 process.env.BASE_STOCK_SWAPS_ENABLED = 'true';
+process.env.BOBBY_SESSION_SECRET = process.env.BOBBY_SESSION_SECRET || 'e2e-session-secret-not-real-0000000000000000';
 
 const { quoteBaseSwap, SWAP_ROUTER02, baseClient } = await import('../api/_lib/base-swap.js');
 const { verifySwapOnChain, confirmSwapReceipt, recordBuiltSwap, setReceiptStoreFetchForTests } = await import('../api/_lib/swap-receipts.js');
@@ -43,7 +44,7 @@ const fakeFetch: typeof fetch = (async (input: RequestInfo | URL, init?: Request
     if (!wasConfirmed) Object.assign(r, { status: 'confirmed', tx_hash: p.p_tx_hash, block_number: p.p_block_number, block_timestamp: p.p_block_timestamp, amount_out_raw: p.p_amount_out_raw, confirmed_at: new Date().toISOString() });
     let t = tables.agent_trades.find((x) => x.idempotency_key === `swap:${p.p_tx_hash}`);
     if (!t) {
-      t = { id: `agent_trades-${nextId++}`, cycle_id: r.cycle_id, chain: 'base', token_address: p.p_token_address, token_symbol: p.p_token_symbol, direction: p.p_direction, amount_usd: p.p_amount_usd, entry_price: p.p_entry_price, tx_hash: p.p_tx_hash, status: 'confirmed', owner_address: p.p_wallet, idempotency_key: `swap:${p.p_tx_hash}` };
+      t = { id: `agent_trades-${nextId++}`, cycle_id: r.cycle_id, chain: 'base', token_address: p.p_token_address, token_symbol: p.p_token_symbol, direction: p.p_direction, amount_usd: p.p_amount_usd, entry_price: p.p_entry_price, tx_hash: p.p_tx_hash, status: 'confirmed', owner_address: p.p_wallet, idempotency_key: `swap:${p.p_tx_hash}`, settled_at: p.p_direction === 'SELL' ? new Date().toISOString() : null };
       tables.agent_trades.push(t);
       const c = r.cycle_id ? tables.agent_cycles.find((x) => x.id === r.cycle_id) : null;
       if (c) { c.trades_executed = Number(c.trades_executed) + 1; c.total_usd_deployed = Number(c.total_usd_deployed) + Number(p.p_amount_usd); }
@@ -190,14 +191,14 @@ if (process.env.E2E_STOCKS === '1') {
 
 // ---------- agent path: intents only (no calldata, nothing recorded), store outage fails closed ----------
 {
-  const p1 = await prepareBaseIntent({ tokenSymbol: 'cbBTC', amountUsd: 10, cycleId: 'cycle-e2e' });
+  const p1 = await prepareBaseIntent({ tokenSymbol: 'cbBTC', amountUsd: 10, cycleId: 'cycle-e2e', wallet: account.address });
   assert.equal(p1.ok, false, 'agent path only handles tokenized stocks');
   assert.ok(String(p1.reason).includes('tokenized-stock'), p1.reason);
   // A real stock intent needs the B20 quoter, which anvil 1.5 cannot run (OpcodeNotFound);
   // the live smoke asserts it. Here: an intent is quote-only and records nothing.
   if (process.env.E2E_STOCKS === '1') {
     const before = table.length;
-    const p2 = await prepareBaseIntent({ tokenSymbol: 'NVDA', amountUsd: 20, cycleId: 'cycle-e2e' });
+    const p2 = await prepareBaseIntent({ tokenSymbol: 'NVDA', amountUsd: 20, cycleId: 'cycle-e2e', wallet: account.address });
     assert.equal(p2.ok, true, p2.reason);
     assert.equal(p2.intent!.cycleId, 'cycle-e2e');
     assert.equal(table.length, before, 'an intent records nothing and carries no calldata');
@@ -221,6 +222,12 @@ if (process.env.E2E_STOCKS === '1') {
   assert.equal(trades.length, table.filter((r) => r.status === 'confirmed').length, 'one agent_trades row per confirmed receipt');
   assert.ok(trades.every((t) => t.status === 'confirmed' && t.chain === 'base' && typeof t.amount_usd === 'number' && (t.amount_usd as number) > 0), JSON.stringify(trades[0]));
   assert.ok(table.filter((r) => r.status === 'confirmed').every((r) => r.agent_trade_id), 'receipt rows point at their trade');
+  assert.ok(trades.filter((t) => t.direction === 'SELL').every((t) => t.settled_at), 'a SELL is settled at confirm: not a position');
+  assert.ok(trades.filter((t) => t.direction === 'BUY').every((t) => !t.settled_at), 'a BUY stays open for scoring');
+  // On-chain exposure for the fork wallet: only stocks count, and the fork holds none (B20 quotes cannot run here).
+  const { fetchOnchainStockExposureUsd } = await import('../api/_lib/base-swap.js');
+  const exposure = await fetchOnchainStockExposureUsd(account.address).catch(() => -1);
+  assert.ok(exposure === 0 || exposure === -1, `exposure ${exposure}`);
   // Repair: a confirmed receipt whose trade vanished gets it back on the next confirm ('already').
   const victim = table.find((r) => r.status === 'confirmed')!;
   tables.agent_trades.splice(tables.agent_trades.findIndex((t) => t.id === victim.agent_trade_id), 1);
