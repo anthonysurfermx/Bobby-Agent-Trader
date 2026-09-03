@@ -6,6 +6,8 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
+import { enforcePublicRateLimit } from './_lib/request-security.js';
 
 export const config = { maxDuration: 10 };
 
@@ -94,8 +96,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             to === '0xf841b428e6d743187d7be2242eccc1078fde2395' || // TrackRecord
             to === '0xa4704e92e9d9eca646716c14a124907c356c78d7';   // AgentEconomy
 
-          // Accept either: value transfer to Bobby OR contract interaction (commit/debate fee)
-          if (validRecipient && (value >= MIN_PAYMENT || tx.result.input?.length > 10)) {
+          // A payment is a VALUE transfer of at least MIN_PAYMENT to Bobby. Zero-value
+          // contract calls (Bobby's own recorder txs are public on the explorer) are
+          // not payments, and one tx hash unlocks the signal exactly once
+          // (security review 2026-09-03).
+          const consumed = await fetch(bobbyRest('api_cache?on_conflict=cache_key&select=cache_key'), {
+            method: 'POST',
+            headers: bobbyServiceHeaders({ Prefer: 'resolution=ignore-duplicates,return=representation' }),
+            body: JSON.stringify({ cache_key: `premium-signal:${txHash.toLowerCase()}`, payload: { to, value: value.toString() }, expires_at: new Date(Date.now() + 365 * 86_400_000).toISOString(), updated_at: new Date().toISOString() }),
+          });
+          const firstUse = consumed.ok && (((await consumed.json().catch(() => [])) as unknown[]).length > 0);
+          if (validRecipient && value >= MIN_PAYMENT && firstUse) {
             verified = true;
             verificationDetails = {
               ...verificationDetails,
@@ -106,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               block: parseInt(receipt.result.blockNumber, 16),
             };
           } else {
-            verificationDetails.status = 'invalid_recipient_or_amount';
+            verificationDetails.status = !firstUse ? 'tx_already_used' : 'invalid_recipient_or_amount';
             verificationDetails.to = to;
             verificationDetails.value = (Number(value) / 1e18).toFixed(6) + ' OKB';
           }

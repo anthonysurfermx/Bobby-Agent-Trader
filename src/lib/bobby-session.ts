@@ -8,7 +8,31 @@
 // answers 401 and the UI degrades to "nothing personal to show".
 // ============================================================
 
+import { SIGN_IN_STATEMENT } from './wallet-session-message';
+
 export interface StoredSession { token: string; wallet: string; expiresAt: number }
+
+/**
+ * The server builds the EIP-4361 text, but the wallet signs whatever we hand
+ * it — so the browser checks the message against what IT knows before asking
+ * for a signature: our own host and origin, the connected wallet, the exact
+ * statement, a short expiry. A tampered or hijacked API cannot turn this into
+ * a signature over someone else's text (security review 2026-09-03).
+ */
+export function signInMessageLooksSafe(message: string, wallet: string): string | null {
+  const lines = message.split('\n');
+  const host = window.location.host;
+  if (lines[0] !== `${host} wants you to sign in with your Ethereum account:`) return `domain is not ${host}`;
+  if ((lines[1] || '').toLowerCase() !== wallet.toLowerCase()) return 'address is not the connected wallet';
+  if (lines[3] !== SIGN_IN_STATEMENT) return 'statement differs from the sign-in statement';
+  if (lines[5] !== `URI: ${window.location.origin}`) return `URI is not ${window.location.origin}`;
+  const exp = lines.find((l) => l.startsWith('Expiration Time: '))?.slice('Expiration Time: '.length);
+  const expMs = exp ? Date.parse(exp) : NaN;
+  if (!Number.isFinite(expMs) || expMs - Date.now() > 15 * 60_000 || expMs < Date.now()) return 'expiration is missing or not within 15 minutes';
+  if (!/^Nonce: [A-Za-z0-9_-]{16,64}$/.test(lines[8] || '')) return 'nonce is malformed';
+  if (message.includes('\u0000') || lines.length !== 11) return 'unexpected message shape';
+  return null;
+}
 
 const EVENT = 'bobby-session-changed';
 const key = (wallet: string) => `bobby_session:${wallet.toLowerCase()}`;
@@ -78,7 +102,9 @@ export async function requestSession(
       if (!ch.ok) { console.warn('[bobby-session] challenge refused', ch.status); return null; }
       const challenge = (await ch.json()) as { nonce?: string; message?: string };
       if (!challenge.nonce || !challenge.message) return null;
-      // 2. sign exactly what the server built
+      // 2. verify, THEN sign exactly what the server built
+      const problem = signInMessageLooksSafe(challenge.message, w);
+      if (problem) { console.error('[bobby-session] refusing to sign a sign-in message:', problem); declined.add(w); return null; }
       const signature = await signMessage(challenge.message);
       // 3. exchange (the nonce is consumed server-side; a replay is refused)
       const res = await fetch('/api/wallet-session', {

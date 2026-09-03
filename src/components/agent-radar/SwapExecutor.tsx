@@ -5,7 +5,7 @@
 // ============================================================
 
 import { useState, useCallback } from 'react';
-import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useSendTransaction, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import { parseUnits, type Hex } from 'viem';
 import { Wallet, ArrowRight, Check, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
@@ -55,6 +55,10 @@ interface Props {
 
 export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', className = '' }: Props) {
   const { address, isConnected, chain } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
+  // Every TOKENS entry is chainId '1' (Ethereum): pin it and switch before sending (review 2026-09-03).
+  const quoteChainId = Number(TOKENS[fromToken]?.chainId || '1');
+  const ensureChain = async () => { if (chain?.id !== quoteChainId) await switchChainAsync({ chainId: quoteChainId }); };
   const { open: openWallet } = useAppKit();
   const { sendTransactionAsync } = useSendTransaction();
 
@@ -145,7 +149,9 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
       }
 
       // Send the approve tx via wallet
+      await ensureChain();
       await sendTransactionAsync({
+        chainId: quoteChainId,
         to: data.approve.to as Hex,
         data: data.approve.data as Hex,
         gas: data.approve.gasLimit ? BigInt(data.approve.gasLimit) : undefined,
@@ -171,7 +177,9 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
     setError(null);
 
     try {
+      await ensureChain();
       const hash = await sendTransactionAsync({
+        chainId: quoteChainId,
         to: quote.tx.to as Hex,
         data: quote.tx.data as Hex,
         value: BigInt(quote.tx.value || '0'),

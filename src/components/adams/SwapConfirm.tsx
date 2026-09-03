@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState } from 'react';
-import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useSendTransaction, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
 import { CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react';
 
 export interface TradeExecution {
@@ -61,11 +61,22 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
     setState('confirmed');
   }
 
+  // The calldata was built for ONE chain; the wallet must be on that chain,
+  // and the request pins it so wagmi refuses a mismatch (review 2026-09-03).
+  const targetChainId = Number(trade.chain) || 196;
+  const { chainId: connectedChainId } = useAccount();
+  const { switchChainAsync } = useSwitchChain();
+  const ensureChain = async () => {
+    if (connectedChainId !== targetChainId) await switchChainAsync({ chainId: targetChainId });
+  };
+
   const handleApprove = async () => {
     try {
       setState('approving');
       const tx = trade.execution.approveTx!;
+      await ensureChain();
       const hash = await sendTransactionAsync({
+        chainId: targetChainId,
         to: tx.to as `0x${string}`,
         data: tx.data as `0x${string}`,
         value: tx.value ? BigInt(tx.value) : undefined,
@@ -81,7 +92,9 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
     try {
       setState('swapping');
       const tx = trade.execution.swapTx;
+      await ensureChain();
       const hash = await sendTransactionAsync({
+        chainId: targetChainId,
         to: tx.to as `0x${string}`,
         data: tx.data as `0x${string}`,
         value: tx.value ? BigInt(tx.value) : undefined,

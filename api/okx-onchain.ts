@@ -122,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'wallet-pnl': {
         // Wallet PnL analysis
         const { address } = req.query;
-        if (!address) return res.status(400).json({ error: 'address required' });
+        if (!address || !/^0x[a-fA-F0-9]{40}$/.test(String(address))) return res.status(400).json({ error: 'address required (0x + 40 hex)' });
         const params = new URLSearchParams({
           chainIndex: String(chainIndex),
           address: String(address),

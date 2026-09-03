@@ -96,6 +96,7 @@ export function XLayerSwapCard({ symbol, direction, conviction, entryPrice }: XL
       if (!txData) { setError('No transaction data'); setState('error'); return; }
 
       const hash = await sendTransactionAsync({
+        chainId: XLAYER_CHAIN_ID,
         to: txData.to as `0x${string}`,
         data: txData.data as `0x${string}`,
         value: txData.value ? BigInt(txData.value) : undefined,
