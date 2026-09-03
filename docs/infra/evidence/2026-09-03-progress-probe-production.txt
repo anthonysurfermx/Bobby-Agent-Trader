@@ -1,0 +1,6 @@
+GET without session → 401 (expect 401)
+GET fresh → {"via":"wallet","xp":0,"streak":0}
+POST 4 events + profile → {"xp":40,"streak":1,"dailyAwards":3,"awarded":[10,20,10,0],"legacyImported":0,"companion":"byte"}
+POST same event again → {"xp":40,"duplicate":true,"awarded":0}
+POST unknown kind → 400 (expect 400)
+GET after → {"xp":40,"streak":1,"recent":4,"identityId":"28ceef53"}

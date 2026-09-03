@@ -1,0 +1,10 @@
+awards → {"xp":30,"aura":8,"routeIndex":2,"world":["crypto_bay_data_dock:seed","crypto_bay_water_walkway:bloomed"]}
+world → {"land":{"size":8,"theme":"night"},"aura":8,"route":{"index":2,"total":8,"next":"risk_reef_dual_orbit_antenna"},"inventory":["crypto_bay_data_dock:seed","crypto_bay_water_walkway:bloomed"],"catalog":25}
+place bloomed → 200 placements=1
+place again → 409 Piece already placed
+place a seed → 409 A seed cannot be placed until it blooms
+outside grid (seed) → 409 A seed cannot be placed until it blooms
+remove → 200 placements=0
+thesis_closed → {"xp":45,"aura":14,"bloomed":"oldest seed bloomed"}
+inventory after → ["crypto_bay_data_dock:bloomed","crypto_bay_water_walkway:bloomed"]
+GET without session → 401
