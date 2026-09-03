@@ -22,7 +22,7 @@ process.env.BOBBY_SESSION_SECRET = process.env.BOBBY_SESSION_SECRET || 'e2e-sess
 const { quoteBaseSwap, SWAP_ROUTER02, baseClient } = await import('../api/_lib/base-swap.js');
 const { verifySwapOnChain, confirmSwapReceipt, recordBuiltSwap, setReceiptStoreFetchForTests } = await import('../api/_lib/swap-receipts.js');
 const { prepareBaseIntent } = await import('../api/_lib/dex-execution.js');
-const { matchFifo } = await import('../api/_lib/lots.js');
+const { replayFifo } = await import('../api/_lib/lots.js');
 const { BASE_USDC } = await import('../src/lib/base-swap/tokens.js');
 
 // ---------- in-memory PostgREST for swap_receipts ----------
@@ -45,22 +45,25 @@ const fakeFetch: typeof fetch = (async (input: RequestInfo | URL, init?: Request
     if (!wasConfirmed) Object.assign(r, { status: 'confirmed', tx_hash: p.p_tx_hash, block_number: p.p_block_number, block_timestamp: p.p_block_timestamp, amount_out_raw: p.p_amount_out_raw, confirmed_at: new Date().toISOString() });
     let t = tables.agent_trades.find((x) => x.idempotency_key === `swap:${p.p_tx_hash}`);
     if (!t) {
-      t = { id: `agent_trades-${nextId++}`, cycle_id: r.cycle_id, chain: 'base', token_address: p.p_token_address, token_symbol: p.p_token_symbol, direction: p.p_direction, amount_usd: p.p_amount_usd, entry_price: p.p_entry_price, tx_hash: p.p_tx_hash, status: 'confirmed', owner_address: p.p_wallet, idempotency_key: `swap:${p.p_tx_hash}`, settled_at: p.p_direction === 'SELL' ? new Date().toISOString() : null, units: p.p_units, units_remaining: p.p_direction === 'BUY' ? p.p_units : 0, created_at: new Date().toISOString() };
+      t = { id: `agent_trades-${nextId++}`, cycle_id: r.cycle_id, chain: 'base', token_address: p.p_token_address, token_symbol: p.p_token_symbol, direction: p.p_direction, amount_usd: p.p_amount_usd,
+        entry_price: p.p_direction === 'BUY' ? p.p_entry_price : null, exit_price: p.p_direction === 'SELL' ? p.p_entry_price : null,
+        tx_hash: p.p_tx_hash, status: 'confirmed', owner_address: p.p_wallet, idempotency_key: `swap:${p.p_tx_hash}`, settled_at: p.p_direction === 'SELL' ? new Date().toISOString() : null,
+        units: p.p_units, units_remaining: p.p_units, block_number: Number(p.p_block_number), tx_index: Number(p.p_tx_index), created_at: new Date().toISOString() };
       tables.agent_trades.push(t);
-      if (p.p_direction === 'SELL' && p.p_units > 0) {
-        // Same FIFO the SQL function runs, via the shared pure matcher.
-        const lots = tables.agent_trades.filter((x) => x.owner_address === p.p_wallet && x.token_symbol === p.p_token_symbol && x.direction === 'BUY' && Number(x.units_remaining) > 0).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-        const res = matchFifo(lots.map((l) => ({ id: l.id as string, unitsRemaining: Number(l.units_remaining), entryPrice: Number(l.entry_price) })), Number(p.p_units), Number(p.p_entry_price), tables.bobby_lot_fills.map((fl) => ({ lotId: fl.buy_trade_id as string, units: Number(fl.units), buyPrice: Number(fl.buy_price), sellPrice: Number(fl.sell_price) })));
-        for (const fl of res.fills) tables.bobby_lot_fills.push({ id: `fill-${nextId++}`, buy_trade_id: fl.lotId, sell_trade_id: t.id, units: fl.units, buy_price: fl.buyPrice, sell_price: fl.sellPrice });
-        for (const l of res.lots) { const row = tables.agent_trades.find((x) => x.id === l.id)!; row.units_remaining = l.unitsRemaining; }
-        for (const st of res.settled) { const row = tables.agent_trades.find((x) => x.id === st.lotId)!; Object.assign(row, { exit_price: st.exitPrice, realized_pnl_pct: st.pnlPct, outcome: st.outcome, settled_at: new Date().toISOString() }); }
-        if (res.matchedUnits > 0 && res.matchedAvgBuy) {
-          const pnl = ((Number(p.p_entry_price) - res.matchedAvgBuy) / res.matchedAvgBuy) * 100;
-          Object.assign(t, { units: res.matchedUnits, units_remaining: res.unmatchedUnits, entry_price: res.matchedAvgBuy, exit_price: p.p_entry_price, realized_pnl_pct: pnl, outcome: Math.abs(pnl) < 1 ? 'break_even' : pnl > 0 ? 'win' : 'loss' });
-        } else Object.assign(t, { units: 0, units_remaining: res.unmatchedUnits });
-      }
       const c = r.cycle_id ? tables.agent_cycles.find((x) => x.id === r.cycle_id) : null;
-      if (c) { c.trades_executed = Number(c.trades_executed) + 1; c.total_usd_deployed = Number(c.total_usd_deployed) + Number(p.p_amount_usd); }
+      if (c) { c.trades_executed = Number(c.trades_executed) + 1; if (p.p_direction === 'BUY') c.total_usd_deployed = Number(c.total_usd_deployed) + Number(p.p_amount_usd); }
+    }
+    // bobby_match_fifo: deterministic chain-ordered replay for (wallet, symbol), via the shared pure spec.
+    {
+      const mine = (x: Row) => x.owner_address === p.p_wallet && x.token_symbol === p.p_token_symbol && x.status === 'confirmed';
+      const lots = tables.agent_trades.filter((x) => mine(x) && x.direction === 'BUY').map((x) => ({ id: x.id, units: Number(x.units), unitsRemaining: Number(x.units_remaining), entryPrice: Number(x.entry_price), blockNumber: Number(x.block_number), txIndex: Number(x.tx_index) }));
+      const sells = tables.agent_trades.filter((x) => mine(x) && x.direction === 'SELL').map((x) => ({ id: x.id, units: Number(x.units), unitsRemaining: Number(x.units_remaining), sellPrice: Number(x.exit_price), blockNumber: Number(x.block_number), txIndex: Number(x.tx_index) }));
+      const prior = tables.bobby_lot_fills.filter((fl) => lots.some((l) => l.id === fl.buy_trade_id)).map((fl) => ({ lotId: fl.buy_trade_id as string, sellId: fl.sell_trade_id as string, units: Number(fl.units), buyPrice: Number(fl.buy_price), sellPrice: Number(fl.sell_price) }));
+      const res = replayFifo(lots, sells, prior);
+      for (const fl of res.newFills) tables.bobby_lot_fills.push({ id: `fill-${nextId++}`, buy_trade_id: fl.lotId, sell_trade_id: fl.sellId, units: fl.units, buy_price: fl.buyPrice, sell_price: fl.sellPrice });
+      for (const l of res.lots) { const row = tables.agent_trades.find((x) => x.id === l.id)!; row.units_remaining = l.unitsRemaining; }
+      for (const cl of res.closed) { const row = tables.agent_trades.find((x) => x.id === cl.lotId)!; Object.assign(row, { exit_price: cl.exitPrice, realized_pnl_pct: cl.pnlPct, outcome: cl.outcome, settled_at: row.settled_at ?? new Date().toISOString() }); }
+      for (const rz of res.realizations) { const row = tables.agent_trades.find((x) => x.id === rz.sellId)!; Object.assign(row, { units_remaining: rz.unmatchedUnits, entry_price: rz.entryPrice, realized_pnl_pct: rz.pnlPct, outcome: rz.outcome }); }
     }
     r.agent_trade_id = t.id;
     return json({ outcome: wasConfirmed ? 'already' : 'confirmed', id: r.id, trade_id: t.id });
@@ -274,11 +277,46 @@ if (process.env.E2E_STOCKS === '1') {
     assert.ok(Number(lot.units_remaining) > 0 && Number(lot.units_remaining) < Number(lot.units), `lot partially consumed: ${lot.units_remaining}/${lot.units}`);
     assert.ok(!lot.settled_at, 'a partially consumed lot stays open');
     const sells = tables.agent_trades.filter((t) => t.direction === 'SELL' && t.token_symbol === 'WETH');
-    const unmatched = sells.find((t) => Number(t.units_remaining) > 0 && Number(t.units) === 0);
+    const unmatched = sells.find((t) => Number(t.units_remaining) > 0 && Number(t.units_remaining) === Number(t.units) && !t.outcome);
     assert.ok(unmatched, 'the sell before any lot is fully unmatched, never a realization');
-    const matched = sells.find((t) => Number(t.units) > 0);
+    const matched = sells.find((t) => Number(t.units) > Number(t.units_remaining));
     assert.ok(matched && matched.outcome && tables.bobby_lot_fills.some((fl) => fl.sell_trade_id === matched.id), 'the later sell produced a fill and an outcome');
     console.log(`single-use intent: second calldata refused before confirm, spent after; FIFO: lot ${Number(lot.units_remaining).toFixed(6)}/${Number(lot.units).toFixed(6)} left, ${tables.bobby_lot_fills.length} fill(s)`);
+  }
+
+  // Out-of-order receipts: buy cbBTC, then sell part of it on-chain; confirm the SELL first, the BUY later.
+  {
+    const buy = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'cbBTC', amount: '10', recipient: account.address });
+    if (buy.tx?.approve) { await send(buy.tx.approve); }
+    const buy2 = buy.tx?.swap ? buy : await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'cbBTC', amount: '10', recipient: account.address });
+    assert.ok(buy2.tx?.swap, 'buy calldata');
+    await recordBuiltSwap({ wallet: account.address, tokenIn: buy2.tokenIn, tokenOut: buy2.tokenOut, amountInRaw: buy2.amountInRaw, quotedOutRaw: buy2.amountOutRaw, minOutRaw: buy2.minAmountOutRaw, route: buy2.route.description, router: buy2.venue.router, calldataHash: buy2.tx!.calldataHash!, deadline: buy2.deadline });
+    const b = await send(buy2.tx!.swap!);
+    const sellAmt = (Number(buy2.amountOut) / 2).toFixed(8);
+    const sq = await quoteBaseSwap({ tokenIn: 'cbBTC', tokenOut: 'USDC', amount: sellAmt, recipient: account.address });
+    if (sq.tx?.approve) { await send(sq.tx.approve); }
+    const sq2 = sq.tx?.swap ? sq : await quoteBaseSwap({ tokenIn: 'cbBTC', tokenOut: 'USDC', amount: sellAmt, recipient: account.address });
+    assert.ok(sq2.tx?.swap, 'sell calldata');
+    await recordBuiltSwap({ wallet: account.address, tokenIn: sq2.tokenIn, tokenOut: sq2.tokenOut, amountInRaw: sq2.amountInRaw, quotedOutRaw: sq2.amountOutRaw, minOutRaw: sq2.minAmountOutRaw, route: sq2.route.description, router: sq2.venue.router, calldataHash: sq2.tx!.calldataHash!, deadline: sq2.deadline });
+    const sres = await send(sq2.tx!.swap!);
+    // Confirm SELL first (arrives before the buy's receipt), then the BUY.
+    const vs = await verifySwapOnChain(sres.hash, account.address, baseClient());
+    assert.equal((await confirmSwapReceipt(vs, account.address)).outcome, 'confirmed');
+    const sellRow = tables.agent_trades.find((t) => t.tx_hash === sres.hash.toLowerCase())!;
+    const openBefore = tables.agent_trades.filter((t) => t.direction === 'BUY' && t.token_symbol === 'cbBTC' && Number(t.units_remaining) > 0);
+    // The first cbBTC lot (from the very first journey, 20 USDC) is still open and EARLIER on-chain, so it is consumed first — FIFO.
+    assert.ok(Number(sellRow.units) > 0, 'sell recorded');
+    const vb = await verifySwapOnChain(b.hash, account.address, baseClient());
+    assert.equal((await confirmSwapReceipt(vb, account.address)).outcome, 'confirmed');
+    const lots = tables.agent_trades.filter((t) => t.direction === 'BUY' && t.token_symbol === 'cbBTC').sort((x, y) => Number(x.block_number) - Number(y.block_number));
+    assert.equal(lots.length, 2);
+    assert.ok(Number(lots[0].units_remaining) < Number(lots[0].units), 'the oldest lot was consumed first');
+    assert.equal(Number(lots[1].units_remaining), Number(lots[1].units), 'the late-confirmed newer lot is untouched');
+    assert.equal(Number(sellRow.units_remaining), 0, 'the sell is fully matched after the replay');
+    assert.ok(sellRow.outcome && sellRow.entry_price, 'sell realization derived from fills');
+    const sells = tables.agent_trades.filter((t) => t.direction === 'SELL' && t.outcome);
+    const buysWithOutcome = tables.agent_trades.filter((t) => t.direction === 'BUY' && t.outcome);
+    console.log(`out-of-order: sell confirmed before buy → replay matched it; ${sells.length} sell realization(s), ${buysWithOutcome.length} scored lot(s), ${openBefore.length} lot(s) were open before`);
   }
 
   // Repair: a confirmed receipt whose trade vanished gets it back on the next confirm ('already').

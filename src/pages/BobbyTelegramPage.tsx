@@ -15,7 +15,7 @@ import { Check, Loader2, AlertTriangle } from 'lucide-react';
 import KineticShell from '@/components/kinetic/KineticShell';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
-// Payment config — X Layer (Chain 196)
+// Payment config — retired X Layer rail (kept only for the notice copy)
 // Bobby treasury wallet (NOT the user's wallet)
 const BOBBY_WALLET = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea' as `0x${string}`;
 const USDT_CONTRACT = '0x1E4a5963aBFD975d8c9021ce480b42188849D41d' as `0x${string}`;
@@ -121,57 +121,17 @@ export default function BobbyTelegramPage() {
   // Step 2: Sign real USDT transfer on X Layer
   const handlePay = async () => {
     if (!isConnected || !address || !activateGroupId) return;
-
     setPaymentState('signing');
     setPaymentError('');
-
     try {
-      // Create session first
+      // The OKB/USDT-on-X-Layer payment was retired on 2026-09-03 with the rail.
+      // The server answers 410 until a Base checkout exists; nothing is signed here.
       const sessionRes = await fetch(`/api/telegram-access?group_id=${activateGroupId}&wallet=${address}`);
-      const sessionData = await sessionRes.json();
-
-      if (sessionData.already_active) {
-        setPaymentState('success');
-        return;
-      }
-
-      if (!sessionData.session) {
-        setPaymentError('Could not create payment session');
-        setPaymentState('error');
-        return;
-      }
-
-      setSession(sessionData.session);
-
-      const onSuccess = (hash: string) => { setTxHash(hash); setPaymentState('verifying'); };
-      const onError = (error: any) => {
-        if (error.message?.includes('rejected') || error.code === 4001) {
-          setPaymentError('Transaction rejected. Please try again.');
-        } else if (error.message?.includes('insufficient')) {
-          setPaymentError(`Insufficient ${payToken} balance on X Layer.`);
-        } else {
-          setPaymentError(error.message?.slice(0, 100) || 'Transaction failed');
-        }
-        setPaymentState('error');
-      };
-
-      if (payToken === 'OKB') {
-        // Native OKB transfer
-        sendTransaction({
-          to: BOBBY_WALLET,
-          value: PAYMENT_AMOUNT_OKB,
-          chainId: XLAYER_CHAIN_ID,
-        }, { onSuccess, onError });
-      } else {
-        // USDT ERC-20 transfer
-        writeContract({
-          address: USDT_CONTRACT,
-          abi: [{ name: 'transfer', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
-          functionName: 'transfer',
-          args: [BOBBY_WALLET, PAYMENT_AMOUNT_USDT],
-          chainId: XLAYER_CHAIN_ID,
-        }, { onSuccess, onError });
-      }
+      const sessionData = await sessionRes.json().catch(() => ({}));
+      if (sessionData.already_active) { setPaymentState('success'); return; }
+      setPaymentError(sessionData.error || 'Group activation by payment is paused until the Base checkout ships.');
+      setPaymentState('error');
+      return;
     } catch (err) {
       setPaymentError('Connection error');
       setPaymentState('error');

@@ -418,10 +418,13 @@ async function checkCircuitBreaker(wallet: string | null): Promise<{ halted: boo
       `${url}/rest/v1/agent_trades` +
       `?settled_at=gte.${encodeURIComponent(sinceIso)}` +
       `&status=eq.confirmed` +
+      // Money is realized by SELLs (and their fills). BUY lots also carry an
+      // outcome, for scoring only — counting both would count each loss twice.
+      `&direction=eq.SELL` +
       `&outcome=not.is.null` +
       // One wallet's losses stop that wallet, nobody else. Cron cycles (no wallet) never trade.
       (wallet ? `&owner_address=eq.${wallet.toLowerCase()}` : '') +
-      `&select=outcome,realized_pnl_pct,amount_usd,settled_at` +
+      `&select=outcome,realized_pnl_pct,entry_price,units,units_remaining,settled_at` +
       `&order=settled_at.desc&limit=100`;
     const recentRes = await fetch(recentUrl, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
@@ -433,16 +436,19 @@ async function checkCircuitBreaker(wallet: string | null): Promise<{ halted: boo
     const recent = (await recentRes.json()) as Array<{
       outcome: string;
       realized_pnl_pct: number | null;
-      amount_usd: number | null;
+      entry_price: number | null;
+      units: number | null;
+      units_remaining: number | null;
       settled_at: string;
     }>;
     if (!Array.isArray(recent) || recent.length === 0) return { halted: false };
 
     // Rule 1: realized drawdown in USD / bankroll.
+    // Realized USD of a sell = pct × cost basis of the MATCHED units.
     const realizedUsd = recent.reduce((sum, t) => {
       const pct = (t.realized_pnl_pct || 0) / 100;
-      const notional = t.amount_usd || 0;
-      return sum + pct * notional;
+      const matched = Math.max(0, Number(t.units || 0) - Number(t.units_remaining || 0));
+      return sum + pct * Number(t.entry_price || 0) * matched;
     }, 0);
     if (realizedUsd < -BANKROLL * DRAWDOWN_PCT) {
       return {
@@ -485,12 +491,16 @@ async function fetchRealizedLossTodayUsd(wallet: string): Promise<number | null>
   if (!url || !key) return null;
   try {
     const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const q = `${url}/rest/v1/agent_trades?owner_address=eq.${wallet.toLowerCase()}&settled_at=gte.${encodeURIComponent(sinceIso)}&outcome=eq.loss&select=amount_usd,realized_pnl_pct`;
+    // SELL realizations only (BUY outcomes are scoring, not money).
+    const q = `${url}/rest/v1/agent_trades?owner_address=eq.${wallet.toLowerCase()}&direction=eq.SELL&settled_at=gte.${encodeURIComponent(sinceIso)}&outcome=eq.loss&select=entry_price,units,units_remaining,realized_pnl_pct`;
     const res = await fetch(q, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
     if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ amount_usd: number | null; realized_pnl_pct: number | null }>;
+    const rows = (await res.json()) as Array<{ entry_price: number | null; units: number | null; units_remaining: number | null; realized_pnl_pct: number | null }>;
     if (!Array.isArray(rows)) return null;
-    return rows.reduce((sum, r) => sum + Math.max(0, -((r.realized_pnl_pct || 0) / 100) * (r.amount_usd || 0)), 0);
+    return rows.reduce((sum, r) => {
+      const matched = Math.max(0, Number(r.units || 0) - Number(r.units_remaining || 0));
+      return sum + Math.max(0, -((r.realized_pnl_pct || 0) / 100) * Number(r.entry_price || 0) * matched);
+    }, 0);
   } catch {
     return null;
   }

@@ -418,11 +418,10 @@ export default function BobbyDocsPage() {
                   <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
 {`curl bobbyprotocol.xyz/api/premium-signal
 
-→ 402 {
-  amount: "0.001 OKB",
-  chain: 196,
-  protocol: "x402"
-}`}
+→ 410 {
+  code: "xlayer_x402_retired"
+}
+# The X Layer x402 rail is archive-only.`}
                   </div>
                 </GlassCard>
 
@@ -431,10 +430,9 @@ export default function BobbyDocsPage() {
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.06] font-bold leading-none">2</div>
                   <div className="font-mono text-[10px] text-[#ffb95f] tracking-[0.15em] uppercase mb-3">Legacy payment rail</div>
                   <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
-{`curl bobbyprotocol.xyz/api/
-  premium-signal \\
-  -H "x-payment:
-    0xYOUR_TX_HASH"`}
+{`# Premium MCP tools pay on Base:
+curl bobbyprotocol.xyz/api/mcp-http
+→ 402 challenge on ${'Base'}`}
                   </div>
                 </GlassCard>
 

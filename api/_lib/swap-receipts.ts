@@ -125,6 +125,8 @@ export interface ChainVerification {
   to: Address | null;
   status: 'success' | 'reverted' | null;
   blockNumber: string | null;
+  /** Position inside the block: with blockNumber, the chain order FIFO follows. */
+  txIndex: number | null;
   blockTimestamp: number | null;
   calldataHash: Hex | null;
   valueWei: string | null;
@@ -138,7 +140,7 @@ type ReceiptClient = Pick<ReturnType<typeof baseClient>, 'getTransaction' | 'get
 
 /** Reads the transaction and its receipt; every check is against chain data. */
 export async function verifySwapOnChain(txHash: Hex, wallet: Address, client: ReceiptClient = baseClient()): Promise<ChainVerification> {
-  const base: ChainVerification = { ok: false, reason: null, txHash, from: null, to: null, status: null, blockNumber: null, blockTimestamp: null, calldataHash: null, valueWei: null, movements: [], amountInRaw: null, amountOutRaw: null };
+  const base: ChainVerification = { ok: false, reason: null, txHash, from: null, to: null, status: null, blockNumber: null, txIndex: null, blockTimestamp: null, calldataHash: null, valueWei: null, movements: [], amountInRaw: null, amountOutRaw: null };
   let tx; let receipt;
   try {
     // A hash the node has never seen can make a forked/lagging RPC wait on its
@@ -158,6 +160,7 @@ export async function verifySwapOnChain(txHash: Hex, wallet: Address, client: Re
     to: tx.to ? getAddress(tx.to) : null,
     status: receipt.status,
     blockNumber: receipt.blockNumber.toString(),
+    txIndex: Number(receipt.transactionIndex),
     calldataHash: keccak256(tx.input),
     valueWei: tx.value.toString(),
   };
@@ -290,6 +293,7 @@ export async function confirmSwapReceipt(
         p_amount_usd: facts.amountUsd,
         p_entry_price: facts.entryPrice,
         p_units: facts.units,
+        p_tx_index: v.txIndex,
       }),
     });
     if (!rpc.ok) return { ...none, outcome: 'db_error', id: rows[0].id };

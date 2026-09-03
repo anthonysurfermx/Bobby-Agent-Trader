@@ -135,6 +135,17 @@ Owned first: the round-4 note said "all green" while `test:protocol-write-safety
 | P2 | Cron could be halted by any user's losses | Only manual cycles with a wallet consult the breaker; cron trades for nobody and skips it. |
 | P2 | X Layer "active" in MCP payments | Those names were aliases of `DEFAULT_CHAIN` (Base) since the cutover. Renamed for truth: `api/_lib/protocol-payments.ts`, `PROTOCOL_CHAIN_ID` / `PROTOCOL_RPC_URL`; MCP wallet/portfolio defaults on Base. The only `XLAYER_*` left is the archive config in `chains.ts`. |
 
+## Review round 7 → what changed
+
+| # | Finding | Change |
+|---|---|---|
+| P1 | Each realization counted twice (BUY and SELL both carry `outcome`) | Money metrics read **SELL rows only**: the circuit breaker and the daily-loss ledger filter `direction=SELL` and compute realized USD as `pct × entry × matched units`; `bobby-pnl` already did. BUY lots keep `outcome` strictly for scoring (documented in the SQL). |
+| P1 | FIFO followed receipt arrival, not the chain | `agent_trades.block_number` + `tx_index` are persisted from the receipt. `bobby_match_fifo(wallet, symbol)` is a deterministic **replay** in chain order: every unmatched sell consumes only lots that sit earlier on-chain, oldest first; it runs after every confirmed receipt, so a buy whose receipt arrives after the sell's is matched retroactively, and a sell earlier than every lot stays unmatched forever. `api/_lib/lots.ts` (`replayFifo`) is the same spec, unit-tested (out-of-order, partial, over-sell, re-buy) and drives the e2e double; the e2e confirms a SELL before its BUY on the fork and checks convergence. Sell realizations are derived from fills (`bobby_refresh_sell`). |
+| P1 | `portfolioEquity` counted turnover as capital | `capitalRequired` = peak of the running net investment (buys − sells) in chain order; `portfolioEquity = capitalRequired + realized + unrealized`; `capitalDeployed` stays, labeled turnover; `netInvested` exposed. Buy 100 / sell 110 / buy 100 → 110, not 210. |
+| P2 | Sells inflated `total_usd_deployed` | Only BUYs add to it; both count in `trades_executed`. |
+| P2 | E2E never ran the SQL | `scripts/test-swap-ledger-pg.mts` (`npm run test:swap-ledger-pg`) applies the migration to a scratch Postgres (`DATABASE_URL`) and runs the PL/pgSQL itself: one sell / two lots + idempotent re-confirm, out-of-order receipts, chain-order refusal, and two concurrent confirms against one lot (matched total never exceeds the lot). **Not run here: this machine has no Docker/Postgres.** It must pass on `supabase start` before the migration is applied. |
+| P2 | X Layer x402 surfaces still active | `premium-signal` → 410; `telegram-access` payment gate → 410 and the Telegram page no longer signs OKB/USDT on X Layer (notice instead); docs example updated. |
+
 ## Verification run
 
 ```

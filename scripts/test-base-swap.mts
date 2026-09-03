@@ -158,28 +158,43 @@ const single: QuotedRoute = { route: { kind: 'single', fee: 500 }, amountOut: 40
 // --- a recipient that is not the wallet is impossible to smuggle: build always checksums the given one ---
 assert.throws(() => buildSwapTx({ tokenIn: usdc, tokenOut: cbbtc, route: single, amountIn: 1n, minOut: 1n, recipient: '0xnot' as `0x${string}`, deadline }));
 
-// --- FIFO lots: one sell cannot settle two whole lots; partials; unmatched ---
+// --- FIFO lots in chain order: one sell cannot settle two whole lots; partials; unmatched; out-of-order arrival ---
 {
-  const { matchFifo } = await import('../api/_lib/lots.js');
-  const lots = [{ id: 'a', unitsRemaining: 1, entryPrice: 100 }, { id: 'b', unitsRemaining: 1, entryPrice: 120 }];
-  const one = matchFifo(lots, 1, 110);
-  assert.deepEqual(one.settled.map((s) => s.lotId), ['a'], 'a one-unit sell settles only the oldest one-unit lot');
-  assert.equal(one.lots[1].unitsRemaining, 1, 'the second lot is untouched');
-  assert.equal(one.settled[0].outcome, 'win');
-  const part = matchFifo(lots, 0.4, 130);
-  assert.equal(part.settled.length, 0, 'a partial sell settles nothing');
+  const { replayFifo } = await import('../api/_lib/lots.js');
+  const lot = (id: string, units: number, entryPrice: number, blockNumber: number, txIndex = 0) => ({ id, units, unitsRemaining: units, entryPrice, blockNumber, txIndex });
+  const sell = (id: string, units: number, sellPrice: number, blockNumber: number, txIndex = 0) => ({ id, units, unitsRemaining: units, sellPrice, blockNumber, txIndex });
+  // Two 1-unit lots, one 1-unit sell later: only the oldest lot closes.
+  const one = replayFifo([lot('a', 1, 100, 10), lot('b', 1, 120, 11)], [sell('s1', 1, 110, 12)], []);
+  assert.deepEqual(one.closed.map((c) => c.lotId), ['a']);
+  assert.equal(one.lots.find((l) => l.id === 'b')!.unitsRemaining, 1, 'the second lot is untouched');
+  assert.equal(one.realizations[0].matchedUnits, 1);
+  assert.equal(one.realizations[0].outcome, 'win');
+  // Partial sell, then the rest: exit is fill-weighted across both sells.
+  const part = replayFifo([lot('a', 1, 100, 10)], [sell('s1', 0.4, 130, 11)], []);
+  assert.equal(part.closed.length, 0);
   assert.equal(Number(part.lots[0].unitsRemaining.toFixed(6)), 0.6);
-  const rest = matchFifo(part.lots, 0.6, 90, part.fills);
-  assert.equal(rest.settled.length, 1);
-  assert.equal(Number(rest.settled[0].exitPrice.toFixed(4)), Number(((0.4 * 130 + 0.6 * 90) / 1).toFixed(4)), 'exit is fill-weighted across both sells');
-  const over = matchFifo(lots, 3, 100);
-  assert.equal(over.settled.length, 2);
-  assert.equal(over.unmatchedUnits, 1, 'units beyond the open lots stay unmatched');
-  assert.equal(matchFifo([], 1, 100).matchedAvgBuy, null, 'no lots → nothing matched');
-  // Buy, sell, buy again: the old sell must not touch the new lot (it was consumed at its own time).
-  const first = matchFifo([{ id: 'x', unitsRemaining: 1, entryPrice: 100 }], 1, 110);
-  const again = matchFifo([...first.lots, { id: 'y', unitsRemaining: 1, entryPrice: 105 }], 0, 0);
-  assert.equal(again.lots[1].unitsRemaining, 1, 'a re-bought lot is whole');
+  const rest = replayFifo(part.lots, [...part.sells, sell('s2', 0.6, 90, 12)], part.newFills);
+  assert.equal(rest.closed.length, 1);
+  assert.equal(Number(rest.closed[0].exitPrice.toFixed(4)), Number((0.4 * 130 + 0.6 * 90).toFixed(4)));
+  assert.equal(rest.newFills.length, 1, 'replay is idempotent: only the new sell produced a fill');
+  // Over-sell: units beyond the open lots stay unmatched on the sell.
+  const over = replayFifo([lot('a', 1, 100, 10), lot('b', 1, 120, 11)], [sell('s1', 3, 100, 12)], []);
+  assert.equal(over.closed.length, 2);
+  assert.equal(over.realizations[0].unmatchedUnits, 1);
+  // Chain order, not arrival order: a sell mined BEFORE the lot can never consume it.
+  const before = replayFifo([lot('a', 1, 100, 20)], [sell('s0', 1, 110, 10)], []);
+  assert.equal(before.newFills.length, 0, 'a sell earlier on-chain than every lot stays unmatched');
+  assert.equal(before.lots[0].unitsRemaining, 1);
+  // Out-of-order arrival: the sell's receipt is processed first, the buy's later — replay converges.
+  const late1 = replayFifo([], [sell('s1', 1, 110, 12)], []);
+  assert.equal(late1.realizations[0].matchedUnits, 0);
+  const late2 = replayFifo([lot('a', 1, 100, 10)], late1.sells, late1.newFills);
+  assert.equal(late2.realizations[0].matchedUnits, 1, 'the late lot is consumed by the earlier-recorded sell');
+  assert.equal(late2.closed.length, 1);
+  // Buy, sell, buy again: the old sell never touches the new lot (it is later on-chain).
+  const again = replayFifo([lot('x', 1, 100, 10), lot('y', 1, 105, 30)], [sell('s1', 1, 110, 20)], []);
+  assert.equal(again.lots.find((l) => l.id === 'y')!.unitsRemaining, 1, 'a re-bought lot is whole');
+  assert.equal(again.lots.find((l) => l.id === 'x')!.unitsRemaining, 0);
 }
 
 console.log('base-swap tests passed');

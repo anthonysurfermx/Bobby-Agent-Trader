@@ -30,9 +30,11 @@ interface TradeRow {
   settled_at: string | null;
   units: number | null;
   units_remaining: number | null;
+  block_number: number | null;
+  tx_index: number | null;
 }
 
-const SELECT = 'token_symbol,direction,amount_usd,entry_price,exit_price,realized_pnl_pct,outcome,created_at,settled_at,units,units_remaining';
+const SELECT = 'token_symbol,direction,amount_usd,entry_price,exit_price,realized_pnl_pct,outcome,created_at,settled_at,units,units_remaining,block_number,tx_index';
 
 async function markPrice(symbol: string): Promise<number | null> {
   const token = findBaseToken(symbol);
@@ -52,20 +54,34 @@ function openLots(rows: TradeRow[]) {
     .map((t) => ({ symbol: t.token_symbol, units: Number(t.units_remaining), entryPrice: Number(t.entry_price), amountUsd: Number(t.units_remaining) * Number(t.entry_price), openTime: t.created_at }));
 }
 
+const matchedUnits = (t: TradeRow) => Math.max(0, Number(t.units ?? 0) - Number(t.units_remaining ?? 0));
+
 /**
- * Realizations are SELL rows: entry = FIFO average cost of the matched units,
- * exit = the sell price, realized = pct × entry × matched units. Fully
- * consumed BUY lots also carry an outcome (for scoring), but counting both
- * would double-count; the SELL rows are the ledger here.
+ * Realizations are SELL rows: entry = FIFO cost of the MATCHED units, exit =
+ * the sell price, realized = pct × entry × matched. BUY lots also carry an
+ * outcome (scoring only); counting both would double-count.
+ *
+ * Capital: `capitalDeployed` is turnover (every buy, ever). What the book
+ * actually needed is `capitalRequired` — the peak of the running net
+ * investment (buys − sells) in chain order. Buy $100, sell $110, buy $100
+ * again → net investment 100 → −10 → 90, peak 100. Equity is that peak
+ * plus everything the book made: 100 + 10 realized + unrealized.
  */
 function aggregates(rows: TradeRow[]) {
-  const realizations = rows.filter((t) => t.direction === 'SELL' && t.outcome && t.entry_price && (t.units ?? 0) > 0);
+  const realizations = rows.filter((t) => t.direction === 'SELL' && t.outcome && t.entry_price && matchedUnits(t) > 0);
   const wins = realizations.filter((t) => t.outcome === 'win').length;
   const losses = realizations.filter((t) => t.outcome === 'loss').length;
-  const realizedPnl = realizations.reduce((s, t) => s + ((t.realized_pnl_pct ?? 0) / 100) * Number(t.entry_price) * Number(t.units), 0);
+  const realizedPnl = realizations.reduce((s, t) => s + ((t.realized_pnl_pct ?? 0) / 100) * Number(t.entry_price) * matchedUnits(t), 0);
   const capitalDeployed = rows.filter((t) => t.direction === 'BUY').reduce((s, t) => s + (t.amount_usd ?? 0), 0);
   const realizedCash = rows.filter((t) => t.direction === 'SELL').reduce((s, t) => s + (t.amount_usd ?? 0), 0);
-  return { realizations, wins, losses, realizedPnl, capitalDeployed, realizedCash };
+  const chainOrder = [...rows].sort((a, b) => (Number(a.block_number ?? 0) - Number(b.block_number ?? 0)) || (Number(a.tx_index ?? 0) - Number(b.tx_index ?? 0)) || a.created_at.localeCompare(b.created_at));
+  let net = 0; let capitalRequired = 0;
+  for (const t of chainOrder) {
+    net += t.direction === 'BUY' ? (t.amount_usd ?? 0) : -(t.amount_usd ?? 0);
+    if (net > capitalRequired) capitalRequired = net;
+  }
+  const netInvested = net;
+  return { realizations, wins, losses, realizedPnl, capitalDeployed, realizedCash, capitalRequired, netInvested };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -84,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const r = await fetch(bobbyRest(`agent_trades?chain=eq.base&status=eq.confirmed${scope}&select=${SELECT}&order=created_at.desc&limit=500`), { headers: bobbyServiceHeaders() });
     if (!r.ok) return res.status(502).json({ ok: false, error: 'Could not read trades' });
     const rows = (await r.json()) as TradeRow[];
-    const { realizations, wins, losses, realizedPnl, capitalDeployed, realizedCash } = aggregates(rows);
+    const { realizations, wins, losses, realizedPnl, capitalDeployed, realizedCash, capitalRequired, netInvested } = aggregates(rows);
     const lots = openLots(rows);
 
     const symbols = Array.from(new Set(lots.map((l) => l.symbol)));
@@ -107,21 +123,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     const unrealizedPnl = openPositions.reduce((s, p) => s + p.unrealizedPnl, 0);
     const openPositionValue = openPositions.reduce((s, p) => s + p.amountUsd + p.unrealizedPnl, 0);
-    // Virtual portfolio: everything ever deployed plus what it made. Buying $100
-    // and selling for $110 shows $110, not $0.
-    const portfolioEquity = capitalDeployed + realizedPnl + unrealizedPnl;
-    const totalReturn = capitalDeployed > 0 ? ((realizedPnl + unrealizedPnl) / capitalDeployed) * 100 : 0;
+    // Virtual portfolio = the capital the book ever needed, plus what it made.
+    // Buy $100, sell $110, buy $100 again → 100 + 10 + unrealized, not 210.
+    const netPnl = realizedPnl + unrealizedPnl;
+    const portfolioEquity = capitalRequired + netPnl;
+    const totalReturn = capitalRequired > 0 ? (netPnl / capitalRequired) * 100 : 0;
 
     const summary = {
-      capitalDeployed: Number(capitalDeployed.toFixed(2)),
+      capitalRequired: Number(capitalRequired.toFixed(2)),
+      netInvested: Number(netInvested.toFixed(2)),
+      capitalDeployed: Number(capitalDeployed.toFixed(2)), // turnover: every buy ever
       openPositionValue: Number(openPositionValue.toFixed(2)),
       realizedCash: Number(realizedCash.toFixed(2)),
       realizedPnl: Number(realizedPnl.toFixed(4)),
       unrealizedPnl: Number(unrealizedPnl.toFixed(4)),
+      netPnl: Number(netPnl.toFixed(4)),
       portfolioEquity: Number(portfolioEquity.toFixed(2)),
-      // Names the existing screens read: start = capital deployed, current = portfolio equity.
-      startingCapital: Number(capitalDeployed.toFixed(2)),
-      investedUsd: Number(capitalDeployed.toFixed(2)),
+      // Names the existing screens read: start = capital required, current = portfolio equity.
+      startingCapital: Number(capitalRequired.toFixed(2)),
+      investedUsd: Number(capitalRequired.toFixed(2)),
       currentEquity: Number(portfolioEquity.toFixed(2)),
       totalEquity: Number(portfolioEquity.toFixed(2)),
       totalReturn: Number(totalReturn.toFixed(2)),
@@ -141,10 +161,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       symbol: t.token_symbol,
       direction: 'long' as const,
       leverage: '1x',
-      units: Number(t.units),
+      units: matchedUnits(t),
+      unmatchedUnits: Number(t.units_remaining ?? 0),
       entryPrice: t.entry_price,
       exitPrice: t.exit_price,
-      realizedPnl: Number((((t.realized_pnl_pct ?? 0) / 100) * Number(t.entry_price) * Number(t.units)).toFixed(4)),
+      realizedPnl: Number((((t.realized_pnl_pct ?? 0) / 100) * Number(t.entry_price) * matchedUnits(t)).toFixed(4)),
       pnlPct: Number((t.realized_pnl_pct ?? 0).toFixed(2)),
       result: t.outcome === 'win' ? 'WIN' : t.outcome === 'loss' ? 'LOSS' : 'BREAK_EVEN',
       openTime: t.created_at,

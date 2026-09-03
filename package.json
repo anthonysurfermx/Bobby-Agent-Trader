@@ -29,6 +29,7 @@
     "test:base-swap": "tsx scripts/test-base-swap.mts",
     "smoke:base-swap": "tsx scripts/smoke-base-swap.mts",
     "e2e:base-swap": "tsx scripts/e2e-base-swap-anvil.mts",
+    "test:swap-ledger-pg": "tsx scripts/test-swap-ledger-pg.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts"
   },
   "dependencies": {
@@ -117,6 +118,7 @@
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vercel/node": "^5.6.3",
@@ -127,6 +129,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "lovable-tagger": "^1.1.9",
+    "pg": "^8.23.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",

@@ -37,6 +37,12 @@ async function sendTelegramMessage(chatId: number, text: string) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // 2026-09-03: the OKB-on-X-Layer x402 gate is retired with the rail. Group
+  // activation by payment returns when a Base checkout exists; until then no
+  // session is minted and no proof is accepted.
+  res.setHeader('Cache-Control', 'no-store');
+  return res.status(410).json({ ok: false, code: 'xlayer_x402_retired', error: 'Telegram group activation by X Layer payment is retired; a Base checkout will replace it' });
+
   const limit = req.method === 'POST' ? 10 : 120;
   if (!await enforcePublicRateLimit(req, res, `telegram-access-${req.method || 'unknown'}`, limit, 3600)) return;
   if (!SB_SERVICE_KEY) return res.status(500).json({ error: 'Server misconfigured' });
