@@ -54,7 +54,11 @@ begin
   -- 4. progress recomputed from the union of the ledgers (server truth)
   select coalesce(sum(awarded), 0), coalesce(sum(aura), 0), count(*) into v_xp, v_aura, v_events
     from public.bobby_progress_events where identity_id = p_keep;
-  select count(*) into v_route from public.tl_inventory where identity_id = p_keep and source = 'route';
+  -- Discovery Route position = distinct route pieces owned (a duplicate earned on
+  -- both sides before linking stays in the collection but does not skip a step)
+  select count(distinct i.route_index) into v_route
+    from public.tl_inventory inv join public.tl_items i on i.id = inv.item_id
+    where inv.identity_id = p_keep and inv.source = 'route' and i.route_index is not null;
   select max(day_key) into v_last_day from public.bobby_progress_events where identity_id = p_keep and awarded > 0;
   select count(*) into v_daily from public.bobby_progress_events where identity_id = p_keep and awarded > 0 and day_key = v_last_day;
   v_daily_day := v_last_day;

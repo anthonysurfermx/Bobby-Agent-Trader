@@ -53,7 +53,30 @@ the next one runs at 12:00 UTC on the new database.
 `GATE PASSED` — **183/183** (policy matrix incl. the 8 new tables, canaries, legitimate path
 through the API). Evidence: `evidence/2026-09-03-gate-passed-production-7f4bdcb.txt`.
 
-## 5. iOS login (branch `ios/apple-login`, d1d2dd3)
+## 5. One identity across web and iOS (615e6df) — after Codex's review of d1d2dd3
+
+Codex was right: the web (wallet session) and the phone (Apple) each created their own
+`bobby_identities` row and nothing joined them, so "same XP on both" was false. Now:
+
+- `bobby_link_identities(keep, merge)` (migration 0007, applied): atomic merge —
+  ledger, inventory and pre-calls re-parented, the merged land dropped (pieces back to
+  inventory), wallet moved to the kept row, progress **recomputed from the union of the
+  ledgers** (xp, aura, streak, distinct route positions), refuses two different accounts
+  or wallets.
+- `/api/identity-link`: `issue` (6-char code, 10 min, single use) / `claim` (merges the
+  code's identity into the caller's). Either door can do either.
+- Web: the "Guardado" pill opens a link panel (generate a code / paste one).
+- iOS: the account sheet claims a code from the desk or generates one.
+- Probe on production (`evidence/2026-09-03-identity-link-probe-production.txt`): wallet
+  identity 30 XP + auth identity 10 XP → after claim **one identity, 40 XP on both
+  doors**, wallet attached, `linkedAuth=true`, code single-use (404 on reuse), a second
+  account trying to claim the linked identity → 409.
+
+Correct statement of the capability today: **iOS syncs progress across installs and
+devices that use the same Apple ID; linking with the desk's wallet session takes one
+6-character code, once.**
+
+## 6. iOS login (branch `ios/apple-login`, d1d2dd3 → 32648b6)
 Anthony enabled the Apple provider on the `bobby-protocol` Auth (client id
 `xyz.bobbyprotocol.bobby`, no OAuth secret — native only, users without email allowed)
 and the App ID capability. The app now has: `AccountSession` (native Sign in with Apple
@@ -61,11 +84,14 @@ with nonce → `auth/v1/token?grant_type=id_token` → Keychain, refresh on dema
 `ProgressSync` (every award queued on the phone, reported to `/api/progress` with the
 access token, server state applied back, first sync claims pre-sign-in XP),
 `AccountSheet` from the desk menu ("Save progress"). Entitlement
-`com.apple.developer.applesignin` added via project.yml. Builds on Xcode 26.1.1;
-the sheet and the Apple button verified in the iPhone 17 Pro simulator. The real
-Apple round trip needs a device with an Apple ID (TestFlight build 13) — the
-Supabase side answers correctly to the provider (validation error on a bogus token,
-not "provider disabled").
+`com.apple.developer.applesignin` added via project.yml. Codex fixes in 32648b6: award
+queue keyed per account (`bind` on sign-in migrates the anonymous queue once; another
+Apple ID starts from server state; `signOut(store:)` detaches), sync drains the queue in
+batches of 50 with no truncation, `applyServer` also applies `lastDay` /
+`dailyAwards` / `dailyAwardsDay`, link-code UI, `CURRENT_PROJECT_VERSION` 13. Builds on
+Xcode 26.1.1; the sheet and the Apple button verified in the iPhone 17 Pro simulator.
+The real Apple round trip still needs a device with an Apple ID: build 13 is prepared in
+the project, **not yet archived or uploaded** to TestFlight.
 
 ## Open
 - Trader Land UI wiring and `art_url` (other session).
