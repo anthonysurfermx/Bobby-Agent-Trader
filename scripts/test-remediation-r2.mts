@@ -43,7 +43,11 @@ globalThis.fetch = (async (input: any, init?: any) => {
     const il = q.get('symbol')?.startsWith('ilike.') ? q.get('symbol')!.slice(6) : null;
     let rows = threadRows() as Array<{ symbol?: string }>;
     if (eq !== null) rows = rows.filter((r) => r.symbol === eq);
-    if (il !== null) rows = rows.filter((r) => (r.symbol || '').toLowerCase() === il.toLowerCase());
+    if (il !== null) {
+      // Real ilike semantics (Codex r4): `_` is any single char, `%` any run — so a bypass shows up here.
+      const re = new RegExp('^' + il.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$', 'i');
+      rows = rows.filter((r) => re.test(r.symbol || ''));
+    }
     return json(rows);
   }
   if (url.includes('/rest/v1/forum_posts')) return json(posts);
@@ -190,6 +194,15 @@ await check('C-03 / r3 P2: `nvdac` finds the mixed-case NVDAc thread (ilike, no 
   const text = (state.body as { result?: { content?: Array<{ text?: string }> } })?.result?.content?.[0]?.text || '';
   assert.ok(text.includes('NVDAc'), `the tool answered with the thread, not an empty lookup: ${text.slice(0, 120)}`);
 });
+await check('C-03 / r4 P2: ilike wildcards `_` and `%` are refused before any query', async () => {
+  for (const bad of ['___', 'NVDA_', '%', 'N%c']) {
+    const n = since(); const { res, state } = recorder();
+    await mcpHttp.default(rpc('bobby_recommend', { symbol: bad }), res);
+    const body = state.body as { error?: { message?: string } };
+    assert.ok(body?.error?.message?.includes('symbol must match'), `${bad}: ${JSON.stringify(state.body)}`);
+    assert.equal(urlsSince(n).filter((u) => u.includes('forum_threads')).length, 0, `${bad} reached the database`);
+  }
+});
 await check('C-03 mcp-http bobby_brief takes the same guard', async () => {
   const n = since(); const { res, state } = recorder();
   await mcpHttp.default(rpc('bobby_brief', { symbol: 'x%26select=id' }), res);
@@ -220,11 +233,12 @@ await check('C-01 forum-resolve: private cycle resolved off-chain only, public o
 });
 
 // ---------- Codex r2 #1: repo-wide — every forum_threads read on a public path is pinned ----------
-await check('C-01 repo-wide (r3): every forum_threads READ in any call form is scoped', async () => {
+await check('C-01 repo-wide (r4): every forum_threads READ, any call form, every api/** subdirectory', async () => {
   const { readdirSync } = await import('node:fs');
   const root = new URL('../api/', import.meta.url);
-  const files = [...readdirSync(root).filter((f) => f.endsWith('.ts')).map((f) => `api/${f}`), ...readdirSync(new URL('_lib/', root)).filter((f) => f.endsWith('.ts')).map((f) => `api/_lib/${f}`)];
-  // Reads that legitimately touch private rows — file + a reason. Anything else must be scoped.
+  // recursive: api/agents/**, api/network/**, api/_lib/** — not only the top level
+  const files = (readdirSync(root, { recursive: true }) as string[]).filter((f) => f.endsWith('.ts')).map((f) => `api/${f}`);
+  assert.ok(files.some((f) => f.startsWith('api/agents/')) && files.some((f) => f.startsWith('api/network/')), 'the walk reaches the subdirectories');
   const allow: Array<[string, RegExp, string]> = [
     ['api/my-threads.ts', /forum_threads\?\$\{filter\}/, 'owner-scoped: filter is owner_wallet from the session'],
     ['api/forum-resolve.ts', /forum_threads\?resolution=eq\.pending&entry_price/, 'the sweep resolves private cycles for their owner; on-chain gated on scope'],
@@ -234,16 +248,23 @@ await check('C-01 repo-wide (r3): every forum_threads READ in any call form is s
   for (const f of files) {
     const lines = (await readFile(new URL(`../${f}`, import.meta.url), 'utf8')).split('\n');
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].replace(/\/\/.*$/, '');                                          // drop trailing comments
+      const line = lines[i].replace(/\/\/.*$/, '');
       if (!line.includes('forum_threads')) continue;
       const t = line.trim();
-      if (t.startsWith('*') || t.startsWith('/*')) continue;                                  // block comments
-      if (/forum_threads\.(id|trigger_data)|forum_threads\/forum_posts|forum_threads insert/.test(line)) continue; // prose / error strings
-      const window = lines.slice(i, i + 4).join('\n');                                       // helper calls put the query on the next line
-      if (WRITER.test(window)) continue;                                                       // inserts / patches are not reads
-      if (window.includes('scope=eq.public')) continue;
-      if (/forum_threads\?id=eq\./.test(window) || /`id=eq\.\$\{/.test(window)) continue;       // single row by id
-      if (allow.some(([file, re]) => file === f && re.test(window))) continue;
+      if (t.startsWith('*') || t.startsWith('/*')) continue;
+      // Statement-level: gather from this line to the terminating `;`, max 12 lines (a
+      // trailing `{` is NOT a terminator — `fetch(url, {` continues with `method:` below).
+      let stmt = ''; let j = i;
+      while (j < lines.length && j < i + 12) { stmt += lines[j].replace(/\/\/.*$/, '') + '\n'; if (/;\s*$/.test(lines[j])) break; j += 1; }
+      // Prose (error text, logs) is not a query. Anything else must be a KNOWN query form —
+      // an unknown helper touching forum_threads is an offender too, so new patterns cannot slip by.
+      if (/new Error\(|console\.(log|warn|error)\(|^\s*throw /m.test(stmt) && !/\/rest\/v1\/forum_threads|forum_threads\?/.test(stmt)) continue;
+      const QUERY_FORM = /\/rest\/v1\/forum_threads|forum_threads\?|sbQuery\(\s*'forum_threads'|sbGet\(`forum_threads|\.from\(\s*'forum_threads'\)|queryThreads\(|sbInsert\(\s*'forum_threads'|sbPatch\(\s*'forum_threads'/;
+      if (!QUERY_FORM.test(stmt)) { offenders.push(`${f}:${i + 1}: UNCLASSIFIED form — extend the scanner: ${t.slice(0, 90)}`); continue; }
+      if (WRITER.test(stmt)) continue;
+      if (stmt.includes('scope=eq.public')) continue;
+      if (/forum_threads\?id=eq\./.test(stmt) || /`id=eq\.\$\{/.test(stmt)) continue;
+      if (allow.some(([file, re]) => file === f && re.test(stmt))) continue;
       offenders.push(`${f}:${i + 1}: ${t.slice(0, 100)}`);
     }
   }

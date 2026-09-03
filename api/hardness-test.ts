@@ -158,7 +158,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (shouldCommitOnchain && isHardnessRegistryConfigured()) {
       // Codex r3 P2: re-validate after the CIO moved the levels — an adjusted
       // stop on the wrong side of the entry would revert on-chain.
-      const adjustedError = levelGeometryError(prediction.direction, Number(cio.adjusted_entry || prediction.entry), Number(cio.adjusted_target || prediction.target), Number(cio.adjusted_stop || prediction.stop));
+      const adjustedError = levelGeometryError(prediction.direction, Number(cio.adjusted_entry ?? prediction.entry), Number(cio.adjusted_target ?? prediction.target), Number(cio.adjusted_stop ?? prediction.stop));
       if (adjustedError) {
         onChainProof = { enabled: false, error: `CIO-adjusted levels rejected: ${adjustedError}` };
       } else {
@@ -167,15 +167,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         symbol: prediction.symbol,
         direction: prediction.direction,
         conviction: finalConviction,
-        entryPrice: Number(cio.adjusted_entry || prediction.entry),
-        targetPrice: Number(cio.adjusted_target || prediction.target),
-        stopPrice: Number(cio.adjusted_stop || prediction.stop),
+        entryPrice: Number(cio.adjusted_entry ?? prediction.entry),
+        targetPrice: Number(cio.adjusted_target ?? prediction.target),
+        stopPrice: Number(cio.adjusted_stop ?? prediction.stop),
         shouldCommitPrediction: true,
       });
 
       if (proof && proof.commitTxHash) {
         onChainProof = {
           enabled: true,
+          // Codex r4 P2: the transaction was SUBMITTED; a receipt is not awaited here.
+          commitStatus: 'submitted',
           predictionHash: proof.predictionHash,
           commitTxHash: proof.commitTxHash,
           signalTxHash: proof.signalTxHash || null,

@@ -30,9 +30,9 @@ generic suite as a substitute.* Every row below therefore points at a test that
 
 Run on `security/remediation-r2` after the last edit:
 
-- `forge test` — 14 suites, **243 passed, 0 failed** (round 2a: 228; 2b: 236; 3b adds bonds, owner dispute, timeout, snapshot, reverting receiver)
-- `test:remediation-r2` — 22/22 (round 2a: 15; 2b: 20)
-- `test:hardness-abi-anvil` — pass (bytecode-backed decode of every backend getter)
+- `forge test` — 14 suites, **248 passed, 0 failed** (2a: 228; 2b: 236; 3b: 243; 4 adds farming, timeout-stands, snapshots, cap, revoked-vote cases)
+- `test:remediation-r2` — 23/23 (2a: 15; 2b: 20; 3b: 22)
+- `test:hardness-abi-anvil` — pass (generated ABI equals the artifact; bytecode-backed decode of every backend getter)
 - `test:rls-lockdown-pg` — exploit reproduced on the shipped policies, then refused; views and C-04 asserted (PostgreSQL 17, scratch schema, stand-in roles)
 - `test:api-security` — 47/47
 - `test:base-swap` — pass
@@ -124,6 +124,39 @@ receiver (now pinned by `test_R3_revertingPosterDoesNotLockOthers`, which Codex 
 `submitChallenge{value: bounties.challengeBond()}(…)` makes the bond getter that next
 call, so the challenge ran as the test contract (the owner) and reverted "Resolver
 cannot challenge" — 27 tests at once. The suites use a `BOND` constant now.
+
+## Round 4 review (Codex) — NO-GO on `ff84390`: the bond economics I designed were farmable
+
+Two P1s, both design flaws of round 3b, both accepted:
+
+| # | Codex finding | Decision taken | Regression |
+|---|---|---|---|
+| P1 | **Bond farming.** Losing bonds went to the poster. Poster + shill + a compromised resolver: the shill wins reward + own bond, the poster collects every honest challenger's bond — the actor recovers all principal and nets `N × B`. Filling the slots with own sybils was near-free for the same reason. | **Forfeited bonds go to a neutral `treasury`, never to a party** — losing challenge bonds and rejected dispute bonds alike. Defaults to the owner (the Safe); settable, including to a burn address. | `test_R4_bondFarmingIsUnprofitable`: reward = bond, one shill, three honest, rigged resolver → the colluding actor's payout equals its deposits **exactly**, the poster receives 0, the treasury receives `3 × B`. Sybil and rival-dispute tests re-asserted against the treasury. |
+| P1 | **Free stalling.** `resolveStalledDispute` refunded everything, so a poster could dispute a legitimate winner, sit 30 days, and recover reward and bond if the Safe did nothing. | **Explicit fallback: if the Safe does not rule inside the window, the proposal STANDS and the disputer's bond is forfeited to the treasury.** A dispute is an appeal; an appeal nobody rules on fails and the appellant pays. Stalling now costs a bond and achieves nothing. The security assumption is stated in the code: the Safe must rule on a real shill within `disputeSettlementTimeout` — and it can dispute on its own, without a bond, so it never depends on the poster. | `test_R3_stalledDisputeUpholdsProposal` (rewritten): winner paid after the timeout, staller's bond in the treasury, settle impossible afterwards; `test_R4_registryStalledDisputeUpholdsProposal`. The registry owner-dispute test now has the Safe *settle* (silence would uphold the shill — the documented trade-off). |
+
+And the five P2s:
+
+| Codex finding | Fix | Regression |
+|---|---|---|
+| `disputeSettlementTimeout` read live at timeout → retroactive. | `settlementAfter[id]` snapshotted at dispute time. | `test_R4_settlementDeadlineSnapshot`: owner shortens after the dispute; timeout still blocked until the snapshot. |
+| `challengeBond` neither snapshotted nor capped. | `bountyBond[id]` fixed at post time (challenges and party disputes pay that); `setChallengeBond` capped at `1000 × ABSOLUTE_MIN_BOUNTY`. | `test_R4_bondSnapshotAndCap`: raised after the post → the old bond still applies, the new one is refused; cap enforced. |
+| `_` is an `ilike` wildcard — `symbol=___` matched any 3-char ticker; the mock implemented ilike as equality. | Allow-list drops `_` and `%`. **The mock now implements real ilike semantics** (`_`→any char, `%`→any run), so a bypass would be visible. | `___`, `NVDA_`, `%`, `N%c` → refused before any query. |
+| Scanner skipped `api/agents/**` and `api/network/**`; four-line windows were confusable. | Recursive walk; **statement-level** gathering to the terminating `;` (a trailing `{` no longer ends a statement, which is how `fetch(url, {` + `method: 'POST'` was being misread); prose skipped; **any unknown call form touching `forum_threads` is itself an offender** ("UNCLASSIFIED — extend the scanner"), so a new helper cannot slip by silently. | The walk is asserted to reach both subdirectories. Current inventory clean. |
+| The backend still consumed a hand-written list; the test only detected drift. | **The ABI now comes from the artifact**: `scripts/gen-hardness-abi.mts` writes `api/_lib/hardness-registry.abi.ts` from `contracts/out/…/HardnessRegistry.json`; the lib imports it. The anvil test asserts the generated module **equals** the artifact and still decodes every getter through it. Regenerate after any `forge build`: `npm run gen:hardness-abi`. | `test:hardness-abi-anvil`. |
+| `hardness-test`: `adjusted_* || original` swallowed a CIO adjustment of `0`; `enabled:true` meant submitted, not confirmed. | `??` (only null/undefined fall back — a `0` is validated and rejected); `commitStatus: 'submitted'` states what `enabled` means. | geometry checks unchanged. |
+| Registry: a revoked resolver's vote kept counting in an open round. | Approvers tracked per round; quorum counts **only approvers who are still resolvers**. | `test_R4_revokedResolverVoteDoesNotCount`: approve, revoke, approve → still one active vote; a third resolver reaches quorum. |
+
+Confirmed by Codex this round and kept: no double credit, terminal states and mapping
+zeroing prevent repeated settlement/timeout, pull-payment + CEI isolate reverting
+receivers, C-01 clean on the current inventory, judge-mode / on-chain geometry /
+artifacts correct, the bond loops fit in gas at 500 challengers (~3.4M finalize,
+~12.7M return-all), bytecode 11,385 B (Bounties) / 20,894 B (Registry) before this round.
+
+**Trade-off recorded, not hidden.** The timeout rule means a compromised backend's
+shill proposal wins if *both* the Safe fails to rule for 30 days *and* nobody
+settles. The alternative (refund on timeout) made stalling free, which Codex showed
+is the more exploitable failure. The Safe's own bond-free dispute right is what makes
+the assumption reasonable; `disputeSettlementTimeout` is owner-bounded 7–90 days.
 
 ## For the final round
 

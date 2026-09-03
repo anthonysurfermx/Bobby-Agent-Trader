@@ -133,8 +133,16 @@ After the redeploy, bounty resolution is optimistic: a resolved bounty sits in
 the winner can, but plan a cron. A `DISPUTED` bounty waits for a Safe
 transaction (`settleDispute` / `settleBountyDispute`) — or, after
 `disputeSettlementTimeout` (30 days), anyone can return the escrow to the poster.
-Challenges and party disputes post a bond (`challengeBond`, initially the minimum
-bounty); the Safe disputes without one.
+Challenges and party disputes post a bond (`challengeBond`, fixed per bounty at post
+time, initially the minimum bounty, capped at 1000× the absolute minimum); the Safe
+disputes without one. Forfeited bonds go to `treasury` (defaults to the Safe; may be
+set to a burn address) — never to the poster. If the Safe does not settle a dispute
+within `disputeSettlementTimeout`, the proposal stands and the disputer's bond is
+forfeited: the Safe must rule on a real shill inside that window.
+
+After any `forge build` that touches HardnessRegistry: `npm run gen:hardness-abi`
+regenerates `api/_lib/hardness-registry.abi.ts`; `test:hardness-abi-anvil` fails if
+it is stale.
 
 ## Rollback
 

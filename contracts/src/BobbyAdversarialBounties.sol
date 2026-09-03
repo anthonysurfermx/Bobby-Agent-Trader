@@ -117,6 +117,15 @@ contract BobbyAdversarialBounties {
     uint32 public disputeSettlementTimeout = 30 days;
     uint32 public constant MIN_SETTLEMENT_TIMEOUT = 7 days;
     uint32 public constant MAX_SETTLEMENT_TIMEOUT = 90 days;
+    /// @dev Codex r4: forfeited bonds go HERE, never to a party — a poster who is
+    ///      also the shill farmed honest challengers' bonds when losers paid the
+    ///      poster. Defaults to the owner (the Safe); may be set to a burn address.
+    address public treasury;
+    /// @dev Codex r4: the bond is snapshotted per bounty at post time, and the
+    ///      settlement deadline per dispute — owner changes are never retroactive.
+    mapping(uint256 => uint96) public bountyBond;
+    mapping(uint256 => uint64) public settlementAfter;
+    uint96 public constant MAX_BOND_MULTIPLIER = 1000; // challengeBond <= 1000 x ABSOLUTE_MIN_BOUNTY
 
     // ---- Events ----
 
@@ -149,6 +158,7 @@ contract BobbyAdversarialBounties {
     event DisputeWindowUpdated(uint32 oldWindow, uint32 newWindow);
     event BountyDisputeTimedOut(uint256 indexed bountyId, address indexed poster, uint96 amount);
     event ChallengeBondUpdated(uint96 oldBond, uint96 newBond);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event DisputeSettlementTimeoutUpdated(uint32 oldTimeout, uint32 newTimeout);
     event BountyWithdrawn(uint256 indexed bountyId, address indexed poster, uint96 amount);
     event Withdrawal(address indexed to, uint256 amount);
@@ -187,6 +197,7 @@ contract BobbyAdversarialBounties {
         ABSOLUTE_MIN_BOUNTY = _absoluteMinBounty;
         minBounty = _initialMinBounty;
         challengeBond = _initialMinBounty;
+        treasury = msg.sender;
         emit OwnershipTransferred(address(0), msg.sender);
         emit ResolverUpdated(address(0), _resolver);
     }
@@ -228,6 +239,8 @@ contract BobbyAdversarialBounties {
             // settlement terms of an existing bounty after deposit
             gracePeriodSnapshot: challengeGracePeriod
         });
+
+        bountyBond[bountyId] = challengeBond; // Codex r4: price of contesting is fixed at post time
 
         emit BountyPosted(bountyId, msg.sender, tHash, _dimension, uint96(msg.value), window);
     }
@@ -281,7 +294,7 @@ contract BobbyAdversarialBounties {
 
         // Codex r3: a bond per challenge — returned to the winner, forfeited to
         // the poster by every other challenger once the bounty resolves.
-        require(msg.value == challengeBond, "Challenge bond required");
+        require(msg.value == bountyBond[_bountyId], "Challenge bond required");
         challengeBondOf[_bountyId][msg.sender] = uint96(msg.value);
         hasChallenged[_bountyId][msg.sender] = true;
 
@@ -372,13 +385,14 @@ contract BobbyAdversarialBounties {
         if (msg.sender == owner) {
             require(msg.value == 0, "Owner disputes without bond");
         } else {
-            require(msg.value == challengeBond, "Dispute bond required");
+            require(msg.value == bountyBond[_bountyId], "Dispute bond required");
             disputeBondOf[_bountyId] = uint96(msg.value);
         }
 
         b.status = BountyStatus.DISPUTED;
         disputedBy[_bountyId] = msg.sender;
         disputedAt[_bountyId] = uint64(block.timestamp);
+        settlementAfter[_bountyId] = uint64(block.timestamp) + disputeSettlementTimeout; // Codex r4: snapshot
 
         emit BountyResolutionDisputed(_bountyId, msg.sender);
     }
@@ -407,32 +421,43 @@ contract BobbyAdversarialBounties {
         b.status = BountyStatus.RESOLVED;
         pendingWithdrawals[_winner] += b.reward;
         _settleChallengeBonds(_bountyId, _winner);
-        // Upheld (the proposal changed) → bond back to the disputer; rejected → to the winner.
-        _payDisputeBond(_bountyId, _winner == proposed ? _winner : disputedBy[_bountyId]);
+        // Upheld (the proposal changed) → bond back to the disputer; rejected → to the treasury, never to a party.
+        _payDisputeBond(_bountyId, _winner == proposed ? treasury : disputedBy[_bountyId]);
         emit BountyResolved(_bountyId, _winner, b.reward);
         emit BountyDisputeSettled(_bountyId, _winner, false);
     }
 
-    /// @notice A dispute the owner never settled: after `disputeSettlementTimeout`
-    ///         anyone returns the escrow to the poster and every bond to its owner.
-    ///         Nobody profits from stalling.
+    /// @notice A dispute the owner never settled. Codex r4: "return everything"
+    ///         made stalling free, so the fallback is now explicit — the resolver's
+    ///         PROPOSAL STANDS and the disputer's bond is forfeited to the treasury.
+    ///         A dispute is an appeal to the Safe; an appeal nobody rules on fails,
+    ///         and the appellant pays. Stalling therefore costs a bond and achieves
+    ///         nothing. The security assumption is stated, not hidden: the Safe
+    ///         must rule on a real shill within `disputeSettlementTimeout`, and it
+    ///         can also dispute on its own without a bond.
     function resolveStalledDispute(uint256 _bountyId) external {
         Bounty storage b = bounties[_bountyId];
         require(b.poster != address(0), "Bounty not found");
         require(b.status == BountyStatus.DISPUTED, "Not disputed");
-        require(block.timestamp >= uint256(disputedAt[_bountyId]) + disputeSettlementTimeout, "Settlement timeout not reached");
+        require(block.timestamp >= settlementAfter[_bountyId], "Settlement timeout not reached");
 
-        b.winner = address(0);
-        b.status = BountyStatus.WITHDRAWN;
-        pendingWithdrawals[b.poster] += b.reward;
-        _returnAllChallengeBonds(_bountyId);
-        _payDisputeBond(_bountyId, disputedBy[_bountyId]);
-        emit BountyDisputeTimedOut(_bountyId, b.poster, b.reward);
-        emit BountyWithdrawn(_bountyId, b.poster, b.reward);
+        b.status = BountyStatus.RESOLVED;
+        pendingWithdrawals[b.winner] += b.reward;
+        _settleChallengeBonds(_bountyId, b.winner);
+        _payDisputeBond(_bountyId, treasury);
+        emit BountyDisputeTimedOut(_bountyId, b.winner, b.reward);
+        emit BountyResolved(_bountyId, b.winner, b.reward);
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        require(_treasury != address(0), "Invalid treasury");
+        emit TreasuryUpdated(treasury, _treasury);
+        treasury = _treasury;
     }
 
     function setChallengeBond(uint96 _bond) external onlyOwner {
         require(_bond >= ABSOLUTE_MIN_BOUNTY, "Bond below floor");
+        require(_bond <= ABSOLUTE_MIN_BOUNTY * MAX_BOND_MULTIPLIER, "Bond above cap"); // Codex r4
         emit ChallengeBondUpdated(challengeBond, _bond);
         challengeBond = _bond;
     }
@@ -443,16 +468,17 @@ contract BobbyAdversarialBounties {
         disputeSettlementTimeout = _seconds;
     }
 
-    /// @dev Winner's bond back to the winner; every other challenger's bond to the poster.
+    /// @dev Winner's bond back to the winner; every other challenger's bond to the
+    ///      TREASURY (Codex r4 — the poster may be the shill's own wallet).
     function _settleChallengeBonds(uint256 _bountyId, address _winner) internal {
         Challenge[] storage cs = _challenges[_bountyId];
-        address poster = bounties[_bountyId].poster;
+        address sink = treasury;
         for (uint256 i = 0; i < cs.length; i++) {
             address c = cs[i].challenger;
             uint96 bond = challengeBondOf[_bountyId][c];
             if (bond == 0) continue;
             challengeBondOf[_bountyId][c] = 0;
-            pendingWithdrawals[c == _winner ? c : poster] += bond;
+            pendingWithdrawals[c == _winner ? c : sink] += bond;
         }
     }
 

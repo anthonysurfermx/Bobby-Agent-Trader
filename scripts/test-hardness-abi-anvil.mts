@@ -48,7 +48,7 @@ try {
   const h = ethers.keccak256(ethers.toUtf8Bytes('bobby:thread-1'));
   await (await truth.commitPrediction(h, 'BTC-USD', 77, 100_000n * 10n ** 8n, 110_000n * 10n ** 8n, 95_000n * 10n ** 8n)).wait();
 
-  const backend = new ethers.Contract(address, HARDNESS_REGISTRY_ABI as string[], provider);
+  const backend = new ethers.Contract(address, HARDNESS_REGISTRY_ABI as unknown as ethers.InterfaceAbi, provider);
 
   // 1. agentProfiles — the Codex reproduction: this threw INVALID_ARGUMENT overflow before the fix.
   const profile = await backend.agentProfiles(deployerAddress);
@@ -67,17 +67,9 @@ try {
   assert.equal(p.symbol, 'BTC-USD');
   console.log('ok  getPrediction decodes with the backend ABI (hardnessScore in place, later fields aligned)');
 
-  // 3. Every backend fragment must exist in the artifact with identical selector and outputs.
-  const truthIface = new ethers.Interface(artifact.abi as ethers.InterfaceAbi);
-  const mine = new ethers.Interface(HARDNESS_REGISTRY_ABI as string[]);
-  for (const f of mine.fragments) {
-    if (f.type !== 'function') continue;
-    const fn = f as ethers.FunctionFragment;
-    const real = truthIface.getFunction(fn.selector);
-    assert.ok(real, `backend fragment ${fn.format('sighash')} has no counterpart in the compiled contract`);
-    assert.equal(fn.outputs.map((o) => o.format('full')).join(','), real!.outputs.map((o) => o.format('full')).join(','), `outputs differ for ${fn.name}`);
-  }
-  console.log(`ok  ${mine.fragments.filter((f) => f.type === 'function').length} backend fragments match the compiled ABI (selector + outputs)`);
+  // 3. The generated module must BE the artifact's ABI — byte-for-byte after normalisation.
+  assert.equal(JSON.stringify(HARDNESS_REGISTRY_ABI), JSON.stringify(artifact.abi), 'api/_lib/hardness-registry.abi.ts is stale: run `npm run gen:hardness-abi` after `forge build`');
+  console.log(`ok  generated ABI (${(HARDNESS_REGISTRY_ABI as unknown[]).length} entries) equals the compiled artifact`);
   console.log('hardness ABI (anvil) tests passed');
 } finally {
   clearTimeout(killer);

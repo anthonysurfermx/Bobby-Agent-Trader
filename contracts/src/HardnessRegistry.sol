@@ -208,6 +208,14 @@ contract HardnessRegistry {
     uint32 public bountyDisputeSettlementTimeout = 30 days;
     uint32 public constant MIN_BOUNTY_SETTLEMENT_TIMEOUT = 7 days;
     uint32 public constant MAX_BOUNTY_SETTLEMENT_TIMEOUT = 90 days;
+    /// @dev Codex r4: forfeited bonds never go to a party; per-bounty snapshots of
+    ///      the bond and of the settlement deadline; approvers tracked per round so a
+    ///      revoked resolver's vote stops counting.
+    address public treasury;
+    mapping(uint256 => uint96) public bountyBond;
+    mapping(uint256 => uint64) public bountySettlementAfter;
+    mapping(uint256 => mapping(uint256 => address[])) internal _roundApprovers;
+    uint96 public constant MAX_BOUNTY_BOND_MULTIPLIER = 1000;
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) public hasApprovedResolution;
 
     mapping(address => uint256) public pendingWithdrawals;
@@ -273,6 +281,7 @@ contract HardnessRegistry {
     event BountyDisputeWindowUpdated(uint32 oldWindow, uint32 newWindow);
     event BountyDisputeTimedOut(uint256 indexed bountyId, address indexed poster, uint96 amount);
     event BountyChallengeBondUpdated(uint96 oldBond, uint96 newBond);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event BountyDisputeSettlementTimeoutUpdated(uint32 oldTimeout, uint32 newTimeout);
     event BountyWithdrawn(uint256 indexed bountyId, address indexed poster, uint96 amount);
 
@@ -312,6 +321,7 @@ contract HardnessRegistry {
         REGISTRATION_STAKE = _registrationStake;
         minBounty = _initialMinBounty;
         bountyChallengeBond = _initialMinBounty;
+        treasury = msg.sender;
         emit OwnershipTransferred(address(0), msg.sender);
 
         for (uint256 i = 0; i < initialResolvers.length; i++) {
@@ -590,6 +600,8 @@ contract HardnessRegistry {
             status: BountyStatus.OPEN
         });
 
+        bountyBond[bountyId] = bountyChallengeBond; // Codex r4: fixed at post time
+
         emit BountyPosted(bountyId, msg.sender, keccak256(bytes(threadId)), dimension, uint96(msg.value));
     }
 
@@ -606,7 +618,7 @@ contract HardnessRegistry {
         if (block.timestamp >= uint256(bounty.createdAt) + bounty.claimWindowSecs) revert WindowExpired();
 
         // Codex r3: a bond per challenge; returned to the winner, forfeited to the poster otherwise.
-        if (msg.value != bountyChallengeBond) revert InsufficientPayment();
+        if (msg.value != bountyBond[bountyId]) revert InsufficientPayment();
         bountyChallengeBondOf[bountyId][msg.sender] = uint96(msg.value);
         hasChallenged[bountyId][msg.sender] = true;
         _challenges[bountyId].push(Challenge({
@@ -647,7 +659,15 @@ contract HardnessRegistry {
 
         if (hasApprovedResolution[bountyId][round][msg.sender]) revert AlreadyApproved();
         hasApprovedResolution[bountyId][round][msg.sender] = true;
-        bounty.approvalCount += 1;
+        _roundApprovers[bountyId][round].push(msg.sender);
+        // Codex r4: count only approvers who are STILL resolvers — a revoked key's
+        // vote must not linger in an open round.
+        address[] storage approvers = _roundApprovers[bountyId][round];
+        uint8 active = 0;
+        for (uint256 i = 0; i < approvers.length; i++) {
+            if (resolvers[approvers[i]]) active += 1;
+        }
+        bounty.approvalCount = active;
 
         emit BountyResolutionApproved(
             bountyId,
@@ -695,13 +715,14 @@ contract HardnessRegistry {
         if (msg.sender == owner) {
             if (msg.value != 0) revert InvalidValue();
         } else {
-            if (msg.value != bountyChallengeBond) revert InsufficientPayment();
+            if (msg.value != bountyBond[bountyId]) revert InsufficientPayment();
             bountyDisputeBondOf[bountyId] = uint96(msg.value);
         }
 
         bounty.status = BountyStatus.DISPUTED;
         bountyDisputedBy[bountyId] = msg.sender;
         bountyDisputedAt[bountyId] = uint64(block.timestamp);
+        bountySettlementAfter[bountyId] = uint64(block.timestamp) + bountyDisputeSettlementTimeout; // Codex r4: snapshot
         emit BountyResolutionDisputed(bountyId, msg.sender);
     }
 
@@ -729,29 +750,38 @@ contract HardnessRegistry {
         bounty.status = BountyStatus.RESOLVED;
         pendingWithdrawals[winner] += bounty.reward;
         _settleBountyChallengeBonds(bountyId, winner);
-        _payBountyDisputeBond(bountyId, winner == proposed ? winner : bountyDisputedBy[bountyId]);
+        _payBountyDisputeBond(bountyId, winner == proposed ? treasury : bountyDisputedBy[bountyId]); // rejected → treasury
         emit BountyResolved(bountyId, winner, bounty.reward);
         emit BountyDisputeSettled(bountyId, winner, false);
     }
 
-    /// @dev Codex r3: an unsettled dispute is not a permanent lock.
+    /// @dev Codex r4: an unsettled dispute is not a permanent lock, and stalling is
+    ///      not free either — the quorum's proposal STANDS and the disputer's bond
+    ///      goes to the treasury. The Safe must rule on a real shill within the
+    ///      window (and may dispute on its own, without a bond).
     function resolveStalledBountyDispute(uint256 bountyId) external {
         Bounty storage bounty = bounties[bountyId];
         if (bounty.poster == address(0)) revert NotFound();
         if (bounty.status != BountyStatus.DISPUTED) revert InvalidValue();
-        if (block.timestamp < uint256(bountyDisputedAt[bountyId]) + bountyDisputeSettlementTimeout) revert TooSoon();
+        if (block.timestamp < bountySettlementAfter[bountyId]) revert TooSoon();
 
-        bounty.winner = address(0);
-        bounty.status = BountyStatus.WITHDRAWN;
-        pendingWithdrawals[bounty.poster] += bounty.reward;
-        _returnAllBountyChallengeBonds(bountyId);
-        _payBountyDisputeBond(bountyId, bountyDisputedBy[bountyId]);
-        emit BountyDisputeTimedOut(bountyId, bounty.poster, bounty.reward);
-        emit BountyWithdrawn(bountyId, bounty.poster, bounty.reward);
+        bounty.status = BountyStatus.RESOLVED;
+        pendingWithdrawals[bounty.winner] += bounty.reward;
+        _settleBountyChallengeBonds(bountyId, bounty.winner);
+        _payBountyDisputeBond(bountyId, treasury);
+        emit BountyDisputeTimedOut(bountyId, bounty.winner, bounty.reward);
+        emit BountyResolved(bountyId, bounty.winner, bounty.reward);
+    }
+
+    function setTreasury(address newTreasury) external onlyOwner {
+        if (newTreasury == address(0)) revert InvalidAddress();
+        emit TreasuryUpdated(treasury, newTreasury);
+        treasury = newTreasury;
     }
 
     function setBountyChallengeBond(uint96 bond) external onlyOwner {
         if (bond < ABSOLUTE_MIN_BOUNTY) revert InvalidValue();
+        if (bond > ABSOLUTE_MIN_BOUNTY * MAX_BOUNTY_BOND_MULTIPLIER) revert InvalidValue(); // Codex r4
         emit BountyChallengeBondUpdated(bountyChallengeBond, bond);
         bountyChallengeBond = bond;
     }
@@ -762,15 +792,16 @@ contract HardnessRegistry {
         bountyDisputeSettlementTimeout = secondsTimeout;
     }
 
+    /// @dev Codex r4: losers' bonds go to the treasury, never to the poster.
     function _settleBountyChallengeBonds(uint256 bountyId, address winner) internal {
         Challenge[] storage cs = _challenges[bountyId];
-        address poster = bounties[bountyId].poster;
+        address sink = treasury;
         for (uint256 i = 0; i < cs.length; i++) {
             address c = cs[i].challenger;
             uint96 bond = bountyChallengeBondOf[bountyId][c];
             if (bond == 0) continue;
             bountyChallengeBondOf[bountyId][c] = 0;
-            pendingWithdrawals[c == winner ? c : poster] += bond;
+            pendingWithdrawals[c == winner ? c : sink] += bond;
         }
     }
 

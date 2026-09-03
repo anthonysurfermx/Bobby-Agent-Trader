@@ -13,21 +13,13 @@ import {
 const XLAYER_RPC = PROTOCOL_RPC_URL;
 export const HARDNESS_REGISTRY_ADDRESS = BOBBY_HARDNESS_REGISTRY;
 
-// Codex r3 P1: this list drifted from the contract (agentProfiles lost `stake`,
-// getPrediction lost `hardnessScore`) and ethers reverted decoding the real
-// getters. It is now checked against the Foundry artifact by
-// scripts/test-hardness-abi-anvil.mts, which deploys the compiled bytecode on a
-// local anvil and decodes every getter used here with THIS list.
-export const HARDNESS_REGISTRY_ABI = [
-  'function agentProfiles(address) view returns (bool registered, uint64 registeredAt, uint96 stake, string metadataURI)',
-  'function getService(string serviceId) view returns ((address owner,address recipient,uint128 priceWei,uint128 totalRevenue,uint64 totalCalls,uint64 createdAt,bool active,string serviceId))',
-  'function REGISTRATION_STAKE() view returns (uint96)',
-  'function registerAgent(string metadataURI) payable',
-  'function registerService(string serviceId, uint256 priceWei, address recipient)',
-  'function commitPrediction(bytes32 predictionHash, string symbol, uint8 conviction, uint96 entry, uint96 target, uint96 stop)',
-  'function publishSignal(string symbol, uint8 hardnessScore, uint8 direction, uint8 conviction, bytes32 context)',
-  'function getPrediction(bytes32 predictionHash) view returns ((address agent,uint64 committedAt,uint64 minResolveAt,uint64 resolvedAt,uint8 conviction,uint8 result,uint96 entryPrice,uint8 hardnessScore,uint96 targetPrice,uint96 stopPrice,uint96 exitPrice,int32 pnlBps,string symbol))',
-];
+// Codex r3 P1 / r4 P2: the ABI comes FROM the Foundry artifact via
+// scripts/gen-hardness-abi.mts (generated module below). It once drifted from the
+// contract (agentProfiles lost `stake`, getPrediction lost `hardnessScore`) and
+// ethers reverted decoding the real getters; scripts/test-hardness-abi-anvil.mts
+// deploys the compiled bytecode on anvil and decodes every getter with it.
+import { HARDNESS_REGISTRY_ABI } from './hardness-registry.abi.js';
+export { HARDNESS_REGISTRY_ABI };
 
 const DEFAULT_AGENT_METADATA_URI =
   process.env.BOBBY_HARDNESS_AGENT_METADATA_URI || `${BOBBY_PROTOCOL_BASE_URL}/api/agent-identity`;

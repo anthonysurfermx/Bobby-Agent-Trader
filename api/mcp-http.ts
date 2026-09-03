@@ -83,8 +83,9 @@ const TOOLS = [
  *  `NVDAc&select=id` rewrote the query. tools/call does not enforce inputSchema. */
 function symbolFilterFor(raw: unknown): string {
   if (raw === undefined || raw === null || raw === '') return '';
-  if (typeof raw !== 'string' || !/^[A-Za-z0-9._-]{1,32}$/.test(raw)) {
-    throw new Error('symbol must match [A-Za-z0-9._-]{1,32}');
+  // Codex r4 P2: `_` and `%` are ilike wildcards — `___` matched any 3-char ticker. Neither may pass.
+  if (typeof raw !== 'string' || !/^[A-Za-z0-9.-]{1,32}$/.test(raw)) {
+    throw new Error('symbol must match [A-Za-z0-9.-]{1,32}');
   }
   // Codex r3 P2: `eq` is case-sensitive and stock threads are mixed-case
   // ("NVDAc"), so upper-casing made the lookup empty. `ilike` with no wildcard
