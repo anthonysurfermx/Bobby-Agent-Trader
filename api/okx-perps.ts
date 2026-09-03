@@ -171,6 +171,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'positions',
     'balance',
   ]);
+  // Product rail is Base + Uniswap only. Keep public OKX market metadata
+  // temporarily for backwards-compatible research, but permanently remove
+  // every account read/mutation from this deployment. This fails before any
+  // server or user credential can be selected.
+  if (accountActions.has(action)) {
+    return res.status(410).json({
+      ok: false,
+      code: 'okx_account_rail_retired',
+      error: 'OKX account and perpetual execution are retired; use Base tokenized-stock swaps through Uniswap',
+    });
+  }
   if (accountActions.has(action) && !hasUserCreds && !requireTradingAuth(req, res)) {
     return;
   }

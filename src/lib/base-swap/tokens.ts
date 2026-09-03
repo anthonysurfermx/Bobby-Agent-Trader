@@ -27,6 +27,14 @@ export interface BaseSwapToken {
   stable?: boolean;
   /** Symbols the agents use that map here (BTC → cbBTC). */
   aliases?: string[];
+  /** Coinbase B20 tokenized equity. Identity is pinned by address, never mutable symbol metadata. */
+  assetClass?: 'tokenized-stock';
+  underlyingSymbol?: string;
+  issuer?: 'Coinbase Tokenized Stocks';
+  /** Official Chainlink Total Return Value feed on Base. */
+  referenceFeed?: `0x${string}`;
+  /** A deliberately smaller server-side cap for newer, thinner markets. */
+  maxTicketUsd?: number;
 }
 
 export const BASE_SWAP_TOKENS: readonly BaseSwapToken[] = [
@@ -37,6 +45,30 @@ export const BASE_SWAP_TOKENS: readonly BaseSwapToken[] = [
   { symbol: 'DAI', name: 'Dai Stablecoin', address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', decimals: 18, stable: true },
   { symbol: 'cbBTC', name: 'Coinbase Wrapped BTC', address: '0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf', decimals: 8, aliases: ['BTC', 'WBTC'] },
   { symbol: 'AERO', name: 'Aerodrome', address: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', decimals: 18 },
+  {
+    symbol: 'AAPLc', name: 'Coinbase Tokenized Apple',
+    address: '0xb200000000000000000000C2e324d24d7eEcd1fb', decimals: 8,
+    aliases: ['AAPL'], assetClass: 'tokenized-stock', underlyingSymbol: 'AAPL',
+    issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x787f13dEa48Db0897CbCDD985de77809D837F988', maxTicketUsd: 100,
+  },
+  {
+    symbol: 'GOOGLc', name: 'Coinbase Tokenized Alphabet',
+    address: '0xb2000000000000000000002D0BA3164cc74f58B7', decimals: 8,
+    aliases: ['GOOGL'], assetClass: 'tokenized-stock', underlyingSymbol: 'GOOGL',
+    issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x5bF49E0ffA937CE2FfF033c739aD7C634c4D34F2', maxTicketUsd: 100,
+  },
+  {
+    symbol: 'METAc', name: 'Coinbase Tokenized Meta',
+    address: '0xb2000000000000000000008bC8786B856E61707C', decimals: 8,
+    aliases: ['META'], assetClass: 'tokenized-stock', underlyingSymbol: 'META',
+    issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x6526aE6797A76123638b863AeE4dD27Ba4E4b27D', maxTicketUsd: 100,
+  },
+  {
+    symbol: 'NVDAc', name: 'Coinbase Tokenized NVIDIA',
+    address: '0xb20000000000000000000078ee7ce2fE4908108C', decimals: 8,
+    aliases: ['NVDA'], assetClass: 'tokenized-stock', underlyingSymbol: 'NVDA',
+    issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x04689a41629776563E6822F76f2e57D148d28513', maxTicketUsd: 100,
+  },
 ] as const;
 
 /** Server-enforced limits; the UI only mirrors them. */
@@ -72,3 +104,6 @@ export function findBaseToken(ref: string | null | undefined): BaseSwapToken | n
 
 /** Symbols the UI may offer, in display order. */
 export const BASE_SWAP_SYMBOLS: readonly string[] = BASE_SWAP_TOKENS.map((t) => t.symbol);
+export const BASE_STOCK_SYMBOLS: readonly string[] = BASE_SWAP_TOKENS
+  .filter((t) => t.assetClass === 'tokenized-stock')
+  .map((t) => t.symbol);

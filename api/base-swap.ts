@@ -1,7 +1,7 @@
 // ============================================================
 // /api/base-swap — Uniswap V3 on Base, the only swap rail.
 //
-//   GET  ?tokenIn=USDC&tokenOut=cbBTC&amount=25[&slippagePct=0.5]
+//   GET  ?tokenIn=USDC&tokenOut=NVDAc&amount=25[&slippagePct=0.5]
 //        → quote only (no wallet, no calldata). Public, rate-limited.
 //   POST { tokenIn, tokenOut, amount, slippagePct?, wallet }
 //        → quote + user-signed calldata for `wallet`. Requires a wallet
@@ -27,6 +27,7 @@ const PostSchema = z.object({
   amount: z.union([z.number().positive().finite(), z.string().trim().regex(AMOUNT_RE)]),
   slippagePct: z.number().min(0.05).max(3).optional(),
   wallet: z.string().regex(WALLET_RE),
+  stockEligibilityConfirmed: z.boolean().optional(),
 });
 
 function statusFor(code: BaseSwapError['code']): number {
@@ -75,6 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       amount: body.amount,
       slippagePct: body.slippagePct,
       recipient: wallet ?? body.wallet,
+      stockEligibilityConfirmed: body.stockEligibilityConfirmed,
     });
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ ok: true, quote, execution: toTradeExecution(quote) });

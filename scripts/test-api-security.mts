@@ -94,8 +94,8 @@ try {
   {
     const { response, state } = responseRecorder();
     await perpsHandler(request({ action: 'balance', params: { mode: 'live' } }), response);
-    assert.equal(state.status, 401, 'server OKX account data must require internal auth');
-    assert.equal(fetchCalls, 0, 'rejected OKX account reads must not call OKX');
+    assert.equal(state.status, 410, 'server OKX account rail must be retired');
+    assert.equal(fetchCalls, 0, 'retired OKX account reads must not call OKX');
   }
 
   {
@@ -107,8 +107,8 @@ try {
       ),
       response,
     );
-    assert.equal(state.status, 503, 'cutover freeze must block Bobby server-account live mutations');
-    assert.equal(fetchCalls, 0, 'frozen live mutations must not call OKX');
+    assert.equal(state.status, 410, 'retired OKX rail must reject even authenticated live mutations');
+    assert.equal(fetchCalls, 0, 'retired live mutations must not call OKX');
   }
 
   {
@@ -122,17 +122,16 @@ try {
       },
       params: { mode: 'live' },
     }), response);
-    assert.equal(state.status, 200);
-    assert.equal(state.body?.ok, true);
-    assert.equal(observedAccessKey, 'user-api-key', 'user credentials must never unlock Bobby server credentials');
-    assert.equal(fetchCalls, 1);
+    assert.equal(state.status, 410, 'user credentials cannot reactivate the retired OKX rail');
+    assert.equal(observedAccessKey, '', 'retired rail must not inspect or forward user credentials');
+    assert.equal(fetchCalls, 0);
   }
 
   {
     const { response, state } = responseRecorder();
     await telegramDeliverHandler(request({ thread_id: 'untrusted-thread' }), response);
     assert.equal(state.status, 401, 'Telegram delivery must fail closed without internal auth');
-    assert.equal(fetchCalls, 1, 'rejected Telegram delivery must not call Supabase or Telegram');
+    assert.equal(fetchCalls, 0, 'rejected Telegram delivery must not call Supabase or Telegram');
   }
 
   {
@@ -146,7 +145,7 @@ try {
       positionDelta: 1,
     }), response);
     assert.equal(state.status, 401, 'live-capable signal processing must require internal auth');
-    assert.equal(fetchCalls, 1, 'rejected signals must not reach execution dependencies');
+    assert.equal(fetchCalls, 0, 'rejected signals must not reach execution dependencies');
   }
 
   const [

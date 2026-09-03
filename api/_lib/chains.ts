@@ -163,8 +163,8 @@ export const XLAYER: ChainConfig = {
 
 /**
  * The chain the protocol currently reads and writes.
- * Flip to BASE (or set PROTOCOL_CHAIN=base) once the audited redeploy is live
- * and the addresses above are populated.
+ * Base is the safe default. X Layer remains addressable only for historical
+ * reads and explicit migration tooling.
  */
 export type ProtocolChainName = 'xlayer' | 'base-sepolia' | 'base';
 
@@ -177,7 +177,7 @@ export function resolveProtocolChain(value: string | undefined): {
   name: ProtocolChainName;
   config: ChainConfig;
 } {
-  const normalized = (value || 'xlayer').trim().toLowerCase();
+  const normalized = (value || 'base').trim().toLowerCase();
   if (normalized === 'base') return { name: 'base', config: BASE };
   if (normalized === 'base-sepolia') return { name: 'base-sepolia', config: BASE_SEPOLIA };
   if (normalized === 'xlayer') return { name: 'xlayer', config: XLAYER };
@@ -212,7 +212,8 @@ export function addressUrl(address: string, chainId: number | string = DEFAULT_C
 // Uniswap V3 on Base — the only swap venue (2026-09-03). Addresses from the
 // official deployment list, read back on-chain (factory()/WETH9()) before
 // pinning. The swap rail (api/_lib/base-swap.ts) uses SwapRouter02 + QuoterV2:
-// exact approvals to the router, consumed by the swap; deadline via multicall.
+// exact approvals to the router; deadline via multicall. An approval may remain
+// if a swap is abandoned or reverts, so clients must never call it "consumed".
 export const UNISWAP_BASE = {
   swapRouter02: '0x2626664c2603336E57B271c5C0b26F421741e481',
   quoterV2: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',

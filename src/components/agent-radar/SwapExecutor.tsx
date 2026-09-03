@@ -1,99 +1,84 @@
-// ============================================================
-// SwapExecutor — Real on-chain swap on Base via Uniswap V3
-// Flow: Connect Wallet → Sign session → Quote + calldata → Approve (ERC-20) → Swap → Confirm
-// The server (/api/base-swap) builds and simulates the calldata against
-// pinned Uniswap contracts; this component only shows it and forwards it
-// to the wallet. Bobby never signs.
-// ============================================================
+// Base + Uniswap V3 tokenized-stock execution.
+// Server builds calldata; the wallet signs. An ERC-20 approval is never
+// treated as a swap: after its receipt we re-quote and re-simulate first.
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAccount, useSendTransaction, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import type { Hex } from 'viem';
 import { Wallet, ArrowRight, Check, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { BASE, BASE_CHAIN_ID } from '@/config/chains';
-import { BASE_SWAP_LIMITS, BASE_SWAP_SYMBOLS, findBaseToken } from '@/lib/base-swap/tokens';
+import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, findBaseToken } from '@/lib/base-swap/tokens';
 import { useBobbySession } from '@/hooks/useBobbySession';
 
-const SELL_TOKENS = ['USDC', 'ETH', 'USDT'];
-const BUY_TOKENS = BASE_SWAP_SYMBOLS.filter((s) => s !== 'WETH');
-
-type SwapStep = 'idle' | 'quoting' | 'quoted' | 'approving' | 'approved' | 'swapping' | 'confirmed' | 'error';
-
+const FROM_TOKENS = ['USDC', ...BASE_STOCK_SYMBOLS];
+type SwapStep = 'idle' | 'quoting' | 'quoted' | 'approving' | 'requote' | 'swapping' | 'confirmed' | 'error';
 interface Tx { to: string; data: string; value: string }
 
 interface SwapQuoteView {
   amountIn: string;
+  amountInRaw: string;
   amountOut: string;
   minAmountOut: string;
+  minAmountOutRaw: string;
   executionPrice: number;
   priceImpactPct: number | null;
-  usdValue: number | null;
-  route: { description: string; gasEstimate: string };
+  route: { description: string };
   venue: { name: string; router: string };
   tx: null | { approve: (Tx & { spender: string; amount: string }) | null; swap: Tx; deadline: number };
   simulation: { ran: boolean; ok: boolean | null; reason: string | null };
   txWithheld: string[];
   warnings: string[];
+  stockReference: null | { usdPrice: number; updatedAt: number; ageSec: number; multiplierHuman: number; marketDeviationPct: number };
 }
 
-interface Props {
-  defaultFrom?: string;
-  defaultTo?: string;
-  className?: string;
-}
+interface Props { defaultFrom?: string; defaultTo?: string; className?: string }
 
-export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', className = '' }: Props) {
+export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', className = '' }: Props) {
   const { address, isConnected, chain } = useAccount();
   const { switchChainAsync } = useSwitchChain();
-  const [acknowledged, setAcknowledged] = useState(false);
   const { open: openWallet } = useAppKit();
   const { sendTransactionAsync } = useSendTransaction();
   const session = useBobbySession({ auto: false });
-
   const [fromToken, setFromToken] = useState(findBaseToken(defaultFrom)?.symbol ?? 'USDC');
-  const [toToken, setToToken] = useState(findBaseToken(defaultTo)?.symbol ?? 'ETH');
+  const [toToken, setToToken] = useState(findBaseToken(defaultTo)?.symbol ?? 'NVDAc');
   const [amount, setAmount] = useState('25');
   const [slippage, setSlippage] = useState(String(BASE_SWAP_LIMITS.defaultSlippagePct));
-
+  const [acknowledged, setAcknowledged] = useState(false);
   const [step, setStep] = useState<SwapStep>('idle');
   const [quote, setQuote] = useState<SwapQuoteView | null>(null);
-  const [txHash, setTxHash] = useState<Hex | undefined>();
+  const [approveHash, setApproveHash] = useState<Hex>();
+  const [swapHash, setSwapHash] = useState<Hex>();
   const [error, setError] = useState<string | null>(null);
-
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
-  if (isConfirmed && step === 'swapping') setStep('confirmed');
-
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
+  const { data: approvalReceipt, isLoading: approvalPending } = useWaitForTransactionReceipt({ hash: approveHash });
+  const { data: swapReceipt, isLoading: swapPending } = useWaitForTransactionReceipt({ hash: swapHash });
   const from = findBaseToken(fromToken);
   const to = findBaseToken(toToken);
-  const isNativeFrom = Boolean(from?.native);
 
   const ensureChain = useCallback(async () => {
     if (chain?.id !== BASE_CHAIN_ID) await switchChainAsync({ chainId: BASE_CHAIN_ID });
   }, [chain?.id, switchChainAsync]);
 
-  // ---- Step 1: quote + calldata (server-built, guarded, simulated) ----
-  const getQuote = useCallback(async () => {
+  const reset = useCallback(() => {
+    setStep('idle');
+    setQuote(null);
+    setApproveHash(undefined);
+    setSwapHash(undefined);
+    setError(null);
+  }, []);
+
+  const requestQuote = useCallback(async (afterApproval = false) => {
     if (!address || !from || !to) return;
-    setStep('quoting');
+    setStep(afterApproval ? 'requote' : 'quoting');
     setError(null);
     setQuote(null);
-    setAcknowledged(false);
-    setTxHash(undefined);
     try {
-      // The API only builds calldata for a wallet that proved ownership.
       const stored = session.ready ? session.session : await session.ensureSession();
-      if (!stored) throw new Error('Sign the wallet session to request calldata');
+      if (!stored) throw new Error('Sign the wallet session to request transaction data');
       const res = await fetch('/api/base-swap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...session.headers() },
-        body: JSON.stringify({
-          tokenIn: from.symbol,
-          tokenOut: to.symbol,
-          amount: amount.trim(),
-          slippagePct: parseFloat(slippage),
-          wallet: address.toLowerCase(),
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...session.headers() },
+        body: JSON.stringify({ tokenIn: from.symbol, tokenOut: to.symbol, amount: amount.trim(), slippagePct: parseFloat(slippage), wallet: address.toLowerCase(), stockEligibilityConfirmed: acknowledged }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to get a Base quote');
@@ -103,18 +88,44 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
       setError(err instanceof Error ? err.message : 'Quote failed');
       setStep('error');
     }
-  }, [address, from, to, amount, slippage, session]);
+  }, [address, from, to, amount, slippage, acknowledged, session]);
 
-  // ---- Step 2: exact approval to the router (skip for ETH or when allowance suffices) ----
+  useEffect(() => {
+    if (!approvalReceipt || step !== 'approving') return;
+    if (approvalReceipt.status !== 'success') {
+      setError('The approval reverted on Base. No swap was sent.');
+      setStep('error');
+      return;
+    }
+    void requestQuote(true);
+  }, [approvalReceipt, step, requestQuote]);
+
+  useEffect(() => {
+    if (!swapReceipt || step !== 'swapping') return;
+    if (swapReceipt.status !== 'success') {
+      setError('The swap reverted on Base. The exact approval may still remain.');
+      setStep('error');
+      return;
+    }
+    if (!address || !swapHash || !quote) return;
+    void fetch('/api/swap-receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...session.headers() },
+      body: JSON.stringify({ wallet: address.toLowerCase(), txHash: swapHash, tokenIn: fromToken, tokenOut: toToken, amountInRaw: quote.amountInRaw, minAmountOutRaw: quote.minAmountOutRaw }),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error((await response.json().catch(() => null))?.error || 'history sync failed');
+    }).catch((reason) => setSyncWarning(reason instanceof Error ? reason.message : 'History sync failed'));
+    setStep('confirmed');
+  }, [swapReceipt, step, address, swapHash, quote, fromToken, toToken, session]);
+
   const approveToken = useCallback(async () => {
-    if (!quote?.tx) return;
-    if (!quote.tx.approve) { setStep('approved'); return; }
+    if (!quote?.tx?.approve) return;
     setStep('approving');
     setError(null);
+    setSyncWarning(null);
     try {
       await ensureChain();
-      await sendTransactionAsync({ chainId: BASE_CHAIN_ID, to: quote.tx.approve.to as Hex, data: quote.tx.approve.data as Hex });
-      setStep('approved');
+      setApproveHash(await sendTransactionAsync({ chainId: BASE_CHAIN_ID, to: quote.tx.approve.to as Hex, data: quote.tx.approve.data as Hex }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Approval failed';
       setError(msg.includes('rejected') || msg.includes('denied') ? 'Transaction rejected by user' : msg);
@@ -122,20 +133,16 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
     }
   }, [quote, sendTransactionAsync, ensureChain]);
 
-  // ---- Step 3: the swap ----
   const executeSwap = useCallback(async () => {
-    if (!quote?.tx) return;
+    if (!quote?.tx || quote.tx.approve || !quote.simulation.ran || quote.simulation.ok !== true) return;
+    if (quote.tx.deadline <= Math.floor(Date.now() / 1000) + 15) {
+      setError('Quote expired. Get a fresh quote before signing.'); setStep('error'); return;
+    }
     setStep('swapping');
     setError(null);
     try {
       await ensureChain();
-      const hash = await sendTransactionAsync({
-        chainId: BASE_CHAIN_ID,
-        to: quote.tx.swap.to as Hex,
-        data: quote.tx.swap.data as Hex,
-        value: BigInt(quote.tx.swap.value || '0'),
-      });
-      setTxHash(hash);
+      setSwapHash(await sendTransactionAsync({ chainId: BASE_CHAIN_ID, to: quote.tx.swap.to as Hex, data: quote.tx.swap.data as Hex, value: BigInt(quote.tx.swap.value || '0') }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Swap failed';
       setError(msg.includes('rejected') || msg.includes('denied') ? 'Transaction rejected by user' : msg);
@@ -143,253 +150,38 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
     }
   }, [quote, sendTransactionAsync, ensureChain]);
 
-  const reset = () => {
-    setStep('idle');
-    setQuote(null);
-    setAcknowledged(false);
-    setTxHash(undefined);
-    setError(null);
-  };
+  const changeFrom = (next: string) => { setFromToken(next); setToToken(next === 'USDC' ? 'NVDAc' : 'USDC'); setAcknowledged(false); reset(); };
+  const changeTo = (next: string) => { setToToken(next); setAcknowledged(false); reset(); };
+  const canSign = Boolean(quote?.tx) && quote?.txWithheld.length === 0;
+  const explorerUrl = swapHash ? `${BASE.explorerUrl}/tx/${swapHash}` : null;
 
-  const explorerUrl = txHash ? `${BASE.explorerUrl}/tx/${txHash}` : null;
-  const withheld = quote ? quote.txWithheld : [];
-  const canSign = Boolean(quote?.tx) && withheld.length === 0;
-
-  return (
-    <div className={`space-y-3 ${className}`}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold text-green-400">REAL SWAP</span>
-          <span className="text-[9px] text-neutral-600">Uniswap V3 on {BASE.name}</span>
-        </div>
-        {isConnected && (
-          <span className="text-[9px] text-green-400/60 bg-green-400/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            {address?.slice(0, 6)}...{address?.slice(-4)}
-            {chain?.name && <span className="text-neutral-500">· {chain.name}</span>}
-          </span>
-        )}
-      </div>
-
-      {!isConnected && (
-        <button
-          onClick={() => openWallet()}
-          className="w-full py-3 bg-green-500/15 border border-green-500/30 rounded-xl text-sm font-medium text-green-400 hover:bg-green-500/25 transition-colors flex items-center justify-center gap-2"
-        >
-          <Wallet className="w-4 h-4" />
-          Connect Wallet to Swap
-        </button>
-      )}
-
-      {isConnected && step !== 'confirmed' && (
-        <>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-neutral-900/60 border border-neutral-800 rounded-xl p-3">
-              <div className="text-[9px] text-neutral-500 mb-1">You pay</div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  className="flex-1 bg-transparent text-lg font-bold text-neutral-100 outline-none w-0 min-w-0"
-                  min="0"
-                  step="any"
-                  disabled={step !== 'idle' && step !== 'error'}
-                />
-                <select
-                  value={fromToken}
-                  onChange={e => { setFromToken(e.target.value); reset(); }}
-                  className="bg-neutral-800 text-neutral-200 text-sm font-medium rounded-lg px-2 py-1 outline-none border border-neutral-700"
-                  disabled={step !== 'idle' && step !== 'error'}
-                >
-                  {SELL_TOKENS.filter(t => t !== toToken).map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0">
-              <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
-            </div>
-
-            <div className="flex-1 bg-neutral-900/60 border border-neutral-800 rounded-xl p-3">
-              <div className="text-[9px] text-neutral-500 mb-1">You receive</div>
-              <div className="flex items-center gap-2">
-                <span className="flex-1 text-lg font-bold text-neutral-100">
-                  {quote ? Number(quote.amountOut).toLocaleString(undefined, { maximumFractionDigits: to?.symbol === 'cbBTC' ? 6 : 4 }) : '—'}
-                </span>
-                <select
-                  value={toToken}
-                  onChange={e => { setToToken(e.target.value); reset(); }}
-                  className="bg-neutral-800 text-neutral-200 text-sm font-medium rounded-lg px-2 py-1 outline-none border border-neutral-700"
-                  disabled={step !== 'idle' && step !== 'error'}
-                >
-                  {BUY_TOKENS.filter(t => t !== fromToken).map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-[10px]">
-            <span className="text-neutral-500">Slippage tolerance</span>
-            <div className="flex gap-1">
-              {['0.1', '0.5', '1.0'].map(s => (
-                <button
-                  key={s}
-                  onClick={() => { setSlippage(s); if (step === 'quoted') reset(); }}
-                  className={`px-2 py-0.5 rounded-md transition-colors ${
-                    slippage === s
-                      ? 'bg-green-500/15 text-green-400 border border-green-500/30'
-                      : 'text-neutral-500 hover:text-neutral-300 border border-neutral-800'
-                  }`}
-                >
-                  {s}%
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {quote && (
-            <div className="bg-neutral-900/40 border border-green-500/15 rounded-xl p-3 space-y-1.5">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-neutral-500">Rate</span>
-                <span className="text-neutral-300">1 {fromToken} = {quote.executionPrice.toLocaleString(undefined, { maximumFractionDigits: to?.symbol === 'cbBTC' ? 8 : 6 })} {toToken}</span>
-              </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-neutral-500">Route</span>
-                <span className="text-neutral-400">{quote.route.description}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 text-[10px]">
-                <span className="text-neutral-500 shrink-0">Swap contract</span>
-                <span className="text-neutral-400 font-mono break-all text-right">{quote.venue.router}</span>
-              </div>
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-neutral-500">Chain</span>
-                <span className="text-neutral-400">{BASE.name} ({BASE_CHAIN_ID})</span>
-              </div>
-              {quote.tx?.approve ? (
-                <>
-                  <div className="flex items-center justify-between gap-3 text-[10px]">
-                    <span className="text-neutral-500 shrink-0">Approval token</span>
-                    <span className="text-neutral-400 font-mono break-all text-right">{quote.tx.approve.to}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 text-[10px]">
-                    <span className="text-neutral-500 shrink-0">Approval spender</span>
-                    <span className="text-neutral-400 font-mono break-all text-right">{quote.tx.approve.spender} (exact amount)</span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-neutral-500">Approval</span>
-                  <span className="text-neutral-400">{isNativeFrom ? 'Not required (ETH)' : 'Existing allowance covers this amount'}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">Min received</span>
-                <span className="text-neutral-400">{quote.minAmountOut} {toToken}</span>
-              </div>
-              <div className="flex justify-between text-[10px]">
-                <span className="text-neutral-500">Price impact</span>
-                <span className="text-neutral-400">{quote.priceImpactPct === null ? '—' : `${quote.priceImpactPct.toFixed(2)}%`}</span>
-              </div>
-              <div className="flex justify-between text-[10px]">
-                <span className="text-neutral-500">Simulation</span>
-                <span className="text-neutral-400">{quote.simulation.ran ? (quote.simulation.ok ? 'passed (eth_call)' : 'reverted') : 'after approval'}</span>
-              </div>
-              {withheld.length > 0 && (
-                <div className="text-[10px] text-amber-400/90 space-y-0.5 pt-1">
-                  {withheld.map((w) => <div key={w}>⚠ {w}</div>)}
-                </div>
-              )}
-              {canSign && (
-                <label className="flex items-center gap-2 text-[11px] text-neutral-400 cursor-pointer">
-                  <input type="checkbox" checked={acknowledged} onChange={(ev) => setAcknowledged(ev.target.checked)} />
-                  I checked the contract, the chain and the minimum received.
-                </label>
-              )}
-            </div>
-          )}
-
-          {error && (
-            <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              <div>
-                <div className="text-xs text-red-400 font-medium">Error</div>
-                <div className="text-[10px] text-red-400/70 mt-0.5">{error}</div>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {(step === 'idle' || step === 'error') && (
-              <button
-                onClick={getQuote}
-                disabled={!amount || parseFloat(amount) <= 0}
-                className="w-full py-3 bg-green-500/15 border border-green-500/30 rounded-xl text-sm font-medium text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Get Swap Quote
-              </button>
-            )}
-            {step === 'quoting' && (
-              <div className="w-full py-3 flex items-center justify-center gap-2 text-sm text-neutral-400">
-                <Loader2 className="w-4 h-4 animate-spin" /> Quoting on {BASE.name}...
-              </div>
-            )}
-            {step === 'quoted' && canSign && (
-              <button
-                onClick={quote?.tx?.approve ? approveToken : executeSwap}
-                disabled={!acknowledged}
-                className="w-full py-3 bg-green-500/15 border border-green-500/30 rounded-xl text-sm font-medium text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {quote?.tx?.approve ? `Approve ${fromToken} (exact)` : `Swap ${amount} ${fromToken} → ${toToken}`}
-              </button>
-            )}
-            {step === 'quoted' && !canSign && (
-              <button onClick={reset} className="w-full py-3 border border-neutral-800 rounded-xl text-sm text-neutral-400 hover:text-neutral-200 transition-colors">
-                Calldata withheld — adjust and re-quote
-              </button>
-            )}
-            {step === 'approving' && (
-              <div className="w-full py-3 flex items-center justify-center gap-2 text-sm text-amber-400">
-                <Loader2 className="w-4 h-4 animate-spin" /> Approving {fromToken}...
-              </div>
-            )}
-            {step === 'approved' && (
-              <button
-                onClick={executeSwap}
-                className="w-full py-3 bg-green-500/15 border border-green-500/30 rounded-xl text-sm font-medium text-green-400 hover:bg-green-500/25 transition-colors"
-              >
-                Swap {amount} {fromToken} → {toToken}
-              </button>
-            )}
-            {step === 'swapping' && (
-              <div className="w-full py-3 flex items-center justify-center gap-2 text-sm text-amber-400">
-                <Loader2 className="w-4 h-4 animate-spin" /> {isConfirming ? 'Confirming on-chain...' : 'Waiting for wallet...'}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {step === 'confirmed' && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-            <Check className="w-4 h-4 text-green-400" />
-            <div className="text-xs text-green-400 font-medium">Swap confirmed on {BASE.name}</div>
-          </div>
-          {explorerUrl && (
-            <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-neutral-400 hover:text-neutral-200 transition-colors">
-              <ExternalLink className="w-3 h-3" /> View on {BASE.explorerName}
-            </a>
-          )}
-          <button onClick={reset} className="w-full py-2 border border-neutral-800 rounded-xl text-xs text-neutral-400 hover:text-neutral-200 transition-colors">
-            New swap
-          </button>
-        </div>
-      )}
+  return <div className={`space-y-3 ${className}`}>
+    <div className="flex items-center justify-between">
+      <div><div className="text-[10px] font-bold text-green-400">TOKENIZED STOCKS · BASE</div><div className="text-[9px] text-neutral-600">Coinbase B20 markets routed directly through Uniswap V3</div></div>
+      {isConnected && <span className="text-[9px] text-green-400/60 bg-green-400/10 px-2 py-0.5 rounded-full">{address?.slice(0, 6)}...{address?.slice(-4)}</span>}
     </div>
-  );
+    {!isConnected ? <button onClick={() => openWallet()} className="w-full py-3 bg-green-500/15 border border-green-500/30 rounded-xl text-sm text-green-400 flex items-center justify-center gap-2"><Wallet className="w-4 h-4" />Connect Wallet</button> : step !== 'confirmed' ? <>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 bg-neutral-900/60 border border-neutral-800 rounded-xl p-3"><div className="text-[9px] text-neutral-500 mb-1">You pay</div><div className="flex gap-2"><input type="number" value={amount} onChange={(e) => { setAmount(e.target.value); reset(); }} min="0" step="any" className="flex-1 min-w-0 bg-transparent text-lg font-bold text-neutral-100 outline-none" /><select value={fromToken} onChange={(e) => changeFrom(e.target.value)} className="bg-neutral-800 text-neutral-200 text-sm rounded-lg px-2 border border-neutral-700">{FROM_TOKENS.map((s) => <option key={s}>{s}</option>)}</select></div></div>
+        <ArrowRight className="w-4 h-4 text-neutral-500 shrink-0" />
+        <div className="flex-1 bg-neutral-900/60 border border-neutral-800 rounded-xl p-3"><div className="text-[9px] text-neutral-500 mb-1">You receive</div><div className="flex gap-2"><span className="flex-1 text-lg font-bold text-neutral-100">{quote ? Number(quote.amountOut).toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'}</span><select value={toToken} onChange={(e) => changeTo(e.target.value)} className="bg-neutral-800 text-neutral-200 text-sm rounded-lg px-2 border border-neutral-700">{(fromToken === 'USDC' ? BASE_STOCK_SYMBOLS : ['USDC']).map((s) => <option key={s}>{s}</option>)}</select></div></div>
+      </div>
+      <div className="flex items-center justify-between text-[10px]"><span className="text-neutral-500">Slippage</span><div className="flex gap-1">{['0.1', '0.5', '1.0'].map((s) => <button key={s} onClick={() => { setSlippage(s); reset(); }} className={`px-2 py-0.5 rounded-md border ${slippage === s ? 'bg-green-500/15 text-green-400 border-green-500/30' : 'text-neutral-500 border-neutral-800'}`}>{s}%</button>)}</div></div>
+      <label className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[10px] text-neutral-300 cursor-pointer"><input type="checkbox" checked={acknowledged} onChange={(e) => { setAcknowledged(e.target.checked); reset(); }} className="mt-0.5" /><span>I am in an eligible jurisdiction outside the U.S. I understand this is a Coinbase B20 tokenized equity, not the underlying share, and I will review the contract, route and minimum before signing.</span></label>
+      {quote && <div className="bg-neutral-900/40 border border-green-500/15 rounded-xl p-3 space-y-1.5 text-[10px]">
+        <div className="flex justify-between"><span className="text-neutral-500">Route</span><span className="text-neutral-300">{quote.route.description}</span></div><div className="flex justify-between gap-3"><span className="text-neutral-500">Router</span><span className="font-mono text-neutral-400 break-all text-right">{quote.venue.router}</span></div><div className="flex justify-between"><span className="text-neutral-500">Minimum</span><span className="text-neutral-300">{quote.minAmountOut} {toToken}</span></div><div className="flex justify-between"><span className="text-neutral-500">Pool impact</span><span className="text-neutral-300">{quote.priceImpactPct === null ? '—' : `${quote.priceImpactPct.toFixed(2)}%`}</span></div>
+        {quote.stockReference && <><div className="flex justify-between"><span className="text-neutral-500">Official reference</span><span className="text-neutral-300">${quote.stockReference.usdPrice.toFixed(2)} · Δ {quote.stockReference.marketDeviationPct.toFixed(2)}%</span></div><div className="flex justify-between"><span className="text-neutral-500">B20 multiplier</span><span className="text-neutral-300">{quote.stockReference.multiplierHuman.toFixed(6)}×</span></div></>}
+        <div className="flex justify-between"><span className="text-neutral-500">Simulation</span><span className="text-neutral-300">{quote.simulation.ran ? (quote.simulation.ok ? 'passed' : 'reverted') : 'runs after approval'}</span></div>
+        {quote.tx?.approve && <div className="text-amber-300/80">Exact approval to {quote.tx.approve.spender}. It can remain if you stop or the swap reverts.</div>}{quote.warnings.map((w) => <div key={w} className="text-amber-300">⚠ {w}</div>)}{quote.txWithheld.map((w) => <div key={w} className="text-red-300">Blocked: {w}</div>)}
+      </div>}
+      {error && <div className="flex gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-[10px] text-red-400"><AlertCircle className="w-4 h-4 shrink-0" />{error}</div>}
+      {(step === 'idle' || step === 'error') && <button onClick={() => void requestQuote(false)} disabled={!acknowledged || !amount || Number(amount) <= 0} className="w-full py-3 bg-green-500/15 border border-green-500/30 rounded-xl text-sm text-green-400 disabled:opacity-40">Review quote</button>}
+      {(step === 'quoting' || step === 'requote') && <div className="py-3 flex justify-center gap-2 text-sm text-neutral-400"><Loader2 className="w-4 h-4 animate-spin" />{step === 'requote' ? 'Approval confirmed. Re-quoting and simulating…' : 'Checking Uniswap and B20 reference…'}</div>}
+      {step === 'quoted' && canSign && quote?.tx?.approve && <button onClick={approveToken} className="w-full py-3 bg-green-500/15 border border-green-500/30 rounded-xl text-sm text-green-400">Approve {fromToken} exactly</button>}
+      {step === 'quoted' && canSign && quote?.tx && !quote.tx.approve && quote.simulation.ok && <button onClick={executeSwap} className="w-full py-3 bg-green-500/15 border border-green-500/30 rounded-xl text-sm text-green-400">Swap {amount} {fromToken} → {toToken}</button>}
+      {step === 'quoted' && !canSign && <button onClick={reset} className="w-full py-3 border border-neutral-800 rounded-xl text-sm text-neutral-400">Adjust and re-quote</button>}
+      {step === 'approving' && <div className="py-3 flex justify-center gap-2 text-sm text-amber-400"><Loader2 className="w-4 h-4 animate-spin" />{approvalPending ? 'Confirming approval on Base…' : 'Waiting for wallet…'}</div>}
+      {step === 'swapping' && <div className="py-3 flex justify-center gap-2 text-sm text-amber-400"><Loader2 className="w-4 h-4 animate-spin" />{swapPending ? 'Confirming swap on Base…' : 'Waiting for wallet…'}</div>}
+    </> : <div className="space-y-3"><div className="flex items-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 p-3 text-xs text-green-400"><Check className="w-4 h-4" />Swap confirmed on Base</div>{syncWarning && <div className="text-[10px] text-amber-300">Confirmed on-chain; history sync will retry later: {syncWarning}</div>}{explorerUrl && <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] text-neutral-400"><ExternalLink className="w-3 h-3" />View on {BASE.explorerName}</a>}<button onClick={() => { setAcknowledged(false); reset(); }} className="w-full py-2 border border-neutral-800 rounded-xl text-xs text-neutral-400">New swap</button></div>}
+  </div>;
 }

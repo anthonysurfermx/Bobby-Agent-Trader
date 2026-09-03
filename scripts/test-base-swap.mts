@@ -8,7 +8,7 @@ import {
   buildApproveTx, buildSwapTx, candidateRoutes, clampSlippage, computeMinOut, decodeSwapTx, encodePath, resolvePair, toRawAmount,
   type QuotedRoute,
 } from '../api/_lib/base-swap.js';
-import { BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, findBaseToken } from '../src/lib/base-swap/tokens.js';
+import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, findBaseToken } from '../src/lib/base-swap/tokens.js';
 
 const wallet = getAddress('0x1111111111111111111111111111111111111111');
 
@@ -27,6 +27,9 @@ assert.equal(findBaseToken(BASE_USDC.toLowerCase())?.symbol, 'USDC');
 assert.equal(findBaseToken(WETH9)?.symbol, 'WETH', 'address lookup never resolves to native ETH');
 assert.equal(findBaseToken('DOGE'), null);
 assert.equal(findBaseToken('0x0000000000000000000000000000000000000000'), null);
+assert.deepEqual(BASE_STOCK_SYMBOLS, ['AAPLc', 'GOOGLc', 'METAc', 'NVDAc']);
+assert.equal(findBaseToken('NVDA')?.symbol, 'NVDAc', 'underlying ticker resolves to the pinned B20 address');
+assert.equal(findBaseToken('aaplc')?.address, '0xb200000000000000000000C2e324d24d7eEcd1fb');
 
 function code(run: () => unknown): string | undefined {
   try { run(); return undefined; } catch (e) { assert(e instanceof BaseSwapError, `expected BaseSwapError, got ${e}`); return e.code; }
@@ -34,6 +37,7 @@ function code(run: () => unknown): string | undefined {
 assert.equal(code(() => resolvePair('USDC', 'DOGE')), 'token_not_allowed');
 assert.equal(code(() => resolvePair('USDC', 'USDC')), 'same_token');
 assert.equal(code(() => resolvePair('ETH', 'WETH')), 'same_token');
+assert.equal(code(() => resolvePair('ETH', 'NVDA')), 'stock_pair_not_supported');
 assert.equal(code(() => toRawAmount('-1', 6)), 'bad_amount');
 assert.equal(code(() => toRawAmount('0', 6)), 'bad_amount');
 assert.equal(code(() => toRawAmount('1e3', 6)), 'bad_amount');
@@ -53,8 +57,10 @@ assert.equal(clampSlippage(0), 0.05);
 const usdc = findBaseToken('USDC')!;
 const cbbtc = findBaseToken('cbBTC')!;
 const eth = findBaseToken('ETH')!;
+const nvda = findBaseToken('NVDA')!;
 assert.equal(candidateRoutes(usdc.address, cbbtc.address).length, FEE_TIERS.length + 4, 'direct tiers + 4 two-hop combos via WETH');
 assert.equal(candidateRoutes(eth.address, usdc.address).length, FEE_TIERS.length, 'no WETH hop when one leg is WETH');
+assert.equal(candidateRoutes(usdc.address, nvda.address, true).length, FEE_TIERS.length, 'tokenized stocks are direct-only');
 const path = encodePath([usdc.address, WETH9, cbbtc.address], [500, 3000]);
 assert.equal(path.toLowerCase(), `0x${usdc.address.slice(2)}0001f4${WETH9.slice(2)}000bb8${cbbtc.address.slice(2)}`.toLowerCase());
 

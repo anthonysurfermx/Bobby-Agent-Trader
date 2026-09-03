@@ -12,9 +12,10 @@ import { findBaseToken } from '@/lib/base-swap/tokens';
 
 // Maps Polymarket asset keywords to an allow-listed Base token.
 const SLUG_ASSET_MAP: Record<string, string> = {
-  btc: 'cbBTC', bitcoin: 'cbBTC',
-  eth: 'ETH', ethereum: 'ETH',
-  aero: 'AERO', aerodrome: 'AERO',
+  nvda: 'NVDAc', nvidia: 'NVDAc',
+  aapl: 'AAPLc', apple: 'AAPLc',
+  googl: 'GOOGLc', google: 'GOOGLc', alphabet: 'GOOGLc',
+  meta: 'METAc', facebook: 'METAc',
 };
 
 interface BaseQuote {
@@ -26,6 +27,7 @@ interface BaseQuote {
   route: { description: string; gasEstimate: string };
   venue: { name: string; router: string };
   alternatives: Array<{ description: string; amountOut: string }>;
+  stockReference: null | { usdPrice: number; ageSec: number; multiplierHuman: number; marketDeviationPct: number };
 }
 
 interface Props {
@@ -74,20 +76,21 @@ export function DexQuotePanel({ marketSlug, marketTitle, polymarketPrice, spotPr
 
   if (!token) return null;
 
-  const displayAsset = token.symbol === 'cbBTC' ? 'BTC' : token.symbol;
+  const displayAsset = token.underlyingSymbol ?? token.symbol;
   // USDC per unit of the asset at this size.
   const unitPrice = quote && quote.executionPrice > 0 ? 1 / quote.executionPrice : 0;
   const toAmount = quote ? Number(quote.amountOut) : 0;
+  const referencePrice = quote?.stockReference?.usdPrice ?? spotPrice ?? 0;
 
-  const arbOpportunity = quote && spotPrice && polymarketPrice && unitPrice > 0
-    ? ((1 - polymarketPrice) * spotPrice - unitPrice * toAmount) / (unitPrice * toAmount) * 100
+  const arbOpportunity = quote && referencePrice && polymarketPrice && unitPrice > 0
+    ? ((1 - polymarketPrice) * referencePrice - unitPrice * toAmount) / (unitPrice * toAmount) * 100
     : null;
 
   return (
     <div className={`border border-cyan-500/20 bg-cyan-500/5 p-3 font-mono ${className}`}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-cyan-400 text-[10px] font-bold">⬡ UNISWAP V3 · {BASE.name.toUpperCase()}</span>
+          <span className="text-cyan-400 text-[10px] font-bold">⬡ TOKENIZED STOCK · UNISWAP V3 · {BASE.name.toUpperCase()}</span>
           <span className="text-cyan-400/30 text-[9px]">Chain {BASE_CHAIN_ID}</span>
         </div>
         {quote && (
@@ -113,7 +116,7 @@ export function DexQuotePanel({ marketSlug, marketTitle, polymarketPrice, spotPr
             onChange={(e) => setAmount(Math.max(1, Number(e.target.value)))}
             className="bg-transparent text-cyan-300 text-xs w-16 outline-none font-mono"
             min={1}
-            max={100000}
+            max={100}
             onClick={(e) => e.stopPropagation()}
           />
           <span className="text-cyan-400/30 text-[10px]">USDC</span>
@@ -140,7 +143,7 @@ export function DexQuotePanel({ marketSlug, marketTitle, polymarketPrice, spotPr
           <div className="flex items-center justify-between text-[10px]">
             <span className="text-cyan-400/50">You get:</span>
             <span className="text-cyan-300 font-bold">
-              {toAmount.toLocaleString(undefined, { maximumFractionDigits: token.symbol === 'cbBTC' ? 6 : 4 })} {displayAsset}
+              {toAmount.toLocaleString(undefined, { maximumFractionDigits: 6 })} {token.symbol}
             </span>
           </div>
 
@@ -151,20 +154,27 @@ export function DexQuotePanel({ marketSlug, marketTitle, polymarketPrice, spotPr
             </span>
           </div>
 
-          {spotPrice && (
+          {quote.stockReference && (
             <div className="flex items-center justify-between text-[10px]">
-              <span className="text-cyan-400/50">CEX spot price:</span>
+              <span className="text-cyan-400/50">Official B20 reference:</span>
               <span className="text-cyan-300/60">
-                ${spotPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                ${quote.stockReference.usdPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </span>
             </div>
           )}
 
-          {spotPrice && unitPrice > 0 && (
+          {quote.stockReference && (
             <div className="flex items-center justify-between text-[10px]">
-              <span className="text-cyan-400/50">DEX vs CEX:</span>
+              <span className="text-cyan-400/50">B20 multiplier:</span>
+              <span className="text-cyan-300/60">{quote.stockReference.multiplierHuman.toFixed(6)}×</span>
+            </div>
+          )}
+
+          {referencePrice > 0 && unitPrice > 0 && (
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="text-cyan-400/50">Uniswap vs reference:</span>
               {(() => {
-                const diff = ((unitPrice - spotPrice) / spotPrice) * 100;
+                const diff = ((unitPrice - referencePrice) / referencePrice) * 100;
                 const color = Math.abs(diff) < 0.5 ? 'text-cyan-300/60' : diff > 0 ? 'text-red-400' : 'text-green-400';
                 return (
                   <span className={color}>
@@ -178,7 +188,7 @@ export function DexQuotePanel({ marketSlug, marketTitle, polymarketPrice, spotPr
 
           <div className="flex items-center justify-between text-[10px]">
             <span className="text-cyan-400/50">Min received (0.5%):</span>
-            <span className="text-cyan-300/60">{Number(quote.minAmountOut).toLocaleString(undefined, { maximumFractionDigits: 6 })} {displayAsset}</span>
+            <span className="text-cyan-300/60">{Number(quote.minAmountOut).toLocaleString(undefined, { maximumFractionDigits: 6 })} {token.symbol}</span>
           </div>
 
           <div className="flex items-center justify-between text-[10px]">
@@ -197,7 +207,7 @@ export function DexQuotePanel({ marketSlug, marketTitle, polymarketPrice, spotPr
                 {quote.alternatives.map((a) => (
                   <div key={a.description} className="flex items-center justify-between text-[9px]">
                     <span className="text-cyan-400/40">{a.description}</span>
-                    <span className="text-cyan-400/30">{Number(a.amountOut).toLocaleString(undefined, { maximumFractionDigits: 6 })} {displayAsset}</span>
+                    <span className="text-cyan-400/30">{Number(a.amountOut).toLocaleString(undefined, { maximumFractionDigits: 6 })} {token.symbol}</span>
                   </div>
                 ))}
               </div>

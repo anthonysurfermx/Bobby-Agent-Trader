@@ -9,7 +9,8 @@
 //     against the official deployment list. There is no upstream that can
 //     hand us a `to`, a spender or calldata: the allow-list is the code.
 //   - Only tokens in src/lib/base-swap/tokens.ts are ever quoted.
-//   - Approvals are exact-amount to SwapRouter02 and consumed by the swap.
+//   - Approvals are exact-amount to SwapRouter02. They can remain if the
+//     user abandons or the swap reverts, so clients must disclose that fact.
 //   - amountOutMinimum comes from OUR quoter call, never from a client.
 //   - Deadline is enforced by the router (multicall(deadline, …)).
 //   - Bobby never holds keys and never signs. This module returns calldata;
@@ -89,7 +90,7 @@ export function baseClient() {
 }
 
 export class BaseSwapError extends Error {
-  constructor(message: string, public readonly code: 'token_not_allowed' | 'same_token' | 'bad_amount' | 'no_route' | 'rpc_failed') {
+  constructor(message: string, public readonly code: 'token_not_allowed' | 'same_token' | 'stock_pair_not_supported' | 'bad_amount' | 'no_route' | 'rpc_failed') {
     super(message);
     this.name = 'BaseSwapError';
   }
@@ -122,9 +123,9 @@ export function encodePath(tokens: Address[], fees: number[]): Hex {
   return encodePacked(types, values);
 }
 
-export function candidateRoutes(tokenIn: Address, tokenOut: Address): RouteCandidate[] {
+export function candidateRoutes(tokenIn: Address, tokenOut: Address, directOnly = false): RouteCandidate[] {
   const routes: RouteCandidate[] = FEE_TIERS.map((fee) => ({ kind: 'single', fee }));
-  const viaWeth = tokenIn.toLowerCase() !== WETH9.toLowerCase() && tokenOut.toLowerCase() !== WETH9.toLowerCase();
+  const viaWeth = !directOnly && tokenIn.toLowerCase() !== WETH9.toLowerCase() && tokenOut.toLowerCase() !== WETH9.toLowerCase();
   if (viaWeth) for (const fees of MULTI_HOP_FEES) routes.push({ kind: 'multi', fees: [fees[0], fees[1]] });
   return routes;
 }
@@ -162,6 +163,11 @@ export function resolvePair(tokenInRef: string, tokenOutRef: string): { tokenIn:
   if (!tokenIn) throw new BaseSwapError(`tokenIn "${tokenInRef}" is not on the Base allow-list`, 'token_not_allowed');
   if (!tokenOut) throw new BaseSwapError(`tokenOut "${tokenOutRef}" is not on the Base allow-list`, 'token_not_allowed');
   if (tokenIn.address.toLowerCase() === tokenOut.address.toLowerCase()) throw new BaseSwapError('tokenIn and tokenOut are the same asset', 'same_token');
+  const hasStock = tokenIn.assetClass === 'tokenized-stock' || tokenOut.assetClass === 'tokenized-stock';
+  const hasUsdc = tokenIn.address.toLowerCase() === BASE_USDC.toLowerCase() || tokenOut.address.toLowerCase() === BASE_USDC.toLowerCase();
+  if (hasStock && !hasUsdc) {
+    throw new BaseSwapError('tokenized stocks are available only in direct USDC pairs', 'stock_pair_not_supported');
+  }
   return { tokenIn, tokenOut };
 }
 
@@ -244,7 +250,8 @@ export function decodeSwapTx(data: Hex): { deadline: bigint; calls: Array<{ func
 async function quoteRoutes(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, amountIn: bigint): Promise<QuotedRoute[]> {
   const tIn = getAddress(tokenIn.address);
   const tOut = getAddress(tokenOut.address);
-  const routes = candidateRoutes(tIn, tOut);
+  const directOnly = tokenIn.assetClass === 'tokenized-stock' || tokenOut.assetClass === 'tokenized-stock';
+  const routes = candidateRoutes(tIn, tOut, directOnly);
   const contracts = routes.map((r) =>
     r.kind === 'single'
       ? { address: QUOTER_V2, abi: QUOTER_ABI, functionName: 'quoteExactInputSingle' as const, args: [{ tokenIn: tIn, tokenOut: tOut, amountIn, fee: r.fee, sqrtPriceLimitX96: 0n }] as const }
@@ -277,7 +284,21 @@ async function quoteRoutes(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, amou
 
 const FACTORY_ABI = parseAbi(['function getPool(address tokenA, address tokenB, uint24 fee) view returns (address)']);
 const POOL_ABI = parseAbi(['function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)']);
+const B20_ABI = parseAbi([
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+  'function totalSupply() view returns (uint256)',
+  'function multiplier() view returns (uint256)',
+]);
+const CHAINLINK_ABI = parseAbi([
+  'function decimals() view returns (uint8)',
+  'function latestRoundData() view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)',
+]);
 const ZERO = '0x0000000000000000000000000000000000000000';
+const STOCK_REFERENCE_WARN_AGE_SEC = 26 * 60 * 60;
+const STOCK_REFERENCE_MAX_AGE_SEC = 96 * 60 * 60;
+const STOCK_REFERENCE_WARN_DEVIATION_PCT = 2;
+const STOCK_REFERENCE_MAX_DEVIATION_PCT = 5;
 
 /** Spot price (tokenOut per tokenIn, human units) of one V3 pool from slot0. */
 function spotFromSqrt(sqrtPriceX96: bigint, tokenIn: Address, tokenOut: Address, decIn: number, decOut: number): number {
@@ -327,11 +348,34 @@ export interface BaseSwapInput {
   slippagePct?: number;
   /** Wallet that pays, receives and signs. Required for calldata. */
   recipient?: string | null;
+  /** Required before calldata for Coinbase B20 tokenized equities. */
+  stockEligibilityConfirmed?: boolean;
 }
 
 export interface BaseSwapLimits { maxTicketUsd: number; minTicketUsd: number; defaultSlippagePct: number; maxSlippagePct: number; maxPriceImpactPct: number; deadlineSec: number }
 
-export interface BaseSwapTokenView { symbol: string; name: string; address: Address; decimals: number; native: boolean }
+export interface BaseSwapTokenView {
+  symbol: string;
+  name: string;
+  address: Address;
+  decimals: number;
+  native: boolean;
+  assetClass: BaseSwapToken['assetClass'] | null;
+  underlyingSymbol: string | null;
+  issuer: BaseSwapToken['issuer'] | null;
+}
+
+export interface StockReferenceView {
+  symbol: string;
+  tokenAddress: Address;
+  feedAddress: Address;
+  usdPrice: number;
+  updatedAt: number;
+  ageSec: number;
+  multiplier: string;
+  multiplierHuman: number;
+  marketDeviationPct: number;
+}
 
 export interface BaseSwapQuote {
   chainId: typeof BASE_SWAP_CHAIN_ID;
@@ -366,10 +410,21 @@ export interface BaseSwapQuote {
   txWithheld: string[];
   warnings: string[];
   limits: BaseSwapLimits;
+  requiresStockEligibility: boolean;
+  stockReference: StockReferenceView | null;
 }
 
 function view(t: BaseSwapToken): BaseSwapTokenView {
-  return { symbol: t.symbol, name: t.name, address: getAddress(t.address), decimals: t.decimals, native: Boolean(t.native) };
+  return {
+    symbol: t.symbol,
+    name: t.name,
+    address: getAddress(t.address),
+    decimals: t.decimals,
+    native: Boolean(t.native),
+    assetClass: t.assetClass ?? null,
+    underlyingSymbol: t.underlyingSymbol ?? null,
+    issuer: t.issuer ?? null,
+  };
 }
 
 function isAddress(v: unknown): v is Address {
@@ -377,19 +432,53 @@ function isAddress(v: unknown): v is Address {
 }
 
 /** Env may LOWER the ticket cap (ops brake); it can never raise it above the code constant. */
-export function effectiveMaxTicketUsd(): number {
+export function effectiveMaxTicketUsd(...tokens: BaseSwapToken[]): number {
   const env = Number(process.env.BASE_SWAP_MAX_TICKET_USD);
-  return Number.isFinite(env) && env > 0 ? Math.min(env, BASE_SWAP_LIMITS.maxTicketUsd) : BASE_SWAP_LIMITS.maxTicketUsd;
+  const codeCap = Math.min(BASE_SWAP_LIMITS.maxTicketUsd, ...tokens.map((t) => t.maxTicketUsd ?? BASE_SWAP_LIMITS.maxTicketUsd));
+  return Number.isFinite(env) && env > 0 ? Math.min(env, codeCap) : codeCap;
+}
+
+async function readStockReference(stock: BaseSwapToken, executionUsdPerToken: number): Promise<StockReferenceView> {
+  if (stock.assetClass !== 'tokenized-stock' || !stock.referenceFeed) throw new Error('stock reference metadata missing');
+  const tokenAddress = getAddress(stock.address);
+  const feedAddress = getAddress(stock.referenceFeed);
+  const [symbol, decimals, totalSupply, multiplier, feedDecimals, round] = await multicallLoose([
+    { address: tokenAddress, abi: B20_ABI, functionName: 'symbol' },
+    { address: tokenAddress, abi: B20_ABI, functionName: 'decimals' },
+    { address: tokenAddress, abi: B20_ABI, functionName: 'totalSupply' },
+    { address: tokenAddress, abi: B20_ABI, functionName: 'multiplier' },
+    { address: feedAddress, abi: CHAINLINK_ABI, functionName: 'decimals' },
+    { address: feedAddress, abi: CHAINLINK_ABI, functionName: 'latestRoundData' },
+  ], false);
+  if (String(symbol) !== stock.symbol || Number(decimals) !== stock.decimals) throw new Error('pinned B20 metadata no longer matches onchain metadata');
+  if ((totalSupply as bigint) <= 0n) throw new Error('B20 token has no circulating supply');
+  const answer = (round as readonly [bigint, bigint, bigint, bigint, bigint])[1];
+  const updatedAt = Number((round as readonly [bigint, bigint, bigint, bigint, bigint])[3]);
+  if (answer <= 0n || !updatedAt) throw new Error('stock reference feed returned no usable price');
+  const usdPrice = Number(formatUnits(answer, Number(feedDecimals)));
+  const marketDeviationPct = Math.abs(executionUsdPerToken / usdPrice - 1) * 100;
+  return {
+    symbol: stock.symbol,
+    tokenAddress,
+    feedAddress,
+    usdPrice,
+    updatedAt,
+    ageSec: Math.max(0, Math.floor(Date.now() / 1000) - updatedAt),
+    multiplier: (multiplier as bigint).toString(),
+    multiplierHuman: Number(formatUnits(multiplier as bigint, 18)),
+    marketDeviationPct,
+  };
 }
 
 export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote> {
   const { tokenIn, tokenOut } = resolvePair(input.tokenIn, input.tokenOut);
+  const stock = tokenIn.assetClass === 'tokenized-stock' ? tokenIn : tokenOut.assetClass === 'tokenized-stock' ? tokenOut : null;
   const amountInRaw = toRawAmount(input.amount, tokenIn.decimals);
   const slippagePct = clampSlippage(input.slippagePct);
   const c = baseClient();
   const warnings: string[] = [];
   const txWithheld: string[] = [];
-  const limits: BaseSwapLimits = { ...BASE_SWAP_LIMITS, maxTicketUsd: effectiveMaxTicketUsd() };
+  const limits: BaseSwapLimits = { ...BASE_SWAP_LIMITS, maxTicketUsd: effectiveMaxTicketUsd(tokenIn, tokenOut) };
 
   const routes = await quoteRoutes(tokenIn, tokenOut, amountInRaw);
   if (!routes.length) throw new BaseSwapError(`no Uniswap V3 liquidity on Base for ${tokenIn.symbol} → ${tokenOut.symbol}`, 'no_route');
@@ -421,6 +510,26 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     if (usdValue < limits.minTicketUsd) txWithheld.push(`ticket $${usdValue.toFixed(2)} is below the $${limits.minTicketUsd} minimum`);
   }
 
+  let stockReference: StockReferenceView | null = null;
+  if (stock) {
+    const executionUsdPerToken = tokenIn.assetClass === 'tokenized-stock' ? executionPrice : 1 / executionPrice;
+    try {
+      stockReference = await readStockReference(stock, executionUsdPerToken);
+      if (stockReference.ageSec > STOCK_REFERENCE_MAX_AGE_SEC) {
+        txWithheld.push(`stock reference is ${Math.floor(stockReference.ageSec / 3600)}h old; wait for a fresh market reference`);
+      } else if (stockReference.ageSec > STOCK_REFERENCE_WARN_AGE_SEC) {
+        warnings.push(`stock reference is ${Math.floor(stockReference.ageSec / 3600)}h old (market may be closed)`);
+      }
+      if (stockReference.marketDeviationPct > STOCK_REFERENCE_MAX_DEVIATION_PCT) {
+        txWithheld.push(`Uniswap price differs ${stockReference.marketDeviationPct.toFixed(2)}% from the official reference`);
+      } else if (stockReference.marketDeviationPct > STOCK_REFERENCE_WARN_DEVIATION_PCT) {
+        warnings.push(`Uniswap price differs ${stockReference.marketDeviationPct.toFixed(2)}% from the official reference`);
+      }
+    } catch (error) {
+      txWithheld.push(`stock metadata/reference could not be verified: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   const minOutRaw = computeMinOut(amountOutRaw, slippagePct);
   const deadline = Math.floor(Date.now() / 1000) + limits.deadlineSec;
 
@@ -434,6 +543,9 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
   }
 
   if (recipient) {
+    if (stock && input.stockEligibilityConfirmed !== true) {
+      txWithheld.push('confirm tokenized-stock eligibility before requesting transaction data');
+    }
     // Balance and allowance in one call. A failed read is not a pass.
     let balance: bigint | null = null;
     let allowance: bigint | null = tokenIn.native ? 0n : null;
@@ -513,6 +625,8 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     txWithheld: Array.from(new Set(txWithheld)),
     warnings,
     limits,
+    requiresStockEligibility: Boolean(stock),
+    stockReference,
   };
 }
 
@@ -521,7 +635,7 @@ export interface TradeExecutionPayload {
   needsApproval: boolean;
   approveTx?: BuiltTx;
   swapTx: BuiltTx;
-  quote: { fromToken: string; toToken: string; fromAmount: string; toAmount: string; minReceived: string };
+  quote: { fromToken: string; toToken: string; fromAmount: string; fromAmountRaw: string; toAmount: string; minReceived: string; minReceivedRaw: string };
   disclosure: {
     chainId: number;
     venue: string;
@@ -543,7 +657,7 @@ export function toTradeExecution(q: BaseSwapQuote): TradeExecutionPayload | null
     needsApproval: Boolean(q.tx.approve),
     approveTx: q.tx.approve ? { to: q.tx.approve.to, data: q.tx.approve.data, value: q.tx.approve.value } : undefined,
     swapTx: q.tx.swap,
-    quote: { fromToken: q.tokenIn.symbol, toToken: q.tokenOut.symbol, fromAmount: q.amountIn, toAmount: q.amountOut, minReceived: q.minAmountOut },
+    quote: { fromToken: q.tokenIn.symbol, toToken: q.tokenOut.symbol, fromAmount: q.amountIn, fromAmountRaw: q.amountInRaw, toAmount: q.amountOut, minReceived: q.minAmountOut, minReceivedRaw: q.minAmountOutRaw },
     disclosure: {
       chainId: q.chainId,
       venue: q.venue.name,
@@ -555,7 +669,7 @@ export function toTradeExecution(q: BaseSwapQuote): TradeExecutionPayload | null
       priceImpactPct: q.priceImpactPct,
       deadline: q.deadline,
       simulated: q.simulation.ran && q.simulation.ok === true,
-      note: 'Router and quoter are constants verified against the Uniswap deployment list; approvals are exact and consumed by the swap. Bobby never signs for you.',
+      note: 'Router and quoter are pinned Uniswap deployments. Approval is exact, but can remain if the swap is abandoned or reverts. Bobby never signs for you.',
     },
   };
 }

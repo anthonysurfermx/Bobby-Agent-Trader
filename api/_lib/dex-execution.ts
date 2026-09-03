@@ -31,13 +31,20 @@ export interface PreparedTrade {
 /** USDC → `tokenSymbol` for `amountUsd`, built for `wallet` to sign. */
 export async function prepareBaseTrade(opts: { tokenSymbol: string; amountUsd: number; wallet: string }): Promise<PreparedTrade> {
   const { tokenSymbol, amountUsd, wallet } = opts;
-  if (!findBaseToken(tokenSymbol)) return { ok: false, status: 'aborted_exec_error', reason: `${tokenSymbol} is not on the Base allow-list` };
+  const token = findBaseToken(tokenSymbol);
+  if (!token) return { ok: false, status: 'aborted_exec_error', reason: `${tokenSymbol} is not on the Base allow-list` };
+  if (token.assetClass !== 'tokenized-stock') {
+    return { ok: false, status: 'aborted_exec_error', reason: `${tokenSymbol} is outside the Base tokenized-stock execution focus` };
+  }
   if (!Number.isFinite(amountUsd) || amountUsd <= 0 || amountUsd > AGENT_MAX_TICKET_USD) {
     return { ok: false, status: 'aborted_exec_error', reason: `invalid amountUsd ${amountUsd}` };
   }
   if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) return { ok: false, status: 'aborted_exec_error', reason: 'invalid wallet' };
   try {
-    const quote = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: tokenSymbol, amount: amountUsd, recipient: wallet });
+    // The execution card presents the jurisdiction/issuer acknowledgement
+    // before it enables either wallet signature. This flag allows the
+    // already-authenticated agent request to prepare that review payload.
+    const quote = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: tokenSymbol, amount: amountUsd, recipient: wallet, stockEligibilityConfirmed: true });
     if (!(Number(quote.amountOut) > 0)) return { ok: false, status: 'aborted_stale_quote', reason: 'quote returned no output' };
     const execution = toTradeExecution(quote);
     if (!execution) return { ok: false, status: 'aborted_exec_error', reason: quote.txWithheld.join('; ') || 'calldata withheld' };

@@ -1180,7 +1180,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }));
     }
 
-    const totalDeployed = trades.reduce((sum, t) => sum + t.amountUsd, 0);
+    // A recommendation, simulation or wallet-pending calldata is not an
+    // executed trade. Only an onchain-confirmed receipt may count as capital
+    // deployed; the receipt endpoint updates that lifecycle separately.
+    const confirmedTrades = trades.filter((t) => t.status === 'confirmed' && typeof t.txHash === 'string' && t.txHash.startsWith('0x'));
+    const totalDeployed = confirmedTrades.reduce((sum, t) => sum + t.amountUsd, 0);
 
     // Phase 7: Log
     const result = {
@@ -1189,7 +1193,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       signals_found: raw.length,
       signals_filtered: filtered.length,
       llm_decisions: debate.decisions.length,
-      trades_executed: trades.length,
+      trades_executed: confirmedTrades.length,
       trades_blocked: blocked,
       total_usd_deployed: totalDeployed,
       latency_ms: Date.now() - startMs,

@@ -5,10 +5,11 @@
 // this card only shows what the wallet is about to sign and forwards it.
 // ============================================================
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useSendTransaction, useSwitchChain, useWaitForTransactionReceipt } from 'wagmi';
 import { CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react';
 import { BASE, BASE_CHAIN_ID } from '@/config/chains';
+import { useBobbySession } from '@/hooks/useBobbySession';
 
 export interface TradeExecution {
   tokenSymbol: string;
@@ -21,7 +22,7 @@ export interface TradeExecution {
     needsApproval: boolean;
     approveTx?: { to: string; data: string; value?: string };
     swapTx: { to: string; data: string; value?: string; gas?: string };
-    quote: { fromToken: string; toToken: string; fromAmount: string; toAmount: string; minReceived?: string };
+    quote: { fromToken: string; toToken: string; fromAmount: string; fromAmountRaw: string; toAmount: string; minReceived?: string; minReceivedRaw: string };
     disclosure?: {
       venue?: string;
       router?: string;
@@ -43,17 +44,17 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
   const [acknowledged, setAcknowledged] = useState(false);
   const [state, setState] = useState<SwapState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [syncWarning, setSyncWarning] = useState('');
+  const [execution, setExecution] = useState(trade.execution);
+  const session = useBobbySession({ auto: false });
 
   const { sendTransactionAsync } = useSendTransaction();
 
   const [approveTxHash, setApproveTxHash] = useState<`0x${string}` | undefined>();
-  const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTxHash });
+  const { data: approvalReceipt } = useWaitForTransactionReceipt({ hash: approveTxHash });
 
   const [swapTxHash, setSwapTxHash] = useState<`0x${string}` | undefined>();
-  const { isSuccess: swapConfirmed } = useWaitForTransactionReceipt({ hash: swapTxHash });
-
-  if (approveConfirmed && state === 'approving') setState('approved');
-  if (swapConfirmed && state === 'swapping') setState('confirmed');
+  const { data: swapReceipt } = useWaitForTransactionReceipt({ hash: swapTxHash });
 
   // The calldata was built for Base; the request pins the chain so wagmi
   // refuses a mismatch instead of signing on the wrong network.
@@ -63,14 +64,70 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
     if (connectedChainId !== BASE_CHAIN_ID) await switchChainAsync({ chainId: BASE_CHAIN_ID });
   };
 
-  const disclosure = trade.execution.disclosure;
-  const minReceived = trade.execution.quote.minReceived ?? disclosure?.minReceived ?? '—';
+  const disclosure = execution.disclosure;
+  const minReceived = execution.quote.minReceived ?? disclosure?.minReceived ?? '—';
   const deadlineLeftMin = disclosure?.deadline ? Math.max(0, Math.round((disclosure.deadline * 1000 - Date.now()) / 60000)) : null;
+
+  const refreshAfterApproval = useCallback(async () => {
+    if (!walletAddress) throw new Error('Wallet session is missing');
+    const stored = session.ready ? session.session : await session.ensureSession();
+    if (!stored) throw new Error('Sign the wallet session to refresh the swap');
+    const res = await fetch('/api/base-swap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...session.headers() },
+      body: JSON.stringify({
+        tokenIn: execution.quote.fromToken,
+        tokenOut: execution.quote.toToken,
+        amount: execution.quote.fromAmount,
+        wallet: walletAddress.toLowerCase(),
+        stockEligibilityConfirmed: acknowledged,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok || !data.execution) throw new Error(data.error || 'Fresh post-approval simulation failed');
+    if (data.execution.needsApproval || data.execution.disclosure?.simulated !== true) throw new Error('Swap is not ready after approval');
+    setExecution(data.execution);
+  }, [walletAddress, session, execution.quote, acknowledged]);
+
+  useEffect(() => {
+    if (!approvalReceipt || state !== 'approving') return;
+    if (approvalReceipt.status !== 'success') {
+      setErrorMsg('Approval reverted. No swap was sent.');
+      setState('error');
+      return;
+    }
+    void refreshAfterApproval().then(() => setState('approved')).catch((error) => {
+      setErrorMsg(error instanceof Error ? error.message : 'Could not refresh the swap');
+      setState('error');
+    });
+  }, [approvalReceipt, state, refreshAfterApproval]);
+
+  useEffect(() => {
+    if (!swapReceipt || state !== 'swapping') return;
+    if (swapReceipt.status !== 'success') {
+      setErrorMsg('Swap reverted. The exact approval may still remain.');
+      setState('error');
+      return;
+    }
+    if (!walletAddress || !swapTxHash) return;
+    void fetch('/api/swap-receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...session.headers() },
+      body: JSON.stringify({
+        wallet: walletAddress.toLowerCase(), txHash: swapTxHash,
+        tokenIn: execution.quote.fromToken, tokenOut: execution.quote.toToken,
+        amountInRaw: execution.quote.fromAmountRaw, minAmountOutRaw: execution.quote.minReceivedRaw,
+      }),
+    }).then(async (response) => {
+      if (!response.ok) throw new Error((await response.json().catch(() => null))?.error || 'history sync failed');
+    }).catch((error) => setSyncWarning(error instanceof Error ? error.message : 'History sync failed'));
+    setState('confirmed');
+  }, [swapReceipt, state, walletAddress, swapTxHash, execution.quote, session]);
 
   const handleApprove = async () => {
     try {
       setState('approving');
-      const tx = trade.execution.approveTx!;
+      const tx = execution.approveTx!;
       await ensureChain();
       const hash = await sendTransactionAsync({
         chainId: BASE_CHAIN_ID,
@@ -87,8 +144,10 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
 
   const handleSwap = async () => {
     try {
+      if (disclosure?.deadline && disclosure.deadline <= Math.floor(Date.now() / 1000) + 15) throw new Error('Quote expired. Refresh before signing.');
+      if (disclosure?.simulated !== true) throw new Error('Swap has not passed the post-approval simulation');
       setState('swapping');
-      const tx = trade.execution.swapTx;
+      const tx = execution.swapTx;
       await ensureChain();
       const hash = await sendTransactionAsync({
         chainId: BASE_CHAIN_ID,
@@ -97,21 +156,6 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
         value: tx.value ? BigInt(tx.value) : undefined,
       });
       setSwapTxHash(hash);
-
-      try {
-        await fetch('/api/agent-confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            walletAddress: walletAddress || '',
-            txHash: hash,
-            status: 'confirmed',
-            chain: String(BASE_CHAIN_ID),
-            tokenSymbol: trade.tokenSymbol,
-            amountUsd: trade.amountUsd,
-          }),
-        });
-      } catch {}
     } catch (err) {
       setState('error');
       setErrorMsg(err instanceof Error ? err.message : 'Swap failed');
@@ -134,17 +178,17 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
         {/* What the wallet is about to sign — destination, spender, minimum out. Nothing is enabled until read. */}
         <div className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[10px] text-white/70 space-y-1">
           <div>CHAIN · {BASE.name} ({BASE_CHAIN_ID})</div>
-          <div>SWAP CONTRACT · {trade.execution.swapTx.to}</div>
+          <div>SWAP CONTRACT · {execution.swapTx.to}</div>
           {disclosure?.route && <div>ROUTE · {disclosure.route}</div>}
-          {trade.execution.approveTx && <div>APPROVE TOKEN · {disclosure?.tokenContract ?? trade.execution.approveTx.to}</div>}
-          {trade.execution.approveTx && <div>APPROVE SPENDER · {disclosure?.spender ?? '—'} (exact amount)</div>}
-          <div>MIN RECEIVED · {minReceived} {trade.execution.quote.toToken}</div>
+          {execution.approveTx && <div>APPROVE TOKEN · {disclosure?.tokenContract ?? execution.approveTx.to}</div>}
+          {execution.approveTx && <div>APPROVE SPENDER · {disclosure?.spender ?? '—'} (exact amount; may remain if no swap)</div>}
+          <div>MIN RECEIVED · {minReceived} {execution.quote.toToken}</div>
           {typeof disclosure?.priceImpactPct === 'number' && <div>PRICE IMPACT · {disclosure.priceImpactPct.toFixed(2)}%</div>}
           {deadlineLeftMin !== null && <div>VALID FOR · {deadlineLeftMin} min</div>}
           {disclosure?.simulated !== undefined && <div>SIMULATED · {disclosure.simulated ? 'yes (eth_call passed)' : 'after approval'}</div>}
           <label className="flex items-center gap-2 pt-1 cursor-pointer">
             <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-            <span>I checked the contract and the minimum received. Bobby never signs for me.</span>
+            <span>I am in an eligible jurisdiction outside the U.S. I understand this B20 token is not the underlying share, and I checked the contract and minimum.</span>
           </label>
         </div>
         <div className="text-green-400/50">
@@ -154,13 +198,13 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
 
       {state === 'idle' && (
         <div className="flex gap-2">
-          {trade.execution.needsApproval ? (
+          {execution.needsApproval ? (
             <button
               disabled={!acknowledged}
               onClick={handleApprove}
               className="flex-1 py-1.5 px-3 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors rounded disabled:opacity-40"
             >
-              Approve {trade.execution.quote.fromToken}
+              Approve {execution.quote.fromToken}
             </button>
           ) : (
             <button
@@ -183,7 +227,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
       {state === 'approving' && (
         <div className="flex items-center gap-2 text-amber-400">
           <Loader2 className="w-3 h-3 animate-spin" />
-          Approving {trade.execution.quote.fromToken}...
+          Approving {execution.quote.fromToken}...
         </div>
       )}
 
@@ -191,7 +235,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-green-400">
             <CheckCircle className="w-3 h-3" />
-            {trade.execution.quote.fromToken} approved (exact amount)
+            {execution.quote.fromToken} approved; quote refreshed and simulation passed
           </div>
           <div className="flex gap-2">
             <button
@@ -223,6 +267,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
             <CheckCircle className="w-3 h-3" />
             Confirmed!
           </div>
+          {syncWarning && <div className="text-amber-300/80">Confirmed on-chain; history sync will retry later: {syncWarning}</div>}
           <a
             href={`${BASE.explorerUrl}/tx/${swapTxHash}`}
             target="_blank"
