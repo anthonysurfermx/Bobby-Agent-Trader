@@ -34,6 +34,7 @@ import { callLlm } from './_lib/llm.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIpKey } from './_lib/rate-limit.js';
 import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
+import { walletSessionFromRequest } from './_lib/wallet-session.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { requireWritesOpen } from './_lib/control.js';
 
