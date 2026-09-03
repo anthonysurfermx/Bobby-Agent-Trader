@@ -120,7 +120,7 @@ export async function getSwapQuote(
 
   try {
     const resp = await fetch(`https://www.okx.com${path}`, { headers: okxHeaders(c, ts, sig) });
-    const data = await resp.json();
+    const data = (await resp.json()) as { data?: Array<Record<string, any>> };
     if (data?.data?.[0]) {
       return {
         fromToken: fromSymbol,
@@ -173,7 +173,7 @@ export async function getSwapCalldata(
 
   try {
     const resp = await fetch(`https://www.okx.com${path}`, { headers: okxHeaders(c, ts, sig) });
-    const data = await resp.json();
+    const data = (await resp.json()) as { data?: Array<Record<string, any>> };
     const tx = data?.data?.[0]?.tx;
     if (tx) {
       return { to: tx.to, data: tx.data, value: tx.value || '0', gas: tx.gas || '500000' };
@@ -210,7 +210,7 @@ export async function getApproveCalldata(
 
   try {
     const resp = await fetch(`https://www.okx.com${path}`, { headers: okxHeaders(c, ts, sig) });
-    const data = await resp.json();
+    const data = (await resp.json()) as { data?: Array<Record<string, any>> };
     if (data?.data?.[0]) {
       return { to: data.data[0].to, data: data.data[0].data };
     }
