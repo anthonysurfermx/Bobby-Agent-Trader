@@ -26,7 +26,8 @@
     "test:voice-brief": "tsx scripts/test-voice-desk-brief.mts",
     "test:tts-routing": "tsx scripts/test-tts-routing.mts",
     "test:asset-discovery": "tsx scripts/test-asset-discovery.mts",
-    "test:dex-allowlist": "tsx scripts/test-dex-allowlist.mts",
+    "test:base-swap": "tsx scripts/test-base-swap.mts",
+    "smoke:base-swap": "tsx scripts/smoke-base-swap.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts"
   },
   "dependencies": {

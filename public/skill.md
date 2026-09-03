@@ -99,9 +99,7 @@ Bobby currently exposes **22 MCP tools** total:
 | `bobby_intel` | Full intelligence briefing (10 data sources) | `{}` |
 | `bobby_ta` | Technical analysis (SMA, RSI, MACD, Bollinger, S/R) | `{ symbol }` |
 | `bobby_stats` | Track record (win rate, PnL, recent trades) | `{}` |
-| `bobby_xlayer_signals` | Smart money signals on X Layer | `{}` |
-| `bobby_xlayer_quote` | DEX swap quote on X Layer | `{ from, to, amount }` |
-| `bobby_uniswap_quote` | Uniswap-compatible exact-input quote on X Layer | `{ tokenIn, tokenOut, amount, chainId?, tradeType?, slippageBps? }` |
+| `bobby_uniswap_quote` | Exact-input quote on Uniswap V3, Base (read-only) | `{ tokenIn, tokenOut, amount, chainId?, tradeType?, slippageBps? }` |
 | `bobby_wheel_evaluate` | Pressure-test a b1nary Wheel leg with Bobby guardrails | `{ asset, side, strike, expiry_days, collateral? }` |
 | `bobby_wheel_positions` | Read-only snapshot of b1nary positions plus Bobby regime context | `{ address }` |
 | `bobby_wallet_balance` | Bobby's agentic wallet balance | `{ chain }` |

@@ -36,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       wallet_address: walletAddress || 'unknown',
       tx_hash: txHash,
       status, // confirmed | rejected | failed
-      chain: chain || '196',
+      chain: chain || '8453',
       token_symbol: tokenSymbol || '',
       amount_usd: amountUsd || 0,
       executed_at: new Date().toISOString(),

@@ -44,9 +44,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           { name: 'bobby_debate', description: 'Trigger a 3-agent debate (Alpha Hunter vs Red Team vs Bobby CIO)', inputSchema: { type: 'object', properties: { question: { type: 'string', description: 'Trading question to debate' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['question'] } },
           { name: 'bobby_ta', description: 'Technical analysis: SMA, RSI, MACD, Bollinger, support/resistance', inputSchema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
           { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time sources', inputSchema: { type: 'object', properties: {} } },
-          { name: 'bobby_xlayer_signals', description: 'Smart money signals on X Layer (OKX L2)', inputSchema: { type: 'object', properties: {} } },
-          { name: 'bobby_xlayer_quote', description: 'DEX swap quote on X Layer', inputSchema: { type: 'object', properties: { from: { type: 'string', default: 'OKB' }, to: { type: 'string', default: 'USDT' }, amount: { type: 'string', default: '1' } } } },
-          { name: 'bobby_uniswap_quote', description: 'Uniswap-compatible exact-input quote on X Layer', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'OKB' }, tokenOut: { type: 'string', default: 'USDT' }, amount: { type: 'string', default: '1' }, amountIn: { type: 'string' }, chainId: { type: 'string', default: '196' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
+          { name: 'bobby_uniswap_quote', description: 'Exact-input quote on Uniswap V3, Base (read-only)', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'ETH' }, tokenOut: { type: 'string', default: 'USDC' }, amount: { type: 'string', default: '1' }, amountIn: { type: 'string' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
           { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades)', inputSchema: { type: 'object', properties: {} } },
           { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance on any chain', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'xlayer' } } } },
           { name: 'bobby_wallet_portfolio', description: 'Get portfolio of any wallet address (multi-chain)', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '196' } }, required: ['address'] } },
@@ -110,39 +108,8 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
         return { content: [{ type: 'text', text: data.briefing }] };
       }
 
-      if (toolName === 'bobby_xlayer_signals') {
-        const res = await fetch(`${BASE_URL}/api/xlayer-trade`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'signals' }),
-        });
-        const data = await res.json();
-        const signals = data.data?.slice(0, 5).map((s: any) => ({
-          token: s.token?.symbol, amount: `$${parseFloat(s.amountUsd).toFixed(0)}`,
-          wallets: s.triggerWalletCount,
-        }));
-        return { content: [{ type: 'text', text: JSON.stringify(signals, null, 2) }] };
-      }
-
-      if (toolName === 'bobby_xlayer_quote') {
-        const res = await fetch(`${BASE_URL}/api/xlayer-trade`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'quote',
-            params: {
-              from_token: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-              to_token: '0x1e4a5963abfd975d8c9021ce480b42188849d41d',
-              amount: BigInt(Math.floor(parseFloat(args.amount || '1') * 1e18)).toString(),
-            },
-          }),
-        });
-        const data = await res.json();
-        return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
-      }
-
       if (toolName === 'bobby_uniswap_quote') {
-        const quote = await getUniswapCompatibleQuote(BASE_URL, args);
+        const quote = await getUniswapCompatibleQuote(args);
         return { content: [{ type: 'text', text: JSON.stringify(quote, null, 2) }] };
       }
 
@@ -216,7 +183,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'mcp',
       endpoints: { tools: '/api/mcp-bobby' },
       pricing: {
-        free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_xlayer_signals', 'bobby_dex_trending', 'bobby_dex_signals', 'bobby_xlayer_quote', 'bobby_uniswap_quote', 'bobby_wallet_balance'],
+        free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_dex_trending', 'bobby_dex_signals', 'bobby_uniswap_quote', 'bobby_wallet_balance'],
         premium: {
           tools: Array.from(PREMIUM_TOOLS),
           price: fee ? `${fee.feeNative} ${fee.nativeSymbol} per call` : 'temporarily unavailable',

@@ -1890,7 +1890,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             .map((t: any) => ({
               tokenSymbol: t.tokenSymbol, amountUsd: t.amountUsd,
               confidence: t.confidence || 0, sizingMethod: t.sizingMethod || 'half-kelly',
-              chain: t.chain || '196', execution: t.execution,
+              chain: t.chain || '8453', execution: t.execution,
             }));
 
           // Build a summary from the response

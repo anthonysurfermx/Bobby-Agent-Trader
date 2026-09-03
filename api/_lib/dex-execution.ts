@@ -1,241 +1,49 @@
 // ============================================================
-// dex-execution — OKX DEX Aggregator helpers for building signable
-// calldata. Previously inlined in api/agent-run.ts. Uses the v5 endpoint
-// path the agent cycle was already using; the public /api/dex-* proxy
-// endpoints use v6 with a different response shape — those are distinct
-// on purpose (different callers, different token addressing).
+// dex-execution — the agent cycle's bridge to the swap rail. Base-only,
+// Uniswap V3 (api/_lib/base-swap.ts). The OKX aggregator path that used
+// to live here was retired on 2026-09-03: no upstream builds calldata
+// for Bobby anymore.
+//
+// Fail-closed contract for agent-run: a decision the rail cannot turn into
+// guarded, simulated calldata is ABORTED, never queued with placeholders.
 // ============================================================
 
-import { hmacSign } from './okx-hmac.js';
-import { checkApproveTx, checkSwapTx, DexRefusal, requireAllowedRouters, requireAllowedSpenders } from './dex-allowlist.js';
+import { BaseSwapError, quoteBaseSwap, toTradeExecution, type TradeExecutionPayload } from './base-swap.js';
+import { BASE_SWAP_CHAIN_ID, findBaseToken } from '../../src/lib/base-swap/tokens.js';
 
-const NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
+/** The only chain the agent trades on, as the string the trade rows carry. */
+export const TRADE_CHAIN_ID = String(BASE_SWAP_CHAIN_ID);
+/** Hard ceiling on what a debate may ask for, before the rail's own per-ticket cap. */
+const AGENT_MAX_TICKET_USD = 10_000;
 
-export const TOKEN_REGISTRY: Record<string, Record<string, { address: string; decimals: number }>> = {
-  '196': { // X Layer
-    USDC: { address: '0x74b7F16337b8972027F6196A17a631aC6dE26d22', decimals: 6 },
-    WETH: { address: '0x5A77f1443D16ee5761d310e38b62f77f726bC71c', decimals: 18 },
-    WBTC: { address: '0xEA034fb02eB1808C2cc3adbC15f447B93CbE08e1', decimals: 8 },
-    OKB:  { address: NATIVE_TOKEN, decimals: 18 },
-  },
-  '1': { // Ethereum
-    USDC: { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6 },
-    WETH: { address: NATIVE_TOKEN, decimals: 18 },
-    WBTC: { address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', decimals: 8 },
-  },
-  '8453': { // Base
-    USDC: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 },
-    WETH: { address: NATIVE_TOKEN, decimals: 18 },
-  },
-};
-
-interface OkxCreds {
-  apiKey: string;
-  secretKey: string;
-  passphrase: string;
-  projectId: string;
+// One shape (not a discriminated union): the API tsconfig is not strict, and
+// without strictNullChecks `if (!prepared.ok)` would not narrow.
+export interface PreparedTrade {
+  ok: boolean;
+  execution?: TradeExecutionPayload;
+  usdValue?: number | null;
+  route?: string;
+  warnings?: string[];
+  status?: 'aborted_stale_quote' | 'aborted_exec_error';
+  reason?: string;
 }
 
-/**
- * Client-side param validation (okx-dex-swap v2.2.5 pattern).
- * Catches errors before signing — stops gas-waste on malformed requests.
- * Throws with a clear message; callers wrap in try/catch to return null.
- */
-function validateSwapParams(opts: {
-  chainId: string;
-  fromSymbol: string;
-  toSymbol: string;
-  amountUsd: number;
-  userWallet?: string;
-  slippage?: string;
-}): void {
-  const { chainId, fromSymbol, toSymbol, amountUsd, userWallet, slippage } = opts;
-  if (!chainId || !TOKEN_REGISTRY[chainId]) throw new Error(`unsupported chainId ${chainId}`);
-  const reg = TOKEN_REGISTRY[chainId];
-  if (!reg[fromSymbol]) throw new Error(`fromSymbol ${fromSymbol} not in registry for chain ${chainId}`);
-  if (!reg[toSymbol]) throw new Error(`toSymbol ${toSymbol} not in registry for chain ${chainId}`);
-  if (fromSymbol === toSymbol) throw new Error(`fromSymbol == toSymbol (${fromSymbol}) — no-op swap`);
-  if (!Number.isFinite(amountUsd) || amountUsd <= 0) throw new Error(`invalid amountUsd ${amountUsd}`);
-  if (amountUsd > 10000) throw new Error(`amountUsd ${amountUsd} exceeds safety ceiling $10K`);
-  if (userWallet !== undefined) {
-    if (!/^0x[0-9a-fA-F]{40}$/.test(userWallet)) throw new Error(`invalid userWallet ${userWallet}`);
+/** USDC → `tokenSymbol` for `amountUsd`, built for `wallet` to sign. */
+export async function prepareBaseTrade(opts: { tokenSymbol: string; amountUsd: number; wallet: string }): Promise<PreparedTrade> {
+  const { tokenSymbol, amountUsd, wallet } = opts;
+  if (!findBaseToken(tokenSymbol)) return { ok: false, status: 'aborted_exec_error', reason: `${tokenSymbol} is not on the Base allow-list` };
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0 || amountUsd > AGENT_MAX_TICKET_USD) {
+    return { ok: false, status: 'aborted_exec_error', reason: `invalid amountUsd ${amountUsd}` };
   }
-  if (slippage !== undefined) {
-    const s = parseFloat(slippage);
-    if (!Number.isFinite(s) || s < 0 || s > 50) throw new Error(`slippage ${slippage} out of range [0, 50]`);
-  }
-}
-
-function creds(): OkxCreds | null {
-  const apiKey = process.env.OKX_API_KEY;
-  const secretKey = process.env.OKX_SECRET_KEY;
-  const passphrase = process.env.OKX_PASSPHRASE;
-  const projectId = process.env.OKX_PROJECT_ID;
-  if (!apiKey || !secretKey || !passphrase || !projectId) return null;
-  return { apiKey, secretKey, passphrase, projectId };
-}
-
-function okxHeaders(c: OkxCreds, ts: string, sig: string) {
-  return {
-    'OK-ACCESS-KEY': c.apiKey,
-    'OK-ACCESS-SIGN': sig,
-    'OK-ACCESS-TIMESTAMP': ts,
-    'OK-ACCESS-PASSPHRASE': c.passphrase,
-    'OK-ACCESS-PROJECT': c.projectId,
-  };
-}
-
-export interface SwapQuote {
-  fromAmount: string;
-  toAmount: string;
-  fromToken: string;
-  toToken: string;
-}
-
-export async function getSwapQuote(
-  chainId: string,
-  fromSymbol: string,
-  toSymbol: string,
-  amountUsd: number,
-): Promise<SwapQuote | null> {
-  const c = creds();
-  if (!c) return null;
-
+  if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) return { ok: false, status: 'aborted_exec_error', reason: 'invalid wallet' };
   try {
-    validateSwapParams({ chainId, fromSymbol, toSymbol, amountUsd });
-  } catch (e) {
-    console.error('[DEX] Quote param validation failed:', (e as Error).message);
-    return null;
+    const quote = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: tokenSymbol, amount: amountUsd, recipient: wallet });
+    if (!(Number(quote.amountOut) > 0)) return { ok: false, status: 'aborted_stale_quote', reason: 'quote returned no output' };
+    const execution = toTradeExecution(quote);
+    if (!execution) return { ok: false, status: 'aborted_exec_error', reason: quote.txWithheld.join('; ') || 'calldata withheld' };
+    return { ok: true, execution, usdValue: quote.usdValue, route: quote.route.description, warnings: quote.warnings };
+  } catch (error) {
+    if (error instanceof BaseSwapError && error.code === 'no_route') return { ok: false, status: 'aborted_stale_quote', reason: error.message };
+    return { ok: false, status: 'aborted_exec_error', reason: error instanceof Error ? error.message : String(error) };
   }
-
-  const chainTokens = TOKEN_REGISTRY[chainId];
-  if (!chainTokens || !chainTokens[fromSymbol] || !chainTokens[toSymbol]) return null;
-
-  const from = chainTokens[fromSymbol];
-  const to = chainTokens[toSymbol];
-  const fromAmount = String(Math.round(amountUsd * (10 ** from.decimals)));
-
-  const path = `/api/v5/dex/aggregator/quote?chainId=${chainId}&fromTokenAddress=${from.address}&toTokenAddress=${to.address}&amount=${fromAmount}`;
-  const ts = new Date().toISOString();
-  const sig = await hmacSign(ts + 'GET' + path, c.secretKey);
-
-  try {
-    const resp = await fetch(`https://www.okx.com${path}`, { headers: okxHeaders(c, ts, sig) });
-    const data = (await resp.json()) as { data?: Array<Record<string, any>> };
-    if (data?.data?.[0]) {
-      return {
-        fromToken: fromSymbol,
-        toToken: toSymbol,
-        fromAmount,
-        toAmount: data.data[0].toTokenAmount || '0',
-      };
-    }
-  } catch (e) {
-    console.error('[DEX] Quote error:', e);
-  }
-  return null;
-}
-
-export interface SwapCalldata {
-  to: string;
-  data: string;
-  value: string;
-  gas: string;
-  minReceiveAmount: string | null;
-}
-
-export async function getSwapCalldata(
-  chainId: string,
-  fromSymbol: string,
-  toSymbol: string,
-  amountUsd: number,
-  userWallet: string,
-  slippage = '0.005',
-): Promise<SwapCalldata | null> {
-  const c = creds();
-  if (!c) return null;
-  requireAllowedRouters(chainId);
-
-  try {
-    validateSwapParams({ chainId, fromSymbol, toSymbol, amountUsd, userWallet, slippage });
-  } catch (e) {
-    console.error('[DEX] Swap calldata param validation failed:', (e as Error).message);
-    return null;
-  }
-
-  const chainTokens = TOKEN_REGISTRY[chainId];
-  if (!chainTokens || !chainTokens[fromSymbol] || !chainTokens[toSymbol]) return null;
-
-  const from = chainTokens[fromSymbol];
-  const to = chainTokens[toSymbol];
-  const fromAmount = String(Math.round(amountUsd * (10 ** from.decimals)));
-
-  const path = `/api/v5/dex/aggregator/swap?chainId=${chainId}&fromTokenAddress=${from.address}&toTokenAddress=${to.address}&amount=${fromAmount}&userWalletAddress=${userWallet}&slippage=${slippage}`;
-  const ts = new Date().toISOString();
-  const sig = await hmacSign(ts + 'GET' + path, c.secretKey);
-
-  try {
-    const resp = await fetch(`https://www.okx.com${path}`, { headers: okxHeaders(c, ts, sig) });
-    const data = (await resp.json()) as { data?: Array<Record<string, any>> };
-    const tx = data?.data?.[0]?.tx;
-    if (tx) {
-      // allow-listed router, sane value (security review 2026-09-03); a refusal propagates as a thrown DexRefusal
-      const checked = checkSwapTx(chainId, tx, from.address, fromAmount);
-      return {
-        to: checked.to,
-        data: tx.data,
-        value: checked.value,
-        gas: tx.gas || '500000',
-        minReceiveAmount: typeof tx.minReceiveAmount === 'string' ? tx.minReceiveAmount : null,
-      };
-    }
-  } catch (e) {
-    if (e instanceof DexRefusal) throw e;
-    console.error('[DEX] Swap calldata error:', e);
-  }
-  return null;
-}
-
-export interface ApproveCalldata {
-  to: string;
-  data: string;
-  spender: string;
-}
-
-export async function getApproveCalldata(
-  chainId: string,
-  tokenSymbol: string,
-  amount: string,
-): Promise<ApproveCalldata | null> {
-  const c = creds();
-  if (!c) return null;
-  requireAllowedSpenders(chainId);
-
-  const chainTokens = TOKEN_REGISTRY[chainId];
-  if (!chainTokens || !chainTokens[tokenSymbol]) return null;
-
-  const token = chainTokens[tokenSymbol];
-  // Native tokens don't need approval.
-  if (token.address === NATIVE_TOKEN) return null;
-
-  const path = `/api/v5/dex/aggregator/approve-transaction?chainId=${chainId}&tokenContractAddress=${token.address}&approveAmount=${amount}`;
-  const ts = new Date().toISOString();
-  const sig = await hmacSign(ts + 'GET' + path, c.secretKey);
-
-  try {
-    const resp = await fetch(`https://www.okx.com${path}`, { headers: okxHeaders(c, ts, sig) });
-    const data = (await resp.json()) as { data?: Array<Record<string, any>> };
-    if (data?.data?.[0]) {
-      const checked = checkApproveTx(chainId, {
-        tokenAddress: token.address,
-        spender: data.data[0].dexContractAddress,
-        data: data.data[0].data,
-      }, String(amount));
-      return { to: checked.to, data: data.data[0].data, spender: checked.spender };
-    }
-  } catch (e) {
-    if (e instanceof DexRefusal) throw e;
-    console.error('[DEX] Approve error:', e);
-  }
-  return null;
 }

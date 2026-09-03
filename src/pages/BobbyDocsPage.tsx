@@ -115,7 +115,7 @@ const TOOL_ICONS: Record<string, React.ElementType> = {
   bobby_intel: Eye,
   bobby_dex_trending: Zap,
   bobby_dex_signals: MessageSquare,
-  bobby_xlayer_signals: Globe,
+  bobby_uniswap_quote: Globe,
   bobby_analyze: Cpu,
   bobby_debate: MessageSquare,
   bobby_security_scan: AlertTriangle,
@@ -130,7 +130,7 @@ const FREE_TOOLS = [
   { name: 'bobby_intel', desc: 'Full 12-source intelligence briefing in 10 seconds' },
   { name: 'bobby_dex_trending', desc: 'Trending tokens on-chain across DEXs' },
   { name: 'bobby_dex_signals', desc: 'Whale and KOL buy/sell signals' },
-  { name: 'bobby_xlayer_signals', desc: 'Smart money movements across Base markets' },
+  { name: 'bobby_uniswap_quote', desc: 'Uniswap V3 quote on Base from Bobby\'s own quoter call' },
 ];
 
 const PREMIUM_TOOLS = [

@@ -209,10 +209,14 @@ export function addressUrl(address: string, chainId: number | string = DEFAULT_C
   return `${getChain(chainId).explorerUrl}/address/${address}`;
 }
 
-// Uniswap on Base (Universal Router + QuoterV2, v3)
+// Uniswap V3 on Base — the only swap venue (2026-09-03). Addresses from the
+// official deployment list, read back on-chain (factory()/WETH9()) before
+// pinning. The swap rail (api/_lib/base-swap.ts) uses SwapRouter02 + QuoterV2:
+// exact approvals to the router, consumed by the swap; deadline via multicall.
 export const UNISWAP_BASE = {
-  universalRouter: '0x6ff5693b99212da76ad316178a184ab56d299b43',
-  quoterV2: '0x3d4e44eb1374240ce5f1b871ab261cd16335b76a',
-  v3Factory: '0x33128a8fc17869897dce68ed026d694621f6fdfd',
-  permit2: '0x000000000022d473030f116ddee9f6b43ac78ba3',
+  swapRouter02: '0x2626664c2603336E57B271c5C0b26F421741e481',
+  quoterV2: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
+  v3Factory: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
+  universalRouter: '0x6fF5693b99212Da76ad316178A184AB56D299b43',
+  permit2: '0x000000000022D473030F116dDEE9F6B43aC78BA3',
 } as const;

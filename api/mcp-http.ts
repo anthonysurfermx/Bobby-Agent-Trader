@@ -62,9 +62,7 @@ const TOOLS = [
   { name: 'bobby_brief', description: 'One-shot compact briefing (~400 tokens). Signal + track record + guardrails in a single call. Optimized for token-constrained agents.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol. Omit for Bobby\'s current pick.' } } } },
   { name: 'bobby_ta', description: 'Technical analysis: SMA, RSI, MACD, Bollinger, support/resistance.', inputSchema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
   { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time data sources. Use sections param to filter: prices,regime,whale,sentiment,technical,macro.', inputSchema: { type: 'object', properties: { sections: { type: 'string', description: 'Comma-separated sections to include: prices,regime,whale,sentiment,technical,macro,funding,oi,prediction,traders,security. Omit for all.' } } } },
-  { name: 'bobby_xlayer_signals', description: 'Smart money signals on X Layer (OKX L2).', inputSchema: { type: 'object', properties: {} } },
-  { name: 'bobby_xlayer_quote', description: 'DEX swap quote on X Layer.', inputSchema: { type: 'object', properties: { from: { type: 'string', default: 'OKB' }, to: { type: 'string', default: 'USDT' }, amount: { type: 'string', default: '1' } } } },
-  { name: 'bobby_uniswap_quote', description: 'Uniswap-compatible exact-input quote on X Layer via the OKX OnchainOS DEX aggregator.', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'OKB', description: 'Token symbol or contract address on X Layer' }, tokenOut: { type: 'string', default: 'USDT', description: 'Token symbol or contract address on X Layer' }, amount: { type: 'string', default: '1', description: 'Human-readable exact-input amount' }, amountIn: { type: 'string', description: 'Alias for amount' }, chainId: { type: 'string', default: '196' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
+  { name: 'bobby_uniswap_quote', description: 'Exact-input quote on Uniswap V3, Base (8453), from Bobby\'s own quoter call. Read-only; never calldata.', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'ETH', description: 'Allow-listed Base token symbol or address (ETH, WETH, USDC, USDT, DAI, cbBTC, AERO)' }, tokenOut: { type: 'string', default: 'USDC', description: 'Allow-listed Base token symbol or address' }, amount: { type: 'string', default: '1', description: 'Human-readable exact-input amount' }, amountIn: { type: 'string', description: 'Alias for amount' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
   { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades).', inputSchema: { type: 'object', properties: {} } },
   { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'xlayer' } } } },
   { name: 'bobby_wallet_portfolio', description: 'Portfolio of any wallet address (multi-chain). Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '196' } }, required: ['address'] } },
@@ -224,35 +222,8 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
     return { content: [{ type: 'text', text: JSON.stringify(brief, null, 2) }] };
   }
 
-  if (name === 'bobby_xlayer_signals') {
-    const res = await fetch(`${BASE_URL}/api/xlayer-trade`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
-      body: JSON.stringify({ action: 'signals' }),
-    });
-    const data = await res.json() as { data?: any[] };
-    const signals = data.data?.slice(0, 5).map((s: any) => ({
-      token: s.token?.symbol, amount: `$${parseFloat(s.amountUsd).toFixed(0)}`, wallets: s.triggerWalletCount,
-    }));
-    return { content: [{ type: 'text', text: JSON.stringify(signals, null, 2) }] };
-  }
-
-  if (name === 'bobby_xlayer_quote') {
-    const res = await fetch(`${BASE_URL}/api/xlayer-trade`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
-      body: JSON.stringify({
-        action: 'quote',
-        params: {
-          from_token: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
-          to_token: '0x1e4a5963abfd975d8c9021ce480b42188849d41d',
-          amount: BigInt(Math.floor(parseFloat(args.amount || '1') * 1e18)).toString(),
-        },
-      }),
-    });
-    return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
-  }
-
   if (name === 'bobby_uniswap_quote') {
-    const quote = await getUniswapCompatibleQuote(BASE_URL, args);
+    const quote = await getUniswapCompatibleQuote(args);
     return { content: [{ type: 'text', text: JSON.stringify(quote, null, 2) }] };
   }
 

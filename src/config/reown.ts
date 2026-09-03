@@ -7,20 +7,11 @@ import type { AppKitNetwork } from '@reown/appkit/networks'
 // 1. Get projectId from https://cloud.reown.com
 export const projectId = import.meta.env.VITE_REOWN_PROJECT_ID || '4d0d8421a091e769c3306153621ea088'
 
-// X Layer (OKX L2 — chain 196)
-const xlayer = {
-  id: 196,
-  name: 'X Layer',
-  nativeCurrency: { name: 'OKB', symbol: 'OKB', decimals: 18 },
-  rpcUrls: { default: { http: ['https://rpc.xlayer.tech'] } },
-  blockExplorers: { default: { name: 'OKLink', url: 'https://www.oklink.com/xlayer' } },
-} as const satisfies AppKitNetwork
-
 // 2. Set up Wagmi adapter
-// Base is the protocol's active network. Keep X Layer available for legacy
-// archive/swap surfaces, but never present it as the default connection.
+// Base is the only network Bobby transacts on (2026-09-03: X Layer retired
+// from the wallet; its history stays readable through the explorer links).
 // baseSepolia rides along for the canary challenge flow on /protocol/calls.
-export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [base, xlayer, mainnet, polygon, arbitrum, optimism, baseSepolia]
+export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [base, mainnet, polygon, arbitrum, optimism, baseSepolia]
 
 export const wagmiAdapter = new WagmiAdapter({
   networks,

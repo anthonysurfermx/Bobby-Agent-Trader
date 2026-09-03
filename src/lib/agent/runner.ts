@@ -155,7 +155,7 @@ async function executeSwap(
     };
   }
 
-  // Real execution via our dex-swap proxy
+  // Real execution would go through /api/base-swap (Uniswap V3 on Base); this runner stays simulation-only
   try {
     const BASE_URL = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`

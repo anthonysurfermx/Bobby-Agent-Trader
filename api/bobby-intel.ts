@@ -1064,7 +1064,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Run all intelligence sources in parallel
-    const [rawSignals, polyConsensus, recentCycles, cryptoPrices, fundingRates, openInterest, topTradersLS, fearGreed, dxyData, stockPrices, xlayerSignals, dexLeaderboard, trendingTokens, trenchTokens, calibration, btcIndicators, ethIndicators, solIndicators] = await Promise.allSettled([
+    const [rawSignals, polyConsensus, recentCycles, cryptoPrices, fundingRates, openInterest, topTradersLS, fearGreed, dxyData, stockPrices, dexLeaderboard, trendingTokens, trenchTokens, calibration, btcIndicators, ethIndicators, solIndicators] = await Promise.allSettled([
       collectDexSignals(),
       collectPolymarketIntelligence(),
       fetchRecentCycles(5),
@@ -1075,11 +1075,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchFearGreed(),
       fetchDXY(),
       fetchTopStocks(),
-      // X Layer on-chain signals via OnchainOS
-      fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'https://defi-mexico-hub.vercel.app'}/api/xlayer-trade`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'signals' }),
-      }).then(r => r.ok ? r.json() : null).catch(() => null),
       fetchDexLeaderboard(),
       fetchTrendingTokens(),
       fetchTrenchTokens(),
@@ -1087,7 +1082,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchTechnicalIndicators('BTC-USDT', '1H'),
       fetchTechnicalIndicators('ETH-USDT', '1H'),
       fetchTechnicalIndicators('SOL-USDT', '1H'),
-    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null)) as [any, any, any, any, FundingRate[], OpenInterestData[], LongShortRatio[], FearGreedData | null, { dxy: number } | null, any, any, DexLeaderEntry[], TrendingToken[], TrenchToken[], CalibrationData | null, TechnicalIndicatorBundle | null, TechnicalIndicatorBundle | null, TechnicalIndicatorBundle | null];
+    ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null)) as [any, any, any, any, FundingRate[], OpenInterestData[], LongShortRatio[], FearGreedData | null, { dxy: number } | null, any, DexLeaderEntry[], TrendingToken[], TrenchToken[], CalibrationData | null, TechnicalIndicatorBundle | null, TechnicalIndicatorBundle | null, TechnicalIndicatorBundle | null];
 
     const livePrices = [...(cryptoPrices || []), ...(stockPrices || [])];
 
@@ -1186,14 +1181,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const latencyMs = Date.now() - startMs;
 
-    // Format X Layer signals
-    const xlayerFormatted = xlayerSignals?.data?.slice(0, 5).map((s: any) => ({
-      token: s.token?.symbol || 'UNKNOWN',
-      amount_usd: parseFloat(parseFloat(s.amountUsd || '0').toFixed(2)),
-      wallets: parseInt(s.triggerWalletCount || '0'),
-      market_cap: parseFloat(parseFloat(s.token?.marketCapUsd || '0').toFixed(0)),
-    })) || [];
-
     // Format DEX leaderboard + trending for briefing
     const leaderFormatted = (dexLeaderboard || []).slice(0, 5);
     const trendingFormatted = (trendingTokens || []).slice(0, 5);
@@ -1211,7 +1198,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Build the intelligence briefing text for Bobby's brain
     const trenchFormatted = (trenchTokens || []).slice(0, 5);
-    const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, xlayerFormatted, leaderFormatted, trendingFormatted, securityResults, trenchFormatted, calibration, technicalPulse, convictionModel);
+    const briefing = buildBriefing(signalsWithConviction, polyFormatted, livePrices || [], fundingRates || [], performance, regime, latencyMs, openInterest || [], topTradersLS || [], fearGreed, dxyData, leaderFormatted, trendingFormatted, securityResults, trenchFormatted, calibration, technicalPulse, convictionModel);
 
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
     res.setHeader('X-Intel-Cache', 'miss');
@@ -1227,7 +1214,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       topTradersLS: topTradersLS || [],
       fearGreed,
       dxy: dxyData,
-      xlayer: xlayerFormatted,
       dexLeaderboard: leaderFormatted,
       trending: trendingFormatted,
       security: securityResults,
@@ -1279,7 +1265,6 @@ function buildBriefing(
   topTradersLS: LongShortRatio[],
   fearGreed: FearGreedData | null,
   dxyData: { dxy: number } | null,
-  xlayerSignals?: Array<{ token: string; amount_usd: number; wallets: number; market_cap: number }>,
   dexLeaderboard?: DexLeaderEntry[],
   trendingTokens?: TrendingToken[],
   securityResults?: TokenSecurity[],
@@ -1370,9 +1355,6 @@ function buildBriefing(
   }
 
   // X Layer on-chain signals (smart money activity on OKX L2)
-  if (xlayerSignals && xlayerSignals.length > 0) {
-    blocks.push(`<XLAYER_SIGNALS count="${xlayerSignals.length}">\n${JSON.stringify(xlayerSignals)}\n</XLAYER_SIGNALS>`);
-  }
 
   // Performance / metacognition
   const metaData = {

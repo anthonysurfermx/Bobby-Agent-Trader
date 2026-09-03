@@ -52,10 +52,9 @@ try {
   process.env.OKX_CEX_SECRET_KEY = 'server-secret-key';
   process.env.OKX_CEX_PASSPHRASE = 'server-passphrase';
 
-  const [{ default: walletHandler }, { default: perpsHandler }, { default: xlayerHandler }, { default: telegramDeliverHandler }, { default: onchainSignalHandler }] = await Promise.all([
+  const [{ default: walletHandler }, { default: perpsHandler }, { default: telegramDeliverHandler }, { default: onchainSignalHandler }] = await Promise.all([
     import('../api/bobby-wallet.js'),
     import('../api/okx-perps.js'),
-    import('../api/xlayer-trade.js'),
     import('../api/telegram-deliver.js'),
     import('../api/onchainos-signal.js'),
   ]);
@@ -126,20 +125,6 @@ try {
     assert.equal(state.status, 200);
     assert.equal(state.body?.ok, true);
     assert.equal(observedAccessKey, 'user-api-key', 'user credentials must never unlock Bobby server credentials');
-    assert.equal(fetchCalls, 1);
-  }
-
-  {
-    const { response, state } = responseRecorder();
-    await xlayerHandler(request({ action: 'swap', params: {} }), response);
-    assert.equal(state.status, 400, 'arbitrary X Layer proxy actions must be rejected');
-    assert.equal(fetchCalls, 1);
-  }
-
-  {
-    const { response, state } = responseRecorder();
-    await xlayerHandler(request({ action: 'swap_data', params: {} }), response);
-    assert.equal(state.status, 503, 'transaction calldata must not cross an HTTP upstream');
     assert.equal(fetchCalls, 1);
   }
 

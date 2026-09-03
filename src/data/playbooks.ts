@@ -153,7 +153,6 @@ export const PLAYBOOKS: Playbook[] = [
       "Mimicking a wallet on token X right as that wallet is already exiting. Or buying a contract that scans as risky the moment anyone bothers to check.",
     tools: [
       { name: 'bobby_dex_signals', role: 'Cross-chain smart money flow' },
-      { name: 'bobby_xlayer_signals', role: 'Smart money on X Layer' },
       { name: 'bobby_security_scan', role: 'Optional deeper audit', paid: true },
     ],
     guardrails: ['hard_risk_gate', 'metacognition'],

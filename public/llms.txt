@@ -20,9 +20,7 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
 - `bobby_stats` — Track record: win rate, PnL, trades, $100 Challenge status
 - `bobby_ta` — Technical analysis: RSI, MACD, BB, SuperTrend, support/resistance
 - `bobby_intel` — Full intelligence briefing from 12 real-time data sources
-- `bobby_xlayer_signals` — Smart money signals on X Layer
-- `bobby_xlayer_quote` — DEX swap quote on X Layer
-- `bobby_uniswap_quote` — Uniswap-compatible exact-input quote on X Layer
+- `bobby_uniswap_quote` — Exact-input quote on Uniswap V3, Base (read-only)
 - `bobby_wallet_balance` — Check any wallet balance
 - `bobby_dex_trending` — Hot trending tokens on-chain
 - `bobby_dex_signals` — Smart money / whale / KOL buy signals

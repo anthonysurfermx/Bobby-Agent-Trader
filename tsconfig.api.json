@@ -75,12 +75,10 @@
     "api/_lib/progress-rules.ts",
     "api/_lib/trader-land.ts",
     "api/_lib/rate-limit.ts",
-    "api/dex-swap.ts",
-    "api/dex-approve.ts",
-    "api/dex-quote.ts",
-    "api/xlayer-trade.ts",
-    "api/_lib/dex-allowlist.ts",
     "api/_lib/dex-execution.ts",
-    "api/bobby-pnl.ts"
+    "api/bobby-pnl.ts",
+    "api/base-swap.ts",
+    "api/_lib/base-swap.ts",
+    "api/_lib/mcp-uniswap-quote.ts"
   ]
 }

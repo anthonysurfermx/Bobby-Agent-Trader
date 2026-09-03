@@ -12,11 +12,7 @@ import {
   type RawSignal,
   type FilteredSignal,
 } from './_lib/signals.js';
-import {
-  getSwapQuote,
-  getSwapCalldata,
-  getApproveCalldata,
-} from './_lib/dex-execution.js';
+import { prepareBaseTrade, TRADE_CHAIN_ID } from './_lib/dex-execution.js';
 import {
   applyRiskGate,
   calculateDynamicConviction,
@@ -1158,65 +1154,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Phase 6: Execute
     let trades: any[];
     if (walletAddress && isManual) {
-      // Real execution mode — fetch swap calldata from OKX DEX Aggregator.
-      // Fail-closed guard: if quote or swapTx are missing/invalid the trade
-      // is aborted rather than queued with placeholder data. A stale or
-      // malformed quote at sign-time is the classic silent-loss path.
-      console.log(`[Agent] Fetching DEX calldata for wallet ${walletAddress.slice(0, 8)}...`);
+      // Real execution mode — Uniswap V3 on Base calldata for the human to sign.
+      // Fail-closed: any guard the swap rail raises (allow-list, ticket cap,
+      // price impact, balance, simulation) aborts the trade instead of
+      // queueing it with placeholder data. Base is the only chain the rail
+      // knows, whatever chain the debate wrote on the decision.
+      console.log(`[Agent] Building Base swap calldata for wallet ${walletAddress.slice(0, 8)}...`);
       trades = [];
       for (const d of approved) {
-        const chainId = d.chain || '196'; // Default X Layer for hackathon
-        const fromAmount = String(Math.round(d.amountUsd * 1e6)); // USDC decimals
-
-        try {
-          const [quote, swapTx, approveTx] = await Promise.all([
-            getSwapQuote(chainId, 'USDC', d.tokenSymbol, d.amountUsd),
-            getSwapCalldata(chainId, 'USDC', d.tokenSymbol, d.amountUsd, walletAddress),
-            getApproveCalldata(chainId, 'USDC', fromAmount),
-          ]);
-
-          // Stale-quote abort: reject if we do not have a usable quote AND swap tx.
-          // A quote whose toAmount parses to 0 means no route or a dead pair.
-          const toAmountNum = quote ? parseFloat(String((quote as any).toAmount ?? '0')) : 0;
-          if (!quote || !swapTx || !(toAmountNum > 0)) {
-            console.warn(`[Agent] Abort ${d.tokenSymbol}: stale/invalid quote (toAmount=${toAmountNum}, swapTx=${!!swapTx})`);
-            trades.push({
-              ...d,
-              txHash: null,
-              status: 'aborted_stale_quote',
-              execution: undefined,
-            });
-            continue;
-          }
-
-          trades.push({
-            ...d,
-            txHash: null,
-            status: 'pending_execution',
-            execution: {
-              needsApproval: !!approveTx,
-              approveTx: approveTx || undefined,
-              swapTx,
-              quote: { ...quote, minReceived: swapTx.minReceiveAmount },
-              disclosure: {
-                router: swapTx.to,
-                tokenContract: approveTx?.to || null,
-                spender: approveTx?.spender || null,
-                minReceived: swapTx.minReceiveAmount,
-                note: 'Router and spender passed Bobby allow-lists; Bobby never signs for you.',
-              },
-            },
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error(`[Agent] Abort ${d.tokenSymbol}: execution prep failed — ${msg}`);
-          trades.push({
-            ...d,
-            txHash: null,
-            status: 'aborted_exec_error',
-            execution: undefined,
-          });
+        const prepared = await prepareBaseTrade({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, wallet: walletAddress });
+        if (!prepared.ok) {
+          console.warn(`[Agent] Abort ${d.tokenSymbol}: ${prepared.reason}`);
+          trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: prepared.status, execution: undefined, abortReason: prepared.reason });
+          continue;
         }
+        if (prepared.warnings?.length) console.warn(`[Agent] ${d.tokenSymbol} warnings: ${prepared.warnings.join('; ')}`);
+        trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: 'pending_execution', execution: prepared.execution });
       }
     } else {
       // Cron/simulation mode
