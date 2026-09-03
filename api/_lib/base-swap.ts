@@ -684,6 +684,11 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
   }
 
   if (recipient && stock) {
+    // Master switch: nobody gets stock calldata unless ops turned it on. Off by
+    // default, off on a typo, off when the variable is missing. Quotes stay visible.
+    if (process.env.BASE_STOCK_SWAPS_ENABLED !== 'true') {
+      txWithheld.push('tokenized-stock swaps are disabled (BASE_STOCK_SWAPS_ENABLED is not "true")');
+    }
     // Two independent gates for tokenized stocks: the human's own attestation
     // and the edge's view of where they are. US or unknown = no calldata.
     if (input.stockEligibilityConfirmed !== true) {

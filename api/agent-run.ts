@@ -6,15 +6,14 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { randomUUID } from 'node:crypto';
-import { resolveIdentity } from './_lib/user-identity.js';
 import { cached } from './_lib/api-cache.js';
 import {
-  collectDexSignals,
   filterSignals,
   type RawSignal,
   type FilteredSignal,
 } from './_lib/signals.js';
-import { prepareBaseTrade, TRADE_CHAIN_ID } from './_lib/dex-execution.js';
+import { prepareBaseIntent, TRADE_CHAIN_ID } from './_lib/dex-execution.js';
+import { collectStockSignals } from './_lib/stock-signals.js';
 import {
   applyRiskGate,
   calculateDynamicConviction,
@@ -27,7 +26,6 @@ import {
   type PolyPosition,
   type PolyLeaderboardEntry,
 } from './_lib/polymarket.js';
-import { checkTokenRiskBatch } from './_lib/okx-security.js';
 import { callLlm } from './_lib/llm.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIpKey } from './_lib/rate-limit.js';
@@ -137,8 +135,8 @@ function buildSignalContext(
     : '';
 
   return `Signals (${signals.length}):\n${signals.map((s, i) => {
-    const okxNorm = s.filterScore / 100;
-    const dc = calculateDynamicConviction(okxNorm, bestPolyEdge, age);
+    const signalNorm = s.filterScore / 100;
+    const dc = calculateDynamicConviction(signalNorm, bestPolyEdge, age);
     return `[${i + 1}] ${s.tokenSymbol} (chain ${s.chain}) — $${s.amountUsd.toLocaleString()} — score ${s.filterScore} — dynamicConviction: ${dc.toFixed(2)} — ${s.reasons.join(', ')}`;
   }).join('\n')}${polyContext}${performanceCtx || ''}`;
 }
@@ -200,7 +198,7 @@ async function multiAgentDebate(
   const alphaPrompt = selfOptimizedPrompt || `You are the Alpha Hunter agent. Your ONLY job is to find the best trading opportunities.
 Analyze signals aggressively. Look for: high wallet convergence, low sold ratio, large volume, smart money patterns.
 For Polymarket, find edges where smart money entry price diverges from current price.
-IMPORTANT: Each signal includes a dynamicConviction score (0-1) that factors in OKX signal strength, Polymarket consensus, and signal age (latency penalty). Prioritize signals with dynamicConviction > 0.6. Signals with dynamicConviction < 0.3 are likely stale or low-quality — skip them unless you have a very strong thesis.
+IMPORTANT: Each signal includes a dynamicConviction score (0-1) that factors in the Base signal strength, Polymarket consensus, and signal age (latency penalty). Prioritize signals with dynamicConviction > 0.6. Signals with dynamicConviction < 0.3 are likely stale or low-quality — skip them unless you have a very strong thesis.
 Be BULLISH and find alpha. Max 3 trades. Call execute_decisions.`;
 
   const alphaPromise = callClaude(
@@ -238,12 +236,12 @@ Be SKEPTICAL and adversarial. Output a risk assessment for each signal.`,
 IDENTITY: You are the smartest person in the room. You've seen every trap, every pump-and-dump, every "this time is different." Your job is to protect capital like it's your own money — because reputationally, it is.
 
 MARKET CONTEXT (2026):
-- On-chain data (OKX OnchainOS) = HARD TRUTH. Wallet flows don't lie. Whales don't move billions for fun.
+- On-chain data (Base B20 pools vs the Chainlink reference) = HARD TRUTH. A pool discount is the edge; a premium is the trap.
 - Polymarket = CROWD NOISE. Useful as a contrarian indicator. When everyone agrees, the smart money is already on the other side.
 
 DIALECTIC PROTOCOL:
-1. CONVERGENCE: OKX whales buying + Polymarket consensus rising = real move. Approve with conviction.
-2. TRAP DETECTION: Polymarket says 80% YES but OKX shows Net Outflow? That's a LIQUIDATION HUNT. The crowd is the exit liquidity. Mark as TRAP. Do NOT trade.
+1. CONVERGENCE: pool discount + underlying momentum + Polymarket consensus = real move. Approve with conviction.
+2. TRAP DETECTION: Polymarket says 80% YES but the pool trades at a premium to the reference? The crowd is the exit liquidity. Mark as TRAP. Do NOT trade.
 3. LATENCY PENALTY: Signals older than 1h are DEAD. If you're reading it on a public feed, the smart money already exited. Signals >5min lose credibility proportionally.
 4. CONVICTION FORMULA: Each signal has a pre-computed dynamicConviction (0-1). Use it as floor — adjust based on your read, but if the math says garbage, it's garbage.
 
@@ -279,7 +277,7 @@ OUTPUT: Call execute_decisions. Set confidence as conviction_score (0.0-1.0). Ma
       amountUsd: Number(t.amount_usd) || 25,
       reason: String(t.reason),
       confidence: Number(t.confidence),
-      signalSources: ['okx_dex_signal'],
+      signalSources: ['base_b20'],
     }));
 
   console.log(`[Agent] Debate: Alpha proposed ${alphaTrades.length}, Judge approved ${decisions.length}`);
@@ -474,13 +472,17 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
 
 // ---- Fetch USD currently at risk in open (unsettled) positions ----
 // Prevents cumulative over-exposure when multiple cycles fire before settlement.
-async function fetchOpenExposureUsd(): Promise<number> {
+/**
+ * Open exposure for ONE wallet: its confirmed, unsettled BUYs on Base. Never
+ * global — one user's swaps must not throttle another's cycle — and never
+ * sells, which reduce exposure. Cron cycles have no wallet and no exposure.
+ */
+async function fetchOpenExposureUsd(wallet: string | null): Promise<number> {
   const url = bobbyDbUrl();
   const key = bobbyServiceKey();
-  if (!url || !key) return 0;
+  if (!url || !key || !wallet) return 0;
   try {
-    // Confirmed on-chain and not yet settled = open exposure (agent_trades has no 'open' status).
-    const q = `${url}/rest/v1/agent_trades?status=eq.confirmed&settled_at=is.null&select=amount_usd`;
+    const q = `${url}/rest/v1/agent_trades?status=eq.confirmed&settled_at=is.null&direction=eq.BUY&owner_address=eq.${wallet.toLowerCase()}&select=amount_usd`;
     const res = await fetch(q, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
     if (!res.ok) {
       console.warn(`[OpenExposure] HTTP ${res.status} — treating open exposure as 0`);
@@ -594,7 +596,7 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
     L.push('');
   }
 
-  // ── OKX SECTION: COLLECT → FILTER → THINK → EXECUTE ──
+  // ── SIGNAL SECTION: COLLECT → FILTER → THINK → INTENT ──
 
   // Metacognition banner
   const meta = ctx.metacognition;
@@ -623,7 +625,7 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
 
   if (lang === 'es') {
     // COLLECT
-    L.push(`--- OKX OnchainOS ---`);
+    L.push(`--- Base tokenized stocks ---`);
     L.push(`Escaneé ${cycle.signals_found} señales on-chain (ETH, SOL, Base).`);
     if (topFilteredSignals.length > 0) {
       L.push(`Top señales detectadas:`);
@@ -688,7 +690,7 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
     L.push(`Nos vemos en ${hrs} horas.`);
 
   } else if (lang === 'pt') {
-    L.push(`--- OKX OnchainOS ---`);
+    L.push(`--- Base tokenized stocks ---`);
     L.push(`Escaneei ${cycle.signals_found} sinais on-chain (ETH, SOL, Base).`);
     if (topFilteredSignals.length > 0) {
       L.push(`Top sinais detectados:`);
@@ -746,7 +748,7 @@ function generateGreeting(profile: AdvisorProfile, ctx: GreetingContext, memoryF
     L.push(`Nos vemos em ${hrs} horas.`);
 
   } else {
-    L.push(`--- OKX OnchainOS ---`);
+    L.push(`--- Base tokenized stocks ---`);
     L.push(`Scanned ${cycle.signals_found} on-chain signals (ETH, SOL, Base).`);
     if (topFilteredSignals.length > 0) {
       L.push(`Top signals detected:`);
@@ -963,7 +965,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // The cycle id is minted here so calldata built in Phase 6 can be tied to
   // the cycle row logged in Phase 7; a confirmed receipt then updates that row.
   const cycleId = randomUUID();
-  const viewerIdentity = isManual ? await resolveIdentity(req).catch(() => null) : null;
   const hasOperatorAuth = isInternalRequest(req);
   if (!isManual && !requireInternalAuth(req, res)) return;
   if (walletAddress && !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
@@ -1033,10 +1034,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Phase 0: Polymarket Intelligence (parallel with OKX)
-    console.log('[Agent] Collecting signals + Polymarket intelligence...');
+    // Phase 0: Base tokenized-stock signals (keyless: pools + Chainlink + Yahoo)
+    // in parallel with Polymarket intelligence. No OKX in this pipeline.
+    console.log('[Agent] Collecting Base stock signals + Polymarket intelligence...');
     const [raw, polyConsensus] = await Promise.all([
-      collectDexSignals({ logPrefix: '[Agent]' }),
+      collectStockSignals({ logPrefix: '[Agent]' }),
       collectPolymarketIntelligence({ logPrefix: '[Agent]' }),
     ]);
     console.log(`[Agent] ${raw.length} raw signals, ${polyConsensus.length} Polymarket consensus markets`);
@@ -1045,28 +1047,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let filtered = filterSignals(raw);
     console.log(`[Agent] ${filtered.length} passed filters`);
 
-    // Phase 2b: Deterministic security pre-gate (OKX risk-token detection v2.2.9).
-    // Drops honeypots / blacklisted / high-tax tokens before they reach the LLM debate.
-    if (filtered.length > 0) {
-      const tokenSet = filtered
-        .filter(s => s.tokenAddress && s.tokenAddress.length > 0)
-        .map(s => ({ chainIndex: s.chain, tokenAddress: s.tokenAddress }));
-      if (tokenSet.length > 0) {
-        const risks = await checkTokenRiskBatch(tokenSet);
-        const before = filtered.length;
-        filtered = filtered.filter(s => {
-          const verdict = risks.get(`${s.chain}:${s.tokenAddress}`);
-          if (!verdict) return true; // unknown → permissive, Red Team is final check
-          if (!verdict.safe) {
-            console.warn(`[Agent] SECURITY BLOCK ${s.tokenSymbol} (${verdict.raw}): ${verdict.flags.join(',')} buyTax=${verdict.buyTax} sellTax=${verdict.sellTax}`);
-            return false;
-          }
-          return true;
-        });
-        if (before !== filtered.length) console.log(`[Agent] Security gate dropped ${before - filtered.length} flagged tokens`);
-      }
-    }
-
+    // Phase 2b: security pre-gate. For B20 stocks it already ran inside the
+    // collector (issuer pause, stale reference); the rail re-checks everything
+    // (metadata, multiplier, policies, simulation) before any calldata exists.
     if (filtered.length === 0) {
       const result = {
         started_at: startedAt,
@@ -1079,13 +1062,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         total_usd_deployed: 0,
         latency_ms: Date.now() - startMs,
         llm_reasoning: polyConsensus.length > 0
-          ? `No OKX signals, but ${polyConsensus.length} Polymarket consensus markets detected.`
+          ? `No Base stock signals, but ${polyConsensus.length} Polymarket consensus markets detected.`
           : 'No actionable signals this cycle.',
         status: 'completed',
       };
       await logToSupabase(result);
 
-      // Still generate greetings with Polymarket data even if no OKX signals
+      // Still generate greetings with Polymarket data even if no stock signals
       const allProfiles0 = await fetchAdvisorProfiles();
       const profiles0 = isManual
         ? allProfiles0.filter((profile) => profile.wallet_address.toLowerCase() === walletAddress.toLowerCase())
@@ -1155,30 +1138,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Phase 5: Kelly Criterion Risk Gate (safe mode reduces exposure)
     // Pre-load open exposure so caps count unsettled positions from prior cycles.
-    const openExposure = await fetchOpenExposureUsd();
+    const openExposure = await fetchOpenExposureUsd(isManual && walletAddress ? walletAddress : null);
     if (openExposure > 0) console.log(`[Agent] Open exposure from prior cycles: $${openExposure.toFixed(2)}`);
     const { approved, blocked, sizingMethod } = applyRiskGate(debate.decisions, 500, isSafeMode, undefined, openExposure);
     console.log(`[Agent] ${approved.length} approved (${sizingMethod}), ${blocked} blocked`);
 
-    // Phase 6: Execute
+    // Phase 6: Intents. The cycle never builds calldata: it hands the human a
+    // quote-only preview tied to this cycle id. The card asks for the
+    // eligibility attestation, then /api/base-swap builds, simulates and
+    // records the transaction for the session wallet.
     let trades: any[];
     if (walletAddress && isManual) {
-      // Real execution mode — Uniswap V3 on Base calldata for the human to sign.
-      // Fail-closed: any guard the swap rail raises (allow-list, ticket cap,
-      // price impact, balance, simulation) aborts the trade instead of
-      // queueing it with placeholder data. Base is the only chain the rail
-      // knows, whatever chain the debate wrote on the decision.
-      console.log(`[Agent] Building Base swap calldata for wallet ${walletAddress.slice(0, 8)}...`);
+      console.log(`[Agent] Preparing Base stock intents for wallet ${walletAddress.slice(0, 8)}...`);
       trades = [];
       for (const d of approved) {
-        const prepared = await prepareBaseTrade({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, wallet: walletAddress, country: viewerCountry, cycleId, identityId: viewerIdentity?.id ?? null });
+        const prepared = await prepareBaseIntent({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, cycleId });
         if (!prepared.ok) {
           console.warn(`[Agent] Abort ${d.tokenSymbol}: ${prepared.reason}`);
-          trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: prepared.status, execution: undefined, abortReason: prepared.reason });
+          trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: prepared.status, intent: undefined, abortReason: prepared.reason });
           continue;
         }
-        if (prepared.warnings?.length) console.warn(`[Agent] ${d.tokenSymbol} warnings: ${prepared.warnings.join('; ')}`);
-        trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: 'pending_execution', execution: prepared.execution });
+        trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: 'intent', intent: prepared.intent });
       }
     } else {
       // Cron/simulation mode
@@ -1245,7 +1225,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: generateGreeting(p, {
         cycle: result,
         topFilteredSignals: filtered,
-        trades: trades.map(t => ({ tokenSymbol: t.tokenSymbol, amountUsd: t.amountUsd, confidence: t.confidence, chain: t.chain })),
+        trades: trades.map(t => ({ tokenSymbol: t.tokenSymbol, amountUsd: t.amountUsd, confidence: t.confidence, chain: t.chain, status: t.status, intent: t.intent, abortReason: t.abortReason })),
         polymarketData: polyConsensus,
         debate: { alphaView: debate.alphaView, redTeamView: debate.redTeamView, judgeVerdict: debate.judgeVerdict },
         sizingMethod,

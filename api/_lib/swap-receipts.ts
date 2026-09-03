@@ -84,8 +84,15 @@ export async function recordBuiltSwap(row: BuiltSwapRow, fetchImpl: typeof fetch
         platform: row.platform ?? 'web',
       }),
     });
-    if (!res.ok) return { recorded: false, reason: `db ${res.status}` };
-    return { recorded: true };
+    if (res.ok) return { recorded: true, ...(row.cycleId ? {} : {}) };
+    // 23503 = the cycle row is not there (a cycle whose log failed, or a stale
+    // id). The swap is still Bobby's; record it unlinked and say so.
+    const text = await res.text().catch(() => '');
+    if (row.cycleId && (res.status === 409 || res.status === 400) && /23503|foreign key|cycle_id/i.test(text)) {
+      const again = await recordBuiltSwap({ ...row, cycleId: null }, fetchImpl);
+      return again.recorded ? { recorded: true, reason: 'cycle not found; recorded unlinked' } : again;
+    }
+    return { recorded: false, reason: `db ${res.status}` };
   } catch (error) {
     return { recorded: false, reason: error instanceof Error ? error.message : String(error) };
   }
@@ -118,7 +125,13 @@ export async function verifySwapOnChain(txHash: Hex, wallet: Address, client: Re
   const base: ChainVerification = { ok: false, reason: null, txHash, from: null, to: null, status: null, blockNumber: null, blockTimestamp: null, calldataHash: null, valueWei: null, movements: [], amountInRaw: null, amountOutRaw: null };
   let tx; let receipt;
   try {
-    [tx, receipt] = await Promise.all([client.getTransaction({ hash: txHash }), client.getTransactionReceipt({ hash: txHash })]);
+    // A hash the node has never seen can make a forked/lagging RPC wait on its
+    // upstream; bound it. 'pending' means "ask again", never "failed".
+    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 15_000));
+    [tx, receipt] = await Promise.race([
+      Promise.all([client.getTransaction({ hash: txHash }), client.getTransactionReceipt({ hash: txHash })]),
+      timeout,
+    ]);
   } catch {
     return { ...base, reason: 'pending' };
   }
@@ -174,61 +187,10 @@ export async function verifySwapOnChain(txHash: Hex, wallet: Address, client: Re
 
 export interface ConfirmResult {
   recorded: boolean;
-  /** 'confirmed' = row flipped now; 'already' = same hash was already recorded; 'unbuilt' = Bobby never built this calldata; 'conflict' = another hash already confirmed this calldata. */
+  /** 'confirmed' = row flipped now; 'already' = same hash was already recorded (trade repaired if missing); 'unbuilt' = Bobby never built this calldata; 'conflict' = another hash already confirmed this calldata. */
   outcome: 'confirmed' | 'already' | 'unbuilt' | 'conflict' | 'db_error';
   id: string | null;
-}
-
-/** Idempotent: flips the matching 'built' row to 'confirmed'. */
-export async function confirmSwapReceipt(
-  v: ChainVerification,
-  wallet: string,
-  opts: { identityId?: string | null; platform?: 'web' | 'ios' } = {},
-  fetchImpl: typeof fetch = storeFetch,
-): Promise<ConfirmResult> {
-  if (!v.ok || !v.calldataHash) return { recorded: false, outcome: 'unbuilt', id: null };
-  if (!bobbyDbConfigured()) return { recorded: false, outcome: 'db_error', id: null };
-  const headers = bobbyServiceHeaders({ 'Content-Type': 'application/json' });
-  try {
-    const q = `${SWAP_RECEIPTS_TABLE}?wallet_address=eq.${wallet.toLowerCase()}&calldata_hash=eq.${v.calldataHash}&select=id,status,tx_hash,cycle_id,agent_trade_id,token_in_symbol,token_out_symbol,token_in_address,token_out_address,amount_in_raw,quoted_out_raw,identity_id`;
-    const found = await fetchImpl(bobbyRest(q), { headers });
-    if (!found.ok) return { recorded: false, outcome: 'db_error', id: null };
-    const rows = (await found.json()) as Array<BuiltRow>;
-    if (!rows.length) return { recorded: false, outcome: 'unbuilt', id: null };
-    const row = rows[0];
-    if (row.status === 'confirmed') {
-      return row.tx_hash?.toLowerCase() === v.txHash.toLowerCase()
-        ? { recorded: true, outcome: 'already', id: row.id }
-        : { recorded: false, outcome: 'conflict', id: row.id };
-    }
-    const patch = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?id=eq.${row.id}&status=eq.built`), {
-      method: 'PATCH',
-      headers: { ...headers, Prefer: 'return=representation' },
-      body: JSON.stringify({
-        status: 'confirmed',
-        tx_hash: v.txHash.toLowerCase(),
-        block_number: v.blockNumber,
-        block_timestamp: v.blockTimestamp ? new Date(v.blockTimestamp * 1000).toISOString() : null,
-        amount_out_raw: v.amountOutRaw,
-        confirmed_at: new Date().toISOString(),
-        ...(opts.identityId ? { identity_id: opts.identityId } : {}),
-        ...(opts.platform ? { platform: opts.platform } : {}),
-      }),
-    });
-    if (!patch.ok) return { recorded: false, outcome: 'db_error', id: row.id };
-    const updated = (await patch.json()) as unknown[];
-    // Zero rows updated means a concurrent confirm won the race: re-read is the idempotent answer.
-    if (!updated.length) return confirmSwapReceipt(v, wallet, opts, fetchImpl);
-    // The swap is now a fact for the rest of Bobby: exposure, PnL, settlement
-    // and the cycle's counters read agent_trades, not this table.
-    const tradeId = await linkTradeRecord(row, v, wallet, fetchImpl).catch(() => null);
-    if (tradeId) {
-      await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?id=eq.${row.id}`), { method: 'PATCH', headers, body: JSON.stringify({ agent_trade_id: tradeId }) }).catch(() => null);
-    }
-    return { recorded: true, outcome: 'confirmed', id: row.id };
-  } catch {
-    return { recorded: false, outcome: 'db_error', id: null };
-  }
+  tradeId: string | null;
 }
 
 interface BuiltRow {
@@ -246,13 +208,8 @@ interface BuiltRow {
   identity_id: string | null;
 }
 
-/**
- * One agent_trades row per confirmed swap (idempotent on tx hash), plus the
- * cycle's executed/deployed counters when the calldata came from a cycle.
- * USD value: the stable leg when there is one (USDC, 6 decimals).
- */
-async function linkTradeRecord(row: BuiltRow, v: ChainVerification, wallet: string, fetchImpl: typeof fetch): Promise<string | null> {
-  const headers = bobbyServiceHeaders({ 'Content-Type': 'application/json' });
+/** What the trade row will say, derived from chain data and the built row. */
+export function tradeFacts(row: Pick<BuiltRow, 'token_in_address' | 'token_out_address' | 'amount_in_raw'>, v: ChainVerification): { tokenSymbol: string; tokenAddress: string; direction: 'BUY' | 'SELL'; amountUsd: number; entryPrice: number | null } | null {
   const tokenIn = findBaseToken(row.token_in_address);
   const tokenOut = findBaseToken(row.token_out_address);
   if (!tokenIn || !tokenOut) return null;
@@ -263,48 +220,65 @@ async function linkTradeRecord(row: BuiltRow, v: ChainVerification, wallet: stri
   const buying = !tokenOut.stable; // USDC → asset is a BUY; asset → USDC is a SELL
   const asset = buying ? tokenOut : tokenIn;
   const assetUnits = Number(buying ? outRaw : inRaw) / 10 ** asset.decimals;
-  const entryPrice = assetUnits > 0 ? amountUsd / assetUnits : null;
-  const txHash = v.txHash.toLowerCase();
-  const existing = await fetchImpl(bobbyRest(`${AGENT_TRADES_TABLE}?tx_hash=eq.${txHash}&select=id`), { headers });
-  if (existing.ok) {
-    const rows = (await existing.json()) as Array<{ id: string }>;
-    if (rows.length) return rows[0].id;
+  return {
+    tokenSymbol: asset.symbol,
+    tokenAddress: asset.address.toLowerCase(),
+    direction: buying ? 'BUY' : 'SELL',
+    amountUsd: Number(amountUsd.toFixed(2)),
+    entryPrice: assetUnits > 0 ? amountUsd / assetUnits : null,
+  };
+}
+
+/**
+ * One transaction on the database side (rpc confirm_swap_receipt): lock the
+ * built row, flip it to confirmed, upsert the agent_trades row (idempotent
+ * on the tx hash), bump the cycle's counters atomically, link the trade.
+ * Calling it again with the same hash repairs anything missing and answers
+ * 'already'. A different hash for the same calldata is a conflict.
+ */
+export async function confirmSwapReceipt(
+  v: ChainVerification,
+  wallet: string,
+  opts: { identityId?: string | null; platform?: 'web' | 'ios' } = {},
+  fetchImpl: typeof fetch = storeFetch,
+): Promise<ConfirmResult> {
+  const none: ConfirmResult = { recorded: false, outcome: 'unbuilt', id: null, tradeId: null };
+  if (!v.ok || !v.calldataHash) return none;
+  if (!bobbyDbConfigured()) return { ...none, outcome: 'db_error' };
+  const headers = bobbyServiceHeaders({ 'Content-Type': 'application/json' });
+  try {
+    const q = `${SWAP_RECEIPTS_TABLE}?wallet_address=eq.${wallet.toLowerCase()}&calldata_hash=eq.${v.calldataHash}&select=id,status,tx_hash,cycle_id,agent_trade_id,token_in_symbol,token_out_symbol,token_in_address,token_out_address,amount_in_raw,quoted_out_raw,identity_id`;
+    const found = await fetchImpl(bobbyRest(q), { headers });
+    if (!found.ok) return { ...none, outcome: 'db_error' };
+    const rows = (await found.json()) as BuiltRow[];
+    if (!rows.length) return none;
+    const facts = tradeFacts(rows[0], v);
+    if (!facts) return { ...none, outcome: 'db_error', id: rows[0].id };
+    const rpc = await fetchImpl(bobbyRest('rpc/confirm_swap_receipt'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        p_wallet: wallet.toLowerCase(),
+        p_calldata_hash: v.calldataHash,
+        p_tx_hash: v.txHash.toLowerCase(),
+        p_block_number: v.blockNumber,
+        p_block_timestamp: v.blockTimestamp ? new Date(v.blockTimestamp * 1000).toISOString() : null,
+        p_amount_in_raw: v.amountInRaw,
+        p_amount_out_raw: v.amountOutRaw,
+        p_identity_id: opts.identityId ?? null,
+        p_platform: opts.platform ?? null,
+        p_token_symbol: facts.tokenSymbol,
+        p_token_address: facts.tokenAddress,
+        p_direction: facts.direction,
+        p_amount_usd: facts.amountUsd,
+        p_entry_price: facts.entryPrice,
+      }),
+    });
+    if (!rpc.ok) return { ...none, outcome: 'db_error', id: rows[0].id };
+    const out = (await rpc.json()) as { outcome: ConfirmResult['outcome']; id?: string | null; trade_id?: string | null };
+    const recorded = out.outcome === 'confirmed' || out.outcome === 'already';
+    return { recorded, outcome: out.outcome, id: out.id ?? rows[0].id, tradeId: out.trade_id ?? null };
+  } catch {
+    return { ...none, outcome: 'db_error' };
   }
-  const inserted = await fetchImpl(bobbyRest(`${AGENT_TRADES_TABLE}?select=id`), {
-    method: 'POST',
-    headers: { ...headers, Prefer: 'return=representation' },
-    body: JSON.stringify({
-      cycle_id: row.cycle_id,
-      chain: 'base',
-      token_address: asset.address.toLowerCase(),
-      token_symbol: asset.symbol,
-      direction: buying ? 'BUY' : 'SELL',
-      amount_usd: Number(amountUsd.toFixed(2)),
-      entry_price: entryPrice,
-      tx_hash: txHash,
-      status: 'confirmed',
-      signal_sources: ['base-swap', SWAP_ENGINE],
-      owner_address: wallet.toLowerCase(),
-      user_id: row.identity_id,
-      idempotency_key: `swap:${txHash}`,
-      expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-    }),
-  });
-  if (!inserted.ok) return null;
-  const created = (await inserted.json()) as Array<{ id: string }>;
-  const tradeId = created[0]?.id ?? null;
-  if (row.cycle_id) {
-    // Counters: read, add, write. A lost race under-counts by one; never double-counts a hash (idempotent above).
-    const cyc = await fetchImpl(bobbyRest(`${AGENT_CYCLES_TABLE}?id=eq.${row.cycle_id}&select=trades_executed,total_usd_deployed`), { headers });
-    if (cyc.ok) {
-      const rows = (await cyc.json()) as Array<{ trades_executed: number | null; total_usd_deployed: number | null }>;
-      if (rows.length) {
-        await fetchImpl(bobbyRest(`${AGENT_CYCLES_TABLE}?id=eq.${row.cycle_id}`), {
-          method: 'PATCH', headers,
-          body: JSON.stringify({ trades_executed: (rows[0].trades_executed ?? 0) + 1, total_usd_deployed: Number(((rows[0].total_usd_deployed ?? 0) + amountUsd).toFixed(2)) }),
-        }).catch(() => null);
-      }
-    }
-  }
-  return tradeId;
 }

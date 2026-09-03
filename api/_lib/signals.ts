@@ -191,6 +191,29 @@ export function filterSignals(signals: RawSignal[]): FilteredSignal[] {
       if (signal.marketCapUsd && signal.marketCapUsd < 100000) continue;
     }
 
+    if (signal.source === 'base_b20') {
+      // Tokenized stock on Base: score the pool vs its Chainlink reference and
+      // the underlying's recent move. A pool discount is the edge; a premium
+      // is the trap; a fresh reference is a precondition, not a bonus.
+      const m = (signal.metadata || {}) as { deviationPct?: number; move5dPct?: number | null; referenceAgeSec?: number; pausedFeatures?: string };
+      const dev = typeof m.deviationPct === 'number' ? m.deviationPct : 0;
+      if (dev <= -1) { score += 45; reasons.push(`pool ${dev.toFixed(2)}% below reference`); }
+      else if (dev <= -0.3) { score += 30; reasons.push(`pool ${dev.toFixed(2)}% below reference`); }
+      else if (dev < 1) { score += 20; reasons.push('pool at reference'); }
+      else if (dev < 2) { score += 5; reasons.push(`pool ${dev.toFixed(2)}% above reference`); }
+      else continue; // paying a premium to the reference is not a signal
+      const mv = typeof m.move5dPct === 'number' ? m.move5dPct : null;
+      if (mv !== null) {
+        if (mv >= 3) { score += 15; reasons.push(`+${mv.toFixed(1)}% 5d`); }
+        else if (mv <= -5) { score += 10; reasons.push(`${mv.toFixed(1)}% 5d (pullback)`); }
+        else { score += 5; }
+      }
+      const age = typeof m.referenceAgeSec === 'number' ? m.referenceAgeSec : Infinity;
+      if (age <= 2 * 3600) { score += 10; reasons.push('reference fresh'); }
+      else if (age > 26 * 3600) reasons.push('market closed');
+      if (m.pausedFeatures && m.pausedFeatures !== '0') reasons.push('issuer paused mint/redeem');
+    }
+
     if (score < 20) continue;
     filtered.push({ ...signal, filterScore: Math.min(100, score), reasons });
   }

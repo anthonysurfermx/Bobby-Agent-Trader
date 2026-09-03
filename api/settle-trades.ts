@@ -1,8 +1,9 @@
 // ============================================================
 // GET/POST /api/settle-trades
 // Cron-driven settlement loop for agent_trades:
-//   1. Pull trades with status='open' that have entry + (stop OR target).
-//   2. Batch-fetch current OKX mid for unique symbols.
+//   1. Pull confirmed, unsettled trades (agent_trades has no 'open' status).
+//   2. Price each symbol from Bobby's own rail on Base (pool execution
+//      price for allow-listed tokens; the underlying via Yahoo for anything else).
 //   3. For each open trade:
 //        - LONG:  price >= target → win   | price <= stop → loss
 //        - SHORT: price <= target → win   | price >= stop → loss
@@ -21,6 +22,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireInternalAuth, requireOpsAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { requireWritesOpen } from './_lib/control.js';
+import { quoteBaseSwap } from './_lib/base-swap.js';
+import { findBaseToken } from '../src/lib/base-swap/tokens.js';
 
 export const config = { maxDuration: 60 };
 
@@ -50,7 +53,8 @@ function sbHeaders() {
 async function fetchOpenTrades(): Promise<OpenTrade[]> {
   const url =
     `${SB_URL}/rest/v1/agent_trades` +
-    `?status=eq.open` +
+    `?status=eq.confirmed` +
+    `&settled_at=is.null` +
     `&entry_price=not.is.null` +
     `&select=id,cycle_id,token_symbol,direction,entry_price,stop_price,target_price,expires_at,amount_usd` +
     `&order=created_at.asc&limit=200`;
@@ -61,25 +65,24 @@ async function fetchOpenTrades(): Promise<OpenTrade[]> {
 }
 
 async function getCurrentPrice(symbol: string): Promise<number | null> {
-  // OKX instruments in the order agent_trades is most likely to carry:
-  // SPOT crypto uses `<SYM>-USDT`; perps use `<SYM>-USDT-SWAP`. Yahoo is a
-  // stocks fallback for equity tickers that slip into the table.
-  const candidates = [`${symbol}-USDT-SWAP`, `${symbol}-USDT`];
-  for (const instId of candidates) {
+  // Allow-listed Base tokens settle at what the wallet could sell for now:
+  // the rail's own execution price (USD per unit of the asset). Anything else
+  // in the table is legacy; Yahoo answers for equity tickers, nothing for the rest.
+  const token = findBaseToken(symbol);
+  if (token && !token.stable) {
     try {
-      const res = await fetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`);
-      if (!res.ok) continue;
-      const json = (await res.json()) as { code: string; data: Array<{ last: string }> };
-      if (json.code !== '0' || !json.data?.[0]) continue;
-      const price = parseFloat(json.data[0].last);
-      if (price > 0) return price;
+      const q = await quoteBaseSwap({ tokenIn: token.symbol, tokenOut: 'USDC', amount: token.decimals >= 8 ? '0.01' : '1' });
+      if (q.executionPrice > 0) return q.executionPrice;
     } catch {
-      continue;
+      /* fall through */
     }
+    if (token.assetClass === 'tokenized-stock' && token.underlyingSymbol) symbol = token.underlyingSymbol;
+    else return null;
   }
   try {
     const res = await fetch(
       `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } },
     );
     if (res.ok) {
       const data = (await res.json()) as {
@@ -103,7 +106,7 @@ interface Decision {
 function decideOutcome(trade: OpenTrade, currentPrice: number, now: number): Decision | null {
   if (!trade.entry_price) return null;
   const entry = trade.entry_price;
-  const isLong = trade.direction !== 'short';
+  const isLong = trade.direction !== 'short' && trade.direction !== 'SELL';
   const expired = trade.expires_at ? new Date(trade.expires_at).getTime() < now : false;
 
   if (isLong) {
@@ -161,8 +164,9 @@ async function updateTrade(id: string, decision: Decision): Promise<boolean> {
     const res = await fetch(`${SB_URL}/rest/v1/agent_trades?id=eq.${id}`, {
       method: 'PATCH',
       headers: sbHeaders(),
+      // status stays 'confirmed' (the schema's check allows pending/confirmed/failed/simulated);
+      // settled_at + outcome are what "closed" means everywhere else.
       body: JSON.stringify({
-        status: 'closed',
         outcome: decision.outcome,
         exit_price: decision.exit_price,
         realized_pnl_pct: parseFloat(decision.pnl_pct.toFixed(2)),
@@ -214,7 +218,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, checked: 0, settled: 0 });
     }
 
-    // Dedupe symbols — one OKX call per symbol regardless of how many
+    // Dedupe symbols — one price read per symbol regardless of how many
     // open trades reference it.
     const symbols = Array.from(new Set(trades.map((t) => t.token_symbol).filter(Boolean)));
     const priceEntries = await Promise.all(

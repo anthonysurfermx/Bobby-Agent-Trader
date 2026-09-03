@@ -1889,12 +1889,14 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         stopThinkingSound();
 
         if (data.ok) {
+          // The cycle hands over intents (quote-only). The card asks for the
+          // eligibility attestation and only then the server builds calldata.
           const trades: TradeExecution[] = (data.trades || [])
-            .filter((t: any) => t.execution)
+            .filter((t: any) => t.intent || t.execution)
             .map((t: any) => ({
               tokenSymbol: t.tokenSymbol, amountUsd: t.amountUsd,
               confidence: t.confidence || 0, sizingMethod: t.sizingMethod || 'half-kelly',
-              chain: t.chain || '8453', execution: t.execution,
+              chain: t.chain || '8453', intent: t.intent, execution: t.execution,
             }));
 
           // Build a summary from the response

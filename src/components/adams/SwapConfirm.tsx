@@ -30,6 +30,24 @@ interface StockReference {
   transferPaused: boolean;
 }
 
+export interface TradeIntent {
+  tokenIn: 'USDC';
+  tokenOut: string;
+  amount: string;
+  cycleId: string;
+  preview: {
+    amountOut: string;
+    minAmountOut: string;
+    executionPrice: number;
+    priceImpactPct: number | null;
+    route: { description: string };
+    venue: { name: string; router: string };
+    stockReference: StockReference | null;
+    warnings: string[];
+    limits: { maxTicketUsd: number };
+  };
+}
+
 export interface TradeExecution {
   tokenSymbol: string;
   amountUsd: number;
@@ -37,7 +55,9 @@ export interface TradeExecution {
   sizingMethod: string;
   /** Always Base (8453); kept on the row for the record. */
   chain: string;
-  execution: {
+  /** The cycle's recommendation, quote-only. Calldata exists only after the human attests. */
+  intent?: TradeIntent;
+  execution?: {
     needsApproval: boolean;
     approveTx?: Tx;
     /** Absent while an approval is pending; filled by the re-quote. */
@@ -62,11 +82,11 @@ export interface TradeExecution {
   };
 }
 
-type SwapState = 'idle' | 'approving' | 'requoting' | 'ready' | 'swapping' | 'verifying' | 'confirmed' | 'unrecorded' | 'skipped' | 'error';
+type SwapState = 'intent' | 'building' | 'idle' | 'approving' | 'requoting' | 'ready' | 'swapping' | 'verifying' | 'confirmed' | 'unrecorded' | 'skipped' | 'error';
 
 export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; walletAddress?: string }) {
   const [acknowledged, setAcknowledged] = useState(false);
-  const [state, setState] = useState<SwapState>(trade.execution.swapTx ? 'ready' : 'idle');
+  const [state, setState] = useState<SwapState>(trade.execution ? (trade.execution.swapTx ? 'ready' : 'idle') : 'intent');
   const [execution, setExecution] = useState(trade.execution);
   const [errorMsg, setErrorMsg] = useState('');
   const [swapTxHash, setSwapTxHash] = useState<`0x${string}` | undefined>();
@@ -79,8 +99,14 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
   const session = useBobbySession({ auto: false });
   const wallet = (walletAddress || address || '').toLowerCase();
 
-  const disclosure = execution.disclosure;
-  const stock = disclosure?.stockReference ?? null;
+  const disclosure = execution?.disclosure;
+  const stock = disclosure?.stockReference ?? trade.intent?.preview.stockReference ?? null;
+  const fromToken = execution?.quote.fromToken ?? trade.intent?.tokenIn ?? 'USDC';
+  const toToken = execution?.quote.toToken ?? trade.intent?.tokenOut ?? trade.tokenSymbol;
+  const fromAmount = execution?.quote.fromAmount ?? trade.intent?.amount ?? trade.amountUsd.toFixed(2);
+
+  /** Where a fresh server answer lands: approval first, or straight to the swap. */
+  const stateFor = (exec: NonNullable<TradeExecution['execution']>): SwapState => (exec.swapTx ? 'ready' : 'idle');
 
   const ensureChain = async () => {
     if (connectedChainId !== BASE_CHAIN_ID) await switchChainAsync({ chainId: BASE_CHAIN_ID });
@@ -107,27 +133,45 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
     return session.headers();
   };
 
-  /** Fresh, simulated calldata for the same trade. */
-  const requote = async () => {
+  /**
+   * Asks the server to build (or rebuild) the transaction for this wallet.
+   * The attestation the human just gave travels with the request; the cycle
+   * id ties the receipt to the recommendation. Returns what the server built:
+   * an approval step, or simulated swap calldata.
+   */
+  const build = async (): Promise<NonNullable<TradeExecution['execution']>> => {
     const headers = await sessionHeaders();
     const res = await fetch('/api/base-swap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify({
-        tokenIn: execution.quote.fromToken,
-        tokenOut: execution.quote.toToken,
-        amount: execution.quote.fromAmount,
+        tokenIn: fromToken,
+        tokenOut: toToken,
+        amount: fromAmount,
         wallet,
         stockEligibilityConfirmed: acknowledged,
+        ...(trade.intent?.cycleId ? { cycleId: trade.intent.cycleId } : {}),
       }),
     });
     const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || 'Re-quote failed');
-    if (!data.execution?.swapTx || data.execution.disclosure?.simulated !== true) {
-      const why = (data.quote?.txWithheld as string[] | undefined)?.join('; ') || 'swap calldata withheld';
+    if (!res.ok || !data.ok) throw new Error(data.error || 'Build failed');
+    if (!data.execution) {
+      const why = (data.quote?.txWithheld as string[] | undefined)?.join('; ') || 'calldata withheld';
       throw new Error(why);
     }
     setExecution(data.execution);
+    return data.execution;
+  };
+
+  const handleBuild = async () => {
+    try {
+      setState('building');
+      const exec = await build();
+      setState(stateFor(exec));
+    } catch (err) {
+      setState('error');
+      setErrorMsg(err instanceof Error ? err.message : 'Build failed');
+    }
   };
 
   const notExpired = () => {
@@ -136,11 +180,13 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
 
   const handleApprove = async () => {
     try {
+      if (!execution?.approveTx) throw new Error('No approval to sign; build first');
       notExpired();
       setState('approving');
-      await sendAndConfirm(execution.approveTx!);
+      await sendAndConfirm(execution.approveTx);
       setState('requoting');
-      await requote();
+      const exec = await build();
+      if (!exec.swapTx || exec.disclosure?.simulated !== true) throw new Error('Swap is not ready after the approval; re-quote');
       setState('ready');
     } catch (err) {
       setState('error');
@@ -174,7 +220,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
 
   const handleSwap = async () => {
     try {
-      if (!execution.swapTx) throw new Error('No swap calldata; re-quote first');
+      if (!execution?.swapTx) throw new Error('No swap calldata; re-quote first');
       if (disclosure?.simulated !== true) throw new Error('Swap has not passed the post-approval simulation');
       notExpired();
       setState('swapping');
@@ -190,12 +236,13 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
 
   const handleRevoke = async () => {
     try {
-      if (!execution.revokeTx) return;
+      if (!execution?.revokeTx) return;
       setState('approving');
       await sendAndConfirm(execution.revokeTx);
       setState('requoting');
-      await requote();
-      setState('ready');
+      // After a revoke the next build needs an approval again: land on 'idle', not 'ready'.
+      const exec = await build();
+      setState(stateFor(exec));
     } catch (err) {
       setState('error');
       setErrorMsg(err instanceof Error ? err.message : 'Revoke failed');
@@ -204,9 +251,10 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
 
   if (state === 'skipped') return null;
 
-  const minReceived = execution.quote.minReceived ?? disclosure?.minReceived ?? '—';
+  const minReceived = execution?.quote.minReceived ?? disclosure?.minReceived ?? trade.intent?.preview.minAmountOut ?? '—';
   const deadlineLeftMin = disclosure?.deadline ? Math.max(0, Math.round((disclosure.deadline * 1000 - Date.now()) / 60000)) : null;
   const canSign = acknowledged && (state === 'idle' || state === 'ready');
+  const canBuild = acknowledged && state === 'intent';
   const button = 'flex-1 py-1.5 px-3 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors rounded disabled:opacity-40';
   const skip = 'py-1.5 px-3 border border-white/10 text-white/30 hover:text-white/60 transition-colors rounded';
 
@@ -215,21 +263,21 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
       <div className="text-green-400/60 mb-2">Bobby recommends:</div>
 
       <div className="space-y-1 mb-3">
-        <div className="text-green-300">BUY {trade.tokenSymbol} for ${trade.amountUsd.toFixed(2)}</div>
+        <div className="text-green-300">BUY {toToken} for ${trade.amountUsd.toFixed(2)}{trade.intent ? ` · ≈ ${Number(trade.intent.preview.amountOut).toLocaleString(undefined, { maximumFractionDigits: 6 })} ${toToken}` : ''}</div>
         <div className="text-green-400/50">via {disclosure?.venue ?? 'Uniswap V3'} on {BASE.name}{stock ? ' · Coinbase Tokenized Stock (B20)' : ''}</div>
         <div className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[10px] text-white/70 space-y-1">
           <div>CHAIN · {BASE.name} ({BASE_CHAIN_ID})</div>
-          <div>SWAP CONTRACT · {disclosure?.router ?? execution.swapTx?.to ?? '—'}</div>
-          {disclosure?.route && <div>ROUTE · {disclosure.route}</div>}
-          {execution.approveTx && state !== 'ready' && (
+          <div>SWAP CONTRACT · {disclosure?.router ?? execution?.swapTx?.to ?? trade.intent?.preview.venue.router ?? '—'}</div>
+          {(disclosure?.route ?? trade.intent?.preview.route.description) && <div>ROUTE · {disclosure?.route ?? trade.intent?.preview.route.description}</div>}
+          {execution?.approveTx && state !== 'ready' && (
             <>
               <div>APPROVE TOKEN · {disclosure?.tokenContract ?? execution.approveTx.to}</div>
-              <div>APPROVE SPENDER · {disclosure?.spender ?? '—'} · exact {execution.quote.fromAmount} {execution.quote.fromToken}</div>
+              <div>APPROVE SPENDER · {disclosure?.spender ?? '—'} · exact {fromAmount} {fromToken}</div>
               <div className="text-amber-300/80">If you approve and do not complete the swap, or the swap reverts, that allowance stays until spent or revoked.</div>
             </>
           )}
-          <div>MIN RECEIVED · {minReceived} {execution.quote.toToken}</div>
-          {typeof disclosure?.priceImpactPct === 'number' && <div>PRICE IMPACT · {disclosure.priceImpactPct.toFixed(2)}%</div>}
+          <div>MIN RECEIVED · {minReceived} {toToken}</div>
+          {typeof (disclosure?.priceImpactPct ?? trade.intent?.preview.priceImpactPct) === 'number' && <div>PRICE IMPACT · {(disclosure?.priceImpactPct ?? trade.intent!.preview.priceImpactPct)!.toFixed(2)}%</div>}
           {stock && (
             <>
               <div>B20 REFERENCE · ${stock.usdPrice.toFixed(2)} · Uniswap {stock.marketDeviationPct.toFixed(2)}% away · feed {Math.round(stock.ageSec / 3600)}h old</div>
@@ -237,8 +285,8 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
             </>
           )}
           {deadlineLeftMin !== null && <div>VALID FOR · {deadlineLeftMin} min</div>}
-          <div>SIMULATED · {execution.swapTx ? (disclosure?.simulated ? 'yes (eth_call passed)' : 'no') : 'after approval + re-quote'}</div>
-          {(state === 'idle' || state === 'ready') && (
+          <div>SIMULATED · {execution?.swapTx ? (disclosure?.simulated ? 'yes (eth_call passed)' : 'no') : execution ? 'after approval + re-quote' : 'after you attest and the server builds'}</div>
+          {(state === 'intent' || state === 'idle' || state === 'ready') && (
             <label className="flex items-center gap-2 pt-1 cursor-pointer">
               <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
               <span>
@@ -252,27 +300,34 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
         <div className="text-green-400/50">Confidence: {trade.confidence}% ({trade.sizingMethod})</div>
       </div>
 
-      {state === 'idle' && (
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <button disabled={!canSign} onClick={handleApprove} className={button}>Approve {execution.quote.fromToken} (exact)</button>
-            <button onClick={() => setState('skipped')} className={skip}>Skip</button>
-          </div>
-          {execution.revokeTx && <button onClick={handleRevoke} className="w-full py-1 text-white/40 hover:text-white/70 border border-white/10 rounded">Revoke existing {execution.quote.fromToken} allowance (approve 0)</button>}
+      {state === 'intent' && (
+        <div className="flex gap-2">
+          <button disabled={!canBuild} onClick={handleBuild} className={button}>Build transaction for my wallet</button>
+          <button onClick={() => setState('skipped')} className={skip}>Skip</button>
         </div>
       )}
-      {state === 'approving' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Approving {execution.quote.fromToken}… waiting for the receipt</div>}
-      {state === 'requoting' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Approval mined. Re-quoting and simulating the swap…</div>}
-      {state === 'ready' && (
+      {state === 'building' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Building and simulating for your wallet…</div>}
+      {state === 'idle' && execution && (
         <div className="space-y-2">
-          {trade.execution.approveTx && !execution.approveTx && (
+          <div className="flex gap-2">
+            <button disabled={!canSign} onClick={handleApprove} className={button}>Approve {fromToken} (exact)</button>
+            <button onClick={() => setState('skipped')} className={skip}>Skip</button>
+          </div>
+          {execution.revokeTx && <button onClick={handleRevoke} className="w-full py-1 text-white/40 hover:text-white/70 border border-white/10 rounded">Revoke existing {fromToken} allowance (approve 0)</button>}
+        </div>
+      )}
+      {state === 'approving' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Approving {fromToken}… waiting for the receipt</div>}
+      {state === 'requoting' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Approval mined. Re-quoting and simulating the swap…</div>}
+      {state === 'ready' && execution && (
+        <div className="space-y-2">
+          {!execution.approveTx && execution.swapTx && (
             <div className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3 h-3" />Approval confirmed · quote refreshed and simulation passed</div>
           )}
           <div className="flex gap-2">
             <button disabled={!canSign} onClick={handleSwap} className={button}>Execute Swap</button>
             <button onClick={() => setState('skipped')} className={skip}>Skip</button>
           </div>
-          {execution.revokeTx && <button onClick={handleRevoke} className="w-full py-1 text-white/40 hover:text-white/70 border border-white/10 rounded">Revoke {execution.quote.fromToken} allowance instead (approve 0)</button>}
+          {execution.revokeTx && <button onClick={handleRevoke} className="w-full py-1 text-white/40 hover:text-white/70 border border-white/10 rounded">Revoke {fromToken} allowance instead (approve 0)</button>}
         </div>
       )}
       {state === 'swapping' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Swapping… waiting for the receipt</div>}
@@ -299,7 +354,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
       {state === 'error' && (
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-red-400"><XCircle className="w-3 h-3" />{errorMsg || 'Transaction failed'}</div>
-          <button onClick={() => { setState(execution.swapTx ? 'ready' : 'idle'); setErrorMsg(''); }} className="text-white/30 hover:text-white/60 transition-colors">Retry</button>
+          <button onClick={() => { setState(execution ? stateFor(execution) : 'intent'); setErrorMsg(''); }} className="text-white/30 hover:text-white/60 transition-colors">Retry</button>
         </div>
       )}
     </div>

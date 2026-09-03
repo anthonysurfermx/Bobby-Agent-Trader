@@ -87,6 +87,19 @@ The review asked for Universal Router + Permit2 with exact, expiring approvals. 
 
 Left as-is, on purpose: ESLint reports pre-existing warnings (0 errors) across files this work did not touch.
 
+## Review round 3 → what changed
+
+| # | Finding | Change |
+|---|---|---|
+| P1 | Cycle id used before the cycle row exists (FK); re-quote lost the cycle id | The cycle no longer builds calldata at all (see P1 attestation). `/api/base-swap` accepts `cycleId`; by then the cycle row is logged. If the FK still fails (23503), the built row is recorded **unlinked** and the response says so; nothing is silently dropped. The e2e emulates the FK. |
+| P1 | "Confirmed" did not guarantee `agent_trades`; counters read-modify-write | One transactional, idempotent RPC `confirm_swap_receipt` (in the migration): lock the built row, flip it, upsert the trade on `idempotency_key = swap:<hash>`, bump the cycle's counters with `SET x = x + 1`, link the trade. Re-running with the same hash repairs a missing trade and answers `already`. The e2e emulates the RPC and asserts the repair. |
+| P1 | Exposure global and eternal; `settle-trades` only read `open` | Exposure is per wallet (`owner_address`), BUYs only, confirmed and unsettled; cron cycles have no wallet and no exposure. `settle-trades` reads `status=confirmed & settled_at is null` (the schema has no `open`), prices allow-listed tokens from the rail's own pool quote (stocks fall back to the underlying on Yahoo), and no longer writes `status='closed'` (not allowed by the check). |
+| P1 | Server invented the attestation | `agent-run` hands the card an **intent** (quote-only preview, cycle id, no recipient, nothing recorded). The card shows the preview, the human attests, then `/api/base-swap` builds, simulates and records for the session wallet with that attestation and the cycle id. |
+| P1 | OKX still inside the cycle | The cycle's signal source is now `api/_lib/stock-signals.ts`: keyless, pools vs Chainlink reference + issuer pause flags + the underlying's 5-day move (Yahoo). `filterSignals` scores that source. OKX signal collection and the OKX risk-token gate are out of `agent-run`; prompts speak of Base pools, not OnchainOS. `bobby-intel` still reads OKX **public market data** for the briefing — data, not execution; removing it is a separate product call. |
+| P2 | Revoke left the card in `ready` without `swapTx` | Every fresh server answer lands where it belongs: approval present → `idle`, swap present → `ready`. |
+| — | Geogate on by default | `BASE_STOCK_SWAPS_ENABLED` must be exactly `"true"` or stock calldata is withheld (quotes still visible). Unset, `TRUE`, `1` = off. |
+| — | iOS | No swaps, no transactional wallet, no perps, no trade buttons, no links that look like a way around it. iOS stays analysis, learning, character and progress. `/api/swap-receipt` GET can feed a read-only history; nothing on iOS builds or signs. |
+
 ## Verification run
 
 ```

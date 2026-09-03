@@ -30,6 +30,8 @@ const PostSchema = z.object({
   slippagePct: z.number().min(0.05).max(3).optional(),
   wallet: z.string().regex(WALLET_RE),
   stockEligibilityConfirmed: z.boolean().optional(),
+  /** The agent cycle whose intent this builds; the receipt then lands on that cycle. */
+  cycleId: z.string().uuid().optional(),
 });
 
 /** ISO country stamped by Vercel's edge; absent locally, which fails closed for stocks. */
@@ -95,6 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       receipt = await recordBuiltSwap({
         wallet: quote.recipient,
         identityId: identity?.id ?? null,
+        cycleId: body.cycleId ?? null,
         platform: 'web',
         tokenIn: { symbol: quote.tokenIn.symbol, address: quote.tokenIn.address },
         tokenOut: { symbol: quote.tokenOut.symbol, address: quote.tokenOut.address },
@@ -106,6 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         calldataHash: quote.tx.calldataHash,
         deadline: quote.deadline,
       });
+      if (receipt.recorded && receipt.reason) quote.warnings.push(receipt.reason);
       if (!receipt.recorded) {
         // Fail closed: calldata that the store did not see cannot be confirmed
         // later, so it is not handed out. The quote itself stays visible.

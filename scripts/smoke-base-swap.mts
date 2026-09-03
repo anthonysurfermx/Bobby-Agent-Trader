@@ -8,6 +8,9 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { getAddress } from 'viem';
 import { quoteBaseSwap, verifyVenue } from '../api/_lib/base-swap.js';
+import { collectStockSignals } from '../api/_lib/stock-signals.js';
+import { filterSignals } from '../api/_lib/signals.js';
+process.env.BASE_STOCK_SWAPS_ENABLED = process.env.BASE_STOCK_SWAPS_ENABLED ?? 'true';
 
 const wallet = process.argv[2];
 // A fresh random address: guaranteed empty (0xdEaD-style burn addresses hold tokens).
@@ -51,6 +54,41 @@ for (const [tokenIn, tokenOut, amount] of pairs) {
   const ar = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: empty, stockEligibilityConfirmed: true, country: 'AR' });
   assert.ok(ar.txWithheld.some((w) => w.includes('not offered in AR')), 'countries outside the allow-list get no stock calldata');
   console.log(`stock gates: US refused, unknown country refused, AR (not allow-listed) refused; NVDAc pausedFeatures=${ref.stockReference!.pausedFeatures} transferPaused=${ref.stockReference!.transferPaused}`);
+}
+
+// Kill switch: off by default, off unless exactly 'true'.
+{
+  const saved = process.env.BASE_STOCK_SWAPS_ENABLED;
+  delete process.env.BASE_STOCK_SWAPS_ENABLED;
+  const off = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: empty, stockEligibilityConfirmed: true, country: 'MX' });
+  assert.ok(off.txWithheld.some((w) => w.includes('BASE_STOCK_SWAPS_ENABLED')), 'unset flag withholds stock calldata');
+  process.env.BASE_STOCK_SWAPS_ENABLED = 'TRUE';
+  const typo = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: empty, stockEligibilityConfirmed: true, country: 'MX' });
+  assert.ok(typo.txWithheld.some((w) => w.includes('BASE_STOCK_SWAPS_ENABLED')), 'anything but "true" withholds');
+  process.env.BASE_STOCK_SWAPS_ENABLED = saved ?? 'true';
+  console.log('kill switch: unset and "TRUE" both withhold; only "true" enables');
+}
+
+// The cycle hands the human an INTENT: quote-only, cycle-tagged, no calldata, nothing recorded.
+{
+  const { prepareBaseIntent } = await import('../api/_lib/dex-execution.js');
+  const p = await prepareBaseIntent({ tokenSymbol: 'NVDA', amountUsd: 20, cycleId: '00000000-0000-4000-8000-000000000001' });
+  assert.equal(p.ok, true, p.reason);
+  assert.equal(p.intent!.tokenOut, 'NVDAc');
+  assert.equal(p.intent!.tokenIn, 'USDC');
+  assert.ok(Number(p.intent!.preview.amountOut) > 0 && p.intent!.preview.stockReference!.usdPrice > 0);
+  assert.ok(!('tx' in p.intent!.preview) && !('execution' in p), 'intent carries no calldata');
+  const crypto = await prepareBaseIntent({ tokenSymbol: 'cbBTC', amountUsd: 20, cycleId: '00000000-0000-4000-8000-000000000001' });
+  assert.equal(crypto.ok, false, 'agent intents are tokenized stocks only');
+  console.log(`intent: NVDA $20 → ≈${p.intent!.preview.amountOut} NVDAc, ref $${p.intent!.preview.stockReference!.usdPrice.toFixed(2)}, cycle-tagged, no calldata`);
+}
+
+// Keyless stock signals for the cycle: pools vs Chainlink + underlying momentum.
+{
+  const raw = await collectStockSignals({ logPrefix: '[smoke]' });
+  assert.ok(raw.length >= 1, 'at least one stock signal');
+  const filtered = filterSignals(raw);
+  console.log(`stock signals: ${raw.length} raw → ${filtered.length} filtered: ${filtered.map((s) => `${s.tokenSymbol} ${s.signalType} score ${s.filterScore} (${s.reasons.join(', ')})`).join(' | ')}`);
 }
 
 // Ticket cap: fail closed above the limit.

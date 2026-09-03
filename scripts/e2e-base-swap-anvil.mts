@@ -16,10 +16,11 @@ process.env.BASE_RPC_URL = ANVIL;
 process.env.BASE_RPC_FALLBACK_URL = ANVIL;
 process.env.BOBBY_SUPABASE_URL = 'https://db.e2e.invalid';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'e2e-service-key-not-real-0000000000';
+process.env.BASE_STOCK_SWAPS_ENABLED = 'true';
 
 const { quoteBaseSwap, SWAP_ROUTER02, baseClient } = await import('../api/_lib/base-swap.js');
-const { verifySwapOnChain, confirmSwapReceipt, setReceiptStoreFetchForTests } = await import('../api/_lib/swap-receipts.js');
-const { prepareBaseTrade } = await import('../api/_lib/dex-execution.js');
+const { verifySwapOnChain, confirmSwapReceipt, recordBuiltSwap, setReceiptStoreFetchForTests } = await import('../api/_lib/swap-receipts.js');
+const { prepareBaseIntent } = await import('../api/_lib/dex-execution.js');
 const { BASE_USDC } = await import('../src/lib/base-swap/tokens.js');
 
 // ---------- in-memory PostgREST for swap_receipts ----------
@@ -31,14 +32,34 @@ const fakeFetch: typeof fetch = (async (input: RequestInfo | URL, init?: Request
   if (storeDown) return new Response('down', { status: 503 });
   const url = new URL(String(input));
   const name = url.pathname.split('/rest/v1/')[1];
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  if (name === 'rpc/confirm_swap_receipt') {
+    // Emulates the transactional function in the migration, same semantics.
+    const p = JSON.parse(String(init?.body)) as Record<string, any>;
+    const r = tables.bobby_swap_receipts.find((x) => x.wallet_address === p.p_wallet && x.calldata_hash === p.p_calldata_hash);
+    if (!r) return json({ outcome: 'unbuilt' });
+    const wasConfirmed = r.status === 'confirmed';
+    if (wasConfirmed && r.tx_hash !== p.p_tx_hash) return json({ outcome: 'conflict', id: r.id });
+    if (!wasConfirmed) Object.assign(r, { status: 'confirmed', tx_hash: p.p_tx_hash, block_number: p.p_block_number, block_timestamp: p.p_block_timestamp, amount_out_raw: p.p_amount_out_raw, confirmed_at: new Date().toISOString() });
+    let t = tables.agent_trades.find((x) => x.idempotency_key === `swap:${p.p_tx_hash}`);
+    if (!t) {
+      t = { id: `agent_trades-${nextId++}`, cycle_id: r.cycle_id, chain: 'base', token_address: p.p_token_address, token_symbol: p.p_token_symbol, direction: p.p_direction, amount_usd: p.p_amount_usd, entry_price: p.p_entry_price, tx_hash: p.p_tx_hash, status: 'confirmed', owner_address: p.p_wallet, idempotency_key: `swap:${p.p_tx_hash}` };
+      tables.agent_trades.push(t);
+      const c = r.cycle_id ? tables.agent_cycles.find((x) => x.id === r.cycle_id) : null;
+      if (c) { c.trades_executed = Number(c.trades_executed) + 1; c.total_usd_deployed = Number(c.total_usd_deployed) + Number(p.p_amount_usd); }
+    }
+    r.agent_trade_id = t.id;
+    return json({ outcome: wasConfirmed ? 'already' : 'confirmed', id: r.id, trade_id: t.id });
+  }
   const table = tables[name];
   assert.ok(table, `unexpected table ${url.pathname}`);
   const filters = [...url.searchParams.entries()].filter(([k, v]) => k !== 'select' && k !== 'on_conflict' && (v.startsWith('eq.') || v.startsWith('is.'))).map(([k, v]) => [k, v.slice(3), v.startsWith('is.')] as const);
   const match = (r: Row) => filters.every(([k, v, isOp]) => (isOp ? (v === 'null' ? r[k] == null : r[k] != null) : String(r[k]) === v));
-  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   if (init?.method === 'POST') {
     const row = JSON.parse(String(init.body)) as Row;
     if (name === 'bobby_swap_receipts') {
+      // FK emulation: a cycle id that is not in agent_cycles is a 23503.
+      if (row.cycle_id && !tables.agent_cycles.some((c) => c.id === row.cycle_id)) return json({ code: '23503', message: 'insert violates foreign key constraint bobby_swap_receipts_cycle_id_fkey' }, 409);
       const dup = table.find((r) => r.wallet_address === row.wallet_address && r.calldata_hash === row.calldata_hash);
       if (!dup) table.push({ ...row, id: `row-${nextId++}` });
       return new Response(null, { status: 201 });
@@ -97,7 +118,7 @@ const send = async (tx: { to: string; data: string; value: string }) => {
 };
 
 // ---------- journey: USDC → cbBTC (ERC-20 in, approval needed) ----------
-async function journey(tokenIn: string, tokenOut: string, amount: string, country = 'MX') {
+async function journey(tokenIn: string, tokenOut: string, amount: string, country = 'MX', cycleId: string | null = null) {
   console.log(`\n=== ${amount} ${tokenIn} → ${tokenOut}`);
   const q1 = await quoteBaseSwap({ tokenIn, tokenOut, amount, recipient: account.address, country, stockEligibilityConfirmed: true });
   assert.deepEqual(q1.txWithheld, [], `guards: ${q1.txWithheld.join('; ')}`);
@@ -121,12 +142,12 @@ async function journey(tokenIn: string, tokenOut: string, amount: string, countr
   assert.equal(q2.simulation.ran, true);
   assert.equal(q2.simulation.ok, true, `simulation: ${q2.simulation.reason}`);
   // Record exactly as /api/base-swap does (same lib call, store reached through the hook).
-  const { recordBuiltSwap } = await import('../api/_lib/swap-receipts.js');
   const built = await recordBuiltSwap({
-    wallet: account.address, tokenIn: q2.tokenIn, tokenOut: q2.tokenOut, amountInRaw: q2.amountInRaw, quotedOutRaw: q2.amountOutRaw,
+    wallet: account.address, cycleId, tokenIn: q2.tokenIn, tokenOut: q2.tokenOut, amountInRaw: q2.amountInRaw, quotedOutRaw: q2.amountOutRaw,
     minOutRaw: q2.minAmountOutRaw, route: q2.route.description, router: q2.venue.router, calldataHash: q2.tx!.calldataHash!, deadline: q2.deadline,
   });
-  assert.equal(built.recorded, true);
+  assert.equal(built.recorded, true, built.reason);
+  if (cycleId === 'cycle-missing') assert.match(String(built.reason), /cycle not found/, 'unknown cycle → recorded unlinked, and said so');
   const before = q2.tokenOut.native ? await pub.getBalance({ address: account.address }) : await pub.readContract({ address: q2.tokenOut.address, abi: ERC20, functionName: 'balanceOf', args: [account.address] });
   const { hash, receipt } = await send(q2.tx!.swap!);
   assert.equal(receipt.status, 'success', 'swap must mine successfully');
@@ -143,6 +164,7 @@ async function journey(tokenIn: string, tokenOut: string, amount: string, countr
   assert.ok(v.movements.some((m) => m.symbol === q2.tokenOut.symbol || (q2.tokenOut.native && m.symbol === 'ETH')), 'movement to wallet recorded');
   const c1 = await confirmSwapReceipt(v, account.address);
   assert.equal(c1.outcome, 'confirmed');
+  assert.ok(c1.tradeId, 'confirm returns the trade it wrote');
   const c2 = await confirmSwapReceipt(v, account.address);
   assert.equal(c2.outcome, 'already', 'second confirm is a no-op');
   const c3 = await confirmSwapReceipt({ ...v, txHash: ('0x' + 'ab'.repeat(32)) as Hex }, account.address);
@@ -151,9 +173,11 @@ async function journey(tokenIn: string, tokenOut: string, amount: string, countr
   return { hash, q2 };
 }
 
-const a = await journey('USDC', 'cbBTC', '20');
-await journey('ETH', 'USDC', '0.01');
+const a = await journey('USDC', 'cbBTC', '20', 'MX', 'cycle-e2e');
+await journey('ETH', 'USDC', '0.01', 'MX', 'cycle-missing');
 await journey('USDC', 'ETH', '15');
+assert.equal(tables.agent_cycles[0].trades_executed, 1, 'the cycle-linked swap bumped its cycle once');
+assert.equal(tables.agent_cycles[0].total_usd_deployed, 20, 'and by its USD size');
 // Tokenized stocks: the B20 token bytecode uses an opcode anvil 1.5 rejects
 // (EVM error OpcodeNotFound, every hardfork/--optimism combination tried
 // 2026-09-03), so their swap leg cannot be mined on this fork. Their guards
@@ -164,27 +188,47 @@ if (process.env.E2E_STOCKS === '1') {
   await journey('NVDAc', 'USDC', '0.05');
 }
 
-// ---------- agent path: prepareBaseTrade records its own calldata, links the cycle, and fails closed ----------
+// ---------- agent path: intents only (no calldata, nothing recorded), store outage fails closed ----------
 {
-  // Allowance already covers this size after the cbBTC journey? No: it was consumed. So approve first via the agent card path.
-  const p1 = await prepareBaseTrade({ tokenSymbol: 'cbBTC', amountUsd: 10, wallet: account.address, country: 'MX', cycleId: 'cycle-e2e' });
-  // Crypto is outside the tokenized-stock focus in the agent path: it must abort, not build.
-  assert.equal(p1.ok, false, 'agent path only builds tokenized stocks');
+  const p1 = await prepareBaseIntent({ tokenSymbol: 'cbBTC', amountUsd: 10, cycleId: 'cycle-e2e' });
+  assert.equal(p1.ok, false, 'agent path only handles tokenized stocks');
   assert.ok(String(p1.reason).includes('tokenized-stock'), p1.reason);
+  // A real stock intent needs the B20 quoter, which anvil 1.5 cannot run (OpcodeNotFound);
+  // the live smoke asserts it. Here: an intent is quote-only and records nothing.
+  if (process.env.E2E_STOCKS === '1') {
+    const before = table.length;
+    const p2 = await prepareBaseIntent({ tokenSymbol: 'NVDA', amountUsd: 20, cycleId: 'cycle-e2e' });
+    assert.equal(p2.ok, true, p2.reason);
+    assert.equal(p2.intent!.cycleId, 'cycle-e2e');
+    assert.equal(table.length, before, 'an intent records nothing and carries no calldata');
+  }
+  // Kill switch (needs a B20 quote → live smoke asserts it; here only with E2E_STOCKS=1).
+  if (process.env.E2E_STOCKS === '1') {
+    process.env.BASE_STOCK_SWAPS_ENABLED = 'false';
+    const off = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: account.address, country: 'MX', stockEligibilityConfirmed: true });
+    assert.ok(off.txWithheld.some((w) => w.includes('BASE_STOCK_SWAPS_ENABLED')), 'kill switch withholds');
+    process.env.BASE_STOCK_SWAPS_ENABLED = 'true';
+  }
   // Store outage: no calldata is handed out by the endpoint-equivalent rule.
   storeDown = true;
   const q = await quoteBaseSwap({ tokenIn: 'ETH', tokenOut: 'USDC', amount: '0.001', recipient: account.address });
   assert.ok(q.tx?.swap, 'quote itself still builds');
-  const { recordBuiltSwap } = await import('../api/_lib/swap-receipts.js');
   const rec = await recordBuiltSwap({ wallet: account.address, tokenIn: q.tokenIn, tokenOut: q.tokenOut, amountInRaw: q.amountInRaw, quotedOutRaw: q.amountOutRaw, minOutRaw: q.minAmountOutRaw, route: q.route.description, router: q.venue.router, calldataHash: q.tx!.calldataHash!, deadline: q.deadline });
   assert.equal(rec.recorded, false, 'store down → not recorded → endpoint withholds calldata');
   storeDown = false;
-  // Trade linkage from the crypto journeys above: each confirmed receipt became an agent_trades row.
+  // Trade linkage from the crypto journeys above: each confirmed receipt became an agent_trades row, atomically with the confirm.
   const trades = tables.agent_trades;
   assert.equal(trades.length, table.filter((r) => r.status === 'confirmed').length, 'one agent_trades row per confirmed receipt');
   assert.ok(trades.every((t) => t.status === 'confirmed' && t.chain === 'base' && typeof t.amount_usd === 'number' && (t.amount_usd as number) > 0), JSON.stringify(trades[0]));
   assert.ok(table.filter((r) => r.status === 'confirmed').every((r) => r.agent_trade_id), 'receipt rows point at their trade');
-  console.log('\nagent path: crypto refused, store outage withholds calldata, trades linked:', trades.map((t) => `${t.direction} ${t.token_symbol} $${t.amount_usd}`).join(', '));
+  // Repair: a confirmed receipt whose trade vanished gets it back on the next confirm ('already').
+  const victim = table.find((r) => r.status === 'confirmed')!;
+  tables.agent_trades.splice(tables.agent_trades.findIndex((t) => t.id === victim.agent_trade_id), 1);
+  const vv = await verifySwapOnChain(victim.tx_hash as Hex, account.address, baseClient());
+  const repaired = await confirmSwapReceipt(vv, account.address);
+  assert.equal(repaired.outcome, 'already');
+  assert.ok(tables.agent_trades.some((t) => t.id === repaired.tradeId), 'missing trade repaired by the idempotent confirm');
+  console.log('\nagent path: crypto refused, intent carries no calldata, kill switch, store outage, trades linked + repaired:', trades.map((t) => `${t.direction} ${t.token_symbol} $${t.amount_usd}`).join(', '));
 }
 
 // ---------- negatives ----------
