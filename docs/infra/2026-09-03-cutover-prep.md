@@ -174,3 +174,31 @@ Expected freeze window: about 10 minutes (steps 1–7).
 `pkMin/pkMax`. This branch (`feat/migration-prep-v2`) was rebuilt from `main` with sanitized
 files; `origin/feat/migration-prep` was deleted so the commit is unreachable from the remote.
 The local branch is kept until Anthony confirms the deletion (the agent may not delete branches).
+
+
+## CUT-OVER EXECUTED — 2026-09-03 23:52 → 2026-09-04 00:12 UTC (Anthony's GO)
+
+| Step | Time (UTC) | Result |
+|------|------------|--------|
+| Freeze legacy (`bobby_control.write_freeze=true`) | 23:52 | production health `writeFreeze=true` after 12 s |
+| Delta copy under freeze: T0 source → export → import → sequences → T0 target → verify | 23:53–00:00 | first verify: 2 FAIL — the destination's `updated_at` triggers rewrote `agent_profiles` and `bobby_control` during the upsert; re-imported with `trg_agent_profiles_updated_at` and `bobby_control_touch` disabled → **VERIFIED 164/164** (`2026-09-04-cutover-verify-under-freeze.txt`) |
+| Arm the journal: `bobby_outbox_enable(outboxPlan())` | 00:01 | 33/33 tables, pk columns match; `verify --expect-outbox` VERIFIED |
+| Vercel Production env: `BOBBY_SUPABASE_URL`, `BOBBY_SUPABASE_ANON_KEY`, `VITE_BOBBY_SUPABASE_URL`, `VITE_BOBBY_SUPABASE_ANON_KEY` (readable, values verified by pull), `BOBBY_SUPABASE_SERVICE_ROLE_KEY` (Secret) | 00:02 | created; a first attempt from an unlinked worktree left four unverifiable copies, which were removed and re-created |
+| `main` 11ff84b → 0cdfcbf (tooling/docs only, no runtime change) + push → Git deploy | 00:03–00:06 | health: `sha=0cdfcbf`, **`db.ref=qbvdqkknnuweatptjohi`**, salt and receipt key configured |
+| Unfreeze destination | 00:06 | `writeFreeze=false` |
+| Full gate A+B+C against the new production (`GATE_EXPECTED_SHA=0cdfcbf`) | 00:07–00:11 | **GATE PASSED 158/158** (`2026-09-04-gate-passed-production-on-destination.txt`), canary residue 0 |
+| Smoke | 00:12 | `/`, `/agentic-world`, `/agentic-world/bobby`, `/agentic-world/forum`, `/agentic-world/bobby/history`, `/desk`, `/agentic-world/bobby/calls` → 200; stats 864 debates / 794 resolved / 433W 244L / 54.5 %; registry Base 8453, mcpFee live; anon public forum reads 3,397 threads; private tables refuse anon |
+
+**State now:** `bobby-protocol` (`qbvdqkknnuweatptjohi`) is primary. Legacy
+(`egpixaunlnzauztbrnuz`) stays **frozen, read-only** as the rollback target; the
+`migration_outbox` journal on the destination records every write (36 entries after the
+gate, all its own canaries).
+
+**Rollback** (any time, ~5 min): freeze destination → `replay-outbox --from target`
+(needs both sides frozen) → REPLAY COMPLETE → remove the five `BOBBY_*`/`VITE_BOBBY_*`
+variables → redeploy → unfreeze legacy.
+
+**Follow-ups:** (1) `import.mts` should disable user triggers on the target for the
+duration of the copy (done by hand this time); (2) decide when to disarm the journal and
+archive legacy (after the investor demo and a quiet day); (3) Trader Land connects to
+the new project through the same `BOBBY_SUPABASE_*` variables — nothing else to change.
