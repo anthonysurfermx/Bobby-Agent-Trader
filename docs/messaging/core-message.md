@@ -256,3 +256,31 @@ Lockup:   Refuted before execution. Published before the outcome.
 9. **Publicar los límites**, siempre, como sección propia.
 10. **Voz:** impersonal y afirmativa. Ni "tú" ni "usted" en el cuerpo; el titular es la única
     excepción, porque ahí el señalamiento directo es el mecanismo.
+
+---
+
+## 12. Adenda v5.1 — la línea de consumidor (2026-09-03)
+
+Cerrada con Anthony tras ocho iteraciones para el video promocional (`docs/video/bobby-promo-v2/`).
+Es la traducción de la tesis v5 ("la ventaja pasó a la comprobación") a lo que le importa a
+alguien que ya le pregunta a ChatGPT por sus activos. **Es la línea que se usa en cualquier pieza
+de consumidor** (video, anuncios, bio de redes, App Store) cuando hay que decir qué hace Bobby en
+una frase:
+
+> **ES:** ChatGPT te responde. Bobby comprueba el mercado antes de responder.
+> **EN:** ChatGPT answers. Bobby checks the market first.
+
+Por qué ganó:
+- Nombra el mercado. Sin eso, Bobby se lee como un chatbot generalista (falla detectada en la landing del protocolo: una lectora no supo qué hacía Bobby Protocol).
+- Dice el orden: Bobby también responde, pero después de comprobar.
+- Cero vocabulario de protocolo: no dice veredicto, debate, refutación, registro, on-chain ni agentes.
+- Fluye como habla la gente, no como tres slogans engrapados (feedback explícito de Anthony).
+
+Descartadas en el camino: "veredicto desafiado + registro antes del resultado" (técnico);
+"ChatGPT nunca te va a decir que no" (ChatGPT sí pone avisos genéricos de riesgo; atacable);
+"Bobby pone a prueba el mercado" (Bobby prueba la respuesta, no el mercado).
+
+Relación con v5: no la reemplaza. v5 sigue siendo la doctrina institucional del protocolo. Esta
+línea es la puerta de entrada; el "cómo" (procedimiento, registro, límites) vive detrás de ella.
+Cuando se nombre a ChatGPT en una pieza pública, que sea en el gancho, no en el cierre: la marca
+de Bobby no cuelga de la de otro.
