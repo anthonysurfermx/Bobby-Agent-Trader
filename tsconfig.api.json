@@ -65,6 +65,15 @@
     "api/bobby-asset-cache.ts",
     "api/forum-agent-register.ts",
     "api/_lib/mcp-challenges.ts",
-    "api/_lib/trackrecord-v2-recorder.ts"
+    "api/_lib/trackrecord-v2-recorder.ts",
+    "api/agent-run.ts",
+    "api/okx-onchain.ts",
+    "api/progress.ts",
+    "api/trader-land.ts",
+    "api/identity-link.ts",
+    "api/_lib/user-identity.ts",
+    "api/_lib/progress-rules.ts",
+    "api/_lib/trader-land.ts",
+    "api/_lib/rate-limit.ts"
   ]
 }
