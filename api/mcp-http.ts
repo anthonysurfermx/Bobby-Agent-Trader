@@ -908,8 +908,14 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
         verifiedPayment = await verifyMcpPaymentTx(txHash, toolName);
 
         // Atomic consume challenge
-        const effectiveChallengeId = challengeIdHeader || verifiedPayment.challengeId;
-        if (effectiveChallengeId) {
+        // The challenge id is READ FROM THE PAID TRANSACTION; a header may only
+        // confirm it, never replace it (security review 2026-09-03). Missing id = refuse.
+        const effectiveChallengeId = verifiedPayment.challengeId;
+        if (challengeIdHeader && effectiveChallengeId && challengeIdHeader.toLowerCase() !== effectiveChallengeId.toLowerCase()) {
+          return jsonrpcError(id, -32402, 'Challenge id does not match the paid transaction.', { protocol: 'x402' });
+        }
+        if (!effectiveChallengeId) return jsonrpcError(id, -32402, 'Paid transaction carries no challenge id.', { protocol: 'x402' });
+        {
           const { consumed } = await atomicConsumeChallenge(effectiveChallengeId, txHash, verifiedPayment.payer);
           if (!consumed) {
             return jsonrpcError(id, -32402, 'Challenge already consumed, expired, or not found. Request a new challenge.', {

@@ -324,8 +324,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Atomic consume: only one request can consume the challenge (Codex R1 P0)
-      const effectiveChallengeId = challengeIdHeader || verifiedPayment.challengeId;
-      if (effectiveChallengeId) {
+      // Same rule as mcp-http: the challenge id comes from the paid tx; a header may only confirm it.
+      const effectiveChallengeId = verifiedPayment.challengeId;
+      if (challengeIdHeader && effectiveChallengeId && challengeIdHeader.toLowerCase() !== effectiveChallengeId.toLowerCase()) {
+        return res.status(402).json({ jsonrpc: '2.0', error: { code: -32402, message: 'Challenge id does not match the paid transaction.' }, id: body.id });
+      }
+      if (!effectiveChallengeId) {
+        return res.status(402).json({ jsonrpc: '2.0', error: { code: -32402, message: 'Paid transaction carries no challenge id.' }, id: body.id });
+      }
+      {
         const { consumed } = await atomicConsumeChallenge(
           effectiveChallengeId,
           txHash,

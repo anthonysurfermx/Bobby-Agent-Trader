@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { waitUntil } from '@vercel/functions';
 import { tgSendMessage, tgSendVoiceAnalysis, tgSendPhoto } from './_lib/telegram.js';
@@ -44,7 +45,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[telegram-webhook] webhook secret not set for bot', bot.key, '— rejecting');
     return res.status(500).json({ error: 'Webhook not configured' });
   }
-  if (req.headers['x-telegram-bot-api-secret-token'] !== bot.webhookSecret) {
+  const provided = String(req.headers['x-telegram-bot-api-secret-token'] || '');
+  const providedDigest = createHash('sha256').update(provided).digest();
+  const expectedDigest = createHash('sha256').update(bot.webhookSecret).digest();
+  if (!provided || !timingSafeEqual(providedDigest, expectedDigest)) {
     return res.status(403).json({ error: 'Invalid webhook secret' });
   }
 

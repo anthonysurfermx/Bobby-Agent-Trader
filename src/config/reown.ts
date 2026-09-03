@@ -31,13 +31,16 @@ export const wagmiAdapter = new WagmiAdapter({
 const appUrl =
   typeof window !== 'undefined' && window.location.origin
     ? window.location.origin
-    : 'https://defimexico.org';
+    : 'https://bobbyprotocol.xyz';
 
+// What the wallet shows in its approval sheet. It MUST match the site the user
+// is on: a foreign name or icon in the prompt is the exact signal people are
+// taught to treat as phishing (security review 2026-09-03).
 export const metadata = {
-  name: 'DeFi México Hub',
-  description: 'El Hub #1 de DeFi en México',
+  name: 'Bobby Protocol',
+  description: 'Refuted before execution. Bobby never holds funds or keys.',
   url: appUrl,
-  icons: ['https://defimexico.org/icon.png'],
+  icons: [`${appUrl}/apple-touch-icon-bobby-v3.png`],
 };
 
 // 4. Create modal

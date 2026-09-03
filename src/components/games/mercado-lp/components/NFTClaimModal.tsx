@@ -92,6 +92,10 @@ export const NFTClaimModal = ({
       iframe.style.borderRadius = '12px';
       iframe.style.background = 'transparent';
       iframe.allow = 'clipboard-write; web-share';
+      // A srcdoc frame inherits OUR origin unless sandboxed: without this the
+      // vendor's script could read bobby_session:* tokens from localStorage.
+      // No allow-same-origin on purpose (security review 2026-09-03).
+      iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox');
 
       iframe.srcdoc = `
         <!DOCTYPE html>

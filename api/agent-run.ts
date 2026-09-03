@@ -963,6 +963,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (walletAddress && !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
     return res.status(400).json({ error: 'Invalid wallet address' });
   }
+  // A manual run that builds swap calldata for a wallet must be asked for by
+  // THAT wallet (session token), not by anyone naming an address (review 2026-09-03).
+  if (isManual && walletAddress && !hasOperatorAuth) {
+    const session = walletSessionFromRequest(req);
+    if (!session || session.wallet !== walletAddress.toLowerCase()) {
+      return res.status(401).json({ error: 'Sign in with this wallet to run a cycle for it' });
+    }
+  }
 
   // Manual runs stay public (UI "analyze" button) but each one costs
   // 3 LLM calls — cap them per IP and globally across all instances.

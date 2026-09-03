@@ -4,8 +4,11 @@
 // aigts-bot (dead project), DeFi México or Polymarket travels.
 //
 // Excluded on purpose and why:
-//   telegram_groups, telegram_subscriptions, telegram_activation_sessions,
-//   dm_conversations        — aigts-bot GTS group bot (dead); PII (Telegram ids)
+//   dm_conversations        — aigts-bot DM state (dead bot); PII (Telegram ids)
+//   (telegram_groups, telegram_subscriptions, telegram_activation_sessions were
+//   excluded at first as aigts-bot tables; Bobby's own api/telegram-access,
+//   telegram-deliver and telegram-webhook use them, so they were added back on
+//   2026-09-03 — pii-flagged, journaled like the rest)
 //   api_cache               — schema only (baseline already has it). Its 144
 //                             legacy rows are 140 rate-limit counters keyed by
 //                             the OLD salt (useless after rotation) plus 4
@@ -69,6 +72,10 @@ export const APPROVED_TABLES: TableSpec[] = [
   { name: 'agent_position_rechecks', pk: ['id'], fks: ['thread_id->forum_threads.id'] },
   { name: 'mcp_payment_receipts', pk: ['tx_hash'], fks: ['challenge_id->mcp_payment_challenges.challenge_id'], proofColumns: ['tx_hash', 'response_hash'] },
   { name: 'telegram_connections', pk: ['id'], fks: ['agent_profile_id->agent_profiles.id'], pii: true },
+  // ---- Bobby's Telegram group activation (NOT aigts-bot) ----
+  { name: 'telegram_groups', pk: ['id'], fks: [], pii: true },
+  { name: 'telegram_activation_sessions', pk: ['id'], fks: ['telegram_group_id->telegram_groups.telegram_group_id'], pii: true },
+  { name: 'telegram_subscriptions', pk: ['id'], fks: ['telegram_group_id->telegram_groups.telegram_group_id'], pii: true },
 ];
 
 /** Tables that must exist on the destination but carry no rows from legacy. */

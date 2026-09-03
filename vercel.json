@@ -1,50 +1,103 @@
 {
   "rewrites": [
-    { "source": "/bobby", "destination": "/agentic-world/bobby/challenge" },
-    { "source": "/api/polymarket-gamma/:path*", "destination": "https://gamma-api.polymarket.com/:path*" },
-    { "source": "/api/polymarket-data/:path*", "destination": "https://data-api.polymarket.com/:path*" },
-    { "source": "/api/polymarket-clob/:path*", "destination": "https://clob.polymarket.com/:path*" },
-    { "source": "/((?!api/|ai-judge-manifest\\.json$).*)", "destination": "/" }
+    {
+      "source": "/bobby",
+      "destination": "/agentic-world/bobby/challenge"
+    },
+    {
+      "source": "/api/polymarket-gamma/:path*",
+      "destination": "https://gamma-api.polymarket.com/:path*"
+    },
+    {
+      "source": "/api/polymarket-data/:path*",
+      "destination": "https://data-api.polymarket.com/:path*"
+    },
+    {
+      "source": "/api/polymarket-clob/:path*",
+      "destination": "https://clob.polymarket.com/:path*"
+    },
+    {
+      "source": "/((?!api/|ai-judge-manifest\\.json$).*)",
+      "destination": "/"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), geolocation=(), microphone=(self)" }
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), geolocation=(), microphone=(self), payment=(), usb=(), serial=(), bluetooth=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'"
+        },
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://www.tiktok.com https://app.bueno.art; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://defillama.com https://app.bueno.art https://www.tiktok.com https://verify.walletconnect.com https://verify.walletconnect.org https://secure.walletconnect.com https://secure.walletconnect.org; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'"
+        }
       ]
     },
     {
       "source": "/api/polymarket-data/v1/leaderboard",
       "headers": [
-        { "key": "Cache-Control", "value": "s-maxage=300, stale-while-revalidate=60" }
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=300, stale-while-revalidate=60"
+        }
       ]
     },
     {
       "source": "/api/polymarket-data/positions",
       "headers": [
-        { "key": "Cache-Control", "value": "s-maxage=120, stale-while-revalidate=60" }
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=120, stale-while-revalidate=60"
+        }
       ]
     },
     {
       "source": "/api/polymarket-gamma/:path*",
       "headers": [
-        { "key": "Cache-Control", "value": "s-maxage=300, stale-while-revalidate=60" }
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=300, stale-while-revalidate=60"
+        }
       ]
     },
     {
       "source": "/api/discover-markets",
       "headers": [
-        { "key": "Cache-Control", "value": "s-maxage=60, stale-while-revalidate=30" }
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=60, stale-while-revalidate=30"
+        }
       ]
     },
     {
       "source": "/api/scan-traders",
       "headers": [
-        { "key": "Cache-Control", "value": "s-maxage=120, stale-while-revalidate=60" }
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=120, stale-while-revalidate=60"
+        }
       ]
     }
   ],
@@ -126,7 +179,7 @@
       "maxDuration": 10,
       "memory": 256
     },
-"api/xlayer-record.ts": {
+    "api/xlayer-record.ts": {
       "maxDuration": 30,
       "memory": 256
     },
