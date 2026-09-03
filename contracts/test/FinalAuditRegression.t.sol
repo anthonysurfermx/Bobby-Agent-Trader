@@ -15,6 +15,12 @@ contract FinalAuditRegressionTest is Test {
     address internal constant AGENT = address(0xA11CE);
     address internal constant POSTER = address(0xB0B);
     address internal constant RESOLVER = address(0xBEEF);
+    /// @dev the constructor copies the initial minBounty into the challenge bond; a constant keeps vm.prank on the real call
+    uint256 internal constant BOND = 0.001 ether;
+
+    function setUp() public {
+        vm.deal(AGENT, 1 ether); vm.deal(POSTER, 1 ether); vm.deal(RESOLVER, 1 ether);
+    }
 
     function _registry() internal returns (HardnessRegistry registry) {
         address[] memory resolvers = new address[](1);
@@ -109,7 +115,7 @@ contract FinalAuditRegressionTest is Test {
 
         vm.prank(RESOLVER);
         vm.expectRevert("Resolver cannot challenge");
-        bounties.submitChallenge(bountyId, keccak256("resolver-evidence"));
+        bounties.submitChallenge{value: BOND}(bountyId, keccak256("resolver-evidence"));
 
         // Nothing changed hands; the poster can still reclaim after expiry.
         assertEq(bounties.pendingWithdrawals(RESOLVER), 0);
@@ -126,14 +132,14 @@ contract FinalAuditRegressionTest is Test {
     /// name itself (or the owner) as the winner.
     function test_P1_resolverCannotBeNamedWinner() public {
         BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
-        address challenger = makeAddr("challenger");
+        address challenger = makeAddr("challenger"); vm.deal(challenger, 1 ether);
         vm.deal(POSTER, 1 ether);
         vm.prank(POSTER);
         uint256 bountyId = bounties.postBounty{value: 0.1 ether}(
             "thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours
         );
         vm.prank(challenger);
-        bounties.submitChallenge(bountyId, keccak256("evidence"));
+        bounties.submitChallenge{value: BOND}(bountyId, keccak256("evidence"));
 
         vm.prank(RESOLVER);
         vm.expectRevert("Resolver cannot win");
@@ -145,12 +151,12 @@ contract FinalAuditRegressionTest is Test {
     /// the poster disputes inside the window; the Safe refunds. The shill gets 0.
     function test_R2_auxiliaryEoaCannotDrain_posterDisputes() public {
         BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
-        address shill = makeAddr("shill");
+        address shill = makeAddr("shill"); vm.deal(shill, 1 ether);
         vm.deal(POSTER, 1 ether);
         vm.prank(POSTER);
         uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
         vm.prank(shill);
-        bounties.submitChallenge(id, keccak256("junk"));
+        bounties.submitChallenge{value: BOND}(id, keccak256("junk"));
         vm.prank(RESOLVER);
         bounties.resolveBounty(id, shill);
 
@@ -163,11 +169,11 @@ contract FinalAuditRegressionTest is Test {
         bounties.finalizeResolution(id);
 
         vm.prank(POSTER);
-        bounties.disputeResolution(id);
+        bounties.disputeResolution{value: BOND}(id);
         bounties.settleDispute(id, address(0)); // owner = this test contract (the Safe on mainnet)
 
-        assertEq(bounties.pendingWithdrawals(shill), 0);
-        assertEq(bounties.pendingWithdrawals(POSTER), 0.1 ether);
+        assertEq(bounties.pendingWithdrawals(shill), bounties.challengeBond(), 'nothing was won: the challenge bond comes back, the reward never does');
+        assertEq(bounties.pendingWithdrawals(POSTER), 0.1 ether + bounties.challengeBond(), 'reward refunded + dispute bond back (the dispute was upheld)');
         // and the shill can never be finalized afterwards
         vm.warp(block.timestamp + 30 days);
         vm.expectRevert("Not pending");
@@ -178,36 +184,37 @@ contract FinalAuditRegressionTest is Test {
     /// the pot to the honest challenger instead.
     function test_R2_rivalChallengerDisputes_ownerPaysHonestOne() public {
         BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
-        address shill = makeAddr("shill"); address honest = makeAddr("honest");
+        address shill = makeAddr("shill"); vm.deal(shill, 1 ether); address honest = makeAddr("honest"); vm.deal(honest, 1 ether);
         vm.deal(POSTER, 1 ether);
         vm.prank(POSTER);
         uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
-        vm.prank(honest); bounties.submitChallenge(id, keccak256("real evidence"));
-        vm.prank(shill);  bounties.submitChallenge(id, keccak256("junk"));
+        vm.prank(honest); bounties.submitChallenge{value: BOND}(id, keccak256("real evidence"));
+        vm.prank(shill);  bounties.submitChallenge{value: BOND}(id, keccak256("junk"));
         vm.prank(RESOLVER); bounties.resolveBounty(id, shill);
-        vm.prank(honest); bounties.disputeResolution(id);
+        vm.prank(honest); bounties.disputeResolution{value: BOND}(id);
         bounties.settleDispute(id, honest);
-        assertEq(bounties.pendingWithdrawals(honest), 0.1 ether);
-        assertEq(bounties.pendingWithdrawals(shill), 0);
+        assertEq(bounties.pendingWithdrawals(honest), 0.1 ether + 2 * uint256(bounties.challengeBond()), 'reward + own challenge bond + dispute bond back');
+        assertEq(bounties.pendingWithdrawals(shill), 0, 'the shill forfeits its bond');
+        assertEq(bounties.pendingWithdrawals(POSTER), bounties.challengeBond(), 'the forfeited bond goes to the poster');
     }
 
     /// #2 honest path: no dispute → the winner is paid after the window, by anyone.
     function test_R2_undisputedResolutionPaysAfterWindow() public {
         BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
-        address honest = makeAddr("honest");
+        address honest = makeAddr("honest"); vm.deal(honest, 1 ether);
         vm.deal(POSTER, 1 ether);
         vm.prank(POSTER);
         uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
-        vm.prank(honest); bounties.submitChallenge(id, keccak256("real evidence"));
+        vm.prank(honest); bounties.submitChallenge{value: BOND}(id, keccak256("real evidence"));
         vm.prank(RESOLVER); bounties.resolveBounty(id, honest);
         vm.warp(block.timestamp + bounties.disputeWindow());
         vm.prank(makeAddr("anyone"));
         bounties.finalizeResolution(id);
-        assertEq(bounties.pendingWithdrawals(honest), 0.1 ether);
+        assertEq(bounties.pendingWithdrawals(honest), 0.1 ether + bounties.challengeBond());
         // the poster cannot dispute after the fact
         vm.prank(POSTER);
         vm.expectRevert("Not pending");
-        bounties.disputeResolution(id);
+        bounties.disputeResolution{value: BOND}(id);
     }
 
     /// #2: the proposed winner cannot dispute (it would only delay its own payout,
@@ -215,14 +222,15 @@ contract FinalAuditRegressionTest is Test {
     /// and a stranger cannot dispute.
     function test_R2_onlyPartiesDispute() public {
         BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
-        address honest = makeAddr("honest");
+        address honest = makeAddr("honest"); vm.deal(honest, 1 ether);
         vm.deal(POSTER, 1 ether);
         vm.prank(POSTER);
         uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
-        vm.prank(honest); bounties.submitChallenge(id, keccak256("e"));
+        vm.prank(honest); bounties.submitChallenge{value: BOND}(id, keccak256("e"));
         vm.prank(RESOLVER); bounties.resolveBounty(id, honest);
-        vm.prank(honest); vm.expectRevert("Winner cannot dispute"); bounties.disputeResolution(id);
-        vm.prank(makeAddr("stranger")); vm.expectRevert("Not a party"); bounties.disputeResolution(id);
+        vm.prank(honest); vm.expectRevert("Winner cannot dispute"); bounties.disputeResolution{value: BOND}(id);
+        address stranger = makeAddr("stranger"); vm.deal(stranger, 1 ether);
+        vm.prank(stranger); vm.expectRevert("Not a party"); bounties.disputeResolution{value: BOND}(id);
     }
 
     /// #2 on HardnessRegistry: resolvers cannot contest, quorum only proposes,
@@ -231,7 +239,7 @@ contract FinalAuditRegressionTest is Test {
         address[] memory resolvers = new address[](2);
         resolvers[0] = RESOLVER; resolvers[1] = makeAddr("resolver2");
         HardnessRegistry registry = new HardnessRegistry(resolvers, 2, 0.0001 ether, 0.01 ether, 0.001 ether);
-        address honest = makeAddr("honest"); address shill = makeAddr("shill");
+        address honest = makeAddr("honest"); vm.deal(honest, 1 ether); address shill = makeAddr("shill"); vm.deal(shill, 1 ether);
         vm.deal(POSTER, 1 ether);
         vm.prank(POSTER);
         uint256 id = registry.postBounty{value: 0.01 ether}("thread", HardnessRegistry.BountyDimension.DATA_INTEGRITY, 1 days);
@@ -239,10 +247,10 @@ contract FinalAuditRegressionTest is Test {
         // a resolver cannot challenge at all
         vm.prank(RESOLVER);
         vm.expectRevert(HardnessRegistry.NotAuthorized.selector);
-        registry.submitChallenge(id, keccak256("resolver junk"));
+        registry.submitChallenge{value: BOND}(id, keccak256("resolver junk"));
 
-        vm.prank(honest); registry.submitChallenge(id, keccak256("real"));
-        vm.prank(shill);  registry.submitChallenge(id, keccak256("junk"));
+        vm.prank(honest); registry.submitChallenge{value: BOND}(id, keccak256("real"));
+        vm.prank(shill);  registry.submitChallenge{value: BOND}(id, keccak256("junk"));
         vm.prank(resolvers[0]); registry.approveBountyResolution(id, shill);
         vm.prank(resolvers[1]); registry.approveBountyResolution(id, shill);
 
@@ -252,10 +260,11 @@ contract FinalAuditRegressionTest is Test {
         vm.expectRevert(HardnessRegistry.TooSoon.selector);
         registry.finalizeBountyResolution(id);
 
-        vm.prank(POSTER); registry.disputeBountyResolution(id);
+        vm.prank(POSTER); registry.disputeBountyResolution{value: BOND}(id);
         registry.settleBountyDispute(id, honest);
-        assertEq(registry.pendingWithdrawals(honest), 0.01 ether);
+        assertEq(registry.pendingWithdrawals(honest), 0.01 ether + registry.bountyChallengeBond());
         assertEq(registry.pendingWithdrawals(shill), 0);
+        assertEq(registry.pendingWithdrawals(POSTER), 2 * uint256(registry.bountyChallengeBond()), 'shill bond forfeited to the poster + own dispute bond back');
     }
 
     /// #2 on HardnessRegistry: a resolver cannot be named winner even by a quorum.
@@ -266,7 +275,7 @@ contract FinalAuditRegressionTest is Test {
         vm.deal(POSTER, 1 ether);
         vm.prank(POSTER);
         uint256 id = registry.postBounty{value: 0.01 ether}("thread", HardnessRegistry.BountyDimension.DATA_INTEGRITY, 1 days);
-        vm.prank(makeAddr("honest")); registry.submitChallenge(id, keccak256("real"));
+        address honest2 = makeAddr("honest"); vm.deal(honest2, 1 ether); vm.prank(honest2); registry.submitChallenge{value: BOND}(id, keccak256("real"));
         vm.prank(RESOLVER);
         vm.expectRevert(HardnessRegistry.NotAuthorized.selector);
         registry.approveBountyResolution(id, RESOLVER);
@@ -300,4 +309,138 @@ contract FinalAuditRegressionTest is Test {
         registry.commitPrediction(keccak256("g6"), "BTC-USD", 50, 100e8, 0, 110e8);     // stop above entry alone → short: fine
         vm.stopPrank();
     }
+    // ======================= Codex round 3 =======================
+
+    /// P1: the Safe stops a shill proposal with the poster asleep — no bond, no other party.
+    function test_R3_ownerCanDisputeWithoutPoster() public {
+        BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
+        address shill = makeAddr("shill"); vm.deal(shill, 1 ether);
+        vm.prank(POSTER);
+        uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
+        vm.prank(shill); bounties.submitChallenge{value: BOND}(id, keccak256("junk"));
+        vm.prank(RESOLVER); bounties.resolveBounty(id, shill);
+        bounties.disputeResolution(id);              // owner = this contract, value 0
+        bounties.settleDispute(id, address(0));
+        assertEq(bounties.pendingWithdrawals(shill), bounties.challengeBond(), 'bond back, reward never');
+        assertEq(bounties.pendingWithdrawals(POSTER), 0.1 ether);
+        vm.warp(block.timestamp + 30 days);
+        vm.expectRevert("Not pending");
+        bounties.finalizeResolution(id);
+    }
+
+    /// P1: a frivolous dispute costs the disputer its bond, paid to the rightful winner.
+    function test_R3_frivolousDisputeForfeitsBond() public {
+        BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
+        address honest = makeAddr("honest"); vm.deal(honest, 1 ether);
+        vm.prank(POSTER);
+        uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
+        vm.prank(honest); bounties.submitChallenge{value: BOND}(id, keccak256("real"));
+        vm.prank(RESOLVER); bounties.resolveBounty(id, honest);
+        vm.prank(POSTER); bounties.disputeResolution{value: BOND}(id);
+        bounties.settleDispute(id, honest);          // owner confirms the proposal
+        assertEq(bounties.pendingWithdrawals(honest), 0.1 ether + 2 * uint256(bounties.challengeBond()), 'reward + own bond + the poster\'s forfeited dispute bond');
+        assertEq(bounties.pendingWithdrawals(POSTER), 0);
+    }
+
+    /// P1: an unsettled dispute is not a permanent lock — after the timeout anyone
+    /// returns the escrow to the poster and every bond to its owner.
+    function test_R3_stalledDisputeTimesOutToPoster() public {
+        BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
+        address honest = makeAddr("honest"); vm.deal(honest, 1 ether);
+        vm.prank(POSTER);
+        uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
+        vm.prank(honest); bounties.submitChallenge{value: BOND}(id, keccak256("real"));
+        vm.prank(RESOLVER); bounties.resolveBounty(id, honest);
+        vm.prank(POSTER); bounties.disputeResolution{value: BOND}(id);
+        vm.expectRevert("Settlement timeout not reached");
+        bounties.resolveStalledDispute(id);
+        vm.warp(block.timestamp + bounties.disputeSettlementTimeout());
+        vm.prank(makeAddr("anyone"));
+        bounties.resolveStalledDispute(id);
+        assertEq(bounties.pendingWithdrawals(POSTER), 0.1 ether + bounties.challengeBond(), 'escrow + dispute bond back');
+        assertEq(bounties.pendingWithdrawals(honest), bounties.challengeBond(), 'challenge bond back; nobody profits from the stall');
+        vm.expectRevert("Not disputed");
+        bounties.settleDispute(id, honest);
+    }
+
+    /// P1: sybil challengers pay a bond each and forfeit all of them to the poster.
+    function test_R3_sybilChallengesForfeitToPoster() public {
+        BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
+        address honest = makeAddr("honest"); vm.deal(honest, 1 ether);
+        vm.prank(POSTER);
+        uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
+        for (uint256 i = 0; i < 3; i++) {
+            address sybil = makeAddr(string(abi.encodePacked("sybil", i))); vm.deal(sybil, 1 ether);
+            vm.prank(sybil); bounties.submitChallenge{value: BOND}(id, keccak256(abi.encodePacked("junk", i)));
+        }
+        vm.prank(honest); bounties.submitChallenge{value: BOND}(id, keccak256("real"));
+        vm.prank(RESOLVER); bounties.resolveBounty(id, honest);
+        vm.warp(block.timestamp + bounties.disputeWindow());
+        bounties.finalizeResolution(id);
+        assertEq(bounties.pendingWithdrawals(POSTER), 3 * uint256(bounties.challengeBond()), 'three forfeited bonds');
+        assertEq(bounties.pendingWithdrawals(honest), 0.1 ether + bounties.challengeBond());
+    }
+
+    /// P2: the deadline is snapshotted — shortening the window later does not unlock a pending proposal.
+    function test_R3_deadlineSnapshotIgnoresLaterWindowChange() public {
+        BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
+        address honest = makeAddr("honest"); vm.deal(honest, 1 ether);
+        vm.prank(POSTER);
+        uint256 id = bounties.postBounty{value: 0.1 ether}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
+        vm.prank(honest); bounties.submitChallenge{value: BOND}(id, keccak256("real"));
+        vm.prank(RESOLVER); bounties.resolveBounty(id, honest);
+        uint64 snapshot = bounties.resolutionFinalizeAfter(id);
+        bounties.setDisputeWindow(1 days);          // owner shortens AFTER the proposal
+        vm.warp(block.timestamp + 1 days + 1);
+        vm.expectRevert("Dispute window open");
+        bounties.finalizeResolution(id);
+        vm.warp(snapshot);
+        bounties.finalizeResolution(id);
+    }
+
+    /// Codex r3: pull-payment isolates a receiver that reverts — the poster contract
+    /// cannot take its refund, but nothing else is locked.
+    function test_R3_revertingPosterDoesNotLockOthers() public {
+        BobbyAdversarialBounties bounties = new BobbyAdversarialBounties(RESOLVER, 0.0001 ether, 0.001 ether);
+        RevertingPoster rp = new RevertingPoster();
+        vm.deal(address(rp), 1 ether);
+        address honest = makeAddr("honest"); vm.deal(honest, 1 ether);
+        uint256 id = rp.post{value: 0.1 ether}(bounties);
+        vm.prank(honest); bounties.submitChallenge{value: BOND}(id, keccak256("real"));
+        vm.prank(RESOLVER); bounties.resolveBounty(id, honest);
+        bounties.disputeResolution(id);              // owner disputes
+        bounties.settleDispute(id, address(0));       // refund to the reverting poster
+        assertEq(bounties.pendingWithdrawals(address(rp)), 0.1 ether, 'credited, not pushed');
+        vm.expectRevert("Transfer failed");
+        rp.pull(bounties);
+        vm.prank(honest); bounties.withdraw();        // the honest challenger is unaffected
+        assertEq(bounties.pendingWithdrawals(honest), 0);
+    }
+
+    /// P1 on HardnessRegistry: owner dispute + stalled-dispute timeout.
+    function test_R3_registryOwnerDisputeAndTimeout() public {
+        address[] memory resolvers = new address[](1);
+        resolvers[0] = RESOLVER;
+        HardnessRegistry registry = new HardnessRegistry(resolvers, 1, 0.0001 ether, 0.01 ether, 0.001 ether);
+        address shill = makeAddr("shill"); vm.deal(shill, 1 ether);
+        vm.prank(POSTER);
+        uint256 id = registry.postBounty{value: 0.01 ether}("thread", HardnessRegistry.BountyDimension.DATA_INTEGRITY, 1 days);
+        vm.prank(shill); registry.submitChallenge{value: BOND}(id, keccak256("junk"));
+        vm.prank(RESOLVER); registry.approveBountyResolution(id, shill);
+        registry.disputeBountyResolution(id);         // owner, no bond
+        vm.expectRevert(HardnessRegistry.TooSoon.selector);
+        registry.resolveStalledBountyDispute(id);
+        vm.warp(block.timestamp + registry.bountyDisputeSettlementTimeout());
+        registry.resolveStalledBountyDispute(id);
+        assertEq(registry.pendingWithdrawals(POSTER), 0.01 ether);
+        assertEq(registry.pendingWithdrawals(shill), registry.bountyChallengeBond());
+    }
+}
+
+contract RevertingPoster {
+    function post(BobbyAdversarialBounties b) external payable returns (uint256) {
+        return b.postBounty{value: msg.value}("thread", BobbyAdversarialBounties.Dimension.DATA_INTEGRITY, 1 hours);
+    }
+    function pull(BobbyAdversarialBounties b) external { b.withdraw(); }
+    receive() external payable { revert("no"); }
 }

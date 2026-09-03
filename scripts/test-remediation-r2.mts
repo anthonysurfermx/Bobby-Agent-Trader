@@ -35,7 +35,17 @@ globalThis.fetch = (async (input: any, init?: any) => {
   if (url.includes('api.openai.com')) return json(openai);
   if (url.includes('okx.com/api/v5/market/ticker')) return json({ code: '0', data: [{ last: '125' }] }); // long from 100 → target 120 hit
   if (url.includes('/api/protocol-record')) return json({ ok: true });
-  if (url.includes('/rest/v1/forum_threads')) return method === 'GET' ? json(threadRows()) : json({});
+  if (url.includes('/rest/v1/forum_threads')) {
+    if (method !== 'GET') return json({});
+    // Apply the symbol filter like PostgREST would: eq is case-sensitive, ilike (no wildcard) is not.
+    const q = new URL(url).searchParams;
+    const eq = q.get('symbol')?.startsWith('eq.') ? q.get('symbol')!.slice(3) : null;
+    const il = q.get('symbol')?.startsWith('ilike.') ? q.get('symbol')!.slice(6) : null;
+    let rows = threadRows() as Array<{ symbol?: string }>;
+    if (eq !== null) rows = rows.filter((r) => r.symbol === eq);
+    if (il !== null) rows = rows.filter((r) => (r.symbol || '').toLowerCase() === il.toLowerCase());
+    return json(rows);
+  }
   if (url.includes('/rest/v1/forum_posts')) return json(posts);
   if (url.includes('/api/bobby-protocol-stats')) return json({ error: 'unavailable in test' }, 503); // checkpoint treats !ok as null
   return json([]); // agent_events / agent_cycles / memory_objects / api_cache / stats → empty, honest
@@ -171,12 +181,14 @@ await check('C-03 mcp-http bobby_recommend refuses `symbol=NVDAc&select=id`', as
   assert.ok(body?.error?.message?.includes('symbol must match'), JSON.stringify(state.body));
   assert.equal(urlsSince(n).filter((u) => u.includes('forum_threads')).length, 0, 'no thread query was sent');
 });
-await check('C-03 mcp-http honest symbol is upper-cased, encoded and scoped', async () => {
-  const n = since(); const { res } = recorder();
+await check('C-03 / r3 P2: `nvdac` finds the mixed-case NVDAc thread (ilike, no upper-casing)', async () => {
+  const n = since(); const { res, state } = recorder();
   await mcpHttp.default(rpc('bobby_recommend', { symbol: 'nvdac' }), res);
   const reads = urlsSince(n).filter((u) => u.includes('forum_threads'));
   assert.ok(reads.length >= 1);
-  for (const u of reads) { assert.ok(u.includes('symbol=eq.NVDAC'), u); assert.ok(u.includes('scope=eq.public'), u); }
+  for (const u of reads) { assert.ok(u.includes('symbol=ilike.nvdac'), u); assert.ok(!u.includes('NVDAC'), u); assert.ok(u.includes('scope=eq.public'), u); }
+  const text = (state.body as { result?: { content?: Array<{ text?: string }> } })?.result?.content?.[0]?.text || '';
+  assert.ok(text.includes('NVDAc'), `the tool answered with the thread, not an empty lookup: ${text.slice(0, 120)}`);
 });
 await check('C-03 mcp-http bobby_brief takes the same guard', async () => {
   const n = since(); const { res, state } = recorder();
@@ -208,29 +220,54 @@ await check('C-01 forum-resolve: private cycle resolved off-chain only, public o
 });
 
 // ---------- Codex r2 #1: repo-wide — every forum_threads read on a public path is pinned ----------
-await check('C-01 repo-wide: no unscoped forum_threads read outside the allow-list', async () => {
+await check('C-01 repo-wide (r3): every forum_threads READ in any call form is scoped', async () => {
   const { readdirSync } = await import('node:fs');
   const root = new URL('../api/', import.meta.url);
   const files = [...readdirSync(root).filter((f) => f.endsWith('.ts')).map((f) => `api/${f}`), ...readdirSync(new URL('_lib/', root)).filter((f) => f.endsWith('.ts')).map((f) => `api/_lib/${f}`)];
-  // Reads that legitimately touch private rows, each with its reason:
-  const allow: Array<[RegExp, string]> = [
-    [/^api\/my-threads\.ts$/, 'owner-scoped: filters owner_wallet from the session'],
-    [/^api\/user-cycle\.ts$/, 'writes the private thread for its owner'],
-    [/^api\/agent-run\.ts$/, 'internal cycle, own thread'],
+  // Reads that legitimately touch private rows — file + a reason. Anything else must be scoped.
+  const allow: Array<[string, RegExp, string]> = [
+    ['api/my-threads.ts', /forum_threads\?\$\{filter\}/, 'owner-scoped: filter is owner_wallet from the session'],
+    ['api/forum-resolve.ts', /forum_threads\?resolution=eq\.pending&entry_price/, 'the sweep resolves private cycles for their owner; on-chain gated on scope'],
   ];
+  const WRITER = /method:\s*'(POST|PATCH|DELETE)'|sbInsert\(|sbPatch\(|\.insert\(|\.update\(|\.delete\(/;
   const offenders: string[] = [];
   for (const f of files) {
-    const src = await readFile(new URL(`../${f}`, import.meta.url), 'utf8');
-    for (const m of src.matchAll(/forum_threads\?[^`'"\n]*/g)) {
-      const lit = m[0];
-      if (lit.includes('scope=eq.public')) continue;
-      if (/forum_threads\?id=eq\./.test(lit)) continue;                    // single row by id: the caller already holds the id
-      if (f === 'api/forum-resolve.ts' && lit.startsWith('forum_threads?resolution=eq.pending')) continue; // the sweep: on-chain gated on scope
-      if (allow.some(([re]) => re.test(f))) continue;
-      offenders.push(`${f}: ${lit.slice(0, 90)}`);
+    const lines = (await readFile(new URL(`../${f}`, import.meta.url), 'utf8')).split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].replace(/\/\/.*$/, '');                                          // drop trailing comments
+      if (!line.includes('forum_threads')) continue;
+      const t = line.trim();
+      if (t.startsWith('*') || t.startsWith('/*')) continue;                                  // block comments
+      if (/forum_threads\.(id|trigger_data)|forum_threads\/forum_posts|forum_threads insert/.test(line)) continue; // prose / error strings
+      const window = lines.slice(i, i + 4).join('\n');                                       // helper calls put the query on the next line
+      if (WRITER.test(window)) continue;                                                       // inserts / patches are not reads
+      if (window.includes('scope=eq.public')) continue;
+      if (/forum_threads\?id=eq\./.test(window) || /`id=eq\.\$\{/.test(window)) continue;       // single row by id
+      if (allow.some(([file, re]) => file === f && re.test(window))) continue;
+      offenders.push(`${f}:${i + 1}: ${t.slice(0, 100)}`);
     }
   }
   assert.deepEqual(offenders, [], `unscoped forum_threads reads:\n  ${offenders.join('\n  ')}`);
+});
+
+// ---------- Codex r3 P2: hardness-test refuses incoherent levels before spending model calls ----------
+await check('r3 P2 hardness-test: long with stop above entry → 400, zero fetches', async () => {
+  const { default: hardnessTest } = await import('../api/hardness-test.js');
+  const n = since(); const { res, state } = recorder();
+  await hardnessTest(req('POST', {}, { prediction: { symbol: 'BTC', direction: 'long', entry: 100, target: 110, stop: 120, thesis: 'x' }, commitOnchain: true }, INTERNAL), res);
+  assert.equal(state.status, 400, JSON.stringify(state.body));
+  // the persistent rate limiter may touch api_cache; what must NOT happen is any model or chain call
+  const spent = calls.slice(n).filter((c) => c.url.includes('api.openai.com') || c.url.includes('/api/protocol-record') || c.url.includes('rpc'));
+  assert.deepEqual(spent, [], 'no model call, no on-chain call for a rejected geometry');
+});
+await check('r3 P2 hardness-test: levelGeometryError is the same rule the registry enforces', async () => {
+  const { levelGeometryError } = await import('../api/hardness-test.js');
+  assert.equal(levelGeometryError('long', 100, 110, 90), null);
+  assert.equal(levelGeometryError('short', 100, 90, 110), null);
+  assert.match(levelGeometryError('long', 100, 110, 120) || '', /target > entry > stop/);
+  assert.match(levelGeometryError('short', 100, 90, 80) || '', /target < entry < stop/);
+  assert.match(levelGeometryError('long', 100, 100, 90) || '', /target > entry > stop/);
+  assert.match(levelGeometryError('sideways', 100, 110, 90) || '', /long or short/);
 });
 
 console.log(`remediation-r2: ${passed}/${passed} checks passed`);

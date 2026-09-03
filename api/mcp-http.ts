@@ -86,7 +86,10 @@ function symbolFilterFor(raw: unknown): string {
   if (typeof raw !== 'string' || !/^[A-Za-z0-9._-]{1,32}$/.test(raw)) {
     throw new Error('symbol must match [A-Za-z0-9._-]{1,32}');
   }
-  return `&symbol=eq.${encodeURIComponent(raw.toUpperCase())}`;
+  // Codex r3 P2: `eq` is case-sensitive and stock threads are mixed-case
+  // ("NVDAc"), so upper-casing made the lookup empty. `ilike` with no wildcard
+  // is a case-insensitive equality — the allow-list above excludes % and _.
+  return `&symbol=ilike.${encodeURIComponent(raw)}`;
 }
 
 async function executeTool(name: string, args: Record<string, any>): Promise<{ content: Array<{ type: string; text: string }> }> {

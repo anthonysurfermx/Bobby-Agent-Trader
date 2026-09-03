@@ -163,13 +163,15 @@ function computeOverallScore(dimensions: Record<string, number>): number {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  // Codex round-2 #3: a public POST here ran gpt-4o for free and bypassed the
-  // MCP fee on bobby_judge. Internal callers only (cron, mcp-http after payment).
+  // Codex round-2 #3 / round-3 P2: a public POST here ran gpt-4o for free and
+  // bypassed the MCP fee on bobby_judge. Internal callers only — and checked
+  // BEFORE the dynamic control source, so an anonymous caller triggers no
+  // Supabase read and learns nothing about the control record.
   if (!requireInternalAuth(req, res)) return;
+  if (!(await requireWritesOpen(res))) return;
   if (!await enforcePublicRateLimit(req, res, 'judge-mode', 10, 600)) return;
 
   if (!OPENAI_API_KEY) {

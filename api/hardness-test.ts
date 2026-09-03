@@ -5,6 +5,15 @@ import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-securi
 
 export const config = { maxDuration: 90 };
 
+/** Long must be target > entry > stop; short must be target < entry < stop. */
+export function levelGeometryError(direction: string, entry: number, target: number, stop: number): string | null {
+  if (![entry, target, stop].every((v) => Number.isFinite(v) && v > 0)) return 'entry, target and stop must be positive numbers';
+  const d = String(direction).toLowerCase();
+  if (d === 'long') return target > entry && entry > stop ? null : 'long requires target > entry > stop';
+  if (d === 'short') return target < entry && entry < stop ? null : 'short requires target < entry < stop';
+  return 'direction must be long or short';
+}
+
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 interface HardnessTestRequest {
@@ -64,6 +73,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const prices = [prediction.entry, prediction.target, prediction.stop].map(Number);
+  // Codex r3 P2: the registry now refuses incoherent levels at commit; refuse
+  // them here first, so a bad request never spends three model calls.
+  const geometryError = levelGeometryError(prediction.direction, prices[0], prices[1], prices[2]);
+  if (geometryError) return res.status(400).json({ error: geometryError });
   if (!/^[A-Z0-9.-]{1,20}$/i.test(prediction.symbol)
     || !['long', 'short'].includes(prediction.direction)
     || prices.some((value) => !Number.isFinite(value) || value <= 0)
@@ -143,6 +156,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // and writing chain state is an explicitly authenticated operation.
     const shouldCommitOnchain = body.commitOnchain === true && isInternalRequest(req);
     if (shouldCommitOnchain && isHardnessRegistryConfigured()) {
+      // Codex r3 P2: re-validate after the CIO moved the levels — an adjusted
+      // stop on the wrong side of the entry would revert on-chain.
+      const adjustedError = levelGeometryError(prediction.direction, Number(cio.adjusted_entry || prediction.entry), Number(cio.adjusted_target || prediction.target), Number(cio.adjusted_stop || prediction.stop));
+      if (adjustedError) {
+        onChainProof = { enabled: false, error: `CIO-adjusted levels rejected: ${adjustedError}` };
+      } else {
       const proof = await recordHardnessActivity({
         threadId: debateId,
         symbol: prediction.symbol,
@@ -154,13 +173,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         shouldCommitPrediction: true,
       });
 
-      if (proof) {
+      if (proof && proof.commitTxHash) {
         onChainProof = {
           enabled: true,
           predictionHash: proof.predictionHash,
-          commitTxHash: proof.commitTxHash || null,
+          commitTxHash: proof.commitTxHash,
           signalTxHash: proof.signalTxHash || null,
         };
+      } else {
+        // Codex r3 P2: never answer enabled:true with commitTxHash:null.
+        onChainProof = { enabled: false, error: proof?.commitError || 'commit did not land', predictionHash: proof?.predictionHash || null };
+      }
       }
     }
 

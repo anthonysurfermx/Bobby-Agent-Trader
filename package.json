@@ -32,6 +32,7 @@
     "test:swap-ledger-pg": "tsx scripts/test-swap-ledger-pg.mts",
     "test:remediation-r2": "tsx scripts/test-remediation-r2.mts",
     "test:rls-lockdown-pg": "tsx scripts/test-rls-lockdown-pg.mts",
+    "test:hardness-abi-anvil": "tsx scripts/test-hardness-abi-anvil.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts"
   },
   "dependencies": {

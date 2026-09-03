@@ -131,7 +131,10 @@ After the redeploy, bounty resolution is optimistic: a resolved bounty sits in
 `PENDING_RESOLUTION` for `disputeWindow` (2 days) and someone must call
 `finalizeResolution(id)` / `finalizeBountyResolution(id)` — permissionless, so
 the winner can, but plan a cron. A `DISPUTED` bounty waits for a Safe
-transaction (`settleDispute` / `settleBountyDispute`).
+transaction (`settleDispute` / `settleBountyDispute`) — or, after
+`disputeSettlementTimeout` (30 days), anyone can return the escrow to the poster.
+Challenges and party disputes post a bond (`challengeBond`, initially the minimum
+bounty); the Safe disputes without one.
 
 ## Rollback
 

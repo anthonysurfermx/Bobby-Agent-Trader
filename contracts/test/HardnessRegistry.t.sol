@@ -17,6 +17,8 @@ contract HardnessRegistryTest is Test {
     address challenger1 = address(0xD1);
     address challenger2 = address(0xD2);
     address outsider = address(0xE1);
+    /// @dev the constructor copies the initial minBounty into the challenge bond; a constant keeps vm.prank on the real call
+    uint256 internal constant BOND = 0.001 ether;
 
     string constant THREAD_ID = "thread-123";
 
@@ -389,7 +391,7 @@ contract HardnessRegistryTest is Test {
         uint256 bountyId = _postDefaultBounty();
 
         vm.prank(challenger1);
-        registry.submitChallenge(bountyId, _evidence("e1"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e1"));
 
         HardnessRegistry.Bounty memory bounty = registry.getBounty(bountyId);
         assertEq(uint8(bounty.status), uint8(HardnessRegistry.BountyStatus.CHALLENGED));
@@ -401,7 +403,7 @@ contract HardnessRegistryTest is Test {
 
         vm.prank(user);
         vm.expectRevert(HardnessRegistry.NotAuthorized.selector);
-        registry.submitChallenge(bountyId, _evidence("e1"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e1"));
     }
 
     function test_submitChallenge_revertsAfterWindow() public {
@@ -410,14 +412,14 @@ contract HardnessRegistryTest is Test {
 
         vm.prank(challenger1);
         vm.expectRevert(HardnessRegistry.WindowExpired.selector);
-        registry.submitChallenge(bountyId, _evidence("late"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("late"));
     }
 
     function test_approveBountyResolution_requiresThreshold() public {
         uint256 bountyId = _postDefaultBounty();
 
         vm.prank(challenger1);
-        registry.submitChallenge(bountyId, _evidence("e1"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e1"));
 
         vm.prank(resolver1);
         registry.approveBountyResolution(bountyId, challenger1);
@@ -439,14 +441,14 @@ contract HardnessRegistryTest is Test {
         registry.finalizeBountyResolution(bountyId);
         bounty = registry.getBounty(bountyId);
         assertEq(uint8(bounty.status), uint8(HardnessRegistry.BountyStatus.RESOLVED));
-        assertEq(registry.pendingWithdrawals(challenger1), 0.01 ether);
+        assertEq(registry.pendingWithdrawals(challenger1), 0.01 ether + registry.bountyChallengeBond()); // reward + own bond back
     }
 
     function test_approveBountyResolution_revertsForNonResolver() public {
         uint256 bountyId = _postDefaultBounty();
 
         vm.prank(challenger1);
-        registry.submitChallenge(bountyId, _evidence("e1"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e1"));
 
         vm.prank(outsider);
         vm.expectRevert(HardnessRegistry.NotAuthorized.selector);
@@ -457,7 +459,7 @@ contract HardnessRegistryTest is Test {
         uint256 bountyId = _postDefaultBounty();
 
         vm.prank(challenger1);
-        registry.submitChallenge(bountyId, _evidence("e1"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e1"));
 
         vm.prank(resolver1);
         vm.expectRevert(HardnessRegistry.NotFound.selector);
@@ -468,9 +470,9 @@ contract HardnessRegistryTest is Test {
         uint256 bountyId = _postDefaultBounty();
 
         vm.prank(challenger1);
-        registry.submitChallenge(bountyId, _evidence("e1"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e1"));
         vm.prank(challenger2);
-        registry.submitChallenge(bountyId, _evidence("e2"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e2"));
 
         vm.prank(resolver1);
         registry.approveBountyResolution(bountyId, challenger1);
@@ -489,7 +491,7 @@ contract HardnessRegistryTest is Test {
         uint256 bountyId = _postDefaultBounty();
 
         vm.prank(challenger1);
-        registry.submitChallenge(bountyId, _evidence("e1"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e1"));
 
         vm.prank(resolver1);
         registry.approveBountyResolution(bountyId, challenger1);
@@ -523,7 +525,7 @@ contract HardnessRegistryTest is Test {
         uint256 bountyId = _postDefaultBounty();
 
         vm.prank(challenger1);
-        registry.submitChallenge(bountyId, _evidence("e1"));
+        registry.submitChallenge{value: BOND}(bountyId, _evidence("e1"));
 
         vm.warp(block.timestamp + 1 days + registry.challengeGracePeriod() + 1);
 

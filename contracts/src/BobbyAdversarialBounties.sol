@@ -99,8 +99,24 @@ contract BobbyAdversarialBounties {
     uint32 public constant MAX_DISPUTE_WINDOW = 14 days;
     /// @dev bountyId → when the resolver proposed the winner
     mapping(uint256 => uint64) public resolutionProposedAt;
-    /// @dev bountyId → who disputed (poster or a rival challenger)
+    /// @dev bountyId → who disputed (poster, a rival challenger, or the owner)
     mapping(uint256 => address) public disputedBy;
+
+    /// @dev Codex r3: contesting and disputing carry a bond, so filling the
+    ///      challenge slots or freezing an escrow costs the attacker money.
+    ///      Loser bonds go to the poster; a wrong dispute's bond goes to the winner.
+    uint96 public challengeBond;
+    mapping(uint256 => mapping(address => uint96)) public challengeBondOf;
+    mapping(uint256 => uint96) public disputeBondOf;
+    /// @dev Codex r3: the deadline is SNAPSHOTTED per bounty at proposal time —
+    ///      a later setDisputeWindow cannot shorten or extend it.
+    mapping(uint256 => uint64) public resolutionFinalizeAfter;
+    /// @dev Codex r3: a dispute the owner never settles is not a permanent lock —
+    ///      after this timeout anyone can return the escrow to the poster.
+    mapping(uint256 => uint64) public disputedAt;
+    uint32 public disputeSettlementTimeout = 30 days;
+    uint32 public constant MIN_SETTLEMENT_TIMEOUT = 7 days;
+    uint32 public constant MAX_SETTLEMENT_TIMEOUT = 90 days;
 
     // ---- Events ----
 
@@ -131,6 +147,9 @@ contract BobbyAdversarialBounties {
     event BountyResolutionDisputed(uint256 indexed bountyId, address indexed by);
     event BountyDisputeSettled(uint256 indexed bountyId, address indexed winner, bool refundedToPoster);
     event DisputeWindowUpdated(uint32 oldWindow, uint32 newWindow);
+    event BountyDisputeTimedOut(uint256 indexed bountyId, address indexed poster, uint96 amount);
+    event ChallengeBondUpdated(uint96 oldBond, uint96 newBond);
+    event DisputeSettlementTimeoutUpdated(uint32 oldTimeout, uint32 newTimeout);
     event BountyWithdrawn(uint256 indexed bountyId, address indexed poster, uint96 amount);
     event Withdrawal(address indexed to, uint256 amount);
 
@@ -167,6 +186,7 @@ contract BobbyAdversarialBounties {
         resolver = _resolver;
         ABSOLUTE_MIN_BOUNTY = _absoluteMinBounty;
         minBounty = _initialMinBounty;
+        challengeBond = _initialMinBounty;
         emit OwnershipTransferred(address(0), msg.sender);
         emit ResolverUpdated(address(0), _resolver);
     }
@@ -236,6 +256,7 @@ contract BobbyAdversarialBounties {
     /// @param _evidenceHash Hash of the evidence blob (IPFS CID, Arweave tx, etc)
     function submitChallenge(uint256 _bountyId, bytes32 _evidenceHash)
         external
+        payable
         whenNotPaused
     {
         Bounty storage b = bounties[_bountyId];
@@ -258,6 +279,10 @@ contract BobbyAdversarialBounties {
             "Claim window expired"
         );
 
+        // Codex r3: a bond per challenge — returned to the winner, forfeited to
+        // the poster by every other challenger once the bounty resolves.
+        require(msg.value == challengeBond, "Challenge bond required");
+        challengeBondOf[_bountyId][msg.sender] = uint96(msg.value);
         hasChallenged[_bountyId][msg.sender] = true;
 
         uint16 idx = b.challengeCount;
@@ -309,8 +334,10 @@ contract BobbyAdversarialBounties {
         b.winner = _winner;
         b.status = BountyStatus.PENDING_RESOLUTION;
         resolutionProposedAt[_bountyId] = uint64(block.timestamp);
+        uint64 finalizeAfter = uint64(block.timestamp) + disputeWindow;
+        resolutionFinalizeAfter[_bountyId] = finalizeAfter;
 
-        emit BountyResolutionProposed(_bountyId, _winner, b.reward, uint64(block.timestamp) + disputeWindow);
+        emit BountyResolutionProposed(_bountyId, _winner, b.reward, finalizeAfter);
     }
 
     /// @notice Pay the proposed winner once the dispute window has passed with no
@@ -320,10 +347,11 @@ contract BobbyAdversarialBounties {
         Bounty storage b = bounties[_bountyId];
         require(b.poster != address(0), "Bounty not found");
         require(b.status == BountyStatus.PENDING_RESOLUTION, "Not pending");
-        require(block.timestamp >= uint256(resolutionProposedAt[_bountyId]) + disputeWindow, "Dispute window open");
+        require(block.timestamp >= resolutionFinalizeAfter[_bountyId], "Dispute window open");
 
         b.status = BountyStatus.RESOLVED;
         pendingWithdrawals[b.winner] += b.reward;
+        _settleChallengeBonds(_bountyId, b.winner);
 
         emit BountyResolved(_bountyId, b.winner, b.reward);
     }
@@ -331,16 +359,26 @@ contract BobbyAdversarialBounties {
     /// @notice The poster, or any challenger who is not the proposed winner, can
     ///         freeze a proposed resolution inside the window. Only the owner
     ///         (the 2/3 Safe) can then settle it.
-    function disputeResolution(uint256 _bountyId) external {
+    /// @dev Codex r3: the owner (Safe) may dispute too — the compromised-backend
+    ///      model must not depend on the poster being awake. Parties post a bond;
+    ///      the owner does not.
+    function disputeResolution(uint256 _bountyId) external payable {
         Bounty storage b = bounties[_bountyId];
         require(b.poster != address(0), "Bounty not found");
         require(b.status == BountyStatus.PENDING_RESOLUTION, "Not pending");
-        require(block.timestamp < uint256(resolutionProposedAt[_bountyId]) + disputeWindow, "Dispute window closed");
-        require(msg.sender == b.poster || hasChallenged[_bountyId][msg.sender], "Not a party");
+        require(block.timestamp < resolutionFinalizeAfter[_bountyId], "Dispute window closed");
+        require(msg.sender == owner || msg.sender == b.poster || hasChallenged[_bountyId][msg.sender], "Not a party");
         require(msg.sender != b.winner, "Winner cannot dispute");
+        if (msg.sender == owner) {
+            require(msg.value == 0, "Owner disputes without bond");
+        } else {
+            require(msg.value == challengeBond, "Dispute bond required");
+            disputeBondOf[_bountyId] = uint96(msg.value);
+        }
 
         b.status = BountyStatus.DISPUTED;
         disputedBy[_bountyId] = msg.sender;
+        disputedAt[_bountyId] = uint64(block.timestamp);
 
         emit BountyResolutionDisputed(_bountyId, msg.sender);
     }
@@ -352,10 +390,13 @@ contract BobbyAdversarialBounties {
         require(b.poster != address(0), "Bounty not found");
         require(b.status == BountyStatus.DISPUTED, "Not disputed");
 
+        address proposed = b.winner;
         if (_winner == address(0)) {
             b.winner = address(0);
             b.status = BountyStatus.WITHDRAWN;
             pendingWithdrawals[b.poster] += b.reward;
+            _returnAllChallengeBonds(_bountyId);
+            _payDisputeBond(_bountyId, disputedBy[_bountyId]); // the dispute was upheld
             emit BountyWithdrawn(_bountyId, b.poster, b.reward);
             emit BountyDisputeSettled(_bountyId, address(0), true);
             return;
@@ -365,8 +406,73 @@ contract BobbyAdversarialBounties {
         b.winner = _winner;
         b.status = BountyStatus.RESOLVED;
         pendingWithdrawals[_winner] += b.reward;
+        _settleChallengeBonds(_bountyId, _winner);
+        // Upheld (the proposal changed) → bond back to the disputer; rejected → to the winner.
+        _payDisputeBond(_bountyId, _winner == proposed ? _winner : disputedBy[_bountyId]);
         emit BountyResolved(_bountyId, _winner, b.reward);
         emit BountyDisputeSettled(_bountyId, _winner, false);
+    }
+
+    /// @notice A dispute the owner never settled: after `disputeSettlementTimeout`
+    ///         anyone returns the escrow to the poster and every bond to its owner.
+    ///         Nobody profits from stalling.
+    function resolveStalledDispute(uint256 _bountyId) external {
+        Bounty storage b = bounties[_bountyId];
+        require(b.poster != address(0), "Bounty not found");
+        require(b.status == BountyStatus.DISPUTED, "Not disputed");
+        require(block.timestamp >= uint256(disputedAt[_bountyId]) + disputeSettlementTimeout, "Settlement timeout not reached");
+
+        b.winner = address(0);
+        b.status = BountyStatus.WITHDRAWN;
+        pendingWithdrawals[b.poster] += b.reward;
+        _returnAllChallengeBonds(_bountyId);
+        _payDisputeBond(_bountyId, disputedBy[_bountyId]);
+        emit BountyDisputeTimedOut(_bountyId, b.poster, b.reward);
+        emit BountyWithdrawn(_bountyId, b.poster, b.reward);
+    }
+
+    function setChallengeBond(uint96 _bond) external onlyOwner {
+        require(_bond >= ABSOLUTE_MIN_BOUNTY, "Bond below floor");
+        emit ChallengeBondUpdated(challengeBond, _bond);
+        challengeBond = _bond;
+    }
+
+    function setDisputeSettlementTimeout(uint32 _seconds) external onlyOwner {
+        require(_seconds >= MIN_SETTLEMENT_TIMEOUT && _seconds <= MAX_SETTLEMENT_TIMEOUT, "Timeout out of bounds");
+        emit DisputeSettlementTimeoutUpdated(disputeSettlementTimeout, _seconds);
+        disputeSettlementTimeout = _seconds;
+    }
+
+    /// @dev Winner's bond back to the winner; every other challenger's bond to the poster.
+    function _settleChallengeBonds(uint256 _bountyId, address _winner) internal {
+        Challenge[] storage cs = _challenges[_bountyId];
+        address poster = bounties[_bountyId].poster;
+        for (uint256 i = 0; i < cs.length; i++) {
+            address c = cs[i].challenger;
+            uint96 bond = challengeBondOf[_bountyId][c];
+            if (bond == 0) continue;
+            challengeBondOf[_bountyId][c] = 0;
+            pendingWithdrawals[c == _winner ? c : poster] += bond;
+        }
+    }
+
+    /// @dev Nothing was won: every challenger gets their bond back.
+    function _returnAllChallengeBonds(uint256 _bountyId) internal {
+        Challenge[] storage cs = _challenges[_bountyId];
+        for (uint256 i = 0; i < cs.length; i++) {
+            address c = cs[i].challenger;
+            uint96 bond = challengeBondOf[_bountyId][c];
+            if (bond == 0) continue;
+            challengeBondOf[_bountyId][c] = 0;
+            pendingWithdrawals[c] += bond;
+        }
+    }
+
+    function _payDisputeBond(uint256 _bountyId, address _to) internal {
+        uint96 bond = disputeBondOf[_bountyId];
+        if (bond == 0) return;
+        disputeBondOf[_bountyId] = 0;
+        pendingWithdrawals[_to] += bond;
     }
 
     function setDisputeWindow(uint32 _seconds) external onlyOwner {
@@ -394,6 +500,7 @@ contract BobbyAdversarialBounties {
         uint96 amount = b.reward;
         b.status = BountyStatus.WITHDRAWN;
         pendingWithdrawals[msg.sender] += amount;
+        _returnAllChallengeBonds(_bountyId); // Codex r3: an unresolved bounty owes nobody a bond
 
         emit BountyWithdrawn(_bountyId, msg.sender, amount);
     }

@@ -30,8 +30,9 @@ generic suite as a substitute.* Every row below therefore points at a test that
 
 Run on `security/remediation-r2` after the last edit:
 
-- `forge test` — 14 suites, **236 passed, 0 failed** (round 2a: 228; round 2b adds the dispute-window and geometry cases)
-- `test:remediation-r2` — 20/20 (round 2a: 15)
+- `forge test` — 14 suites, **243 passed, 0 failed** (round 2a: 228; 2b: 236; 3b adds bonds, owner dispute, timeout, snapshot, reverting receiver)
+- `test:remediation-r2` — 22/22 (round 2a: 15; 2b: 20)
+- `test:hardness-abi-anvil` — pass (bytecode-backed decode of every backend getter)
 - `test:rls-lockdown-pg` — exploit reproduced on the shipped policies, then refused; views and C-04 asserted (PostgreSQL 17, scratch schema, stand-in roles)
 - `test:api-security` — 47/47
 - `test:base-swap` — pass
@@ -97,7 +98,41 @@ It is permissionless, so the winner can; a small cron is the friendlier option.
 A `DISPUTED` bounty waits for the Safe; there is deliberately no timeout that pays
 either side without it.
 
-## For round 3 (final GO decision)
+## Round 3 review (Codex) — NO-GO on `8734ff2`, and what changed for it
+
+Four P1s and five P2s. The meta-point was the important one: *the suites were green
+but the blockers were not expressed by the tests.* Round 3b therefore changed the
+tests' reach, not only the code.
+
+| # | Codex finding | Fix | Regression |
+|---|---|---|---|
+| P1 | **C-01 still open**: `getRecentContradictions` (`bobby-cycle.ts:606`) and the last-trade read (`:814`) use `sbQuery('forum_threads', …)` with no scope — private symbols/PnL entered the public cycle prompt. The scanner missed them because it only matched `forum_threads?` URL literals. | Both scoped. **Scanner rewritten by token**: every line in `api/**` that mentions `forum_threads` (comments stripped) is classified — writer (`POST`/`sbInsert`/`.insert`/…), single-row `id=eq.`, scoped, or on a two-entry allow-list with a reason (`my-threads` owner filter; the `forum-resolve` sweep). Anything else fails. | The scanner found `commit-policy.ts:26` on its first run — a type comment, which is how the comment handling got written. It found nothing else. |
+| P1 | **The Safe had no last word**: only the poster or a challenger could dispute; with the poster asleep the backend's shill got paid. Rotating the resolver did not cancel a proposal. | `disputeResolution` / `disputeBountyResolution` accept the **owner**, without a bond. Role rotation deliberately leaves proposals in place — the owner's dispute right is the cancel. | `test_R3_ownerCanDisputeWithoutPoster`: shill proposed, owner disputes, owner refunds, shill gets its bond back and never the reward; `test_R3_registryOwnerDisputeAndTimeout`. |
+| P1 | **Free disputes froze escrow forever; 50 sybils could fill the challenge slots.** | **Bonds**: every challenge and every party dispute posts `challengeBond` (= initial minBounty; owner-set, floored at the absolute minimum). Winner's bond returns; every other challenger's bond is forfeited **to the poster**; a rejected dispute's bond goes to the winner, an upheld one returns. **Timeout**: a `DISPUTED` bounty the owner never settles can be closed by anyone after `disputeSettlementTimeout` (30 d, bounded 7–90) — escrow back to the poster, every bond back to its owner. Nobody profits from stalling. Both contracts. | `test_R3_frivolousDisputeForfeitsBond`, `test_R3_stalledDisputeTimesOutToPoster` (also asserts the timeout cannot fire early and settle cannot follow it), `test_R3_sybilChallengesForfeitToPoster` (three sybils → three bonds to the poster). Every pre-existing bounty test re-learned the bond. |
+| P1 | **Backend ABI incompatible with the redeployed registry**: `agentProfiles` lacked `stake`, `getPrediction` lacked `hardnessScore` — ethers threw `INVALID_ARGUMENT overflow`. | Fragments corrected and **exported**. New `test:hardness-abi-anvil`: deploys the Foundry artifact's bytecode on a throwaway anvil, drives it with the true ABI, then decodes every getter with the backend's list; also asserts each backend fragment exists in the artifact with identical selector and outputs. `contracts/abi/HardnessRegistry.json` + `BobbyAdversarialBounties.json` regenerated from `out/`; `verify/BobbyAdversarialBounties.flat.sol` re-flattened. | The Codex reproduction is the first assertion in that test. |
+| P2 | Dispute deadline recomputed from a mutable global. | `resolutionFinalizeAfter[id]` snapshotted at proposal; finalize and dispute read the snapshot. | `test_R3_deadlineSnapshotIgnoresLaterWindowChange`: owner shortens the window after the proposal; finalize stays blocked until the snapshot. |
+| P2 | `symbolFilterFor` upper-cased `NVDAc`; `eq` is case-sensitive → empty lookup; the test only looked at the URL. | `symbol=ilike.<raw>` (no wildcards can pass the allow-list, so `ilike` is a case-insensitive equality). **The mock now applies the filter**, so the test asserts the tool *answers with the NVDAc thread* for `nvdac`. | `C-03 / r3 P2` check. |
+| P2 | `judge-mode` read the dynamic control source before authenticating. | `requireInternalAuth` first. | 401 test unchanged, now true in prod too. |
+| P2 | Stale `contracts/abi` and `contracts/verify` artifacts. | Regenerated from the current compile. | — |
+| P2 | `/api/hardness-test` did not revalidate geometry after the CIO moved the levels and answered `enabled:true` with `commitTxHash:null`. | `levelGeometryError()` on the request (400 before any model call) and again on the adjusted levels; `recordHardnessActivity` now returns `commitError`, and the endpoint answers `enabled:false` with it instead of a null hash. | Two checks: incoherent request → 400 with no model/chain call; the rule matches the registry's. |
+
+Confirmed by Codex this round and kept: `DISPUTED → finalize` blocked, poster cannot be
+named winner, `PENDING_RESOLUTION` blocks reclaim, pull-payment isolates a reverting
+receiver (now pinned by `test_R3_revertingPosterDoesNotLockOthers`, which Codex asked for).
+
+**Foundry gotcha worth recording**: `vm.prank` applies to the *next external call*.
+`submitChallenge{value: bounties.challengeBond()}(…)` makes the bond getter that next
+call, so the challenge ran as the test contract (the owner) and reverted "Resolver
+cannot challenge" — 27 tests at once. The suites use a `BOND` constant now.
+
+## For the final round
+
+Everything below is on `security/remediation-r2`. The dispute economics are new
+code: hunt for a bond that can be double-credited (settle vs timeout vs
+withdrawBounty on the same bounty), a challenger list that can be made to exceed
+the loop's gas at `maxChallenges`, an owner dispute that leaves a party's bond
+stranded, and whether `disputeSettlementTimeout` can be set so short by the owner
+that a legitimate dispute times out before the Safe meets.
 
 Everything below is on `security/remediation-r2`. Reproduce the round-2 exploits on
 `8b9af14` (they still work there) and confirm the refusals here. Then hunt in the
