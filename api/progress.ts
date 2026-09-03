@@ -15,7 +15,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { AWARD_KINDS, applyAward, type AwardKind, type ProgressCounters } from './_lib/progress-rules.js';
+import { AWARD_AURA, AWARD_KINDS, applyAward, type AwardKind, type ProgressCounters } from './_lib/progress-rules.js';
+import { grantRoutePiece, type RouteGrant } from './_lib/trader-land.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -50,6 +51,8 @@ interface ProgressRow {
   onboarded: boolean;
   risk_notice_version: number;
   xp: number;
+  aura: number;
+  route_index: number;
   streak: number;
   last_day: string | null;
   daily_awards: number;
@@ -59,7 +62,7 @@ interface ProgressRow {
   updated_at: string;
 }
 
-const SELECT = 'identity_id,companion_id,vibe_id,onboarded,risk_notice_version,xp,streak,last_day,daily_awards,daily_awards_day,quick_access,last_platform,updated_at';
+const SELECT = 'identity_id,companion_id,vibe_id,onboarded,risk_notice_version,xp,aura,route_index,streak,last_day,daily_awards,daily_awards_day,quick_access,last_platform,updated_at';
 
 function toClient(row: ProgressRow, identity: Identity) {
   return {
@@ -69,6 +72,8 @@ function toClient(row: ProgressRow, identity: Identity) {
     onboarded: row.onboarded,
     riskNoticeVersion: row.risk_notice_version,
     xp: row.xp,
+    aura: row.aura ?? 0,
+    routeIndex: row.route_index ?? 0,
     streak: row.streak,
     lastDay: row.last_day,
     dailyAwards: row.daily_awards,
@@ -146,7 +151,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Apply in chronological order with the shared rules.
     let counters: ProgressCounters = { xp: row.xp, streak: row.streak, lastDay: row.last_day, dailyAwards: row.daily_awards, dailyAwardsDay: row.daily_awards_day };
-    const results: Array<{ id: string; awarded: number; xpBefore: number; xpAfter: number; duplicate: boolean }> = [];
+    const results: Array<{ id: string; awarded: number; aura: number; xpBefore: number; xpAfter: number; duplicate: boolean; world?: RouteGrant | null }> = [];
+    let auraTotal = row.aura ?? 0;
+    let routeIndex = row.route_index ?? 0;
+    const grants: Array<{ eventId: string; kind: AwardKind }> = [];
     const ledger: Array<Record<string, unknown>> = [];
     const now = Date.now();
     // One-time import of pre-sign-in XP, decided BEFORE this request's events are
@@ -169,10 +177,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const at = new Date(Math.min(Math.max(atMs, now - 30 * 86_400_000), now + 5 * 60_000));
       const out = applyAward(counters, e.kind, at, e.tzOffsetMin);
       counters = out.state;
-      results.push({ id: e.id, awarded: out.awarded, xpBefore: out.xpBefore, xpAfter: out.xpAfter, duplicate: false });
-      ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta: e.meta ?? null });
+      const aura = out.awarded > 0 ? AWARD_AURA[e.kind] : 0;
+      auraTotal += aura;
+      if (out.awarded > 0) grants.push({ eventId: e.id, kind: e.kind });
+      results.push({ id: e.id, awarded: out.awarded, aura, xpBefore: out.xpBefore, xpAfter: out.xpAfter, duplicate: false });
+      ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, aura, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta: e.meta ?? null });
     }
-    for (const e of events) if (!fresh.includes(e)) results.push({ id: e.id, awarded: 0, xpBefore: row.xp, xpAfter: row.xp, duplicate: true });
+    for (const e of events) if (!fresh.includes(e)) results.push({ id: e.id, awarded: 0, aura: 0, xpBefore: row.xp, xpAfter: row.xp, duplicate: true });
 
     if (ledger.length) {
       const ins = await fetch(bobbyRest('bobby_progress_events'), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(ledger) });
@@ -182,8 +193,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Trader Land: every awarded event plants (or blooms) the next piece of the
+    // Discovery Route — deterministic, one per event, idempotent per event id.
+    if (grants.length) {
+      const idsQ = grants.map((g) => g.eventId).join(',');
+      const led = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${idsQ})&select=id,client_event_id`), { headers: bobbyServiceHeaders() });
+      const byClient = new Map((led.ok ? ((await led.json()) as Array<{ id: string; client_event_id: string }>) : []).map((r) => [r.client_event_id, r.id]));
+      for (const g of grants) {
+        const ledgerId = byClient.get(g.eventId);
+        if (!ledgerId) continue;
+        const grant = await grantRoutePiece(identity.id, ledgerId, g.kind, routeIndex);
+        if (grant?.routeIndex !== undefined) routeIndex = grant.routeIndex;
+        const r = results.find((x) => x.id === g.eventId);
+        if (r) r.world = grant;
+      }
+    }
+
     const patch: Record<string, unknown> = {
-      xp: counters.xp, streak: counters.streak, last_day: counters.lastDay, daily_awards: counters.dailyAwards, daily_awards_day: counters.dailyAwardsDay,
+      xp: counters.xp, aura: auraTotal, route_index: routeIndex, streak: counters.streak, last_day: counters.lastDay, daily_awards: counters.dailyAwards, daily_awards_day: counters.dailyAwardsDay,
       last_platform: platform, updated_at: new Date().toISOString(),
     };
     if (profile) {

@@ -32,6 +32,8 @@ export interface ServerProgress {
   dailyAwards: number;
   dailyAwardsDay: string | null;
   quickAccess: string[];
+  aura?: number;
+  routeIndex?: number;
 }
 
 export interface Progress {
@@ -46,6 +48,9 @@ export interface Progress {
   dailyAwards: number;
   dailyAwardsDay: string | null;
   quickAccess: string[];
+  /** Trader Land soft currency and Discovery Route position — server-owned, mirrored here. */
+  aura: number;
+  routeIndex: number;
   pendingEvents: PendingEvent[];
   /** ISO time of the last successful server reconcile; null = local only. */
   syncedAt: string | null;
@@ -62,6 +67,8 @@ const DEFAULT: Progress = {
   dailyAwards: 0,
   dailyAwardsDay: null,
   quickAccess: ['BTC', 'NVDA', 'ETH'],
+  aura: 0,
+  routeIndex: 0,
   pendingEvents: [],
   syncedAt: null,
 };
@@ -140,6 +147,8 @@ export const progressStore = {
       dailyAwards: server.dailyAwards,
       dailyAwardsDay: server.dailyAwardsDay,
       quickAccess: state.quickAccess.length ? state.quickAccess : server.quickAccess,
+      aura: server.aura ?? state.aura,
+      routeIndex: server.routeIndex ?? state.routeIndex,
       pendingEvents: state.pendingEvents.filter((e) => !ack.has(e.id)),
       syncedAt: new Date().toISOString(),
     });

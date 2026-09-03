@@ -12,7 +12,11 @@
 export const AWARD_POINTS = {
   read_complete: 10,
   no_trade_respected: 20,
+  /** the thesis of an earlier read came back and was closed (hit / invalidated / expired) — the seed blooms */
+  thesis_closed: 15,
 } as const;
+/** Aura (Trader Land soft currency) per kind — SYSTEM-DESIGN v0.2 "Distribución inicial". */
+export const AWARD_AURA: Record<AwardKind, number> = { read_complete: 2, no_trade_respected: 6, thesis_closed: 6 };
 export type AwardKind = keyof typeof AWARD_POINTS;
 export const AWARD_KINDS = Object.keys(AWARD_POINTS) as AwardKind[];
 export const MAX_DAILY_AWARDS = 3;

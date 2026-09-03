@@ -141,8 +141,8 @@ const PROTECTED = ['agent_cycles', 'agent_events', 'agent_trades', 'agent_positi
   'forum_threads', 'forum_posts', 'user_feedback', 'api_cache', 'indicator_cache',
   'agent_messages', 'user_interests', 'user_digests', 'sandbox_runs', 'mcp_payment_challenges', 'mcp_payment_receipts',
   'agent_profiles', 'telegram_connections', 'memory_objects', 'agent_config', 'hardness_agents', 'hardness_agent_sessions', 'bobby_control', 'forum_publish_receipts',
-  'bobby_identities', 'bobby_progress', 'bobby_progress_events', 'bobby_pre_calls'];
-const PRIVATE = new Set(['agent_messages', 'user_interests', 'user_digests', 'sandbox_runs', 'mcp_payment_challenges', 'mcp_payment_receipts', 'agent_profiles', 'telegram_connections', 'memory_objects', 'agent_config', 'hardness_agents', 'hardness_agent_sessions', 'bobby_control', 'forum_publish_receipts', 'bobby_identities', 'bobby_progress', 'bobby_progress_events', 'bobby_pre_calls']);
+  'bobby_identities', 'bobby_progress', 'bobby_progress_events', 'bobby_pre_calls', 'tl_items', 'tl_lands', 'tl_inventory', 'tl_placements'];
+const PRIVATE = new Set(['agent_messages', 'user_interests', 'user_digests', 'sandbox_runs', 'mcp_payment_challenges', 'mcp_payment_receipts', 'agent_profiles', 'telegram_connections', 'memory_objects', 'agent_config', 'hardness_agents', 'hardness_agent_sessions', 'bobby_control', 'forum_publish_receipts', 'bobby_identities', 'bobby_progress', 'bobby_progress_events', 'bobby_pre_calls', 'tl_lands', 'tl_inventory', 'tl_placements']);
 
 interface Policy { tablename: string; policyname: string; cmd: string; roles: string[]; qual: string | null; with_check: string | null }
 
