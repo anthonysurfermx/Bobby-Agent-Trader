@@ -9,6 +9,20 @@ import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 10 };
 
+const FILTER_VALUE = /^[A-Za-z0-9_.-]{1,64}$/;
+/** Exact-match filters only; returns null when any supplied value is off the allow-list. */
+export function buildFilters(query: Record<string, unknown>): string | null {
+  let filters = '';
+  for (const field of ['kind', 'symbol', 'outcome'] as const) {
+    const raw = query[field];
+    if (raw === undefined || raw === '') continue;
+    if (typeof raw !== 'string' || !FILTER_VALUE.test(raw)) return null;
+    filters += `&${field}=eq.${encodeURIComponent(raw)}`;
+  }
+  return filters;
+}
+
+
 const SB_URL = bobbyDbUrl();
 const SB_KEY = bobbyReadKey();
 
@@ -18,14 +32,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const limit = Math.min(Number(req.query.limit) || 50, 200);
-  const kind = req.query.kind as string | undefined;
-  const symbol = req.query.symbol as string | undefined;
-  const outcome = req.query.outcome as string | undefined;
-
-  let filters = '';
-  if (kind) filters += `&kind=eq.${kind}`;
-  if (symbol) filters += `&symbol=eq.${symbol}`;
-  if (outcome) filters += `&outcome=eq.${outcome}`;
+  // C-03 (final audit): these were interpolated raw into the PostgREST URL, so
+  // `?kind=x%26select=id` rewrote the query. Allow-list the shape and encode.
+  const filters = buildFilters(req.query);
+  if (filters === null) {
+    return res.status(400).json({ error: 'kind, symbol and outcome accept only [A-Za-z0-9_.-], max 64 chars' });
+  }
 
   try {
     const response = await fetch(

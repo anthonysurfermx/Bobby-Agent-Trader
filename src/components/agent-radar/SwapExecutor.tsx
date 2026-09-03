@@ -10,6 +10,7 @@
 // ============================================================
 
 import { useState, useCallback } from 'react';
+import { quoteMatchesAmount } from '@/lib/base-swap/quote-guard';
 import { useAccount, usePublicClient, useSendTransaction, useSwitchChain } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import type { Hex } from 'viem';
@@ -156,6 +157,13 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
   // ---- Step 3: swap → receipt → verified record ----
   const executeSwap = useCallback(async () => {
     if (!quote?.tx?.swap || !address || quote.simulation.ok !== true) return;
+    // Final audit P1-1: the label reads the live input, the calldata is the quote's.
+    // Refuse to sign unless they are the same amount, whatever path led here.
+    if (!quoteMatchesAmount(quote.amountIn, amount)) {
+      setError(`Amount changed since the quote (${quote.amountIn} → ${amount}). Get a new quote.`);
+      reset();
+      return;
+    }
     setStep('swapping'); setError(null);
     try {
       notExpired(quote);
@@ -167,7 +175,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
       setError(friendly(err, 'Swap failed'));
       setStep('error');
     }
-  }, [quote, address, sendAndConfirm, submitReceipt]);
+  }, [quote, address, amount, sendAndConfirm, submitReceipt]);
 
   // ---- Revoke a leftover allowance (approve(router, 0)) ----
   const revokeAllowance = useCallback(async () => {
@@ -223,7 +231,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
             <div className="flex-1 bg-neutral-900/60 border border-neutral-800 rounded-xl p-3">
               <div className="text-[9px] text-neutral-500 mb-1">You pay</div>
               <div className="flex items-center gap-2">
-                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="flex-1 bg-transparent text-lg font-bold text-neutral-100 outline-none w-0 min-w-0" min="0" step="any" disabled={busy} />
+                <input type="number" value={amount} onChange={e => { setAmount(e.target.value); if (step === 'quoted') reset(); }} className="flex-1 bg-transparent text-lg font-bold text-neutral-100 outline-none w-0 min-w-0" min="0" step="any" disabled={busy} />
                 <select value={fromToken} onChange={e => { setFromToken(e.target.value); if (e.target.value !== 'USDC') setToToken('USDC'); reset(); }} className="bg-neutral-800 text-neutral-200 text-sm font-medium rounded-lg px-2 py-1 outline-none border border-neutral-700" disabled={busy}>
                   {PAIR_TOKENS.filter(t => t !== toToken).map(t => <option key={t} value={t}>{t}</option>)}
                 </select>

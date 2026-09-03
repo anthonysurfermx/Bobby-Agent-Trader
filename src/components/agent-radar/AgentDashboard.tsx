@@ -438,8 +438,8 @@ export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete
   const loadData = async () => {
     setLoading(true);
     const [c, t, p, m] = await Promise.all([
-      fetchSupabase<AgentCycle>('agent_cycles?order=started_at.desc&limit=20'),
-      fetchSupabase<AgentTrade>('agent_trades?order=created_at.desc&limit=50'),
+      fetchSupabase<AgentCycle>('agent_cycles_public?order=started_at.desc&limit=20'),
+      fetchSupabase<AgentTrade>('agent_trades_public?order=created_at.desc&limit=50'),
       fetchSupabase<AgentPosition>('agent_positions?closed_at=is.null&order=opened_at.desc'),
       fetchSupabase<AgentMessage>('agent_messages?order=created_at.desc&limit=20'),
     ]);

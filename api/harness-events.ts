@@ -36,8 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Try agent_events table first (new unified events)
   // Exclude demo traffic (meta.demo_source = 'playbooks_page') from the public Harness Console feed
-  let typeFilter = '';
-  if (eventType) typeFilter = `&event_type=eq.${eventType}`;
+  // C-03 (final audit): raw interpolation let `?type=x%26select=id` rewrite the query.
+  if (eventType !== undefined && !/^[A-Za-z0-9_.-]{1,64}$/.test(eventType)) {
+    return res.status(400).json({ error: 'type accepts only [A-Za-z0-9_.-], max 64 chars' });
+  }
+  const typeFilter = eventType ? `&event_type=eq.${encodeURIComponent(eventType)}` : '';
   const demoFilter = '&or=(meta->>demo_source.is.null,meta->>demo_source.neq.playbooks_page)';
   const events = await sbGet(`agent_events?order=created_at.desc&limit=${limit}${typeFilter}${demoFilter}`);
 
@@ -54,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Fallback: reconstruct events from agent_cycles + forum_threads
   const [cycles, threads] = await Promise.all([
     sbGet(`agent_cycles?order=created_at.desc&limit=${limit}&select=id,status,created_at,completed_at,latency_ms,trades_executed,llm_reasoning,vibe_phrase,idle_cash_usd,yield_debate_triggered`),
-    sbGet(`forum_threads?order=created_at.desc&limit=${limit}&select=id,symbol,direction,conviction_score,status,resolution,entry_price,stop_price,target_price,resolution_pnl_pct,created_at,trigger_reason,debate_quality`),
+    sbGet(`forum_threads?scope=eq.public&order=created_at.desc&limit=${limit}&select=id,symbol,direction,conviction_score,status,resolution,entry_price,stop_price,target_price,resolution_pnl_pct,created_at,trigger_reason,debate_quality`),
   ]);
 
   // Transform into unified event format

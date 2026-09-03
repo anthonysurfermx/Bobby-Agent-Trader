@@ -18,7 +18,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       // Get all resolved threads with trade params
       const threadsRes = await fetch(
-        `${SB_URL}/rest/v1/forum_threads?resolution=neq.pending&entry_price=not.is.null&select=symbol,direction,entry_price,target_price,stop_price,conviction_score,resolution,resolution_pnl_pct,resolved_at,created_at&order=created_at.desc&limit=50`,
+        `${SB_URL}/rest/v1/forum_threads?scope=eq.public&resolution=neq.pending&entry_price=not.is.null&select=symbol,direction,entry_price,target_price,stop_price,conviction_score,resolution,resolution_pnl_pct,resolved_at,created_at&order=created_at.desc&limit=50`,
         { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
       );
 

@@ -38,7 +38,7 @@ export default function BobbyAgentsPage() {
       .catch(() => {});
 
     // Check real agent status from latest cycle
-    fetch(`${SB}/rest/v1/agent_cycles?status=eq.completed&order=started_at.desc&limit=1&select=started_at`, { headers })
+    fetch(`${SB}/rest/v1/agent_cycles_public?status=eq.completed&order=started_at.desc&limit=1&select=started_at`, { headers })
       .then(r => r.json())
       .then((cycles: any[]) => {
         if (!Array.isArray(cycles) || !cycles.length) { setAgentStatus('OFFLINE'); return; }

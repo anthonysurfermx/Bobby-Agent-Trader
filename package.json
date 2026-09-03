@@ -30,6 +30,8 @@
     "smoke:base-swap": "tsx scripts/smoke-base-swap.mts",
     "e2e:base-swap": "tsx scripts/e2e-base-swap-anvil.mts",
     "test:swap-ledger-pg": "tsx scripts/test-swap-ledger-pg.mts",
+    "test:remediation-r2": "tsx scripts/test-remediation-r2.mts",
+    "test:rls-lockdown-pg": "tsx scripts/test-rls-lockdown-pg.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts"
   },
   "dependencies": {

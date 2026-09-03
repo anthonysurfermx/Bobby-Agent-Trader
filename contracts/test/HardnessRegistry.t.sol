@@ -231,13 +231,18 @@ contract HardnessRegistryTest is Test {
         registry.commitPrediction(predictionHash, "BTC-USD", 70, 100, 120, 90);
     }
 
-    function test_resolvePrediction_byAgent_updatesStats() public {
+    /// @dev Final audit P0-3: an agent can no longer resolve its own prediction —
+    /// the resolver does, and the outcome is derived from entry/exit
+    /// ((2250-2000)/2000 = +1250 bps, which is what the resolver reports here).
+    function test_resolvePrediction_byResolver_updatesStats() public {
         bytes32 predictionHash = _predictionHash("pred-4");
         vm.prank(agent1);
         registry.commitPrediction(predictionHash, "ETH-USD", 80, 2_000e8, 2_300e8, 1_850e8);
 
+        address r = makeAddr("resolver-pred-4");
+        registry.updateResolver(r, true);
         vm.warp(block.timestamp + registry.minPredictionAge());
-        vm.prank(agent1);
+        vm.prank(r);
         registry.resolvePrediction(predictionHash, 1250, HardnessRegistry.PredictionResult.WIN, 2_250e8);
 
         HardnessRegistry.Prediction memory prediction = registry.getPrediction(predictionHash);
@@ -308,8 +313,10 @@ contract HardnessRegistryTest is Test {
         vm.prank(agent1);
         registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
 
+        address r = makeAddr("resolver-pred-8");
+        registry.updateResolver(r, true);
         vm.warp(block.timestamp + registry.minPredictionAge());
-        vm.prank(agent1);
+        vm.prank(r);
         vm.expectRevert(HardnessRegistry.InvalidResult.selector);
         registry.resolvePrediction(predictionHash, -1, HardnessRegistry.PredictionResult.WIN, 121);
     }

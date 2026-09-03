@@ -226,6 +226,9 @@ contract BobbyAdversarialBounties {
             "Bounty not open"
         );
         require(msg.sender != b.poster, "Poster cannot challenge own bounty");
+        // Final audit P1-6: the party that picks the winner cannot also be a
+        // contestant — otherwise resolver + challenge + resolve drains the pot.
+        require(msg.sender != resolver && msg.sender != owner, "Resolver cannot challenge");
         require(_evidenceHash != bytes32(0), "Evidence required");
         require(b.challengeCount < maxChallenges, "Max challenges reached");
         // R3: one challenge per address per bounty — prevents a single
@@ -270,6 +273,9 @@ contract BobbyAdversarialBounties {
         require(b.poster != address(0), "Bounty not found");
         require(b.status == BountyStatus.CHALLENGED, "No challenges to resolve");
         require(_winner != address(0), "Invalid winner");
+        // Final audit P1-6, belt to the check in submitChallenge: a resolver or
+        // owner rotated in AFTER challenging still cannot be paid.
+        require(_winner != resolver && _winner != owner, "Resolver cannot win");
 
         // R3: resolver cannot settle after the effective expiry. Without
         // this check, resolve and withdrawBounty could race once the

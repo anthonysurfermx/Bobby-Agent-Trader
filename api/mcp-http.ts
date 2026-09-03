@@ -174,7 +174,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
     const symbolFilter = args.symbol ? `&symbol=eq.${(args.symbol as string).toUpperCase()}` : '';
 
     const [threadRes, repRes, intelRes] = await Promise.all([
-      fetch(`${SB_URL_MCP}/rest/v1/forum_threads?resolution=eq.pending&entry_price=not.is.null&order=created_at.desc&limit=1${symbolFilter}&select=symbol,direction,conviction_score,entry_price,stop_price,target_price,expires_at`, {
+      fetch(`${SB_URL_MCP}/rest/v1/forum_threads?scope=eq.public&resolution=eq.pending&entry_price=not.is.null&order=created_at.desc&limit=1${symbolFilter}&select=symbol,direction,conviction_score,entry_price,stop_price,target_price,expires_at`, {
         headers: { apikey: SB_KEY_MCP, Authorization: `Bearer ${SB_KEY_MCP}` },
       }).then(r => r.json()).catch(() => []),
       fetch(`${BASE_URL}/api/reputation`).then(r => r.json()).catch(() => ({})),
@@ -228,7 +228,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
     const SB_KEY_MCP = bobbyReadKey();
     const symbolFilter = args.symbol ? `&symbol=eq.${args.symbol.toUpperCase()}` : '';
     const threadsRes = await fetch(
-      `${SB_URL_MCP}/rest/v1/forum_threads?resolution=eq.pending&entry_price=not.is.null&order=created_at.desc&limit=5${symbolFilter}&select=symbol,direction,conviction_score,entry_price,stop_price,target_price,trigger_reason,created_at,expires_at,debate_quality`,
+      `${SB_URL_MCP}/rest/v1/forum_threads?scope=eq.public&resolution=eq.pending&entry_price=not.is.null&order=created_at.desc&limit=5${symbolFilter}&select=symbol,direction,conviction_score,entry_price,stop_price,target_price,trigger_reason,created_at,expires_at,debate_quality`,
       { headers: { apikey: SB_KEY_MCP, Authorization: `Bearer ${SB_KEY_MCP}` } }
     );
     const threads = await threadsRes.json() as Array<Record<string, unknown>>;
@@ -368,7 +368,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
   if (name === 'bobby_judge') {
     const res = await fetch(`${BASE_URL}/api/judge-mode`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ thread_id: args.thread_id || undefined, language: args.language || 'en' }),
     });
     const data = await res.json() as { error?: string; verdict?: any };

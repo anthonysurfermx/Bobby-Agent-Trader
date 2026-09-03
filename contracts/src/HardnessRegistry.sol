@@ -181,6 +181,10 @@ contract HardnessRegistry {
     mapping(uint256 => Bounty) public bounties;
     mapping(uint256 => Challenge[]) private _challenges;
     mapping(uint256 => mapping(address => bool)) public hasChallenged;
+    /// @dev Final audit P0-3: max distance allowed between the resolver's reported
+    ///      pnlBps and the figure derived on-chain from entry/exit (1%).
+    uint32 public constant PNL_TOLERANCE_BPS = 100;
+
     mapping(address => bool) public resolvers;
     mapping(uint256 => address) public proposedWinner;
     mapping(uint256 => uint256) public resolutionRound;
@@ -422,24 +426,29 @@ contract HardnessRegistry {
         if (block.timestamp < prediction.minResolveAt) revert TooSoon();
         if (block.timestamp > prediction.committedAt + predictionTTL) revert Expired();
         /// @dev Kimi/Codex audit (Base r4, CRITICAL): being a registered agent must NOT
-        /// grant resolution rights over other agents' predictions — otherwise any
-        /// attacker can register and stamp LOSS on a competitor's record. Only the
-        /// prediction's own agent or an explicitly approved resolver may resolve.
-        if (msg.sender != prediction.agent && !resolvers[msg.sender]) revert NotAuthorized();
+        /// grant resolution rights over other agents' predictions. Final audit
+        /// 2026-09-03 (P0-3): nor over its OWN — with no oracle in this contract the
+        /// exit price is caller-supplied, so a self-resolving agent minted a perfect
+        /// record for one stake plus gas. Only an approved resolver may resolve.
+        if (!resolvers[msg.sender]) revert NotAuthorized();
         if (result == PredictionResult.NONE || result == PredictionResult.EXPIRED) revert InvalidResult();
 
-        if (result == PredictionResult.WIN) {
-            if (pnlBps <= 0) revert InvalidResult();
-        } else if (result == PredictionResult.LOSS) {
-            if (pnlBps >= 0) revert InvalidResult();
-        } else {
-            if (pnlBps != 0) revert InvalidResult();
-        }
+        /// @dev P0-3, second half: the outcome is DERIVED from the committed prices
+        /// and the exit price, never taken on faith — the same gate v1's
+        /// resolveTrade has always had. The reported pnlBps must agree with the
+        /// derived figure within PNL_TOLERANCE_BPS; the derived figure is stored.
+        int256 computed = _derivePnlBps(prediction, exitPrice);
+        PredictionResult derived = computed > 0 ? PredictionResult.WIN : computed < 0 ? PredictionResult.LOSS : PredictionResult.BREAK_EVEN;
+        if (derived != result) revert InvalidResult();
+        int256 delta = int256(pnlBps) - computed;
+        if (delta < 0) delta = -delta;
+        if (delta > int256(uint256(PNL_TOLERANCE_BPS))) revert InvalidResult();
+        if (computed > int256(type(int32).max) || computed < int256(type(int32).min)) revert InvalidValue();
 
         prediction.result = result;
         prediction.resolvedAt = uint64(block.timestamp);
         prediction.exitPrice = exitPrice;
-        prediction.pnlBps = pnlBps;
+        prediction.pnlBps = int32(computed);
 
         AgentStats storage stats = _agentStats[prediction.agent];
         stats.totalResolved += 1;
@@ -801,6 +810,21 @@ contract HardnessRegistry {
         uint8 oldThreshold = resolverThreshold;
         resolverThreshold = newThreshold;
         emit ResolverThresholdUpdated(oldThreshold, newThreshold);
+    }
+
+    /// @dev Final audit P0-3. Direction is inferred from the committed levels:
+    ///      target above entry (or stop below it) is long; the mirror is short.
+    ///      A commit whose target and stop both sit ON the entry has no direction
+    ///      and cannot be resolved as anything but expired. Returns signed bps.
+    function _derivePnlBps(Prediction storage p, uint96 exitPrice) internal view returns (int256) {
+        uint256 entry = p.entryPrice; // non-zero: enforced at commit
+        bool isLong;
+        if (p.targetPrice != 0 && p.targetPrice != entry) isLong = p.targetPrice > entry;
+        else if (p.stopPrice != 0 && p.stopPrice != entry) isLong = p.stopPrice < entry;
+        else revert InvalidValue();
+        int256 move = int256(uint256(exitPrice)) - int256(entry);
+        if (!isLong) move = -move;
+        return (move * 10000) / int256(entry);
     }
 
     function _computeWinRate(uint64 wins, uint64 losses, uint64 breakEvens) internal pure returns (uint32) {

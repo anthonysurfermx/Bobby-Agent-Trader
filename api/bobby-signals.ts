@@ -16,7 +16,8 @@ const SB_KEY = bobbyServiceKey()
 const SB_HEADERS = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 
 async function queryThreads(query: string): Promise<any[]> {
-  const sbRes = await fetch(`${SB_URL}/rest/v1/forum_threads?${query}`, { headers: SB_HEADERS });
+  // C-01 (final audit): this endpoint is public and reads with the service key — pin it to public threads.
+  const sbRes = await fetch(`${SB_URL}/rest/v1/forum_threads?scope=eq.public&${query}`, { headers: SB_HEADERS });
   if (!sbRes.ok) {
     const body = await sbRes.text().catch(() => '');
     throw new Error(`Supabase ${sbRes.status}: ${body || 'request failed'}`);

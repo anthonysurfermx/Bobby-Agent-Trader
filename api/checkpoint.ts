@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Fetch recent debates and on-chain stats in parallel
   const [recentThreads, statsRes] = await Promise.all([
-    sbQuery('forum_threads', `created_at=gte.${since}&order=created_at.desc&limit=20&select=id,symbol,direction,conviction_score,status,resolution,entry_price,stop_price,target_price,resolution_pnl_pct,created_at,trigger_reason,debate_quality`),
+    sbQuery('forum_threads', `scope=eq.public&created_at=gte.${since}&order=created_at.desc&limit=20&select=id,symbol,direction,conviction_score,status,resolution,entry_price,stop_price,target_price,resolution_pnl_pct,created_at,trigger_reason,debate_quality`),
     fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/bobby-protocol-stats`).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 

@@ -7,7 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { requireWritesOpen } from './_lib/control.js';
 
@@ -40,7 +40,7 @@ interface JudgeVerdict {
 
 async function fetchThread(threadId: string) {
   const res = await fetch(
-    `${SB_URL}/rest/v1/forum_threads?id=eq.${threadId}&select=*`,
+    `${SB_URL}/rest/v1/forum_threads?id=eq.${threadId}&scope=eq.public&select=*`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } },
   );
   if (!res.ok) return null;
@@ -59,7 +59,7 @@ async function fetchPosts(threadId: string) {
 
 async function fetchLatestThread() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/forum_threads?select=*&order=created_at.desc&limit=1`,
+    `${SB_URL}/rest/v1/forum_threads?scope=eq.public&select=*&order=created_at.desc&limit=1`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } },
   );
   if (!res.ok) return null;
@@ -70,7 +70,7 @@ async function fetchLatestThread() {
 async function fetchCalibration(): Promise<{ winRate: number; recentLosses: number; mood: string } | null> {
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/forum_threads?resolution=neq.pending&select=resolution,conviction_score&order=created_at.desc&limit=20`,
+      `${SB_URL}/rest/v1/forum_threads?scope=eq.public&resolution=neq.pending&select=resolution,conviction_score&order=created_at.desc&limit=20`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } },
     );
     if (!res.ok) return null;
@@ -259,9 +259,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       red_flags: parsed.red_flags || [],
     };
 
-    // Store verdict in thread's debate_quality column
-    await fetch(
-      `${SB_URL}/rest/v1/forum_threads?id=eq.${thread.id}`,
+    // Store verdict in thread's debate_quality column.
+    // Final audit P1-3: only an internal caller (cron, MCP with the internal
+    // secret) may persist — a public POST gets the verdict but writes nothing.
+    // The thread was already pinned to scope=public above, so even the internal
+    // write can never touch a private thread.
+    if (isInternalRequest(req)) await fetch(
+      `${SB_URL}/rest/v1/forum_threads?id=eq.${thread.id}&scope=eq.public`,
       {
         method: 'PATCH',
         headers: {

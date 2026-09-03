@@ -59,6 +59,28 @@ Additive only — every statement is `if not exists` / `create or replace`,
 and no existing column or row is rewritten. Safe to apply before step 4;
 until the flag flips, nothing writes to these tables.
 
+## 2b. Apply migration `20260903000010_lock_down_public_reads.sql` — BEFORE step 4
+
+Added by the final audit (round-2 remediation, `docs/security/2026-09-03-remediation-r2.md`).
+Revokes anon/authenticated on `api_cache`, `agent_trades`, `agent_cycles`, adds the
+shaped views `agent_trades_public` / `agent_cycles_public` the dashboard now reads,
+and re-parents swap receipts in the identity merge. Additive plus revokes; the
+server is unaffected (every server reader uses the service key). Regression:
+`DATABASE_URL=… npm run test:rls-lockdown-pg`. After applying, confirm with
+`bobby_rls_matrix()` that no anon policy remains on those three tables.
+
+## 2c. Safe transaction — activate the canonical Pyth on TrackRecordV2 (C-02)
+
+Read-only state on 2026-09-03: `activePyth = 0x8250…` (old), `0xbC16…` approved,
+timelock elapsed 2026-08-17. One transaction from the 2/3 Safe `0x8BE6…53b4`:
+
+- to: `0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321`
+- value: 0
+- data: `0xb4d6badf000000000000000000000000bc16aee60f64864882bc6c4e428e148fc0e272f5`
+  (`activatePyth(0xbC16aee60f64864882BC6C4E428e148Fc0E272F5)`)
+
+Then `npm run check:mainnet:postdeploy` — the verifier that failed in round 1.
+
 ## 3. `PROTOCOL_CHAIN=base` in the production environment
 
 `api/_lib/chains.ts` resolves this strictly: an unknown value throws, and
@@ -97,6 +119,13 @@ X Layer is archive-only since round 7. The key has no remaining consumer.
 Revoke it in the OKX console (read-only market data needs no key).
 
 ---
+
+## Not a switch step, but blocks citing the registry
+
+`HardnessRegistry` and `BobbyAdversarialBounties` are fixed in source
+(`security/remediation-r2`) and unchanged on chain — both are non-upgradeable.
+Redeploy is under the three-round `.sol` audit rule. Until then, do not cite
+HardnessRegistry stats publicly; both contracts hold 0 ETH.
 
 ## Rollback
 
