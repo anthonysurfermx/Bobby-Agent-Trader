@@ -15,7 +15,7 @@ import {
   BOBBY_TRACK_RECORD,
 } from './_lib/protocol-constants.js';
 import { BASE_SEPOLIA, DEFAULT_CHAIN, XLAYER } from './_lib/chains.js';
-import { readMcpCallFee } from './_lib/xlayer-payments.js';
+import { readMcpCallFee } from './_lib/protocol-payments.js';
 
 export const config = { maxDuration: 10 };
 

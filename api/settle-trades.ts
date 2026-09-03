@@ -4,9 +4,9 @@
 //   1. Pull confirmed, unsettled trades (agent_trades has no 'open' status).
 //   2. Price each symbol from Bobby's own rail on Base (pool execution
 //      price for allow-listed tokens; the underlying via Yahoo for anything else).
-//   3. For each open BUY: settle only when a later SELL by the same wallet
-//      realized it (exit = the sell's price). Legacy rows with stop/target
-//      settle against the current price. Nothing is realized by the clock.
+//   3. Base swaps are realized by FIFO fills inside confirm_swap_receipt
+//      (bobby_lot_fills). This cron only settles legacy rows that carry a
+//      stop or target, against the current price. Nothing is realized by the clock.
 //   4. UPDATE the row with outcome / exit_price / realized_pnl_pct / settled_at.
 //   5. Re-aggregate per cycle: set agent_cycles.trades_successful =
 //      count(agent_trades.outcome = 'win').
@@ -57,6 +57,9 @@ async function fetchOpenTrades(): Promise<OpenTrade[]> {
     `&settled_at=is.null` +
     `&direction=eq.BUY` +
     `&entry_price=not.is.null` +
+    // Base swaps are realized by FIFO fills inside confirm_swap_receipt; only
+    // rows that carry a stop or target (legacy theses) are settled here.
+    `&or=(stop_price.not.is.null,target_price.not.is.null)` +
     `&select=id,cycle_id,token_symbol,direction,entry_price,stop_price,target_price,expires_at,amount_usd,owner_address,created_at` +
     `&order=created_at.asc&limit=200`;
   const res = await fetch(url, { headers: sbHeaders() });
@@ -96,30 +99,6 @@ async function getCurrentPrice(symbol: string): Promise<number | null> {
     /* silent */
   }
   return null;
-}
-
-/**
- * The SELL that realized a BUY: same owner, same symbol, confirmed after the
- * buy. A lot still held is NOT realized — no "PnL" is invented at 48h; the
- * on-chain balance is what the risk gate reads for exposure.
- */
-async function realizingSell(trade: OpenTrade): Promise<{ price: number; at: string } | null> {
-  if (!trade.owner_address) return null;
-  const url =
-    `${SB_URL}/rest/v1/agent_trades` +
-    `?status=eq.confirmed&direction=eq.SELL` +
-    `&owner_address=eq.${trade.owner_address.toLowerCase()}` +
-    `&token_symbol=eq.${encodeURIComponent(trade.token_symbol)}` +
-    `&created_at=gt.${encodeURIComponent(trade.created_at)}` +
-    `&entry_price=not.is.null&select=entry_price,created_at&order=created_at.asc&limit=1`;
-  try {
-    const res = await fetch(url, { headers: sbHeaders() });
-    if (!res.ok) return null;
-    const rows = (await res.json()) as Array<{ entry_price: number; created_at: string }>;
-    return rows[0] ? { price: rows[0].entry_price, at: rows[0].created_at } : null;
-  } catch {
-    return null;
-  }
 }
 
 interface Decision {
@@ -261,18 +240,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }> = [];
 
     for (const trade of trades) {
-      // Base swaps: only a later SELL by the same wallet realizes the lot.
-      // Stop/target (legacy rows) still settle against the current price.
-      const sell = await realizingSell(trade);
-      let decision: Decision | null = null;
-      if (sell && trade.entry_price) {
-        const pnl = ((sell.price - trade.entry_price) / trade.entry_price) * 100;
-        decision = { outcome: Math.abs(pnl) < 1 ? 'break_even' : pnl > 0 ? 'win' : 'loss', exit_price: sell.price, pnl_pct: pnl };
-      } else if (trade.stop_price || trade.target_price) {
-        const currentPrice = prices.get(trade.token_symbol) ?? null;
-        if (!currentPrice) continue;
-        decision = decideOutcome({ ...trade, expires_at: null }, currentPrice, now);
-      }
+      const currentPrice = prices.get(trade.token_symbol) ?? null;
+      if (!currentPrice) continue;
+      // Never by the clock: a lot still held is not realized.
+      const decision = decideOutcome({ ...trade, expires_at: null }, currentPrice, now);
       if (!decision) continue;
 
       const ok = await updateTrade(trade.id, decision);

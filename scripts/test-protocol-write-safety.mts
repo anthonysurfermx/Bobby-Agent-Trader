@@ -153,8 +153,12 @@ assert.match(
   /assertProviderChain\(provider, chain\.id\)/,
 );
 
+// 2026-09-03: the X Layer activity generators are retired outright (410),
+// same shape as deploy-hardness — no signer, no provider, no contract call.
 for (const legacyWriter of ['api/generate-activity.ts', 'api/auto-bounty.ts']) {
-  assert.match(readFileSync(legacyWriter, 'utf8'), /requireLegacyXLayerMode/);
+  const src = readFileSync(legacyWriter, 'utf8');
+  assert.match(src, /status\(410\)/);
+  assert.doesNotMatch(src, /BOBBY_RECORDER_KEY|new ethers\.Wallet|sendTransaction|assertProviderChain|requireLegacyXLayerMode/);
 }
 
 const retiredDeploySource = readFileSync('api/deploy-hardness.ts', 'utf8');

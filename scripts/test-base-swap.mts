@@ -158,4 +158,28 @@ const single: QuotedRoute = { route: { kind: 'single', fee: 500 }, amountOut: 40
 // --- a recipient that is not the wallet is impossible to smuggle: build always checksums the given one ---
 assert.throws(() => buildSwapTx({ tokenIn: usdc, tokenOut: cbbtc, route: single, amountIn: 1n, minOut: 1n, recipient: '0xnot' as `0x${string}`, deadline }));
 
+// --- FIFO lots: one sell cannot settle two whole lots; partials; unmatched ---
+{
+  const { matchFifo } = await import('../api/_lib/lots.js');
+  const lots = [{ id: 'a', unitsRemaining: 1, entryPrice: 100 }, { id: 'b', unitsRemaining: 1, entryPrice: 120 }];
+  const one = matchFifo(lots, 1, 110);
+  assert.deepEqual(one.settled.map((s) => s.lotId), ['a'], 'a one-unit sell settles only the oldest one-unit lot');
+  assert.equal(one.lots[1].unitsRemaining, 1, 'the second lot is untouched');
+  assert.equal(one.settled[0].outcome, 'win');
+  const part = matchFifo(lots, 0.4, 130);
+  assert.equal(part.settled.length, 0, 'a partial sell settles nothing');
+  assert.equal(Number(part.lots[0].unitsRemaining.toFixed(6)), 0.6);
+  const rest = matchFifo(part.lots, 0.6, 90, part.fills);
+  assert.equal(rest.settled.length, 1);
+  assert.equal(Number(rest.settled[0].exitPrice.toFixed(4)), Number(((0.4 * 130 + 0.6 * 90) / 1).toFixed(4)), 'exit is fill-weighted across both sells');
+  const over = matchFifo(lots, 3, 100);
+  assert.equal(over.settled.length, 2);
+  assert.equal(over.unmatchedUnits, 1, 'units beyond the open lots stay unmatched');
+  assert.equal(matchFifo([], 1, 100).matchedAvgBuy, null, 'no lots → nothing matched');
+  // Buy, sell, buy again: the old sell must not touch the new lot (it was consumed at its own time).
+  const first = matchFifo([{ id: 'x', unitsRemaining: 1, entryPrice: 100 }], 1, 110);
+  const again = matchFifo([...first.lots, { id: 'y', unitsRemaining: 1, entryPrice: 105 }], 0, 0);
+  assert.equal(again.lots[1].unitsRemaining, 1, 'a re-bought lot is whole');
+}
+
 console.log('base-swap tests passed');

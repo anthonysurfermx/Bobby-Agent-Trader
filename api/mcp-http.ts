@@ -12,7 +12,7 @@ import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
-  XLAYER_CHAIN_ID,
+  PROTOCOL_CHAIN_ID,
   buildPostBountyCalldata,
   buildSubmitChallengeCalldata,
   extractPaymentTxHash,
@@ -21,7 +21,7 @@ import {
   readMinBounty,
   readMcpCallFee,
   verifyMcpPaymentTx,
-} from './_lib/xlayer-payments.js';
+} from './_lib/protocol-payments.js';
 import {
   createChallenge,
   atomicConsumeChallenge,
@@ -396,7 +396,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
     return {
       content: [{ type: 'text', text: JSON.stringify({
         contract: BOBBY_ADVERSARIAL_BOUNTIES,
-        chainId: XLAYER_CHAIN_ID,
+        chainId: PROTOCOL_CHAIN_ID,
         minBountyNative: minInfo.minBountyNative,
         nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
         count: bounties.length,
@@ -427,7 +427,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
     return {
       content: [{ type: 'text', text: JSON.stringify({
         kind: 'unsigned_tx',
-        chainId: XLAYER_CHAIN_ID,
+        chainId: PROTOCOL_CHAIN_ID,
         to: built.to,
         data: built.data,
         value: `0x${valueWei.toString(16)}`,
@@ -449,7 +449,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
     return {
       content: [{ type: 'text', text: JSON.stringify({
         kind: 'unsigned_tx',
-        chainId: XLAYER_CHAIN_ID,
+        chainId: PROTOCOL_CHAIN_ID,
         to: built.to,
         data: built.data,
         value: '0x0',
@@ -704,7 +704,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           price: fee ? `${fee.feeNative} ${fee.nativeSymbol}` : 'temporarily unavailable',
           priceWei: fee?.feeWei ?? null,
           protocol: 'x402',
-          chainId: XLAYER_CHAIN_ID,
+          chainId: PROTOCOL_CHAIN_ID,
           contract: BOBBY_AGENT_ECONOMY,
         },
       },
@@ -852,7 +852,7 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
             metadata: {
               challengeId,
               expiresAt,
-              chainId: XLAYER_CHAIN_ID,
+              chainId: PROTOCOL_CHAIN_ID,
               transport: 'streamable-http',
             },
           });
@@ -905,7 +905,7 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
           user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
           metadata: {
             arguments: args,
-            chainId: XLAYER_CHAIN_ID,
+            chainId: PROTOCOL_CHAIN_ID,
             transport: 'streamable-http',
           },
         });
@@ -921,7 +921,7 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
           valueNative: verifiedPayment.valueNative,
           nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
           contract: BOBBY_AGENT_ECONOMY,
-          chainId: XLAYER_CHAIN_ID,
+          chainId: PROTOCOL_CHAIN_ID,
           explorerUrl: `${DEFAULT_CHAIN.explorerUrl}/tx/${verifiedPayment.txHash}`,
         };
 
@@ -950,7 +950,7 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
           external_agent: String(req.headers['x-agent-name'] || '').trim() || null,
           request_ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null,
           user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
-          metadata: { arguments: args, chainId: XLAYER_CHAIN_ID, transport: 'streamable-http' },
+          metadata: { arguments: args, chainId: PROTOCOL_CHAIN_ID, transport: 'streamable-http' },
         });
       }
 

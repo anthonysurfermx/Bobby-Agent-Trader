@@ -62,29 +62,15 @@ export interface BuiltSwapRow {
 export async function recordBuiltSwap(row: BuiltSwapRow, fetchImpl: typeof fetch = storeFetch): Promise<{ recorded: boolean; reason?: string }> {
   if (!bobbyDbConfigured()) return { recorded: false, reason: 'database not configured' };
   try {
-    if (row.intentJti) {
-      // One intent, one swap. A confirmed row spends the jti for good; a row
-      // still 'built' (deadline passed, re-quote) is replaced, not duplicated.
-      const prior = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?wallet_address=eq.${row.wallet.toLowerCase()}&intent_jti=eq.${row.intentJti}&select=id,status`), { headers: bobbyServiceHeaders() });
-      if (!prior.ok) return { recorded: false, reason: `db ${prior.status}` };
-      const rows = (await prior.json()) as Array<{ id: string; status: string }>;
-      if (rows.some((r) => r.status === 'confirmed')) return { recorded: false, reason: 'intent already used' };
-      const built = rows.find((r) => r.status === 'built');
-      if (built) {
-        const patch = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?id=eq.${built.id}&status=eq.built`), {
-          method: 'PATCH',
-          headers: bobbyServiceHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-          body: JSON.stringify({
-            calldata_hash: row.calldataHash, deadline: new Date(row.deadline * 1000).toISOString(),
-            amount_in_raw: row.amountInRaw, quoted_out_raw: row.quotedOutRaw, min_amount_out_raw: row.minOutRaw, route: row.route,
-          }),
-        });
-        return patch.ok ? { recorded: true, reason: 'intent re-quoted; previous unconfirmed calldata superseded' } : { recorded: false, reason: `db ${patch.status}` };
-      }
-    }
-    const res = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?on_conflict=wallet_address,calldata_hash`), {
+    // One intent, ONE swap calldata — ever. The first swap calldata recorded
+    // for a jti consumes it (the partial unique index on (wallet, intent_jti)
+    // is the arbiter; no read-then-write). Approval-only builds record
+    // nothing, so they do not consume. If the deadline passes before signing
+    // the human needs a new intent: every calldata Bobby ever handed out for
+    // an intent is exactly the row that exists.
+    const res = await fetchImpl(bobbyRest(SWAP_RECEIPTS_TABLE), {
       method: 'POST',
-      headers: bobbyServiceHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' }),
+      headers: bobbyServiceHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
       body: JSON.stringify({
         identity_id: row.identityId ?? null,
         cycle_id: row.cycleId ?? null,
@@ -107,7 +93,14 @@ export async function recordBuiltSwap(row: BuiltSwapRow, fetchImpl: typeof fetch
         platform: row.platform ?? 'web',
       }),
     });
-    if (res.ok) return { recorded: true, ...(row.cycleId ? {} : {}) };
+    if (res.ok) return { recorded: true };
+    if (res.status === 409) {
+      // Two unique keys can fire. The same calldata again (re-quote returned
+      // identical bytes) is fine; the same intent with different calldata is not.
+      const same = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?wallet_address=eq.${row.wallet.toLowerCase()}&calldata_hash=eq.${row.calldataHash}&select=id`), { headers: bobbyServiceHeaders() });
+      if (same.ok && ((await same.json()) as unknown[]).length) return { recorded: true, reason: 'already recorded' };
+      if (row.intentJti) return { recorded: false, reason: 'intent already used' };
+    }
     // 23503 = the cycle row is not there (a cycle whose log failed, or a stale
     // id). The swap is still Bobby's; record it unlinked and say so.
     const text = await res.text().catch(() => '');
@@ -232,7 +225,7 @@ interface BuiltRow {
 }
 
 /** What the trade row will say, derived from chain data and the built row. */
-export function tradeFacts(row: Pick<BuiltRow, 'token_in_address' | 'token_out_address' | 'amount_in_raw'>, v: ChainVerification): { tokenSymbol: string; tokenAddress: string; direction: 'BUY' | 'SELL'; amountUsd: number; entryPrice: number | null } | null {
+export function tradeFacts(row: Pick<BuiltRow, 'token_in_address' | 'token_out_address' | 'amount_in_raw'>, v: ChainVerification): { tokenSymbol: string; tokenAddress: string; direction: 'BUY' | 'SELL'; amountUsd: number; entryPrice: number | null; units: number } | null {
   const tokenIn = findBaseToken(row.token_in_address);
   const tokenOut = findBaseToken(row.token_out_address);
   if (!tokenIn || !tokenOut) return null;
@@ -249,6 +242,7 @@ export function tradeFacts(row: Pick<BuiltRow, 'token_in_address' | 'token_out_a
     direction: buying ? 'BUY' : 'SELL',
     amountUsd: Number(amountUsd.toFixed(2)),
     entryPrice: assetUnits > 0 ? amountUsd / assetUnits : null,
+    units: assetUnits,
   };
 }
 
@@ -295,6 +289,7 @@ export async function confirmSwapReceipt(
         p_direction: facts.direction,
         p_amount_usd: facts.amountUsd,
         p_entry_price: facts.entryPrice,
+        p_units: facts.units,
       }),
     });
     if (!rpc.ok) return { ...none, outcome: 'db_error', id: rows[0].id };

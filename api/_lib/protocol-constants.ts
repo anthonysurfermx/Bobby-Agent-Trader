@@ -22,11 +22,12 @@ export const BOBBY_PROTOCOL_BASE_URL =
 // aliases must move together with PROTOCOL_CHAIN — misleading names and all.
 
 /** @deprecated use DEFAULT_CHAIN.id / getChain(id) from ./chains.js */
-export const XLAYER_CHAIN_ID = DEFAULT_CHAIN.id;
+/** The protocol chain (Base unless PROTOCOL_CHAIN says base-sepolia). Formerly misnamed XLAYER_CHAIN_ID. */
+export const PROTOCOL_CHAIN_ID = DEFAULT_CHAIN.id;
 /** @deprecated use DEFAULT_CHAIN.rpcUrl */
-export const XLAYER_RPC_URL = DEFAULT_CHAIN.rpcUrl;
+export const PROTOCOL_RPC_URL = DEFAULT_CHAIN.rpcUrl;
 /** @deprecated use DEFAULT_CHAIN.rpcFallbackUrl */
-export const XLAYER_RPC_FALLBACK_URL = DEFAULT_CHAIN.rpcFallbackUrl ?? DEFAULT_CHAIN.rpcUrl;
+export const PROTOCOL_RPC_FALLBACK_URL = DEFAULT_CHAIN.rpcFallbackUrl ?? DEFAULT_CHAIN.rpcUrl;
 
 /** @deprecated use DEFAULT_CHAIN.contracts.* */
 export const BOBBY_TREASURY = DEFAULT_CHAIN.contracts.treasury;

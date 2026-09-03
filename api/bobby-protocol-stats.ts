@@ -11,13 +11,13 @@ import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
-  XLAYER_RPC_URL,
+  PROTOCOL_RPC_URL,
   getEconomyStats,
   listRecentBounties,
   readBounty,
   readMinBounty,
   readNextBountyId,
-} from './_lib/xlayer-payments.js';
+} from './_lib/protocol-payments.js';
 import {
   BOBBY_AGENT_REGISTRY,
   BOBBY_CONVICTION_ORACLE,
@@ -56,7 +56,7 @@ const TRACK_RECORD_INTERFACE = new Interface([
 const WIN_RATE_FN = trackRecordWinRateFunction(DEFAULT_CHAIN.id);
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
-  const urls = [...new Set([XLAYER_RPC_URL, DEFAULT_CHAIN.rpcFallbackUrl].filter(Boolean))] as string[];
+  const urls = [...new Set([PROTOCOL_RPC_URL, DEFAULT_CHAIN.rpcFallbackUrl].filter(Boolean))] as string[];
   let lastError: unknown;
 
   for (const url of urls) {

@@ -1,7 +1,7 @@
 import {
   BOBBY_HARDNESS_REGISTRY,
   BOBBY_PROTOCOL_BASE_URL,
-  XLAYER_RPC_URL,
+  PROTOCOL_RPC_URL,
 } from './protocol-constants.js';
 import { DEFAULT_CHAIN } from './chains.js';
 import {
@@ -10,7 +10,7 @@ import {
   recorderKeyEnvForChain,
 } from './protocol-write-safety.js';
 
-const XLAYER_RPC = XLAYER_RPC_URL;
+const XLAYER_RPC = PROTOCOL_RPC_URL;
 export const HARDNESS_REGISTRY_ADDRESS = BOBBY_HARDNESS_REGISTRY;
 
 const HARDNESS_REGISTRY_ABI = [

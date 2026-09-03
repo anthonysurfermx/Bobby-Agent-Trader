@@ -22,11 +22,12 @@ process.env.BOBBY_SESSION_SECRET = process.env.BOBBY_SESSION_SECRET || 'e2e-sess
 const { quoteBaseSwap, SWAP_ROUTER02, baseClient } = await import('../api/_lib/base-swap.js');
 const { verifySwapOnChain, confirmSwapReceipt, recordBuiltSwap, setReceiptStoreFetchForTests } = await import('../api/_lib/swap-receipts.js');
 const { prepareBaseIntent } = await import('../api/_lib/dex-execution.js');
+const { matchFifo } = await import('../api/_lib/lots.js');
 const { BASE_USDC } = await import('../src/lib/base-swap/tokens.js');
 
 // ---------- in-memory PostgREST for swap_receipts ----------
 type Row = Record<string, unknown> & { id: string };
-const tables: Record<string, Row[]> = { bobby_swap_receipts: [], agent_trades: [], agent_cycles: [{ id: 'cycle-e2e', trades_executed: 0, total_usd_deployed: 0 }] };
+const tables: Record<string, Row[]> = { bobby_swap_receipts: [], agent_trades: [], bobby_lot_fills: [], agent_cycles: [{ id: 'cycle-e2e', trades_executed: 0, total_usd_deployed: 0 }] };
 let nextId = 1;
 let storeDown = false;
 const fakeFetch: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -44,8 +45,20 @@ const fakeFetch: typeof fetch = (async (input: RequestInfo | URL, init?: Request
     if (!wasConfirmed) Object.assign(r, { status: 'confirmed', tx_hash: p.p_tx_hash, block_number: p.p_block_number, block_timestamp: p.p_block_timestamp, amount_out_raw: p.p_amount_out_raw, confirmed_at: new Date().toISOString() });
     let t = tables.agent_trades.find((x) => x.idempotency_key === `swap:${p.p_tx_hash}`);
     if (!t) {
-      t = { id: `agent_trades-${nextId++}`, cycle_id: r.cycle_id, chain: 'base', token_address: p.p_token_address, token_symbol: p.p_token_symbol, direction: p.p_direction, amount_usd: p.p_amount_usd, entry_price: p.p_entry_price, tx_hash: p.p_tx_hash, status: 'confirmed', owner_address: p.p_wallet, idempotency_key: `swap:${p.p_tx_hash}`, settled_at: p.p_direction === 'SELL' ? new Date().toISOString() : null };
+      t = { id: `agent_trades-${nextId++}`, cycle_id: r.cycle_id, chain: 'base', token_address: p.p_token_address, token_symbol: p.p_token_symbol, direction: p.p_direction, amount_usd: p.p_amount_usd, entry_price: p.p_entry_price, tx_hash: p.p_tx_hash, status: 'confirmed', owner_address: p.p_wallet, idempotency_key: `swap:${p.p_tx_hash}`, settled_at: p.p_direction === 'SELL' ? new Date().toISOString() : null, units: p.p_units, units_remaining: p.p_direction === 'BUY' ? p.p_units : 0, created_at: new Date().toISOString() };
       tables.agent_trades.push(t);
+      if (p.p_direction === 'SELL' && p.p_units > 0) {
+        // Same FIFO the SQL function runs, via the shared pure matcher.
+        const lots = tables.agent_trades.filter((x) => x.owner_address === p.p_wallet && x.token_symbol === p.p_token_symbol && x.direction === 'BUY' && Number(x.units_remaining) > 0).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+        const res = matchFifo(lots.map((l) => ({ id: l.id as string, unitsRemaining: Number(l.units_remaining), entryPrice: Number(l.entry_price) })), Number(p.p_units), Number(p.p_entry_price), tables.bobby_lot_fills.map((fl) => ({ lotId: fl.buy_trade_id as string, units: Number(fl.units), buyPrice: Number(fl.buy_price), sellPrice: Number(fl.sell_price) })));
+        for (const fl of res.fills) tables.bobby_lot_fills.push({ id: `fill-${nextId++}`, buy_trade_id: fl.lotId, sell_trade_id: t.id, units: fl.units, buy_price: fl.buyPrice, sell_price: fl.sellPrice });
+        for (const l of res.lots) { const row = tables.agent_trades.find((x) => x.id === l.id)!; row.units_remaining = l.unitsRemaining; }
+        for (const st of res.settled) { const row = tables.agent_trades.find((x) => x.id === st.lotId)!; Object.assign(row, { exit_price: st.exitPrice, realized_pnl_pct: st.pnlPct, outcome: st.outcome, settled_at: new Date().toISOString() }); }
+        if (res.matchedUnits > 0 && res.matchedAvgBuy) {
+          const pnl = ((Number(p.p_entry_price) - res.matchedAvgBuy) / res.matchedAvgBuy) * 100;
+          Object.assign(t, { units: res.matchedUnits, units_remaining: res.unmatchedUnits, entry_price: res.matchedAvgBuy, exit_price: p.p_entry_price, realized_pnl_pct: pnl, outcome: Math.abs(pnl) < 1 ? 'break_even' : pnl > 0 ? 'win' : 'loss' });
+        } else Object.assign(t, { units: 0, units_remaining: res.unmatchedUnits });
+      }
       const c = r.cycle_id ? tables.agent_cycles.find((x) => x.id === r.cycle_id) : null;
       if (c) { c.trades_executed = Number(c.trades_executed) + 1; c.total_usd_deployed = Number(c.total_usd_deployed) + Number(p.p_amount_usd); }
     }
@@ -61,8 +74,11 @@ const fakeFetch: typeof fetch = (async (input: RequestInfo | URL, init?: Request
     if (name === 'bobby_swap_receipts') {
       // FK emulation: a cycle id that is not in agent_cycles is a 23503.
       if (row.cycle_id && !tables.agent_cycles.some((c) => c.id === row.cycle_id)) return json({ code: '23503', message: 'insert violates foreign key constraint bobby_swap_receipts_cycle_id_fkey' }, 409);
-      const dup = table.find((r) => r.wallet_address === row.wallet_address && r.calldata_hash === row.calldata_hash);
-      if (!dup) table.push({ ...row, id: `row-${nextId++}` });
+      // Unique keys: (wallet, calldata_hash) and the partial (wallet, intent_jti).
+      const dupCalldata = table.some((r) => r.wallet_address === row.wallet_address && r.calldata_hash === row.calldata_hash);
+      const dupJti = row.intent_jti && table.some((r) => r.wallet_address === row.wallet_address && r.intent_jti === row.intent_jti);
+      if (dupCalldata || dupJti) return json({ code: '23505', message: 'duplicate key value violates unique constraint' }, 409);
+      table.push({ ...row, id: `row-${nextId++}` });
       return new Response(null, { status: 201 });
     }
     const created = { ...row, id: `${name}-${nextId++}` };
@@ -235,18 +251,34 @@ if (process.env.E2E_STOCKS === '1') {
     const base = { wallet: account.address, cycleId: 'cycle-e2e', intentJti: jti, tokenIn: q1.tokenIn, tokenOut: q1.tokenOut, amountInRaw: q1.amountInRaw, quotedOutRaw: q1.amountOutRaw, minOutRaw: q1.minAmountOutRaw, route: q1.route.description, router: q1.venue.router, deadline: q1.deadline };
     const r1 = await recordBuiltSwap({ ...base, calldataHash: q1.tx!.calldataHash! });
     assert.equal(r1.recorded, true, r1.reason);
+    // A second, different calldata for the same intent BEFORE anything confirmed: refused,
+    // so Bobby never hands out two valid swaps for one intent.
+    await new Promise((r) => setTimeout(r, 1100)); // a later deadline → different calldata
     const q2 = await quoteBaseSwap({ tokenIn: 'ETH', tokenOut: 'USDC', amount: '0.002', recipient: account.address });
+    assert.notEqual(q2.tx!.calldataHash, q1.tx!.calldataHash, 'second build is different calldata');
     const r2 = await recordBuiltSwap({ ...base, calldataHash: q2.tx!.calldataHash!, deadline: q2.deadline });
-    assert.equal(r2.recorded, true, r2.reason);
-    assert.match(String(r2.reason), /superseded/, 're-quote replaced the unconfirmed row');
-    assert.equal(table.filter((r) => r.intent_jti === jti).length, 1, 'still one row for the intent');
-    const { hash } = await send(q2.tx!.swap!);
+    assert.equal(r2.recorded, false);
+    assert.equal(r2.reason, 'intent already used', 'second calldata for the same intent is never delivered');
+    assert.equal(table.filter((r) => r.intent_jti === jti).length, 1, 'exactly one row for the intent');
+    const r1b = await recordBuiltSwap({ ...base, calldataHash: q1.tx!.calldataHash! });
+    assert.equal(r1b.recorded, true, 'the same calldata again is idempotent');
+    // Only q1 was ever delivered; broadcast it, confirm, and the jti is spent for good.
+    const { hash } = await send(q1.tx!.swap!);
     const vj = await verifySwapOnChain(hash, account.address, baseClient());
     assert.equal((await confirmSwapReceipt(vj, account.address)).outcome, 'confirmed');
     const r3 = await recordBuiltSwap({ ...base, calldataHash: ('0x' + 'ef'.repeat(32)) as Hex });
     assert.equal(r3.recorded, false);
     assert.equal(r3.reason, 'intent already used', 'a spent intent cannot produce another swap');
-    console.log('single-use intent: supersede while built, refused once confirmed');
+    // FIFO: this 0.002 ETH sell consumed part of the 15 USDC → ETH lot; the earlier 0.01 ETH sell had no lot (unmatched).
+    const lot = tables.agent_trades.find((t) => t.direction === 'BUY' && t.token_symbol === 'WETH')!;
+    assert.ok(Number(lot.units_remaining) > 0 && Number(lot.units_remaining) < Number(lot.units), `lot partially consumed: ${lot.units_remaining}/${lot.units}`);
+    assert.ok(!lot.settled_at, 'a partially consumed lot stays open');
+    const sells = tables.agent_trades.filter((t) => t.direction === 'SELL' && t.token_symbol === 'WETH');
+    const unmatched = sells.find((t) => Number(t.units_remaining) > 0 && Number(t.units) === 0);
+    assert.ok(unmatched, 'the sell before any lot is fully unmatched, never a realization');
+    const matched = sells.find((t) => Number(t.units) > 0);
+    assert.ok(matched && matched.outcome && tables.bobby_lot_fills.some((fl) => fl.sell_trade_id === matched.id), 'the later sell produced a fill and an outcome');
+    console.log(`single-use intent: second calldata refused before confirm, spent after; FIFO: lot ${Number(lot.units_remaining).toFixed(6)}/${Number(lot.units).toFixed(6)} left, ${tables.bobby_lot_fills.length} fill(s)`);
   }
 
   // Repair: a confirmed receipt whose trade vanished gets it back on the next confirm ('already').

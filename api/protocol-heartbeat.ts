@@ -15,15 +15,15 @@ import {
   BOBBY_HARDNESS_REGISTRY,
   BOBBY_TRACK_RECORD,
   BOBBY_TREASURY,
-  XLAYER_CHAIN_ID,
-  XLAYER_RPC_FALLBACK_URL,
-  XLAYER_RPC_URL,
+  PROTOCOL_CHAIN_ID,
+  PROTOCOL_RPC_FALLBACK_URL,
+  PROTOCOL_RPC_URL,
 } from './_lib/protocol-constants.js';
 
 export const config = { maxDuration: 25 };
 
-const XLAYER_RPC = XLAYER_RPC_FALLBACK_URL;
-const XLAYER_RPC_FALLBACK = XLAYER_RPC_URL;
+const XLAYER_RPC = PROTOCOL_RPC_FALLBACK_URL;
+const XLAYER_RPC_FALLBACK = PROTOCOL_RPC_URL;
 const SB_URL = bobbyDbUrl();
 const SB_KEY = bobbyReadKey();
 
@@ -125,7 +125,7 @@ const trackRecordIface = new Interface([
 
 // V2 (Base) has no combined getWinRate (D-1); the heartbeat's headline is the
 // VERIFIED win rate there. On X Layer the v1 selector stays.
-const HEARTBEAT_WIN_RATE_FN = DEFAULT_CHAIN.id === XLAYER_CHAIN_ID ? 'getWinRate' : 'getVerifiedWinRate';
+const HEARTBEAT_WIN_RATE_FN = DEFAULT_CHAIN.id === PROTOCOL_CHAIN_ID ? 'getWinRate' : 'getVerifiedWinRate';
 
 const bountiesIface = new Interface([
   'function nextBountyId() view returns (uint256)',
@@ -421,7 +421,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       cached: false,
       stale: false,
       chain: {
-        id: XLAYER_CHAIN_ID,
+        id: PROTOCOL_CHAIN_ID,
         name: DEFAULT_CHAIN.name,
         nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
         explorerUrl: DEFAULT_CHAIN.explorerUrl,
@@ -506,7 +506,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       stale: false,
       error: msg,
       timestamp: new Date().toISOString(),
-      chain: { id: XLAYER_CHAIN_ID, name: DEFAULT_CHAIN.name, nativeSymbol: DEFAULT_CHAIN.nativeSymbol, explorerUrl: DEFAULT_CHAIN.explorerUrl, blockNumber: 0, status: 'degraded' },
+      chain: { id: PROTOCOL_CHAIN_ID, name: DEFAULT_CHAIN.name, nativeSymbol: DEFAULT_CHAIN.nativeSymbol, explorerUrl: DEFAULT_CHAIN.explorerUrl, blockNumber: 0, status: 'degraded' },
       treasury: { address: TREASURY, balanceNative: '0.0000' },
       revenue: { totalVolumeNative: '0.0000', nativeSymbol: DEFAULT_CHAIN.nativeSymbol, totalPayments: 0, totalMcpCalls: 0, totalDebates: 0 },
       protocolTotals: { bountyEscrowNative: '0.0000', totalBounties: 0, protocolNotionalNative: '0.0000', totalInteractions: 0 },

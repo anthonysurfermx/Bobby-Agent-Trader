@@ -1002,9 +1002,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Circuit breaker: halt on sustained losses. Only an authenticated
   // operator (Bearer CRON_SECRET) may force-bypass with ?force=true;
   // unauthenticated manual runs and cron always respect it.
+  // The breaker is a per-wallet brake on that wallet's realized losses. Cron
+  // cycles trade for nobody, so no wallet's losses may stop the shared
+  // analysis; only manual cycles with a wallet consult it.
   const forceBypass = req.query.force === 'true' && isManual && hasOperatorAuth;
-  if (!forceBypass) {
-    const breaker = await checkCircuitBreaker(isManual && walletAddress ? walletAddress : null);
+  if (!forceBypass && isManual && walletAddress) {
+    const breaker = await checkCircuitBreaker(walletAddress);
     if (breaker.halted) {
       console.warn(`[Agent] CIRCUIT BREAKER ACTIVE — ${breaker.reason}: ${breaker.detail}`);
       const haltResult = {

@@ -10,12 +10,12 @@ import { Interface } from 'ethers';
 import {
   BOBBY_AGENT_ECONOMY,
   BOBBY_ADVERSARIAL_BOUNTIES,
-  XLAYER_CHAIN_ID,
-  XLAYER_RPC_URL,
+  PROTOCOL_CHAIN_ID,
+  PROTOCOL_RPC_URL,
   getEconomyStats,
   readMinBounty,
   readNextBountyId,
-} from './_lib/xlayer-payments.js';
+} from './_lib/protocol-payments.js';
 import {
   BOBBY_CONVICTION_ORACLE,
   BOBBY_PROTOCOL_BASE_URL,
@@ -48,14 +48,14 @@ const TRACK_RECORD_INTERFACE = new Interface([
   'function totalPnlBpsVerified() view returns (int256)',
 ]);
 
-const IS_V2_CHAIN = DEFAULT_CHAIN.id !== XLAYER_CHAIN_ID;
+const IS_V2_CHAIN = DEFAULT_CHAIN.id !== PROTOCOL_CHAIN_ID;
 const FN_WIN_RATE = IS_V2_CHAIN ? 'getVerifiedWinRate' : 'getWinRate';
 const FN_WINS = IS_V2_CHAIN ? 'winsVerified' : 'wins';
 const FN_LOSSES = IS_V2_CHAIN ? 'lossesVerified' : 'losses';
 const FN_PNL = IS_V2_CHAIN ? 'totalPnlBpsVerified' : 'totalPnlBps';
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(XLAYER_RPC_URL, {
+  const res = await fetch(PROTOCOL_RPC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
@@ -158,11 +158,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     protocol: 'Bobby Protocol',
     version: '3.1.0',
     chain: {
-      id: XLAYER_CHAIN_ID,
+      id: PROTOCOL_CHAIN_ID,
       name: DEFAULT_CHAIN.name,
       nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
       explorerUrl: DEFAULT_CHAIN.explorerUrl,
-      rpc: XLAYER_RPC_URL,
+      rpc: PROTOCOL_RPC_URL,
     },
     fetchedAt: new Date().toISOString(),
 

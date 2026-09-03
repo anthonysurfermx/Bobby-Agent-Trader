@@ -10,11 +10,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
 import {
   BOBBY_AGENT_ECONOMY,
-  XLAYER_CHAIN_ID,
+  PROTOCOL_CHAIN_ID,
   extractPaymentTxHash,
   readMcpCallFee,
   verifyMcpPaymentTx,
-} from './_lib/xlayer-payments.js';
+} from './_lib/protocol-payments.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
 import {
   createChallenge,
@@ -47,7 +47,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           { name: 'bobby_uniswap_quote', description: 'Exact-input quote on Uniswap V3, Base (read-only)', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'ETH' }, tokenOut: { type: 'string', default: 'USDC' }, amount: { type: 'string', default: '1' }, amountIn: { type: 'string' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
           { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades)', inputSchema: { type: 'object', properties: {} } },
           { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance on any chain', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'base' } } } },
-          { name: 'bobby_wallet_portfolio', description: 'Get portfolio of any wallet address (multi-chain)', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '196' } }, required: ['address'] } },
+          { name: 'bobby_wallet_portfolio', description: 'Get portfolio of any wallet address (multi-chain)', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '8453' } }, required: ['address'] } },
           { name: 'bobby_security_scan', description: 'Scan a token contract for honeypot, rug pull, and safety risks', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '1' } }, required: ['address'] } },
           { name: 'bobby_dex_trending', description: 'Hot trending tokens on-chain right now', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' } } } },
           { name: 'bobby_dex_signals', description: 'Smart money / whale / KOL buy signals', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' }, type: { type: 'string', default: 'smart_money' } } } },
@@ -131,7 +131,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
       if (toolName === 'bobby_wallet_portfolio') {
         const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
           method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
-          body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '196' } }),
+          body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '8453' } }),
         });
         return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
       }
@@ -189,7 +189,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           price: fee ? `${fee.feeNative} ${fee.nativeSymbol} per call` : 'temporarily unavailable',
           priceWei: fee?.feeWei ?? null,
           protocol: 'x402',
-          chainId: XLAYER_CHAIN_ID,
+          chainId: PROTOCOL_CHAIN_ID,
           settlementContract: BOBBY_AGENT_ECONOMY,
           settlementMethod: 'payMCPCall(bytes32 challengeId, string toolName)',
         },
@@ -336,7 +336,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
           metadata: {
             arguments: args,
-            chainId: XLAYER_CHAIN_ID,
+            chainId: PROTOCOL_CHAIN_ID,
             paymentContract: BOBBY_AGENT_ECONOMY,
           },
         });
@@ -363,7 +363,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_agent: String(req.headers['user-agent'] || '').slice(0, 250) || null,
           metadata: {
             arguments: args,
-            chainId: XLAYER_CHAIN_ID,
+            chainId: PROTOCOL_CHAIN_ID,
             paymentContract: BOBBY_AGENT_ECONOMY,
             challengeId: verifiedPayment.challengeId,
           },

@@ -2,17 +2,17 @@ import { Interface, formatEther } from 'ethers';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
-  XLAYER_CHAIN_ID,
-  XLAYER_RPC_FALLBACK_URL,
-  XLAYER_RPC_URL,
+  PROTOCOL_CHAIN_ID,
+  PROTOCOL_RPC_FALLBACK_URL,
+  PROTOCOL_RPC_URL,
 } from './protocol-constants.js';
 import { DEFAULT_CHAIN } from './chains.js';
 
 export {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
-  XLAYER_CHAIN_ID,
-  XLAYER_RPC_URL,
+  PROTOCOL_CHAIN_ID,
+  PROTOCOL_RPC_URL,
 } from './protocol-constants.js';
 
 const ECONOMY_INTERFACE = new Interface([
@@ -204,7 +204,7 @@ interface RpcEnvelope<T> {
 }
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
-  const urls = [...new Set([XLAYER_RPC_URL, XLAYER_RPC_FALLBACK_URL].filter(Boolean))];
+  const urls = [...new Set([PROTOCOL_RPC_URL, PROTOCOL_RPC_FALLBACK_URL].filter(Boolean))];
   let lastError: unknown;
 
   for (const url of urls) {

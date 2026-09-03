@@ -125,6 +125,16 @@ Owned first: the round-4 note said "all green" while `test:protocol-write-safety
 | P1 | Circuit breaker global; `status: 'halted'` not in the schema | Breaker filters by `owner_address` for the requesting wallet (cron cycles never trade). A halted cycle logs `status: 'completed'` with the halt in `llm_reasoning`. |
 | P2 | Base-only not guaranteed by environment | `PROTOCOL_CHAIN=xlayer` now throws at boot ("retired"); `.env.example` says `base` / `8453`; MCP wallet tools default to `base`/`8453`; the OnchainOS leaderboard call in `mcp-http` is gone. X Layer config remains only for explorer links and read-only archive views. |
 
+## Review round 6 → what changed
+
+| # | Finding | Change |
+|---|---|---|
+| P1 | One sell could settle several whole lots; sells not consumed; PnL lots subtracted historical sells | FIFO lot accounting, atomic in SQL inside `confirm_swap_receipt`: `agent_trades.units/units_remaining`, `bobby_lot_fills` (buy id, sell id, units, buy price, sell price). A SELL consumes open lots of the same wallet+symbol oldest-first, partially if needed; a lot closes with the fill-weighted exit; units no lot covers stay unmatched on the sell. The same algorithm lives in `api/_lib/lots.ts` (pure, unit-tested: one sell / two lots, partials, over-sell, re-buy) and drives the e2e's store double. `bobby-pnl` reads `units_remaining` for open lots; realizations are the SELL rows. `settle-trades` no longer touches Base rows (legacy stop/target rows only). |
+| P1 | A re-quote overwrote the built row: two valid calldatas, one recorded | One intent, one swap calldata — ever. The first recorded swap for a jti consumes it; the partial unique index `(wallet_address, intent_jti)` is the arbiter (no read-then-write, no `return=minimal` race). A second, different calldata for the same intent is refused before anything confirms (`409 intent_consumed`); the same calldata again is idempotent. Approval-only builds record nothing and do not consume. E2E: build `q1`, build `q2` before confirming → `q2` never delivered; broadcast `q1`; jti spent. |
+| P1 | `startingCapital` = all buys, `currentEquity` = open lots → $0 after a profitable round trip | Separated: `capitalDeployed`, `openPositionValue`, `realizedCash`, `realizedPnl`, `unrealizedPnl`, `portfolioEquity = capitalDeployed + realizedPnl + unrealizedPnl` (virtual portfolio). The screens' names map onto them (`startingCapital` = deployed, `currentEquity` = portfolio equity). Buy $100, sell $110 → equity $110. |
+| P2 | Cron could be halted by any user's losses | Only manual cycles with a wallet consult the breaker; cron trades for nobody and skips it. |
+| P2 | X Layer "active" in MCP payments | Those names were aliases of `DEFAULT_CHAIN` (Base) since the cutover. Renamed for truth: `api/_lib/protocol-payments.ts`, `PROTOCOL_CHAIN_ID` / `PROTOCOL_RPC_URL`; MCP wallet/portfolio defaults on Base. The only `XLAYER_*` left is the archive config in `chains.ts`. |
+
 ## Verification run
 
 ```

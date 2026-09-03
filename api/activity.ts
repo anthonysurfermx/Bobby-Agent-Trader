@@ -6,7 +6,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { listAgentCommerceEvents } from './_lib/agent-commerce-log.js';
-import { listRecentBounties } from './_lib/xlayer-payments.js';
+import { listRecentBounties } from './_lib/protocol-payments.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
 

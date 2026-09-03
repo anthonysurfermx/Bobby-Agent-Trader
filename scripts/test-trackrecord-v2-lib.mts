@@ -96,11 +96,11 @@ eq('X Layer stats use V1 combined win rate', trackRecordWinRateFunction(196), 'g
 eq('Base stats use V2 verified win rate', trackRecordWinRateFunction(8453), 'getVerifiedWinRate');
 eq('Base Sepolia stats use V2 verified win rate', trackRecordWinRateFunction(84532), 'getVerifiedWinRate');
 const protocolStatsSource = readFileSync('api/bobby-protocol-stats.ts', 'utf8');
-const paymentReaderSource = readFileSync('api/_lib/xlayer-payments.ts', 'utf8');
+const paymentReaderSource = readFileSync('api/_lib/protocol-payments.ts', 'utf8');
 ok('public stats report the selected chain id', protocolStatsSource.includes('id: DEFAULT_CHAIN.id'));
-ok('public stats do not use a legacy chain-id alias', !protocolStatsSource.includes('id: XLAYER_CHAIN_ID'));
+ok('public stats do not use a legacy chain-id alias', !protocolStatsSource.includes('id: PROTOCOL_CHAIN_ID'));
 ok('Base has an independent read fallback RPC', Boolean(BASE.rpcFallbackUrl));
-ok('shared protocol reads use the fallback RPC', paymentReaderSource.includes('XLAYER_RPC_FALLBACK_URL'));
+ok('shared protocol reads use the fallback RPC', paymentReaderSource.includes('PROTOCOL_RPC_FALLBACK_URL'));
 
 console.log(`\ntrackrecord-v2 lib: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
