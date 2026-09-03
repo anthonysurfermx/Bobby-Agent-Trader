@@ -1,0 +1,11 @@
+wallet identity → {"id":"3e4dffee","xp":30,"aura":8,"route":2}
+apple identity  → {"id":"15416602","via":"supabase","xp":10,"route":1}
+two different identities before linking: true
+desk issued code: 6 chars, expires 10:58Z
+phone claimed   → {"xp":40,"aura":10,"kept":"15416602-9282-4249-a8c6-b45c73b0f1b7","events":3,"merged":"3e4dffee-975a-41e4-a490-e281e47d1000","streak":1,"route_index":3}
+same code again → 404 (expect 404: single use)
+after link · apple door: {"id":"15416602","xp":40,"aura":10,"route":3,"wallet":"0x426349","linkedAuth":true}
+after link · wallet door: {"id":"15416602","xp":40,"aura":10,"route":3,"linkedAuth":true}
+ONE identity, same numbers on both doors: true
+world after link: {"inventory":["crypto_bay_data_dock:seed","crypto_bay_water_walkway:bloomed","crypto_bay_data_dock:seed"],"route":3}
+another account claiming the linked identity → 409 Those two identities already belong to different people
