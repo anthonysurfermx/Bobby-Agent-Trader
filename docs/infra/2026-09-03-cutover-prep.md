@@ -234,3 +234,19 @@ go: freeze destination → `replay-outbox --from target` → T0 both sides → `
 (destination as truth, legacy as restore target; control-plane row hash not compared)
 → unfreeze destination, which stays primary. A failed verify leaves the destination
 frozen on purpose. Expected production write pause: 1–2 minutes.
+
+### Rollback drill — PASSED (2026-09-03 08:39–08:41 UTC, outside demo hours)
+
+First run (08:35) replayed the 35 pending canary entries onto legacy (REPLAY COMPLETE,
+0 pending) and all 156 data checks passed, but `verify` failed on one tooling gap: legacy
+has no `bobby_sequence_check()` RPC. The destination was left frozen by design for ~2
+minutes, then reopened by hand. Fix: the drill now runs `sequences.sql` on legacy via psql
+(Keychain password) and checks each of the 7 sequences with a real `nextval()`, and calls
+`verify --skip-sequence-rpc` (explicit, logged as INFO). Second run (08:39): both sides
+frozen → REPLAY COMPLETE (0 entries) → 7/7 legacy sequences beyond `max(id)` → manifests
+under freeze → **legacy == destination for every data table** (control plane excluded by
+design) → destination unfrozen, **still primary**. Evidence:
+`docs/infra/evidence/2026-09-03-rollback-drill/`. Production write pause per run: ~2 min.
+
+**Migration operationally closed:** destination primary, legacy frozen read-only,
+journal armed on 32 tables, rollback certified end-to-end.

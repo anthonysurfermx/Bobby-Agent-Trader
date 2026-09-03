@@ -21,6 +21,9 @@ const args = process.argv.slice(2);
 const src = args[args.indexOf('--source') + 1];
 const tgt = args[args.indexOf('--target') + 1];
 const expectOutbox = args.includes('--expect-outbox');
+// The legacy project has no bobby_sequence_check(); the rollback drill proves its
+// sequences with psql instead and passes this flag explicitly.
+const skipSequenceRpc = args.includes('--skip-sequence-rpc');
 if (!src || !tgt) { console.error('--source and --target manifest paths are required'); process.exit(2); }
 interface Proof { nonNull: number; sha256: string }
 interface M { ref: string; allowMissing?: boolean; exclusions?: { agentIds: string[]; sessionIds: string[] }; tables: Array<{ table: string; exists: boolean; rows: number; sha256: string | null; proofs?: Record<string, Proof> }> }
@@ -65,8 +68,10 @@ const line = (ok: boolean, label: string, detail = '') => { if (!ok) failures +=
     }
   }
   // Identity sequences: real nextval() above max(id) on every identity table.
-  const seq = await rpc<Array<{ table_name: string; max_id: number | null; last_value: number | null; next_value: number; ok: boolean }>>(p, 'bobby_sequence_check');
-  if (seq.status !== 200 || !Array.isArray(seq.body)) {
+  const seq = skipSequenceRpc ? { status: 0, body: null } : await rpc<Array<{ table_name: string; max_id: number | null; last_value: number | null; next_value: number; ok: boolean }>>(p, 'bobby_sequence_check');
+  if (skipSequenceRpc) {
+    console.log('INFO   sequences: --skip-sequence-rpc — proven outside this tool (rollback drill runs sequences.sql + a psql check on the legacy target)');
+  } else if (seq.status !== 200 || !Array.isArray(seq.body)) {
     line(false, 'bobby_sequence_check() available on target', `HTTP ${seq.status} — apply 20260903000003_migration_outbox.sql`);
   } else {
     for (const t of IDENTITY_TABLES) {

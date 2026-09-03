@@ -1,0 +1,7 @@
+agent_memory 0 1 t
+cycle_transitions 0 1 t
+llm_calls 0 1 t
+hardness_agents 1 2 t
+hardness_agent_sessions 1 2 t
+hardness_agent_proofs 1 2 t
+trade_intents 0 1 t

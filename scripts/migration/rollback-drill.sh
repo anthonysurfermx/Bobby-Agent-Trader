@@ -32,13 +32,29 @@ sleep 12; log "production health: $(health_freeze)"
 log "2. replaying the journal destination → legacy"
 npx tsx scripts/migration/replay-outbox.mts --from target 2>&1 | tee "$OUT/replay.log"
 
-log "3. manifests under freeze on both sides"
+log "3a. legacy sequences: setval above the replayed ids, then a real nextval check (psql, password from the Keychain)"
+LEGACY_PW="$(security find-generic-password -s bobby/LEGACY_DB_PASSWORD -w)"
+LEGACY_CONN="host=db.$(echo "$SOURCE_SUPABASE_URL" | sed -E 's#https://([a-z]+)\..*#\1#').supabase.co port=5432 dbname=postgres user=postgres sslmode=require"
+PGPASSWORD="$LEGACY_PW" /opt/homebrew/opt/libpq/bin/psql "$LEGACY_CONN" -v ON_ERROR_STOP=1 -tAf scripts/migration/sequences.sql > /dev/null
+PGPASSWORD="$LEGACY_PW" /opt/homebrew/opt/libpq/bin/psql "$LEGACY_CONN" -v ON_ERROR_STOP=1 -tA -F' ' -c "
+  select t, coalesce(max_id,0) as max_id, nextval(seq) as next_value, nextval(seq) > coalesce(max_id,0) as ok from (
+    select 'agent_memory' t, pg_get_serial_sequence('public.agent_memory','id') seq, (select max(id) from public.agent_memory) max_id
+    union all select 'cycle_transitions', pg_get_serial_sequence('public.cycle_transitions','id'), (select max(id) from public.cycle_transitions)
+    union all select 'llm_calls', pg_get_serial_sequence('public.llm_calls','id'), (select max(id) from public.llm_calls)
+    union all select 'hardness_agents', pg_get_serial_sequence('public.hardness_agents','id'), (select max(id) from public.hardness_agents)
+    union all select 'hardness_agent_sessions', pg_get_serial_sequence('public.hardness_agent_sessions','id'), (select max(id) from public.hardness_agent_sessions)
+    union all select 'hardness_agent_proofs', pg_get_serial_sequence('public.hardness_agent_proofs','id'), (select max(id) from public.hardness_agent_proofs)
+    union all select 'trade_intents', pg_get_serial_sequence('public.trade_intents','id'), (select max(id) from public.trade_intents)) x" | tee "$OUT/legacy-sequences.txt"
+if grep -q " f$" "$OUT/legacy-sequences.txt"; then log "   a legacy sequence is NOT above max(id) — destination left FROZEN"; exit 1; fi
+log "   7/7 legacy sequences beyond max(id)"
+
+log "3b. manifests under freeze on both sides"
 npx tsx scripts/migration/t0-manifest.mts --side target --out "$OUT/t0-destination.json" 2>&1 | tail -1
 npx tsx scripts/migration/t0-manifest.mts --side source --out "$OUT/t0-legacy.json" 2>&1 | tail -1
 log "   verify: destination (as source of truth) vs legacy (as restore target)"
 # role swap: verify runs its orphan/sequence checks against TARGET_*, which must be legacy here
 if TARGET_SUPABASE_URL="$SOURCE_SUPABASE_URL" TARGET_SUPABASE_SERVICE_KEY="$SOURCE_SUPABASE_SERVICE_KEY" \
-   npx tsx scripts/migration/verify.mts --source "$OUT/t0-destination.json" --target "$OUT/t0-legacy.json" 2>&1 | tee "$OUT/verify.log" | tail -1 | grep -q '^VERIFIED'; then
+   npx tsx scripts/migration/verify.mts --source "$OUT/t0-destination.json" --target "$OUT/t0-legacy.json" --skip-sequence-rpc 2>&1 | tee "$OUT/verify.log" | tail -1 | grep -q '^VERIFIED'; then
   log "   legacy == destination for every data table"
 else
   log "   VERIFY FAILED — destination left FROZEN on purpose; inspect $OUT/verify.log before unfreezing"; exit 1
