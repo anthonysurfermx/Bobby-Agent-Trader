@@ -121,7 +121,39 @@ API (69 files):
 - `api/_lib/trackrecord-v2.ts`
 - `api/_lib/xlayer-payments.ts`
 
-UI (0 files):
+UI (28 files, 8 of them with chain selectors/options):
+- `src/components/WalletConnect.tsx`
+- `src/components/adams/AdamsChat.tsx`
+- `src/components/adams/DisclaimerBanner.tsx`
+- `src/components/adams/ExecutionTimeline.tsx`
+- `src/components/adams/IntelligenceFeed.tsx`
+- `src/components/adams/SwapConfirm.tsx` (selector)
+- `src/components/adams/XLayerSwapCard.tsx` (selector)
+- `src/components/agent-radar/AgentRadarLanding.tsx`
+- `src/components/agent-radar/OKXSwapWidget.tsx`
+- `src/components/agent-radar/YieldBanner.tsx`
+- `src/components/agentic/SkillsComparisonSection.tsx`
+- `src/components/charts/AIAgentSkillsTable.tsx`
+- `src/components/claw-trader/DexQuotePanel.tsx`
+- `src/config/reown.ts`
+- `src/data/playbooks.ts`
+- `src/lib/onchainos/dex-client.ts`
+- `src/lib/onchainos/xlayer-tokens.ts`
+- `src/pages/AgentForumPage.tsx`
+- `src/pages/BobbyArchitecturePage.tsx`
+- `src/pages/BobbyChallengePage.tsx` (selector)
+- `src/pages/BobbyDocsPage.tsx` (selector)
+- `src/pages/BobbyHarnessConsolePage.tsx`
+- `src/pages/BobbyMarketplacePage.tsx` (selector)
+- `src/pages/BobbyNetworkConsolePage.tsx`
+- `src/pages/BobbyProtocolLanding.tsx` (selector)
+- `src/pages/BobbySubmissionPage.tsx` (selector)
+- `src/pages/BobbyTelegramPage.tsx` (selector)
+- `src/pages/PolymarketTrackerPage.tsx`
 
+Routes in src/App.tsx mentioning X Layer:
+```
+(none)
+```
 
 Keep read-only: ledger rows, explorer links for historical X Layer receipts.
