@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useAccount, useSendTransaction, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi';
+import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { useAppKit } from '@reown/appkit/react';
 import { Check, Loader2, AlertTriangle } from 'lucide-react';
@@ -17,11 +17,6 @@ import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 // Payment config — retired X Layer rail (kept only for the notice copy)
 // Bobby treasury wallet (NOT the user's wallet)
-const BOBBY_WALLET = '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea' as `0x${string}`;
-const USDT_CONTRACT = '0x1E4a5963aBFD975d8c9021ce480b42188849D41d' as `0x${string}`;
-const PAYMENT_AMOUNT_OKB = BigInt('1000000000000000'); // 0.001 OKB
-const PAYMENT_AMOUNT_USDT = BigInt('10000'); // 0.01 USDT (6 decimals)
-const XLAYER_CHAIN_ID = 196;
 
 const DEMO_CONVERSATION = [
   {
@@ -67,13 +62,11 @@ export default function BobbyTelegramPage() {
   const [paymentError, setPaymentError] = useState('');
   const [session, setSession] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [payToken, setPayToken] = useState<'OKB' | 'USDT'>('OKB');
 
   // OKB native transfer
-  const { sendTransaction, data: sendTxHash } = useSendTransaction();
+  const sendTxHash: `0x${string}` | undefined = undefined; // payments retired
   // USDT ERC-20 transfer
-  const { writeContract, data: writeTxHash } = useWriteContract();
-  const { switchChain } = useSwitchChain();
+  const writeTxHash: `0x${string}` | undefined = undefined; // payments retired
 
   // Pick whichever hash exists
   const pendingTxHash = sendTxHash || writeTxHash;
@@ -250,90 +243,23 @@ export default function BobbyTelegramPage() {
                 </>
               )}
 
-              {/* STATE: IDLE (not connected) or CONNECTED (ready to pay) */}
+              {/* STATE: IDLE / CONNECTED — payments retired with the X Layer rail (2026-09-03) */}
               {(paymentState === 'idle' || paymentState === 'connected') && (
                 <>
-                  <div className="w-10 h-10 rounded bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-3">
-                    <span className="text-green-400 text-lg">⚡</span>
+                  <div className="w-10 h-10 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-3">
+                    <span className="text-amber-400 text-lg">⏸</span>
                   </div>
                   <h3 className="text-sm font-black mb-1">
-                    ACTIVATE BOBBY IN {groupInfo?.name?.toUpperCase() || 'YOUR GROUP'}
+                    ACTIVATION PAUSED FOR {groupInfo?.name?.toUpperCase() || 'YOUR GROUP'}
                   </h3>
-
-                  {/* Wallet connected indicator */}
-                  {isConnected && address && (
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      <span className="text-[9px] font-mono text-green-400/60">{address.slice(0, 6)}...{address.slice(-4)}</span>
-                    </div>
-                  )}
-
-                  {/* Receipt */}
                   <div className="bg-white/[0.02] border border-white/[0.06] rounded p-3 mb-4 text-left">
-                    <div className="flex justify-between text-[9px] font-mono mb-1">
-                      <span className="text-white/30">GROUP</span>
-                      <span className="text-white/60">{groupInfo?.name || 'Loading...'}</span>
-                    </div>
-                    <div className="flex justify-between text-[9px] font-mono mb-1">
-                      <span className="text-white/30">NETWORK</span>
-                      <span className="text-white/60">X Layer (196)</span>
-                    </div>
-                    <div className="flex justify-between text-[9px] font-mono mb-1">
-                      <span className="text-white/30">DURATION</span>
-                      <span className="text-white/60">30 Days Prepaid</span>
-                    </div>
-                    <div className="flex justify-between text-[9px] font-mono mb-1">
-                      <span className="text-white/30">AUTO-RENEW</span>
-                      <span className="text-white/60">OFF (You control)</span>
-                    </div>
-                    <div className="flex justify-between text-[9px] font-mono mb-1">
-                      <span className="text-white/30">PAY TO</span>
-                      <span className="text-green-400/60">{BOBBY_WALLET.slice(0, 6)}...{BOBBY_WALLET.slice(-4)}</span>
-                    </div>
-                    {/* Token selector */}
-                    <div className="flex gap-2 mt-2 pt-2 border-t border-white/[0.06] mb-2">
-                      <button onClick={() => setPayToken('OKB')}
-                        className={`flex-1 py-1.5 rounded text-[9px] font-mono font-bold transition-all ${payToken === 'OKB' ? 'bg-green-500/20 border border-green-500/40 text-green-400' : 'bg-white/[0.03] border border-white/[0.06] text-white/30'}`}>
-                        0.001 OKB
-                      </button>
-                      <button onClick={() => setPayToken('USDT')}
-                        className={`flex-1 py-1.5 rounded text-[9px] font-mono font-bold transition-all ${payToken === 'USDT' ? 'bg-green-500/20 border border-green-500/40 text-green-400' : 'bg-white/[0.03] border border-white/[0.06] text-white/30'}`}>
-                        0.01 USDT
-                      </button>
-                    </div>
-                    <div className="flex justify-between text-[9px] font-mono">
-                      <span className="text-white/40">COST</span>
-                      <span className="text-green-400 font-bold text-sm">{payToken === 'OKB' ? '0.001 OKB' : '0.01 USDT'}</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-2">
-                      <span className="text-[7px]">🛡</span>
-                      <span className="text-[7px] font-mono text-white/20">Secured by OKX X Layer (Chain 196)</span>
-                    </div>
+                    <p className="text-[9px] font-mono text-white/50 leading-relaxed">
+                      Paid activation ran on the X Layer rail, which Bobby retired on 2026-09-03. There is nothing to sign here: no wallet, no OKB, no USDT.
+                      Group activation returns with a checkout on Base. Until then the bot keeps answering in groups that were already active.
+                    </p>
                   </div>
-
-                  {/* Step 1: Connect OR Step 2: Pay */}
-                  {!isConnected ? (
-                    <button onClick={handleConnect}
-                      className="w-full py-3 bg-green-500 text-black font-mono text-[10px] font-black tracking-widest rounded active:scale-95 transition-all"
-                      style={{ boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
-                      CONNECT WALLET TO INITIALIZE
-                    </button>
-                  ) : (
-                    <>
-                      <div className="bg-amber-500/[0.06] border border-amber-500/20 rounded p-2 mb-3">
-                        <p className="text-[9px] font-mono text-amber-400/70">
-                          Wallet authorized. Broadcast activation onto X Layer.
-                        </p>
-                      </div>
-                      <button onClick={handlePay}
-                        className="w-full py-3 bg-green-500 text-black font-mono text-[10px] font-black tracking-widest rounded active:scale-95 transition-all animate-pulse"
-                        style={{ boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
-                        SIGN & PAY {payToken === 'OKB' ? '0.001 OKB' : '0.01 USDT'}
-                      </button>
-                    </>
-                  )}
                   <p className="text-[7px] font-mono text-white/15 mt-2 leading-relaxed">
-                    Payments are final and non-refundable. Service activates immediately upon block confirmation. Cancel anytime by removing the bot from your group.
+                    Nothing on this page moves funds. If a message asks you to pay to activate Bobby, it is not from us.
                   </p>
                 </>
               )}

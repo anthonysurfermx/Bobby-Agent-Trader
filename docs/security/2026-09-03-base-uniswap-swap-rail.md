@@ -146,6 +146,17 @@ Owned first: the round-4 note said "all green" while `test:protocol-write-safety
 | P2 | E2E never ran the SQL | `scripts/test-swap-ledger-pg.mts` (`npm run test:swap-ledger-pg`) applies the migration to a scratch Postgres (`DATABASE_URL`) and runs the PL/pgSQL itself: one sell / two lots + idempotent re-confirm, out-of-order receipts, chain-order refusal, and two concurrent confirms against one lot (matched total never exceeds the lot). **Not run here: this machine has no Docker/Postgres.** It must pass on `supabase start` before the migration is applied. |
 | P2 | X Layer x402 surfaces still active | `premium-signal` → 410; `telegram-access` payment gate → 410 and the Telegram page no longer signs OKB/USDT on X Layer (notice instead); docs example updated. |
 
+## Review round 8 → what changed
+
+| # | Finding | Change |
+|---|---|---|
+| P1 | The "replay" patched instead of rebuilding (sell@30 kept a lot that sell@20, recorded later, should own) | `bobby_match_fifo` now **rebuilds** the pair: deletes every fill of the (wallet, symbol), resets lots and sells to their on-chain units and clears outcomes, then recomputes in chain order. `replayFifo` in `lots.ts` does the same (no prior-fills input any more); unit test and the Postgres scenario cover exactly Codex's case (buy@10, sell@30 first, sell@20 later → sell@20 owns the lot, one fill for the pair). |
+| P1 | `FOR UPDATE` cannot serialize rows the other transaction has not committed | `pg_advisory_xact_lock(hashtext(wallet:symbol))` at the top of `confirm_swap_receipt` and of `bobby_match_fifo`: confirms of one pair run strictly one after another, so a buy and a sell confirmed at the same instant see each other before the rebuild. |
+| P1 | The Postgres test named `public.*` | Every statement (fixture, migration, helpers, checks) is rewritten to the scratch schema, including the functions' `set search_path`; `public` is never named. Non-local `DATABASE_URL` hosts are refused unless `SWAP_LEDGER_PG_ALLOW_REMOTE=1`. Still **not executed here** (no Docker/Postgres on this machine). |
+| P1 | `bobby-pnl` stopped at 500 rows | The whole ledger is read page by page (1,000 rows, up to 50 pages, `truncated: true` beyond that), in chain order. |
+| P2 | Anonymous `capitalRequired` mixed wallets' cash flows | Peak net investment is computed per wallet in chain order, then summed. |
+| P2 | Telegram page still invited to pay | The payment UI is gone: no wallet prompt, no token selector, no "SIGN & PAY"; a notice explains the rail was retired and warns that nothing on the page moves funds. |
+
 ## Verification run
 
 ```

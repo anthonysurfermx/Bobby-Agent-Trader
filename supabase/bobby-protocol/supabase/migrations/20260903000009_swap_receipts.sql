@@ -130,19 +130,36 @@ begin
 end;
 $$;
 
--- Deterministic FIFO replay for one (wallet, symbol), in CHAIN order: every
--- unmatched sell consumes the open lots that sit earlier on-chain, oldest
--- first. Receipts may arrive in any order; replaying after each confirmed
--- receipt converges. Rows are locked (for update) so concurrent confirms
--- serialize per wallet/symbol and a lot can never be over-consumed.
+-- Deterministic FIFO REBUILD for one (wallet, symbol), in CHAIN order.
+-- Every fill of the pair is discarded and recomputed from the raw rows:
+-- sells ascending by (block, tx index), each consuming the open lots that
+-- sit earlier on-chain, oldest first. Because nothing is kept from a
+-- previous pass, receipts may arrive in any order (a later-arriving sell
+-- at block 20 takes the lot away from the block-30 sell that was matched
+-- first). The pair is serialized by an advisory lock so two confirms that
+-- cannot yet see each other's rows still run one after the other.
 create or replace function public.bobby_match_fifo(p_wallet text, p_symbol text) returns void
 language plpgsql security definer set search_path = public as $$
 declare s record; lot record; v_left numeric; v_take numeric;
 begin
+  perform pg_advisory_xact_lock(hashtext(lower(p_wallet) || ':' || p_symbol));
+  -- 1. Forget every fill of the pair and reset both sides.
+  delete from public.bobby_lot_fills f
+   using public.agent_trades t
+   where f.sell_trade_id = t.id and t.owner_address = lower(p_wallet) and t.token_symbol = p_symbol;
+  update public.agent_trades
+     set units_remaining = units, exit_price = null, realized_pnl_pct = null, outcome = null, settled_at = null
+   where owner_address = lower(p_wallet) and token_symbol = p_symbol and direction = 'BUY' and status = 'confirmed'
+     and chain = 'base' and units is not null;
+  update public.agent_trades
+     set units_remaining = units, entry_price = null, realized_pnl_pct = null, outcome = null
+   where owner_address = lower(p_wallet) and token_symbol = p_symbol and direction = 'SELL' and status = 'confirmed'
+     and chain = 'base' and units is not null;
+  -- 2. Rebuild in chain order.
   for s in
     select id, units_remaining, exit_price, block_number, tx_index from public.agent_trades
      where owner_address = lower(p_wallet) and token_symbol = p_symbol
-       and direction = 'SELL' and status = 'confirmed' and units_remaining > 0
+       and direction = 'SELL' and status = 'confirmed' and chain = 'base' and units_remaining > 0
        and block_number is not null and tx_index is not null
      order by block_number, tx_index, created_at
      for update
@@ -151,7 +168,7 @@ begin
     for lot in
       select id, units_remaining, entry_price from public.agent_trades
        where owner_address = lower(p_wallet) and token_symbol = p_symbol
-         and direction = 'BUY' and status = 'confirmed' and units_remaining > 0
+         and direction = 'BUY' and status = 'confirmed' and chain = 'base' and units_remaining > 0
          and block_number is not null and tx_index is not null
          and (block_number, tx_index) < (s.block_number, s.tx_index)
        order by block_number, tx_index, created_at
@@ -192,6 +209,9 @@ declare
   t_id uuid;
   was_confirmed boolean;
 begin
+  -- Serialize every confirm of this wallet/symbol pair: a buy and a sell
+  -- confirmed at the same instant must see each other before the rebuild.
+  perform pg_advisory_xact_lock(hashtext(lower(p_wallet) || ':' || p_token_symbol));
   select * into r from public.bobby_swap_receipts
    where wallet_address = lower(p_wallet) and calldata_hash = p_calldata_hash
    for update;

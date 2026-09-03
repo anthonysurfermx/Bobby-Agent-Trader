@@ -32,9 +32,26 @@ interface TradeRow {
   units_remaining: number | null;
   block_number: number | null;
   tx_index: number | null;
+  owner_address: string | null;
 }
 
-const SELECT = 'token_symbol,direction,amount_usd,entry_price,exit_price,realized_pnl_pct,outcome,created_at,settled_at,units,units_remaining,block_number,tx_index';
+const SELECT = 'token_symbol,direction,amount_usd,entry_price,exit_price,realized_pnl_pct,outcome,created_at,settled_at,units,units_remaining,block_number,tx_index,owner_address';
+const PAGE = 1000;
+const MAX_PAGES = 50;
+
+/** The whole ledger, page by page: an accounting that stops at row 500 is not an accounting. */
+async function readLedger(scope: string): Promise<{ rows: TradeRow[]; truncated: boolean }> {
+  const rows: TradeRow[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE;
+    const r = await fetch(bobbyRest(`agent_trades?chain=eq.base&status=eq.confirmed${scope}&select=${SELECT}&order=block_number.asc,tx_index.asc,created_at.asc`), { headers: bobbyServiceHeaders({ Range: `${from}-${from + PAGE - 1}`, 'Range-Unit': 'items' }) });
+    if (!r.ok && r.status !== 206) throw new Error(`ledger read ${r.status}`);
+    const batch = (await r.json()) as TradeRow[];
+    rows.push(...batch);
+    if (batch.length < PAGE) return { rows, truncated: false };
+  }
+  return { rows, truncated: true };
+}
 
 async function markPrice(symbol: string): Promise<number | null> {
   const token = findBaseToken(symbol);
@@ -74,13 +91,19 @@ function aggregates(rows: TradeRow[]) {
   const realizedPnl = realizations.reduce((s, t) => s + ((t.realized_pnl_pct ?? 0) / 100) * Number(t.entry_price) * matchedUnits(t), 0);
   const capitalDeployed = rows.filter((t) => t.direction === 'BUY').reduce((s, t) => s + (t.amount_usd ?? 0), 0);
   const realizedCash = rows.filter((t) => t.direction === 'SELL').reduce((s, t) => s + (t.amount_usd ?? 0), 0);
+  // Capital required is a per-wallet notion (one wallet's sale never funds
+  // another wallet's purchase): peak of each wallet's running net investment
+  // in chain order, then summed.
   const chainOrder = [...rows].sort((a, b) => (Number(a.block_number ?? 0) - Number(b.block_number ?? 0)) || (Number(a.tx_index ?? 0) - Number(b.tx_index ?? 0)) || a.created_at.localeCompare(b.created_at));
-  let net = 0; let capitalRequired = 0;
+  const net = new Map<string, number>(); const peak = new Map<string, number>();
   for (const t of chainOrder) {
-    net += t.direction === 'BUY' ? (t.amount_usd ?? 0) : -(t.amount_usd ?? 0);
-    if (net > capitalRequired) capitalRequired = net;
+    const w = (t.owner_address ?? '').toLowerCase();
+    const n = (net.get(w) ?? 0) + (t.direction === 'BUY' ? (t.amount_usd ?? 0) : -(t.amount_usd ?? 0));
+    net.set(w, n);
+    if (n > (peak.get(w) ?? 0)) peak.set(w, n);
   }
-  const netInvested = net;
+  const capitalRequired = [...peak.values()].reduce((s, v) => s + v, 0);
+  const netInvested = [...net.values()].reduce((s, v) => s + v, 0);
   return { realizations, wins, losses, realizedPnl, capitalDeployed, realizedCash, capitalRequired, netInvested };
 }
 
@@ -97,9 +120,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const scope = identity
       ? `&or=(user_id.eq.${identity.id}${identity.wallet ? `,owner_address.eq.${identity.wallet.toLowerCase()}` : ''})`
       : '';
-    const r = await fetch(bobbyRest(`agent_trades?chain=eq.base&status=eq.confirmed${scope}&select=${SELECT}&order=created_at.desc&limit=500`), { headers: bobbyServiceHeaders() });
-    if (!r.ok) return res.status(502).json({ ok: false, error: 'Could not read trades' });
-    const rows = (await r.json()) as TradeRow[];
+    let rows: TradeRow[]; let truncated = false;
+    try { ({ rows, truncated } = await readLedger(scope)); } catch { return res.status(502).json({ ok: false, error: 'Could not read trades' }); }
     const { realizations, wins, losses, realizedPnl, capitalDeployed, realizedCash, capitalRequired, netInvested } = aggregates(rows);
     const lots = openLots(rows);
 
@@ -150,6 +172,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       losses,
       winRate: realizations.length ? Number(((wins / realizations.length) * 100).toFixed(1)) : 0,
       openPositions: openPositions.length,
+      /** true only if the ledger exceeded 50,000 rows; figures would then be partial. */
+      truncated,
     };
 
     res.setHeader('Cache-Control', identity ? 'no-store' : 's-maxage=15, stale-while-revalidate=60');
@@ -157,7 +181,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Anonymous: totals only. No per-trade rows leave the server.
       return res.status(200).json({ ok: true, timestamp: new Date().toISOString(), agent: 'Bobby Agent Trader', scope: 'public-aggregate', source: 'agent_trades (Base · verified receipts)', summary, openPositions: [], closedPositions: [] });
     }
-    const closedPositions = realizations.map((t) => ({
+    const closedPositions = [...realizations].reverse().map((t) => ({
       symbol: t.token_symbol,
       direction: 'long' as const,
       leverage: '1x',

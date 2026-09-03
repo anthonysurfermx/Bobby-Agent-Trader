@@ -9,8 +9,8 @@
 //     (block number, transaction index).
 //   · A SELL realizes: it may only consume lots that sit EARLIER on-chain
 //     than itself, oldest first, possibly partially. Receipts can arrive in
-//     any order — replaying the whole (wallet, symbol) ledger from the
-//     current rows and fills always converges to the same result.
+//     any order — the ledger of a (wallet, symbol) pair is REBUILT from the
+//     raw rows after every receipt, never patched, so it always converges.
 //   · Each consumed slice is a fill (lot, sell, units, buy price, sell
 //     price). A lot whose units hit zero closes with the fill-weighted
 //     exit (scoring only — money metrics read SELL rows and fills).
@@ -59,15 +59,15 @@ export interface SellRealization {
 }
 
 export interface ReplayResult {
-  /** New fills produced by this replay (the store appends them). */
-  newFills: Fill[];
-  /** All lots, with units updated. */
+  /** EVERY fill of the pair after the rebuild (the store replaces, never appends). */
+  fills: Fill[];
+  /** All lots, units recomputed from scratch. */
   lots: Lot[];
-  /** All sells, with unmatched units updated. */
+  /** All sells, unmatched units recomputed from scratch. */
   sells: Sell[];
-  /** Lots that closed during this replay. */
+  /** Lots fully consumed after the rebuild. */
   closed: LotClose[];
-  /** Realization state of every sell after the replay. */
+  /** Realization state of every sell after the rebuild. */
   realizations: SellRealization[];
 }
 
@@ -86,25 +86,23 @@ export function earlier(a: ChainPos, b: ChainPos): boolean {
 }
 
 /**
- * Deterministic replay over one (wallet, symbol): walks unmatched sells in
- * chain order and consumes earlier open lots, oldest first. Idempotent:
- * running it again with its own output adds nothing.
+ * Deterministic REBUILD over one (wallet, symbol): forgets every previous
+ * fill, restores every lot and sell to its on-chain units, then walks the
+ * sells in chain order and lets each consume the lots that sit earlier
+ * on-chain, oldest first. Same input rows → same fills, whatever order the
+ * receipts were recorded in. (bobby_match_fifo in the migration does this.)
  */
-export function replayFifo(lotsIn: Lot[], sellsIn: Sell[], priorFills: Fill[]): ReplayResult {
-  const lots = lotsIn.map((l) => ({ ...l })).sort(byChain);
-  const sells = sellsIn.map((s) => ({ ...s })).sort(byChain);
-  const fills = [...priorFills];
-  const newFills: Fill[] = [];
+export function replayFifo(lotsIn: Lot[], sellsIn: Sell[]): ReplayResult {
+  const lots = lotsIn.map((l) => ({ ...l, unitsRemaining: l.units })).sort(byChain);
+  const sells = sellsIn.map((s) => ({ ...s, unitsRemaining: s.units })).sort(byChain);
+  const fills: Fill[] = [];
   const closed: LotClose[] = [];
   for (const sell of sells) {
-    if (sell.unitsRemaining <= EPS) continue;
     for (const lot of lots) {
       if (sell.unitsRemaining <= EPS) break;
       if (lot.unitsRemaining <= EPS || !earlier(lot, sell)) continue;
       const take = Math.min(lot.unitsRemaining, sell.unitsRemaining);
-      const fill: Fill = { lotId: lot.id, sellId: sell.id, units: take, buyPrice: lot.entryPrice, sellPrice: sell.sellPrice };
-      fills.push(fill);
-      newFills.push(fill);
+      fills.push({ lotId: lot.id, sellId: sell.id, units: take, buyPrice: lot.entryPrice, sellPrice: sell.sellPrice });
       lot.unitsRemaining -= take;
       sell.unitsRemaining -= take;
       if (lot.unitsRemaining <= EPS) {
@@ -125,5 +123,5 @@ export function replayFifo(lotsIn: Lot[], sellsIn: Sell[], priorFills: Fill[]): 
     const pnlPct = entryPrice ? ((sell.sellPrice - entryPrice) / entryPrice) * 100 : null;
     return { sellId: sell.id, matchedUnits, unmatchedUnits: Math.max(0, sell.units - matchedUnits), entryPrice, pnlPct, outcome: pnlPct === null ? null : outcomeFor(pnlPct) };
   });
-  return { newFills, lots, sells, closed, realizations };
+  return { fills, lots, sells, closed, realizations };
 }

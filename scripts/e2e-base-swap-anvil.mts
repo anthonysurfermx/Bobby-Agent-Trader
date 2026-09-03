@@ -58,11 +58,13 @@ const fakeFetch: typeof fetch = (async (input: RequestInfo | URL, init?: Request
       const mine = (x: Row) => x.owner_address === p.p_wallet && x.token_symbol === p.p_token_symbol && x.status === 'confirmed';
       const lots = tables.agent_trades.filter((x) => mine(x) && x.direction === 'BUY').map((x) => ({ id: x.id, units: Number(x.units), unitsRemaining: Number(x.units_remaining), entryPrice: Number(x.entry_price), blockNumber: Number(x.block_number), txIndex: Number(x.tx_index) }));
       const sells = tables.agent_trades.filter((x) => mine(x) && x.direction === 'SELL').map((x) => ({ id: x.id, units: Number(x.units), unitsRemaining: Number(x.units_remaining), sellPrice: Number(x.exit_price), blockNumber: Number(x.block_number), txIndex: Number(x.tx_index) }));
-      const prior = tables.bobby_lot_fills.filter((fl) => lots.some((l) => l.id === fl.buy_trade_id)).map((fl) => ({ lotId: fl.buy_trade_id as string, sellId: fl.sell_trade_id as string, units: Number(fl.units), buyPrice: Number(fl.buy_price), sellPrice: Number(fl.sell_price) }));
-      const res = replayFifo(lots, sells, prior);
-      for (const fl of res.newFills) tables.bobby_lot_fills.push({ id: `fill-${nextId++}`, buy_trade_id: fl.lotId, sell_trade_id: fl.sellId, units: fl.units, buy_price: fl.buyPrice, sell_price: fl.sellPrice });
-      for (const l of res.lots) { const row = tables.agent_trades.find((x) => x.id === l.id)!; row.units_remaining = l.unitsRemaining; }
-      for (const cl of res.closed) { const row = tables.agent_trades.find((x) => x.id === cl.lotId)!; Object.assign(row, { exit_price: cl.exitPrice, realized_pnl_pct: cl.pnlPct, outcome: cl.outcome, settled_at: row.settled_at ?? new Date().toISOString() }); }
+      // Rebuild: drop the pair's fills, reset both sides, recompute.
+      const sellIds = new Set(sells.map((x) => x.id));
+      tables.bobby_lot_fills = tables.bobby_lot_fills.filter((fl) => !sellIds.has(fl.sell_trade_id as string));
+      const res = replayFifo(lots, sells);
+      for (const fl of res.fills) tables.bobby_lot_fills.push({ id: `fill-${nextId++}`, buy_trade_id: fl.lotId, sell_trade_id: fl.sellId, units: fl.units, buy_price: fl.buyPrice, sell_price: fl.sellPrice });
+      for (const l of res.lots) { const row = tables.agent_trades.find((x) => x.id === l.id)!; Object.assign(row, { units_remaining: l.unitsRemaining, exit_price: null, realized_pnl_pct: null, outcome: null, settled_at: null }); }
+      for (const cl of res.closed) { const row = tables.agent_trades.find((x) => x.id === cl.lotId)!; Object.assign(row, { exit_price: cl.exitPrice, realized_pnl_pct: cl.pnlPct, outcome: cl.outcome, settled_at: new Date().toISOString() }); }
       for (const rz of res.realizations) { const row = tables.agent_trades.find((x) => x.id === rz.sellId)!; Object.assign(row, { units_remaining: rz.unmatchedUnits, entry_price: rz.entryPrice, realized_pnl_pct: rz.pnlPct, outcome: rz.outcome }); }
     }
     r.agent_trade_id = t.id;
