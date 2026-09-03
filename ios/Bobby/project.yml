@@ -43,6 +43,14 @@ targets:
       - Assets.xcassets
       - path: Resources/Mascots
         buildPhase: resources
+      - path: ../../public/land/v1/gate-A
+        type: folder
+        buildPhase: resources
+      - path: ../../public/land/v1/world-snapshot-v01.json
+        buildPhase: resources
+      - path: ../../public/land/v1/audio
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: GLTFKit2
     entitlements:
