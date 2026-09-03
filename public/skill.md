@@ -1,215 +1,99 @@
 # Bobby Protocol — Agent Integration Skill
 
-> **Version:** 2.0.0
-> **Protocol:** MCP (Model Context Protocol) over Streamable HTTP
-> **Proof Chain:** Base Mainnet (8453) — deployed, writes frozen during controlled activation
-> **Endpoint:** `https://bobbyprotocol.xyz/api/mcp-http`
-> **Settlement:** Legacy OKB-native x402 rail on X Layer during staged cutover
+> **Version:** 3.0.0
+> **Protocol:** MCP over Streamable HTTP
+> **Chain:** Base mainnet (8453)
+> **Endpoint:** `https://bobbyprotocol.xyz/api/mcp-bobby`
+> **Custody:** none; users sign their own transactions
 
----
+## What Bobby does
 
-## What is Bobby?
+Bobby is an accountability layer for autonomous financial decisions. Alpha Hunter proposes a thesis, Red Team attacks it, and the CIO resolves the debate behind a deterministic risk gate. The decision is committed before its outcome and can later be resolved with signed oracle evidence.
 
-Bobby is an accountability protocol for autonomous finance. Three AI agents debate every call, the decision is committed before its outcome, Pyth evidence verifies resolution, and anyone can challenge a missed stop. Seven audited contracts are deployed on Base mainnet. Writes remain frozen until the published Safe accepts ownership and post-deploy verification, canary and soak complete. X Layer remains the legacy archive and current x402 settlement rail.
+Bobby is Base-only. It does not connect to centralized-exchange accounts, accept exchange API credentials, or expose an exchange execution route.
 
-Your agent can consume Bobby's intelligence, analysis, and debate system by calling the MCP endpoint below.
+## Discover the live tools
 
----
-
-## Quick Start
-
-### Step 1: Discover available tools
+Always prefer runtime discovery over a copied list:
 
 ```bash
-curl https://bobbyprotocol.xyz/api/mcp-http
+curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-Returns server metadata, tool list, and pricing.
+The production endpoint currently exposes:
 
-### Step 2: Call a free tool
+- `bobby_analyze`
+- `bobby_debate`
+- `bobby_ta`
+- `bobby_intel`
+- `bobby_uniswap_quote`
+- `bobby_stats`
+- `bobby_wallet_balance`
+- `bobby_wallet_portfolio`
+- `bobby_security_scan`
+- `bobby_dex_trending`
+- `bobby_dex_signals`
+
+## Call a tool
 
 ```bash
-curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
-  -H "Content-Type: application/json" \
+curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
+  -H 'content-type: application/json' \
   -d '{
     "jsonrpc": "2.0",
+    "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "bobby_intel",
-      "arguments": {}
-    },
-    "id": "1"
+      "name": "bobby_uniswap_quote",
+      "arguments": { "tokenIn": "USDC", "tokenOut": "NVDAc", "amount": "10" }
+    }
   }'
 ```
 
-### Step 3: Call a premium tool (x402 payment)
+The quote tool is read-only and never returns wallet calldata.
 
-Premium tools cost 0.001 OKB per call, settled on X Layer.
+## Base execution safety
 
-```bash
-# 1. Call without payment — get a challenge
-curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "bobby_analyze",
-      "arguments": { "symbol": "BTC" }
-    },
-    "id": "2"
-  }'
-# Response: 402 with challengeId
+The web swap endpoint separates quoting from execution:
 
-# 2. Pay on-chain: call payMCPCall(challengeId, "bobby_analyze") with 0.001 OKB
-#    Contract: 0xD9540D770C8aF67e9E6412C92D78E34bc11ED871 on X Layer (196)
+1. `GET /api/base-swap` returns a read-only route and market reference.
+2. A write request must prove the wallet session, pass origin/rate-limit/risk/eligibility checks and match an exact operations switch.
+3. Bobby prepares bounded calldata; only the user's wallet can sign it.
+4. A receipt is recorded before calldata is handed out and confirmed against Base afterward.
+5. Confirmed receipts rebuild FIFO lots in canonical block and transaction order under a per-wallet-and-pair lock.
+6. PnL is computed from the complete paginated ledger and capital requirements are aggregated per wallet.
 
-# 3. Retry with payment proof
-curl -X POST https://bobbyprotocol.xyz/api/mcp-http \
-  -H "Content-Type: application/json" \
-  -H "x-402-payment: <txHash>" \
-  -H "x-challenge-id: <challengeId>" \
-  -H "x-agent-name: your-agent-name" \
-  -d '{
-    "jsonrpc": "2.0",
-    "method": "tools/call",
-    "params": {
-      "name": "bobby_analyze",
-      "arguments": { "symbol": "BTC" }
-    },
-    "id": "3"
-  }'
-```
+Tokenized-stock calldata remains disabled until legal and operations approval. Read-only quotes remain available.
 
----
+## Base contracts
 
-## Available Tools
+| Contract | Address |
+|---|---|
+| BobbyTrackRecord V2 | `0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321` |
+| BobbyConvictionOracle | `0x27f51D711171c830dd796D4B03914a8C6c46D75e` |
+| BobbyAgentEconomyV2 | `0x009de59e0e7f4109fF9E89E744A4412082AD2aaF` |
+| BobbyAdversarialBounties | `0x73fD6c77ff0403Ea071e8721c76f88cE34ac9968` |
+| HardnessRegistry | `0x15800F40b8988765AD3F46030B73bC8109A793f5` |
+| BobbyAgentRegistry | `0xB3137D7afE26fbdBcAA95573C7A20be896efde93` |
+| BobbyIntentEscrow | `0x5D9d534419421B7Edfe9Bb509E4c48512256BC97` |
 
-Bobby currently exposes **22 MCP tools** total:
-- **15 free decision and analytics tools**
-- **2 free bounty calldata builders**
-- **5 premium x402 tools**
+All addresses link from `https://bobbyprotocol.xyz/protocol/docs` to Basescan.
 
-### Free Decision + Analytics Tier (15 tools)
+## Boundaries
 
-| Tool | Description | Arguments |
-|------|-------------|-----------|
-| `bobby_recommend` | Current actionable recommendation with conviction and guardrails | `{ symbol? }` |
-| `bobby_brief` | Compact one-shot briefing for token-constrained agents | `{ symbol? }` |
-| `bobby_intel` | Full intelligence briefing (10 data sources) | `{}` |
-| `bobby_ta` | Technical analysis (SMA, RSI, MACD, Bollinger, S/R) | `{ symbol }` |
-| `bobby_stats` | Track record (win rate, PnL, recent trades) | `{}` |
-| `bobby_uniswap_quote` | Exact-input quote on Uniswap V3, Base (read-only) | `{ tokenIn, tokenOut, amount, chainId?, tradeType?, slippageBps? }` |
-| `bobby_wheel_evaluate` | Pressure-test a b1nary Wheel leg with Bobby guardrails | `{ asset, side, strike, expiry_days, collateral? }` |
-| `bobby_wheel_positions` | Read-only snapshot of b1nary positions plus Bobby regime context | `{ address }` |
-| `bobby_wallet_balance` | Bobby's agentic wallet balance | `{ chain }` |
-| `bobby_dex_trending` | Trending tokens on-chain | `{ chain }` |
-| `bobby_dex_signals` | Smart money / whale / KOL signals | `{ chain, type }` |
-| `bobby_bounty_list` | List recent adversarial bounties | `{ limit }` |
-| `bobby_bounty_get` | Get single bounty details | `{ bounty_id }` |
-
-### Premium Tier (0.001 OKB per call via x402)
-
-| Tool | Description | Arguments |
-|------|-------------|-----------|
-| `bobby_analyze` | Full market analysis with conviction score | `{ symbol, language? }` |
-| `bobby_debate` | 3-agent debate (Alpha Hunter vs Red Team vs CIO) | `{ question, language? }` |
-| `bobby_security_scan` | Token contract honeypot/rug risk scan | `{ address, chain }` |
-| `bobby_wallet_portfolio` | Portfolio analysis (multi-chain) | `{ address, chain }` |
-| `bobby_judge` | Judge Mode audit on 6 dimensions | `{ thread_id, language? }` |
-
-### Bounty Tools (build unsigned calldata)
-
-| Tool | Description | Arguments |
-|------|-------------|-----------|
-| `bobby_bounty_post` | Build calldata to post a bounty | `{ thread_id, dimension, reward_okb, claim_window_secs? }` |
-| `bobby_bounty_challenge` | Build calldata to challenge a bounty | `{ bounty_id, evidence_hash }` |
-
----
-
-## x402 Payment Contract
-
-```
-Contract:  0xD9540D770C8aF67e9E6412C92D78E34bc11ED871
-Chain:     X Layer Mainnet (196)
-RPC:       https://xlayerrpc.okx.com/
-Function:  payMCPCall(bytes32 challengeId, string toolName)
-Value:     0.001 OKB (1000000000000000 wei)
-```
-
-The `challengeId` is returned by the server when you call a premium tool without payment. Each challenge is single-use and expires after 15 minutes.
-
----
-
-## Reputation Endpoint
-
-Check Bobby's on-chain track record and protocol reputation:
-
-```bash
-curl https://bobbyprotocol.xyz/api/reputation
-```
-
-Returns win rate, total trades, conviction oracle stats, economy volume, and contract addresses — all read from X Layer.
-
----
-
-## Adversarial Bounties
-
-Bobby's debate quality can be challenged by anyone. Six dimensions:
-
-- `DATA_INTEGRITY` — Was the data accurate?
-- `ADVERSARIAL_QUALITY` — Was the Red Team attack strong enough?
-- `DECISION_LOGIC` — Was the CIO reasoning sound?
-- `RISK_MANAGEMENT` — Were downside risks properly gated?
-- `CALIBRATION_ALIGNMENT` — Does conviction match actual edge?
-- `NOVELTY` — Is this original analysis or recycled groupthink?
-
-**Bounty Contract:** `0xa8005ab465a0e02cb14824cd0e7630391fba673d` (verified on OKLink)
-
----
-
-## Judge Mode Manifest
-
-Machine-readable evaluation framework: `https://bobbyprotocol.xyz/ai-judge-manifest.json`
-
----
-
-## Architecture
-
-```
-Your Agent
-    │
-    ▼
-POST /api/mcp-http (JSON-RPC 2.0)
-    │
-    ├── Free tools → instant response
-    │
-    └── Premium tools → 402 challenge
-            │
-            ▼
-        Pay 0.001 OKB on X Layer
-        (AgentEconomyV2.payMCPCall)
-            │
-            ▼
-        Retry with x-402-payment header
-            │
-            ▼
-        Bobby executes tool + returns result
-            │
-            ▼
-        On-chain receipt stored
-```
-
----
+- Analysis is not investment advice.
+- A favorable verdict is not a promise of profit.
+- Bobby does not hold funds or sign for users.
+- Telegram setup never requests a wallet or payment.
+- A missing country, attestation, balance, allowance, simulation or operations flag withholds stock calldata.
 
 ## Links
 
-- **Live Terminal:** https://bobbyprotocol.xyz/agentic-world/bobby
-- **Protocol Landing:** https://bobbyprotocol.xyz
-- **Submission:** https://bobbyprotocol.xyz/submission
-- **GitHub:** https://github.com/anthonysurfermx/Bobby-Agent-Trader
-- **Judge Manifest:** https://bobbyprotocol.xyz/ai-judge-manifest.json
-
----
-
-*Bobby Protocol — Build X Season 2 on OKX X Layer*
+- Product: https://bobbyprotocol.xyz
+- App: https://bobbyprotocol.xyz/app
+- Documentation: https://bobbyprotocol.xyz/protocol/docs
+- Public record: https://bobbyprotocol.xyz/protocol/calls
+- MCP endpoint: https://bobbyprotocol.xyz/api/mcp-bobby
+- GitHub: https://github.com/anthonysurfermx/Bobby-Agent-Trader

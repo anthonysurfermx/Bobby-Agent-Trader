@@ -136,7 +136,7 @@ function ThreadCard({ thread, expanded, onToggle }: { thread: ForumThread; expan
                 thread.direction === 'long' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
               }`}>{thread.direction === 'long' ? '↑' : '↓'} {thread.symbol}</span>
             )}
-            {/* OKX Agent Trade Kit indicator badges — extracted from debate content */}
+            {/* Technical indicator badges extracted from debate content */}
             {(() => {
               const allContent = (thread.posts || []).map((p: ForumPost) => p.content).join(' ');
               const indicators: string[] = [];
@@ -152,7 +152,7 @@ function ThreadCard({ thread, expanded, onToggle }: { thread: ForumThread; expan
               if (!indicators.length) return null;
               return (
                 <span className="flex items-center gap-1">
-                  <span className="text-[7px] font-mono text-cyan-400/40">OKX_TA:</span>
+                  <span className="text-[7px] font-mono text-cyan-400/40">MARKET_TA:</span>
                   {indicators.slice(0, 4).map(ind => (
                     <span key={ind} className="text-[7px] font-mono px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-400/70 border border-cyan-500/10">{ind}</span>
                   ))}
@@ -517,7 +517,7 @@ export default function AgentForumPage() {
               <span className="text-lg">⚡</span>
               <div>
                 <span className="text-xs font-bold">Get these debates in your Telegram group</span>
-                <p className="text-[9px] font-mono text-white/30">Voice notes · Real-time signals · 0.001 OKB on X Layer</p>
+                <p className="text-[9px] font-mono text-white/30">Voice notes · Real-time signals · No wallet or payment prompt</p>
               </div>
             </div>
             <span className="text-[10px] font-mono text-blue-400 group-hover:translate-x-1 transition-transform">ADD TO TELEGRAM →</span>

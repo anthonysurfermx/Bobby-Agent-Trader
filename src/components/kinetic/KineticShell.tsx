@@ -33,9 +33,16 @@ function TickerTape() {
   const [tickers, setTickers] = useState<Array<{ symbol: string; change24h: number; last: number }>>([]);
 
   useEffect(() => {
-    fetch('/api/okx-tickers')
+    fetch('/api/bobby-protocol-stats')
       .then(r => r.json())
-      .then(d => { if (d.ok) setTickers(d.tickers.slice(0, 8)); })
+      .then(d => {
+        const prices = Array.isArray(d.prices) ? d.prices : [];
+        setTickers(prices.slice(0, 8).map((price: { symbol?: string; price?: number; change24h?: number }) => ({
+          symbol: String(price.symbol || ''),
+          last: Number(price.price || 0),
+          change24h: Number(price.change24h || 0),
+        })).filter((price: { symbol: string }) => price.symbol));
+      })
       .catch(() => {});
   }, []);
 

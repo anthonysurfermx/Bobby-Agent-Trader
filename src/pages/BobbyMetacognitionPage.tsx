@@ -113,8 +113,8 @@ function MetacognitionLoader() {
   const [lines, setLines] = useState<string[]>([]);
   const steps = [
     '> INITIATING METACOGNITION SEQUENCE...',
-    '> CONNECTING TO OKX OnchainOS...',
-    '> LOADING OKX AGENT TRADE KIT — 70+ INDICATORS...',
+    '> LOADING PUBLIC MARKET CONTEXT...',
+    '> LOADING TECHNICAL INDICATORS...',
     '> FETCHING RSI, MACD, BOLLINGER, SUPERTREND, AHR999...',
     '> LOADING WHALE SIGNALS + FUNDING RATES...',
     '> FETCHING POLYMARKET SMART MONEY DATA...',
@@ -661,4 +661,3 @@ export default function BobbyMetacognitionPage() {
     </KineticShell>
   );
 }
-

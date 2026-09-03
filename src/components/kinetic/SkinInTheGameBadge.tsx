@@ -1,6 +1,6 @@
 // ============================================================
 // Skin-in-the-Game Badge — persistent trust signal in header
-// Shows win rate + total return from /api/bobby-pnl (OKX track record).
+// Shows win rate + total return from the confirmed Base receipt ledger.
 // It is NOT an on-chain proof — the on-chain ledgers live on the landing
 // (Base mainnet) and /agentic-world/bobby/calls (Base Sepolia canary), so
 // this badge must not claim verification it cannot back (Codex review).
@@ -68,7 +68,7 @@ export default function SkinInTheGameBadge() {
   return (
     <Link
       to="/agentic-world/bobby/history"
-      title={`${summary.totalTrades} trades in the OKX track record`}
+      title={`${summary.totalTrades} trades in the confirmed Base receipt ledger`}
       className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-sm bg-white/[0.02] border border-white/[0.04] hover:border-white/10 transition-colors font-mono text-[10px]"
     >
       <Shield className="w-3 h-3 text-green-400" />
@@ -76,7 +76,7 @@ export default function SkinInTheGameBadge() {
       <span className="text-white/20">·</span>
       <span className={returnColor}>{returnSign}{summary.totalReturn.toFixed(1)}% PnL</span>
       <span className="text-white/20">·</span>
-      <span className="text-white/40">OKX TRACK RECORD</span>
+      <span className="text-white/40">BASE RECEIPT LEDGER</span>
     </Link>
   );
 }

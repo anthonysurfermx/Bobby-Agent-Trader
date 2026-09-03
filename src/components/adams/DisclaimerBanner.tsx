@@ -7,11 +7,11 @@ const COPY = {
   es: {
     subtitle: 'PROTOTIPO EXPERIMENTAL',
     warning: 'No operes con grandes cantidades de dinero.',
-    warningDetail: 'Este es un experimento de inteligencia artificial construido para el OKX Hackathon.',
-    desc1: 'Bobby es un agente de trading con metacognición — escanea ballenas en OKX, cruza datos con Polymarket, y debate consigo mismo antes de recomendar.',
+    warningDetail: 'Este es un experimento de inteligencia de mercado construido sobre Base.',
+    desc1: 'Bobby es un agente con metacognición: combina contexto de mercado y mercados de predicción, y debate consigo mismo antes de publicar una tesis.',
     desc2: 'Pero sigue siendo un prototipo. Las decisiones de trading son generadas por IA y pueden ser incorrectas. El mercado crypto es volátil e impredecible.',
     risk: 'RIESGO REAL:',
-    riskDetail: 'Si ejecutas swaps, usarás fondos reales en X Layer. No inviertas lo que no puedas perder.',
+    riskDetail: 'Los swaps usan fondos reales en Base y siempre requieren tu firma. No inviertas lo que no puedas perder.',
     checkbox: 'Entiendo que Bobby Agent Trader es un experimento. No operaré con cantidades que no pueda permitirme perder. Acepto el riesgo.',
     btnReady: 'ENTENDIDO — ENTRAR',
     btnWait: 'MARCA LA CASILLA PARA CONTINUAR',
@@ -19,11 +19,11 @@ const COPY = {
   en: {
     subtitle: 'EXPERIMENTAL PROTOTYPE',
     warning: 'Do not trade with large amounts of money.',
-    warningDetail: 'This is an AI experiment built for the OKX Hackathon.',
-    desc1: 'Bobby is a trading agent with metacognition — he scans OKX whale flows, cross-references Polymarket smart money, and debates himself before making a call.',
+    warningDetail: 'This is a market-intelligence experiment built on Base.',
+    desc1: 'Bobby is a metacognitive agent: it combines market context with prediction markets and debates itself before publishing a thesis.',
     desc2: 'But he\'s still a prototype. Trading decisions are AI-generated and can be wrong. The crypto market is volatile and unpredictable.',
     risk: 'REAL RISK:',
-    riskDetail: 'If you execute swaps, you\'ll use real funds on X Layer. Don\'t invest what you can\'t afford to lose.',
+    riskDetail: 'Swaps use real funds on Base and always require your signature. Don\'t invest what you can\'t afford to lose.',
     checkbox: 'I understand Bobby Agent Trader is an experiment. I won\'t trade with money I can\'t afford to lose. I accept the risk.',
     btnReady: 'UNDERSTOOD — ENTER',
     btnWait: 'CHECK THE BOX TO CONTINUE',
@@ -111,7 +111,7 @@ export function DisclaimerBanner() {
         </button>
 
         <p className="text-[9px] text-neutral-600 text-center font-mono">
-          OKX X LAYER AI HACKATHON 2026 — NOT FINANCIAL ADVICE
+          BOBBY PROTOCOL · BASE 8453 — NOT FINANCIAL ADVICE
         </p>
       </div>
     </div>

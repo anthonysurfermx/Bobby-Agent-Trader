@@ -61,7 +61,7 @@ export default function BobbyHistoryPage() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <h1 className="text-3xl md:text-5xl font-black tracking-tight">Trade <span className="text-white/20">/</span> History</h1>
           <p className="text-[10px] font-mono text-white/20 mt-1">
-            Bobby's real OKX trades · Your agent's simulated signals appear in <a href="/agentic-world/forum" className="text-green-400/50 hover:text-green-400">Debates</a>
+            Bobby's confirmed Base receipt ledger · Agent theses and simulated signals appear in <a href="/agentic-world/forum" className="text-green-400/50 hover:text-green-400">Debates</a>
           </p>
           <div className="flex items-center gap-2 mt-2">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />

@@ -132,7 +132,7 @@ export default function BobbyAppLandingExperience() {
   ];
 
   const moments = [
-    { step: '01', eyebrow: t('Ask out loud', 'Pregunta en voz alta'), title: t('Say the ticker. The desk wakes up.', 'Di el ticker. El desk despierta.'), text: t('BTC, NVDA, gold and 600+ more, by voice or text. Live candles, not recycled takes. Your companion answers in its own voice, wearing the gear you earned.', 'BTC, NVDA, oro y más de 600 activos, por voz o texto. Velas en vivo, no opiniones recicladas. Tu companion contesta con su propia voz, con el equipo que te ganaste.'), image: '/app/shot-desk.webp', alt: t('The Live Desk with Byte wearing his gear and Bit the dog', 'El Live Desk con Byte usando su equipo y Bit el perro'), accent: GREEN },
+    { step: '01', eyebrow: t('Ask out loud', 'Pregunta en voz alta'), title: t('Say the ticker. The desk wakes up.', 'Di el ticker. El desk despierta.'), text: t('BTC, NVDA, gold and 600+ more, by voice or text. Live market context and public reference feeds, not recycled takes. Your companion answers in its own voice, wearing the gear you earned.', 'BTC, NVDA, oro y más de 600 activos, por voz o texto. Contexto de mercado en vivo y referencias públicas, no opiniones recicladas. Tu companion contesta con su propia voz, con el equipo que te ganaste.'), image: '/app/shot-desk.webp', alt: t('The Live Desk with Byte wearing his gear and Bit the dog', 'El Live Desk con Byte usando su equipo y Bit el perro'), accent: GREEN },
     { step: '02', eyebrow: t('NO TRADE is a win', 'NO TRADE es una victoria'), title: t('Three agents fight. When there is no edge, the gate closes.', 'Tres agentes se pelean. Si no hay ventaja, la puerta se cierra.'), text: t('Alpha Hunter finds the setup, Red Team tears it apart, the CIO decides. No clean signal? Halo\'s risk gate says NO TRADE and pays you +20 discipline XP for listening.', 'Alpha Hunter busca el setup, Red Team lo destroza, el CIO decide. ¿Sin señal limpia? La puerta de riesgo de Halo dice NO TRADE y te paga +20 XP de disciplina por escuchar.'), image: '/app/shot-notrade.webp', alt: t('A real NO TRADE verdict on BTC with +20 discipline XP and the live chart', 'Un NO TRADE real en BTC con +20 XP de disciplina y la gráfica en vivo'), accent: '#7ea6ff' },
     { step: '03', eyebrow: t('Farm market aura', 'Farmea aura del mercado'), title: t('Aura becomes gear your companion actually wears.', 'El aura se vuelve equipo que tu companion sí se pone.'), text: t('Goggles on the face, a radio on the hip, a golden codex in the hand, a pet at the feet. Hold any item to preview it on its owner. Discipline only, never volume.', 'Gafas en la cara, radio en la cadera, un códice dorado en la mano, una mascota a los pies. Mantén presionado cualquier item para verlo puesto. Solo disciplina, nunca volumen.'), image: '/app/shot-preview.webp', alt: t('Gear preview: Bobby wearing a piece earned with discipline', 'Preview de equipo: Bobby usando una pieza ganada con disciplina'), accent: GOLD },
   ];
@@ -144,8 +144,8 @@ export default function BobbyAppLandingExperience() {
   ];
 
   const boundaries = [
-    { icon: ShieldCheck, title: t('No custody', 'Sin custodia'), text: t('Bobby never holds funds or connects to your accounts.', 'Bobby nunca guarda fondos ni se conecta a tus cuentas.') },
-    { icon: Zap, title: t('No execution', 'Sin ejecución'), text: t('It places no orders. The call is always yours.', 'No pone órdenes. La decisión siempre es tuya.') },
+    { icon: ShieldCheck, title: t('No custody', 'Sin custodia'), text: t('Bobby never holds funds or asks for exchange credentials.', 'Bobby nunca guarda fondos ni pide credenciales de un exchange.') },
+    { icon: Zap, title: t('You sign', 'Tú firmas'), text: t('Base swaps are self-custodial. Bobby can prepare bounded calldata; only your wallet can approve it.', 'Los swaps en Base son autocustodia. Bobby puede preparar calldata limitada; solo tu wallet puede aprobarla.') },
     { icon: Volume2, title: t('No fake certainty', 'Sin certezas falsas'), text: t('A favorable verdict is analysis, not a promise or advice.', 'Un veredicto favorable es análisis, no una promesa ni asesoría.') },
     { icon: Trophy, title: t('No pay-to-win', 'Sin pay-to-win'), text: t('Aura comes from better process, never from spending more.', 'El aura viene de un mejor proceso, nunca de gastar más.') },
   ];
@@ -237,7 +237,7 @@ export default function BobbyAppLandingExperience() {
               </div>
               <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 font-mono text-[9px] uppercase tracking-[0.12em] text-white/38">
                 <span className="inline-flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-[#5cff91]" /> {t('Voice or text', 'Voz o texto')}</span>
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> {t('Never touches your money', 'Nunca toca tu dinero')}</span>
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> {t('Base-only · self-custody', 'Solo Base · autocustodia')}</span>
                 <span className="inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-[#F5C542]" /> {t('Gear, pets & a world', 'Equipo, mascotas y un mundo')}</span>
               </div>
             </motion.div>
@@ -263,7 +263,7 @@ export default function BobbyAppLandingExperience() {
           <div className="flex min-w-max animate-marquee items-center gap-9 font-mono text-[10px] font-bold uppercase tracking-[0.17em] text-white/55 motion-reduce:animate-none">
             {[0, 1].map((duplicate) => (
               <div key={duplicate} className="flex shrink-0 items-center gap-9">
-                {['Vibe trading', t('Farm market aura', 'Farmea aura del mercado'), t('Three-agent debate', 'Debate de tres agentes'), t('NO TRADE is a win', 'NO TRADE es una victoria'), t('Gear, pets & a world', 'Equipo, mascotas y un mundo'), t('Never touches your money', 'Nunca toca tu dinero')].map((label) => (
+                {['Vibe trading', t('Farm market aura', 'Farmea aura del mercado'), t('Three-agent debate', 'Debate de tres agentes'), t('NO TRADE is a win', 'NO TRADE es una victoria'), t('Base-only proofs', 'Pruebas solo en Base'), t('Self-custody', 'Autocustodia')].map((label) => (
                   <span key={`${duplicate}-${label}`} className="flex items-center gap-9"><span>{label}</span><span className="text-[#F5C542]">✦</span></span>
                 ))}
               </div>
@@ -458,7 +458,7 @@ export default function BobbyAppLandingExperience() {
               <div>
                 <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">{t('The public record', 'El historial público')}</div>
                 <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Bobby remembers', 'Bobby recuerda')}<br /><span className="text-white/38">{t('the misses too.', 'también los fallos.')}</span></h2>
-                <p className="mt-6 max-w-lg text-base leading-7 text-white/50">{t('Calls are published before the outcome. Wins, losses and flat results live on the same page, so confidence has consequences.', 'Las llamadas se publican antes del resultado. Aciertos, fallos y empates viven en la misma página, para que la confianza tenga consecuencias.')}</p>
+                <p className="mt-6 max-w-lg text-base leading-7 text-white/50">{t('Calls are published before the outcome on Base. Confirmed swaps use a chain-ordered receipt ledger; wins, losses and flat results stay visible, so confidence has consequences.', 'Las llamadas se publican antes del resultado en Base. Los swaps confirmados usan un ledger ordenado por cadena; aciertos, fallos y empates siguen visibles, para que la confianza tenga consecuencias.')}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[[t('Published', 'Publicadas'), formatNumber(record?.commitmentsCreated)], [t('Resolved', 'Resueltas'), formatNumber(record?.decisionsResolved)], [t('Wrong', 'Fallidas'), formatNumber(record?.losses)], [t('Record', 'Récord'), hitRate]].map(([label, value]) => (

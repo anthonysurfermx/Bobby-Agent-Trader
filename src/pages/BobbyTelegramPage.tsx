@@ -8,15 +8,8 @@ import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useAccount, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits } from 'viem';
-import { useAppKit } from '@reown/appkit/react';
-import { Check, Loader2, AlertTriangle } from 'lucide-react';
+import { Check } from 'lucide-react';
 import KineticShell from '@/components/kinetic/KineticShell';
-import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
-
-// Payment config — retired X Layer rail (kept only for the notice copy)
-// Bobby treasury wallet (NOT the user's wallet)
 
 const DEMO_CONVERSATION = [
   {
@@ -54,34 +47,8 @@ const DEMO_CONVERSATION = [
 export default function BobbyTelegramPage() {
   const [searchParams] = useSearchParams();
   const activateGroupId = searchParams.get('activate');
-  const { address, isConnected } = useAccount();
-  const { open: openWallet } = useAppKit();
-
   const [groupInfo, setGroupInfo] = useState<{ name: string; status: string } | null>(null);
-  const [paymentState, setPaymentState] = useState<'idle' | 'connected' | 'signing' | 'verifying' | 'success' | 'error'>('idle');
-  const [paymentError, setPaymentError] = useState('');
-  const [session, setSession] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
-
-  // OKB native transfer
-  const sendTxHash: `0x${string}` | undefined = undefined; // payments retired
-  // USDT ERC-20 transfer
-  const writeTxHash: `0x${string}` | undefined = undefined; // payments retired
-
-  // Pick whichever hash exists
-  const pendingTxHash = sendTxHash || writeTxHash;
-
-  // Wait for transaction confirmation
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash: pendingTxHash,
-  });
-
-  // When tx is confirmed, activate the group
-  useEffect(() => {
-    if (isConfirmed && pendingTxHash && session && paymentState === 'verifying') {
-      activateGroup(pendingTxHash, session);
-    }
-  }, [isConfirmed, pendingTxHash, session]);
+  const [groupActive, setGroupActive] = useState(false);
 
   // If ?activate=GROUP_ID, fetch group info
   useEffect(() => {
@@ -93,68 +60,11 @@ export default function BobbyTelegramPage() {
         if (d.group_name || d.bot_status) setGroupInfo({ name: d.group_name || 'Your Group', status: d.bot_status || (d.active ? 'active' : 'unknown') });
         if (d.active) {
           if (!d.group_name) setGroupInfo({ name: 'Group', status: 'active' });
-          setPaymentState('success');
+          setGroupActive(true);
         }
       })
       .catch(() => {});
   }, [activateGroupId]);
-
-  // Update state when wallet connects (NO auto-trigger — explicit 2-step per Codex)
-  useEffect(() => {
-    if (isConnected && address && paymentState === 'idle' && activateGroupId) {
-      setPaymentState('connected');
-    }
-  }, [isConnected, address, activateGroupId]);
-
-  // Step 1: Connect wallet
-  const handleConnect = () => {
-    openWallet();
-  };
-
-  // Step 2: Sign real USDT transfer on X Layer
-  const handlePay = async () => {
-    if (!isConnected || !address || !activateGroupId) return;
-    setPaymentState('signing');
-    setPaymentError('');
-    try {
-      // The OKB/USDT-on-X-Layer payment was retired on 2026-09-03 with the rail.
-      // The server answers 410 until a Base checkout exists; nothing is signed here.
-      const sessionRes = await fetch(`/api/telegram-access?group_id=${activateGroupId}&wallet=${address}`);
-      const sessionData = await sessionRes.json().catch(() => ({}));
-      if (sessionData.already_active) { setPaymentState('success'); return; }
-      setPaymentError(sessionData.error || 'Group activation by payment is paused until the Base checkout ships.');
-      setPaymentState('error');
-      return;
-    } catch (err) {
-      setPaymentError('Connection error');
-      setPaymentState('error');
-    }
-  };
-
-  // Step 3: Activate group after tx confirmed
-  const activateGroup = async (hash: string, sessionId: string) => {
-    try {
-      const activateRes = await fetch('/api/telegram-access', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session: sessionId,
-          wallet_address: address,
-          tx_hash: hash,
-        }),
-      });
-      const result = await activateRes.json();
-      if (result.ok) {
-        setPaymentState('success');
-      } else {
-        setPaymentError(result.error || 'Activation failed');
-        setPaymentState('error');
-      }
-    } catch {
-      setPaymentError('Failed to activate group');
-      setPaymentState('error');
-    }
-  };
 
   return (
     <KineticShell activeTab="terminal">
@@ -170,15 +80,14 @@ export default function BobbyTelegramPage() {
           </p>
         </motion.div>
 
-        {/* Activation Flow — 6-state payment (Gemini UX design) */}
+        {/* Group status — informational only; this page never requests a wallet or payment. */}
         {activateGroupId && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className={`mb-6 p-px rounded ${paymentState === 'success' ? 'bg-gradient-to-r from-green-500/40 via-green-400/20 to-green-500/40' : paymentState === 'error' ? 'bg-gradient-to-r from-red-500/30 via-red-400/10 to-red-500/30' : 'bg-gradient-to-r from-green-500/30 via-green-400/10 to-green-500/30'}`}>
-            <div className="bg-[#0a0a0a] rounded p-5 text-center"
-              style={paymentState === 'success' ? { boxShadow: '0 0 30px rgba(0,255,102,0.1)' } : undefined}>
+            className="mb-6 rounded bg-gradient-to-r from-green-500/30 via-green-400/10 to-green-500/30 p-px">
+            <div className="rounded bg-[#0a0a0a] p-5 text-center" style={groupActive ? { boxShadow: '0 0 30px rgba(0,255,102,0.1)' } : undefined}>
 
               {/* STATE: SUCCESS */}
-              {paymentState === 'success' && (
+              {groupActive && (
                 <>
                   <div className="w-16 h-16 rounded-full bg-green-500/20 border-2 border-green-500/40 flex items-center justify-center mx-auto mb-4">
                     <Check className="w-8 h-8 text-green-400" />
@@ -186,12 +95,6 @@ export default function BobbyTelegramPage() {
                   <h3 className="text-xl font-black text-green-400 mb-1">BOBBY IS LIVE</h3>
                   <p className="text-[10px] font-mono text-white/40 mb-1">{groupInfo?.name || 'Your group'}</p>
                   <p className="text-[9px] font-mono text-white/20 mb-4">Bobby is now fully integrated.</p>
-                  {txHash && (
-                    <a href={`https://www.oklink.com/xlayer/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
-                      className="text-[8px] font-mono text-green-400/40 hover:text-green-400 mb-3 block">
-                      TX: {txHash.slice(0, 10)}...{txHash.slice(-6)} · View on Explorer →
-                    </a>
-                  )}
                   <a href="https://t.me/Bobbyagentraderbot" target="_blank" rel="noopener noreferrer"
                     className="inline-block w-full px-6 py-3 bg-green-500 text-black font-mono text-[10px] font-black tracking-widest rounded active:scale-95 transition-all"
                     style={{ boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
@@ -208,58 +111,21 @@ export default function BobbyTelegramPage() {
                 </>
               )}
 
-              {/* STATE: ERROR */}
-              {paymentState === 'error' && (
-                <>
-                  <div className="w-14 h-14 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center mx-auto mb-3">
-                    <AlertTriangle className="w-6 h-6 text-red-400" />
-                  </div>
-                  <h3 className="text-lg font-black text-red-400 mb-1">ACTIVATION FAILED</h3>
-                  <p className="text-[10px] font-mono text-white/30 mb-4">{paymentError}</p>
-                  <button onClick={() => { setPaymentState('connected'); setPaymentError(''); }}
-                    className="w-full py-3 bg-white/[0.06] text-white/60 font-mono text-[10px] font-black tracking-widest rounded hover:bg-white/[0.1] transition-all">
-                    RETRY TRANSACTION
-                  </button>
-                </>
-              )}
-
-              {/* STATE: SIGNING */}
-              {paymentState === 'signing' && (
-                <>
-                  <Loader2 className="w-10 h-10 text-green-400 animate-spin mx-auto mb-3" />
-                  <h3 className="text-sm font-black mb-1">AWAITING SIGNATURE...</h3>
-                  <p className="text-[10px] font-mono text-white/30">Please confirm the transaction in your wallet.</p>
-                  <p className="text-[8px] font-mono text-white/15 mt-2">Do not close this window.</p>
-                </>
-              )}
-
-              {/* STATE: VERIFYING */}
-              {paymentState === 'verifying' && (
-                <>
-                  <Loader2 className="w-10 h-10 text-amber-400 animate-spin mx-auto mb-3" />
-                  <h3 className="text-sm font-black text-amber-400 mb-1">VERIFYING ON X LAYER...</h3>
-                  {pendingTxHash && <p className="text-[9px] font-mono text-white/30">TX: {pendingTxHash.slice(0, 14)}...</p>}
-                  <p className="text-[8px] font-mono text-white/15 mt-2">Block confirmation pending...</p>
-                </>
-              )}
-
-              {/* STATE: IDLE / CONNECTED — payments retired with the X Layer rail (2026-09-03) */}
-              {(paymentState === 'idle' || paymentState === 'connected') && (
+              {!groupActive && (
                 <>
                   <div className="w-10 h-10 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-3">
                     <span className="text-amber-400 text-lg">⏸</span>
                   </div>
                   <h3 className="text-sm font-black mb-1">
-                    ACTIVATION PAUSED FOR {groupInfo?.name?.toUpperCase() || 'YOUR GROUP'}
+                    GROUP SETUP PAUSED FOR {groupInfo?.name?.toUpperCase() || 'YOUR GROUP'}
                   </h3>
                   <div className="bg-white/[0.02] border border-white/[0.06] rounded p-3 mb-4 text-left">
                     <p className="text-[9px] font-mono text-white/50 leading-relaxed">
-                      Paid activation ran on the X Layer rail, which Bobby retired on 2026-09-03. There is nothing to sign here: no wallet, no OKB, no USDT.
-                      Group activation returns with a checkout on Base. Until then the bot keeps answering in groups that were already active.
+                      New group activation is paused while Bobby moves to a Base-only architecture. Existing active groups keep working.
                     </p>
                   </div>
                   <p className="text-[7px] font-mono text-white/15 mt-2 leading-relaxed">
-                    Nothing on this page moves funds. If a message asks you to pay to activate Bobby, it is not from us.
+                    This page never connects a wallet, requests payment or moves funds. A payment request is not from Bobby.
                   </p>
                 </>
               )}
@@ -341,7 +207,7 @@ export default function BobbyTelegramPage() {
           </div>
         </motion.div>
 
-        {/* Deploy to Telegram Group — x402 payment flow */}
+        {/* Deploy to Telegram Group */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}>
           <div className="p-px rounded bg-gradient-to-r from-green-500/30 via-green-400/10 to-green-500/30">
             <div className="bg-[#0a0a0a] rounded p-5 text-center">
@@ -352,33 +218,33 @@ export default function BobbyTelegramPage() {
               <p className="text-[10px] font-mono text-white/30 mb-3 max-w-xs mx-auto">
                 Activate Bobby in your Telegram group. Multi-agent trading intelligence, voice notes, real-time signals.
               </p>
-              {/* Payment info */}
+              {/* Service status */}
               <div className="bg-white/[0.02] border border-white/[0.06] rounded p-3 mb-4 max-w-xs mx-auto">
                 <div className="flex justify-between text-[9px] font-mono mb-1">
                   <span className="text-white/30">SERVICE</span>
                   <span className="text-white/60">Bobby Agent Trader</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-mono mb-1">
-                  <span className="text-white/30">NETWORK</span>
-                  <span className="text-white/60">X Layer (196)</span>
+                  <span className="text-white/30">PROOFS</span>
+                  <span className="text-white/60">Base (8453)</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-mono mb-1">
-                  <span className="text-white/30">ACCESS</span>
-                  <span className="text-white/60">30 Days</span>
+                  <span className="text-white/30">STATUS</span>
+                  <span className="text-amber-300">New activations paused</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-mono mt-2 pt-2 border-t border-white/[0.06]">
-                  <span className="text-white/40">COST</span>
-                  <span className="text-green-400 font-bold text-sm">0.1 OKB (~$8)</span>
+                  <span className="text-white/40">FUNDS</span>
+                  <span className="text-green-400 font-bold">No payment requested</span>
                 </div>
               </div>
 
               <a href="https://t.me/Bobbyagentraderbot?startgroup=true" target="_blank" rel="noopener noreferrer"
                 className="inline-block w-full max-w-xs px-6 py-3 bg-green-500 text-black font-mono text-[10px] font-black tracking-widest rounded active:scale-95 transition-all"
                 style={{ boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
-                STEP 1: ADD BOT TO GROUP →
+                ADD BOT TO GROUP →
               </a>
               <p className="text-[8px] font-mono text-white/15 mt-2">
-                After adding, Bobby will send you a payment link to activate.
+                Bobby never sends a wallet or payment prompt from this flow.
               </p>
               <button onClick={() => navigator.clipboard.writeText('https://t.me/Bobbyagentraderbot?startgroup=true')}
                 className="text-[7px] font-mono text-white/10 mt-1 hover:text-white/25 transition-colors">
@@ -394,8 +260,8 @@ export default function BobbyTelegramPage() {
           {[
             { label: 'MULTI_AGENT', desc: '3 AI agents debate' },
             { label: 'VOICE_NOTES', desc: 'Audio responses' },
-            { label: 'REAL_TIME', desc: 'OKX market data' },
-            { label: 'ON_CHAIN', desc: 'X Layer verified' },
+            { label: 'REAL_TIME', desc: 'Live market context' },
+            { label: 'ON_CHAIN', desc: 'Base proof record' },
           ].map(f => (
             <div key={f.label} className="bg-white/[0.02] border border-white/[0.04] rounded p-3">
               <span className="text-[8px] font-mono text-green-400/50 tracking-widest">{f.label}</span>

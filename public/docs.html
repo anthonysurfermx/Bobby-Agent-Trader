@@ -1,121 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Bobby Agent Trader — Developer Docs</title>
-<meta name="description" content="Connect your AI agent to Bobby. Seven audited proof contracts are deployed on Base mainnet; the legacy x402 rail remains on X Layer during controlled activation.">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bobby Protocol — Developer Docs</title>
+  <meta name="description" content="Connect an AI agent to Bobby's Base-native debate, risk and proof system.">
+  <meta http-equiv="refresh" content="0; url=/protocol/docs">
+  <link rel="canonical" href="https://bobbyprotocol.xyz/protocol/docs">
 </head>
 <body>
-<h1>Bobby Agent Trader — Developer Documentation</h1>
-<p>Connect your AI agent to Bobby in one command. Seven audited proof contracts are deployed on Base mainnet. Public writes remain frozen during Safe acceptance, runtime verification, canary and soak; x402 settlement remains on the legacy X Layer rail during cutover.</p>
-
-<h2>Quick Start</h2>
-<pre>
-# Add Bobby to Claude Code
-claude mcp add bobby-trader https://defimexico.org/api/mcp-bobby
-
-# Call Bobby via API
-curl -X POST https://defimexico.org/api/mcp-bobby \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"bobby_ta","arguments":{"symbol":"BTC"}},"id":1}'
-</pre>
-
-<h2>MCP Tools (12 available)</h2>
-<h3>Free Tools</h3>
-<ul>
-<li><strong>bobby_stats</strong> — Track record: win rate, PnL, trades, $100 Challenge status</li>
-<li><strong>bobby_ta</strong> — Technical analysis: RSI, MACD, BB, SuperTrend, support/resistance (70+ indicators from OKX Agent Trade Kit)</li>
-<li><strong>bobby_intel</strong> — Full intelligence briefing from 12 real-time data sources</li>
-<li><strong>bobby_uniswap_quote</strong> — Exact-input quote on Uniswap V3, Base (read-only)</li>
-<li><strong>bobby_dex_trending</strong> — Hot trending tokens on-chain</li>
-<li><strong>bobby_dex_signals</strong> — Smart money / whale / KOL buy signals</li>
-<li><strong>bobby_wallet_balance</strong> — Check any wallet balance on any chain</li>
-</ul>
-
-<h3>Premium Tools (x402 payment on X Layer)</h3>
-<ul>
-<li><strong>bobby_analyze</strong> — Full market analysis with 12 data sources (0.01 USDC)</li>
-<li><strong>bobby_debate</strong> — Trigger 3-agent adversarial debate: Alpha Hunter vs Red Team vs CIO (0.01 USDC)</li>
-<li><strong>bobby_security_scan</strong> — Token contract safety scan (0.01 USDC)</li>
-<li><strong>bobby_wallet_portfolio</strong> — Multi-chain wallet analysis (0.01 USDC)</li>
-</ul>
-
-<h2>Smart Contracts on Base Mainnet (Chain 8453)</h2>
-<table border="1">
-<tr><th>Contract</th><th>Address</th><th>Purpose</th></tr>
-<tr><td>BobbyTrackRecord V2</td><td>0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321</td><td>Future-anchored, Pyth-verified decision history</td></tr>
-<tr><td>BobbyConvictionOracle</td><td>0x27f51D711171c830dd796D4B03914a8C6c46D75e</td><td>Pre-execution conviction commitments</td></tr>
-<tr><td>BobbyAgentEconomyV2</td><td>0x009de59e0e7f4109fF9E89E744A4412082AD2aaF</td><td>Native-fee protocol economy</td></tr>
-<tr><td>BobbyAdversarialBounties</td><td>0x73fD6c77ff0403Ea071e8721c76f88cE34ac9968</td><td>Adversarial bounty settlement</td></tr>
-<tr><td>HardnessRegistry</td><td>0x15800F40b8988765AD3F46030B73bC8109A793f5</td><td>Difficulty-weighted scoring</td></tr>
-<tr><td>BobbyAgentRegistry</td><td>0xB3137D7afE26fbdBcAA95573C7A20be896efde93</td><td>Staked on-chain agent identities</td></tr>
-<tr><td>BobbyIntentEscrow</td><td>0x5D9d534419421B7Edfe9Bb509E4c48512256BC97</td><td>Separate attested-intent ledger</td></tr>
-</table>
-<p>Deployment block 50275770. Production Safe: 0x8BE60853F27b944e11486285d95c3e06596553b4. Status: deployed; writes frozen until controlled activation.</p>
-
-<h2>Read ConvictionOracle (Solidity)</h2>
-<pre>
-interface IBobbyOracle {
-    function getConviction(string memory symbol) external view returns (
-        uint8 direction,    // 0=NEUTRAL, 1=LONG, 2=SHORT
-        uint8 conviction,   // 0-10
-        uint96 entryPrice,  // 8 decimal precision
-        bool isActive       // false if signal expired
-    );
-}
-
-IBobbyOracle oracle = IBobbyOracle(0x27f51D711171c830dd796D4B03914a8C6c46D75e);
-(uint8 dir, uint8 conv, uint96 entry, bool active) = oracle.getConviction("BTC");
-</pre>
-
-<h2>x402 Payment Flow</h2>
-<pre>
-# Step 1: Request premium signal (returns 402)
-GET /api/premium-signal
-→ 402 { paymentRequired: true, amount: "0.001 OKB", chain: 196 }
-
-# Step 2: Pay on X Layer, then retry with TX hash
-GET /api/premium-signal -H "x-payment: 0xYOUR_TX_HASH"
-→ 200 { signal: {...}, verification: { status: "verified", chain: "X Layer" } }
-</pre>
-
-<h2>Universal Asset Search</h2>
-<pre>
-GET /api/bobby-asset-search?q=PEPE
-→ { results: [{ instId: "PEPE-USDT", instType: "SPOT" }, ...] }
-
-GET /api/bobby-asset-search?q=NVDA
-→ { results: [{ instId: "NVDA-USDT-SWAP", instType: "SWAP" }] }
-</pre>
-
-<h2>Technical Indicators (OKX Agent Trade Kit)</h2>
-<p>Bobby integrates 70+ indicators: RSI, MACD, Bollinger Bands, MA, EMA, KDJ, ATR, SuperTrend, AHR999, BTC Rainbow.</p>
-<pre>
-GET /api/bobby-signals
-→ { indicators: [{ symbol: "BTC", compositeScore: -0.568, signal: "short", conviction: 0.535, agreement: 0.72 }] }
-</pre>
-
-<h2>Agent Commerce — 10 Use Cases</h2>
-<ol>
-<li><strong>AI Trading Fund</strong> — calls bobby_analyze → rebalances vault (x402 paid)</li>
-<li><strong>AI Risk Manager</strong> — reads ConvictionOracle on-chain → adjusts collateral (free)</li>
-<li><strong>AI Newsletter</strong> — calls bobby_debate → publishes analysis (x402 paid)</li>
-<li><strong>AI Portfolio Optimizer</strong> — calls bobby_ta → ranks assets (free)</li>
-<li><strong>AI Alert Service</strong> — polls oracle → sends Telegram alerts (free)</li>
-<li><strong>AI Academy Tutor</strong> — calls bobby_debate → grades students (x402 paid)</li>
-<li><strong>AI Hedge Bot</strong> — reads regime from bobby_intel → opens hedges (free)</li>
-<li><strong>AI Social Trader</strong> — calls bobby_debate → generates X threads (x402 paid)</li>
-<li><strong>AI Market Maker</strong> — reads ATR → adjusts spreads (free)</li>
-<li><strong>AI Insurance Protocol</strong> — reads calibration → prices risk (free)</li>
-</ol>
-
-<h2>Links</h2>
-<ul>
-<li>Live: <a href="https://defimexico.org/bobby">defimexico.org/bobby</a></li>
-<li>GitHub: <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader">github.com/anthonysurfermx/Bobby-Agent-Trader</a></li>
-<li>MCP Endpoint: <a href="https://defimexico.org/api/mcp-bobby">defimexico.org/api/mcp-bobby</a></li>
-<li>LLM Context: <a href="https://defimexico.org/llms.txt">defimexico.org/llms.txt</a></li>
-<li>Marketplace: <a href="https://defimexico.org/agentic-world/bobby/marketplace">defimexico.org/agentic-world/bobby/marketplace</a></li>
-</ul>
+  <h1>Bobby Protocol developer documentation</h1>
+  <p>Bobby is Base-only, self-custodial and does not require exchange credentials.</p>
+  <p><a href="/protocol/docs">Open the current documentation</a></p>
 </body>
 </html>

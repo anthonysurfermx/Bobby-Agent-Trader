@@ -1,6 +1,6 @@
 // ============================================================
 // Bobby AI Docs — Integration portal for AI agents & developers
-// okx.ai-inspired dark design, Base blue accent
+// Base-native dark design
 // ============================================================
 
 import { useState } from 'react';
@@ -218,7 +218,7 @@ export default function BobbyDocsPage() {
               Connect your AI agent to Bobby in one command
             </h1>
             <p className="text-sm md:text-base leading-7 text-white/60 max-w-xl mx-auto">
-              Base V2 proof canary, 12 MCP tools, 70+ technical indicators and a legacy x402 rail
+              Base mainnet proofs, 11 MCP tools, self-custodial quotes and a chain-ordered receipt ledger
             </p>
           </motion.div>
 
@@ -366,9 +366,9 @@ export default function BobbyDocsPage() {
               </div>
 
               <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/10 pt-5 font-mono text-[10px] uppercase tracking-[0.12em]">
-                <span className="rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-3 py-1 text-[#7da6ff]">Base mainnet deployed</span>
-                <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-amber-300">Writes frozen</span>
-                <span className="text-white/35">Pending Safe acceptance · runtime verification · canary · soak</span>
+                <span className="rounded-full border border-[#0052ff]/40 bg-[#0052ff]/10 px-3 py-1 text-[#7da6ff]">Base mainnet live</span>
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-emerald-300">Dynamic write controls</span>
+                <span className="text-white/35">Safe-owned · runtime verified · public heartbeat</span>
               </div>
             </GlassCard>
           </motion.div>
@@ -402,51 +402,57 @@ export default function BobbyDocsPage() {
             </GlassCard>
           </motion.div>
 
-          {/* ===== 5. x402 PAYMENT PROTOCOL ===== */}
+          {/* ===== 6. BASE SWAP RECEIPT LEDGER ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
-              <SectionLabel icon={Lock} label="x402 payment protocol" />
+              <SectionLabel icon={Wallet} label="Base execution receipt ledger" right="Self-custody · FIFO" />
               <p className="text-sm leading-7 text-white/60 mb-7 max-w-2xl">
-                The current product direction is Base-first. The payment example below documents the legacy X Layer rail while the Base deployment is cut over.
+                Bobby never holds funds or exchange credentials. It can quote a bounded Uniswap route on Base, hand approved calldata to the user's wallet, and record only confirmed on-chain receipts. Tokenized-stock calldata remains disabled until the legal and operations gates are explicitly approved.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Step 1 */}
                 <GlassCard className="p-5 relative overflow-hidden">
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.06] font-bold leading-none">1</div>
-                  <div className="font-mono text-[10px] text-white/50 tracking-[0.15em] uppercase mb-3">Request</div>
+                  <div className="font-mono text-[10px] text-white/50 tracking-[0.15em] uppercase mb-3">Quote</div>
                   <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
-{`curl bobbyprotocol.xyz/api/premium-signal
+{`curl 'bobbyprotocol.xyz/api/base-swap?\
+tokenIn=USDC&tokenOut=NVDAc&amount=10'
 
-→ 410 {
-  code: "xlayer_x402_retired"
+→ 200 {
+  ok: true,
+  quote: { route: "USDC → NVDAc" }
 }
-# The X Layer x402 rail is archive-only.`}
+# GET never returns wallet calldata.`}
                   </div>
                 </GlassCard>
 
                 {/* Step 2 */}
                 <GlassCard className="p-5 relative overflow-hidden">
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.06] font-bold leading-none">2</div>
-                  <div className="font-mono text-[10px] text-[#ffb95f] tracking-[0.15em] uppercase mb-3">Legacy payment rail</div>
+                  <div className="font-mono text-[10px] text-[#ffb95f] tracking-[0.15em] uppercase mb-3">Wallet approval</div>
                   <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
-{`# Premium MCP tools pay on Base:
-curl bobbyprotocol.xyz/api/mcp-http
-→ 402 challenge on ${'Base'}`}
+{`# POST requires:
+• wallet session proof
+• origin + rate-limit checks
+• eligibility + country gate
+• exact ops switch
+
+# Only the user's wallet signs.`}
                   </div>
                 </GlassCard>
 
                 {/* Step 3 */}
                 <GlassCard className="p-5 relative overflow-hidden">
                   <div className="absolute top-3 right-3 font-mono text-[32px] text-white/[0.06] font-bold leading-none">3</div>
-                  <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.15em] uppercase mb-3">Access granted</div>
+                  <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.15em] uppercase mb-3">Confirmed receipt</div>
                   <div className="bg-black/60 border border-white/10 rounded-xl p-3.5 font-mono text-[10px] text-[#7da6ff] overflow-x-auto whitespace-pre leading-relaxed">
-{`→ 200 {
-  signal: { ... },
-  verification: {
-    status: "verified"
-  }
-}`}
+{`receipt.status = "confirmed"
+ledger.order = block + tx index
+matching = FIFO rebuild per pair
+pnl.scope = wallet
+
+# Concurrent confirms serialize.`}
                   </div>
                 </GlassCard>
               </div>
@@ -493,28 +499,28 @@ IBobbyOracle oracle = IBobbyOracle(
 → 200 {
   results: [
     { symbol: "PEPE", name: "Pepe", type: "crypto", price: 0.0000089 },
-    { symbol: "PEPE/USDT", exchange: "okx", volume_24h: "12.4M" }
+    { symbol: "PEPE", source: "public-market", volume_24h: "12.4M" }
   ]
 }`}
               />
             </GlassCard>
           </motion.div>
 
-          {/* ===== 8. CTA — AGENT COMMERCE ===== */}
+          {/* ===== 8. CTA — PUBLIC PROOFS ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
-            <a href="/agentic-world/bobby/marketplace" className="block group">
+            <a href="/protocol/calls" className="block group">
               <GlassCard glow accentBorder className="p-6 md:p-8 hover:bg-white/[0.07] transition-all">
                 <div className="flex items-center gap-5">
                   <div className="w-12 h-12 rounded-xl bg-[#0052ff]/20 border border-[#0052ff]/40 flex items-center justify-center shrink-0">
                     <ShoppingCart className="w-5 h-5 text-[#7da6ff]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-2">Intelligence protocol</div>
+                    <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-2">Public proof ledger</div>
                     <div className="text-lg md:text-xl text-white font-extrabold tracking-[-0.05em] mb-1.5">
-                      10 Intelligence Protocol use cases
+                      Inspect verified calls
                     </div>
                     <div className="text-sm leading-6 text-white/60">
-                      How agents buy and sell intelligence through Bobby's agent-native payment rail
+                      Committed before outcome, resolved with evidence, and anchored to Base.
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-[#7da6ff]/60 group-hover:text-[#7da6ff] group-hover:translate-x-1 transition-all shrink-0" />
@@ -528,7 +534,7 @@ IBobbyOracle oracle = IBobbyOracle(
             <div className="border-t border-white/10 pt-8 space-y-5">
               {/* Powered by */}
               <div className="flex flex-wrap items-center justify-center gap-3">
-                {['Base', 'MCP', 'x402', 'Claude AI'].map(tech => (
+                {['Base', 'MCP', 'Uniswap V3', 'Supabase'].map(tech => (
                   <span key={tech} className="font-mono text-[10px] text-white/40 tracking-[0.15em] px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.04]">
                     {tech.toUpperCase()}
                   </span>
@@ -539,9 +545,9 @@ IBobbyOracle oracle = IBobbyOracle(
               <div className="flex items-center justify-center gap-6 font-mono text-[10px] text-white/35 tracking-[0.18em]">
                 <span>LATENCY: 14MS</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#0052ff]" />
-                <span>ENDPOINTS: 12</span>
+                <span>CHAIN: 8453</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#0052ff]" />
-                <span>TOOLS: {FREE_TOOLS.length + PREMIUM_TOOLS.length + UTILITY_TOOLS.length}</span>
+                <span>PUBLIC MCP TOOLS: 11</span>
               </div>
 
               {/* Links */}

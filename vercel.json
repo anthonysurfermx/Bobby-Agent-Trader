@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/bobby",
-      "destination": "/agentic-world/bobby/challenge"
+      "destination": "/agentic-world/bobby"
     },
     {
       "source": "/api/polymarket-gamma/:path*",

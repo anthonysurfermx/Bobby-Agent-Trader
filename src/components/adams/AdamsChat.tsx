@@ -1100,7 +1100,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     },
     phases: {
       es: [
-        { text: 'Conectando a OKX OnchainOS...', delay: 0 },
+        { text: 'Cargando contexto de mercado en vivo...', delay: 0 },
         { text: 'Escaneando señales whale en ETH, SOL, Base...', delay: 1200 },
         { text: 'Filtrando señales (score > 20)...', delay: 3000 },
         { text: 'Obteniendo leaderboard Polymarket (top 15)...', delay: 5000 },
@@ -1114,7 +1114,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         { text: 'Casi listo...', delay: 90000 },
       ],
       en: [
-        { text: 'Connecting to OKX OnchainOS...', delay: 0 },
+        { text: 'Loading live market context...', delay: 0 },
         { text: 'Scanning whale signals across ETH, SOL, Base...', delay: 1200 },
         { text: 'Filtering signals (score > 20)...', delay: 3000 },
         { text: 'Fetching Polymarket leaderboard (top 15)...', delay: 5000 },
@@ -1128,7 +1128,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         { text: 'Almost done...', delay: 90000 },
       ],
       pt: [
-        { text: 'Conectando ao OKX OnchainOS...', delay: 0 },
+        { text: 'Carregando contexto de mercado ao vivo...', delay: 0 },
         { text: 'Escaneando sinais whale em ETH, SOL, Base...', delay: 1200 },
         { text: 'Filtrando sinais (score > 20)...', delay: 3000 },
         { text: 'Obtendo leaderboard Polymarket (top 15)...', delay: 5000 },
@@ -1204,9 +1204,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       pt: (addr: string) => `Wallet conectada: ${addr}\n\nPortfolio tracking em breve na v2. Por agora, rode "Analyze Market" — escaneio sinais e recomendo trades com Kelly Criterion para seu perfil de risco.`,
     },
     help: {
-      es: 'Esto es lo que puedo hacer:\n\n"BTC" o "ETH" — Precio en vivo + funding rate\n"All Prices" — Panorama del mercado\n"What\'s trending?" — Mayores movimientos\n"Analyze Market" — Escaneo completo OKX + Polymarket (debate multi-agente + Kelly sizing)\n"Portfolio" — Revisar wallet conectada\n\nO escribe cualquier token — SOL, OKB, MATIC...',
-      en: 'Here\'s what I can do:\n\n"BTC" or "ETH" — Live price + funding rate\n"All Prices" — Full market overview\n"What\'s trending?" — Biggest movers\n"Analyze Market" — Full OKX + Polymarket scan (multi-agent debate + Kelly sizing)\n"Portfolio" — Check connected wallet\n\nOr just type any token name — SOL, OKB, MATIC...',
-      pt: 'Aqui está o que posso fazer:\n\n"BTC" ou "ETH" — Preço ao vivo + funding rate\n"All Prices" — Visão do mercado\n"What\'s trending?" — Maiores movimentos\n"Analyze Market" — Escaneamento completo OKX + Polymarket (debate multi-agente + Kelly sizing)\n"Portfolio" — Verificar wallet conectada\n\nOu digite qualquer token — SOL, OKB, MATIC...',
+      es: 'Esto es lo que puedo hacer:\n\n"BTC" o "ETH" — Precio en vivo + funding rate\n"All Prices" — Panorama del mercado\n"What\'s trending?" — Mayores movimientos\n"Analyze Market" — Contexto público + mercados de predicción (debate multi-agente + Kelly sizing)\n"Portfolio" — Revisar wallet conectada\n\nO escribe cualquier token — SOL, MATIC, PEPE...',
+      en: 'Here\'s what I can do:\n\n"BTC" or "ETH" — Live price + funding rate\n"All Prices" — Full market overview\n"What\'s trending?" — Biggest movers\n"Analyze Market" — Public market + prediction-market context (multi-agent debate + Kelly sizing)\n"Portfolio" — Check connected wallet\n\nOr just type any token name — SOL, MATIC, PEPE...',
+      pt: 'Aqui está o que posso fazer:\n\n"BTC" ou "ETH" — Preço ao vivo + funding rate\n"All Prices" — Visão do mercado\n"What\'s trending?" — Maiores movimentos\n"Analyze Market" — Contexto público + mercados de previsão (debate multi-agente + Kelly sizing)\n"Portfolio" — Verificar wallet conectada\n\nOu digite qualquer token — SOL, MATIC, PEPE...',
     },
     marketOverview: {
       es: (sym: string, change: string) => `Panorama del mercado — ${sym} liderando con ${change}%:`,
@@ -1214,9 +1214,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       pt: (sym: string, change: string) => `Panorama do mercado — ${sym} liderando com ${change}%:`,
     },
     marketError: {
-      es: 'No pude obtener datos del mercado. La API de OKX puede estar temporalmente fuera de servicio.',
-      en: 'Failed to fetch market data. OKX API might be temporarily unavailable.',
-      pt: 'Não consegui obter dados do mercado. A API da OKX pode estar temporariamente indisponível.',
+      es: 'No pude obtener datos del mercado. La fuente pública puede estar temporalmente fuera de servicio.',
+      en: 'Failed to fetch market data. The public feed might be temporarily unavailable.',
+      pt: 'Não consegui obter dados do mercado. A fonte pública pode estar temporariamente indisponível.',
     },
     trending: {
       es: (movers: string) => `Mayores movimientos ahorita: ${movers}\n\nPara posiciones de smart money y señales de ballenas, corre "Analyze Market".`,
@@ -1746,7 +1746,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             ? `Tu equity es ${s.currentEquity.toFixed(2)} dólares. Win rate ${s.winRate.toFixed(0)} por ciento. ${positions.length} posiciones abiertas.`
             : `Your equity is ${s.currentEquity.toFixed(2)} dollars. Win rate ${s.winRate.toFixed(0)} percent. ${positions.length} open positions.`);
         } else {
-          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude conectar con OKX.' : 'Could not connect to OKX.', timestamp: Date.now() }]);
+          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude cargar el rendimiento.' : 'Could not load performance.', timestamp: Date.now() }]);
         }
       } catch {
         setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: 'Error fetching performance data.', timestamp: Date.now() }]);
@@ -2071,10 +2071,10 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         // ---- XML-tagged structured briefing (Vance strategy) ----
         if (fetchIntel) {
           const sources: string[] = [];
-          if (needsOKX || hasTokens) sources.push('OKX OnchainOS');
+          if (needsOKX || hasTokens) sources.push('Public crypto market');
           if (needsPoly) sources.push('Polymarket');
-          if (hasStocks) sources.push('Yahoo Finance');
-          if ((isGeneralOpinion || hasVibeContext) && !needsOKX && !needsPoly && !hasStocks) sources.push('OKX + Polymarket');
+          if (hasStocks) sources.push('Public equity market');
+          if ((isGeneralOpinion || hasVibeContext) && !needsOKX && !needsPoly && !hasStocks) sources.push('Public market + prediction markets');
           contextBlocks.push(`<REASONING sources="${sources.join(', ')}">Use ALL live data below. Cite specific numbers, whale flows, consensus %. Cross-reference when multiple sources available.</REASONING>`);
         }
 
@@ -3226,7 +3226,6 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                     </motion.div>
                   )}
 
-                  {/* Perps Trade Card — execute leveraged perpetuals via OKX CEX */}
                   {/* Trade execution cards */}
                   {latestAdvisor.trades && latestAdvisor.trades.length > 0 && (
                     <div className="mt-3 space-y-2">

@@ -611,11 +611,11 @@ export function MarketCanvas({
                 <span className="font-mono text-[9px] text-white/25">
                   {language === 'es'
                     ? (!getVoiceAsset(symbol)
-                        ? 'no hay velas en OKX ni Yahoo Finance para este activo'
-                        : `no hay velas en ${isStock ? 'Yahoo Finance' : 'OKX'} para este activo`)
+                        ? 'no hay velas en las fuentes públicas para este activo'
+                        : `no hay velas en el feed público de ${isStock ? 'acciones' : 'cripto'} para este activo`)
                     : (!getVoiceAsset(symbol)
-                        ? 'no candles on OKX or Yahoo Finance for this asset'
-                        : `no candles on ${isStock ? 'Yahoo Finance' : 'OKX'} for this asset`)}
+                        ? 'no candles from public sources for this asset'
+                        : `no candles from the public ${isStock ? 'equity' : 'crypto'} feed for this asset`)}
                 </span>
               </>
             )}
@@ -626,7 +626,7 @@ export function MarketCanvas({
       <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
         <span>{isStock
           ? (language === 'es' ? 'Yahoo Finance · mercado accionario' : 'Yahoo Finance · equities')
-          : (language === 'es' ? 'OKX · mercado cripto' : 'OKX · crypto market')}
+          : (language === 'es' ? 'feed público · mercado cripto' : 'public feed · crypto market')}
         </span>
         <span className={error ? 'text-red-400' : undefined}>
           {error

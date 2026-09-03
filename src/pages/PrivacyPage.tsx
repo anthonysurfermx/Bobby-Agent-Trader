@@ -78,7 +78,7 @@ export default function PrivacyPage() {
               text-to-speech when the primary voice is unavailable.
             </li>
             <li>
-              <span className="text-white">Market data sources</span> (OKX, Yahoo Finance) — we
+              <span className="text-white">Public market data sources</span> — we
               request public prices and charts; none of your data is sent to them.
             </li>
             <li>

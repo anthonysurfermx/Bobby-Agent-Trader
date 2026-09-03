@@ -188,11 +188,10 @@ export default function BobbyProtocolLanding() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'recorded'>('all');
   const btc = price(stats, 'BTC');
-  // Provenance (Codex review): debates, decisions and win rate come from the
-  // public resolution ledger, which spans every era (X Layer included). MCP
-  // calls and interactions come from AgentEconomy on the LIVE chain (Base
-  // mainnet). Mixing the two in one row read as a contradiction — "0 debates,
-  // 864 decisions" — so each row now states where its numbers come from.
+  // Debates, decisions and win rate come from the public resolution ledger.
+  // MCP calls and interactions come from AgentEconomy on Base mainnet. Each
+  // row states its provenance so historical outcomes are not mixed with live
+  // contract counters.
   const publicRecord = stats?.debateActivity;
   const totalDebates = publicRecord?.totalDebates ?? stats?.contracts?.agentEconomy?.stats?.totalDebates;
   const liveChainDebates = stats?.contracts?.agentEconomy?.stats?.totalDebates;
@@ -219,9 +218,9 @@ export default function BobbyProtocolLanding() {
     }
     return `${Number(rate).toFixed(1)}% (n=${resolved})`;
   };
-  const chainLabel = stats?.chain?.id === 196 ? 'Legacy X Layer' : (stats?.chain?.name || 'Base');
-  const provenanceNote = `Debates, decisions and win rate: public resolution ledger, all eras. MCP calls and interactions: AgentEconomy on ${chainLabel}${liveChainDebates !== undefined ? ` (${formatNumber(liveChainDebates, '0')} debates settled there so far)` : ''}.`;
-  const nativeSymbol = stats?.chain?.nativeSymbol || (stats?.chain?.id === 196 ? 'OKB' : 'ETH');
+  const chainLabel = stats?.chain?.name || 'Base';
+  const provenanceNote = `Debates, decisions and win rate: public resolution ledger. MCP calls and interactions: AgentEconomy on ${chainLabel}${liveChainDebates !== undefined ? ` (${formatNumber(liveChainDebates, '0')} debates settled there so far)` : ''}.`;
+  const nativeSymbol = stats?.chain?.nativeSymbol || 'ETH';
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
     : null;
@@ -326,7 +325,7 @@ export default function BobbyProtocolLanding() {
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />The verification layer for financial intelligence <span aria-hidden>›</span>
               </a>
               <h1 className="max-w-4xl text-[clamp(2.4rem,5.2vw,5rem)] font-extrabold leading-[.96] tracking-[-0.085em]">No decision is approved<br />without being <span className="text-[#0052ff]">refuted.</span></h1>
-              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">Every idea follows a fixed procedure — case, refutation, risk gate and verdict — and the verdict is published before any outcome exists to justify it.</p>
+              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">Every idea follows a fixed procedure — case, refutation, risk gate and verdict — and the verdict is published on Base before any outcome exists to justify it.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
                 <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a verdict <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
                 <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the procedure <ChevronDown className="h-4 w-4" /></a>
@@ -540,7 +539,7 @@ export default function BobbyProtocolLanding() {
                 },
                 {
                   title: 'Proof',
-                  description: 'The thesis and decision are committed before the outcome. Anyone can inspect what was decided and when.',
+                  description: 'The thesis and decision are committed on Base before the outcome. Confirmed swaps enter a chain-ordered receipt ledger with FIFO lots and wallet-scoped PnL.',
                   image: '/images/protocol/onchain-proof.jpg',
                   alt: 'Transparent cobalt glass monolith containing a sealed point of light',
                   telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
@@ -691,9 +690,9 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Track record</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The next build is Base.</h2>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The live protocol is Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Bobby ran in production on X Layer through the hackathon era. Those legacy records show what was committed on-chain; the current build and next deployment are Base-first. They do not claim oracle-verified market truth while TrackRecord v2 is still being designed.
+                Identity, debates, risk proofs and the execution receipt ledger now share one Base-only architecture. Wallets stay self-custodial: Bobby prepares bounded calldata, records confirmed receipts and never holds funds or exchange credentials.
               </p>
             </div>
 
@@ -723,8 +722,8 @@ export default function BobbyProtocolLanding() {
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
               <span>Base · 8453</span>
-              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy TrackRecord ↗</a>
-              <a href={`https://www.oklink.com/xlayer/address/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">Legacy AgentEconomy ↗</a>
+              <a href={`${explorerAddressUrl}/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord on Basescan ↗</a>
+              <a href={`${explorerAddressUrl}/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">AgentEconomy on Basescan ↗</a>
               <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>
             </div>
           </div>

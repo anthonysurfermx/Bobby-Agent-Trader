@@ -497,7 +497,7 @@ export default function CompanionDesk() {
               {chart.lines.map((l) => (<g key={l.label}><line x1="0" x2={chart.w} y1={l.y} y2={l.y} stroke={l.color} strokeDasharray="4 4" strokeWidth="1" /><text x={chart.w - 4} y={l.y - 3} fill={l.color} fontSize="9" fontFamily="monospace" textAnchor="end">{l.label}</text></g>))}
             </svg>
           )}
-          <div className="text-[10px] font-mono text-white/40 flex justify-between"><span>{snapshot.isEquity ? 'YAHOO FINANCE · EQUITIES' : 'OKX · CRYPTO MARKET'}</span><span>{series.length} OHLCV · LIVE</span></div>
+          <div className="text-[10px] font-mono text-white/40 flex justify-between"><span>{snapshot.isEquity ? 'PUBLIC EQUITY MARKET' : 'PUBLIC CRYPTO MARKET'}</span><span>{series.length} OHLCV · LIVE</span></div>
           <div className="flex flex-wrap gap-2 text-[10px] font-mono">
             {answer.trend && <span className="px-2 py-1 rounded-full border" style={{ color: answer.trend.includes('alcista') ? '#34D399' : answer.trend.includes('bajista') ? '#f87171' : 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.1)' }}>{localizedTrend(answer.trend).toUpperCase()}</span>}
             {answer.rsi !== null && <span className="px-2 py-1 rounded-full border border-white/10 text-sky-300">RSI {Math.round(answer.rsi)}</span>}

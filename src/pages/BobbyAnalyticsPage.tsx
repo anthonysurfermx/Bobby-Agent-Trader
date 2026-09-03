@@ -90,7 +90,7 @@ export default function BobbyAnalyticsPage() {
           <div className="min-w-0">
             <h1 className="break-all text-2xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl">PERFORMANCE_ANALYTICS</h1>
             <p className="font-mono text-xs text-white/30 mt-1">
-              Bobby's $100 Challenge · Real OKX trades · <span className="text-green-400">LIVE</span>
+              Bobby's public track record · Confirmed Base receipts · <span className="text-green-400">LIVE</span>
             </p>
           </div>
           <div className="hidden sm:flex gap-4">

@@ -21,7 +21,6 @@ const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
-const BobbySubmissionPage = lazy(() => import('@/pages/BobbySubmissionPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
 const StartupDetailPage = lazy(() => import('@/pages/StartupDetailPage'));
@@ -63,7 +62,6 @@ const ClawTraderPage = lazy(() => import('@/pages/ClawTraderPage'));
 const ClawTraderChatPage = lazy(() => import('@/pages/ClawTraderChatPage'));
 const BobbyAgentTraderPage = lazy(() => import('@/pages/BobbyAgentTraderPage'));
 const CompanionDeskPage = lazy(() => import('@/pages/CompanionDeskPage'));
-const BobbyChallengePage = lazy(() => import('@/pages/BobbyChallengePage'));
 const BobbyAnalyticsPage = lazy(() => import('@/pages/BobbyAnalyticsPage'));
 const BobbyHistoryPage = lazy(() => import('@/pages/BobbyHistoryPage'));
 const BobbyAgentsPage = lazy(() => import('@/pages/BobbyAgentsPage'));
@@ -74,17 +72,13 @@ const DeployAgentPage = lazy(() => import('@/pages/DeployAgentPage'));
 const MascotShowcasePage = lazy(() => import('@/pages/MascotShowcasePage'));
 const BobbyB2BPage = lazy(() => import('@/pages/BobbyB2BPage'));
 const BobbyMetacognitionPage = lazy(() => import('@/pages/BobbyMetacognitionPage'));
-const BobbySignalsPage = lazy(() => import('@/pages/BobbySignalsPage'));
 const BobbyDocsPage = lazy(() => import('@/pages/BobbyDocsPage'));
 const BobbyCallsPage = lazy(() => import('@/pages/BobbyCallsPage'));
 const BobbyRiskPage = lazy(() => import('@/pages/BobbyRiskPage'));
 const BobbyAuditsPage = lazy(() => import('@/pages/BobbyAuditsPage'));
 const BobbyBountyPage = lazy(() => import('@/pages/BobbyBountyPage'));
-const BobbyArchitecturePage = lazy(() => import('@/pages/BobbyArchitecturePage'));
-const BobbyMarketplacePage = lazy(() => import('@/pages/BobbyMarketplacePage'));
 const BobbyHeartbeatPage = lazyWithRetry(() => import('@/pages/BobbyHeartbeatPage'), 'protocol-heartbeat');
 const BobbyAgentConsolePage = lazyWithRetry(() => import('@/pages/BobbyAgentConsolePage'), 'protocol-console');
-const BobbyNetworkConsolePage = lazyWithRetry(() => import('@/pages/BobbyNetworkConsolePage'), 'protocol-network');
 const BobbyHarnessConsolePage = lazyWithRetry(() => import('@/pages/BobbyHarnessConsolePage'), 'protocol-harness');
 const BobbyPlaybooksPage = lazyWithRetry(() => import('@/pages/BobbyPlaybooksPage'), 'protocol-playbooks');
 const BobbySandboxPage = lazyWithRetry(() => import('@/pages/BobbySandboxPage'), 'protocol-sandbox');
@@ -363,11 +357,7 @@ const router = createBrowserRouter(
         },
         {
           path: 'protocol/architecture',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyArchitecturePage />
-            </Suspense>
-          ),
+          element: <Navigate to="/protocol/docs" replace />,
         },
         {
           path: 'protocol/heartbeat',
@@ -387,11 +377,7 @@ const router = createBrowserRouter(
         },
         {
           path: 'protocol/network',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyNetworkConsolePage />
-            </Suspense>
-          ),
+          element: <Navigate to="/protocol/heartbeat" replace />,
         },
         {
           path: 'protocol/harness',
@@ -715,11 +701,7 @@ const router = createBrowserRouter(
             },
             {
               path: 'agentic-world/network',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <BobbyNetworkConsolePage />
-                </Suspense>
-              ),
+              element: <Navigate to="/protocol/heartbeat" replace />,
             },
             // Forum moved outside MainLayout — uses KineticShell
             {
@@ -768,11 +750,7 @@ const router = createBrowserRouter(
 
         {
           path: 'submission',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbySubmissionPage />
-            </Suspense>
-          ),
+          element: <Navigate to="/protocol" replace />,
         },
 
         // DEPLOY AGENT WIZARD (SIN LAYOUT)
@@ -800,15 +778,11 @@ const router = createBrowserRouter(
         // ==========================================
         {
           path: 'bobby',
-          element: <Navigate to="/agentic-world/bobby/challenge" replace />,
+          element: <Navigate to="/agentic-world/bobby" replace />,
         },
         {
           path: 'agentic-world/bobby/challenge',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyChallengePage />
-            </Suspense>
-          ),
+          element: <Navigate to="/protocol/calls" replace />,
         },
         {
           path: 'agentic-world/bobby/analytics',
@@ -860,11 +834,7 @@ const router = createBrowserRouter(
         },
         {
           path: 'agentic-world/bobby/signals',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbySignalsPage />
-            </Suspense>
-          ),
+          element: <Navigate to="/agentic-world/bobby" replace />,
         },
 
         {
@@ -878,11 +848,7 @@ const router = createBrowserRouter(
 
         {
           path: 'agentic-world/bobby/marketplace',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyMarketplacePage />
-            </Suspense>
-          ),
+          element: <Navigate to="/protocol/docs" replace />,
         },
 
         {

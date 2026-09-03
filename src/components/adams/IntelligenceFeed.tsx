@@ -45,7 +45,7 @@ interface IntelligenceFeedProps {
   isLive?: boolean; // true = animate entries one by one
 }
 
-const CHAIN_NAME: Record<string, string> = { '1': 'ETH', '501': 'SOL', '8453': 'Base', '196': 'X Layer' };
+const CHAIN_NAME: Record<string, string> = { '1': 'ETH', '501': 'SOL', '8453': 'Base' };
 
 export function IntelligenceFeed({ debate, metacognition, topSignals, polymarket, isLive = false }: IntelligenceFeedProps) {
   const [expanded, setExpanded] = useState(true);
