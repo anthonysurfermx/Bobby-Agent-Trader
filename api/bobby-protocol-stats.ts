@@ -345,7 +345,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // flow writes forum_threads today, but if one ever does (convention:
         // trigger_data.demo_source), it must not leak into public debate metrics.
         const demoFilter = '&trigger_data->>demo_source=is.null';
-        const response = await fetch(`${SB_URL}/rest/v1/forum_threads?select=id&entry_price=not.is.null${demoFilter}${filter}`, {
+        const response = await fetch(`${SB_URL}/rest/v1/forum_threads?scope=eq.public&select=id&entry_price=not.is.null${demoFilter}${filter}`, {
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'count=exact' },
         });
         if (!response.ok) return 0;

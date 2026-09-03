@@ -430,6 +430,13 @@ contract HardnessRegistryTest is Test {
         vm.prank(resolver2);
         registry.approveBountyResolution(bountyId, challenger1);
 
+        // Codex r2 #2: quorum proposes; nothing is owed until the window passes.
+        bounty = registry.getBounty(bountyId);
+        assertEq(uint8(bounty.status), uint8(HardnessRegistry.BountyStatus.PENDING_RESOLUTION));
+        assertEq(registry.pendingWithdrawals(challenger1), 0);
+
+        vm.warp(block.timestamp + registry.bountyDisputeWindow());
+        registry.finalizeBountyResolution(bountyId);
         bounty = registry.getBounty(bountyId);
         assertEq(uint8(bounty.status), uint8(HardnessRegistry.BountyStatus.RESOLVED));
         assertEq(registry.pendingWithdrawals(challenger1), 0.01 ether);

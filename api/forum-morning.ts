@@ -47,7 +47,7 @@ async function callClaude(model: string, system: string, userMsg: string, maxTok
 async function getTrackRecord(): Promise<{ wins: number; losses: number; winRate: number; lastCalls: string }> {
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/forum_threads?resolution=neq.pending&resolution=not.is.null&select=resolution,symbol,conviction_score,resolution_pnl_pct&order=resolved_at.desc&limit=10`,
+      `${SB_URL}/rest/v1/forum_threads?scope=eq.public&resolution=neq.pending&resolution=not.is.null&select=resolution,symbol,conviction_score,resolution_pnl_pct&order=resolved_at.desc&limit=10`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     );
     if (!res.ok) return { wins: 0, losses: 0, winRate: 50, lastCalls: 'No history' };

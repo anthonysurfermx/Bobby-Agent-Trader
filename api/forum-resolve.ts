@@ -17,6 +17,7 @@ const SB_URL = bobbyDbUrl();
 const SB_KEY = bobbyServiceKeyOptional();
 
 interface PendingThread {
+  scope?: string | null;
   id: string;
   symbol: string;
   direction: string;
@@ -156,9 +157,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           status: 'resolved',
         });
 
-        // Resolve on-chain (chain follows the deployment's DEFAULT_CHAIN)
+        // Resolve on-chain (chain follows the deployment's DEFAULT_CHAIN).
+        // Codex r2 #1: a user's PRIVATE cycle is resolved for the user, but it is
+        // never written to the public on-chain record — that is Bobby's ledger.
         let onchainOk = false;
-        try {
+        if (thread.scope !== 'public') {
+          console.log('[Resolve] private thread resolved off-chain only:', thread.id);
+        } else try {
           const host = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://bobbyprotocol.xyz';
           const onchainRes = await fetch(`${host}/api/protocol-record`, {
              method: 'POST',
@@ -221,7 +226,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Calculate Bobby's track record
     const allResolvedRes = await fetch(
-      `${SB_URL}/rest/v1/forum_threads?resolution=neq.pending&resolution=not.is.null&select=resolution,resolution_pnl_pct`,
+      `${SB_URL}/rest/v1/forum_threads?scope=eq.public&resolution=neq.pending&resolution=not.is.null&select=resolution,resolution_pnl_pct`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     );
     let trackRecord = { total: 0, wins: 0, losses: 0, winRate: 0, avgPnl: 0 };

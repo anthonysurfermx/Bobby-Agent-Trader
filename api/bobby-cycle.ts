@@ -575,8 +575,9 @@ function directionMatchesTechnical(
 // ---- Track record from resolved forum threads ----
 
 async function getTrackRecord(): Promise<{ wins: number; losses: number; winRate: number; lastCalls: string }> {
+  // Codex r2 #1: this record is published in public posts — protocol threads only.
   const data = await sbQuery('forum_threads',
-    'resolution=neq.pending&resolution=not.is.null&select=resolution,symbol,conviction_score,resolution_pnl_pct&order=resolved_at.desc&limit=10'
+    'scope=eq.public&resolution=neq.pending&resolution=not.is.null&select=resolution,symbol,conviction_score,resolution_pnl_pct&order=resolved_at.desc&limit=10'
   );
   if (!data.length) return { wins: 0, losses: 0, winRate: 50, lastCalls: 'No history' };
   const wins = data.filter((d: any) => d.resolution === 'win').length;

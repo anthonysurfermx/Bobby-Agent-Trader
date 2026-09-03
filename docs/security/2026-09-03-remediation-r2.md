@@ -24,14 +24,14 @@ generic suite as a substitute.* Every row below therefore points at a test that
 | **C-04** merge orphans `bobby_swap_receipts` | 0010 re-defines `bobby_link_identities` with one added line re-parenting receipts before the delete. | pg test: receipt on the merged identity; after the RPC it belongs to the kept one and the merged row is gone. | closed |
 | **C-05** non-atomic consume | Moot: no codes are issued (P0-1). Documented in the tombstone what a re-introduction needs (hashed key, single `DELETE … RETURNING`, issuer-side confirm, unlink). | covered by the P0-1 410 tests. | closed by retirement |
 | **P1-6** bounty resolver challenges + awards itself | `submitChallenge` rejects `resolver`/`owner`; `resolveBounty` rejects them as `_winner` (belt for a resolver rotated in after challenging). | Regression: round-1 sequence reverts at `submitChallenge` with `"Resolver cannot challenge"`, poster reclaims the full pot; second test: legitimate challenge exists, `resolveBounty(id, resolver)` → `"Resolver cannot win"`. | closed in **source**; deployed contract unchanged |
-| **C-02** TrackRecordV2 active Pyth is the old address | Read-only check on Base (this session): `activePyth = 0x8250…`, `approvedPyth(0xbC16…) = true`, `pythActivatableAt = 1787340957` (elapsed 2026-08-17), owner = Safe `0x8BE6…53b4`. **One Safe transaction closes it** — below. | `npm run check:mainnet:postdeploy` after the tx (the repo's own verifier is what failed in round 1). | **open — Anthony, Safe 2/3** |
+| **C-02** TrackRecordV2 active Pyth is the old address | Read-only check on Base (this session): `activePyth = 0x8250…`, `approvedPyth(0xbC16…) = true`, `pythActivatableAt = 1787340957` (elapsed 2026-08-21 19:35 UTC), owner = Safe `0x8BE6…53b4`. **One Safe transaction closes it** — below. | `npm run check:mainnet:postdeploy` after the tx (the repo's own verifier is what failed in round 1). | **open — Anthony, Safe 2/3** |
 
 ## Verification record
 
 Run on `security/remediation-r2` after the last edit:
 
-- `forge test` — 14 suites, **228 passed, 0 failed** (221 before + 7 in `FinalAuditRegression.t.sol`; two `HardnessRegistry.t.sol` tests re-pranked from agent to resolver)
-- `test:remediation-r2` — 15/15
+- `forge test` — 14 suites, **236 passed, 0 failed** (round 2a: 228; round 2b adds the dispute-window and geometry cases)
+- `test:remediation-r2` — 20/20 (round 2a: 15)
 - `test:rls-lockdown-pg` — exploit reproduced on the shipped policies, then refused; views and C-04 asserted (PostgreSQL 17, scratch schema, stand-in roles)
 - `test:api-security` — 47/47
 - `test:base-swap` — pass
@@ -70,7 +70,42 @@ Run on `security/remediation-r2` after the last edit:
 8. Live RLS state was read from migration files plus the round-1 live sample. After
    applying 0010, `bobby_rls_matrix()` should show no anon policy on the three tables.
 
-## For round 2 (Codex / Kimi)
+## Round 2 review (Codex) — NO-GO on `8b9af14`, and what changed for it
+
+Codex reviewed `8b9af14` and refused to mark the branch closed: *"the patch fixes
+the exact PoCs, but relevant bypasses remain."* Six points, all accepted. Fixed in
+the follow-up commit on this branch:
+
+| # | Codex finding | Fix | Regression |
+|---|---|---|---|
+| 1 | **C-01 still leaks**: `bobby-cycle.ts:578` and `forum-morning.ts:49` build the *published* track record from every thread; `bobby-intel.ts:473` calibration, `bobby-protocol-stats.ts:348` counts, and `forum-resolve.ts` sweep/patch/**on-chain record** private threads too. | `scope=eq.public` on all five publication reads. `forum-resolve` still resolves a private cycle *for its owner* but **never calls `/api/protocol-record` for it** — Bobby's on-chain ledger is protocol calls only. | `forum-resolve` run against one public + one private pending thread: both PATCHed resolved, **exactly one** `protocol-record` POST, and it carries the public id. Plus a **repo-wide scan** of `api/**`: every `forum_threads?` literal must carry `scope=eq.public`, be a single-row `id=eq.` read, or sit on a three-entry allow-list with a reason. |
+| 2 | **P1-6 survives via an auxiliary EOA**: resolver → `resolveBounty(id, A)` where A is a shill challenger. An address blacklist does not model a compromised backend. Same in HardnessRegistry's quorum module. | **Optimistic resolution with a dispute window, both contracts.** `resolveBounty` / a quorum now *proposes* (`PENDING_RESOLUTION`); anyone finalizes after `disputeWindow` (2 days, owner-bounded 1–14); the **poster or any rival challenger** can dispute inside it (`DISPUTED`); only the **owner — the 2/3 Safe — settles**, to a challenger or back to the poster. In HardnessRegistry, resolvers and the owner can no longer challenge or be named winner at all. A compromised key now needs the poster asleep for the whole window *and* no rival watching — and the Safe still has the last word. | `test_R2_auxiliaryEoaCannotDrain_posterDisputes` (the exact Codex sequence: shill gets 0, poster refunded, finalize impossible afterwards), rival-challenger dispute → Safe pays the honest one, undisputed → paid after window by anyone, only parties may dispute, registry quorum → PENDING → poster disputes → Safe settles, resolver cannot challenge or be winner in the registry. Existing bounty tests re-learned the window (`_finalize` helper, 6 sites; registry threshold test). |
+| 3 | `judge-mode` still runs gpt-4o for free and bypasses the MCP fee on `bobby_judge`. | `requireInternalAuth` at the top: 401 for the public. `mcp-http` already sends the secret after its payment gate. | Public POST → **401 with zero fetches** (no model call, no Supabase); internal → 200 + one scoped PATCH. |
+| 4 | **C-03 incomplete**: `mcp-http` interpolates `args.symbol` raw in two queries; `tools/call` does not enforce `inputSchema`. | `symbolFilterFor()`: `^[A-Za-z0-9._-]{1,32}$`, upper-cased, `encodeURIComponent`; off-list throws → JSON-RPC error before any query. | `bobby_recommend {symbol:'NVDAc&select=id'}` → error, no thread query; `bobby_brief` same; honest `nvdac` → `symbol=eq.NVDAC` and scoped. |
+| 5 | `PredictionResolved` emitted the *reported* pnl while storing the derived one. | Emits `int32(computed)`. | `vm.expectEmit` on the honest path: 480 reported, 500 emitted. |
+| 6 | `_derivePnlBps` accepted incoherent levels (`entry=100, target=110, stop=120` read as long). | Validated at **commit**: long is `target > entry > stop`, short is `target < entry < stop`; a single level must sit off the entry. | Four incoherent commits revert `InvalidValue`; two single-level commits pass. |
+
+Codex also corrected a date: `pythActivatableAt = 1787340957` is **2026-08-21 19:35:57 UTC**,
+not the 17th. Fixed everywhere it appeared. Confirmed by Codex: the 0010 migration
+closes the direct reads correctly with no identifier leaking through the views; the
+`0xb4d6badf…` calldata is right; C-02 remains open on chain.
+
+**Operational consequence of the dispute window.** Nothing in `api/` calls
+`resolveBounty` today, so there is no bot to update — but once bounties are live,
+someone must call `finalizeResolution` / `finalizeBountyResolution` after the window.
+It is permissionless, so the winner can; a small cron is the friendlier option.
+A `DISPUTED` bounty waits for the Safe; there is deliberately no timeout that pays
+either side without it.
+
+## For round 3 (final GO decision)
+
+Everything below is on `security/remediation-r2`. Reproduce the round-2 exploits on
+`8b9af14` (they still work there) and confirm the refusals here. Then hunt in the
+dispute window: can a proposal be finalized during a dispute; can the poster dispute
+a proposal that names themself; does `settleDispute(id, 0)` on a bounty whose poster
+is a contract that reverts on receive lock the pot (pull-payment says no — verify);
+does `_effectiveExpiry` interact badly with `PENDING_RESOLUTION` (poster reclaim is
+blocked, which is intended — confirm it cannot be un-blocked by a status trick).
 
 Reproduce first, on `e20d2b8`, with the tests as they stand here — the pg test and
 the regression contract test are written so the *pre-fix* state is exercised

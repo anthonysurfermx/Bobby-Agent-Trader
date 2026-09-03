@@ -13,6 +13,7 @@ process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'dummy-service-key';
 process.env.BOBBY_SUPABASE_ANON_KEY = 'dummy-anon-key';
 process.env.OPENAI_API_KEY = 'dummy-openai';
 process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+process.env.XLAYER_RECORD_SECRET = 'test-record-secret'; // forum-resolve is guarded by requireRecordAuth
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://dummy.bobby';
 delete process.env.PROTOCOL_CUTOVER_FREEZE;
 delete process.env.BOBBY_WRITE_FREEZE;
@@ -22,6 +23,7 @@ type Rec = { url: string; method: string; body?: string };
 const calls: Rec[] = [];
 const THREAD_ID = '11111111-2222-4333-8444-555555555555';
 const thread = { id: THREAD_ID, scope: 'public', symbol: 'NVDAc', direction: 'long', conviction_score: 0.7, status: 'open', resolution: 'pending', entry_price: 100, stop_price: 90, target_price: 120, resolution_pnl_pct: null, created_at: new Date().toISOString(), trigger_reason: 'test', debate_quality: null, trigger_data: { technical: { rsi: 50 } } };
+let threadRows: () => unknown[] = () => [thread];
 const posts = ['alpha', 'redteam', 'cio'].map((agent, i) => ({ id: `p${i}`, thread_id: THREAD_ID, agent, agent_type: agent, agent_name: agent, role: agent, content: `${agent} says something`, body: `${agent} says something`, created_at: new Date().toISOString() }));
 const openai = { choices: [{ message: { content: JSON.stringify({ dimensions: { data_integrity: 3, adversarial_quality: 3, decision_logic: 3, risk_management: 3, calibration_alignment: 3, novelty: 3 }, biases_detected: [], conviction_assessment: 'reasonable', recommendation: 'pass', rationale: 'fine', red_flags: [] }) } }] };
 
@@ -31,7 +33,9 @@ globalThis.fetch = (async (input: any, init?: any) => {
   calls.push({ url, method, body: typeof init?.body === 'string' ? init.body : undefined });
   const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
   if (url.includes('api.openai.com')) return json(openai);
-  if (url.includes('/rest/v1/forum_threads')) return method === 'GET' ? json([thread]) : json({});
+  if (url.includes('okx.com/api/v5/market/ticker')) return json({ code: '0', data: [{ last: '125' }] }); // long from 100 → target 120 hit
+  if (url.includes('/api/protocol-record')) return json({ ok: true });
+  if (url.includes('/rest/v1/forum_threads')) return method === 'GET' ? json(threadRows()) : json({});
   if (url.includes('/rest/v1/forum_posts')) return json(posts);
   if (url.includes('/api/bobby-protocol-stats')) return json({ error: 'unavailable in test' }, 503); // checkpoint treats !ok as null
   return json([]); // agent_events / agent_cycles / memory_objects / api_cache / stats → empty, honest
@@ -58,11 +62,12 @@ const urlsSince = (n: number) => calls.slice(n).map((c) => c.url);
 let passed = 0;
 const check = (name: string, fn: () => void | Promise<void>) => Promise.resolve().then(fn).then(() => { passed += 1; console.log(`ok  ${name}`); });
 
-const [identityLink, harnessMemory, harnessEvents, ghostWallet, checkpoint, bobbySignals, judgeMode, quoteGuard] = await Promise.all([
+const [identityLink, harnessMemory, harnessEvents, ghostWallet, checkpoint, bobbySignals, judgeMode, quoteGuard, mcpHttp, forumResolve] = await Promise.all([
   import('../api/identity-link.js'), import('../api/harness-memory.js'), import('../api/harness-events.js'),
   import('../api/ghost-wallet.js'), import('../api/checkpoint.js'), import('../api/bobby-signals.js'), import('../api/judge-mode.js'),
-  import('../src/lib/base-swap/quote-guard.js'),
+  import('../src/lib/base-swap/quote-guard.js'), import('../api/mcp-http.js'), import('../api/forum-resolve.js'),
 ]);
+const INTERNAL = { 'x-internal-secret': 'test-internal-secret' };
 
 // ---------- P0-1 / C-05: the pairing endpoint no longer issues or accepts codes ----------
 await check('P0-1 identity-link issue → 410, no api_cache write', async () => {
@@ -110,10 +115,10 @@ await check('C-01 ghost-wallet', async () => { const n = since(); const { res } 
 await check('C-01 checkpoint', async () => { const n = since(); const { res } = recorder(); await checkpoint.default(req('GET'), res); scoped(n); });
 await check('C-01 bobby-signals', async () => { const n = since(); const { res } = recorder(); await bobbySignals.default(req('GET'), res); scoped(n); });
 await check('C-01 harness-events fallback', async () => { const n = since(); const { res } = recorder(); await harnessEvents.default(req('GET'), res); scoped(n); });
-await check('C-01 judge-mode latest + by id', async () => {
+await check('C-01 judge-mode latest + by id (internal caller)', async () => {
   const n = since();
-  await judgeMode.default(req('POST', {}, {}), recorder().res);
-  await judgeMode.default(req('POST', {}, { thread_id: THREAD_ID }), recorder().res);
+  await judgeMode.default(req('POST', {}, {}, INTERNAL), recorder().res);
+  await judgeMode.default(req('POST', {}, { thread_id: THREAD_ID }, INTERNAL), recorder().res);
   scoped(n);
 });
 await check('C-01 mcp-http source: every forum_threads literal carries scope=eq.public', async () => {
@@ -124,11 +129,11 @@ await check('C-01 mcp-http source: every forum_threads literal carries scope=eq.
 });
 
 // ---------- P1-3: judge-mode persists only for internal callers ----------
-await check('P1-3 public judge-mode returns a verdict and writes nothing', async () => {
+await check('P1-3 / Codex r2 #3: public judge-mode → 401, no model call, no write', async () => {
   const n = since(); const { res, state } = recorder();
   await judgeMode.default(req('POST', {}, { thread_id: THREAD_ID }), res);
-  assert.equal(state.status, 200, JSON.stringify(state.body));
-  assert.equal(calls.slice(n).filter((c) => c.method === 'PATCH').length, 0, 'no PATCH for a public caller');
+  assert.equal(state.status, 401, JSON.stringify(state.body));
+  assert.equal(calls.slice(n).length, 0, 'nothing was fetched — no OpenAI, no Supabase');
 });
 await check('P1-3 internal judge-mode persists, and only to a public thread', async () => {
   const n = since(); const { res, state } = recorder();
@@ -155,6 +160,77 @@ await check('P1-1 SwapExecutor: amount edit resets the quote and executeSwap che
   const src = await readFile(new URL('../src/components/agent-radar/SwapExecutor.tsx', import.meta.url), 'utf8');
   assert.match(src, /value=\{amount\} onChange=\{e => \{ setAmount\(e\.target\.value\); if \(step === 'quoted'\) reset\(\); \}\}/);
   assert.match(src, /if \(!quoteMatchesAmount\(quote\.amountIn, amount\)\)/);
+});
+
+// ---------- Codex r2 #4: mcp-http args.symbol injection ----------
+const rpc = (name: string, args: Record<string, unknown>) => req('POST', {}, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, { 'content-type': 'application/json' });
+await check('C-03 mcp-http bobby_recommend refuses `symbol=NVDAc&select=id`', async () => {
+  const n = since(); const { res, state } = recorder();
+  await mcpHttp.default(rpc('bobby_recommend', { symbol: 'NVDAc&select=id' }), res);
+  const body = state.body as { error?: { message?: string } };
+  assert.ok(body?.error?.message?.includes('symbol must match'), JSON.stringify(state.body));
+  assert.equal(urlsSince(n).filter((u) => u.includes('forum_threads')).length, 0, 'no thread query was sent');
+});
+await check('C-03 mcp-http honest symbol is upper-cased, encoded and scoped', async () => {
+  const n = since(); const { res } = recorder();
+  await mcpHttp.default(rpc('bobby_recommend', { symbol: 'nvdac' }), res);
+  const reads = urlsSince(n).filter((u) => u.includes('forum_threads'));
+  assert.ok(reads.length >= 1);
+  for (const u of reads) { assert.ok(u.includes('symbol=eq.NVDAC'), u); assert.ok(u.includes('scope=eq.public'), u); }
+});
+await check('C-03 mcp-http bobby_brief takes the same guard', async () => {
+  const n = since(); const { res, state } = recorder();
+  await mcpHttp.default(rpc('bobby_brief', { symbol: 'x%26select=id' }), res);
+  const body = state.body as { error?: { message?: string } };
+  assert.ok(body?.error?.message?.includes('symbol must match'), JSON.stringify(state.body));
+  assert.equal(urlsSince(n).filter((u) => u.includes('forum_threads')).length, 0);
+});
+
+// ---------- Codex r2 #1: forum-resolve resolves private threads but never records them on-chain ----------
+await check('C-01 forum-resolve: private cycle resolved off-chain only, public one recorded', async () => {
+  const pub = { ...thread, id: '11111111-2222-4333-8444-aaaaaaaaaaaa', scope: 'public', symbol: 'BTC', direction: 'long', entry_price: 100, target_price: 120, stop_price: 90, expires_at: new Date(Date.now() + 86_400_000).toISOString() };
+  const priv = { ...pub, id: '11111111-2222-4333-8444-bbbbbbbbbbbb', scope: 'private' };
+  threadRows = () => [pub, priv];
+  try {
+    const n = since(); const { res, state } = recorder();
+    await forumResolve.default(req('POST', {}, {}, { 'x-record-secret': 'test-record-secret' }), res);
+    assert.equal(state.status, 200, JSON.stringify(state.body));
+    const patches = calls.slice(n).filter((c) => c.method === 'PATCH' && c.url.includes('forum_threads'));
+    assert.equal(patches.length, 2, 'both threads were resolved (status written) — the user still gets the outcome');
+    const records = calls.slice(n).filter((c) => c.url.includes('/api/protocol-record'));
+    assert.equal(records.length, 1, 'exactly one on-chain record');
+    assert.ok(records[0].body?.includes(pub.id), 'the recorded thread is the public one');
+    assert.ok(!records[0].body?.includes(priv.id));
+    // and the track record it computes is pinned to public threads
+    const trackReads = calls.slice(n).filter((c) => c.method === 'GET' && c.url.includes('resolution=neq.pending'));
+    for (const c of trackReads) assert.ok(c.url.includes('scope=eq.public'), c.url);
+  } finally { threadRows = () => [thread]; }
+});
+
+// ---------- Codex r2 #1: repo-wide — every forum_threads read on a public path is pinned ----------
+await check('C-01 repo-wide: no unscoped forum_threads read outside the allow-list', async () => {
+  const { readdirSync } = await import('node:fs');
+  const root = new URL('../api/', import.meta.url);
+  const files = [...readdirSync(root).filter((f) => f.endsWith('.ts')).map((f) => `api/${f}`), ...readdirSync(new URL('_lib/', root)).filter((f) => f.endsWith('.ts')).map((f) => `api/_lib/${f}`)];
+  // Reads that legitimately touch private rows, each with its reason:
+  const allow: Array<[RegExp, string]> = [
+    [/^api\/my-threads\.ts$/, 'owner-scoped: filters owner_wallet from the session'],
+    [/^api\/user-cycle\.ts$/, 'writes the private thread for its owner'],
+    [/^api\/agent-run\.ts$/, 'internal cycle, own thread'],
+  ];
+  const offenders: string[] = [];
+  for (const f of files) {
+    const src = await readFile(new URL(`../${f}`, import.meta.url), 'utf8');
+    for (const m of src.matchAll(/forum_threads\?[^`'"\n]*/g)) {
+      const lit = m[0];
+      if (lit.includes('scope=eq.public')) continue;
+      if (/forum_threads\?id=eq\./.test(lit)) continue;                    // single row by id: the caller already holds the id
+      if (f === 'api/forum-resolve.ts' && lit.startsWith('forum_threads?resolution=eq.pending')) continue; // the sweep: on-chain gated on scope
+      if (allow.some(([re]) => re.test(f))) continue;
+      offenders.push(`${f}: ${lit.slice(0, 90)}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `unscoped forum_threads reads:\n  ${offenders.join('\n  ')}`);
 });
 
 console.log(`remediation-r2: ${passed}/${passed} checks passed`);

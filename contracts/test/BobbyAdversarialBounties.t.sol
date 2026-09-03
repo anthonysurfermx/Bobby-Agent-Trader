@@ -182,6 +182,7 @@ contract BobbyAdversarialBountiesTest is Test {
 
         vm.prank(resolver);
         bounties.resolveBounty(id, challenger1);
+        _finalize(id); // Codex r2 #2: resolution now waits out the dispute window
 
         BobbyAdversarialBounties.Bounty memory b = bounties.getBounty(id);
         assertEq(uint8(b.status), uint8(BobbyAdversarialBounties.BountyStatus.RESOLVED));
@@ -247,6 +248,7 @@ contract BobbyAdversarialBountiesTest is Test {
         bounties.submitChallenge(id, keccak256("evidence"));
         vm.prank(resolver);
         bounties.resolveBounty(id, challenger1);
+        _finalize(id); // Codex r2 #2: resolution now waits out the dispute window
 
         uint256 balBefore = challenger1.balance;
         vm.prank(challenger1);
@@ -317,6 +319,7 @@ contract BobbyAdversarialBountiesTest is Test {
         bounties.submitChallenge(id, keccak256("evidence"));
         vm.prank(resolver);
         bounties.resolveBounty(id, challenger1);
+        _finalize(id); // Codex r2 #2: resolution now waits out the dispute window
 
         vm.warp(block.timestamp + 5 days);
         vm.prank(poster);
@@ -420,6 +423,7 @@ contract BobbyAdversarialBountiesTest is Test {
         bounties.submitChallenge(id, keccak256("evidence"));
         vm.prank(resolver);
         bounties.resolveBounty(id, challenger1);
+        _finalize(id); // Codex r2 #2: resolution now waits out the dispute window
 
         bounties.pause();
 
@@ -468,6 +472,7 @@ contract BobbyAdversarialBountiesTest is Test {
 
         vm.prank(resolver);
         bounties.resolveBounty(id, challenger1);
+        _finalize(id); // Codex r2 #2: resolution now waits out the dispute window
         assertEq(bounties.pendingWithdrawals(challenger1), 0.1 ether);
     }
 
@@ -545,6 +550,7 @@ contract BobbyAdversarialBountiesTest is Test {
         // Also: resolver can still resolve inside original grace
         vm.prank(resolver);
         bounties.resolveBounty(id, challenger1);
+        _finalize(id); // Codex r2 #2: resolution now waits out the dispute window
         assertEq(bounties.pendingWithdrawals(challenger1), 0.1 ether);
     }
 
@@ -560,5 +566,10 @@ contract BobbyAdversarialBountiesTest is Test {
         );
         BobbyAdversarialBounties.Bounty memory b = bounties.getBounty(id);
         assertEq(b.gracePeriodSnapshot, 1 days);
+    }
+    /// @dev Codex r2 #2: resolveBounty proposes; the pot moves after the dispute window.
+    function _finalize(uint256 id) internal {
+        vm.warp(block.timestamp + bounties.disputeWindow());
+        bounties.finalizeResolution(id);
     }
 }

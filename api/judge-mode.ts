@@ -7,7 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
+import { enforcePublicRateLimit, requireInternalAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { requireWritesOpen } from './_lib/control.js';
 
@@ -167,6 +167,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  // Codex round-2 #3: a public POST here ran gpt-4o for free and bypassed the
+  // MCP fee on bobby_judge. Internal callers only (cron, mcp-http after payment).
+  if (!requireInternalAuth(req, res)) return;
   if (!await enforcePublicRateLimit(req, res, 'judge-mode', 10, 600)) return;
 
   if (!OPENAI_API_KEY) {
@@ -264,7 +267,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // secret) may persist — a public POST gets the verdict but writes nothing.
     // The thread was already pinned to scope=public above, so even the internal
     // write can never touch a private thread.
-    if (isInternalRequest(req)) await fetch(
+    await fetch(
       `${SB_URL}/rest/v1/forum_threads?id=eq.${thread.id}&scope=eq.public`,
       {
         method: 'PATCH',

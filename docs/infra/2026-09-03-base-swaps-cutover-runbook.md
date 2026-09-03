@@ -72,7 +72,7 @@ server is unaffected (every server reader uses the service key). Regression:
 ## 2c. Safe transaction — activate the canonical Pyth on TrackRecordV2 (C-02)
 
 Read-only state on 2026-09-03: `activePyth = 0x8250…` (old), `0xbC16…` approved,
-timelock elapsed 2026-08-17. One transaction from the 2/3 Safe `0x8BE6…53b4`:
+timelock elapsed 2026-08-21 19:35 UTC. One transaction from the 2/3 Safe `0x8BE6…53b4`:
 
 - to: `0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321`
 - value: 0
@@ -126,6 +126,12 @@ Revoke it in the OKX console (read-only market data needs no key).
 (`security/remediation-r2`) and unchanged on chain — both are non-upgradeable.
 Redeploy is under the three-round `.sol` audit rule. Until then, do not cite
 HardnessRegistry stats publicly; both contracts hold 0 ETH.
+
+After the redeploy, bounty resolution is optimistic: a resolved bounty sits in
+`PENDING_RESOLUTION` for `disputeWindow` (2 days) and someone must call
+`finalizeResolution(id)` / `finalizeBountyResolution(id)` — permissionless, so
+the winner can, but plan a cron. A `DISPUTED` bounty waits for a Safe
+transaction (`settleDispute` / `settleBountyDispute`).
 
 ## Rollback
 

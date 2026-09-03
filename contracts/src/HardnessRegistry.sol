@@ -32,7 +32,9 @@ contract HardnessRegistry {
         OPEN,
         CHALLENGED,
         RESOLVED,
-        WITHDRAWN
+        WITHDRAWN,
+        PENDING_RESOLUTION, // Codex r2 #2: quorum reached, dispute window running
+        DISPUTED            // poster / rival challenger objected; owner settles
     }
 
     struct AgentProfile {
@@ -188,6 +190,14 @@ contract HardnessRegistry {
     mapping(address => bool) public resolvers;
     mapping(uint256 => address) public proposedWinner;
     mapping(uint256 => uint256) public resolutionRound;
+    /// @dev Codex r2 #2: a quorum of backend keys is still one operator. The pot
+    ///      waits out a dispute window; the poster or a rival challenger can freeze
+    ///      it and only the owner (Safe) settles.
+    uint32 public bountyDisputeWindow = 2 days;
+    uint32 public constant MIN_BOUNTY_DISPUTE_WINDOW = 1 days;
+    uint32 public constant MAX_BOUNTY_DISPUTE_WINDOW = 14 days;
+    mapping(uint256 => uint64) public bountyResolutionProposedAt;
+    mapping(uint256 => address) public bountyDisputedBy;
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) public hasApprovedResolution;
 
     mapping(address => uint256) public pendingWithdrawals;
@@ -247,6 +257,10 @@ contract HardnessRegistry {
         uint8 threshold
     );
     event BountyResolved(uint256 indexed bountyId, address indexed winner, uint96 reward);
+    event BountyResolutionProposed(uint256 indexed bountyId, address indexed winner, uint96 reward, uint64 finalizeAfter);
+    event BountyResolutionDisputed(uint256 indexed bountyId, address indexed by);
+    event BountyDisputeSettled(uint256 indexed bountyId, address indexed winner, bool refundedToPoster);
+    event BountyDisputeWindowUpdated(uint32 oldWindow, uint32 newWindow);
     event BountyWithdrawn(uint256 indexed bountyId, address indexed poster, uint96 amount);
 
     modifier onlyOwner() {
@@ -392,6 +406,16 @@ contract HardnessRegistry {
         if (conviction > 100) revert InvalidValue();
         if (entry == 0) revert InvalidValue();
         if (target == 0 && stop == 0) revert InvalidValue();
+        /// @dev Codex r2 #6: the levels must describe ONE direction. Long is
+        ///      target > entry > stop; short is target < entry < stop. A single
+        ///      level is enough but must sit off the entry; two levels must agree.
+        if (target != 0 && target == entry) revert InvalidValue();
+        if (stop != 0 && stop == entry) revert InvalidValue();
+        if (target != 0 && stop != 0) {
+            bool longSide = target > entry && stop < entry;
+            bool shortSide = target < entry && stop > entry;
+            if (!longSide && !shortSide) revert InvalidValue();
+        }
         if (_predictions[predictionHash].agent != address(0)) revert AlreadyExists();
 
         _predictions[predictionHash] = Prediction({
@@ -461,7 +485,8 @@ contract HardnessRegistry {
         }
         stats.winRateBps = _computeWinRate(stats.wins, stats.losses, stats.breakEvens);
 
-        emit PredictionResolved(msg.sender, prediction.agent, predictionHash, result, pnlBps);
+        // Codex r2 #5: emit what was stored, not what was reported.
+        emit PredictionResolved(msg.sender, prediction.agent, predictionHash, result, int32(computed));
     }
 
     function expirePrediction(bytes32 predictionHash) external {
@@ -559,6 +584,8 @@ contract HardnessRegistry {
         if (bounty.poster == address(0)) revert NotFound();
         if (bounty.status != BountyStatus.OPEN && bounty.status != BountyStatus.CHALLENGED) revert InvalidValue();
         if (msg.sender == bounty.poster) revert NotAuthorized();
+        // Codex r2 #2: the parties that adjudicate cannot also contest.
+        if (resolvers[msg.sender] || msg.sender == owner) revert NotAuthorized();
         if (evidenceHash == bytes32(0)) revert InvalidValue();
         if (hasChallenged[bountyId][msg.sender]) revert AlreadyChallenged();
         if (bounty.challengeCount >= maxChallengesPerBounty) revert MaxChallenges();
@@ -589,6 +616,7 @@ contract HardnessRegistry {
         if (bounty.poster == address(0)) revert NotFound();
         if (bounty.status != BountyStatus.CHALLENGED) revert InvalidValue();
         if (winner == address(0)) revert InvalidAddress();
+        if (resolvers[winner] || winner == owner) revert NotAuthorized();
         if (!hasChallenged[bountyId][winner]) revert NotFound();
         if (block.timestamp >= _effectiveExpiry(bounty)) revert WindowExpired();
 
@@ -614,11 +642,69 @@ contract HardnessRegistry {
         );
 
         if (bounty.approvalCount >= bounty.approvalThreshold) {
+            // Codex r2 #2: quorum proposes; the pot moves in finalizeBountyResolution.
             bounty.winner = winner;
-            bounty.status = BountyStatus.RESOLVED;
-            pendingWithdrawals[winner] += bounty.reward;
-            emit BountyResolved(bountyId, winner, bounty.reward);
+            bounty.status = BountyStatus.PENDING_RESOLUTION;
+            bountyResolutionProposedAt[bountyId] = uint64(block.timestamp);
+            emit BountyResolutionProposed(bountyId, winner, bounty.reward, uint64(block.timestamp) + bountyDisputeWindow);
         }
+    }
+
+    /// @dev Permissionless, not pausable: pays the proposed winner after the window.
+    function finalizeBountyResolution(uint256 bountyId) external {
+        Bounty storage bounty = bounties[bountyId];
+        if (bounty.poster == address(0)) revert NotFound();
+        if (bounty.status != BountyStatus.PENDING_RESOLUTION) revert InvalidValue();
+        if (block.timestamp < uint256(bountyResolutionProposedAt[bountyId]) + bountyDisputeWindow) revert TooSoon();
+
+        bounty.status = BountyStatus.RESOLVED;
+        pendingWithdrawals[bounty.winner] += bounty.reward;
+        emit BountyResolved(bountyId, bounty.winner, bounty.reward);
+    }
+
+    /// @dev The poster or any challenger other than the proposed winner may freeze
+    ///      a proposal inside the window.
+    function disputeBountyResolution(uint256 bountyId) external {
+        Bounty storage bounty = bounties[bountyId];
+        if (bounty.poster == address(0)) revert NotFound();
+        if (bounty.status != BountyStatus.PENDING_RESOLUTION) revert InvalidValue();
+        if (block.timestamp >= uint256(bountyResolutionProposedAt[bountyId]) + bountyDisputeWindow) revert WindowExpired();
+        if (msg.sender != bounty.poster && !hasChallenged[bountyId][msg.sender]) revert NotAuthorized();
+        if (msg.sender == bounty.winner) revert NotAuthorized();
+
+        bounty.status = BountyStatus.DISPUTED;
+        bountyDisputedBy[bountyId] = msg.sender;
+        emit BountyResolutionDisputed(bountyId, msg.sender);
+    }
+
+    /// @dev Owner settles: a challenger (never a resolver or the owner), or
+    ///      address(0) to refund the poster.
+    function settleBountyDispute(uint256 bountyId, address winner) external onlyOwner {
+        Bounty storage bounty = bounties[bountyId];
+        if (bounty.poster == address(0)) revert NotFound();
+        if (bounty.status != BountyStatus.DISPUTED) revert InvalidValue();
+
+        if (winner == address(0)) {
+            bounty.winner = address(0);
+            bounty.status = BountyStatus.WITHDRAWN;
+            pendingWithdrawals[bounty.poster] += bounty.reward;
+            emit BountyWithdrawn(bountyId, bounty.poster, bounty.reward);
+            emit BountyDisputeSettled(bountyId, address(0), true);
+            return;
+        }
+        if (!hasChallenged[bountyId][winner]) revert NotFound();
+        if (resolvers[winner] || winner == owner) revert NotAuthorized();
+        bounty.winner = winner;
+        bounty.status = BountyStatus.RESOLVED;
+        pendingWithdrawals[winner] += bounty.reward;
+        emit BountyResolved(bountyId, winner, bounty.reward);
+        emit BountyDisputeSettled(bountyId, winner, false);
+    }
+
+    function setBountyDisputeWindow(uint32 secondsWindow) external onlyOwner {
+        if (secondsWindow < MIN_BOUNTY_DISPUTE_WINDOW || secondsWindow > MAX_BOUNTY_DISPUTE_WINDOW) revert InvalidValue();
+        emit BountyDisputeWindowUpdated(bountyDisputeWindow, secondsWindow);
+        bountyDisputeWindow = secondsWindow;
     }
 
     function withdrawBounty(uint256 bountyId) external {

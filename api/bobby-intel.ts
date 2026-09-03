@@ -470,7 +470,7 @@ async function fetchCalibrationCurve(): Promise<CalibrationData> {
 
   try {
     const res = await fetch(
-      `${url}/rest/v1/forum_threads?resolution=neq.pending&resolution=not.is.null&conviction_score=not.is.null&select=conviction_score,resolution`,
+      `${url}/rest/v1/forum_threads?scope=eq.public&resolution=neq.pending&resolution=not.is.null&conviction_score=not.is.null&select=conviction_score,resolution`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } },
     );
     if (!res.ok) return defaultData;
