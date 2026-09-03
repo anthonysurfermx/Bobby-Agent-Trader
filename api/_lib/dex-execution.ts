@@ -7,6 +7,7 @@
 // ============================================================
 
 import { hmacSign } from './okx-hmac.js';
+import { checkApproveTx, checkSwapTx, DexRefusal } from './dex-allowlist.js';
 
 const NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
@@ -176,9 +177,12 @@ export async function getSwapCalldata(
     const data = (await resp.json()) as { data?: Array<Record<string, any>> };
     const tx = data?.data?.[0]?.tx;
     if (tx) {
-      return { to: tx.to, data: tx.data, value: tx.value || '0', gas: tx.gas || '500000' };
+      // allow-listed router, sane value (security review 2026-09-03); a refusal propagates as a thrown DexRefusal
+      const checked = checkSwapTx(chainId, tx, from.address, fromAmount);
+      return { to: checked.to, data: tx.data, value: checked.value, gas: tx.gas || '500000' };
     }
   } catch (e) {
+    if (e instanceof DexRefusal) throw e;
     console.error('[DEX] Swap calldata error:', e);
   }
   return null;
@@ -212,9 +216,11 @@ export async function getApproveCalldata(
     const resp = await fetch(`https://www.okx.com${path}`, { headers: okxHeaders(c, ts, sig) });
     const data = (await resp.json()) as { data?: Array<Record<string, any>> };
     if (data?.data?.[0]) {
-      return { to: data.data[0].to, data: data.data[0].data };
+      const checked = checkApproveTx(chainId, { to: data.data[0].dexContractAddress || data.data[0].to, data: data.data[0].data }, String(amount));
+      return { to: checked.to, data: data.data[0].data };
     }
   } catch (e) {
+    if (e instanceof DexRefusal) throw e;
     console.error('[DEX] Approve error:', e);
   }
   return null;

@@ -28,7 +28,7 @@ async function okxGet(path: string): Promise<any> {
       'OK-ACCESS-PASSPHRASE': PASSPHRASE,
     },
   });
-  const data = await res.json();
+  const data = (await res.json()) as { data?: any[]; code?: string; msg?: string };
   return data.data || [];
 }
 
@@ -145,23 +145,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         preChallengeTradesExcluded: preChallengeTradeCount,
       },
 
-      // Live positions
-      openPositions,
-
-      // Historical trades (challenge only for equity curve)
-      closedPositions: challengeTrades,
-
-      // Pre-challenge trades (for reference, not counted in stats)
-      preChallengePositions: closedPositions.filter((p: any) => !p.closeTime || p.closeTime < CHALLENGE_START),
-
-      // Recent fills
-      recentFills: fills.slice(0, 20),
-
-      // Balance breakdown
-      balance: {
-        totalEquity,
-        currencies,
-      },
+      // Public payload is AGGREGATES ONLY (security review 2026-09-03, Codex decision):
+      // no live positions, leverage, liquidation prices, fills or per-currency
+      // balances of the real account. The equity curve keeps only what a chart
+      // needs: when a challenge trade closed and its result.
+      openPositionsCount: openPositions.length,
+      equityCurve: challengeTrades.map((p: any) => ({ closedAt: p.closeTime, symbol: p.symbol || p.instId || null, pnlPct: p.pnlPct ?? p.pnlRatio ?? null, outcome: (p.pnl ?? 0) >= 0 ? 'win' : 'loss' })),
+      // kept as empty arrays so older clients degrade to "no rows" instead of crashing
+      openPositions: [],
+      closedPositions: [],
+      preChallengePositions: [],
+      recentFills: [],
     });
   } catch (error) {
     return res.status(500).json({

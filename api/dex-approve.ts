@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { checkApproveTx, DexRefusal } from './_lib/dex-allowlist.js';
 import { hmacSign } from './_lib/okx-hmac.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 
@@ -99,13 +100,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.setHeader('Cache-Control', 'no-store');
 
+    // The spender must be allow-listed and the calldata must be exactly approve(spender, requested amount).
+    let checked: { to: string; spender: string };
+    try {
+      checked = checkApproveTx(String(chainId), { to: d.dexContractAddress, data: d.data }, String(approveAmount));
+    } catch (e) {
+      const r = e instanceof DexRefusal ? e : new DexRefusal(String(e));
+      console.error('[dex-approve] refused', r.code, r.message);
+      return res.status(r.code === 'dex_not_configured' ? 503 : 502).json({ ok: false, error: r.message, code: r.code });
+    }
     return res.status(200).json({
       ok: true,
       approve: {
         data: d.data,
-        to: d.dexContractAddress,
+        to: checked.to,
+        spender: checked.spender,
+        amount: String(approveAmount),
         gasLimit: d.gasLimit,
         gasPrice: d.gasPrice,
+        disclosure: { chainId: Number(chainId), router: checked.to, spender: checked.spender, valueWei: '0', minReceived: null, note: 'Exact-amount approval to an allow-listed OKX contract; never unlimited.' },
       },
     });
   } catch (error) {

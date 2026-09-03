@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { checkSwapTx, DexRefusal, minReceived } from './_lib/dex-allowlist.js';
 import { hmacSign } from './_lib/okx-hmac.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 
@@ -123,6 +124,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // No cache — swap calldata is time-sensitive
     res.setHeader('Cache-Control', 'no-store');
 
+    // Never forward the aggregator's transaction blindly (security review 2026-09-03).
+    let checked: { to: string; value: string };
+    try {
+      checked = checkSwapTx(String(chainId), d.tx || {}, String(fromToken), String(amount));
+    } catch (e) {
+      const r = e instanceof DexRefusal ? e : new DexRefusal(String(e));
+      console.error('[dex-swap] refused', r.code, r.message);
+      return res.status(r.code === 'dex_not_configured' ? 503 : 502).json({ ok: false, error: r.message, code: r.code });
+    }
+    const minOut = minReceived(String(d.routerResult.toTokenAmount), Number(slippage) || 0.5);
     return res.status(200).json({
       ok: true,
       swap: {
@@ -130,8 +141,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         toToken: d.routerResult.toToken.tokenSymbol,
         fromAmount: parseFloat(d.routerResult.fromTokenAmount) / (10 ** fromDecimals),
         toAmount: parseFloat(d.routerResult.toTokenAmount) / (10 ** toDecimals),
+        minReceived: Number(minOut) / (10 ** toDecimals),
         estimateGasFee: d.routerResult.estimateGasFee,
-        tx: d.tx,
+        tx: { ...d.tx, to: checked.to, value: checked.value },
+        disclosure: { chainId: Number(chainId), router: checked.to, spender: null, valueWei: checked.value, minReceived: minOut, note: 'Router allow-listed by Bobby; calldata built by the OKX aggregator.' },
       },
     });
   } catch (error) {

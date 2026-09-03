@@ -101,3 +101,33 @@ check to `api/**/*.ts`.
 - Telegram tables restored on the new Supabase with their exact DDL, 13 rows, journaled,
   unique index on `payment_tx_hash`.
 - Full RLS gate against production 054ac70: see `docs/infra/evidence/`.
+
+
+## 6. Codex's decisions (2026-09-03) and what shipped for them
+
+1. **Router / spender allow-list + confirmation screen — shipped** (`security/swap-allowlist`):
+   `api/_lib/dex-allowlist.ts` refuses any swap whose `to` is not in
+   `DEX_ALLOWED_ROUTERS_<chainId>` and any approval whose spender is not in
+   `DEX_ALLOWED_SPENDERS_<chainId>` or whose calldata is not exactly
+   `approve(spender, requestedAmount)` (no unlimited approvals); native `value` only
+   when selling the native token and never above the amount. Empty list = **fail closed**
+   (503 `dex_not_configured`). Applied to `/api/dex-swap`, `/api/dex-approve` and the agent
+   path (`dex-execution.ts`). Responses carry a `disclosure` (chain, router, spender,
+   minimum received) and the three swap cards show it and stay disabled until the user
+   ticks "I checked the contract and the minimum received".
+   **To enable swaps on a chain, Anthony/Codex populate the two variables from OKX's
+   published contract addresses after checking them on the explorer.** Today the public
+   DEX proxies answer OKX 401 in production (web3 credentials rejected), so nothing
+   changes for users until both the credentials and the lists are set. Self-built
+   calldata on Base stays a separate change.
+2. **`/api/bobby-pnl` reduced to aggregates — shipped**: `summary` + `openPositionsCount`
+   + an `equityCurve` of `{closedAt, symbol, pnlPct, outcome}`; positions, fills,
+   leverage, liquidation prices and per-currency balances are no longer returned (the
+   arrays stay present but empty so older clients degrade). The OKX key scope
+   (read-only, IP-restricted) is confirmed in the OKX dashboard by Anthony.
+3. **CSP** stays Report-Only for a week; `/login`, mint widget and TikTok embed are a
+   product decision.
+
+Branch note: this work is based on `codex/genz-ux-trader-land` (the deployed tree, with the
+Aura Core reservation), not on `feat/bobby-progress-v2`, so it fast-forwards onto Codex's
+branch without regressing `api/trader-land.ts`.

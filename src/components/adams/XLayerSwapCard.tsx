@@ -27,6 +27,7 @@ const XLAYER_TOKENS: Record<string, string> = {
 type SwapState = 'idle' | 'quoting' | 'quoted' | 'switching_chain' | 'swapping' | 'confirmed' | 'error';
 
 export function XLayerSwapCard({ symbol, direction, conviction, entryPrice }: XLayerSwapProps) {
+  const [acknowledged, setAcknowledged] = useState(false);
   const [state, setState] = useState<SwapState>('idle');
   const [quote, setQuote] = useState<any>(null);
   const [error, setError] = useState('');
@@ -186,8 +187,13 @@ export function XLayerSwapCard({ symbol, direction, conviction, entryPrice }: XL
       {state === 'quoted' && (
         <div className="space-y-2">
           <div className="text-green-400/60">Quote ready · OKX DEX via X Layer</div>
+          <div className="mt-1 rounded border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[10px] text-white/70 space-y-1">
+            <div>SWAP CONTRACT · {(Array.isArray(quote) ? quote[0]?.tx?.to : quote?.tx?.to) ?? '—'}</div>
+            <div>VALUE · {(Array.isArray(quote) ? quote[0]?.tx?.value : quote?.tx?.value) ?? '0'} wei · CHAIN · X Layer (196)</div>
+            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={acknowledged} onChange={(ev) => setAcknowledged(ev.target.checked)} />I checked the contract and the chain.</label>
+          </div>
           <div className="flex gap-2">
-            <button onClick={executeSwap}
+            <button disabled={!acknowledged} onClick={executeSwap}
               className="flex-1 py-1.5 px-3 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors rounded">
               Sign & Execute
             </button>

@@ -36,6 +36,7 @@ interface SwapQuote {
   toToken: string;
   fromAmount: number;
   toAmount: number;
+  minReceived?: number;
   estimateGasFee: string;
   tx: {
     from: string;
@@ -56,6 +57,7 @@ interface Props {
 export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', className = '' }: Props) {
   const { address, isConnected, chain } = useAccount();
   const { switchChainAsync } = useSwitchChain();
+  const [acknowledged, setAcknowledged] = useState(false);
   // Every TOKENS entry is chainId '1' (Ethereum): pin it and switch before sending (review 2026-09-03).
   const quoteChainId = Number(TOKENS[fromToken]?.chainId || '1');
   const ensureChain = async () => { if (chain?.id !== quoteChainId) await switchChainAsync({ chainId: quoteChainId }); };
@@ -329,6 +331,18 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
                 </span>
               </div>
               <div className="flex items-center justify-between text-[10px]">
+                <span className="text-neutral-500">Swap contract</span>
+                <span className="text-neutral-400 font-mono text-[10px]">{quote.tx?.to}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-neutral-500">Min received</span>
+                <span className="text-neutral-400">{quote.minReceived ?? '—'} {quote.toToken}</span>
+              </div>
+              <label className="flex items-center gap-2 text-[11px] text-neutral-400 cursor-pointer">
+                <input type="checkbox" checked={acknowledged} onChange={(ev) => setAcknowledged(ev.target.checked)} />
+                I checked the contract, the chain and the minimum received.
+              </label>
+              <div className="flex justify-between text-xs">
                 <span className="text-neutral-500">Est. gas</span>
                 <span className="text-neutral-400">{quote.estimateGasFee}</span>
               </div>
@@ -375,6 +389,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
             {step === 'quoted' && !isNativeFrom && (
               <div className="space-y-2">
                 <button
+                  disabled={!acknowledged}
                   onClick={approveToken}
                   className="w-full py-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-sm font-medium text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center justify-center gap-2"
                 >
@@ -398,6 +413,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
             {/* Step 3: Execute swap (shown after approve or immediately for native) */}
             {(step === 'approved' || (step === 'quoted' && isNativeFrom)) && (
               <button
+                disabled={!acknowledged}
                 onClick={executeSwap}
                 className="w-full py-3 bg-green-500/20 border border-green-500/40 rounded-xl text-sm font-bold text-green-400 hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2"
               >
