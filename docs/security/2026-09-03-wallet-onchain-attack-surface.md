@@ -109,9 +109,10 @@ check to `api/**/*.ts`.
    `api/_lib/dex-allowlist.ts` refuses any swap whose `to` is not in
    `DEX_ALLOWED_ROUTERS_<chainId>` and any approval whose spender is not in
    `DEX_ALLOWED_SPENDERS_<chainId>` or whose calldata is not exactly
-   `approve(spender, requestedAmount)` (no unlimited approvals); native `value` only
-   when selling the native token and never above the amount. Empty list = **fail closed**
-   (503 `dex_not_configured`). Applied to `/api/dex-swap`, `/api/dex-approve` and the agent
+   `approve(spender, requestedAmount)` (no unlimited approvals). The approval transaction
+   is sent to the requested token contract—not the spender—and native `value` must exactly
+   equal the amount being sold. Empty list = **fail closed** (503 `dex_not_configured`).
+   Applied to `/api/dex-swap`, `/api/dex-approve`, `/api/xlayer-trade` and the agent
    path (`dex-execution.ts`). Responses carry a `disclosure` (chain, router, spender,
    minimum received) and the three swap cards show it and stay disabled until the user
    ticks "I checked the contract and the minimum received".

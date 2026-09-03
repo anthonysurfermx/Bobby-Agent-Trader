@@ -18,7 +18,7 @@ export interface TradeExecution {
     approveTx?: { to: string; data: string; value?: string };
     swapTx: { to: string; data: string; value?: string; gas?: string };
     quote: { fromToken: string; toToken: string; fromAmount: string; toAmount: string; minReceived?: string };
-    disclosure?: { router?: string; spender?: string | null; minReceived?: string | null; note?: string };
+    disclosure?: { router?: string; tokenContract?: string | null; spender?: string | null; minReceived?: string | null; note?: string };
   };
 }
 
@@ -143,7 +143,8 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
         <div className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[10px] text-white/70 space-y-1">
           <div>CHAIN · {getChainName(trade.chain)} ({trade.chain})</div>
           <div>SWAP CONTRACT · {trade.execution.swapTx.to}</div>
-          {trade.execution.approveTx && <div>APPROVE SPENDER · {trade.execution.disclosure?.spender ?? trade.execution.approveTx.to} (exact amount)</div>}
+          {trade.execution.approveTx && <div>APPROVE TOKEN · {trade.execution.disclosure?.tokenContract ?? trade.execution.approveTx.to}</div>}
+          {trade.execution.approveTx && <div>APPROVE SPENDER · {trade.execution.disclosure?.spender ?? '—'} (exact amount)</div>}
           <div>MIN RECEIVED · {trade.execution.quote.minReceived ?? trade.execution.disclosure?.minReceived ?? '—'} {trade.execution.quote.toToken}</div>
           <label className="flex items-center gap-2 pt-1 cursor-pointer">
             <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />

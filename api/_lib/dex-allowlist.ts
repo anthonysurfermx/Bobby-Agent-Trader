@@ -28,30 +28,65 @@ export function allowedRouters(chainId: number | string): Set<string> { return e
 export function allowedSpenders(chainId: number | string): Set<string> { return envList(`DEX_ALLOWED_SPENDERS_${chainId}`); }
 export function dexConfigured(chainId: number | string): boolean { return allowedRouters(chainId).size > 0 && allowedSpenders(chainId).size > 0; }
 
-export interface Disclosure { chainId: number; router: string; spender: string | null; valueWei: string; minReceived: string | null; note: string }
+export function requireAllowedRouters(chainId: number | string): Set<string> {
+  const routers = allowedRouters(chainId);
+  if (!routers.size) throw new DexRefusal(`Swaps on chain ${chainId} are not enabled: DEX_ALLOWED_ROUTERS_${chainId} is empty (fail closed)`, 'dex_not_configured');
+  return routers;
+}
+
+export function requireAllowedSpenders(chainId: number | string): Set<string> {
+  const spenders = allowedSpenders(chainId);
+  if (!spenders.size) throw new DexRefusal(`Approvals on chain ${chainId} are not enabled: DEX_ALLOWED_SPENDERS_${chainId} is empty (fail closed)`, 'dex_not_configured');
+  return spenders;
+}
+
+export interface Disclosure {
+  chainId: number;
+  router: string | null;
+  tokenContract?: string | null;
+  spender: string | null;
+  valueWei: string;
+  minReceived: string | null;
+  note: string;
+}
 
 export class DexRefusal extends Error { constructor(message: string, public readonly code = 'dex_refused') { super(message); this.name = 'DexRefusal'; } }
 
 /** A swap transaction from the aggregator, checked against the allow-list. */
 export function checkSwapTx(chainId: number | string, tx: { to?: string; data?: string; value?: string }, fromToken: string, amountWei: string): { to: string; value: string } {
-  const routers = allowedRouters(chainId);
-  if (!routers.size) throw new DexRefusal(`Swaps on chain ${chainId} are not enabled: DEX_ALLOWED_ROUTERS_${chainId} is empty (fail closed)`, 'dex_not_configured');
+  const routers = requireAllowedRouters(chainId);
   const to = String(tx.to || '').toLowerCase();
   if (!routers.has(to)) throw new DexRefusal(`Aggregator returned a router that is not allow-listed on chain ${chainId} (${to || 'none'})`, 'router_not_allowed');
   if (!/^0x[0-9a-fA-F]*$/.test(String(tx.data || '')) || String(tx.data || '').length < 10) throw new DexRefusal('Aggregator returned malformed calldata', 'calldata_malformed');
-  const value = BigInt(tx.value || '0');
+  let value: bigint;
+  let amount: bigint;
+  try {
+    value = BigInt(tx.value || '0');
+    amount = BigInt(amountWei);
+  } catch {
+    throw new DexRefusal('Swap amount or native value is malformed', 'value_malformed');
+  }
+  if (value < 0n || amount <= 0n) throw new DexRefusal('Swap amount or native value is invalid', 'value_malformed');
   const sellsNative = NATIVE.has(fromToken.toLowerCase());
   if (!sellsNative && value !== 0n) throw new DexRefusal('Swap carries native value although the sold token is an ERC-20', 'unexpected_value');
-  if (sellsNative && value > BigInt(amountWei)) throw new DexRefusal('Swap value exceeds the amount being sold', 'value_exceeds_amount');
+  if (sellsNative && value !== amount) throw new DexRefusal('Swap value differs from the native amount being sold', 'value_amount_mismatch');
   return { to: getAddress(to), value: value.toString() };
 }
 
-/** An approval from the aggregator: spender allow-listed, calldata really is approve(spender, amount). */
-export function checkApproveTx(chainId: number | string, approve: { to?: string; data?: string }, amountWei: string): { to: string; spender: string } {
-  const spenders = allowedSpenders(chainId);
-  if (!spenders.size) throw new DexRefusal(`Approvals on chain ${chainId} are not enabled: DEX_ALLOWED_SPENDERS_${chainId} is empty (fail closed)`, 'dex_not_configured');
-  const spenderTo = String(approve.to || '').toLowerCase();
-  if (!spenders.has(spenderTo)) throw new DexRefusal(`Aggregator returned an approval spender that is not allow-listed on chain ${chainId} (${spenderTo || 'none'})`, 'spender_not_allowed');
+/**
+ * An ERC-20 approval from the aggregator. The transaction target is the token
+ * contract; the allow-listed spender is encoded inside approve(spender, amount).
+ */
+export function checkApproveTx(
+  chainId: number | string,
+  approve: { tokenAddress?: string; spender?: string; data?: string },
+  amountWei: string,
+): { to: string; spender: string } {
+  const spenders = requireAllowedSpenders(chainId);
+  const tokenAddress = String(approve.tokenAddress || '').toLowerCase();
+  const spender = String(approve.spender || '').toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(tokenAddress)) throw new DexRefusal('Approval token contract is malformed', 'token_malformed');
+  if (!spenders.has(spender)) throw new DexRefusal(`Aggregator returned an approval spender that is not allow-listed on chain ${chainId} (${spender || 'none'})`, 'spender_not_allowed');
   let decoded: { spender: string; amount: bigint };
   try {
     const parsed = ERC20.parseTransaction({ data: String(approve.data || '') });
@@ -60,12 +95,13 @@ export function checkApproveTx(chainId: number | string, approve: { to?: string;
   } catch {
     throw new DexRefusal('Approval calldata is not approve(spender, amount)', 'calldata_malformed');
   }
-  if (decoded.spender !== spenderTo) throw new DexRefusal('Approval calldata names a different spender than the one returned', 'spender_mismatch');
+  if (decoded.spender !== spender) throw new DexRefusal('Approval calldata names a different spender than the one returned', 'spender_mismatch');
   if (decoded.amount !== BigInt(amountWei)) throw new DexRefusal(`Approval amount ${decoded.amount} differs from the requested ${amountWei} (no unlimited approvals)`, 'amount_mismatch');
-  return { to: getAddress(spenderTo), spender: getAddress(spenderTo) };
+  return { to: getAddress(tokenAddress), spender: getAddress(spender) };
 }
 
-export function minReceived(toAmountWei: string, slippagePct: number): string {
-  const bps = BigInt(Math.round(Math.max(0, Math.min(100, slippagePct)) * 100));
+/** `slippageFraction` uses 0.005 for 0.5%, matching OKX v5 and the web client. */
+export function minReceived(toAmountWei: string, slippageFraction: number): string {
+  const bps = BigInt(Math.round(Math.max(0, Math.min(1, slippageFraction)) * 10_000));
   return ((BigInt(toAmountWei) * (10_000n - bps)) / 10_000n).toString();
 }

@@ -7,7 +7,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkApproveTx, DexRefusal } from './_lib/dex-allowlist.js';
+import { checkApproveTx, DexRefusal, requireAllowedSpenders } from './_lib/dex-allowlist.js';
 import { hmacSign } from './_lib/okx-hmac.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 
@@ -29,6 +29,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!/^\d{1,10}$/.test(String(chainId)) || !/^0x[a-fA-F0-9]{40}$/.test(String(tokenContractAddress))
     || !/^\d{1,78}$/.test(String(approveAmount))) {
     return res.status(400).json({ error: 'Invalid approval parameters' });
+  }
+  try {
+    requireAllowedSpenders(String(chainId));
+  } catch (error) {
+    const refusal = error as DexRefusal;
+    return res.status(503).json({ ok: false, error: refusal.message, code: refusal.code });
   }
 
   const apiKey = process.env.OKX_API_KEY;
@@ -103,7 +109,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // The spender must be allow-listed and the calldata must be exactly approve(spender, requested amount).
     let checked: { to: string; spender: string };
     try {
-      checked = checkApproveTx(String(chainId), { to: d.dexContractAddress, data: d.data }, String(approveAmount));
+      checked = checkApproveTx(String(chainId), {
+        tokenAddress: String(tokenContractAddress),
+        spender: d.dexContractAddress,
+        data: d.data,
+      }, String(approveAmount));
     } catch (e) {
       const r = e instanceof DexRefusal ? e : new DexRefusal(String(e));
       console.error('[dex-approve] refused', r.code, r.message);
@@ -118,7 +128,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         amount: String(approveAmount),
         gasLimit: d.gasLimit,
         gasPrice: d.gasPrice,
-        disclosure: { chainId: Number(chainId), router: checked.to, spender: checked.spender, valueWei: '0', minReceived: null, note: 'Exact-amount approval to an allow-listed OKX contract; never unlimited.' },
+        disclosure: {
+          chainId: Number(chainId),
+          router: null,
+          tokenContract: checked.to,
+          spender: checked.spender,
+          valueWei: '0',
+          minReceived: null,
+          note: 'Exact-amount approval for an allow-listed OKX spender; never unlimited.',
+        },
       },
     });
   } catch (error) {

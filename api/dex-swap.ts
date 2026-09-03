@@ -6,7 +6,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkSwapTx, DexRefusal, minReceived } from './_lib/dex-allowlist.js';
+import { checkSwapTx, DexRefusal, minReceived, requireAllowedRouters } from './_lib/dex-allowlist.js';
 import { hmacSign } from './_lib/okx-hmac.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 
@@ -30,8 +30,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!/^\d{1,10}$/.test(String(chainId)) || !addressPattern.test(String(fromToken))
     || !addressPattern.test(String(toToken)) || !addressPattern.test(String(userWalletAddress))
     || !/^\d{1,78}$/.test(String(amount)) || !Number.isFinite(slippageNumber)
-    || slippageNumber <= 0 || slippageNumber > 0.5) {
+    || slippageNumber <= 0 || slippageNumber > 0.05) {
     return res.status(400).json({ error: 'Invalid swap parameters' });
+  }
+  try {
+    requireAllowedRouters(String(chainId));
+  } catch (error) {
+    const refusal = error as DexRefusal;
+    return res.status(503).json({ ok: false, error: refusal.message, code: refusal.code });
   }
 
   const apiKey = process.env.OKX_API_KEY;
@@ -52,7 +58,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       toTokenAddress: String(toToken),
       amount: String(amount),
       userWalletAddress: String(userWalletAddress),
-      slippage: String(slippageNumber),
+      // v6 names this percentage points (0.5 means 0.5%); the web client and
+      // Bobby's v5 helper use a fraction (0.005 means 0.5%).
+      slippagePercent: String(slippageNumber * 100),
       swapMode: 'exactIn',
     };
 
@@ -133,7 +141,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('[dex-swap] refused', r.code, r.message);
       return res.status(r.code === 'dex_not_configured' ? 503 : 502).json({ ok: false, error: r.message, code: r.code });
     }
-    const minOut = minReceived(String(d.routerResult.toTokenAmount), Number(slippage) || 0.5);
+    const expectedMinOut = minReceived(String(d.routerResult.toTokenAmount), slippageNumber);
+    const minOut = String(d.tx.minReceiveAmount || expectedMinOut);
+    if (!/^\d{1,78}$/.test(minOut) || BigInt(minOut) < BigInt(expectedMinOut)) {
+      return res.status(502).json({ ok: false, error: 'Aggregator returned an unsafe minimum received amount', code: 'min_received_too_low' });
+    }
     return res.status(200).json({
       ok: true,
       swap: {

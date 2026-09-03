@@ -1,7 +1,7 @@
 // ============================================================
 // GET /api/bobby-pnl
-// Bobby's REAL PnL Dashboard — reads directly from OKX CEX
-// Shows live positions, trade history, equity curve, win rate
+// Bobby's public aggregate PnL dashboard — reads directly from OKX CEX
+// but returns no position, liquidation, fill, or per-currency details.
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -45,25 +45,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Fetch everything in parallel
-    const [balanceData, positionsData, historyData, fillsData] = await Promise.all([
+    const [balanceData, positionsData, historyData] = await Promise.all([
       okxGet('/api/v5/account/balance'),
       okxGet('/api/v5/account/positions?instType=SWAP'),
       okxGet('/api/v5/account/positions-history?instType=SWAP&limit=50'),
-      okxGet('/api/v5/trade/fills?instType=SWAP&limit=100'),
     ]);
 
     // ── Current Balance ──
     const balance = balanceData[0] || {};
     const totalEquity = parseFloat(balance.totalEq || '0');
-    const currencies = (balance.details || [])
-      .filter((d: any) => parseFloat(d.eq) > 0.001)
-      .map((d: any) => ({
-        currency: d.ccy,
-        equity: parseFloat(d.eq),
-        equityUsd: parseFloat(d.eqUsd),
-        unrealizedPnl: parseFloat(d.upl || '0'),
-      }));
-
     // ── Open Positions (Live PnL) ──
     const openPositions = positionsData
       .filter((p: any) => parseFloat(p.pos || '0') !== 0)
@@ -97,16 +87,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       result: parseFloat(p.realizedPnl || p.pnl || '0') > 0 ? 'WIN' : parseFloat(p.realizedPnl || p.pnl || '0') < 0 ? 'LOSS' : 'BREAK_EVEN',
     }));
 
-    // ── Trade Fills ──
-    const fills = fillsData.map((f: any) => ({
-      symbol: f.instId.split('-')[0],
-      side: f.side,
-      price: parseFloat(f.fillPx),
-      size: parseFloat(f.fillSz),
-      fee: parseFloat(f.fee),
-      time: f.ts ? new Date(parseInt(f.ts)).toISOString() : null,
-    }));
-
     // ── Stats ──
     const totalUnrealizedPnl = openPositions.reduce((sum: number, p: any) => sum + p.unrealizedPnl, 0);
 
@@ -125,6 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const currentValue = totalEquity;
     const totalReturn = ((currentValue - startingCapital) / startingCapital) * 100;
 
+    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=60');
     return res.status(200).json({
       ok: true,
       timestamp: new Date().toISOString(),
@@ -150,7 +131,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // balances of the real account. The equity curve keeps only what a chart
       // needs: when a challenge trade closed and its result.
       openPositionsCount: openPositions.length,
-      equityCurve: challengeTrades.map((p: any) => ({ closedAt: p.closeTime, symbol: p.symbol || p.instId || null, pnlPct: p.pnlPct ?? p.pnlRatio ?? null, outcome: (p.pnl ?? 0) >= 0 ? 'win' : 'loss' })),
+      equityCurve: challengeTrades.map((p: any) => ({
+        closedAt: p.closeTime,
+        symbol: p.symbol || null,
+        pnlPct: p.pnlPct ?? null,
+        outcome: p.result === 'WIN' ? 'win' : p.result === 'LOSS' ? 'loss' : 'break_even',
+      })),
       // kept as empty arrays so older clients degrade to "no rows" instead of crashing
       openPositions: [],
       closedPositions: [],

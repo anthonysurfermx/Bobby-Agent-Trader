@@ -78,6 +78,7 @@
     "api/dex-swap.ts",
     "api/dex-approve.ts",
     "api/dex-quote.ts",
+    "api/xlayer-trade.ts",
     "api/_lib/dex-allowlist.ts",
     "api/_lib/dex-execution.ts",
     "api/bobby-pnl.ts"

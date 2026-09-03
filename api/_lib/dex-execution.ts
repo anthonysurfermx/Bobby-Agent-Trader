@@ -7,7 +7,7 @@
 // ============================================================
 
 import { hmacSign } from './okx-hmac.js';
-import { checkApproveTx, checkSwapTx, DexRefusal } from './dex-allowlist.js';
+import { checkApproveTx, checkSwapTx, DexRefusal, requireAllowedRouters, requireAllowedSpenders } from './dex-allowlist.js';
 
 const NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
@@ -141,6 +141,7 @@ export interface SwapCalldata {
   data: string;
   value: string;
   gas: string;
+  minReceiveAmount: string | null;
 }
 
 export async function getSwapCalldata(
@@ -149,10 +150,11 @@ export async function getSwapCalldata(
   toSymbol: string,
   amountUsd: number,
   userWallet: string,
-  slippage = '0.5',
+  slippage = '0.005',
 ): Promise<SwapCalldata | null> {
   const c = creds();
   if (!c) return null;
+  requireAllowedRouters(chainId);
 
   try {
     validateSwapParams({ chainId, fromSymbol, toSymbol, amountUsd, userWallet, slippage });
@@ -179,7 +181,13 @@ export async function getSwapCalldata(
     if (tx) {
       // allow-listed router, sane value (security review 2026-09-03); a refusal propagates as a thrown DexRefusal
       const checked = checkSwapTx(chainId, tx, from.address, fromAmount);
-      return { to: checked.to, data: tx.data, value: checked.value, gas: tx.gas || '500000' };
+      return {
+        to: checked.to,
+        data: tx.data,
+        value: checked.value,
+        gas: tx.gas || '500000',
+        minReceiveAmount: typeof tx.minReceiveAmount === 'string' ? tx.minReceiveAmount : null,
+      };
     }
   } catch (e) {
     if (e instanceof DexRefusal) throw e;
@@ -191,6 +199,7 @@ export async function getSwapCalldata(
 export interface ApproveCalldata {
   to: string;
   data: string;
+  spender: string;
 }
 
 export async function getApproveCalldata(
@@ -200,6 +209,7 @@ export async function getApproveCalldata(
 ): Promise<ApproveCalldata | null> {
   const c = creds();
   if (!c) return null;
+  requireAllowedSpenders(chainId);
 
   const chainTokens = TOKEN_REGISTRY[chainId];
   if (!chainTokens || !chainTokens[tokenSymbol]) return null;
@@ -216,8 +226,12 @@ export async function getApproveCalldata(
     const resp = await fetch(`https://www.okx.com${path}`, { headers: okxHeaders(c, ts, sig) });
     const data = (await resp.json()) as { data?: Array<Record<string, any>> };
     if (data?.data?.[0]) {
-      const checked = checkApproveTx(chainId, { to: data.data[0].dexContractAddress || data.data[0].to, data: data.data[0].data }, String(amount));
-      return { to: checked.to, data: data.data[0].data };
+      const checked = checkApproveTx(chainId, {
+        tokenAddress: token.address,
+        spender: data.data[0].dexContractAddress,
+        data: data.data[0].data,
+      }, String(amount));
+      return { to: checked.to, data: data.data[0].data, spender: checked.spender };
     }
   } catch (e) {
     if (e instanceof DexRefusal) throw e;
