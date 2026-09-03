@@ -42,6 +42,7 @@ const line = (ok: boolean, label: string, detail = '') => { if (!ok) failures +=
     line(Boolean(d?.exists), `${t.name}: exists on target`);
     if (!s?.exists || !d?.exists) continue;
     line(s.rows === d.rows, `${t.name}: row count ${s.rows} = ${d.rows}`);
+    if (t.controlPlane) { console.log(`INFO   ${t.name}: control plane — row hash intentionally not compared (freeze flags differ by design)`); continue; }
     line(s.sha256 === d.sha256, `${t.name}: row hash identical`, s.sha256 === d.sha256 ? '' : `${s.sha256?.slice(0, 12)} vs ${d.sha256?.slice(0, 12)}`);
     for (const [c, sp] of Object.entries(s.proofs || {})) {
       const dp = (d.proofs || {})[c];

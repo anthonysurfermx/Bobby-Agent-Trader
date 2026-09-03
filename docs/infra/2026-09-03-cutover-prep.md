@@ -224,3 +224,13 @@ legacy in the middle of a rollback and unfrozen the rollback target. Fixed:
 
 Timestamps in this document were first written one day ahead (host clock in UTC+1
 crossing midnight); corrected to UTC: the cut-over ran 2026-09-02 23:52 → 2026-09-03 00:12.
+
+### Rollback drill — prepared, NOT run (Codex status 2026-09-03 00:45 UTC)
+
+Codex: production GO, migration GO, journal correct (32 tables), control plane out of
+the replay, rollback theoretically safe; **end-to-end certification pending the full
+drill, after the investor demo**. `scripts/migration/rollback-drill.sh` runs it in one
+go: freeze destination → `replay-outbox --from target` → T0 both sides → `verify`
+(destination as truth, legacy as restore target; control-plane row hash not compared)
+→ unfreeze destination, which stays primary. A failed verify leaves the destination
+frozen on purpose. Expected production write pause: 1–2 minutes.
