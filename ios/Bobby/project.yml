@@ -48,6 +48,9 @@ targets:
         buildPhase: resources
       - path: ../../public/land/v1/world-snapshot-v01.json
         buildPhase: resources
+      - path: ../../public/land/v1/audio
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: GLTFKit2
     settings:

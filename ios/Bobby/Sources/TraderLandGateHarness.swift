@@ -1,3 +1,4 @@
+import AVFoundation
 import CoreImage
 import SwiftUI
 import UIKit
@@ -15,12 +16,24 @@ private struct ArtState: Codable {
     enum CodingKeys: String, CodingKey { case contentBounds, anchor, variants; case derivedSeed = "derived_seed" }
 }
 private struct ArtOrientation: Codable { let states: [String: ArtState] }
+private struct CoreAnimationLayers: Codable {
+    let layers: [String: ArtVariant]
+    let sphereCentre: [CGFloat]
+    let sphereRadius: CGFloat
+    enum CodingKeys: String, CodingKey { case layers, sphereRadius = "sphere_radius", sphereCentre = "sphere_centre" }
+}
 private struct ManifestItem: Codable, Identifiable {
     let id: String
     let district: String
     let kind: String
     let footprint: Footprint
     let orientations: [String: ArtOrientation]
+    let animationLayers: CoreAnimationLayers?
+
+    enum CodingKeys: String, CodingKey {
+        case id, district, kind, footprint, orientations
+        case animationLayers = "animation_layers"
+    }
 
     var artState: ArtState? {
         guard let orientation = orientations.values.first else { return nil }
@@ -63,6 +76,28 @@ private enum RuntimeBundle {
 
     static func bundlePath(_ manifestURL: String) -> String {
         manifestURL.replacingOccurrences(of: "/land/v1/", with: "")
+    }
+}
+
+@MainActor private final class LandSound: ObservableObject {
+    @Published private(set) var enabled = false
+    private var loop: AVAudioPlayer?
+    private var cues: [AVAudioPlayer] = []
+
+    func toggle() {
+        enabled.toggle()
+        if enabled {
+            play("land_enter_vrum", volume: 0.5)
+            guard let url = Bundle.main.resourceURL?.appendingPathComponent("audio/aura_core_loop.m4a"), let player = try? AVAudioPlayer(contentsOf: url) else { return }
+            player.numberOfLoops = -1; player.volume = 0.16; player.prepareToPlay(); player.play(); loop = player
+        } else {
+            loop?.stop(); loop = nil; cues.forEach { $0.stop() }; cues.removeAll()
+        }
+    }
+
+    func play(_ name: String, volume: Float = 0.48) {
+        guard enabled, let url = Bundle.main.resourceURL?.appendingPathComponent("audio/\(name).m4a"), let player = try? AVAudioPlayer(contentsOf: url) else { return }
+        cues.removeAll { !$0.isPlaying }; player.volume = volume; player.prepareToPlay(); player.play(); cues.append(player)
     }
 }
 
@@ -159,6 +194,48 @@ private struct LayeredManifestImage: View {
     }
 }
 
+private struct AnimatedAuraCore: View {
+    let item: ManifestItem
+    let seed: Bool
+    let pulse: Int
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var floating = false
+    @State private var orbiting = false
+
+    var body: some View {
+        if seed || item.animationLayers == nil {
+            LayeredManifestImage(item: item, seed: seed)
+        } else if let animation = item.animationLayers, let state = item.artState {
+            ZStack {
+                if let shadow = state.variants["shadow_1024"] { LuminanceBundleImage(path: RuntimeBundle.bundlePath(shadow.url), glow: false) }
+                layer("body", animation)
+                layer("ring_back", animation).scaleEffect(x: floating ? 1.014 : 0.986, y: floating ? 0.99 : 1.01, anchor: .init(x: 0.5, y: 0.3223)).opacity(floating ? 1 : 0.78)
+                layer("sphere", animation).offset(y: reduceMotion ? 0 : (floating ? 7 : -7)).shadow(color: .mint.opacity(0.65), radius: 8)
+                layer("ring_front", animation).scaleEffect(x: floating ? 0.99 : 1.01, y: floating ? 1.012 : 0.99, anchor: .init(x: 0.5, y: 0.3223))
+                if let glow = state.variants["glow_1024"] { LuminanceBundleImage(path: RuntimeBundle.bundlePath(glow.url), glow: true) }
+                ForEach(0..<7, id: \.self) { index in
+                    Circle().fill(.mint.opacity(index.isMultiple(of: 3) ? 0.95 : 0.62))
+                        .frame(width: index.isMultiple(of: 3) ? 5 : 3, height: index.isMultiple(of: 3) ? 5 : 3)
+                        .shadow(color: .mint, radius: 4)
+                        .offset(x: CGFloat(42 + index * 4))
+                        .rotationEffect(.degrees((orbiting ? 360 : 0) + Double(index * 51)), anchor: .center)
+                        .position(x: 0.498 * 360, y: 0.3223 * 360)
+                }
+            }
+            .id(pulse)
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.easeInOut(duration: 7).repeatForever(autoreverses: true)) { floating = true }
+                withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) { orbiting = true }
+            }
+        }
+    }
+
+    @ViewBuilder private func layer(_ name: String, _ animation: CoreAnimationLayers) -> some View {
+        if let variant = animation.layers[name] { GateBundleImage(path: RuntimeBundle.bundlePath(variant.url)) }
+    }
+}
+
 private struct ProceduralFilament: View {
     let connectors: Set<Connector>
     let dimmed: Bool
@@ -187,6 +264,7 @@ private struct GateCanvas: View {
     let placements: [LandPlacement]
     let focusLevel: Int
     let seed: Bool
+    let corePulse: Int
     let place: (Int, Int) -> Void
 
     private var items: [String: ManifestItem] { Dictionary(uniqueKeysWithValues: manifest.items.map { ($0.id, $0) }) }
@@ -242,7 +320,10 @@ private struct GateCanvas: View {
             let visibleWidth = max(0.2, state.contentBounds[2] - state.contentBounds[0])
             let footprintWidth = GateLayout.tileWidth * CGFloat(item.footprint.cols + item.footprint.rows) / 2
             let size = min(360, footprintWidth * 0.9 / visibleWidth)
-            LayeredManifestImage(item: item, seed: seed)
+            Group {
+                if item.kind == "core" { AnimatedAuraCore(item: item, seed: seed, pulse: corePulse) }
+                else { LayeredManifestImage(item: item, seed: seed) }
+            }
                 .frame(width: size, height: size)
                 .position(x: center.x, y: center.y + size * (0.5 - state.anchor[1]))
                 .zIndex(100 + center.y).allowsHitTesting(false).accessibilityLabel(item.id)
@@ -267,6 +348,12 @@ struct TraderLandGateHarnessView: View {
     @State private var seed = false
     @State private var history: [SavedWorld] = []
     @State private var notice = "Choose a blueprint, then tap a revealed tile."
+    @State private var zoom: CGFloat = 0.42
+    @State private var settledZoom: CGFloat = 0.42
+    @State private var pan: CGSize = .zero
+    @State private var settledPan: CGSize = .zero
+    @State private var corePulse = 0
+    @StateObject private var sound = LandSound()
 
     init() {
         let fixture = RuntimeBundle.fixture
@@ -301,18 +388,30 @@ struct TraderLandGateHarnessView: View {
                         Text("FOCUS \(focusLevel)/2 · \(placements.count + 1) PLACED").font(.system(size: 9, design: .monospaced)).tracking(1.4).accessibilityIdentifier("land-world-status")
                     }.padding(.horizontal, 18)
 
-                    GateCanvas(manifest: manifest, fixture: fixture, placements: placements, focusLevel: focusLevel, seed: seed, place: place)
-                        .scaleEffect(0.42, anchor: .topLeading)
-                        .frame(width: GateLayout.canvas.width * 0.42, height: GateLayout.canvas.height * 0.42, alignment: .topLeading)
-                        .frame(maxWidth: .infinity).background(.black).clipShape(RoundedRectangle(cornerRadius: 24))
-                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.green.opacity(0.25))).padding(.horizontal, 12)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .topTrailing) {
+                            GateCanvas(manifest: manifest, fixture: fixture, placements: placements, focusLevel: focusLevel, seed: seed, corePulse: corePulse, place: place)
+                                .scaleEffect(zoom)
+                                .offset(pan)
+                            HStack(spacing: 4) {
+                                Button { setZoom(zoom - 0.08) } label: { Image(systemName: "minus") }.accessibilityLabel("Zoom out")
+                                Button("\(Int(zoom * 100))%", action: resetView).accessibilityLabel("Reset view")
+                                Button { setZoom(zoom + 0.08) } label: { Image(systemName: "plus") }.accessibilityLabel("Zoom in")
+                            }.font(.caption2).buttonStyle(.bordered).padding(8).zIndex(2_000)
+                        }
+                        .frame(width: proxy.size.width, height: 330)
+                    }
+                    .frame(height: 330).background(.black).clipShape(RoundedRectangle(cornerRadius: 24))
+                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(.green.opacity(0.25))).padding(.horizontal, 12)
+                    .simultaneousGesture(MagnifyGesture().onChanged { value in setZoom(settledZoom * value.magnification) }.onEnded { _ in settledZoom = zoom })
+                    .simultaneousGesture(DragGesture().onChanged { value in pan = CGSize(width: settledPan.width + value.translation.width, height: settledPan.height + value.translation.height) }.onEnded { _ in settledPan = pan })
 
                     VStack(alignment: .leading, spacing: 10) {
                         Text("BLUEPRINTS · \(manifest.items.count - 1)").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(.secondary)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 7) {
                                 ForEach(manifest.items.filter { $0.kind != "core" }) { item in
-                                    Button(item.id.replacingOccurrences(of: "_", with: " ")) { selectedItemId = item.id }
+                                    Button(item.id.replacingOccurrences(of: "_", with: " ")) { selectedItemId = item.id; sound.play("placement_tick") }
                                         .font(.caption2.bold()).buttonStyle(.bordered).tint(selectedItemId == item.id ? .green : .gray)
                                         .accessibilityIdentifier("blueprint-\(item.id)")
                                 }
@@ -320,11 +419,17 @@ struct TraderLandGateHarnessView: View {
                         }
                         HStack {
                             Button("Rotate · \(orientation.rawValue)") { orientation = orientation == .neSW ? .nwSE : .neSW }
-                            Button(seed ? "Seed" : "Bloom") { seed.toggle() }
+                            Button(seed ? "Seed" : "Bloom") { sound.play(seed ? "bloom_complete" : "seed_reveal"); seed.toggle() }
                             Button("Undo", action: undo)
                             Button("Restore", action: restore)
                         }.font(.caption).buttonStyle(.bordered)
                         Button("Reveal next focus ring", action: reveal).buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
+                        HStack {
+                            Button { sound.toggle() } label: { Label(sound.enabled ? "Sound on" : "Sound off", systemImage: sound.enabled ? "speaker.wave.2.fill" : "speaker.slash.fill") }
+                                .accessibilityIdentifier("land-sound-toggle")
+                            Button { corePulse += 1; sound.play(["orbit_whoosh_a", "orbit_whoosh_b", "orbit_whoosh_c"][corePulse % 3], volume: 0.35) } label: { Label("Pulse core", systemImage: "wave.3.right") }
+                                .accessibilityIdentifier("land-core-pulse")
+                        }.font(.caption).buttonStyle(.bordered)
                         Text(notice).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).padding(12).background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12))
                     }.padding(18)
                 }.padding(.vertical, 18)
@@ -346,15 +451,18 @@ struct TraderLandGateHarnessView: View {
         let cells = (0..<item.footprint.cols).flatMap { x in (0..<item.footprint.rows).map { y in (col + x, row + y) } }
         let valid = col + item.footprint.cols <= fixture.gridSize && row + item.footprint.rows <= fixture.gridSize
             && cells.allSatisfy { revealed($0.0, $0.1) && !occupied.contains("\($0.0):\($0.1)") }
-        guard valid else { notice = "Blocked · reveal the tile or clear the full footprint."; return }
+        guard valid else { sound.play("placement_invalid"); notice = "Blocked · reveal the tile or clear the full footprint."; return }
         checkpoint()
         placements.append(.init(uid: "\(item.id)-\(UUID().uuidString)", itemId: item.id, col: col, row: row, orientation: item.kind == "path_pavement" ? orientation : nil))
+        sound.play("placement_confirm")
         notice = "Built · visual adjacency only."
     }
     private func checkpoint() { history.append(.init(placements: placements, focusLevel: focusLevel)); if history.count > 10 { history.removeFirst() } }
     private func undo() { guard let previous = history.popLast() else { notice = "Nothing to undo."; return }; placements = previous.placements; focusLevel = previous.focusLevel }
     private func restore() { checkpoint(); placements = fixture.placements; focusLevel = fixture.focusLevel; notice = "Canonical fixture restored." }
-    private func reveal() { guard focusLevel < 2 else { notice = "Full island revealed."; return }; checkpoint(); focusLevel = 2; notice = "Focus expanded 6×6 → 8×8." }
+    private func reveal() { guard focusLevel < 2 else { sound.play("placement_invalid"); notice = "Full island revealed."; return }; checkpoint(); focusLevel = 2; sound.play("fog_reveal"); DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { sound.play("five_attributes_chord") }; notice = "Focus expanded 6×6 → 8×8." }
+    private func setZoom(_ value: CGFloat) { zoom = min(0.72, max(0.28, value)); settledZoom = zoom }
+    private func resetView() { zoom = 0.42; settledZoom = zoom; pan = .zero; settledPan = .zero }
     private func save() { if let data = try? JSONEncoder().encode(SavedWorld(placements: placements, focusLevel: focusLevel)) { UserDefaults.standard.set(data, forKey: Self.storageKey) } }
     private static func load() -> SavedWorld? { guard let data = UserDefaults.standard.data(forKey: storageKey) else { return nil }; return try? JSONDecoder().decode(SavedWorld.self, from: data) }
 }

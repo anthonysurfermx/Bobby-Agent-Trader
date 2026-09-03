@@ -8,6 +8,10 @@ final class TraderLandGateTests: XCTestCase {
 
         let restore = app.buttons["Restore"]
         XCTAssertTrue(restore.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["land-sound-toggle"].exists)
+        XCTAssertTrue(app.buttons["land-core-pulse"].exists)
+        XCTAssertTrue(app.buttons["Zoom in"].exists)
+        XCTAssertTrue(app.buttons["Reset view"].exists)
         restore.tap()
         XCTAssertTrue(app.staticTexts["FOCUS 1/2 · 8 PLACED"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.descendants(matching: .any)["path-path-a-connectors-SE"].exists)
