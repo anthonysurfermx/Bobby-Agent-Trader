@@ -132,3 +132,45 @@ check to `api/**/*.ts`.
 Branch note: this work is based on `codex/genz-ux-trader-land` (the deployed tree, with the
 Aura Core reservation), not on `feat/bobby-progress-v2`, so it fast-forwards onto Codex's
 branch without regressing `api/trader-land.ts`.
+
+## 7. DEX allow-list — candidate values, verified, NOT yet applied
+
+Codex deployed the allow-list (58a98f7) fail-closed and corrected my approve target: the
+approve transaction goes to the **token contract** with the spender inside `approve(...)`;
+the allow-list checks the **spender**, the router checks `tx.to`.
+
+Candidate addresses from OKX's official OnchainOS documentation
+(https://web3.okx.com/onchainos/dev-docs/trade/dex-smart-contract), each confirmed to have
+deployed bytecode on its chain through public RPCs on 2026-09-03 (the aggregator router is
+the same 13,322-byte deployment on all three chains; the approval contract is the same
+1,610-byte deployment on Base and X Layer):
+
+| Chain | Role | Address | Code |
+|-------|------|---------|------|
+| Base 8453 | DEX router | `0x67d03631fe51b741c0c00c4e16eb662ac84381df` | 13,322 B |
+| Base 8453 | exactOut router | `0x77449Ff075C0A385796Da0762BCB46fd5cc884c6` | 14,314 B |
+| Base 8453 | Token approval (spender) | `0x57df6092665eb6058DE53939612413ff4B09114E` | 1,610 B |
+| X Layer 196 | DEX router | `0x7c5bee2a8091c3ef39072f64f18fac913060aeaf` | 13,322 B |
+| X Layer 196 | Token approval (spender) | `0x8b773D83bc66Be128c60e07E17C8901f7a64F000` | 1,610 B |
+| Ethereum 1 | DEX router | `0x8feab81d36e7576107d5de0758c1b839be31b4f6` | 13,322 B |
+| Ethereum 1 | exactOut router | `0xa875Fb2204cE71679BE054d97f7fAFFeb6536D67` | 14,437 B |
+| Ethereum 1 | Token approval (spender) | `0x40aA958dd87FC8305b97f2BA922CDdCa374bcD7f` | 2,133 B |
+
+OKX's own note: these addresses "may be subject to replacement due to contract upgrades" —
+which is exactly why the allow-list fails closed instead of trusting the API's answer: a
+rotation shows up as a 503 to review, never as a blind signature.
+
+Second-source cross-check still pending: OKX's GitHub ABI repository and the DEX API docs
+returned 404 to automated fetches; confirm the three approval contracts on Basescan /
+OKLink / Etherscan (name tag "OKX: DEX Approve" or similar) before applying. Then, from a
+linked checkout (public values, non-sensitive):
+
+```bash
+vercel env add DEX_ALLOWED_ROUTERS_8453 production --value "0x67d03631fe51b741c0c00c4e16eb662ac84381df,0x77449Ff075C0A385796Da0762BCB46fd5cc884c6" --yes --no-sensitive
+vercel env add DEX_ALLOWED_SPENDERS_8453 production --value "0x57df6092665eb6058DE53939612413ff4B09114E" --yes --no-sensitive
+vercel env add DEX_ALLOWED_ROUTERS_196 production --value "0x7c5bee2a8091c3ef39072f64f18fac913060aeaf" --yes --no-sensitive
+vercel env add DEX_ALLOWED_SPENDERS_196 production --value "0x8b773D83bc66Be128c60e07E17C8901f7a64F000" --yes --no-sensitive
+```
+
+Ethereum (chain 1) is only reachable from the unrouted `SwapExecutor`; leave it closed.
+Swaps also need valid OKX web3 credentials — the proxies currently answer OKX 401.
