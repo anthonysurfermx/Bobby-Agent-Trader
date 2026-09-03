@@ -149,6 +149,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const results: Array<{ id: string; awarded: number; xpBefore: number; xpAfter: number; duplicate: boolean }> = [];
     const ledger: Array<Record<string, unknown>> = [];
     const now = Date.now();
+    // One-time import of pre-sign-in XP, decided BEFORE this request's events are
+    // applied: only while the ledger is empty and xp is still 0, capped at LEGACY_IMPORT_CAP so a tampered claim buys at
+    // most level 3. Recorded in the ledger like everything else.
+    let legacyImported = 0;
+    if (profile?.localXpClaim && row.xp === 0) {
+      const any = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&select=id&limit=1`), { headers: bobbyServiceHeaders() });
+      const empty = any.ok && ((await any.json()) as unknown[]).length === 0;
+      if (empty) {
+        legacyImported = Math.min(LEGACY_IMPORT_CAP, profile.localXpClaim);
+        counters = { ...counters, xp: counters.xp + legacyImported };
+        ledger.push({ identity_id: identity.id, client_event_id: crypto.randomUUID(), kind: 'legacy_import', points: legacyImported, awarded: legacyImported, xp_after: counters.xp, platform, occurred_at: new Date(now).toISOString(), day_key: new Date(now).toISOString().slice(0, 10), meta: { claimed: profile.localXpClaim } });
+      }
+    }
+
     for (const e of [...fresh].sort((a, b) => a.at.localeCompare(b.at))) {
       // Clock sanity: no awards from the future or older than 30 days.
       const atMs = Date.parse(e.at);
@@ -159,20 +173,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta: e.meta ?? null });
     }
     for (const e of events) if (!fresh.includes(e)) results.push({ id: e.id, awarded: 0, xpBefore: row.xp, xpAfter: row.xp, duplicate: true });
-
-    // One-time import of pre-sign-in XP: only while the ledger is empty and
-    // xp is still 0, capped at LEGACY_IMPORT_CAP so a tampered claim buys at
-    // most level 3. Recorded in the ledger like everything else.
-    let legacyImported = 0;
-    if (profile?.localXpClaim && row.xp === 0 && counters.xp === 0) {
-      const any = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&select=id&limit=1`), { headers: bobbyServiceHeaders() });
-      const empty = any.ok && ((await any.json()) as unknown[]).length === 0;
-      if (empty) {
-        legacyImported = Math.min(LEGACY_IMPORT_CAP, profile.localXpClaim);
-        counters = { ...counters, xp: counters.xp + legacyImported };
-        ledger.push({ identity_id: identity.id, client_event_id: crypto.randomUUID(), kind: 'legacy_import', points: legacyImported, awarded: legacyImported, xp_after: counters.xp, platform, occurred_at: new Date(now).toISOString(), day_key: new Date(now).toISOString().slice(0, 10), meta: { claimed: profile.localXpClaim } });
-      }
-    }
 
     if (ledger.length) {
       const ins = await fetch(bobbyRest('bobby_progress_events'), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(ledger) });

@@ -106,21 +106,11 @@ create policy bobby_progress_service_all        on public.bobby_progress        
 create policy bobby_progress_events_service_all on public.bobby_progress_events for all to service_role using (true) with check (true);
 create policy bobby_pre_calls_service_all       on public.bobby_pre_calls       for all to service_role using (true) with check (true);
 
--- Own-row reads for Supabase Auth users (lets the iOS Supabase SDK read
--- without going through /api). Wallet-only identities have no auth.uid()
--- and read through /api/progress with their session token.
-drop policy if exists bobby_identities_own_read      on public.bobby_identities;
-drop policy if exists bobby_progress_own_read        on public.bobby_progress;
-drop policy if exists bobby_progress_events_own_read on public.bobby_progress_events;
-drop policy if exists bobby_pre_calls_own_read       on public.bobby_pre_calls;
-create policy bobby_identities_own_read on public.bobby_identities
-  for select to authenticated using (auth_user_id = auth.uid());
-create policy bobby_progress_own_read on public.bobby_progress
-  for select to authenticated using (identity_id in (select id from public.bobby_identities where auth_user_id = auth.uid()));
-create policy bobby_progress_events_own_read on public.bobby_progress_events
-  for select to authenticated using (identity_id in (select id from public.bobby_identities where auth_user_id = auth.uid()));
-create policy bobby_pre_calls_own_read on public.bobby_pre_calls
-  for select to authenticated using (identity_id in (select id from public.bobby_identities where auth_user_id = auth.uid()));
+-- Phase-0 convention (enforced by the RLS gate): per-user tables are
+-- service-role only — no anon or authenticated policy at all. Every read and
+-- write goes through /api/progress with a wallet session or a Supabase access
+-- token. (An earlier draft added authenticated own-row SELECT policies; the
+-- gate rejected them and they were dropped.)
 
 -- Verification (after applying): select * from public.bobby_rls_matrix()
 -- where table_name like 'bobby_%'; expect service_role ALL + authenticated
