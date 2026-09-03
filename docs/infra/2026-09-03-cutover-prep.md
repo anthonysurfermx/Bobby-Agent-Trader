@@ -36,7 +36,7 @@ is dead; nothing of it, of DeFi México or of Polymarket travels.
 | 7 | Disk 5.7 GiB, 99 % | selftest now removes its temp dir; the export rehearsal was deleted; the rest is Anthony's caches | — |
 | — | `e2e-test-agent` | **Shared exclusion filter** (`exclusions.ts`): the agent, its sessions and their proofs are removed from T0, export, verify and verify-proofs by the same PostgREST predicate; both manifests record the exclusion set and `verify` checks they match and that no excluded row exists on the target | T0 source now 33/33, **26,159 rows** (3 fewer) |
 
-## Exact schema — produced and dry-run (2026-09-03 23:30 UTC)
+## Exact schema — produced and dry-run (2026-09-02 23:30 UTC)
 
 Anthony stored the legacy DB password in the macOS Keychain
 (`bobby/LEGACY_DB_PASSWORD`; never in chat, never in the repo). With it:
@@ -117,7 +117,7 @@ destination baseline 3/33 (`--allow-missing`); T0 on the destination *without* t
 flag fails closed (no file written); selftest 10/10; proofs check surfaces the two
 legacy findings above. Evidence in `docs/infra/evidence/2026-09-03-*`.
 
-## Restore rehearsal on the destination — DONE (2026-09-03 23:45–23:55 UTC, Anthony's GO)
+## Restore rehearsal on the destination — DONE (2026-09-02 23:45–23:55 UTC, Anthony's GO)
 
 Anthony (investor demo today) authorised applying to the destination and clearing the
 host caches (12 GiB free now). Executed, all read-only on legacy:
@@ -176,20 +176,20 @@ files; `origin/feat/migration-prep` was deleted so the commit is unreachable fro
 The local branch is kept until Anthony confirms the deletion (the agent may not delete branches).
 
 
-## CUT-OVER EXECUTED — 2026-09-03 23:52 → 2026-09-04 00:12 UTC (Anthony's GO)
+## CUT-OVER EXECUTED — 2026-09-02 23:52 → 2026-09-03 00:12 UTC (Anthony's GO)
 
 | Step | Time (UTC) | Result |
 |------|------------|--------|
 | Freeze legacy (`bobby_control.write_freeze=true`) | 23:52 | production health `writeFreeze=true` after 12 s |
-| Delta copy under freeze: T0 source → export → import → sequences → T0 target → verify | 23:53–00:00 | first verify: 2 FAIL — the destination's `updated_at` triggers rewrote `agent_profiles` and `bobby_control` during the upsert; re-imported with `trg_agent_profiles_updated_at` and `bobby_control_touch` disabled → **VERIFIED 164/164** (`2026-09-04-cutover-verify-under-freeze.txt`) |
+| Delta copy under freeze: T0 source → export → import → sequences → T0 target → verify | 23:53–00:00 | first verify: 2 FAIL — the destination's `updated_at` triggers rewrote `agent_profiles` and `bobby_control` during the upsert; re-imported with `trg_agent_profiles_updated_at` and `bobby_control_touch` disabled → **VERIFIED 164/164** (`2026-09-03-cutover-verify-under-freeze.txt`) |
 | Arm the journal: `bobby_outbox_enable(outboxPlan())` | 00:01 | 33/33 tables, pk columns match; `verify --expect-outbox` VERIFIED |
 | Vercel Production env: `BOBBY_SUPABASE_URL`, `BOBBY_SUPABASE_ANON_KEY`, `VITE_BOBBY_SUPABASE_URL`, `VITE_BOBBY_SUPABASE_ANON_KEY` (readable, values verified by pull), `BOBBY_SUPABASE_SERVICE_ROLE_KEY` (Secret) | 00:02 | created; a first attempt from an unlinked worktree left four unverifiable copies, which were removed and re-created |
 | `main` 11ff84b → 0cdfcbf (tooling/docs only, no runtime change) + push → Git deploy | 00:03–00:06 | health: `sha=0cdfcbf`, **`db.ref=qbvdqkknnuweatptjohi`**, salt and receipt key configured |
 | Unfreeze destination | 00:06 | `writeFreeze=false` |
-| Full gate A+B+C against the new production (`GATE_EXPECTED_SHA=0cdfcbf`) | 00:07–00:11 | **GATE PASSED 158/158** (`2026-09-04-gate-passed-production-on-destination.txt`), canary residue 0 |
+| Full gate A+B+C against the new production (`GATE_EXPECTED_SHA=0cdfcbf`) | 00:07–00:11 | **GATE PASSED 158/158** (`2026-09-03-gate-passed-production-on-destination.txt`), canary residue 0 |
 | Smoke | 00:12 | `/`, `/agentic-world`, `/agentic-world/bobby`, `/agentic-world/forum`, `/agentic-world/bobby/history`, `/desk`, `/agentic-world/bobby/calls` → 200; stats 864 debates / 794 resolved / 433W 244L / 54.5 %; registry Base 8453, mcpFee live; anon public forum reads 3,397 threads; private tables refuse anon |
 
-**State now:** `bobby-protocol` (`qbvdqkknnuweatptjohi`) is primary. Legacy
+**State now:** `bobby-protocol` (`qbvdqkknnuweatptjohi`) is primary since 2026-09-03 00:06 UTC. Legacy
 (`egpixaunlnzauztbrnuz`) stays **frozen, read-only** as the rollback target; the
 `migration_outbox` journal on the destination records every write (36 entries after the
 gate, all its own canaries).
@@ -202,3 +202,25 @@ variables → redeploy → unfreeze legacy.
 duration of the copy (done by hand this time); (2) decide when to disarm the journal and
 archive legacy (after the investor demo and a quiet day); (3) Trader Land connects to
 the new project through the same `BOBBY_SUPABASE_*` variables — nothing else to change.
+
+### Post-cut finding (Codex, 2026-09-03 00:30 UTC): the journal must not carry the control plane
+
+`bobby_control` was one of the 33 journaled tables, and the unfreeze of the destination
+left an `UPDATE … write_freeze=false` entry pending. A replay would have applied it to
+legacy in the middle of a rollback and unfrozen the rollback target. Fixed:
+
+- `tables.ts`: `bobby_control` is `controlPlane: true` — still copied once, **never
+  journaled or replayed**; `outboxPlan()` covers the 32 data tables.
+- destination: `bobby_outbox` trigger dropped on `bobby_control`; `bobby_outbox_status()`
+  = 32; `verify --expect-outbox` VERIFIED against the new plan.
+- the pending `bobby_control` entry was marked `replayed_at` with
+  `replay_target = skipped:control-plane:never-replay` (never applied).
+- `replay-outbox.mts` skips any control-plane entry it ever meets (marks it, logs it,
+  applies nothing); self-test case added (16/16).
+- rollback rehearsal: `replay-outbox --from target --dry-run` sees 32/32 triggers and the
+  35 pending canary entries (INSERT/DELETE pairs, net zero). A full replay drill needs
+  both sides frozen — that is a ~1-minute write pause on production, scheduled outside
+  the investor demo.
+
+Timestamps in this document were first written one day ahead (host clock in UTC+1
+crossing midnight); corrected to UTC: the cut-over ran 2026-09-02 23:52 → 2026-09-03 00:12.

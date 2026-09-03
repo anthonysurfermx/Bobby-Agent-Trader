@@ -31,6 +31,12 @@ export interface TableSpec {
   proofColumns?: string[];
   /** pk bounds contain personal data: the manifest records their hash, never the value. */
   pii?: boolean;
+  /**
+   * Control plane, not data: copied once, NEVER journaled or replayed. A replay
+   * of bobby_control would carry `write_freeze=false` onto the rollback target
+   * in the middle of a rollback (Codex, 2026-09-03).
+   */
+  controlPlane?: boolean;
 }
 
 export const APPROVED_TABLES: TableSpec[] = [
@@ -45,7 +51,7 @@ export const APPROVED_TABLES: TableSpec[] = [
   { name: 'agent_positions', pk: ['id'], fks: [] },
   { name: 'agent_profiles', pk: ['id'], fks: [] },
   { name: 'agent_source_health', pk: ['source', 'checked_at'], fks: [] },
-  { name: 'bobby_control', pk: ['id'], fks: [] },
+  { name: 'bobby_control', pk: ['id'], fks: [], controlPlane: true },
   { name: 'bobby_early_access', pk: ['id'], fks: [] },
   { name: 'cycle_transitions', pk: ['id'], fks: [], identity: 'id' },
   { name: 'forum_publish_receipts', pk: ['receipt_id'], fks: [] },
@@ -81,7 +87,10 @@ export function spec(name: string): TableSpec {
   if (!s) throw new Error(`not an approved table: ${name}`);
   return s;
 }
-/** Argument for bobby_outbox_enable(): every approved table with its pk list. */
+/** Tables the rollback journal covers: every approved table except the control plane. */
+export const JOURNALED_TABLES = APPROVED_TABLES.filter((t) => !t.controlPlane);
+export const CONTROL_PLANE_TABLES = APPROVED_TABLES.filter((t) => t.controlPlane).map((t) => t.name);
+/** Argument for bobby_outbox_enable(): the journaled tables with their pk list. */
 export function outboxPlan(): Record<string, string> {
-  return Object.fromEntries(APPROVED_TABLES.map((t) => [t.name, t.pk.join(',')]));
+  return Object.fromEntries(JOURNALED_TABLES.map((t) => [t.name, t.pk.join(',')]));
 }

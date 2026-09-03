@@ -12,7 +12,7 @@
 //     (bobby_outbox_status) or the replay refuses to start
 //   npx tsx scripts/migration/replay-outbox.mts --from target [--dry-run]
 // ============================================================
-import { APPROVED_TABLES, outboxPlan, spec } from './tables.js';
+import { APPROVED_TABLES, CONTROL_PLANE_TABLES, JOURNALED_TABLES, outboxPlan, spec } from './tables.js';
 import { headers, log, project, rpc, type Side } from './lib.js';
 
 const args = process.argv.slice(2);
@@ -24,7 +24,9 @@ const unsafe = args.includes('--unsafe-no-freeze-check');
 const src = project(from);
 const dst = project(from === 'target' ? 'source' : 'target');
 if (src.ref === dst.ref) { console.error(`refusing: source and target are the same project (${src.ref})`); process.exit(2); }
-const approved = new Set(APPROVED_TABLES.map((t) => t.name));
+const approved = new Set(JOURNALED_TABLES.map((t) => t.name));
+const controlPlane = new Set(CONTROL_PLANE_TABLES);
+void APPROVED_TABLES;
 const PAGE = 1000;
 // Drain passes: if the journal never empties, writes are still landing faster
 // than we replay — that is a freeze failure, not something to loop on forever.
@@ -56,7 +58,7 @@ async function pending(p: typeof src): Promise<Entry[]> {
   const extra = [...armed.keys()].filter((t) => !(t in plan));
   const wrongPk = Object.entries(plan).filter(([t, pk]) => armed.has(t) && armed.get(t) !== pk).map(([t, pk]) => `${t}(${armed.get(t)}≠${pk})`);
   if (missing.length || extra.length || wrongPk.length) { console.error(`outbox triggers do not match the approved plan: missing=[${missing.join(',')}] extra=[${extra.join(',')}] wrongPk=[${wrongPk.join(',')}] (expected exactly ${approved.size})`); process.exit(1); }
-  log(`outbox triggers: ${armed.size}/${approved.size} approved tables covered with the right pk columns`);
+  log(`outbox triggers: ${armed.size}/${approved.size} journaled tables covered with the right pk columns (control plane excluded: ${[...controlPlane].join(',')})`);
   // 2. both sides frozen
   if (!unsafe) {
     const [fs, fd] = await Promise.all([frozen(src), frozen(dst)]);
@@ -72,6 +74,14 @@ async function pending(p: typeof src): Promise<Entry[]> {
     if (passes > MAX_PASSES) { console.error(`REPLAY INCOMPLETE: journal still non-empty after ${MAX_PASSES} passes — writes keep landing on ${src.ref}. Do not unfreeze.`); process.exit(1); }
     if (dryRun) { log(`${batch.length} pending in this page (dry run — not applied)`); break; }
     for (const e of batch) {
+      if (controlPlane.has(e.table_name)) {
+        // Control-plane rows (bobby_control) are never replayed: a journaled
+        // `write_freeze=false` would unfreeze the rollback target mid-rollback.
+        const skip = await fetch(`${src.url}/rest/v1/migration_outbox?id=eq.${e.id}`, { method: 'PATCH', headers: headers(src, { Prefer: 'return=minimal' }), body: JSON.stringify({ replayed_at: new Date().toISOString(), replay_target: `skipped:control-plane:${dst.ref}` }) });
+        if (!skip.ok) { console.error(`entry ${e.id}: could not mark control-plane entry as skipped (${skip.status})`); process.exit(1); }
+        log(`skip   ${e.table_name} ${JSON.stringify(e.pk)} (control plane, never replayed)`);
+        continue;
+      }
       if (!approved.has(e.table_name)) { console.error(`entry ${e.id}: table ${e.table_name} is not approved — journal corrupted?`); process.exit(1); }
       const t = spec(e.table_name);
       const where = Object.entries(e.pk).map(([k, v]) => `${k}=eq.${encodeURIComponent(String(v))}`).join('&');

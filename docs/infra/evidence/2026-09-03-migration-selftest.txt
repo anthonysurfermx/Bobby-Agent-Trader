@@ -12,6 +12,7 @@ OK     replay: trigger set ≠ approved list refused  — exit=1
 OK     replay: trigger armed with the wrong pk columns refused  — exit=1
 OK     replay: refuses without freeze on both sides  — exit=1
 OK     replay: drains 5,432 pending entries across pages to zero  — exit=0 upserts=5432 left=0
+OK     replay: bobby_control entry skipped (control plane), data entry applied  — exit=0 upserts=1
 OK     replay: writes that keep landing after every drain → exit 1 (do not unfreeze)  — exit=1
 
 SELFTEST PASSED: fail-closed behaviour demonstrated.

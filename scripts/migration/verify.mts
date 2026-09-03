@@ -80,7 +80,7 @@ const line = (ok: boolean, label: string, detail = '') => { if (!ok) failures +=
     const armed = new Map(Array.isArray(st.body) ? st.body.map((x) => [x.table_name, x.pk_columns || '']) : []);
     const missing = Object.keys(plan).filter((x) => !armed.has(x)); const extra = [...armed.keys()].filter((x) => !(x in plan));
     const wrongPk = Object.entries(plan).filter(([t, pk]) => armed.has(t) && armed.get(t) !== pk).map(([t]) => t);
-    line(st.status === 200 && missing.length === 0 && extra.length === 0 && wrongPk.length === 0, `outbox triggers cover exactly the ${Object.keys(plan).length} approved tables with the right pk columns`, `armed=${armed.size} missing=[${missing.join(',')}] extra=[${extra.join(',')}] wrongPk=[${wrongPk.join(',')}]`);
+    line(st.status === 200 && missing.length === 0 && extra.length === 0 && wrongPk.length === 0, `outbox triggers cover exactly the ${Object.keys(plan).length} journaled tables (control plane excluded) with the right pk columns`, `armed=${armed.size} missing=[${missing.join(',')}] extra=[${extra.join(',')}] wrongPk=[${wrongPk.join(',')}]`);
     // Excluded rows must not exist on the target at all.
     for (const [table, key, values] of [['hardness_agents', 'agent_id', ex.agentIds], ['hardness_agent_sessions', 'agent_id', ex.agentIds]] as const) {
       if (!values.length) continue;

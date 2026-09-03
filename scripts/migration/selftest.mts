@@ -15,7 +15,7 @@ import { createServer } from 'node:http';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { APPROVED_TABLES } from './tables.js';
+import { APPROVED_TABLES, JOURNALED_TABLES } from './tables.js';
 
 type Mode = { missing?: string; mismatch?: string; freeze?: boolean; triggers?: 'all' | 'partial' | 'wrongpk'; pending?: number; leak?: boolean };
 let mode: Mode = {};
@@ -26,7 +26,7 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url || '/', 'http://x');
   const table = url.pathname.replace('/rest/v1/', '');
   const json = (code: number, body: unknown, headers: Record<string, string> = {}) => { res.writeHead(code, { 'Content-Type': 'application/json', ...headers }); res.end(JSON.stringify(body)); };
-  if (table === 'rpc/bobby_outbox_status') return json(200, (mode.triggers === 'partial' ? APPROVED_TABLES.slice(0, 5) : APPROVED_TABLES).map((t) => ({ table_name: t.name, pk_columns: mode.triggers === 'wrongpk' && t.name === 'agent_market_snapshots' ? 'symbol' : t.pk.join(',') })));
+  if (table === 'rpc/bobby_outbox_status') return json(200, (mode.triggers === 'partial' ? JOURNALED_TABLES.slice(0, 5) : JOURNALED_TABLES).map((t) => ({ table_name: t.name, pk_columns: mode.triggers === 'wrongpk' && t.name === 'agent_market_snapshots' ? 'symbol' : t.pk.join(',') })));
   if (table === 'bobby_control' && url.searchParams.get('select') === 'write_freeze') return json(200, [{ write_freeze: mode.freeze === true }]);
   if (table === 'migration_outbox') {
     if (req.method === 'PATCH') { const id = Number(url.searchParams.get('id')?.replace('eq.', '')); outboxPending = outboxPending.filter((e) => e.id !== id); if (mode.leak && outboxPending.length === 0) { outboxPending.push({ id: 900000 + Math.floor(Math.random() * 1e5), table_name: 'agent_config', op: 'INSERT', pk: { key: 'late' }, row_data: { key: 'late', value: 'x' } }); } return json(204, null); }
@@ -115,6 +115,12 @@ server.listen(0, async () => {
   upserts = 0;
   r = await run('replay-outbox.mts', ['--from', 'target'], B);
   line(r.status === 0 && upserts === 5_432 && outboxPending.length === 0 && /REPLAY COMPLETE: 5432/.test(r.stdout), 'replay: drains 5,432 pending entries across pages to zero', `exit=${r.status} upserts=${upserts} left=${outboxPending.length}`);
+  // a journaled bobby_control row must be skipped, never applied
+  mode = { triggers: 'all', freeze: true };
+  outboxPending = [{ id: 1, table_name: 'bobby_control', op: 'UPDATE', pk: { id: 'global' }, row_data: { id: 'global', write_freeze: false } }, { id: 2, table_name: 'agent_config', op: 'INSERT', pk: { key: 'a' }, row_data: { key: 'a', value: '1' } }];
+  upserts = 0;
+  r = await run('replay-outbox.mts', ['--from', 'target'], B);
+  line(r.status === 0 && upserts === 1 && /skip\s+bobby_control/.test(r.stdout) && outboxPending.length === 0, 'replay: bobby_control entry skipped (control plane), data entry applied', `exit=${r.status} upserts=${upserts}`);
   // late write after drain → incomplete
   mode = { triggers: 'all', freeze: true, leak: true };
   outboxPending = [{ id: 1, table_name: 'agent_config', op: 'INSERT', pk: { key: 'a' }, row_data: { key: 'a', value: '1' } }];
