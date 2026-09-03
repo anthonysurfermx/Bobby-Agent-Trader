@@ -13,7 +13,6 @@ import { AdvisorSetup, useAdvisorProfile } from '@/components/agent-radar/Adviso
 import type { AdvisorProfile } from '@/components/agent-radar/AdvisorSetup';
 import { fetchTickers, fetchMarketDetail, formatVolume, type OKXTicker } from '@/services/okx-market.service';
 import { SwapConfirm, type TradeExecution } from './SwapConfirm';
-import PerpsTradeCard from './PerpsTradeCard';
 import TradingModeSelector, { type TradingMode } from './TradingModeSelector';
 import { VoiceOrb, type OrbState, type OrbMood } from './VoiceOrb';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
@@ -1874,9 +1873,14 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 125_000); // 125s timeout
 
+        // With a wallet the server builds signable calldata, so it demands the
+        // wallet session (proof of ownership); without one it only simulates.
         const walletParam = address ? `&wallet=${address}` : '';
-        const res = await fetch(`/api/agent-run?manual=true${walletParam}`, { signal: controller.signal });
+        const res = await fetch(`/api/agent-run?manual=true${walletParam}`, { signal: controller.signal, headers: sessionHeaders(address?.toLowerCase()) });
         clearTimeout(timeout);
+        if (res.status === 401 && address) {
+          throw new Error(lang === 'es' ? 'Firma la sesión de tu wallet para recibir tarjetas de swap.' : 'Sign your wallet session to receive swap cards.');
+        }
         const data = await res.json();
 
         phaseTimerRef.current.forEach(clearTimeout);
@@ -2471,185 +2475,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           } catch (forumErr) { console.warn('[Bobby] Forum publish failed:', forumErr); }
         }
 
-        // ── AUTO-EXECUTE: ONLY for authenticated owner, never for guests ──
-        // This prevents random users from opening positions with Bobby's OKX account
-        const OWNER_WALLET = '0xC3F836EC06A2202af23e59997A613CA0722F35d1'.toLowerCase();
-        const isOwner = isAuthenticated && address?.toLowerCase() === OWNER_WALLET;
-        console.log(`[Bobby] Auto-execute check: tradingMode=${tradingMode}, isOwner=${isOwner}, hasText=${!!fullText}`);
-        if (tradingMode === 'auto' && tradingRoom && fullText && isOwner) {
-          try {
-            // Codex P1: Parse ONLY the CIO verdict section, not Alpha/Red Team
-            // This prevents executing Alpha's trade when CIO said NO
-            const verdictMatch = fullText.match(/\*\*\s*(?:MY\s*VERDICT|MI\s*VEREDICTO)\s*:?\s*\*\*:?\s*([\s\S]*?)$/i);
-            const verdictText = verdictMatch ? verdictMatch[1] : fullText;
-
-            const convMatch = verdictText.match(/(\d+)\s*\/\s*10/);
-            const conv = convMatch ? parseInt(convMatch[1]) : 0;
-            // For symbol/direction: prefer CIO verdict, fallback to full text
-            const allAssets = /\b(BTC|ETH|SOL|OKB|XRP|AVAX|LINK|DOGE|ADA|ATOM|ARB|OP|NVDA|NVIDIA|AAPL|APPLE|TSLA|TESLA|META|GOOGL|GOOGLE|MSFT|MICROSOFT|AMD|COIN|COINBASE|MSTR|SPY|QQQ|XOM|EXXON|JPM|GS|CVX|CHEVRON)\b/i;
-            const rawSymMatch = verdictText.match(allAssets) || fullText.match(allAssets);
-            // Normalize company names to tickers
-            const nameToTicker: Record<string, string> = {
-              nvidia: 'NVDA', apple: 'AAPL', tesla: 'TSLA', google: 'GOOGL',
-              microsoft: 'MSFT', coinbase: 'COIN', exxon: 'XOM', chevron: 'CVX',
-            };
-            const symMatch = rawSymMatch
-              ? [rawSymMatch[0], nameToTicker[rawSymMatch[1].toLowerCase()] || rawSymMatch[1]]
-              : null;
-            const dirMatch = verdictText.match(/\b(long|short|comprar?|vender?)\b/i)
-              || fullText.match(/\b(long|short|comprar?|vender?)\b/i);
-            // Check if user specified leverage/amount in their message
-            const leverageMatch = msg.match(/(\d+)\s*[xX]/);
-            const amountMatch = msg.match(/(\d+)\s*(?:usdt|usd|dólares|dollars)/i);
-
-            console.log(`[Bobby] Auto-execute parse (CIO only): conv=${conv}, symbol=${symMatch?.[1]}, direction=${dirMatch?.[1]}, verdict="${verdictText.slice(0, 100)}"`);
-            if (conv >= 5 && symMatch && dirMatch) {
-              const symbol = symMatch[1].toUpperCase();
-              const direction = /short|vender/i.test(dirMatch[1]) ? 'short' : 'long';
-              const rawLeverage = leverageMatch ? parseInt(leverageMatch[1]) : (conv >= 8 ? 10 : conv >= 6 ? 5 : 3);
-              const leverage = Math.min(rawLeverage, 50); // Cap at 50x — OKX max varies by instrument
-              // Calculate minimum margin based on asset price (1 contract = markPrice USDT for most SWAP)
-              const cachedTicker = tickerCacheRef.current.find(t => t.symbol === symbol || t.instId === `${symbol}-USDT` || t.instId?.startsWith(`${symbol}-`));
-              const markPrice = cachedTicker?.last || 0;
-              // BTC=$70k needs ~$70 margin at 1x, ETH=$2k needs ~$2. With leverage, min = price / leverage but OKX min is 1 contract
-              const minMarginForOneContract = markPrice > 0 ? Math.ceil(markPrice / leverage) + 1 : 10;
-              const rawAmount = amountMatch ? parseFloat(amountMatch[1]) : Math.max(minMarginForOneContract, conv >= 8 ? 15 : conv >= 6 ? 12 : 10);
-              const amount = Math.max(rawAmount, minMarginForOneContract); // Never below 1 contract
-
-              console.log(`[Bobby] 🤖 AUTO-EXECUTE: ${direction.toUpperCase()} ${symbol} ${leverage}x $${amount} — conviction ${conv}/10 (mark=${markPrice}, minMargin=${minMarginForOneContract})`);
-
-              // Play execution sound
-              if (!textOnly) {
-                try {
-                  const audioCtx = new AudioContext();
-                  const osc = audioCtx.createOscillator();
-                  const gain = audioCtx.createGain();
-                  osc.connect(gain);
-                  gain.connect(audioCtx.destination);
-                  osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-                  osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1);
-                  gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                  osc.start();
-                  osc.stop(audioCtx.currentTime + 0.3);
-                } catch { }
-              }
-
-              // Bobby announces the execution with his voice
-              const execAnnouncement = lang === 'es'
-                ? `Ejecutando ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${leverage}x. Convicción ${conv} de diez.`
-                : `Executing ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${leverage}x. Conviction ${conv} out of ten.`;
-              if (voiceOutputEnabled) queueSentence(execAnnouncement, 'cio', lang);
-
-              setMessages(prev => [...prev, {
-                id: uid(), role: 'advisor', timestamp: Date.now(),
-                text: lang === 'es'
-                  ? `🤖 **Ejecutando automáticamente...** ${direction.toUpperCase()} ${symbol} ${leverage}x — Convicción ${conv}/10`
-                  : `🤖 **Auto-executing...** ${direction.toUpperCase()} ${symbol} ${leverage}x — Conviction ${conv}/10`,
-              }]);
-
-              let execData: any = {};
-              try {
-                // Codex P1: 15s timeout to prevent UI stuck on "Ejecutando..."
-                const execAbort = new AbortController();
-                const execTimeout = setTimeout(() => execAbort.abort(), 15000);
-                const execRes = await fetch('/api/okx-perps', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  signal: execAbort.signal,
-                  body: JSON.stringify({
-                    action: 'open_position',
-                    params: { symbol, direction, leverage, amount, mode: 'live', conviction: conv },
-                  }),
-                });
-                clearTimeout(execTimeout);
-                if (!execRes.ok) {
-                  throw new Error(`API error (${execRes.status})`);
-                }
-                execData = await execRes.json();
-              } catch (err: any) {
-                execData = { ok: false, error: err.name === 'AbortError' ? 'Timeout (15s)' : (err.message || 'API request failed') };
-              }
-
-              if (execData.ok) {
-                // Auto TP/SL
-                const targetMatch = verdictText.match(/target\s*(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                const targetPrice = targetMatch ? parseFloat(targetMatch[1].replace(/,/g, '')) : undefined;
-                const stopMatch = verdictText.match(/stop\s*(?:loss)?\s*(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                const stopPrice = stopMatch ? parseFloat(stopMatch[1].replace(/,/g, '')) : undefined;
-
-                if (targetPrice || stopPrice) {
-                  fetch('/api/okx-perps', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      action: 'set_tpsl',
-                      params: { symbol, direction, takeProfit: targetPrice, stopLoss: stopPrice, mode: 'live' },
-                    }),
-                  }).catch(e => console.warn('[Bobby] Auto TP/SL failed:', e));
-                }
-
-                // Success sound — ascending tone
-                if (!textOnly) {
-                  try {
-                    const audioCtx = new AudioContext();
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.frequency.setValueAtTime(523, audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(1047, audioCtx.currentTime + 0.15);
-                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.4);
-                  } catch { }
-                }
-
-                // Bobby confirms with voice
-                const confirmText = lang === 'es'
-                  ? `Operación confirmada. ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${execData.leverage} a ${execData.markPrice?.toLocaleString()} dólares. El trade está vivo.`
-                  : `Trade confirmed. ${direction === 'long' ? 'Long' : 'Short'} ${symbol} ${execData.leverage} at ${execData.markPrice?.toLocaleString()} dollars. The trade is live.`;
-                if (voiceOutputEnabled) queueSentence(confirmText, 'cio', lang);
-
-                setMessages(prev => [...prev, {
-                  id: uid(), role: 'advisor', timestamp: Date.now(),
-                  text: lang === 'es'
-                    ? `✅ **Operación confirmada: ${direction.toUpperCase()} ${symbol} ${execData.leverage}**\n\n📍 Entry: $${execData.markPrice?.toLocaleString()}\n💰 Margin: ${execData.margin}\n📊 Exposición: ${execData.notional}\n📐 Tamaño: ${execData.size}\n🔗 Order: ${execData.orderId}\n\n_Registrado on-chain en X Layer_`
-                    : `✅ **Trade confirmed: ${direction.toUpperCase()} ${symbol} ${execData.leverage}**\n\n📍 Entry: $${execData.markPrice?.toLocaleString()}\n💰 Margin: ${execData.margin}\n📊 Notional: ${execData.notional}\n📐 Size: ${execData.size}\n🔗 Order: ${execData.orderId}\n\n_Recorded on-chain on X Layer_`,
-                }]);
-              } else {
-                setMessages(prev => [...prev, {
-                  id: uid(), role: 'advisor', timestamp: Date.now(),
-                  text: lang === 'es'
-                    ? `Bobby intentó ejecutar pero OKX rechazó la orden: ${execData.error}. Ajusta el monto o leverage e intenta de nuevo.`
-                    : `Bobby tried to execute but OKX rejected the order: ${execData.error}. Adjust amount or leverage and retry.`,
-                }]);
-              }
-            } else if (conv >= 5) {
-              setMessages(prev => prev.map(m =>
-                m.id === replyId
-                  ? {
-                    ...m, text: m.text + (lang === 'es'
-                      ? `\n\n🛑 **No se pudo ejecutar:** Faltó token o dirección en el análisis de Bobby.`
-                      : `\n\n🛑 **Auto-execute failed:** Missing token or direction in Bobby's analysis.`)
-                  }
-                  : m
-              ));
-            } else if (conv > 0 && conv < 5) {
-              // Append "not executing" to Bobby's debate text instead of separate message
-              setMessages(prev => prev.map(m =>
-                m.id === replyId
-                  ? {
-                    ...m, text: m.text + (lang === 'es'
-                      ? `\n\n🛑 **No ejecuto.** Convicción ${conv}/10 — demasiado baja. Mínimo 5/10 para auto-ejecución.`
-                      : `\n\n🛑 **Not executing.** Conviction ${conv}/10 — too low. Minimum 5/10 for auto-execution.`)
-                  }
-                  : m
-              ));
-            }
-          } catch (autoErr) { console.warn('[Bobby] Auto-execute failed:', autoErr); }
-        }
+        // Execution: Bobby never places orders. OKX auto-execute was retired on
+        // 2026-09-03 (Base + Uniswap only). Trades reach the user as swap cards
+        // built by /api/agent-run → /api/base-swap and signed by their wallet.
 
         // If we got no text from stream, set a fallback
         if (!fullText) {
@@ -3397,34 +3225,6 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                   )}
 
                   {/* Perps Trade Card — execute leveraged perpetuals via OKX CEX */}
-                  {!isProcessing && latestAdvisor.text.length > 100 && (() => {
-                    const text = latestAdvisor.text;
-                    const convMatch = text.match(/(\d+)\s*\/\s*10/);
-                    const conv = convMatch ? parseInt(convMatch[1]) / 10 : 0.5;
-                    const symMatch = text.match(/\b(BTC|ETH|SOL|OKB|HYPE|XRP|UNI|MATIC|DOGE|AVAX|LINK|ADA|ATOM|ARB|OP|NVDA|AAPL|TSLA|META|GOOGL|MSFT|AMD|COIN|MSTR|SPY|QQQ|XOM|JPM|GS)\b/i);
-                    const dirMatch = text.match(/\b(long|short|comprar?|vender?)\b/i);
-                    const entryMatch = text.match(/(?:entry|entr[ao]|comprar?)\s*(?:\w+\s+)*?(?:en|at|a)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                    const targetMatch = text.match(/target\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                    const stopMatch = text.match(/stop\s*(?:loss)?\s*(?:\w+\s+)*?(?:en|at|a|in)?\s*\$?([\d,]+(?:\.\d+)?)/i);
-                    if (symMatch && false) { // Hidden for now — trade cards moved to dedicated execution page
-                      const dir = dirMatch ? (/short|vender/i.test(dirMatch[1]) ? 'short' : 'long') : 'long';
-                      return (
-                        <PerpsTradeCard
-                          symbol={symMatch[1].toUpperCase()}
-                          direction={dir as 'long' | 'short'}
-                          conviction={conv}
-                          entryPrice={entryMatch ? parseFloat(entryMatch[1].replace(/,/g, '')) : undefined}
-                          targetPrice={targetMatch ? parseFloat(targetMatch[1].replace(/,/g, '')) : undefined}
-                          stopPrice={stopMatch ? parseFloat(stopMatch[1].replace(/,/g, '')) : undefined}
-                          language={lang}
-                          tradingMode={(tradingMode === 'auto' || tradingMode === 'confirm') ? 'live' : 'paper'}
-                          isOwner={isAuthenticated && address?.toLowerCase() === '0xc3f836ec06a2202af23e59997a613ca0722f35d1'}
-                        />
-                      );
-                    }
-                    return null;
-                  })()}
-
                   {/* Trade execution cards */}
                   {latestAdvisor.trades && latestAdvisor.trades.length > 0 && (
                     <div className="mt-3 space-y-2">

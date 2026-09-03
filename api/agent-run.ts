@@ -5,6 +5,8 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { randomUUID } from 'node:crypto';
+import { resolveIdentity } from './_lib/user-identity.js';
 import { cached } from './_lib/api-cache.js';
 import {
   collectDexSignals,
@@ -477,7 +479,8 @@ async function fetchOpenExposureUsd(): Promise<number> {
   const key = bobbyServiceKey();
   if (!url || !key) return 0;
   try {
-    const q = `${url}/rest/v1/agent_trades?status=eq.open&select=amount_usd`;
+    // Confirmed on-chain and not yet settled = open exposure (agent_trades has no 'open' status).
+    const q = `${url}/rest/v1/agent_trades?status=eq.confirmed&settled_at=is.null&select=amount_usd`;
     const res = await fetch(q, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
     if (!res.ok) {
       console.warn(`[OpenExposure] HTTP ${res.status} — treating open exposure as 0`);
@@ -955,6 +958,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Auth check for cron (skip for manual)
   const isManual = req.query.manual === 'true';
   const walletAddress = isManual ? String(req.query.wallet || '') : '';
+  // Edge-stamped country; tokenized stocks refuse calldata without it (US exclusion).
+  const viewerCountry = typeof req.headers['x-vercel-ip-country'] === 'string' ? String(req.headers['x-vercel-ip-country']) : null;
+  // The cycle id is minted here so calldata built in Phase 6 can be tied to
+  // the cycle row logged in Phase 7; a confirmed receipt then updates that row.
+  const cycleId = randomUUID();
+  const viewerIdentity = isManual ? await resolveIdentity(req).catch(() => null) : null;
   const hasOperatorAuth = isInternalRequest(req);
   if (!isManual && !requireInternalAuth(req, res)) return;
   if (walletAddress && !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
@@ -1162,7 +1171,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`[Agent] Building Base swap calldata for wallet ${walletAddress.slice(0, 8)}...`);
       trades = [];
       for (const d of approved) {
-        const prepared = await prepareBaseTrade({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, wallet: walletAddress });
+        const prepared = await prepareBaseTrade({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, wallet: walletAddress, country: viewerCountry, cycleId, identityId: viewerIdentity?.id ?? null });
         if (!prepared.ok) {
           console.warn(`[Agent] Abort ${d.tokenSymbol}: ${prepared.reason}`);
           trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: prepared.status, execution: undefined, abortReason: prepared.reason });
@@ -1188,6 +1197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Phase 7: Log
     const result = {
+      id: cycleId,
       started_at: startedAt,
       completed_at: new Date().toISOString(),
       signals_found: raw.length,

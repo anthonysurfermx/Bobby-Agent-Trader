@@ -71,6 +71,22 @@ The review asked for Universal Router + Permit2 with exact, expiring approvals. 
 - **iOS** has no swap surface today; when it gets one it should consume `/api/base-swap` with the same session header.
 - **X Layer copy elsewhere** (x402 settlement docs, protocol pages, historical views) was left alone on purpose: it is the ledger, not the swap rail.
 
+## Review round 2 → what changed (on the merged branch)
+
+| # | Finding | Change |
+|---|---|---|
+| P1 | `AdamsChat` called `/api/agent-run?manual=true&wallet=…` without the session → 401 | The call carries `x-bobby-session`; a 401 with a wallet tells the user to sign the session instead of failing silently. |
+| P1 | Persistence fail-open (calldata handed out when the store failed; UIs green on 202/409/503) | `/api/base-swap` withholds `tx` when the built row could not be recorded (quote stays visible). Both cards: 202 → retry with backoff (6×); non-200 → amber "mined, NOT recorded" state with a Retry button; green only on 200. |
+| P1 | Agent path skipped `recordBuiltSwap` | `prepareBaseTrade` records the built swap (with cycle id and identity) and aborts the trade when the store is unavailable. E2E now exercises this rule through the store hook, not a manual call. |
+| P1 | Confirmed swaps never reached the cycle / `agent_trades` | `confirmSwapReceipt` writes one `agent_trades` row per confirmed receipt (idempotent on tx hash; `status='confirmed'`, `direction` BUY/SELL, USD from the stable leg, `owner_address`, `user_id`), links it on the receipt row, and bumps `agent_cycles.trades_executed/total_usd_deployed` when the calldata came from a cycle (`agent-run` mints the cycle id up front and logs it). `fetchOpenExposureUsd` now counts `confirmed` unsettled trades (this schema has no `open` status — the old query always returned 0). |
+| P1 | Geogate: only `US` blocked, IP ≠ residence | Fail-closed, versioned allow-list `STOCK_COUNTRY_ALLOWLIST` (`2026-09-03-draft-pending-legal-review`, currently `MX` only); `BASE_STOCK_COUNTRY_ALLOWLIST` may only narrow it. Two independent gates remain: the human's attestation and the edge country. Neither replaces KYC where the issuer requires it — counsel must validate the list before it grows. |
+| P1 | OKX not fully retired | `okx-perps`: every account action (server or user credentials) returns 410 before any credential is read. `AdamsChat`: the auto-execute block and `PerpsTradeCard` are gone; Bobby never places orders. `bobby-cycle` Phase 4b retired. `@okxweb3/dex-widget` removed. |
+| P2 | Inline card lacked revoke | `toTradeExecution` carries `revokeTx`; `SwapConfirm` offers it. |
+| P2 | Sell pre-check used `transfer`, router uses `transferFrom` + executor policy | Before the human pays for an approval, the exact swap calldata is simulated with the wallet's allowance overridden in state (`eth_call` + `stateOverride`; the allowance slot is discovered with one call). That runs `transferFrom`, the B20 sender/receiver/executor policies and the pool. A revert withholds the approval. Swap calldata is still only handed out after the real approval mines and the live re-simulation passes. |
+| P2 | Selectors listed 13 stocks | Only the four with pools are listed (Codex's cut). |
+
+Left as-is, on purpose: ESLint reports pre-existing warnings (0 errors) across files this work did not touch.
+
 ## Verification run
 
 ```

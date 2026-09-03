@@ -79,6 +79,7 @@
     "api/bobby-pnl.ts",
     "api/base-swap.ts",
     "api/_lib/base-swap.ts",
-    "api/_lib/mcp-uniswap-quote.ts"
+    "api/_lib/mcp-uniswap-quote.ts",
+    "api/_lib/swap-receipts.ts"
   ]
 }

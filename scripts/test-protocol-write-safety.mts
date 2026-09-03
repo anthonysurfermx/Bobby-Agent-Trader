@@ -32,7 +32,7 @@ function withContracts(chain: ChainConfig): ChainConfig {
   };
 }
 
-assert.equal(resolveProtocolChain(undefined).name, 'xlayer');
+assert.equal(resolveProtocolChain(undefined).name, 'base');
 assert.equal(resolveProtocolChain('base').config.id, 8453);
 assert.equal(resolveProtocolChain(' base-sepolia ').config.id, 84532);
 assert.throws(() => resolveProtocolChain('base-mainnet'), /Invalid PROTOCOL_CHAIN/);
@@ -197,8 +197,9 @@ assert.match(frontendChainsSource, /VITE_TREASURY_ADDRESS_BASE/);
 assert.doesNotMatch(frontendChainsSource, /treasury: '0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea'/);
 
 const perpsSource = readFileSync('api/okx-perps.ts', 'utf8');
-assert.match(perpsSource, /isProtocolCutoverFrozen\(\)/);
-assert.match(perpsSource, /serverLiveMutations/);
+// 2026-09-03: every OKX account action (server or user credentials) is
+// retired with 410 before any credential is selected.
+assert.match(perpsSource, /if \(accountActions\.has\(action\)\) \{\s*return res\.status\(410\)/);
 
 const gitignoreSource = readFileSync('.gitignore', 'utf8');
 assert.match(gitignoreSource, /^\.env\*$/m);

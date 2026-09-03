@@ -5,10 +5,10 @@ import assert from 'node:assert/strict';
 import { decodeFunctionData, getAddress, parseUnits } from 'viem';
 import {
   BaseSwapError, ERC20_ABI, FEE_TIERS, ROUTER_ADDRESS_THIS, SWAP_ROUTER02, QUOTER_V2, V3_FACTORY, WETH9,
-  buildApproveTx, buildSwapTx, candidateRoutes, clampSlippage, computeMinOut, decodeSwapTx, encodePath, resolvePair, toRawAmount,
+  buildApproveTx, buildRevokeTx, buildSwapTx, candidateRoutes, clampSlippage, computeMinOut, decodeSwapTx, encodePath, resolvePair, toRawAmount,
   type QuotedRoute,
 } from '../api/_lib/base-swap.js';
-import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, findBaseToken } from '../src/lib/base-swap/tokens.js';
+import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed } from '../src/lib/base-swap/tokens.js';
 
 const wallet = getAddress('0x1111111111111111111111111111111111111111');
 
@@ -30,6 +30,18 @@ assert.equal(findBaseToken('0x0000000000000000000000000000000000000000'), null);
 assert.deepEqual(BASE_STOCK_SYMBOLS, ['AAPLc', 'GOOGLc', 'METAc', 'NVDAc']);
 assert.equal(findBaseToken('NVDA')?.symbol, 'NVDAc', 'underlying ticker resolves to the pinned B20 address');
 assert.equal(findBaseToken('aaplc')?.address, '0xb200000000000000000000C2e324d24d7eEcd1fb');
+
+// --- country allow-list: fail closed, env may only narrow ---
+assert.ok(STOCK_COUNTRY_ALLOWLIST.version.length > 8);
+assert.equal(stockCountryAllowed('MX'), true);
+assert.equal(stockCountryAllowed('mx'), true);
+assert.equal(stockCountryAllowed('US'), false);
+assert.equal(stockCountryAllowed('AR'), false, 'not on the list = refused');
+assert.equal(stockCountryAllowed(''), false);
+assert.equal(stockCountryAllowed(null), false);
+assert.equal(stockCountryAllowed('MX', 'CO'), false, 'env narrows: MX not in env list');
+assert.equal(stockCountryAllowed('CO', 'CO,MX'), false, 'env cannot widen beyond the code list');
+assert.equal(stockCountryAllowed('MX', 'garbage'), true, 'malformed env entries are ignored');
 
 function code(run: () => unknown): string | undefined {
   try { run(); return undefined; } catch (e) { assert(e instanceof BaseSwapError, `expected BaseSwapError, got ${e}`); return e.code; }
@@ -73,6 +85,16 @@ assert.equal(approve.value, '0x0');
   assert.equal(d.functionName, 'approve');
   assert.equal(d.args[0], SWAP_ROUTER02);
   assert.equal(d.args[1], 25_000_000n, 'no unlimited approvals');
+}
+
+// --- revoke: approve(router, 0) on the token, nothing else ---
+{
+  const revoke = buildRevokeTx(usdc.address);
+  assert.equal(revoke.to, usdc.address);
+  const d = decodeFunctionData({ abi: ERC20_ABI, data: revoke.data });
+  assert.equal(d.functionName, 'approve');
+  assert.equal(d.args[0], SWAP_ROUTER02);
+  assert.equal(d.args[1], 0n);
 }
 
 const deadline = 1_900_000_000;

@@ -21,12 +21,12 @@
 
 import {
   createPublicClient, http, fallback, parseAbi, encodeFunctionData, decodeFunctionData, encodePacked,
-  formatUnits, parseUnits, getAddress, type Address, type Hex,
+  formatUnits, parseUnits, getAddress, keccak256, type Address, type Hex,
 } from 'viem';
 import { base } from 'viem/chains';
 import { BASE, UNISWAP_BASE } from './chains.js';
 import {
-  BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_USDC, BASE_WETH, findBaseToken, type BaseSwapToken,
+  BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_USDC, BASE_WETH, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed, type BaseSwapToken,
 } from '../../src/lib/base-swap/tokens.js';
 
 export const SWAP_ROUTER02: Address = getAddress(UNISWAP_BASE.swapRouter02);
@@ -63,7 +63,9 @@ export const ROUTER_ABI = parseAbi([
   'function WETH9() view returns (address)',
 ]);
 
-const RPC_URLS = Array.from(new Set([BASE.rpcUrl, BASE.rpcFallbackUrl, 'https://mainnet.base.org'].filter((u): u is string => Boolean(u))));
+// Exactly the chain config's endpoints — no hidden extra fallback. When
+// BASE_RPC_URL points at a fork (tests), nothing silently answers from mainnet.
+const RPC_URLS = Array.from(new Set([BASE.rpcUrl, BASE.rpcFallbackUrl].filter((u): u is string => Boolean(u))));
 
 function makeClient() {
   return createPublicClient({
@@ -183,6 +185,16 @@ export function buildApproveTx(token: Address, amount: bigint): BuiltTx & { spen
   };
 }
 
+/** approve(router, 0): clears an allowance left behind by an abandoned or reverted swap. */
+export function buildRevokeTx(token: Address): BuiltTx & { spender: Address } {
+  return {
+    to: getAddress(token),
+    data: encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [SWAP_ROUTER02, 0n] }),
+    value: '0x0',
+    spender: SWAP_ROUTER02,
+  };
+}
+
 export function buildSwapTx(opts: {
   tokenIn: BaseSwapToken;
   tokenOut: BaseSwapToken;
@@ -263,6 +275,14 @@ async function quoteRoutes(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, amou
   } catch (error) {
     throw new BaseSwapError(`Base RPC quote failed: ${error instanceof Error ? error.message : String(error)}`, 'rpc_failed');
   }
+  // viem retries a failed aggregate3 call one contract at a time and reports
+  // transport errors as per-item failures. A pool that does not exist reverts
+  // (a contract error); an RPC that is down or rate-limited is not "no route".
+  const failures = results.filter((r): r is Extract<McResult, { status: 'failure' }> => r.status === 'failure');
+  if (failures.length === results.length && failures.length > 0) {
+    const transport = failures.every((r) => /HttpRequestError|TimeoutError|RpcRequestError|InternalRpcError|LimitExceeded/i.test(`${r.error?.name} ${r.error?.message}`) && !/revert/i.test(`${r.error?.message}`));
+    if (transport) throw new BaseSwapError(`Base RPC quote failed: ${failures[0].error?.message?.split('\n')[0] ?? 'unknown'}`, 'rpc_failed');
+  }
   const quoted: QuotedRoute[] = [];
   results.forEach((res, i) => {
     if (res.status !== 'success') return;
@@ -289,6 +309,9 @@ const B20_ABI = parseAbi([
   'function decimals() view returns (uint8)',
   'function totalSupply() view returns (uint256)',
   'function multiplier() view returns (uint256)',
+  'function pausedFeatures() view returns (uint256)',
+  'function isPaused(uint8 feature) view returns (bool)',
+  'function transfer(address to, uint256 amount) returns (bool)',
 ]);
 const CHAINLINK_ABI = parseAbi([
   'function decimals() view returns (uint8)',
@@ -315,17 +338,111 @@ function spotFromSqrt(sqrtPriceX96: bigint, tokenIn: Address, tokenOut: Address,
  * tiny probe quote was tried first and rejected: integer rounding on
  * low-decimal outputs (cbBTC) made it noisier than the number it measured.
  */
-async function routeMidPrice(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, route: QuotedRoute): Promise<number | null> {
+function routeHops(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, route: QuotedRoute): Array<{ a: BaseSwapToken; b: BaseSwapToken; fee: number }> {
   const weth = findBaseToken(WETH9)!;
-  const hops: Array<{ a: BaseSwapToken; b: BaseSwapToken; fee: number }> = route.route.kind === 'single'
+  return route.route.kind === 'single'
     ? [{ a: tokenIn, b: tokenOut, fee: route.route.fee }]
     : [{ a: tokenIn, b: weth, fee: route.route.fees[0] }, { a: weth, b: tokenOut, fee: route.route.fees[1] }];
+}
+
+/** Pool address per hop of the route (null when any hop has no pool). */
+async function routePools(hops: ReturnType<typeof routeHops>): Promise<Address[] | null> {
+  const pools = (await multicallLoose(
+    hops.map((h) => ({ address: V3_FACTORY, abi: FACTORY_ABI, functionName: 'getPool', args: [getAddress(h.a.address), getAddress(h.b.address), h.fee] })),
+    false,
+  )) as Address[];
+  if (pools.some((p) => !p || p.toLowerCase() === ZERO)) return null;
+  return pools;
+}
+
+/**
+ * B20 policies gate transfers, not approve(): a blocked wallet could pay for
+ * an approval it can never use. Prove the transfer leg with an eth_call
+ * before returning anything — from the pool for buys (can the wallet
+ * receive?), from the wallet for sells (can it send?). One base unit is
+ * enough for the policy check; balance is verified separately.
+ */
+async function stockTransferPolicyReason(token: BaseSwapToken, wallet: Address, side: 'buy' | 'sell', pool: Address): Promise<string | null> {
+  const c = baseClient();
+  const address = getAddress(token.address);
   try {
-    const pools = (await multicallLoose(
-      hops.map((h) => ({ address: V3_FACTORY, abi: FACTORY_ABI, functionName: 'getPool', args: [getAddress(h.a.address), getAddress(h.b.address), h.fee] })),
-      false,
-    )) as Address[];
-    if (pools.some((p) => !p || p.toLowerCase() === ZERO)) return null;
+    if (side === 'buy') await c.simulateContract({ address, abi: B20_ABI, functionName: 'transfer', args: [wallet, 1n], account: pool });
+    else await c.simulateContract({ address, abi: B20_ABI, functionName: 'transfer', args: [pool, 1n], account: wallet });
+    return null;
+  } catch {
+    return `${token.symbol}: issuer policy blocks this wallet for this token (transfer simulation reverted)`;
+  }
+}
+
+const ALLOWANCE_SLOT_CANDIDATES = 64;
+const allowanceSlotCache = new Map<string, number>();
+
+/**
+ * Finds the storage base slot of `allowance` for an ERC-20 with ONE eth_call:
+ * every candidate slot is overridden with a distinct value and allowance()
+ * reports which one it read. Cached per token (proxies included: storage
+ * lives on the address we call). null when the token is not a plain mapping.
+ */
+async function findAllowanceSlot(token: Address, owner: Address, spender: Address): Promise<number | null> {
+  const key = token.toLowerCase();
+  const cached = allowanceSlotCache.get(key);
+  if (cached !== undefined) return cached;
+  const c = baseClient();
+  const stateDiff = Array.from({ length: ALLOWANCE_SLOT_CANDIDATES }, (_, i) => ({
+    slot: keccak256(encodePacked(['bytes32', 'bytes32'], [
+      `0x${spender.slice(2).toLowerCase().padStart(64, '0')}` as Hex,
+      keccak256(encodePacked(['bytes32', 'uint256'], [`0x${owner.slice(2).toLowerCase().padStart(64, '0')}` as Hex, BigInt(i)])),
+    ])),
+    value: `0x${(i + 1).toString(16).padStart(64, '0')}` as Hex,
+  }));
+  try {
+    const raw = await c.call({
+      to: token,
+      data: encodeFunctionData({ abi: ERC20_ABI, functionName: 'allowance', args: [owner, spender] }),
+      stateOverride: [{ address: token, stateDiff }],
+    });
+    const read = raw.data ? Number(BigInt(raw.data)) : 0;
+    if (read >= 1 && read <= ALLOWANCE_SLOT_CANDIDATES) {
+      allowanceSlotCache.set(key, read - 1);
+      return read - 1;
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
+/**
+ * Simulates the exact swap as if the router already held the allowance:
+ * transferFrom, the B20 executor/sender/receiver policies and the pool all
+ * run. Lets a human learn BEFORE paying an approval that the swap would
+ * revert. null = could not be simulated (unknown storage layout).
+ */
+async function simulateWithAllowanceOverride(token: Address, owner: Address, amount: bigint, swap: BuiltTx): Promise<{ ok: boolean; reason: string | null } | null> {
+  const slot = await findAllowanceSlot(token, owner, SWAP_ROUTER02);
+  if (slot === null) return null;
+  const c = baseClient();
+  const allowanceSlot = keccak256(encodePacked(['bytes32', 'bytes32'], [
+    `0x${SWAP_ROUTER02.slice(2).toLowerCase().padStart(64, '0')}` as Hex,
+    keccak256(encodePacked(['bytes32', 'uint256'], [`0x${owner.slice(2).toLowerCase().padStart(64, '0')}` as Hex, BigInt(slot)])),
+  ]));
+  try {
+    await c.call({
+      account: owner,
+      to: swap.to,
+      data: swap.data,
+      value: BigInt(swap.value),
+      stateOverride: [{ address: token, stateDiff: [{ slot: allowanceSlot, value: `0x${amount.toString(16).padStart(64, '0')}` as Hex }] }],
+    });
+    return { ok: true, reason: null };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message.split('\n')[0].slice(0, 160) : String(error) };
+  }
+}
+
+async function routeMidPrice(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, route: QuotedRoute): Promise<number | null> {
+  const hops = routeHops(tokenIn, tokenOut, route);
+  try {
+    const pools = await routePools(hops);
+    if (!pools) return null;
     const slots = (await multicallLoose(
       pools.map((p) => ({ address: p, abi: POOL_ABI, functionName: 'slot0' })),
       false,
@@ -348,8 +465,10 @@ export interface BaseSwapInput {
   slippagePct?: number;
   /** Wallet that pays, receives and signs. Required for calldata. */
   recipient?: string | null;
-  /** Required before calldata for Coinbase B20 tokenized equities. */
+  /** Required before calldata for Coinbase B20 tokenized equities: the human's own attestation. */
   stockEligibilityConfirmed?: boolean;
+  /** ISO country stamped by the edge (`x-vercel-ip-country`). Required for stock calldata; US or missing = none. */
+  country?: string | null;
 }
 
 export interface BaseSwapLimits { maxTicketUsd: number; minTicketUsd: number; defaultSlippagePct: number; maxSlippagePct: number; maxPriceImpactPct: number; deadlineSec: number }
@@ -375,6 +494,10 @@ export interface StockReferenceView {
   multiplier: string;
   multiplierHuman: number;
   marketDeviationPct: number;
+  /** Raw B20 pause bitmask; non-zero = some issuer feature paused (mint/redeem side). */
+  pausedFeatures: string;
+  /** Transfer-level pause (feature 0). When true nothing can move. */
+  transferPaused: boolean;
 }
 
 export interface BaseSwapQuote {
@@ -399,13 +522,23 @@ export interface BaseSwapQuote {
   route: { kind: RouteCandidate['kind']; fees: number[]; path: Hex | null; description: string; gasEstimate: string };
   alternatives: Array<{ description: string; amountOut: string }>;
   recipient: Address | null;
-  /** Present only when every guard passed and a recipient was given. */
+  /**
+   * Present only when every guard passed and a recipient was given.
+   * `approve` set ⇒ `swap` is null: sign the approval, wait for its receipt,
+   * then re-quote — the swap is only handed out once it simulated with the
+   * allowance in place. `revoke` is offered whenever an allowance exists.
+   */
   tx: null | {
     chainId: typeof BASE_SWAP_CHAIN_ID;
     approve: (BuiltTx & { spender: Address; amount: string }) | null;
-    swap: BuiltTx;
+    swap: BuiltTx | null;
+    /** keccak256 of the swap calldata — the key /api/swap-receipt matches on. */
+    calldataHash: Hex | null;
+    revoke: (BuiltTx & { spender: Address }) | null;
     deadline: number;
   };
+  /** Current router allowance of tokenIn for the recipient (raw units); null for ETH or no recipient. */
+  allowanceRaw: string | null;
   simulation: { ran: boolean; ok: boolean | null; reason: string | null };
   txWithheld: string[];
   warnings: string[];
@@ -442,13 +575,15 @@ async function readStockReference(stock: BaseSwapToken, executionUsdPerToken: nu
   if (stock.assetClass !== 'tokenized-stock' || !stock.referenceFeed) throw new Error('stock reference metadata missing');
   const tokenAddress = getAddress(stock.address);
   const feedAddress = getAddress(stock.referenceFeed);
-  const [symbol, decimals, totalSupply, multiplier, feedDecimals, round] = await multicallLoose([
+  const [symbol, decimals, totalSupply, multiplier, feedDecimals, round, pausedFeatures, transferPaused] = await multicallLoose([
     { address: tokenAddress, abi: B20_ABI, functionName: 'symbol' },
     { address: tokenAddress, abi: B20_ABI, functionName: 'decimals' },
     { address: tokenAddress, abi: B20_ABI, functionName: 'totalSupply' },
     { address: tokenAddress, abi: B20_ABI, functionName: 'multiplier' },
     { address: feedAddress, abi: CHAINLINK_ABI, functionName: 'decimals' },
     { address: feedAddress, abi: CHAINLINK_ABI, functionName: 'latestRoundData' },
+    { address: tokenAddress, abi: B20_ABI, functionName: 'pausedFeatures' },
+    { address: tokenAddress, abi: B20_ABI, functionName: 'isPaused', args: [0] },
   ], false);
   if (String(symbol) !== stock.symbol || Number(decimals) !== stock.decimals) throw new Error('pinned B20 metadata no longer matches onchain metadata');
   if ((totalSupply as bigint) <= 0n) throw new Error('B20 token has no circulating supply');
@@ -467,6 +602,8 @@ async function readStockReference(stock: BaseSwapToken, executionUsdPerToken: nu
     multiplier: (multiplier as bigint).toString(),
     multiplierHuman: Number(formatUnits(multiplier as bigint, 18)),
     marketDeviationPct,
+    pausedFeatures: (pausedFeatures as bigint).toString(),
+    transferPaused: Boolean(transferPaused),
   };
 }
 
@@ -525,6 +662,9 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
       } else if (stockReference.marketDeviationPct > STOCK_REFERENCE_WARN_DEVIATION_PCT) {
         warnings.push(`Uniswap price differs ${stockReference.marketDeviationPct.toFixed(2)}% from the official reference`);
       }
+      if (stockReference.transferPaused) txWithheld.push(`${stock.symbol}: transfers are paused by the issuer`);
+      else if (stockReference.pausedFeatures !== '0') warnings.push(`${stock.symbol}: issuer has paused some features (mint/redeem side); secondary trading still open`);
+      if (stockReference.multiplierHuman !== 1) warnings.push(`${stock.symbol}: multiplier is ${stockReference.multiplierHuman}: one token is ${stockReference.multiplierHuman} shares`);
     } catch (error) {
       txWithheld.push(`stock metadata/reference could not be verified: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -535,6 +675,7 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
 
   let recipient: Address | null = null;
   let tx: BaseSwapQuote['tx'] = null;
+  let allowanceRaw: string | null = null;
   const simulation: BaseSwapQuote['simulation'] = { ran: false, ok: null, reason: 'no recipient: quote only' };
 
   if (input.recipient !== undefined && input.recipient !== null && input.recipient !== '') {
@@ -542,10 +683,30 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     else recipient = getAddress(input.recipient);
   }
 
-  if (recipient) {
-    if (stock && input.stockEligibilityConfirmed !== true) {
+  if (recipient && stock) {
+    // Two independent gates for tokenized stocks: the human's own attestation
+    // and the edge's view of where they are. US or unknown = no calldata.
+    if (input.stockEligibilityConfirmed !== true) {
       txWithheld.push('confirm tokenized-stock eligibility before requesting transaction data');
     }
+    const country = (input.country || '').trim().toUpperCase();
+    if (!country) txWithheld.push('viewer country unavailable; cannot confirm eligibility for tokenized stocks');
+    else if (country === 'US') txWithheld.push('tokenized stocks are not available to US persons');
+    else if (!stockCountryAllowed(country, process.env.BASE_STOCK_COUNTRY_ALLOWLIST)) {
+      txWithheld.push(`tokenized stocks are not offered in ${country} (allow-list ${STOCK_COUNTRY_ALLOWLIST.version})`);
+    }
+    if (txWithheld.length === 0) {
+      const pools = await routePools(routeHops(tokenIn, tokenOut, best)).catch(() => null);
+      if (!pools) txWithheld.push('route pools could not be resolved for the transfer-policy check');
+      else {
+        const side: 'buy' | 'sell' = tokenOut.assetClass === 'tokenized-stock' ? 'buy' : 'sell';
+        const reason = await stockTransferPolicyReason(stock, recipient, side, side === 'buy' ? pools[pools.length - 1] : pools[0]);
+        if (reason) txWithheld.push(reason);
+      }
+    }
+  }
+
+  if (recipient) {
     // Balance and allowance in one call. A failed read is not a pass.
     let balance: bigint | null = null;
     let allowance: bigint | null = tokenIn.native ? 0n : null;
@@ -566,12 +727,35 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     }
     if (balance !== null && balance < amountInRaw) txWithheld.push(`wallet holds less ${tokenIn.symbol} than the amount to swap`);
 
+    if (allowance !== null && !tokenIn.native) allowanceRaw = allowance.toString();
     if (txWithheld.length === 0 && balance !== null && allowance !== null) {
       const needsApproval = !tokenIn.native && allowance < amountInRaw;
-      const swap = buildSwapTx({ tokenIn, tokenOut, route: best, amountIn: amountInRaw, minOut: minOutRaw, recipient, deadline });
+      const revoke = !tokenIn.native && allowance > 0n ? buildRevokeTx(getAddress(tokenIn.address)) : null;
       if (needsApproval) {
-        simulation.reason = 'approval pending: the router cannot pull the token yet; the quoter already ran the pool math for this exact size';
+        // No swap calldata yet: the real state cannot execute it. But the human
+        // is about to pay for an approval, so the swap is simulated with the
+        // allowance overridden in state (transferFrom + B20 policies + pool).
+        // A revert here withholds the approval too. The client still signs
+        // the approval, waits for the receipt and re-quotes for live calldata.
+        const preview = buildSwapTx({ tokenIn, tokenOut, route: best, amountIn: amountInRaw, minOut: minOutRaw, recipient, deadline });
+        const pre = await simulateWithAllowanceOverride(getAddress(tokenIn.address), recipient, amountInRaw, preview);
+        if (pre === null) {
+          simulation.reason = 'approval pending: allowance-override simulation unavailable for this token; the swap is simulated again after the approval mines';
+        } else if (pre.ok) {
+          simulation.ran = true;
+          simulation.ok = true;
+          simulation.reason = 'simulated with the allowance overridden; re-quote after the approval mines for live calldata';
+        } else {
+          simulation.ran = true;
+          simulation.ok = false;
+          simulation.reason = pre.reason;
+          txWithheld.push(`swap would revert even with the allowance in place: ${pre.reason}`);
+        }
+        if (txWithheld.length === 0) {
+          tx = { chainId: BASE_SWAP_CHAIN_ID, approve: buildApproveTx(getAddress(tokenIn.address), amountInRaw), swap: null, calldataHash: null, revoke, deadline };
+        }
       } else {
+        const swap = buildSwapTx({ tokenIn, tokenOut, route: best, amountIn: amountInRaw, minOut: minOutRaw, recipient, deadline });
         simulation.ran = true;
         try {
           await c.call({ account: recipient, to: swap.to, data: swap.data, value: BigInt(swap.value) });
@@ -583,14 +767,9 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
           simulation.reason = msg;
           txWithheld.push(`swap simulation reverted: ${msg}`);
         }
-      }
-      if (txWithheld.length === 0) {
-        tx = {
-          chainId: BASE_SWAP_CHAIN_ID,
-          approve: needsApproval ? buildApproveTx(getAddress(tokenIn.address), amountInRaw) : null,
-          swap,
-          deadline,
-        };
+        if (txWithheld.length === 0) {
+          tx = { chainId: BASE_SWAP_CHAIN_ID, approve: null, swap, calldataHash: keccak256(swap.data), revoke, deadline };
+        }
       }
     }
   }
@@ -621,6 +800,7 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     alternatives: routes.slice(1, 4).map((r) => ({ description: r.description, amountOut: formatUnits(r.amountOut, tokenOut.decimals) })),
     recipient,
     tx,
+    allowanceRaw,
     simulation,
     txWithheld: Array.from(new Set(txWithheld)),
     warnings,
@@ -634,7 +814,11 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
 export interface TradeExecutionPayload {
   needsApproval: boolean;
   approveTx?: BuiltTx;
-  swapTx: BuiltTx;
+  /** Absent while an approval is pending: re-quote after the approval receipt. */
+  swapTx?: BuiltTx;
+  calldataHash?: Hex;
+  /** approve(router, 0), offered whenever an allowance exists. */
+  revokeTx?: BuiltTx;
   quote: { fromToken: string; toToken: string; fromAmount: string; fromAmountRaw: string; toAmount: string; minReceived: string; minReceivedRaw: string };
   disclosure: {
     chainId: number;
@@ -647,6 +831,8 @@ export interface TradeExecutionPayload {
     priceImpactPct: number | null;
     deadline: number;
     simulated: boolean;
+    /** Present for tokenized-stock legs. */
+    stockReference?: StockReferenceView | null;
     note: string;
   };
 }
@@ -656,7 +842,9 @@ export function toTradeExecution(q: BaseSwapQuote): TradeExecutionPayload | null
   return {
     needsApproval: Boolean(q.tx.approve),
     approveTx: q.tx.approve ? { to: q.tx.approve.to, data: q.tx.approve.data, value: q.tx.approve.value } : undefined,
-    swapTx: q.tx.swap,
+    swapTx: q.tx.swap ?? undefined,
+    calldataHash: q.tx.calldataHash ?? undefined,
+    revokeTx: q.tx.revoke ? { to: q.tx.revoke.to, data: q.tx.revoke.data, value: q.tx.revoke.value } : undefined,
     quote: { fromToken: q.tokenIn.symbol, toToken: q.tokenOut.symbol, fromAmount: q.amountIn, fromAmountRaw: q.amountInRaw, toAmount: q.amountOut, minReceived: q.minAmountOut, minReceivedRaw: q.minAmountOutRaw },
     disclosure: {
       chainId: q.chainId,
@@ -669,6 +857,7 @@ export function toTradeExecution(q: BaseSwapQuote): TradeExecutionPayload | null
       priceImpactPct: q.priceImpactPct,
       deadline: q.deadline,
       simulated: q.simulation.ran && q.simulation.ok === true,
+      stockReference: q.stockReference,
       note: 'Router and quoter are pinned Uniswap deployments. Approval is exact, but can remain if the swap is abandoned or reverts. Bobby never signs for you.',
     },
   };

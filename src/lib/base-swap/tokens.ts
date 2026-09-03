@@ -54,7 +54,7 @@ export const BASE_SWAP_TOKENS: readonly BaseSwapToken[] = [
   {
     symbol: 'GOOGLc', name: 'Coinbase Tokenized Alphabet',
     address: '0xb2000000000000000000002D0BA3164cc74f58B7', decimals: 8,
-    aliases: ['GOOGL'], assetClass: 'tokenized-stock', underlyingSymbol: 'GOOGL',
+    aliases: ['GOOGL', 'GOOG'], assetClass: 'tokenized-stock', underlyingSymbol: 'GOOGL',
     issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x5bF49E0ffA937CE2FfF033c739aD7C634c4D34F2', maxTicketUsd: 100,
   },
   {
@@ -100,6 +100,33 @@ export function findBaseToken(ref: string | null | undefined): BaseSwapToken | n
   if (!raw) return null;
   if (/^0x[0-9a-fA-F]{40}$/.test(raw)) return BY_ADDRESS.get(raw.toLowerCase()) ?? null;
   return BY_SYMBOL.get(raw.toUpperCase()) ?? null;
+}
+
+/**
+ * Where Coinbase tokenized stocks may be offered by Bobby. FAIL-CLOSED: a
+ * viewer whose edge country is not on this list gets quotes but never
+ * calldata. Coinbase excludes US persons and "other restricted
+ * jurisdictions"; this list is Bobby's own, narrower, and must be validated
+ * by counsel before it grows. Version it on every change. The env brake
+ * BASE_STOCK_COUNTRY_ALLOWLIST may only NARROW it (intersection), never widen.
+ * IP country is a gate, not proof of residence — the human's attestation is
+ * the other gate, and neither replaces KYC where the issuer requires it.
+ */
+export const STOCK_COUNTRY_ALLOWLIST = {
+  version: '2026-09-03-draft-pending-legal-review',
+  countries: ['MX'] as readonly string[],
+} as const;
+
+export function stockCountryAllowed(country: string | null | undefined, envList?: string | null): boolean {
+  const c = (country || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(c)) return false;
+  if (!STOCK_COUNTRY_ALLOWLIST.countries.includes(c)) return false;
+  const narrow = (envList || '').split(',').map((x) => x.trim().toUpperCase()).filter((x) => /^[A-Z]{2}$/.test(x));
+  return narrow.length ? narrow.includes(c) : true;
+}
+
+export function isStockToken(t: BaseSwapToken | null | undefined): boolean {
+  return t?.assetClass === 'tokenized-stock';
 }
 
 /** Symbols the UI may offer, in display order. */

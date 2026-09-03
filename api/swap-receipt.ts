@@ -1,103 +1,70 @@
-// Verified Base swap receipts shared by web and iOS.
-// The client submits only a tx hash plus the quote it displayed. The server
-// re-reads Base, verifies sender/router/calldata/status, then persists.
+// ============================================================
+// /api/swap-receipt — verified Base swap receipts, one history for web + iOS.
+//
+//   GET                       → this identity's confirmed swaps (wallet
+//                               session or Supabase bearer, see user-identity)
+//   POST { txHash, wallet }   → verifies the broadcast swap against Base and
+//                               records it. The client never tells the server
+//                               what happened; the chain does. Session-bound:
+//                               the wallet in the body must be the session's
+//                               and must be the transaction sender.
+//   200 { ok:true, verification, receipt }   verified and recorded (or already)
+//   202 { ok:false, pending:true }           not mined yet — retry
+//   409                                      calldata Bobby never built, or hash conflict
+//   422                                      on-chain checks failed (sender/target/status/output)
+//   503                                      verified on-chain but the database is unavailable
+// ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { getAddress, type Address, type Hex } from 'viem';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { BASE_SWAP_CHAIN_ID } from '../src/lib/base-swap/tokens.js';
-import { baseClient, decodeSwapTx, resolvePair, SWAP_ROUTER02 } from './_lib/base-swap.js';
-import { requireIdentity } from './_lib/user-identity.js';
+import { confirmSwapReceipt, SWAP_RECEIPTS_TABLE, verifySwapOnChain } from './_lib/swap-receipts.js';
+import { requireIdentity, resolveIdentity } from './_lib/user-identity.js';
 import { guardWrite, WALLET_RE } from './_lib/write-guard.js';
 
 export const config = { maxDuration: 20 };
 
-const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
-const UINT_RE = /^\d{1,78}$/;
-const Body = z.object({
+const Schema = z.object({
+  txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   wallet: z.string().regex(WALLET_RE),
-  txHash: z.string().regex(HASH_RE),
-  tokenIn: z.string().trim().min(1).max(64),
-  tokenOut: z.string().trim().min(1).max(64),
-  amountInRaw: z.string().regex(UINT_RE),
-  minAmountOutRaw: z.string().regex(UINT_RE),
+  platform: z.enum(['web', 'ios']).optional(),
 });
-
-function addressEq(a: unknown, b: Address): boolean {
-  return typeof a === 'string' && a.toLowerCase() === b.toLowerCase();
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const identity = await requireIdentity(req, res);
     if (!identity) return;
     const filters = identity.wallet
-      ? `or=(identity_id.eq.${identity.id},wallet_address.eq.${identity.wallet})`
+      ? `or=(identity_id.eq.${identity.id},wallet_address.eq.${identity.wallet.toLowerCase()})`
       : `identity_id=eq.${identity.id}`;
-    const r = await fetch(bobbyRest(`bobby_swap_receipts?${filters}&order=block_timestamp.desc&limit=100&select=*`), { headers: bobbyServiceHeaders() });
+    const r = await fetch(bobbyRest(`${SWAP_RECEIPTS_TABLE}?${filters}&status=eq.confirmed&order=confirmed_at.desc&limit=100&select=id,wallet_address,chain_id,engine,router_address,token_in_symbol,token_out_symbol,token_in_address,token_out_address,amount_in_raw,quoted_out_raw,min_amount_out_raw,amount_out_raw,route,tx_hash,block_number,block_timestamp,platform,confirmed_at`), { headers: bobbyServiceHeaders() });
     if (!r.ok) return res.status(502).json({ error: 'Could not read swap history' });
     return res.status(200).json({ ok: true, receipts: await r.json() });
   }
 
   const guarded = await guardWrite(req, res, {
-    methods: ['POST'], scope: 'swap-receipt', schema: Body,
-    perIp: { limit: 30, windowSec: 600 },
-    perSubject: { key: (_body, wallet) => wallet, limit: 60, windowSec: 3600 },
+    methods: ['POST'],
+    scope: 'swap-receipt',
+    schema: Schema,
+    perIp: { limit: 60, windowSec: 600 },
+    perSubject: { key: (_b, wallet) => wallet, limit: 60, windowSec: 3600 },
   });
   if (!guarded) return;
-  const identity = await requireIdentity(req, res);
-  if (!identity || !guarded.wallet) return;
-  const body = guarded.body;
+  const wallet = (guarded.wallet ?? guarded.body.wallet) as `0x${string}`;
+  const txHash = guarded.body.txHash as `0x${string}`;
+  // Identity is attached when known (Apple / linked wallet); the wallet session alone is enough to record.
+  const identity = await resolveIdentity(req).catch(() => null);
 
-  try {
-    const { tokenIn, tokenOut } = resolvePair(body.tokenIn, body.tokenOut);
-    if (tokenIn.assetClass !== 'tokenized-stock' && tokenOut.assetClass !== 'tokenized-stock') {
-      return res.status(400).json({ error: 'Only tokenized-stock receipts are accepted here' });
-    }
-    const client = baseClient();
-    const hash = body.txHash as Hex;
-    const [tx, receipt] = await Promise.all([client.getTransaction({ hash }), client.getTransactionReceipt({ hash })]);
-    if (receipt.status !== 'success') return res.status(409).json({ error: 'Transaction did not succeed on Base' });
-    if (!addressEq(tx.from, getAddress(guarded.wallet))) return res.status(403).json({ error: 'Transaction sender does not match session wallet' });
-    if (!tx.to || !addressEq(tx.to, SWAP_ROUTER02)) return res.status(400).json({ error: 'Transaction did not target the pinned Uniswap router' });
-
-    const decoded = decodeSwapTx(tx.input);
-    const swapCall = decoded.calls.find((call) => call.functionName === 'exactInputSingle');
-    if (!swapCall) return res.status(400).json({ error: 'Unsupported swap calldata shape' });
-    const params = swapCall.args[0] as { tokenIn?: Address; tokenOut?: Address; recipient?: Address; amountIn?: bigint; amountOutMinimum?: bigint };
-    if (!addressEq(params.tokenIn, getAddress(tokenIn.address)) || !addressEq(params.tokenOut, getAddress(tokenOut.address))) {
-      return res.status(400).json({ error: 'Onchain token pair does not match the displayed quote' });
-    }
-    if (!addressEq(params.recipient, getAddress(guarded.wallet))) return res.status(400).json({ error: 'Swap recipient does not match session wallet' });
-    if (params.amountIn !== BigInt(body.amountInRaw) || params.amountOutMinimum !== BigInt(body.minAmountOutRaw)) {
-      return res.status(400).json({ error: 'Onchain amounts do not match the displayed quote' });
-    }
-    if (Number(tx.chainId) !== BASE_SWAP_CHAIN_ID) return res.status(400).json({ error: 'Wrong chain' });
-    const block = await client.getBlock({ blockNumber: receipt.blockNumber });
-    const row = {
-      identity_id: identity.id,
-      wallet_address: guarded.wallet,
-      chain_id: BASE_SWAP_CHAIN_ID,
-      tx_hash: hash.toLowerCase(),
-      router_address: SWAP_ROUTER02.toLowerCase(),
-      token_in_address: tokenIn.address.toLowerCase(),
-      token_out_address: tokenOut.address.toLowerCase(),
-      token_in_symbol: tokenIn.symbol,
-      token_out_symbol: tokenOut.symbol,
-      amount_in_raw: body.amountInRaw,
-      min_amount_out_raw: body.minAmountOutRaw,
-      block_number: receipt.blockNumber.toString(),
-      block_timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
-      platform: 'web',
-    };
-    const stored = await fetch(bobbyRest('bobby_swap_receipts?on_conflict=chain_id,tx_hash&select=id,tx_hash,block_timestamp'), {
-      method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=representation' }), body: JSON.stringify(row),
-    });
-    if (!stored.ok) throw new Error(`database returned ${stored.status}`);
-    return res.status(200).json({ ok: true, receipt: ((await stored.json()) as unknown[])[0] });
-  } catch (error) {
-    console.error('[swap-receipt]', error);
-    return res.status(502).json({ error: 'Could not verify and store swap receipt' });
+  const verification = await verifySwapOnChain(txHash, wallet);
+  if (!verification.ok && verification.reason === 'pending') {
+    return res.status(202).json({ ok: false, pending: true, txHash });
   }
+  if (!verification.ok) {
+    return res.status(422).json({ ok: false, error: verification.reason, verification });
+  }
+  const receipt = await confirmSwapReceipt(verification, wallet, { identityId: identity?.id ?? null, platform: guarded.body.platform });
+  if (receipt.outcome === 'unbuilt') return res.status(409).json({ ok: false, error: 'This calldata was not built by Bobby for this wallet', verification });
+  if (receipt.outcome === 'conflict') return res.status(409).json({ ok: false, error: 'This calldata was already confirmed with a different transaction', verification });
+  if (receipt.outcome === 'db_error') return res.status(503).json({ ok: false, error: 'Receipt could not be recorded; the swap itself is verified on-chain', verification });
+  return res.status(200).json({ ok: true, verification, receipt });
 }

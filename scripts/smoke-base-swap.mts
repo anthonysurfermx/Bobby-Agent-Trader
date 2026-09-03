@@ -25,24 +25,46 @@ const pairs: Array<[string, string, string]> = [
 for (const [tokenIn, tokenOut, amount] of pairs) {
   const q = await quoteBaseSwap({ tokenIn, tokenOut, amount });
   assert.ok(Number(q.amountOut) > 0, `${tokenIn}→${tokenOut}: no output`);
-  assert.ok(q.priceImpactPct !== null && q.priceImpactPct < 1, `${tokenIn}→${tokenOut}: impact ${q.priceImpactPct}`);
+  // Impact includes the pool fee: GOOGLc's deepest pool is the 1% tier, so allow fee + 0.5%.
+  assert.ok(q.priceImpactPct !== null && q.priceImpactPct < q.route.fees[0] / 10_000 + 0.5, `${tokenIn}→${tokenOut}: impact ${q.priceImpactPct}`);
   assert.ok(q.stockReference && q.stockReference.usdPrice > 0, `${tokenOut}: missing official stock reference`);
   assert.ok(q.route.kind === 'single', `${tokenOut}: tokenized stock must not route through WETH`);
   console.log(`${tokenIn} ${amount} → ${tokenOut} ${q.amountOut} via ${q.route.description}  impact ${q.priceImpactPct?.toFixed(3)}%  usd ${q.usdValue?.toFixed(2)}  withheld=${JSON.stringify(q.txWithheld)}`);
 }
 
+// The rail still serves allow-listed crypto (agent bridge and MCP quotes); one pair keeps that path honest.
+{
+  const q = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'cbBTC', amount: '25' });
+  assert.ok(Number(q.amountOut) > 0 && q.priceImpactPct !== null && q.priceImpactPct < 1, 'USDC→cbBTC quote');
+  console.log(`USDC 25 → cbBTC ${q.amountOut} via ${q.route.description}  impact ${q.priceImpactPct?.toFixed(3)}%`);
+}
+
+// Stock gates: attestation AND edge country, both required for calldata.
+{
+  const us = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: empty, stockEligibilityConfirmed: true, country: 'US' });
+  assert.ok(us.txWithheld.some((w) => w.includes('US persons')), 'US viewers get no stock calldata');
+  assert.equal(us.tx, null);
+  const nowhere = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: empty, stockEligibilityConfirmed: true });
+  assert.ok(nowhere.txWithheld.some((w) => w.includes('country unavailable')), 'unknown country gets no stock calldata');
+  const ref = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20' });
+  assert.ok(ref.stockReference && ref.stockReference.transferPaused === false, 'transfer pause flag read');
+  const ar = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: empty, stockEligibilityConfirmed: true, country: 'AR' });
+  assert.ok(ar.txWithheld.some((w) => w.includes('not offered in AR')), 'countries outside the allow-list get no stock calldata');
+  console.log(`stock gates: US refused, unknown country refused, AR (not allow-listed) refused; NVDAc pausedFeatures=${ref.stockReference!.pausedFeatures} transferPaused=${ref.stockReference!.transferPaused}`);
+}
+
 // Ticket cap: fail closed above the limit.
-const big = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '101', recipient: empty, stockEligibilityConfirmed: true });
+const big = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '101', recipient: empty, stockEligibilityConfirmed: true, country: 'MX' });
 assert.ok(big.txWithheld.some((w) => w.includes('per-trade limit')), 'ticket cap must withhold calldata');
 assert.equal(big.tx, null);
-const noEligibility = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '5', recipient: empty });
+const noEligibility = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '5', recipient: empty, country: 'MX' });
 assert.ok(noEligibility.txWithheld.some((w) => w.includes('eligibility')), 'stock calldata requires an explicit eligibility confirmation');
 
 if (wallet) {
-  const q = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '5', recipient: wallet, stockEligibilityConfirmed: true });
+  const q = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '5', recipient: wallet, stockEligibilityConfirmed: true, country: 'MX' });
   console.log('with wallet', { withheld: q.txWithheld, simulation: q.simulation, needsApproval: Boolean(q.tx?.approve), hasSwap: Boolean(q.tx?.swap) });
 } else {
-  const q = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '5', recipient: empty, stockEligibilityConfirmed: true });
+  const q = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '5', recipient: empty, stockEligibilityConfirmed: true, country: 'MX' });
   assert.ok(q.txWithheld.some((w) => w.includes('holds less')), 'empty wallet must be refused before any approval');
   assert.equal(q.tx, null);
   console.log('empty wallet refused as expected:', q.txWithheld);
