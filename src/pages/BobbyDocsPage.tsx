@@ -85,14 +85,10 @@ function SectionLabel({ icon: Icon, label, right }: { icon: React.ElementType; l
   );
 }
 
-function Badge({ type }: { type: 'free' | 'x402' }) {
-  return type === 'free' ? (
+function Badge() {
+  return (
     <span className="font-mono text-[9px] px-2 py-0.5 rounded-full bg-[#0052ff]/20 text-[#7da6ff] border border-[#0052ff]/40 tracking-[0.15em]">
-      FREE
-    </span>
-  ) : (
-    <span className="font-mono text-[9px] px-2 py-0.5 rounded-full bg-[#ffb95f]/10 text-[#ffb95f] border border-[#ffb95f]/20 tracking-[0.15em]">
-      x402
+      PUBLIC
     </span>
   );
 }
@@ -120,29 +116,21 @@ const TOOL_ICONS: Record<string, React.ElementType> = {
   bobby_debate: MessageSquare,
   bobby_security_scan: AlertTriangle,
   bobby_wallet_portfolio: Wallet,
-  bobby_asset_search: Search,
-  bobby_conviction_oracle: Lock,
+  bobby_wallet_balance: Wallet,
 };
 
-const FREE_TOOLS = [
+const PUBLIC_TOOLS = [
+  { name: 'bobby_analyze', desc: 'Full multi-source market analysis with AI synthesis' },
+  { name: 'bobby_debate', desc: '3-agent adversarial debate (Alpha Hunter vs Red Team vs CIO)' },
   { name: 'bobby_stats', desc: 'Track record, win rate, PnL — live performance metrics' },
   { name: 'bobby_ta', desc: 'Technical analysis with RSI, MACD, Bollinger Bands, SuperTrend' },
   { name: 'bobby_intel', desc: 'Full 12-source intelligence briefing in 10 seconds' },
+  { name: 'bobby_wallet_balance', desc: 'Read-only balance for a Base wallet' },
+  { name: 'bobby_wallet_portfolio', desc: 'Read-only portfolio breakdown and analysis' },
+  { name: 'bobby_security_scan', desc: 'Token contract safety audit and risk scoring' },
   { name: 'bobby_dex_trending', desc: 'Trending tokens on-chain across DEXs' },
   { name: 'bobby_dex_signals', desc: 'Whale and KOL buy/sell signals' },
   { name: 'bobby_uniswap_quote', desc: 'Uniswap V3 quote on Base from Bobby\'s own quoter call' },
-];
-
-const PREMIUM_TOOLS = [
-  { name: 'bobby_analyze', desc: 'Full multi-source market analysis with AI synthesis' },
-  { name: 'bobby_debate', desc: '3-agent adversarial debate (Alpha Hunter vs Red Team vs CIO)' },
-  { name: 'bobby_security_scan', desc: 'Token contract safety audit and risk scoring' },
-  { name: 'bobby_wallet_portfolio', desc: 'Multi-chain portfolio breakdown and analysis' },
-];
-
-const UTILITY_TOOLS = [
-  { name: 'bobby_asset_search', desc: 'Universal search: crypto, stocks, commodities, forex' },
-  { name: 'bobby_conviction_oracle', desc: 'Read on-chain conviction data from Solidity' },
 ];
 
 // --------------- Animation Variants ---------------
@@ -168,7 +156,7 @@ const cardItem = {
 
 // --------------- Tool Card ---------------
 
-function ToolCard({ name, desc, free }: { name: string; desc: string; free: boolean }) {
+function ToolCard({ name, desc }: { name: string; desc: string }) {
   const Icon = TOOL_ICONS[name] || Cpu;
   return (
     <motion.div variants={cardItem}>
@@ -179,7 +167,7 @@ function ToolCard({ name, desc, free }: { name: string; desc: string; free: bool
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
-              <Badge type={free ? 'free' : 'x402'} />
+              <Badge />
               <span className="font-mono text-xs text-white/85 font-bold truncate">{name}</span>
             </div>
             <p className="text-xs text-white/60 leading-6">{desc}</p>
@@ -281,11 +269,11 @@ export default function BobbyDocsPage() {
           {/* ===== 3. MCP TOOLS GRID ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
-              <SectionLabel icon={Cpu} label="12 MCP tools" right="24 active endpoints" />
+              <SectionLabel icon={Cpu} label="11 public MCP tools" right="live schema via tools/list" />
 
-              {/* Free Tools */}
+              {/* Public tools */}
               <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-3">
-                Free tools ({FREE_TOOLS.length})
+                Public tools ({PUBLIC_TOOLS.length})
               </div>
               <motion.div
                 variants={stagger}
@@ -294,40 +282,8 @@ export default function BobbyDocsPage() {
                 viewport={{ once: true }}
                 className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-6"
               >
-                {FREE_TOOLS.map(t => (
-                  <ToolCard key={t.name} name={t.name} desc={t.desc} free />
-                ))}
-              </motion.div>
-
-              {/* Premium Tools */}
-              <div className="font-mono text-[10px] text-[#ffb95f]/70 tracking-[0.18em] uppercase mb-3">
-                Premium tools ({PREMIUM_TOOLS.length})
-              </div>
-              <motion.div
-                variants={stagger}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-6"
-              >
-                {PREMIUM_TOOLS.map(t => (
-                  <ToolCard key={t.name} name={t.name} desc={t.desc} free={false} />
-                ))}
-              </motion.div>
-
-              {/* Utility */}
-              <div className="font-mono text-[10px] text-white/40 tracking-[0.18em] uppercase mb-3">
-                Utility ({UTILITY_TOOLS.length})
-              </div>
-              <motion.div
-                variants={stagger}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-2.5"
-              >
-                {UTILITY_TOOLS.map(t => (
-                  <ToolCard key={t.name} name={t.name} desc={t.desc} free />
+                {PUBLIC_TOOLS.map(t => (
+                  <ToolCard key={t.name} name={t.name} desc={t.desc} />
                 ))}
               </motion.div>
             </GlassCard>
