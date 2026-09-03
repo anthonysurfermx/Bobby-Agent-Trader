@@ -53,7 +53,19 @@ the next one runs at 12:00 UTC on the new database.
 `GATE PASSED` — **183/183** (policy matrix incl. the 8 new tables, canaries, legitimate path
 through the API). Evidence: `evidence/2026-09-03-gate-passed-production-7f4bdcb.txt`.
 
+## 5. iOS login (branch `ios/apple-login`, d1d2dd3)
+Anthony enabled the Apple provider on the `bobby-protocol` Auth (client id
+`xyz.bobbyprotocol.bobby`, no OAuth secret — native only, users without email allowed)
+and the App ID capability. The app now has: `AccountSession` (native Sign in with Apple
+with nonce → `auth/v1/token?grant_type=id_token` → Keychain, refresh on demand),
+`ProgressSync` (every award queued on the phone, reported to `/api/progress` with the
+access token, server state applied back, first sync claims pre-sign-in XP),
+`AccountSheet` from the desk menu ("Save progress"). Entitlement
+`com.apple.developer.applesignin` added via project.yml. Builds on Xcode 26.1.1;
+the sheet and the Apple button verified in the iPhone 17 Pro simulator. The real
+Apple round trip needs a device with an Apple ID (TestFlight build 13) — the
+Supabase side answers correctly to the provider (validation error on a bogus token,
+not "provider disabled").
+
 ## Open
-- iOS: enable Sign in with Apple in Supabase Auth (dashboard) and point the app's
-  progress sync at `/api/progress` with the access token.
 - Trader Land UI wiring and `art_url` (other session).
