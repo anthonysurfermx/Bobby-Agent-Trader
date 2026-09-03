@@ -365,6 +365,10 @@ export function MarketCanvas({
         const computed = analyzeCandles(rows);
         ema20Ref.current?.setData(computed.ema20Series as never);
         ema50Ref.current?.setData(computed.ema50Series as never);
+        // A wide desktop can otherwise leave the series pinned to the right
+        // with a large empty area on the left. Fit the complete dataset after
+        // every successful refresh so price action uses the available canvas.
+        requestAnimationFrame(() => chartRef.current?.timeScale().fitContent());
         setAnalysis(computed);
 
         const first = rows[0];

@@ -5,6 +5,7 @@
 // explore board, risk notice. Bobby never executes anything.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { Globe, Grid2x2, Lock, Map as MapIcon, Mic, MicOff, MoreHorizontal, RotateCcw, Share2, ShieldAlert, ShieldCheck, Users, Volume2, VolumeX } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
@@ -166,6 +167,7 @@ type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'cio' | 'complete' | '
 interface Msg { from: 'bobby' | 'you'; text: string }
 
 export default function CompanionDesk() {
+  const navigate = useNavigate();
   const progress = useProgress();
   const voice = useCompanionVoice();
   const companion = getCompanion(progress.companionId) ?? COMPANIONS[1];
@@ -194,6 +196,7 @@ export default function CompanionDesk() {
   const [speakEnabled, setSpeakEnabled] = useState(true);
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const booted = useRef(false);
 
   const say = useCallback((text: string, essential = true) => {
@@ -339,16 +342,21 @@ export default function CompanionDesk() {
   };
 
   const statusLabel = listening ? t('LISTENING', 'ESCUCHANDO') : voice.speaking ? t('SPEAKING', 'BOBBY HABLA') : ({ idle: t('DESK ONLINE', 'DESK ONLINE'), resolving: t('LINKING ASSET', 'ENLAZANDO ACTIVO'), alpha: 'ALPHA HUNTER', redTeam: 'RED TEAM', cio: 'CIO', complete: t('VERDICT READY', 'VEREDICTO LISTO'), error: t('INCOMPLETE LINK', 'ENLACE INCOMPLETO'), confirm: t('CONFIRM ASSET', 'CONFIRMA EL ACTIVO') } as Record<Phase, string>)[phase];
-  const statusHint = voice.speaking ? t('Your companion reacts to the voice in real time', 'Tu companion reacciona a la voz en tiempo real') : phase === 'idle' ? t('Tap your companion and name an asset', 'Toca a tu companion y nombra un activo') : phase === 'complete' ? t('Market, levels and thesis in sync', 'Mercado, niveles y tesis en sincronía') : phase === 'error' ? t('Try the name or the ticker', 'Prueba con el nombre o ticker') : '';
+  const statusHint = voice.speaking ? t('Your companion reacts to the voice in real time', 'Tu companion reacciona a la voz en tiempo real') : phase === 'idle' ? t('Type or name an asset to begin', 'Escribe o di un activo para empezar') : phase === 'complete' ? t('Market, levels and thesis in sync', 'Mercado, niveles y tesis en sincronía') : phase === 'error' ? t('Try the name or the ticker', 'Prueba con el nombre o ticker') : '';
   const mascotState = listening ? 'listening' : voice.speaking ? 'speaking' : ['alpha', 'redTeam', 'cio', 'resolving'].includes(phase) ? 'thinking' : 'idle';
   const canDictate = typeof window !== 'undefined' && (('SpeechRecognition' in window) || ('webkitSpeechRecognition' in window));
+  const isWorking = ['resolving', 'alpha', 'redTeam', 'cio'].includes(phase);
+  const openTraderLand = useCallback(() => {
+    sfxTock();
+    navigate('/trader-land');
+  }, [navigate]);
 
   const chart = useMemo(() => buildChart(series, answer), [series, answer]);
 
   // Worn gear (pieces still in the loot queue are not worn yet — they fly on
   // when the human taps EQUIP IT) plus the pet at the feet.
   const desktop = useMediaQuery('(min-width: 1024px)');
-  const mascotSize = desktop ? 400 : 260;
+  const mascotSize = desktop ? 340 : 260;
   const [chartSymbol, setChartSymbol] = useState('BTC');
   const [chartTimeframe, setChartTimeframe] = useState<Timeframe>('15m');
   useEffect(() => { if (snapshot?.symbol) setChartSymbol(snapshot.symbol); }, [snapshot?.symbol]);
@@ -407,7 +415,7 @@ export default function CompanionDesk() {
                   {[
                     { icon: <Grid2x2 size={14} />, label: t('Explore markets', 'Explorar mercados'), act: () => setSheet('board') },
                     { icon: <Users size={14} />, label: t('My squad', 'Mi squad'), act: () => setSheet('squad') },
-                    { icon: <MapIcon size={14} />, label: t('Trader Land · soon', 'Trader Land · pronto'), act: () => setSheet('world') },
+                    { icon: <MapIcon size={14} />, label: 'Trader Land', act: openTraderLand },
                     { icon: <Share2 size={14} />, label: t('Share my skin', 'Compartir mi skin'), act: () => void shareSkin() },
                     { icon: <ShieldAlert size={14} />, label: t('Risk notice', 'Aviso de riesgo'), act: () => setSheet('risk') },
                     { icon: <Globe size={14} />, label: isSpanish() ? 'English' : 'Español', act: () => { try { localStorage.setItem('bobby_lang', isSpanish() ? 'en' : 'es'); } catch { /* private mode */ } window.location.reload(); } },
@@ -445,7 +453,7 @@ export default function CompanionDesk() {
           <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor]" />{statusLabel}
         </div>
         <div className="text-[10px] font-mono text-white/45 mt-1 min-h-[16px]">{statusHint}</div>
-        <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={() => { sfxTock(); setSheet('world'); }} /></div>
+        <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={openTraderLand} /></div>
       </div>
     </>
   );
@@ -559,9 +567,9 @@ export default function CompanionDesk() {
       {/* composer */}
       <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-transparent p-4">
         <div className="mx-auto max-w-2xl flex gap-2">
-          <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about BTC, NVDA, gold…', 'Pregunta por BTC, NVDA, oro…')} className="flex-1 rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none focus:border-sky-400/50" />
+          <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Asset to analyze', 'Activo a analizar')} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about BTC, NVDA, gold…', 'Pregunta por BTC, NVDA, oro…')} className="flex-1 rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none focus:border-sky-400/50" />
           {canDictate && <button type="button" onClick={toggleDictation} className={`h-12 w-12 rounded-xl flex items-center justify-center ${listening ? 'bg-red-400 text-black' : 'bg-sky-500 text-white'}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>}
-          <button type="submit" className="h-12 px-4 rounded-xl bg-green-400 text-black font-mono text-xs tracking-[0.15em]">{t('ASK', 'PREGUNTA')}</button>
+          <button type="submit" disabled={!input.trim() || isWorking} className="h-12 px-4 rounded-xl bg-green-400 text-black font-mono text-xs tracking-[0.15em] disabled:cursor-not-allowed disabled:opacity-40">{isWorking ? t('ANALYZING', 'ANALIZANDO') : t('ASK', 'PREGUNTA')}</button>
         </div>
       </form>
     </>
@@ -573,7 +581,7 @@ export default function CompanionDesk() {
     return (
       <div className="flex min-h-[calc(100vh-80px)] flex-col text-white">
         <div className="border-b border-white/10 px-6 py-3">{headerNode}</div>
-        <div className="grid min-h-0 flex-1 grid-cols-2">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(340px,0.78fr)_minmax(0,1.22fr)]">
           {/* companion side */}
           <section className="relative flex min-h-0 flex-col items-center justify-center overflow-hidden px-5 py-6" style={{ background: `radial-gradient(circle at 50% 45%, ${tintFor(companion, 0.12)}, transparent 62%)` }}>
             <div className="absolute left-4 top-4 z-20 flex flex-col gap-2">
@@ -603,18 +611,32 @@ export default function CompanionDesk() {
         <div className="text-[10px] font-mono text-white/45 mt-1 min-h-[16px]">{statusHint}</div>
             </div>
             <div className="relative mt-5 flex shrink-0 flex-col items-center gap-2">
-              <button type="button" onClick={canDictate ? toggleDictation : () => document.querySelector<HTMLInputElement>('input[data-desk-input]')?.focus()} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Tap to talk', 'Toca para hablar')} className={`relative grid h-14 w-14 place-items-center rounded-full transition ${listening ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)]' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff]'}`}>
+              <button type="button" onClick={canDictate ? toggleDictation : () => inputRef.current?.focus()} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Tap to talk', 'Toca para hablar')} className={`relative grid h-14 w-14 place-items-center rounded-full transition ${listening ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)]' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff]'}`}>
                 {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               </button>
               <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">{listening ? t('LISTENING · SPEAK NORMALLY', 'ESCUCHANDO · HABLA NORMAL') : t('TAP TO ACTIVATE · analysis, not advice', 'TOCA PARA ACTIVAR · análisis, no asesoría')}</p>
             </div>
             <div className="relative mt-5">
-        <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={() => { sfxTock(); setSheet('world'); }} /></div>
+        <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={openTraderLand} /></div>
             </div>
           </section>
 
           {/* market side */}
           <section className="flex min-h-0 flex-col gap-3 border-l border-white/10 p-4">
+            <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="rounded-2xl border border-green-400/25 bg-green-400/[0.045] p-3 shadow-[0_0_36px_rgba(74,222,128,.05)]">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-green-300">{t('START HERE', 'EMPIEZA AQUÍ')}</div>
+                  <div className="mt-0.5 text-sm font-medium text-white">{t('What stock or asset do you want to understand?', '¿Qué acción o activo quieres entender?')}</div>
+                </div>
+                <span className="hidden font-mono text-[9px] uppercase tracking-[0.12em] text-white/35 xl:block">{t('You choose · Bobby analyzes · nothing executes', 'Tú eliges · Bobby analiza · nada se ejecuta')}</span>
+              </div>
+              <div className="flex gap-2">
+                <input ref={inputRef} data-desk-input autoFocus value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Asset to analyze', 'Activo a analizar')} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Try Tesla, NVDA, bitcoin…', 'Prueba Tesla, NVDA, bitcoin…')} className="min-w-0 flex-1 rounded-xl border border-white/[0.10] bg-black/35 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-green-400/60" />
+                {canDictate && <button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Name an asset by voice', 'Di un activo por voz')} className={`h-12 w-12 shrink-0 rounded-xl grid place-items-center ${listening ? 'bg-red-400 text-black' : 'border border-sky-400/30 bg-sky-500/15 text-sky-300'}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>}
+                <button type="submit" disabled={!input.trim() || isWorking} className="h-12 shrink-0 rounded-xl bg-green-400 px-5 font-mono text-xs font-bold tracking-[0.13em] text-black transition hover:bg-green-300 disabled:cursor-not-allowed disabled:opacity-40">{isWorking ? t('ANALYZING', 'ANALIZANDO') : t('ANALYZE', 'ANALIZAR')}</button>
+              </div>
+            </form>
             {!snapshot && phase !== 'confirm' && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/40">QUICK ACCESS</span>
@@ -643,10 +665,6 @@ export default function CompanionDesk() {
               )}
               {logNode}
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="flex gap-2 pt-1">
-              <input data-desk-input value={input} onChange={(e) => setInput(e.target.value)} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about BTC, NVDA, gold…', 'Pregunta por BTC, NVDA, oro…')} className="flex-1 rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none focus:border-sky-400/50" />
-              <button type="submit" className="h-12 px-5 rounded-xl bg-green-400 text-black font-mono text-xs tracking-[0.15em]">{t('ASK', 'PREGUNTA')}</button>
-            </form>
           </section>
         </div>
         <div className="flex items-center gap-3 border-t border-white/10 px-6 py-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/40"><span className="h-1.5 w-1.5 rounded-full bg-white/30" />{statusBar}</div>

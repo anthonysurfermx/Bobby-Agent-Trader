@@ -446,6 +446,14 @@ const router = createBrowserRouter(
           ),
         },
         {
+          path: 'trader-land',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <TraderLandGatePage />
+            </Suspense>
+          ),
+        },
+        {
           path: 'internal/trader-land-gate-a',
           element: (
             <Suspense fallback={<PageLoader />}>

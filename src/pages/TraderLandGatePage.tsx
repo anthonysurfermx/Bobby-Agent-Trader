@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, Minus, Plus, RotateCw, Sparkles, Undo2, Volume2, VolumeX, Waves } from 'lucide-react';
+import { ArrowLeft, LoaderCircle, Minus, Plus, RotateCw, Sparkles, Trash2, Volume2, VolumeX, Waves } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useAppKit } from '@reown/appkit/react';
+import { useBobbySession } from '@/hooks/useBobbySession';
 
 type District = 'crypto_bay' | 'evidence_mines' | 'thesis_citadel' | 'risk_reef' | 'axiom_archive';
 type PathOrientation = 'ne_sw' | 'nw_se';
@@ -25,12 +28,16 @@ type ManifestItem = {
 };
 type Manifest = { gate: string; version: number; layer_encoding: Record<string, string>; items: ManifestItem[] };
 type Placement = { uid: string; itemId: string; col: number; row: number; orientation?: PathOrientation };
-type Snapshot = { placements: Placement[]; focusLevel: number };
-type SnapshotFixture = Snapshot & {
-  version: number;
-  gridSize: number;
-  core: { itemId: string; col: number; row: number };
-  expectedPathConnectors: Record<string, Connector[]>;
+type CatalogItem = { id: string; world: string; attribution: string; kind: string; footprint_w: number; footprint_h: number; route_index: number | null; art_url: string | null };
+type WorldInventory = { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; placed: boolean; item: CatalogItem | null };
+type ApiPlacement = { id: string; inventory_id: string; x: number; y: number; rotation: number };
+type World = {
+  xp: number;
+  aura: number;
+  land: { size: number };
+  route: { index: number; total: number; complete: boolean; next: { id: string } | null };
+  inventory: WorldInventory[];
+  placements: ApiPlacement[];
 };
 
 const GRID = 8;
@@ -38,15 +45,10 @@ const TILE_W = 92;
 const TILE_H = 46;
 const ORIGIN_X = 430;
 const ORIGIN_Y = 230;
-const STORAGE_KEY = 'bobby.trader-land.runtime-v03';
 const districts: District[] = ['crypto_bay', 'evidence_mines', 'thesis_citadel', 'risk_reef', 'axiom_archive'];
 const districtNames: Record<District, string> = {
   crypto_bay: 'Crypto Bay', evidence_mines: 'Evidence Mines', thesis_citadel: 'Thesis Citadel',
   risk_reef: 'Risk Reef', axiom_archive: 'Axiom Archive',
-};
-const fallbackSnapshot: SnapshotFixture = {
-  version: 1, gridSize: GRID, focusLevel: 1, core: { itemId: 'aura_core', col: 3, row: 3 },
-  placements: [], expectedPathConnectors: {},
 };
 
 function iso(col: number, row: number) {
@@ -194,18 +196,15 @@ function pretty(value: string) {
 export default function TraderLandGatePage() {
   const scroller = useRef<HTMLDivElement>(null);
   const [manifest, setManifest] = useState<Manifest | null>(null);
-  const [fixture, setFixture] = useState<SnapshotFixture | null>(null);
   const [loadError, setLoadError] = useState('');
-  const [placements, setPlacements] = useState<Placement[]>([]);
-  const [focusLevel, setFocusLevel] = useState(1);
-  const [history, setHistory] = useState<Snapshot[]>([]);
+  const [world, setWorld] = useState<World | null>(null);
+  const [busy, setBusy] = useState(false);
   const [district, setDistrict] = useState<District>('crypto_bay');
-  const [selectedId, setSelectedId] = useState('crypto_bay_data_dock');
+  const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<PathOrientation>('ne_sw');
-  const [seed, setSeed] = useState(false);
   const [hovered, setHovered] = useState<{ col: number; row: number } | null>(null);
-  const [notice, setNotice] = useState('Choose a blueprint, then tap a revealed tile.');
+  const [notice, setNotice] = useState('Choose an unlocked piece, then tap a free tile.');
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [corePulse, setCorePulse] = useState(0);
@@ -214,33 +213,50 @@ export default function TraderLandGatePage() {
   const gesture = useRef<{ distance: number; midpoint: { x: number; y: number } } | null>(null);
   const dragged = useRef(false);
   const { enabled: soundEnabled, toggle: toggleSound, cue } = useLandSound();
+  const { wallet, ready, ensureSession, headers } = useBobbySession({ auto: false });
+  const { open } = useAppKit();
 
   useEffect(() => {
-    Promise.all([
-      fetch('/land/v1/gate-A/asset-manifest.json'),
-      fetch('/land/v1/world-snapshot-v01.json'),
-    ])
-      .then(async ([manifestResponse, fixtureResponse]) => {
-        if (!manifestResponse.ok || !fixtureResponse.ok) throw new Error('Runtime fixture unavailable');
-        return [await manifestResponse.json() as Manifest, await fixtureResponse.json() as SnapshotFixture] as const;
+    fetch('/land/v1/gate-A/asset-manifest.json')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Art manifest unavailable');
+        return response.json() as Promise<Manifest>;
       })
-      .then(([manifestValue, fixtureValue]) => {
-        if (!manifestValue.layer_encoding || manifestValue.items.length < 27 || fixtureValue.gridSize !== GRID) throw new Error('Incomplete runtime contract');
-        setManifest(manifestValue); setFixture(fixtureValue);
-        try {
-          const stored = localStorage.getItem(STORAGE_KEY);
-          const parsed = stored ? JSON.parse(stored) as Snapshot : null;
-          const initial = parsed?.placements?.length ? parsed : fixtureValue;
-          setPlacements(initial.placements); setFocusLevel(initial.focusLevel);
-        } catch {
-          setPlacements(fixtureValue.placements); setFocusLevel(fixtureValue.focusLevel);
-        }
+      .then((value) => {
+        if (!value.layer_encoding || value.items.length < 27) throw new Error('Incomplete art contract');
+        setManifest(value);
       })
       .catch((error) => setLoadError(String(error)));
   }, []);
+
+  const requestWorld = useCallback(async (body?: Record<string, unknown>) => {
+    setBusy(true);
+    setLoadError('');
+    try {
+      const response = await fetch('/api/trader-land', {
+        method: body ? 'POST' : 'GET',
+        headers: { ...headers(), ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      const json = await response.json().catch(() => ({})) as World & { error?: string };
+      if (!response.ok) throw new Error(json.error || 'Trader Land request failed');
+      setWorld(json);
+      return json;
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : String(error));
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  // `headers` reads the current session from storage on each request.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, wallet]);
+
   useEffect(() => {
-    if (fixture) localStorage.setItem(STORAGE_KEY, JSON.stringify({ placements, focusLevel }));
-  }, [fixture, placements, focusLevel]);
+    if (ready) void requestWorld();
+    else setWorld(null);
+  }, [ready, requestWorld]);
+
   useEffect(() => {
     const node = scroller.current;
     if (node) node.scrollLeft = Math.max(0, (node.scrollWidth - node.clientWidth) / 2);
@@ -257,9 +273,16 @@ export default function TraderLandGatePage() {
   }, [manifest]);
 
   const itemsById = useMemo(() => new Map(manifest?.items.map((item) => [item.id, item]) ?? []), [manifest]);
-  const inventory = useMemo(() => manifest?.items.filter((item) => item.district === district) ?? [], [district, manifest]);
-  const selected = itemsById.get(selectedId) ?? inventory[0];
-  const isRevealed = useCallback((col: number, row: number) => Math.max(Math.abs(col - 3.5), Math.abs(row - 3.5)) <= focusLevel + 1.5, [focusLevel]);
+  const placements = useMemo<Placement[]>(() => world?.placements.map((placement) => {
+    const inventory = world.inventory.find((candidate) => candidate.id === placement.inventory_id);
+    return { uid: placement.id, itemId: inventory?.item_id ?? '', col: placement.x, row: placement.y, orientation: placement.rotation === 90 || placement.rotation === 270 ? 'nw_se' : 'ne_sw' };
+  }).filter((placement) => placement.itemId) ?? [], [world]);
+  const inventory = useMemo(() => world?.inventory.filter((entry) => entry.item?.world === district) ?? [], [district, world]);
+  const selectedInventory = world?.inventory.find((entry) => entry.id === selectedInventoryId) ?? inventory.find((entry) => entry.state === 'bloomed' && !entry.placed) ?? inventory[0];
+  const selected = selectedInventory ? itemsById.get(selectedInventory.item_id) : undefined;
+  useEffect(() => {
+    if (!selectedInventoryId && selectedInventory) setSelectedInventoryId(selectedInventory.id);
+  }, [selectedInventory, selectedInventoryId]);
   const used = useMemo(() => {
     const cells = new Set(['3:3', '3:4', '4:3', '4:4']);
     placements.forEach((placement) => {
@@ -269,39 +292,32 @@ export default function TraderLandGatePage() {
     return cells;
   }, [itemsById, placements]);
   const previewCells = useMemo(() => hovered && selected ? cellsFor(selected, hovered.col, hovered.row) : [], [hovered, selected]);
-  const previewValid = Boolean(hovered && selected && hovered.col + selected.footprint.cols <= GRID && hovered.row + selected.footprint.rows <= GRID && previewCells.every((cell) => {
-    const [col, row] = cell.split(':').map(Number);
-    return isRevealed(col, row) && !used.has(cell);
-  }));
+  const previewValid = Boolean(hovered && selected && selectedInventory?.state === 'bloomed' && !selectedInventory.placed && hovered.col + selected.footprint.cols <= GRID && hovered.row + selected.footprint.rows <= GRID && previewCells.every((cell) => !used.has(cell)));
 
-  const checkpoint = useCallback(() => setHistory((value) => [...value.slice(-9), { placements, focusLevel }]), [focusLevel, placements]);
-  const place = useCallback((col: number, row: number) => {
+  const place = useCallback(async (col: number, row: number) => {
     if (dragged.current) { dragged.current = false; return; }
-    if (!selected) return;
+    if (!selected || !selectedInventory || busy) return;
+    if (selectedInventory.state !== 'bloomed') { cue('placement_invalid'); setNotice('That piece is still a seed. Keep learning to bloom it.'); return; }
+    if (selectedInventory.placed) { cue('placement_invalid'); setNotice('That piece is already in your Land.'); return; }
     const cells = cellsFor(selected, col, row);
-    const valid = col + selected.footprint.cols <= GRID && row + selected.footprint.rows <= GRID && cells.every((cell) => {
-      const [cellCol, cellRow] = cell.split(':').map(Number);
-      return isRevealed(cellCol, cellRow) && !used.has(cell);
-    });
-    if (!valid) { cue('placement_invalid'); return setNotice('Blocked · reveal the tile or clear the full footprint.'); }
-    checkpoint();
-    const next: Placement = { uid: `${selected.id}-${Date.now()}`, itemId: selected.id, col, row, ...(selected.kind === 'path_pavement' ? { orientation } : {}) };
-    setPlacements((value) => [...value, next]);
-    setSelectedUid(next.uid);
+    const valid = col + selected.footprint.cols <= GRID && row + selected.footprint.rows <= GRID && cells.every((cell) => !used.has(cell));
+    if (!valid) { cue('placement_invalid'); setNotice('Blocked · clear the full footprint and try another tile.'); return; }
+    const next = await requestWorld({ action: 'place', inventoryId: selectedInventory.id, x: col, y: row, rotation: orientation === 'nw_se' ? 90 : 0 });
+    if (!next) { cue('placement_invalid'); return; }
+    const placed = next.placements.find((entry) => entry.inventory_id === selectedInventory.id);
+    setSelectedUid(placed?.id ?? null);
     cue('placement_confirm');
-    setNotice('Built · visual adjacency only. No XP or trading advantage.');
-  }, [checkpoint, cue, isRevealed, orientation, selected, used]);
+    setNotice('Built and saved to your shared Bobby identity.');
+  }, [busy, cue, orientation, requestWorld, selected, selectedInventory, used]);
 
-  const undo = () => {
-    const previous = history.at(-1);
-    if (!previous) return setNotice('Nothing to undo.');
-    setPlacements(previous.placements); setFocusLevel(previous.focusLevel); setHistory((value) => value.slice(0, -1)); setNotice('Last world change undone.');
-  };
-  const restore = () => { checkpoint(); const source = fixture ?? fallbackSnapshot; setPlacements(source.placements); setFocusLevel(source.focusLevel); setSelectedUid(null); setNotice('Canonical 8×8 snapshot restored.'); };
-  const reveal = () => {
-    if (focusLevel >= 2) { cue('placement_invalid'); return setNotice('The full 8×8 island is already revealed.'); }
-    checkpoint(); setFocusLevel(2); cue('fog_reveal'); window.setTimeout(() => cue('five_attributes_chord'), 700); setNotice('Focus expanded the fog ring: 6×6 → 8×8.');
-  };
+  const remove = useCallback(async (placementId: string) => {
+    if (busy) return;
+    const next = await requestWorld({ action: 'remove', placementId });
+    if (!next) { cue('placement_invalid'); return; }
+    setSelectedUid(null);
+    cue('placement_tick');
+    setNotice('Piece returned to your inventory and synced.');
+  }, [busy, cue, requestWorld]);
 
   const clampZoom = (value: number) => Math.min(1.8, Math.max(.68, value));
   const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
@@ -325,18 +341,34 @@ export default function TraderLandGatePage() {
   };
   const pointerUp = (event: React.PointerEvent<HTMLDivElement>) => { pointers.current.delete(event.pointerId); if (pointers.current.size < 2) gesture.current = null; window.setTimeout(() => { dragged.current = false; }, 0); };
 
-  if (loadError) return <main className="min-h-screen bg-[#05070a] p-8 text-red-300">Trader Land contract failed closed: {loadError}</main>;
-  if (!manifest || !fixture) return <main className="min-h-screen bg-[#05070a] p-8 font-mono text-emerald-300">LOADING · TRADER LAND</main>;
+  if (!manifest) return <main className="min-h-screen bg-[#05070a] p-8 font-mono text-emerald-300">{loadError ? `TRADER LAND · ${loadError}` : 'LOADING · TRADER LAND'}</main>;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#05070a] text-white">
       <div className="mx-auto max-w-7xl px-4 py-6">
         <header className="flex flex-wrap items-end justify-between gap-4">
-          <div><div className="font-mono text-[10px] font-bold uppercase tracking-[.34em] text-emerald-300">Trader Land // Runtime v01</div><h1 className="mt-2 text-3xl font-semibold">Discipline becomes a world.</h1><p className="mt-2 max-w-2xl text-sm text-white/55">Local integration vertical · no wallet, XP, API, database or production writes.</p></div>
-          <div className="rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 font-mono text-[10px] uppercase tracking-[.18em] text-white/55">Focus {focusLevel}/2 · {placements.length + 1} placed · autosaved</div>
+          <div>
+            <Link to="/desk" className="mb-4 inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.18em] text-white/45 hover:text-white"><ArrowLeft size={13} />Back to desk</Link>
+            <div className="font-mono text-[10px] font-bold uppercase tracking-[.34em] text-emerald-300">Trader Land // Shared world</div>
+            <h1 className="mt-2 text-3xl font-semibold">Your discipline becomes a world.</h1>
+            <p className="mt-2 max-w-2xl text-sm text-white/55">Every piece is earned through the same XP and Discovery Route on web and iOS. Placement never changes a trade or creates an advantage.</p>
+          </div>
+          {world && <div className="rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 font-mono text-[10px] uppercase tracking-[.18em] text-white/55">{world.xp} XP · {world.aura} aura · route {world.route.index}/{world.route.total} · {placements.length} placed</div>}
         </header>
 
-        <section className="mt-6 grid gap-4 xl:grid-cols-[1fr_300px]">
+        {!ready && (
+          <section className="mt-10 rounded-3xl border border-emerald-400/20 bg-emerald-400/[.04] p-8 text-center">
+            <Sparkles className="mx-auto text-emerald-300" size={28} />
+            <h2 className="mt-4 text-xl font-semibold">Load your Trader Land</h2>
+            <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-white/55">Use the same Bobby identity you link with the iOS app. Your XP, inventory and placements stay server-authoritative and follow you between both experiences.</p>
+            <button onClick={() => void (wallet ? ensureSession() : open())} className="mt-5 rounded-xl bg-emerald-300 px-5 py-3 font-mono text-xs font-bold uppercase tracking-[.15em] text-black">{wallet ? 'Verify and load' : 'Connect to continue'}</button>
+          </section>
+        )}
+
+        {ready && busy && !world && <div className="mt-10 flex items-center justify-center gap-2 font-mono text-xs text-emerald-300"><LoaderCircle className="animate-spin" size={16} />LOADING YOUR LAND</div>}
+        {ready && loadError && <div className="mt-5 rounded-xl border border-red-400/25 bg-red-400/[.05] p-3 text-sm text-red-200">{loadError} <button onClick={() => void requestWorld()} className="ml-2 underline">Retry</button></div>}
+
+        {world && <section className="mt-6 grid gap-4 xl:grid-cols-[1fr_320px]">
           <div ref={scroller} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} onWheel={(event) => { if (event.ctrlKey || event.metaKey) { event.preventDefault(); setZoom((value) => clampZoom(value - event.deltaY * .004)); } }} className="relative overflow-hidden rounded-3xl border border-emerald-400/20 bg-[radial-gradient(circle_at_50%_42%,rgba(18,93,73,.24),transparent_48%),linear-gradient(#071019,#05070a)] touch-none">
             <div className="absolute right-3 top-3 z-[1000] flex gap-1 rounded-xl border border-white/10 bg-black/70 p-1">
               <button aria-label="Zoom out" onClick={() => setZoom((value) => clampZoom(value - .15))} className="p-2 text-white/70"><Minus size={14} /></button>
@@ -350,11 +382,11 @@ export default function TraderLandGatePage() {
               })}
               {placements.map((placement) => {
                 const item = itemsById.get(placement.itemId); if (!item) return null;
-                return <ArtSprite key={placement.uid} item={item} placement={placement} seed={seed} selected={placement.uid === selectedUid} />;
+                const owned = world.inventory.find((entry) => entry.item_id === placement.itemId && world.placements.some((placed) => placed.id === placement.uid && placed.inventory_id === entry.id));
+                return <ArtSprite key={placement.uid} item={item} placement={placement} seed={owned?.state === 'seed'} selected={placement.uid === selectedUid} />;
               })}
               {placements.map((placement) => itemsById.get(placement.itemId)?.kind === 'path_pavement' ? <PathFilament key={`flow-${placement.uid}`} placement={placement} placements={placements} itemsById={itemsById} selected={placement.uid === selectedUid} /> : null)}
-              <AnimatedAuraCore item={itemsById.get('aura_core')!} placement={{ uid: 'aura-core', itemId: 'aura_core', col: 3, row: 3 }} seed={seed} pulse={corePulse} />
-              {Array.from({ length: GRID * GRID }, (_, index) => { const col = index % GRID; const row = Math.floor(index / GRID); return !isRevealed(col, row) ? <Diamond key={`fog-${col}:${row}`} col={col} row={row} tone="fog" z={700 + col + row} /> : null; })}
+              <AnimatedAuraCore item={itemsById.get('aura_core')!} placement={{ uid: 'aura-core', itemId: 'aura_core', col: 3, row: 3 }} seed={false} pulse={corePulse} />
               {hovered && previewCells.map((cell) => { const [col, row] = cell.split(':').map(Number); return <Diamond key={`preview-${cell}`} col={col} row={row} tone={previewValid ? 'valid' : 'invalid'} />; })}
               <div className="pointer-events-none absolute left-[355px] top-[544px] z-[900] rounded-full border border-emerald-300/30 bg-black/70 px-3 py-1 font-mono text-[9px] uppercase tracking-[.18em] text-emerald-200">Aura Core · balance</div>
             </div>
@@ -363,25 +395,23 @@ export default function TraderLandGatePage() {
           <aside className="rounded-3xl border border-white/10 bg-white/[.035] p-4">
             <div className="font-mono text-[10px] uppercase tracking-[.25em] text-white/45">District blueprints</div>
             <div className="mt-3 grid grid-cols-2 gap-2">
-              {districts.map((value) => <button key={value} onClick={() => { setDistrict(value); const first = manifest.items.find((item) => item.district === value); if (first) setSelectedId(first.id); }} className={`rounded-xl border px-2 py-2 text-left text-[10px] ${district === value ? 'border-emerald-300 bg-emerald-300/10 text-emerald-200' : 'border-white/10 text-white/50'}`}>{districtNames[value]}</button>)}
+              {districts.map((value) => <button key={value} onClick={() => { setDistrict(value); const first = world.inventory.find((entry) => entry.item?.world === value); setSelectedInventoryId(first?.id ?? null); }} className={`rounded-xl border px-2 py-2 text-left text-[10px] ${district === value ? 'border-emerald-300 bg-emerald-300/10 text-emerald-200' : 'border-white/10 text-white/50'}`}>{districtNames[value]}</button>)}
             </div>
             <div className="mt-4 grid grid-cols-5 gap-1.5">
-              {inventory.map((item) => { const art = artFor(item, false); return <button key={item.id} onClick={() => { setSelectedId(item.id); cue('placement_tick'); }} title={pretty(item.id)} className={`aspect-square overflow-hidden rounded-xl border bg-black/30 ${selected?.id === item.id ? 'border-amber-300' : 'border-white/10'}`}><img src={art.thumb?.url ?? art.albedo.url} alt={pretty(item.id)} className="h-full w-full object-contain" /></button>; })}
+              {inventory.map((entry) => { const item = itemsById.get(entry.item_id); if (!item) return null; const art = artFor(item, entry.state === 'seed'); return <button key={entry.id} onClick={() => { setSelectedInventoryId(entry.id); cue('placement_tick'); }} title={`${pretty(item.id)} · ${entry.state}${entry.placed ? ' · placed' : ''}`} className={`relative aspect-square overflow-hidden rounded-xl border bg-black/30 ${selectedInventory?.id === entry.id ? 'border-amber-300' : 'border-white/10'} ${entry.state === 'seed' || entry.placed ? 'opacity-50' : ''}`}><img src={art.thumb?.url ?? art.albedo.url} alt={pretty(item.id)} className="h-full w-full object-contain" /><span className="absolute bottom-0 inset-x-0 bg-black/75 py-0.5 font-mono text-[7px] uppercase">{entry.placed ? 'placed' : entry.state}</span></button>; })}
             </div>
-            {selected && <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3"><div className="text-sm font-semibold">{pretty(selected.id.replace(`${selected.district}_`, ''))}</div><div className="mt-1 font-mono text-[9px] uppercase tracking-[.16em] text-white/40">{selected.kind} · {selected.footprint.cols}×{selected.footprint.rows}</div></div>}
+            {!inventory.length && <div className="mt-4 rounded-xl border border-white/10 p-4 text-xs text-white/45">No pieces from this district yet. Continue the Discovery Route on the desk.</div>}
+            {selected && selectedInventory && <div className="mt-3 rounded-xl border border-white/10 bg-black/25 p-3"><div className="text-sm font-semibold">{pretty(selected.id.replace(`${selected.district}_`, ''))}</div><div className="mt-1 font-mono text-[9px] uppercase tracking-[.16em] text-white/40">{selected.kind} · {selected.footprint.cols}×{selected.footprint.rows} · {selectedInventory.placed ? 'placed' : selectedInventory.state}</div></div>}
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button onClick={() => setOrientation((value) => value === 'ne_sw' ? 'nw_se' : 'ne_sw')} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70"><RotateCw size={13} />{orientation}</button>
-              <button onClick={() => setSeed((value) => { cue(value ? 'bloom_complete' : 'seed_reveal'); return !value; })} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70"><Sparkles size={13} />{seed ? 'seed' : 'bloom'}</button>
-              <button onClick={undo} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70"><Undo2 size={13} />Undo</button>
-              <button onClick={restore} className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70">Restore</button>
-              <button onClick={reveal} className="col-span-2 flex items-center justify-center gap-2 rounded-xl bg-emerald-300 px-3 py-2 text-xs font-bold text-black"><Eye size={14} />Reveal next focus ring</button>
+              {selectedInventory?.placed ? <button onClick={() => { const placed = world.placements.find((entry) => entry.inventory_id === selectedInventory.id); if (placed) void remove(placed.id); }} disabled={busy} className="flex items-center justify-center gap-2 rounded-xl border border-red-400/25 px-3 py-2 text-xs text-red-200 disabled:opacity-40"><Trash2 size={13} />Return piece</button> : <div className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/45"><Sparkles size={13} />{selectedInventory?.state ?? 'locked'}</div>}
               <button onClick={toggleSound} className="flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70">{soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}Sound {soundEnabled ? 'on' : 'off'}</button>
               <button onClick={() => { setCorePulse((value) => value + 1); cue((['orbit_whoosh_a', 'orbit_whoosh_b', 'orbit_whoosh_c'] as SoundCue[])[corePulse % 3]); }} className="flex items-center justify-center gap-2 rounded-xl border border-emerald-300/30 px-3 py-2 text-xs text-emerald-200"><Waves size={13} />Pulse core</button>
             </div>
             <div className="mt-4 rounded-xl border border-emerald-300/15 bg-black/30 p-3 text-xs leading-relaxed text-white/55">{notice}</div>
-            <div className="mt-4 space-y-1 font-mono text-[9px] uppercase tracking-[.13em] text-white/35"><div>Paths: neighbor-derived connectors</div><div>Adjacency: visual only</div><div>Depth: normalized anchor Y</div><div>Fog: placement denied</div><div>Persistence: localStorage</div><div>View: pinch / drag / wheel</div><div>Load: {loadMetric}</div></div>
+            <div className="mt-4 space-y-1 font-mono text-[9px] uppercase tracking-[.13em] text-white/35"><div>Inventory: earned from Discovery Route</div><div>Authority: Bobby shared database</div><div>Identity: same web + iOS progress</div><div>Placement: server validated</div><div>View: pinch / drag / wheel</div><div>Load: {loadMetric}</div></div>
           </aside>
-        </section>
+        </section>}
       </div>
       <style>{`
         @keyframes aura-float { 0%,100% { transform: translateY(-2%); } 50% { transform: translateY(2%); } }
