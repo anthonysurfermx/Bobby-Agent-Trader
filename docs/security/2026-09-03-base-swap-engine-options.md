@@ -47,3 +47,81 @@ token list, limits and offline tests, and swap its router layer for the
 Permit2 + Universal Router builder from this branch, then rerun the fork test.
 Whichever engine wins, swaps stay closed (`BASE_SWAPS_ENABLED` unset) until Codex
 reviews calldata, slippage, recipient, allow-list and an on-chain confirmation.
+
+## X Layer / OKX touchpoints to retire (inventory, read-only, main@d55967d)
+
+API (69 files):
+- `api/activity.ts`
+- `api/agent-run.ts`
+- `api/auto-bounty.ts`
+- `api/bobby-asset-cache.ts`
+- `api/bobby-asset-search.ts`
+- `api/bobby-cycle.ts`
+- `api/bobby-intel.ts`
+- `api/bobby-pnl.ts`
+- `api/bobby-protocol-stats.ts`
+- `api/bobby-signals.ts`
+- `api/dex-approve.ts`
+- `api/dex-quote.ts`
+- `api/dex-swap.ts`
+- `api/explain.ts`
+- `api/forum-resolve.ts`
+- `api/generate-activity.ts`
+- `api/mcp-bobby.ts`
+- `api/mcp-http.ts`
+- `api/okx-candles.ts`
+- `api/okx-market.ts`
+- `api/okx-onchain.ts`
+- `api/okx-perps.ts`
+- `api/okx-signal.ts`
+- `api/okx-tickers.ts`
+- `api/onchainos-price.ts`
+- `api/onchainos-status.ts`
+- `api/openclaw-chat.ts`
+- `api/premium-signal.ts`
+- `api/protocol-heartbeat.ts`
+- `api/protocol-tx-history.ts`
+- `api/registry.ts`
+- `api/reputation.ts`
+- `api/sandbox-run.ts`
+- `api/sentinel-demo.ts`
+- `api/settle-trades.ts`
+- `api/smart-money-leaderboard.ts`
+- `api/technical-analysis.ts`
+- `api/telegram-access.ts`
+- `api/telegram-deliver.ts`
+- `api/telegram-webhook.ts`
+- `api/voice-tool.ts`
+- `api/xlayer-record.ts`
+- `api/xlayer-trade.ts`
+- `api/_lib/assets.ts`
+- `api/_lib/b1nary.ts`
+- `api/_lib/base-swap.ts`
+- `api/_lib/chains.ts`
+- `api/_lib/chart.ts`
+- `api/_lib/commit-policy.ts`
+- `api/_lib/dex-allowlist.ts`
+- `api/_lib/dex-execution.ts`
+- `api/_lib/dm-analysis.ts`
+- `api/_lib/hardness-registry.ts`
+- `api/_lib/indicators.ts`
+- `api/_lib/mcp-challenges.ts`
+- `api/_lib/mcp-uniswap-quote.ts`
+- `api/_lib/okx-hmac.ts`
+- `api/_lib/okx-indicators.ts`
+- `api/_lib/okx-link.ts`
+- `api/_lib/okx-security.ts`
+- `api/_lib/protocol-constants.ts`
+- `api/_lib/protocol-write-safety.ts`
+- `api/_lib/record-auth.ts`
+- `api/_lib/risk-gate.ts`
+- `api/_lib/signals.ts`
+- `api/_lib/trackrecord-stats-adapter.ts`
+- `api/_lib/trackrecord-v2-recorder.ts`
+- `api/_lib/trackrecord-v2.ts`
+- `api/_lib/xlayer-payments.ts`
+
+UI (0 files):
+
+
+Keep read-only: ledger rows, explorer links for historical X Layer receipts.
