@@ -19,6 +19,7 @@ import { findBaseToken } from '../src/lib/base-swap/tokens.js';
 import {
   applyRiskGate,
   calculateDynamicConviction,
+  calculateStockConviction,
   kellySize,
   type TradeDecision,
 } from './_lib/risk-gate.js';
@@ -398,7 +399,7 @@ async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: str
 //   1. Rolling 24h realized drawdown > 10% of bankroll.
 //   2. >=3 consecutive settled losses with no intervening win.
 // Fails open on DB error — per-cycle risk gate still bounds downside.
-async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string; detail?: string }> {
+async function checkCircuitBreaker(wallet: string | null): Promise<{ halted: boolean; reason?: string; detail?: string }> {
   const url = bobbyDbUrl();
   const key = bobbyServiceKey();
   if (!url || !key) {
@@ -418,6 +419,8 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
       `?settled_at=gte.${encodeURIComponent(sinceIso)}` +
       `&status=eq.confirmed` +
       `&outcome=not.is.null` +
+      // One wallet's losses stop that wallet, nobody else. Cron cycles (no wallet) never trade.
+      (wallet ? `&owner_address=eq.${wallet.toLowerCase()}` : '') +
       `&select=outcome,realized_pnl_pct,amount_usd,settled_at` +
       `&order=settled_at.desc&limit=100`;
     const recentRes = await fetch(recentUrl, {
@@ -476,20 +479,20 @@ async function checkCircuitBreaker(): Promise<{ halted: boolean; reason?: string
 // ---- Fetch USD currently at risk in open (unsettled) positions ----
 // Prevents cumulative over-exposure when multiple cycles fire before settlement.
 /** Realized losses (USD, positive) settled in the last 24h for ONE wallet — the daily loss budget. */
-async function fetchRealizedLossTodayUsd(wallet: string): Promise<number> {
+async function fetchRealizedLossTodayUsd(wallet: string): Promise<number | null> {
   const url = bobbyDbUrl();
   const key = bobbyServiceKey();
-  if (!url || !key) return 0;
+  if (!url || !key) return null;
   try {
     const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const q = `${url}/rest/v1/agent_trades?owner_address=eq.${wallet.toLowerCase()}&settled_at=gte.${encodeURIComponent(sinceIso)}&outcome=eq.loss&select=amount_usd,realized_pnl_pct`;
     const res = await fetch(q, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-    if (!res.ok) return 0;
+    if (!res.ok) return null;
     const rows = (await res.json()) as Array<{ amount_usd: number | null; realized_pnl_pct: number | null }>;
-    if (!Array.isArray(rows)) return 0;
+    if (!Array.isArray(rows)) return null;
     return rows.reduce((sum, r) => sum + Math.max(0, -((r.realized_pnl_pct || 0) / 100) * (r.amount_usd || 0)), 0);
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -1001,7 +1004,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // unauthenticated manual runs and cron always respect it.
   const forceBypass = req.query.force === 'true' && isManual && hasOperatorAuth;
   if (!forceBypass) {
-    const breaker = await checkCircuitBreaker();
+    const breaker = await checkCircuitBreaker(isManual && walletAddress ? walletAddress : null);
     if (breaker.halted) {
       console.warn(`[Agent] CIRCUIT BREAKER ACTIVE — ${breaker.reason}: ${breaker.detail}`);
       const haltResult = {
@@ -1015,7 +1018,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         total_usd_deployed: 0,
         latency_ms: Date.now() - startMs,
         llm_reasoning: `Halted: ${breaker.reason}. ${breaker.detail || ''}`,
-        status: 'halted',
+        status: 'completed', // schema: running | completed | failed — the halt is in llm_reasoning
       };
       await logToSupabase(haltResult);
       res.setHeader('Cache-Control', 'no-store');
@@ -1137,21 +1140,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Exposure is what the wallet HOLDS on-chain, valued at the Chainlink
     // reference — not what a table remembers. A sold lot is gone; a lot held
     // past the 48h scoring horizon is still exposure.
-    const openExposure = isManual && walletAddress ? await fetchOnchainStockExposureUsd(walletAddress).catch(() => 0) : 0;
-    if (openExposure > 0) console.log(`[Agent] On-chain stock exposure: $${openExposure.toFixed(2)}`);
-    // Realized losses in the last 24h for this wallet: the daily loss budget.
-    const realizedLossToday = isManual && walletAddress ? await fetchRealizedLossTodayUsd(walletAddress) : 0;
-    // The deterministic conviction map: the same score the prompt showed, keyed
-    // by the symbol the pipeline scored. The gate refuses anything else.
-    const bestPolyEdge = polyConsensus.length > 0 ? Math.min(1, Math.max(0, polyConsensus[0].edgePct / 100)) : 0;
+    // Fail closed: if either risk input cannot be read, no intent is approved
+    // this cycle. A degraded RPC or database must never look like "no risk".
+    let riskInputsUnavailable: string | null = null;
+    let openExposure = 0;
+    let realizedLossToday = 0;
+    if (isManual && walletAddress) {
+      const exposure = await fetchOnchainStockExposureUsd(walletAddress).catch((e: unknown) => (e instanceof Error ? e.message : String(e)));
+      const loss = await fetchRealizedLossTodayUsd(walletAddress);
+      if (typeof exposure !== 'number') riskInputsUnavailable = `on-chain exposure unavailable: ${exposure}`;
+      else if (loss === null) riskInputsUnavailable = 'realized-loss ledger unavailable';
+      else { openExposure = exposure; realizedLossToday = loss; }
+      if (openExposure > 0) console.log(`[Agent] On-chain stock exposure: $${openExposure.toFixed(2)}`);
+      if (riskInputsUnavailable) console.error(`[Agent] ${riskInputsUnavailable} — approving nothing`);
+    }
+    // The deterministic conviction map: the same evidence the prompt showed,
+    // keyed by the listed symbol. Polymarket counts only for a market ABOUT the
+    // asset (name or ticker in the title); a hot unrelated market is not evidence.
+    const polyEdgeFor = (sig: FilteredSignal): number => {
+      const token = findBaseToken(sig.tokenSymbol);
+      const needles = [token?.underlyingSymbol, token?.name?.split(' ').slice(-1)[0], token?.symbol].filter((x): x is string => Boolean(x && x.length >= 3)).map((x) => x.toLowerCase());
+      const related = polyConsensus.filter((m) => needles.some((n) => m.title.toLowerCase().includes(n)));
+      return related.length ? Math.min(1, Math.max(0, related[0].edgePct / 100)) : 0;
+    };
     const convictionMap = new Map<string, number>();
-    for (const sig of filtered) convictionMap.set(sig.tokenSymbol, calculateDynamicConviction(sig.filterScore / 100, bestPolyEdge, signalAgeMs));
+    for (const sig of filtered) {
+      const conv = sig.source === 'base_b20'
+        ? calculateStockConviction(sig.filterScore / 100, polyEdgeFor(sig), signalAgeMs)
+        : calculateDynamicConviction(sig.filterScore / 100, 0, signalAgeMs);
+      convictionMap.set(sig.tokenSymbol, conv);
+    }
     for (const d of debate.decisions) {
       // The LLM may answer with the underlying ticker (NVDA); score lookups use the listed symbol (NVDAc).
       const listed = findBaseToken(d.tokenSymbol)?.symbol;
       if (listed && listed !== d.tokenSymbol && convictionMap.has(listed)) { d.tokenSymbol = listed; }
     }
-    const { approved, blocked, sizingMethod } = applyRiskGate(debate.decisions, 500, isSafeMode, convictionMap, openExposure, realizedLossToday);
+    const gate = riskInputsUnavailable
+      ? { approved: [] as typeof debate.decisions, blocked: debate.decisions.length, sizingMethod: 'blocked-risk-inputs-unavailable' }
+      : applyRiskGate(debate.decisions, 500, isSafeMode, convictionMap, openExposure, realizedLossToday);
+    const { approved, blocked, sizingMethod } = gate;
     console.log(`[Agent] ${approved.length} approved (${sizingMethod}), ${blocked} blocked`);
 
     // Phase 6: Intents. The cycle never builds calldata: it hands the human a

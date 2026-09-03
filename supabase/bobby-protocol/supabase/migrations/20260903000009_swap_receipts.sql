@@ -14,6 +14,8 @@ create table if not exists public.bobby_swap_receipts (
   cycle_id            uuid references public.agent_cycles(id) on delete set null,
   -- The agent_trades row written when the receipt confirmed (exposure, PnL, settlement)
   agent_trade_id      uuid,
+  -- Single-use intent id minted by the cycle; one confirmed swap per intent
+  intent_jti          text,
   wallet_address      text not null,
   chain_id            integer not null default 8453 check (chain_id = 8453),
   engine              text not null default 'uniswap-v3-swaprouter02',
@@ -41,6 +43,8 @@ create table if not exists public.bobby_swap_receipts (
   constraint bobby_swap_receipts_tx_once unique (chain_id, tx_hash)
 );
 
+create unique index if not exists bobby_swap_receipts_intent_once
+  on public.bobby_swap_receipts (wallet_address, intent_jti) where intent_jti is not null;
 create index if not exists bobby_swap_receipts_identity_time
   on public.bobby_swap_receipts (identity_id, created_at desc);
 create index if not exists bobby_swap_receipts_wallet_time

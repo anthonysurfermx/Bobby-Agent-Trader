@@ -44,6 +44,8 @@ export interface BuiltSwapRow {
   wallet: string;
   identityId?: string | null;
   cycleId?: string | null;
+  /** Single-use intent id: at most one CONFIRMED swap per jti; a still-'built' row is superseded by a re-quote. */
+  intentJti?: string | null;
   platform?: 'web' | 'ios';
   tokenIn: { symbol: string; address: string };
   tokenOut: { symbol: string; address: string };
@@ -60,12 +62,33 @@ export interface BuiltSwapRow {
 export async function recordBuiltSwap(row: BuiltSwapRow, fetchImpl: typeof fetch = storeFetch): Promise<{ recorded: boolean; reason?: string }> {
   if (!bobbyDbConfigured()) return { recorded: false, reason: 'database not configured' };
   try {
+    if (row.intentJti) {
+      // One intent, one swap. A confirmed row spends the jti for good; a row
+      // still 'built' (deadline passed, re-quote) is replaced, not duplicated.
+      const prior = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?wallet_address=eq.${row.wallet.toLowerCase()}&intent_jti=eq.${row.intentJti}&select=id,status`), { headers: bobbyServiceHeaders() });
+      if (!prior.ok) return { recorded: false, reason: `db ${prior.status}` };
+      const rows = (await prior.json()) as Array<{ id: string; status: string }>;
+      if (rows.some((r) => r.status === 'confirmed')) return { recorded: false, reason: 'intent already used' };
+      const built = rows.find((r) => r.status === 'built');
+      if (built) {
+        const patch = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?id=eq.${built.id}&status=eq.built`), {
+          method: 'PATCH',
+          headers: bobbyServiceHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+          body: JSON.stringify({
+            calldata_hash: row.calldataHash, deadline: new Date(row.deadline * 1000).toISOString(),
+            amount_in_raw: row.amountInRaw, quoted_out_raw: row.quotedOutRaw, min_amount_out_raw: row.minOutRaw, route: row.route,
+          }),
+        });
+        return patch.ok ? { recorded: true, reason: 'intent re-quoted; previous unconfirmed calldata superseded' } : { recorded: false, reason: `db ${patch.status}` };
+      }
+    }
     const res = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?on_conflict=wallet_address,calldata_hash`), {
       method: 'POST',
       headers: bobbyServiceHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' }),
       body: JSON.stringify({
         identity_id: row.identityId ?? null,
         cycle_id: row.cycleId ?? null,
+        intent_jti: row.intentJti ?? null,
         wallet_address: row.wallet.toLowerCase(),
         chain_id: BASE_SWAP_CHAIN_ID,
         engine: SWAP_ENGINE,

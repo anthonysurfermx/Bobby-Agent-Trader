@@ -13,6 +13,7 @@ import {
   kellySize,
   applyRiskGate,
   type TradeDecision,
+  calculateStockConviction,
 } from '../api/_lib/risk-gate.ts';
 
 const failures: string[] = [];
@@ -170,6 +171,13 @@ group('gate: a deterministic map blocks tickers the pipeline never scored', () =
   const result = applyRiskGate([decision('OOO', 0.2), decision('PPP', 0.99)], 3000, false, conv);
   assert(result.approved.length === 1 && result.approved[0].tokenSymbol === 'OOO', 'scored ticker approved on the deterministic score, unscored ticker blocked whatever the LLM said');
   assert(approx(result.approved[0].confidence, 0.9), 'confidence carried is the deterministic one');
+});
+
+group('stock conviction: evidence is the score; only an asset-specific market adds', () => {
+  assert(approx(calculateStockConviction(0.70, 0, 0), 0.70), 'a 70-score discount setup reaches the gate on its own');
+  assert(calculateStockConviction(0.45, 0, 0) < 0.7, 'at-reference stock does not trade on Polymarket noise');
+  assert(approx(calculateStockConviction(0.45, 0.9, 0), 0.72), 'a related market with real edge can lift it');
+  assert(calculateStockConviction(0.70, 0, 60 * 60 * 1000) < 0.7, 'an hour-old signal decays below the gate');
 });
 
 // ── Report ─────────────────────────────────────────────────

@@ -180,9 +180,14 @@ export function resolveProtocolChain(value: string | undefined): {
   const normalized = (value || 'base').trim().toLowerCase();
   if (normalized === 'base') return { name: 'base', config: BASE };
   if (normalized === 'base-sepolia') return { name: 'base-sepolia', config: BASE_SEPOLIA };
-  if (normalized === 'xlayer') return { name: 'xlayer', config: XLAYER };
+  // X Layer is history: its config stays for explorer links and read-only
+  // archive views, but no deployment may select it as the protocol chain —
+  // a stale PROTOCOL_CHAIN=xlayer in an environment must fail loudly.
+  if (normalized === 'xlayer') {
+    throw new Error('PROTOCOL_CHAIN=xlayer is retired (2026-09-03): Base is the only protocol chain. Unset it or set base.');
+  }
   throw new Error(
-    `Invalid PROTOCOL_CHAIN=${JSON.stringify(value)}; expected xlayer, base-sepolia, or base`,
+    `Invalid PROTOCOL_CHAIN=${JSON.stringify(value)}; expected base or base-sepolia`,
   );
 }
 

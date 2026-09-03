@@ -33,6 +33,7 @@ function withContracts(chain: ChainConfig): ChainConfig {
 }
 
 assert.equal(resolveProtocolChain(undefined).name, 'base');
+assert.throws(() => resolveProtocolChain('xlayer'), /retired/, 'X Layer can no longer be the protocol chain');
 assert.equal(resolveProtocolChain('base').config.id, 8453);
 assert.equal(resolveProtocolChain(' base-sepolia ').config.id, 84532);
 assert.throws(() => resolveProtocolChain('base-mainnet'), /Invalid PROTOCOL_CHAIN/);
@@ -173,7 +174,7 @@ assert.match(cycleSource, /evaluateCommitPolicy\(/);
 assert.match(cycleSource, /assessCommitReceipt\(/);
 assert.match(cycleSource, /commitState === 'blocked'/);
 assert.match(cycleSource, /PROTOCOL_CUTOVER_FREEZE/);
-assert.match(cycleSource, /tradingAuthHeaders\(\)/);
+assert.doesNotMatch(cycleSource, /tradingAuthHeaders\(\)|\/api\/okx-perps/); // no OKX auth path left in the cycle
 assert.match(cycleSource, /recordAuthHeaders\(\)/);
 
 const hardnessSource = readFileSync('api/_lib/hardness-registry.ts', 'utf8');

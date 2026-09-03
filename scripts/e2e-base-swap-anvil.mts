@@ -228,6 +228,27 @@ if (process.env.E2E_STOCKS === '1') {
   const { fetchOnchainStockExposureUsd } = await import('../api/_lib/base-swap.js');
   const exposure = await fetchOnchainStockExposureUsd(account.address).catch(() => -1);
   assert.ok(exposure === 0 || exposure === -1, `exposure ${exposure}`);
+  // Single-use intent: re-quote supersedes an unconfirmed row; a confirmed row spends the jti.
+  {
+    const jti = 'ab'.repeat(16);
+    const q1 = await quoteBaseSwap({ tokenIn: 'ETH', tokenOut: 'USDC', amount: '0.002', recipient: account.address });
+    const base = { wallet: account.address, cycleId: 'cycle-e2e', intentJti: jti, tokenIn: q1.tokenIn, tokenOut: q1.tokenOut, amountInRaw: q1.amountInRaw, quotedOutRaw: q1.amountOutRaw, minOutRaw: q1.minAmountOutRaw, route: q1.route.description, router: q1.venue.router, deadline: q1.deadline };
+    const r1 = await recordBuiltSwap({ ...base, calldataHash: q1.tx!.calldataHash! });
+    assert.equal(r1.recorded, true, r1.reason);
+    const q2 = await quoteBaseSwap({ tokenIn: 'ETH', tokenOut: 'USDC', amount: '0.002', recipient: account.address });
+    const r2 = await recordBuiltSwap({ ...base, calldataHash: q2.tx!.calldataHash!, deadline: q2.deadline });
+    assert.equal(r2.recorded, true, r2.reason);
+    assert.match(String(r2.reason), /superseded/, 're-quote replaced the unconfirmed row');
+    assert.equal(table.filter((r) => r.intent_jti === jti).length, 1, 'still one row for the intent');
+    const { hash } = await send(q2.tx!.swap!);
+    const vj = await verifySwapOnChain(hash, account.address, baseClient());
+    assert.equal((await confirmSwapReceipt(vj, account.address)).outcome, 'confirmed');
+    const r3 = await recordBuiltSwap({ ...base, calldataHash: ('0x' + 'ef'.repeat(32)) as Hex });
+    assert.equal(r3.recorded, false);
+    assert.equal(r3.reason, 'intent already used', 'a spent intent cannot produce another swap');
+    console.log('single-use intent: supersede while built, refused once confirmed');
+  }
+
   // Repair: a confirmed receipt whose trade vanished gets it back on the next confirm ('already').
   const victim = table.find((r) => r.status === 'confirmed')!;
   tables.agent_trades.splice(tables.agent_trades.findIndex((t) => t.id === victim.agent_trade_id), 1);

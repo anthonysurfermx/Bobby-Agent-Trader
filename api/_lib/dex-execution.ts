@@ -9,7 +9,7 @@
 // along so the confirmed receipt lands on this cycle.
 // ============================================================
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { BaseSwapError, quoteBaseSwap, type BaseSwapQuote } from './base-swap.js';
 import { BASE_SWAP_CHAIN_ID, findBaseToken } from '../../src/lib/base-swap/tokens.js';
 
@@ -30,6 +30,8 @@ export interface TradeIntent {
   wallet: string;
   /** Unix seconds; the token below stops verifying after this. */
   expiresAt: number;
+  /** Single-use id: one confirmed swap per intent (the store enforces it). */
+  jti: string;
   /**
    * HMAC over (cycleId, wallet, tokenIn, tokenOut, amount, expiresAt) with the
    * session secret. /api/base-swap only links a build to a cycle when this
@@ -52,10 +54,10 @@ function intentSecret(): Buffer | null {
   return raw.length >= 32 ? Buffer.from(raw, 'utf8') : null;
 }
 
-export interface IntentFields { cycleId: string; wallet: string; tokenIn: string; tokenOut: string; amount: string; expiresAt: number }
+export interface IntentFields { cycleId: string; wallet: string; tokenIn: string; tokenOut: string; amount: string; expiresAt: number; jti: string }
 
 function intentPayload(f: IntentFields): string {
-  return [f.cycleId, f.wallet.toLowerCase(), f.tokenIn.toUpperCase(), f.tokenOut, f.amount, String(f.expiresAt)].join('|');
+  return [f.cycleId, f.wallet.toLowerCase(), f.tokenIn.toUpperCase(), f.tokenOut, f.amount, String(f.expiresAt), f.jti].join('|');
 }
 
 /** Null when the server has no secret: intents then carry no token and cannot be linked. */
@@ -93,7 +95,8 @@ export async function prepareBaseIntent(opts: { tokenSymbol: string; amountUsd: 
     // Guards that need no wallet already apply to the preview (ticket cap, impact, reference, pause).
     if (q.txWithheld.length) return { ok: false, status: 'aborted_exec_error', reason: q.txWithheld.join('; ') };
     const expiresAt = Math.floor(Date.now() / 1000) + INTENT_TTL_SEC;
-    const intentToken = signIntent({ cycleId, wallet, tokenIn: 'USDC', tokenOut: token.symbol, amount, expiresAt });
+    const jti = randomBytes(16).toString('hex');
+    const intentToken = signIntent({ cycleId, wallet, tokenIn: 'USDC', tokenOut: token.symbol, amount, expiresAt, jti });
     if (!intentToken) return { ok: false, status: 'aborted_exec_error', reason: 'intent signing is not configured (BOBBY_SESSION_SECRET)' };
     return {
       ok: true,
@@ -104,6 +107,7 @@ export async function prepareBaseIntent(opts: { tokenSymbol: string; amountUsd: 
         cycleId,
         wallet: wallet.toLowerCase(),
         expiresAt,
+        jti,
         intentToken,
         preview: {
           amountIn: q.amountIn, amountOut: q.amountOut, minAmountOut: q.minAmountOut, executionPrice: q.executionPrice,

@@ -24,6 +24,25 @@ export interface TradeDecision {
  * into a single 0-1 conviction score. Weights favor Polymarket (0.6) over
  * OKX (0.4) because crowd-predicted breakouts tend to lead whale flows.
  */
+/**
+ * Conviction for a tokenized-stock signal. The filter score already carries
+ * the evidence (pool discount vs reference, underlying momentum, feed
+ * freshness); Polymarket only counts when a market is ABOUT this asset
+ * (matched by name/ticker upstream) — a hot unrelated market is not evidence.
+ * Latency penalty as for on-chain signals. 0.7+ means a clear discount with
+ * momentum, which is what the gate should require.
+ */
+export function calculateStockConviction(
+  score: number,          // 0-1, normalized from filterScore
+  polyEdgeForAsset: number, // 0-1, edge of a Polymarket market about THIS asset, else 0
+  latencyMs: number,
+): number {
+  const minutes = latencyMs / 60000;
+  const latencyPenalty = minutes <= 5 ? 0 : Math.min(0.7, 0.05 * Math.exp(0.08 * minutes));
+  const raw = score + polyEdgeForAsset * 0.3 - latencyPenalty;
+  return Math.max(0, Math.min(1, raw));
+}
+
 export function calculateDynamicConviction(
   okxScore: number,      // 0-1, normalized from filterScore (0-100)
   polyConsensus: number, // 0-1, normalized from Polymarket edgePct

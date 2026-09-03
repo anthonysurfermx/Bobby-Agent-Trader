@@ -35,6 +35,7 @@ const PostSchema = z.object({
   cycleId: z.string().uuid().optional(),
   intentToken: z.string().min(16).max(256).optional(),
   intentExpiresAt: z.number().int().positive().optional(),
+  intentJti: z.string().regex(/^[0-9a-f]{32}$/).optional(),
 });
 
 /** ISO country stamped by Vercel's edge; absent locally, which fails closed for stocks. */
@@ -86,8 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Anything else is refused outright rather than silently unlinked.
   if (body.cycleId) {
     const amount = typeof body.amount === 'number' ? body.amount.toFixed(2) : body.amount;
-    const ok = body.intentExpiresAt !== undefined && verifyIntent(
-      { cycleId: body.cycleId, wallet: (wallet ?? body.wallet).toLowerCase(), tokenIn: body.tokenIn, tokenOut: body.tokenOut, amount, expiresAt: body.intentExpiresAt },
+    const ok = body.intentExpiresAt !== undefined && body.intentJti !== undefined && verifyIntent(
+      { cycleId: body.cycleId, wallet: (wallet ?? body.wallet).toLowerCase(), tokenIn: body.tokenIn, tokenOut: body.tokenOut, amount, expiresAt: body.intentExpiresAt, jti: body.intentJti },
       body.intentToken,
     );
     if (!ok) return res.status(403).json({ ok: false, error: 'cycleId does not carry a valid intent token for this wallet, pair and amount', code: 'intent_invalid' });
@@ -113,6 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         wallet: quote.recipient,
         identityId: identity?.id ?? null,
         cycleId: body.cycleId ?? null,
+        intentJti: body.cycleId ? body.intentJti ?? null : null,
         platform: 'web',
         tokenIn: { symbol: quote.tokenIn.symbol, address: quote.tokenIn.address },
         tokenOut: { symbol: quote.tokenOut.symbol, address: quote.tokenOut.address },
@@ -125,6 +127,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         deadline: quote.deadline,
       });
       if (receipt.recorded && receipt.reason) quote.warnings.push(receipt.reason);
+      if (!receipt.recorded && receipt.reason === 'intent already used') {
+        return res.status(409).json({ ok: false, error: 'This intent already produced a confirmed swap; run a new cycle', code: 'intent_consumed' });
+      }
       if (!receipt.recorded) {
         // Fail closed: calldata that the store did not see cannot be confirmed
         // later, so it is not handed out. The quote itself stays visible.

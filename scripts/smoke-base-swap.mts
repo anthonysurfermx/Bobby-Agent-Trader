@@ -81,10 +81,11 @@ for (const [tokenIn, tokenOut, amount] of pairs) {
   assert.ok(Number(p.intent!.preview.amountOut) > 0 && p.intent!.preview.stockReference!.usdPrice > 0);
   assert.ok(!('tx' in p.intent!.preview) && !('execution' in p), 'intent carries no calldata');
   const i = p.intent!;
-  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt }, i.intentToken), true, 'intent token verifies for its own fields');
-  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: '0x1111111111111111111111111111111111111111', tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt }, i.intentToken), false, 'another wallet cannot use the token');
-  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: '500.00', expiresAt: i.expiresAt }, i.intentToken), false, 'another amount cannot use the token');
-  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt }, i.intentToken, i.expiresAt + 1), false, 'expired token is refused');
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt, jti: i.jti }, i.intentToken), true, 'intent token verifies for its own fields');
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt, jti: 'cd'.repeat(16) }, i.intentToken), false, 'another jti cannot use the token');
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: '0x1111111111111111111111111111111111111111', tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt, jti: i.jti }, i.intentToken), false, 'another wallet cannot use the token');
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: '500.00', expiresAt: i.expiresAt, jti: i.jti }, i.intentToken), false, 'another amount cannot use the token');
+  assert.equal(verifyIntent({ cycleId: i.cycleId, wallet: i.wallet, tokenIn: i.tokenIn, tokenOut: i.tokenOut, amount: i.amount, expiresAt: i.expiresAt, jti: i.jti }, i.intentToken, i.expiresAt + 1), false, 'expired token is refused');
   const crypto = await prepareBaseIntent({ tokenSymbol: 'cbBTC', amountUsd: 20, cycleId: '00000000-0000-4000-8000-000000000001', wallet: empty });
   assert.equal(crypto.ok, false, 'agent intents are tokenized stocks only');
   console.log(`intent: NVDA $20 → ≈${p.intent!.preview.amountOut} NVDAc, ref $${p.intent!.preview.stockReference!.usdPrice.toFixed(2)}, cycle-tagged + signed for the wallet, no calldata`);

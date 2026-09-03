@@ -587,9 +587,11 @@ async function readStockReference(stock: BaseSwapToken, executionUsdPerToken: nu
   ], false);
   if (String(symbol) !== stock.symbol || Number(decimals) !== stock.decimals) throw new Error('pinned B20 metadata no longer matches onchain metadata');
   if ((totalSupply as bigint) <= 0n) throw new Error('B20 token has no circulating supply');
-  const answer = (round as readonly [bigint, bigint, bigint, bigint, bigint])[1];
-  const updatedAt = Number((round as readonly [bigint, bigint, bigint, bigint, bigint])[3]);
+  const rd = round as readonly [bigint, bigint, bigint, bigint, bigint];
+  const answer = rd[1];
+  const updatedAt = Number(rd[3]);
   if (answer <= 0n || !updatedAt) throw new Error('stock reference feed returned no usable price');
+  if (rd[4] < rd[0]) throw new Error('stock reference round is incomplete (answeredInRound < roundId)');
   const usdPrice = Number(formatUnits(answer, Number(feedDecimals)));
   const marketDeviationPct = Math.abs(executionUsdPerToken / usdPrice - 1) * 100;
   return {
@@ -891,8 +893,14 @@ export async function fetchOnchainStockExposureUsd(wallet: string): Promise<numb
       { address: feed, abi: CHAINLINK_ABI, functionName: 'decimals' },
       { address: feed, abi: CHAINLINK_ABI, functionName: 'latestRoundData' },
     ], false)) as [number, readonly [bigint, bigint, bigint, bigint, bigint]];
-    const price = round[1] > 0n ? Number(formatUnits(round[1], Number(dec))) : 0;
-    total += Number(formatUnits(bal, stocks[i].decimals)) * price;
+    // A reference that is not a reference is an error, not a zero: the caller
+    // fails closed. Complete round, positive answer, younger than the 96h bound.
+    const [roundId, answer, , updatedAt, answeredInRound] = round;
+    const ageSec = Math.floor(Date.now() / 1000) - Number(updatedAt);
+    if (answer <= 0n || answeredInRound < roundId || Number(updatedAt) === 0 || ageSec > STOCK_REFERENCE_MAX_AGE_SEC) {
+      throw new Error(`${stocks[i].symbol}: Chainlink reference unusable (answer ${answer}, round ${roundId}/${answeredInRound}, age ${ageSec}s)`);
+    }
+    total += Number(formatUnits(bal, stocks[i].decimals)) * Number(formatUnits(answer, Number(dec)));
   }
   return total;
 }

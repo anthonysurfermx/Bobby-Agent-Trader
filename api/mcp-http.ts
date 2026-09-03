@@ -56,7 +56,7 @@ const BASE_URL = BOBBY_PROTOCOL_BASE_URL;
 const PREMIUM_TOOLS = new Set(['bobby_analyze', 'bobby_debate', 'bobby_security_scan', 'bobby_wallet_portfolio', 'bobby_judge']);
 // ---- Tool Definitions ----
 const TOOLS = [
-  { name: 'bobby_analyze', description: 'Get Bobby\'s full market analysis with conviction score. Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol (BTC, ETH, SOL, OKB)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['symbol'] } },
+  { name: 'bobby_analyze', description: 'Get Bobby\'s full market analysis with conviction score. Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol (BTC, ETH, SOL) or a Base tokenized stock (NVDAc, AAPLc, METAc, GOOGLc)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['symbol'] } },
   { name: 'bobby_debate', description: 'Trigger a 3-agent debate (Alpha Hunter vs Red Team vs CIO). Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { question: { type: 'string', description: 'Trading question to debate' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['question'] } },
   { name: 'bobby_recommend', description: 'Get Bobby\'s current actionable recommendation: symbol, direction, conviction, entry/stop/target, and guardrail status. The signal your agent needs to decide.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol (BTC, ETH, SOL). Omit for Bobby\'s best current pick.' } } } },
   { name: 'bobby_brief', description: 'One-shot compact briefing (~400 tokens). Signal + track record + guardrails in a single call. Optimized for token-constrained agents.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol. Omit for Bobby\'s current pick.' } } } },
@@ -64,8 +64,8 @@ const TOOLS = [
   { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time data sources. Use sections param to filter: prices,regime,whale,sentiment,technical,macro.', inputSchema: { type: 'object', properties: { sections: { type: 'string', description: 'Comma-separated sections to include: prices,regime,whale,sentiment,technical,macro,funding,oi,prediction,traders,security. Omit for all.' } } } },
   { name: 'bobby_uniswap_quote', description: 'Read-only quote for Coinbase B20 tokenized stocks through direct USDC pools on Uniswap V3, Base (8453). Never returns calldata.', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'USDC', description: 'USDC or a supported B20 token (AAPLc, GOOGLc, METAc, NVDAc; underlying ticker aliases accepted)' }, tokenOut: { type: 'string', default: 'NVDAc', description: 'USDC or a supported B20 token; one side must be USDC' }, amount: { type: 'string', default: '10', description: 'Human-readable exact-input amount' }, amountIn: { type: 'string', description: 'Alias for amount' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
   { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades).', inputSchema: { type: 'object', properties: {} } },
-  { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'xlayer' } } } },
-  { name: 'bobby_wallet_portfolio', description: 'Portfolio of any wallet address (multi-chain). Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '196' } }, required: ['address'] } },
+  { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'base' } } } },
+  { name: 'bobby_wallet_portfolio', description: 'Portfolio of any wallet address (multi-chain). Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '8453' } }, required: ['address'] } },
   { name: 'bobby_security_scan', description: 'Scan token contract for honeypot/rug risks. Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '1' } }, required: ['address'] } },
   { name: 'bobby_dex_trending', description: 'Hot trending tokens on-chain right now.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' } } } },
   { name: 'bobby_dex_signals', description: 'Smart money / whale / KOL buy signals.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' }, type: { type: 'string', default: 'smart_money' } } } },
@@ -127,11 +127,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
     const promises: Promise<unknown>[] = [fetch(`${BASE_URL}/api/bobby-intel`).then(r => r.json())];
     if (wantsLeaderboard) {
-      promises.push(
-        fetch(`${BASE_URL}/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5`)
-          .then(r => r.ok ? r.json() : null)
-          .catch(() => null)
-      );
+      promises.push(Promise.resolve(null)); // OKX OnchainOS smart-money leaderboard retired 2026-09-03
     }
 
     const [intelData, lbData] = await Promise.all(promises) as [{ briefing?: string }, { leaderboard?: unknown[] } | null];
@@ -333,7 +329,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
   if (name === 'bobby_wallet_balance') {
     const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
-      body: JSON.stringify({ action: 'balance', params: { chain: args.chain || 'xlayer' } }),
+      body: JSON.stringify({ action: 'balance', params: { chain: args.chain || 'base' } }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
   }
@@ -341,7 +337,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
   if (name === 'bobby_wallet_portfolio') {
     const res = await fetch(`${BASE_URL}/api/bobby-wallet`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
-      body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '196' } }),
+      body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '8453' } }),
     });
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
   }

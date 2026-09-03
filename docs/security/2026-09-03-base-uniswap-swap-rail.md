@@ -111,6 +111,20 @@ Left as-is, on purpose: ESLint reports pre-existing warnings (0 errors) across f
 | P1 | Gate blocked every normal trade at $500; SELL scored as a short; 48h expiry hid held lots | `maxDailyLoss` now means what it says: realized losses in the last 24h for the wallet (new gate input); position size is bounded by the exposure cap only. Exposure is **what the wallet holds on-chain** in tokenized stocks at the Chainlink reference (`fetchOnchainStockExposureUsd`) — a sold lot is gone, a held lot never expires. In the RPC a SELL is settled at confirm (a realization, not a position); `settle-trades` ignores it. Tests updated: the "KNOWN QUIRK" is gone. |
 | — | Apple | Unchanged and restated: iOS stays analysis, learning, character, progress. No swaps, no transactional wallet, no perps, no trade buttons, no links around it. `BASE_STOCK_SWAPS_ENABLED` stays `false` until the territorial questions are settled. |
 
+## Review round 5 → what changed
+
+Owned first: the round-4 note said "all green" while `test:protocol-write-safety` failed on an assertion I had just invalidated (`tradingAuthHeaders()` removed from the cycle). Fixed: the test now asserts the *absence* of any OKX auth path in the cycle, and every suite below was re-run after the last edit.
+
+| # | Finding | Change |
+|---|---|---|
+| P1 | `/api/bobby-pnl` public with per-trade rows across all wallets | Two scopes: anonymous → aggregates only (`openPositions`/`closedPositions` empty); signed in (wallet session or Supabase bearer) → that identity's own rows (`user_id` / `owner_address`). Service headers stay server-side; no row leaves for an anonymous caller. |
+| P1 | PnL contract broke screens; positions not net of sells; sells and 48h "realized" PnL | `startingCapital` (= capital deployed), `leverage: '1x'`, `totalTrades`, `currentEquity`, `winRate` all present; `BobbyChallengePage`, `PerformanceStats`, `TradeHistory` and the HUD keep working with zero trades. Open lots are BUY units minus later SELL units per symbol (FIFO). `settle-trades` settles a BUY **only** when a later SELL by the same wallet realized it (exit = the sell's price); nothing is realized by the clock any more. |
+| P1 | One global Polymarket edge lifted every stock | `calculateStockConviction`: the filter score *is* the evidence; Polymarket adds only when a market is about that asset (name/ticker in the title, up to +0.3). At-reference stocks (45) stay under the 0.7 gate; a clear discount + momentum (70) passes on its own. |
+| P1 | Intent tokens reusable for an hour | Each intent carries a random `jti` inside the HMAC. The receipt store enforces single use: a still-`built` row for the jti is superseded by a re-quote (needed after an approval), a `confirmed` row spends it for good (`409 intent_consumed`); partial unique index `(wallet_address, intent_jti)`. E2E: supersede then refuse. |
+| P1 | Guards failed open (RPC/Chainlink/Supabase → 0) | Exposure and the realized-loss ledger return errors, not zeros; if either is unavailable the cycle approves **nothing** (`blocked-risk-inputs-unavailable`). Chainlink rounds are validated (positive answer, `answeredInRound ≥ roundId`, `updatedAt` within 96h) in both the exposure read and the reference read; a bad round throws. |
+| P1 | Circuit breaker global; `status: 'halted'` not in the schema | Breaker filters by `owner_address` for the requesting wallet (cron cycles never trade). A halted cycle logs `status: 'completed'` with the halt in `llm_reasoning`. |
+| P2 | Base-only not guaranteed by environment | `PROTOCOL_CHAIN=xlayer` now throws at boot ("retired"); `.env.example` says `base` / `8453`; MCP wallet tools default to `base`/`8453`; the OnchainOS leaderboard call in `mcp-http` is gone. X Layer config remains only for explorer links and read-only archive views. |
+
 ## Verification run
 
 ```

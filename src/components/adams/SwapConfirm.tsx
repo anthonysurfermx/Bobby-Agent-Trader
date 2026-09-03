@@ -37,6 +37,7 @@ export interface TradeIntent {
   cycleId: string;
   wallet: string;
   expiresAt: number;
+  jti: string;
   intentToken: string;
   preview: {
     amountOut: string;
@@ -153,7 +154,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
         amount: fromAmount,
         wallet,
         stockEligibilityConfirmed: acknowledged,
-        ...(trade.intent ? { cycleId: trade.intent.cycleId, intentToken: trade.intent.intentToken, intentExpiresAt: trade.intent.expiresAt } : {}),
+        ...(trade.intent ? { cycleId: trade.intent.cycleId, intentToken: trade.intent.intentToken, intentExpiresAt: trade.intent.expiresAt, intentJti: trade.intent.jti } : {}),
       }),
     });
     const data = await res.json();
