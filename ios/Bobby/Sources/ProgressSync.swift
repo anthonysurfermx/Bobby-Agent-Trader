@@ -30,9 +30,21 @@ final class ProgressSync {
         guard let token = await AccountSession.shared.accessToken() else { status = .unauthenticated; return }
         inflight = true; status = .syncing
         defer { inflight = false }
-        do {
-            let pending = store.pendingAwards
+        if let uid = AccountSession.shared.session?.userId { store.bind(to: uid) }
+        // The server accepts 50 events per request: drain the queue in batches, never drop.
+        var rounds = 0
+        repeat {
+            rounds += 1
+            let pending = Array(store.pendingAwards.prefix(50))
             let mustPost = !pending.isEmpty || store.syncedAt == nil
+            let ok = await round(store: store, profile: profile, platform: platform, token: token, pending: pending, mustPost: mustPost)
+            if !ok { return }
+        } while !store.pendingAwards.isEmpty && rounds < 20
+        status = .synced
+    }
+
+    private func round(store: CompanionStore, profile: AgentProfile, platform: String, token: String, pending: [PendingAward], mustPost: Bool) async -> Bool {
+        do {
             var req = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/progress"))
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             req.timeoutInterval = 30
@@ -46,16 +58,17 @@ final class ProgressSync {
             }
             let (data, response) = try await URLSession.shared.data(for: req)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if code == 401 { AccountSession.shared.signOut(); status = .unauthenticated; return }
+            if code == 401 { AccountSession.shared.signOut(); status = .unauthenticated; return false }
             guard (200..<300).contains(code), let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let p = json["progress"] as? [String: Any] else { status = .error; return }
+                  let p = json["progress"] as? [String: Any] else { status = .error; return false }
             let acked = ((json["results"] as? [[String: Any]]) ?? []).compactMap { $0["id"] as? String }
             let server = ServerProgress(xp: p["xp"] as? Int ?? 0, streak: p["streak"] as? Int ?? 0, aura: p["aura"] as? Int ?? 0, routeIndex: p["routeIndex"] as? Int ?? 0,
                                         lastDay: p["lastDay"] as? String, dailyAwards: p["dailyAwards"] as? Int ?? 0, dailyAwardsDay: p["dailyAwardsDay"] as? String, companionId: p["companionId"] as? String)
             store.applyServer(server, acknowledged: acked)
-            status = .synced
+            return true
         } catch {
             status = .error
+            return false
         }
     }
 }

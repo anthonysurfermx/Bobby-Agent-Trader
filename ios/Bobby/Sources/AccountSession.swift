@@ -48,8 +48,29 @@ final class AccountSession: ObservableObject {
         }
     }
 
-    func signOut() {
+    func signOut(store: CompanionStore? = nil) {
         session = nil; Keychain.delete(service: keychainService)
+        store?.unbind()
+    }
+
+    /// Identity link with the web desk: issue a 6-char code here, or claim one shown there.
+    func link(action: String, code: String? = nil) async -> (ok: Bool, code: String?, message: String) {
+        guard let token = await accessToken() else { return (false, nil, L.t("Sign in first", "Inicia sesión primero")) }
+        var req = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/identity-link"))
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["action": action]
+        if let code { body["code"] = code.uppercased() }
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            let ok = (200..<300).contains((response as? HTTPURLResponse)?.statusCode ?? 0)
+            if ok, action == "issue" { return (true, json["code"] as? String, L.t("Enter this code on bobbyprotocol.xyz → Saved → Link", "Escribe este código en bobbyprotocol.xyz → Guardado → Vincular")) }
+            if ok { let xp = (json["linked"] as? [String: Any])?["xp"] as? Int ?? 0; return (true, nil, L.t("Linked · \(xp) XP in total", "Vinculado · \(xp) XP en total")) }
+            return (false, nil, json["error"] as? String ?? "HTTP error")
+        } catch { return (false, nil, error.localizedDescription) }
     }
 
     // ---- Sign in with Apple ----

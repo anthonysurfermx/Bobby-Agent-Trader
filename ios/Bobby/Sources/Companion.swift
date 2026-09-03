@@ -218,6 +218,7 @@ final class CompanionStore: ObservableObject {
         static let syncedAt = "companion.syncedAt"
         static let aura = "companion.aura"
         static let routeIndex = "companion.routeIndex"
+        static let owner = "companion.ownerUserId"
     }
 
     @Published var companionId: String? {
@@ -236,9 +237,13 @@ final class CompanionStore: ObservableObject {
     /// The UI plays the unlock moment for each, in order, then clears it.
     @Published var pendingToolUnlocks: [CompanionTool] = []
     /// Awards not yet acknowledged by the server (offline / signed out). The server re-applies the rules.
+    /// Queue key is per account: awards earned under one Apple ID never travel to another.
+    private var pendingKey: String { Key.pending + "." + (ownerUserId ?? "local") }
     @Published private(set) var pendingAwards: [PendingAward] {
-        didSet { defaults.set(try? JSONEncoder().encode(pendingAwards), forKey: Key.pending) }
+        didSet { defaults.set(try? JSONEncoder().encode(pendingAwards), forKey: pendingKey) }
     }
+    /// Which account the local counters belong to (nil = anonymous device state).
+    private(set) var ownerUserId: String? { didSet { defaults.set(ownerUserId, forKey: Key.owner) } }
     /// Last successful reconcile with /api/progress; nil = local only.
     @Published private(set) var syncedAt: Date? { didSet { defaults.set(syncedAt, forKey: Key.syncedAt) } }
     /// Trader Land soft currency and Discovery Route position — server-owned, mirrored here.
@@ -249,14 +254,17 @@ final class CompanionStore: ObservableObject {
         companionId = defaults.string(forKey: Key.companion)
         disciplineXP = defaults.integer(forKey: Key.xp)
         disciplineStreak = defaults.integer(forKey: Key.streak)
-        pendingAwards = defaults.data(forKey: Key.pending).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
+        ownerUserId = defaults.string(forKey: Key.owner)
+        let queueKey = Key.pending + "." + (defaults.string(forKey: Key.owner) ?? "local")
+        pendingAwards = defaults.data(forKey: queueKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
         syncedAt = defaults.object(forKey: Key.syncedAt) as? Date
         aura = defaults.integer(forKey: Key.aura)
         routeIndex = defaults.integer(forKey: Key.routeIndex)
         pendingEvolution = nil
     }
 
-    /// Server state wins on the counters; the phone keeps its companion when the server has none.
+    /// Server state wins on every counter, including the daily cap, so an award
+    /// already spent on another device is not shown optimistically here.
     func applyServer(_ server: ServerProgress, acknowledged: [String]) {
         let ack = Set(acknowledged)
         disciplineXP = server.xp
@@ -264,8 +272,41 @@ final class CompanionStore: ObservableObject {
         aura = server.aura
         routeIndex = server.routeIndex
         if companionId == nil, let c = server.companionId { companionId = c }
+        let iso = ISO8601DateFormatter(); iso.formatOptions = [.withFullDate]
+        if let d = server.lastDay.flatMap({ iso.date(from: $0) }) { defaults.set(d, forKey: Key.lastDay) } else { defaults.removeObject(forKey: Key.lastDay) }
+        defaults.set(server.dailyAwards, forKey: Key.dailyAwards)
+        if let d = server.dailyAwardsDay.flatMap({ iso.date(from: $0) }) { defaults.set(d, forKey: Key.dailyAwardsDay) } else { defaults.removeObject(forKey: Key.dailyAwardsDay) }
         pendingAwards.removeAll { ack.contains($0.id) }
         syncedAt = Date()
+    }
+
+    /// Bind the local state to an account. Same account (or first sign-in from
+    /// anonymous): keep everything, the anonymous queue becomes this account's.
+    /// A different account: the previous owner's queue stays under its own key,
+    /// the counters are cleared and the server fills them on the next sync.
+    func bind(to userId: String) {
+        if ownerUserId == userId { return }
+        let previous = ownerUserId
+        if previous == nil {
+            let local = pendingAwards
+            ownerUserId = userId
+            pendingAwards = local           // migrates the anonymous queue to this account
+            defaults.removeObject(forKey: Key.pending + ".local")
+            return
+        }
+        ownerUserId = userId
+        pendingAwards = defaults.data(forKey: pendingKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
+        disciplineXP = 0; disciplineStreak = 0; aura = 0; routeIndex = 0; syncedAt = nil
+        defaults.removeObject(forKey: Key.lastDay); defaults.set(0, forKey: Key.dailyAwards); defaults.removeObject(forKey: Key.dailyAwardsDay)
+    }
+
+    /// Signing out keeps the device usable but detaches the counters from the account.
+    func unbind() {
+        guard ownerUserId != nil else { return }
+        ownerUserId = nil
+        pendingAwards = defaults.data(forKey: pendingKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
+        disciplineXP = 0; disciplineStreak = 0; aura = 0; routeIndex = 0; syncedAt = nil
+        defaults.removeObject(forKey: Key.lastDay); defaults.set(0, forKey: Key.dailyAwards); defaults.removeObject(forKey: Key.dailyAwardsDay)
     }
 
     var companion: Companion? { bobbyCompanions.first { $0.id == companionId } }
@@ -341,7 +382,6 @@ final class CompanionStore: ObservableObject {
         defaults.set(now, forKey: Key.lastDay)
         // Queue for the server (same rules there; it is the authority once signed in).
         pendingAwards.append(PendingAward(id: UUID().uuidString.lowercased(), kind: kind, at: ISO8601DateFormatter().string(from: now), tzOffsetMin: -TimeZone.current.secondsFromGMT(for: now) / 60))
-        if pendingAwards.count > 50 { pendingAwards.removeFirst(pendingAwards.count - 50) }
         return points
     }
 }
