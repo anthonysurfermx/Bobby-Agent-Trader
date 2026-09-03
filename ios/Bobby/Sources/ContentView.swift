@@ -320,8 +320,9 @@ final class BobbyViewModel: ObservableObject {
             // earns more because restraint is the behavior Bobby is teaching.
             // awardedXP is what the daily cap ACTUALLY granted — the UI shows
             // that number, never the intent.
-            let awardedXP = companions.awardDiscipline(answer.isNoTrade ? 20 : 10)
+            let awardedXP = companions.awardDiscipline(answer.isNoTrade ? 20 : 10, kind: answer.isNoTrade ? "no_trade_respected" : "read_complete")
             if awardedXP > 0 { streak = companions.disciplineStreak }
+            Task { await ProgressSync.shared.sync(store: companions, profile: profile) }
             if answer.isNoTrade {
                 withAnimation(.spring(duration: 0.52, bounce: 0.24)) {
                     noTradeMoment = NoTradeMoment(
@@ -360,6 +361,8 @@ struct ContentView: View {
     @State private var showSquad = false
     @State private var showBoard = false
     @State private var showRiskNotice = false
+    @State private var showAccount = false
+    @ObservedObject private var account = AccountSession.shared
     @State private var inspectedTool: CompanionTool?
     @State private var showCatalog = false
     @State private var showWorld = false
@@ -414,7 +417,10 @@ struct ContentView: View {
             vm.say(L.t("I evolved. Call me \(evolvedName) now.\(levelTone(newLevel))",
                        "Evolucioné. Ahora dime \(evolvedName).\(levelTone(newLevel))"))
         }
-        .onAppear { if vm.profile.acceptedRiskNotice && vm.profile.onboarded { vm.bootGreetingIfNeeded() } }
+        .onAppear {
+            if vm.profile.acceptedRiskNotice && vm.profile.onboarded { vm.bootGreetingIfNeeded() }
+            Task { await ProgressSync.shared.sync(store: vm.companions, profile: vm.profile) }
+        }
         .task { await SpeechInput.refreshVocabularyIfStale() }
         .onChange(of: vm.input) { vm.updateSuggestions() }
         // Hands-free loop: when a voice-driven answer finishes speaking, the
@@ -454,6 +460,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showRiskNotice) {
             RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
+        }
+        .sheet(isPresented: $showAccount) {
+            AccountSheet(store: vm.companions, profile: vm.profile) { showAccount = false }
         }
         .sheet(isPresented: $showSquad) {
             MascotGalleryView(store: vm.companions, voice: vm.voice, voiceId: vm.profile.voiceId)
@@ -607,6 +616,9 @@ struct ContentView: View {
                     // Reachable from every screen, not just first-run onboarding.
                     Button { skinSnapshotToken += 1 } label: {
                         Label(L.t("Share my skin", "Compartir mi skin"), systemImage: "square.and.arrow.up")
+                    }
+                    Button { showAccount = true } label: {
+                        Label(account.isSignedIn ? L.t("Progress saved · account", "Progreso guardado · cuenta") : L.t("Save progress", "Guardar progreso"), systemImage: account.isSignedIn ? "checkmark.icloud" : "icloud")
                     }
                     Button { showRiskNotice = true } label: {
                         Label(L.t("Risk notice", "Aviso de riesgo"), systemImage: "exclamationmark.triangle")

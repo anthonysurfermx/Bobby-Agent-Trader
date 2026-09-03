@@ -45,6 +45,10 @@ targets:
         buildPhase: resources
     dependencies:
       - package: GLTFKit2
+    entitlements:
+      path: Bobby.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: xyz.bobbyprotocol.bobby
