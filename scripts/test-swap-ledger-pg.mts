@@ -33,9 +33,9 @@ if (!url) {
   }
 }
 const pool = new pg.Pool({ connectionString: url, max: 4 });
+const schema = `ledger_test_${Date.now()}`;
 const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20260903000009_swap_receipts.sql', 'utf8')
   .replaceAll('set search_path = public', `set search_path = ${schema}`);
-const schema = `ledger_test_${Date.now()}`;
 
 // Everything below is qualified with the scratch schema; `public` is never
 // named. The migration text is rewritten the same way before it runs.
@@ -53,7 +53,9 @@ create unique index if not exists agent_trades_idem_uidx on S.agent_trades (idem
 
 async function withClient<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect();
-  try { return await fn(c); } finally { c.release(); }
+  try { return await fn(c); }
+  catch (e) { try { await c.query('rollback'); } catch { /* nothing open */ } throw e; }
+  finally { c.release(); }
 }
 
 const wallet = '0x' + 'ab'.repeat(20);
@@ -74,6 +76,13 @@ async function lots(c: pg.PoolClient, symbol: string) {
 }
 
 await withClient(async (c) => {
+  // Supabase ships anon / authenticated / service_role; a bare Postgres does
+  // not, and the migration grants to them. Same stand-in idea as FIXTURE.
+  await c.query(`do $$ begin
+    if not exists (select from pg_roles where rolname = 'anon') then create role anon noinherit; end if;
+    if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated noinherit; end if;
+    if not exists (select from pg_roles where rolname = 'service_role') then create role service_role noinherit bypassrls; end if;
+  end $$;`);
   await c.query(`create schema ${schema}`);
   await c.query(`set search_path to ${schema}, public`);
 });
