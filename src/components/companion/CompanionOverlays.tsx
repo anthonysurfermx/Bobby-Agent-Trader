@@ -86,7 +86,7 @@ export function ToolBelt({ companion, xp, onTap, onPet, onPlus, onWorld }: { com
       )}
       <button onClick={onPlus} title={t('What else you can earn', 'Qué más puedes conseguir')} className="h-11 w-11 rounded-full flex items-center justify-center border border-dashed border-white/20 text-white/50"><Plus size={14} /></button>
       {/* The world slot: the map we are building next, fog of war and all. */}
-      <button onClick={onWorld} title={t('Trader Land · soon', 'Trader Land · pronto')} className="relative h-11 w-11 rounded-full flex items-center justify-center overflow-visible" style={{ border: `1px solid ${GOLD}99`, backgroundImage: `url(${WORLD_MAP_ART})`, backgroundSize: '300%', backgroundPosition: '50% 58%' }}>
+      <button onClick={onWorld} title="Trader Land" className="relative h-11 w-11 rounded-full flex items-center justify-center overflow-visible" style={{ border: `1px solid ${GOLD}99`, backgroundImage: `url(${WORLD_MAP_ART})`, backgroundSize: '300%', backgroundPosition: '50% 58%' }}>
         <span className="absolute inset-0 rounded-full bg-black/45" />
         <motion.span className="absolute inset-0 rounded-full" style={{ border: `1px solid ${GOLD}` }} animate={{ scale: [1, 1.45], opacity: [0.8, 0] }} transition={{ repeat: Infinity, duration: 1.7, ease: 'easeOut' }} />
         <MapIcon size={14} className="relative" style={{ color: GOLD }} />

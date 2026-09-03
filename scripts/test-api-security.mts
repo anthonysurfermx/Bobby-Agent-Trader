@@ -62,10 +62,13 @@ try {
 
   let fetchCalls = 0;
   let observedAccessKey = '';
-  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
-    fetchCalls += 1;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const inputUrl = String(input);
+    const dbUrl = process.env.BOBBY_SUPABASE_URL || process.env.SUPABASE_URL || '';
+    const isRateLimitCall = Boolean(dbUrl && inputUrl.startsWith(`${dbUrl.replace(/\/+$/, '')}/rest/v1/api_cache`));
+    if (!isRateLimitCall) fetchCalls += 1;
     const headers = init?.headers as Record<string, string> | undefined;
-    observedAccessKey = headers?.['OK-ACCESS-KEY'] || '';
+    if (!isRateLimitCall) observedAccessKey = headers?.['OK-ACCESS-KEY'] || '';
     return new Response(JSON.stringify({
       code: '0',
       data: [{ totalEq: '100', availBal: '90', details: [] }],

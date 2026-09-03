@@ -412,7 +412,9 @@ export class MascotScene {
         hand: { p: [0.53 * R, -0.42 * R, 0.68 * R], size: 0.34 * R },
       },
       kora: {
-        headset: { p: [0, 0.54 * R, 0.72 * R], size: 0.68 * R },
+        // Calibrated against Kora's cat silhouette and mirrored in iOS 13.
+        // The previous depth made the right cup look detached at her neck.
+        headset: { p: [0, 0.58 * R, 0.64 * R], size: 0.68 * R },
         shoulder: { p: [-0.22 * R, 0.14 * R, 0.78 * R], size: 0.28 * R },
         hand: { p: [0.24 * R, -0.46 * R, 0.80 * R], size: 0.30 * R },
       },

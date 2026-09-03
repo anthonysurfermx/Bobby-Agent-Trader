@@ -1197,7 +1197,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               needsApproval: !!approveTx,
               approveTx: approveTx || undefined,
               swapTx,
-              quote,
+              quote: { ...quote, minReceived: swapTx.minReceiveAmount },
+              disclosure: {
+                router: swapTx.to,
+                tokenContract: approveTx?.to || null,
+                spender: approveTx?.spender || null,
+                minReceived: swapTx.minReceiveAmount,
+                note: 'Router and spender passed Bobby allow-lists; Bobby never signs for you.',
+              },
             },
           });
         } catch (err) {

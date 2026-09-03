@@ -27,6 +27,7 @@ const XLAYER_TOKENS: Record<string, string> = {
 type SwapState = 'idle' | 'quoting' | 'quoted' | 'switching_chain' | 'swapping' | 'confirmed' | 'error';
 
 export function XLayerSwapCard({ symbol, direction, conviction, entryPrice }: XLayerSwapProps) {
+  const [acknowledged, setAcknowledged] = useState(false);
   const [state, setState] = useState<SwapState>('idle');
   const [quote, setQuote] = useState<any>(null);
   const [error, setError] = useState('');
@@ -44,6 +45,7 @@ export function XLayerSwapCard({ symbol, direction, conviction, entryPrice }: XL
     if (!address) { setError('Connect your wallet first'); setState('error'); return; }
     if (!amount || parseFloat(amount) <= 0) { setError('Enter an amount'); setState('error'); return; }
     setState('quoting');
+    setAcknowledged(false);
     try {
       // Convert amount to wei (OKB has 18 decimals)
       const amountWei = BigInt(Math.floor(parseFloat(amount) * 1e18)).toString();
@@ -186,8 +188,16 @@ export function XLayerSwapCard({ symbol, direction, conviction, entryPrice }: XL
       {state === 'quoted' && (
         <div className="space-y-2">
           <div className="text-green-400/60">Quote ready · OKX DEX via X Layer</div>
+          <div className="mt-1 rounded border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[10px] text-white/70 space-y-1">
+            <div>CHAIN · X Layer (196)</div>
+            <div className="break-all">SWAP CONTRACT · {(Array.isArray(quote) ? quote[0]?.tx?.to : quote?.tx?.to) ?? '—'}</div>
+            <div>SPENDER · Not required (native OKB)</div>
+            <div>MIN RECEIVED · {(Array.isArray(quote) ? quote[0]?.tx?.minReceiveAmount : quote?.tx?.minReceiveAmount) ?? '—'} wei</div>
+            <div>VALUE · {(Array.isArray(quote) ? quote[0]?.tx?.value : quote?.tx?.value) ?? '0'} wei</div>
+            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={acknowledged} onChange={(ev) => setAcknowledged(ev.target.checked)} />I checked the contract, chain and minimum received.</label>
+          </div>
           <div className="flex gap-2">
-            <button onClick={executeSwap}
+            <button disabled={!acknowledged} onClick={executeSwap}
               className="flex-1 py-1.5 px-3 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors rounded">
               Sign & Execute
             </button>

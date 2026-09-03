@@ -6,6 +6,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { checkSwapTx, DexRefusal, minReceived, requireAllowedRouters } from './_lib/dex-allowlist.js';
 import { hmacSign } from './_lib/okx-hmac.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 
@@ -29,8 +30,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!/^\d{1,10}$/.test(String(chainId)) || !addressPattern.test(String(fromToken))
     || !addressPattern.test(String(toToken)) || !addressPattern.test(String(userWalletAddress))
     || !/^\d{1,78}$/.test(String(amount)) || !Number.isFinite(slippageNumber)
-    || slippageNumber <= 0 || slippageNumber > 0.5) {
+    || slippageNumber <= 0 || slippageNumber > 0.05) {
     return res.status(400).json({ error: 'Invalid swap parameters' });
+  }
+  try {
+    requireAllowedRouters(String(chainId));
+  } catch (error) {
+    const refusal = error as DexRefusal;
+    return res.status(503).json({ ok: false, error: refusal.message, code: refusal.code });
   }
 
   const apiKey = process.env.OKX_API_KEY;
@@ -51,7 +58,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       toTokenAddress: String(toToken),
       amount: String(amount),
       userWalletAddress: String(userWalletAddress),
-      slippage: String(slippageNumber),
+      // v6 names this percentage points (0.5 means 0.5%); the web client and
+      // Bobby's v5 helper use a fraction (0.005 means 0.5%).
+      slippagePercent: String(slippageNumber * 100),
       swapMode: 'exactIn',
     };
 
@@ -123,6 +132,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // No cache — swap calldata is time-sensitive
     res.setHeader('Cache-Control', 'no-store');
 
+    // Never forward the aggregator's transaction blindly (security review 2026-09-03).
+    let checked: { to: string; value: string };
+    try {
+      checked = checkSwapTx(String(chainId), d.tx || {}, String(fromToken), String(amount));
+    } catch (e) {
+      const r = e instanceof DexRefusal ? e : new DexRefusal(String(e));
+      console.error('[dex-swap] refused', r.code, r.message);
+      return res.status(r.code === 'dex_not_configured' ? 503 : 502).json({ ok: false, error: r.message, code: r.code });
+    }
+    const expectedMinOut = minReceived(String(d.routerResult.toTokenAmount), slippageNumber);
+    const minOut = String(d.tx.minReceiveAmount || expectedMinOut);
+    if (!/^\d{1,78}$/.test(minOut) || BigInt(minOut) < BigInt(expectedMinOut)) {
+      return res.status(502).json({ ok: false, error: 'Aggregator returned an unsafe minimum received amount', code: 'min_received_too_low' });
+    }
     return res.status(200).json({
       ok: true,
       swap: {
@@ -130,8 +153,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         toToken: d.routerResult.toToken.tokenSymbol,
         fromAmount: parseFloat(d.routerResult.fromTokenAmount) / (10 ** fromDecimals),
         toAmount: parseFloat(d.routerResult.toTokenAmount) / (10 ** toDecimals),
+        minReceived: Number(minOut) / (10 ** toDecimals),
         estimateGasFee: d.routerResult.estimateGasFee,
-        tx: d.tx,
+        tx: { ...d.tx, to: checked.to, value: checked.value },
+        disclosure: { chainId: Number(chainId), router: checked.to, spender: null, valueWei: checked.value, minReceived: minOut, note: 'Router allow-listed by Bobby; calldata built by the OKX aggregator.' },
       },
     });
   } catch (error) {

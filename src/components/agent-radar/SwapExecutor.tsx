@@ -36,6 +36,7 @@ interface SwapQuote {
   toToken: string;
   fromAmount: number;
   toAmount: number;
+  minReceived?: number;
   estimateGasFee: string;
   tx: {
     from: string;
@@ -47,6 +48,14 @@ interface SwapQuote {
   };
 }
 
+interface ApprovalData {
+  to: string;
+  spender: string;
+  data: string;
+  amount: string;
+  gasLimit?: string;
+}
+
 interface Props {
   defaultFrom?: string;
   defaultTo?: string;
@@ -56,9 +65,7 @@ interface Props {
 export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', className = '' }: Props) {
   const { address, isConnected, chain } = useAccount();
   const { switchChainAsync } = useSwitchChain();
-  // Every TOKENS entry is chainId '1' (Ethereum): pin it and switch before sending (review 2026-09-03).
-  const quoteChainId = Number(TOKENS[fromToken]?.chainId || '1');
-  const ensureChain = async () => { if (chain?.id !== quoteChainId) await switchChainAsync({ chainId: quoteChainId }); };
+  const [acknowledged, setAcknowledged] = useState(false);
   const { open: openWallet } = useAppKit();
   const { sendTransactionAsync } = useSendTransaction();
 
@@ -69,6 +76,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
 
   const [step, setStep] = useState<SwapStep>('idle');
   const [quote, setQuote] = useState<SwapQuote | null>(null);
+  const [approval, setApproval] = useState<ApprovalData | null>(null);
   const [txHash, setTxHash] = useState<Hex | undefined>();
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +93,11 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
   const to = TOKENS[toToken];
 
   const isNativeFrom = from?.address === NATIVE_TOKEN;
+  // Every TOKENS entry is chainId '1' (Ethereum): pin it and switch before sending (review 2026-09-03).
+  const quoteChainId = Number(from?.chainId || '1');
+  const ensureChain = useCallback(async () => {
+    if (chain?.id !== quoteChainId) await switchChainAsync({ chainId: quoteChainId });
+  }, [chain?.id, quoteChainId, switchChainAsync]);
 
   // ---- Step 1: Get swap quote + calldata ----
   const getQuote = useCallback(async () => {
@@ -93,6 +106,8 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
     setStep('quoting');
     setError(null);
     setQuote(null);
+    setApproval(null);
+    setAcknowledged(false);
     setTxHash(undefined);
 
     try {
@@ -107,20 +122,35 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
         slippage: (parseFloat(slippage) / 100).toString(),
       });
 
-      const res = await fetch(`/api/dex-swap?${params}`);
+      const approveParams = new URLSearchParams({
+        chainId: from.chainId,
+        tokenContractAddress: from.address,
+        approveAmount: amountRaw,
+      });
+      const [res, approveRes] = await Promise.all([
+        fetch(`/api/dex-swap?${params}`),
+        isNativeFrom ? Promise.resolve(null) : fetch(`/api/dex-approve?${approveParams}`),
+      ]);
       const data = await res.json();
 
       if (!data.ok) {
         throw new Error(data.error || data.msg || 'Failed to get swap route');
       }
+      let approvalData: ApprovalData | null = null;
+      if (approveRes) {
+        const approveJson = await approveRes.json();
+        if (!approveJson.ok) throw new Error(approveJson.error || 'Failed to verify approval data');
+        approvalData = approveJson.approve;
+      }
 
       setQuote(data.swap);
+      setApproval(approvalData);
       setStep('quoted');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Quote failed');
       setStep('error');
     }
-  }, [address, from, to, amount, slippage]);
+  }, [address, from, to, amount, slippage, isNativeFrom]);
 
   // ---- Step 2: Approve ERC-20 (skip for native) ----
   const approveToken = useCallback(async () => {
@@ -128,33 +158,23 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
       setStep('approved');
       return;
     }
+    if (!approval) {
+      setError('Verified approval data is missing. Request a new quote.');
+      setStep('error');
+      return;
+    }
 
     setStep('approving');
     setError(null);
 
     try {
-      const amountRaw = parseUnits(amount, from.decimals).toString();
-
-      const params = new URLSearchParams({
-        chainId: from.chainId,
-        tokenContractAddress: from.address,
-        approveAmount: amountRaw,
-      });
-
-      const res = await fetch(`/api/dex-approve?${params}`);
-      const data = await res.json();
-
-      if (!data.ok) {
-        throw new Error(data.error || 'Failed to get approval data');
-      }
-
       // Send the approve tx via wallet
       await ensureChain();
       await sendTransactionAsync({
         chainId: quoteChainId,
-        to: data.approve.to as Hex,
-        data: data.approve.data as Hex,
-        gas: data.approve.gasLimit ? BigInt(data.approve.gasLimit) : undefined,
+        to: approval.to as Hex,
+        data: approval.data as Hex,
+        gas: approval.gasLimit ? BigInt(approval.gasLimit) : undefined,
       });
 
       setStep('approved');
@@ -167,7 +187,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
       }
       setStep('error');
     }
-  }, [from, isNativeFrom, amount, sendTransactionAsync]);
+  }, [from, isNativeFrom, approval, sendTransactionAsync, quoteChainId, ensureChain]);
 
   // ---- Step 3: Execute the swap ----
   const executeSwap = useCallback(async () => {
@@ -197,12 +217,14 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
       }
       setStep('error');
     }
-  }, [quote, sendTransactionAsync]);
+  }, [quote, sendTransactionAsync, quoteChainId, ensureChain]);
 
   // ---- Reset ----
   const reset = () => {
     setStep('idle');
     setQuote(null);
+    setApproval(null);
+    setAcknowledged(false);
     setTxHash(undefined);
     setError(null);
   };
@@ -329,6 +351,40 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
                 </span>
               </div>
               <div className="flex items-center justify-between text-[10px]">
+                <span className="text-neutral-500">Swap contract</span>
+                <span className="text-neutral-400 font-mono text-[10px] break-all text-right">{quote.tx?.to}</span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-neutral-500">Chain</span>
+                <span className="text-neutral-400">Ethereum ({quoteChainId})</span>
+              </div>
+              {approval && (
+                <>
+                  <div className="flex items-center justify-between gap-3 text-[10px]">
+                    <span className="text-neutral-500 shrink-0">Approval token</span>
+                    <span className="text-neutral-400 font-mono break-all text-right">{approval.to}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-[10px]">
+                    <span className="text-neutral-500 shrink-0">Approval spender</span>
+                    <span className="text-neutral-400 font-mono break-all text-right">{approval.spender}</span>
+                  </div>
+                </>
+              )}
+              {!approval && isNativeFrom && (
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-neutral-500">Approval spender</span>
+                  <span className="text-neutral-400">Not required (native token)</span>
+                </div>
+              )}
+              <div className="flex justify-between text-xs">
+                <span className="text-neutral-500">Min received</span>
+                <span className="text-neutral-400">{quote.minReceived ?? '—'} {quote.toToken}</span>
+              </div>
+              <label className="flex items-center gap-2 text-[11px] text-neutral-400 cursor-pointer">
+                <input type="checkbox" checked={acknowledged} onChange={(ev) => setAcknowledged(ev.target.checked)} />
+                I checked the contract, the chain and the minimum received.
+              </label>
+              <div className="flex justify-between text-xs">
                 <span className="text-neutral-500">Est. gas</span>
                 <span className="text-neutral-400">{quote.estimateGasFee}</span>
               </div>
@@ -375,6 +431,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
             {step === 'quoted' && !isNativeFrom && (
               <div className="space-y-2">
                 <button
+                  disabled={!acknowledged}
                   onClick={approveToken}
                   className="w-full py-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-sm font-medium text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center justify-center gap-2"
                 >
@@ -398,6 +455,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'ETH', classNam
             {/* Step 3: Execute swap (shown after approve or immediately for native) */}
             {(step === 'approved' || (step === 'quoted' && isNativeFrom)) && (
               <button
+                disabled={!acknowledged}
                 onClick={executeSwap}
                 className="w-full py-3 bg-green-500/20 border border-green-500/40 rounded-xl text-sm font-bold text-green-400 hover:bg-green-500/30 transition-colors flex items-center justify-center gap-2"
               >

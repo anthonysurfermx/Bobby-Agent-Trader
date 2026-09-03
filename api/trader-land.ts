@@ -80,7 +80,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (piece.placed) return res.status(409).json({ error: 'Piece already placed' });
     const mine = cells(body.x, body.y, piece.item.footprint_w, piece.item.footprint_h, body.rotation);
     if (mine.some(([cx, cy]) => cx >= w.land.size || cy >= w.land.size)) return res.status(400).json({ error: `Outside the ${w.land.size}×${w.land.size} land` });
-    const occupied = new Set<string>();
+    // The Aura Core is part of every land even though it is not an inventory
+    // placement. Reserve its 2x2 footprint on the server as well as in both
+    // clients so web and iOS cannot persist a piece underneath it.
+    const occupied = new Set<string>(['3,3', '3,4', '4,3', '4,4']);
     for (const p of w.placements) {
       const inv = w.inventory.find((i) => i.id === p.inventory_id); if (!inv?.item) continue;
       for (const [cx, cy] of cells(p.x, p.y, inv.item.footprint_w, inv.item.footprint_h, p.rotation)) occupied.add(`${cx},${cy}`);

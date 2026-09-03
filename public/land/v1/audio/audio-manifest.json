@@ -1,0 +1,69 @@
+{
+  "version": "v01",
+  "sample_rate": 48000,
+  "bit_depth": 24,
+  "channels": 2,
+  "design": "orbital/tech/calm; fundamental 90-140 Hz (phone speakers), harmonics 220-420 Hz, sub 55 Hz for headphones only; no casino cues; aura_core_loop is a seamless 16 s loop (one LFO cycle); respect mute, silent mode, reduce motion and voice ducking 8-12 dB",
+  "cues": {
+    "land_enter_vrum": {
+      "file": "/land/v1/audio/land_enter_vrum.wav",
+      "seconds": 0.7,
+      "rms_dbfs": -16
+    },
+    "aura_core_loop": {
+      "file": "/land/v1/audio/aura_core_loop.wav",
+      "seconds": 16.0,
+      "rms_dbfs": -24
+    },
+    "orbit_whoosh_a": {
+      "file": "/land/v1/audio/orbit_whoosh_a.wav",
+      "seconds": 1.4,
+      "rms_dbfs": -22
+    },
+    "orbit_whoosh_b": {
+      "file": "/land/v1/audio/orbit_whoosh_b.wav",
+      "seconds": 1.6,
+      "rms_dbfs": -22
+    },
+    "orbit_whoosh_c": {
+      "file": "/land/v1/audio/orbit_whoosh_c.wav",
+      "seconds": 1.9,
+      "rms_dbfs": -22
+    },
+    "seed_reveal": {
+      "file": "/land/v1/audio/seed_reveal.wav",
+      "seconds": 0.9,
+      "rms_dbfs": -18
+    },
+    "placement_tick": {
+      "file": "/land/v1/audio/placement_tick.wav",
+      "seconds": 0.08,
+      "rms_dbfs": -16
+    },
+    "placement_invalid": {
+      "file": "/land/v1/audio/placement_invalid.wav",
+      "seconds": 0.12,
+      "rms_dbfs": -20
+    },
+    "placement_confirm": {
+      "file": "/land/v1/audio/placement_confirm.wav",
+      "seconds": 0.45,
+      "rms_dbfs": -17
+    },
+    "bloom_complete": {
+      "file": "/land/v1/audio/bloom_complete.wav",
+      "seconds": 1.4,
+      "rms_dbfs": -17
+    },
+    "fog_reveal": {
+      "file": "/land/v1/audio/fog_reveal.wav",
+      "seconds": 1.8,
+      "rms_dbfs": -20
+    },
+    "five_attributes_chord": {
+      "file": "/land/v1/audio/five_attributes_chord.wav",
+      "seconds": 2.2,
+      "rms_dbfs": -18
+    }
+  }
+}
