@@ -223,7 +223,7 @@ enum BobbyAPI {
         return raw.lowercased().split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
 
-    /// Live search over the full OKX universe (621 bases) — one row per asset.
+    /// Live search over the server's normalized asset universe — one row per asset.
     static func searchAssets(_ q: String, limit: Int = 4) async -> [AssetHit] {
         guard let obj = await assetSearch(q, limit: 10),
               let results = obj["results"] as? [[String: Any]] else { return [] }
@@ -270,7 +270,7 @@ enum BobbyAPI {
 
     /// The hottest assets of the last 24h, biggest absolute move first. Reads
     /// the board's `movers` when the server provides them; otherwise the
-    /// public ticker feed, so the greeting always has a real number.
+    /// public ticker fallback, so the greeting always has a real number.
     static func topMovers(limit: Int = 2) async -> [Mover] {
         var out: [Mover] = []
         if let obj = try? await json("api/bobby-asset-search?browse=1") as? [String: Any],

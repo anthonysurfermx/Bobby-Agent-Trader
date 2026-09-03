@@ -224,7 +224,7 @@ struct ToolBelt: View {
                 .frame(width: 38, height: 38)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(L.t("Trader Land, coming soon", "Trader Land, próximamente"))
+            .accessibilityLabel("Trader Land")
         }
         .onAppear {
             withAnimation(.easeOut(duration: 1.7).repeatForever(autoreverses: false)) { worldPulse = true }

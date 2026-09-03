@@ -347,7 +347,7 @@ struct TraderLandGateHarnessView: View {
     @State private var orientation = LandOrientation.neSW
     @State private var seed = false
     @State private var history: [SavedWorld] = []
-    @State private var notice = "Choose a blueprint, then tap a revealed tile."
+    @State private var notice = L.t("Choose a blueprint, then tap a revealed tile.", "Elige un plano y toca una casilla revelada.")
     @State private var zoom: CGFloat = 0.42
     @State private var settledZoom: CGFloat = 0.42
     @State private var pan: CGSize = .zero
@@ -382,9 +382,9 @@ struct TraderLandGateHarnessView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("TRADER LAND // RUNTIME V01").font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(3).foregroundStyle(.mint)
-                        Text("Discipline becomes a world.").font(.title2.bold())
-                        Text("Shared fixture · no wallet, XP, API or production writes.").font(.caption).foregroundStyle(.secondary)
+                        Text("TRADER LAND").font(.system(size: 11, weight: .bold, design: .monospaced)).tracking(3).foregroundStyle(.mint)
+                        Text(L.t("Discipline becomes a world.", "La disciplina se convierte en un mundo.")).font(.title2.bold())
+                        Text(L.t("Build and shape your island. Nothing here moves funds.", "Construye y transforma tu isla. Nada aquí mueve fondos.")).font(.caption).foregroundStyle(.secondary)
                         Text("FOCUS \(focusLevel)/2 · \(placements.count + 1) PLACED").font(.system(size: 9, design: .monospaced)).tracking(1.4).accessibilityIdentifier("land-world-status")
                     }.padding(.horizontal, 18)
 
@@ -407,7 +407,7 @@ struct TraderLandGateHarnessView: View {
                     .simultaneousGesture(DragGesture().onChanged { value in pan = CGSize(width: settledPan.width + value.translation.width, height: settledPan.height + value.translation.height) }.onEnded { _ in settledPan = pan })
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("BLUEPRINTS · \(manifest.items.count - 1)").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(.secondary)
+                        Text("\(L.t("BLUEPRINTS", "PLANOS")) · \(manifest.items.count - 1)").font(.system(size: 10, weight: .bold, design: .monospaced)).tracking(2).foregroundStyle(.secondary)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 7) {
                                 ForEach(manifest.items.filter { $0.kind != "core" }) { item in
@@ -423,7 +423,7 @@ struct TraderLandGateHarnessView: View {
                             Button("Undo", action: undo)
                             Button("Restore", action: restore)
                         }.font(.caption).buttonStyle(.bordered)
-                        Button("Reveal next focus ring", action: reveal).buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
+                        Button(L.t("Reveal next focus ring", "Revelar el siguiente anillo"), action: reveal).buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
                         HStack {
                             Button { sound.toggle() } label: { Label(sound.enabled ? "Sound on" : "Sound off", systemImage: sound.enabled ? "speaker.wave.2.fill" : "speaker.slash.fill") }
                                 .accessibilityIdentifier("land-sound-toggle")
@@ -451,16 +451,16 @@ struct TraderLandGateHarnessView: View {
         let cells = (0..<item.footprint.cols).flatMap { x in (0..<item.footprint.rows).map { y in (col + x, row + y) } }
         let valid = col + item.footprint.cols <= fixture.gridSize && row + item.footprint.rows <= fixture.gridSize
             && cells.allSatisfy { revealed($0.0, $0.1) && !occupied.contains("\($0.0):\($0.1)") }
-        guard valid else { sound.play("placement_invalid"); notice = "Blocked · reveal the tile or clear the full footprint."; return }
+        guard valid else { sound.play("placement_invalid"); notice = L.t("Blocked · reveal the tile or clear the full footprint.", "Bloqueado · revela la casilla o libera toda el área."); return }
         checkpoint()
         placements.append(.init(uid: "\(item.id)-\(UUID().uuidString)", itemId: item.id, col: col, row: row, orientation: item.kind == "path_pavement" ? orientation : nil))
         sound.play("placement_confirm")
-        notice = "Built · visual adjacency only."
+        notice = L.t("Built · visual adjacency only.", "Construido · la conexión es solo visual.")
     }
     private func checkpoint() { history.append(.init(placements: placements, focusLevel: focusLevel)); if history.count > 10 { history.removeFirst() } }
-    private func undo() { guard let previous = history.popLast() else { notice = "Nothing to undo."; return }; placements = previous.placements; focusLevel = previous.focusLevel }
-    private func restore() { checkpoint(); placements = fixture.placements; focusLevel = fixture.focusLevel; notice = "Canonical fixture restored." }
-    private func reveal() { guard focusLevel < 2 else { sound.play("placement_invalid"); notice = "Full island revealed."; return }; checkpoint(); focusLevel = 2; sound.play("fog_reveal"); DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { sound.play("five_attributes_chord") }; notice = "Focus expanded 6×6 → 8×8." }
+    private func undo() { guard let previous = history.popLast() else { notice = L.t("Nothing to undo.", "Nada que deshacer."); return }; placements = previous.placements; focusLevel = previous.focusLevel }
+    private func restore() { checkpoint(); placements = fixture.placements; focusLevel = fixture.focusLevel; notice = L.t("Trader Land restored.", "Trader Land restaurado.") }
+    private func reveal() { guard focusLevel < 2 else { sound.play("placement_invalid"); notice = L.t("Full island revealed.", "Isla completa revelada."); return }; checkpoint(); focusLevel = 2; sound.play("fog_reveal"); DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { sound.play("five_attributes_chord") }; notice = L.t("Focus expanded 6×6 → 8×8.", "Enfoque ampliado 6×6 → 8×8.") }
     private func setZoom(_ value: CGFloat) { zoom = min(0.72, max(0.28, value)); settledZoom = zoom }
     private func resetView() { zoom = 0.42; settledZoom = zoom; pan = .zero; settledPan = .zero }
     private func save() { if let data = try? JSONEncoder().encode(SavedWorld(placements: placements, focusLevel: focusLevel)) { UserDefaults.standard.set(data, forKey: Self.storageKey) } }

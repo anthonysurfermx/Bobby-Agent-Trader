@@ -21,8 +21,8 @@ enum LoadoutKit {
         [
             .init(id: "radar", icon: "antenna.radiowaves.left.and.right",
                   title: L.t("LIVE RADAR", "RADAR EN VIVO"),
-                  line: L.t("Real OKX and Yahoo candles. No delay, no smoke.",
-                            "Velas reales de OKX y Yahoo. Sin retraso, sin humo."),
+                  line: L.t("Live crypto and equity candles. No delay, no smoke.",
+                            "Velas en vivo de cripto y acciones. Sin retraso, sin humo."),
                   sound: 1104),
             .init(id: "shield", icon: "shield.checkered",
                   title: L.t("NO TRADE SHIELD", "ESCUDO NO TRADE"),

@@ -446,7 +446,7 @@ struct ContentView: View {
                 .presentationBackground(Theme.bg)
         }
         .sheet(isPresented: $showWorld) {
-            WorldMapSheet(xp: vm.companions.disciplineXP, level: vm.companions.level.number)
+            TraderLandGateHarnessView()
                 .presentationDetents([.large])
                 .presentationBackground(Theme.bg)
         }
@@ -605,7 +605,7 @@ struct ContentView: View {
                 Button {
                     showWorld = true
                 } label: {
-                    Label(L.t("Trader Land · soon", "Trader Land · pronto"), systemImage: "map")
+                    Label("Trader Land", systemImage: "map")
                 }
                 Section {
                     Label(vm.streak >= 1 ? L.t("Discipline streak: \(vm.streak) day\(vm.streak == 1 ? "" : "s") 🔥", "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥") : L.t("No streak yet — review an analysis", "Sin racha aún — revisa un análisis"),
@@ -978,7 +978,7 @@ struct ContentView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.stroke, lineWidth: 1))
 
                 HStack {
-                    Text(snapshot.isEquity ? "YAHOO FINANCE · EQUITIES" : "OKX · CRYPTO MARKET")
+                    Text(snapshot.isEquity ? "EQUITIES · LIVE MARKET" : "CRYPTO · LIVE MARKET")
                     Spacer()
                     Text("100 OHLCV · LIVE")
                 }
