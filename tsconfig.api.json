@@ -19,6 +19,8 @@
     ]
   },
   "include": [
+    "api/base-swap.ts",
+    "api/_lib/base-swap.ts",
     "api/_lib/protocol-constants.ts",
     "api/_lib/xlayer-payments.ts",
     "api/_lib/hardness-registry.ts",
