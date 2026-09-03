@@ -49,8 +49,11 @@ Voice `/api/bobby-voice-free` → 200 audio/mpeg (61 KB); MCP `tools/list` → 2
 commits; top up before a busy day). Last daily cycle 2026-09-02 12:01 UTC (0 trades);
 the next one runs at 12:00 UTC on the new database.
 
+## Full gate on production 7f4bdcb
+`GATE PASSED` — **183/183** (policy matrix incl. the 8 new tables, canaries, legitimate path
+through the API). Evidence: `evidence/2026-09-03-gate-passed-production-7f4bdcb.txt`.
+
 ## Open
-- Full gate run for 7f4bdcb (queued, waits for the forum-publish window).
 - iOS: enable Sign in with Apple in Supabase Auth (dashboard) and point the app's
   progress sync at `/api/progress` with the access token.
 - Trader Land UI wiring and `art_url` (other session).

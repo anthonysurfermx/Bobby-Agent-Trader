@@ -1,0 +1,195 @@
+RLS adversarial gate v2 — https://qbvdqkknnuweatptjohi.supabase.co · https://bobbyprotocol.xyz · marker RLS-CANARY-1788426691852-53c427
+
+A. Policy matrix (pg_policies via bobby_rls_matrix)
+OK     agent_cycles: RLS enabled
+OK     agent_cycles.agent_cycles_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     agent_cycles.agent_cycles_public_read: anon may only SELECT  — cmd=SELECT
+OK     agent_cycles.agent_cycles_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     agent_events: RLS enabled
+OK     agent_events.agent_events_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     agent_events.agent_events_public_read: anon may only SELECT  — cmd=SELECT
+OK     agent_events.agent_events_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     agent_trades: RLS enabled
+OK     agent_trades.agent_trades_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     agent_trades.agent_trades_public_read: anon may only SELECT  — cmd=SELECT
+OK     agent_trades.agent_trades_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     agent_positions: RLS enabled
+OK     agent_positions.agent_positions_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     agent_positions.agent_positions_public_read: anon may only SELECT  — cmd=SELECT
+OK     agent_positions.agent_positions_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     agent_signals: RLS enabled
+OK     agent_signals.agent_signals_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     agent_signals.agent_signals_public_read: anon may only SELECT  — cmd=SELECT
+OK     agent_signals.agent_signals_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     hardness_agent_proofs: RLS enabled
+OK     hardness_agent_proofs.hardness_agent_proofs_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     hardness_agent_proofs.hardness_agent_proofs_public_read: anon may only SELECT  — cmd=SELECT
+OK     hardness_agent_proofs.hardness_agent_proofs_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     forum_threads: RLS enabled
+OK     forum_threads.forum_threads_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     forum_threads.forum_threads_public_read: anon may only SELECT  — cmd=SELECT
+OK     forum_threads.forum_threads_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     forum_posts: RLS enabled
+OK     forum_posts.forum_posts_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     forum_posts.forum_posts_public_read: anon may only SELECT  — cmd=SELECT
+OK     forum_posts.forum_posts_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     user_feedback: RLS enabled
+OK     user_feedback.user_feedback_anon_insert: not granted to public  — roles=anon,authenticated cmd=INSERT
+OK     user_feedback.user_feedback_anon_insert: anon may only SELECT  — cmd=INSERT
+OK     user_feedback.user_feedback_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     api_cache: RLS enabled
+OK     api_cache.api_cache_anon_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     api_cache.api_cache_anon_read: anon may only SELECT  — cmd=SELECT
+OK     api_cache.api_cache_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     indicator_cache: RLS enabled
+OK     indicator_cache.indicator_cache_anon_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     indicator_cache.indicator_cache_anon_read: anon may only SELECT  — cmd=SELECT
+OK     indicator_cache.indicator_cache_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     agent_messages: RLS enabled
+OK     agent_messages.agent_messages_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     agent_messages: no anon/authenticated/public policy at all
+OK     user_interests: RLS enabled
+OK     user_interests.user_interests_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     user_interests: no anon/authenticated/public policy at all
+OK     user_digests: RLS enabled
+OK     user_digests.user_digests_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     user_digests: no anon/authenticated/public policy at all
+OK     sandbox_runs: RLS enabled
+OK     sandbox_runs.sandbox_runs_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     sandbox_runs: no anon/authenticated/public policy at all
+OK     mcp_payment_challenges: RLS enabled
+OK     mcp_payment_challenges.mcp_payment_challenges_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     mcp_payment_challenges: no anon/authenticated/public policy at all
+OK     mcp_payment_receipts: RLS enabled
+OK     mcp_payment_receipts.mcp_payment_receipts_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     mcp_payment_receipts: no anon/authenticated/public policy at all
+OK     agent_profiles: RLS enabled
+OK     agent_profiles.agent_profiles_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     agent_profiles: no anon/authenticated/public policy at all
+OK     telegram_connections: RLS enabled
+OK     telegram_connections.telegram_connections_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     telegram_connections: no anon/authenticated/public policy at all
+OK     memory_objects: RLS enabled
+OK     memory_objects.memory_objects_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     memory_objects: no anon/authenticated/public policy at all
+OK     agent_config: RLS enabled
+OK     agent_config.agent_config_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     agent_config: no anon/authenticated/public policy at all
+OK     hardness_agents: RLS enabled
+OK     hardness_agents.hardness_agents_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     hardness_agents: no anon/authenticated/public policy at all
+OK     hardness_agent_sessions: RLS enabled
+OK     hardness_agent_sessions.hardness_agent_sessions_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     hardness_agent_sessions: no anon/authenticated/public policy at all
+OK     bobby_control: RLS enabled
+OK     bobby_control: no anon/authenticated/public policy at all
+OK     forum_publish_receipts: RLS enabled
+OK     forum_publish_receipts.forum_publish_receipts_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     forum_publish_receipts: no anon/authenticated/public policy at all
+OK     bobby_identities: RLS enabled
+OK     bobby_identities.bobby_identities_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     bobby_identities: no anon/authenticated/public policy at all
+OK     bobby_progress: RLS enabled
+OK     bobby_progress.bobby_progress_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     bobby_progress: no anon/authenticated/public policy at all
+OK     bobby_progress_events: RLS enabled
+OK     bobby_progress_events.bobby_progress_events_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     bobby_progress_events: no anon/authenticated/public policy at all
+OK     bobby_pre_calls: RLS enabled
+OK     bobby_pre_calls.bobby_pre_calls_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     bobby_pre_calls: no anon/authenticated/public policy at all
+OK     tl_items: RLS enabled
+OK     tl_items.tl_items_public_read: not granted to public  — roles=anon,authenticated cmd=SELECT
+OK     tl_items.tl_items_public_read: anon may only SELECT  — cmd=SELECT
+OK     tl_items.tl_items_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     tl_lands: RLS enabled
+OK     tl_lands.tl_lands_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     tl_lands: no anon/authenticated/public policy at all
+OK     tl_inventory: RLS enabled
+OK     tl_inventory.tl_inventory_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     tl_inventory: no anon/authenticated/public policy at all
+OK     tl_placements: RLS enabled
+OK     tl_placements.tl_placements_service_all: not granted to public  — roles=service_role cmd=ALL
+OK     tl_placements: no anon/authenticated/public policy at all
+
+B. Canary rows (service role plants, anon attacks)
+OK     anon SELECT agent_cycles canary → visible  — HTTP 200 rows=1
+OK     anon UPDATE agent_cycles canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE agent_cycles canary → row still exists  — HTTP 200
+OK     anon SELECT forum_threads canary → visible  — HTTP 200 rows=1
+OK     anon UPDATE forum_threads canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE forum_threads canary → row still exists  — HTTP 200
+OK     anon SELECT forum_threads canary → hidden  — HTTP 200 rows=0
+OK     anon UPDATE forum_threads canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE forum_threads canary → row still exists  — HTTP 200
+OK     anon SELECT forum_posts canary → visible  — HTTP 200 rows=1
+OK     anon UPDATE forum_posts canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE forum_posts canary → row still exists  — HTTP 200
+OK     anon SELECT forum_posts canary → hidden  — HTTP 200 rows=0
+OK     anon UPDATE forum_posts canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE forum_posts canary → row still exists  — HTTP 200
+OK     anon SELECT agent_trades canary → visible  — HTTP 200 rows=1
+OK     anon UPDATE agent_trades canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE agent_trades canary → row still exists  — HTTP 200
+OK     anon SELECT agent_messages canary → hidden  — HTTP 200 rows=0
+OK     anon UPDATE agent_messages canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE agent_messages canary → row still exists  — HTTP 200
+OK     anon SELECT user_interests canary → hidden  — HTTP 200 rows=0
+OK     anon UPDATE user_interests canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE user_interests canary → row still exists  — HTTP 200
+OK     anon SELECT user_digests canary → hidden  — HTTP 200 rows=0
+OK     anon UPDATE user_digests canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE user_digests canary → row still exists  — HTTP 200
+OK     anon SELECT mcp_payment_challenges canary → hidden  — HTTP 200 rows=0
+OK     anon UPDATE mcp_payment_challenges canary → refused and row untouched  — HTTP 200 rows=0 []
+OK     anon DELETE mcp_payment_challenges canary → row still exists  — HTTP 200
+OK     anon INSERT agent_cycles → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT forum_threads → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT forum_posts → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT agent_trades → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT agent_messages → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT user_interests → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT user_digests → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT mcp_payment_challenges → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT telegram_connections → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT agent_profiles → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT hardness_agent_proofs → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT memory_objects → refused by RLS  — HTTP 401 {"code":"42501","details":null,"hint":null,"message":"new row violates row-level
+OK     anon INSERT user_feedback (valid payload, return=minimal) → succeeds by design  — HTTP 201 
+OK     user_feedback row visible to the service role (and removed)  — rows=1
+
+C. Legitimate path (throw-away wallet through the API)
+OK     GET /api/wallet-session?address= issues a single-use challenge  — HTTP 200 
+OK     POST /api/wallet-session issues a token for a valid signature  — HTTP 200 
+OK     REPLAY of the same nonce + signature → 401 (nonce consumed)  — HTTP 401
+OK     signature reused against a challenge for another address → 401  — HTTP 401
+OK     POST /api/user-interests without session → 401  — HTTP 401
+OK     POST /api/user-interests with another wallet in the body → 403  — HTTP 403
+OK     POST /api/user-interests with session → row written  — HTTP 200 {"ok":true,"updated":0,"inserted":1}
+OK     GET /api/user-interests returns the row just written  — HTTP 200 rows=1
+OK     GET /api/agent-messages without session → 401  — HTTP 401
+OK     second throw-away wallet (B) signed in for the cross-wallet check  — 0x157aab546ab989d0642e7c738702d4ae7b8d15b9
+OK     POST /api/openclaw-chat streams a three-agent debate for the session wallet  — HTTP 200 text/event-stream 574 chars
+OK     stream ends with a single-use receipt marked publishable (issued by the server, never by this gate)  — receipt btr2.eyJmIjp… publishable=true
+OK     the same request WITHOUT a session gets no receipt (guest debates are never publishable)  — receipt=false reason=no-wallet-session
+     persisted limiter shows 5 forum-publish hit(s) in the current window
+     forum-publish window (api_cache) resets at 09:47:46 UTC — waiting 37 min so the verdict is a single run…
+OK     wallet B publishing wallet A's receipt → 403  — HTTP 403
+OK     wallet A publishing its own receipt → thread created atomically  — HTTP 200 
+OK     stored conviction is on the protocol scale 0..1  — stored=0.6 symbol=BTC
+OK     thread owned by wallet A, public scope  — owner=0x9f158f53ccd3da64d2d0a66fa4ceaf9101f239fe
+OK     SAME receipt again → 409 (single use)  — HTTP 409
+OK     edited transcript with the old receipt → 403  — HTTP 403
+OK     receipt with a forged signature → 403  — HTTP 403
+OK     missing receipt → 400 (schema)  — HTTP 400
+OK     RPC bobby_publish_debate refuses conviction 7 (must be within 0..1)  — HTTP 400 {"code":"22023","details":null,"hint":null,"message":"bobby_publish_debate: conv
+OK     refused RPC call left no receipt row (transaction rolled back)  — rows=0
+OK     GET /api/my-threads with session → 200  — HTTP 200
+OK     DELETE /api/agent-messages naming another wallet → 403  — HTTP 403
+OK     anon SELECT forum_threads (public read) still works  — HTTP 200
+OK     GET /api/bobby-health  — HTTP 200
+OK     deployment runs with a real RATE_LIMIT_SALT (IP hashes not enumerable)  — rateLimitSaltConfigured=true
+OK     deployment.fullSha === GATE_EXPECTED_SHA (7f4bdcb)  — fullSha=7f4bdcbf67e5308c6267fdf1701a242c937ca952 source=vercel-git
+
+GATE PASSED: policy matrix exact, canaries untouched, legitimate path proven.
+exit=0
