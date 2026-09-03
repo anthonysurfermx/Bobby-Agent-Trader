@@ -28,6 +28,7 @@
     "test:asset-discovery": "tsx scripts/test-asset-discovery.mts",
     "test:base-swap": "tsx scripts/test-base-swap.mts",
     "smoke:base-swap": "tsx scripts/smoke-base-swap.mts",
+    "e2e:base-swap": "tsx scripts/e2e-base-swap-anvil.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts"
   },
   "dependencies": {

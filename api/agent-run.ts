@@ -955,6 +955,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Auth check for cron (skip for manual)
   const isManual = req.query.manual === 'true';
   const walletAddress = isManual ? String(req.query.wallet || '') : '';
+  // Edge-stamped country; tokenized stocks refuse calldata without it (US exclusion).
+  const viewerCountry = typeof req.headers['x-vercel-ip-country'] === 'string' ? String(req.headers['x-vercel-ip-country']) : null;
   const hasOperatorAuth = isInternalRequest(req);
   if (!isManual && !requireInternalAuth(req, res)) return;
   if (walletAddress && !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
@@ -1162,7 +1164,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.log(`[Agent] Building Base swap calldata for wallet ${walletAddress.slice(0, 8)}...`);
       trades = [];
       for (const d of approved) {
-        const prepared = await prepareBaseTrade({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, wallet: walletAddress });
+        const prepared = await prepareBaseTrade({ tokenSymbol: d.tokenSymbol, amountUsd: d.amountUsd, wallet: walletAddress, country: viewerCountry });
         if (!prepared.ok) {
           console.warn(`[Agent] Abort ${d.tokenSymbol}: ${prepared.reason}`);
           trades.push({ ...d, chain: TRADE_CHAIN_ID, txHash: null, status: prepared.status, execution: undefined, abortReason: prepared.reason });
@@ -1180,7 +1182,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }));
     }
 
-    const totalDeployed = trades.reduce((sum, t) => sum + t.amountUsd, 0);
+    // Only cron/simulation trades count as executed. Manual-mode rows are
+    // calldata waiting for a human signature (or aborted) — nothing was
+    // deployed until /api/swap-receipt verifies a receipt on-chain.
+    const executedTrades = trades.filter((t) => t.status === 'simulated');
+    const totalDeployed = executedTrades.reduce((sum, t) => sum + t.amountUsd, 0);
 
     // Phase 7: Log
     const result = {
@@ -1189,7 +1195,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       signals_found: raw.length,
       signals_filtered: filtered.length,
       llm_decisions: debate.decisions.length,
-      trades_executed: trades.length,
+      trades_executed: executedTrades.length,
       trades_blocked: blocked,
       total_usd_deployed: totalDeployed,
       latency_ms: Date.now() - startMs,

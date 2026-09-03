@@ -14,6 +14,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { BaseSwapError, quoteBaseSwap, toTradeExecution } from './_lib/base-swap.js';
+import { recordBuiltSwap } from './_lib/swap-receipts.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { guardWrite, WALLET_RE } from './_lib/write-guard.js';
 
@@ -28,6 +29,12 @@ const PostSchema = z.object({
   slippagePct: z.number().min(0.05).max(3).optional(),
   wallet: z.string().regex(WALLET_RE),
 });
+
+/** ISO country stamped by Vercel's edge; absent locally, which fails closed for stocks. */
+function viewerCountry(req: VercelRequest): string | null {
+  const h = req.headers['x-vercel-ip-country'];
+  return typeof h === 'string' && h ? h : null;
+}
 
 function statusFor(code: BaseSwapError['code']): number {
   if (code === 'no_route') return 422;
@@ -75,9 +82,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       amount: body.amount,
       slippagePct: body.slippagePct,
       recipient: wallet ?? body.wallet,
+      country: viewerCountry(req),
     });
+    // What was built is written down before it is handed out, so a later
+    // receipt can only confirm calldata this server produced.
+    let receipt: { recorded: boolean; reason?: string } = { recorded: false, reason: 'no swap calldata in this response' };
+    if (quote.tx?.swap && quote.tx.calldataHash && quote.recipient) {
+      receipt = await recordBuiltSwap({
+        wallet: quote.recipient,
+        tokenIn: quote.tokenIn.symbol,
+        tokenOut: quote.tokenOut.symbol,
+        amountIn: quote.amountIn,
+        quotedOut: quote.amountOut,
+        minOut: quote.minAmountOut,
+        route: quote.route.description,
+        router: quote.venue.router,
+        calldataHash: quote.tx.calldataHash,
+        deadline: quote.deadline,
+      });
+      if (!receipt.recorded) console.error('[BaseSwap] built swap not recorded:', receipt.reason);
+    }
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json({ ok: true, quote, execution: toTradeExecution(quote) });
+    return res.status(200).json({ ok: true, quote, execution: toTradeExecution(quote), receipt });
   } catch (error) {
     if (error instanceof BaseSwapError) return res.status(statusFor(error.code)).json({ ok: false, error: error.message, code: error.code });
     console.error('[BaseSwap] build failed', error);

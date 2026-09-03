@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { decodeFunctionData, getAddress, parseUnits } from 'viem';
 import {
   BaseSwapError, ERC20_ABI, FEE_TIERS, ROUTER_ADDRESS_THIS, SWAP_ROUTER02, QUOTER_V2, V3_FACTORY, WETH9,
-  buildApproveTx, buildSwapTx, candidateRoutes, clampSlippage, computeMinOut, decodeSwapTx, encodePath, resolvePair, toRawAmount,
+  buildApproveTx, buildRevokeTx, buildSwapTx, candidateRoutes, clampSlippage, computeMinOut, decodeSwapTx, encodePath, resolvePair, toRawAmount,
   type QuotedRoute,
 } from '../api/_lib/base-swap.js';
 import { BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, findBaseToken } from '../src/lib/base-swap/tokens.js';
@@ -67,6 +67,16 @@ assert.equal(approve.value, '0x0');
   assert.equal(d.functionName, 'approve');
   assert.equal(d.args[0], SWAP_ROUTER02);
   assert.equal(d.args[1], 25_000_000n, 'no unlimited approvals');
+}
+
+// --- revoke: approve(router, 0) on the token, nothing else ---
+{
+  const revoke = buildRevokeTx(usdc.address);
+  assert.equal(revoke.to, usdc.address);
+  const d = decodeFunctionData({ abi: ERC20_ABI, data: revoke.data });
+  assert.equal(d.functionName, 'approve');
+  assert.equal(d.args[0], SWAP_ROUTER02);
+  assert.equal(d.args[1], 0n);
 }
 
 const deadline = 1_900_000_000;

@@ -8,7 +8,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createHmac } from 'crypto';
 import { recordAuthHeaders } from './_lib/record-auth.js';
-import { isProtocolCutoverFrozenAsync } from './_lib/protocol-write-safety.js';
 import { enforcePublicRateLimit, isTradingRequest, requireTradingAuth } from './_lib/request-security.js';
 
 const OKX_BASE = 'https://www.okx.com';
@@ -186,13 +185,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     'close_position',
     'set_tpsl',
   ]);
-  if (
-    !hasUserCreds &&
-    tradingMode === 'live' &&
-    serverLiveMutations.has(action) &&
-    (await isProtocolCutoverFrozenAsync())
-  ) {
-    return res.status(503).json({ error: 'Bobby live trading is frozen for the protocol cutover' });
+  // Bobby's server-held OKX account never trades again (Base-only decision,
+  // 2026-09-03): paper or live, frozen or not. Users trading with their OWN
+  // credentials are outside that decision and unaffected.
+  if (!hasUserCreds && serverLiveMutations.has(action)) {
+    return res.status(410).json({ error: 'Bobby server-account trading on OKX is retired; swaps are user-signed on Base via Uniswap' });
   }
 
   const resolved = hasUserCreds

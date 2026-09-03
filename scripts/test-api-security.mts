@@ -107,8 +107,8 @@ try {
       ),
       response,
     );
-    assert.equal(state.status, 503, 'cutover freeze must block Bobby server-account live mutations');
-    assert.equal(fetchCalls, 0, 'frozen live mutations must not call OKX');
+    assert.equal(state.status, 410, 'Bobby server-account OKX mutations are retired');
+    assert.equal(fetchCalls, 0, 'retired mutations must not call OKX');
   }
 
   {

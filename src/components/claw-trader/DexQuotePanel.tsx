@@ -15,6 +15,17 @@ const SLUG_ASSET_MAP: Record<string, string> = {
   btc: 'cbBTC', bitcoin: 'cbBTC',
   eth: 'ETH', ethereum: 'ETH',
   aero: 'AERO', aerodrome: 'AERO',
+  // Coinbase tokenized stocks on Base (quote fails closed with no_route until a pool exists)
+  nvidia: 'NVDAc', nvda: 'NVDAc',
+  apple: 'AAPLc', aapl: 'AAPLc',
+  meta: 'METAc', facebook: 'METAc',
+  google: 'GOOGLc', alphabet: 'GOOGLc', googl: 'GOOGLc',
+  tesla: 'TSLAc', tsla: 'TSLAc',
+  microsoft: 'MSFTc', msft: 'MSFTc',
+  amazon: 'AMZNc', amzn: 'AMZNc',
+  coinbase: 'COINc',
+  microstrategy: 'MSTRc', mstr: 'MSTRc',
+  spacex: 'SPCXc',
 };
 
 interface BaseQuote {
@@ -74,7 +85,7 @@ export function DexQuotePanel({ marketSlug, marketTitle, polymarketPrice, spotPr
 
   if (!token) return null;
 
-  const displayAsset = token.symbol === 'cbBTC' ? 'BTC' : token.symbol;
+  const displayAsset = token.symbol === 'cbBTC' ? 'BTC' : (token.underlying ?? token.symbol);
   // USDC per unit of the asset at this size.
   const unitPrice = quote && quote.executionPrice > 0 ? 1 / quote.executionPrice : 0;
   const toAmount = quote ? Number(quote.amountOut) : 0;

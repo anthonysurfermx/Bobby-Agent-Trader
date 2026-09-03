@@ -7,8 +7,6 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { canOpenPosition, getPositionSize } from '../src/lib/onchainos/risk-manager.js';
-import type { TradeParams } from '../src/lib/onchainos/types.js';
 import type { TechnicalAssetSignal, TechnicalMarketSummary } from '../src/lib/bobby-technical.js';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { getBobbyControl } from './_lib/control.js';
@@ -575,15 +573,6 @@ function directionMatchesTechnical(
   return asset.direction === direction;
 }
 
-// ---- Fetch OKX positions (optional — works without) ----
-
-async function fetchPositions(mode: 'paper' | 'live' = 'live'): Promise<any[]> {
-  try {
-    const data = await fetchLocalApi('/api/okx-perps', { action: 'positions', params: { mode } });
-    return data?.ok ? data.positions || [] : [];
-  } catch { return []; }
-}
-
 // ---- Track record from resolved forum threads ----
 
 async function getTrackRecord(): Promise<{ wins: number; losses: number; winRate: number; lastCalls: string }> {
@@ -685,7 +674,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       error: 'Live Bobby cycles are frozen during the protocol cutover',
     });
   }
-  const okxMode = challengeMode === 'paper' ? 'paper' : 'live';
   const isDryRun = challengeMode === 'dryrun';
   const effects = { mode: challengeMode, canary };
   const effectsAllowed = externalEffectsAllowed(effects);
@@ -710,7 +698,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ============================================================
     const [intel, positions, track, corrections, smartMoney] = await Promise.all([
       fetchIntel(),
-      fetchPositions(okxMode),
+      Promise.resolve([] as any[]), // OKX positions: retired 2026-09-03 (no account reads)
       getTrackRecord(),
       getRecentContradictions(),
       fetch(`${BOBBY_PROTOCOL_BASE_URL}/api/smart-money-leaderboard?chains=196,1&tokens=OKB,ETH&limit=5`)
@@ -1186,199 +1174,31 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
     }
 
     // ============================================================
-    // PHASE 4b: Execute on OKX & X Layer ($100 Challenge Integration)
+    // PHASE 4b: Execution — RETIRED (2026-09-03, Base-only decision)
+    // Bobby no longer opens, closes or sizes positions on OKX, paper or
+    // live, and reads no OKX account. A thesis is committed on-chain and
+    // published; any swap happens on Base through Uniswap, built by
+    // /api/base-swap and signed by the human. The variables below stay so
+    // the rest of the cycle (yield debate, forum thread, summaries) keeps
+    // its shape with execution = none.
     // ============================================================
     let executionResult: any = null;
     let tpslResult: any = null;
     let tradeRejectedReason: string | null = null;
     let txHash: string | null = onchainCommitTx;
-    let finalBalanceStr: string | null = null;
+    let finalBalanceStr: string | null = overriddenBalance !== null ? String(overriddenBalance) : null;
     let effectiveBalanceForExecution: number | null = overriddenBalance;
     let availableCashUsd: number | null = overriddenAvailableBalance;
 
-    // Always fetch balance from the selected execution venue (live or paper)
-    if (overriddenBalance !== null) {
-      finalBalanceStr = String(overriddenBalance);
-    } else {
-      try {
-        const balCheck = await fetchLocalApi('/api/okx-perps', { action: 'balance', params: { mode: okxMode } });
-        if (balCheck.ok) {
-          finalBalanceStr = String(balCheck.totalEquity || '???');
-          effectiveBalanceForExecution = balCheck.totalEquity || null;
-          availableCashUsd = balCheck.availableBalance || balCheck.totalEquity || null;
-        }
-      } catch { /* non-blocking */ }
-    }
-
     if (commitState === 'blocked') {
-      // A live actionable thesis without a CONFIRMED on-chain commit must NOT
-      // open a position: there would be a real trade without its published
-      // proof. This covers policy-invalid theses, recorder failures, and
-      // success-shaped responses that carry no real receipt.
-      tradeRejectedReason = `On-chain commit required but not confirmed — execution blocked: ${onchainCommitError}`;
+      tradeRejectedReason = `On-chain commit required but not confirmed: ${onchainCommitError}`;
       console.error(`[Cycle] ${tradeRejectedReason}`);
     } else if (!isDryRun && cioSaysExecute && symbol && direction && conviction !== null && conviction >= 0.35) {
-      try {
-        const currentPrice = intel.prices?.find((p: any) => p.symbol === symbol)?.price || entryPrice;
-        
-        // 1. Fetch balance via OKX Perps API
-        const balRes = overriddenBalance !== null
-          ? {
-              ok: true,
-              totalEquity: overriddenBalance,
-              availableBalance: overriddenAvailableBalance ?? overriddenBalance,
-            }
-          : await fetchLocalApi('/api/okx-perps', { action: 'balance', params: { mode: okxMode } });
-        
-        if (balRes.ok) {
-          const totalEq = balRes.totalEquity || 100;
-          finalBalanceStr = String(totalEq);
-          const availBal = balRes.availableBalance || totalEq;
-          availableCashUsd = availBal;
-          const balanceObj = { ccy: 'USDT', availBal: String(availBal), totalEq: String(totalEq), frozenBal: '0' };
-          
-          const isSafeMode = intel.performance?.isSafeMode === true;
-          const positionSizeUsd = getPositionSize(totalEq, conviction, isSafeMode);
-          const leverage = 5; // Hardcoded for challenge
-          
-          if (positionSizeUsd > 0) {
-            const tradeParams: TradeParams = {
-              instId: `${symbol}-USDT-SWAP`,
-              side: direction === 'long' ? 'buy' : 'sell',
-              size: String(positionSizeUsd),
-              lever: String(leverage),
-              ordType: 'market',
-              slTriggerPx: stopPrice ? String(stopPrice) : undefined
-            };
-
-            // 2. Risk Manager Validation
-            const riskValidation = canOpenPosition(tradeParams, balanceObj, conviction, effectivePositions.length, currentPrice);
-
-            if (riskValidation.valid) {
-              // 3. Execute Trade on OKX
-              const openRes = await fetchLocalApi('/api/okx-perps', {
-                action: 'open_position',
-                params: { symbol, direction, leverage, amount: positionSizeUsd, conviction, mode: okxMode, skipOnchainCommit: true },
-              }, true);
-
-              if (openRes.ok) {
-                executionResult = openRes;
-
-                // Insert into agent_trades (Codex P0: metrics were never recorded).
-                // Stop/target stamped here so /api/settle-trades can close and
-                // score the trade without joining across tables. expires_at
-                // matches the 48h horizon used for forum_threads — after that
-                // the settler marks break_even / win / loss based on the mark.
-                await sbInsert('agent_trades', {
-                  cycle_id: cycleId || null,
-                  chain: 'xlayer',
-                  token_symbol: symbol,
-                  token_address: `${symbol}-USDT-SWAP`,
-                  direction,
-                  amount_usd: positionSizeUsd,
-                  entry_price: currentPrice || entryPrice,
-                  stop_price: stopPrice || null,
-                  target_price: targetPrice || null,
-                  expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-                  tx_hash: openRes.ordId || openRes.orderId || null,
-                  status: 'open',
-                  llm_reasoning: cioPost.slice(0, 500),
-                  confidence: conviction,
-                  signal_sources: ['bobby-cycle', 'okx-perps'],
-                });
-
-                // 4. Set TP/SL — MANDATORY for challenge
-                // Wait 2s for OKX to register the position (Codex P0: TP/SL race condition)
-                await new Promise(r => setTimeout(r, 2000));
-                if (stopPrice || targetPrice) {
-                  tpslResult = await fetchLocalApi('/api/okx-perps', {
-                    action: 'set_tpsl',
-                    params: { symbol, direction, stopLoss: stopPrice, takeProfit: targetPrice, mode: okxMode }
-                  }, true /* noFallback */);
-                  // If TP/SL failed and we have a stop, this is dangerous — close position
-                  if (!tpslResult?.ok && stopPrice) {
-                    console.error('[Cycle] TP/SL FAILED — closing unprotected position');
-                    const closeRes = await fetchLocalApi('/api/okx-perps', {
-                      action: 'close_position',
-                      params: { symbol, direction, mode: okxMode }
-                    }, true /* noFallback */);
-                    // Verify the close actually worked
-                    executionResult = null;
-                    if (!closeRes?.ok) {
-                      console.error('[Cycle] EMERGENCY: close_position FAILED — position may still be open without SL!');
-                      tradeRejectedReason = 'EMERGENCY: TP/SL failed AND close failed — manual intervention required';
-                      // Send emergency Telegram notification
-                      const TG_BOT = process.env.TELEGRAM_BOT_TOKEN;
-                      const TG_CHAT = process.env.TELEGRAM_CHAT_ID || '1026323121';
-                      if (TG_BOT && effectsAllowed) {
-                        fetch(`https://api.telegram.org/bot${TG_BOT}/sendMessage`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            chat_id: TG_CHAT,
-                            text: `🚨 BOBBY EMERGENCY 🚨\n\nPosition ${direction?.toUpperCase()} ${symbol} is OPEN without Stop Loss!\nTP/SL failed AND close_position failed.\n\nManual intervention required NOW.\nOpen OKX app and close the position manually.`,
-                            parse_mode: 'HTML',
-                          }),
-                        }).catch(e => console.error('[Cycle] Telegram alert failed:', e));
-                      }
-                    } else {
-                      tradeRejectedReason = 'TP/SL failed — position closed for safety';
-                    }
-                  }
-                }
-
-                // 5. On-chain commit already performed (awaited) in PHASE 3c,
-                // BEFORE execution — a live position never exists without its
-                // published proof. Nothing to commit here.
-                if (executionResult && challengeMode === 'paper') {
-                  txHash = 'paper-mode';
-                }
-
-              } else {
-                tradeRejectedReason = openRes.error || 'OKX API execution failed';
-              }
-            } else {
-              tradeRejectedReason = riskValidation.reason || 'Unknown risk validation failure';
-            }
-          }
-        } else {
-          tradeRejectedReason = 'Could not fetch OKX balance';
-        }
-      } catch (err) {
-        tradeRejectedReason = `Execution exception: ${err instanceof Error ? err.message : String(err)}`;
-      }
+      tradeRejectedReason = `Execution retired: Bobby publishes the thesis; ${symbol} ${direction} is not opened by the cycle (Base/Uniswap swaps are user-signed)`;
+      console.log(`[Cycle] ${tradeRejectedReason}`);
     } else if (!isDryRun && cioSaysClose && symbol && direction) {
-      // ── CLOSE EXISTING POSITION ──
-      try {
-        console.log(`[Cycle] Closing position: ${direction} ${symbol}`);
-        const closeRes = await fetchLocalApi('/api/okx-perps', {
-          action: 'close_position',
-          params: { symbol, direction, mode: okxMode }
-        }, true);
-        if (closeRes?.ok) {
-          executionResult = { ...closeRes, action: 'close' };
-          tradeRejectedReason = null;
-          console.log(`[Cycle] Position closed: ${direction} ${symbol}`);
-          // Notify via Telegram
-          const TG_BOT = process.env.TELEGRAM_BOT_TOKEN;
-          const TG_CHAT = process.env.TELEGRAM_CHAT_ID || '1026323121';
-          if (TG_BOT && effectsAllowed) {
-            fetch(`https://api.telegram.org/bot${TG_BOT}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: TG_CHAT,
-                text: `📤 Bobby CLOSED ${direction.toUpperCase()} ${symbol}\n\nConviction: ${conviction ? (conviction * 10).toFixed(0) : '?'}/10\nReason: ${vibePhrase || 'Thesis invalidated'}`,
-              }),
-            }).catch(() => {});
-          }
-        } else {
-          tradeRejectedReason = `Close failed: ${closeRes?.error || 'unknown'}`;
-          console.error(`[Cycle] Close failed:`, closeRes?.error);
-        }
-      } catch (err) {
-        tradeRejectedReason = `Close exception: ${err instanceof Error ? err.message : String(err)}`;
-      }
+      tradeRejectedReason = `Execution retired: close ${direction} ${symbol} is a thesis update, not an order`;
+      console.log(`[Cycle] ${tradeRejectedReason}`);
     } else if (conviction !== null && conviction < 0.35) {
       tradeRejectedReason = `Conviction ${(conviction * 10).toFixed(1)}/10 below 3.5/10 threshold`;
     } else if (!isDryRun && structuredVerdictRejectReason) {
@@ -1426,7 +1246,7 @@ Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
 IDLE CASH CONTEXT:
 - Trade rejected reason: ${tradeRejectedReason || 'No trade edge'}
 - Idle cash available: ${formatUsd(idleCashUsd)}
-- Trading venue: OKX ${challengeMode === 'paper' ? 'paper' : 'live'}
+- Trading venue: none (cycle execution retired; swaps are user-signed on Base via Uniswap)
 - Current yield state: none active
 - Objective: park idle capital without blocking the next high-conviction trade
 
@@ -2045,7 +1865,7 @@ Return ONLY valid JSON, no markdown, no explanation:
     return res.status(200).json({
       ok: true,
       challengeMode,
-      executionVenue: isDryRun ? 'none' : okxMode,
+      executionVenue: 'none', // cycle execution retired 2026-09-03
       cycleId,
       threadId: threadId || null,
       digestId: digest?.id || null,

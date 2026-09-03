@@ -30,6 +30,26 @@ for (const [tokenIn, tokenOut, amount] of pairs) {
   console.log(`${tokenIn} ${amount} → ${tokenOut} ${q.amountOut} via ${q.route.description}  impact ${q.priceImpactPct?.toFixed(3)}%  usd ${q.usdValue?.toFixed(2)}  withheld=${JSON.stringify(q.txWithheld)}`);
 }
 
+// Tokenized stocks (Coinbase B20): reference price, deviation, country gate.
+for (const [tokenIn, tokenOut, amount] of [['USDC', 'NVDA', '20'], ['USDC', 'AAPLc', '20'], ['GOOGL', 'USDC', '0.05']] as const) {
+  const q = await quoteBaseSwap({ tokenIn, tokenOut, amount });
+  const stock = q.stocks[0];
+  assert.ok(stock, 'stock leg expected');
+  assert.ok(stock.referencePrice && stock.referencePrice > 0, `${stock.symbol}: Chainlink reference missing`);
+  assert.ok(stock.deviationPct !== null && Math.abs(stock.deviationPct) < 3, `${stock.symbol}: deviation ${stock.deviationPct}`);
+  console.log(`${tokenIn} ${amount} → ${tokenOut}: ${q.amountOut} ${q.tokenOut.symbol} via ${q.route.description} | ref $${stock.referencePrice!.toFixed(2)} dev ${stock.deviationPct!.toFixed(2)}% feed ${Math.round((stock.referenceAgeSec ?? 0) / 60)}min | withheld=${JSON.stringify(q.txWithheld)} warn=${JSON.stringify(q.warnings)}`);
+}
+{
+  const us = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: empty, country: 'US' });
+  assert.ok(us.txWithheld.some((w) => w.includes('US persons')), 'US viewers get no stock calldata');
+  assert.equal(us.tx, null);
+  const nowhere = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '20', recipient: empty });
+  assert.ok(nowhere.txWithheld.some((w) => w.includes('country unavailable')), 'unknown country gets no stock calldata');
+  const small = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '2', recipient: empty, country: 'MX' });
+  assert.ok(small.txWithheld.some((w) => w.includes('below the $5 minimum')), 'stock minimum ticket');
+  console.log('stock gates: US refused, unknown country refused, $5 minimum enforced');
+}
+
 // Ticket cap: fail closed above the limit.
 const big = await quoteBaseSwap({ tokenIn: 'USDC', tokenOut: 'ETH', amount: '5000', recipient: empty });
 assert.ok(big.txWithheld.some((w) => w.includes('per-trade limit')), 'ticket cap must withhold calldata');

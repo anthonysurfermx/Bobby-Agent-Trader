@@ -161,23 +161,21 @@ export const XLAYER: ChainConfig = {
   contracts: XLAYER_CONTRACTS,
 };
 
-/**
- * The chain the protocol currently reads and writes.
- * Flip to BASE (or set PROTOCOL_CHAIN=base) once the audited redeploy is live
- * and the addresses above are populated.
- */
+/** The chain the protocol reads and writes: Base unless PROTOCOL_CHAIN says otherwise. */
 export type ProtocolChainName = 'xlayer' | 'base-sepolia' | 'base';
 
 /**
  * Resolve the protocol chain strictly. A typo in PROTOCOL_CHAIN must never
- * fall back to X Layer: on a writer that would sign a valid transaction on
- * the wrong network with the same hot key.
+ * fall back to another chain: on a writer that would sign a valid transaction
+ * on the wrong network with the same hot key. Unset means Base — the only
+ * network Bobby operates on since 2026-09-03; 'xlayer' stays resolvable for
+ * read-only access to the legacy ledger.
  */
 export function resolveProtocolChain(value: string | undefined): {
   name: ProtocolChainName;
   config: ChainConfig;
 } {
-  const normalized = (value || 'xlayer').trim().toLowerCase();
+  const normalized = (value || 'base').trim().toLowerCase();
   if (normalized === 'base') return { name: 'base', config: BASE };
   if (normalized === 'base-sepolia') return { name: 'base-sepolia', config: BASE_SEPOLIA };
   if (normalized === 'xlayer') return { name: 'xlayer', config: XLAYER };

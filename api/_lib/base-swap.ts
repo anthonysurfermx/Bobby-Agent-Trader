@@ -20,12 +20,12 @@
 
 import {
   createPublicClient, http, fallback, parseAbi, encodeFunctionData, decodeFunctionData, encodePacked,
-  formatUnits, parseUnits, getAddress, type Address, type Hex,
+  formatUnits, parseUnits, getAddress, keccak256, type Address, type Hex,
 } from 'viem';
 import { base } from 'viem/chains';
 import { BASE, UNISWAP_BASE } from './chains.js';
 import {
-  BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_USDC, BASE_WETH, findBaseToken, type BaseSwapToken,
+  BASE_STOCK_LIMITS, BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_USDC, BASE_WETH, findBaseToken, isStockToken, type BaseSwapToken,
 } from '../../src/lib/base-swap/tokens.js';
 
 export const SWAP_ROUTER02: Address = getAddress(UNISWAP_BASE.swapRouter02);
@@ -62,7 +62,21 @@ export const ROUTER_ABI = parseAbi([
   'function WETH9() view returns (address)',
 ]);
 
-const RPC_URLS = Array.from(new Set([BASE.rpcUrl, BASE.rpcFallbackUrl, 'https://mainnet.base.org'].filter((u): u is string => Boolean(u))));
+// B20 (Coinbase tokenized stock) surface: redemption multiplier + pause bitmask.
+const B20_ABI = parseAbi([
+  'function multiplier() view returns (uint256)',
+  'function pausedFeatures() view returns (uint256)',
+  'function isPaused(uint8 feature) view returns (bool)',
+  'function transfer(address to, uint256 amount) returns (bool)',
+]);
+const FEED_ABI = parseAbi([
+  'function latestRoundData() view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)',
+  'function decimals() view returns (uint8)',
+]);
+
+// Exactly the chain config's endpoints — no hidden extra fallback. When
+// BASE_RPC_URL points at a fork (tests), nothing silently answers from mainnet.
+const RPC_URLS = Array.from(new Set([BASE.rpcUrl, BASE.rpcFallbackUrl].filter((u): u is string => Boolean(u))));
 
 function makeClient() {
   return createPublicClient({
@@ -177,6 +191,16 @@ export function buildApproveTx(token: Address, amount: bigint): BuiltTx & { spen
   };
 }
 
+/** approve(router, 0): clears an allowance left behind by an abandoned swap. */
+export function buildRevokeTx(token: Address): BuiltTx & { spender: Address } {
+  return {
+    to: getAddress(token),
+    data: encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [SWAP_ROUTER02, 0n] }),
+    value: '0x0',
+    spender: SWAP_ROUTER02,
+  };
+}
+
 export function buildSwapTx(opts: {
   tokenIn: BaseSwapToken;
   tokenOut: BaseSwapToken;
@@ -256,6 +280,14 @@ async function quoteRoutes(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, amou
   } catch (error) {
     throw new BaseSwapError(`Base RPC quote failed: ${error instanceof Error ? error.message : String(error)}`, 'rpc_failed');
   }
+  // viem retries a failed aggregate3 call one contract at a time and reports
+  // transport errors as per-item failures. A pool that does not exist reverts
+  // (a contract error); an RPC that is down or rate-limited is not "no route".
+  const failures = results.filter((r): r is Extract<McResult, { status: 'failure' }> => r.status === 'failure');
+  if (failures.length === results.length && failures.length > 0) {
+    const transport = failures.every((r) => /HttpRequestError|TimeoutError|RpcRequestError|InternalRpcError|LimitExceeded/i.test(`${r.error?.name} ${r.error?.message}`) && !/revert/i.test(`${r.error?.message}`));
+    if (transport) throw new BaseSwapError(`Base RPC quote failed: ${failures[0].error?.message?.split('\n')[0] ?? 'unknown'}`, 'rpc_failed');
+  }
   const quoted: QuotedRoute[] = [];
   results.forEach((res, i) => {
     if (res.status !== 'success') return;
@@ -294,17 +326,28 @@ function spotFromSqrt(sqrtPriceX96: bigint, tokenIn: Address, tokenOut: Address,
  * tiny probe quote was tried first and rejected: integer rounding on
  * low-decimal outputs (cbBTC) made it noisier than the number it measured.
  */
-async function routeMidPrice(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, route: QuotedRoute): Promise<number | null> {
+function routeHops(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, route: QuotedRoute): Array<{ a: BaseSwapToken; b: BaseSwapToken; fee: number }> {
   const weth = findBaseToken(WETH9)!;
-  const hops: Array<{ a: BaseSwapToken; b: BaseSwapToken; fee: number }> = route.route.kind === 'single'
+  return route.route.kind === 'single'
     ? [{ a: tokenIn, b: tokenOut, fee: route.route.fee }]
     : [{ a: tokenIn, b: weth, fee: route.route.fees[0] }, { a: weth, b: tokenOut, fee: route.route.fees[1] }];
+}
+
+/** Pool address per hop of the route (null when any hop has no pool). */
+async function routePools(hops: ReturnType<typeof routeHops>): Promise<Address[] | null> {
+  const pools = (await multicallLoose(
+    hops.map((h) => ({ address: V3_FACTORY, abi: FACTORY_ABI, functionName: 'getPool', args: [getAddress(h.a.address), getAddress(h.b.address), h.fee] })),
+    false,
+  )) as Address[];
+  if (pools.some((p) => !p || p.toLowerCase() === ZERO)) return null;
+  return pools;
+}
+
+async function routeMidPrice(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, route: QuotedRoute): Promise<number | null> {
+  const hops = routeHops(tokenIn, tokenOut, route);
   try {
-    const pools = (await multicallLoose(
-      hops.map((h) => ({ address: V3_FACTORY, abi: FACTORY_ABI, functionName: 'getPool', args: [getAddress(h.a.address), getAddress(h.b.address), h.fee] })),
-      false,
-    )) as Address[];
-    if (pools.some((p) => !p || p.toLowerCase() === ZERO)) return null;
+    const pools = await routePools(hops);
+    if (!pools) return null;
     const slots = (await multicallLoose(
       pools.map((p) => ({ address: p, abi: POOL_ABI, functionName: 'slot0' })),
       false,
@@ -319,6 +362,116 @@ async function routeMidPrice(tokenIn: BaseSwapToken, tokenOut: BaseSwapToken, ro
   }
 }
 
+// ---------- tokenized stocks (B20) ----------
+
+export interface StockStatus {
+  symbol: string;
+  underlying: string;
+  /** Chainlink reference in USD per share; null when unreadable. */
+  referencePrice: number | null;
+  referenceUpdatedAt: number | null;
+  referenceAgeSec: number | null;
+  referenceStale: boolean;
+  feed: Address;
+  /** Redemption ratio, 1.0 = one token is one share. */
+  multiplier: number;
+  /** Raw pause bitmask; non-zero means some issuer feature is paused. */
+  pausedFeatures: string;
+  /** Transfer-level pause (feature 0). When true nothing can move. */
+  transferPaused: boolean;
+  /** On-chain reads that failed. Any failure means: no calldata. */
+  failedReads: string[];
+}
+
+export async function getStockStatus(token: BaseSwapToken, now = Math.floor(Date.now() / 1000)): Promise<StockStatus> {
+  const address = getAddress(token.address);
+  const feed = getAddress(token.chainlinkFeed as Address);
+  const results = await multicallLoose([
+    { address, abi: B20_ABI, functionName: 'multiplier' },
+    { address, abi: B20_ABI, functionName: 'pausedFeatures' },
+    { address, abi: B20_ABI, functionName: 'isPaused', args: [0] },
+    { address: feed, abi: FEED_ABI, functionName: 'latestRoundData' },
+    { address: feed, abi: FEED_ABI, functionName: 'decimals' },
+  ], true);
+  const names = ['token.multiplier', 'token.pausedFeatures', 'token.isPaused', 'feed.latestRoundData', 'feed.decimals'];
+  const val = <T,>(i: number): T | null => (results[i]?.status === 'success' ? ((results[i] as { result: unknown }).result as T) : null);
+  const failedReads = names.filter((_, i) => results[i]?.status !== 'success');
+  const multiplierRaw = val<bigint>(0);
+  const pausedFeatures = val<bigint>(1) ?? 0n;
+  const transferPaused = val<boolean>(2) ?? false;
+  const round = val<readonly [bigint, bigint, bigint, bigint, bigint]>(3);
+  const feedDecimals = val<number>(4) ?? 8;
+  const updatedAt = round ? Number(round[3]) : null;
+  const ageSec = updatedAt ? now - updatedAt : null;
+  const price = round && round[1] > 0n ? Number(formatUnits(round[1], feedDecimals)) : null;
+  return {
+    symbol: token.symbol,
+    underlying: token.underlying ?? token.symbol,
+    referencePrice: price,
+    referenceUpdatedAt: updatedAt,
+    referenceAgeSec: ageSec,
+    referenceStale: price === null || ageSec === null || ageSec > BASE_STOCK_LIMITS.maxFeedAgeSec,
+    feed,
+    multiplier: multiplierRaw === null ? 1 : Number(formatUnits(multiplierRaw, 18)),
+    pausedFeatures: pausedFeatures.toString(),
+    transferPaused,
+    failedReads,
+  };
+}
+
+export interface StockView {
+  symbol: string;
+  underlying: string;
+  side: 'buy' | 'sell';
+  referencePrice: number | null;
+  referenceAgeSec: number | null;
+  /** Execution vs reference, percent; positive = paying above (buy) or receiving below (sell). */
+  deviationPct: number | null;
+  multiplier: number;
+  pausedFeatures: string;
+}
+
+/** Pure: reasons a stock leg withholds calldata, plus soft warnings. Unit-tested offline. */
+export function stockGuardReasons(status: StockStatus, executionUsdPerShare: number | null, side: 'buy' | 'sell'): { withheld: string[]; warnings: string[]; deviationPct: number | null } {
+  const withheld: string[] = [];
+  const warnings: string[] = [];
+  const ref = status.referencePrice;
+  let deviationPct: number | null = null;
+  if (ref && executionUsdPerShare && executionUsdPerShare > 0) {
+    deviationPct = ((executionUsdPerShare - ref) / ref) * 100 * (side === 'buy' ? 1 : -1);
+  }
+  // Fail closed: a read that did not happen is not a pass, a stale reference is not a reference.
+  if (status.failedReads.length) withheld.push(`${status.symbol}: on-chain risk read failed (${status.failedReads.join(', ')})`);
+  if (status.referenceStale) withheld.push(`${status.symbol}: Chainlink reference is stale (market closed or corporate action); calldata resumes when the feed updates`);
+  if (deviationPct === null && !status.referenceStale) withheld.push(`${status.symbol}: execution price could not be compared with the reference`);
+  if (deviationPct !== null && Math.abs(deviationPct) > BASE_STOCK_LIMITS.maxOracleDeviationPct) {
+    withheld.push(`${status.symbol}: DEX price is ${deviationPct.toFixed(2)}% from the Chainlink reference (limit ${BASE_STOCK_LIMITS.maxOracleDeviationPct}%)`);
+  }
+  if (status.transferPaused) withheld.push(`${status.symbol}: transfers are paused by the issuer`);
+  else if (status.pausedFeatures !== '0') warnings.push(`${status.symbol}: issuer has paused some features (mint/redeem side); secondary trading still open`);
+  if (status.multiplier !== 1) warnings.push(`${status.symbol}: multiplier is ${status.multiplier}: one token is ${status.multiplier} shares`);
+  return { withheld, warnings, deviationPct };
+}
+
+/**
+ * B20 policies gate transfers, not approve(): a blocked wallet could pay for
+ * an approval it can never use. Prove the transfer leg with an eth_call
+ * before returning anything — from the pool for buys (can the wallet
+ * receive?), from the wallet for sells (can it send?). 1 base unit is enough
+ * for the policy check; balance was verified separately.
+ */
+async function stockTransferPolicyReason(token: BaseSwapToken, wallet: Address, side: 'buy' | 'sell', pool: Address): Promise<string | null> {
+  const c = baseClient();
+  const address = getAddress(token.address);
+  try {
+    if (side === 'buy') await c.simulateContract({ address, abi: B20_ABI, functionName: 'transfer', args: [wallet, 1n], account: pool });
+    else await c.simulateContract({ address, abi: B20_ABI, functionName: 'transfer', args: [pool, 1n], account: wallet });
+    return null;
+  } catch {
+    return `${token.symbol}: issuer policy blocks this wallet for this token (transfer simulation reverted)`;
+  }
+}
+
 export interface BaseSwapInput {
   tokenIn: string;
   tokenOut: string;
@@ -327,6 +480,8 @@ export interface BaseSwapInput {
   slippagePct?: number;
   /** Wallet that pays, receives and signs. Required for calldata. */
   recipient?: string | null;
+  /** ISO country from the edge (`x-vercel-ip-country`). Required for stock calldata (US exclusion). */
+  country?: string | null;
 }
 
 export interface BaseSwapLimits { maxTicketUsd: number; minTicketUsd: number; defaultSlippagePct: number; maxSlippagePct: number; maxPriceImpactPct: number; deadlineSec: number }
@@ -355,13 +510,25 @@ export interface BaseSwapQuote {
   route: { kind: RouteCandidate['kind']; fees: number[]; path: Hex | null; description: string; gasEstimate: string };
   alternatives: Array<{ description: string; amountOut: string }>;
   recipient: Address | null;
-  /** Present only when every guard passed and a recipient was given. */
+  /** Tokenized-stock legs, with reference price and deviation. Empty for crypto pairs. */
+  stocks: StockView[];
+  /**
+   * Present only when every guard passed and a recipient was given.
+   * `approve` set ⇒ `swap` is null: sign the approval, wait for its receipt,
+   * then re-quote — the swap is only handed out once it simulated with the
+   * allowance in place. `revoke` is offered whenever an allowance exists.
+   */
   tx: null | {
     chainId: typeof BASE_SWAP_CHAIN_ID;
     approve: (BuiltTx & { spender: Address; amount: string }) | null;
-    swap: BuiltTx;
+    swap: BuiltTx | null;
+    /** keccak256 of the swap calldata — the key /api/swap-receipt matches on. */
+    calldataHash: Hex | null;
+    revoke: (BuiltTx & { spender: Address }) | null;
     deadline: number;
   };
+  /** Current router allowance of tokenIn for the recipient (raw units); null for ETH or no recipient. */
+  allowanceRaw: string | null;
   simulation: { ran: boolean; ok: boolean | null; reason: string | null };
   txWithheld: string[];
   warnings: string[];
@@ -415,10 +582,38 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     const usdRoutes = await quoteRoutes(tokenIn, usdc, amountInRaw).catch(() => []);
     usdValue = usdRoutes.length ? Number(formatUnits(usdRoutes[0].amountOut, usdc.decimals)) : null;
   }
+  const stockLegs: Array<{ token: BaseSwapToken; side: 'buy' | 'sell' }> = [];
+  if (isStockToken(tokenIn)) stockLegs.push({ token: tokenIn, side: 'sell' });
+  if (isStockToken(tokenOut)) stockLegs.push({ token: tokenOut, side: 'buy' });
+  const minTicket = stockLegs.length ? Math.max(limits.minTicketUsd, BASE_STOCK_LIMITS.minTicketUsd) : limits.minTicketUsd;
   if (usdValue === null) txWithheld.push('ticket could not be valued in USD');
   else {
     if (usdValue > limits.maxTicketUsd) txWithheld.push(`ticket $${usdValue.toFixed(2)} is above the $${limits.maxTicketUsd} per-trade limit`);
-    if (usdValue < limits.minTicketUsd) txWithheld.push(`ticket $${usdValue.toFixed(2)} is below the $${limits.minTicketUsd} minimum`);
+    if (usdValue < minTicket) txWithheld.push(`ticket $${usdValue.toFixed(2)} is below the $${minTicket} minimum`);
+  }
+
+  // Tokenized stocks: the pool price must sit near the Chainlink reference,
+  // the feed must be fresh, and the issuer must not have paused transfers.
+  const stocks: StockView[] = [];
+  const stockStatuses = new Map<string, StockStatus>();
+  for (const leg of stockLegs) {
+    const status = await getStockStatus(leg.token);
+    stockStatuses.set(leg.token.symbol, status);
+    const shares = leg.side === 'buy' ? amountOut : amountIn;
+    const usdPerShare = usdValue !== null && shares > 0 ? usdValue / shares : null;
+    const verdict = stockGuardReasons(status, usdPerShare, leg.side);
+    txWithheld.push(...verdict.withheld);
+    warnings.push(...verdict.warnings);
+    stocks.push({
+      symbol: status.symbol,
+      underlying: status.underlying,
+      side: leg.side,
+      referencePrice: status.referencePrice,
+      referenceAgeSec: status.referenceAgeSec,
+      deviationPct: verdict.deviationPct,
+      multiplier: status.multiplier,
+      pausedFeatures: status.pausedFeatures,
+    });
   }
 
   const minOutRaw = computeMinOut(amountOutRaw, slippagePct);
@@ -426,11 +621,31 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
 
   let recipient: Address | null = null;
   let tx: BaseSwapQuote['tx'] = null;
+  let allowanceRaw: string | null = null;
   const simulation: BaseSwapQuote['simulation'] = { ran: false, ok: null, reason: 'no recipient: quote only' };
 
   if (input.recipient !== undefined && input.recipient !== null && input.recipient !== '') {
     if (!isAddress(input.recipient)) txWithheld.push('recipient wallet is malformed');
     else recipient = getAddress(input.recipient);
+  }
+
+  if (recipient && stockLegs.length) {
+    // Coinbase tokenized stocks are not offered to US persons; the edge tells
+    // us the viewer's country. No country, no calldata.
+    const country = (input.country || '').trim().toUpperCase();
+    if (!country) txWithheld.push('viewer country unavailable; cannot confirm eligibility for tokenized stocks');
+    else if (country === 'US') txWithheld.push('tokenized stocks are not available to US persons');
+    if (txWithheld.length === 0) {
+      const pools = await routePools(routeHops(tokenIn, tokenOut, best)).catch(() => null);
+      if (!pools) txWithheld.push('route pools could not be resolved for the transfer-policy check');
+      else {
+        for (const leg of stockLegs) {
+          const pool = leg.side === 'buy' ? pools[pools.length - 1] : pools[0];
+          const reason = await stockTransferPolicyReason(leg.token, recipient, leg.side, pool);
+          if (reason) txWithheld.push(reason);
+        }
+      }
+    }
   }
 
   if (recipient) {
@@ -454,12 +669,17 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     }
     if (balance !== null && balance < amountInRaw) txWithheld.push(`wallet holds less ${tokenIn.symbol} than the amount to swap`);
 
+    if (allowance !== null && !tokenIn.native) allowanceRaw = allowance.toString();
     if (txWithheld.length === 0 && balance !== null && allowance !== null) {
       const needsApproval = !tokenIn.native && allowance < amountInRaw;
-      const swap = buildSwapTx({ tokenIn, tokenOut, route: best, amountIn: amountInRaw, minOut: minOutRaw, recipient, deadline });
+      const revoke = !tokenIn.native && allowance > 0n ? buildRevokeTx(getAddress(tokenIn.address)) : null;
       if (needsApproval) {
-        simulation.reason = 'approval pending: the router cannot pull the token yet; the quoter already ran the pool math for this exact size';
+        // No swap calldata yet: it could not be simulated, so it is not handed
+        // out. The client signs the approval, waits for the receipt, re-quotes.
+        simulation.reason = 'approval pending: sign it, wait for the receipt, then re-quote to receive simulated swap calldata';
+        tx = { chainId: BASE_SWAP_CHAIN_ID, approve: buildApproveTx(getAddress(tokenIn.address), amountInRaw), swap: null, calldataHash: null, revoke, deadline };
       } else {
+        const swap = buildSwapTx({ tokenIn, tokenOut, route: best, amountIn: amountInRaw, minOut: minOutRaw, recipient, deadline });
         simulation.ran = true;
         try {
           await c.call({ account: recipient, to: swap.to, data: swap.data, value: BigInt(swap.value) });
@@ -471,14 +691,9 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
           simulation.reason = msg;
           txWithheld.push(`swap simulation reverted: ${msg}`);
         }
-      }
-      if (txWithheld.length === 0) {
-        tx = {
-          chainId: BASE_SWAP_CHAIN_ID,
-          approve: needsApproval ? buildApproveTx(getAddress(tokenIn.address), amountInRaw) : null,
-          swap,
-          deadline,
-        };
+        if (txWithheld.length === 0) {
+          tx = { chainId: BASE_SWAP_CHAIN_ID, approve: null, swap, calldataHash: keccak256(swap.data), revoke, deadline };
+        }
       }
     }
   }
@@ -508,7 +723,9 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     },
     alternatives: routes.slice(1, 4).map((r) => ({ description: r.description, amountOut: formatUnits(r.amountOut, tokenOut.decimals) })),
     recipient,
+    stocks,
     tx,
+    allowanceRaw,
     simulation,
     txWithheld: Array.from(new Set(txWithheld)),
     warnings,
@@ -520,7 +737,9 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
 export interface TradeExecutionPayload {
   needsApproval: boolean;
   approveTx?: BuiltTx;
-  swapTx: BuiltTx;
+  /** Absent while an approval is pending: re-quote after the approval receipt. */
+  swapTx?: BuiltTx;
+  calldataHash?: Hex;
   quote: { fromToken: string; toToken: string; fromAmount: string; toAmount: string; minReceived: string };
   disclosure: {
     chainId: number;
@@ -533,6 +752,8 @@ export interface TradeExecutionPayload {
     priceImpactPct: number | null;
     deadline: number;
     simulated: boolean;
+    /** Present for tokenized-stock legs. */
+    stocks?: StockView[];
     note: string;
   };
 }
@@ -542,7 +763,8 @@ export function toTradeExecution(q: BaseSwapQuote): TradeExecutionPayload | null
   return {
     needsApproval: Boolean(q.tx.approve),
     approveTx: q.tx.approve ? { to: q.tx.approve.to, data: q.tx.approve.data, value: q.tx.approve.value } : undefined,
-    swapTx: q.tx.swap,
+    swapTx: q.tx.swap ?? undefined,
+    calldataHash: q.tx.calldataHash ?? undefined,
     quote: { fromToken: q.tokenIn.symbol, toToken: q.tokenOut.symbol, fromAmount: q.amountIn, toAmount: q.amountOut, minReceived: q.minAmountOut },
     disclosure: {
       chainId: q.chainId,
@@ -555,6 +777,7 @@ export function toTradeExecution(q: BaseSwapQuote): TradeExecutionPayload | null
       priceImpactPct: q.priceImpactPct,
       deadline: q.deadline,
       simulated: q.simulation.ran && q.simulation.ok === true,
+      stocks: q.stocks.length ? q.stocks : undefined,
       note: 'Router and quoter are constants verified against the Uniswap deployment list; approvals are exact and consumed by the swap. Bobby never signs for you.',
     },
   };
