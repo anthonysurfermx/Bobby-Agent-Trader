@@ -189,7 +189,29 @@ Round-6 verification: Foundry **257/257** across 14 suites; targeted new/adjacen
 83/83; `test:remediation-r2` 23/23; `test:hardness-abi-anvil`, `check:api`, lint,
 `git diff --check`, and the production Vite build all pass.
 
-## For the final round
+## Round 7 review (Codex) — NO-GO on `44a2d51`: slash and timestamp edge cases
+
+| # | Codex finding | Fix | Regression |
+|---|---|---|---|
+| P1 | A full Safe slash set `registered = false`, but an already-active service remained payable because `payForService` checked only `service.active`. The slashed agent could keep collecting service fees without stake. | `payForService` now also requires the service owner to remain registered. This disables every service after a full slash without an unbounded loop over `serviceKeys`; re-staking deliberately restores service availability. | `test_slashAgent_fullSlashStopsExistingServicePayments` registers a live service, fully slashes its owner, and proves the next payment is refused. |
+| P2 | Prediction and signal expiry snapshots cast `block.timestamp + delay` to `uint64`, while their time setters accepted arbitrarily large `uint256` values. Even a boundary value accepted by the Safe would become unsafe in a later block. | All three setters reject delays that cannot be represented as future `uint64` timestamps, and `commitPrediction`/`publishSignal` independently recheck representability when the snapshot is created. | `test_predictionTimeSettersRejectUint64Truncation` and `test_signalTimeSetterAndPublishRejectUint64Truncation` cover the first overflowing setter value and the later-block use of a formerly valid boundary. |
+
+Post-fix verification: Foundry **260/260** across 14 suites; targeted
+`HardnessRegistryTest` **59/59**; `test:remediation-r2` **30/30**;
+`test:hardness-abi-anvil` confirms all 159 ABI entries equal the compiled artifact;
+production Vite build and `check:api` pass. The `HardnessRegistry` runtime is
+23,410 bytes, 1,166 bytes below EIP-170; bounties remain 12,006 bytes.
+
+This round changes `HardnessRegistry.sol`, so the deploy remains under the standing
+three-round rule; review the exact post-round-7 bytecode rather than treating these
+tests as deployment approval.
+
+## For the next independent round
+
+First reproduce the round-7 service-payment and timestamp failures on `44a2d51`,
+then confirm both refusals on the new commit. Exercise partial slash, full slash,
+re-registration, service deactivation/reactivation, withdrawal ordering, and the
+largest accepted time delay. Recheck runtime size from a clean build.
 
 Everything below is on `security/remediation-r2`. The dispute economics are new
 code: hunt for a bond that can be double-credited (settle vs timeout vs

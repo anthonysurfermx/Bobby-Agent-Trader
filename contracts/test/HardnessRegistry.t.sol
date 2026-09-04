@@ -199,6 +199,24 @@ contract HardnessRegistryTest is Test {
         assertEq(registry.pendingWithdrawals(owner), registry.REGISTRATION_STAKE());
     }
 
+    function test_slashAgent_fullSlashStopsExistingServicePayments() public {
+        vm.prank(agent1);
+        registry.registerService("judge-mode", 0.001 ether, agent1);
+
+        registry.slashAgent(agent1, type(uint256).max, keccak256("safe-ruling"));
+
+        vm.deal(outsider, 1 ether);
+        vm.prank(outsider);
+        vm.expectRevert(HardnessRegistry.ServiceInactive.selector);
+        registry.payForService{value: 0.001 ether}(keccak256("after-slash"), "judge-mode");
+
+        vm.prank(agent1);
+        registry.registerAgent{value: 0.01 ether}("ipfs://agent-1-restaked");
+        vm.prank(outsider);
+        registry.payForService{value: 0.001 ether}(keccak256("after-restake"), "judge-mode");
+        assertEq(registry.pendingWithdrawals(agent1), 0.001 ether);
+    }
+
     function test_registerAgent_revertsWhenPaused() public {
         registry.pause();
         vm.deal(outsider, 10 ether);
@@ -456,6 +474,24 @@ contract HardnessRegistryTest is Test {
         registry.expirePrediction(predictionHash);
     }
 
+    function test_predictionTimeSettersRejectUint64Truncation() public {
+        uint256 largestDelay = uint256(type(uint64).max) - block.timestamp;
+        registry.setMinPredictionAge(largestDelay);
+        registry.setPredictionTTL(largestDelay);
+        assertEq(registry.minPredictionAge(), largestDelay);
+        assertEq(registry.predictionTTL(), largestDelay);
+
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setMinPredictionAge(largestDelay + 1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setPredictionTTL(largestDelay + 1);
+
+        vm.warp(block.timestamp + 1);
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.commitPrediction(_predictionHash("stale-time-bound"), "BTC-USD", 66, 100, 120, 90);
+    }
+
     function test_expirePrediction_revertsBeforeTtl() public {
         bytes32 predictionHash = _predictionHash("pred-10");
         vm.prank(agent1);
@@ -486,6 +522,20 @@ contract HardnessRegistryTest is Test {
         vm.prank(agent1);
         vm.expectRevert(HardnessRegistry.InvalidValue.selector);
         registry.publishSignal("BTC-USD", 0, 9, 82, keccak256("ctx"));
+    }
+
+    function test_signalTimeSetterAndPublishRejectUint64Truncation() public {
+        uint256 largestDelay = uint256(type(uint64).max) - block.timestamp;
+        registry.setDefaultSignalTTL(largestDelay);
+        assertEq(registry.defaultSignalTTL(), largestDelay);
+
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setDefaultSignalTTL(largestDelay + 1);
+
+        vm.warp(block.timestamp + 1);
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.publishSignal("BTC-USD", 0, uint8(HardnessRegistry.Direction.LONG), 82, keccak256("stale-time-bound"));
     }
 
     // getConsensus tests removed — function moved to off-chain indexing (EIP-170 size limit)
