@@ -11,6 +11,7 @@ import {
 import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed } from '../src/lib/base-swap/tokens.js';
 import { assertApprovalCalldata, assertRevokeCalldata, assertSwapCalldata } from '../src/lib/base-swap/calldata-guard.js';
 import { assertQuoteConsistent } from '../src/lib/base-swap/quote-guard.js';
+import { evaluateStockReference } from '../api/_lib/base-swap.js';
 
 const wallet = getAddress('0x1111111111111111111111111111111111111111');
 
@@ -201,6 +202,24 @@ assert.throws(
   const vs = assertQuoteConsistent(swapQuote, req, now);
   assert.doesNotThrow(() => assertSwapCalldata(guardedSwap, { tokenInSymbol: vs.tokenInSymbol, tokenOutSymbol: vs.tokenOutSymbol, amountInRaw: vs.amountInRaw, minAmountOutRaw: vs.minAmountOutRaw, recipient: vs.recipient, deadline: vs.deadline }));
   console.log('BP-01: quote validator — 1 consistent journey, 20 inconsistent responses refused');
+}
+
+// --- BP-14: one reference validator for quote AND exposure; a fresh timestamp never overrides an issuer pause ---
+{
+  const ok = { issuerPaused: false, registryMultiplier: '1000000000000000000', multiplier: '1000000000000000000', roundComplete: true, answerPositive: true };
+  assert.deepEqual(evaluateStockReference({ ...ok, ageSec: 600 }), { status: 'fresh', usable: true, reason: null }, 'open market');
+  const weekend = evaluateStockReference({ ...ok, ageSec: 30 * 3600 });
+  assert.equal(weekend.status, 'market-closed'); assert.equal(weekend.usable, true, 'weekend secondary trading stays supported, with a warning');
+  const paused = evaluateStockReference({ ...ok, ageSec: 600, issuerPaused: true });
+  assert.equal(paused.status, 'issuer-paused'); assert.equal(paused.usable, false, 'a 10-minute-old timestamp does not override a known issuer pause');
+  const unknown = evaluateStockReference({ ...ok, ageSec: 600, issuerPaused: null, registryMultiplier: null });
+  assert.equal(unknown.status, 'unusable'); assert.equal(unknown.usable, false, 'unknown pause state fails closed');
+  assert.equal(evaluateStockReference({ ...ok, ageSec: 600, registryMultiplier: '2000000000000000000' }).usable, false, 'registry/token multiplier disagreement fails closed');
+  assert.equal(evaluateStockReference({ ...ok, ageSec: 100 * 3600 }).status, 'stale');
+  assert.equal(evaluateStockReference({ ...ok, ageSec: 600, roundComplete: false }).status, 'unusable');
+  assert.equal(evaluateStockReference({ ...ok, ageSec: 600, answerPositive: false }).status, 'unusable');
+  assert.deepEqual(evaluateStockReference({ ...ok, ageSec: 600 }), evaluateStockReference({ ...ok, ageSec: 600 }), 'resumed feed: same verdict as fresh');
+  console.log('BP-14: reference validator — open / weekend / issuer-paused / unknown / mismatch / stale / unusable');
 }
 
 // --- ERC-20 → ERC-20 ---

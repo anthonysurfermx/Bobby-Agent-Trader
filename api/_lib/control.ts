@@ -54,21 +54,42 @@ function failClosed(reason: string): BobbyControl {
   return { writeFreeze: true, canary: true, source: 'error', note: reason, fetchedAt: Date.now() };
 }
 
+/**
+ * BP-04 (2026-09-04 review): a dynamic control record is a DECISION, not a hint.
+ * It must be a plain object whose `write_freeze` and `canary` are literal
+ * booleans; anything else (array, null, missing field, string "false", number)
+ * is not an explicit decision to open writes and fails CLOSED. Exported so the
+ * parser is unit-tested on its own.
+ */
+export function parseControlRecord(raw: unknown, source: 'table' | 'edge-config'): BobbyControl {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return failClosed(`${source}: control record is not an object`);
+  const rec = raw as Record<string, unknown>;
+  if (typeof rec.write_freeze !== 'boolean') return failClosed(`${source}: write_freeze is not a boolean`);
+  if (typeof rec.canary !== 'boolean') return failClosed(`${source}: canary is not a boolean`);
+  if (rec.note !== undefined && rec.note !== null && typeof rec.note !== 'string') return failClosed(`${source}: note is not a string`);
+  return { writeFreeze: rec.write_freeze, canary: rec.canary, source, note: (rec.note as string | null | undefined) ?? null, fetchedAt: Date.now() };
+}
+
+/**
+ * BP-04: the environment freeze flags are an ADDITIVE emergency brake. They can
+ * only add a freeze on top of whatever the dynamic source says — never open
+ * writes — so operations can pull the plug without touching the control table.
+ */
+function applyEnvEmergencyFreeze(control: BobbyControl, env: NodeJS.ProcessEnv = process.env): BobbyControl {
+  const emergency = env.PROTOCOL_CUTOVER_FREEZE === 'true' || env.BOBBY_WRITE_FREEZE === 'true';
+  if (!emergency || control.writeFreeze) return control;
+  return { ...control, writeFreeze: true, note: `${control.note ? `${control.note}; ` : ''}env emergency freeze` };
+}
+
 async function fromTable(): Promise<BobbyControl> {
   const res = await fetch(bobbyRest('bobby_control?id=eq.global&select=write_freeze,canary,note&limit=1'), {
     headers: bobbyServiceHeaders(),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) return failClosed(`bobby_control HTTP ${res.status}`);
-  const rows = (await res.json()) as Array<{ write_freeze?: boolean; canary?: boolean; note?: string | null }>;
+  const rows = (await res.json()) as unknown;
   if (!Array.isArray(rows) || rows.length === 0) return failClosed('bobby_control row "global" is missing');
-  return {
-    writeFreeze: rows[0].write_freeze === true,
-    canary: rows[0].canary === true,
-    source: 'table',
-    note: rows[0].note ?? null,
-    fetchedAt: Date.now(),
-  };
+  return parseControlRecord(rows[0], 'table');
 }
 
 async function fromEdgeConfig(): Promise<BobbyControl> {
@@ -81,15 +102,8 @@ async function fromEdgeConfig(): Promise<BobbyControl> {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) return failClosed(`edge config HTTP ${res.status}`);
-  const item = (await res.json()) as { write_freeze?: boolean; canary?: boolean; note?: string | null } | null;
-  if (!item || typeof item !== 'object') return failClosed('edge config item "bobby_control" is missing');
-  return {
-    writeFreeze: item.write_freeze === true,
-    canary: item.canary === true,
-    source: 'edge-config',
-    note: item.note ?? null,
-    fetchedAt: Date.now(),
-  };
+  const item = (await res.json()) as unknown;
+  return parseControlRecord(item, 'edge-config');
 }
 
 /** Current flags. Dynamic sources are cached 10 s; env is read live. */
@@ -102,7 +116,15 @@ export async function getBobbyControl(): Promise<BobbyControl> {
   } catch (error) {
     cached = failClosed(error instanceof Error ? error.message : String(error));
   }
+  // Precedence, documented and tested (BP-04): the dynamic source decides; the
+  // env flags can only ADD a freeze. An env "false" never overrides a dynamic freeze.
+  cached = applyEnvEmergencyFreeze(cached);
   return cached;
+}
+
+/** Test hook: forget the 10 s snapshot so the next read hits the source again. */
+export function resetBobbyControlCache(): void {
+  cached = null;
 }
 
 /** Last control snapshot seen by this lambda (sync consumers such as the write latch). */

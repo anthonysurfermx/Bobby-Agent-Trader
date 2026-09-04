@@ -33,6 +33,7 @@
     "test:remediation-r2": "tsx scripts/test-remediation-r2.mts",
     "test:rls-lockdown-pg": "tsx scripts/test-rls-lockdown-pg.mts",
     "test:hardness-abi-anvil": "tsx scripts/test-hardness-abi-anvil.mts",
+    "test:agent-registry-pg": "tsx scripts/test-agent-registry-pg.mts",
     "gen:hardness-abi": "tsx scripts/gen-hardness-abi.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts"
   },

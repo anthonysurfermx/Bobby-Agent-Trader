@@ -16,12 +16,7 @@ import {
   verifyMcpPaymentTx,
 } from './_lib/protocol-payments.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
-import {
-  createChallenge,
-  atomicConsumeChallenge,
-  storeReceipt,
-  getChallenge,
-} from './_lib/mcp-challenges.js';
+import { createChallenge, storeReceipt, getChallenge, claimChallenge, completeChallenge, failChallenge, requestHashFor } from './_lib/mcp-challenges.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
 import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
 
@@ -210,6 +205,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // x402 payment check for premium tools (V2: challenge-based, replay-resistant)
   let verifiedPayment: Awaited<ReturnType<typeof verifyMcpPaymentTx>> | null = null;
+  let claimedChallengeId: string | null = null;
   if (body.method === 'tools/call') {
     const toolName = (body.params as Record<string, unknown>)?.name as string;
     if (PREMIUM_TOOLS.has(toolName)) {
@@ -220,14 +216,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
       const challengeIdHeader = String(req.headers['x-challenge-id'] || '').trim();
 
+      // BP-08: the challenge is issued FOR this exact request (tool + arguments).
+      const requestHash = requestHashFor(toolName, ((body.params as Record<string, unknown>)?.arguments || {}) as Record<string, unknown>);
       if (!txHash) {
         // No payment: create a new challenge and return 402
         try {
           const fee = await readMcpCallFee();
-          const { challengeId, expiresAt } = await createChallenge(
+          const { challengeId, expiresAt, clientSecret } = await createChallenge(
             toolName,
             fee.feeWei,
-            undefined,
+            requestHash,
             String(req.headers['x-agent-name'] || '').trim() || undefined,
           );
           void logAgentCommerceEvent({
@@ -260,7 +258,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 chainId: fee.chainId,
                 settlementContract: BOBBY_AGENT_ECONOMY,
                 settlementMethod: 'payMCPCall(bytes32 challengeId, string toolName)',
-                instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol}. Then retry with x-402-payment: <txHash> and x-challenge-id: ${challengeId}`,
+                clientSecret,
+                instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol}. Then retry the identical request with x-402-payment: <txHash>, x-challenge-id: ${challengeId} and x-challenge-secret: ${clientSecret}`,
               },
             },
             id: body.id,
@@ -300,28 +299,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(402).json({ jsonrpc: '2.0', error: { code: -32402, message: 'Paid transaction carries no challenge id.' }, id: body.id });
       }
       {
-        const { consumed } = await atomicConsumeChallenge(
-          effectiveChallengeId,
-          txHash,
-          verifiedPayment.payer,
-        );
-        if (!consumed) {
+        // BP-08: authorised by the client secret, bound to the identical request; failures stay retryable.
+        const clientSecret = String(req.headers['x-challenge-secret'] || '').trim();
+        const claim = await claimChallenge(effectiveChallengeId, txHash, verifiedPayment.payer, clientSecret, requestHash);
+        if (claim.outcome === 'replay') return res.status(200).json({ jsonrpc: '2.0', result: claim.result, id: body.id });
+        if (claim.outcome === 'refused') {
           return res.status(402).json({
             jsonrpc: '2.0',
-            error: {
-              code: -32402,
-              message: 'Challenge already consumed, expired, or not found. Request a new challenge.',
-              data: { challengeId: effectiveChallengeId, txHash },
-            },
+            error: { code: -32402, message: claim.reason, data: { challengeId: effectiveChallengeId, txHash } },
             id: body.id,
           });
         }
+        claimedChallengeId = effectiveChallengeId;
       }
     }
   }
 
   try {
-    const result = await handleMethod(body.method, body.params || {});
+    let result: unknown;
+    try {
+      result = await handleMethod(body.method, body.params || {});
+    } catch (error) {
+      if (claimedChallengeId) await failChallenge(claimedChallengeId, error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+    if (claimedChallengeId) await completeChallenge(claimedChallengeId, result);
 
     if (body.method === 'tools/call') {
       const toolName = (body.params as Record<string, unknown>)?.name as string;

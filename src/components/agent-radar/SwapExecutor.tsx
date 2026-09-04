@@ -50,7 +50,7 @@ interface SwapQuoteView {
   simulation: { ran: boolean; ok: boolean | null; reason: string | null };
   txWithheld: string[];
   warnings: string[];
-  stockReference: null | { symbol: string; usdPrice: number; ageSec: number; multiplierHuman: number; marketDeviationPct: number; pausedFeatures: string; transferPaused: boolean };
+  stockReference: null | { symbol: string; usdPrice: number; ageSec: number; updatedAt: number; multiplierHuman: number; marketDeviationPct: number; pausedFeatures: string; transferPaused: boolean; issuerPaused: boolean | null; status: string; usable: boolean };
 }
 
 interface Props { defaultFrom?: string; defaultTo?: string; className?: string }
@@ -309,6 +309,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
               {stock && (
                 <>
                   <div className="flex justify-between"><span className="text-neutral-500">{stock.symbol} official reference</span><span className="text-neutral-400">${stock.usdPrice.toFixed(2)} · Uniswap {stock.marketDeviationPct.toFixed(2)}% away · feed {Math.round(stock.ageSec / 3600)}h</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Reference status</span><span className={stock.usable ? 'text-neutral-400' : 'text-amber-400'}>{stock.status}{stock.issuerPaused === true ? ' · issuer feed frozen' : stock.issuerPaused === null ? ' · pause state unknown' : ''} · {new Date(stock.updatedAt * 1000).toISOString().replace('T', ' ').slice(0, 16)}Z</span></div>
                   <div className="flex justify-between"><span className="text-neutral-500">B20 multiplier</span><span className="text-neutral-400">{stock.multiplierHuman}× {stock.transferPaused ? '· transfers paused' : stock.pausedFeatures !== '0' ? '· issuer paused mint/redeem' : ''}</span></div>
                 </>
               )}

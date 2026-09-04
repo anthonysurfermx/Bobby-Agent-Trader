@@ -384,4 +384,143 @@ await check('BP-09 agent-run: every cycle write passes provenance; the history r
   }
 });
 
+// ---------- BP-04: malformed dynamic controls fail CLOSED; env freeze is additive ----------
+await check('BP-04 parseControlRecord: only explicit booleans open writes', async () => {
+  const { parseControlRecord } = await import('../api/_lib/control.js');
+  assert.equal(parseControlRecord({ write_freeze: false, canary: false }, 'edge-config').writeFreeze, false, 'well-formed explicit false opens');
+  for (const bad of [null, [], 'x', 42, {}, { write_freeze: false }, { write_freeze: 'false', canary: false }, { write_freeze: false, canary: 'no' }, { write_freeze: 0, canary: false }, { write_freeze: false, canary: false, note: 7 }]) {
+    const c = parseControlRecord(bad, 'edge-config');
+    assert.equal(c.writeFreeze, true, `malformed ${JSON.stringify(bad)} must freeze`);
+    assert.equal(c.canary, true); assert.equal(c.source, 'error');
+  }
+});
+await check('BP-04 getBobbyControl: dynamic source decides; env flags can only ADD a freeze', async () => {
+  const control = await import('../api/_lib/control.js');
+  const prev = { src: process.env.BOBBY_CONTROL_SOURCE, ec: process.env.EDGE_CONFIG, fz: process.env.PROTOCOL_CUTOVER_FREEZE };
+  process.env.BOBBY_CONTROL_SOURCE = 'edge-config';
+  process.env.EDGE_CONFIG = 'https://edge-config.vercel.com/ecfg_test?token=tok';
+  const realFetch = globalThis.fetch;
+  const withRecord = (body: unknown, status = 200) => { globalThis.fetch = (async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })) as typeof fetch; control.resetBobbyControlCache(); };
+  try {
+    delete process.env.PROTOCOL_CUTOVER_FREEZE;
+    withRecord({ write_freeze: false, canary: false }); assert.equal((await control.getBobbyControl()).writeFreeze, false, 'explicit false opens');
+    withRecord({}); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'missing fields freeze');
+    withRecord(null); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'null freezes');
+    withRecord([]); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'array freezes');
+    withRecord({ write_freeze: 'false', canary: false }); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'string-valued freezes');
+    withRecord({ write_freeze: false, canary: false }, 500); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'unreadable freezes');
+    process.env.PROTOCOL_CUTOVER_FREEZE = 'true';
+    withRecord({ write_freeze: false, canary: false }); const c = await control.getBobbyControl();
+    assert.equal(c.writeFreeze, true, 'env emergency freeze overrides a well-formed open'); assert.match(String(c.note), /env emergency freeze/);
+    delete process.env.PROTOCOL_CUTOVER_FREEZE;
+    withRecord({ write_freeze: true, canary: false }); process.env.PROTOCOL_CUTOVER_FREEZE = 'false';
+    assert.equal((await control.getBobbyControl()).writeFreeze, true, 'env "false" never opens a dynamic freeze');
+  } finally {
+    globalThis.fetch = realFetch; control.resetBobbyControlCache();
+    if (prev.src === undefined) delete process.env.BOBBY_CONTROL_SOURCE; else process.env.BOBBY_CONTROL_SOURCE = prev.src;
+    if (prev.ec === undefined) delete process.env.EDGE_CONFIG; else process.env.EDGE_CONFIG = prev.ec;
+    if (prev.fz === undefined) delete process.env.PROTOCOL_CUTOVER_FREEZE; else process.env.PROTOCOL_CUTOVER_FREEZE = prev.fz;
+  }
+});
+
+// ---------- BP-08: redemption bound to the client and the request, with a fulfilment lifecycle ----------
+await check('BP-08 challenge lifecycle: secret + identical request claim; replay returns the stored result; failure stays retryable', async () => {
+  const ch = await import('../api/_lib/mcp-challenges.js');
+  const realFetch = globalThis.fetch;
+  // A tiny PostgREST emulation for mcp_payment_challenges honouring the filters the library relies on.
+  const rows: Record<string, any>[] = [];
+  const parseFilter = (u: URL) => {
+    const f: Record<string, string> = {}; for (const [k, v] of u.searchParams) f[k] = v; return f;
+  };
+  const matches = (row: Record<string, any>, f: Record<string, string>) => {
+    for (const [k, v] of Object.entries(f)) {
+      if (k === 'select' || k === 'on_conflict') continue;
+      if (k === 'or') {
+        const ok = (v.includes('status.eq.pending') && row.status === 'pending') || (v.includes('status.eq.retryable_failure') && row.status === 'retryable_failure')
+          || (v.includes('status.eq.in_progress') && row.status === 'in_progress' && row.consumed_at < decodeURIComponent(v.match(/consumed_at\.lt\.([^)]+)/)?.[1] ?? ''));
+        if (!ok) return false; continue;
+      }
+      const [op, ...rest] = v.split('.'); const val = decodeURIComponent(rest.join('.'));
+      if (op === 'eq' && String(row[k]) !== val) return false;
+      if (op === 'gt' && !(String(row[k]) > val)) return false;
+    }
+    return true;
+  };
+  globalThis.fetch = (async (input: any, init?: any) => {
+    const u = new URL(typeof input === 'string' ? input : input.url); const method = (init?.method || 'GET').toUpperCase();
+    const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
+    if (!u.pathname.includes('mcp_payment_challenges')) return json([]);
+    const f = parseFilter(u);
+    if (method === 'POST') { const r = { challenge_id: `c${rows.length + 1}`, status: 'pending', expires_at: new Date(Date.now() + 600_000).toISOString(), attempts: 0, ...JSON.parse(init.body) }; rows.push(r); return json([r]); }
+    if (method === 'PATCH') { const patch = JSON.parse(init.body); const hit = rows.filter((r) => matches(r, f)); hit.forEach((r) => Object.assign(r, patch)); return json(hit); }
+    return json(rows.filter((r) => matches(r, f)));
+  }) as typeof fetch;
+  try {
+    const args = { thread_id: 't1', language: 'en' };
+    const reqHash = ch.requestHashFor('bobby_judge', args);
+    assert.equal(ch.requestHashFor('bobby_judge', { language: 'en', thread_id: 't1' }), reqHash, 'canonical: key order does not matter');
+    assert.notEqual(ch.requestHashFor('bobby_judge', { ...args, language: 'es' }), reqHash, 'different terms, different hash');
+    const issued = await ch.createChallenge('bobby_judge', '1000', reqHash, 'agent-x');
+    assert.match(issued.clientSecret, /^[a-f0-9]{64}$/); assert.equal(rows[0].client_secret_hash, ch.sha256Hex(issued.clientSecret), 'only the hash is stored');
+    // an unrelated client with the (public) tx hash but not the secret cannot redeem
+    assert.equal((await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', 'a'.repeat(64), reqHash)).outcome, 'refused');
+    assert.equal(rows[0].status, 'pending', 'a refused claim consumes nothing');
+    // the right client, but different terms → refused
+    assert.equal((await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', issued.clientSecret, ch.requestHashFor('bobby_judge', { ...args, language: 'es' }))).outcome, 'refused');
+    // the right client, same request → claimed (in_progress)
+    const claim = await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', issued.clientSecret, reqHash);
+    assert.equal(claim.outcome, 'claimed'); assert.equal(rows[0].status, 'in_progress');
+    // tool failed → retryable, then the same client retries and is claimed again
+    await ch.failChallenge(issued.challengeId, 'upstream 502'); assert.equal(rows[0].status, 'retryable_failure');
+    assert.equal((await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', issued.clientSecret, reqHash)).outcome, 'claimed', 'a failed fulfilment does not cost a second payment');
+    // tool succeeded → completed; a retry by the same client is an idempotent replay with the stored result, no re-execution
+    await ch.completeChallenge(issued.challengeId, { verdict: 'ok' }); assert.equal(rows[0].status, 'completed');
+    const replay = await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', issued.clientSecret, reqHash);
+    assert.deepEqual(replay, { outcome: 'replay', result: { verdict: 'ok' } });
+    // a stranger cannot even replay
+    assert.equal((await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', 'b'.repeat(64), reqHash)).outcome, 'refused');
+  } finally { globalThis.fetch = realFetch; }
+});
+await check('BP-08 transports: both issue with the request hash + secret and redeem through claim/complete/fail', async () => {
+  for (const f of ['api/mcp-http.ts', 'api/mcp-bobby.ts']) {
+    const src = await readFile(new URL(`../${f}`, import.meta.url), 'utf8');
+    assert.ok(!src.includes('atomicConsumeChallenge'), `${f}: the unbound consume is gone`);
+    assert.match(src, /requestHashFor\(toolName, /, `${f}: request hash at issuance`);
+    assert.match(src, /createChallenge\(\s*toolName,\s*fee\.feeWei,\s*requestHash,/, `${f}: challenge bound to the request`);
+    assert.match(src, /x-challenge-secret/, `${f}: secret header`);
+    assert.match(src, /claimChallenge\(effectiveChallengeId, txHash, verifiedPayment\.payer, clientSecret, requestHash\)/, `${f}: claim`);
+    assert.match(src, /claim\.outcome === 'replay'/, `${f}: replay path`);
+    assert.match(src, /failChallenge\(claimedChallengeId/, `${f}: failure path`);
+    assert.match(src, /completeChallenge\(claimedChallengeId, result\)/, `${f}: completion path`);
+  }
+});
+
+// ---------- BP-10: a failed registry read never authorises a write; owner changes need a transfer ----------
+await check('BP-10 register: storage read failure → 502 and no write; owner change → 409 and no write', async () => {
+  process.env.BOBBY_SUPABASE_URL = 'https://dummy.supabase.co';
+  const { default: register } = await import('../api/agents/register.js');
+  const realFetch = globalThis.fetch; const writes: string[] = [];
+  const body = { agentId: 'agent-1', owner: '0x1111111111111111111111111111111111111111', name: 'A' };
+  try {
+    globalThis.fetch = (async (input: any, init?: any) => {
+      const url = typeof input === 'string' ? input : input.url; const method = (init?.method || 'GET').toUpperCase();
+      if (method !== 'GET' && /hardness_agents|rpc\/hardness_/.test(url)) writes.push(`${method} ${url}`); // registry writes only (the rate limiter's api_cache counter is not one)
+      if (url.includes('hardness_agents') && method === 'GET') return new Response('boom', { status: 500 });
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    let { res, state } = recorder();
+    await register(req('POST', {}, body, INTERNAL), res);
+    assert.equal(state.status, 502, JSON.stringify(state.body)); assert.deepEqual(writes, [], 'no write after a failed read');
+    globalThis.fetch = (async (input: any, init?: any) => {
+      const url = typeof input === 'string' ? input : input.url; const method = (init?.method || 'GET').toUpperCase();
+      if (method !== 'GET' && /hardness_agents|rpc\/hardness_/.test(url)) writes.push(`${method} ${url}`);
+      if (url.includes('hardness_agents') && method === 'GET') return new Response(JSON.stringify([{ agent_id: 'agent-1', owner_address: '0x2222222222222222222222222222222222222222', version: 3 }]), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    ({ res, state } = recorder());
+    await register(req('POST', {}, body, INTERNAL), res);
+    assert.equal(state.status, 409, JSON.stringify(state.body)); assert.match(String((state.body as any).error), /transfer/); assert.deepEqual(writes, [], 'an owner change through registration writes nothing');
+  } finally { globalThis.fetch = realFetch; }
+});
+
 console.log(`remediation-r2: ${passed}/${passed} checks passed`);

@@ -22,12 +22,7 @@ import {
   readMcpCallFee,
   verifyMcpPaymentTx,
 } from './_lib/protocol-payments.js';
-import {
-  createChallenge,
-  atomicConsumeChallenge,
-  getLatestReceipt,
-  storeReceipt,
-} from './_lib/mcp-challenges.js';
+import { createChallenge, getLatestReceipt, storeReceipt, claimChallenge, completeChallenge, failChallenge, requestHashFor } from './_lib/mcp-challenges.js';
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
 import { logHarnessEvent } from './_lib/harness-events.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
@@ -838,6 +833,7 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
 
       // x402 payment gate for premium tools
       let verifiedPayment: Awaited<ReturnType<typeof verifyMcpPaymentTx>> | null = null;
+      let claimedChallengeId: string | null = null;
 
       if (PREMIUM_TOOLS.has(toolName)) {
         const txHash = extractPaymentTxHash(
@@ -847,13 +843,15 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
         );
         const challengeIdHeader = String(req.headers['x-challenge-id'] || '').trim();
 
+        // BP-08: the challenge is issued FOR this exact request (tool + arguments).
+        const requestHash = requestHashFor(toolName, args);
         if (!txHash) {
           // No payment → create challenge, return 402
           const fee = await readMcpCallFee();
-          const { challengeId, expiresAt } = await createChallenge(
+          const { challengeId, expiresAt, clientSecret } = await createChallenge(
             toolName,
             fee.feeWei,
-            undefined,
+            requestHash,
             String(req.headers['x-agent-name'] || '').trim() || undefined,
           );
           void logAgentCommerceEvent({
@@ -881,7 +879,9 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
             chainId: fee.chainId,
             contract: BOBBY_AGENT_ECONOMY,
             method: 'payMCPCall(bytes32 challengeId, string toolName)',
-            instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol}, then retry with headers x-402-payment: <txHash> and x-challenge-id: ${challengeId}`,
+            // BP-08: the secret is shown ONCE; only its holder, repeating the SAME request, can redeem.
+            clientSecret,
+            instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol}, then retry the identical request with headers x-402-payment: <txHash>, x-challenge-id: ${challengeId} and x-challenge-secret: ${clientSecret}`,
           });
         }
 
@@ -896,18 +896,26 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
           return jsonrpcError(id, -32402, 'Challenge id does not match the paid transaction.', { protocol: 'x402' });
         }
         if (!effectiveChallengeId) return jsonrpcError(id, -32402, 'Paid transaction carries no challenge id.', { protocol: 'x402' });
-        {
-          const { consumed } = await atomicConsumeChallenge(effectiveChallengeId, txHash, verifiedPayment.payer);
-          if (!consumed) {
-            return jsonrpcError(id, -32402, 'Challenge already consumed, expired, or not found. Request a new challenge.', {
-              challengeId: effectiveChallengeId, txHash,
-            });
-          }
+        // BP-08: redemption is authorised by the client secret and bound to the identical request —
+        // a public tx hash is payment evidence, never a redemption credential.
+        const clientSecret = String(req.headers['x-challenge-secret'] || '').trim();
+        const claim = await claimChallenge(effectiveChallengeId, txHash, verifiedPayment.payer, clientSecret, requestHash);
+        if (claim.outcome === 'replay') return jsonrpcOk(id, claim.result); // already fulfilled for this client: no second execution
+        if (claim.outcome === 'refused') {
+          return jsonrpcError(id, -32402, claim.reason, { challengeId: effectiveChallengeId, txHash });
         }
+        claimedChallengeId = effectiveChallengeId;
       }
 
-      // Execute the tool
-      const result = await executeTool(toolName, args);
+      // Execute the tool. A paid call that fails is left retryable, never consumed.
+      let result: Awaited<ReturnType<typeof executeTool>>;
+      try {
+        result = await executeTool(toolName, args);
+      } catch (error) {
+        if (claimedChallengeId) await failChallenge(claimedChallengeId, error instanceof Error ? error.message : String(error));
+        throw error;
+      }
+      if (claimedChallengeId) await completeChallenge(claimedChallengeId, result);
 
       if (!PREMIUM_TOOLS.has(toolName)) {
         void logAgentCommerceEvent({

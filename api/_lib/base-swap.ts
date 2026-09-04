@@ -26,7 +26,7 @@ import {
 import { base } from 'viem/chains';
 import { BASE, UNISWAP_BASE } from './chains.js';
 import {
-  BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, BASE_WETH, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed, type BaseSwapToken,
+  BASE_B20_ORACLE_REGISTRY, BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, BASE_WETH, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed, type BaseSwapToken,
 } from '../../src/lib/base-swap/tokens.js';
 
 export const SWAP_ROUTER02: Address = getAddress(UNISWAP_BASE.swapRouter02);
@@ -317,6 +317,32 @@ const CHAINLINK_ABI = parseAbi([
   'function decimals() view returns (uint8)',
   'function latestRoundData() view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)',
 ]);
+// BP-14: the issuer registry is the source of truth for a feed freeze (corporate
+// actions). Selector 0xd4197e82 — resolved from the deployed bytecode and probed on
+// all four tokens: (multiplier 1e18, paused). Token transfer pauses are a different signal.
+const B20_ORACLE_REGISTRY_ABI = parseAbi(['function getOracleParams(address token) view returns (uint256 multiplier, bool paused)']);
+const ORACLE_REGISTRY = getAddress(BASE_B20_ORACLE_REGISTRY);
+
+export type StockReferenceStatus = 'fresh' | 'market-closed' | 'stale' | 'issuer-paused' | 'unusable';
+
+/**
+ * BP-14: ONE rule for "may this reference drive a risk decision", shared by the
+ * quote guard and the held-exposure calculation. Market closure, missing data and
+ * an issuer pause are distinguished; a recent timestamp never overrides a known
+ * pause, and an unknown pause state is not usable.
+ */
+export function evaluateStockReference(ref: {
+  ageSec: number; issuerPaused: boolean | null; registryMultiplier: string | null; multiplier: string; roundComplete: boolean; answerPositive: boolean;
+}, now: number = Math.floor(Date.now() / 1000)): { status: StockReferenceStatus; usable: boolean; reason: string | null } {
+  void now;
+  if (!ref.answerPositive || !ref.roundComplete) return { status: 'unusable', usable: false, reason: 'stock reference feed returned no usable price' };
+  if (ref.issuerPaused === null) return { status: 'unusable', usable: false, reason: 'issuer registry pause state could not be read' };
+  if (ref.issuerPaused) return { status: 'issuer-paused', usable: false, reason: 'issuer feed is frozen (corporate action); the last price is held, not current' };
+  if (ref.registryMultiplier !== null && ref.registryMultiplier !== ref.multiplier) return { status: 'unusable', usable: false, reason: 'registry multiplier differs from the token multiplier' };
+  if (ref.ageSec > STOCK_REFERENCE_MAX_AGE_SEC) return { status: 'stale', usable: false, reason: `stock reference is ${Math.floor(ref.ageSec / 3600)}h old; wait for a fresh market reference` };
+  if (ref.ageSec > STOCK_REFERENCE_WARN_AGE_SEC) return { status: 'market-closed', usable: true, reason: `stock reference is ${Math.floor(ref.ageSec / 3600)}h old (market may be closed)` };
+  return { status: 'fresh', usable: true, reason: null };
+}
 const ZERO = '0x0000000000000000000000000000000000000000';
 const STOCK_REFERENCE_WARN_AGE_SEC = 26 * 60 * 60;
 const STOCK_REFERENCE_MAX_AGE_SEC = 96 * 60 * 60;
@@ -498,6 +524,13 @@ export interface StockReferenceView {
   pausedFeatures: string;
   /** Transfer-level pause (feature 0). When true nothing can move. */
   transferPaused: boolean;
+  /** BP-14: issuer registry pause flag (feed frozen for a corporate action). null = could not be read. */
+  issuerPaused: boolean | null;
+  /** BP-14: multiplier the registry reports, to cross-check the token's. */
+  registryMultiplier: string | null;
+  /** BP-14: the shared validator's verdict, shown to the user next to updatedAt. */
+  status: StockReferenceStatus;
+  usable: boolean;
 }
 
 export interface BaseSwapQuote {
@@ -575,7 +608,7 @@ async function readStockReference(stock: BaseSwapToken, executionUsdPerToken: nu
   if (stock.assetClass !== 'tokenized-stock' || !stock.referenceFeed) throw new Error('stock reference metadata missing');
   const tokenAddress = getAddress(stock.address);
   const feedAddress = getAddress(stock.referenceFeed);
-  const [symbol, decimals, totalSupply, multiplier, feedDecimals, round, pausedFeatures, transferPaused] = await multicallLoose([
+  const [symbol, decimals, totalSupply, multiplier, feedDecimals, round, pausedFeatures, transferPaused, oracleParams] = await multicallLoose([
     { address: tokenAddress, abi: B20_ABI, functionName: 'symbol' },
     { address: tokenAddress, abi: B20_ABI, functionName: 'decimals' },
     { address: tokenAddress, abi: B20_ABI, functionName: 'totalSupply' },
@@ -584,6 +617,7 @@ async function readStockReference(stock: BaseSwapToken, executionUsdPerToken: nu
     { address: feedAddress, abi: CHAINLINK_ABI, functionName: 'latestRoundData' },
     { address: tokenAddress, abi: B20_ABI, functionName: 'pausedFeatures' },
     { address: tokenAddress, abi: B20_ABI, functionName: 'isPaused', args: [0] },
+    { address: ORACLE_REGISTRY, abi: B20_ORACLE_REGISTRY_ABI, functionName: 'getOracleParams', args: [tokenAddress] },
   ], false);
   if (String(symbol) !== stock.symbol || Number(decimals) !== stock.decimals) throw new Error('pinned B20 metadata no longer matches onchain metadata');
   if ((totalSupply as bigint) <= 0n) throw new Error('B20 token has no circulating supply');
@@ -594,18 +628,28 @@ async function readStockReference(stock: BaseSwapToken, executionUsdPerToken: nu
   if (rd[4] < rd[0]) throw new Error('stock reference round is incomplete (answeredInRound < roundId)');
   const usdPrice = Number(formatUnits(answer, Number(feedDecimals)));
   const marketDeviationPct = Math.abs(executionUsdPerToken / usdPrice - 1) * 100;
+  // BP-14: an unreadable registry is an UNKNOWN pause state — not "not paused".
+  const params = Array.isArray(oracleParams) && oracleParams.length === 2 ? (oracleParams as unknown as readonly [bigint, boolean]) : null;
+  const issuerPaused = params ? Boolean(params[1]) : null;
+  const registryMultiplier = params ? params[0].toString() : null;
+  const ageSec = Math.max(0, Math.floor(Date.now() / 1000) - updatedAt);
+  const verdict = evaluateStockReference({ ageSec, issuerPaused, registryMultiplier, multiplier: (multiplier as bigint).toString(), roundComplete: true, answerPositive: true });
   return {
     symbol: stock.symbol,
     tokenAddress,
     feedAddress,
     usdPrice,
     updatedAt,
-    ageSec: Math.max(0, Math.floor(Date.now() / 1000) - updatedAt),
+    ageSec,
     multiplier: (multiplier as bigint).toString(),
     multiplierHuman: Number(formatUnits(multiplier as bigint, 18)),
     marketDeviationPct,
     pausedFeatures: (pausedFeatures as bigint).toString(),
     transferPaused: Boolean(transferPaused),
+    issuerPaused,
+    registryMultiplier,
+    status: verdict.status,
+    usable: verdict.usable,
   };
 }
 
@@ -654,11 +698,10 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     const executionUsdPerToken = tokenIn.assetClass === 'tokenized-stock' ? executionPrice : 1 / executionPrice;
     try {
       stockReference = await readStockReference(stock, executionUsdPerToken);
-      if (stockReference.ageSec > STOCK_REFERENCE_MAX_AGE_SEC) {
-        txWithheld.push(`stock reference is ${Math.floor(stockReference.ageSec / 3600)}h old; wait for a fresh market reference`);
-      } else if (stockReference.ageSec > STOCK_REFERENCE_WARN_AGE_SEC) {
-        warnings.push(`stock reference is ${Math.floor(stockReference.ageSec / 3600)}h old (market may be closed)`);
-      }
+      // BP-14: one shared verdict — issuer pause and unknown state withhold, market closure only warns.
+      const verdict = evaluateStockReference({ ageSec: stockReference.ageSec, issuerPaused: stockReference.issuerPaused, registryMultiplier: stockReference.registryMultiplier, multiplier: stockReference.multiplier, roundComplete: true, answerPositive: true });
+      if (!verdict.usable) txWithheld.push(`${stock.symbol}: ${verdict.reason}`);
+      else if (verdict.reason) warnings.push(verdict.reason);
       if (stockReference.marketDeviationPct > STOCK_REFERENCE_MAX_DEVIATION_PCT) {
         txWithheld.push(`Uniswap price differs ${stockReference.marketDeviationPct.toFixed(2)}% from the official reference`);
       } else if (stockReference.marketDeviationPct > STOCK_REFERENCE_WARN_DEVIATION_PCT) {
@@ -889,16 +932,25 @@ export async function fetchOnchainStockExposureUsd(wallet: string): Promise<numb
     const bal = balances[i] ?? 0n;
     if (bal <= 0n) continue;
     const feed = getAddress(stocks[i].referenceFeed as Address);
-    const [dec, round] = (await multicallLoose([
+    const tokenAddr = getAddress(stocks[i].address);
+    const [dec, round, tokenMultiplier, oracleParams] = (await multicallLoose([
       { address: feed, abi: CHAINLINK_ABI, functionName: 'decimals' },
       { address: feed, abi: CHAINLINK_ABI, functionName: 'latestRoundData' },
-    ], false)) as [number, readonly [bigint, bigint, bigint, bigint, bigint]];
+      { address: tokenAddr, abi: B20_ABI, functionName: 'multiplier' },
+      { address: ORACLE_REGISTRY, abi: B20_ORACLE_REGISTRY_ABI, functionName: 'getOracleParams', args: [tokenAddr] },
+    ], false)) as [number, readonly [bigint, bigint, bigint, bigint, bigint], bigint, readonly [bigint, boolean] | undefined];
     // A reference that is not a reference is an error, not a zero: the caller
-    // fails closed. Complete round, positive answer, younger than the 96h bound.
+    // fails closed. BP-14: the SAME validator as the quote path — an issuer pause
+    // or an unknown pause state makes the held exposure unpriceable.
     const [roundId, answer, , updatedAt, answeredInRound] = round;
     const ageSec = Math.floor(Date.now() / 1000) - Number(updatedAt);
-    if (answer <= 0n || answeredInRound < roundId || Number(updatedAt) === 0 || ageSec > STOCK_REFERENCE_MAX_AGE_SEC) {
-      throw new Error(`${stocks[i].symbol}: Chainlink reference unusable (answer ${answer}, round ${roundId}/${answeredInRound}, age ${ageSec}s)`);
+    const params = Array.isArray(oracleParams) && oracleParams.length === 2 ? oracleParams : null;
+    const verdict = evaluateStockReference({
+      ageSec, issuerPaused: params ? Boolean(params[1]) : null, registryMultiplier: params ? params[0].toString() : null,
+      multiplier: (tokenMultiplier ?? 0n).toString(), roundComplete: answeredInRound >= roundId && Number(updatedAt) !== 0, answerPositive: answer > 0n,
+    });
+    if (!verdict.usable) {
+      throw new Error(`${stocks[i].symbol}: reference ${verdict.status} — ${verdict.reason} (round ${roundId}/${answeredInRound}, age ${ageSec}s)`);
     }
     total += Number(formatUnits(bal, stocks[i].decimals)) * Number(formatUnits(answer, Number(dec)));
   }
