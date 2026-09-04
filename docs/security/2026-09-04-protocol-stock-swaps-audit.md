@@ -1,6 +1,6 @@
 # Bobby Protocol and tokenized-stock swaps — expanded security review
 
-Date: 2026-09-04. Status: **NO-GO; first expanded source-review pass.**
+Date: 2026-09-04. Status: **NO-GO; expanded review in progress (two passes).**
 
 Reviewed web/backend/contracts: `security/remediation-r2` at
 `02a0a7aa51b129f89089be121d047a00dfb78452`. Reviewed native client:
@@ -8,6 +8,18 @@ Reviewed web/backend/contracts: `security/remediation-r2` at
 The native client is in a separate checkout; the web branch has no `ios/` tree.
 Findings below refer to those exact revisions. No production setting, deployed
 contract, wallet transaction, or application source was changed during this pass.
+
+Continuation: web/backend/contracts re-pinned at documentation-only commit
+`7a7e7704dc57ddc17ecd123172294bddb8f98793`; application code is unchanged from
+the revision above. Pass two adds BP-07/BP-08/BP-09, broader source coverage and
+real local-Postgres verification. The only executable change is to the database
+test harness: a remediation-only mode and stronger effective-privilege checks.
+At the end of pass two, the native checkout also contained someone else's
+uncommitted `TraderLandGateHarness.swift` changes. They were left untouched and
+are not covered by the pinned native revision or its earlier 9/9 test result;
+the swap/signing files themselves had no working-tree diff.
+Current findings: **3 P1 and 6 P2**. No new P0 was confirmed in these passes;
+that is not a guarantee that no critical defect remains in unverified coverage.
 
 The user requested review of Bobby Protocol and the complete stock-swap feature
 on web and iOS. The implemented stock rail is **Coinbase B20 on Base 8453**, with
@@ -167,6 +179,104 @@ ABI and database suites in the release verification workflow.
 
 Closure evidence: the actual CI job reaches tests and layout verification, and an
 oversized production artifact still makes the release gate fail.
+Database tests must actually execute: both current Postgres scripts exit zero
+with a skip message when `DATABASE_URL` is missing. Merely adding their commands
+to CI would not establish database coverage.
+
+### BP-07 — P2: the MCP bounty integration still builds zero-bond challenges
+
+Evidence: `api/mcp-http.ts:456`–`:470`;
+`api/_lib/protocol-payments.ts:27`, `:46`, `:173`;
+`contracts/src/BobbyAdversarialBounties.sol:243`, `:296`.
+
+The released builder still returns a challenge transaction with zero value,
+while the remediated contract requires the bounty's snapshotted bond. With the
+adopted nonzero bond configuration, the supported MCP challenge workflow cannot
+submit an otherwise valid challenge. The contract refuses it; there is no
+zero-bond bypass. Users may encounter a simulation failure or pay gas for a
+reverted transaction if they broadcast without simulation.
+
+The same integration only names four statuses and exposes no proposal/dispute
+deadlines: new states become `STATUS_4` and `STATUS_5`. The remediated contract's
+dispute window therefore is not adequately surfaced to MCP observers.
+
+Required correction: derive the interface from the current artifact; read the
+specific bounty's `bountyBond`, not the mutable global default; include exact
+transaction value and bond disclosure; publish all status names and applicable
+proposal/settlement deadlines. Document a usable dispute/finalization path.
+
+Closure evidence: a normal supported-client challenge succeeds with a nonzero
+snapshotted bond in a local deployment; subsequent global bond changes do not
+change its value; all six statuses and their deadlines round-trip through the
+reader. No live challenge was submitted during this review.
+
+### BP-08 — P2: MCP payment redemption is not bound to the requesting client
+
+Evidence: `api/mcp-http.ts:853`, `:889`–`:910`;
+`api/mcp-bobby.ts:227`, `:295`–`:324`;
+`api/_lib/mcp-challenges.ts:83`–`:115`.
+
+Both transports establish that a transaction paid for the named tool, but never
+establish that the HTTP requester is that payer or the client that obtained the
+challenge. Challenge creation passes no request hash; the verified chain sender
+is written as `payer_address` during consumption, not checked against an
+authenticated caller. A public transaction identifier is payment evidence, not
+a private redemption credential. Atomic consumption prevents repeated service
+delivery but does not determine which requester is entitled to the first one.
+
+Impact: unauthorized use of a still-unredeemed paid service and denial of that
+redemption to the paying client. This does not permit signing for the payer or
+withdrawing its wallet funds. The conclusion is from the source authorization
+path; no payment interception or live redemption was attempted.
+
+Required correction: bind issuance and redemption to an authenticated payer or a
+private client capability, and bind canonical request parameters/tool to the
+challenge. Keep the atomic single-consumer constraint. Return/recover a stored
+result only to the same authorized client.
+
+Related reliability gap: consumption occurs before tool execution and no
+recoverable completion/result state is used. A tool failure leaves the legitimate
+client with a consumed payment. Include in-progress/completed/retryable-failure
+states and idempotent authorized retries in the remediation design.
+
+Closure evidence: the authorized client can fulfill and safely retry its paid
+request; unrelated clients cannot redeem it; changing request terms is refused;
+tool failure does not require paying a second time for the same fulfillment.
+
+### BP-09 — P1: wallet-specific cycles are persisted as public protocol cycles
+
+Evidence: `api/agent-run.ts:969`, `:1023`–`:1036`, `:1066`–`:1081`,
+`:1230`–`:1249`, `:1323`;
+`supabase/bobby-protocol/supabase/migrations/20260903000010_lock_down_public_reads.sql:40`–`:50`;
+`supabase/bobby-protocol/supabase/migrations/20260903000009_swap_receipts.sql:251`;
+`src/components/agent-radar/AgentDashboard.tsx:441`.
+
+Manual wallet cycles prove ownership before running and retain `walletAddress`
+in memory. Their success, halt, no-signal and failure records omit both
+`owner_address` and `user_id`. Those columns default to null. Migration 0010's
+public view interprets exactly that combination as a protocol-owned row and
+publishes its reasoning, timestamps and capital counters. For example, the halt
+record includes the wallet-specific circuit-breaker reason. Confirming a linked
+swap later updates the cycle's deployed-capital counters without assigning
+ownership, so it does not repair the classification.
+
+Impact: wallet-specific cycle information can be published through the intended
+public view even after base-table access is revoked. The rows do not directly
+include the wallet address, but timing and trading amounts can support linkage;
+the primary defect is unauthorized publication, not a demonstrated identification
+of a production user. No private production rows were queried.
+
+Required correction: bind the proven wallet/identity centrally in the logging
+function for every manual-wallet branch; mark true protocol cycles explicitly;
+make the public view require positive public provenance rather than treating
+missing ownership as permission. Scope service-role history readers likewise.
+Assess existing unowned rows conservatively; do not automatically classify
+ambiguous historical rows as public or delete them during the audit.
+
+Closure evidence: ordinary wallet cycles (success, halted, no-signal and failure)
+remain private before and after receipt confirmation, while deliberate protocol
+cycles remain public. Test the real producer together with the migration view:
+correctly tagged synthetic fixtures alone cannot detect this defect.
 
 ## Additional integrity and dependency work
 
@@ -188,17 +298,57 @@ oversized production artifact still makes the release gate fail.
 
 ## Coverage and release evidence
 
+Pass two expanded the manual source review across the seven production contract
+families. In addition to the prior bounty liability review, it inspected
+TrackRecord V2's announce/commit/oracle/resolve/expire/stop-challenge paths,
+snapshotted parameters, split statistics, oracle rotation and refunds; Hardness
+registration/unstaking/services/predictions/signals/admin paths; IntentEscrow
+signatures, domain separation, nonces and role transitions; and the Economy,
+ConvictionOracle and AgentRegistry implementations. No additional contract-level
+funds-loss finding was confirmed in those paths. This is manual review plus the
+existing regression suites, not formal verification or an independent external
+audit.
+
+Important trust boundaries remain explicit: Hardness outcomes are resolver
+attestations using caller-supplied exit prices; IntentEscrow records an execution
+reference and resolver attestation, not a verified Uniswap execution; the
+ConvictionOracle publishes opinions, not a market-price oracle; AgentRegistry
+statistics are owner-authored. TrackRecord V2 verifies price evidence, not proof
+that the user actually traded. None should be presented as interchangeable with
+the swap receipt ledger. Safe administration and Pyth/issuer governance remain
+trusted dependencies, not guarantees supplied by these contracts.
+
+Backend source coverage now also includes the complete swap builder, receipt
+verification/confirmation, wallet nonce/session and identity helpers, intent
+HMAC path, protocol-record writer and V2 adapter, protocol write latch, MCP
+payment/challenge lifecycle, and PnL reader. The producer-to-public-view review
+in BP-09 demonstrates why database permissions alone are insufficient.
+
 | Area | Evidence obtained in this pass | Still required |
 |---|---|---|
 | Bounty reward/bond liabilities and terminal states | Source review plus 81/81 existing bounty, final-regression and deployment-gate tests; full Foundry suite 269/269 across 14 suites; no new liability finding | Correct BP-03/BP-06 and repeat the pending deployment review |
 | All seven production artifacts | Source/script/compiler diff from round 8 empty; every runtime below EIP-170 | Compare constructor-patched deployed runtime and final ownership to the finalized manifest |
+| Other production-contract paths | Manual source review described above; existing full Foundry suite 269/269 | Independent review of remediations and deployment/runtime evidence; operational trust-boundary disclosures |
 | Backend authorization and existing remediations | API security 47/47; remediation 30/30; record-auth and protocol write-safety pass | Live auth/RLS/configuration evidence against the actual release environment |
 | Swap math, risk and routing | Base-swap tests pass; risk gate 42 assertions; ticker routing 52 equities + 9 speech cases | Close BP-01/BP-02; signed canary and observed receipts |
 | Oracle adapter | TrackRecord V2 library 50/50; commit-policy pass | Live canonical Pyth activation and deployment parameter checks |
 | Public Base data | Read-only smoke passed for all four stock pairs, venue getters, country gates, feature switch and empty-wallet refusal | Real approval/swap/revoke after release prerequisites are met |
 | Web release | API typecheck and production build pass; generated Hardness ABI 159/159 | Rendered signing-flow verification after fixes, production configuration and canary |
 | Native client | Source review of quote guards, signing bridge, UI, API receipts, Keychain and privacy manifest; existing simulator tests 9/9 | Close BP-02/BP-05; physical-device wallet return/cancel/relaunch and signed archive |
-| Database ledger | Migration 0009/0010 source reviewed for service-only writes, receipt uniqueness and transactional FIFO | Scratch-Postgres suites and current deployed policy/function inspection |
+| Database ledger | Real PostgreSQL 17: three FIFO/ordering/concurrency scenarios pass; migration 0010 post-fix permission/view/identity-reparenting checks pass | BP-09 producer ownership; current deployed policy/function inspection |
+| MCP bounty/payment consumers | Manual source review of contract interface, value, status decoding, payment verification and atomic consumption | BP-07/BP-08; end-to-end normal fulfillment after remediation |
+
+The scratch cluster listened only on a Unix socket inside a mode-0700 temporary
+directory, not TCP. `test:swap-ledger-pg` exercised the actual migration 0009
+functions. `test:rls-lockdown-pg -- --postfix-only` applied migration 0010 before
+authorization checks and skipped historical pre-fix reads. The latter now checks
+effective SELECT/INSERT/UPDATE/DELETE privileges for both `anon` and
+`authenticated`, denial of merge-RPC execution, public-view readability,
+identifier omission and service-role receipt reparenting. No production database
+or user data was involved. These fixtures do not prove every migration in the
+full Supabase stack is installed or that producers label data correctly (BP-09).
+The temporary database server was stopped after verification; its local files
+were retained, with no deletion or alteration of existing databases.
 
 The first native test invocation disabled code signing and the test host trapped
 in Reown's pairing/key creation before XCTest could run. Repeating the same suite
@@ -214,8 +364,18 @@ was supplied to make the check green.
 This pass does not certify the entire protocol as vulnerability-free. It has not
 completed a fresh line-by-line review of every remaining API/contract, issuer
 implementation, live Supabase policy, deployed contract, or physical-device path.
-The expanded audit stays open until those coverage gaps and findings are closed.
+The expanded audit stays open while its coverage gaps are being investigated.
+An audit can conclude NO-GO with open findings; remediation and a successful
+retest are separate prerequisites for launch, not a reason to hide the findings.
 Existing green tests are regression evidence, not substitutes for missing checks.
+
+Remaining audit work is concrete: finish cross-surface authorization/data-flow
+review of the other protocol control-plane, event and agent API consumers;
+dependency-advisory reachability; issuer/proxy upgrade assumptions and monitored
+configuration; and rendered web/native session-transition verification. Live
+Supabase policies, deployment manifests/runtime and physical-wallet behavior
+require environment/device evidence not available from source or simulator unit
+tests alone. No Supabase connector was available in this session.
 
 Launch also requires the real deployment environment, finalized receipt manifest,
 Safe handoff/Pyth actions, approved issuer-country policy and the final-bytecode

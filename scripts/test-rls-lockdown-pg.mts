@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 
+// Audit mode: validate the remediated schema without exercising the old exposure.
+const postfixOnly = process.argv.includes('--postfix-only');
 const url = process.env.DATABASE_URL;
 if (!url) { console.log('test-rls-lockdown-pg: skipped (set DATABASE_URL to a scratch Postgres)'); process.exit(0); }
 {
@@ -78,16 +80,36 @@ try {
     assert.fail(`${label}: anon read still succeeds`);
   };
 
-  // 1. The exploit reproduces on the shipped policies.
-  assert.equal((await asAnon(`select cache_key, payload from S.api_cache`)).rows[0].cache_key, 'identity-link:K7QW2M', 'pre-fix: anon reads the live pairing code');
-  assert.equal((await asAnon(`select owner_address from S.agent_trades where owner_address is not null`)).rows[0].owner_address, '0xvictim', 'pre-fix: anon reads owner_address + PnL rows');
-  assert.equal((await asAnon(`select owner_address from S.agent_cycles where owner_address is not null`)).rows.length, 1);
-  console.log('exploit reproduced on the pre-fix policies (api_cache, agent_trades, agent_cycles readable by anon)');
+  // 1. Optional historical baseline; remediation-only audits skip these reads.
+  if (!postfixOnly) {
+    assert.equal((await asAnon(`select cache_key, payload from S.api_cache`)).rows[0].cache_key, 'identity-link:K7QW2M', 'pre-fix: anon reads the live pairing code');
+    assert.equal((await asAnon(`select owner_address from S.agent_trades where owner_address is not null`)).rows[0].owner_address, '0xvictim', 'pre-fix: anon reads owner_address + PnL rows');
+    assert.equal((await asAnon(`select owner_address from S.agent_cycles where owner_address is not null`)).rows.length, 1);
+    console.log('exploit reproduced on the pre-fix policies (api_cache, agent_trades, agent_cycles readable by anon)');
+  }
 
   // 2. Apply the remediation.
   await c.query('begin');
   await c.query(migration);
   await c.query('commit');
+
+  // Check effective privileges, including inherited PUBLIC grants, for both
+  // browser roles. The privileged merge must remain service-only.
+  for (const role of ['anon', 'authenticated']) {
+    for (const table of ['api_cache', 'agent_trades', 'agent_cycles']) {
+      for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+        const check = await c.query('select has_table_privilege($1, $2, $3) as allowed', [role, `${S}.${table}`, privilege]);
+        assert.equal(check.rows[0].allowed, false, `${role} has ${privilege} on ${table}`);
+      }
+    }
+    const mergeCheck = await c.query('select has_function_privilege($1, $2, $3) as allowed', [role, `${S}.bobby_link_identities(uuid,uuid)`, 'EXECUTE']);
+    assert.equal(mergeCheck.rows[0].allowed, false, `${role} can execute identity merge`);
+    for (const view of ['agent_trades_public', 'agent_cycles_public']) {
+      const viewCheck = await c.query('select has_table_privilege($1, $2, $3) as allowed', [role, `${S}.${view}`, 'SELECT']);
+      assert.equal(viewCheck.rows[0].allowed, true, `${role} cannot read ${view}`);
+    }
+  }
+  console.log('post-migration effective privileges: both browser roles blocked from private tables and merge RPC; public views readable');
 
   // 3. The same reads are refused.
   assert.equal(await denied(`select cache_key from S.api_cache`, 'P0-1'), '42501');
