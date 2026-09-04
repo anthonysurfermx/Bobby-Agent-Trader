@@ -6,9 +6,10 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Apple, ArrowRight, Check, ChevronRight, Flame, Loader2, Lock, Map as MapIcon, Menu, Mic, PawPrint, ShieldCheck, Sparkles, Trophy, Volume2, X, Zap } from 'lucide-react';
+import { Apple, ArrowRight, Check, ChevronRight, Flame, Loader2, Lock, Map as MapIcon, Menu, Mic, PawPrint, ShieldCheck, Sparkles, Trophy, Volume2, X, Zap, UserRound, Smartphone, ArrowLeftRight } from 'lucide-react';
 import { COMPANIONS, LEVELS, PET_UNLOCK_XP, VIBES, petArt, petFor, tintFor, toolArt, toolHasArt, toolUnlockXP, toolsFor } from '@/lib/companions/data';
 import { isSpanish, pick, t } from '@/lib/companions/i18n';
+import TraderLandPreview, { TRADER_LAND_URL } from '@/components/companion/TraderLandPreview';
 
 interface DebateActivity { commitmentsCreated?: number; decisionsResolved?: number; wins?: number; losses?: number; breakEven?: number; pending?: number; winRate?: number }
 interface ProtocolStats { debateActivity?: DebateActivity }
@@ -65,15 +66,15 @@ function LangToggle() {
   const es = isSpanish();
   return (
     <div className="inline-flex overflow-hidden rounded-full border border-white/12 font-mono text-[9px] font-bold uppercase tracking-[0.12em]">
-      <button type="button" onClick={() => setLang('es')} className={`px-3 py-2 transition ${es ? 'bg-white text-black' : 'text-white/55 hover:text-white'}`}>ES</button>
-      <button type="button" onClick={() => setLang('en')} className={`px-3 py-2 transition ${!es ? 'bg-white text-black' : 'text-white/55 hover:text-white'}`}>EN</button>
+      <button type="button" onClick={() => setLang('es')} className={`min-h-11 px-3 py-2 transition ${es ? 'bg-white text-black' : 'text-white/55 hover:text-white'}`}>ES</button>
+      <button type="button" onClick={() => setLang('en')} className={`min-h-11 px-3 py-2 transition ${!es ? 'bg-white text-black' : 'text-white/55 hover:text-white'}`}>EN</button>
     </div>
   );
 }
 
 function ComingSoonBadge({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`inline-flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] text-left shadow-[inset_0_1px_rgba(255,255,255,.08)] ${compact ? 'px-4 py-2.5' : 'px-5 py-3.5'}`} role="img" aria-label="Coming soon on the App Store">
+    <div className={`inline-flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] text-left shadow-[inset_0_1px_rgba(255,255,255,.08)] ${compact ? 'px-4 py-2.5' : 'px-5 py-3.5'}`} role="img" aria-label={t('Coming soon on the App Store', 'Próximamente en el App Store')}>
       <Apple className={compact ? 'h-6 w-6' : 'h-8 w-8'} strokeWidth={1.7} aria-hidden="true" />
       <span className="leading-none">
         <span className="block font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-white/45">{t('Coming soon on the', 'Muy pronto en el')}</span>
@@ -101,7 +102,7 @@ export default function BobbyAppLandingExperience() {
   const [signupState, setSignupState] = useState<SignupState>('idle');
   const [signupMessage, setSignupMessage] = useState('');
 
-  const pageTitle = t('Bobby — Vibe trading. Farm market aura.', 'Bobby — Vibe trading. Farmea aura del mercado.');
+  const pageTitle = t('Bobby — Farm aura. Build your world.', 'Bobby — Farmea aura. Crea tu mundo.');
   useEffect(() => { document.title = pageTitle; }, [pageTitle]);
 
   const record = stats?.debateActivity;
@@ -128,7 +129,7 @@ export default function BobbyAppLandingExperience() {
     ['Aura', '#aura'],
     ['Squad', '#squad'],
     ['Trader Land', '#trader-land'],
-    [t('The record', 'El historial'), '#record'],
+    [t('New in the app', 'En la app'), '#app-features'],
   ];
 
   const moments = [
@@ -145,7 +146,7 @@ export default function BobbyAppLandingExperience() {
 
   const boundaries = [
     { icon: ShieldCheck, title: t('No custody', 'Sin custodia'), text: t('Bobby never holds funds or asks for exchange credentials.', 'Bobby nunca guarda fondos ni pide credenciales de un exchange.') },
-    { icon: Zap, title: t('You sign', 'Tú firmas'), text: t('Base swaps are self-custodial. Bobby can prepare bounded calldata; only your wallet can approve it.', 'Los swaps en Base son autocustodia. Bobby puede preparar calldata limitada; solo tu wallet puede aprobarla.') },
+    { icon: Zap, title: t('You sign', 'Tú firmas'), text: t('Where enabled, Base swaps require your external wallet and your confirmation. Availability is restricted; Bobby never signs for you.', 'Donde estén habilitados, los swaps en Base requieren tu wallet externa y tu confirmación. La disponibilidad está restringida; Bobby nunca firma por ti.') },
     { icon: Volume2, title: t('No fake certainty', 'Sin certezas falsas'), text: t('A favorable verdict is analysis, not a promise or advice.', 'Un veredicto favorable es análisis, no una promesa ni asesoría.') },
     { icon: Trophy, title: t('No pay-to-win', 'Sin pay-to-win'), text: t('Aura comes from better process, never from spending more.', 'El aura viene de un mejor proceso, nunca de gastar más.') },
   ];
@@ -177,33 +178,35 @@ export default function BobbyAppLandingExperience() {
   const reveal = reduceMotion ? {} : { initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.18 } };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#050706] font-sans text-white antialiased selection:bg-[#5cff91] selection:text-[#041009]">
+    <div className="min-h-screen overflow-x-clip [&_section[id]]:scroll-mt-24 [&_a:focus-visible]:outline [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-4 [&_a:focus-visible]:outline-[#b7e89c] [&_button:focus-visible]:outline [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-4 [&_button:focus-visible]:outline-[#b7e89c] bg-[#050706] font-sans text-white antialiased selection:bg-[#5cff91] selection:text-[#041009]">
       <Helmet>
         <title>{pageTitle}</title>
-        <meta name="description" content={t('Vibe trading: talk to the market, watch three agents debate your idea, take the NO TRADE when there is no edge, and farm aura — gear, pets and a world earned with discipline, never volume.', 'Vibe trading: háblale al mercado, mira a tres agentes debatir tu idea, toma el NO TRADE cuando no hay ventaja y farmea aura: equipo, mascotas y un mundo ganados con disciplina, nunca con volumen.')} />
+        <meta name="description" content={t('Meet Bobby: voice-led market analysis, a three-agent debate, companions and Trader Land. Build your practice island on the web and discover what is new in the iPhone beta.', 'Conoce Bobby: análisis por voz, debate de tres agentes, companions y Trader Land. Construye tu isla de práctica en la web y descubre las novedades de la beta de iPhone.')} />
+        <link rel="canonical" href="https://bobbyprotocol.xyz/app" />
+        <meta property="og:url" content="https://bobbyprotocol.xyz/app" />
         <meta property="og:title" content={pageTitle} />
-        <meta property="og:description" content={t('Farm market aura. Bobby is the market companion you talk to.', 'Farmea aura del mercado. Bobby es el companion de mercado con el que hablas.')} />
+        <meta property="og:description" content={t('A desk to think. An island to make your own. Explore Bobby and Trader Land.', 'Un desk para pensar. Una isla para hacerla tuya. Explora Bobby y Trader Land.')} />
         <meta property="og:image" content="https://bobbyprotocol.xyz/favicon-bobby-v3.png" />
       </Helmet>
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050706]/88 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
           <BrandMark />
-          <nav className="hidden items-center gap-6 md:flex" aria-label="Main navigation">
+          <nav className="hidden items-center gap-6 lg:flex" aria-label={t('Main navigation', 'Navegación principal')}>
             {navItems.map(([label, href]) => (
               <a key={href} href={href} className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-white/48 transition hover:text-white">{label}</a>
             ))}
           </nav>
           <div className="flex items-center gap-3">
             <LangToggle />
-            <a href={TRY_IT_URL} className="hidden rounded-full bg-[#5cff91] px-5 py-2.5 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white md:inline-flex">{t('Open the desk', 'Abrir el desk')}</a>
-            <button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.04] md:hidden" aria-label="Toggle navigation" aria-expanded={menuOpen}>
+            <a href={TRY_IT_URL} className="hidden rounded-full bg-[#5cff91] px-5 py-2.5 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white lg:inline-flex">{t('Open the desk', 'Abrir el desk')}</a>
+            <button type="button" onClick={() => setMenuOpen((open) => !open)} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.04] lg:hidden" aria-label={t('Toggle navigation', 'Abrir o cerrar navegación')} aria-expanded={menuOpen}>
               {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
           </div>
         </div>
         {menuOpen && (
-          <nav className="border-t border-white/10 bg-[#080a09] px-5 py-4 md:hidden" aria-label="Mobile navigation">
+          <nav className="border-t border-white/10 bg-[#080a09] px-5 py-4 lg:hidden" aria-label={t('Mobile navigation', 'Navegación móvil')}>
             {navItems.map(([label, href]) => (
               <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block border-b border-white/[0.06] py-4 font-mono text-xs uppercase tracking-[0.14em] text-white/70">{label}</a>
             ))}
@@ -221,24 +224,25 @@ export default function BobbyAppLandingExperience() {
             <motion.div initial={reduceMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.55 }} className="relative z-10">
               <div className="mb-7 flex flex-wrap items-center gap-3">
                 <ComingSoonBadge compact />
-                <span className="rounded-full border border-[#F5C542]/30 bg-[#F5C542]/[0.08] px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#F5C542]">{t('iPhone early access', 'Acceso anticipado iPhone')}</span>
+                <span className="rounded-full border border-[#F5C542]/30 bg-[#F5C542]/[0.08] px-3 py-2 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-[#F5C542]">{t('iPhone beta · Web playground live', 'Beta iPhone · Isla web disponible')}</span>
               </div>
               <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-[#5cff91]">Vibe trading</div>
               <h1 className="max-w-3xl text-[clamp(2.85rem,7vw,6.4rem)] font-black leading-[0.88] tracking-[-0.078em]">
-                {t('Farm', 'Farmea')}{' '}
-                <span className="bg-[linear-gradient(100deg,#F5C542_0%,#5cff91_55%,#76d6ff_100%)] bg-clip-text text-transparent">{t('market aura.', 'aura del mercado.')}</span>
+                {t('Farm aura.', 'Farmea aura.')}<br />
+                <span className="bg-[linear-gradient(100deg,#F5C542_0%,#5cff91_55%,#76d6ff_100%)] bg-clip-text text-transparent">{t('Build your world.', 'Crea tu mundo.')}</span>
               </h1>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/58 sm:text-lg sm:leading-8">
-                {t('Bobby is the market companion you talk to. Ask anything out loud, watch three agents fight over it, take the NO TRADE when there is no edge, and level up your aura: gear, pets and a whole world, earned with discipline, never with volume.', 'Bobby es el companion de mercado con el que hablas. Pregunta lo que sea en voz alta, mira a tres agentes pelearse por tu idea, toma el NO TRADE cuando no hay ventaja y sube tu aura: equipo, mascotas y un mundo entero, ganados con disciplina, nunca con volumen.')}
+                {t('Talk through an idea with your companion. Let three agents challenge it. Then make space for something of your own: a little island you can build, rearrange and explore in Trader Land. Better habits, not more trades.', 'Piensa una idea en voz alta con tu companion. Deja que tres agentes la cuestionen. Después dale espacio a algo tuyo: una pequeña isla para construir, reorganizar y explorar en Trader Land. Mejores hábitos, no más operaciones.')}
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <a href="#early-access" className="group inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-[#5cff91] px-7 font-mono text-xs font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white">{t('Join early access', 'Quiero acceso anticipado')} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
+                <a href={TRADER_LAND_URL} className="group inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-[#5cff91] px-7 font-mono text-xs font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white">{t('Play Trader Land', 'Jugar Trader Land')} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
                 <a href={TRY_IT_URL} className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]">{t('Try the live desk', 'Prueba el live desk')}</a>
               </div>
+              <a href="#early-access" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-white/60 underline decoration-white/20 underline-offset-4 hover:text-white">{t('Prefer iPhone? Join the early-access list', '¿Prefieres iPhone? Únete al acceso anticipado')}<ChevronRight size={15} /></a>
               <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 font-mono text-[9px] uppercase tracking-[0.12em] text-white/38">
                 <span className="inline-flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-[#5cff91]" /> {t('Voice or text', 'Voz o texto')}</span>
-                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> {t('Base-only · self-custody', 'Solo Base · autocustodia')}</span>
-                <span className="inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-[#F5C542]" /> {t('Gear, pets & a world', 'Equipo, mascotas y un mundo')}</span>
+                <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> {t('Your decisions, always', 'Tú decides, siempre')}</span>
+                <span className="inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-[#F5C542]" /> {t('Build · rotate · explore', 'Construye · gira · explora')}</span>
               </div>
             </motion.div>
 
@@ -270,6 +274,44 @@ export default function BobbyAppLandingExperience() {
             ))}
           </div>
         </div>
+
+        {/* TRADER LAND — the shipped pieces, not a future-world concept. */}
+        <section id="trader-land" className="relative overflow-hidden border-b border-[#b4deb5]/15 bg-[#101b15] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
+            <motion.div {...reveal}>
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#cde9b4]/25 bg-[#cde9b4]/10 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.15em] text-[#d1edb8]"><MapIcon size={14} />{t('Trader Land · Play on the web', 'Trader Land · Juega en la web')}</div>
+              <h2 className="text-4xl font-black leading-[.98] tracking-[-.055em] text-[#edf3e5] sm:text-6xl">{t('A little world.', 'Un pequeño mundo.')}<br /><span className="text-[#b9d69b]">{t('Entirely your own.', 'Completamente tuyo.')}</span></h2>
+              <p className="mt-6 max-w-lg text-base leading-7 text-[#c3d0bd]">{t('A floating island, a living Aura Core and a collection waiting to find its place. Start small. Move a tower, turn a path, make a quiet corner. There is no perfect layout. There is yours.', 'Una isla flotante, un Aura Core y una colección esperando su lugar. Empieza pequeño. Mueve una torre, gira un camino, crea un rincón tranquilo. No hay un diseño perfecto. Está el tuyo.')}</p>
+              <ul className="mt-7 space-y-3 text-sm leading-6 text-[#c3d0bd]">
+                {[t('Preview a piece. Rotate it. Confirm when it fits.', 'Previsualiza una pieza. Gírala. Confirma cuando encaje.'), t('Move, store or undo. Your practice layout stays in this browser.', 'Mueve, guarda o deshaz. Tu diseño de práctica queda en este navegador.'), t('Drag to explore. Pinch or scroll to zoom. Keyboard controls included.', 'Arrastra para explorar. Pellizca o usa la rueda para acercar. También con teclado.')].map((line) => <li key={line} className="flex gap-3"><Check size={17} className="mt-1 shrink-0 text-[#b9d69b]" />{line}</li>)}
+              </ul>
+              <a href={TRADER_LAND_URL} className="mt-8 inline-flex min-h-14 items-center gap-3 rounded-xl bg-[#d1edb8] px-6 text-sm font-bold text-[#17251a] transition hover:bg-[#e7f6d8]">{t('Build my practice island', 'Construir mi isla de práctica')}<ArrowRight size={17} /></a>
+              <p className="mt-4 max-w-lg text-xs leading-5 text-[#a2b29c]">{t('No account needed to practice. Practice pieces are separate from earned inventory. Moving synced pieces between web and iPhone is not enabled yet.', 'Practica sin cuenta. Las piezas de prueba están separadas de tu inventario ganado. Mover piezas sincronizadas entre web y iPhone todavía no está habilitado.')}</p>
+            </motion.div>
+            <motion.div {...reveal}><TraderLandPreview /></motion.div>
+          </div>
+          <div className="mx-auto mt-10 flex max-w-7xl flex-wrap gap-2" aria-label={t('Five districts', 'Cinco distritos')}>
+            {['Crypto Bay', 'Evidence Mines', 'Thesis Citadel', 'Risk Reef', 'Axiom Archive'].map((name, index) => <span key={name} className="rounded-full border border-[#cde9b4]/15 px-4 py-2.5 text-xs text-[#c3d0bd]"><span className="mr-2 font-mono text-[#91a784]">0{index + 1}</span>{name}</span>)}
+          </div>
+        </section>
+
+        <section id="app-features" className="bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
+          <div className="mx-auto max-w-7xl">
+            <motion.div {...reveal} className="mb-9 max-w-3xl">
+              <p className="mb-4 font-mono text-[10px] font-bold uppercase tracking-[.2em] text-[#8dc9ff]">{t('New in the iPhone beta', 'Novedades de la beta de iPhone')}</p>
+              <h2 className="text-4xl font-black leading-[.98] tracking-[-.055em] sm:text-5xl">{t('More to make yours.', 'Más cosas para hacer tuyas.')}<br /><span className="text-white/45">{t('Still your call.', 'Las decisiones siguen siendo tuyas.')}</span></h2>
+            </motion.div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              {[
+                { icon: Smartphone, tag: t('Native island editor', 'Editor nativo de islas'), title: t('Your island, in your pocket.', 'Tu isla, en el bolsillo.'), text: t('Trader Land comes to iPhone with a piece collection, placement previews, rotation, move controls, undo and camera gestures. The latest build has been sent to TestFlight.', 'Trader Land llega a iPhone con colección, vistas previas, rotación, controles de movimiento, deshacer y gestos de cámara. El último build fue enviado a TestFlight.') },
+                { icon: UserRound, tag: t('Account & privacy', 'Cuenta y privacidad'), title: t('Sign in as yourself.', 'Entra con tu cuenta.'), text: t('Sign in with Apple and manage your Bobby account from the app, including account deletion. Your Bobby identity and optional external wallet are separate.', 'Inicia sesión con Apple y gestiona tu cuenta de Bobby desde la app, incluido su borrado. Tu identidad de Bobby y tu wallet externa opcional son independientes.') },
+                { icon: ArrowLeftRight, tag: t('Controlled rollout', 'Lanzamiento controlado'), title: t('Base swaps. You confirm.', 'Swaps en Base. Tú confirmas.'), text: t('The beta includes a self-custodial swap flow with quote review, exact approvals, receipts and allowance revocation. Access depends on service availability and eligibility; it is not open to everyone.', 'La beta incluye un flujo de swaps sin custodia con revisión de cotización, permisos exactos, recibos y revocación de permisos. El acceso depende de disponibilidad y elegibilidad; no está abierto para todos.') },
+              ].map(({ icon: Icon, tag, title, text }) => <motion.article key={tag} {...reveal} className="rounded-3xl border border-white/10 bg-[#101510] p-6 sm:p-7"><Icon size={24} className="mb-7 text-[#b8d6eb]" /><p className="font-mono text-[10px] uppercase tracking-[.14em] text-[#92ac9b]">{tag}</p><h3 className="mt-3 text-2xl font-semibold leading-tight tracking-tight">{title}</h3><p className="mt-4 text-sm leading-6 text-white/60">{text}</p></motion.article>)}
+            </div>
+            <p className="mt-6 text-sm leading-6 text-white/45">{t('Web playground: available now. iPhone: beta access by invitation, not a public App Store release. Joining the list does not guarantee a TestFlight place.', 'Isla de práctica web: disponible ahora. iPhone: beta por invitación, no un lanzamiento público en el App Store. Unirte a la lista no garantiza un cupo en TestFlight.')}</p>
+            <a href="#early-access" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#b8d6eb]">{t('Get iPhone beta updates', 'Recibir novedades de la beta iPhone')}<ChevronRight size={16} /></a>
+          </div>
+        </section>
 
         {/* THE VIBE — three moments */}
         <section id="vibe" className="bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
@@ -306,7 +348,7 @@ export default function BobbyAppLandingExperience() {
               <div>
                 <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#F5C542]">Aura</div>
                 <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Aura is discipline', 'El aura es disciplina')}<br /><span className="text-white/38">{t('you can wear.', 'que se lleva puesta.')}</span></h2>
-                <p className="mt-6 max-w-lg text-base leading-7 text-white/52">{t('Every full read, every NO TRADE you accept, every day you come back adds aura. Aura unlocks gear your companion actually wears, a pet at its feet and, soon, a world. Volume, frequency and P&L give you nothing. Ever.', 'Cada lectura completa, cada NO TRADE que aceptas, cada día que vuelves suma aura. El aura desbloquea equipo que tu companion sí se pone, una mascota a sus pies y, pronto, un mundo. El volumen, la frecuencia y el P&L no te dan nada. Nunca.')}</p>
+                <p className="mt-6 max-w-lg text-base leading-7 text-white/52">{t('Read, reflect and return. Discipline XP unlocks gear and companions; your discovery route grows an earned collection. In Trader Land, you can also try every piece in a separate practice island. Trading volume, frequency and P&L do not earn XP.', 'Lee, reflexiona y vuelve. El XP de disciplina desbloquea equipo y companions; tu ruta de descubrimiento hace crecer una colección ganada. En Trader Land también puedes probar todas las piezas en una isla de práctica separada. El volumen, la frecuencia y el P&L no dan XP.')}</p>
                 <div className="mt-8 grid gap-3 sm:grid-cols-3">
                   {auraRules.map(({ icon: Icon, title, lines, tone }) => (
                     <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -429,27 +471,6 @@ export default function BobbyAppLandingExperience() {
           </div>
         </section>
 
-        {/* TRADER LAND — the world */}
-        <section id="trader-land" className="relative overflow-hidden bg-[#080a09] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.1fr_.9fr] lg:items-center">
-            <motion.div {...reveal} className="relative overflow-hidden rounded-[2rem] border" style={{ borderColor: `${GOLD}40`, boxShadow: `0 0 80px ${GOLD}1a` }}>
-              <img src="/world/bobby-world.jpg" alt={t('Trader Land, the world you build with discipline', 'Trader Land, el mundo que construyes con disciplina')} loading="lazy" className="h-full w-full object-cover" />
-              <div className="absolute left-4 top-4 rounded-full bg-black/60 px-3 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.3em] text-white/85 backdrop-blur">Trader Land</div>
-              <div className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.3em] text-black" style={{ background: GOLD, boxShadow: `0 0 24px ${GOLD}88` }}><Lock className="h-3 w-3" /> {t('Soon', 'Pronto')}</div>
-            </motion.div>
-            <motion.div {...reveal}>
-              <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: GOLD }}><MapIcon className="mr-2 inline h-3.5 w-3.5" />{t('Coming next', 'Lo que sigue')}</div>
-              <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Your world,', 'Tu mundo,')}<br /><span className="text-white/38">{t('built with discipline.', 'construido con disciplina.')}</span></h2>
-              <p className="mt-6 max-w-lg text-base leading-7 text-white/52">{t('Every desk session drops a piece for your land. Regions open with aura, never with volume: Crypto Bay, Gold Mines, Wall Street Citadel, Risk Reef. Your squad builds a base together. The XP you earn today already counts.', 'Cada sesión de desk deja una pieza para tu tierra. Las regiones se abren con aura, nunca con volumen: Crypto Bay, Gold Mines, Wall Street Citadel, Risk Reef. Tu squad construye una base en equipo. El XP que ganas hoy ya cuenta.')}</p>
-              <div className="mt-8 flex flex-wrap gap-2">
-                {['CRYPTO BAY', 'GOLD MINES', 'WALL STREET CITADEL', 'RISK REEF'].map((region) => (
-                  <span key={region} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-mono text-[9px] tracking-[0.14em] text-white/55"><Lock className="h-3 w-3" />{region}</span>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
         {/* THE PUBLIC RECORD — live numbers */}
         <section id="record" className="relative overflow-hidden border-y border-white/10 bg-[#050706] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_22%,rgba(92,255,145,.11),transparent_42%)]" />
@@ -498,8 +519,8 @@ export default function BobbyAppLandingExperience() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(245,197,66,.16),transparent_50%),radial-gradient(circle_at_82%_24%,rgba(92,255,145,.12),transparent_38%)]" />
           <motion.div {...reveal} className="relative mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.045] p-6 text-center shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-xl sm:p-10 lg:p-14">
             <div className="mx-auto mb-7 flex w-fit"><ComingSoonBadge /></div>
-            <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Be there when', 'Llega primero cuando')}<br /><span className="text-[#F5C542]">{t('Bobby lands on iPhone.', 'Bobby aterrice en iPhone.')}</span></h2>
-            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t('Join the early-access list for TestFlight openings, launch news and your first chance to pick a companion.', 'Únete a la lista de acceso anticipado para cupos de TestFlight, noticias del lanzamiento y tu primera oportunidad de elegir companion.')}</p>
+            <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Your next little world.', 'Tu próximo pequeño mundo.')}<br /><span className="text-[#F5C542]">{t('Coming along on iPhone.', 'También en iPhone.')}</span></h2>
+            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t('The latest Bobby build has been sent to TestFlight. Join the list for future invitations and launch updates. While you wait, the Live Desk and Trader Land playground are open on the web.', 'El último build de Bobby fue enviado a TestFlight. Únete a la lista para futuras invitaciones y novedades del lanzamiento. Mientras esperas, el Live Desk y la isla de práctica de Trader Land ya están en la web.')}</p>
             {signupState === 'success' ? (
               <div className="mx-auto mt-9 flex max-w-xl items-center justify-center gap-3 rounded-2xl border border-[#5cff91]/25 bg-[#5cff91]/10 px-5 py-5 text-left text-sm text-[#baffcc]" role="status">
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#5cff91] text-[#041009]"><Check className="h-4 w-4" /></span>
