@@ -6,6 +6,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Interface, formatEther } from 'ethers';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { trackRecordSelectors } from './_lib/trackrecord-stats-adapter.js';
+import { rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
@@ -68,7 +70,7 @@ async function fetchJsonWithTimeout(url: string, body: unknown, timeoutMs: numbe
       signal: controller.signal,
     });
     if (!res.ok) {
-      throw new Error(`RPC ${res.status} from ${url}`);
+      throw new Error(`RPC ${res.status} from ${rpcEndpointLabel(url)}`);
     }
     return await res.json();
   } finally {
@@ -123,9 +125,11 @@ const trackRecordIface = new Interface([
   'function totalTrades() view returns (uint256)',
 ]);
 
+// BP-11: selectors come from the deployment's DECLARED TrackRecord version.
+const TRACK_RECORD_SELECTORS = trackRecordSelectors(DEFAULT_CHAIN);
 // V2 (Base) has no combined getWinRate (D-1); the heartbeat's headline is the
 // VERIFIED win rate there. On X Layer the v1 selector stays.
-const HEARTBEAT_WIN_RATE_FN = DEFAULT_CHAIN.id === PROTOCOL_CHAIN_ID ? 'getWinRate' : 'getVerifiedWinRate';
+const HEARTBEAT_WIN_RATE_FN = TRACK_RECORD_SELECTORS.winRate;
 
 const bountiesIface = new Interface([
   'function nextBountyId() view returns (uint256)',
@@ -144,10 +148,10 @@ async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
         2000
       ) as { result?: unknown; error?: { message?: string } };
       if (json.error) {
-        throw new Error(json.error.message || `RPC error from ${url}`);
+        throw new Error(scrubRpcSecrets(json.error.message || '') || `RPC error from ${rpcEndpointLabel(url)}`);
       }
       if (json.result == null) {
-        throw new Error(`RPC returned no result from ${url}`);
+        throw new Error(`RPC returned no result from ${rpcEndpointLabel(url)}`);
       }
 
       return json.result;
@@ -269,7 +273,7 @@ async function fetchBlockBatch(calls: unknown[]): Promise<Array<{ result?: RpcBl
     try {
       const json = await fetchJsonWithTimeout(url, calls, 2500) as unknown;
       if (!Array.isArray(json)) {
-        throw new Error(`RPC returned non-array payload from ${url}`);
+        throw new Error(`RPC returned non-array payload from ${rpcEndpointLabel(url)}`);
       }
       return json as Array<{ result?: RpcBlock }>;
     } catch (error) {
@@ -330,6 +334,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const treasuryWei = BigInt(treasuryBalanceHex ? String(treasuryBalanceHex) : '0x0').toString();
 
+    // BP-11: a read that does not decode is UNAVAILABLE, not zero. Each source
+    // reports its own health and its numbers become null — never a fake zero
+    // under ok:true (the v1 selector on the V2 contract decoded exactly that way).
+    const sources = { economy: 'ok', trackRecord: 'ok', bounties: 'ok' } as Record<'economy' | 'trackRecord' | 'bounties', 'ok' | 'unavailable'>;
+
     // Decode getEconomyStats() — returns (totalDebates, totalMcpCalls, totalSignalAccesses, totalVolume, totalPayments)
     let totalDebates = '0';
     let totalMcpCalls = '0';
@@ -343,22 +352,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalVolumeWei = decoded[3].toString();
       totalPayments = decoded[4].toString();
     } catch {
+      sources.economy = 'unavailable';
       console.error('[ProtocolHeartbeat] Failed to decode getEconomyStats');
     }
 
-    // Decode single-value returns from TrackRecord
-    let winRateBps = '0';
-    let totalTrades = '0';
+    // Decode single-value returns from TrackRecord (selectors per declared version)
+    let winRateBps: string | null = null;
+    let totalTrades: string | null = null;
     try {
       const [wr] = trackRecordIface.decodeFunctionResult(HEARTBEAT_WIN_RATE_FN, String(winRateHex));
       winRateBps = wr.toString();
     } catch {
-      console.error(`[ProtocolHeartbeat] Failed to decode ${HEARTBEAT_WIN_RATE_FN}`);
+      sources.trackRecord = 'unavailable';
+      console.error(`[ProtocolHeartbeat] Failed to decode ${HEARTBEAT_WIN_RATE_FN} (trackRecord ${TRACK_RECORD_SELECTORS.version})`);
     }
     try {
       const [tt] = trackRecordIface.decodeFunctionResult('totalTrades', String(totalTradesHex));
       totalTrades = tt.toString();
     } catch {
+      sources.trackRecord = 'unavailable';
       console.error('[ProtocolHeartbeat] Failed to decode totalTrades');
     }
 
@@ -369,19 +381,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [nbi] = bountiesIface.decodeFunctionResult('nextBountyId', String(nextBountyIdHex));
       nextBountyId = nbi.toString();
     } catch {
+      sources.bounties = 'unavailable';
       console.error('[ProtocolHeartbeat] Failed to decode nextBountyId');
     }
     try {
       const [minimum] = bountiesIface.decodeFunctionResult('minBounty', String(minBountyHex));
       minBountyWei = minimum.toString();
     } catch {
+      sources.bounties = 'unavailable';
       console.error('[ProtocolHeartbeat] Failed to decode minBounty');
     }
+    const allSourcesOk = Object.values(sources).every((v) => v === 'ok');
 
     // Settlement is the real AgentEconomy on-chain volume.
     // Protocol totals keep bounty escrow separate from paid MCP settlement.
     const economyVolumeNative = parseFloat(formatEther(BigInt(totalVolumeWei)));
-    const winRate = parseInt(winRateBps) / 100;
+    const winRate = winRateBps === null ? null : parseInt(winRateBps) / 100;
     const totalBounties = Math.max(0, parseInt(nextBountyId) - 1);
     const bountyEscrowNative = totalBounties * parseFloat(formatEther(BigInt(minBountyWei)));
     const protocolNotionalNative = economyVolumeNative + bountyEscrowNative;
@@ -416,7 +431,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const contractHealth = parseInt(totalMcpCalls) > 0 || totalBounties > 0 ? 'active' : 'dormant';
 
     const payload = {
-      ok: true,
+      ok: allSourcesOk,
+      degraded: !allSourcesOk,
+      sources,
+      trackRecordVersion: TRACK_RECORD_SELECTORS.version,
       timestamp: new Date().toISOString(),
       cached: false,
       stale: false,
@@ -447,8 +465,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       performance: {
         winRate,
-        totalTrades: parseInt(totalTrades),
-        totalBounties,
+        totalTrades: totalTrades === null ? null : parseInt(totalTrades),
+        totalBounties: sources.bounties === 'ok' ? totalBounties : null,
       },
       lastCycle: lastCycle ? {
         id: (lastCycle as Record<string, unknown>).id,
@@ -462,7 +480,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         chain: blockAge,
         cycle: cycleHealth,
         contracts: contractHealth,
-        overall: blockAge === 'healthy' && contractHealth === 'active' ? 'operational' : 'degraded',
+        overall: blockAge === 'healthy' && contractHealth === 'active' && allSourcesOk ? 'operational' : 'degraded',
       },
       recentTxs: recentTxs as OnChainTx[],
       contracts: {
@@ -483,7 +501,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=10');
     return res.status(200).json(payload);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
+    // BP-12: never echo a configured RPC URL (it may carry a key) to logs or clients.
+    const msg = rpcErrorMessage(error);
     console.error('[ProtocolHeartbeat] Error:', msg);
 
     if (heartbeatCache) {
@@ -502,6 +521,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({
       ok: false,
+      degraded: true,
+      sources: { economy: 'unavailable', trackRecord: 'unavailable', bounties: 'unavailable' },
+      trackRecordVersion: TRACK_RECORD_SELECTORS.version,
       cached: false,
       stale: false,
       error: msg,
@@ -510,7 +532,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       treasury: { address: TREASURY, balanceNative: '0.0000' },
       revenue: { totalVolumeNative: '0.0000', nativeSymbol: DEFAULT_CHAIN.nativeSymbol, totalPayments: 0, totalMcpCalls: 0, totalDebates: 0 },
       protocolTotals: { bountyEscrowNative: '0.0000', totalBounties: 0, protocolNotionalNative: '0.0000', totalInteractions: 0 },
-      performance: { winRate: 0, totalTrades: 0, totalBounties: 0 },
+      performance: { winRate: null, totalTrades: null, totalBounties: null },
       lastCycle: null,
       recentCommerce: [],
       recentTxs: [],

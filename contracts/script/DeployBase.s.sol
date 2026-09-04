@@ -5,6 +5,7 @@ import {Script, console2} from "forge-std/Script.sol";
 import {SafeOwnerGate} from "./SafeOwnerGate.sol";
 import {PythOracleGate} from "./PythOracleGate.sol";
 import {BountyEconomicsGate} from "./BountyEconomicsGate.sol";
+import {V2ParamsGate} from "./V2ParamsGate.sol";
 import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
@@ -58,6 +59,9 @@ contract DeployBase is Script {
         uint256 debateFeePerAgent;
         uint96 minBounty;
         uint96 absoluteMinBounty;
+        // BP-03: the seven V2 verification params at FULL WIDTH (validated by
+        // V2ParamsGate before narrowing; written to the manifest; re-proven live).
+        V2ParamsGate.Raw v2Raw;
         uint96 registrationStake;
         uint256 maxSizeUsd;
         uint8 resolverThreshold;
@@ -137,21 +141,26 @@ contract DeployBase is Script {
         // safe-deployments registry). Mandatory on 8453.
         c.expectedOwnerCodehash = vm.envOr("OWNER_SAFE_CODEHASH", bytes32(0));
         c.expectedOwnerSingleton = vm.envOr("OWNER_SAFE_SINGLETON", address(0));
+        c.v2Raw = _v2Raw();
     }
 
-    /// @dev V2 verification params. Defaults are the audited deploy config
-    ///      (Anthony's §8 decisions: maxExitLag 600s cap, 7-day challenge
-    ///      window, 100 bps tolerances to be tightened from real basis, conf
-    ///      50 bps). Overridable per deploy; the constructor re-validates every
-    ///      field against its hard bounds, so a bad env value fails loudly.
-    function _v2Params() internal view returns (BobbyTrackRecordV2.VerificationParams memory p) {
-        p.entryWindowSec = uint16(vm.envOr("V2_ENTRY_WINDOW_SEC", uint256(60)));
-        p.exitWindowSec = uint16(vm.envOr("V2_EXIT_WINDOW_SEC", uint256(120)));
-        p.maxExitLagSec = uint24(vm.envOr("V2_MAX_EXIT_LAG_SEC", uint256(600)));
-        p.challengeWindowSec = uint24(vm.envOr("V2_CHALLENGE_WINDOW_SEC", uint256(7 days)));
-        p.entryTolBps = uint16(vm.envOr("V2_ENTRY_TOL_BPS", uint256(100)));
-        p.exitTolBps = uint16(vm.envOr("V2_EXIT_TOL_BPS", uint256(100)));
-        p.confMaxBps = uint16(vm.envOr("V2_CONF_MAX_BPS", uint256(50)));
+    /// @dev V2 verification params, read at FULL WIDTH (BP-03). Defaults are
+    ///      the audited deploy config (Anthony's §8 decisions: maxExitLag 600s
+    ///      cap, 7-day challenge window, 100 bps tolerances to be tightened
+    ///      from real basis, conf 50 bps). Overridable per deploy; every value
+    ///      is bounds-checked by V2ParamsGate BEFORE it is narrowed to the
+    ///      struct's uint16/uint24 fields (_validateConfig, pre-broadcast), so
+    ///      a fat-fingered value can never truncate into a "valid" parameter.
+    ///      The constructor re-validates the narrowed struct as a second line.
+    function _v2Raw() internal view returns (V2ParamsGate.Raw memory r) {
+        V2ParamsGate.Raw memory d = V2ParamsGate.defaults();
+        r.entryWindowSec = vm.envOr("V2_ENTRY_WINDOW_SEC", d.entryWindowSec);
+        r.exitWindowSec = vm.envOr("V2_EXIT_WINDOW_SEC", d.exitWindowSec);
+        r.maxExitLagSec = vm.envOr("V2_MAX_EXIT_LAG_SEC", d.maxExitLagSec);
+        r.challengeWindowSec = vm.envOr("V2_CHALLENGE_WINDOW_SEC", d.challengeWindowSec);
+        r.entryTolBps = vm.envOr("V2_ENTRY_TOL_BPS", d.entryTolBps);
+        r.exitTolBps = vm.envOr("V2_EXIT_TOL_BPS", d.exitTolBps);
+        r.confMaxBps = vm.envOr("V2_CONF_MAX_BPS", d.confMaxBps);
     }
 
     function run() external returns (Deployed memory d) {
@@ -224,10 +233,10 @@ contract DeployBase is Script {
 
         // TrackRecordV2: oracle-verified. The Pyth set is the chain's CANONICAL
         // set (not raw env) — mainnet gets upgraded-active + current-fallback,
-        // asserted distinct and code-bearing. Params default to the audited
-        // deploy config (maxExitLag 600s etc.) and are re-validated by the
-        // constructor's bounds. Feeds: BTC/ETH/SOL, ids pinned in the gate.
-        BobbyTrackRecordV2.VerificationParams memory v2Params = _v2Params();
+        // asserted distinct and code-bearing. Params were validated at full
+        // width in _validateConfig; narrow() re-validates and is the only path
+        // into the constructor. Feeds: BTC/ETH/SOL, ids pinned in the gate.
+        BobbyTrackRecordV2.VerificationParams memory v2Params = V2ParamsGate.narrow(c.v2Raw);
         address[] memory pyths = PythOracleGate.canonicalPyths(block.chainid);
         PythOracleGate.assertCanonical(block.chainid, pyths);
         (string[] memory v2Symbols, bytes32[] memory v2Feeds) = PythOracleGate.verifiedFeeds();
@@ -315,6 +324,14 @@ contract DeployBase is Script {
         console2.log("registrationStake   ", c.registrationStake);
         console2.log("challengeBond       ", c.challengeBond);
         console2.log("treasury            ", c.treasury);
+        console2.log("--- v2 params (full-width validated) ---");
+        console2.log("entryWindowSec      ", c.v2Raw.entryWindowSec);
+        console2.log("exitWindowSec       ", c.v2Raw.exitWindowSec);
+        console2.log("maxExitLagSec       ", c.v2Raw.maxExitLagSec);
+        console2.log("challengeWindowSec  ", c.v2Raw.challengeWindowSec);
+        console2.log("entryTolBps         ", c.v2Raw.entryTolBps);
+        console2.log("exitTolBps          ", c.v2Raw.exitTolBps);
+        console2.log("confMaxBps          ", c.v2Raw.confMaxBps);
     }
 
 
@@ -332,6 +349,8 @@ contract DeployBase is Script {
             c.maxSizeUsd > 0 && c.maxSizeUsd <= 100_000_000e18,
             "config: escrow maxSizeUsd out of bounds (18dp, ceiling 100M)"
         );
+        // BP-03: full-width bounds on the seven V2 params, before any narrowing.
+        V2ParamsGate.validate(c.v2Raw);
     }
 
     /// @dev r7 integration: post-deploy assertions — the script itself proves
@@ -376,6 +395,8 @@ contract DeployBase is Script {
             for (uint256 i = 0; i < syms.length; i++) {
                 require(tr.feedOf(keccak256(bytes(syms[i]))) == feeds[i], "assert: verified feed not seeded");
             }
+            // BP-03: the deployed params equal the operator's full-width values.
+            V2ParamsGate.assertMatches(V2ParamsGate.live(d.trackRecord), c.v2Raw);
         }
 
         BobbyAgentEconomyV2 economy = BobbyAgentEconomyV2(payable(d.agentEconomyV2));
@@ -457,6 +478,18 @@ contract DeployBase is Script {
         vm.serializeUint(f, "challengeBondWei", c.challengeBond);
         string memory feesJson = vm.serializeUint(f, "escrowMaxSizeUsd18dp", c.maxSizeUsd);
         vm.serializeString(m, "fees", feesJson);
+
+        // BP-03: the reviewed V2 verification params travel with the manifest so
+        // VerifyBaseDeployment and the readiness check re-prove them live.
+        string memory v = "v2Params";
+        vm.serializeUint(v, "entryWindowSec", c.v2Raw.entryWindowSec);
+        vm.serializeUint(v, "exitWindowSec", c.v2Raw.exitWindowSec);
+        vm.serializeUint(v, "maxExitLagSec", c.v2Raw.maxExitLagSec);
+        vm.serializeUint(v, "challengeWindowSec", c.v2Raw.challengeWindowSec);
+        vm.serializeUint(v, "entryTolBps", c.v2Raw.entryTolBps);
+        vm.serializeUint(v, "exitTolBps", c.v2Raw.exitTolBps);
+        string memory v2Json = vm.serializeUint(v, "confMaxBps", c.v2Raw.confMaxBps);
+        vm.serializeString(m, "v2Params", v2Json);
 
         string memory q = "quorum";
         vm.serializeAddress(q, "resolvers", resolverSet);

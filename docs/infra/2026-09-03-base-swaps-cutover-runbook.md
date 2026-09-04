@@ -171,9 +171,54 @@ and `VerifyBaseDeployment` / `check:mainnet:*` / `finalize:base-manifest` all
 re-prove them. For bounties of material value, make the bond proportional to the
 reward or cap the reward — a follow-up.
 
-After any `forge build` that touches HardnessRegistry: `npm run gen:hardness-abi`
-regenerates `api/_lib/hardness-registry.abi.ts`; `test:hardness-abi-anvil` fails if
-it is stale.
+After any `forge build` that touches HardnessRegistry or BobbyAdversarialBounties:
+`npm run gen:hardness-abi` regenerates **both** `api/_lib/hardness-registry.abi.ts` and
+`api/_lib/adversarial-bounties.abi.ts`; `test:hardness-abi-anvil` / `test:bounties-abi-anvil`
+fail if either is stale.
+
+**V2 verification params (BP-03).** The seven TrackRecordV2 params are reviewed values and
+must be explicit in the deploy environment; `check:mainnet:*` refuses to run without them and
+bounds-checks them at full width before `DeployBase` ever narrows them:
+
+| env | reviewed value | bounds |
+|---|---|---|
+| `V2_ENTRY_WINDOW_SEC` | `60` | [10, 600] |
+| `V2_EXIT_WINDOW_SEC` | `120` | [10, 1800] |
+| `V2_MAX_EXIT_LAG_SEC` | `600` | [300, 3600] |
+| `V2_CHALLENGE_WINDOW_SEC` | `604800` (7 days) | (172800, 2592000] — strictly above the 2-day Pyth timelock |
+| `V2_ENTRY_TOL_BPS` | `100` | [10, 500] |
+| `V2_EXIT_TOL_BPS` | `100` | [10, 500] |
+| `V2_CONF_MAX_BPS` | `50` | [10, 200] |
+
+`DeployBase` writes them to the manifest as `v2Params.*`, asserts them live right after the
+broadcast, and `VerifyBaseDeployment` refuses a mainnet manifest without the block. The
+readiness check fails if `manifest.v2Params.*` differs from the env.
+
+**CI (BP-06).** The contracts job enforces EIP-170 on the seven production artifacts with
+`script/check-sizes.sh` (not `forge build --sizes`, which trips on the test harness), then
+runs the suite and the layout gate. A separate `integration` job runs the anvil ABI suites
+and the three Postgres suites against a `postgres:17` service; those scripts fail — not
+skip — when `CI=true` and `DATABASE_URL` is missing.
+
+**MCP client contract (BP-07).** `bobby_bounty_challenge` returns `value` / `valueWei` /
+`valueNative`: the bounty's challenge bond, fixed at post time. Send exactly that value; a
+zero-value challenge reverts. `bobby_bounty_get` / `_list` report all six states plus
+`bondWei`, `resolutionFinalizeAfter`, `settlementAfter`, `disputedBy` and `nextDeadline`.
+
+**Public readers (BP-11 / BP-12).** `/api/reputation` and `/api/protocol-heartbeat` select
+TrackRecord getters from the chain's declared `trackRecordVersion` (Base = V2, verified
+ledger). A source that cannot be read answers `sources.<x> = 'unavailable'` with null
+numbers and `ok:false` — consumers must not treat null as zero. The advertised
+`chain.rpc` is the static public endpoint; the configured `BASE_RPC_URL` (which may
+carry a key) never appears in a response or a log line.
+
+**Orchestrate (BP-13).** `POST /api/orchestrate` takes `prediction.quantity` and/or
+`prediction.notionalUsd`. Without a size it analyses but never returns `execute` /
+`reduce_size`. The `decision` is derived from the agent's effective policy, the model's
+action and the proof state (`analysis` / `proof_submitted` / `proof_confirmed` /
+`proof_failed`); a policy that requires on-chain proof only ever yields executable advice
+after a **confirmed** commit. A model answer outside the schema is a 502 with a `failed`
+session — nothing is decided on it.
 
 ## Rollback
 

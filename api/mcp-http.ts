@@ -451,7 +451,9 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
   if (name === 'bobby_bounty_challenge') {
     const bountyId = String(args.bounty_id || '').trim();
     if (!bountyId) throw new Error('bounty_id is required');
-    const built = buildSubmitChallengeCalldata({
+    // BP-07: the bounty's fixed challenge bond rides along as msg.value —
+    // without it the contract reverts ("Challenge bond required").
+    const built = await buildSubmitChallengeCalldata({
       bountyId,
       evidenceHash: String(args.evidence_hash || ''),
     });
@@ -461,8 +463,11 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
         chainId: PROTOCOL_CHAIN_ID,
         to: built.to,
         data: built.data,
-        value: '0x0',
-        note: 'Sign and send from your wallet. Evidence must already be pinned off-chain (IPFS/Arweave) before posting.',
+        value: built.value,
+        valueWei: built.valueWei,
+        valueNative: built.valueNative,
+        nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+        note: 'Sign and send from your wallet with exactly this value: it is the challenge bond fixed for this bounty at post time (returned to the winner; losing bonds go to the treasury). Evidence must already be pinned off-chain (IPFS/Arweave) before posting.',
       }, null, 2) }],
     };
   }

@@ -1,4 +1,4 @@
-import { Interface, formatEther } from 'ethers';
+import { Interface, formatEther, type InterfaceAbi } from 'ethers';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -7,6 +7,10 @@ import {
   PROTOCOL_RPC_URL,
 } from './protocol-constants.js';
 import { DEFAULT_CHAIN } from './chains.js';
+// BP-07: the bounties ABI comes FROM the compiled artifact (gen:hardness-abi),
+// never from a hand-written fragment list that can drift from the contract.
+import { ADVERSARIAL_BOUNTIES_ABI } from './adversarial-bounties.abi.js';
+import { rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './rpc-redact.js';
 
 export {
   BOBBY_ADVERSARIAL_BOUNTIES,
@@ -22,17 +26,7 @@ const ECONOMY_INTERFACE = new Interface([
   'function getStats() view returns (uint256,uint256,uint256)',
 ]);
 
-const BOUNTIES_INTERFACE = new Interface([
-  'function postBounty(string threadId, uint8 dimension, uint32 claimWindowSecs) payable returns (uint256)',
-  'function submitChallenge(uint256 bountyId, bytes32 evidenceHash)',
-  'function withdraw()',
-  'function withdrawBounty(uint256 bountyId)',
-  'function nextBountyId() view returns (uint256)',
-  'function minBounty() view returns (uint96)',
-  'function challengeCount(uint256 bountyId) view returns (uint256)',
-  'function bounties(uint256 bountyId) view returns (bytes32 threadHash, address poster, uint96 reward, address winner, uint64 createdAt, uint32 claimWindowSecs, uint8 dimension, uint8 status, uint16 challengeCount, uint32 gracePeriodSnapshot)',
-  'function pendingWithdrawals(address) view returns (uint256)',
-]);
+const BOUNTIES_INTERFACE = new Interface(ADVERSARIAL_BOUNTIES_ABI as unknown as InterfaceAbi);
 
 const DIMENSION_NAMES = [
   'DATA_INTEGRITY',
@@ -43,7 +37,20 @@ const DIMENSION_NAMES = [
   'NOVELTY',
 ] as const;
 
-const BOUNTY_STATUS_NAMES = ['OPEN', 'CHALLENGED', 'RESOLVED', 'WITHDRAWN'] as const;
+// BP-07: all SIX on-chain states (the optimistic-resolution states were missing,
+// so PENDING_RESOLUTION / DISPUTED surfaced as STATUS_4 / STATUS_5 with no deadline).
+export const BOUNTY_STATUS_NAMES = ['OPEN', 'CHALLENGED', 'RESOLVED', 'WITHDRAWN', 'PENDING_RESOLUTION', 'DISPUTED'] as const;
+export type BountyStatusName = (typeof BOUNTY_STATUS_NAMES)[number];
+
+/** The next on-chain clock that matters for a bounty in its current state. */
+export interface BountyDeadline {
+  /** What the deadline gates. */
+  action: 'submitChallenge' | 'resolveBounty' | 'finalizeResolution' | 'resolveStalledDispute';
+  /** Unix seconds. */
+  at: number;
+  /** Where the number came from on-chain. */
+  source: 'claimWindow' | 'claimWindow+grace' | 'resolutionFinalizeAfter' | 'settlementAfter';
+}
 
 export interface BountySummary {
   bountyId: string;
@@ -58,8 +65,19 @@ export interface BountySummary {
   claimWindowSecs: number;
   effectiveExpiry: number;
   dimension: string;
-  status: string;
+  status: BountyStatusName | string;
   challengeCount: number;
+  /** BP-07: the challenge/dispute bond fixed for THIS bounty at post time (wei). */
+  bondWei: string;
+  bondNative: string;
+  /** PENDING_RESOLUTION: finalizeResolution is callable from this time; disputes before it. */
+  resolutionFinalizeAfter: number | null;
+  /** DISPUTED: resolveStalledDispute is callable from this time. */
+  settlementAfter: number | null;
+  /** DISPUTED: who froze the resolution. */
+  disputedBy: string | null;
+  /** The deadline that applies to the CURRENT state, or null when terminal. */
+  nextDeadline: BountyDeadline | null;
 }
 
 function parseDimensionInput(dim: string | number | undefined): number {
@@ -71,6 +89,18 @@ function parseDimensionInput(dim: string | number | undefined): number {
   const idx = DIMENSION_NAMES.indexOf(key as (typeof DIMENSION_NAMES)[number]);
   if (idx < 0) throw new Error(`Unknown dimension: ${dim}`);
   return idx;
+}
+
+async function bountyView<T = unknown>(fn: string, args: unknown[]): Promise<T> {
+  const data = BOUNTIES_INTERFACE.encodeFunctionData(fn, args);
+  const raw = await rpcCall<string>('eth_call', [{ to: BOBBY_ADVERSARIAL_BOUNTIES, data }, 'latest']);
+  return BOUNTIES_INTERFACE.decodeFunctionResult(fn, raw)[0] as T;
+}
+
+/** BP-07: the bond a challenger (or a disputing party) must send for this bounty — snapshotted at post time. */
+export async function readBountyBond(bountyId: number | string | bigint): Promise<bigint> {
+  const bond = await bountyView<bigint>('bountyBond', [BigInt(bountyId)]);
+  return BigInt(bond.toString());
 }
 
 export async function readBounty(bountyId: number | string): Promise<BountySummary> {
@@ -91,9 +121,31 @@ export async function readBounty(bountyId: number | string): Promise<BountySumma
   const statusIdx = Number(d[7]);
   const challengeCnt = Number(d[8]);
   const grace = Number(d[9]);
+  const status = BOUNTY_STATUS_NAMES[statusIdx] || `STATUS_${statusIdx}`;
+
+  // BP-07: the per-bounty bond and the state-specific deadlines are on-chain
+  // facts the tools must report — not derivable from the packed struct.
+  const [bond, finalizeAfter, settlement, disputedBy] = await Promise.all([
+    readBountyBond(id),
+    status === 'PENDING_RESOLUTION' || status === 'DISPUTED' || status === 'RESOLVED'
+      ? bountyView<bigint>('resolutionFinalizeAfter', [id]).then((v) => Number(v))
+      : Promise.resolve(0),
+    status === 'DISPUTED' || status === 'RESOLVED'
+      ? bountyView<bigint>('settlementAfter', [id]).then((v) => Number(v))
+      : Promise.resolve(0),
+    status === 'DISPUTED' || status === 'RESOLVED'
+      ? bountyView<string>('disputedBy', [id]).then((v) => String(v).toLowerCase())
+      : Promise.resolve('0x0000000000000000000000000000000000000000'),
+  ]);
 
   let effectiveExpiry = createdAt + claimWindowSecs;
   if (statusIdx === 1 /* CHALLENGED */) effectiveExpiry += grace;
+
+  let nextDeadline: BountyDeadline | null = null;
+  if (status === 'OPEN') nextDeadline = { action: 'submitChallenge', at: createdAt + claimWindowSecs, source: 'claimWindow' };
+  else if (status === 'CHALLENGED') nextDeadline = { action: 'resolveBounty', at: effectiveExpiry, source: 'claimWindow+grace' };
+  else if (status === 'PENDING_RESOLUTION') nextDeadline = { action: 'finalizeResolution', at: finalizeAfter, source: 'resolutionFinalizeAfter' };
+  else if (status === 'DISPUTED') nextDeadline = { action: 'resolveStalledDispute', at: settlement, source: 'settlementAfter' };
 
   const rewardNative = formatEther(rewardWei);
   return {
@@ -108,8 +160,14 @@ export async function readBounty(bountyId: number | string): Promise<BountySumma
     claimWindowSecs,
     effectiveExpiry,
     dimension: DIMENSION_NAMES[dimIdx] || `DIM_${dimIdx}`,
-    status: BOUNTY_STATUS_NAMES[statusIdx] || `STATUS_${statusIdx}`,
+    status,
     challengeCount: challengeCnt,
+    bondWei: bond.toString(),
+    bondNative: formatEther(bond),
+    resolutionFinalizeAfter: finalizeAfter > 0 ? finalizeAfter : null,
+    settlementAfter: settlement > 0 ? settlement : null,
+    disputedBy: disputedBy !== '0x0000000000000000000000000000000000000000' ? disputedBy : null,
+    nextDeadline,
   };
 }
 
@@ -170,19 +228,35 @@ export function buildPostBountyCalldata(params: {
   return { to: BOBBY_ADVERSARIAL_BOUNTIES, data, dimension: DIMENSION_NAMES[dimIdx] };
 }
 
-export function buildSubmitChallengeCalldata(params: {
-  bountyId: number | string;
-  evidenceHash: string;
-}): { to: string; data: string } {
+/** Pure encoder (no chain read). The unsigned tx handed to a wallet must come from buildSubmitChallengeCalldata. */
+export function encodeSubmitChallenge(params: { bountyId: number | string; evidenceHash: string }): { to: string; data: string } {
   const hash = params.evidenceHash.startsWith('0x') ? params.evidenceHash : `0x${params.evidenceHash}`;
   if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
     throw new Error('evidenceHash must be a 32-byte hex string (0x + 64 chars)');
   }
-  const data = BOUNTIES_INTERFACE.encodeFunctionData('submitChallenge', [
-    BigInt(params.bountyId),
-    hash,
-  ]);
+  if (/^0x0{64}$/.test(hash)) throw new Error('evidenceHash must not be zero (the contract requires evidence)');
+  const data = BOUNTIES_INTERFACE.encodeFunctionData('submitChallenge', [BigInt(params.bountyId), hash]);
   return { to: BOBBY_ADVERSARIAL_BOUNTIES, data };
+}
+
+/**
+ * BP-07: submitChallenge is payable and REQUIRES msg.value == bountyBond(id) —
+ * the bond snapshotted for that bounty at post time (a later owner change to
+ * the global challengeBond does not apply). The unsigned tx therefore carries
+ * the bond read live for THIS bounty; a tx without it reverts on-chain.
+ */
+export async function buildSubmitChallengeCalldata(params: {
+  bountyId: number | string;
+  evidenceHash: string;
+}): Promise<{ to: string; data: string; value: string; valueWei: string; valueNative: string }> {
+  const encoded = encodeSubmitChallenge(params);
+  const bondWei = await readBountyBond(params.bountyId);
+  return {
+    ...encoded,
+    value: `0x${bondWei.toString(16)}`,
+    valueWei: bondWei.toString(),
+    valueNative: formatEther(bondWei),
+  };
 }
 
 export interface VerifiedMcpPayment {
@@ -215,14 +289,15 @@ async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
       });
 
-      if (!res.ok) throw new Error(`${DEFAULT_CHAIN.name} RPC ${res.status}`);
+      if (!res.ok) throw new Error(`${DEFAULT_CHAIN.name} ${rpcEndpointLabel(url)} ${res.status}`);
 
       const json = await res.json() as RpcEnvelope<T>;
-      if (json.error) throw new Error(json.error.message || `${DEFAULT_CHAIN.name} RPC error`);
-      if (json.result == null) throw new Error(`${DEFAULT_CHAIN.name} RPC returned no result`);
+      // BP-12: upstream messages may echo the request URL — scrub before they propagate.
+      if (json.error) throw new Error(scrubRpcSecrets(json.error.message || '') || `${DEFAULT_CHAIN.name} ${rpcEndpointLabel(url)} error`);
+      if (json.result == null) throw new Error(`${DEFAULT_CHAIN.name} ${rpcEndpointLabel(url)} returned no result`);
       return json.result;
     } catch (error) {
-      lastError = error;
+      lastError = new Error(rpcErrorMessage(error));
     }
   }
 

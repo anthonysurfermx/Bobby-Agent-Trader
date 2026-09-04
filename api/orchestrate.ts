@@ -10,6 +10,10 @@ import { computeHardnessScore, isHardnessRegistryConfigured, recordHardnessActiv
 import { createProof, createSession, evaluatePolicy, getAgent, updateSession } from './_lib/hardness-control-plane.js';
 import { buildAuthChallenge, verifyAgentRequest } from './_lib/agent-auth.js';
 import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
+import { z } from 'zod';
+import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { BOBBY_HARDNESS_REGISTRY } from './_lib/protocol-constants.js';
+import { rpcErrorMessage } from './_lib/rpc-redact.js';
 
 export const config = { maxDuration: 120 };
 
@@ -30,6 +34,10 @@ interface OrchestrateBody {
     catalysts?: string[];
     invalidation?: string;
     timeframe?: string;
+    /** BP-13: executable advice needs a validated size — units of the symbol… */
+    quantity?: number;
+    /** …or the notional in USD (both may be given; they must agree). */
+    notionalUsd?: number;
   };
   options?: {
     runDebate?: boolean;
@@ -77,6 +85,148 @@ function determineAction(score: number): OrchestrateAction {
   return 'reject';
 }
 
+// ── BP-13 (2026-09-04 review): the model proposes, the policy disposes ──
+//
+// The score-derived action used to be the final answer: an agent whose policy
+// said "paper only" or "proof required" still received `execute`, the policy
+// was evaluated against the ENTRY PRICE as if it were the notional, the session
+// was marked `proved` with no proof, and the LLM JSON was trusted verbatim.
+
+const RecommendationSchema = z.enum(['execute', 'pass', 'reduce_size']);
+const AlphaSchema = z.object({
+  thesis: z.string().max(4_000).optional().default(''),
+  evidence: z.array(z.string().max(1_000)).max(20).optional().default([]),
+  catalyst: z.string().max(1_000).optional().default(''),
+  conviction: z.number().min(1).max(10).optional(),
+}).passthrough();
+const RedSchema = z.object({
+  counterpoints: z.array(z.string().max(1_000)).max(20).optional().default([]),
+  biases_detected: z.array(z.string().max(200)).max(20).optional().default([]),
+  failure_modes: z.array(z.string().max(1_000)).max(20).optional().default([]),
+}).passthrough();
+const CioSchema = z.object({
+  recommendation: RecommendationSchema,
+  conviction: z.number().min(1).max(10).optional(),
+  rationale: z.string().max(4_000).optional().default(''),
+  adjusted_entry: z.number().positive().nullable().optional(),
+  adjusted_stop: z.number().positive().nullable().optional(),
+}).passthrough();
+const DimensionScore = z.number().int().min(1).max(5);
+const JudgeSchema = z.object({
+  dimensions: z.object({
+    data_integrity: DimensionScore,
+    adversarial_quality: DimensionScore,
+    decision_logic: DimensionScore,
+    risk_management: DimensionScore,
+    calibration_alignment: DimensionScore,
+    novelty: DimensionScore,
+  }),
+  biases_detected: z.array(z.string().max(200)).max(20).optional().default([]),
+  recommendation: RecommendationSchema,
+  rationale: z.string().max(4_000).optional().default(''),
+  red_flags: z.array(z.string().max(500)).max(20).optional().default([]),
+}).passthrough();
+
+class ModelOutputError extends Error {
+  constructor(public readonly role: string, detail: string) {
+    super(`${role} output rejected: ${detail}`);
+  }
+}
+
+/** One role call whose JSON is validated against the schema the decision relies on. */
+async function callRoleValidated<T>(role: string, schema: z.ZodType<T, z.ZodTypeDef, unknown>, system: string, context: string, maxTokens?: number): Promise<T> {
+  const raw = await callRole(system, context, maxTokens);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new ModelOutputError(role, 'not a JSON object');
+  }
+  const result = schema.safeParse(parsed);
+  if (!result.success) {
+    const detail = result.error.issues.slice(0, 3).map((i) => `${i.path.join('.') || 'root'}: ${i.message}`).join('; ');
+    throw new ModelOutputError(role, detail);
+  }
+  return result.data;
+}
+
+interface Sizing { quantity: number | null; notionalUsd: number | null }
+
+/** Either field may be given; both must agree (1% tolerance). Absent → no executable advice. */
+function resolveSizing(p: OrchestrateBody['prediction']): { ok: true; sizing: Sizing } | { ok: false; error: string } {
+  const q = p.quantity;
+  const notional = p.notionalUsd;
+  if (q == null && notional == null) return { ok: true, sizing: { quantity: null, notionalUsd: null } };
+  const valid = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 1e9;
+  if (q != null && !valid(q)) return { ok: false, error: 'prediction.quantity must be a positive number <= 1e9' };
+  if (notional != null && !valid(notional)) return { ok: false, error: 'prediction.notionalUsd must be a positive number <= 1e9' };
+  const derived = q != null ? q * p.entry : null;
+  if (q != null && notional != null && derived !== null && Math.abs(derived - notional) > Math.max(1, notional * 0.01)) {
+    return { ok: false, error: 'prediction.notionalUsd does not equal quantity x entry (1% tolerance)' };
+  }
+  const notionalUsd = notional ?? derived;
+  return { ok: true, sizing: { quantity: q ?? (notionalUsd as number) / p.entry, notionalUsd } };
+}
+
+type ProofState = 'analysis' | 'proof_submitted' | 'proof_confirmed' | 'proof_failed';
+const PROOF_CONFIRM_TIMEOUT_MS = 20_000;
+
+/** A tx hash is a submission, not a proof: only a mined receipt with status 1 confirms it. */
+async function confirmProof(txHash: string): Promise<ProofState> {
+  try {
+    const { JsonRpcProvider } = await import('ethers');
+    const provider = new JsonRpcProvider(DEFAULT_CHAIN.rpcUrl, DEFAULT_CHAIN.id, { staticNetwork: true });
+    const receipt = await provider.waitForTransaction(txHash, 1, PROOF_CONFIRM_TIMEOUT_MS);
+    if (!receipt) return 'proof_submitted';
+    return receipt.status === 1 ? 'proof_confirmed' : 'proof_failed';
+  } catch (error) {
+    console.warn('[Orchestrate] proof confirmation pending:', rpcErrorMessage(error));
+    return 'proof_submitted';
+  }
+}
+
+type PolicyEvaluation = ReturnType<typeof evaluatePolicy>;
+
+/**
+ * The final action is a function of the EFFECTIVE policy, the model's action
+ * and the proof state — the model's action is an upper bound, never the answer.
+ * Precedence: blocked → reject; no validated size → nothing executable; paper
+ * mode/result → paper at most; reduction → reduce_size at most; a required
+ * proof that is not confirmed → human approval; advisory mode → human approval.
+ */
+export function finalizeAction(input: {
+  modelAction: OrchestrateAction;
+  policy: PolicyEvaluation;
+  proofState: ProofState;
+  executable: boolean;
+}): { action: OrchestrateAction; reasons: string[] } {
+  const reasons: string[] = [];
+  const executableAdvice = (a: OrchestrateAction) => a === 'execute' || a === 'reduce_size';
+  if (input.policy.result === 'blocked') return { action: 'reject', reasons: [`policy blocked: ${input.policy.reason}`] };
+  let action = input.modelAction;
+  if (!input.executable && executableAdvice(action)) {
+    action = 'publish_only';
+    reasons.push('no validated quantity/notional: analysis only, no executable advice');
+  }
+  if ((input.policy.result === 'paper_only' || input.policy.policy.mode === 'paper') && executableAdvice(action)) {
+    action = 'paper_only';
+    reasons.push(`policy paper: ${input.policy.reason}`);
+  }
+  if (input.policy.result === 'allowed_with_reduction' && action === 'execute') {
+    action = 'reduce_size';
+    reasons.push(`policy reduction: notional above maxNotionalUsd ${input.policy.policy.maxNotionalUsd}`);
+  }
+  if (input.policy.policy.requireOnchainProof && input.proofState !== 'proof_confirmed' && executableAdvice(action)) {
+    action = 'require_human_approval';
+    reasons.push(`policy requires on-chain proof; proof state is ${input.proofState}`);
+  }
+  if (input.policy.policy.mode === 'advisory' && action === 'execute') {
+    action = 'require_human_approval';
+    reasons.push('advisory mode: execution needs a human');
+  }
+  return { action, reasons };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     return res.status(200).json({
@@ -84,7 +234,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       description: 'Financial orchestration for AI agents. Submit a structured prediction, get it stress-tested through adversarial debate, scored on 6 dimensions, and proven on-chain.',
       usage: 'POST with JSON body: { agent, prediction: { symbol, direction, entry, target, stop, thesis }, options: { runDebate, runJudge, commitOnchain } }',
       docs: 'https://bobbyprotocol.xyz/protocol/console',
-      registry: process.env.HARDNESS_REGISTRY_ADDRESS || '0xD89c1721CD760984a31dE0325fD96cD27bB31040',
+      registry: BOBBY_HARDNESS_REGISTRY,
+      chainId: DEFAULT_CHAIN.id,
       auth: {
         headers: ['x-agent-address', 'x-agent-timestamp', 'x-agent-signature'],
         challengeExample: buildAuthChallenge(
@@ -134,6 +285,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!validShape || !validLevels) {
     return res.status(400).json({ error: 'Invalid or oversized HardnessSpec' });
   }
+  // BP-13: size is validated up front; without one the harness still analyses
+  // but never returns executable advice.
+  const sized = resolveSizing(p);
+  if (sized.ok === false) return res.status(400).json({ error: sized.error });
+  const sizing = sized.sizing;
 
   if (!OPENAI_API_KEY) {
     return res.status(503).json({ error: 'LLM not configured' });
@@ -143,7 +299,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const rr = p.direction === 'long'
     ? (p.target - p.entry) / Math.max(1, p.entry - p.stop)
     : (p.entry - p.target) / Math.max(1, p.stop - p.entry);
-  const isHighRisk = (p.entry * (p.conviction || 5) / 10) > 50000 || rr < 1.0;
+  // BP-13: the notional gate uses the VALIDATED notional (the entry price was
+  // being treated as the notional, so a BTC long tripped it on price alone).
+  const isHighRisk = (sizing.notionalUsd ?? 0) > 50000 || rr < 1.0;
   if (isHighRisk && !body.options?.acknowledgeHighRisk) {
     return res.status(200).json({
       ok: true,
@@ -208,74 +366,83 @@ Invalidation: ${p.invalidation || 'not specified'}`;
       status: 'received',
     });
 
-    let alpha: Record<string, unknown> = {};
-    let red: Record<string, unknown> = {};
-    let cio: Record<string, unknown> = {};
-    let judge: Record<string, unknown> = {};
+    let alpha: z.infer<typeof AlphaSchema> = { thesis: '', evidence: [], catalyst: '' };
+    let red: z.infer<typeof RedSchema> = { counterpoints: [], biases_detected: [], failure_modes: [] };
+    let cio: z.infer<typeof CioSchema> | null = null;
+    let judge: z.infer<typeof JudgeSchema> | null = null;
 
-    if (runDebate) {
-      // ISOLATED DEBATE — each role sees only what it should
+    try {
+      if (runDebate) {
+        // ISOLATED DEBATE — each role sees only what it should. Every role's
+        // JSON is schema-validated (BP-13): a malformed or out-of-range answer
+        // aborts the session instead of steering the decision.
 
-      // Alpha Hunter: sees ONLY the spec packet, strengthens the thesis
-      const alphaRaw = await callRole(
-        'You are Alpha Hunter. Strengthen this trade thesis with verifiable evidence. Be specific: cite price levels, indicators, catalysts. Return JSON: {"thesis":string,"evidence":string[],"catalyst":string,"conviction":number}',
-        specPacket
-      );
-      alpha = JSON.parse(alphaRaw);
+        // Alpha Hunter: sees ONLY the spec packet, strengthens the thesis
+        alpha = await callRoleValidated(
+          'Alpha Hunter',
+          AlphaSchema,
+          'You are Alpha Hunter. Strengthen this trade thesis with verifiable evidence. Be specific: cite price levels, indicators, catalysts. Return JSON: {"thesis":string,"evidence":string[],"catalyst":string,"conviction":number}',
+          specPacket
+        );
 
-      // Red Team: sees spec packet + Alpha's CONCLUSION only (not reasoning)
-      // This is the isolation guarantee — Red doesn't see Alpha's evidence
-      const redContext = `${specPacket}\n\nALPHA CONCLUSION: ${(alpha as Record<string, string>).thesis || 'bullish'} (conviction ${(alpha as Record<string, number>).conviction || conviction}/10)`;
-      const redRaw = await callRole(
-        'You are Red Team. Destroy this thesis with adversarial rigor. Find data gaps, selection bias, timing risks. Return JSON: {"counterpoints":string[],"biases_detected":string[],"failure_modes":string[]}',
-        redContext
-      );
-      red = JSON.parse(redRaw);
+        // Red Team: sees spec packet + Alpha's CONCLUSION only (not reasoning)
+        // This is the isolation guarantee — Red doesn't see Alpha's evidence
+        const redContext = `${specPacket}\n\nALPHA CONCLUSION: ${alpha.thesis || 'bullish'} (conviction ${alpha.conviction || conviction}/10)`;
+        red = await callRoleValidated(
+          'Red Team',
+          RedSchema,
+          'You are Red Team. Destroy this thesis with adversarial rigor. Find data gaps, selection bias, timing risks. Return JSON: {"counterpoints":string[],"biases_detected":string[],"failure_modes":string[]}',
+          redContext
+        );
 
-      // CIO: sees FULL transcript (Alpha evidence + Red counterpoints)
-      const cioContext = `${specPacket}\n\nALPHA THESIS:\n${JSON.stringify(alpha)}\n\nRED TEAM ATTACK:\n${JSON.stringify(red)}`;
-      const cioRaw = await callRole(
-        'You are Bobby CIO. Decide if this trade survives. Be decisive. Return JSON: {"recommendation":"execute"|"pass"|"reduce_size","conviction":number,"rationale":string,"adjusted_entry":number,"adjusted_stop":number}',
-        cioContext
-      );
-      cio = JSON.parse(cioRaw);
+        // CIO: sees FULL transcript (Alpha evidence + Red counterpoints)
+        const cioContext = `${specPacket}\n\nALPHA THESIS:\n${JSON.stringify(alpha)}\n\nRED TEAM ATTACK:\n${JSON.stringify(red)}`;
+        cio = await callRoleValidated(
+          'CIO',
+          CioSchema,
+          'You are Bobby CIO. Decide if this trade survives. Be decisive. Return JSON: {"recommendation":"execute"|"pass"|"reduce_size","conviction":number,"rationale":string,"adjusted_entry":number,"adjusted_stop":number}',
+          cioContext
+        );
+      }
+
+      if (runJudge) {
+        // Judge: enters ONLY at the end, scores debate quality (not market direction)
+        const judgeContext = `${specPacket}\n\nDEBATE TRANSCRIPT:\nAlpha: ${JSON.stringify(alpha)}\nRed: ${JSON.stringify(red)}\nCIO: ${JSON.stringify(cio ?? {})}`;
+        judge = await callRoleValidated(
+          'Judge',
+          JudgeSchema,
+          'You are Judge Mode. Score debate QUALITY, not market direction. Return JSON: {"dimensions":{"data_integrity":1-5,"adversarial_quality":1-5,"decision_logic":1-5,"risk_management":1-5,"calibration_alignment":1-5,"novelty":1-5},"biases_detected":string[],"recommendation":"execute"|"pass"|"reduce_size","rationale":string,"red_flags":string[]}',
+          judgeContext,
+          400
+        );
+      }
+    } catch (error) {
+      if (error instanceof ModelOutputError) {
+        console.error('[Orchestrate] model output rejected:', error.message);
+        await updateSession(sessionId, { status: 'failed', decision_json: { error: error.message, role: error.role } });
+        return res.status(502).json({ error: error.message, role: error.role, sessionId });
+      }
+      throw error;
     }
 
-    let dimensions: Record<string, number> = {};
-    let hardnessScore = 0;
-    let judgeRecommendation = 'pass';
+    const dimensions: Record<string, number> = judge ? { ...judge.dimensions } : {};
+    const hardnessScore = judge ? computeHardnessScore(dimensions) : 0;
+    const judgeRecommendation = judge?.recommendation ?? 'pass';
 
-    if (runJudge) {
-      // Judge: enters ONLY at the end, scores debate quality (not market direction)
-      const judgeContext = `${specPacket}\n\nDEBATE TRANSCRIPT:\nAlpha: ${JSON.stringify(alpha)}\nRed: ${JSON.stringify(red)}\nCIO: ${JSON.stringify(cio)}`;
-      const judgeRaw = await callRole(
-        'You are Judge Mode. Score debate QUALITY, not market direction. Return JSON: {"dimensions":{"data_integrity":1-5,"adversarial_quality":1-5,"decision_logic":1-5,"risk_management":1-5,"calibration_alignment":1-5,"novelty":1-5},"biases_detected":string[],"recommendation":"execute"|"pass"|"reduce_size","rationale":string,"red_flags":string[]}',
-        judgeContext,
-        400
-      );
-      judge = JSON.parse(judgeRaw);
-      dimensions = (judge as Record<string, Record<string, number>>).dimensions || {};
-      hardnessScore = computeHardnessScore(dimensions);
-      judgeRecommendation = (judge as Record<string, string>).recommendation || 'pass';
-    }
-
-    let action = determineAction(hardnessScore);
-    const finalConviction = Math.max(1, Math.min(10,
-      (cio as Record<string, number>).conviction || conviction
-    ));
+    const modelAction = determineAction(hardnessScore);
+    const finalConviction = Math.max(1, Math.min(10, cio?.conviction || conviction));
     const policy = evaluatePolicy(agent?.risk_policy_json, {
       symbol: p.symbol,
       hardnessScore,
       judgePresent: runJudge,
-      requestedNotionalUsd: p.entry,
+      // BP-13: the validated notional — never the entry price.
+      requestedNotionalUsd: sizing.notionalUsd,
     });
-    
-    if (action === 'execute' && agent?.risk_policy_json?.mode === 'advisory') {
-      action = 'require_human_approval';
-    }
 
-    // On-chain proof
+    // On-chain proof. A returned hash is a SUBMISSION; only a mined receipt
+    // with status 1 is a proof the policy can rely on.
     let proofs: Record<string, string | null> | null = null;
+    let proofState: ProofState = 'analysis';
     if ((commitOnchain || publishSignal) && isHardnessRegistryConfigured() && policy.result !== 'blocked') {
       const proof = await recordHardnessActivity({
         threadId: debateId,
@@ -293,19 +460,31 @@ Invalidation: ${p.invalidation || 'not specified'}`;
           commitTxHash: proof.commitTxHash || null,
           signalTxHash: proof.signalTxHash || null,
         };
+        if (commitOnchain) {
+          proofState = proof.commitTxHash ? await confirmProof(proof.commitTxHash) : 'proof_failed';
+        }
         await createProof({
           session_id: sessionId,
           prediction_hash: proof.predictionHash,
           commit_tx_hash: proof.commitTxHash || null,
           signal_tx_hash: proof.signalTxHash || null,
-          chain_id: 196,
+          chain_id: DEFAULT_CHAIN.id,
         });
+      } else if (commitOnchain) {
+        proofState = 'proof_failed';
       }
     }
 
+    const executable = sizing.notionalUsd !== null && sizing.quantity !== null;
+    const finalAction = finalizeAction({ modelAction, policy, proofState, executable });
+    const action = finalAction.action;
+    const reducedNotionalUsd = action === 'reduce_size' && sizing.notionalUsd !== null
+      ? Math.min(sizing.notionalUsd, policy.policy.maxNotionalUsd)
+      : null;
+
     const biases = Array.from(new Set([
-      ...((red as Record<string, string[]>).biases_detected || []),
-      ...((judge as Record<string, string[]>).biases_detected || []),
+      ...red.biases_detected,
+      ...(judge?.biases_detected ?? []),
     ]));
 
     const responseBody = {
@@ -314,47 +493,61 @@ Invalidation: ${p.invalidation || 'not specified'}`;
       sessionId,
       agent: agentId,
       authMode: auth.mode,
-      decision: policy.result === 'blocked' ? 'reject' : action,
+      decision: action,
+      modelAction,
+      finalActionReasons: finalAction.reasons,
       policyResult: policy.result,
       policyReason: policy.reason,
+      policyMode: policy.policy.mode,
+      proofState,
       hardnessScore,
       conviction: finalConviction,
       biases,
-      redFlags: (judge as Record<string, string[]>).red_flags || [],
-      rationale: (cio as Record<string, string>).rationale || '',
+      redFlags: judge?.red_flags ?? [],
+      rationale: cio?.rationale ?? '',
       debate: {
-        alpha: { thesis: (alpha as Record<string, string>).thesis || '', evidence: (alpha as Record<string, string[]>).evidence || [] },
-        redTeam: { counterpoints: (red as Record<string, string[]>).counterpoints || [], failureModes: (red as Record<string, string[]>).failure_modes || [] },
-        cio: { recommendation: (cio as Record<string, string>).recommendation || '', conviction: finalConviction, rationale: (cio as Record<string, string>).rationale || '' },
+        alpha: { thesis: alpha.thesis, evidence: alpha.evidence },
+        redTeam: { counterpoints: red.counterpoints, failureModes: red.failure_modes },
+        cio: { recommendation: cio?.recommendation ?? '', conviction: finalConviction, rationale: cio?.rationale ?? '' },
       },
       judge: { dimensions, recommendation: judgeRecommendation },
       proofs,
       sizing: {
-        suggestedAction: policy.result === 'blocked' ? 'reject' : action,
+        suggestedAction: action,
+        executable,
+        quantity: sizing.quantity,
+        notionalUsd: sizing.notionalUsd,
+        maxNotionalUsd: policy.policy.maxNotionalUsd,
+        reducedNotionalUsd,
         riskReward: parseFloat(rr.toFixed(2)),
         maxConviction: finalConviction,
       },
     };
 
     await updateSession(sessionId, {
-      status: 'proved',
+      status: proofState,
       hardness_score: hardnessScore,
       policy_result: policy.result,
       decision_json: {
-        decision: responseBody.decision,
+        decision: action,
+        modelAction,
+        finalActionReasons: finalAction.reasons,
+        proofState,
         conviction: finalConviction,
-        recommendation: (cio as Record<string, string>).recommendation || '',
+        recommendation: cio?.recommendation ?? '',
         judgeRecommendation,
         biases,
-        redFlags: (judge as Record<string, string[]>).red_flags || [],
+        redFlags: judge?.red_flags ?? [],
         prediction: p,
+        sizing: responseBody.sizing,
         proofs,
       },
     });
 
     return res.status(200).json(responseBody);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Unknown error';
+    // BP-12: never echo a configured RPC URL to the client.
+    const msg = rpcErrorMessage(error);
     console.error('[Orchestrate] Error:', msg);
     return res.status(500).json({ error: msg });
   }

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther } from 'ethers';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -107,15 +108,15 @@ async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
       });
 
       if (!res.ok) {
-        throw new Error(`RPC ${res.status} from ${url}`);
+        throw new Error(`RPC ${res.status} from ${rpcEndpointLabel(url)}`);
       }
 
       const json = await res.json() as { result?: unknown; error?: { message?: string } };
       if (json.error) {
-        throw new Error(json.error.message || `RPC error from ${url}`);
+        throw new Error(scrubRpcSecrets(json.error.message || '') || `RPC error from ${rpcEndpointLabel(url)}`);
       }
       if (json.result == null) {
-        throw new Error(`RPC returned no result from ${url}`);
+        throw new Error(`RPC returned no result from ${rpcEndpointLabel(url)}`);
       }
 
       return json.result;
@@ -140,12 +141,12 @@ async function fetchBlockBatch(calls: unknown[]): Promise<Array<{ result?: RpcBl
       });
 
       if (!res.ok) {
-        throw new Error(`Block batch RPC ${res.status} from ${url}`);
+        throw new Error(`Block batch RPC ${res.status} from ${rpcEndpointLabel(url)}`);
       }
 
       const json = await res.json() as unknown;
       if (!Array.isArray(json)) {
-        throw new Error(`Block batch RPC returned non-array payload from ${url}`);
+        throw new Error(`Block batch RPC returned non-array payload from ${rpcEndpointLabel(url)}`);
       }
 
       return json as Array<{ result?: RpcBlock }>;
@@ -358,7 +359,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     return res.status(200).json(payload);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    // BP-12: the message reaches the client (degraded payload) — scrub any configured RPC URL.
+    const message = rpcErrorMessage(error);
     console.error('[ProtocolTxHistory]', message);
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
     const rawCursor = req.query.cursor;

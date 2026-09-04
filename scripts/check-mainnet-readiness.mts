@@ -188,6 +188,28 @@ for (const name of [
   requireEnv(name, positiveUint96);
 }
 
+// BP-03 (2026-09-04 review): the seven TrackRecordV2 verification params are
+// reviewed values, not defaults. They must be explicit on mainnet, in the
+// contract's bounds at FULL width (DeployBase narrows only after V2ParamsGate
+// validates), and identical to what the manifest says was deployed.
+const V2_PARAM_BOUNDS: Record<string, { env: string; min: bigint; max: bigint; width: bigint }> = {
+  entryWindowSec: { env: 'V2_ENTRY_WINDOW_SEC', min: 10n, max: 600n, width: (1n << 16n) - 1n },
+  exitWindowSec: { env: 'V2_EXIT_WINDOW_SEC', min: 10n, max: 1800n, width: (1n << 16n) - 1n },
+  maxExitLagSec: { env: 'V2_MAX_EXIT_LAG_SEC', min: 300n, max: 3600n, width: (1n << 24n) - 1n },
+  challengeWindowSec: { env: 'V2_CHALLENGE_WINDOW_SEC', min: 2n * 86400n + 1n, max: 30n * 86400n, width: (1n << 24n) - 1n },
+  entryTolBps: { env: 'V2_ENTRY_TOL_BPS', min: 10n, max: 500n, width: (1n << 16n) - 1n },
+  exitTolBps: { env: 'V2_EXIT_TOL_BPS', min: 10n, max: 500n, width: (1n << 16n) - 1n },
+  confMaxBps: { env: 'V2_CONF_MAX_BPS', min: 10n, max: 200n, width: (1n << 16n) - 1n },
+};
+for (const [key, bound] of Object.entries(V2_PARAM_BOUNDS)) {
+  requireEnv(bound.env, (value) => {
+    if (!/^[1-9][0-9]*$/.test(value)) return false;
+    const v = BigInt(value);
+    return v <= bound.width && v >= bound.min && v <= bound.max;
+  });
+  void key;
+}
+
 const configuredBountyTreasury = env('BOUNTY_TREASURY_ADDRESS');
 if (!validAddress(configuredBountyTreasury)) {
   fail('BOUNTY_TREASURY_ADDRESS is missing or invalid');
@@ -329,6 +351,18 @@ if (manifest) {
     if (String(manifest.fees?.[key] ?? '') !== env(envName)) {
       fail(`manifest fees.${key} does not match ${envName}`);
     } else pass(`${envName} matches manifest`);
+  }
+
+  // BP-03: the manifest must carry the reviewed V2 params and they must equal
+  // the configured ones — a pre-BP-03 manifest (no block) is not verifiable.
+  if (!manifest.v2Params || typeof manifest.v2Params !== 'object') {
+    fail('manifest v2Params block is missing — redeploy with the BP-03 DeployBase (full-width validated params in the manifest)');
+  } else {
+    for (const [key, bound] of Object.entries(V2_PARAM_BOUNDS)) {
+      if (String(manifest.v2Params[key] ?? '') !== env(bound.env)) {
+        fail(`manifest v2Params.${key} does not match ${bound.env}`);
+      } else pass(`${bound.env} matches manifest`);
+    }
   }
 
   const manifestResolvers = Array.isArray(manifest.quorum?.resolvers)

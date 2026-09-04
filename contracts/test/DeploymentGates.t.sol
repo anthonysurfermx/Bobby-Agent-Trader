@@ -5,6 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {SafeOwnerGate} from "../script/SafeOwnerGate.sol";
 import {VerifyBaseDeployment} from "../script/VerifyBaseDeployment.s.sol";
 import {BountyEconomicsGate} from "../script/BountyEconomicsGate.sol";
+import {V2ParamsGate} from "../script/V2ParamsGate.sol";
+import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
+import {MockPyth} from "./BobbyTrackRecordV2.t.sol";
 import {BobbyAdversarialBounties} from "../src/BobbyAdversarialBounties.sol";
 import {HardnessRegistry} from "../src/HardnessRegistry.sol";
 
@@ -98,6 +101,32 @@ contract VerifyHarness is VerifyBaseDeployment {
 
     function resolveExpectedOwner(string memory json, address deployer) external view returns (address) {
         return _resolveExpectedOwner(json, deployer);
+    }
+
+    function verifyV2Params(address trackRecord, string memory json) external {
+        _verifyV2Params(trackRecord, json);
+    }
+}
+
+/// @dev BP-03: stands in for a deployed TrackRecordV2 — same public `params()`
+///      7-tuple getter, settable so the verifier's drift branch can be exercised.
+contract MockTrackRecordParams {
+    BobbyTrackRecordV2.VerificationParams public params;
+
+    function set(BobbyTrackRecordV2.VerificationParams memory p) external {
+        params = p;
+    }
+}
+
+/// @dev BP-03: library calls through an external frame so expectRevert can
+///      catch the require() messages.
+contract V2GateCaller {
+    function narrow(V2ParamsGate.Raw memory r) external pure returns (BobbyTrackRecordV2.VerificationParams memory) {
+        return V2ParamsGate.narrow(r);
+    }
+
+    function assertMatches(BobbyTrackRecordV2.VerificationParams memory live, V2ParamsGate.Raw memory reviewed) external pure {
+        V2ParamsGate.assertMatches(live, reviewed);
     }
 }
 
@@ -298,5 +327,179 @@ contract DeploymentGatesTest is Test {
         // and the deployer, no longer owner, cannot move the treasury back
         vm.prank(address(deployerEoa)); vm.expectRevert("Not owner");
         bo.setTreasury(address(deployerEoa));
+    }
+
+    // ── BP-03 (2026-09-04 review): V2 params validated at full width BEFORE narrowing ──
+
+    function _v2Defaults() internal pure returns (V2ParamsGate.Raw memory) {
+        return V2ParamsGate.defaults();
+    }
+
+    function _v2Manifest(V2ParamsGate.Raw memory r) internal pure returns (string memory) {
+        return string.concat(
+            '{"v2Params":{"entryWindowSec":', vm.toString(r.entryWindowSec),
+            ',"exitWindowSec":', vm.toString(r.exitWindowSec),
+            ',"maxExitLagSec":', vm.toString(r.maxExitLagSec),
+            ',"challengeWindowSec":', vm.toString(r.challengeWindowSec),
+            ',"entryTolBps":', vm.toString(r.entryTolBps),
+            ',"exitTolBps":', vm.toString(r.exitTolBps),
+            ',"confMaxBps":', vm.toString(r.confMaxBps), "}}"
+        );
+    }
+
+    function test_v2Params_defaultsNarrowUnchanged() public {
+        V2GateCaller g = new V2GateCaller();
+        BobbyTrackRecordV2.VerificationParams memory p = g.narrow(_v2Defaults());
+        assertEq(uint256(p.entryWindowSec), 60);
+        assertEq(uint256(p.exitWindowSec), 120);
+        assertEq(uint256(p.maxExitLagSec), 600);
+        assertEq(uint256(p.challengeWindowSec), 7 days);
+        assertEq(uint256(p.entryTolBps), 100);
+        assertEq(uint256(p.exitTolBps), 100);
+        assertEq(uint256(p.confMaxBps), 50);
+    }
+
+    function test_v2Params_validOverridesNarrow() public {
+        V2GateCaller g = new V2GateCaller();
+        V2ParamsGate.Raw memory r = _v2Defaults();
+        r.entryWindowSec = 600; r.exitWindowSec = 1800; r.maxExitLagSec = 3600;
+        r.challengeWindowSec = 30 days; r.entryTolBps = 500; r.exitTolBps = 10; r.confMaxBps = 200;
+        BobbyTrackRecordV2.VerificationParams memory p = g.narrow(r);
+        assertEq(uint256(p.challengeWindowSec), 30 days);
+        assertEq(uint256(p.maxExitLagSec), 3600);
+    }
+
+    /// The exact hazard the review named: 65_596 narrows to uint16(60) — the OLD
+    /// _v2Params would have deployed a "valid" 60-second window from a typo'd
+    /// operator value. The gate rejects the full-width value first.
+    function test_v2Params_uint16OverflowIsRejectedBeforeNarrowing() public {
+        V2GateCaller g = new V2GateCaller();
+        V2ParamsGate.Raw memory r = _v2Defaults();
+        r.entryWindowSec = uint256(type(uint16).max) + 1 + 60;
+        assertEq(uint256(uint16(r.entryWindowSec)), 60, "reproduction: silent truncation to an in-range value");
+        vm.expectRevert(bytes("V2ParamsGate: entryWindowSec exceeds uint16"));
+        g.narrow(r);
+    }
+
+    /// 7 days + 2^24 narrows to uint24(7 days): the audited default, from a value
+    /// 27x larger than the 30-day cap.
+    function test_v2Params_uint24OverflowIsRejectedBeforeNarrowing() public {
+        V2GateCaller g = new V2GateCaller();
+        V2ParamsGate.Raw memory r = _v2Defaults();
+        r.challengeWindowSec = uint256(type(uint24).max) + 1 + 7 days;
+        assertEq(uint256(uint24(r.challengeWindowSec)), 7 days, "reproduction: silent truncation to the default");
+        vm.expectRevert(bytes("V2ParamsGate: challengeWindowSec exceeds uint24"));
+        g.narrow(r);
+    }
+
+    function test_v2Params_challengeWindowMustOutlastTimelock() public {
+        V2GateCaller g = new V2GateCaller();
+        V2ParamsGate.Raw memory r = _v2Defaults();
+        r.challengeWindowSec = 2 days; // == PYTH_ACTIVATION_DELAY (V-03 requires strictly greater)
+        vm.expectRevert(bytes("V2ParamsGate: challengeWindowSec out of (PYTH_ACTIVATION_DELAY,30d]"));
+        g.narrow(r);
+        r.challengeWindowSec = 2 days + 1;
+        g.narrow(r); // boundary passes
+    }
+
+    /// The gate's timelock constant must equal the contract's: deploy the REAL
+    /// TrackRecordV2 at the boundary and show the two agree on both sides of it.
+    function test_v2Params_gateBoundaryEqualsContractBoundary() public {
+        MockPyth pyth = new MockPyth();
+        address[] memory pyths = new address[](1);
+        pyths[0] = address(pyth);
+        string[] memory syms = new string[](0);
+        bytes32[] memory feeds = new bytes32[](0);
+        V2ParamsGate.Raw memory r = _v2Defaults();
+        r.challengeWindowSec = 2 days + 1;
+        BobbyTrackRecordV2 rec = new BobbyTrackRecordV2(address(this), V2ParamsGate.narrow(r), pyths, syms, feeds);
+        assertEq(V2ParamsGate.PYTH_ACTIVATION_DELAY, uint256(rec.PYTH_ACTIVATION_DELAY()), "gate timelock == contract timelock");
+        V2ParamsGate.assertMatches(V2ParamsGate.live(address(rec)), r); // the live getter round-trips
+        BobbyTrackRecordV2.VerificationParams memory atTimelock = V2ParamsGate.narrow(r);
+        atTimelock.challengeWindowSec = 2 days;
+        vm.expectRevert(BobbyTrackRecordV2.ParamsOutOfBounds.selector);
+        new BobbyTrackRecordV2(address(this), atTimelock, pyths, syms, feeds);
+    }
+
+    function test_v2Params_semanticBoundsMirrorContract() public {
+        V2GateCaller g = new V2GateCaller();
+        V2ParamsGate.Raw memory r;
+        r = _v2Defaults(); r.entryWindowSec = 9;
+        vm.expectRevert(bytes("V2ParamsGate: entryWindowSec out of [10,600]")); g.narrow(r);
+        r = _v2Defaults(); r.exitWindowSec = 1801;
+        vm.expectRevert(bytes("V2ParamsGate: exitWindowSec out of [10,1800]")); g.narrow(r);
+        r = _v2Defaults(); r.maxExitLagSec = 299;
+        vm.expectRevert(bytes("V2ParamsGate: maxExitLagSec out of [300,3600]")); g.narrow(r);
+        r = _v2Defaults(); r.entryTolBps = 501;
+        vm.expectRevert(bytes("V2ParamsGate: entryTolBps out of [10,500]")); g.narrow(r);
+        r = _v2Defaults(); r.exitTolBps = 9;
+        vm.expectRevert(bytes("V2ParamsGate: exitTolBps out of [10,500]")); g.narrow(r);
+        r = _v2Defaults(); r.confMaxBps = 201;
+        vm.expectRevert(bytes("V2ParamsGate: confMaxBps out of [10,200]")); g.narrow(r);
+    }
+
+    function test_v2Params_assertMatchesDetectsLiveDrift() public {
+        V2GateCaller g = new V2GateCaller();
+        V2ParamsGate.Raw memory reviewed = _v2Defaults();
+        BobbyTrackRecordV2.VerificationParams memory live = V2ParamsGate.narrow(reviewed);
+        g.assertMatches(live, reviewed); // equal → passes
+        live.exitTolBps = 101;
+        vm.expectRevert(bytes("V2ParamsGate: live exitTolBps drift"));
+        g.assertMatches(live, reviewed);
+    }
+
+    function test_v2Params_assertMatchesRejectsOutOfRangeReviewedEvenIfChainAgrees() public {
+        V2GateCaller g = new V2GateCaller();
+        V2ParamsGate.Raw memory reviewed = _v2Defaults();
+        reviewed.confMaxBps = 300;
+        BobbyTrackRecordV2.VerificationParams memory live;
+        live.entryWindowSec = 60; live.exitWindowSec = 120; live.maxExitLagSec = 600;
+        live.challengeWindowSec = 7 days; live.entryTolBps = 100; live.exitTolBps = 100; live.confMaxBps = 300;
+        vm.expectRevert(bytes("V2ParamsGate: confMaxBps out of [10,200]"));
+        g.assertMatches(live, reviewed);
+    }
+
+    // ── VerifyBaseDeployment._verifyV2Params: manifest branches ──
+
+    function test_verifyV2Params_mainnetRejectsManifestWithoutBlock() public {
+        vm.chainId(8453);
+        vm.expectRevert(bytes("VERIFY FAILED: mainnet manifest missing v2Params (redeploy with BP-03 DeployBase)"));
+        verify.verifyV2Params(address(0), "{}");
+    }
+
+    function test_verifyV2Params_testnetSkipsLegacyManifest() public {
+        vm.chainId(84532);
+        verify.verifyV2Params(address(0), "{}"); // no live read, no revert
+    }
+
+    function test_verifyV2Params_matchingLivePasses() public {
+        vm.chainId(8453);
+        MockTrackRecordParams tr = new MockTrackRecordParams();
+        V2ParamsGate.Raw memory reviewed = _v2Defaults();
+        tr.set(V2ParamsGate.narrow(reviewed));
+        verify.verifyV2Params(address(tr), _v2Manifest(reviewed));
+    }
+
+    function test_verifyV2Params_liveDriftFails() public {
+        vm.chainId(8453);
+        MockTrackRecordParams tr = new MockTrackRecordParams();
+        V2ParamsGate.Raw memory reviewed = _v2Defaults();
+        BobbyTrackRecordV2.VerificationParams memory live = V2ParamsGate.narrow(reviewed);
+        live.challengeWindowSec = 3 days; // someone called setParams after the review
+        tr.set(live);
+        vm.expectRevert(bytes("V2ParamsGate: live challengeWindowSec drift"));
+        verify.verifyV2Params(address(tr), _v2Manifest(reviewed));
+    }
+
+    function test_verifyV2Params_manifestOutOfRangeFails() public {
+        vm.chainId(8453);
+        MockTrackRecordParams tr = new MockTrackRecordParams();
+        V2ParamsGate.Raw memory reviewed = _v2Defaults();
+        reviewed.maxExitLagSec = 86400; // the pre-V-01 24h value, out of [300,3600]
+        BobbyTrackRecordV2.VerificationParams memory live = V2ParamsGate.narrow(_v2Defaults());
+        live.maxExitLagSec = 86400;
+        tr.set(live);
+        vm.expectRevert(bytes("V2ParamsGate: maxExitLagSec out of [300,3600]"));
+        verify.verifyV2Params(address(tr), _v2Manifest(reviewed));
     }
 }

@@ -8,7 +8,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
-import { DEFAULT_CHAIN, XLAYER_CHAIN_ID, txUrl, addressUrl } from './_lib/chains.js';
+import { DEFAULT_CHAIN, txUrl, addressUrl } from './_lib/chains.js';
 import { requireRecordAuth } from './_lib/record-auth.js';
 import { resolvePriceMode, PriceMode } from './_lib/trackrecord-v2.js';
 import { commitV2, resolveV2, readStatsV2 } from './_lib/trackrecord-v2-recorder.js';
@@ -19,9 +19,9 @@ import {
 } from './_lib/protocol-write-safety.js';
 
 // V2 (oracle-verified, Pyth) runs on Base/Base-Sepolia; v1 (attested-only)
-// stays on X Layer. With PROTOCOL_CHAIN unset this is false and NOTHING in the
-// V2 path executes — production keeps the exact v1 behavior until the flip.
-const IS_V2_CHAIN = DEFAULT_CHAIN.id !== XLAYER_CHAIN_ID;
+// stays on X Layer. BP-11: the reader follows the deployment's DECLARED
+// TrackRecord version, not a chain-id comparison.
+const IS_V2_CHAIN = DEFAULT_CHAIN.trackRecordVersion === 'v2';
 
 // Chain-aware since the Sepolia canary: RPC and addresses follow PROTOCOL_CHAIN.
 // Legacy env vars remain as fallback for the X Layer production deployment.

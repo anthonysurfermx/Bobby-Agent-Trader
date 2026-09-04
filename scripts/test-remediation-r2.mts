@@ -523,4 +523,101 @@ await check('BP-10 register: storage read failure → 502 and no write; owner ch
   } finally { globalThis.fetch = realFetch; }
 });
 
+
+// ---------- BP-13: the final action comes from the effective policy + proof state + validated size; LLM JSON is schema-checked ----------
+{
+  const { default: orchestrate, finalizeAction } = await import('../api/orchestrate.js');
+  const ALL5 = { data_integrity: 5, adversarial_quality: 5, decision_logic: 5, risk_management: 5, calibration_alignment: 5, novelty: 5 };
+  const ALL1 = { data_integrity: 1, adversarial_quality: 1, decision_logic: 1, risk_management: 1, calibration_alignment: 1, novelty: 1 };
+  const baseFetch = globalThis.fetch;
+  const prediction = { symbol: 'BTC', direction: 'long', entry: 100, target: 120, stop: 90, thesis: 'structured thesis with levels' };
+  /** Per-role model answers + an optional agent row; records session patches. */
+  const scenario = (opts: { judge?: Record<string, number>; cio?: unknown; agent?: Record<string, unknown> | null }) => {
+    const patches: Array<Record<string, unknown>> = [];
+    globalThis.fetch = (async (input: any, init?: any) => {
+      const url = typeof input === 'string' ? input : input.url; const method = (init?.method || 'GET').toUpperCase();
+      const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
+      if (url.includes('api.openai.com')) {
+        const system = String(JSON.parse(String(init?.body)).messages[0].content);
+        let out: unknown;
+        if (system.includes('Alpha Hunter')) out = { thesis: 'bullish structure', evidence: ['e1'], catalyst: 'c', conviction: 8 };
+        else if (system.includes('Red Team')) out = { counterpoints: ['x'], biases_detected: ['recency'], failure_modes: ['gap'] };
+        else if (system.includes('Bobby CIO')) out = opts.cio ?? { recommendation: 'execute', conviction: 8, rationale: 'ok', adjusted_entry: 100, adjusted_stop: 90 };
+        else out = { dimensions: opts.judge ?? ALL5, biases_detected: [], recommendation: 'execute', rationale: 'r', red_flags: [] };
+        return json({ choices: [{ message: { content: JSON.stringify(out) } }] });
+      }
+      if (url.includes('/rest/v1/hardness_agents') && method === 'GET') return json(opts.agent ? [opts.agent] : []);
+      if (url.includes('/rest/v1/hardness_agent_sessions') && method === 'PATCH') { patches.push(JSON.parse(String(init?.body))); return json([]); }
+      if (url.includes('/rest/v1/hardness_agent_sessions')) return json([{ session_id: 'x' }]);
+      return baseFetch(input, init);
+    }) as typeof fetch;
+    return patches;
+  };
+  const run = async (body: Record<string, unknown>) => { const { res, state } = recorder(); await orchestrate(req('POST', {}, body, INTERNAL), res); return state; };
+  const agentRow = (risk_policy_json: Record<string, unknown>) => ({ agent_id: 'a1', owner_address: '0x1111111111111111111111111111111111111111', name: 'A', risk_policy_json, status: 'active', version: 1 });
+  try {
+    await check('BP-13 no validated size → analysis only: a top score never becomes executable advice; session is `analysis`, not `proved`', async () => {
+      const patches = scenario({});
+      const s = await run({ agentId: 'anonymous', prediction });
+      assert.equal(s.status, 200, JSON.stringify(s.body)); const b = s.body as any;
+      assert.equal(b.hardnessScore, 100); assert.equal(b.modelAction, 'execute');
+      assert.equal(b.decision, 'publish_only'); assert.equal(b.sizing.executable, false); assert.equal(b.sizing.notionalUsd, null);
+      assert.match(b.finalActionReasons.join(' '), /no validated quantity/);
+      assert.equal(b.proofState, 'analysis'); assert.equal(patches.at(-1)?.status, 'analysis');
+    });
+    await check('BP-13 default policy (proof required, advisory): sized + top score → human approval, never execute', async () => {
+      scenario({});
+      const b = (await run({ agentId: 'anonymous', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.sizing.executable, true); assert.equal(b.sizing.notionalUsd, 100);
+      assert.equal(b.decision, 'require_human_approval'); assert.match(b.finalActionReasons.join(' '), /requires on-chain proof; proof state is analysis/);
+    });
+    await check('BP-13 the reproduction: the policy sees the NOTIONAL, not the entry price (BTC at 83000, 0.001 units = $83 under a $1000 cap → execute in auto mode)', async () => {
+      scenario({ agent: agentRow({ mode: 'auto', requireOnchainProof: false, maxNotionalUsd: 1000 }) });
+      const b = (await run({ agentId: 'a1', prediction: { ...prediction, entry: 83000, target: 95000, stop: 78000, quantity: 0.001 } })).body as any;
+      assert.equal(b.policyResult, 'allowed', b.policyReason); assert.equal(b.decision, 'execute'); assert.equal(b.sizing.notionalUsd, 83);
+    });
+    await check('BP-13 reduction: notional above maxNotionalUsd → reduce_size with the reduced notional', async () => {
+      scenario({ agent: agentRow({ mode: 'auto', requireOnchainProof: false, maxNotionalUsd: 50 }) });
+      const b = (await run({ agentId: 'a1', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.policyResult, 'allowed_with_reduction'); assert.equal(b.decision, 'reduce_size'); assert.equal(b.sizing.reducedNotionalUsd, 50);
+    });
+    await check('BP-13 paper mode caps at paper_only; a blocked symbol is reject regardless of score', async () => {
+      scenario({ agent: agentRow({ mode: 'paper', requireOnchainProof: false }) });
+      let b = (await run({ agentId: 'a1', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.decision, 'paper_only');
+      scenario({ agent: agentRow({ mode: 'auto', requireOnchainProof: false, allowedSymbols: ['ETH'] }) });
+      b = (await run({ agentId: 'a1', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.policyResult, 'blocked'); assert.equal(b.decision, 'reject');
+    });
+    await check('BP-13 model output outside the schema aborts the session (502) instead of steering the decision', async () => {
+      const patches = scenario({ cio: { recommendation: 'yolo', conviction: 42 } });
+      const s = await run({ agentId: 'anonymous', prediction: { ...prediction, quantity: 1 } });
+      assert.equal(s.status, 502, JSON.stringify(s.body)); assert.match(String((s.body as any).error), /CIO output rejected/);
+      assert.equal(patches.at(-1)?.status, 'failed');
+      const patches2 = scenario({ judge: { ...ALL5, novelty: 9 } });
+      const s2 = await run({ agentId: 'anonymous', prediction: { ...prediction, quantity: 1 } });
+      assert.equal(s2.status, 502); assert.match(String((s2.body as any).error), /Judge output rejected/); assert.equal(patches2.at(-1)?.status, 'failed');
+    });
+    await check('BP-13 sizing validation: inconsistent quantity/notional → 400; low score with a valid policy → reject', async () => {
+      scenario({});
+      const s = await run({ agentId: 'anonymous', prediction: { ...prediction, quantity: 1, notionalUsd: 500 } });
+      assert.equal(s.status, 400); assert.match(String((s.body as any).error), /does not equal quantity x entry/);
+      scenario({ judge: ALL1, agent: agentRow({ mode: 'auto', requireOnchainProof: false }) });
+      const b = (await run({ agentId: 'a1', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.hardnessScore, 20); assert.equal(b.decision, 'reject');
+    });
+    await check('BP-13 finalizeAction precedence table', async () => {
+      const policy = (result: string, reason: string, p: Record<string, unknown> = {}) => ({ result, reason, policy: { minHardnessScore: 60, maxNotionalUsd: 1000, allowedSymbols: [], requireJudge: true, requireOnchainProof: false, mode: 'auto', ...p } }) as any;
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed', 'policy_pass'), proofState: 'analysis', executable: true }).action, 'execute');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed', 'policy_pass', { requireOnchainProof: true }), proofState: 'proof_submitted', executable: true }).action, 'require_human_approval', 'a submitted-but-unconfirmed hash is not a proof');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed', 'policy_pass', { requireOnchainProof: true }), proofState: 'proof_confirmed', executable: true }).action, 'execute');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed', 'policy_pass', { requireOnchainProof: true }), proofState: 'proof_failed', executable: true }).action, 'require_human_approval');
+      assert.equal(finalizeAction({ modelAction: 'reduce_size', policy: policy('paper_only', 'paper_mode', { mode: 'paper' }), proofState: 'proof_confirmed', executable: true }).action, 'paper_only');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed_with_reduction', 'max_notional_exceeded'), proofState: 'proof_confirmed', executable: true }).action, 'reduce_size');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('blocked', 'judge_required'), proofState: 'proof_confirmed', executable: true }).action, 'reject');
+      assert.equal(finalizeAction({ modelAction: 'publish_only', policy: policy('allowed', 'policy_pass'), proofState: 'analysis', executable: false }).action, 'publish_only');
+    });
+  } finally { globalThis.fetch = baseFetch; }
+}
+
 console.log(`remediation-r2: ${passed}/${passed} checks passed`);

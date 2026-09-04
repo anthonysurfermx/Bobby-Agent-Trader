@@ -12,7 +12,11 @@ import { buildCycleRow, cycleProvenance } from '../api/_lib/cycle-provenance.js'
 // Audit mode: validate the remediated schema without exercising the old exposure.
 const postfixOnly = process.argv.includes('--postfix-only');
 const url = process.env.DATABASE_URL;
-if (!url) { console.log('test-rls-lockdown-pg: skipped (set DATABASE_URL to a scratch Postgres)'); process.exit(0); }
+if (!url) {
+  // BP-06: skipping is a local convenience; in CI the database is a declared service and its absence must fail.
+  if (process.env.CI === 'true') { console.error('test-rls-lockdown-pg: DATABASE_URL is required when CI=true'); process.exit(1); }
+  console.log('test-rls-lockdown-pg: skipped (set DATABASE_URL to a scratch Postgres)'); process.exit(0);
+}
 {
   const host = new URL(url).hostname;
   if (!['localhost', '127.0.0.1', '::1', 'host.docker.internal'].includes(host) && process.env.SWAP_LEDGER_PG_ALLOW_REMOTE !== '1') {
