@@ -4,7 +4,7 @@
 // the verified mapping). Update the date whenever the substance changes.
 import { Helmet } from 'react-helmet-async';
 
-const EFFECTIVE_DATE = 'August 24, 2026';
+const EFFECTIVE_DATE = 'September 4, 2026';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -20,7 +20,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-[#050505] text-white">
       <Helmet>
         <title>Privacy Policy | Bobby</title>
-        <meta name="description" content="Privacy policy for the Bobby iOS app and bobbyprotocol.xyz — no accounts, no tracking, personalization stays on your device." />
+        <meta name="description" content="Privacy policy for the Bobby iOS app and bobbyprotocol.xyz — optional accounts and wallets, synced progress, non-custodial swaps, and no cross-app tracking." />
       </Helmet>
 
       <div className="mx-auto max-w-3xl px-5 py-16 lg:py-24">
@@ -30,56 +30,84 @@ export default function PrivacyPage() {
 
         <Section title="The short version">
           <p>
-            Bobby has no accounts, no ads, no tracking, and no analytics SDKs inside the iOS app.
-            Your companion, its name, and your Discipline XP live on your device. When you ask
-            about an asset, your question is processed to generate the answer and then discarded —
-            we do not store it. We do not sell or share personal data with anyone.
+            Bobby has no ads and does not track you across apps or websites. You may use an
+            optional Sign in with Apple account to sync progress and an optional external wallet
+            for non-custodial Base swaps. Bobby never receives your wallet keys, takes custody of
+            funds, or signs a transaction for you. We do not sell personal data.
           </p>
         </Section>
 
-        <Section title="What stays on your device (iOS app)">
+        <Section title="What stays on your device">
           <p>
-            Everything that personalizes Bobby is stored locally on your iPhone and never uploaded:
+            Your creative profile stays locally on your iPhone:
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>Your chosen companion and its evolution level</li>
             <li>The agent name, voice, vibe, and aura you configured</li>
-            <li>Discipline XP, streaks, and daily progress</li>
           </ul>
           <p>
-            Deleting the app deletes all of it. There is no account to close because none exists.
+            XP, streaks, gear, and other progress also start on your device. If you choose Sign in
+            with Apple, that progress is sent to Bobby so it can survive a reinstall and follow you
+            between the app and website.
           </p>
         </Section>
 
-        <Section title="What our servers process (and never keep)">
+        <Section title="Accounts and synced progress">
           <p>
-            To answer you, the app sends the text of your question (for example, “bitcoin”), the
-            text to be spoken aloud, and your device language (English or Spanish) to our backend
-            at bobbyprotocol.xyz. This data is processed to produce the analysis or the audio and
-            is not stored. Server logs record errors only — never the content of your questions.
+            Sign in with Apple is optional. When you use it, Apple and our authentication provider
+            give Bobby an account identifier and session credentials. Bobby stores an internal user
+            ID together with the progress you choose to sync, such as Discipline XP, streaks,
+            awards, gear, and Trader Land state. We do not require your real name or email address.
+          </p>
+        </Section>
+
+        <Section title="Wallets and Base swaps">
+          <p>
+            Connecting a wallet is optional and separate from your Apple account. Reown AppKit
+            helps your chosen external wallet connect to Bobby. Bobby processes your public wallet
+            address, a signed proof that you control it, and the quote and transaction data needed
+            for the swap you request. The wallet shows the final transaction and only you can sign it.
           </p>
           <p>
-            For abuse prevention, our rate limiter keeps a short-lived counter keyed by a salted
-            cryptographic hash of your IP address. The raw address is never written to storage,
-            and the hash cannot be reversed into it.
+            For security, history, and reconciliation, we retain prepared and confirmed swap data:
+            public wallet address, token pair, amounts, route, calldata hash, transaction hash, and
+            confirmation details. Blockchain transactions are public and cannot be erased by Bobby.
+            Where a receipt is linked to an Apple account, account deletion removes that account
+            link; the public wallet and transaction record may remain for security, audit, and legal
+            purposes.
+          </p>
+          <p>
+            Country is inferred at the network edge to decide whether a restricted feature is
+            available. Bobby does not store that country in your swap receipt.
+          </p>
+        </Section>
+
+        <Section title="Questions, voice, and operational data">
+          <p>
+            To answer or speak, the app sends the text you provide, recent conversation context,
+            requested voice, and language to our backend and the relevant AI or speech provider.
+            Bobby processes this content for the request and does not add it to your account or
+            retain a conversation history on its servers. Your device keeps the visible transcript.
+          </p>
+          <p>
+            Infrastructure providers may create short-lived request and error logs. For abuse and
+            cost prevention, Bobby stores short-lived counters keyed by salted cryptographic hashes
+            of network or device identifiers instead of storing the raw values in those counters.
           </p>
         </Section>
 
         <Section title="Service providers">
           <p>These processors act on our behalf, only to deliver the product:</p>
           <ul className="list-disc space-y-1 pl-5">
-            <li>
-              <span className="text-white">OpenAI</span> — generates the market analysis and the
-              spoken voice from the text we relay. Data sent through the API is not used to train
-              their models.
-            </li>
-            <li>
-              <span className="text-white">Microsoft Edge Neural voices</span> — free fallback
-              text-to-speech when the primary voice is unavailable.
-            </li>
+            <li><span className="text-white">Apple</span> — Sign in with Apple and optional speech recognition.</li>
+            <li><span className="text-white">Supabase</span> — authentication, synced progress, and product records.</li>
+            <li><span className="text-white">Reown</span> — connection to your chosen external wallet; analytics are disabled in the iOS app.</li>
+            <li><span className="text-white">Base and Uniswap</span> — public blockchain and swap-router infrastructure.</li>
+            <li><span className="text-white">OpenAI, ElevenLabs, and Microsoft</span> — AI analysis or speech processing, depending on the requested feature and availability.</li>
             <li>
               <span className="text-white">Public market data sources</span> — we
-              request public prices and charts; none of your data is sent to them.
+              request public prices and charts using an asset symbol and timeframe, without your
+              account or wallet identifiers.
             </li>
             <li>
               <span className="text-white">Vercel</span> — hosts our backend and website, with
@@ -109,18 +137,34 @@ export default function PrivacyPage() {
 
         <Section title="What Bobby is not">
           <p>
-            Bobby is an educational market-analysis companion. It does not execute trades, hold
-            funds or keys, connect to your exchange accounts, or give personalized investment
-            advice. Because there are no financial accounts, we never ask for — and cannot
-            receive — financial credentials.
+            Bobby is market-analysis software, not a broker, exchange, custodian, or investment
+            adviser. It can prepare a non-custodial Base swap transaction, but cannot execute it
+            without your review and signature in an external wallet. Bobby does not receive seed
+            phrases, private keys, exchange passwords, or custody of your assets.
+          </p>
+        </Section>
+
+        <Section title="Retention and your choices">
+          <p>
+            Local data remains until you remove it or delete the app. Account and synced progress
+            remain until you delete the account. Confirmed public-chain data and limited records
+            needed for fraud prevention, security, audit, legal compliance, or dispute resolution
+            may remain after account deletion. Service providers keep operational data under their
+            own retention terms.
+          </p>
+          <p>
+            To delete an Apple account and its synced Bobby progress, open Bobby on iOS, choose
+            Account, then “Delete account and synced progress.” You can also request access or
+            deletion help through the contact below. Signing out alone does not delete the account.
           </p>
         </Section>
 
         <Section title="Children">
           <p>
-            Bobby is not directed at children under 13, and we do not knowingly process personal
-            information from them. The app has no accounts and collects no personal data from any
-            user.
+            Bobby and its tokenized-asset features are not directed at children under 18. We do
+            not knowingly allow children to create accounts or use restricted financial features.
+            If you believe a child provided personal data, contact us so we can investigate and
+            delete it where applicable.
           </p>
         </Section>
 

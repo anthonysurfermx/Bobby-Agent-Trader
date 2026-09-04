@@ -26,6 +26,9 @@ const thread = { id: THREAD_ID, scope: 'public', symbol: 'NVDAc', direction: 'lo
 let threadRows: () => unknown[] = () => [thread];
 const posts = ['alpha', 'redteam', 'cio'].map((agent, i) => ({ id: `p${i}`, thread_id: THREAD_ID, agent, agent_type: agent, agent_name: agent, role: agent, content: `${agent} says something`, body: `${agent} says something`, created_at: new Date().toISOString() }));
 const openai = { choices: [{ message: { content: JSON.stringify({ dimensions: { data_integrity: 3, adversarial_quality: 3, decision_logic: 3, risk_management: 3, calibration_alignment: 3, novelty: 3 }, biases_detected: [], conviction_assessment: 'reasonable', recommendation: 'pass', rationale: 'fine', red_flags: [] }) } }] };
+const AUTH_USER_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+const AUTH_IDENTITY_ID = '99999999-8888-4777-8666-555555555555';
+let identityDeleteStatus = 200;
 
 globalThis.fetch = (async (input: any, init?: any) => {
   const url = typeof input === 'string' ? input : input.url;
@@ -35,6 +38,12 @@ globalThis.fetch = (async (input: any, init?: any) => {
   if (url.includes('api.openai.com')) return json(openai);
   if (url.includes('okx.com/api/v5/market/ticker')) return json({ code: '0', data: [{ last: '125' }] }); // long from 100 → target 120 hit
   if (url.includes('/api/protocol-record')) return json({ ok: true });
+  if (url.endsWith('/auth/v1/user') && method === 'GET') return json({ id: AUTH_USER_ID, email: null, app_metadata: { provider: 'apple' } });
+  if (url.includes('/auth/v1/admin/users/') && method === 'DELETE') return json({});
+  if (url.includes('/rest/v1/bobby_identities')) {
+    if (method === 'POST') return json([{ id: AUTH_IDENTITY_ID, auth_user_id: AUTH_USER_ID, wallet_address: null }]);
+    if (method === 'DELETE') return json([], identityDeleteStatus);
+  }
   if (url.includes('/rest/v1/forum_threads')) {
     if (method !== 'GET') return json({});
     // Apply the symbol filter like PostgREST would: eq is case-sensitive, ilike (no wildcard) is not.
@@ -76,12 +85,49 @@ const urlsSince = (n: number) => calls.slice(n).map((c) => c.url);
 let passed = 0;
 const check = (name: string, fn: () => void | Promise<void>) => Promise.resolve().then(fn).then(() => { passed += 1; console.log(`ok  ${name}`); });
 
-const [identityLink, harnessMemory, harnessEvents, ghostWallet, checkpoint, bobbySignals, judgeMode, quoteGuard, mcpHttp, forumResolve] = await Promise.all([
+const [identityLink, harnessMemory, harnessEvents, ghostWallet, checkpoint, bobbySignals, judgeMode, quoteGuard, mcpHttp, forumResolve, account] = await Promise.all([
   import('../api/identity-link.js'), import('../api/harness-memory.js'), import('../api/harness-events.js'),
   import('../api/ghost-wallet.js'), import('../api/checkpoint.js'), import('../api/bobby-signals.js'), import('../api/judge-mode.js'),
-  import('../src/lib/base-swap/quote-guard.js'), import('../api/mcp-http.js'), import('../api/forum-resolve.js'),
+  import('../src/lib/base-swap/quote-guard.js'), import('../api/mcp-http.js'), import('../api/forum-resolve.js'), import('../api/account.js'),
 ]);
 const INTERNAL = { 'x-internal-secret': 'test-internal-secret' };
+
+// ---------- App Store account deletion: authenticated, origin-bound, ordered ----------
+await check('account delete rejects an untrusted origin before any fetch', async () => {
+  const n = since(); const { res, state } = recorder();
+  await account.default(req('DELETE', {}, {}, { origin: 'https://evil.example' }), res);
+  assert.equal(state.status, 403, JSON.stringify(state.body));
+  assert.equal(calls.slice(n).length, 0);
+});
+await check('account delete requires a Supabase bearer before destructive calls', async () => {
+  const n = since(); const { res, state } = recorder();
+  await account.default(req('DELETE'), res);
+  assert.equal(state.status, 401, JSON.stringify(state.body));
+  assert.equal(calls.slice(n).filter((c) => c.method === 'DELETE').length, 0);
+});
+await check('account delete removes identity before the exact authenticated Auth user', async () => {
+  const n = since(); const { res, state } = recorder();
+  await account.default(req('DELETE', {}, {}, { authorization: 'Bearer valid-supabase-token' }), res);
+  assert.equal(state.status, 200, JSON.stringify(state.body));
+  const destructive = calls.slice(n).filter((c) => c.method === 'DELETE');
+  assert.equal(destructive.length, 2, JSON.stringify(destructive));
+  assert.ok(destructive[0].url.includes(`/rest/v1/bobby_identities?id=eq.${AUTH_IDENTITY_ID}`), destructive[0].url);
+  assert.ok(destructive[0].url.includes(`auth_user_id=eq.${AUTH_USER_ID}`), destructive[0].url);
+  assert.ok(destructive[1].url.endsWith(`/auth/v1/admin/users/${AUTH_USER_ID}`), destructive[1].url);
+});
+await check('account delete never removes Auth while Bobby data deletion failed', async () => {
+  identityDeleteStatus = 500;
+  try {
+    const n = since(); const { res, state } = recorder();
+    await account.default(req('DELETE', {}, {}, { authorization: 'Bearer valid-supabase-token' }), res);
+    assert.equal(state.status, 503, JSON.stringify(state.body));
+    const destructive = calls.slice(n).filter((c) => c.method === 'DELETE');
+    assert.equal(destructive.length, 1, JSON.stringify(destructive));
+    assert.ok(destructive[0].url.includes('/rest/v1/bobby_identities'), destructive[0].url);
+  } finally {
+    identityDeleteStatus = 200;
+  }
+});
 
 // ---------- P0-1 / C-05: the pairing endpoint no longer issues or accepts codes ----------
 await check('P0-1 identity-link issue → 410, no api_cache write', async () => {

@@ -2,8 +2,8 @@
 // Who is calling — resolved to a bobby_identities row.
 //
 // Two credentials are accepted, so the web keeps its SIWE wallet session and
-// the iOS app (which holds no keys, by App Store promise) can use Supabase
-// Auth (Sign in with Apple):
+// the iOS app can use Supabase Auth (Sign in with Apple). That account remains
+// separate from the app's optional external, non-custodial wallet connection:
 //   · `x-bobby-session` / `Authorization: Bearer bws.…`  → wallet session
 //   · `Authorization: Bearer <supabase access token>`    → verified against
 //     the auth project's /auth/v1/user (never decoded locally, no secret)
