@@ -440,6 +440,14 @@ const router = createBrowserRouter(
           ),
         },
         {
+          path: 'agentic-world/bobby/trader-land',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <TraderLandGatePage />
+            </Suspense>
+          ),
+        },
+        {
           path: 'internal/trader-land-gate-a',
           element: (
             <Suspense fallback={<PageLoader />}>
