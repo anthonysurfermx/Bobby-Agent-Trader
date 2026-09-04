@@ -205,10 +205,30 @@ contract VerifyBaseDeployment is Script {
         _ok(bo.resolver() == r.resolver, "bounties.resolver");
         _ok(bo.minBounty() == vm.parseJsonUint(json, ".fees.minBountyWei"), "bounties.minBounty");
         _ok(bo.ABSOLUTE_MIN_BOUNTY() == vm.parseJsonUint(json, ".fees.absoluteMinBountyWei"), "bounties.floor");
+        _verifyTreasuryAndBond(bo.treasury(), bo.challengeBond(), r, json, "bounties");
+    }
+
+    /// @dev Codex r5 [P1]: forfeited bonds must never flow to the deployer EOA. The
+    ///      manifest carries the declared treasury and bond; both are re-proven live,
+    ///      and on mainnet the treasury must equal the declared owner (the Safe) —
+    ///      a burn address is a deliberate, documented exception via BOUNTY_TREASURY_ADDRESS
+    ///      that still must not be the deployer.
+    function _verifyTreasuryAndBond(address liveTreasury, uint96 liveBond, Roles memory r, string memory json, string memory label) internal {
+        require(vm.keyExistsJson(json, ".treasury"), string.concat("VERIFY FAILED: manifest missing treasury (redeploy with r5 DeployBase) - ", label));
+        address declared = vm.parseJsonAddress(json, ".treasury");
+        _ok(liveTreasury == declared, string.concat(label, ".treasury == manifest treasury"));
+        _ok(liveTreasury != r.deployer, string.concat(label, ".treasury is not the deployer EOA"));
+        if (block.chainid == 8453) {
+            address expectedOwner = _resolveExpectedOwner(json, r.deployer);
+            _ok(liveTreasury == expectedOwner || vm.envOr("BOUNTY_TREASURY_ADDRESS", address(0)) == liveTreasury,
+                string.concat(label, ".treasury is the Safe (or the explicitly configured BOUNTY_TREASURY_ADDRESS)"));
+        }
+        _ok(liveBond == vm.parseJsonUint(json, ".fees.challengeBondWei"), string.concat(label, ".challengeBond == manifest challengeBondWei"));
     }
 
     function _verifyHardness(Addrs memory a, Roles memory r, string memory json) internal {
         HardnessRegistry hr = HardnessRegistry(payable(a.hardness));
+        _verifyTreasuryAndBond(hr.treasury(), hr.bountyChallengeBond(), r, json, "hardness");
         address[] memory resolverSet = vm.parseJsonAddressArray(json, ".quorum.resolvers");
         _ok(hr.resolverThreshold() == vm.parseJsonUint(json, ".quorum.threshold"), "hardness.threshold");
         _ok(hr.resolverCount() == resolverSet.length, "hardness.resolverCount");

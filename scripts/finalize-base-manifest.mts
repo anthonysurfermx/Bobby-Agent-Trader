@@ -86,6 +86,14 @@ if (!/^0x[0-9a-fA-F]{40}$/.test(scorer)) throw new Error('manifest hardnessScore
 
 const ownershipInterface = new Interface(['function transferOwnership(address)']);
 const scorerInterface = new Interface(['function setHardnessScorer(address)']);
+// Codex r5 [P1]: the broadcast must contain the treasury + bond configuration on both contracts.
+const treasury = String(manifest.treasury || '');
+const challengeBond = String(manifest.fees?.challengeBondWei ?? '');
+if (!/^0x[0-9a-fA-F]{40}$/.test(treasury)) throw new Error('manifest treasury is missing or invalid (redeploy with the r5 DeployBase)');
+if (treasury.toLowerCase() === deployer.toLowerCase()) throw new Error('manifest treasury is the deployer EOA');
+if (!/^[1-9][0-9]*$/.test(challengeBond)) throw new Error('manifest fees.challengeBondWei is missing or invalid');
+const treasuryInterface = new Interface(['function setTreasury(address)']);
+const bondInterface = new Interface(['function setChallengeBond(uint96)', 'function setBountyChallengeBond(uint96)']);
 const expectedCalls = new Map<string, { target: string; functionName: string; argument: string; input: string }>();
 function expectCall(target: string, functionName: string, argument: string, input: string) {
   expectedCalls.set(`${target.toLowerCase()}:${functionName}`, { target, functionName, argument, input });
@@ -96,6 +104,11 @@ expectCall(
   scorer,
   scorerInterface.encodeFunctionData('setHardnessScorer', [scorer]),
 );
+for (const target of [String(manifest.addresses?.adversarialBounties || ''), String(manifest.addresses?.hardnessRegistry || '')]) {
+  expectCall(target, 'setTreasury(address)', treasury, treasuryInterface.encodeFunctionData('setTreasury', [treasury]));
+}
+expectCall(String(manifest.addresses?.adversarialBounties || ''), 'setChallengeBond(uint96)', challengeBond, bondInterface.encodeFunctionData('setChallengeBond', [challengeBond]));
+expectCall(String(manifest.addresses?.hardnessRegistry || ''), 'setBountyChallengeBond(uint96)', challengeBond, bondInterface.encodeFunctionData('setBountyChallengeBond', [challengeBond]));
 if (expectedOwner.toLowerCase() !== deployer.toLowerCase()) {
   for (const target of Object.values(manifest.addresses || {}) as string[]) {
     expectCall(

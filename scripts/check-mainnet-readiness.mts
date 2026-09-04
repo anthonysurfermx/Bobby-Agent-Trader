@@ -252,6 +252,7 @@ const feeEnvByManifestKey: Record<string, string> = {
   absoluteMinBountyWei: 'ABSOLUTE_MIN_BOUNTY_WEI',
   registrationStakeWei: 'REGISTRATION_STAKE_WEI',
   escrowMaxSizeUsd18dp: 'ESCROW_MAX_SIZE_USD',
+  challengeBondWei: 'CHALLENGE_BOND_WEI', // Codex r5: one parameter drives both bonds
 };
 
 if (manifest) {
@@ -276,6 +277,15 @@ if (manifest) {
   if (String(manifest.deployer || '').toLowerCase() !== env('DEPLOYER_ADDRESS').toLowerCase()) {
     fail('manifest deployer does not match DEPLOYER_ADDRESS');
   } else pass('manifest deployer matches the reviewed deployer');
+
+  // Codex r5 [P1]: forfeited bonds go to the treasury — it must be the Safe (or an
+  // explicitly configured BOUNTY_TREASURY_ADDRESS) and never the deployer EOA.
+  const expectedTreasury = (env('BOUNTY_TREASURY_ADDRESS') || env('OWNER_SAFE_ADDRESS')).toLowerCase();
+  const manifestTreasury = String(manifest.treasury || '').toLowerCase();
+  if (!validAddress(manifestTreasury)) fail('manifest treasury is missing — redeploy with the r5 DeployBase (treasury + challengeBond configured before handoff)');
+  else if (manifestTreasury === env('DEPLOYER_ADDRESS').toLowerCase()) fail('manifest treasury is the deployer EOA');
+  else if (manifestTreasury !== expectedTreasury) fail('manifest treasury does not match BOUNTY_TREASURY_ADDRESS / OWNER_SAFE_ADDRESS');
+  else pass('manifest treasury is the Safe (or the configured BOUNTY_TREASURY_ADDRESS) and not the deployer');
 
   const manifestAddresses = Object.entries(addressEnvByManifestKey).map(([key, envName]) => {
     const address = String(manifest?.addresses?.[key] || '');

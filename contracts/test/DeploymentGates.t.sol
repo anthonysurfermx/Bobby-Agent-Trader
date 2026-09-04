@@ -4,6 +4,9 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {SafeOwnerGate} from "../script/SafeOwnerGate.sol";
 import {VerifyBaseDeployment} from "../script/VerifyBaseDeployment.s.sol";
+import {BountyEconomicsGate} from "../script/BountyEconomicsGate.sol";
+import {BobbyAdversarialBounties} from "../src/BobbyAdversarialBounties.sol";
+import {HardnessRegistry} from "../src/HardnessRegistry.sol";
 
 /// @dev Stands in for the audited Safe singleton — the gate only requires it
 /// to have code and to match the pinned address.
@@ -95,6 +98,26 @@ contract VerifyHarness is VerifyBaseDeployment {
 
     function resolveExpectedOwner(string memory json, address deployer) external view returns (address) {
         return _resolveExpectedOwner(json, deployer);
+    }
+}
+
+/// @dev Codex r5 [P1]: plays the deployer EOA — creates both contracts, runs (or
+///      skips) the SAME gate DeployBase runs, and hands ownership to the Safe.
+contract DeployerEoa {
+    struct Params { address resolver; uint96 absoluteMinBounty; uint96 minBounty; uint96 registrationStake; uint96 challengeBond; address treasury; address expectedOwner; }
+
+    function deployPair(Params memory p, bool configure) external returns (address bountiesAddr, address registryAddr) {
+        address[] memory resolvers = new address[](1);
+        resolvers[0] = p.resolver;
+        bountiesAddr = address(new BobbyAdversarialBounties(p.resolver, p.absoluteMinBounty, p.minBounty));
+        registryAddr = address(new HardnessRegistry(resolvers, 1, p.absoluteMinBounty, p.registrationStake, p.minBounty));
+        if (configure) BountyEconomicsGate.configure(bountiesAddr, registryAddr, p.treasury, p.challengeBond);
+        BobbyAdversarialBounties(payable(bountiesAddr)).transferOwnership(p.expectedOwner);
+        HardnessRegistry(payable(registryAddr)).transferOwnership(p.expectedOwner);
+    }
+
+    function assertConfigured(address bountiesAddr, address registryAddr, address treasury, uint96 bond) external view {
+        BountyEconomicsGate.assertConfigured(bountiesAddr, registryAddr, treasury, bond, address(this));
     }
 }
 
@@ -233,5 +256,47 @@ contract DeploymentGatesTest is Test {
     function test_resolveExpectedOwner_testnetFallsBackToDeployer() public {
         vm.chainId(84532);
         assertEq(verify.resolveExpectedOwner("{}", DEPLOYER), DEPLOYER);
+    }
+    // ── Codex r5 [P1]: the treasury must follow the Safe, not stay with the deployer ──
+
+    function _economicsConfig(address safeAddr) internal pure returns (DeployerEoa.Params memory c) {
+        c.resolver = address(0xBEEF);
+        c.absoluteMinBounty = 0.0000025 ether;
+        c.minBounty = 0.000025 ether;
+        c.registrationStake = 0.00025 ether;
+        c.challengeBond = 0.000025 ether; // = MIN_BOUNTY_WEI, the recommended value
+        c.treasury = safeAddr;
+        c.expectedOwner = safeAddr;
+    }
+
+    /// The exact state Codex reproduced on 8bb2d2d: owner() is the Safe, treasury() is the deployer EOA.
+    function test_treasury_withoutConfigureStaysWithDeployer() public {
+        DeployerEoa deployerEoa = new DeployerEoa();
+        (address b, address h) = deployerEoa.deployPair(_economicsConfig(address(safe)), false);
+        vm.prank(address(safe)); BobbyAdversarialBounties(payable(b)).acceptOwnership();
+        vm.prank(address(safe)); HardnessRegistry(payable(h)).acceptOwnership();
+        assertEq(BobbyAdversarialBounties(payable(b)).owner(), address(safe));
+        assertEq(BobbyAdversarialBounties(payable(b)).treasury(), address(deployerEoa), "reproduction: treasury stuck with the deployer");
+        assertEq(HardnessRegistry(payable(h)).treasury(), address(deployerEoa));
+    }
+
+    /// With the r5 step the treasury and both bonds land BEFORE the handoff, and survive it.
+    function test_treasury_configuredBeforeHandoffFollowsSafe() public {
+        DeployerEoa deployerEoa = new DeployerEoa();
+        DeployerEoa.Params memory c = _economicsConfig(address(safe));
+        (address b, address h) = deployerEoa.deployPair(c, true);
+        vm.prank(address(safe)); BobbyAdversarialBounties(payable(b)).acceptOwnership();
+        vm.prank(address(safe)); HardnessRegistry(payable(h)).acceptOwnership();
+        BobbyAdversarialBounties bo = BobbyAdversarialBounties(payable(b));
+        HardnessRegistry hr = HardnessRegistry(payable(h));
+        assertEq(bo.owner(), address(safe)); assertEq(hr.owner(), address(safe));
+        assertEq(bo.treasury(), address(safe), "bounties treasury is the Safe");
+        assertEq(hr.treasury(), address(safe), "registry treasury is the Safe");
+        assertTrue(bo.treasury() != address(deployerEoa) && hr.treasury() != address(deployerEoa));
+        assertEq(bo.challengeBond(), c.challengeBond); assertEq(hr.bountyChallengeBond(), c.challengeBond);
+        deployerEoa.assertConfigured(b, h, address(safe), c.challengeBond); // the gate's own live proof
+        // and the deployer, no longer owner, cannot move the treasury back
+        vm.prank(address(deployerEoa)); vm.expectRevert("Not owner");
+        bo.setTreasury(address(deployerEoa));
     }
 }

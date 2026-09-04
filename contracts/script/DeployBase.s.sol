@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Script, console2} from "forge-std/Script.sol";
 import {SafeOwnerGate} from "./SafeOwnerGate.sol";
 import {PythOracleGate} from "./PythOracleGate.sol";
+import {BountyEconomicsGate} from "./BountyEconomicsGate.sol";
 import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
@@ -64,6 +65,12 @@ contract DeployBase is Script {
         address expectedOwner;
         bytes32 expectedOwnerCodehash;
         address expectedOwnerSingleton;
+        /// @dev Codex r5 [P1]: both bounty contracts initialise `treasury = msg.sender`
+        ///      (the deployer EOA). Ownership was handed to the Safe but the treasury
+        ///      was not — forfeited bonds would have flowed to a hot key. Configured
+        ///      explicitly, BEFORE the handoff, from a single parameter each.
+        address treasury;
+        uint96 challengeBond;
     }
 
     function _config() internal view returns (Config memory c) {
@@ -113,6 +120,12 @@ contract DeployBase is Script {
         // r7 integration: judge-mode needs the scorer role; defaults to bobby so
         // hardness certification is never silently dead after a deploy.
         c.hardnessScorer = vm.envOr("HARDNESS_SCORER_ADDRESS", c.bobby);
+        // Codex r5: one parameter drives BOTH bonds; defaults to the minimum bounty.
+        uint256 rawBond = vm.envOr("CHALLENGE_BOND_WEI", rawMinBounty);
+        require(rawBond <= type(uint96).max, "CHALLENGE_BOND_WEI exceeds uint96");
+        c.challengeBond = uint96(rawBond);
+        // Resolved against expectedOwner in run() (it is not known yet here): unset = the Safe.
+        c.treasury = vm.envOr("BOUNTY_TREASURY_ADDRESS", address(0));
         // r9 H-02 / D-4: the address that must END UP owning all seven
         // contracts. On mainnet this is the Safe — mandatory, and distinct from
         // the hot deployer EOA. On testnet it defaults to the deployer (no
@@ -229,6 +242,14 @@ contract DeployBase is Script {
             new BobbyAgentEconomyV2(c.alpha, c.red, c.cio, c.mcpCallFee, c.debateFeePerAgent)
         );
 
+        // Codex r5 [P1]: the treasury defaults to the address that will OWN the
+        // contracts (the Safe on mainnet) and may never be the deployer EOA there.
+        if (c.treasury == address(0)) c.treasury = c.expectedOwner;
+        require(c.treasury != address(0), "config: treasury unresolved");
+        if (block.chainid == 8453) {
+            require(c.treasury != deployer, "config: treasury must not be the deployer EOA on mainnet");
+        }
+
         d.adversarialBounties = address(
             new BobbyAdversarialBounties(c.resolver, c.absoluteMinBounty, c.minBounty)
         );
@@ -248,6 +269,10 @@ contract DeployBase is Script {
         );
 
         HardnessRegistry(payable(d.hardnessRegistry)).setHardnessScorer(c.hardnessScorer);
+        // Codex r5 [P1]: treasury + bonds set while the deployer still owns both,
+        // i.e. BEFORE the two-step handoff below. Asserted in _assertDeployment,
+        // written to the manifest, re-proven live by VerifyBaseDeployment.
+        BountyEconomicsGate.configure(d.adversarialBounties, d.hardnessRegistry, c.treasury, c.challengeBond);
 
         // r9 H-02: scripted handoff — propose the Safe as pendingOwner on all
         // seven contracts in the SAME broadcast. Two-step everywhere: the Safe
@@ -288,7 +313,10 @@ contract DeployBase is Script {
         console2.log("minBounty           ", c.minBounty);
         console2.log("absoluteMinBounty   ", c.absoluteMinBounty);
         console2.log("registrationStake   ", c.registrationStake);
+        console2.log("challengeBond       ", c.challengeBond);
+        console2.log("treasury            ", c.treasury);
     }
+
 
     /// @dev r8 #3: every economic parameter checked before touching the chain.
     function _validateConfig(Config memory c) internal pure {
@@ -296,6 +324,10 @@ contract DeployBase is Script {
         require(c.absoluteMinBounty > 0, "config: zero bounty floor");
         require(c.minBounty >= c.absoluteMinBounty, "config: minBounty below floor");
         require(c.registrationStake > 0, "config: zero registration stake");
+        require(
+            c.challengeBond >= c.absoluteMinBounty && c.challengeBond <= c.absoluteMinBounty * 1000,
+            "config: challengeBond outside [floor, 1000 x floor]"
+        );
         require(
             c.maxSizeUsd > 0 && c.maxSizeUsd <= 100_000_000e18,
             "config: escrow maxSizeUsd out of bounds (18dp, ceiling 100M)"
@@ -355,6 +387,8 @@ contract DeployBase is Script {
         require(bounties.resolver() == c.resolver, "assert: bounties.resolver");
         require(bounties.minBounty() == c.minBounty, "assert: bounties.minBounty");
         require(bounties.ABSOLUTE_MIN_BOUNTY() == c.absoluteMinBounty, "assert: bounties.floor");
+        // Codex r5 [P1]: treasury + bonds, both contracts, never the deployer on mainnet.
+        BountyEconomicsGate.assertConfigured(d.adversarialBounties, d.hardnessRegistry, c.treasury, c.challengeBond, deployer);
 
         HardnessRegistry hardness = HardnessRegistry(payable(d.hardnessRegistry));
         require(hardness.resolverThreshold() == c.resolverThreshold, "assert: hardness.threshold");
@@ -389,6 +423,8 @@ contract DeployBase is Script {
         // r10.1 [P1]: pinned Safe identity so the verifier re-proves it live.
         vm.serializeBytes32(m, "expectedOwnerCodehash", c.expectedOwnerCodehash);
         vm.serializeAddress(m, "expectedOwnerSingleton", c.expectedOwnerSingleton);
+        // Codex r5: where forfeited bonds go — verified live, cross-checked by readiness.
+        vm.serializeAddress(m, "treasury", c.treasury);
 
         string memory a = "addresses";
         vm.serializeAddress(a, "trackRecord", d.trackRecord);
@@ -417,6 +453,7 @@ contract DeployBase is Script {
         vm.serializeUint(f, "minBountyWei", c.minBounty);
         vm.serializeUint(f, "absoluteMinBountyWei", c.absoluteMinBounty);
         vm.serializeUint(f, "registrationStakeWei", c.registrationStake);
+        vm.serializeUint(f, "challengeBondWei", c.challengeBond);
         string memory feesJson = vm.serializeUint(f, "escrowMaxSizeUsd18dp", c.maxSizeUsd);
         vm.serializeString(m, "fees", feesJson);
 

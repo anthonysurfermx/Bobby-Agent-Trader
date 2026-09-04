@@ -30,7 +30,7 @@ generic suite as a substitute.* Every row below therefore points at a test that
 
 Run on `security/remediation-r2` after the last edit:
 
-- `forge test` — 14 suites, **248 passed, 0 failed** (2a: 228; 2b: 236; 3b: 243; 4 adds farming, timeout-stands, snapshots, cap, revoked-vote cases)
+- `forge test` — 14 suites, **250 passed, 0 failed** (2a: 228; 2b: 236; 3b: 243; 4: 248; 5 adds the deployer≠Safe treasury pair)
 - `test:remediation-r2` — 23/23 (2a: 15; 2b: 20; 3b: 22)
 - `test:hardness-abi-anvil` — pass (generated ABI equals the artifact; bytecode-backed decode of every backend getter)
 - `test:rls-lockdown-pg` — exploit reproduced on the shipped policies, then refused; views and C-04 asserted (PostgreSQL 17, scratch schema, stand-in roles)
@@ -157,6 +157,22 @@ shill proposal wins if *both* the Safe fails to rule for 30 days *and* nobody
 settles. The alternative (refund on timeout) made stalling free, which Codex showed
 is the more exploitable failure. The Safe's own bond-free dispute right is what makes
 the assumption reasonable; `disputeSettlementTimeout` is owner-bounded 7–90 days.
+
+## Round 5 review (Codex) — NO-GO on `8bb2d2d`: the deploy left the treasury with the EOA
+
+| # | Codex finding | Fix | Regression |
+|---|---|---|---|
+| P1 | Both contracts initialise `treasury = msg.sender`; `DeployBase` creates them from the deployer EOA and only runs `transferOwnership(Safe)`. After the handoff `owner()` is the Safe and `treasury()` is still the EOA — forfeited bonds would have flowed to a hot key. Neither the manifest nor `VerifyBaseDeployment` checked it. | `Config` gains `treasury` + `challengeBond`, driven by **one parameter each**: `BOUNTY_TREASURY_ADDRESS` (unset = the declared owner, i.e. the Safe; on 8453 it may never be the deployer — the script refuses) and `CHALLENGE_BOND_WEI` (default = `MIN_BOUNTY_WEI`). `_configureBountyEconomics` sets both treasuries and both bonds **before** the two-step handoff. `_assertDeployment` proves all four (and, on mainnet, treasury ≠ deployer); the manifest carries `treasury` and `fees.challengeBondWei`; `VerifyBaseDeployment` re-proves them live against the manifest and against the Safe; `check:mainnet:*` cross-checks manifest ↔ env and fails on a manifest that predates the field; `finalize:base-manifest` requires the four configuration calls in the broadcast. | `DeploymentGates.t.sol` drives the **real script code path** from a harness that plays the EOA: `test_treasury_withoutConfigureStaysWithDeployer` reproduces Codex's exact state (owner = Safe, treasury = EOA); `test_treasury_configuredBeforeHandoffFollowsSafe` proves the fix survives the handoff and the ex-owner cannot move the treasury back. |
+| P2 | Runbook line 135 still said the timeout returns the escrow to the poster; lines 139–141 said the opposite. | Fixed; the deploy configuration block added next to it. | — |
+
+Values adopted, as recommended: treasury = Safe `0x8BE60853F27b944e11486285d95c3e06596553b4`,
+`challengeBond = 25000000000000 wei` (= `MIN_BOUNTY_WEI`), both in `.env.example` and the
+manifest. Codex's follow-up stands: for bounties of material value the bond should become
+proportional to the reward, or the reward capped.
+
+Confirmed by Codex this round: settlement economics correct — no double credit, no trapped
+funds; bytecodes 12,006 B / 21,595 B, inside EIP-170. Codex also warned the disk was nearly
+full (~607 MiB free) — worth clearing `contracts/out` / `cache` in the review worktrees.
 
 ## For the final round
 

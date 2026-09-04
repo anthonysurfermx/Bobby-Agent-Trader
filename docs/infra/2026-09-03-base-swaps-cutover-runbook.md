@@ -132,13 +132,23 @@ After the redeploy, bounty resolution is optimistic: a resolved bounty sits in
 `finalizeResolution(id)` / `finalizeBountyResolution(id)` — permissionless, so
 the winner can, but plan a cron. A `DISPUTED` bounty waits for a Safe
 transaction (`settleDispute` / `settleBountyDispute`) — or, after
-`disputeSettlementTimeout` (30 days), anyone can return the escrow to the poster.
+`disputeSettlementTimeout` (30 days), anyone can finalize the standing proposal:
+the proposed winner is paid and the disputer's bond is forfeited to the treasury.
 Challenges and party disputes post a bond (`challengeBond`, fixed per bounty at post
 time, initially the minimum bounty, capped at 1000× the absolute minimum); the Safe
 disputes without one. Forfeited bonds go to `treasury` (defaults to the Safe; may be
 set to a burn address) — never to the poster. If the Safe does not settle a dispute
 within `disputeSettlementTimeout`, the proposal stands and the disputer's bond is
 forfeited: the Safe must rule on a real shill inside that window.
+
+Deploy configuration for the redeploy (Codex r5): `BOUNTY_TREASURY_ADDRESS` = the Safe
+`0x8BE60853F27b944e11486285d95c3e06596553b4` (unset = the Safe; never the deployer —
+DeployBase refuses on 8453) and `CHALLENGE_BOND_WEI` = `25000000000000`
+(= `MIN_BOUNTY_WEI`). DeployBase sets both `treasury` and both bonds BEFORE the
+two-step handoff, writes `treasury` and `fees.challengeBondWei` to the manifest,
+and `VerifyBaseDeployment` / `check:mainnet:*` / `finalize:base-manifest` all
+re-prove them. For bounties of material value, make the bond proportional to the
+reward or cap the reward — a follow-up.
 
 After any `forge build` that touches HardnessRegistry: `npm run gen:hardness-abi`
 regenerates `api/_lib/hardness-registry.abi.ts`; `test:hardness-abi-anvil` fails if
