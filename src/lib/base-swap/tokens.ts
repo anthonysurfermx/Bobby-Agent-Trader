@@ -9,6 +9,8 @@
 // ============================================================
 
 export const BASE_SWAP_CHAIN_ID = 8453;
+/** Pinned Uniswap V3 SwapRouter02 on Base. Shared with the browser signing guard. */
+export const BASE_SWAP_ROUTER02 = '0x2626664c2603336E57B271c5C0b26F421741e481' as const;
 
 /** Canonical WETH9 on Base (also what ETH is wrapped into by the router). */
 export const BASE_WETH = '0x4200000000000000000000000000000000000006' as const;

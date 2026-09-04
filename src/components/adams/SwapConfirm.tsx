@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { useAccount, usePublicClient, useSendTransaction, useSwitchChain } from 'wagmi';
 import { CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react';
 import { BASE, BASE_CHAIN_ID } from '@/config/chains';
+import { assertApprovalCalldata, assertRevokeCalldata, assertSwapCalldata } from '@/lib/base-swap/calldata-guard';
 import { useBobbySession } from '@/hooks/useBobbySession';
 
 interface Tx { to: string; data: string; value?: string }
@@ -186,6 +187,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
     try {
       if (!execution?.approveTx) throw new Error('No approval to sign; build first');
       notExpired();
+      assertApprovalCalldata(execution.approveTx, { tokenSymbol: fromToken, amountRaw: execution.quote.fromAmountRaw });
       setState('approving');
       await sendAndConfirm(execution.approveTx);
       setState('requoting');
@@ -227,6 +229,14 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
       if (!execution?.swapTx) throw new Error('No swap calldata; re-quote first');
       if (disclosure?.simulated !== true) throw new Error('Swap has not passed the post-approval simulation');
       notExpired();
+      assertSwapCalldata(execution.swapTx, {
+        tokenInSymbol: fromToken,
+        tokenOutSymbol: toToken,
+        amountInRaw: execution.quote.fromAmountRaw,
+        minAmountOutRaw: execution.quote.minReceivedRaw,
+        recipient: wallet,
+        deadline: disclosure.deadline,
+      });
       setState('swapping');
       const hash = await sendAndConfirm(execution.swapTx);
       setSwapTxHash(hash);
@@ -241,6 +251,7 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
   const handleRevoke = async () => {
     try {
       if (!execution?.revokeTx) return;
+      assertRevokeCalldata(execution.revokeTx, { tokenSymbol: fromToken });
       setState('approving');
       await sendAndConfirm(execution.revokeTx);
       setState('requoting');

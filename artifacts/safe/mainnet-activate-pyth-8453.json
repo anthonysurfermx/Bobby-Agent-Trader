@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "chainId": "8453",
+  "createdAt": 1788538500000,
+  "meta": {
+    "name": "Bobby Protocol activate canonical Pyth (8453)",
+    "description": "Activate the approved canonical Pyth contract after the elapsed timelock",
+    "txBuilderVersion": "1.18.0",
+    "createdFromSafeAddress": "0x8BE60853F27b944e11486285d95c3e06596553b4",
+    "createdFromOwnerAddress": "",
+    "checksum": ""
+  },
+  "transactions": [
+    {
+      "to": "0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "_pyth",
+            "type": "address"
+          }
+        ],
+        "name": "activatePyth",
+        "payable": false
+      },
+      "contractInputsValues": {
+        "_pyth": "0xbC16aee60f64864882BC6C4E428e148Fc0E272F5"
+      }
+    }
+  ]
+}

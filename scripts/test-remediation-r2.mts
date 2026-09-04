@@ -175,6 +175,18 @@ await check('P1-1 SwapExecutor: amount edit resets the quote and executeSwap che
   assert.match(src, /value=\{amount\} onChange=\{e => \{ setAmount\(e\.target\.value\); if \(step === 'quoted'\) reset\(\); \}\}/);
   assert.match(src, /if \(!quoteMatchesAmount\(quote\.amountIn, amount\)\)/);
 });
+await check('P1-2 SwapExecutor decodes approval, swap and revoke before wallet submission', async () => {
+  const src = await readFile(new URL('../src/components/agent-radar/SwapExecutor.tsx', import.meta.url), 'utf8');
+  assert.match(src, /assertApprovalCalldata\([\s\S]{0,250}sendAndConfirm\(quote\.tx\.approve\)/);
+  assert.match(src, /assertSwapCalldata\([\s\S]{0,500}sendAndConfirm\(quote\.tx\.swap\)/);
+  assert.match(src, /assertRevokeCalldata\([\s\S]{0,250}sendAndConfirm\(quote\.tx\.revoke\)/);
+});
+await check('P1-2 SwapConfirm decodes approval, swap and revoke before wallet submission', async () => {
+  const src = await readFile(new URL('../src/components/adams/SwapConfirm.tsx', import.meta.url), 'utf8');
+  assert.match(src, /assertApprovalCalldata\([\s\S]{0,250}sendAndConfirm\(execution\.approveTx\)/);
+  assert.match(src, /assertSwapCalldata\([\s\S]{0,500}sendAndConfirm\(execution\.swapTx\)/);
+  assert.match(src, /assertRevokeCalldata\([\s\S]{0,250}sendAndConfirm\(execution\.revokeTx\)/);
+});
 
 // ---------- Codex r2 #4: mcp-http args.symbol injection ----------
 const rpc = (name: string, args: Record<string, unknown>) => req('POST', {}, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, { 'content-type': 'application/json' });

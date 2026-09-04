@@ -2,13 +2,14 @@
 // min-out math, path encoding and — the part that matters — that the
 // calldata we hand to a wallet decodes to exactly what we claim.
 import assert from 'node:assert/strict';
-import { decodeFunctionData, getAddress, parseUnits } from 'viem';
+import { decodeFunctionData, encodeFunctionData, getAddress, parseUnits } from 'viem';
 import {
   BaseSwapError, ERC20_ABI, FEE_TIERS, ROUTER_ADDRESS_THIS, SWAP_ROUTER02, QUOTER_V2, V3_FACTORY, WETH9,
   buildApproveTx, buildRevokeTx, buildSwapTx, candidateRoutes, clampSlippage, computeMinOut, decodeSwapTx, encodePath, resolvePair, toRawAmount,
   type QuotedRoute,
 } from '../api/_lib/base-swap.js';
 import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed } from '../src/lib/base-swap/tokens.js';
+import { assertApprovalCalldata, assertRevokeCalldata, assertSwapCalldata } from '../src/lib/base-swap/calldata-guard.js';
 
 const wallet = getAddress('0x1111111111111111111111111111111111111111');
 
@@ -99,6 +100,54 @@ assert.equal(approve.value, '0x0');
 
 const deadline = 1_900_000_000;
 const single: QuotedRoute = { route: { kind: 'single', fee: 500 }, amountOut: 40_000n, gasEstimate: 0n, path: null, description: 'x' };
+
+// --- browser last-mile guard: independently decode every transaction before signing ---
+assert.doesNotThrow(() => assertApprovalCalldata(approve, { tokenSymbol: 'USDC', amountRaw: '25000000' }));
+assert.throws(
+  () => assertApprovalCalldata(approve, { tokenSymbol: 'USDC', amountRaw: '25000001' }),
+  /approval amount is not the exact quoted amount/,
+);
+assert.throws(
+  () => assertApprovalCalldata({
+    ...approve,
+    data: encodeFunctionData({ abi: ERC20_ABI, functionName: 'approve', args: [wallet, 25_000_000n] }),
+  }, { tokenSymbol: 'USDC', amountRaw: '25000000' }),
+  /approval spender does not match/,
+);
+assert.throws(
+  () => assertApprovalCalldata({ ...approve, to: nvda.address }, { tokenSymbol: 'USDC', amountRaw: '25000000' }),
+  /approval token does not match/,
+);
+
+const guardedRevoke = buildRevokeTx(usdc.address);
+assert.doesNotThrow(() => assertRevokeCalldata(guardedRevoke, { tokenSymbol: 'USDC' }));
+assert.throws(
+  () => assertRevokeCalldata(approve, { tokenSymbol: 'USDC' }),
+  /revoke amount is not zero/,
+);
+
+const guardedSwap = buildSwapTx({ tokenIn: usdc, tokenOut: nvda, route: single, amountIn: 25_000_000n, minOut: 39_800n, recipient: wallet, deadline });
+const guardedExpectation = {
+  tokenInSymbol: 'USDC',
+  tokenOutSymbol: 'NVDAc',
+  amountInRaw: '25000000',
+  minAmountOutRaw: '39800',
+  recipient: wallet,
+  deadline,
+};
+assert.doesNotThrow(() => assertSwapCalldata(guardedSwap, guardedExpectation));
+assert.throws(
+  () => assertSwapCalldata({ ...guardedSwap, to: usdc.address }, guardedExpectation),
+  /swap router does not match/,
+);
+assert.throws(
+  () => assertSwapCalldata(guardedSwap, { ...guardedExpectation, recipient: getAddress('0x2222222222222222222222222222222222222222') }),
+  /swap recipient does not match/,
+);
+assert.throws(
+  () => assertSwapCalldata(guardedSwap, { ...guardedExpectation, minAmountOutRaw: '39801' }),
+  /minimum received does not match/,
+);
 
 // --- ERC-20 → ERC-20 ---
 {

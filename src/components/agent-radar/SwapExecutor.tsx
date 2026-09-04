@@ -17,6 +17,7 @@ import type { Hex } from 'viem';
 import { Wallet, ArrowRight, Check, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
 import { BASE, BASE_CHAIN_ID } from '@/config/chains';
 import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, findBaseToken } from '@/lib/base-swap/tokens';
+import { assertApprovalCalldata, assertRevokeCalldata, assertSwapCalldata } from '@/lib/base-swap/calldata-guard';
 import { useBobbySession } from '@/hooks/useBobbySession';
 
 const PAIR_TOKENS = ['USDC', ...BASE_STOCK_SYMBOLS];
@@ -27,8 +28,10 @@ interface Tx { to: string; data: string; value: string }
 
 interface SwapQuoteView {
   amountIn: string;
+  amountInRaw: string;
   amountOut: string;
   minAmountOut: string;
+  minAmountOutRaw: string;
   executionPrice: number;
   priceImpactPct: number | null;
   usdValue: number | null;
@@ -127,6 +130,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
     setStep('approving'); setError(null);
     try {
       notExpired(quote);
+      assertApprovalCalldata(quote.tx.approve, { tokenSymbol: fromToken, amountRaw: quote.amountInRaw });
       await sendAndConfirm(quote.tx.approve);
       setStep('requoting');
       setQuote(await fetchQuote(true));
@@ -135,7 +139,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
       setError(friendly(err, 'Approval failed'));
       setStep('error');
     }
-  }, [quote, sendAndConfirm, fetchQuote]);
+  }, [quote, fromToken, sendAndConfirm, fetchQuote]);
 
   /** 202 → retry with backoff; 200 → recorded; anything else → shown as NOT recorded, never green. */
   const submitReceipt = useCallback(async (hash: Hex) => {
@@ -167,6 +171,14 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
     setStep('swapping'); setError(null);
     try {
       notExpired(quote);
+      assertSwapCalldata(quote.tx.swap, {
+        tokenInSymbol: fromToken,
+        tokenOutSymbol: toToken,
+        amountInRaw: quote.amountInRaw,
+        minAmountOutRaw: quote.minAmountOutRaw,
+        recipient: address,
+        deadline: quote.tx.deadline,
+      });
       const hash = await sendAndConfirm(quote.tx.swap);
       setTxHash(hash);
       setStep('verifying');
@@ -175,13 +187,14 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
       setError(friendly(err, 'Swap failed'));
       setStep('error');
     }
-  }, [quote, address, amount, sendAndConfirm, submitReceipt]);
+  }, [quote, address, amount, fromToken, toToken, sendAndConfirm, submitReceipt]);
 
   // ---- Revoke a leftover allowance (approve(router, 0)) ----
   const revokeAllowance = useCallback(async () => {
     if (!quote?.tx?.revoke) return;
     setStep('approving'); setError(null);
     try {
+      assertRevokeCalldata(quote.tx.revoke, { tokenSymbol: fromToken });
       await sendAndConfirm(quote.tx.revoke);
       setStep('requoting');
       setQuote(await fetchQuote(acknowledged));
@@ -190,7 +203,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
       setError(friendly(err, 'Revoke failed'));
       setStep('error');
     }
-  }, [quote, sendAndConfirm, fetchQuote, acknowledged]);
+  }, [quote, fromToken, sendAndConfirm, fetchQuote, acknowledged]);
 
   const reset = () => { setStep('idle'); setQuote(null); setAcknowledged(false); setTxHash(undefined); setReceiptNote(null); setError(null); };
 

@@ -2,6 +2,8 @@
 // Single source of truth for chain config. All chain IDs, tokens, RPCs and
 // explorer URLs must come from here — never hardcode them in components/endpoints.
 
+import { BASE_SWAP_ROUTER02 } from '../lib/base-swap/tokens';
+
 export const BASE_CHAIN_ID = 8453;
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
 const BASE_TREASURY = import.meta.env.VITE_TREASURY_ADDRESS_BASE || '';
@@ -104,7 +106,7 @@ export function addressUrl(address: string, chainId: number | string = BASE_CHAI
 // pinning. The swap rail (api/_lib/base-swap.ts) uses SwapRouter02 + QuoterV2:
 // exact approvals to the router, consumed by the swap; deadline via multicall.
 export const UNISWAP_BASE = {
-  swapRouter02: '0x2626664c2603336E57B271c5C0b26F421741e481',
+  swapRouter02: BASE_SWAP_ROUTER02,
   quoterV2: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a',
   v3Factory: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
   universalRouter: '0x6fF5693b99212Da76ad316178A184AB56D299b43',
