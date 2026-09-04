@@ -84,7 +84,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // === Create session + return 402: GET /api/telegram-access?group_id=123&wallet=0x... ===
   if (req.method === 'GET') {
     const groupId = Number(req.query.group_id);
-    const wallet = typeof req.query.wallet === 'string' ? req.query.wallet.toLowerCase() : null;
+    const requestedWallet = req.query.wallet;
+    const wallet = typeof requestedWallet === 'string' ? String(requestedWallet).toLowerCase() : null;
 
     if (!groupId) return res.status(400).json({ error: 'group_id required' });
 

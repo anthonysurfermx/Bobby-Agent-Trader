@@ -30,9 +30,10 @@ export const AGENT_CYCLES_TABLE = 'agent_cycles';
 // The store is reached through this indirection so tests can stand in a
 // PostgREST double for the WHOLE path (endpoint → lib → store), not just the
 // lib. Production never calls the setter.
-let storeFetch: typeof fetch = (...args) => fetch(...args);
+const defaultStoreFetch: typeof fetch = (input, init) => fetch(input, init);
+let storeFetch: typeof fetch = defaultStoreFetch;
 export function setReceiptStoreFetchForTests(fn: typeof fetch | null): void {
-  storeFetch = fn ?? ((...args) => fetch(...args));
+  storeFetch = fn ?? defaultStoreFetch;
 }
 
 const TRANSFER_ABI = parseAbi(['event Transfer(address indexed from, address indexed to, uint256 value)']);
