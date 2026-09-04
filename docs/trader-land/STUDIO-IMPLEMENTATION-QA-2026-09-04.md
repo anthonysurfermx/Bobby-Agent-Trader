@@ -99,3 +99,46 @@ verification. Its files remain under `/tmp/trader-land-db.X8m2Gb` for inspection
 
 The user-facing preview is `http://127.0.0.1:8080/trader-land` while the local Vite
 server is running. Neither that preview nor the simulator is a production release.
+
+## Backend deploy — synced moves (2026-09-04, late)
+
+Scope: `api/trader-land.ts` (`action: 'move'`, fail-closed world read, 409 → "reload"),
+`api/_lib/trader-land.ts` (land read fails instead of inventing an 8×8), migration
+`20260904222250_trader_land_occupied_cells.sql`, `scripts/test-trader-land-cells.sql`.
+
+Pre-flight on production (`bobby-protocol`, read-only): 0 placements, 1 land, 0 inventory,
+25 items, no `tl_placement_cells` / trigger / function present → the final revalidation
+`update tl_placements set x = x` could not fail.
+
+Local gate: throwaway Postgres 17 (`initdb --locale=C`, TCP 127.0.0.1:54331) →
+`scripts/test-trader-land-cells.sql` PASS (footprint, collision, rotation, core, bounds,
+seed, ownership, rollback, removal); migration re-applied on the same database without
+error (idempotent: `if not exists` / `or replace` / `drop … if exists`).
+`tsc -p tsconfig.api.json` clean, `npm run build` clean.
+
+Production migration: applied through the Supabase MCP `apply_migration` (the runbook's
+only write path; `execute_sql` is read-only). Recorded as version `20260904222250`, name
+`trader_land_occupied_cells`; the repo file was renamed to match so `supabase db push`
+stays in sync. Verified: table + PK, RLS on, single `service_role` policy, grants only to
+`service_role`, trigger `tl_placement_cells_reserve` on `tl_placements`.
+
+Production smoke (write path, always rolled back — a `DO` block that ends in
+`RAISE EXCEPTION`): footprint reserved (2 cells), overlap → `unique_violation`, rotation
+re-reserves and releases, Aura Core / out-of-bounds / seed / foreign owner →
+`check_violation`, legal move re-reserves, delete releases. Result:
+`SMOKE_ROLLBACK PASS`. Post-check: 0 smoke identities, 0 cells, no smoke migration row.
+
+Code: `16abb54` on `main` → Vercel `dpl_25GJzt5DkybbD8bEU4xSRhN6V3Mq` (production).
+Probe: an unauthenticated `POST {action:'move'}` returned 400 (unknown discriminator) on
+the previous deployment and must return 401 (auth) once the new function is live.
+
+Client effect: the shipped web page gates synced moves on `world.capabilities.move`;
+`world()` now returns `capabilities: { move: true }`. iOS build 15 already sends
+`action: 'move'` with `placementId`.
+
+Still open: real-iPhone gesture validation; cross-device sync check with a linked test
+account (needs a signed-in identity with bloomed inventory).
+
+Verified 2026-09-04 22:28 UTC: `dpl_25GJzt5DkybbD8bEU4xSRhN6V3Mq` READY on `bobbyprotocol.xyz`.
+Unauthenticated `POST {action:'move'}` → 401 (schema now lists `place | move | remove`),
+`rotation: 45` → 400, `GET` → 401. Runtime logs: only the expected 4xx from the probes, no 5xx.
