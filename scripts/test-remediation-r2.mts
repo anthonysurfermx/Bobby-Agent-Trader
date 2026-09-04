@@ -187,6 +187,13 @@ await check('P1-2 SwapConfirm decodes approval, swap and revoke before wallet su
   assert.match(src, /assertSwapCalldata\([\s\S]{0,500}sendAndConfirm\(execution\.swapTx\)/);
   assert.match(src, /assertRevokeCalldata\([\s\S]{0,250}sendAndConfirm\(execution\.revokeTx\)/);
 });
+await check('P1 product copy describes the non-custodial Base swap flow truthfully', async () => {
+  const src = await readFile(new URL('../src/components/companion/RiskNotice.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /This desk does not execute trades|Este desk no ejecuta operaciones/);
+  assert.match(src, /prepare Base swap transaction data/);
+  assert.match(src, /Tú revisas y firmas desde tu wallet/);
+  assert.match(src, /never holds your funds or keys/);
+});
 
 // ---------- Codex r2 #4: mcp-http args.symbol injection ----------
 const rpc = (name: string, args: Record<string, unknown>) => req('POST', {}, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, { 'content-type': 'application/json' });
