@@ -168,3 +168,9 @@ card), 2 community cards with thumbnails and stats; visitor mode shows title, di
 no Share, "Construir la mía" + "Ver más mundos"; practice-mode Share panel invites sign-in.
 Not verified yet: a real publish end-to-end (needs a signed-in identity on production) and iOS
 (opens the web link; native gallery pending).
+
+Production verification 2026-09-04 23:11 UTC (`dpl_EyR3B74Fr7GHStqSBWFBi1dJ8UbP`, commits 09861d0 + 18a55fa):
+`GET /api/trader-land-public` → 200 `{ worlds: [], catalog: 25 }` (CDN HIT on the second read),
+`?code=BAD!` → 400, unknown code → 404, `POST` → 405, unauthenticated `publish` → 401 (schema accepts it).
+Gallery, visitor and `/app` routes serve 200 and the deployed chunks carry the new copy
+("Islas de la comunidad", "Compartir isla", "ya no es una ventaja"). Runtime logs: no failures from the new code.
