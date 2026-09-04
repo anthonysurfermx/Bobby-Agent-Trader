@@ -31,11 +31,12 @@ generic suite as a substitute.* Every row below therefore points at a test that
 Run on `security/remediation-r2` after the last edit:
 
 - `forge test` — 14 suites, **257 passed, 0 failed** (2a: 228; 2b: 236; 3b: 243; 4: 248; 5: 250; 6 adds seven stake-exit/TTL regressions)
-- `test:remediation-r2` — 23/23 (2a: 15; 2b: 20; 3b: 22)
+- `test:remediation-r2` — 32/32 (2a: 15; 2b: 20; 3b: 22; 4: 23; Codex rounds: 30; 12 adds BP-09 provenance + producer/reader checks)
 - `test:hardness-abi-anvil` — pass (generated ABI equals the artifact; bytecode-backed decode of every backend getter)
-- `test:rls-lockdown-pg` — exploit reproduced on the shipped policies, then refused; views and C-04 asserted (PostgreSQL 17, scratch schema, stand-in roles)
+- `test:rls-lockdown-pg` — pass: exploit reproduced on the shipped policies, then refused; migrations 0010 **and 0011**; real-producer rows for wallet / scheduled / manual / untagged cycles — only the scheduled one is public (PostgreSQL 17, scratch schema, stand-in roles)
 - `test:api-security` — 47/47
-- `test:base-swap` — pass
+- `test:base-swap` — pass, including BP-01: 1 consistent journey + 20 inconsistent responses refused
+- iOS `BaseSwapGuardTests` — 9/9 on the iPhone 17 Pro simulator (BP-02 wrong-stock, reversed-direction, unpinned-pair cases)
 - `check:api` (tsc) — pass · `eslint` on every touched file — 0 errors
 - `npm run build` — pass
 
@@ -322,6 +323,32 @@ expanded pass, including two signing-consent P1s, is recorded separately in
 [the 2026-09-04 audit](2026-09-04-protocol-stock-swaps-audit.md). Its findings and
 remaining coverage must be closed before enabling swaps, regardless of the
 contract review count.
+
+## Round 12 — the 2026-09-04 expanded review (14 findings, NO-GO): the three P1s closed
+
+Input: `docs/security/2026-09-04-protocol-stock-swaps-audit.md` on `8c3fba8`. Remediation
+order per that report: BP-01/BP-02/BP-09 first. Each closure below is the test the report
+asked for, not a green generic suite.
+
+| # | Finding | Fix | Closure evidence |
+|---|---|---|---|
+| **BP-01** P1 | Web signing guards compared decoded calldata to raw fields *from the same response*; the human saw decimal fields nobody bound to those units; no local minimum-received derivation. | `src/lib/base-swap/quote-guard.ts` → `assertQuoteConsistent(quote, request)`: rebuilds the economics in **integer units from the user's own request** (pair resolved through the pinned list — exact symbols, addresses, decimals; `parseUnits(amount)` must equal `amountInRaw` and every displayed field must equal its raw twin; `minAmountOutRaw` must equal `amountOutRaw·(10000−bps)/10000` for the user's slippage; non-zero outputs; local ticket cap, price-impact, deadline and recipient policy; stock reference symbol and pause). Both cards run it on every response **and again immediately before approval and swap**, and pass the **validated** values — not the response's — into the calldata decoders. `SwapConfirm` keeps the full quote; the reduced `execution.quote` is display only. | `test:base-swap`: one consistent approve→re-quote→swap journey through the decoders, and **20 inconsistent responses refused** — raw≠displayed (input, output, minimum), minimum not derived from output+slippage, server-changed slippage, wrong stock, reversed direction, zero output, non-canonical integer, over-cap ticket, over-limit impact, foreign recipient, far deadline, mismatched tx deadline, wrong router, wrong token address, foreign stock reference, paused issuer. |
+| **BP-02** P1 | iOS `validateQuote` checked the response was *an* allowed USDC/stock pair, never *the* pair the user selected; the receive label used the local selection. | `BaseSwapGuard.validateQuote(_:requestedTokenIn:requestedTokenOut:…)`: the selected pair (symbols **and** pinned addresses) is the first check; all three call sites pass `tokenIn/tokenOut` from `side/stock`; `loadQuote` freezes the request before the await and refuses a response if the selection moved meanwhile; the post-approval re-quote refuses a wallet change; `.onChange` on side/stock/amount/slippage/wallet resets the quote. | `BaseSwapGuardTests` on the iPhone 17 Pro simulator, **9/9**: wrong-stock response (consistent, allow-listed) refused with "you selected …"; reversed direction refused; degenerate/unpinned requested pair refused; the four existing tests carry the requested pair. |
+| **BP-09** P1 | Manual wallet cycles were logged without `owner_address`/`user_id`; migration 0010's view read that absence as "protocol-owned" and published halt reasons, timing and capital counters. | **Positive provenance.** `api/_lib/cycle-provenance.ts`: `cycleProvenance(isManual, wallet, operator)` decides once from the authorisation — manual+wallet → private+owner; scheduled or operator-authorised → public; manual without either → private — and `buildCycleRow` makes it win over whatever the data carried. `agent-run` takes it as a **required** argument of `logToSupabase` (all four branches: halt, no-signal, success, failure); `bobby-cycle` tags its rows `public` explicitly. Migration `0011`: `agent_cycles.visibility` (default **private**, checked), the cycles view requires `visibility = 'public'`, the trades view **joins the cycle** and requires it public. Historical rows stay private; a reviewed operator statement is left as a comment. Service-role readers that feed public surfaces (`harness-events`, `protocol-heartbeat`, `bobby-intel`, `conviction-tiers`, the cycle's own history prompt) are pinned to `visibility=eq.public`. | `test:rls-lockdown-pg` writes rows with the **real producer function** for a wallet run, a scheduled run, a manual run without operator auth and a pre-fix untagged row, then reads the 0011 views as `anon`: only the scheduled cycle and its trade are public; the wallet row carries its owner lower-cased. `test:remediation-r2`: provenance rules; every `logToSupabase` call site carries provenance; every public `agent_cycles` read is scoped. |
+
+**Operational note.** After 0011 the public dashboard shows *no* historical cycles until an
+operator reviews and tags the ones the scheduled cycle produced (statement in the migration
+comment). That is the conservative reading the audit asked for.
+
+**Incident during this round.** Mid-remediation macOS revoked this session's access to
+`~/Documents` (TCC); every read and write under the repo failed with EPERM while `~/.claude`
+kept working. State and plan were persisted to memory, access was re-granted, the edits were
+re-applied from the same anchors — and one anchor guard caught a real temporal-dead-zone bug
+on the way (`hasOperatorAuth` is declared *after* `walletAddress` in `agent-run`).
+
+Still open from the 2026-09-04 report, in its own order: BP-04/BP-08/BP-10 (fail-closed
+controls, payment binding, ownership CAS), BP-05/BP-14 (wallet RPC correlation, issuer pause),
+then BP-03/BP-06/BP-07/BP-11/BP-12/BP-13 and the pending third deployment review.
 
 ## For the next independent round
 

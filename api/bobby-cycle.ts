@@ -741,6 +741,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const cycle = await sbInsert('agent_cycles', {
       started_at: new Date().toISOString(),
       status: 'running',
+      visibility: 'public', // BP-09: the scheduled protocol cycle is public by declaration, not by omission
       signals_found: intel.meta?.signalsRaw || 0,
       signals_filtered: intel.meta?.signalsFiltered || 0,
       dynamic_conviction: intel.performance?.dynamicConviction || null,

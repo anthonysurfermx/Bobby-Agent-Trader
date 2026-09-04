@@ -10,6 +10,7 @@ import {
 } from '../api/_lib/base-swap.js';
 import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed } from '../src/lib/base-swap/tokens.js';
 import { assertApprovalCalldata, assertRevokeCalldata, assertSwapCalldata } from '../src/lib/base-swap/calldata-guard.js';
+import { assertQuoteConsistent } from '../src/lib/base-swap/quote-guard.js';
 
 const wallet = getAddress('0x1111111111111111111111111111111111111111');
 
@@ -148,6 +149,59 @@ assert.throws(
   () => assertSwapCalldata(guardedSwap, { ...guardedExpectation, minAmountOutRaw: '39801' }),
   /minimum received does not match/,
 );
+
+// --- BP-01: the quote's economics are rebuilt locally from the request and every field must agree ---
+{
+  const now = deadline - 600;
+  const req = { tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '25', slippagePct: 0.5, wallet };
+  const consistent = {
+    chainId: 8453,
+    venue: { name: 'Uniswap V3 (SwapRouter02)', router: SWAP_ROUTER02 },
+    tokenIn: { symbol: 'USDC', address: usdc.address, decimals: 6 },
+    tokenOut: { symbol: 'NVDAc', address: nvda.address, decimals: 8 },
+    amountIn: '25', amountInRaw: '25000000',
+    amountOut: '0.0004', amountOutRaw: '40000',
+    minAmountOut: '0.000398', minAmountOutRaw: '39800',
+    slippagePct: 0.5, deadline, priceImpactPct: 0.3, usdValue: 25, recipient: wallet,
+    requiresStockEligibility: true, stockReference: { symbol: 'NVDAc', transferPaused: false },
+    tx: { deadline, approve: null, swap: { to: SWAP_ROUTER02, data: '0x', value: '0' } }, txWithheld: [],
+  };
+  const v = assertQuoteConsistent(consistent, req, now);
+  assert.deepEqual([v.tokenInSymbol, v.tokenOutSymbol, v.amountInRaw, v.minAmountOutRaw, v.slippageBps, v.deadline, v.recipient],
+    ['USDC', 'NVDAc', '25000000', '39800', 50, deadline, wallet.toLowerCase()], 'a consistent quote validates and yields integer units');
+  const refuse = (label: string, mutate: (q: any) => void, reqOverride: Partial<typeof req> = {}, re: RegExp = /Quote refused/) => {
+    const q = structuredClone(consistent); mutate(q);
+    assert.throws(() => assertQuoteConsistent(q, { ...req, ...reqOverride }, now), re, label);
+  };
+  refuse('displayed input differs from raw units', (q) => { q.amountIn = '2.5'; }, {}, /displayed input differs/);
+  refuse('raw input differs from what the user typed', (q) => { q.amountInRaw = '250000000'; }, {}, /not the amount you entered/);
+  refuse('displayed output differs from raw', (q) => { q.amountOut = '0.004'; }, {}, /displayed output differs/);
+  refuse('displayed minimum differs from raw', (q) => { q.minAmountOut = '0.0004'; }, {}, /displayed minimum differs/);
+  refuse('minimum not derived from output and slippage', (q) => { q.minAmountOutRaw = '39801'; q.minAmountOut = '0.00039801'; }, {}, /not derived from the quoted output/);
+  refuse('slippage changed by the server', (q) => { q.slippagePct = 1; }, {}, /changed the requested slippage/);
+  refuse('slippage the user did not ask for', (q) => {}, { slippagePct: 1 }, /changed the requested slippage/);
+  refuse('wrong stock, everything else consistent', (q) => {}, { tokenOut: 'AAPLc' }, /quote output token is NVDAc, you asked for AAPLc/);
+  refuse('reversed direction', (q) => {}, { tokenIn: 'NVDAc', tokenOut: 'USDC' }, /quote input token is USDC, you asked for NVDAc/);
+  refuse('zero output', (q) => { q.amountOutRaw = '0'; q.amountOut = '0'; q.minAmountOutRaw = '0'; q.minAmountOut = '0'; }, {}, /quote output is zero/);
+  refuse('non-canonical raw integer', (q) => { q.amountInRaw = '025000000'; }, {}, /not a canonical integer/);
+  refuse('ticket above the local cap', (q) => { q.usdValue = 250; }, {}, /outside the \$1–\$100 limit/);
+  refuse('price impact above the local limit', (q) => { q.priceImpactPct = 3.5; }, {}, /price impact is over/);
+  refuse('recipient is another wallet', (q) => { q.recipient = '0x2222222222222222222222222222222222222222'; }, {}, /recipient is not the connected wallet/);
+  refuse('deadline beyond the local policy', (q) => { q.deadline = now + 3600; q.tx.deadline = now + 3600; }, {}, /deadline exceeds the local policy/);
+  refuse('transaction deadline differs from the quote', (q) => { q.tx.deadline = deadline + 1; }, {}, /transaction deadline differs/);
+  refuse('router is not the pinned one', (q) => { q.venue.router = usdc.address; }, {}, /names another router/);
+  refuse('output token address is not the pinned one', (q) => { q.tokenOut.address = usdc.address; }, {}, /output token address is not the pinned one/);
+  refuse('stock reference for another token', (q) => { q.stockReference.symbol = 'AAPLc'; }, {}, /stock reference is for another token/);
+  refuse('issuer paused transfers', (q) => { q.stockReference.transferPaused = true; }, {}, /paused transfers/);
+  // the normal journey: approval quote → (approval mines) → swap quote, both validated, decoders fed with validated values
+  const approvalQuote = { ...structuredClone(consistent), tx: { deadline, approve: { to: usdc.address, data: approve.data, value: '0', spender: SWAP_ROUTER02, amount: '25000000' }, swap: null } };
+  const va = assertQuoteConsistent(approvalQuote, req, now);
+  assert.doesNotThrow(() => assertApprovalCalldata(approvalQuote.tx.approve, { tokenSymbol: va.tokenInSymbol, amountRaw: va.amountInRaw }));
+  const swapQuote = { ...structuredClone(consistent), tx: { deadline, approve: null, swap: guardedSwap } };
+  const vs = assertQuoteConsistent(swapQuote, req, now);
+  assert.doesNotThrow(() => assertSwapCalldata(guardedSwap, { tokenInSymbol: vs.tokenInSymbol, tokenOutSymbol: vs.tokenOutSymbol, amountInRaw: vs.amountInRaw, minAmountOutRaw: vs.minAmountOutRaw, recipient: vs.recipient, deadline: vs.deadline }));
+  console.log('BP-01: quote validator — 1 consistent journey, 20 inconsistent responses refused');
+}
 
 // --- ERC-20 → ERC-20 ---
 {

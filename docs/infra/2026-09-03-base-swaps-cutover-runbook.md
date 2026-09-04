@@ -69,6 +69,15 @@ server is unaffected (every server reader uses the service key). Regression:
 `DATABASE_URL=… npm run test:rls-lockdown-pg`. After applying, confirm with
 `bobby_rls_matrix()` that no anon policy remains on those three tables.
 
+## 2b-ii. Apply migration `20260903000011_cycle_provenance.sql` — right after 0010
+
+BP-09 (2026-09-04 review). Adds `agent_cycles.visibility` (default private) and
+rebuilds both public views on POSITIVE provenance: a cycle is public only when its
+producer said so; a trade is public only through a public cycle. Historical rows
+stay private — after applying, review and run the operator statement left as a
+comment in the migration to re-publish the rows the scheduled cycle produced.
+Regression: `DATABASE_URL=… npm run test:rls-lockdown-pg`.
+
 ## 2c. Safe transaction — activate the canonical Pyth on TrackRecordV2 (C-02)
 
 Read-only state on 2026-09-03: `activePyth = 0x8250…` (old), `0xbC16…` approved,

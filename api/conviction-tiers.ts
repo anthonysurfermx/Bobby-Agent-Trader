@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Fetch all resolved cycles with conviction scores
   const cycles: CycleRow[] = await sbQuery(
-    'agent_cycles?resolution=not.is.null&resolution=neq.pending&conviction_score=not.is.null&select=conviction_score,resolution,resolution_pnl_pct&order=resolved_at.desc&limit=200'
+    'agent_cycles?visibility=eq.public&resolution=not.is.null&resolution=neq.pending&conviction_score=not.is.null&select=conviction_score,resolution,resolution_pnl_pct&order=resolved_at.desc&limit=200'
   );
 
   // Define tiers: LOW (1-3), MEDIUM (4-6), HIGH (7-10)

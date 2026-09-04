@@ -10,7 +10,7 @@
 // ============================================================
 
 import { useState, useCallback } from 'react';
-import { quoteMatchesAmount } from '@/lib/base-swap/quote-guard';
+import { assertQuoteConsistent, quoteMatchesAmount, type ValidatedQuote } from '@/lib/base-swap/quote-guard';
 import { useAccount, usePublicClient, useSendTransaction, useSwitchChain } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import type { Hex } from 'viem';
@@ -27,16 +27,24 @@ type SwapStep = 'idle' | 'quoting' | 'quoted' | 'approving' | 'requoting' | 'swa
 interface Tx { to: string; data: string; value: string }
 
 interface SwapQuoteView {
+  chainId: number;
+  venue: { name: string; router: string };
+  tokenIn: { symbol: string; address: string; decimals: number };
+  tokenOut: { symbol: string; address: string; decimals: number };
   amountIn: string;
   amountInRaw: string;
   amountOut: string;
+  amountOutRaw: string;
   minAmountOut: string;
   minAmountOutRaw: string;
+  slippagePct: number;
+  deadline: number;
+  recipient: string | null;
+  requiresStockEligibility: boolean;
   executionPrice: number;
   priceImpactPct: number | null;
   usdValue: number | null;
   route: { description: string; gasEstimate: string };
-  venue: { name: string; router: string };
   tx: null | { approve: (Tx & { spender: string; amount: string }) | null; swap: Tx | null; revoke: (Tx & { spender: string }) | null; deadline: number };
   allowanceRaw: string | null;
   simulation: { ran: boolean; ok: boolean | null; reason: string | null };
@@ -100,8 +108,17 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to get a Base quote');
+    // BP-01: rebuild the economics from OUR request (pair, amount, slippage, wallet) in
+    // integer units and refuse the response unless every displayed and raw field agrees.
+    assertQuoteConsistent(data.quote, { tokenIn: from.symbol, tokenOut: to.symbol, amount: amount.trim(), slippagePct: parseFloat(slippage), wallet: address });
     return data.quote as SwapQuoteView;
   }, [address, from, to, amount, slippage, sessionHeaders]);
+
+  /** Re-validates the quote against the CURRENT selection right before a signature. */
+  const validated = useCallback((q: SwapQuoteView): ValidatedQuote => {
+    if (!address || !from || !to) throw new Error('Connect a wallet and pick a pair');
+    return assertQuoteConsistent(q, { tokenIn: from.symbol, tokenOut: to.symbol, amount: amount.trim(), slippagePct: parseFloat(slippage), wallet: address });
+  }, [address, from, to, amount, slippage]);
 
   const friendly = (err: unknown, fallback: string) => {
     const msg = err instanceof Error ? err.message : fallback;
@@ -130,7 +147,8 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
     setStep('approving'); setError(null);
     try {
       notExpired(quote);
-      assertApprovalCalldata(quote.tx.approve, { tokenSymbol: fromToken, amountRaw: quote.amountInRaw });
+      const v = validated(quote);
+      assertApprovalCalldata(quote.tx.approve, { tokenSymbol: v.tokenInSymbol, amountRaw: v.amountInRaw });
       await sendAndConfirm(quote.tx.approve);
       setStep('requoting');
       setQuote(await fetchQuote(true));
@@ -139,7 +157,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
       setError(friendly(err, 'Approval failed'));
       setStep('error');
     }
-  }, [quote, fromToken, sendAndConfirm, fetchQuote]);
+  }, [quote, validated, sendAndConfirm, fetchQuote]);
 
   /** 202 → retry with backoff; 200 → recorded; anything else → shown as NOT recorded, never green. */
   const submitReceipt = useCallback(async (hash: Hex) => {
@@ -171,13 +189,15 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
     setStep('swapping'); setError(null);
     try {
       notExpired(quote);
+      // BP-01: the decoder is handed the VALIDATED values, never the response's own fields.
+      const v = validated(quote);
       assertSwapCalldata(quote.tx.swap, {
-        tokenInSymbol: fromToken,
-        tokenOutSymbol: toToken,
-        amountInRaw: quote.amountInRaw,
-        minAmountOutRaw: quote.minAmountOutRaw,
-        recipient: address,
-        deadline: quote.tx.deadline,
+        tokenInSymbol: v.tokenInSymbol,
+        tokenOutSymbol: v.tokenOutSymbol,
+        amountInRaw: v.amountInRaw,
+        minAmountOutRaw: v.minAmountOutRaw,
+        recipient: v.recipient,
+        deadline: v.deadline,
       });
       const hash = await sendAndConfirm(quote.tx.swap);
       setTxHash(hash);
@@ -187,7 +207,7 @@ export function SwapExecutor({ defaultFrom = 'USDC', defaultTo = 'NVDAc', classN
       setError(friendly(err, 'Swap failed'));
       setStep('error');
     }
-  }, [quote, address, amount, fromToken, toToken, sendAndConfirm, submitReceipt]);
+  }, [quote, address, amount, validated, sendAndConfirm, submitReceipt]);
 
   // ---- Revoke a leftover allowance (approve(router, 0)) ----
   const revokeAllowance = useCallback(async () => {

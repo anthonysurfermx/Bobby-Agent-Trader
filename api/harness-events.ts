@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Fallback: reconstruct events from agent_cycles + forum_threads
   const [cycles, threads] = await Promise.all([
-    sbGet(`agent_cycles?order=created_at.desc&limit=${limit}&select=id,status,created_at,completed_at,latency_ms,trades_executed,llm_reasoning,vibe_phrase,idle_cash_usd,yield_debate_triggered`),
+    sbGet(`agent_cycles?visibility=eq.public&order=created_at.desc&limit=${limit}&select=id,status,created_at,completed_at,latency_ms,trades_executed,llm_reasoning,vibe_phrase,idle_cash_usd,yield_debate_triggered`),
     sbGet(`forum_threads?scope=eq.public&order=created_at.desc&limit=${limit}&select=id,symbol,direction,conviction_score,status,resolution,entry_price,stop_price,target_price,resolution_pnl_pct,created_at,trigger_reason,debate_quality`),
   ]);
 

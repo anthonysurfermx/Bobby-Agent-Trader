@@ -356,4 +356,32 @@ await check('r3 P2 hardness-test: levelGeometryError is the same rule the regist
   assert.match(levelGeometryError('sideways', 100, 110, 90) || '', /long or short/);
 });
 
+// ---------- BP-09: cycle provenance is decided by the authorisation, never by missing columns ----------
+await check('BP-09 cycleProvenance: wallet run private+owner, cron public, manual-without-operator private', async () => {
+  const { cycleProvenance, buildCycleRow } = await import('../api/_lib/cycle-provenance.js');
+  assert.deepEqual(cycleProvenance(true, '0xAbC', false), { owner_address: '0xabc', visibility: 'private' });
+  assert.deepEqual(cycleProvenance(true, '0xAbC', true), { owner_address: '0xabc', visibility: 'private' }, 'a wallet run is private even with operator auth');
+  assert.deepEqual(cycleProvenance(false, '', true), { owner_address: null, visibility: 'public' });
+  assert.deepEqual(cycleProvenance(true, '', false), { owner_address: null, visibility: 'private' });
+  assert.deepEqual(cycleProvenance(true, '', true), { owner_address: null, visibility: 'public' }, 'an operator-authorised manual run is a protocol cycle');
+  const row = buildCycleRow({ status: 'completed', owner_address: '0xspoof', visibility: 'public' }, cycleProvenance(true, '0xReal', false));
+  assert.deepEqual([row.owner_address, row.visibility], ['0xreal', 'private'], 'provenance always wins over whatever the data carried');
+});
+await check('BP-09 agent-run: every cycle write passes provenance; the history read is public-only', async () => {
+  const src = await readFile(new URL('../api/agent-run.ts', import.meta.url), 'utf8');
+  const calls = src.match(/logToSupabase\(/g) ?? [];
+  assert.equal(calls.length, 5, 'four call sites + the definition');
+  assert.equal((src.match(/logToSupabase\(provenance, /g) ?? []).length, 4, 'all four call sites carry the provenance');
+  assert.match(src, /async function logToSupabase\(provenance: CycleProvenance, data/);
+  assert.match(src, /body: JSON\.stringify\(buildCycleRow\(data, provenance\)\)/);
+  assert.match(src, /const provenance = cycleProvenance\(isManual, walletAddress, !isManual \|\| hasOperatorAuth\)/);
+  assert.match(src, /agent_cycles\?visibility=eq\.public&select=llm_reasoning/);
+  const cycle = await readFile(new URL('../api/bobby-cycle.ts', import.meta.url), 'utf8');
+  assert.match(cycle, /sbInsert\('agent_cycles', \{\n\s+started_at: new Date\(\)\.toISOString\(\),\n\s+status: 'running',\n\s+visibility: 'public'/);
+  for (const f of ['api/harness-events.ts', 'api/protocol-heartbeat.ts', 'api/bobby-intel.ts', 'api/conviction-tiers.ts']) {
+    const t = await readFile(new URL(`../${f}`, import.meta.url), 'utf8');
+    for (const m of t.matchAll(/agent_cycles\?[^`'"\n]*/g)) assert.ok(m[0].includes('visibility=eq.public'), `${f}: unscoped agent_cycles read: ${m[0].slice(0, 80)}`);
+  }
+});
+
 console.log(`remediation-r2: ${passed}/${passed} checks passed`);

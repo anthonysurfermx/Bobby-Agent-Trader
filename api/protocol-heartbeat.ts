@@ -311,7 +311,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ethCall(BOUNTIES, bountiesIface.encodeFunctionData('minBounty')),
       // Supabase: recent cycles (column is started_at, not created_at)
       withTimeout(
-        sbQuery('agent_cycles', 'select=id,status,started_at,vibe_phrase,trades_executed&order=started_at.desc&limit=1'),
+        sbQuery('agent_cycles', 'visibility=eq.public&select=id,status,started_at,vibe_phrase,trades_executed&order=started_at.desc&limit=1'),
         1500,
         []
       ),
