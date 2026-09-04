@@ -254,8 +254,11 @@ export default function CompanionDesk() {
     const noTradeNow = isNoTrade(a);
     if (noTradeNow) sfxShield(); else sfxSuccess();
     // A full review earns discipline; respecting NO TRADE earns more. The
-    // number shown is what the daily cap ACTUALLY granted.
-    const result = progressStore.awardDiscipline(noTradeNow ? 'no_trade_respected' : 'read_complete');
+    // number shown is what the daily cap ACTUALLY granted. The verdict rides
+    // along as the thesis the seed will be reviewed against in Trader Land.
+    const level = (v: number | null) => (v !== null && Number.isFinite(v) && v > 0 ? v : null);
+    const thesis = { symbol: snap.symbol, isEquity: snap.isEquity, direction: a.direction === 'long' || a.direction === 'short' ? a.direction : 'none' as const, price: level(a.price), entry: level(a.entry), stop: level(a.stop), target: level(a.target) };
+    const result = progressStore.awardDiscipline(noTradeNow ? 'no_trade_respected' : 'read_complete', new Date(), thesis);
     if (noTradeNow) setNoTrade({ symbol: snap.symbol, reason: noTradeReason(a), xp: result.awarded });
     if (result.evolvedTo) setEvolution(result.evolvedTo);
     if (result.drops.length) setDrops((d) => [...d, ...result.drops]);
