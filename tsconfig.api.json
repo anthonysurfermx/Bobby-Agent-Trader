@@ -71,6 +71,7 @@
     "api/okx-onchain.ts",
     "api/progress.ts",
     "api/trader-land.ts",
+    "api/trader-land-public.ts",
     "api/identity-link.ts",
     "api/_lib/user-identity.ts",
     "api/_lib/progress-rules.ts",

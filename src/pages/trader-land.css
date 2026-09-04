@@ -64,3 +64,9 @@
 .land-library>.land-selected-detail{flex-shrink:0;margin:0 20px 16px;box-shadow:0 -10px 24px #101d1988}
 @media(max-width:760px){.land-library>.land-selected-detail{margin:0 12px calc(8px + env(safe-area-inset-bottom))}.land-library-content{padding-bottom:12px}.land-library>.land-selected-detail h3{font-size:14px}}
 @media(prefers-reduced-motion:reduce){.land-studio .aura-sphere,.land-studio .aura-ring,.land-studio .aura-mote{animation:none!important}.land-studio *{scroll-behavior:auto!important;transition:none!important}}
+
+/* Shared worlds: share panel, visitor aside */
+.land-share-field{display:flex;flex-direction:column;gap:6px;margin-top:14px;font-size:12px;color:#9dc0a9}.land-share-field input{min-height:44px;padding:0 12px;border-radius:10px;border:1px solid #99c9a94d;background:#0b1a14;color:#ecf5e9;font-size:14px}.land-share-field input:focus{outline:2px solid #64ffb6;outline-offset:1px}
+.land-share-link{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;padding:10px;border-radius:12px;background:#07130e;border:1px solid #99c9a92e}.land-share-link code{flex:1 1 100%;font-size:11px;color:#c5e9b3;word-break:break-all}.land-share-link .land-subtle,.land-share .land-selected-actions .land-subtle{display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.land-visitor-districts{display:flex;flex-wrap:wrap;gap:6px}.land-visitor-districts span{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#b2cbb9;padding:5px 9px;border-radius:999px;border:1px solid #99c9a92e}.land-visitor-districts i{width:8px;height:8px;border-radius:50%;background:var(--district-color)}
+.land-primary-link{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:10px;width:100%}

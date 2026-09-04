@@ -4,6 +4,8 @@
 //   POST { action: 'place', inventoryId, x, y, rotation } → placed
 //   POST { action: 'move', placementId, x, y, rotation }  → moved
 //   POST { action: 'remove', placementId }                → removed
+//   POST { action: 'publish', title? }                     → island public + share code
+//   POST { action: 'unpublish' }                           → island private (code kept)
 // Placement rules (v1): the piece must belong to the caller, be bloomed, fit
 // inside the 8×8 grid with its footprint, and not overlap another piece.
 // capabilities.move tells clients that moves are arbitrated atomically by the
@@ -14,7 +16,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { catalog, ensureLand } from './_lib/trader-land.js';
+import { catalog, cleanTitle, ensureLand, newShareCode } from './_lib/trader-land.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -24,6 +26,8 @@ const Body = z.discriminatedUnion('action', [
   z.object({ action: z.literal('place'), inventoryId: z.string().uuid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0) }),
   z.object({ action: z.literal('move'), placementId: z.string().uuid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0) }),
   z.object({ action: z.literal('remove'), placementId: z.string().uuid() }),
+  z.object({ action: z.literal('publish'), title: z.string().max(80).optional() }),
+  z.object({ action: z.literal('unpublish') }),
 ]);
 
 interface Inv { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; seeded_at: string; bloomed_at: string | null }
@@ -56,6 +60,7 @@ async function world(identity: Identity) {
     placements,
     catalog: items,
     capabilities: { move: true },
+    share: { public: land.visibility === 'public', code: land.share_code, title: land.title, publishedAt: land.published_at },
   };
 }
 
@@ -78,6 +83,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!identity) return;
   const body = guarded.body;
   try {
+    if (body.action === 'unpublish') {
+      const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identity.id}`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ visibility: 'private' }) });
+      if (!r.ok || !((await r.json()) as unknown[]).length) return res.status(502).json({ error: 'Could not hide the island' });
+      return res.status(200).json({ ok: true, unpublished: true, ...(await world(identity)) });
+    }
+    if (body.action === 'publish') {
+      const land = await ensureLand(identity.id);
+      const title = body.title === undefined ? land.title : cleanTitle(body.title);
+      // The share code is minted once and survives unpublish/republish, so a
+      // link that was already shared keeps working when the island comes back.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const code = land.share_code ?? newShareCode();
+        const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identity.id}`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ visibility: 'public', share_code: code, title, published_at: new Date().toISOString() }) });
+        if (r.status === 409 && !land.share_code) continue; // another land drew the same code
+        if (!r.ok || !((await r.json()) as unknown[]).length) return res.status(502).json({ error: 'Could not publish the island' });
+        return res.status(200).json({ ok: true, published: code, ...(await world(identity)) });
+      }
+      return res.status(502).json({ error: 'Could not publish the island' });
+    }
     if (body.action === 'remove') {
       const r = await fetch(bobbyRest(`tl_placements?id=eq.${body.placementId}&identity_id=eq.${identity.id}`), { method: 'DELETE', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }) });
       if (!r.ok) return res.status(502).json({ error: 'Could not store the piece. Reload the island before retrying.' });

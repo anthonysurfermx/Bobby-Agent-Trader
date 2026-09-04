@@ -142,3 +142,29 @@ account (needs a signed-in identity with bloomed inventory).
 Verified 2026-09-04 22:28 UTC: `dpl_25GJzt5DkybbD8bEU4xSRhN6V3Mq` READY on `bobbyprotocol.xyz`.
 Unauthenticated `POST {action:'move'}` → 401 (schema now lists `place | move | remove`),
 `rotation: 45` → 400, `GET` → 401. Runtime logs: only the expected 4xx from the probes, no 5xx.
+
+## Shared worlds (2026-09-05, early) — "que la gente pueda ver los mundos de los demás"
+
+Two layers, web first:
+1. **Worlds gallery** `/agentic-world/bobby/trader-land/worlds` — the five districts with their
+   real pieces (art from the manifest, names from `tl_items`), then the islands the community
+   published (mini isometric renders via `IslandThumb`), then how to share.
+2. **Publishing** — on the studio, *Share* → name (≤40 chars) → *Publish*. The island gets a
+   10-char share code and a link `/agentic-world/bobby/trader-land/w/<code>`; visitors see it
+   read-only in the studio's visitor mode (no editing, no account, no builder identity).
+   *Hide* flips it private; the code is kept so a re-publish restores the same link.
+
+Data: migration `20260904230244_trader_land_public_worlds.sql` (applied on production via
+`apply_migration`, version as recorded): `tl_lands.visibility/share_code/title/published_at`,
+check constraints, partial unique index on `share_code`, index for the gallery. Applied twice
+on a local Postgres without error; constraints rejected a bad code and a 41-char title.
+API: `POST /api/trader-land { action: 'publish' | 'unpublish' }`, `world().share`, and the new
+public read-only `GET /api/trader-land-public[?code=]` (CDN cache 30 s, never returns identities).
+Fix in passing: the catalog id `axiom_archive_return_path` did not exist in the art manifest
+(`…_return_path_curve`); both manifest loaders now alias it so the Discovery Route piece renders.
+
+Local verification (dev server + mocked public API): gallery renders 5 districts × 5 pieces (+ core
+card), 2 community cards with thumbnails and stats; visitor mode shows title, districts, no Undo,
+no Share, "Construir la mía" + "Ver más mundos"; practice-mode Share panel invites sign-in.
+Not verified yet: a real publish end-to-end (needs a signed-in identity on production) and iOS
+(opens the web link; native gallery pending).

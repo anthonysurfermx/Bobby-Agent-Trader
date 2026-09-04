@@ -83,6 +83,7 @@ const BobbyHarnessConsolePage = lazyWithRetry(() => import('@/pages/BobbyHarness
 const BobbyPlaybooksPage = lazyWithRetry(() => import('@/pages/BobbyPlaybooksPage'), 'protocol-playbooks');
 const BobbySandboxPage = lazyWithRetry(() => import('@/pages/BobbySandboxPage'), 'protocol-sandbox');
 const TraderLandGatePage = lazy(() => import('@/pages/TraderLandGatePage'));
+const TraderLandWorldsPage = lazy(() => import('@/pages/TraderLandWorldsPage'));
 
 
 // Auth pages
@@ -441,6 +442,22 @@ const router = createBrowserRouter(
         },
         {
           path: 'agentic-world/bobby/trader-land',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <TraderLandGatePage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'agentic-world/bobby/trader-land/worlds',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <TraderLandWorldsPage />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'agentic-world/bobby/trader-land/w/:code',
           element: (
             <Suspense fallback={<PageLoader />}>
               <TraderLandGatePage />

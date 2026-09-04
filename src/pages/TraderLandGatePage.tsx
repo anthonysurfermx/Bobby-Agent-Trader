@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Compass, Hand, HelpCircle, Layers3, LoaderCircle, Maximize, Minus, Move, Plus, RotateCw, Sparkles, Undo2, Volume2, VolumeX, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowLeft, Check, ChevronDown, Compass, Copy, ExternalLink, Globe, Hand, HelpCircle, Layers3, LoaderCircle, Maximize, Minus, Move, Plus, RotateCw, Share2, Sparkles, Undo2, Volume2, VolumeX, X } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 import { useAppKit } from '@reown/appkit/react';
 import { useBobbySession } from '@/hooks/useBobbySession';
 import { Helmet } from 'react-helmet-async';
 import { t } from '@/lib/companions/i18n';
 import { draggedGridPosition } from '@/lib/trader-land-gestures';
+import { CATALOG_ALIASES, STUDIO_PATH, WORLDS_PATH, shareUrl, withCatalogAliases } from '@/lib/trader-land/public';
 import './trader-land.css';
 
 type District = 'crypto_bay' | 'evidence_mines' | 'thesis_citadel' | 'risk_reef' | 'axiom_archive';
@@ -40,6 +41,7 @@ type World = {
   aura: number;
   land: { size: number };
   capabilities?: { move?: boolean };
+  share?: { public: boolean; code: string | null; title: string | null; publishedAt: string | null };
   route: { index: number; total: number; complete: boolean; next: { id: string } | null };
   inventory: WorldInventory[];
   placements: ApiPlacement[];
@@ -222,7 +224,8 @@ const districtColors: Record<District, string> = { crypto_bay: '#56d9e8', eviden
 const districtTraits: Record<District, [string, string]> = { crypto_bay: ['Patience', 'Paciencia'], evidence_mines: ['Clarity', 'Claridad'], thesis_citadel: ['Risk', 'Riesgo'], risk_reef: ['Contradiction', 'Contradicción'], axiom_archive: ['Closure', 'Cierre'] };
 function itemName(item: ManifestItem) { return pretty(item.id.replace(item.district + '_', '')); }
 function demoWorld(manifest: Manifest, fixture: Fixture): World {
-  const inventory: WorldInventory[] = manifest.items.filter((item) => item.kind !== 'core').map((item) => ({
+  // Alias ids exist only so account pieces resolve; the practice collection shows each artwork once.
+  const inventory: WorldInventory[] = manifest.items.filter((item) => item.kind !== 'core' && !(item.id in CATALOG_ALIASES)).map((item) => ({
     id: 'demo-' + item.id, item_id: item.id, state: 'bloomed', source: 'demo', placed: false,
     item: { id: item.id, world: item.district, attribution: '', kind: item.kind, footprint_w: item.footprint.cols, footprint_h: item.footprint.rows, route_index: null, art_url: null },
   }));
@@ -236,6 +239,14 @@ function demoWorld(manifest: Manifest, fixture: Fixture): World {
 }
 function withPlacements(world: World, placements: ApiPlacement[]): World {
   return { ...world, placements, inventory: world.inventory.map((entry) => ({ ...entry, placed: placements.some((p) => p.inventory_id === entry.id) })) };
+}
+// A published island as the studio understands it: every placed piece is a
+// bloomed, placed inventory entry; nothing can be edited.
+type PublicWorldPayload = { code: string; title: string | null; size: number; publishedAt: string | null; placements: Array<{ item_id: string; x: number; y: number; rotation: number }>; stats: { pieces: number; districts: string[] } };
+function visitorWorld(payload: PublicWorldPayload): World {
+  const inventory: WorldInventory[] = payload.placements.map((p, index) => ({ id: `visit-${index}`, item_id: p.item_id, state: 'bloomed', source: 'visit', placed: true, item: null }));
+  const placements: ApiPlacement[] = payload.placements.map((p, index) => ({ id: `visit-${index}`, inventory_id: `visit-${index}`, x: p.x, y: p.y, rotation: p.rotation }));
+  return { xp: 0, aura: 0, land: { size: payload.size }, capabilities: { move: false }, route: { index: 0, total: 0, complete: false, next: null }, inventory, placements };
 }
 
 export default function TraderLandGatePage() {
@@ -253,6 +264,14 @@ export default function TraderLandGatePage() {
   const [notice, setNotice] = useState('');
   const [libraryOpen, setLibraryOpen] = useState(true);
   const [help, setHelp] = useState(false);
+  // Visitor mode: /trader-land/w/:code shows someone else's published island, read-only.
+  const { code: visitorCode } = useParams<{ code?: string }>();
+  const visitor = Boolean(visitorCode);
+  const [visited, setVisited] = useState<World | null>(null);
+  const [visitorMeta, setVisitorMeta] = useState<{ title: string | null; publishedAt: string | null; pieces: number; districts: string[] } | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareTitle, setShareTitle] = useState('');
+  const [copied, setCopied] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 900, height: 600 });
   const [camera, setCamera] = useState<Camera>({ x: 0, y: 0, scale: 1 });
@@ -264,11 +283,11 @@ export default function TraderLandGatePage() {
   const { wallet, ready, ensureSession, headers } = useBobbySession({ auto: false });
   const { open } = useAppKit();
   const { enabled: soundEnabled, toggle: toggleSound, cue } = useLandSound();
-  const isDemo = !ready;
-  const editingBlocked = busy || (!isDemo && Boolean(error));
-  const world = isDemo ? demo : remote;
+  const isDemo = !ready && !visitor;
+  const editingBlocked = visitor || busy || (!isDemo && Boolean(error));
+  const world = visitor ? visited : isDemo ? demo : remote;
   // Older deployments cannot move pieces atomically. Enable only when advertised by the server.
-  const canMove = isDemo || world?.capabilities?.move === true;
+  const canMove = !visitor && (isDemo || world?.capabilities?.move === true);
   const items = useMemo(() => new Map(manifest?.items.map((item) => [item.id, item]) ?? []), [manifest]);
   const baseScale = Math.min(size.width / 830, size.height / 640, 1.5);
   const effectiveScale = baseScale * camera.scale;
@@ -303,8 +322,10 @@ export default function TraderLandGatePage() {
       const response = await fetch(url, { signal: controller.signal });
       if (!response.ok) throw new Error(t('The island could not load. Please reload.', 'No se pudo cargar la isla. Recarga la página.'));
       return response.json();
-    })).then(([art, fixture]: [Manifest, Fixture]) => {
+    })).then(([loaded, fixture]: [Manifest, Fixture]) => {
+      let art = loaded;
       if (!art.layer_encoding || !art.items.find((item) => item.id === 'aura_core')) throw new Error('Incomplete art catalog');
+      art = { ...art, items: withCatalogAliases(art.items) };
       const initial = demoWorld(art, fixture);
       try {
         const saved = JSON.parse(localStorage.getItem(DEMO_KEY) || 'null') as ApiPlacement[] | null;
@@ -326,9 +347,9 @@ export default function TraderLandGatePage() {
     return () => controller.abort();
   }, []);
   useEffect(() => {
-    if (!demo) return;
+    if (!demo || visitor) return;
     try { localStorage.setItem(DEMO_KEY, JSON.stringify(demo.placements)); } catch { setNotice(t('This browser cannot save your demo.', 'Este navegador no puede guardar tu demo.')); }
-  }, [demo]);
+  }, [demo, visitor]);
   useEffect(() => {
     const node = viewport.current;
     if (!node) return;
@@ -336,6 +357,7 @@ export default function TraderLandGatePage() {
     observer.observe(node); return () => observer.disconnect();
   }, [manifest]);
   useEffect(() => {
+    if (visitor) return;
     requestEpoch.current += 1; const epoch = requestEpoch.current;
     setRemote(null); setDraft(null); setSelectedId(null); setUndoWorld(null); setUndoAction(null); setError('');
     if (!ready) { setBusy(false); return; }
@@ -349,8 +371,22 @@ export default function TraderLandGatePage() {
   // The identity is the invalidation boundary; headers reads the current token.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, wallet]);
+  useEffect(() => {
+    setVisited(null); setVisitorMeta(null);
+    if (!visitorCode) return;
+    const controller = new AbortController();
+    setBusy(true); setError(''); setDraft(null); setSelectedId(null);
+    fetch(`/api/trader-land-public?code=${encodeURIComponent(visitorCode)}`, { signal: controller.signal, headers: { Accept: 'application/json' } }).then(async (response) => {
+      const value = await response.json().catch(() => ({}));
+      if (!response.ok || !value.world || !Array.isArray(value.world.placements)) throw new Error(response.status === 404 ? t('This island is not published or does not exist.', 'Esta isla no está publicada o no existe.') : (value.error || t('The island could not load.', 'No se pudo cargar la isla.')));
+      const payload = value.world as PublicWorldPayload;
+      setVisited(visitorWorld(payload)); setVisitorMeta({ title: payload.title, publishedAt: payload.publishedAt, pieces: payload.stats?.pieces ?? payload.placements.length, districts: payload.stats?.districts ?? [] });
+    }).catch((err) => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err)); }).finally(() => { if (!controller.signal.aborted) setBusy(false); });
+    return () => controller.abort();
+  }, [visitorCode]);
+  useEffect(() => { setShareTitle(remote?.share?.title ?? ''); }, [remote?.share?.title]);
   const mutate = async (action: Record<string, unknown>): Promise<World | null> => {
-    if (lock.current || error || (action.action === 'move' && !canMove)) return null;
+    if (visitor || lock.current || error || (action.action === 'move' && !canMove)) return null;
     lock.current = true; setBusy(true); setError('');
     const epoch = requestEpoch.current;
     try {
@@ -412,6 +448,18 @@ export default function TraderLandGatePage() {
     if (isDemo && undoWorld) { setDemo(undoWorld); setUndoWorld(null); }
     else if (!isDemo && undoAction) { if (!await mutate(undoAction)) return; setUndoAction(null); }
     setNotice(t('Last change undone.', 'Último cambio deshecho.'));
+  };
+  const publish = async () => {
+    const next = await mutate({ action: 'publish', title: shareTitle.trim() });
+    if (next?.share?.public) { cue('placement_confirm'); setNotice(t('Your island is public. Share the link.', 'Tu isla es pública. Comparte el enlace.')); }
+  };
+  const unpublish = async () => {
+    if (await mutate({ action: 'unpublish' })) { setCopied(false); setNotice(t('Your island is private again.', 'Tu isla vuelve a ser privada.')); }
+  };
+  const copyLink = async () => {
+    const code = world?.share?.code; if (!code) return;
+    try { await navigator.clipboard.writeText(shareUrl(code)); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
+    catch { setNotice(t('Copy the link manually.', 'Copia el enlace manualmente.')); }
   };
   const localPoint = (clientX: number, clientY: number) => {
     const rect = viewport.current!.getBoundingClientRect(); const current=cameraRef.current;
@@ -492,22 +540,24 @@ export default function TraderLandGatePage() {
     <main className="land-studio">
       <Helmet><title>Trader Land · Bobby</title><meta name="description" content="Build your island, one thoughtful decision at a time."/></Helmet>
       <header className="land-header">
-        <Link className="land-icon" to="/agentic-world/bobby" aria-label={t('Back to desk','Volver al desk')}><ArrowLeft size={20}/></Link>
-        <div className="land-wordmark"><span className="land-eyebrow">BOBBY WORLD</span><h1>Trader Land</h1></div>
+        <Link className="land-icon" to={visitor?WORLDS_PATH:'/agentic-world/bobby'} aria-label={visitor?t('Back to worlds','Volver a mundos'):t('Back to desk','Volver al desk')}><ArrowLeft size={20}/></Link>
+        <div className="land-wordmark"><span className="land-eyebrow">BOBBY WORLD</span><h1>{visitor?(visitorMeta?.title||t('Community island','Isla de la comunidad')):'Trader Land'}</h1></div>
         <div className="land-header-divider"/>
-        <span className="land-mode"><i/>{isDemo?t('Playground','Zona de prueba'):t('My island','Mi isla')}</span>
+        <span className="land-mode"><i/>{visitor?t('Visiting','Visitando'):isDemo?t('Playground','Zona de prueba'):t('My island','Mi isla')}</span>
         <div className="land-header-right">
-          {!isDemo && world && <span className="land-xp">{world.xp} XP <span>· {world.aura} aura</span></span>}
+          {!isDemo && !visitor && world && <span className="land-xp">{world.xp} XP <span>· {world.aura} aura</span></span>}
+          <Link className="land-icon" to={WORLDS_PATH} aria-label={t('Worlds','Mundos')} title={t('Worlds','Mundos')}><Globe size={19}/></Link>
+          {!visitor && <button className="land-icon" onClick={()=>{setShareOpen(!shareOpen);setHelp(false);}} aria-label={t('Share island','Compartir isla')} aria-expanded={shareOpen} title={t('Share island','Compartir isla')}><Share2 size={19}/></button>}
           <button className="land-icon" onClick={toggleSound} aria-label={t('Toggle sound','Activar o silenciar sonido')} aria-pressed={soundEnabled}>{soundEnabled?<Volume2 size={19}/>:<VolumeX size={19}/>}</button>
-          <button className="land-icon" onClick={()=>setHelp(!help)} aria-label={t('How to play','Cómo jugar')} aria-expanded={help}><HelpCircle size={20}/></button>
+          <button className="land-icon" onClick={()=>{setHelp(!help);setShareOpen(false);}} aria-label={t('How to play','Cómo jugar')} aria-expanded={help}><HelpCircle size={20}/></button>
         </div>
       </header>
       <div className={'land-workspace '+(!libraryOpen?'library-closed':'')}>
         <section className="land-map" ref={viewport} aria-label={t('Interactive island','Isla interactiva')} tabIndex={0} onKeyDown={keyboard} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
           <div className="land-map-caption" data-land-ui>
-            <span className="land-eyebrow">{t('FIRST LIGHT · ISLAND 01','PRIMERA LUZ · ISLA 01')}</span>
-            <h2>{draft?t('Find its place.','Encuentra su lugar.'):t('A little world. All yours.','Un pequeño mundo. Muy tuyo.')}</h2>
-            <p>{draft?t('Drag the piece or tap a tile. Confirm when it feels right.','Arrastra la pieza o toca una casilla. Confirma cuando esté lista.'):t('Every thoughtful decision leaves something behind.','Cada decisión consciente deja una huella.')}</p>
+            <span className="land-eyebrow">{visitor?t('COMMUNITY ISLAND','ISLA DE LA COMUNIDAD'):t('FIRST LIGHT · ISLAND 01','PRIMERA LUZ · ISLA 01')}</span>
+            <h2>{visitor?(visitorMeta?.title||t('Someone else\'s world.','El mundo de alguien más.')):draft?t('Find its place.','Encuentra su lugar.'):t('A little world. All yours.','Un pequeño mundo. Muy tuyo.')}</h2>
+            <p>{visitor?t('Explore it. Nothing here can be changed.','Explórala. Aquí nada se puede cambiar.'):draft?t('Drag the piece or tap a tile. Confirm when it feels right.','Arrastra la pieza o toca una casilla. Confirma cuando esté lista.'):t('Every thoughtful decision leaves something behind.','Cada decisión consciente deja una huella.')}</p>
           </div>
           <div className="land-scene" data-testid="trader-land-grid" style={{left:size.width/2+camera.x,top:size.height/2+camera.y,transform:`scale(${effectiveScale}) translate(-430px,-335px)`}}>
             <svg className="land-island-base" width="860" height="720" aria-hidden="true"><defs><linearGradient id="land-edge" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#244547"/><stop offset="1" stopColor="#081a23"/></linearGradient></defs><path d="M62 391 L430 575 L798 391 L798 412 L430 602 L62 412 Z" fill="url(#land-edge)" stroke="#41665f" strokeOpacity=".4"/><path d="M62 391 L430 575 L798 391" fill="none" stroke="#94e7ca" strokeOpacity=".4"/></svg>
@@ -541,14 +591,35 @@ export default function TraderLandGatePage() {
               <button className="land-icon" disabled={busy} onClick={()=>{setDraft(null);setLibraryOpen(true);}} aria-label={t('Cancel placement','Cancelar colocación')}><X size={20}/></button>
               <button className="land-icon" disabled={busy} onClick={rotate} aria-label={t('Rotate piece','Girar pieza')}><RotateCw size={20}/></button>
               <button className="land-primary" disabled={!validDraft||editingBlocked} onClick={()=>void confirm()}>{busy?<LoaderCircle size={18} className="animate-spin"/>:<Check size={18}/>}<span>{t('Place','Colocar')}</span></button>
-            </div> : <div className="land-explore-bar"><span><Hand size={15}/>{t('Drag to explore · scroll to zoom','Arrastra para explorar · pellizca para acercar')}</span><button className="land-subtle" disabled={editingBlocked||!(isDemo?undoWorld:undoAction)} onClick={()=>void undo()}><Undo2 size={17}/>{t('Undo','Deshacer')}</button></div>}
+            </div> : <div className="land-explore-bar"><span><Hand size={15}/>{t('Drag to explore · scroll to zoom','Arrastra para explorar · pellizca para acercar')}</span>{!visitor && <button className="land-subtle" disabled={editingBlocked||!(isDemo?undoWorld:undoAction)} onClick={()=>void undo()}><Undo2 size={17}/>{t('Undo','Deshacer')}</button>}</div>}
             {notice && <div role="status" className="land-notice">{notice}</div>}
             {error && <div role="alert" className="land-error">{error}<button onClick={()=>window.location.reload()} aria-label={t('Reload saved island','Recargar isla guardada')}><RotateCw size={16}/></button></div>}
           </div>
-          {!world && <div className="land-load-overlay">{busy?<><LoaderCircle className="animate-spin"/><p>{t('Loading your island…','Cargando tu isla…')}</p></>:<><p>{error||t('Your island is unavailable.','Tu isla no está disponible.')}</p><button className="land-primary" onClick={()=>window.location.reload()}>{t('Retry','Reintentar')}</button></>}</div>}
+          {!world && <div className="land-load-overlay">{busy?<><LoaderCircle className="animate-spin"/><p>{visitor?t('Loading the island…','Cargando la isla…'):t('Loading your island…','Cargando tu isla…')}</p></>:<><p>{error||t('Your island is unavailable.','Tu isla no está disponible.')}</p><button className="land-primary" onClick={()=>window.location.reload()}>{t('Retry','Reintentar')}</button></>}</div>}
           {help && <div className="land-help" data-land-ui role="region" aria-label={t('How to play','Cómo jugar')}><button className="land-icon" onClick={()=>setHelp(false)} aria-label={t('Close help','Cerrar ayuda')}><X size={18}/></button><h3>{t('Make room for your ideas.','Dale espacio a tus ideas.')}</h3><p>{t('Choose a piece from your collection. Tap a tile, rotate, then confirm. Tap a built piece to move it or return it to your collection.','Elige una pieza de tu colección. Toca una casilla, gira y confirma. Toca una pieza construida para moverla o devolverla a tu colección.')}</p><p>{t('Drag the ground to explore. Pinch or scroll to zoom. Keyboard: arrows to move, R to rotate, Enter to place, Esc to cancel.','Arrastra el suelo para explorar. Pellizca o usa la rueda para acercar. Teclado: flechas para mover, R para girar, Enter para colocar y Esc para cancelar.')}</p></div>}
+          {shareOpen && !visitor && <div className="land-help land-share" data-land-ui role="region" aria-label={t('Share island','Compartir isla')}>
+            <button className="land-icon" onClick={()=>setShareOpen(false)} aria-label={t('Close','Cerrar')}><X size={18}/></button>
+            {isDemo ? <>
+              <h3>{t('Share your earned island.','Comparte tu isla ganada.')}</h3>
+              <p>{t('The practice island lives only in this browser. Sign in to publish the island you build with real decisions and get a link anyone can visit.','La isla de práctica vive solo en este navegador. Inicia sesión para publicar la isla que construyes con decisiones reales y obtener un enlace que cualquiera puede visitar.')}</p>
+              <div className="land-selected-actions"><button className="land-primary" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}}>{t('Open my earned island','Abrir mi isla ganada')}</button><Link className="land-subtle" to={WORLDS_PATH}>{t('See worlds','Ver mundos')}</Link></div>
+            </> : <>
+              <h3>{world?.share?.public?t('Your island is public.','Tu isla es pública.'):t('Share your island.','Comparte tu isla.')}</h3>
+              <p>{world?.share?.public?t('Anyone with the link can visit it and it appears in Worlds. Hide it whenever you want.','Cualquiera con el enlace puede visitarla y aparece en Mundos. Ocúltala cuando quieras.'):t('Publish it so others can visit it and it appears in Worlds. You can hide it at any time.','Publícala para que otros la visiten y aparezca en Mundos. Puedes ocultarla cuando quieras.')}</p>
+              <label className="land-share-field"><span>{t('Island name (optional)','Nombre de la isla (opcional)')}</span><input value={shareTitle} maxLength={40} onChange={(event)=>setShareTitle(event.target.value)} placeholder={t('e.g. Patience Bay','p. ej. Bahía Paciente')} /></label>
+              {world?.share?.public && world.share.code && <div className="land-share-link"><code>{shareUrl(world.share.code)}</code><button className="land-subtle" onClick={()=>void copyLink()}>{copied?<><Check size={15}/>{t('Copied','Copiado')}</>:<><Copy size={15}/>{t('Copy link','Copiar enlace')}</>}</button><a className="land-subtle" href={shareUrl(world.share.code)} target="_blank" rel="noreferrer"><ExternalLink size={15}/>{t('View as visitor','Ver como visitante')}</a></div>}
+              <div className="land-selected-actions"><button className="land-primary" disabled={editingBlocked||Boolean(draft)} onClick={()=>void publish()}>{busy?<LoaderCircle size={18} className="animate-spin"/>:<Share2 size={17}/>}<span>{world?.share?.public?t('Save name','Guardar nombre'):t('Publish','Publicar')}</span></button>{world?.share?.public && <button className="land-subtle" disabled={editingBlocked} onClick={()=>void unpublish()}>{t('Hide','Ocultar')}</button>}</div>
+            </>}
+          </div>}
         </section>
-        <aside className={'land-library '+(!libraryOpen?'collapsed':'')} aria-label={t('Piece collection','Colección de piezas')}>
+        {visitor ? <aside className="land-library" aria-label={t('About this island','Sobre esta isla')}>
+          <div className="land-library-title"><span><Globe size={20}/>{t('Community island','Isla de la comunidad')}</span></div>
+          <div className="land-library-content">
+            <div className="land-district-heading"><h3>{visitorMeta?.title||t('Untitled island','Isla sin nombre')}</h3><span>{visitorMeta?`${visitorMeta.pieces} ${t('pieces','piezas')} · ${visitorMeta.districts.length} ${t(visitorMeta.districts.length===1?'world':'worlds',visitorMeta.districts.length===1?'mundo':'mundos')}`:''}</span></div>
+            {visitorMeta && visitorMeta.districts.length>0 && <div className="land-visitor-districts">{visitorMeta.districts.map((value)=><span key={value} style={{'--district-color':districtColors[value as District]??'#7da6ff'} as React.CSSProperties}><i/>{districtNames[value as District]??pretty(value)}</span>)}</div>}
+            <div className="land-collection-footer"><span><Sparkles size={16}/>{t('Built with discipline','Construida con disciplina')}</span><p>{t('Every piece here came from a real decision: a completed read, a respected no-trade or a closed thesis. Nothing is bought.','Cada pieza nació de una decisión real: una lectura completa, un no-trade respetado o una tesis cerrada. Nada se compra.')}</p><Link className="land-primary land-primary-link" to={STUDIO_PATH}>{t('Build mine','Construir la mía')}</Link><Link className="land-text-link" to={WORLDS_PATH}>{t('See more worlds','Ver más mundos')}</Link></div>
+          </div>
+        </aside> : <aside className={'land-library '+(!libraryOpen?'collapsed':'')} aria-label={t('Piece collection','Colección de piezas')}>
           <button className="land-library-title" onClick={()=>setLibraryOpen(!libraryOpen)} aria-expanded={libraryOpen}><span><Layers3 size={20}/>{t('Your collection','Tu colección')}<small>{available}</small></span><ChevronDown size={18}/></button>
           {libraryOpen && <div className="land-library-content">
             <div className="land-districts" role="tablist" aria-label={t('Districts','Distritos')}>{districts.map((value,index)=><button key={value} role="tab" aria-selected={district===value} aria-label={districtNames[value]} title={districtNames[value]} style={{'--district-color':districtColors[value]} as React.CSSProperties} className={district===value?'active':''} onClick={()=>{setDistrict(value);if(!draft)setSelectedId(null);}}><span>0{index+1}</span><i/></button>)}</div>
@@ -562,7 +633,7 @@ export default function TraderLandGatePage() {
             <div className="land-collection-footer">{isDemo?<><span><Compass size={16}/>{t('Your practice island','Tu isla de práctica')}</span><p>{t('Try every piece. This layout stays in this browser, separate from your earned collection.','Prueba todas las piezas. Este diseño se guarda en este navegador, separado de tu colección ganada.')}</p><button className="land-text-link" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}}>{t('Open my earned island','Abrir mi isla ganada')} <ArrowLeft size={14} style={{transform:'rotate(180deg)'}}/></button></>:<><span><Sparkles size={16}/>{t('Built with discipline','Construida con disciplina')}</span><p>{t('Keep learning and reviewing your decisions to grow your collection.','Sigue aprendiendo y revisando tus decisiones para hacer crecer tu colección.')}</p><Link className="land-text-link" to="/agentic-world/bobby">{t('Continue my discovery route','Continuar mi ruta de descubrimiento')}</Link></>}</div>
           </div>}
           {libraryOpen && selectedItem && selected && <div className="land-selected-detail"><div><span className="land-eyebrow">{selectedPlacement?t('ON YOUR ISLAND','EN TU ISLA'):t('BLUEPRINT','PLANO')}</span><h3>{itemName(selectedItem)}</h3><p>{footprint(selectedItem,draft?.orientation).cols} × {footprint(selectedItem,draft?.orientation).rows} {t('tiles','casillas')}</p>{selectedPlacement&&!canMove&&<p>{t('Moving saved pieces is coming soon.','Mover piezas sincronizadas estará disponible pronto.')}</p>}</div><div className="land-selected-actions"><button className="land-primary" disabled={editingBlocked||Boolean(draft)||selected.state!=='bloomed'||Boolean(selectedPlacement&&!canMove)} onClick={()=>startDraft(selected)}>{selectedPlacement?<Move size={17}/>:<Plus size={17}/>} {selectedPlacement?t('Move','Mover'):selected.state==='seed'?t('Growing','Creciendo'):t('Build','Construir')}</button>{selectedPlacement&&!draft&&<button className="land-subtle" disabled={editingBlocked} onClick={()=>void returnPiece()}>{t('Store','Guardar')}</button>}</div></div>}
-        </aside>
+        </aside>}
       </div>
     </main>
   );
