@@ -405,6 +405,11 @@ export default function CompanionDesk() {
             <ShieldCheck className="h-3 w-3 text-[#7da6ff]" />
             <span>{t('Bobby never executes · you confirm', 'Bobby no ejecuta · tú confirmas')}</span>
           </div>
+          {/* Trader Land lives here as a compact control: the chart stays the co-star of the desk. */}
+          <button type="button" onClick={openTraderLand} aria-label="Trader Land" title="Trader Land" className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-emerald-200/20 bg-emerald-200/[0.06] pl-1 pr-1 text-emerald-100 transition hover:border-emerald-200/40 hover:bg-emerald-200/[0.12] sm:pr-3">
+            <img src="/land/v1/gate-A/aura_core/ne/stage1_thumb_256.png" alt="" width="32" height="32" className="h-8 w-8 object-contain" />
+            <span className="hidden font-mono text-[9px] uppercase tracking-[0.14em] sm:inline">Trader Land</span>
+          </button>
           <ProgressSync />
           <button onClick={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-sky-300">{speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
           <div className="relative">
