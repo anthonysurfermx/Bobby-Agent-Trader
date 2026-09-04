@@ -6,7 +6,7 @@ import SwiftUI
 
 enum RiskNotice {
     /// Bump when the wording changes materially; users re-acknowledge.
-    static let currentVersion = 1
+    static let currentVersion = 2
 }
 
 struct RiskNoticeView: View {
@@ -22,9 +22,9 @@ struct RiskNoticeView: View {
             (L.t("Not investment advice.", "No es asesoría de inversión."),
              L.t("Everything Bobby says — verdicts, levels, entries, stops, XP — is educational market analysis produced by software. It is not a recommendation to buy, sell or hold anything, and it is not tailored to you.",
                  "Todo lo que dice Bobby (veredictos, niveles, entradas, stops, XP) es análisis educativo generado por software. No es una recomendación de comprar, vender o mantener nada, y no está hecho a tu medida.")),
-            (L.t("Bobby never touches your money.", "Bobby nunca toca tu dinero."),
-             L.t("The app does not execute trades, does not hold funds or keys, and does not connect to your exchange. Anything you do with a broker or a wallet is your own action, outside this app.",
-                 "La app no ejecuta operaciones, no guarda fondos ni llaves y no se conecta a tu exchange. Lo que hagas en un bróker o una wallet es tu propia acción, fuera de esta app.")),
+            (L.t("Bobby never takes custody or signs for you.", "Bobby nunca toma custodia ni firma por ti."),
+             L.t("The app can prepare Base swap transaction data for your connected wallet. You review and sign from your wallet; Bobby never holds your funds or keys.",
+                 "La app puede preparar datos de transacción para swaps en Base con tu wallet conectada. Tú revisas y firmas desde tu wallet; Bobby nunca guarda tus fondos ni llaves.")),
             (L.t("Markets involve risk. You decide.", "Los mercados implican riesgo. Tú decides."),
              L.t("Prices move against you, data can be delayed or wrong, and you can lose money. Only you own your decisions and their results. If you need advice, talk to a licensed professional.",
                  "Los precios se mueven en tu contra, los datos pueden llegar tarde o mal, y puedes perder dinero. Solo tú eres dueño de tus decisiones y de sus resultados. Si necesitas asesoría, acude a un profesional autorizado.")),

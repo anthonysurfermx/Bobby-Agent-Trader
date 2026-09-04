@@ -1,55 +1,58 @@
-# Bobby iOS — App Privacy (App Store Connect questionnaire)
+# Bobby iOS — App Privacy (App Store Connect)
 
-Estas respuestas están **verificadas contra el código** (2026-08-24). Son
-válidas una vez mergeado el PR #42 (hash de IP en rate-limit) — sin ese merge,
-la fila de rate-limit en Supabase guarda IP cruda y habría que declarar
-"Identifiers".
+Estado verificado contra el código del build 14, 2026-09-04. Estas respuestas
+sustituyen la antigua declaración “Data Not Collected”: la app ya ofrece cuenta
+opcional, sincronización de progreso y swaps no custodiales.
 
-## Lo que la app realmente hace con datos
+## Datos que salen del dispositivo
 
-| Dato | ¿Sale del dispositivo? | ¿Se almacena? | Dónde |
-|---|---|---|---|
-| Nombre/voz/vibe/aura del agente | No | Sí (local) | UserDefaults |
-| Companion + Discipline XP/racha | No | Sí (local) | UserDefaults |
-| Pregunta de mercado ("bitcoin") | Sí → bobbyprotocol.xyz | No (solo se procesa; logs solo de errores) | — |
-| Texto a sintetizar (TTS) | Sí → bobbyprotocol.xyz → OpenAI/Edge | No (respuesta de audio; sin retención propia) | — |
-| Idioma del dispositivo (es/en) | Sí (parámetro `lang`) | No | — |
-| IP | Solo como contador de rate-limit **hasheado con sal** (PR #42) | TTL corto, irreversible | Supabase api_cache |
-| Identificadores (device ID, cuenta, email) | **No existen** — la app no tiene cuentas ni SDKs | — | — |
+| Dato | Retención | Uso |
+|---|---|---|
+| Credencial de Sign in with Apple y UUID de Supabase | Sí, por Supabase Auth | Cuenta opcional y sesión |
+| Companion elegido, XP, racha y eventos de progreso | Sí, sólo al iniciar sesión | Sincronizar progreso entre app y web |
+| Dirección pública de wallet y prueba firmada | Sesión temporal; la dirección se conserva con recibos | Probar control de la wallet y limitar calldata a su dueño |
+| Par, importes, ruta, hash de calldata y transacción confirmada | Sí, ligados a la dirección pública | Auditoría y historial de swaps |
+| País inferido por el edge | Se procesa para elegibilidad; no se guarda en el recibo | Bloqueo geográfico fail-closed |
+| Pregunta de mercado y texto TTS | Sólo durante la petición; Bobby no los retiene | Análisis y audio solicitados |
+| Perfil creativo (nombre, voz, vibe y aura) | No sale del dispositivo | Personalización local |
 
-Sin SDKs de analytics, sin ads, sin crash reporting de terceros, sin tracking.
+Reown 2.3.2 tiene analytics desactivado en la app. Sus privacy manifests
+declaran cero tracking y cero datos recolectados. No hay ads ni SDK de
+analytics o crash reporting.
 
-## Respuestas al cuestionario
+## Respuestas en App Store Connect
 
-**Do you or your third-party partners collect data from this app?**
-→ **No** ("Data Not Collected").
+**Do you or your third-party partners collect data from this app?** → **Yes**.
 
-Justificación bajo la definición de Apple ("collect" = transmitir fuera del
-dispositivo Y retener más allá de lo necesario para atender la petición):
-- Las preguntas y textos TTS se transmiten pero **no se retienen** (se
-  procesan y se descartan; los logs de los endpoints solo registran errores,
-  verificado en `bobby-voice-free.ts`, `voice-tool.ts`, `bobby-asset-search.ts`).
-- El contador de rate-limit persiste un **hash salado** de la IP, no la IP
-  (PR #42) — no es un identificador legible.
-- Todo el perfil/XP vive en UserDefaults **en el dispositivo**.
+Declarar, todos con propósito **App Functionality**, **Linked to the User: Yes**
+y **Used for Tracking: No**:
 
-**Tracking (ATT)?** → No. Sin App Tracking Transparency necesaria.
+- **Identifiers → User ID**: UUID de cuenta y dirección pública de wallet.
+- **Usage Data → Product Interaction**: eventos de progreso/discipline usados
+  para XP, racha y sincronización.
+- **Financial Info → Other Financial Info**: par, importes y recibos on-chain de
+  swaps solicitados por la persona.
 
-**Privacy Policy URL** (obligatoria aunque no se recolecte):
-https://bobbyprotocol.xyz/privacy — ⚠️ hay que publicar esa página antes del
-submit (contenido: lo de la tabla de arriba en prosa; pedirla cuando toque).
+No declarar ubicación: el país del edge no se retiene después de resolver la
+elegibilidad. No declarar Audio Data: Speech de Apple procesa el dictado y el
+backend recibe texto, no la grabación. No declarar Search History mientras las
+preguntas no se almacenen.
 
-## Permisos del sistema (Info.plist, ya declarados)
+**Tracking / ATT** → No.
+**Privacy Policy URL** → https://bobbyprotocol.xyz/privacy
+**User Privacy Choices URL** → https://bobbyprotocol.xyz/privacy. La política
+explica acceso/borrado y la app ofrece Account → Delete account and synced
+progress, con confirmación destructiva.
 
-- **Micrófono** — "Bobby te escucha para responder sobre cualquier activo."
-  Uso: dictar preguntas. El audio se procesa con Speech de Apple; no se sube.
-- **Reconocimiento de voz** — ídem; transcripción en dispositivo/Apple.
+## Correspondencia con el binario
 
-Ambos son opcionales (la app funciona 100% tecleando).
+`Sources/PrivacyInfo.xcprivacy` declara `UserID`, `ProductInteraction` y
+`OtherFinancialInfo`, todos ligados, sólo para funcionalidad y sin tracking.
+También declara UserDefaults con motivo `CA92.1` para preferencias y caché de
+progreso propias de la app.
 
-## Notas de mantenimiento
+Antes de cada submit hay que comprobar que:
 
-- Si algún día se agrega analytics, cuentas, o se loguean preguntas con
-  identificador → este documento y la declaración cambian. Revisar antes.
-- `RATE_LIMIT_SALT` en Vercel env hace el hash no-reproducible fuera de prod
-  (opcional pero recomendado — un env var de un click).
+1. la política pública describe wallet, Reown, Supabase y recibos on-chain;
+2. los privacy manifests de todas las dependencias resueltas no cambiaron;
+3. App Store Connect conserva estas tres categorías y no “Data Not Collected”.

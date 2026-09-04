@@ -1,92 +1,65 @@
-# Bobby iOS — App Store readiness checklist (2026-08-24)
+# Bobby iOS — App Store readiness checklist (2026-09-04)
 
-## ✅ Hecho (verificado en simulador)
+## Implementado y verificado
 
-- **App icon** 1024 (Bobby Orb, `Assets.xcassets/AppIcon.appiconset`) + display
-  name **"Bobby"** + `ITSAppUsesNonExemptEncryption: NO` (export compliance).
-- **Bilingüe por idioma del dispositivo** (`L.t`): UI, saludos, veredictos,
-  onboarding, accesibilidad. Verificado EN y ES en pantalla.
-- **Companion habla y SE MUEVE** (puppet-talk: nod + pulso por nivel de audio,
-  procedural cuando el player no da métricas). Verificado en vivo.
-- **Evolución en vivo**: byte→KILOBYTE (orgánico) →MEGABYTE (verificado hoy):
-  nombre, badge de nivel, tono del saludo y overlay. XP solo por disciplina,
-  tope diario, racha con día de gracia.
-- Privacy strings de micrófono y speech ya en Info.plist (project.yml).
-- Métricas de carga/memoria de mascotas instrumentadas (sesión paralela).
+- Build 14, iOS, bundle `xyz.bobbyprotocol.bobby`, deep link
+  `bobbyprotocol://wallet`, Sign in with Apple y App Group de Reown declarados
+  desde `project.yml`.
+- Reown AppKit 2.3.2, Web3 0.8.8 y CryptoSwift 1.8.3 fijados a versión exacta;
+  Reown analytics desactivado.
+- Pantalla visible “Base swaps” con conexión no custodial, attestation de
+  jurisdicción, USDC ↔ AAPLc/GOOGLc/METAc/NVDAc, approve exacto, swap, recibo y
+  revocación de allowance.
+- Guard local independiente: Base 8453, direcciones de tokens y router,
+  calldata ABI, fee de pool, recipient, importe, mínimo recalculado desde
+  slippage, deadline y simulación.
+- `xcodebuild` para simulador: PASS. XCTest nativo: 9/9 PASS. Flujo visual y
+  selector Reown revisados en iPhone 16e / iOS 26.1.
+- Aviso de riesgo v2 y copy de cuenta distinguen cuenta Apple, wallet externa,
+  firma del usuario y ausencia de custodia.
+- Borrado de cuenta dentro de la app, con confirmación destructiva: elimina la
+  identidad Auth y los datos sincronizados; desliga recibos que deban conservarse.
+- Privacy manifest y respuestas de tienda actualizados para `UserID`,
+  `ProductInteraction` y `OtherFinancialInfo`, sin tracking.
 
-## ✅ RESUELTO — la voz (era el bloqueante #1)
+## NO-GO para TestFlight/App Review
 
-**PR #41 mergeado 2026-08-24.** Producción verificada: MP3 + persona OpenAI
-(`x-tts-provider: openai`) en es y en. Del lado iOS además se corrigió que la
-app mandaba `edgeVoice` legacy en cada request (forzaba la voz Edge española
-sobre la persona cálida): ya no se envía, la persona del companion siempre
-gana, y el paso de voz del onboarding ahora ofrece las personas reales
-(CORAL/BALLAD/SAGE/ASH) con migración de los ids Edge viejos. Falta solo tu
-prueba de oído de 30s en dispositivo (un análisis ES y uno EN).
+- [ ] La cuenta del Apple Developer Program debe ser de **organización**, no de
+  una persona, y el App ID debe habilitar Sign in with Apple + App Group
+  `group.xyz.bobbyprotocol.bobby`.
+- [ ] Legal debe confirmar por escrito la entidad, permisos/licencias y países
+  donde puede ofrecerse cada B20 token. La allow-list actual de México sigue en
+  estado draft; no activar producción con esa etiqueta.
+- [ ] Definir con Apple un camino revisable para la función restringida fuera
+  de EE. UU. sin bypass secreto de geolocalización.
+- [ ] Ejecutar el camino destructivo de `DELETE /api/account` en producción
+  con una cuenta de prueba desechable. La política publicada y los rechazos
+  403/401 del endpoint ya se verificaron en el SHA web `a12daea4`.
+- [ ] Actualizar App Store Connect: ya no es “Data Not Collected” ni una app
+  read-only. Usar `app-privacy-answers.md`, `reviewer-notes.md` y el listing
+  corregido.
+- [ ] Regenerar screenshots: el set actual no muestra la función de swaps.
+- [ ] Probar en iPhone real: regreso por deep link desde OKX/MetaMask/Trust,
+  cambio a Base, rechazo de firma, approve minado, re-quote, swap, recibo,
+  revocación y restauración de sesión tras relaunch.
+- [ ] Ejecutar un archive firmado y validar privacy report / export compliance.
 
-## Pasos de publicación (requieren tu Apple ID — no automatizables desde CLI)
+## Orden de publicación
 
-1. **Cuenta**: Xcode → Settings → Accounts → añadir el Apple ID del team
-   `QZRTV6CMTT` (Apple Developer Program activo, $99/año).
-2. **Bundle ID**: registrar `xyz.bobbyprotocol.bobby` en
-   developer.apple.com → Identifiers (o dejar que Xcode lo haga automatic).
-3. **App Store Connect**: crear la app (nombre "Bobby — AI Market Companion"
-   o similar; el nombre corto "Bobby" puede estar tomado), idioma primario
-   English (US), añadir localización Spanish (MX).
-4. **Archive**: abrir `ios/Bobby/Bobby.xcodeproj`, destino "Any iOS Device",
-   Product → Archive → Distribute → App Store Connect. (Signing: Automatic
-   con el team QZRTV6CMTT ya configurado en project.yml.)
-5. **TestFlight primero**: subir build, probarla en TU iPhone real 1-2 días
-   (voz real, datos móviles, memoria en dispositivo físico).
-6. **App Privacy** (App Store Connect): micrófono = "App Functionality"
-   (voz→texto local), sin tracking, sin data collection vinculada a identidad
-   (todo el perfil/XP vive on-device en UserDefaults). Data Not Collected si
-   se confirma que bobby-voice-free no loguea texto con IP (revisar antes de
-   declarar).
-7. **Review notes**: explicar que es análisis de mercados **read-only**, sin
-   ejecución de operaciones, sin custodia, sin recomendaciones personalizadas
-   (guideline 3.1.5 fintech / 2.3 metadata). Incluir el disclaimer que ya
-   aparece en onboarding.
-8. **Screenshots**: en inglés (decisión), 6.9" (iPhone 17 Pro Max) y 6.5".
-   Storyboard en `docs/app-store/ios-screenshot-storyboard.md` + capturas de
-   referencia en `docs/app-store/ui-captures/`. Momentos: companion en desk,
-   SQUAD gallery, evolución (MEGABYTE overlay), veredicto con chart, NO TRADE.
-9. **Edad**: 17+ ó 4+ con "Unrestricted Web Access: No"… contenido financiero
-   → marcar categoría Finance; cuestionario de rating honesto.
+1. Cerrar los ocho NO-GO anteriores.
+2. Activar `BASE_STOCK_SWAPS_ENABLED=true` y la allow-list aprobada sólo para el
+   test legal controlado; verificar una operación mínima y su recibo.
+3. Subir a TestFlight interno, no a producción pública.
+4. Probar 1–2 días en dispositivo físico y revisar logs/recibos.
+5. Enviar a App Review con las notas y evidencia exactas.
+6. Ampliar países sólo mediante una nueva aprobación legal y cambio explícito
+   de allow-list.
 
-## ✅ Paquete de tienda listo (2026-08-24)
+## Evidencia que debe conservarse
 
-- **Screenshots 6.9"** reales en `store-shots/` (rig de UI tests
-  `BobbyUITests/StoreShots` — regenerables; ver `ios-screenshot-storyboard.md`).
-- **Listing EN + ES-MX** copy-paste en `app-store-listing.md`.
-- **App Privacy** con respuestas verificadas contra código en
-  `app-privacy-answers.md` — válidas al mergear **PR #42** (hash de IP en
-  rate-limit). Falta publicar `bobbyprotocol.xyz/privacy`.
-- **Review notes** listas en `reviewer-notes.md`.
-- Momento **NO TRADE / Halo** ya existe y está capturado (09-verdict).
-- Localización barrida: onboarding (FORGE/NEXT/OPEN THE DESK/sparks),
-  saludo del desk, AuraCard, "TÚ/YOU" — cero español hardcodeado en EN.
-- Métricas de performance de la galería ocultas tras `-store-shots`
-  (⚠️ siguen visibles en builds normales — gate a #if DEBUG antes del
-  release público si molestan).
-
-## ⚠️ Deuda consciente antes del release público (TestFlight OK sin esto)
-
-- Sonido corto + partículas al seleccionar companion (háptico ya está).
-- Pausar el rAF/spin del SceneKit cuando la app pasa a background (batería).
-- Publicar la página de privacidad en bobbyprotocol.xyz/privacy.
-
-## Round 4 (Codex + Kimi, 2026-08-24) — estado
-
-Corregidos: F1 fallo-backend≠NO-TRADE (isUnavailable, cero XP, mensaje honesto),
-F2 XP fantasma (awardDiscipline devuelve lo otorgado; "DAILY XP COMPLETE" al
-tope), F3 etiqueta honesta ("SAVED ON THIS DEVICE" hasta tener ledger real),
-F5 aritmética del día de gracia (1=+1, 2=mantener, >2=reset), F7 lifecycle 3D
-(dismantleUIView + teardown de display link/acciones), F8 persona en la frase
-de selección + delegate del fallback AVSpeech, F9 fallback del desk al orb si
-el GLB falla, F10 parcial (Reduce Motion en spin/talk/burst).
-
-Diferidos conscientemente a la fase de servidor-autoridad (arquitectura
-avatar-evolution): F4 XP con cycleId idempotente y acción de revisión
-explícita, F6 ledger firmado server-side (UserDefaults como caché). También
-pendiente: target de tests unitarios para XP/cap/gracia.
+- Resultado de `xcodebuild test` y SHA del commit enviado.
+- Versiones resueltas de Swift Package Manager.
+- Capturas EN/ES del aviso, swap, wallet picker, quote y confirmación.
+- Matriz país → permiso/licencia → fecha de aprobación.
+- Hash de la política de privacidad publicada y respuestas de App Store
+  Connect del mismo release.

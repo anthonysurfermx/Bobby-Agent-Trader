@@ -1,9 +1,11 @@
-// Bobby — the trading assistant. Thin, beautiful client over the live
-// bobbyprotocol.xyz brain. No keys on device; all intelligence server-side.
+// Bobby — the trading assistant. Thin native client over the live
+// bobbyprotocol.xyz brain. Wallets sign externally; Bobby stores no keys.
 import SwiftUI
 
 @main
 struct BobbyApp: App {
+    init() { WalletBridge.configure() }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -20,6 +22,7 @@ struct BobbyApp: App {
 #endif
             }
             .preferredColorScheme(.dark)
+            .onOpenURL { WalletBridge.shared.handleDeepLink($0) }
         }
     }
 }

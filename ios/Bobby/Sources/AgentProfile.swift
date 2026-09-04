@@ -64,7 +64,7 @@ enum AuraForge {
         }
         // djb2 → a hue of its own: same words, same aura, always.
         var h: UInt64 = 5381
-        for b in t.utf8 { h = (h &* 33) &+ UInt64(b) }
+        for b in t.utf8 { h = (h &* 33) &+ UInt64(truncatingIfNeeded: b) }
         return Double(h % 360) / 360
     }
 

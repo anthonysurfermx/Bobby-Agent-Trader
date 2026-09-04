@@ -3,6 +3,10 @@
 Idioma primario: **English (US)**. Localización adicional: **Spanish (Mexico)**.
 Los límites de App Store Connect van anotados en cada campo.
 
+> **NO-GO:** no publicar este listing hasta cerrar la aprobación de entidad,
+> licencias/permisos y países. La metadata debe coincidir con el feature flag y
+> la allow-list reales del día del submit.
+
 ---
 
 ## English (US) — primary
@@ -41,6 +45,13 @@ Every question runs through Bobby's desk:
 
 You see the debate, not just the conclusion — for crypto and major stocks.
 
+OPTIONAL, NON-CUSTODIAL BASE SWAPS
+In eligible jurisdictions outside the United States, connect your own wallet
+to review direct USDC swaps for supported Coinbase B20 tokenized-equity tokens
+on Base. B20 tokens are not the underlying shares. Bobby checks the route,
+contracts, exact input and minimum received; your wallet shows the final
+request and only you can sign it. Availability varies by country.
+
 "NO TRADE" IS AN ANSWER
 Most days, the best position is none. When the setup isn't there, Bobby tells you exactly that — and your companion earns Discipline XP for the patience. No signals spam. No fake urgency.
 
@@ -52,11 +63,13 @@ Warm, natural voices in English and Spanish, matched to your device language. Yo
 
 HONEST BY DESIGN
 • Analysis, not financial advice — no personalized recommendations
-• Read-only: Bobby never touches your funds, keys or exchange accounts
-• No account required; your progress is saved on your device
+• Non-custodial: Bobby never holds funds or keys and never signs for you
+• No account required for analysis; optional Apple sign-in syncs progress
 • Market data from public sources
 
-Bobby is an educational market-analysis companion. It does not execute trades, hold assets, or provide personalized investment advice. Markets involve risk.
+Bobby is an educational market-analysis companion with an optional user-signed
+swap interface. It does not hold assets, control wallets or provide personalized
+investment advice. Tokenized assets and markets involve risk.
 ```
 
 **Keywords** (max 100 — usa 97, sin espacios tras coma):
@@ -68,7 +81,7 @@ crypto,bitcoin,ethereum,stocks,market,analysis,ai,companion,btc,eth,investing,le
 **What's New (v1.0)**:
 
 ```
-First release: 10 3D companions, three-agent debates, discipline XP, warm bilingual voices.
+First release: 10 3D companions, three-agent debates, discipline XP, bilingual voices and optional non-custodial Base swaps where available.
 ```
 
 - **Support URL**: https://bobbyprotocol.xyz
@@ -113,6 +126,13 @@ Cada pregunta pasa por la mesa de Bobby:
 
 Ves el debate completo, no solo la conclusión — en cripto y acciones principales.
 
+SWAPS OPCIONALES Y NO CUSTODIALES EN BASE
+En jurisdicciones elegibles fuera de Estados Unidos, conecta tu propia wallet
+para revisar swaps directos de USDC por tokens de acciones Coinbase B20
+compatibles en Base. Los tokens B20 no son las acciones subyacentes. Bobby
+verifica ruta, contratos, monto exacto y mínimo recibido; tu wallet muestra la
+solicitud final y sólo tú puedes firmarla. La disponibilidad cambia por país.
+
 "NO TRADE" TAMBIÉN ES RESPUESTA
 La mayoría de los días, la mejor posición es ninguna. Cuando el setup no está, Bobby te lo dice tal cual — y tu companion gana XP de Disciplina por la paciencia. Sin spam de señales. Sin urgencia falsa.
 
@@ -124,11 +144,14 @@ Voces cálidas y naturales en español e inglés, según el idioma de tu disposi
 
 HONESTO POR DISEÑO
 • Análisis, no asesoría financiera — sin recomendaciones personalizadas
-• Solo lectura: Bobby nunca toca tus fondos, llaves ni cuentas de exchange
-• Sin registro; tu progreso se guarda en tu dispositivo
+• No custodial: Bobby nunca guarda fondos o llaves ni firma por ti
+• El análisis no requiere cuenta; Apple sign-in opcional sincroniza el progreso
 • Datos de mercado de fuentes públicas
 
-Bobby es un companion educativo de análisis de mercados. No ejecuta operaciones, no custodia activos y no da asesoría de inversión personalizada. Los mercados implican riesgo.
+Bobby es un companion educativo de análisis de mercados con una interfaz
+opcional de swaps firmados por el usuario. No custodia activos, no controla
+wallets y no da asesoría de inversión personalizada. Los activos tokenizados y
+los mercados implican riesgo.
 ```
 
 **Keywords** (100):
@@ -143,7 +166,9 @@ cripto,bitcoin,ethereum,acciones,mercado,análisis,ia,btc,eth,invertir,aprender,
 
 - **Categoría**: Finance (primaria) · Education (secundaria)
 - **Precio**: Free
-- **Age rating**: contestar el cuestionario tal cual (sin apuestas, sin web
-  sin restricciones, sin UGC) → sale **4+**. No marcar "unrestricted web".
+- **Disponibilidad**: seleccionar únicamente países con aprobación legal
+  documentada y hacer coincidir la allow-list del backend.
+- **Age rating**: volver a contestar el cuestionario actual con la función
+  financiera real; no reutilizar el resultado previo de la versión read-only.
 - **Screenshots**: solo se requiere el set 6.9" (ASC escala el resto).
   Ver `ios-screenshot-storyboard.md` y `store-shots/`.

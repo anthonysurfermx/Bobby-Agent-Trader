@@ -1,5 +1,9 @@
 # Bobby iOS — Screenshot storyboard (App Store 6.9")
 
+> **Obsoleto para el build 14:** este set documenta la versión de análisis
+> read-only y no muestra “Base swaps”. Regenerar el storyboard y las capturas
+> después del GO legal; no subir las imágenes actuales con el binario nuevo.
+
 Capturas reales en `store-shots/` — **1320×2868 px** (iPhone 17 Pro Max,
 exactamente lo que pide App Store Connect para 6.9"; ASC deriva los demás
 tamaños solo). Idioma: inglés (decisión de tienda). Producidas por el rig

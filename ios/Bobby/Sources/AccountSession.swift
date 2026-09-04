@@ -1,8 +1,8 @@
 // Account — Sign in with Apple → Supabase session, kept in the Keychain.
-// The app never holds a wallet or a private key (App Store promise): the
-// identity is Apple's, exchanged for a Supabase access token that
-// /api/progress and /api/trader-land verify server-side. No SDK: three REST
-// calls against the bobby-protocol Auth service.
+// Apple sign-in never creates or holds a wallet or private key: this identity
+// is separate from the optional non-custodial wallet connection and is
+// exchanged for a Supabase access token that Bobby verifies server-side.
+// No SDK: REST calls go to the bobby-protocol Auth service.
 import AuthenticationServices
 import CryptoKit
 import Foundation
@@ -50,6 +50,36 @@ final class AccountSession: ObservableObject {
     func signOut(store: CompanionStore? = nil) {
         session = nil; Keychain.delete(service: keychainService)
         store?.unbind()
+    }
+
+    /// Permanently remove the Apple-backed account and synced Bobby data.
+    /// Confirmed public-chain transactions cannot be erased; the server removes
+    /// their Bobby account link before deleting the Auth user.
+    func deleteAccount(store: CompanionStore? = nil) async -> Bool {
+        guard let token = await accessToken() else {
+            lastError = L.t("Sign in again before deleting your account", "Inicia sesión de nuevo antes de borrar tu cuenta")
+            return false
+        }
+        var request = URLRequest(url: URL(string: "https://bobbyprotocol.xyz/api/account")!)
+        request.httpMethod = "DELETE"
+        request.timeoutInterval = 20
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                lastError = message ?? L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
+                return false
+            }
+            signOut(store: store)
+            lastError = nil
+            return true
+        } catch {
+            lastError = L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
+            return false
+        }
     }
 
     // ---- Sign in with Apple ----

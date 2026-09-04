@@ -362,6 +362,7 @@ struct ContentView: View {
     @State private var showBoard = false
     @State private var showRiskNotice = false
     @State private var showAccount = false
+    @State private var showBaseSwap = false
     @ObservedObject private var account = AccountSession.shared
     @State private var inspectedTool: CompanionTool?
     @State private var showCatalog = false
@@ -463,6 +464,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showAccount) {
             AccountSheet(store: vm.companions, profile: vm.profile) { showAccount = false }
+        }
+        .sheet(isPresented: $showBaseSwap) {
+            BaseSwapView(defaultSymbol: vm.snapshot?.symbol)
         }
         .sheet(isPresented: $showSquad) {
             MascotGalleryView(store: vm.companions, voice: vm.voice, voiceId: vm.profile.voiceId)
@@ -587,7 +591,7 @@ struct ContentView: View {
                     .background(Circle().fill(Theme.card))
                     .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
             }
-            // Aura, streak and read-only live in the menu — the header breathes
+            // Progress, account, swaps and the custody promise live in the menu.
             Menu {
                 // The explore board must stay reachable after the first
                 // analysis (commandDeck hides once a snapshot exists).
@@ -607,10 +611,15 @@ struct ContentView: View {
                 } label: {
                     Label("Trader Land", systemImage: "map")
                 }
+                Button {
+                    showBaseSwap = true
+                } label: {
+                    Label(L.t("Base swaps", "Swaps en Base"), systemImage: "arrow.left.arrow.right.circle")
+                }
                 Section {
                     Label(vm.streak >= 1 ? L.t("Discipline streak: \(vm.streak) day\(vm.streak == 1 ? "" : "s") 🔥", "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥") : L.t("No streak yet — review an analysis", "Sin racha aún — revisa un análisis"),
                           systemImage: "flame")
-                    Label(L.t("READ ONLY — Bobby never executes", "READ ONLY — Bobby no ejecuta"), systemImage: "lock.shield")
+                    Label(L.t("YOU SIGN — Bobby never takes custody", "TÚ FIRMAS — Bobby nunca toma custodia"), systemImage: "lock.shield")
                 }
                 Section {
                     // Reachable from every screen, not just first-run onboarding.

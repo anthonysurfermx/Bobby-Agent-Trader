@@ -8,6 +8,15 @@ packages:
   GLTFKit2:
     url: https://github.com/warrenm/GLTFKit2
     from: "0.5.0"
+  ReownSwift:
+    url: https://github.com/reown-com/reown-swift
+    exactVersion: "2.3.2"
+  Web3:
+    url: https://github.com/Boilertalk/Web3.swift
+    exactVersion: "0.8.8"
+  CryptoSwift:
+    url: https://github.com/krzyzanowskim/CryptoSwift.git
+    exactVersion: "1.8.3"
 schemes:
   Bobby:
     build:
@@ -18,8 +27,23 @@ schemes:
     test:
       config: Debug
       targets:
+        - BobbyTests
         - BobbyUITests
 targets:
+  BobbyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: Bobby
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.bobbyprotocol.bobby.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: QZRTV6CMTT
   BobbyUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -53,24 +77,52 @@ targets:
         buildPhase: resources
     dependencies:
       - package: GLTFKit2
+      - package: ReownSwift
+        product: ReownAppKit
+      - package: Web3
+      - package: CryptoSwift
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Bobby
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: xyz.bobbyprotocol.bobby
+            CFBundleURLSchemes:
+              - bobbyprotocol
+        ITSAppUsesNonExemptEncryption: false
+        LSApplicationQueriesSchemes:
+          - metamask
+          - trust
+          - safe
+          - zerion
+          - rainbow
+          - spot
+          - okex
+          - cbwallet
+          - safepalwallet
+          - tpoutside
+          - bnc
+        NSMicrophoneUsageDescription: "Bobby listens so you can ask about any asset out loud."
+        NSSpeechRecognitionUsageDescription: "Bobby turns your voice into questions about the markets. Audio is processed by Apple's speech recognition."
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIUserInterfaceStyle: Dark
     entitlements:
       path: Bobby.entitlements
       properties:
         com.apple.developer.applesignin: [Default]
+        com.apple.security.application-groups: [group.xyz.bobbyprotocol.bobby]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: xyz.bobbyprotocol.bobby
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Bobby
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
-        INFOPLIST_KEY_NSMicrophoneUsageDescription: "Bobby listens so you can ask about any asset out loud."
-        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Bobby turns your voice into questions about the markets. Audio is processed by Apple's speech recognition."
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "13"
-        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        CURRENT_PROJECT_VERSION: "14"
