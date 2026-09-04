@@ -154,6 +154,7 @@ contract HardnessRegistry {
     /// constants — the old OKB-sized ether literals inflate ~40x as ETH on Base.
     uint96 public immutable ABSOLUTE_MIN_BOUNTY;
     uint96 public immutable REGISTRATION_STAKE;
+    uint32 public constant UNSTAKE_COOLDOWN = 7 days;
     uint96 public minBounty;
     uint32 public challengeGracePeriod = 3 days;
     uint32 public defaultClaimWindow = 7 days;
@@ -165,12 +166,19 @@ contract HardnessRegistry {
     uint256 private _status = _NOT_ENTERED;
 
     mapping(address => AgentProfile) public agentProfiles;
+    /// @dev An agent exits in two steps. The stake remains slashable during the
+    ///      cooldown, while `registered = false` prevents new obligations.
+    mapping(address => uint64) public unstakeAvailableAt;
+    mapping(address => uint32) public activeServiceCount;
+    mapping(address => uint32) public unresolvedPredictionCount;
 
     mapping(bytes32 => Service) private _services;
     bytes32[] public serviceKeys;
     mapping(bytes32 => bool) public challengeConsumed;
 
     mapping(bytes32 => Prediction) private _predictions;
+    /// @dev Immutable per-prediction expiry. Owner TTL changes affect only future commits.
+    mapping(bytes32 => uint64) public predictionExpiresAt;
     mapping(address => AgentStats) private _agentStats;
 
     mapping(address => mapping(bytes32 => Signal)) private _signals;
@@ -227,6 +235,9 @@ contract HardnessRegistry {
 
     event AgentRegistered(address indexed agent, string metadataURI);
     event AgentMetadataUpdated(address indexed agent, string metadataURI);
+    event AgentUnstakeRequested(address indexed agent, uint64 availableAt);
+    event AgentUnstakeCancelled(address indexed agent);
+    event AgentUnregistered(address indexed agent, uint96 returnedStake);
 
     event ServiceRegistered(address indexed agent, string serviceId, uint256 priceWei, address recipient);
     event ServiceUpdated(address indexed agent, string serviceId, uint256 priceWei, address recipient, bool active);
@@ -279,7 +290,7 @@ contract HardnessRegistry {
     event BountyResolutionDisputed(uint256 indexed bountyId, address indexed by);
     event BountyDisputeSettled(uint256 indexed bountyId, address indexed winner, bool refundedToPoster);
     event BountyDisputeWindowUpdated(uint32 oldWindow, uint32 newWindow);
-    event BountyDisputeTimedOut(uint256 indexed bountyId, address indexed poster, uint96 amount);
+    event BountyDisputeTimedOut(uint256 indexed bountyId, address indexed winner, uint96 amount);
     event BountyChallengeBondUpdated(uint96 oldBond, uint96 newBond);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event BountyDisputeSettlementTimeoutUpdated(uint32 oldTimeout, uint32 newTimeout);
@@ -337,19 +348,62 @@ contract HardnessRegistry {
     }
 
     function registerAgent(string calldata metadataURI) external payable whenNotPaused {
-        if (msg.value < REGISTRATION_STAKE) revert InsufficientStake();
         AgentProfile storage profile = agentProfiles[msg.sender];
         if (!profile.registered) {
+            // A pending exit must be cancelled explicitly. Otherwise registering
+            // again could overwrite stake that is still inside its slash window.
+            if (unstakeAvailableAt[msg.sender] != 0) revert InvalidValue();
+            if (msg.value < REGISTRATION_STAKE) revert InsufficientStake();
             profile.registered = true;
             profile.registeredAt = uint64(block.timestamp);
-            profile.stake = uint96(msg.value);
+            profile.stake = REGISTRATION_STAKE;
             profile.metadataURI = metadataURI;
+            uint256 excess = msg.value - REGISTRATION_STAKE;
+            if (excess != 0) pendingWithdrawals[msg.sender] += excess;
             emit AgentRegistered(msg.sender, metadataURI);
         } else {
+            // Metadata updates are not stake top-ups. Any accidental value remains
+            // recoverable through the same pull-payment path as registration excess.
+            if (msg.value != 0) pendingWithdrawals[msg.sender] += msg.value;
             profile.metadataURI = metadataURI;
-            profile.stake += uint96(msg.value);
             emit AgentMetadataUpdated(msg.sender, metadataURI);
         }
+    }
+
+    /// @notice Start a seven-day exit. The agent stops creating new obligations
+    ///         immediately, while the Safe retains a bounded window to slash.
+    function requestUnregister() external {
+        AgentProfile storage profile = agentProfiles[msg.sender];
+        if (!profile.registered) revert NotRegistered();
+        if (activeServiceCount[msg.sender] != 0 || unresolvedPredictionCount[msg.sender] != 0) {
+            revert InvalidValue();
+        }
+        profile.registered = false;
+        uint64 availableAt = uint64(block.timestamp) + UNSTAKE_COOLDOWN;
+        unstakeAvailableAt[msg.sender] = availableAt;
+        emit AgentUnstakeRequested(msg.sender, availableAt);
+    }
+
+    function cancelUnregister() external {
+        if (unstakeAvailableAt[msg.sender] == 0) revert NotFound();
+        if (agentProfiles[msg.sender].stake == 0) revert InsufficientStake();
+        unstakeAvailableAt[msg.sender] = 0;
+        agentProfiles[msg.sender].registered = true;
+        emit AgentUnstakeCancelled(msg.sender);
+    }
+
+    /// @notice Move the unslashed stake to the agent's pull-payment balance.
+    function unregisterAgent() external {
+        uint64 availableAt = unstakeAvailableAt[msg.sender];
+        if (availableAt == 0) revert NotFound();
+        if (block.timestamp < availableAt) revert TooSoon();
+
+        AgentProfile storage profile = agentProfiles[msg.sender];
+        uint96 returnedStake = profile.stake;
+        profile.stake = 0;
+        unstakeAvailableAt[msg.sender] = 0;
+        if (returnedStake != 0) pendingWithdrawals[msg.sender] += returnedStake;
+        emit AgentUnregistered(msg.sender, returnedStake);
     }
 
     function registerService(string calldata serviceId, uint256 priceWei, address recipient)
@@ -376,15 +430,23 @@ contract HardnessRegistry {
 
         service.recipient = recipient;
         service.priceWei = uint128(priceWei);
+        if (!service.active) activeServiceCount[msg.sender] += 1;
         service.active = true;
 
         emit ServiceUpdated(msg.sender, serviceId, priceWei, recipient, true);
     }
 
-    function setServiceStatus(string calldata serviceId, bool active) external onlyRegisteredAgent {
+    function setServiceStatus(string calldata serviceId, bool active) external {
         bytes32 serviceKey = keccak256(bytes(serviceId));
         Service storage service = _services[serviceKey];
         if (service.owner != msg.sender) revert NotFound();
+        // An exiting agent may turn its last services off, but cannot reactivate
+        // them without first cancelling the exit or registering again.
+        if (active && !agentProfiles[msg.sender].registered) revert NotRegistered();
+        if (service.active != active) {
+            if (active) activeServiceCount[msg.sender] += 1;
+            else activeServiceCount[msg.sender] -= 1;
+        }
         service.active = active;
         emit ServiceUpdated(msg.sender, serviceId, service.priceWei, service.recipient, active);
     }
@@ -457,6 +519,8 @@ contract HardnessRegistry {
             pnlBps: 0,
             symbol: symbol
         });
+        predictionExpiresAt[predictionHash] = uint64(block.timestamp + predictionTTL);
+        unresolvedPredictionCount[msg.sender] += 1;
 
         emit PredictionCommitted(msg.sender, predictionHash, symbol, conviction);
     }
@@ -472,7 +536,7 @@ contract HardnessRegistry {
         if (prediction.result != PredictionResult.NONE) revert AlreadyResolved();
         if (exitPrice == 0) revert InvalidValue();
         if (block.timestamp < prediction.minResolveAt) revert TooSoon();
-        if (block.timestamp > prediction.committedAt + predictionTTL) revert Expired();
+        if (block.timestamp > predictionExpiresAt[predictionHash]) revert Expired();
         /// @dev Kimi/Codex audit (Base r4, CRITICAL): being a registered agent must NOT
         /// grant resolution rights over other agents' predictions. Final audit
         /// 2026-09-03 (P0-3): nor over its OWN — with no oracle in this contract the
@@ -497,6 +561,7 @@ contract HardnessRegistry {
         prediction.resolvedAt = uint64(block.timestamp);
         prediction.exitPrice = exitPrice;
         prediction.pnlBps = int32(computed);
+        unresolvedPredictionCount[prediction.agent] -= 1;
 
         AgentStats storage stats = _agentStats[prediction.agent];
         stats.totalResolved += 1;
@@ -517,11 +582,12 @@ contract HardnessRegistry {
         Prediction storage prediction = _predictions[predictionHash];
         if (prediction.agent == address(0)) revert NotFound();
         if (prediction.result != PredictionResult.NONE) revert AlreadyResolved();
-        if (block.timestamp <= prediction.committedAt + predictionTTL) revert TooSoon();
+        if (block.timestamp <= predictionExpiresAt[predictionHash]) revert TooSoon();
 
         prediction.result = PredictionResult.EXPIRED;
         prediction.resolvedAt = uint64(block.timestamp);
         prediction.exitPrice = prediction.entryPrice;
+        unresolvedPredictionCount[prediction.agent] -= 1;
 
         AgentStats storage stats = _agentStats[prediction.agent];
         stats.totalResolved += 1;
@@ -617,7 +683,7 @@ contract HardnessRegistry {
         if (bounty.challengeCount >= maxChallengesPerBounty) revert MaxChallenges();
         if (block.timestamp >= uint256(bounty.createdAt) + bounty.claimWindowSecs) revert WindowExpired();
 
-        // Codex r3: a bond per challenge; returned to the winner, forfeited to the poster otherwise.
+        // The winner's bond is returned; every losing bond goes to the treasury.
         if (msg.value != bountyBond[bountyId]) revert InsufficientPayment();
         bountyChallengeBondOf[bountyId][msg.sender] = uint96(msg.value);
         hasChallenged[bountyId][msg.sender] = true;
@@ -930,12 +996,16 @@ contract HardnessRegistry {
         emit HardnessCertified(predictionHash, hardnessScore);
     }
 
-    function slashAgent(address agent, uint256 amount, bytes32 reason) external {
-        if (msg.sender != owner && msg.sender != hardnessScorer) revert NotAuthorized();
+    /// @notice Slash stake during an active registration or pending exit.
+    /// @dev Safe-only: a compromised scorer may certify hardness, but cannot seize
+    ///      third-party funds. `amount` is bounded to the agent's remaining stake.
+    function slashAgent(address agent, uint256 amount, bytes32 reason) external onlyOwner {
         AgentProfile storage profile = agentProfiles[agent];
+        if (amount == 0 || profile.stake == 0) revert InvalidValue();
         if (profile.stake < amount) amount = profile.stake;
 
         profile.stake -= uint96(amount);
+        if (profile.stake == 0) profile.registered = false;
         pendingWithdrawals[owner] += amount;
 
         emit AgentSlashed(agent, amount, reason);

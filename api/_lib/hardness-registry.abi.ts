@@ -138,10 +138,42 @@ export const HARDNESS_REGISTRY_ABI = [
  },
  {
   "type": "function",
+  "name": "UNSTAKE_COOLDOWN",
+  "inputs": [],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint32",
+    "internalType": "uint32"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
   "name": "acceptOwnership",
   "inputs": [],
   "outputs": [],
   "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "activeServiceCount",
+  "inputs": [
+   {
+    "name": "",
+    "type": "address",
+    "internalType": "address"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint32",
+    "internalType": "uint32"
+   }
+  ],
+  "stateMutability": "view"
  },
  {
   "type": "function",
@@ -464,6 +496,13 @@ export const HARDNESS_REGISTRY_ABI = [
    }
   ],
   "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "cancelUnregister",
+  "inputs": [],
+  "outputs": [],
+  "stateMutability": "nonpayable"
  },
  {
   "type": "function",
@@ -1270,6 +1309,25 @@ export const HARDNESS_REGISTRY_ABI = [
  },
  {
   "type": "function",
+  "name": "predictionExpiresAt",
+  "inputs": [
+   {
+    "name": "",
+    "type": "bytes32",
+    "internalType": "bytes32"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint64",
+    "internalType": "uint64"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
   "name": "predictionTTL",
   "inputs": [],
   "outputs": [
@@ -1366,6 +1424,13 @@ export const HARDNESS_REGISTRY_ABI = [
     "internalType": "address"
    }
   ],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "requestUnregister",
+  "inputs": [],
   "outputs": [],
   "stateMutability": "nonpayable"
  },
@@ -1855,6 +1920,51 @@ export const HARDNESS_REGISTRY_ABI = [
  },
  {
   "type": "function",
+  "name": "unregisterAgent",
+  "inputs": [],
+  "outputs": [],
+  "stateMutability": "nonpayable"
+ },
+ {
+  "type": "function",
+  "name": "unresolvedPredictionCount",
+  "inputs": [
+   {
+    "name": "",
+    "type": "address",
+    "internalType": "address"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint32",
+    "internalType": "uint32"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
+  "name": "unstakeAvailableAt",
+  "inputs": [
+   {
+    "name": "",
+    "type": "address",
+    "internalType": "address"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "",
+    "type": "uint64",
+    "internalType": "uint64"
+   }
+  ],
+  "stateMutability": "view"
+ },
+ {
+  "type": "function",
   "name": "updateResolver",
   "inputs": [
    {
@@ -1956,6 +2066,57 @@ export const HARDNESS_REGISTRY_ABI = [
  },
  {
   "type": "event",
+  "name": "AgentUnregistered",
+  "inputs": [
+   {
+    "name": "agent",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   },
+   {
+    "name": "returnedStake",
+    "type": "uint96",
+    "indexed": false,
+    "internalType": "uint96"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
+  "name": "AgentUnstakeCancelled",
+  "inputs": [
+   {
+    "name": "agent",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
+  "name": "AgentUnstakeRequested",
+  "inputs": [
+   {
+    "name": "agent",
+    "type": "address",
+    "indexed": true,
+    "internalType": "address"
+   },
+   {
+    "name": "availableAt",
+    "type": "uint64",
+    "indexed": false,
+    "internalType": "uint64"
+   }
+  ],
+  "anonymous": false
+ },
+ {
+  "type": "event",
   "name": "BountyChallengeBondUpdated",
   "inputs": [
    {
@@ -2028,7 +2189,7 @@ export const HARDNESS_REGISTRY_ABI = [
     "internalType": "uint256"
    },
    {
-    "name": "poster",
+    "name": "winner",
     "type": "address",
     "indexed": true,
     "internalType": "address"

@@ -231,6 +231,7 @@ contract VerifyBaseDeployment is Script {
         _verifyTreasuryAndBond(hr.treasury(), hr.bountyChallengeBond(), r, json, "hardness");
         address[] memory resolverSet = vm.parseJsonAddressArray(json, ".quorum.resolvers");
         _ok(hr.resolverThreshold() == vm.parseJsonUint(json, ".quorum.threshold"), "hardness.threshold");
+        _ok(hr.UNSTAKE_COOLDOWN() == 7 days, "hardness.unstakeCooldown");
         _ok(hr.resolverCount() == resolverSet.length, "hardness.resolverCount");
         for (uint256 i = 0; i < resolverSet.length; i++) {
             _ok(hr.resolvers(resolverSet[i]), string.concat("hardness resolver ", vm.toString(resolverSet[i])));

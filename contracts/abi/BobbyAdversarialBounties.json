@@ -1000,7 +1000,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "poster",
+        "name": "winner",
         "type": "address",
         "indexed": true,
         "internalType": "address"

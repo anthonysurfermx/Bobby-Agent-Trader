@@ -30,7 +30,7 @@ generic suite as a substitute.* Every row below therefore points at a test that
 
 Run on `security/remediation-r2` after the last edit:
 
-- `forge test` — 14 suites, **250 passed, 0 failed** (2a: 228; 2b: 236; 3b: 243; 4: 248; 5 adds the deployer≠Safe treasury pair)
+- `forge test` — 14 suites, **257 passed, 0 failed** (2a: 228; 2b: 236; 3b: 243; 4: 248; 5: 250; 6 adds seven stake-exit/TTL regressions)
 - `test:remediation-r2` — 23/23 (2a: 15; 2b: 20; 3b: 22)
 - `test:hardness-abi-anvil` — pass (generated ABI equals the artifact; bytecode-backed decode of every backend getter)
 - `test:rls-lockdown-pg` — exploit reproduced on the shipped policies, then refused; views and C-04 asserted (PostgreSQL 17, scratch schema, stand-in roles)
@@ -63,12 +63,10 @@ Run on `security/remediation-r2` after the last edit:
    must-list; unchanged. Worth doing before the flip: `decodeFunctionData` on
    `approveTx`, pin spender to `UNISWAP_BASE.swapRouter02`, refuse on mismatch.
 5. **P1-5** CSP enforcement — unchanged. Needs a browser-tested pass, separate PR.
-6. **P1-7** stake has no exit — a design change to the same non-upgradeable contract;
-   fold into the redeploy in (3).
-7. `agent_events` and `hardness_agent_proofs` still have `USING (true)` anon policies
+6. `agent_events` and `hardness_agent_proofs` still have `USING (true)` anon policies
    and carry run/thread/payment/trade ids and session/tx hashes (Codex). Same
    view-shaping treatment; not done here to keep the round reviewable.
-8. Live RLS state was read from migration files plus the round-1 live sample. After
+7. Live RLS state was read from migration files plus the round-1 live sample. After
    applying 0010, `bobby_rls_matrix()` should show no anon policy on the three tables.
 
 ## Round 2 review (Codex) — NO-GO on `8b9af14`, and what changed for it
@@ -173,6 +171,23 @@ proportional to the reward, or the reward capped.
 Confirmed by Codex this round: settlement economics correct — no double credit, no trapped
 funds; bytecodes 12,006 B / 21,595 B, inside EIP-170. Codex also warned the disk was nearly
 full (~607 MiB free) — worth clearing `contracts/out` / `cache` in the review worktrees.
+
+## Round 6 review (Codex) — NO-GO on `2c75a04`: registration stake had no safe exit
+
+| # | Codex finding | Fix | Regression |
+|---|---|---|---|
+| P1 | `HardnessRegistry` locked every registration stake forever, while the hot `hardnessScorer` could slash it. | Two-step exit: `requestUnregister` immediately prevents new obligations and starts `UNSTAKE_COOLDOWN = 7 days`; `unregisterAgent` credits the remaining stake through pull-payment after the cooldown. Exit is blocked while a service is active or a prediction is unresolved. Slashing is Safe-only, remains possible during cooldown, and is capped at the remaining stake. Registration excess and value sent by mistake on a metadata update are withdrawable instead of silently locked. | Seven new regressions cover exact-once return, early refusal, cancellation, active-service and unresolved-prediction gates, scorer refusal/Safe cap, recoverable excess, and immutable prediction expiry. |
+| P2 | Both timeout events named the indexed winner `poster`, so generated ABIs gave indexers the wrong semantic field name. | Rename the event parameter to `winner` in both contracts and regenerate ABI/flattened artifacts. | `expectEmit` asserts the proposal winner in each timeout path. |
+| P2 | The mainnet template omitted the two new bounty-economics inputs, despite readiness depending on the manifest fields. | Add explicit `BOUNTY_TREASURY_ADDRESS = Safe` and `CHALLENGE_BOND_WEI = MIN_BOUNTY_WEI`; predeploy readiness now requires and validates both, including treasury/deployer separation and on-chain bond bounds. | Readiness plus the round-5 deployment-gate tests cover env → deploy → manifest → live verification. |
+
+Prediction expiry is now snapshotted at commit. This is required by the exit gate: a later
+owner TTL change cannot retroactively extend an agent's unresolved obligation or make it
+expire early. The runtime is **23,209 B**, leaving 1,367 B below EIP-170; the bounties
+runtime remains 12,006 B. Generated backend ABI: 159 entries, equal to the Foundry artifact.
+
+Round-6 verification: Foundry **257/257** across 14 suites; targeted new/adjacent suites
+83/83; `test:remediation-r2` 23/23; `test:hardness-abi-anvil`, `check:api`, lint,
+`git diff --check`, and the production Vite build all pass.
 
 ## For the final round
 

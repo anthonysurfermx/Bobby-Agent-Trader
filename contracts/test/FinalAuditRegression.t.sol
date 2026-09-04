@@ -358,6 +358,8 @@ contract FinalAuditRegressionTest is Test {
         vm.expectRevert("Settlement timeout not reached");
         bounties.resolveStalledDispute(id);
         vm.warp(block.timestamp + bounties.disputeSettlementTimeout());
+        vm.expectEmit(true, true, false, true);
+        emit BobbyAdversarialBounties.BountyDisputeTimedOut(id, honest, 0.1 ether);
         vm.prank(makeAddr("anyone"));
         bounties.resolveStalledDispute(id);
         assertEq(bounties.pendingWithdrawals(honest), 0.1 ether + bounties.challengeBond(), 'the proposed winner is paid: stalling achieved nothing');
@@ -452,6 +454,8 @@ contract FinalAuditRegressionTest is Test {
         vm.prank(RESOLVER); registry.approveBountyResolution(id, honest);
         vm.prank(POSTER); registry.disputeBountyResolution{value: BOND}(id);
         vm.warp(block.timestamp + registry.bountyDisputeSettlementTimeout());
+        vm.expectEmit(true, true, false, true);
+        emit HardnessRegistry.BountyDisputeTimedOut(id, honest, 0.01 ether);
         registry.resolveStalledBountyDispute(id);
         assertEq(registry.pendingWithdrawals(honest), 0.01 ether + BOND);
         assertEq(registry.pendingWithdrawals(POSTER), 0);

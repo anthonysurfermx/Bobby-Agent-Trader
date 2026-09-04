@@ -104,17 +104,17 @@ contract BobbyAdversarialBounties {
     /// @dev bountyId → who disputed (poster, a rival challenger, or the owner)
     mapping(uint256 => address) public disputedBy;
 
-    /// @dev Codex r3: contesting and disputing carry a bond, so filling the
-    ///      challenge slots or freezing an escrow costs the attacker money.
-    ///      Loser bonds go to the poster; a wrong dispute's bond goes to the winner.
+    /// @dev Contesting and disputing carry a bond, so filling the challenge slots
+    ///      or freezing an escrow costs the attacker money. Losing challenge bonds
+    ///      and rejected dispute bonds go to the neutral treasury.
     uint96 public challengeBond;
     mapping(uint256 => mapping(address => uint96)) public challengeBondOf;
     mapping(uint256 => uint96) public disputeBondOf;
     /// @dev Codex r3: the deadline is SNAPSHOTTED per bounty at proposal time —
     ///      a later setDisputeWindow cannot shorten or extend it.
     mapping(uint256 => uint64) public resolutionFinalizeAfter;
-    /// @dev Codex r3: a dispute the owner never settles is not a permanent lock —
-    ///      after this timeout anyone can return the escrow to the poster.
+    /// @dev A dispute the owner never settles is not a permanent lock: after this
+    ///      timeout anyone can uphold the standing proposal and forfeit the appeal bond.
     mapping(uint256 => uint64) public disputedAt;
     uint32 public disputeSettlementTimeout = 30 days;
     uint32 public constant MIN_SETTLEMENT_TIMEOUT = 7 days;
@@ -158,7 +158,7 @@ contract BobbyAdversarialBounties {
     event BountyResolutionDisputed(uint256 indexed bountyId, address indexed by);
     event BountyDisputeSettled(uint256 indexed bountyId, address indexed winner, bool refundedToPoster);
     event DisputeWindowUpdated(uint32 oldWindow, uint32 newWindow);
-    event BountyDisputeTimedOut(uint256 indexed bountyId, address indexed poster, uint96 amount);
+    event BountyDisputeTimedOut(uint256 indexed bountyId, address indexed winner, uint96 amount);
     event ChallengeBondUpdated(uint96 oldBond, uint96 newBond);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event DisputeSettlementTimeoutUpdated(uint32 oldTimeout, uint32 newTimeout);
@@ -294,8 +294,7 @@ contract BobbyAdversarialBounties {
             "Claim window expired"
         );
 
-        // Codex r3: a bond per challenge — returned to the winner, forfeited to
-        // the poster by every other challenger once the bounty resolves.
+        // The winner's bond is returned; every losing bond goes to the treasury.
         require(msg.value == bountyBond[_bountyId], "Challenge bond required");
         challengeBondOf[_bountyId][msg.sender] = uint96(msg.value);
         hasChallenged[_bountyId][msg.sender] = true;

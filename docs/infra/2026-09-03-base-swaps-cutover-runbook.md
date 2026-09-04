@@ -142,8 +142,9 @@ within `disputeSettlementTimeout`, the proposal stands and the disputer's bond i
 forfeited: the Safe must rule on a real shill inside that window.
 
 Deploy configuration for the redeploy (Codex r5): `BOUNTY_TREASURY_ADDRESS` = the Safe
-`0x8BE60853F27b944e11486285d95c3e06596553b4` (unset = the Safe; never the deployer —
-DeployBase refuses on 8453) and `CHALLENGE_BOND_WEI` = `25000000000000`
+`0x8BE60853F27b944e11486285d95c3e06596553b4` (DeployBase defaults an unset value
+to the Safe, but mainnet readiness requires it explicitly; never the deployer) and
+`CHALLENGE_BOND_WEI` = `25000000000000`
 (= `MIN_BOUNTY_WEI`). DeployBase sets both `treasury` and both bonds BEFORE the
 two-step handoff, writes `treasury` and `fees.challengeBondWei` to the manifest,
 and `VerifyBaseDeployment` / `check:mainnet:*` / `finalize:base-manifest` all

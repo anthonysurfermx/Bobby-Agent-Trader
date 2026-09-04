@@ -89,10 +89,114 @@ contract HardnessRegistryTest is Test {
 
     function test_registerAgent_updatesMetadata() public {
         vm.prank(agent1);
-        registry.registerAgent{value: 0.01 ether}("ipfs://agent-1b");
+        registry.registerAgent("ipfs://agent-1b");
 
-        (, , , string memory metadataURI) = registry.agentProfiles(agent1);
+        (, , uint96 stake, string memory metadataURI) = registry.agentProfiles(agent1);
+        assertEq(stake, registry.REGISTRATION_STAKE());
         assertEq(metadataURI, "ipfs://agent-1b");
+    }
+
+    function test_registerAgent_excessAndMetadataValueStayWithdrawable() public {
+        vm.prank(outsider);
+        registry.registerAgent{value: 0.03 ether}("ipfs://outsider");
+
+        (, , uint96 stake,) = registry.agentProfiles(outsider);
+        assertEq(stake, registry.REGISTRATION_STAKE());
+        assertEq(registry.pendingWithdrawals(outsider), 0.02 ether);
+
+        vm.prank(outsider);
+        registry.registerAgent{value: 0.005 ether}("ipfs://updated");
+        string memory metadataURI;
+        (, , stake, metadataURI) = registry.agentProfiles(outsider);
+        assertEq(stake, registry.REGISTRATION_STAKE());
+        assertEq(metadataURI, "ipfs://updated");
+        assertEq(registry.pendingWithdrawals(outsider), 0.025 ether);
+    }
+
+    function test_unregisterAgent_twoStepExitReturnsStakeExactlyOnce() public {
+        _registerAgent(outsider, "ipfs://exit");
+
+        vm.prank(outsider);
+        registry.requestUnregister();
+        (bool registered,, uint96 stake,) = registry.agentProfiles(outsider);
+        assertFalse(registered);
+        assertEq(stake, registry.REGISTRATION_STAKE());
+        uint64 availableAt = registry.unstakeAvailableAt(outsider);
+        assertEq(availableAt, block.timestamp + registry.UNSTAKE_COOLDOWN());
+
+        vm.prank(outsider);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.registerAgent{value: 0.01 ether}("ipfs://overwrite");
+        vm.prank(outsider);
+        vm.expectRevert(HardnessRegistry.TooSoon.selector);
+        registry.unregisterAgent();
+
+        vm.warp(availableAt);
+        vm.prank(outsider);
+        registry.unregisterAgent();
+        (registered,, stake,) = registry.agentProfiles(outsider);
+        assertFalse(registered);
+        assertEq(stake, 0);
+        assertEq(registry.pendingWithdrawals(outsider), registry.REGISTRATION_STAKE());
+        vm.prank(outsider);
+        vm.expectRevert(HardnessRegistry.NotFound.selector);
+        registry.unregisterAgent();
+    }
+
+    function test_unregisterAgent_canCancelBeforeCooldown() public {
+        _registerAgent(outsider, "ipfs://stay");
+        vm.prank(outsider);
+        registry.requestUnregister();
+        vm.prank(outsider);
+        registry.cancelUnregister();
+        (bool registered,, uint96 stake,) = registry.agentProfiles(outsider);
+        assertTrue(registered);
+        assertEq(stake, registry.REGISTRATION_STAKE());
+        assertEq(registry.unstakeAvailableAt(outsider), 0);
+    }
+
+    function test_unregisterAgent_requiresInactiveServices() public {
+        vm.prank(agent1);
+        registry.registerService("judge-mode", 0.001 ether, agent1);
+        assertEq(registry.activeServiceCount(agent1), 1);
+
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.requestUnregister();
+        vm.prank(agent1);
+        registry.setServiceStatus("judge-mode", false);
+        assertEq(registry.activeServiceCount(agent1), 0);
+        vm.prank(agent1);
+        registry.requestUnregister();
+    }
+
+    function test_unregisterAgent_requiresResolvedPredictions() public {
+        bytes32 predictionHash = _predictionHash("exit-pending");
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "BTC-USD", 77, 100, 120, 90);
+        assertEq(registry.unresolvedPredictionCount(agent1), 1);
+
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.requestUnregister();
+        vm.warp(registry.predictionExpiresAt(predictionHash) + 1);
+        registry.expirePrediction(predictionHash);
+        assertEq(registry.unresolvedPredictionCount(agent1), 0);
+        vm.prank(agent1);
+        registry.requestUnregister();
+    }
+
+    function test_slashAgent_isSafeOnlyAndCannotExceedStake() public {
+        registry.setHardnessScorer(outsider);
+        vm.prank(outsider);
+        vm.expectRevert(HardnessRegistry.NotOwner.selector);
+        registry.slashAgent(agent1, 1, keccak256("hot-key"));
+
+        registry.slashAgent(agent1, type(uint256).max, keccak256("safe-ruling"));
+        (bool registered,, uint96 stake,) = registry.agentProfiles(agent1);
+        assertFalse(registered);
+        assertEq(stake, 0);
+        assertEq(registry.pendingWithdrawals(owner), registry.REGISTRATION_STAKE());
     }
 
     function test_registerAgent_revertsWhenPaused() public {
@@ -335,6 +439,21 @@ contract HardnessRegistryTest is Test {
         HardnessRegistry.AgentStats memory stats = registry.getAgentStatsFull(agent1);
         assertEq(stats.expired, 1);
         assertEq(stats.totalResolved, 1);
+    }
+
+    function test_predictionExpiry_isSnapshottedAtCommit() public {
+        bytes32 predictionHash = _predictionHash("ttl-snapshot");
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
+        uint64 expiry = registry.predictionExpiresAt(predictionHash);
+
+        registry.setPredictionTTL(1 hours);
+        vm.warp(block.timestamp + 2 hours);
+        vm.expectRevert(HardnessRegistry.TooSoon.selector);
+        registry.expirePrediction(predictionHash);
+
+        vm.warp(expiry + 1);
+        registry.expirePrediction(predictionHash);
     }
 
     function test_expirePrediction_revertsBeforeTtl() public {

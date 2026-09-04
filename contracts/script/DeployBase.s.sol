@@ -392,6 +392,7 @@ contract DeployBase is Script {
 
         HardnessRegistry hardness = HardnessRegistry(payable(d.hardnessRegistry));
         require(hardness.resolverThreshold() == c.resolverThreshold, "assert: hardness.threshold");
+        require(hardness.UNSTAKE_COOLDOWN() == 7 days, "assert: hardness.unstakeCooldown");
         require(hardness.resolverCount() == resolverSet.length, "assert: hardness.resolverCount");
         for (uint256 i = 0; i < resolverSet.length; i++) {
             require(hardness.resolvers(resolverSet[i]), "assert: hardness resolver missing");

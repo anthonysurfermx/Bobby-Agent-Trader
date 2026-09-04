@@ -183,8 +183,18 @@ for (const name of [
   'MIN_BOUNTY_WEI',
   'ABSOLUTE_MIN_BOUNTY_WEI',
   'REGISTRATION_STAKE_WEI',
+  'CHALLENGE_BOND_WEI',
 ] as const) {
   requireEnv(name, positiveUint96);
+}
+
+const configuredBountyTreasury = env('BOUNTY_TREASURY_ADDRESS');
+if (!validAddress(configuredBountyTreasury)) {
+  fail('BOUNTY_TREASURY_ADDRESS is missing or invalid');
+} else if (configuredBountyTreasury.toLowerCase() === env('DEPLOYER_ADDRESS').toLowerCase()) {
+  fail('BOUNTY_TREASURY_ADDRESS must not equal DEPLOYER_ADDRESS');
+} else {
+  pass('bounty treasury is explicit and not the deployer');
 }
 
 requireEnv('ESCROW_MAX_SIZE_USD', (value) => {
@@ -206,6 +216,16 @@ if (positiveUint96(env('MIN_BOUNTY_WEI')) && positiveUint96(env('ABSOLUTE_MIN_BO
     fail('MIN_BOUNTY_WEI must be >= ABSOLUTE_MIN_BOUNTY_WEI');
   } else {
     pass('bounty floor ordering is valid');
+  }
+}
+
+if (positiveUint96(env('CHALLENGE_BOND_WEI')) && positiveUint96(env('ABSOLUTE_MIN_BOUNTY_WEI'))) {
+  const challengeBond = BigInt(env('CHALLENGE_BOND_WEI'));
+  const bountyFloor = BigInt(env('ABSOLUTE_MIN_BOUNTY_WEI'));
+  if (challengeBond < bountyFloor || challengeBond > bountyFloor * 1000n) {
+    fail('CHALLENGE_BOND_WEI must be within [ABSOLUTE_MIN_BOUNTY_WEI, 1000 x floor]');
+  } else {
+    pass('challenge bond is within the on-chain bounds');
   }
 }
 
