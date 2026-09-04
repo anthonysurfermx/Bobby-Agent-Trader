@@ -290,6 +290,114 @@ contract HardnessRegistryTest is Test {
         assertEq(registry.pendingWithdrawals(owner), registry.REGISTRATION_STAKE());
     }
 
+    function testFuzz_slashExitAndServiceRevenueConserveLiabilities(
+        uint96 rawInitialSlash,
+        uint96 rawExitSlash,
+        uint8 rawCalls,
+        bool ownerWithdrawsFirst
+    ) public {
+        uint256 registrationStake = registry.REGISTRATION_STAKE();
+        uint256 initialSlash = bound(uint256(rawInitialSlash), 1, registrationStake - 1);
+        uint256 calls = bound(uint256(rawCalls), 1, 5);
+
+        vm.prank(agent1);
+        registry.registerService("fuzz-service", 0.001 ether, agent1);
+        registry.slashAgent(agent1, initialSlash, keccak256("initial-partial-slash"));
+
+        for (uint256 i = 0; i < calls; i++) {
+            vm.prank(outsider);
+            registry.payForService{value: 0.001 ether}(
+                keccak256(abi.encode("fuzz-service-call", i)), "fuzz-service"
+            );
+        }
+
+        vm.prank(agent1);
+        registry.setServiceStatus("fuzz-service", false);
+        vm.prank(agent1);
+        registry.requestUnregister();
+
+        uint256 stakeBeforeExitSlash = registrationStake - initialSlash;
+        uint256 exitSlash = bound(uint256(rawExitSlash), 1, stakeBeforeExitSlash);
+        registry.slashAgent(agent1, exitSlash, keccak256("cooldown-slash"));
+
+        vm.warp(registry.unstakeAvailableAt(agent1));
+        vm.prank(agent1);
+        registry.unregisterAgent();
+
+        uint256 serviceRevenue = calls * 0.001 ether;
+        uint256 returnedStake = stakeBeforeExitSlash - exitSlash;
+        assertEq(registry.pendingWithdrawals(owner), initialSlash + exitSlash);
+        assertEq(registry.pendingWithdrawals(agent1), serviceRevenue + returnedStake);
+        assertEq(address(registry).balance, registrationStake * 2 + serviceRevenue);
+
+        if (ownerWithdrawsFirst) {
+            registry.withdraw();
+            vm.prank(agent1);
+            registry.withdraw();
+        } else {
+            vm.prank(agent1);
+            registry.withdraw();
+            registry.withdraw();
+        }
+        assertEq(registry.pendingWithdrawals(owner), 0);
+        assertEq(registry.pendingWithdrawals(agent1), 0);
+        assertEq(address(registry).balance, registrationStake);
+
+        vm.prank(agent1);
+        registry.registerAgent{value: registrationStake}("ipfs://agent-1-reregistered");
+        assertEq(registry.activeServiceCount(agent1), 0);
+        vm.prank(agent1);
+        registry.setServiceStatus("fuzz-service", true);
+        assertEq(registry.activeServiceCount(agent1), 1);
+    }
+
+    function testFuzz_activeServiceCountMatchesServiceStates(uint256 rawOperations) public {
+        string[3] memory serviceIds = ["svc-a", "svc-b", "svc-c"];
+        bool[3] memory active = [true, true, true];
+        uint256 registrationStake = registry.REGISTRATION_STAKE();
+        for (uint256 i = 0; i < serviceIds.length; i++) {
+            vm.prank(agent1);
+            registry.registerService(serviceIds[i], 0.001 ether, agent1);
+        }
+
+        for (uint256 i = 0; i < 12; i++) {
+            uint256 operation = rawOperations >> (i * 5);
+            uint256 index = operation % serviceIds.length;
+            bool registerAgain = ((operation >> 2) & 1) == 1;
+            bool nextActive = ((operation >> 3) & 1) == 1;
+
+            vm.prank(agent1);
+            if (registerAgain) {
+                registry.registerService(serviceIds[index], 0.001 ether + i + 1, agent1);
+                active[index] = true;
+            } else {
+                registry.setServiceStatus(serviceIds[index], nextActive);
+                active[index] = nextActive;
+            }
+
+            uint256 expectedActive;
+            for (uint256 j = 0; j < active.length; j++) {
+                if (active[j]) expectedActive++;
+            }
+            assertEq(registry.activeServiceCount(agent1), expectedActive);
+        }
+
+        registry.slashAgent(agent1, type(uint256).max, keccak256("full-slash"));
+        for (uint256 i = 0; i < serviceIds.length; i++) {
+            vm.prank(agent1);
+            registry.setServiceStatus(serviceIds[i], false);
+        }
+        assertEq(registry.activeServiceCount(agent1), 0);
+
+        vm.prank(agent1);
+        registry.registerAgent{value: registrationStake}("ipfs://agent-1-restaked");
+        for (uint256 i = 0; i < serviceIds.length; i++) {
+            vm.prank(agent1);
+            registry.registerService(serviceIds[i], 0.001 ether, agent1);
+        }
+        assertEq(registry.activeServiceCount(agent1), serviceIds.length);
+    }
+
     function test_registerAgent_revertsWhenPaused() public {
         registry.pause();
         vm.deal(outsider, 10 ether);

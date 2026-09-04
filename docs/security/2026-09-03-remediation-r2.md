@@ -253,14 +253,50 @@ Round-9 verification: Foundry **267/267** across 14 suites; targeted
 **159/159**; production Vite build, `check:api`, and the clean compilation pass.
 This is the first clean review of three required on the exact round-8 runtime.
 
+## Round 10 review (Codex) — GO 2/3 on the round-8 bytecode
+
+No production source changed in this round. Two new stateful fuzz regressions add
+512 randomized runs across stake liability conservation and `activeServiceCount`
+transitions; Foundry also replayed the one saved counterexample that exposed and
+then confirmed the correction of a test-harness `vm.prank` ordering error.
+
+The liability model covers partial slash, service revenue, exit during cooldown,
+full or partial cooldown slash, unregister, withdrawal in either order,
+re-registration, and service reactivation. At every terminal point the sum of
+remaining stake and pull-payment liabilities equals the contract balance, and no
+withdrawal can be credited twice. The service-count model applies idempotent
+register/enable/disable operations across three services, then full-slashes and
+re-registers the agent; the stored count matches the modeled active states after
+every transition.
+
+Partial slash preserving registration is intentional and accepted: only the Safe
+can slash, so an agent cannot self-reduce its collateral, while the Safe may choose
+a proportional penalty. Full slash still unregisters the agent and immediately
+blocks payment through every previously active service.
+
+The exact `HardnessRegistry` runtime hash remains
+`0x3449ac0707c855588a1a0df8d45bddbd04aabfb1e35cb66f7a704006b043e0d5`;
+the production source is byte-for-byte unchanged from round 8. Its runtime remains
+23,471 bytes with 1,105 bytes of EIP-170 margin.
+
+Round-10 verification: Foundry **269/269** across 14 suites; targeted
+`HardnessRegistryTest` **68/68**; deployment gates **20/20**;
+`test:remediation-r2` **30/30**; backend ABI **159/159**; production Vite build and
+`check:api` pass. The real mainnet predeploy check correctly remains **31 NO-GO / 0
+PASS** because the secure deployment environment is absent; no placeholder secret,
+role, fee, stake, treasury, or resolver input was invented. This is the second clean
+review of three required on the exact round-8 runtime.
+
 ## For the next independent round
 
 Pin the `HardnessRegistry` runtime hash above before reviewing. Treat any different
-hash as a reset. Independently fuzz stake liability conservation across partial and
-full slash, pending exits, service revenue, withdrawals, and re-registration;
-challenge the intended rule that partial slash preserves registration. Re-audit
-all `activeServiceCount` transitions and prove no underflow, stale active service,
-or withdrawal double-credit. Recheck production sizes and the deploy gates.
+hash as a reset. Independently audit every bounty bond/reward liability through
+settle, finalize, timeout, reclaim, and withdrawal paths, including the treasury and
+owner handoff, and prove that no terminal-state ordering can strand or double-credit
+funds. Recheck the deploy manifest/configuration/runbook, full suite, production
+sizes, ABI equality, and deployment gates. If the runtime is unchanged and the round
+is clean, record GO 3/3. Only then merge to `main` and load the real deployment
+environment; predeploy must move from 31 NO-GO to 0 before any broadcast.
 
 The earlier round-7 review instructions remain useful context:
 
