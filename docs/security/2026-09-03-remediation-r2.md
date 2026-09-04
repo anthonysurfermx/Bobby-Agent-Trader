@@ -287,16 +287,51 @@ PASS** because the secure deployment environment is absent; no placeholder secre
 role, fee, stake, treasury, or resolver input was invented. This is the second clean
 review of three required on the exact round-8 runtime.
 
+## Round 11 review (Codex) — NO-GO on deployment configuration and CI
+
+The third review did not earn GO 3/3. The reward/bond settlement, refund,
+timeout and pull-payment paths did not produce a new liability finding, and the
+full suite remains **269/269** across 14 suites. However, the deployment review
+identified two unresolved P2s:
+
+1. `DeployBase._v2Params()` narrows seven full-width environment inputs before
+   validation. The constructor validates the truncated value, not the operator's
+   original input. The manifest and live verifier also omit these verification
+   parameters. Check before narrowing and carry every parameter through
+   configuration, manifest and live verification (BP-03).
+2. The CI contracts job runs `forge build --sizes` before tests/layout checks.
+   That command currently exits 1 on the oversized `DeployerEoa` test harness,
+   so the workflow never reaches the later checks. Enforce EIP-170 on the seven
+   production artifacts explicitly while preserving compilation/testing of the
+   harness (BP-06).
+
+Production source, deployment scripts and compiler configuration remain unchanged
+from round 8. `HardnessRegistry` runtime hash is still
+`0x3449ac0707c855588a1a0df8d45bddbd04aabfb1e35cb66f7a704006b043e0d5`,
+23,471 bytes; all seven production artifacts remain under EIP-170. The two prior
+clean runtime reviews remain recorded, but this round is not a third clean
+deployment review and grants no launch approval.
+
+Current verification: bounty/final-regression/deployment suites **81/81**;
+full Foundry **269/269**; backend ABI **159/159**; remediation **30/30**;
+API typecheck and production build pass. `forge build --sizes` **fails as described
+above**. No additional exploit reproduction or live write was performed.
+
+The user also requested a broader protocol/web/iOS stock-swap audit. The first
+expanded pass, including two signing-consent P1s, is recorded separately in
+[the 2026-09-04 audit](2026-09-04-protocol-stock-swaps-audit.md). Its findings and
+remaining coverage must be closed before enabling swaps, regardless of the
+contract review count.
+
 ## For the next independent round
 
 Pin the `HardnessRegistry` runtime hash above before reviewing. Treat any different
-hash as a reset. Independently audit every bounty bond/reward liability through
-settle, finalize, timeout, reclaim, and withdrawal paths, including the treasury and
-owner handoff, and prove that no terminal-state ordering can strand or double-credit
-funds. Recheck the deploy manifest/configuration/runbook, full suite, production
-sizes, ABI equality, and deployment gates. If the runtime is unchanged and the round
-is clean, record GO 3/3. Only then merge to `main` and load the real deployment
-environment; predeploy must move from 31 NO-GO to 0 before any broadcast.
+hash as a reset. Close BP-03 and BP-06 first; check full-width input validation,
+parameter manifest/live parity, and execution of every CI contracts step. Recheck
+the deploy manifest/configuration/runbook, full suite, production sizes, ABI
+equality, and deployment gates. If the runtime is unchanged and the round is clean,
+record GO 3/3. Close the expanded web/iOS/protocol audit before release. Predeploy
+must move from 31 NO-GO to 0 before any broadcast.
 
 The earlier round-7 review instructions remain useful context:
 
