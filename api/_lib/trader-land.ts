@@ -34,7 +34,10 @@ export async function ensureLand(identityId: string): Promise<{ size: number; th
   const rows = r.ok ? ((await r.json()) as Array<{ size: number; theme: string }>) : [];
   if (rows[0]) return rows[0];
   const g = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identityId}&select=size,theme&limit=1`), { headers: bobbyServiceHeaders() });
-  return ((g.ok ? await g.json() : [{ size: 8, theme: 'night' }]) as Array<{ size: number; theme: string }>)[0] ?? { size: 8, theme: 'night' };
+  if (!g.ok) throw new Error('Land read failed');
+  const land = ((await g.json()) as Array<{ size: number; theme: string }>)[0];
+  if (!land) throw new Error('Land could not be initialized');
+  return land;
 }
 
 export async function grantRoutePiece(identityId: string, ledgerEventId: string, kind: 'read_complete' | 'no_trade_respected' | 'thesis_closed', routeIndex: number): Promise<RouteGrant | null> {
