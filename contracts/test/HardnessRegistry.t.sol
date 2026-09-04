@@ -585,6 +585,65 @@ contract HardnessRegistryTest is Test {
         assertLt(prediction.minResolveAt, registry.predictionExpiresAt(predictionHash));
     }
 
+    function test_predictionTimeSettersAcceptOneSecondResolutionWindow() public {
+        registry.setPredictionTTL(2 hours);
+        registry.setMinPredictionAge(2 hours - 1);
+
+        bytes32 predictionHash = _predictionHash("one-second-window");
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
+
+        HardnessRegistry.Prediction memory prediction = registry.getPrediction(predictionHash);
+        assertEq(registry.predictionExpiresAt(predictionHash) - prediction.minResolveAt, 1);
+    }
+
+    function testFuzz_predictionTimeSetterOrdersPreserveWindow(
+        uint256 rawMinAge,
+        uint256 rawTTL,
+        bool ttlFirst
+    ) public {
+        uint256 ttl = bound(rawTTL, 1 hours + 1, 30 days);
+        uint256 minAge = bound(rawMinAge, 10 minutes, ttl - 1);
+
+        if (ttlFirst) {
+            registry.setPredictionTTL(ttl);
+            registry.setMinPredictionAge(minAge);
+        } else {
+            registry.setMinPredictionAge(minAge);
+            registry.setPredictionTTL(ttl);
+        }
+
+        uint256 committedAt = block.timestamp;
+        bytes32 predictionHash = keccak256(abi.encode("fuzz-valid-window", rawMinAge, rawTTL, ttlFirst));
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
+
+        HardnessRegistry.Prediction memory prediction = registry.getPrediction(predictionHash);
+        assertEq(prediction.minResolveAt, committedAt + minAge);
+        assertEq(registry.predictionExpiresAt(predictionHash), committedAt + ttl);
+        assertLt(prediction.minResolveAt, registry.predictionExpiresAt(predictionHash));
+    }
+
+    function testFuzz_predictionTimeSettersRejectInvalidRelationship(
+        uint256 rawTTL,
+        uint256 rawMinAge,
+        uint256 rawExcess,
+        uint256 rawBadTTL
+    ) public {
+        uint256 ttl = bound(rawTTL, 1 hours + 2, 30 days);
+        uint256 minAge = bound(rawMinAge, 1 hours, ttl - 1);
+        registry.setPredictionTTL(ttl);
+        registry.setMinPredictionAge(minAge);
+
+        uint256 invalidMinAge = ttl + bound(rawExcess, 0, 30 days);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setMinPredictionAge(invalidMinAge);
+
+        uint256 invalidTTL = bound(rawBadTTL, 1 hours, minAge);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setPredictionTTL(invalidTTL);
+    }
+
     function test_commitPrediction_rejectsInvalidStoredResolutionWindow() public {
         // Simulate a legacy/corrupted pair that bypassed both owner setters.
         stdstore.target(address(registry)).sig("minPredictionAge()").checked_write(2 hours);

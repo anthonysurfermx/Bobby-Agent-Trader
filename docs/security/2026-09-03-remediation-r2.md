@@ -228,13 +228,39 @@ production Vite build and `check:api` pass. The `HardnessRegistry` runtime is
 This round changes `HardnessRegistry.sol`, so the standing three-round requirement
 restarts from the post-round-8 commit.
 
+## Round 9 review (Codex) — GO 1/3 on the round-8 bytecode
+
+The impossible-window PoC was reproduced directly on detached `a075bc5`: a
+prediction configured with a two-hour minimum age and one-hour TTL returned
+`TooSoon` at expiry and `Expired` at its minimum resolve time. The temporary
+worktree was removed after the reproduction.
+
+No production source changed in this round. Three permanent regressions add 512
+fuzz cases across both valid setter orderings and invalid relationships, plus the
+one-second valid boundary. Equality, floors, the largest representable future
+timestamp, corrupted-storage commit defense, partial/full slash, exit cleanup,
+service toggles, and withdrawal conservation all pass.
+
+A clean `forge clean` rebuild reproduced `HardnessRegistry` runtime hash
+`0x3449ac0707c855588a1a0df8d45bddbd04aabfb1e35cb66f7a704006b043e0d5`,
+23,471 bytes with 1,105 bytes of EIP-170 margin. Every production contract remains
+under EIP-170 (`BobbyTrackRecordV2` is the closest at 24,094 bytes / 482 bytes of
+margin); the size command's non-zero exit is caused only by the 39,783-byte
+`DeployerEoa` test harness.
+
+Round-9 verification: Foundry **267/267** across 14 suites; targeted
+`HardnessRegistryTest` **66/66**; `test:remediation-r2` **30/30**; backend ABI
+**159/159**; production Vite build, `check:api`, and the clean compilation pass.
+This is the first clean review of three required on the exact round-8 runtime.
+
 ## For the next independent round
 
-First reproduce the impossible resolution window on `a075bc5`, then confirm both
-setter orderings and the commit-time defense on the new commit. Fuzz transitions
-around `minPredictionAge = predictionTTL - 1`, equality, floors, and the largest
-representable future timestamp. Recheck the slash/exit/service matrix and runtime
-size from a clean build.
+Pin the `HardnessRegistry` runtime hash above before reviewing. Treat any different
+hash as a reset. Independently fuzz stake liability conservation across partial and
+full slash, pending exits, service revenue, withdrawals, and re-registration;
+challenge the intended rule that partial slash preserves registration. Re-audit
+all `activeServiceCount` transitions and prove no underflow, stale active service,
+or withdrawal double-credit. Recheck production sizes and the deploy gates.
 
 The earlier round-7 review instructions remain useful context:
 
