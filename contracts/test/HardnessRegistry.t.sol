@@ -2,9 +2,12 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import "../src/HardnessRegistry.sol";
 
 contract HardnessRegistryTest is Test {
+    using stdStorage for StdStorage;
+
     HardnessRegistry public registry;
 
     address owner = address(this);
@@ -215,6 +218,76 @@ contract HardnessRegistryTest is Test {
         vm.prank(outsider);
         registry.payForService{value: 0.001 ether}(keccak256("after-restake"), "judge-mode");
         assertEq(registry.pendingWithdrawals(agent1), 0.001 ether);
+
+        vm.prank(agent1);
+        registry.setServiceStatus("judge-mode", false);
+        vm.prank(outsider);
+        vm.expectRevert(HardnessRegistry.ServiceInactive.selector);
+        registry.payForService{value: 0.001 ether}(keccak256("manually-disabled"), "judge-mode");
+
+        vm.prank(agent1);
+        registry.setServiceStatus("judge-mode", true);
+        vm.prank(outsider);
+        registry.payForService{value: 0.001 ether}(keccak256("manually-restored"), "judge-mode");
+        assertEq(registry.pendingWithdrawals(agent1), 0.002 ether);
+    }
+
+    function test_slashAgent_partialSlashAndExitConserveWithdrawals() public {
+        vm.prank(agent1);
+        registry.registerService("judge-mode", 0.001 ether, agent1);
+
+        registry.slashAgent(agent1, 0.004 ether, keccak256("partial-ruling"));
+        (bool registered,, uint96 stake,) = registry.agentProfiles(agent1);
+        assertTrue(registered);
+        assertEq(stake, 0.006 ether);
+
+        vm.prank(outsider);
+        registry.payForService{value: 0.001 ether}(keccak256("after-partial-slash"), "judge-mode");
+        vm.prank(agent1);
+        registry.setServiceStatus("judge-mode", false);
+        vm.prank(agent1);
+        registry.requestUnregister();
+
+        registry.slashAgent(agent1, 0.002 ether, keccak256("exit-ruling"));
+        uint64 availableAt = registry.unstakeAvailableAt(agent1);
+        vm.warp(availableAt);
+        vm.prank(agent1);
+        registry.unregisterAgent();
+
+        assertEq(registry.pendingWithdrawals(owner), 0.006 ether);
+        assertEq(registry.pendingWithdrawals(agent1), 0.005 ether);
+        assertEq(address(registry).balance, 0.021 ether);
+
+        vm.prank(agent1);
+        registry.withdraw();
+        registry.withdraw();
+        assertEq(address(registry).balance, 0.01 ether);
+    }
+
+    function test_slashAgent_fullSlashDuringExitCanCleanAndReregister() public {
+        vm.prank(agent1);
+        registry.requestUnregister();
+        uint64 availableAt = registry.unstakeAvailableAt(agent1);
+
+        registry.slashAgent(agent1, type(uint256).max, keccak256("exit-full-slash"));
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InsufficientStake.selector);
+        registry.cancelUnregister();
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.registerAgent{value: 0.01 ether}("ipfs://blocked-before-cleanup");
+
+        vm.warp(availableAt);
+        vm.prank(agent1);
+        registry.unregisterAgent();
+        vm.prank(agent1);
+        registry.registerAgent{value: 0.01 ether}("ipfs://agent-1-fresh");
+
+        (bool registered,, uint96 stake,) = registry.agentProfiles(agent1);
+        assertTrue(registered);
+        assertEq(stake, registry.REGISTRATION_STAKE());
+        assertEq(registry.unstakeAvailableAt(agent1), 0);
+        assertEq(registry.pendingWithdrawals(owner), registry.REGISTRATION_STAKE());
     }
 
     function test_registerAgent_revertsWhenPaused() public {
@@ -465,8 +538,8 @@ contract HardnessRegistryTest is Test {
         registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
         uint64 expiry = registry.predictionExpiresAt(predictionHash);
 
-        registry.setPredictionTTL(1 hours);
-        vm.warp(block.timestamp + 2 hours);
+        registry.setPredictionTTL(2 hours);
+        vm.warp(block.timestamp + 3 hours);
         vm.expectRevert(HardnessRegistry.TooSoon.selector);
         registry.expirePrediction(predictionHash);
 
@@ -476,11 +549,13 @@ contract HardnessRegistryTest is Test {
 
     function test_predictionTimeSettersRejectUint64Truncation() public {
         uint256 largestDelay = uint256(type(uint64).max) - block.timestamp;
-        registry.setMinPredictionAge(largestDelay);
         registry.setPredictionTTL(largestDelay);
-        assertEq(registry.minPredictionAge(), largestDelay);
+        registry.setMinPredictionAge(largestDelay - 1);
+        assertEq(registry.minPredictionAge(), largestDelay - 1);
         assertEq(registry.predictionTTL(), largestDelay);
 
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setMinPredictionAge(largestDelay);
         vm.expectRevert(HardnessRegistry.InvalidValue.selector);
         registry.setMinPredictionAge(largestDelay + 1);
         vm.expectRevert(HardnessRegistry.InvalidValue.selector);
@@ -490,6 +565,34 @@ contract HardnessRegistryTest is Test {
         vm.prank(agent1);
         vm.expectRevert(HardnessRegistry.InvalidValue.selector);
         registry.commitPrediction(_predictionHash("stale-time-bound"), "BTC-USD", 66, 100, 120, 90);
+    }
+
+    function test_predictionTimeSettersPreserveResolutionWindow() public {
+        uint256 currentTTL = registry.predictionTTL();
+        uint256 currentMinAge = registry.minPredictionAge();
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setMinPredictionAge(currentTTL);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setPredictionTTL(currentMinAge);
+
+        registry.setPredictionTTL(2 hours);
+        registry.setMinPredictionAge(90 minutes);
+        bytes32 predictionHash = _predictionHash("valid-resolution-window");
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
+
+        HardnessRegistry.Prediction memory prediction = registry.getPrediction(predictionHash);
+        assertLt(prediction.minResolveAt, registry.predictionExpiresAt(predictionHash));
+    }
+
+    function test_commitPrediction_rejectsInvalidStoredResolutionWindow() public {
+        // Simulate a legacy/corrupted pair that bypassed both owner setters.
+        stdstore.target(address(registry)).sig("minPredictionAge()").checked_write(2 hours);
+        stdstore.target(address(registry)).sig("predictionTTL()").checked_write(1 hours);
+
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.commitPrediction(_predictionHash("invalid-stored-window"), "BTC-USD", 66, 100, 120, 90);
     }
 
     function test_expirePrediction_revertsBeforeTtl() public {

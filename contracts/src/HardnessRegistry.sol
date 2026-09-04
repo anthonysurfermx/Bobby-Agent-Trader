@@ -506,8 +506,12 @@ contract HardnessRegistry {
         }
         if (_predictions[predictionHash].agent != address(0)) revert AlreadyExists();
         // Governance may have configured a boundary value in an earlier block.
-        // Recheck at use time so the uint64 snapshots can never truncate later.
-        if (!_fitsFutureTimestamp(minPredictionAge) || !_fitsFutureTimestamp(predictionTTL)) revert InvalidValue();
+        // Recheck at use time so timestamps cannot truncate and every prediction
+        // retains a non-empty resolution window before expiry.
+        if (
+            minPredictionAge >= predictionTTL || !_fitsFutureTimestamp(minPredictionAge)
+                || !_fitsFutureTimestamp(predictionTTL)
+        ) revert InvalidValue();
 
         _predictions[predictionHash] = Prediction({
             agent: msg.sender,
@@ -1022,12 +1026,12 @@ contract HardnessRegistry {
     }
 
     function setMinPredictionAge(uint256 newAge) external onlyOwner {
-        if (newAge < 10 minutes || !_fitsFutureTimestamp(newAge)) revert InvalidValue();
+        if (newAge < 10 minutes || newAge >= predictionTTL || !_fitsFutureTimestamp(newAge)) revert InvalidValue();
         minPredictionAge = newAge;
     }
 
     function setPredictionTTL(uint256 newTTL) external onlyOwner {
-        if (newTTL < 1 hours || !_fitsFutureTimestamp(newTTL)) revert InvalidValue();
+        if (newTTL < 1 hours || newTTL <= minPredictionAge || !_fitsFutureTimestamp(newTTL)) revert InvalidValue();
         predictionTTL = newTTL;
     }
 

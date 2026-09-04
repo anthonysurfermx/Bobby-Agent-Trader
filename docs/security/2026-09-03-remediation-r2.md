@@ -206,7 +206,37 @@ This round changes `HardnessRegistry.sol`, so the deploy remains under the stand
 three-round rule; review the exact post-round-7 bytecode rather than treating these
 tests as deployment approval.
 
+## Round 8 review (Codex) — NO-GO on `a075bc5`: impossible prediction window
+
+| # | Codex finding | Fix | Regression |
+|---|---|---|---|
+| P1 | `setMinPredictionAge` and `setPredictionTTL` enforced their own floors and timestamp widths but not their relationship. The Safe could set `minPredictionAge > predictionTTL`; the reproduced prediction reverted `TooSoon` through its expiry and `Expired` once it reached `minResolveAt`, so no successful resolution was possible. Equality reduced the valid window to a single timestamp. | Both setters now preserve the strict invariant `minPredictionAge < predictionTTL`; `commitPrediction` independently refuses an invalid stored pair before accepting an obligation. | `test_predictionTimeSettersPreserveResolutionWindow` refuses equality in either setter order and proves a valid updated pair snapshots `minResolveAt < expiresAt`; `test_commitPrediction_rejectsInvalidStoredResolutionWindow` corrupts the pair beneath the setters and proves the commit-time defense. |
+
+The round-7 historical PoCs were also reproduced directly against detached
+`44a2d51`: all three vulnerable behaviors were observed (payable service after a
+full slash, later-block prediction expiry truncation, and later-block signal expiry
+truncation). On the current code, the expanded stake/service matrix covers partial
+and full slash, slash during exit, cooldown cleanup, re-registration, manual service
+deactivation/reactivation, and exact withdrawal conservation.
+
+Post-fix verification: Foundry **264/264** across 14 suites; targeted
+`HardnessRegistryTest` **63/63**; `test:remediation-r2` **30/30**;
+`test:hardness-abi-anvil` confirms all 159 ABI entries equal the compiled artifact;
+production Vite build and `check:api` pass. The `HardnessRegistry` runtime is
+23,471 bytes, 1,105 bytes below EIP-170; bounties remain 12,006 bytes.
+
+This round changes `HardnessRegistry.sol`, so the standing three-round requirement
+restarts from the post-round-8 commit.
+
 ## For the next independent round
+
+First reproduce the impossible resolution window on `a075bc5`, then confirm both
+setter orderings and the commit-time defense on the new commit. Fuzz transitions
+around `minPredictionAge = predictionTTL - 1`, equality, floors, and the largest
+representable future timestamp. Recheck the slash/exit/service matrix and runtime
+size from a clean build.
+
+The earlier round-7 review instructions remain useful context:
 
 First reproduce the round-7 service-payment and timestamp failures on `44a2d51`,
 then confirm both refusals on the new commit. Exercise partial slash, full slash,
