@@ -1,6 +1,6 @@
 # Bobby Protocol and tokenized-stock swaps — expanded security review
 
-Date: 2026-09-04. Status: **NO-GO; expanded review in progress (two passes).**
+Date: 2026-09-04. Status: **NO-GO; source-review report issued after three passes.**
 
 Reviewed web/backend/contracts: `security/remediation-r2` at
 `02a0a7aa51b129f89089be121d047a00dfb78452`. Reviewed native client:
@@ -18,7 +18,14 @@ At the end of pass two, the native checkout also contained someone else's
 uncommitted `TraderLandGateHarness.swift` changes. They were left untouched and
 are not covered by the pinned native revision or its earlier 9/9 test result;
 the swap/signing files themselves had no working-tree diff.
-Current findings: **3 P1 and 6 P2**. No new P0 was confirmed in these passes;
+At report issuance, the external uncommitted native changes also included
+`BobbyApp.swift` and `UITests/TraderLandGateTests.swift`. None of those three
+files' uncommitted changes is included in this audit or the earlier test result.
+Pass three re-pinned the same application code at `23b98e6` and extends the
+control-plane/consumer review, issuer assumptions and dependency triage below.
+It adds BP-10 through BP-14; these are source findings, not newly executed
+failure demonstrations.
+Current findings: **3 P1 and 11 P2**. No new P0 was confirmed in these passes;
 that is not a guarantee that no critical defect remains in unverified coverage.
 
 The user requested review of Bobby Protocol and the complete stock-swap feature
@@ -278,6 +285,147 @@ remain private before and after receipt confirmation, while deliberate protocol
 cycles remain public. Test the real producer together with the migration view:
 correctly tagged synthetic fixtures alone cannot detect this defect.
 
+### BP-10 — P2: off-chain agent ownership is checked outside the authoritative write
+
+Evidence: `api/agents/register.ts:85`–`:113`;
+`api/_lib/hardness-control-plane.ts:68`–`:105`;
+`supabase/migrations/20260412_hardness_control_plane.sql` and the exact-schema
+migration's `hardness_agents_agent_id_key` / service-role policy.
+
+Registration reads the current owner, verifies a signature against that value,
+then performs an unconditional service-role merge on `agent_id`, including
+`owner_address`. The write contains no expected-owner/version condition. The
+read also returns the same `null` for a non-success HTTP response as for an absent
+agent. A uniqueness constraint alone does not preserve the ownership decision
+when the selected operation explicitly updates on conflict.
+
+Precondition/impact: conflicting registrations or an ownership change during a
+request can invalidate the earlier authorization decision. A failed ownership
+lookup must not authorize an existing-row update either. This affects the
+off-chain profile, risk policy and subsequent API ownership checks. It does not
+transfer the on-chain Hardness registration, wallet keys, stake or tokens. No
+registration race or takeover attempt was run.
+
+Required correction: distinguish not-found from read failure; use insert-only
+creation and an atomic update bound to the authenticated current owner and row
+version. Make ownership transfer an explicit, separately authorized operation.
+Use a transactional database function or equivalent compare-and-swap rather
+than relying on a prior service-role read. Add single-use request identifiers
+for ownership-changing requests; the signature timestamp alone is not one.
+
+Closure evidence: database-backed normal create/update/transfer tests preserve
+the expected owner and reject stale versions; a storage-read failure returns an
+error without attempting a profile write.
+
+### BP-11 — P2: Base health and reputation select the retired V1 statistics
+
+Evidence: `api/_lib/protocol-constants.ts:25`;
+`api/reputation.ts:51`–`:55`; `api/protocol-heartbeat.ts:128`;
+`contracts/src/BobbyTrackRecordV2.sol` verified/attested statistics getters.
+
+`PROTOCOL_CHAIN_ID` is an alias of `DEFAULT_CHAIN.id`. Comparing those two values
+cannot detect V1 versus V2: reputation always chooses the V1 statistics and the
+heartbeat always chooses `getWinRate`. Those combined selectors do not exist on
+the reviewed V2 contract. When pointed at V2, reputation replaces failed reads
+with zeros and still returns `ok: true`; the heartbeat can instead degrade the
+entire request. This undermines the release's verified-ledger reporting and
+health monitoring; it is not a bypass of contract settlement.
+
+Required correction: select the interface from an explicit deployment version
+or the intended fixed legacy chain constant, not two aliases. Report unavailable
+statistics as unavailable, with per-source health, rather than as measured zeros.
+Bind the displayed performance population to the verified/attested ledger.
+Related migration drift remains in registration metadata and orchestration proof
+rows, which still use literal chain `196` with chain-selected contract writers.
+
+Closure evidence: normal V1 and V2 fixtures exercise the actual HTTP handlers,
+including nonzero verified statistics, absent data and the returned proof chain.
+
+### BP-12 — P2: public metadata and error responses can disclose private RPC URLs
+
+Evidence: `api/reputation.ts:165`; `api/_lib/chains.ts:108`–`:113`;
+`api/protocol-heartbeat.ts:71`, `:147`, `:150` and its public error responses;
+`api/protocol-tx-history.ts:110`, `:115`, `:118` and its public error responses.
+
+The reputation response exposes `PROTOCOL_RPC_URL`, which resolves to the
+server's configurable RPC URL, rather than the dedicated `publicRpcUrl` field.
+The other consumers interpolate configured URLs into errors and return those
+messages to public callers. If a provider credential is embedded in a URL path,
+query or user information, it can leave the server via these normal responses.
+The public-default URL does not contain such a credential; no secret-bearing
+production response was requested or captured during this review.
+
+Impact is conditional disclosure and potential abuse of provider access/quota,
+not exposure of a signing key. Required correction: advertise only the public
+RPC field; return stable sanitized error codes; redact credential-bearing URLs
+in logs as well. Review all sibling RPC consumers for the same pattern. If
+deployment evidence establishes prior exposure, rotate that provider credential
+through the normal secret-management process, not through this report.
+
+Closure evidence: local responses and logs never contain a non-secret sentinel
+placed in a synthetic configured provider URL, on success or upstream failure.
+
+### BP-13 — P2: orchestration advice does not enforce its effective policy result
+
+Evidence: `api/_lib/hardness-control-plane.ts:285`–`:319`;
+`api/orchestrate.ts:262`–`:301`, `:317`, `:333`, `:340`.
+
+The policy evaluator returns `paper_only` or `allowed_with_reduction`, but the
+response overrides the score-derived action only for `blocked`. A high score
+can therefore retain `execute` under a paper policy or above the declared size
+limit. The advisory override checks the raw stored policy instead of the
+effective defaults. `requireOnchainProof` is copied into the effective policy
+but never evaluated against an actual confirmed proof, while the session is
+marked `proved` even when no proof was produced. Additionally, the purported
+notional passed to the policy evaluator is unit entry price, not quantity times
+price. The request has no independently specified order notional.
+
+Impact/precondition: consumers treating this financial-orchestration response as
+an executable authorization can receive advice inconsistent with the configured
+policy. This endpoint does not itself send a Uniswap order, and the public
+request cannot enable the internal recorder's signing authority. No autonomous
+downstream execution or funds loss is claimed.
+
+Required correction: derive one final action from the validated effective
+policy, model decision and proof state, with paper/reject/human-approval taking
+precedence. Validate explicit quantity/notional if sizing is offered. Keep
+analysis, submitted proof and confirmed proof states distinct. A missing required
+proof or reduction amount must not yield executable advice. Validate LLM output
+against a bounded schema before using it in that decision.
+
+Closure evidence: ordinary paper/advisory/auto policy fixtures and normal
+missing/submitted/confirmed proof states produce consistent decision, sizing and
+session fields; the handler never promotes advisory analysis into execution.
+
+### BP-14 — P2: stock risk references omit the issuer oracle's pause state
+
+Evidence: `api/_lib/base-swap.ts:321`–`:322`, `:574`–`:608`,
+`:655`–`:669`, `:880`–`:906`; the issuer-oracle behavior documented in
+[Base's stock integration guide](https://docs.base.org/specifications/b20/tokenized-stocks-on-base).
+
+The quote guard and held-stock exposure calculation accept a positive complete
+round within a 96-hour age limit. Neither reads the issuer oracle registry's
+pause state. Token `pausedFeatures` / transfer pause are different signals:
+the official guide describes corporate-action feed freezes without stopping
+token transfers. Thus a recently frozen feed can still be classified as usable
+for price-deviation and exposure decisions before the age limit expires.
+
+Precondition/impact: during such a pause, risk checks can use a held reference
+as if it were current. The magnitude depends on subsequent prices and holdings;
+no price manipulation, live corporate-action failure or loss was demonstrated.
+This is not an objection to deliberately supporting weekend secondary trading,
+nor a claim that a multiplier must be applied twice to a total-return feed.
+
+Required correction: distinguish market closure, missing data and issuer pause
+in one shared reference validator. Consume the canonical registry pause state
+and enforce an explicit conservative execution/exposure policy while paused or
+unknown. Show reference timestamp/status to the user. Revalidate at transaction
+build; on-chain slippage remains necessary because state can change afterwards.
+
+Closure evidence: normal open-market, weekend, issuer-paused and resumed feed
+fixtures drive both quote and held-exposure paths consistently. A recent
+timestamp alone must not override a known issuer pause.
+
 ## Additional integrity and dependency work
 
 - Receipt verification checks wallet sender, router, successful execution and
@@ -288,13 +436,95 @@ correctly tagged synthetic fixtures alone cannot detect this defect.
 - `npm audit --omit=dev --json` reports **22 moderate package entries, no high or
   critical entries** for this local dependency tree. These include transitive
   wallet dependencies and are not 22 distinct demonstrated protocol exploits.
-  Reachability and safe upgrade testing remain open; do not use `audit fix
-  --force` as release evidence. This result is distinct from GitHub's earlier
-  default-branch advisory count.
+  Pass three traced the three underlying advisories as detailed below. Safe
+  upgrade testing remains open; do not use `audit fix --force` as release
+  evidence. This result is distinct from GitHub's earlier default-branch count.
 - The issuer metadata exposes paused features even when transfers are permitted.
   The read-only smoke returned `pausedFeatures=32` and `transferPaused=false`
   for NVDAc. This is a deployment-time dependency to monitor, not evidence that
   Bobby can override issuer policy.
+
+Dependency triage uses the installed lockfile tree, package dependency reports,
+application import searches and the indicated installed ESM/source-map paths.
+No advisory payload was executed. A package-manager finding is not, by itself,
+evidence that the affected API is reachable by an untrusted application input.
+
+| Advisory root | Installed path and reviewed use | Disposition |
+|---|---|---|
+| `decode-uri-component`, [GHSA-vcc3-ghjq-m6fr](https://github.com/SamVerschueren/decode-uri-component/security/advisories/GHSA-vcc3-ghjq-m6fr) | Version 0.2.2 via `query-string` 7.1.3 in WalletConnect dependency trees. Four reviewed WalletConnect utils 2.21.0/2.21.1 ESM artifacts/source maps parse their URI query with `URLSearchParams`; those artifacts do not import `query-string`. | Malformed-input availability advisory; upstream fix 0.5.0. No affected decoder path established in those ESM artifacts. Other package branches/bundle variants are not certified safe. |
+| `fflate`, [upstream 0.8.3 security release](https://github.com/101arrowz/fflate/releases/tag/v0.8.3) | 0.8.2 arrives through production-declared `@types/three`; no application `unzipSync` or archive-loader path was found. The separate `@vercel/og`/Satori path uses 0.7.5. | ZIP64 availability advisory, GHSA-px8p-9vwx-vf98. Do not classify the type dependency as a demonstrated remote unzip path. Update the affected dependency and retest the relevant bundles; 0.7.5 is outside the affected 0.8.x range. |
+| `uuid`, [GHSA-w5hq-g745-h8pq](https://github.com/uuidjs/uuid/security/advisories/GHSA-w5hq-g745-h8pq) | Older versions appear in wallet dependencies. No direct application import was found; the inspected MetaMask utils helper uses `v4`, not the affected buffer-taking functions. | Advisory concerns v3/v5/v6 with supplied buffers, not v4. Patched release lines include 11.1.1, 12.0.1 and 13.0.1. Complete consumer/upgrade verification remains required; the inspected helper is not proof of all SDK paths. |
+
+Additional source observations, not separately counted as funds-loss findings:
+
+- The public event/memory/heartbeat handlers use `bobbyReadKey`, which prefers
+  service role. RLS therefore does not scope those reads. In particular,
+  heartbeat reads recent `agent_cycles` directly and exposes cycle metadata;
+  apply BP-09's explicit public provenance and field policy to these consumers,
+  not just the browser view. Event/memory producers and their intended public
+  content need an explicit contract; do not assume all service-role data is public.
+- The transaction-history scanner advances past failed log chunks and past
+  items truncated by its page limit while reporting `degraded: false` on the
+  successful outer path. Its labels compare only two selector bytes. Treat this
+  feed as a best-effort display, not a complete settlement/audit ledger; retain
+  failed ranges and transaction-level cursors and decode full ABI selectors.
+- Reported bounty escrow is lifetime bounty count times the current minimum,
+  not current outstanding liabilities or escrow balance. A completed sandbox
+  run is labeled `paid` without a payment receipt. Separate observed payments,
+  estimated activity and actual liabilities before using these metrics for
+  financial reporting or operational release checks.
+
+## Issuer and execution trust boundary
+
+The [official integration guide](https://docs.base.org/specifications/b20/tokenized-stocks-on-base)
+describes B20 as shared native precompile behavior, not a separate bytecode proxy
+for each asset. Token-address code hashes therefore cannot establish immutable
+issuer behavior. Base upgrades and issuer administration are separate trust
+dependencies. Announcements do not impose a timelock. The four enabled token
+addresses and four total-return feed proxies match the published table.
+
+The [IB20 reference](https://docs.base.org/specifications/b20/reference/interfaces/ib20)
+documents immediate policy updates, separate pause permissions and privileged
+seizure functionality. Those are issuer capabilities, not Bobby vulnerabilities
+or powers held by Bobby's Safe. Bobby's metadata checks, transfer-policy checks
+and exact swap simulations provide point-in-time checks, not a guarantee that
+issuer behavior or eligibility will remain unchanged while a user holds tokens.
+
+Release operations must inventory issuer roles/policies, feed proxy and oracle
+registry configuration, supported Base upgrades, and router/factory identity at
+a recorded block. Define alert handling and a responsible operator for changes
+in roles, policies, pauses, multiplier and feed configuration. A current role
+inventory and an operating monitor were not demonstrated in this review; no
+monitor was created or production setting changed by the audit. Legal/issuer
+eligibility approval remains an external prerequisite, not a code-audit verdict.
+
+## Rendered-flow verification and its limit
+
+Story: select a USDC/stock pair in the web execution card, obtain a session-bound
+quote, confirm exact terms in the wallet, then verify and record the receipt.
+The `verification` and `agent-browser-verify` skills informed the boundary checks;
+their CLI was unavailable, so the integrated browser was used as a fallback.
+
+A loopback-only Vite preview of the already built release loaded
+`/agentic-world/polymarket`. Its accessibility snapshot contained the Agent Radar
+page, Execute section, Coinbase B20 / Uniswap V3 / Base labeling and the
+`Connect Wallet to Swap` button. The page was not blank and no framework error
+overlay appeared in the returned accessibility tree. This is not a console-log
+or pixel-screenshot assertion. No wallet connection, signature, approval, order,
+market-analysis job or authenticated request was initiated by this check.
+
+| Boundary | Result |
+|---|---|
+| Built page and disconnected swap entry | Rendered in the integrated browser |
+| Wallet/session → quote | Not exercised: no connected test-wallet session in this browser; Vite preview is not the release serverless backend |
+| Quote → consent | Source findings BP-01/BP-02 remain open; no rendered success claim |
+| Receipt → ledger | Earlier existing tests and local PostgreSQL evidence below, not a signed end-to-end browser run |
+
+Following the verification skill's stop rule, the rendered journey stops at the
+missing wallet/session boundary. Unit and simulator results do not fill that
+gap. Web account/chain/cancel/requote transitions and physical iOS wallet return,
+cancel and relaunch still require a controlled release-environment rehearsal
+after remediation. The local preview is stopped after collecting this evidence.
 
 ## Coverage and release evidence
 
@@ -323,6 +553,11 @@ verification/confirmation, wallet nonce/session and identity helpers, intent
 HMAC path, protocol-record writer and V2 adapter, protocol write latch, MCP
 payment/challenge lifecycle, and PnL reader. The producer-to-public-view review
 in BP-09 demonstrates why database permissions alone are insufficient.
+Pass three adds agent registration/authentication/profile/activity, the full
+control-plane helper, orchestration and Hardness-test handlers, event logger and
+event/memory/migration readers, reputation, heartbeat and transaction-history
+consumers. The review identified BP-10 through BP-14 and the qualified
+observations above; it did not run live endpoint failure cases.
 
 | Area | Evidence obtained in this pass | Still required |
 |---|---|---|
@@ -333,10 +568,13 @@ in BP-09 demonstrates why database permissions alone are insufficient.
 | Swap math, risk and routing | Base-swap tests pass; risk gate 42 assertions; ticker routing 52 equities + 9 speech cases | Close BP-01/BP-02; signed canary and observed receipts |
 | Oracle adapter | TrackRecord V2 library 50/50; commit-policy pass | Live canonical Pyth activation and deployment parameter checks |
 | Public Base data | Read-only smoke passed for all four stock pairs, venue getters, country gates, feature switch and empty-wallet refusal | Real approval/swap/revoke after release prerequisites are met |
-| Web release | API typecheck and production build pass; generated Hardness ABI 159/159 | Rendered signing-flow verification after fixes, production configuration and canary |
+| Web release | API typecheck and production build pass; generated Hardness ABI 159/159; disconnected execution entry rendered | Rendered signing-flow verification after fixes, production configuration and canary |
 | Native client | Source review of quote guards, signing bridge, UI, API receipts, Keychain and privacy manifest; existing simulator tests 9/9 | Close BP-02/BP-05; physical-device wallet return/cancel/relaunch and signed archive |
 | Database ledger | Real PostgreSQL 17: three FIFO/ordering/concurrency scenarios pass; migration 0010 post-fix permission/view/identity-reparenting checks pass | BP-09 producer ownership; current deployed policy/function inspection |
 | MCP bounty/payment consumers | Manual source review of contract interface, value, status decoding, payment verification and atomic consumption | BP-07/BP-08; end-to-end normal fulfillment after remediation |
+| Protocol control plane and telemetry | Source review of authorization, profile writes, policy/proof state, chain aliases, RPC metadata and history completeness | BP-10 through BP-13; database-backed ownership checks and normal HTTP consumer tests after fixes |
+| Wallet/rendering dependencies | Three underlying advisories traced through the installed dependency tree and selected ESM consumers | Reviewed upgrades, complete release-bundle reachability and repeat scans |
+| Issuer/native-token assumptions | Official B20/IB20 references checked against local token/feed inventory and pause/reference consumers | BP-14; recorded live role/policy/feed inventory and operational change monitoring |
 
 The scratch cluster listened only on a Unix socket inside a mode-0700 temporary
 directory, not TCP. `test:swap-ledger-pg` exercised the actual migration 0009
@@ -361,23 +599,39 @@ deployment environment is absent. Those missing runtime prerequisites are not
 31 additional security vulnerabilities. No placeholder production configuration
 was supplied to make the check green.
 
-This pass does not certify the entire protocol as vulnerability-free. It has not
-completed a fresh line-by-line review of every remaining API/contract, issuer
-implementation, live Supabase policy, deployed contract, or physical-device path.
-The expanded audit stays open while its coverage gaps are being investigated.
-An audit can conclude NO-GO with open findings; remediation and a successful
-retest are separate prerequisites for launch, not a reason to hide the findings.
-Existing green tests are regression evidence, not substitutes for missing checks.
+## Disposition and follow-up verification
 
-Remaining audit work is concrete: finish cross-surface authorization/data-flow
-review of the other protocol control-plane, event and agent API consumers;
-dependency-advisory reachability; issuer/proxy upgrade assumptions and monitored
-configuration; and rendered web/native session-transition verification. Live
-Supabase policies, deployment manifests/runtime and physical-wallet behavior
-require environment/device evidence not available from source or simulator unit
-tests alone. No Supabase connector was available in this session.
+This source-review report is issued with **14 open findings and a NO-GO**. It
+does not certify the entire protocol as vulnerability-free or claim to have
+found every critical issue. The coverage table defines the work actually
+performed. Unrelated application features, the issuer's internal implementation,
+full wallet SDK internals, live database policy state, final deployed bytecode
+and physical-device behavior are not independently certified here.
 
-Launch also requires the real deployment environment, finalized receipt manifest,
-Safe handoff/Pyth actions, approved issuer-country policy and the final-bytecode
-canary. iOS additionally retains the signed archive, device and App Store tasks in
-its own release checklist. The first expanded pass provides no launch approval.
+The deployment gate remains **2/3, not 3/3**. BP-03 and BP-06 prevent awarding the
+pending clean review. This expanded review was performed without granting that
+approval or authorizing deployment. Existing green tests are regression
+evidence, not substitutes for the missing checks.
+
+Remediation order:
+
+1. Close client consent BP-01/BP-02 and private-data provenance BP-09 before
+   exposing real users. Apply ownership protection to all relevant producers
+   and public service-role consumers, not merely the database view.
+2. Close fail-closed controls, ownership and payment boundaries BP-04/BP-08/BP-10;
+   correct wallet request correlation BP-05 and oracle status BP-14.
+3. Align deployment/CI BP-03/BP-06, bounty clients BP-07, telemetry/secret handling
+   BP-11/BP-12 and orchestration policy BP-13. Re-run each stated closure check
+   on the remediated commit and repeat the pending deployment review.
+4. Produce a separate release-validation record: deployed migration/policies,
+   final manifest/runtime and Safe/Pyth state, explicit issuer-country approval,
+   monitored configuration, reviewed dependency upgrades, rendered session
+   transitions and a deliberately authorized final-bytecode canary. iOS also
+   needs the signed archive and physical-device/App Store checklist.
+
+No Supabase connector was available in this session. Live policy, manifest and
+device evidence must come from the actual release environment; do not paste
+private keys or service secrets into the report. Until those checks and the
+remediation retest are complete, keep stock execution disabled and do not merge
+or launch on the strength of this audit. Report issuance is not production
+acceptance, and no application fixes are claimed by these documentation commits.
