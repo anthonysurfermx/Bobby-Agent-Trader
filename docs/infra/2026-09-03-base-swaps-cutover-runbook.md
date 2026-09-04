@@ -78,6 +78,17 @@ stay private — after applying, review and run the operator statement left as a
 comment in the migration to re-publish the rows the scheduled cycle produced.
 Regression: `DATABASE_URL=… npm run test:rls-lockdown-pg`.
 
+## 2b-iii. Apply migrations `0012_hardness_agent_cas.sql` and `0013_mcp_challenge_binding.sql`
+
+BP-10 and BP-08 (2026-09-04 review). `0012` adds `hardness_agents.version`, the
+compare-and-swap registration RPC and the single-use ownership transfer RPC (+ nonce
+table). `0013` adds the client-secret hash, request hash lifecycle columns and the
+new challenge statuses. Both additive. Client contract change for paid MCP tools: the
+402 now returns `clientSecret`; the retry must repeat the **identical** request with
+`x-402-payment`, `x-challenge-id` **and** `x-challenge-secret`. A tool failure leaves
+the payment retryable; a completed call replays its stored result to the same client.
+Regression: `npm run test:agent-registry-pg` and the BP-08 checks in `test:remediation-r2`.
+
 ## 2c. Safe transaction — activate the canonical Pyth on TrackRecordV2 (C-02)
 
 Read-only state on 2026-09-03: `activePyth = 0x8250…` (old), `0xbC16…` approved,
