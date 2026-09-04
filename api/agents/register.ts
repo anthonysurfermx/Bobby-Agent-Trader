@@ -126,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mode: 'advisory',
     },
     status: 'active',
-  }, { owner: existing ? String(existing.owner_address) : null, version: existing ? Number(existing.version ?? 1) : null });
+  }, { owner: existing ? String(existing.owner_address) : null, rowVersion: existing ? Number(existing.row_version ?? 1) : null });
   if (!cas.ok) {
     if (cas.error === 'STALE_VERSION' || cas.error === 'OWNER_MISMATCH' || cas.error === 'OWNER_CHANGE_REQUIRES_TRANSFER') {
       return res.status(409).json({ error: `Registration conflict: ${cas.error}` });
@@ -150,6 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: 'active',
         metadataURI,
         version: body.version || '1.0.0',
+        rowVersion: profile ? Number(profile.row_version ?? 1) : null,
         stored: Boolean(profile),
         authMode: auth.mode,
       },

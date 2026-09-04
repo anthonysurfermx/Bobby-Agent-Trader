@@ -34,6 +34,8 @@ export interface AgentRecord {
   name: string;
   agent_type?: string;
   version?: string | null;
+  /** BP-10 optimistic-lock counter (`hardness_agents.row_version`); `version` is the agent's semver label. */
+  row_version?: number;
   capabilities?: string[];
   mcp_endpoint?: string | null;
   webhook_url?: string | null;
@@ -134,17 +136,18 @@ async function callRpc(fn: string, body: Record<string, unknown>): Promise<{ ok:
  * the caller AUTHORISED against (null for a creation); the database refuses the
  * write if the row moved or the owner differs. Never changes ownership.
  */
-export async function registerAgentCas(agent: AgentRecord, expected: { owner: string | null; version: number | null }) {
+export async function registerAgentCas(agent: AgentRecord, expected: { owner: string | null; rowVersion: number | null }) {
   await assertWritesOpen('hardness registerAgentCas');
   if (!hasSupabase()) return { ok: false as const, error: 'RPC_FAILED' as const, detail: 'not configured' };
   return callRpc('hardness_register_agent', {
     p_agent_id: agent.agent_id,
     p_expected_owner: expected.owner,
-    p_expected_version: expected.version,
+    p_expected_version: expected.rowVersion, // = hardness_agents.row_version, never the semver `version`
     p_row: {
       owner_address: agent.owner_address,
       name: agent.name,
       agent_type: agent.agent_type || 'trading-agent',
+      version: agent.version || null,
       capabilities: agent.capabilities || ['predict'],
       mcp_endpoint: agent.mcp_endpoint || null,
       webhook_url: agent.webhook_url || null,
@@ -156,10 +159,10 @@ export async function registerAgentCas(agent: AgentRecord, expected: { owner: st
 }
 
 /** BP-10: explicit ownership transfer — current owner, row version and a single-use request id. */
-export async function transferAgentOwner(agentId: string, currentOwner: string, newOwner: string, expectedVersion: number, requestId: string) {
+export async function transferAgentOwner(agentId: string, currentOwner: string, newOwner: string, expectedRowVersion: number, requestId: string) {
   await assertWritesOpen('hardness transferAgentOwner');
   if (!hasSupabase()) return { ok: false as const, error: 'RPC_FAILED' as const, detail: 'not configured' };
-  return callRpc('hardness_transfer_agent', { p_agent_id: agentId, p_current_owner: currentOwner, p_new_owner: newOwner, p_expected_version: expectedVersion, p_request_id: requestId });
+  return callRpc('hardness_transfer_agent', { p_agent_id: agentId, p_current_owner: currentOwner, p_new_owner: newOwner, p_expected_version: expectedRowVersion, p_request_id: requestId });
 }
 
 export async function createSession(session: AgentSessionRecord) {

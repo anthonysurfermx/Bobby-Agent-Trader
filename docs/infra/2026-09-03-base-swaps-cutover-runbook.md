@@ -80,6 +80,10 @@ Regression: `DATABASE_URL=… npm run test:rls-lockdown-pg`.
 
 ## 2b-iii. Apply migrations `0012_hardness_agent_cas.sql` and `0013_mcp_challenge_binding.sql`
 
+> Preflight 2026-09-05 (read-only): `0010` is **already applied** on prod; `0011`/`0012`/`0013`
+> pending, preconditions verified. `0012` adds `hardness_agents.row_version` (bigint CAS counter);
+> the pre-existing text `version` column (semver) is untouched. Apply in order 0011 → 0012 → 0013.
+
 BP-10 and BP-08 (2026-09-04 review). `0012` adds `hardness_agents.version`, the
 compare-and-swap registration RPC and the single-use ownership transfer RPC (+ nonce
 table). `0013` adds the client-secret hash, request hash lifecycle columns and the

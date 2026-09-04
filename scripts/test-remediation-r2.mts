@@ -514,7 +514,7 @@ await check('BP-10 register: storage read failure → 502 and no write; owner ch
     globalThis.fetch = (async (input: any, init?: any) => {
       const url = typeof input === 'string' ? input : input.url; const method = (init?.method || 'GET').toUpperCase();
       if (method !== 'GET' && /hardness_agents|rpc\/hardness_/.test(url)) writes.push(`${method} ${url}`);
-      if (url.includes('hardness_agents') && method === 'GET') return new Response(JSON.stringify([{ agent_id: 'agent-1', owner_address: '0x2222222222222222222222222222222222222222', version: 3 }]), { status: 200, headers: { 'content-type': 'application/json' } });
+      if (url.includes('hardness_agents') && method === 'GET') return new Response(JSON.stringify([{ agent_id: 'agent-1', owner_address: '0x2222222222222222222222222222222222222222', row_version: 3 }]), { status: 200, headers: { 'content-type': 'application/json' } });
       return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
     }) as typeof fetch;
     ({ res, state } = recorder());
@@ -554,7 +554,7 @@ await check('BP-10 register: storage read failure → 502 and no write; owner ch
     return patches;
   };
   const run = async (body: Record<string, unknown>) => { const { res, state } = recorder(); await orchestrate(req('POST', {}, body, INTERNAL), res); return state; };
-  const agentRow = (risk_policy_json: Record<string, unknown>) => ({ agent_id: 'a1', owner_address: '0x1111111111111111111111111111111111111111', name: 'A', risk_policy_json, status: 'active', version: 1 });
+  const agentRow = (risk_policy_json: Record<string, unknown>) => ({ agent_id: 'a1', owner_address: '0x1111111111111111111111111111111111111111', name: 'A', risk_policy_json, status: 'active', row_version: 1 });
   try {
     await check('BP-13 no validated size → analysis only: a top score never becomes executable advice; session is `analysis`, not `proved`', async () => {
       const patches = scenario({});

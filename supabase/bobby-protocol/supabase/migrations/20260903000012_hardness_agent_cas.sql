@@ -8,7 +8,10 @@
 -- authorised operation with a single-use request id.
 -- ============================================================
 
-alter table public.hardness_agents add column if not exists version bigint not null default 1;
+-- Preflight against prod (2026-09-05): hardness_agents.version ALREADY EXISTS as a
+-- nullable TEXT semver label, so the CAS counter gets its own column. `version`
+-- stays the agent's declared semver; `row_version` is the optimistic-lock counter.
+alter table public.hardness_agents add column if not exists row_version bigint not null default 1;
 
 create table if not exists public.hardness_agent_ownership_nonces (
   request_id uuid primary key,
@@ -37,8 +40,8 @@ begin
     if p_expected_owner is not null or p_expected_version is not null then
       raise exception 'NOT_FOUND' using errcode = 'P0002';
     end if;
-    insert into public.hardness_agents (agent_id, owner_address, name, agent_type, version, capabilities, mcp_endpoint, webhook_url, metadata_json, risk_policy_json, status, updated_at)
-    values (p_agent_id, v_owner, p_row->>'name', coalesce(p_row->>'agent_type', 'trading-agent'), 1,
+    insert into public.hardness_agents (agent_id, owner_address, name, agent_type, version, row_version, capabilities, mcp_endpoint, webhook_url, metadata_json, risk_policy_json, status, updated_at)
+    values (p_agent_id, v_owner, p_row->>'name', coalesce(p_row->>'agent_type', 'trading-agent'), p_row->>'version', 1,
             coalesce(p_row->'capabilities', '["predict"]'::jsonb), p_row->>'mcp_endpoint', p_row->>'webhook_url',
             coalesce(p_row->'metadata_json', '{}'::jsonb), coalesce(p_row->'risk_policy_json', '{}'::jsonb), coalesce(p_row->>'status', 'active'), now())
     returning * into v_row;
@@ -50,19 +53,20 @@ begin
   if lower(v_row.owner_address) <> v_owner then
     raise exception 'OWNER_CHANGE_REQUIRES_TRANSFER' using errcode = 'P0001';
   end if;
-  if p_expected_version is null or v_row.version <> p_expected_version then
+  if p_expected_version is null or v_row.row_version <> p_expected_version then
     raise exception 'STALE_VERSION' using errcode = 'P0001';
   end if;
   update public.hardness_agents
      set name = coalesce(p_row->>'name', name),
          agent_type = coalesce(p_row->>'agent_type', agent_type),
+         version = coalesce(p_row->>'version', version),
          capabilities = coalesce(p_row->'capabilities', capabilities),
          mcp_endpoint = p_row->>'mcp_endpoint',
          webhook_url = p_row->>'webhook_url',
          metadata_json = coalesce(p_row->'metadata_json', metadata_json),
          risk_policy_json = coalesce(p_row->'risk_policy_json', risk_policy_json),
          status = coalesce(p_row->>'status', status),
-         version = version + 1,
+         row_version = row_version + 1,
          updated_at = now()
    where agent_id = p_agent_id
    returning * into v_row;
@@ -70,7 +74,8 @@ begin
 end $$;
 
 -- Explicit ownership transfer: authorised by the CURRENT owner (verified by the
--- caller), bound to the row version, and single-use via p_request_id.
+-- caller), bound to the row version (p_expected_version = row_version), and
+-- single-use via p_request_id.
 create or replace function public.hardness_transfer_agent(
   p_agent_id text, p_current_owner text, p_new_owner text, p_expected_version bigint, p_request_id uuid
 ) returns jsonb
@@ -88,8 +93,8 @@ begin
   select * into v_row from public.hardness_agents where agent_id = p_agent_id for update;
   if not found then raise exception 'NOT_FOUND' using errcode = 'P0002'; end if;
   if lower(v_row.owner_address) <> lower(p_current_owner) then raise exception 'OWNER_MISMATCH' using errcode = 'P0001'; end if;
-  if v_row.version <> p_expected_version then raise exception 'STALE_VERSION' using errcode = 'P0001'; end if;
-  update public.hardness_agents set owner_address = lower(p_new_owner), version = version + 1, updated_at = now()
+  if v_row.row_version <> p_expected_version then raise exception 'STALE_VERSION' using errcode = 'P0001'; end if;
+  update public.hardness_agents set owner_address = lower(p_new_owner), row_version = row_version + 1, updated_at = now()
    where agent_id = p_agent_id returning * into v_row;
   return to_jsonb(v_row);
 end $$;
