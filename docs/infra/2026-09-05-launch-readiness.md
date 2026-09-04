@@ -37,9 +37,10 @@ agent; every production action is Anthony's, in the order below.
      'mcp_payment_challenges_status_check';` exists.
    Then `DATABASE_URL=<scratch> npm run test:rls-lockdown-pg` locally is unchanged; production
    verification is the three queries above.
-3. **Safe transaction — activate the canonical Pyth** (runbook §2c): to
-   `0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321`, value 0, data
-   `0xb4d6badf000000000000000000000000bc16aee60f64864882bc6c4e428e148fc0e272f5`.
+3. **Safe transaction — activate the canonical Pyth** (runbook §2c): import
+   `contracts/deployments/safe-batches/8453-activate-pyth.json` in the Safe Transaction
+   Builder (to `0x822DB0DbbCAB398e610fcBA86DA9BB92d2493321`, value 0, data
+   `0xb4d6badf000000000000000000000000bc16aee60f64864882bc6c4e428e148fc0e272f5`), sign 2 of 3.
    Check: `cast call 0x822D…2321 'activePyth()(address)' --rpc-url https://mainnet.base.org`
    returns `0xbC16aee60f64864882BC6C4E428e148Fc0E272F5`.
 4. **Redeploy** (3-round rule satisfied only after step 1):
@@ -66,7 +67,8 @@ agent; every production action is Anthony's, in the order below.
 - `deploy/base-mainnet.env.example` (no secrets) — sources cleanly (`set -a; source …`).
 - Manifest, verifier and readiness all understand `v2Params`; the simulation proves the path.
 - Migrations 0011–0013 tested on Postgres 17 against the production column shapes.
-- Safe calldata for `activatePyth` verified with `cast calldata`.
+- Safe calldata for `activatePyth` verified with `cast calldata`, and the importable batch
+  `contracts/deployments/safe-batches/8453-activate-pyth.json` (pinned to the gate's address).
 - The third-round brief with every command and attack per finding.
 - Rollback: runbook §Rollback (flags back to `false`, `PROTOCOL_CUTOVER_FREEZE=true`,
   migrations are additive — views can be dropped without data loss).

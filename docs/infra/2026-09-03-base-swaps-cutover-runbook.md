@@ -103,6 +103,10 @@ timelock elapsed 2026-08-21 19:35 UTC. One transaction from the 2/3 Safe `0x8BE6
 - data: `0xb4d6badf000000000000000000000000bc16aee60f64864882bc6c4e428e148fc0e272f5`
   (`activatePyth(0xbC16aee60f64864882BC6C4E428e148Fc0E272F5)`)
 
+Ready to import (2026-09-05): `contracts/deployments/safe-batches/8453-activate-pyth.json`
+(Safe Transaction Builder format; regenerate with `npm run build:safe-launch-batch --
+--action=activate-pyth`, which pins the address from `PythOracleGate.BASE_PYTH_UPGRADED`).
+
 Then `npm run check:mainnet:postdeploy` — the verifier that failed in round 1.
 
 ## 3. `PROTOCOL_CHAIN=base` in the production environment
