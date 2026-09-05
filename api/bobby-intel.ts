@@ -409,7 +409,7 @@ async function fetchRecentCycles(limit = 5): Promise<CycleRecord[]> {
 
   try {
     const res = await fetch(
-      `${url}/rest/v1/agent_cycles?select=status,trades_executed,trades_successful,total_usd_deployed,llm_reasoning&order=started_at.desc&limit=${limit}`,
+      `${url}/rest/v1/agent_cycles?visibility=eq.public&select=status,trades_executed,trades_successful,total_usd_deployed,llm_reasoning&order=started_at.desc&limit=${limit}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } },
     );
     if (!res.ok) return [];

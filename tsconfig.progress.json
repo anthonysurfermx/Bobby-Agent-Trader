@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": ["src/vite-env.d.ts", "src/lib/companions/progress.ts", "src/lib/companions/sync.ts"]
+}

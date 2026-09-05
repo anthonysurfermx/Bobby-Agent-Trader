@@ -6,7 +6,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { HARDNESS_REGISTRY_ADDRESS } from '../_lib/hardness-registry.js';
-import { getAgent, hasSupabase, upsertAgent } from '../_lib/hardness-control-plane.js';
+import { getAgent, hasSupabase, upsertAgent, getAgentStrict, registerAgentCas, AgentReadError } from '../_lib/hardness-control-plane.js';
 import { buildAuthChallenge, verifyAgentRequest } from '../_lib/agent-auth.js';
 import { enforcePublicRateLimit } from '../_lib/request-security.js';
 
@@ -83,7 +83,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Invalid or oversized agent registration' });
   }
 
-  const existing = await getAgent(body.agentId);
+  // BP-10: a failed read must never authorise a write — 502, not "new agent".
+  let existing: Record<string, any> | null;
+  try {
+    existing = await getAgentStrict(body.agentId);
+  } catch (error) {
+    return res.status(502).json({ error: error instanceof AgentReadError ? error.message : 'Agent registry read failed' });
+  }
+  // Ownership never changes through registration; that is an explicit, separately
+  // authorised transfer (POST /api/agents/transfer, signed by the current owner).
+  if (existing && String(existing.owner_address).toLowerCase() !== body.owner.toLowerCase()) {
+    return res.status(409).json({ error: 'Owner differs from the registered owner; use POST /api/agents/transfer signed by the current owner' });
+  }
 
   const auth = await verifyAgentRequest(
     req,
@@ -95,7 +106,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(401).json({ error: auth.error });
   }
 
-  const profile = await upsertAgent({
+  // BP-10: compare-and-swap against exactly what was authorised above.
+  const cas = await registerAgentCas({
     agent_id: body.agentId,
     owner_address: body.owner,
     name: body.name,
@@ -114,8 +126,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       mode: 'advisory',
     },
     status: 'active',
-  });
-  if (!profile) return res.status(502).json({ error: 'Agent registry write failed' });
+  }, { owner: existing ? String(existing.owner_address) : null, rowVersion: existing ? Number(existing.row_version ?? 1) : null });
+  if (!cas.ok) {
+    if (cas.error === 'STALE_VERSION' || cas.error === 'OWNER_MISMATCH' || cas.error === 'OWNER_CHANGE_REQUIRES_TRANSFER') {
+      return res.status(409).json({ error: `Registration conflict: ${cas.error}` });
+    }
+    if (cas.error === 'NOT_FOUND') return res.status(409).json({ error: 'Agent changed during the request; retry' });
+    return res.status(502).json({ error: 'Agent registry write failed' });
+  }
+  const profile = cas.row;
 
   try {
     // Build metadata URI for on-chain registration
@@ -131,6 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: 'active',
         metadataURI,
         version: body.version || '1.0.0',
+        rowVersion: profile ? Number(profile.row_version ?? 1) : null,
         stored: Boolean(profile),
         authMode: auth.mode,
       },

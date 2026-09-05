@@ -1,15 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { getAddress } from 'ethers';
 
-type Action = 'accept' | 'pause' | 'unpause';
+type Action = 'accept' | 'pause' | 'unpause' | 'activate-pyth';
 
 const actionArg = process.argv.find((arg) => arg.startsWith('--action='));
 const action = (actionArg?.split('=')[1] || '') as Action;
 const chainArg = process.argv.find((arg) => arg.startsWith('--chain-id='));
 const chainId = Number(chainArg?.split('=')[1] || 8453);
 
-if (!['accept', 'pause', 'unpause'].includes(action)) {
-  throw new Error('action must be accept, pause, or unpause');
+if (!['accept', 'pause', 'unpause', 'activate-pyth'].includes(action)) {
+  throw new Error('action must be accept, pause, unpause, or activate-pyth');
 }
 if (![8453, 84532].includes(chainId)) throw new Error('chain-id must be 8453 or 84532');
 
@@ -46,7 +46,28 @@ type BuilderTransaction = {
 };
 
 const transactions: BuilderTransaction[] = [];
-for (const key of contracts) {
+
+// 2026-09-05: the pending C-02 step — activate the canonical (upgraded) Pyth on
+// TrackRecordV2. The address is pinned to PythOracleGate.BASE_PYTH_UPGRADED
+// (read from the Solidity source so the batch can never drift from the gate),
+// and the timelock (pythActivatableAt) must already have elapsed on-chain.
+if (action === 'activate-pyth') {
+  if (chainId !== 8453) throw new Error('activate-pyth is defined for Base mainnet (8453) only');
+  const gate = readFileSync('contracts/script/PythOracleGate.sol', 'utf8');
+  const pinned = gate.match(/BASE_PYTH_UPGRADED\s*=\s*(0x[0-9a-fA-F]{40})/)?.[1];
+  if (!pinned) throw new Error('PythOracleGate.BASE_PYTH_UPGRADED not found');
+  const trackRecord = String(manifest.addresses?.trackRecord || '');
+  if (!/^0x[0-9a-fA-F]{40}$/.test(trackRecord) || /^0x0+$/.test(trackRecord)) throw new Error('manifest trackRecord is invalid');
+  transactions.push({
+    to: getAddress(trackRecord),
+    value: '0',
+    data: null,
+    contractMethod: { inputs: [{ internalType: 'address', name: '_pyth', type: 'address' }], name: 'activatePyth', payable: false },
+    contractInputsValues: { _pyth: getAddress(pinned) },
+  });
+}
+
+for (const key of action === 'activate-pyth' ? [] : contracts) {
   const to = String(manifest.addresses?.[key] || '');
   if (!/^0x[0-9a-fA-F]{40}$/.test(to) || /^0x0+$/.test(to)) {
     throw new Error(`manifest address ${key} is invalid`);

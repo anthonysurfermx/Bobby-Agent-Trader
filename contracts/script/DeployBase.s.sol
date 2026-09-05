@@ -5,6 +5,8 @@ import {Script, console2} from "forge-std/Script.sol";
 import {SafeOwnerGate} from "./SafeOwnerGate.sol";
 import {PythOracleGate} from "./PythOracleGate.sol";
 import {BountyEconomicsGate} from "./BountyEconomicsGate.sol";
+import {V2ParamsGate} from "./V2ParamsGate.sol";
+import {EnvGate} from "./EnvGate.sol";
 import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
@@ -58,6 +60,9 @@ contract DeployBase is Script {
         uint256 debateFeePerAgent;
         uint96 minBounty;
         uint96 absoluteMinBounty;
+        // BP-03: the seven V2 verification params at FULL WIDTH (validated by
+        // V2ParamsGate before narrowing; written to the manifest; re-proven live).
+        V2ParamsGate.Raw v2Raw;
         uint96 registrationStake;
         uint256 maxSizeUsd;
         uint8 resolverThreshold;
@@ -90,24 +95,24 @@ contract DeployBase is Script {
                 "Mainnet economic roles must be pairwise distinct"
             );
         } else {
-            c.alpha = vm.envOr("ALPHA_ADDRESS", c.bobby);
-            c.red = vm.envOr("RED_ADDRESS", c.bobby);
-            c.cio = vm.envOr("CIO_ADDRESS", c.bobby);
-            c.resolver = vm.envOr("RESOLVER_ADDRESS", c.bobby);
+            c.alpha = EnvGate.addressOr(vm, "ALPHA_ADDRESS", c.bobby);
+            c.red = EnvGate.addressOr(vm, "RED_ADDRESS", c.bobby);
+            c.cio = EnvGate.addressOr(vm, "CIO_ADDRESS", c.bobby);
+            c.resolver = EnvGate.addressOr(vm, "RESOLVER_ADDRESS", c.bobby);
         }
         // IntentEscrow F-013 requires cio/arbiter/keeper/resolver to be four
         // DISTINCT addresses (and owner != keeper). There is no safe default
         // for these — set them explicitly per deploy.
         c.arbiter = vm.envAddress("ARBITER_ADDRESS");
         c.keeper = vm.envAddress("KEEPER_ADDRESS");
-        c.mcpCallFee = vm.envOr("FEE_MCP_CALL_WEI", uint256(0.000025 ether));
-        c.debateFeePerAgent = vm.envOr("FEE_DEBATE_PER_AGENT_WEI", uint256(0.0000025 ether));
+        c.mcpCallFee = EnvGate.uintOr(vm, "FEE_MCP_CALL_WEI", uint256(0.000025 ether));
+        c.debateFeePerAgent = EnvGate.uintOr(vm, "FEE_DEBATE_PER_AGENT_WEI", uint256(0.0000025 ether));
         // r9 L-02: validate every env value at full width BEFORE narrowing — a
         // fat-fingered value must fail loudly, never truncate into a "valid" fee.
-        uint256 rawMinBounty = vm.envOr("MIN_BOUNTY_WEI", uint256(0.000025 ether));
-        uint256 rawAbsMinBounty = vm.envOr("ABSOLUTE_MIN_BOUNTY_WEI", uint256(0.0000025 ether));
-        uint256 rawStake = vm.envOr("REGISTRATION_STAKE_WEI", uint256(0.00025 ether));
-        uint256 rawThreshold = vm.envOr("RESOLVER_THRESHOLD", uint256(1));
+        uint256 rawMinBounty = EnvGate.uintOr(vm, "MIN_BOUNTY_WEI", uint256(0.000025 ether));
+        uint256 rawAbsMinBounty = EnvGate.uintOr(vm, "ABSOLUTE_MIN_BOUNTY_WEI", uint256(0.0000025 ether));
+        uint256 rawStake = EnvGate.uintOr(vm, "REGISTRATION_STAKE_WEI", uint256(0.00025 ether));
+        uint256 rawThreshold = EnvGate.uintOr(vm, "RESOLVER_THRESHOLD", uint256(1));
         require(rawMinBounty <= type(uint96).max, "MIN_BOUNTY_WEI exceeds uint96");
         require(rawAbsMinBounty <= type(uint96).max, "ABSOLUTE_MIN_BOUNTY_WEI exceeds uint96");
         require(rawStake <= type(uint96).max, "REGISTRATION_STAKE_WEI exceeds uint96");
@@ -116,42 +121,56 @@ contract DeployBase is Script {
         c.absoluteMinBounty = uint96(rawAbsMinBounty);
         c.registrationStake = uint96(rawStake);
         c.resolverThreshold = uint8(rawThreshold);
-        c.maxSizeUsd = vm.envOr("ESCROW_MAX_SIZE_USD", uint256(10_000e18)); // $10k, 18dp encoding
+        c.maxSizeUsd = EnvGate.uintOr(vm, "ESCROW_MAX_SIZE_USD", uint256(10_000e18)); // $10k, 18dp encoding
         // r7 integration: judge-mode needs the scorer role; defaults to bobby so
         // hardness certification is never silently dead after a deploy.
-        c.hardnessScorer = vm.envOr("HARDNESS_SCORER_ADDRESS", c.bobby);
+        c.hardnessScorer = EnvGate.addressOr(vm, "HARDNESS_SCORER_ADDRESS", c.bobby);
         // Codex r5: one parameter drives BOTH bonds; defaults to the minimum bounty.
-        uint256 rawBond = vm.envOr("CHALLENGE_BOND_WEI", rawMinBounty);
+        uint256 rawBond = EnvGate.uintOr(vm, "CHALLENGE_BOND_WEI", rawMinBounty);
         require(rawBond <= type(uint96).max, "CHALLENGE_BOND_WEI exceeds uint96");
         c.challengeBond = uint96(rawBond);
         // Resolved against expectedOwner in run() (it is not known yet here): unset = the Safe.
-        c.treasury = vm.envOr("BOUNTY_TREASURY_ADDRESS", address(0));
+        c.treasury = EnvGate.addressOr(vm, "BOUNTY_TREASURY_ADDRESS", address(0));
         // r9 H-02 / D-4: the address that must END UP owning all seven
         // contracts. On mainnet this is the Safe — mandatory, and distinct from
         // the hot deployer EOA. On testnet it defaults to the deployer (no
         // handoff), keeping the canary flow unchanged.
-        c.expectedOwner = vm.envOr("OWNER_SAFE_ADDRESS", address(0));
+        c.expectedOwner = EnvGate.addressOr(vm, "OWNER_SAFE_ADDRESS", address(0));
         // r10.1 review [P1]: the Safe's exact on-chain identity, pinned after
         // creating and externally auditing it (runbook: `cast codehash <safe>`
         // and `cast storage <safe> 0`, cross-checked against the official
         // safe-deployments registry). Mandatory on 8453.
-        c.expectedOwnerCodehash = vm.envOr("OWNER_SAFE_CODEHASH", bytes32(0));
-        c.expectedOwnerSingleton = vm.envOr("OWNER_SAFE_SINGLETON", address(0));
+        c.expectedOwnerCodehash = EnvGate.bytes32Or(vm, "OWNER_SAFE_CODEHASH", bytes32(0));
+        c.expectedOwnerSingleton = EnvGate.addressOr(vm, "OWNER_SAFE_SINGLETON", address(0));
+        c.v2Raw = _v2Raw();
     }
 
-    /// @dev V2 verification params. Defaults are the audited deploy config
-    ///      (Anthony's §8 decisions: maxExitLag 600s cap, 7-day challenge
-    ///      window, 100 bps tolerances to be tightened from real basis, conf
-    ///      50 bps). Overridable per deploy; the constructor re-validates every
-    ///      field against its hard bounds, so a bad env value fails loudly.
-    function _v2Params() internal view returns (BobbyTrackRecordV2.VerificationParams memory p) {
-        p.entryWindowSec = uint16(vm.envOr("V2_ENTRY_WINDOW_SEC", uint256(60)));
-        p.exitWindowSec = uint16(vm.envOr("V2_EXIT_WINDOW_SEC", uint256(120)));
-        p.maxExitLagSec = uint24(vm.envOr("V2_MAX_EXIT_LAG_SEC", uint256(600)));
-        p.challengeWindowSec = uint24(vm.envOr("V2_CHALLENGE_WINDOW_SEC", uint256(7 days)));
-        p.entryTolBps = uint16(vm.envOr("V2_ENTRY_TOL_BPS", uint256(100)));
-        p.exitTolBps = uint16(vm.envOr("V2_EXIT_TOL_BPS", uint256(100)));
-        p.confMaxBps = uint16(vm.envOr("V2_CONF_MAX_BPS", uint256(50)));
+    /// @dev V2 verification params, read at FULL WIDTH (BP-03). Defaults are
+    ///      the audited deploy config (Anthony's §8 decisions: maxExitLag 600s
+    ///      cap, 7-day challenge window, 100 bps tolerances to be tightened
+    ///      from real basis, conf 50 bps). Overridable per deploy; every value
+    ///      is bounds-checked by V2ParamsGate BEFORE it is narrowed to the
+    ///      struct's uint16/uint24 fields (_validateConfig, pre-broadcast), so
+    ///      a fat-fingered value can never truncate into a "valid" parameter.
+    ///      The constructor re-validates the narrowed struct as a second line.
+    function _v2Raw() internal view returns (V2ParamsGate.Raw memory r) {
+        V2ParamsGate.Raw memory d = V2ParamsGate.defaults();
+        // Third round: strict parsers (a malformed value reverts, never falls back
+        // to the default) and, on mainnet, the seven reviewed values must be explicit.
+        string[7] memory names = [
+            "V2_ENTRY_WINDOW_SEC", "V2_EXIT_WINDOW_SEC", "V2_MAX_EXIT_LAG_SEC", "V2_CHALLENGE_WINDOW_SEC",
+            "V2_ENTRY_TOL_BPS", "V2_EXIT_TOL_BPS", "V2_CONF_MAX_BPS"
+        ];
+        if (block.chainid == 8453) {
+            for (uint256 i = 0; i < names.length; i++) EnvGate.requireSet(vm, names[i]);
+        }
+        r.entryWindowSec = EnvGate.uintOr(vm, names[0], d.entryWindowSec);
+        r.exitWindowSec = EnvGate.uintOr(vm, names[1], d.exitWindowSec);
+        r.maxExitLagSec = EnvGate.uintOr(vm, names[2], d.maxExitLagSec);
+        r.challengeWindowSec = EnvGate.uintOr(vm, names[3], d.challengeWindowSec);
+        r.entryTolBps = EnvGate.uintOr(vm, names[4], d.entryTolBps);
+        r.exitTolBps = EnvGate.uintOr(vm, names[5], d.exitTolBps);
+        r.confMaxBps = EnvGate.uintOr(vm, names[6], d.confMaxBps);
     }
 
     function run() external returns (Deployed memory d) {
@@ -224,10 +243,10 @@ contract DeployBase is Script {
 
         // TrackRecordV2: oracle-verified. The Pyth set is the chain's CANONICAL
         // set (not raw env) — mainnet gets upgraded-active + current-fallback,
-        // asserted distinct and code-bearing. Params default to the audited
-        // deploy config (maxExitLag 600s etc.) and are re-validated by the
-        // constructor's bounds. Feeds: BTC/ETH/SOL, ids pinned in the gate.
-        BobbyTrackRecordV2.VerificationParams memory v2Params = _v2Params();
+        // asserted distinct and code-bearing. Params were validated at full
+        // width in _validateConfig; narrow() re-validates and is the only path
+        // into the constructor. Feeds: BTC/ETH/SOL, ids pinned in the gate.
+        BobbyTrackRecordV2.VerificationParams memory v2Params = V2ParamsGate.narrow(c.v2Raw);
         address[] memory pyths = PythOracleGate.canonicalPyths(block.chainid);
         PythOracleGate.assertCanonical(block.chainid, pyths);
         (string[] memory v2Symbols, bytes32[] memory v2Feeds) = PythOracleGate.verifiedFeeds();
@@ -315,6 +334,14 @@ contract DeployBase is Script {
         console2.log("registrationStake   ", c.registrationStake);
         console2.log("challengeBond       ", c.challengeBond);
         console2.log("treasury            ", c.treasury);
+        console2.log("--- v2 params (full-width validated) ---");
+        console2.log("entryWindowSec      ", c.v2Raw.entryWindowSec);
+        console2.log("exitWindowSec       ", c.v2Raw.exitWindowSec);
+        console2.log("maxExitLagSec       ", c.v2Raw.maxExitLagSec);
+        console2.log("challengeWindowSec  ", c.v2Raw.challengeWindowSec);
+        console2.log("entryTolBps         ", c.v2Raw.entryTolBps);
+        console2.log("exitTolBps          ", c.v2Raw.exitTolBps);
+        console2.log("confMaxBps          ", c.v2Raw.confMaxBps);
     }
 
 
@@ -332,6 +359,8 @@ contract DeployBase is Script {
             c.maxSizeUsd > 0 && c.maxSizeUsd <= 100_000_000e18,
             "config: escrow maxSizeUsd out of bounds (18dp, ceiling 100M)"
         );
+        // BP-03: full-width bounds on the seven V2 params, before any narrowing.
+        V2ParamsGate.validate(c.v2Raw);
     }
 
     /// @dev r7 integration: post-deploy assertions — the script itself proves
@@ -376,6 +405,8 @@ contract DeployBase is Script {
             for (uint256 i = 0; i < syms.length; i++) {
                 require(tr.feedOf(keccak256(bytes(syms[i]))) == feeds[i], "assert: verified feed not seeded");
             }
+            // BP-03: the deployed params equal the operator's full-width values.
+            V2ParamsGate.assertMatches(V2ParamsGate.live(d.trackRecord), c.v2Raw);
         }
 
         BobbyAgentEconomyV2 economy = BobbyAgentEconomyV2(payable(d.agentEconomyV2));
@@ -457,6 +488,18 @@ contract DeployBase is Script {
         vm.serializeUint(f, "challengeBondWei", c.challengeBond);
         string memory feesJson = vm.serializeUint(f, "escrowMaxSizeUsd18dp", c.maxSizeUsd);
         vm.serializeString(m, "fees", feesJson);
+
+        // BP-03: the reviewed V2 verification params travel with the manifest so
+        // VerifyBaseDeployment and the readiness check re-prove them live.
+        string memory v = "v2Params";
+        vm.serializeUint(v, "entryWindowSec", c.v2Raw.entryWindowSec);
+        vm.serializeUint(v, "exitWindowSec", c.v2Raw.exitWindowSec);
+        vm.serializeUint(v, "maxExitLagSec", c.v2Raw.maxExitLagSec);
+        vm.serializeUint(v, "challengeWindowSec", c.v2Raw.challengeWindowSec);
+        vm.serializeUint(v, "entryTolBps", c.v2Raw.entryTolBps);
+        vm.serializeUint(v, "exitTolBps", c.v2Raw.exitTolBps);
+        string memory v2Json = vm.serializeUint(v, "confMaxBps", c.v2Raw.confMaxBps);
+        vm.serializeString(m, "v2Params", v2Json);
 
         string memory q = "quorum";
         vm.serializeAddress(q, "resolvers", resolverSet);

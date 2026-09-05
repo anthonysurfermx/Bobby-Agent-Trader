@@ -34,6 +34,8 @@ export interface AgentRecord {
   name: string;
   agent_type?: string;
   version?: string | null;
+  /** BP-10 optimistic-lock counter (`hardness_agents.row_version`); `version` is the agent's semver label. */
+  row_version?: number;
   capabilities?: string[];
   mcp_endpoint?: string | null;
   webhook_url?: string | null;
@@ -102,6 +104,65 @@ export async function getAgent(agentId: string) {
   if (!res.ok) return null;
   const rows = await res.json();
   return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+/** BP-10: a read that FAILED is not "not found". Throws on any non-2xx so the caller never authorises against a guess. */
+export class AgentReadError extends Error {}
+export async function getAgentStrict(agentId: string): Promise<Record<string, any> | null> {
+  if (!hasSupabase()) throw new AgentReadError('agent registry not configured');
+  const query = new URLSearchParams({ select: '*', agent_id: `eq.${agentId}`, limit: '1' });
+  const res = await fetch(`${SB_URL}/rest/v1/hardness_agents?${query.toString()}`, { headers: headers() });
+  if (!res.ok) throw new AgentReadError(`agent registry read failed (HTTP ${res.status})`);
+  const rows = await res.json();
+  if (!Array.isArray(rows)) throw new AgentReadError('agent registry read returned no array');
+  return rows[0] || null;
+}
+
+export type AgentCasError = 'NOT_FOUND' | 'OWNER_MISMATCH' | 'OWNER_CHANGE_REQUIRES_TRANSFER' | 'STALE_VERSION' | 'REQUEST_REPLAYED' | 'INVALID_OWNER';
+const CAS_ERRORS = new Set<AgentCasError>(['NOT_FOUND', 'OWNER_MISMATCH', 'OWNER_CHANGE_REQUIRES_TRANSFER', 'STALE_VERSION', 'REQUEST_REPLAYED', 'INVALID_OWNER']);
+
+async function callRpc(fn: string, body: Record<string, unknown>): Promise<{ ok: true; row: Record<string, any> } | { ok: false; error: AgentCasError | 'RPC_FAILED'; detail: string }> {
+  const res = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, { method: 'POST', headers: headers(), body: JSON.stringify(body) });
+  const text = await res.text();
+  if (!res.ok) {
+    const m = text.match(/(NOT_FOUND|OWNER_MISMATCH|OWNER_CHANGE_REQUIRES_TRANSFER|STALE_VERSION|REQUEST_REPLAYED|INVALID_OWNER)/);
+    return { ok: false, error: m && CAS_ERRORS.has(m[1] as AgentCasError) ? (m[1] as AgentCasError) : 'RPC_FAILED', detail: text.slice(0, 300) };
+  }
+  try { return { ok: true, row: JSON.parse(text) }; } catch { return { ok: false, error: 'RPC_FAILED', detail: 'non-JSON rpc response' }; }
+}
+
+/**
+ * BP-10: compare-and-swap registration. `expectedOwner`/`expectedVersion` are what
+ * the caller AUTHORISED against (null for a creation); the database refuses the
+ * write if the row moved or the owner differs. Never changes ownership.
+ */
+export async function registerAgentCas(agent: AgentRecord, expected: { owner: string | null; rowVersion: number | null }) {
+  await assertWritesOpen('hardness registerAgentCas');
+  if (!hasSupabase()) return { ok: false as const, error: 'RPC_FAILED' as const, detail: 'not configured' };
+  return callRpc('hardness_register_agent', {
+    p_agent_id: agent.agent_id,
+    p_expected_owner: expected.owner,
+    p_expected_version: expected.rowVersion, // = hardness_agents.row_version, never the semver `version`
+    p_row: {
+      owner_address: agent.owner_address,
+      name: agent.name,
+      agent_type: agent.agent_type || 'trading-agent',
+      version: agent.version || null,
+      capabilities: agent.capabilities || ['predict'],
+      mcp_endpoint: agent.mcp_endpoint || null,
+      webhook_url: agent.webhook_url || null,
+      metadata_json: agent.metadata_json || {},
+      risk_policy_json: agent.risk_policy_json || {},
+      status: agent.status || 'active',
+    },
+  });
+}
+
+/** BP-10: explicit ownership transfer — current owner, row version and a single-use request id. */
+export async function transferAgentOwner(agentId: string, currentOwner: string, newOwner: string, expectedRowVersion: number, requestId: string) {
+  await assertWritesOpen('hardness transferAgentOwner');
+  if (!hasSupabase()) return { ok: false as const, error: 'RPC_FAILED' as const, detail: 'not configured' };
+  return callRpc('hardness_transfer_agent', { p_agent_id: agentId, p_current_owner: currentOwner, p_new_owner: newOwner, p_expected_version: expectedRowVersion, p_request_id: requestId });
 }
 
 export async function createSession(session: AgentSessionRecord) {

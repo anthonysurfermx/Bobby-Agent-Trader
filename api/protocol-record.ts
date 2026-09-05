@@ -8,7 +8,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { ethers } from 'ethers';
-import { DEFAULT_CHAIN, XLAYER_CHAIN_ID, txUrl, addressUrl } from './_lib/chains.js';
+import { DEFAULT_CHAIN, txUrl, addressUrl } from './_lib/chains.js';
+import { rpcErrorMessage } from './_lib/rpc-redact.js';
 import { requireRecordAuth } from './_lib/record-auth.js';
 import { resolvePriceMode, PriceMode } from './_lib/trackrecord-v2.js';
 import { commitV2, resolveV2, readStatsV2 } from './_lib/trackrecord-v2-recorder.js';
@@ -19,9 +20,9 @@ import {
 } from './_lib/protocol-write-safety.js';
 
 // V2 (oracle-verified, Pyth) runs on Base/Base-Sepolia; v1 (attested-only)
-// stays on X Layer. With PROTOCOL_CHAIN unset this is false and NOTHING in the
-// V2 path executes — production keeps the exact v1 behavior until the flip.
-const IS_V2_CHAIN = DEFAULT_CHAIN.id !== XLAYER_CHAIN_ID;
+// stays on X Layer. BP-11: the reader follows the deployment's DECLARED
+// TrackRecord version, not a chain-id comparison.
+const IS_V2_CHAIN = DEFAULT_CHAIN.trackRecordVersion === 'v2';
 
 // Chain-aware since the Sepolia canary: RPC and addresses follow PROTOCOL_CHAIN.
 // Legacy env vars remain as fallback for the X Layer production deployment.
@@ -127,7 +128,7 @@ async function broadcastSideEffects(p: {
   let oracleTxHash: string | null = null;
   if (!RECORDER_KEY || (!ECONOMY_ADDRESS && !ORACLE_ADDRESS)) return { economyTxHash, oracleTxHash };
 
-  const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+  const provider = new ethers.JsonRpcProvider(XLAYER_RPC, DEFAULT_CHAIN.id, { staticNetwork: true });
   const wallet = new ethers.Wallet(RECORDER_KEY, provider);
   // Prefer the caller's explicit chain (commit nonce + 1): re-reading 'pending'
   // races the just-broadcast commit tx and dropped the fee on canary-002.
@@ -207,7 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           stats,
         });
       } catch (error) {
-        console.error('[XLayerRecord] V2 stats read failed:', error);
+        console.error('[XLayerRecord] V2 stats read failed:', rpcErrorMessage(error));
         return res.status(500).json({ ok: false, error: 'Failed to read V2 on-chain stats' });
       }
     }
@@ -365,8 +366,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             },
           });
         } catch (err: any) {
-          console.error(`[${DEFAULT_CHAIN.name}] V2 commit error:`, err);
-          return res.status(500).json({ error: 'Failed to broadcast V2 commit: ' + err.message });
+          console.error(`[${DEFAULT_CHAIN.name}] V2 commit error:`, rpcErrorMessage(err));
+          return res.status(500).json({ error: 'Failed to broadcast V2 commit: ' + rpcErrorMessage(err) });
         }
       }
 
@@ -390,7 +391,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       try {
-        const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+        const provider = new ethers.JsonRpcProvider(XLAYER_RPC, DEFAULT_CHAIN.id, { staticNetwork: true });
         await assertProviderChain(provider, DEFAULT_CHAIN.id);
         const wallet = new ethers.Wallet(RECORDER_KEY, provider);
         const iface = new ethers.Interface(CONTRACT_ABI);
@@ -483,8 +484,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           data: { debateHash, symbol, agent: agentEnum, conviction },
         });
       } catch (err: any) {
-        console.error(`[${DEFAULT_CHAIN.name}] Emit Error:`, err);
-        return res.status(500).json({ error: 'Failed to broadcast tx: ' + err.message });
+        console.error(`[${DEFAULT_CHAIN.name}] Emit Error:`, rpcErrorMessage(err));
+        return res.status(500).json({ error: 'Failed to broadcast tx: ' + rpcErrorMessage(err) });
       }
     }
 
@@ -556,8 +557,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             },
           });
         } catch (err: any) {
-          console.error(`[${DEFAULT_CHAIN.name}] V2 resolve error:`, err);
-          return res.status(500).json({ error: 'Failed to broadcast V2 resolve: ' + err.message });
+          console.error(`[${DEFAULT_CHAIN.name}] V2 resolve error:`, rpcErrorMessage(err));
+          return res.status(500).json({ error: 'Failed to broadcast V2 resolve: ' + rpcErrorMessage(err) });
         }
       }
 
@@ -588,7 +589,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       try {
-        const provider = new ethers.JsonRpcProvider(XLAYER_RPC);
+        const provider = new ethers.JsonRpcProvider(XLAYER_RPC, DEFAULT_CHAIN.id, { staticNetwork: true });
         await assertProviderChain(provider, DEFAULT_CHAIN.id);
         const wallet = new ethers.Wallet(RECORDER_KEY, provider);
         const iface = new ethers.Interface(CONTRACT_ABI);
@@ -611,8 +612,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           data: { debateHash, result: resultEnum },
         });
       } catch (err: any) {
-        console.error(`[${DEFAULT_CHAIN.name}] Emit Error:`, err);
-        return res.status(500).json({ error: 'Failed to broadcast resolve tx: ' + err.message });
+        console.error(`[${DEFAULT_CHAIN.name}] Emit Error:`, rpcErrorMessage(err));
+        return res.status(500).json({ error: 'Failed to broadcast resolve tx: ' + rpcErrorMessage(err) });
       }
     }
 

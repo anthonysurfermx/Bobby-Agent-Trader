@@ -7,9 +7,16 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
+import { buildCycleRow, cycleProvenance } from '../api/_lib/cycle-provenance.js';
 
+// Audit mode: validate the remediated schema without exercising the old exposure.
+const postfixOnly = process.argv.includes('--postfix-only');
 const url = process.env.DATABASE_URL;
-if (!url) { console.log('test-rls-lockdown-pg: skipped (set DATABASE_URL to a scratch Postgres)'); process.exit(0); }
+if (!url) {
+  // BP-06: skipping is a local convenience; in CI the database is a declared service and its absence must fail.
+  if (process.env.CI === 'true') { console.error('test-rls-lockdown-pg: DATABASE_URL is required when CI=true'); process.exit(1); }
+  console.log('test-rls-lockdown-pg: skipped (set DATABASE_URL to a scratch Postgres)'); process.exit(0);
+}
 {
   const host = new URL(url).hostname;
   if (!['localhost', '127.0.0.1', '::1', 'host.docker.internal'].includes(host) && process.env.SWAP_LEDGER_PG_ALLOW_REMOTE !== '1') {
@@ -20,6 +27,8 @@ const pool = new pg.Pool({ connectionString: url, max: 2 });
 const S = `rls_test_${Date.now()}`;
 const q = (sql: string) => sql.replaceAll('public.', `${S}.`).replaceAll('set search_path = public, pg_catalog', `set search_path = ${S}, pg_catalog`).replaceAll('S.', `${S}.`).replaceAll('S__', S);
 const migration = q(readFileSync('supabase/bobby-protocol/supabase/migrations/20260903000010_lock_down_public_reads.sql', 'utf8'));
+// BP-09: positive provenance — applied on top of 0010 exactly as production will see it.
+const migration0011 = q(readFileSync('supabase/bobby-protocol/supabase/migrations/20260903000011_cycle_provenance.sql', 'utf8'));
 
 // Stand-ins: the columns the views and the RPC touch, plus the identifiers the audit is about.
 const FIXTURE = `
@@ -78,16 +87,54 @@ try {
     assert.fail(`${label}: anon read still succeeds`);
   };
 
-  // 1. The exploit reproduces on the shipped policies.
-  assert.equal((await asAnon(`select cache_key, payload from S.api_cache`)).rows[0].cache_key, 'identity-link:K7QW2M', 'pre-fix: anon reads the live pairing code');
-  assert.equal((await asAnon(`select owner_address from S.agent_trades where owner_address is not null`)).rows[0].owner_address, '0xvictim', 'pre-fix: anon reads owner_address + PnL rows');
-  assert.equal((await asAnon(`select owner_address from S.agent_cycles where owner_address is not null`)).rows.length, 1);
-  console.log('exploit reproduced on the pre-fix policies (api_cache, agent_trades, agent_cycles readable by anon)');
+  // 1. Optional historical baseline; remediation-only audits skip these reads.
+  if (!postfixOnly) {
+    assert.equal((await asAnon(`select cache_key, payload from S.api_cache`)).rows[0].cache_key, 'identity-link:K7QW2M', 'pre-fix: anon reads the live pairing code');
+    assert.equal((await asAnon(`select owner_address from S.agent_trades where owner_address is not null`)).rows[0].owner_address, '0xvictim', 'pre-fix: anon reads owner_address + PnL rows');
+    assert.equal((await asAnon(`select owner_address from S.agent_cycles where owner_address is not null`)).rows.length, 1);
+    console.log('exploit reproduced on the pre-fix policies (api_cache, agent_trades, agent_cycles readable by anon)');
+  }
 
   // 2. Apply the remediation.
   await c.query('begin');
   await c.query(migration);
+  await c.query(migration0011);
   await c.query('commit');
+
+  // BP-09: rows written by the REAL producer function for the three ways a run
+  // can be authorised, plus the pre-fix shape (no tag at all) — an old wallet
+  // cycle that omitted owner_address. Only the cron row may become public.
+  const insertCycle = async (row: Record<string, unknown>) => {
+    const cols = Object.keys(row); const vals = cols.map((_, i) => `$${i + 1}`).join(', ');
+    return (await c.query(q(`insert into S.agent_cycles (${cols.join(', ')}) values (${vals}) returning id`), cols.map((k) => row[k]))).rows[0].id as string;
+  };
+  const base = { status: 'completed', llm_reasoning: 'Halted: circuit breaker — 3 losses in 24h', total_usd_deployed: 25 };
+  const walletCycle = await insertCycle(buildCycleRow(base, cycleProvenance(true, '0xVictimWallet', false)));   // manual + wallet
+  const cronCycle = await insertCycle(buildCycleRow(base, cycleProvenance(false, '', true)));                    // scheduled protocol run
+  const manualNoAuth = await insertCycle(buildCycleRow(base, cycleProvenance(true, '', false)));                // manual, no wallet, no operator
+  const legacyUntagged = await insertCycle({ status: 'completed', llm_reasoning: 'pre-fix wallet cycle', total_usd_deployed: 25 }); // owner null, no tag
+  // trades follow their cycle
+  await c.query(q(`update S.agent_trades set cycle_id = $1 where token_symbol = 'AAPLc'`), [cronCycle]);
+  await c.query(q(`update S.agent_trades set cycle_id = $1 where token_symbol = 'NVDAc'`), [walletCycle]);
+  await c.query(q(`insert into S.agent_trades (token_symbol, direction, amount_usd, cycle_id) values ('METAc','BUY',20,$1)`), [legacyUntagged]); // ownerless trade on an untagged cycle
+
+  // Check effective privileges, including inherited PUBLIC grants, for both
+  // browser roles. The privileged merge must remain service-only.
+  for (const role of ['anon', 'authenticated']) {
+    for (const table of ['api_cache', 'agent_trades', 'agent_cycles']) {
+      for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+        const check = await c.query('select has_table_privilege($1, $2, $3) as allowed', [role, `${S}.${table}`, privilege]);
+        assert.equal(check.rows[0].allowed, false, `${role} has ${privilege} on ${table}`);
+      }
+    }
+    const mergeCheck = await c.query('select has_function_privilege($1, $2, $3) as allowed', [role, `${S}.bobby_link_identities(uuid,uuid)`, 'EXECUTE']);
+    assert.equal(mergeCheck.rows[0].allowed, false, `${role} can execute identity merge`);
+    for (const view of ['agent_trades_public', 'agent_cycles_public']) {
+      const viewCheck = await c.query('select has_table_privilege($1, $2, $3) as allowed', [role, `${S}.${view}`, 'SELECT']);
+      assert.equal(viewCheck.rows[0].allowed, true, `${role} cannot read ${view}`);
+    }
+  }
+  console.log('post-migration effective privileges: both browser roles blocked from private tables and merge RPC; public views readable');
 
   // 3. The same reads are refused.
   assert.equal(await denied(`select cache_key from S.api_cache`, 'P0-1'), '42501');
@@ -97,16 +144,24 @@ try {
 
   // 4. The shaped views: protocol rows only, no identifier columns.
   const tv = await asAnon(`select * from S.agent_trades_public`);
-  assert.equal(tv.rows.length, 1); assert.equal(tv.rows[0].token_symbol, 'AAPLc');
+  assert.equal(tv.rows.length, 1, 'only the trade of the PUBLIC cycle'); assert.equal(tv.rows[0].token_symbol, 'AAPLc');
   for (const col of ['owner_address', 'user_id', 'tx_hash', 'intent_hash', 'idempotency_key', 'cio_signature', 'arbiter_signature']) assert.ok(!(col in tv.rows[0]), `${col} leaked through agent_trades_public`);
-  const cv = await asAnon(`select * from S.agent_cycles_public`);
-  assert.equal(cv.rows.length, 1);
-  for (const col of ['owner_address', 'user_id', 'state', 'idempotency_key', 'cost_usd']) assert.ok(!(col in cv.rows[0]), `${col} leaked through agent_cycles_public`);
-  console.log('views: anon sees protocol rows only, and no owner_address / user_id / hashes / signatures');
+  const cv = await asAnon(`select id, llm_reasoning from S.agent_cycles_public`);
+  assert.deepEqual(cv.rows.map((r) => r.id), [cronCycle], 'BP-09: only the cron cycle is public — not the wallet run, not the manual run, not the untagged legacy row');
+  const cvFull = await asAnon(`select * from S.agent_cycles_public`);
+  for (const col of ['owner_address', 'user_id', 'state', 'idempotency_key', 'cost_usd', 'visibility']) assert.ok(!(col in cvFull.rows[0]), `${col} leaked through agent_cycles_public`);
+  // the producer's own rows carry what the view needs
+  const prov = await c.query(q(`select id, owner_address, visibility from S.agent_cycles where id in ($1, $2, $3, $4)`), [walletCycle, cronCycle, manualNoAuth, legacyUntagged]);
+  const by = Object.fromEntries(prov.rows.map((r) => [r.id, r]));
+  assert.deepEqual([by[walletCycle].owner_address, by[walletCycle].visibility], ['0xvictimwallet', 'private'], 'manual wallet run: private, owner bound and lower-cased');
+  assert.deepEqual([by[cronCycle].owner_address, by[cronCycle].visibility], [null, 'public']);
+  assert.deepEqual([by[manualNoAuth].owner_address, by[manualNoAuth].visibility], [null, 'private'], 'manual run without operator auth is not protocol data');
+  assert.equal(by[legacyUntagged].visibility, 'private', 'an untagged row defaults to private — absence is not permission');
+  console.log('BP-09: producer rows + migration 0011 views — wallet, manual and untagged cycles stay private; only the declared protocol cycle is public');
 
   // 5. Service role still reads the base tables (the server is unaffected).
   await c.query('set role service_role');
-  assert.equal((await c.query(q(`select count(*)::int as n from S.agent_trades`))).rows[0].n, 2);
+  assert.equal((await c.query(q(`select count(*)::int as n from S.agent_trades`))).rows[0].n, 3, 'service role sees every trade, public or not');
   await c.query('reset role');
 
   // 6. C-04: the merge re-parents receipts before deleting the merged identity.

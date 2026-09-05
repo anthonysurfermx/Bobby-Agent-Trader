@@ -231,9 +231,9 @@ export default function BobbyProtocolLanding() {
     {
       label: 'On-chain record',
       value: formatWinRate(onchainRecord?.winRate, onchainRecord?.decisionsResolved),
-      detail: onchainRecord
+      detail: onchainRecord && onchainRecord.available !== false
         ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
-        : 'Waiting for the TrackRecord contract.',
+        : onchainRecord ? 'TrackRecord unavailable right now.' : 'Waiting for the TrackRecord contract.',
       proof: 'TrackRecord contract',
       href: `${explorerAddressUrl}/${c?.trackRecord?.address ?? ''}`,
     },

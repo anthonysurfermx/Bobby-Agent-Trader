@@ -3,7 +3,10 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # Third round (2026-09-05): security branches run CI on push so closure evidence
+    # can cite a real run id before a PR exists.
+    branches: [main, 'security/**']
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,6 +14,14 @@ permissions:
 jobs:
   application:
     runs-on: ubuntu-latest
+    # Third-round BP-06 reopen: test:api-security imports modules that resolve the
+    # database URL at load time; without these the step crashed on every run and
+    # nothing after it (incl. the suites BP-06 added) ever executed. Dummy values —
+    # the suite never reaches a network; secrets are not required.
+    env:
+      BOBBY_SUPABASE_URL: https://dummy.supabase.co
+      BOBBY_SUPABASE_SERVICE_ROLE_KEY: dummy-service-key
+      BOBBY_SUPABASE_ANON_KEY: dummy-anon-key
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -24,9 +35,58 @@ jobs:
       - run: npm run test:protocol-write-safety
       - run: npm run test:risk-gate
       - run: npm run test:asset-discovery
+      # BP-06 (2026-09-04 review): the swap rail and the remediation regressions
+      # were never executed in CI — every closure in docs/security/ ran locally.
+      - run: npm run test:base-swap
+      - run: npm run test:stock-ticker-routing
+      - run: npm run test:remediation-r2
+      - run: npm run test:rpc-redaction
+      - run: npm run test:mcp-payment-transport
+      - run: npm run check:progress
+      - run: npm run test:trader-land-thesis
+      - run: npm run test:progress-thesis-sync
       - run: npm run build
       - run: npm run lint -- --quiet
       - run: npm audit --omit=dev --audit-level=high
+
+  # BP-06: the suites that need a real Postgres (RLS lock-down, swap ledger,
+  # agent-registry CAS) and a real EVM (backend ABI vs compiled artifact). The
+  # pg scripts SKIP when DATABASE_URL is unset locally, but FAIL in CI (CI=true)
+  # so a mis-wired service can never turn them into a silent green.
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['54329:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:54329/postgres
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
+      - run: npm ci
+      - run: forge build
+        working-directory: contracts
+      - run: npm run test:hardness-abi-anvil
+      - run: npm run test:bounties-abi-anvil
+      - run: npm run test:rls-lockdown-pg
+      - run: npm run test:swap-ledger-pg
+      - run: npm run test:agent-registry-pg
 
   contracts:
     runs-on: ubuntu-latest
@@ -38,7 +98,11 @@ jobs:
         with:
           submodules: recursive
       - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
-      - run: forge build --sizes
+      - run: forge build
+      # BP-06: EIP-170 on the seven PRODUCTION artifacts only. `forge build
+      # --sizes` exited on the DeployerEoa test harness and the job never
+      # reached the tests or the layout gate.
+      - run: bash script/check-sizes.sh
       - run: forge test --fuzz-runs 1000
       # Storage-layout regression gate (spec F-06 / audit r2 external P2):
       # fails on ANY drift in top-level slots OR struct member layouts.

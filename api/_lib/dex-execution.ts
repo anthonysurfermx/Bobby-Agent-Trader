@@ -11,6 +11,7 @@
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { BaseSwapError, quoteBaseSwap, type BaseSwapQuote } from './base-swap.js';
+import { rpcErrorMessage } from './rpc-redact.js';
 import { BASE_SWAP_CHAIN_ID, findBaseToken } from '../../src/lib/base-swap/tokens.js';
 
 /** The only chain the agent trades on, as the string the trade rows carry. */
@@ -118,6 +119,6 @@ export async function prepareBaseIntent(opts: { tokenSymbol: string; amountUsd: 
     };
   } catch (error) {
     if (error instanceof BaseSwapError && error.code === 'no_route') return { ok: false, status: 'aborted_stale_quote', reason: error.message };
-    return { ok: false, status: 'aborted_exec_error', reason: error instanceof Error ? error.message : String(error) };
+    return { ok: false, status: 'aborted_exec_error', reason: rpcErrorMessage(error) };
   }
 }

@@ -25,7 +25,7 @@ interface HeartbeatData {
     protocolNotionalNative: string;
     totalInteractions: number;
   };
-  performance: { winRate: number; totalTrades: number; totalBounties: number };
+  performance: { winRate: number | null; totalTrades: number | null; totalBounties: number | null };
   lastCycle: {
     id: string;
     status: string;
@@ -257,7 +257,7 @@ export default function BobbyHeartbeatPage() {
             <MetricCard
               label="Protocol Total"
               value={`${parseFloat(data.protocolTotals.protocolNotionalNative).toFixed(4)} ${sym}`}
-              sub={`${data.performance.totalTrades} trades · ${data.revenue.totalMcpCalls} MCP calls`}
+              sub={`${data.performance.totalTrades ?? 'n/a'} trades · ${data.revenue.totalMcpCalls} MCP calls`}
             />
           </motion.div>
 
@@ -516,7 +516,7 @@ export default function BobbyHeartbeatPage() {
                 { name: 'HardnessRegistry', addr: data.contracts.hardnessRegistry?.address, extra: 'signals + predictions' },
                 { name: 'AgentEconomy', addr: data.contracts.agentEconomy.address, extra: `${data.revenue.totalPayments} payments` },
                 { name: 'AdversarialBounties', addr: data.contracts.bounties.address, extra: `${data.contracts.bounties.totalPosted} bounties` },
-                { name: 'TrackRecord', addr: data.contracts.trackRecord.address, extra: `${data.performance.totalTrades} trades` },
+                { name: 'TrackRecord', addr: data.contracts.trackRecord.address, extra: `${data.performance.totalTrades ?? 'n/a'} trades` },
                 { name: 'ConvictionOracle', addr: data.contracts.convictionOracle?.address, extra: 'real-time feed' },
                 { name: 'AgentRegistry', addr: (data.contracts as any).agentRegistry?.address || '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', extra: 'ERC-721 identity' },
               ].filter(c => c.addr).map((contract) => (
@@ -548,8 +548,8 @@ export default function BobbyHeartbeatPage() {
           >
             <MetricCard label="MCP Calls" value={data.revenue.totalMcpCalls} sub="total settled" />
             <MetricCard label="Debates" value={data.revenue.totalDebates} sub="3-agent adversarial" />
-            <MetricCard label="Trades" value={data.performance.totalTrades} sub="commit-reveal" />
-            <MetricCard label="Bounties" value={data.performance.totalBounties} sub="on-chain challenges" />
+            <MetricCard label="Trades" value={data.performance.totalTrades ?? 'n/a'} sub="commit-reveal" />
+            <MetricCard label="Bounties" value={data.performance.totalBounties ?? 'n/a'} sub="on-chain challenges" />
           </motion.div>
 
           {/* Footer */}

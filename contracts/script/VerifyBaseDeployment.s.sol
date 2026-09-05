@@ -5,6 +5,7 @@ import {Script, console2} from "forge-std/Script.sol";
 import {SafeOwnerGate} from "./SafeOwnerGate.sol";
 import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
 import {PythOracleGate} from "./PythOracleGate.sol";
+import {V2ParamsGate} from "./V2ParamsGate.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
 import {BobbyAdversarialBounties} from "../src/BobbyAdversarialBounties.sol";
@@ -112,6 +113,7 @@ contract VerifyBaseDeployment is Script {
         _verifyCode(a);
         _verifyOwnership(a, r.deployer, expectedOwner);
         _verifyEconomy(a, r, json);
+        _verifyV2Params(a.trackRecord, json);
         _verifyBounties(a, r, json);
         _verifyHardness(a, r, json);
         _verifyEscrow(a, r, json);
@@ -182,6 +184,32 @@ contract VerifyBaseDeployment is Script {
         _ok(eco.alphaHunter() == r.alpha && eco.redTeam() == r.red && eco.cio() == r.cio, "economy agent roles");
         _ok(eco.mcpCallFee() == vm.parseJsonUint(json, ".fees.mcpCallFeeWei"), "economy.mcpCallFee");
         _ok(eco.debateFeePerAgent() == vm.parseJsonUint(json, ".fees.debateFeePerAgentWei"), "economy.debateFeePerAgent");
+    }
+
+    /// @dev BP-03: the LIVE verification params must equal the reviewed
+    ///      full-width values the deploy wrote to the manifest, and those
+    ///      values must be in bounds. Mainnet REQUIRES the block — a manifest
+    ///      written by a pre-BP-03 deploy can only be verified on testnet.
+    function _verifyV2Params(address trackRecord, string memory json) internal {
+        if (!vm.keyExistsJson(json, ".v2Params")) {
+            require(
+                block.chainid != 8453,
+                "VERIFY FAILED: mainnet manifest missing v2Params (redeploy with BP-03 DeployBase)"
+            );
+            console2.log("  skip: v2Params block absent (legacy testnet manifest)");
+            return;
+        }
+        V2ParamsGate.Raw memory reviewed = V2ParamsGate.Raw({
+            entryWindowSec: vm.parseJsonUint(json, ".v2Params.entryWindowSec"),
+            exitWindowSec: vm.parseJsonUint(json, ".v2Params.exitWindowSec"),
+            maxExitLagSec: vm.parseJsonUint(json, ".v2Params.maxExitLagSec"),
+            challengeWindowSec: vm.parseJsonUint(json, ".v2Params.challengeWindowSec"),
+            entryTolBps: vm.parseJsonUint(json, ".v2Params.entryTolBps"),
+            exitTolBps: vm.parseJsonUint(json, ".v2Params.exitTolBps"),
+            confMaxBps: vm.parseJsonUint(json, ".v2Params.confMaxBps")
+        });
+        V2ParamsGate.assertMatches(V2ParamsGate.live(trackRecord), reviewed);
+        _ok(true, "trackRecord.params == manifest v2Params (seven fields, full-width bounds)");
     }
 
     /// @dev TrackRecordV2 oracle wiring against LIVE mined state: the active

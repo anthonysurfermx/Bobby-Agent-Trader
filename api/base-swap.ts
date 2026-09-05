@@ -14,6 +14,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { BaseSwapError, quoteBaseSwap, toTradeExecution } from './_lib/base-swap.js';
+import { rpcErrorMessage } from './_lib/rpc-redact.js';
 import { recordBuiltSwap } from './_lib/swap-receipts.js';
 import { verifyIntent } from './_lib/dex-execution.js';
 import { resolveIdentity } from './_lib/user-identity.js';
@@ -67,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, quote });
     } catch (error) {
       if (error instanceof BaseSwapError) return res.status(statusFor(error.code)).json({ ok: false, error: error.message, code: error.code });
-      console.error('[BaseSwap] quote failed', error);
+      console.error('[BaseSwap] quote failed', rpcErrorMessage(error));
       return res.status(500).json({ ok: false, error: 'Quote failed' });
     }
   }
@@ -142,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, quote, execution: toTradeExecution(quote), receipt });
   } catch (error) {
     if (error instanceof BaseSwapError) return res.status(statusFor(error.code)).json({ ok: false, error: error.message, code: error.code });
-    console.error('[BaseSwap] build failed', error);
+    console.error('[BaseSwap] build failed', rpcErrorMessage(error));
     return res.status(500).json({ ok: false, error: 'Swap build failed' });
   }
 }

@@ -69,6 +69,30 @@ server is unaffected (every server reader uses the service key). Regression:
 `DATABASE_URL=… npm run test:rls-lockdown-pg`. After applying, confirm with
 `bobby_rls_matrix()` that no anon policy remains on those three tables.
 
+## 2b-ii. Apply migration `20260903000011_cycle_provenance.sql` — right after 0010
+
+BP-09 (2026-09-04 review). Adds `agent_cycles.visibility` (default private) and
+rebuilds both public views on POSITIVE provenance: a cycle is public only when its
+producer said so; a trade is public only through a public cycle. Historical rows
+stay private — after applying, review and run the operator statement left as a
+comment in the migration to re-publish the rows the scheduled cycle produced.
+Regression: `DATABASE_URL=… npm run test:rls-lockdown-pg`.
+
+## 2b-iii. Apply migrations `0012_hardness_agent_cas.sql` and `0013_mcp_challenge_binding.sql`
+
+> Preflight 2026-09-05 (read-only): `0010` is **already applied** on prod; `0011`/`0012`/`0013`
+> pending, preconditions verified. `0012` adds `hardness_agents.row_version` (bigint CAS counter);
+> the pre-existing text `version` column (semver) is untouched. Apply in order 0011 → 0012 → 0013.
+
+BP-10 and BP-08 (2026-09-04 review). `0012` adds `hardness_agents.version`, the
+compare-and-swap registration RPC and the single-use ownership transfer RPC (+ nonce
+table). `0013` adds the client-secret hash, request hash lifecycle columns and the
+new challenge statuses. Both additive. Client contract change for paid MCP tools: the
+402 now returns `clientSecret`; the retry must repeat the **identical** request with
+`x-402-payment`, `x-challenge-id` **and** `x-challenge-secret`. A tool failure leaves
+the payment retryable; a completed call replays its stored result to the same client.
+Regression: `npm run test:agent-registry-pg` and the BP-08 checks in `test:remediation-r2`.
+
 ## 2c. Safe transaction — activate the canonical Pyth on TrackRecordV2 (C-02)
 
 Read-only state on 2026-09-03: `activePyth = 0x8250…` (old), `0xbC16…` approved,
@@ -79,7 +103,17 @@ timelock elapsed 2026-08-21 19:35 UTC. One transaction from the 2/3 Safe `0x8BE6
 - data: `0xb4d6badf000000000000000000000000bc16aee60f64864882bc6c4e428e148fc0e272f5`
   (`activatePyth(0xbC16aee60f64864882BC6C4E428e148Fc0E272F5)`)
 
-Then `npm run check:mainnet:postdeploy` — the verifier that failed in round 1.
+Ready to import (2026-09-05): `contracts/deployments/safe-batches/8453-activate-pyth.json`
+(Safe Transaction Builder format; regenerate with `npm run build:safe-launch-batch --
+--action=activate-pyth`, which pins the address from `PythOracleGate.BASE_PYTH_UPGRADED`).
+
+> Third round (2026-09-05): this step only matters if the CURRENT TrackRecordV2 is kept. The
+> full redeploy in `docs/infra/2026-09-05-launch-readiness.md` deploys a new TrackRecordV2 with
+> `0xbC16…2F5` active from its constructor, and the batch goes stale once the manifest is
+> rewritten (it reads `addresses.trackRecord`). Decide before signing.
+
+`npm run check:mainnet:postdeploy` only makes sense after the redeploy (on the current manifest it
+is NO-GO regardless of this step: no treasury, no `v2Params`, no receipt evidence).
 
 ## 3. `PROTOCOL_CHAIN=base` in the production environment
 
@@ -151,9 +185,54 @@ and `VerifyBaseDeployment` / `check:mainnet:*` / `finalize:base-manifest` all
 re-prove them. For bounties of material value, make the bond proportional to the
 reward or cap the reward — a follow-up.
 
-After any `forge build` that touches HardnessRegistry: `npm run gen:hardness-abi`
-regenerates `api/_lib/hardness-registry.abi.ts`; `test:hardness-abi-anvil` fails if
-it is stale.
+After any `forge build` that touches HardnessRegistry or BobbyAdversarialBounties:
+`npm run gen:hardness-abi` regenerates **both** `api/_lib/hardness-registry.abi.ts` and
+`api/_lib/adversarial-bounties.abi.ts`; `test:hardness-abi-anvil` / `test:bounties-abi-anvil`
+fail if either is stale.
+
+**V2 verification params (BP-03).** The seven TrackRecordV2 params are reviewed values and
+must be explicit in the deploy environment; `check:mainnet:*` refuses to run without them and
+bounds-checks them at full width before `DeployBase` ever narrows them:
+
+| env | reviewed value | bounds |
+|---|---|---|
+| `V2_ENTRY_WINDOW_SEC` | `60` | [10, 600] |
+| `V2_EXIT_WINDOW_SEC` | `120` | [10, 1800] |
+| `V2_MAX_EXIT_LAG_SEC` | `600` | [300, 3600] |
+| `V2_CHALLENGE_WINDOW_SEC` | `604800` (7 days) | (172800, 2592000] — strictly above the 2-day Pyth timelock |
+| `V2_ENTRY_TOL_BPS` | `100` | [10, 500] |
+| `V2_EXIT_TOL_BPS` | `100` | [10, 500] |
+| `V2_CONF_MAX_BPS` | `50` | [10, 200] |
+
+`DeployBase` writes them to the manifest as `v2Params.*`, asserts them live right after the
+broadcast, and `VerifyBaseDeployment` refuses a mainnet manifest without the block. The
+readiness check fails if `manifest.v2Params.*` differs from the env.
+
+**CI (BP-06).** The contracts job enforces EIP-170 on the seven production artifacts with
+`script/check-sizes.sh` (not `forge build --sizes`, which trips on the test harness), then
+runs the suite and the layout gate. A separate `integration` job runs the anvil ABI suites
+and the three Postgres suites against a `postgres:17` service; those scripts fail — not
+skip — when `CI=true` and `DATABASE_URL` is missing.
+
+**MCP client contract (BP-07).** `bobby_bounty_challenge` returns `value` / `valueWei` /
+`valueNative`: the bounty's challenge bond, fixed at post time. Send exactly that value; a
+zero-value challenge reverts. `bobby_bounty_get` / `_list` report all six states plus
+`bondWei`, `resolutionFinalizeAfter`, `settlementAfter`, `disputedBy` and `nextDeadline`.
+
+**Public readers (BP-11 / BP-12).** `/api/reputation` and `/api/protocol-heartbeat` select
+TrackRecord getters from the chain's declared `trackRecordVersion` (Base = V2, verified
+ledger). A source that cannot be read answers `sources.<x> = 'unavailable'` with null
+numbers and `ok:false` — consumers must not treat null as zero. The advertised
+`chain.rpc` is the static public endpoint; the configured `BASE_RPC_URL` (which may
+carry a key) never appears in a response or a log line.
+
+**Orchestrate (BP-13).** `POST /api/orchestrate` takes `prediction.quantity` and/or
+`prediction.notionalUsd`. Without a size it analyses but never returns `execute` /
+`reduce_size`. The `decision` is derived from the agent's effective policy, the model's
+action and the proof state (`analysis` / `proof_submitted` / `proof_confirmed` /
+`proof_failed`); a policy that requires on-chain proof only ever yields executable advice
+after a **confirmed** commit. A model answer outside the schema is a 502 with a `failed`
+session — nothing is decided on it.
 
 ## Rollback
 

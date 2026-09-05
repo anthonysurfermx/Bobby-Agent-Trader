@@ -18,6 +18,9 @@ import pg from 'pg';
 
 const url = process.env.DATABASE_URL;
 if (!url) {
+  // BP-06: a skip is a local convenience only — in CI the database is a
+  // declared service, so its absence is a broken pipeline, not a pass.
+  if (process.env.CI === 'true') { console.error('test-swap-ledger-pg: DATABASE_URL is required when CI=true'); process.exit(1); }
   console.log('test-swap-ledger-pg: skipped (set DATABASE_URL to a scratch Postgres)');
   process.exit(0);
 }
