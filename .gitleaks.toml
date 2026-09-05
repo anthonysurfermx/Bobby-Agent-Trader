@@ -5,6 +5,8 @@ useDefault = true
 description = "Known public identifiers: Supabase anon JWT, EVM addresses, and a localStorage key"
 regexTarget = "match"
 regexes = [
+  # Existing native public anon token; exact match, never service-role tokens.
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFidmRxa2tubnV3ZWF0cHRqb2hpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MTcxODEsImV4cCI6MjEwMzA5MzE4MX0\.RnLq8W0O-S7L4BGkck-yG8NaaMFMsGN6QX3sjfVPkd8''',
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0\.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4''',
   '''0x[a-fA-F0-9]{40}''',
   '''mercado-lp-enhancements-v1''',

@@ -1,0 +1,1392 @@
+{
+  "checkedAt": "2026-09-05T14:54:14.748Z",
+  "chainId": 8453,
+  "blockNumber": "50915353",
+  "blockHash": "0x406cdedcc89841d673465f9d7c62c5c144ad54420a157b5bec979c5a689850b4",
+  "status": "READ_ONLY_NOT_ADMITTED",
+  "pairScope": "Direct USDC only; no claim about other pairs or venues.",
+  "sources": [
+    "https://github.com/aerodrome-finance/slipstream/blob/main/README.md",
+    "https://github.com/aerodrome-finance/contracts/blob/main/README.md"
+  ],
+  "factories": [
+    {
+      "name": "Initial Slipstream",
+      "address": "0x5e7BB104d84c7CB9B682AaC2F3d509f5F406809A",
+      "kind": "cl",
+      "variants": [
+        1,
+        50,
+        100,
+        200,
+        2000,
+        10
+      ],
+      "pools": [
+        {
+          "symbol": "AAPLc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "name": "Gauge Caps Slipstream",
+      "address": "0xaDe65c38CD4849aDBA595a4323a8C7DdfE89716a",
+      "kind": "cl",
+      "variants": [
+        1,
+        50,
+        100,
+        200,
+        2000,
+        10,
+        500
+      ],
+      "pools": [
+        {
+          "symbol": "AAPLc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 10,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "name": "Gauges V3 Slipstream",
+      "address": "0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef",
+      "kind": "cl",
+      "variants": [
+        1,
+        50,
+        100,
+        200,
+        2000,
+        500,
+        10
+      ],
+      "pools": [
+        {
+          "symbol": "AAPLc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 200,
+          "status": "pool-found",
+          "address": "0x8FeaCB3AAC9499bA4F53aa16e9CD38c36C57765E"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0xA3b1E3f9747065e2073722Ff4c9027d3eA4994F0"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 500,
+          "status": "pool-found",
+          "address": "0x5E258Fa90fBd64Ed7a42E77C75E4ab352154BD74"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0xB1987CAD1682841b4b641d50E520777eC5Ab5542"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0xEAF57753BC382E0324a1D43F72E7027705a2273E"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 200,
+          "status": "pool-found",
+          "address": "0x204B5342c46A7E1BE3988E60aCB2b7aaCa2e40AB"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0x853F5f1B92b16714Fe6CDA67CAad0856B83C7ab9"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0xd03Bc8C7F2FAedCe2aac81bF0444AEA08Ea06E9b"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0x7103eB3c9590d1281f7dc03b2A9EE27C39dF5D54"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0x8b27f626ab668197000BC722A1012022CAeD10E2"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0x5A8236f575471e7BfCA2C8462a200c28f737246E"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0x0bf58fe0FAc935Ac69595c19B12Ba0d75E3F8c0E"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 1,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 50,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 100,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 200,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 2000,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 500,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": 10,
+          "status": "pool-found",
+          "address": "0x469337fDcc5E8f38e2E4B670B04F57865D13a7BB"
+        }
+      ]
+    },
+    {
+      "name": "Aerodrome V2",
+      "address": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+      "kind": "v2",
+      "variants": [
+        false,
+        true
+      ],
+      "pools": [
+        {
+          "symbol": "AAPLc",
+          "variant": false,
+          "status": "pool-found",
+          "address": "0x6b74fC52Dd84bEb8d2D1BE16732749Dee70C45e7"
+        },
+        {
+          "symbol": "AAPLc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": false,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "GOOGLc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": false,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "METAc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": false,
+          "status": "pool-found",
+          "address": "0x2e39A9018330c8784956998185D23D9dB503d1F7"
+        },
+        {
+          "symbol": "NVDAc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": false,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "AMZNc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": false,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSFTc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": false,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "MSTRc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": false,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SNDKc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": false,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "SPCXc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": false,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        },
+        {
+          "symbol": "TSLAc",
+          "variant": true,
+          "status": "no-pool",
+          "address": "0x0000000000000000000000000000000000000000"
+        }
+      ]
+    }
+  ]
+}

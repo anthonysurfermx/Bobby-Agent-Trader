@@ -40,6 +40,7 @@ jobs:
       - run: npm run test:base-swap
       - run: npm run test:stock-ticker-routing
       - run: npm run test:stock-admission
+      - run: npx tsx scripts/check-stock-client-parity.mts ios/Bobby
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction
       - run: npm run test:mcp-payment-transport
@@ -51,6 +52,18 @@ jobs:
       - run: npm run build
       - run: npm run lint -- --quiet
       - run: npm audit --omit=dev --audit-level=high
+
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install project generator
+        run: brew list xcodegen || brew install xcodegen
+      - name: Run app-hosted native unit tests
+        run: bash scripts/test-ios-simulator.sh
 
   # BP-06: the suites that need a real Postgres (RLS lock-down, swap ledger,
   # agent-registry CAS) and a real EVM (backend ABI vs compiled artifact). The

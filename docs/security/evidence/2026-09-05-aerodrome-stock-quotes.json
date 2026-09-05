@@ -1,0 +1,469 @@
+{
+  "status": "READ_ONLY_NOT_ADMITTED",
+  "checkedAt": "2026-09-05T14:57:41.905Z",
+  "chainId": 8453,
+  "blockNumber": "50915457",
+  "blockHash": "0xc1e278e21b263273ba65cde3a782bd7f63084ce1c161a098d221e5ce84a40153",
+  "factory": "0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef",
+  "quoter": "0x514c8B5f54112481E28028F1166Bd78501089259",
+  "pools": [
+    {
+      "symbol": "AAPLc",
+      "address": "0x8FeaCB3AAC9499bA4F53aa16e9CD38c36C57765E",
+      "tickSpacing": 200,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "452221",
+          "independentSellUsdc": 1.428877,
+          "buyImpactPct": 85.54224722288187,
+          "sellImpactPct": 1.1688038917470722,
+          "buyReferenceDeviationPct": 590.8610934175292,
+          "sellReferenceDeviationPct": 1.2844473420841163
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "452221",
+          "independentSellUsdc": 1.428877,
+          "buyImpactPct": 98.55422472228818,
+          "sellImpactPct": 1.1688038917470722,
+          "buyReferenceDeviationPct": 6808.610934175292,
+          "sellReferenceDeviationPct": 1.2844473420841163
+        }
+      ],
+      "reference": {
+        "usdPrice": 320.08,
+        "ageSec": 68346,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "91713598"
+    },
+    {
+      "symbol": "AAPLc",
+      "address": "0xA3b1E3f9747065e2073722Ff4c9027d3eA4994F0",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "3112028",
+          "independentSellUsdc": 9.989996,
+          "buyImpactPct": 0.05002297415226398,
+          "sellImpactPct": 0.05004205837365605,
+          "buyReferenceDeviationPct": 0.3917363617449432,
+          "sellReferenceDeviationPct": 0.2913044686886579
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "31120281",
+          "independentSellUsdc": 99.899985,
+          "buyImpactPct": 0.05001976242098305,
+          "sellImpactPct": 0.05002025759303086,
+          "buyReferenceDeviationPct": 0.3917331358185283,
+          "sellReferenceDeviationPct": 0.2913263439227487
+        }
+      ],
+      "reference": {
+        "usdPrice": 320.08,
+        "ageSec": 68346,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "319402584584127"
+    },
+    {
+      "symbol": "GOOGLc",
+      "address": "0x5E258Fa90fBd64Ed7a42E77C75E4ab352154BD74",
+      "tickSpacing": 500,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "status": "quote-unavailable"
+        },
+        {
+          "inputUsdc": 100,
+          "status": "quote-unavailable"
+        }
+      ],
+      "reference": {
+        "usdPrice": 338.71195,
+        "ageSec": 88380,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "0"
+    },
+    {
+      "symbol": "GOOGLc",
+      "address": "0xB1987CAD1682841b4b641d50E520777eC5Ab5542",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "2942413",
+          "independentSellUsdc": 9.989997,
+          "buyImpactPct": 0.05002517265910722,
+          "sellImpactPct": 0.05002985486216582,
+          "buyReferenceDeviationPct": 0.3380947352926489,
+          "sellReferenceDeviationPct": 0.23772653912892405
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "29424132",
+          "independentSellUsdc": 99.899987,
+          "buyImpactPct": 0.05001837891704941,
+          "sellImpactPct": 0.05001964009607729,
+          "buyReferenceDeviationPct": 0.33808791516998227,
+          "sellReferenceDeviationPct": 0.23773678330336612
+        }
+      ],
+      "reference": {
+        "usdPrice": 338.71195,
+        "ageSec": 88380,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "335792429090629"
+    },
+    {
+      "symbol": "METAc",
+      "address": "0xEAF57753BC382E0324a1D43F72E7027705a2273E",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "1627164",
+          "independentSellUsdc": 9.989993,
+          "buyImpactPct": 0.05005858868427637,
+          "sellImpactPct": 0.05003645886085817,
+          "buyReferenceDeviationPct": 0.10789423460426661,
+          "sellReferenceDeviationPct": 0.20785626484369768
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "16271644",
+          "independentSellUsdc": 99.89996,
+          "buyImpactPct": 0.050034018341915676,
+          "sellImpactPct": 0.050031014184914735,
+          "buyReferenceDeviationPct": 0.10791879072304944,
+          "sellReferenceDeviationPct": 0.20785082876483285
+        }
+      ],
+      "reference": {
+        "usdPrice": 615.23,
+        "ageSec": 71254,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "138294490248005"
+    },
+    {
+      "symbol": "NVDAc",
+      "address": "0x204B5342c46A7E1BE3988E60aCB2b7aaCa2e40AB",
+      "tickSpacing": 200,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "4304406",
+          "independentSellUsdc": 9.855972,
+          "buyImpactPct": 0.7242711853854167,
+          "sellImpactPct": 0.7212324937464265,
+          "buyReferenceDeviationPct": 1.027491835215666,
+          "sellReferenceDeviationPct": 0.42758692418858324
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "41456337",
+          "independentSellUsdc": 91.584709,
+          "buyImpactPct": 4.386155263716473,
+          "sellImpactPct": 4.213966865778107,
+          "buyReferenceDeviationPct": 4.896711453415037,
+          "sellReferenceDeviationPct": 3.9306520648201504
+        }
+      ],
+      "reference": {
+        "usdPrice": 229.9573,
+        "ageSec": 75206,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "1536159516"
+    },
+    {
+      "symbol": "NVDAc",
+      "address": "0x853F5f1B92b16714Fe6CDA67CAad0856B83C7ab9",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "4332627",
+          "independentSellUsdc": 9.99,
+          "buyImpactPct": 0.050003611987570196,
+          "sellImpactPct": 0.05002140051945103,
+          "buyReferenceDeviationPct": 0.3694391463777924,
+          "sellReferenceDeviationPct": 0.2690697072313952
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "43326266",
+          "independentSellUsdc": 99.899999,
+          "buyImpactPct": 0.050012839645197094,
+          "sellImpactPct": 0.050013173362994934,
+          "buyReferenceDeviationPct": 0.3694484127603648,
+          "sellReferenceDeviationPct": 0.26907796065311906
+        }
+      ],
+      "reference": {
+        "usdPrice": 229.9573,
+        "ageSec": 75206,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "620048329255969"
+    },
+    {
+      "symbol": "AMZNc",
+      "address": "0xd03Bc8C7F2FAedCe2aac81bF0444AEA08Ea06E9b",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "3847715",
+          "independentSellUsdc": 9.989988,
+          "buyImpactPct": 0.05007554419678151,
+          "sellImpactPct": 0.05006952839202716,
+          "buyReferenceDeviationPct": 0.8539427560757318,
+          "sellReferenceDeviationPct": 0.7529677885883546
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "38476939",
+          "independentSellUsdc": 99.898777,
+          "buyImpactPct": 0.050623647007430606,
+          "sellImpactPct": 0.05062498120437242,
+          "buyReferenceDeviationPct": 0.8544958193514196,
+          "sellReferenceDeviationPct": 0.7524078730481998
+        }
+      ],
+      "reference": {
+        "usdPrice": 257.69395,
+        "ageSec": 67786,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "9943985374649"
+    },
+    {
+      "symbol": "MSFTc",
+      "address": "0x7103eB3c9590d1281f7dc03b2A9EE27C39dF5D54",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "1499545",
+          "independentSellUsdc": 9.95517,
+          "buyImpactPct": 0.22461711629241377,
+          "sellImpactPct": 0.22418644483507277,
+          "buyReferenceDeviationPct": 33.43303431688509,
+          "sellReferenceDeviationPct": 32.834854024042514
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "14763402",
+          "independentSellUsdc": 96.523438,
+          "buyImpactPct": 1.7685973267828392,
+          "sellImpactPct": 1.7387155499540063,
+          "buyReferenceDeviationPct": 35.53030625645324,
+          "sellReferenceDeviationPct": 30.818511130657768
+        }
+      ],
+      "reference": {
+        "usdPrice": 499.778,
+        "ageSec": 83956,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "2214766066"
+    },
+    {
+      "symbol": "MSTRc",
+      "address": "0x8b27f626ab668197000BC722A1012022CAeD10E2",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "6997832",
+          "independentSellUsdc": 9.989947,
+          "buyImpactPct": 0.05027657844960398,
+          "sellImpactPct": 0.05027869996040435,
+          "buyReferenceDeviationPct": 0.18863284705357142,
+          "sellReferenceDeviationPct": 0.08791321445245082
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "69976631",
+          "independentSellUsdc": 99.89465,
+          "buyImpactPct": 0.05268896964245595,
+          "sellImpactPct": 0.05268879153891293,
+          "buyReferenceDeviationPct": 0.19105106294166063,
+          "sellReferenceDeviationPct": 0.08549979064684798
+        }
+      ],
+      "reference": {
+        "usdPrice": 142.63235,
+        "ageSec": 62868,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "3108953988208"
+    },
+    {
+      "symbol": "SNDKc",
+      "address": "0x5A8236f575471e7BfCA2C8462a200c28f737246E",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "568078",
+          "independentSellUsdc": 9.989962,
+          "buyImpactPct": 0.050159116055947806,
+          "sellImpactPct": 0.0502460869371113,
+          "buyReferenceDeviationPct": 1.5843246846903414,
+          "sellReferenceDeviationPct": 1.4823543395718675
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "5680745",
+          "independentSellUsdc": 99.898482,
+          "buyImpactPct": 0.050774919595397705,
+          "sellImpactPct": 0.05076885825154864,
+          "buyReferenceDeviationPct": 1.5849505623461768,
+          "sellReferenceDeviationPct": 1.481823552234296
+        }
+      ],
+      "reference": {
+        "usdPrice": 1732.8674,
+        "ageSec": 67208,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "3142320035814"
+    },
+    {
+      "symbol": "SPCXc",
+      "address": "0x0bf58fe0FAc935Ac69595c19B12Ba0d75E3F8c0E",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "6682307",
+          "independentSellUsdc": 9.989967,
+          "buyImpactPct": 0.05017178323410976,
+          "sellImpactPct": 0.0501833946698782,
+          "buyReferenceDeviationPct": 1.0458583121149667,
+          "sellReferenceDeviationPct": 0.9444790024704108
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "66822092",
+          "independentSellUsdc": 99.896757,
+          "buyImpactPct": 0.051634615336804135,
+          "sellImpactPct": 0.051635046220699365,
+          "buyReferenceDeviationPct": 1.047337206990484,
+          "sellReferenceDeviationPct": 0.9430129046378521
+        }
+      ],
+      "reference": {
+        "usdPrice": 148.1,
+        "ageSec": 68634,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "4997647529170"
+    },
+    {
+      "symbol": "TSLAc",
+      "address": "0x469337fDcc5E8f38e2E4B670B04F57865D13a7BB",
+      "tickSpacing": 10,
+      "quotes": [
+        {
+          "inputUsdc": 10,
+          "stockOutRaw": "2810656",
+          "independentSellUsdc": 9.989985,
+          "buyImpactPct": 0.0500834473756151,
+          "sellImpactPct": 0.050091640244653846,
+          "buyReferenceDeviationPct": 0.694490177963103,
+          "sellReferenceDeviationPct": 0.5936446460498734
+        },
+        {
+          "inputUsdc": 100,
+          "stockOutRaw": "28106395",
+          "independentSellUsdc": 99.898684,
+          "buyImpactPct": 0.05067020492371954,
+          "sellImpactPct": 0.05067147041417641,
+          "buyReferenceDeviationPct": 0.6950813100125686,
+          "sellReferenceDeviationPct": 0.593061081432511
+        }
+      ],
+      "reference": {
+        "usdPrice": 353.33495,
+        "ageSec": 68104,
+        "status": "fresh",
+        "usable": true,
+        "transferPaused": false,
+        "issuerPaused": false,
+        "tokenMultiplier": "1000000000000000000",
+        "registryMultiplier": "1000000000000000000"
+      },
+      "activeLiquidityRaw": "7926419987015"
+    }
+  ]
+}
