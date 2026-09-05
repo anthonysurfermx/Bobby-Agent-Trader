@@ -7,7 +7,9 @@
 //   POST { action: 'publish', title? }                     → island public + share code
 //   POST { action: 'unpublish' }                           → island private (code kept)
 //   POST { action: 'close', inventoryId, tzOffsetMin?, platform? } → a seed is
-//        reviewed against the public price, blooms and pays thesis_closed
+//        reviewed against the public price, blooms and pays thesis_closed;
+//        a thesis the wallet executed on Base also pays the execution bonus
+//        and the next season piece (closed.executed / closed.season)
 // Placement rules (v1): the piece must belong to the caller, be bloomed, fit
 // inside the 8×8 grid with its footprint, and not overlap another piece.
 // Every seed carries `review`: the thesis it was read with, when it can be
@@ -21,7 +23,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { THESIS_REVIEW_HOURS, catalog, cleanTitle, closeSeed, ensureLand, newShareCode, seedReviews } from './_lib/trader-land.js';
+import { THESIS_REVIEW_HOURS, catalog, cleanTitle, closeSeed, ensureLand, newShareCode, seasonProgress, seedReviews } from './_lib/trader-land.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -67,6 +69,8 @@ async function world(identity: Identity) {
     xp: prog.xp, aura: prog.aura,
     route: { index: prog.route_index, total: route.length, next: next ? { id: next.id, world: next.world, attribution: next.attribution, kind: next.kind, footprint: [next.footprint_w, next.footprint_h] } : null, complete: prog.route_index >= route.length },
     review: { windowHours: THESIS_REVIEW_HOURS, ready },
+    // The season collection: earned only by reviewed theses executed on Base.
+    season: seasonProgress(inventory),
     inventory: inventory.map(({ event_id: _eventId, ...r }) => ({ ...r, item: byId.get(r.item_id) ?? null, placed: placements.some((p) => p.inventory_id === r.id), review: reviews.get(r.id) ?? null })),
     placements,
     catalog: items,
@@ -121,7 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ok: true, removed: body.placementId, ...(await world(identity)) });
     }
     if (body.action === 'close') {
-      const result = await closeSeed(identity.id, body.inventoryId, { platform: body.platform, tzOffsetMin: body.tzOffsetMin });
+      const result = await closeSeed({ id: identity.id, wallet: identity.wallet }, body.inventoryId, { platform: body.platform, tzOffsetMin: body.tzOffsetMin });
       if (result.ok === false) return res.status(result.status).json({ error: result.error, ...(result.reviewAt ? { reviewAt: result.reviewAt } : {}) });
       return res.status(200).json({ ok: true, closed: result.closed, ...(await world(identity)) });
     }

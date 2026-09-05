@@ -72,6 +72,49 @@ after the window and close as `expired` with no price comparison, so nobody is
 left with a seed that can never bloom. iOS parity: send `thesis` with
 `read_complete` events, render `review.ready`, call `close`.
 
+## Executed theses and the season collection (same day, Anthony: "dale con 1 y 3")
+
+Anthony asked for more XP for xStocks swaps and a "super garden" for active
+wallets. Volume-based XP was declined (it breaks the v0.2 safety promise, the
+App Store 4.3a appeal and reads as gamified trading to a regulator). What
+shipped instead rewards **process**:
+
+1. **Execution bonus.** At review time the server looks for a confirmed Base
+   swap by the reviewer's own wallet (`bobby_swap_receipts`, the rows Bobby
+   built and verified on-chain) that moved the thesis' asset in the thesis'
+   direction between the read and the review: stable → asset for a long,
+   asset → stable for a short; assets matched by contract, so ETH ≡ WETH,
+   BTC ≡ cbBTC, NVDA ≡ NVDAc (`swapExecutesThesis` in `thesis-rules.ts`).
+   One swap executes at most one thesis: receipts already recorded in a
+   `thesis_close.executed` meta are skipped. A match pays `EXECUTION_BONUS`
+   = +10 XP / +4 Aura on top of the close, inside the same `thesis_closed`
+   ledger row (`points` = 25, `meta.thesis_close.executed` = receipt id, tx
+   hash, legs, time). A swap without a thesis, or a wallet full of history,
+   pays nothing. iOS identities without a linked wallet cannot execute yet.
+2. **Season I "On-chain"** (`api/_lib/trader-land-season.ts`): six existing
+   off-route pieces in a fixed, visible order — Candle Tower → Evidence
+   Workshop → Red Team Observatory → Lit Archive → Three Gate Citadel → Base
+   Ring Seal. Every executed review grants the next one, already bloomed,
+   as `tl_inventory` rows with `source = 'season'` tied to the close's ledger
+   event (one piece per event). `GET /api/trader-land` returns `season`
+   (name, rule, earned/total, next); the studio shows a season card in the
+   collection, tags season pieces, hints "Executable on Base" on seeds whose
+   asset Bobby can swap, and the bloom notice names the bonus and the piece.
+
+No migration: `tl_inventory.source` already allows `season`, the six ids exist
+in `tl_items`, and the bonus lives inside the `thesis_closed` row. A dedicated
+on-chain **district** needs its own five lots of art first; moving the season
+table into `tl_items (season, season_index)` is what lets a season rotate
+without a deploy. Known soft spot: two executed reviews of the same identity
+closed in the same instant could both grant the same season piece (the client
+serializes mutations; a partial unique index on `(identity_id, item_id) where
+source = 'season'` closes it when the next migration lands).
+
+Trade-off flagged: an executed cycle (10 + 25 = 35 XP) now out-earns a
+respected NO TRADE (20 XP), which bends v0.2's "same potential for LONG,
+SHORT and NO TRADE". Anthony chose it; the season stays cosmetic and the
+bonus modest.
+
 ## Not in this version
 
 - A resolver cron that closes theses unattended. The design wants the human to

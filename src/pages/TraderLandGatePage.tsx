@@ -5,6 +5,7 @@ import { useAppKit } from '@reown/appkit/react';
 import { useBobbySession } from '@/hooks/useBobbySession';
 import { Helmet } from 'react-helmet-async';
 import { isSpanish, t } from '@/lib/companions/i18n';
+import { findBaseToken } from '@/lib/base-swap/tokens';
 import { draggedGridPosition } from '@/lib/trader-land-gestures';
 import { CATALOG_ALIASES, STUDIO_PATH, WORLDS_PATH, shareUrl, withCatalogAliases } from '@/lib/trader-land/public';
 import './trader-land.css';
@@ -37,7 +38,10 @@ type CatalogItem = { id: string; world: string; attribution: string; kind: strin
 // A seed waits on the thesis it was read with: the server says when it can be reviewed (see api/_lib/thesis-rules.ts).
 type SeedThesis = { symbol: string; isEquity: boolean; direction: 'long' | 'short' | 'none'; price: number | null; entry: number | null; stop: number | null; target: number | null };
 type SeedReview = { thesis: SeedThesis | null; readAt: string | null; reviewAt: string; ready: boolean };
-type ClosedThesis = { inventoryId: string; itemId: string; outcome: 'hit' | 'invalidated' | 'expired'; symbol: string | null; direction: string | null; referencePx: number | null; closePx: number | null; movePct: number | null; xp: number; aura: number };
+// The season collection: pieces earned only by reviewed theses executed on Base (api/_lib/trader-land-season.ts).
+type SeasonProgress = { id: string; name: { en: string; es: string }; rule: { en: string; es: string }; total: number; earned: number; owned: string[]; next: string | null; complete: boolean };
+type Execution = { receiptId: string; txHash: string | null; tokenIn: string; tokenOut: string; at: string | null; xp: number; aura: number };
+type ClosedThesis = { inventoryId: string; itemId: string; outcome: 'hit' | 'invalidated' | 'expired'; symbol: string | null; direction: string | null; referencePx: number | null; closePx: number | null; movePct: number | null; xp: number; aura: number; executed?: Execution | null; season?: { piece: { id: string } | null; progress: SeasonProgress } | null };
 type WorldInventory = { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; placed: boolean; item: CatalogItem | null; review?: SeedReview | null };
 type ApiPlacement = { id: string; inventory_id: string; x: number; y: number; rotation: number };
 type World = {
@@ -48,6 +52,7 @@ type World = {
   share?: { public: boolean; code: string | null; title: string | null; publishedAt: string | null };
   route: { index: number; total: number; complete: boolean; next: { id: string } | null };
   review?: { windowHours: number; ready: number };
+  season?: SeasonProgress;
   /** present on the response to a `close` action */
   closed?: ClosedThesis;
   inventory: WorldInventory[];
@@ -235,16 +240,21 @@ function when(iso: string) { return new Date(iso).toLocaleString(isSpanish() ? '
 function seedLine(review: SeedReview) {
   const read = review.thesis ? `${review.thesis.symbol} ${review.thesis.direction === 'none' ? t('no edge', 'sin sesgo') : review.thesis.direction}${review.thesis.entry ?? review.thesis.price ? ` @ ${review.thesis.entry ?? review.thesis.price}` : ''}` : t('Read without a saved thesis', 'Lectura sin tesis guardada');
   const timing = review.ready ? t('Ready to review.', 'Lista para revisar.') : `${t('Review from', 'Revisable desde')} ${when(review.reviewAt)}.`;
-  return `${read} · ${timing}`;
+  // Only assets Bobby can swap on Base can be executed; the server decides at review time whether they were.
+  const base = review.thesis && review.thesis.direction !== 'none' ? findBaseToken(review.thesis.symbol) : null;
+  const onBase = base && !base.stable ? ` ${t('Executable on Base for the season bonus.', 'Ejecutable en Base para el bono de temporada.')}` : '';
+  return `${read} · ${timing}${onBase}`;
 }
 function outcomeLabel(outcome: ClosedThesis['outcome']) {
   return outcome === 'hit' ? t('target reached', 'objetivo alcanzado') : outcome === 'invalidated' ? t('invalidation hit', 'invalidación tocada') : t('window closed without touching a level', 'venció sin tocar niveles');
 }
-function closeNotice(closed: ClosedThesis, item?: ManifestItem) {
+function closeNotice(closed: ClosedThesis, item?: ManifestItem, seasonItem?: ManifestItem) {
   const piece = item ? itemName(item) : t('Your piece', 'Tu pieza');
   const move = closed.movePct !== null ? ` (${closed.movePct > 0 ? '+' : ''}${closed.movePct}%)` : '';
   const head = closed.symbol ? `${closed.symbol} ${closed.direction && closed.direction !== 'none' ? closed.direction : ''}: ${outcomeLabel(closed.outcome)}${move}. ` : '';
-  return `${head}${piece} ${t('bloomed.', 'floreció.')} +${closed.xp} XP · +${closed.aura} Aura`;
+  const executed = closed.executed ? ` ${t('Executed on Base', 'Ejecutada en Base')} (+${closed.executed.xp} XP · +${closed.executed.aura} Aura).` : '';
+  const season = closed.season?.piece ? ` ${t('Season piece', 'Pieza de temporada')}: ${seasonItem ? itemName(seasonItem) : pretty(closed.season.piece.id)}.` : '';
+  return `${head}${piece} ${t('bloomed.', 'floreció.')} +${closed.xp} XP · +${closed.aura} Aura.${executed}${season}`;
 }
 function demoWorld(manifest: Manifest, fixture: Fixture): World {
   // Alias ids exist only so account pieces resolve; the practice collection shows each artwork once.
@@ -488,7 +498,8 @@ export default function TraderLandGatePage() {
     const next = await mutate({ action: 'close', inventoryId: entry.id, tzOffsetMin: new Date().getTimezoneOffset(), platform: 'web' });
     if (!next?.closed) return;
     cue('bloom_complete');
-    setNotice(closeNotice(next.closed, items.get(entry.item_id)));
+    const seasonPiece = next.closed.season?.piece ? items.get(next.closed.season.piece.id) : undefined;
+    setNotice(closeNotice(next.closed, items.get(entry.item_id), seasonPiece));
   };
   const jumpToReady = () => {
     const first = readySeeds[0]; if (!first) return;
@@ -669,9 +680,10 @@ export default function TraderLandGatePage() {
               const item=items.get(entry.item_id)!;const art=artFor(item,entry.state==='seed');
               const ready=entry.state==='seed'&&Boolean(entry.review?.ready);
               return <button key={entry.id} disabled={busy||Boolean(draft)} className={'land-piece '+(entry.id===selectedId?'selected':'')+(entry.placed?' placed':'')+(ready?' ready':'')} onClick={()=>{setSelectedId(entry.id);cue('placement_tick');}} aria-label={itemName(item)+(entry.placed?t(', on island',', en la isla'):ready?t(', ready to review',', lista para revisar'):entry.state==='seed'?t(', seed',', semilla'):t(', available',', disponible'))} aria-pressed={entry.id===selectedId}>
-                <img src={art.thumb?.url??art.albedo.url} alt="" draggable={false}/><span>{itemName(item)}</span><small>{entry.placed?<><Check size={11}/>{t('On island','En la isla')}</>:ready?<><Sprout size={11}/>{t('Ready to review','Lista para revisar')}</>:entry.state==='seed'?t('Growing','Creciendo'):`${item.footprint.cols} × ${item.footprint.rows}`}</small>
+                <img src={art.thumb?.url??art.albedo.url} alt="" draggable={false}/><span>{itemName(item)}</span><small>{entry.placed?<><Check size={11}/>{t('On island','En la isla')}</>:ready?<><Sprout size={11}/>{t('Ready to review','Lista para revisar')}</>:entry.state==='seed'?t('Growing','Creciendo'):entry.source==='season'?<><Sparkles size={11}/>{t('Season','Temporada')} · {item.footprint.cols} × {item.footprint.rows}</>:`${item.footprint.cols} × ${item.footprint.rows}`}</small>
               </button>;
             })}{!visibleInventory.length&&<p className="land-empty">{t('Your next discoveries will find a home here. Return to the desk to continue your route.','Tus próximos descubrimientos encontrarán un hogar aquí. Vuelve al desk para continuar tu ruta.')}</p>}</div>
+            {!isDemo&&world?.season&&<div className="land-season" aria-label={isSpanish()?world.season.name.es:world.season.name.en}><span className="land-eyebrow">{t('SEASON','TEMPORADA')}</span><h4>{isSpanish()?world.season.name.es:world.season.name.en}<small>{world.season.earned} / {world.season.total}</small></h4><p>{isSpanish()?world.season.rule.es:world.season.rule.en}</p>{world.season.complete?<p className="land-season-next"><Check size={12}/>{t('Season complete.','Temporada completa.')}</p>:world.season.next&&items.get(world.season.next)&&<p className="land-season-next"><Sprout size={12}/>{t('Next piece','Siguiente pieza')}: {itemName(items.get(world.season.next)!)}</p>}</div>}
             <div className="land-collection-footer">{isDemo?<><span><Compass size={16}/>{t('Your practice island','Tu isla de práctica')}</span><p>{t('Try every piece. This layout stays in this browser, separate from your earned collection.','Prueba todas las piezas. Este diseño se guarda en este navegador, separado de tu colección ganada.')}</p><button className="land-text-link" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}}>{t('Open my earned island','Abrir mi isla ganada')} <ArrowLeft size={14} style={{transform:'rotate(180deg)'}}/></button></>:<><span><Sparkles size={16}/>{t('Built with discipline','Construida con disciplina')}</span><p>{t('Keep learning and reviewing your decisions to grow your collection.','Sigue aprendiendo y revisando tus decisiones para hacer crecer tu colección.')}</p><Link className="land-text-link" to="/agentic-world/bobby">{t('Continue my discovery route','Continuar mi ruta de descubrimiento')}</Link></>}</div>
           </div>}
           {libraryOpen && selectedItem && selected && <div className="land-selected-detail"><div><span className="land-eyebrow">{selectedPlacement?t('ON YOUR ISLAND','EN TU ISLA'):selected.state==='seed'?t('SEED','SEMILLA'):t('BLUEPRINT','PLANO')}</span><h3>{itemName(selectedItem)}</h3><p>{footprint(selectedItem,draft?.orientation).cols} × {footprint(selectedItem,draft?.orientation).rows} {t('tiles','casillas')}</p>{selected.state==='seed'&&selected.review&&<p className="land-thesis">{seedLine(selected.review)}</p>}{selected.state==='seed'&&!selected.review&&<p>{t('This seed blooms when you review its thesis.','Esta semilla florece cuando revisas su tesis.')}</p>}{selectedPlacement&&!canMove&&<p>{t('Moving saved pieces is coming soon.','Mover piezas sincronizadas estará disponible pronto.')}</p>}</div><div className="land-selected-actions">{selected.state==='seed'?<button className="land-primary" disabled={editingBlocked||Boolean(draft)||!canClose||!selected.review?.ready} onClick={()=>void closeThesis(selected)}>{busy?<LoaderCircle size={17} className="animate-spin"/>:<Sprout size={17}/>} {selected.review?.ready?t('Review thesis','Revisar tesis'):t('Growing','Creciendo')}</button>:<button className="land-primary" disabled={editingBlocked||Boolean(draft)||Boolean(selectedPlacement&&!canMove)} onClick={()=>startDraft(selected)}>{selectedPlacement?<Move size={17}/>:<Plus size={17}/>} {selectedPlacement?t('Move','Mover'):t('Build','Construir')}</button>}{selectedPlacement&&!draft&&<button className="land-subtle" disabled={editingBlocked} onClick={()=>void returnPiece()}>{t('Store','Guardar')}</button>}</div></div>}

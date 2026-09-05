@@ -27,6 +27,13 @@ export type PlantKind = (typeof PLANT_KINDS)[number];
 export const MAX_DAILY_AWARDS = 3;
 /** Kinds the daily cap does not count: each is already limited to one per seed, after the review window. */
 export const DAILY_CAP_EXEMPT: ReadonlySet<AwardKind> = new Set<AwardKind>(['thesis_closed']);
+/**
+ * Paid on top of thesis_closed when the thesis was EXECUTED on Base between
+ * the read and the review: a confirmed swap of the thesis' asset, in its
+ * direction, by the reviewer's own wallet. Process, not volume — one swap
+ * executes at most one thesis and a swap without a thesis pays nothing.
+ */
+export const EXECUTION_BONUS = { xp: 10, aura: 4 } as const;
 
 export interface ProgressCounters {
   xp: number;

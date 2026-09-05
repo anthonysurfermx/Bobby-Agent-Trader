@@ -11,7 +11,7 @@ import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, LEVEL_TONE, companionName, getCompanion, getVibe, levelFor, nextLevelFor, tintFor, toolArt, toolHasArt, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
 import { isSpanish, pick, t } from '@/lib/companions/i18n';
-import { levelProgress, progressStore, useProgress } from '@/lib/companions/progress';
+import { levelProgress, progressStore, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import RiskNotice from './RiskNotice';
@@ -257,7 +257,7 @@ export default function CompanionDesk() {
     // number shown is what the daily cap ACTUALLY granted. The verdict rides
     // along as the thesis the seed will be reviewed against in Trader Land.
     const level = (v: number | null) => (v !== null && Number.isFinite(v) && v > 0 ? v : null);
-    const thesis = { symbol: snap.symbol, isEquity: snap.isEquity, direction: a.direction === 'long' || a.direction === 'short' ? a.direction : 'none' as const, price: level(a.price), entry: level(a.entry), stop: level(a.stop), target: level(a.target) };
+    const thesis: ThesisSnapshot = { symbol: snap.symbol, isEquity: snap.isEquity, direction: a.direction === 'long' ? 'long' : a.direction === 'short' ? 'short' : 'none', price: level(a.price), entry: level(a.entry), stop: level(a.stop), target: level(a.target) };
     const result = progressStore.awardDiscipline(noTradeNow ? 'no_trade_respected' : 'read_complete', new Date(), thesis);
     if (noTradeNow) setNoTrade({ symbol: snap.symbol, reason: noTradeReason(a), xp: result.awarded });
     if (result.evolvedTo) setEvolution(result.evolvedTo);
