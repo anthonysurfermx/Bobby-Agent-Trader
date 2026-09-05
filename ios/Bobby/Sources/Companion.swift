@@ -336,7 +336,7 @@ final class CompanionStore: ObservableObject {
     /// Returns the points actually awarded — 0 when the daily cap already
     /// rejected the award. The UI must show THIS number, never the intent.
     @discardableResult
-    func awardDiscipline(_ points: Int, kind: String = "read_complete", now: Date = Date()) -> Int {
+    func awardDiscipline(_ points: Int, kind: String = "read_complete", now: Date = Date(), thesisReadId: String? = nil) -> Int {
         let cal = Calendar.current
 
         // Daily cap
@@ -381,7 +381,7 @@ final class CompanionStore: ObservableObject {
         }
         defaults.set(now, forKey: Key.lastDay)
         // Queue for the server (same rules there; it is the authority once signed in).
-        pendingAwards.append(PendingAward(id: UUID().uuidString.lowercased(), kind: kind, at: ISO8601DateFormatter().string(from: now), tzOffsetMin: -TimeZone.current.secondsFromGMT(for: now) / 60))
+        pendingAwards.append(PendingAward(id: UUID().uuidString.lowercased(), kind: kind, at: ISO8601DateFormatter().string(from: now), tzOffsetMin: -TimeZone.current.secondsFromGMT(for: now) / 60, thesisReadId: thesisReadId))
         return points
     }
 }

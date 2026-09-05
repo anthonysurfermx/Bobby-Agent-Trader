@@ -320,7 +320,7 @@ final class BobbyViewModel: ObservableObject {
             // earns more because restraint is the behavior Bobby is teaching.
             // awardedXP is what the daily cap ACTUALLY granted — the UI shows
             // that number, never the intent.
-            let awardedXP = companions.awardDiscipline(answer.isNoTrade ? 20 : 10, kind: answer.isNoTrade ? "no_trade_respected" : "read_complete")
+            let awardedXP = companions.awardDiscipline(answer.isNoTrade ? 20 : 10, kind: answer.isNoTrade ? "no_trade_respected" : "read_complete", thesisReadId: answer.thesisReadId)
             if awardedXP > 0 { streak = companions.disciplineStreak }
             Task { await ProgressSync.shared.sync(store: companions, profile: profile) }
             if answer.isNoTrade {

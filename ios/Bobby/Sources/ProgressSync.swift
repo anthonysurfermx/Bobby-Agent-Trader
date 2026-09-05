@@ -9,6 +9,13 @@ struct PendingAward: Codable, Equatable {
     let kind: String      // read_complete | no_trade_respected | thesis_closed
     let at: String        // ISO-8601
     let tzOffsetMin: Int
+    var thesisReadId: String? = nil
+
+    var requestBody: [String: Any] {
+        var body: [String: Any] = ["id": id, "kind": kind, "at": at, "tzOffsetMin": tzOffsetMin]
+        if let thesisReadId { body["thesisReadId"] = thesisReadId }
+        return body
+    }
 }
 
 struct ServerProgress {
@@ -53,7 +60,7 @@ final class ProgressSync {
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 var profileBody: [String: Any] = ["companionId": store.companionId as Any, "onboarded": profile.onboarded, "riskNoticeVersion": profile.riskNoticeVersion]
                 if store.syncedAt == nil, store.disciplineXP > 0 { profileBody["localXpClaim"] = store.disciplineXP }
-                let events = pending.map { ["id": $0.id, "kind": $0.kind, "at": $0.at, "tzOffsetMin": $0.tzOffsetMin] as [String: Any] }
+                let events = pending.map(\.requestBody)
                 req.httpBody = try JSONSerialization.data(withJSONObject: ["platform": platform, "events": events, "profile": profileBody])
             }
             let (data, response) = try await URLSession.shared.data(for: req)

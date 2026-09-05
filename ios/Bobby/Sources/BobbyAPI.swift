@@ -52,6 +52,7 @@ struct MarketSnapshot {
 
 struct BobbyAnswer {
     var symbol: String
+    var thesisReadId: String?
     var price: Double?
     var trend: String?
     var momentum: String?
@@ -327,7 +328,7 @@ enum BobbyAPI {
         return try? await json(query) as? [String: Any]
     }
 
-    static func json(_ path: String, method: String = "GET", body: [String: Any]? = nil, allowedStatus: ClosedRange<Int>? = nil) async throws -> Any {
+    static func json(_ path: String, method: String = "GET", body: [String: Any]? = nil, allowedStatus: ClosedRange<Int>? = nil, accessToken: String? = nil) async throws -> Any {
         // NOT appendingPathComponent: it percent-encodes '?' and turns every
         // query string into a 404.
         guard let url = URL(string: base.absoluteString + "/" + path) else {
@@ -336,6 +337,7 @@ enum BobbyAPI {
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.timeoutInterval = 60
+        if let accessToken { req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization") }
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -435,15 +437,29 @@ enum BobbyAPI {
 
     /// The full Bobby brain: regime, technicals, signal, trade plan.
     static func debate(_ symbol: String) async -> BobbyAnswer {
-        var a = BobbyAnswer(symbol: symbol)
+        let token = await AccountSession.shared.accessToken()
+        var args: [String: Any] = ["symbol": symbol]
+        if token != nil { args["recordThesisRead"] = true }
         guard let obj = try? await json("api/voice-tool", method: "POST",
-                                        body: ["tool": "run_debate", "args": ["symbol": symbol]]) as? [String: Any]
-        else { return a }
+                                        body: ["tool": "run_debate", "args": args],
+                                        allowedStatus: 200...299, accessToken: token) as? [String: Any]
+        else { return BobbyAnswer(symbol: symbol) }
+        return decodeDebate(obj, symbol: symbol)
+    }
+
+    static func decodeDebate(_ obj: [String: Any], symbol: String) -> BobbyAnswer {
+        var a = BobbyAnswer(symbol: symbol)
 
         // A server-side failure ships as { error: ... } (often alongside the
         // global regime). That is NOT an answer — return the empty state so
         // the UI renders an honest error instead of a NO TRADE.
         if obj["error"] != nil { return a }
+
+        // Only carry the server's origin reference; eligibility remains server-owned.
+        if let proof = obj["thesis_read"] as? [String: Any],
+           let id = proof["id"] as? String, UUID(uuidString: id) != nil {
+            a.thesisReadId = id
+        }
 
         a.regime = obj["regime"] as? String
         if let m = obj["market"] as? [String: Any] { a.price = m["price"] as? Double }
