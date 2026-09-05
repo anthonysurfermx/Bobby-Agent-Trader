@@ -1,0 +1,36 @@
+{
+  "status": "DEPLOYMENT_VERIFIED_NOT_EXECUTION_ADMISSION",
+  "checkedAt": "2026-09-05T15:19:03.530Z",
+  "chainId": 8453,
+  "blockNumber": "50916097",
+  "blockHash": "0x2971a76b4b707fa72f11e8f26b95f320e02c0fd24d4cf9ca86d374507adb9098",
+  "deployments": [
+    {
+      "role": "factory",
+      "address": "0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef",
+      "runtimeCodeHash": "0x4961963494e47f363617ab9a0f3999a28b33c519e51392952db06350cce700bd"
+    },
+    {
+      "role": "router",
+      "address": "0x698Cb2b6dd822994581fEa6eA4Fc755d1363A92F",
+      "runtimeCodeHash": "0xfedc4e21e1097b0ec1b4f1aa901cf645c22f9e5d297727b0f37275ee1d083df4"
+    },
+    {
+      "role": "quoter",
+      "address": "0x514c8B5f54112481E28028F1166Bd78501089259",
+      "runtimeCodeHash": "0x4c4c43e0024343e65597f0f0a1b829aaf69e5a6c0a0148fb63d28ff5730be551"
+    }
+  ],
+  "routerFactory": "0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef",
+  "quoterFactory": "0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef",
+  "wrappedNative": "0x4200000000000000000000000000000000000006",
+  "tickSpacings": [
+    1,
+    50,
+    100,
+    200,
+    2000,
+    500,
+    10
+  ]
+}

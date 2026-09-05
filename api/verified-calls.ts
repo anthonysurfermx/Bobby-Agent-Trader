@@ -9,6 +9,8 @@
 // ============================================================
 import { Contract, Interface, JsonRpcProvider, formatUnits } from 'ethers';
 
+import { rpcErrorMessage } from './_lib/rpc-redact.js';
+
 export const config = { maxDuration: 30 };
 
 // Dedicated env names: the shared BASE_SEPOLIA_TRACK_RECORD_ADDRESS points
@@ -191,7 +193,7 @@ export default async function handler(req: any, res: any) {
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     return res.status(200).json(body);
   } catch (e) {
-    console.error('[VerifiedCalls]', e);
+    console.error('[VerifiedCalls]', rpcErrorMessage(e));
     return res.status(502).json({ error: 'onchain read failed' });
   }
 }

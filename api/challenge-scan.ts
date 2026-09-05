@@ -9,6 +9,8 @@
 // ============================================================
 import { Contract, Interface, JsonRpcProvider } from 'ethers';
 
+import { rpcErrorMessage } from './_lib/rpc-redact.js';
+
 export const config = { maxDuration: 15 };
 
 const RPC = process.env.VERIFIED_CALLS_RPC_URL || 'https://base-sepolia-rpc.publicnode.com';
@@ -124,7 +126,7 @@ export default async function handler(req: any, res: any) {
       });
     }
   } catch (e) {
-    console.error('[ChallengeScan]', e);
+    console.error('[ChallengeScan]', rpcErrorMessage(e));
     return res.status(502).json({ error: 'scan failed' });
   }
 }

@@ -35,6 +35,7 @@ import { getClientIpKey } from './_lib/rate-limit.js';
 import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
 import { walletSessionFromRequest } from './_lib/wallet-session.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+import { buildCycleRow, cycleProvenance, type CycleProvenance } from './_lib/cycle-provenance.js';
 import { requireWritesOpen } from './_lib/control.js';
 
 export const config = { maxDuration: 120 };
@@ -384,7 +385,7 @@ async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: str
 
   try {
     const res = await fetch(
-      `${url}/rest/v1/agent_cycles?select=llm_reasoning,trades_executed,trades_successful,total_usd_deployed,status&order=started_at.desc&limit=${limit}`,
+      `${url}/rest/v1/agent_cycles?visibility=eq.public&select=llm_reasoning,trades_executed,trades_successful,total_usd_deployed,status&order=started_at.desc&limit=${limit}`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` } },
     );
     if (!res.ok) return [];
@@ -936,7 +937,8 @@ async function buildMemoryFollowUp(lastGreeting: LastGreeting): Promise<MemoryFo
 }
 
 // ---- Supabase logging ----
-async function logToSupabase(data: Record<string, unknown>) {
+// BP-09: provenance is a required argument — no branch can log a cycle without saying whose it is.
+async function logToSupabase(provenance: CycleProvenance, data: Record<string, unknown>) {
   const url = bobbyDbUrl();
   const key = bobbyServiceKey();
   if (!url || !key) return;
@@ -950,7 +952,7 @@ async function logToSupabase(data: Record<string, unknown>) {
         Authorization: `Bearer ${key}`,
         Prefer: 'return=minimal',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(buildCycleRow(data, provenance)),
     });
   } catch (err) {
     console.warn('[Agent] Supabase log failed:', err);
@@ -975,6 +977,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // the cycle row logged in Phase 7; a confirmed receipt then updates that row.
   const cycleId = randomUUID();
   const hasOperatorAuth = isInternalRequest(req);
+  // BP-09: decided once, from the authorisation, for every cycle row this run writes.
+  const provenance = cycleProvenance(isManual, walletAddress, !isManual || hasOperatorAuth);
   if (!isManual && !requireInternalAuth(req, res)) return;
   if (walletAddress && !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
     return res.status(400).json({ error: 'Invalid wallet address' });
@@ -1033,7 +1037,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         llm_reasoning: `Halted: ${breaker.reason}. ${breaker.detail || ''}`,
         status: 'completed', // schema: running | completed | failed — the halt is in llm_reasoning
       };
-      await logToSupabase(haltResult);
+      await logToSupabase(provenance, haltResult);
       res.setHeader('Cache-Control', 'no-store');
       return res.status(200).json({
         ok: true,
@@ -1078,7 +1082,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           : 'No actionable signals this cycle.',
         status: 'completed',
       };
-      await logToSupabase(result);
+      await logToSupabase(provenance, result);
 
       // Still generate greetings with Polymarket data even if no stock signals
       const allProfiles0 = await fetchAdvisorProfiles();
@@ -1246,7 +1250,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Attach metacognition data to result for frontend
     const metacognition = { winRate, isSafeMode, mood, confidenceThreshold: isSafeMode ? 0.8 : 0.7 };
 
-    await logToSupabase(result);
+    await logToSupabase(provenance, result);
 
     // Phase 7: Generate personalized greetings for advisors whose interval matches
     console.log('[Agent] Generating greetings...');
@@ -1320,7 +1324,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('[Agent] Fatal:', msg);
 
-    await logToSupabase({
+    await logToSupabase(provenance, {
       started_at: startedAt,
       completed_at: new Date().toISOString(),
       signals_found: 0,

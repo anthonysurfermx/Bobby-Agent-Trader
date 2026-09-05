@@ -356,4 +356,295 @@ await check('r3 P2 hardness-test: levelGeometryError is the same rule the regist
   assert.match(levelGeometryError('sideways', 100, 110, 90) || '', /long or short/);
 });
 
+// ---------- BP-09: cycle provenance is decided by the authorisation, never by missing columns ----------
+await check('BP-09 cycleProvenance: wallet run private+owner, cron public, manual-without-operator private', async () => {
+  const { cycleProvenance, buildCycleRow } = await import('../api/_lib/cycle-provenance.js');
+  assert.deepEqual(cycleProvenance(true, '0xAbC', false), { owner_address: '0xabc', visibility: 'private' });
+  assert.deepEqual(cycleProvenance(true, '0xAbC', true), { owner_address: '0xabc', visibility: 'private' }, 'a wallet run is private even with operator auth');
+  assert.deepEqual(cycleProvenance(false, '', true), { owner_address: null, visibility: 'public' });
+  assert.deepEqual(cycleProvenance(true, '', false), { owner_address: null, visibility: 'private' });
+  assert.deepEqual(cycleProvenance(true, '', true), { owner_address: null, visibility: 'public' }, 'an operator-authorised manual run is a protocol cycle');
+  const row = buildCycleRow({ status: 'completed', owner_address: '0xspoof', visibility: 'public' }, cycleProvenance(true, '0xReal', false));
+  assert.deepEqual([row.owner_address, row.visibility], ['0xreal', 'private'], 'provenance always wins over whatever the data carried');
+});
+await check('BP-09 agent-run: every cycle write passes provenance; the history read is public-only', async () => {
+  const src = await readFile(new URL('../api/agent-run.ts', import.meta.url), 'utf8');
+  const calls = src.match(/logToSupabase\(/g) ?? [];
+  assert.equal(calls.length, 5, 'four call sites + the definition');
+  assert.equal((src.match(/logToSupabase\(provenance, /g) ?? []).length, 4, 'all four call sites carry the provenance');
+  assert.match(src, /async function logToSupabase\(provenance: CycleProvenance, data/);
+  assert.match(src, /body: JSON\.stringify\(buildCycleRow\(data, provenance\)\)/);
+  assert.match(src, /const provenance = cycleProvenance\(isManual, walletAddress, !isManual \|\| hasOperatorAuth\)/);
+  assert.match(src, /agent_cycles\?visibility=eq\.public&select=llm_reasoning/);
+  const cycle = await readFile(new URL('../api/bobby-cycle.ts', import.meta.url), 'utf8');
+  assert.match(cycle, /sbInsert\('agent_cycles', \{\n\s+started_at: new Date\(\)\.toISOString\(\),\n\s+status: 'running',\n\s+visibility: 'public'/);
+  // Third round (BP-09 lens): the scan must see EVERY reference to the base table — the
+  // `agent_cycles?query` form and the `sbQuery('agent_cycles', 'query')` form alike — so a
+  // dropped filter in any reader fails here. Each reference is scoped if `visibility=eq.public`
+  // appears in the same statement (up to the next `;`).
+  let scopedReads = 0;
+  for (const f of ['api/harness-events.ts', 'api/protocol-heartbeat.ts', 'api/bobby-intel.ts', 'api/conviction-tiers.ts']) {
+    // comments stripped; a reference is a quoted table name or a /rest/v1/ path segment
+    const t = (await readFile(new URL(`../${f}`, import.meta.url), 'utf8')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    for (const m of t.matchAll(/(?<=['"`/])agent_cycles(?!_public)/g)) {
+      const statement = t.slice(m.index!, t.indexOf(';', m.index!) + 1);
+      assert.ok(statement.includes('visibility=eq.public'), `${f}: unscoped agent_cycles read: ${statement.slice(0, 120)}`);
+      scopedReads += 1;
+    }
+  }
+  assert.ok(scopedReads >= 4, `expected the four readers' agent_cycles references to be found, saw ${scopedReads}`);
+});
+
+// ---------- BP-04: malformed dynamic controls fail CLOSED; env freeze is additive ----------
+await check('BP-04 parseControlRecord: only explicit booleans open writes', async () => {
+  const { parseControlRecord } = await import('../api/_lib/control.js');
+  assert.equal(parseControlRecord({ write_freeze: false, canary: false }, 'edge-config').writeFreeze, false, 'well-formed explicit false opens');
+  for (const bad of [null, [], 'x', 42, {}, { write_freeze: false }, { write_freeze: 'false', canary: false }, { write_freeze: false, canary: 'no' }, { write_freeze: 0, canary: false }, { write_freeze: false, canary: false, note: 7 }]) {
+    const c = parseControlRecord(bad, 'edge-config');
+    assert.equal(c.writeFreeze, true, `malformed ${JSON.stringify(bad)} must freeze`);
+    assert.equal(c.canary, true); assert.equal(c.source, 'error');
+  }
+});
+await check('BP-04 getBobbyControl: dynamic source decides; env flags can only ADD a freeze', async () => {
+  const control = await import('../api/_lib/control.js');
+  const prev = { src: process.env.BOBBY_CONTROL_SOURCE, ec: process.env.EDGE_CONFIG, fz: process.env.PROTOCOL_CUTOVER_FREEZE };
+  process.env.BOBBY_CONTROL_SOURCE = 'edge-config';
+  process.env.EDGE_CONFIG = 'https://edge-config.vercel.com/ecfg_test?token=tok';
+  const realFetch = globalThis.fetch;
+  const withRecord = (body: unknown, status = 200) => { globalThis.fetch = (async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })) as typeof fetch; control.resetBobbyControlCache(); };
+  try {
+    delete process.env.PROTOCOL_CUTOVER_FREEZE;
+    withRecord({ write_freeze: false, canary: false }); assert.equal((await control.getBobbyControl()).writeFreeze, false, 'explicit false opens');
+    withRecord({}); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'missing fields freeze');
+    withRecord(null); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'null freezes');
+    withRecord([]); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'array freezes');
+    withRecord({ write_freeze: 'false', canary: false }); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'string-valued freezes');
+    withRecord({ write_freeze: false, canary: false }, 500); assert.equal((await control.getBobbyControl()).writeFreeze, true, 'unreadable freezes');
+    process.env.PROTOCOL_CUTOVER_FREEZE = 'true';
+    withRecord({ write_freeze: false, canary: false }); const c = await control.getBobbyControl();
+    assert.equal(c.writeFreeze, true, 'env emergency freeze overrides a well-formed open'); assert.match(String(c.note), /env emergency freeze/);
+    delete process.env.PROTOCOL_CUTOVER_FREEZE;
+    withRecord({ write_freeze: true, canary: false }); process.env.PROTOCOL_CUTOVER_FREEZE = 'false';
+    assert.equal((await control.getBobbyControl()).writeFreeze, true, 'env "false" never opens a dynamic freeze');
+    // Third round (BP-04 residual): the spellings the ops docs use must freeze too — the brake only ever adds a freeze.
+    for (const spelling of ['1', 'TRUE', 'yes', 'on']) {
+      process.env.PROTOCOL_CUTOVER_FREEZE = spelling;
+      withRecord({ write_freeze: false, canary: false });
+      assert.equal((await control.getBobbyControl()).writeFreeze, true, `PROTOCOL_CUTOVER_FREEZE=${spelling} freezes`);
+    }
+    delete process.env.PROTOCOL_CUTOVER_FREEZE; process.env.BOBBY_WRITE_FREEZE = '1';
+    withRecord({ write_freeze: false, canary: false });
+    assert.equal((await control.getBobbyControl()).writeFreeze, true, 'BOBBY_WRITE_FREEZE=1 (documented) freezes');
+    delete process.env.BOBBY_WRITE_FREEZE;
+    withRecord({ write_freeze: false, canary: false });
+    assert.equal((await control.getBobbyControl()).writeFreeze, false, 'with no env flag the well-formed open stands');
+  } finally {
+    globalThis.fetch = realFetch; control.resetBobbyControlCache();
+    if (prev.src === undefined) delete process.env.BOBBY_CONTROL_SOURCE; else process.env.BOBBY_CONTROL_SOURCE = prev.src;
+    if (prev.ec === undefined) delete process.env.EDGE_CONFIG; else process.env.EDGE_CONFIG = prev.ec;
+    if (prev.fz === undefined) delete process.env.PROTOCOL_CUTOVER_FREEZE; else process.env.PROTOCOL_CUTOVER_FREEZE = prev.fz;
+  }
+});
+
+// ---------- BP-08: redemption bound to the client and the request, with a fulfilment lifecycle ----------
+await check('BP-08 challenge lifecycle: secret + identical request claim; replay returns the stored result; failure stays retryable', async () => {
+  const ch = await import('../api/_lib/mcp-challenges.js');
+  const realFetch = globalThis.fetch;
+  // A tiny PostgREST emulation for mcp_payment_challenges honouring the filters the library relies on.
+  const rows: Record<string, any>[] = [];
+  const parseFilter = (u: URL) => {
+    const f: Record<string, string> = {}; for (const [k, v] of u.searchParams) f[k] = v; return f;
+  };
+  const matches = (row: Record<string, any>, f: Record<string, string>) => {
+    for (const [k, v] of Object.entries(f)) {
+      if (k === 'select' || k === 'on_conflict') continue;
+      if (k === 'or') {
+        const ok = (v.includes('status.eq.pending') && row.status === 'pending') || (v.includes('status.eq.retryable_failure') && row.status === 'retryable_failure')
+          || (v.includes('status.eq.in_progress') && row.status === 'in_progress' && row.consumed_at < decodeURIComponent(v.match(/consumed_at\.lt\.([^)]+)/)?.[1] ?? ''));
+        if (!ok) return false; continue;
+      }
+      const [op, ...rest] = v.split('.'); const val = decodeURIComponent(rest.join('.'));
+      if (op === 'eq' && String(row[k]) !== val) return false;
+      if (op === 'gt' && !(String(row[k]) > val)) return false;
+    }
+    return true;
+  };
+  globalThis.fetch = (async (input: any, init?: any) => {
+    const u = new URL(typeof input === 'string' ? input : input.url); const method = (init?.method || 'GET').toUpperCase();
+    const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
+    if (!u.pathname.includes('mcp_payment_challenges')) return json([]);
+    const f = parseFilter(u);
+    // Third round: challenge_id is a uuid column in production — a non-uuid key is a 400 (22P02), never a miss.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (f.challenge_id?.startsWith('eq.') && !UUID.test(decodeURIComponent(f.challenge_id.slice(3)))) return json({ code: '22P02', message: 'invalid input syntax for type uuid' }, 400);
+    if (method === 'POST') { const r = { challenge_id: crypto.randomUUID(), status: 'pending', expires_at: new Date(Date.now() + 600_000).toISOString(), attempts: 0, ...JSON.parse(init.body) }; rows.push(r); return json([r]); }
+    if (method === 'PATCH') { const patch = JSON.parse(init.body); const hit = rows.filter((r) => matches(r, f)); hit.forEach((r) => Object.assign(r, patch)); return json(hit); }
+    return json(rows.filter((r) => matches(r, f)));
+  }) as typeof fetch;
+  try {
+    const args = { thread_id: 't1', language: 'en' };
+    const reqHash = ch.requestHashFor('bobby_judge', args);
+    assert.equal(ch.requestHashFor('bobby_judge', { language: 'en', thread_id: 't1' }), reqHash, 'canonical: key order does not matter');
+    assert.notEqual(ch.requestHashFor('bobby_judge', { ...args, language: 'es' }), reqHash, 'different terms, different hash');
+    const issued = await ch.createChallenge('bobby_judge', '1000', reqHash, 'agent-x');
+    assert.match(issued.clientSecret, /^[a-f0-9]{64}$/); assert.equal(rows[0].client_secret_hash, ch.sha256Hex(issued.clientSecret), 'only the hash is stored');
+    // an unrelated client with the (public) tx hash but not the secret cannot redeem
+    assert.equal((await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', 'a'.repeat(64), reqHash)).outcome, 'refused');
+    assert.equal(rows[0].status, 'pending', 'a refused claim consumes nothing');
+    // the right client, but different terms → refused
+    assert.equal((await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', issued.clientSecret, ch.requestHashFor('bobby_judge', { ...args, language: 'es' }))).outcome, 'refused');
+    // the right client, same request → claimed (in_progress)
+    const claim = await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', issued.clientSecret, reqHash);
+    assert.equal(claim.outcome, 'claimed'); assert.equal(rows[0].status, 'in_progress');
+    // tool failed → retryable, then the same client retries and is claimed again
+    await ch.failChallenge(issued.challengeId, 'upstream 502'); assert.equal(rows[0].status, 'retryable_failure');
+    assert.equal((await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', issued.clientSecret, reqHash)).outcome, 'claimed', 'a failed fulfilment does not cost a second payment');
+    // tool succeeded → completed; a retry by the same client is an idempotent replay with the stored result, no re-execution
+    await ch.completeChallenge(issued.challengeId, { verdict: 'ok' }); assert.equal(rows[0].status, 'completed');
+    const replay = await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', issued.clientSecret, reqHash);
+    assert.deepEqual(replay, { outcome: 'replay', result: { verdict: 'ok' } });
+    // a stranger cannot even replay
+    assert.equal((await ch.claimChallenge(issued.challengeId, '0xtx', '0xpayer', 'b'.repeat(64), reqHash)).outcome, 'refused');
+  } finally { globalThis.fetch = realFetch; }
+});
+await check('BP-08 transports: both issue with the request hash + secret and redeem through claim/complete/fail', async () => {
+  for (const f of ['api/mcp-http.ts', 'api/mcp-bobby.ts']) {
+    const src = await readFile(new URL(`../${f}`, import.meta.url), 'utf8');
+    assert.ok(!src.includes('atomicConsumeChallenge'), `${f}: the unbound consume is gone`);
+    assert.match(src, /requestHashFor\(toolName, /, `${f}: request hash at issuance`);
+    assert.match(src, /createChallenge\(\s*toolName,\s*fee\.feeWei,\s*requestHash,/, `${f}: challenge bound to the request`);
+    assert.match(src, /x-challenge-secret/, `${f}: secret header`);
+    assert.match(src, /claimChallenge\(effectiveChallengeId, txHash, verifiedPayment\.payer, clientSecret, requestHash\)/, `${f}: claim`);
+    assert.match(src, /challengeIdBytes32: challengeIdToBytes32\(challengeId\)/, `${f}: the 402 publishes the bytes32 encoding`);
+    assert.match(src, /claim\.outcome === 'replay'/, `${f}: replay path`);
+    assert.match(src, /failChallenge\(claimedChallengeId/, `${f}: failure path`);
+    assert.match(src, /completeChallenge\(claimedChallengeId, result\)/, `${f}: completion path`);
+  }
+});
+
+// ---------- BP-10: a failed registry read never authorises a write; owner changes need a transfer ----------
+await check('BP-10 register: storage read failure → 502 and no write; owner change → 409 and no write', async () => {
+  process.env.BOBBY_SUPABASE_URL = 'https://dummy.supabase.co';
+  const { default: register } = await import('../api/agents/register.js');
+  const realFetch = globalThis.fetch; const writes: string[] = [];
+  const body = { agentId: 'agent-1', owner: '0x1111111111111111111111111111111111111111', name: 'A' };
+  try {
+    globalThis.fetch = (async (input: any, init?: any) => {
+      const url = typeof input === 'string' ? input : input.url; const method = (init?.method || 'GET').toUpperCase();
+      if (method !== 'GET' && /hardness_agents|rpc\/hardness_/.test(url)) writes.push(`${method} ${url}`); // registry writes only (the rate limiter's api_cache counter is not one)
+      if (url.includes('hardness_agents') && method === 'GET') return new Response('boom', { status: 500 });
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    let { res, state } = recorder();
+    await register(req('POST', {}, body, INTERNAL), res);
+    assert.equal(state.status, 502, JSON.stringify(state.body)); assert.deepEqual(writes, [], 'no write after a failed read');
+    globalThis.fetch = (async (input: any, init?: any) => {
+      const url = typeof input === 'string' ? input : input.url; const method = (init?.method || 'GET').toUpperCase();
+      if (method !== 'GET' && /hardness_agents|rpc\/hardness_/.test(url)) writes.push(`${method} ${url}`);
+      if (url.includes('hardness_agents') && method === 'GET') return new Response(JSON.stringify([{ agent_id: 'agent-1', owner_address: '0x2222222222222222222222222222222222222222', row_version: 3 }]), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch;
+    ({ res, state } = recorder());
+    await register(req('POST', {}, body, INTERNAL), res);
+    assert.equal(state.status, 409, JSON.stringify(state.body)); assert.match(String((state.body as any).error), /transfer/); assert.deepEqual(writes, [], 'an owner change through registration writes nothing');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+
+// ---------- BP-13: the final action comes from the effective policy + proof state + validated size; LLM JSON is schema-checked ----------
+{
+  const { default: orchestrate, finalizeAction } = await import('../api/orchestrate.js');
+  const ALL5 = { data_integrity: 5, adversarial_quality: 5, decision_logic: 5, risk_management: 5, calibration_alignment: 5, novelty: 5 };
+  const ALL1 = { data_integrity: 1, adversarial_quality: 1, decision_logic: 1, risk_management: 1, calibration_alignment: 1, novelty: 1 };
+  const baseFetch = globalThis.fetch;
+  const prediction = { symbol: 'BTC', direction: 'long', entry: 100, target: 120, stop: 90, thesis: 'structured thesis with levels' };
+  /** Per-role model answers + an optional agent row; records session patches. */
+  const scenario = (opts: { judge?: Record<string, number>; cio?: unknown; agent?: Record<string, unknown> | null }) => {
+    const patches: Array<Record<string, unknown>> = [];
+    globalThis.fetch = (async (input: any, init?: any) => {
+      const url = typeof input === 'string' ? input : input.url; const method = (init?.method || 'GET').toUpperCase();
+      const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
+      if (url.includes('api.openai.com')) {
+        const system = String(JSON.parse(String(init?.body)).messages[0].content);
+        let out: unknown;
+        if (system.includes('Alpha Hunter')) out = { thesis: 'bullish structure', evidence: ['e1'], catalyst: 'c', conviction: 8 };
+        else if (system.includes('Red Team')) out = { counterpoints: ['x'], biases_detected: ['recency'], failure_modes: ['gap'] };
+        else if (system.includes('Bobby CIO')) out = opts.cio ?? { recommendation: 'execute', conviction: 8, rationale: 'ok', adjusted_entry: 100, adjusted_stop: 90 };
+        else out = { dimensions: opts.judge ?? ALL5, biases_detected: [], recommendation: 'execute', rationale: 'r', red_flags: [] };
+        return json({ choices: [{ message: { content: JSON.stringify(out) } }] });
+      }
+      if (url.includes('/rest/v1/hardness_agents') && method === 'GET') return json(opts.agent ? [opts.agent] : []);
+      if (url.includes('/rest/v1/hardness_agent_sessions') && method === 'PATCH') { patches.push(JSON.parse(String(init?.body))); return json([]); }
+      if (url.includes('/rest/v1/hardness_agent_sessions')) return json([{ session_id: 'x' }]);
+      return baseFetch(input, init);
+    }) as typeof fetch;
+    return patches;
+  };
+  const run = async (body: Record<string, unknown>) => { const { res, state } = recorder(); await orchestrate(req('POST', {}, body, INTERNAL), res); return state; };
+  const agentRow = (risk_policy_json: Record<string, unknown>) => ({ agent_id: 'a1', owner_address: '0x1111111111111111111111111111111111111111', name: 'A', risk_policy_json, status: 'active', row_version: 1 });
+  try {
+    await check('BP-13 no validated size → analysis only: a top score never becomes executable advice; session is `analysis`, not `proved`', async () => {
+      const patches = scenario({});
+      const s = await run({ agentId: 'anonymous', prediction });
+      assert.equal(s.status, 200, JSON.stringify(s.body)); const b = s.body as any;
+      assert.equal(b.hardnessScore, 100); assert.equal(b.modelAction, 'execute');
+      assert.equal(b.decision, 'publish_only'); assert.equal(b.sizing.executable, false); assert.equal(b.sizing.notionalUsd, null);
+      assert.match(b.finalActionReasons.join(' '), /no validated quantity/);
+      assert.equal(b.proofState, 'analysis'); assert.equal(patches.at(-1)?.status, 'analysis');
+    });
+    await check('BP-13 default policy (proof required, advisory): sized + top score → human approval, never execute', async () => {
+      scenario({});
+      const b = (await run({ agentId: 'anonymous', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.sizing.executable, true); assert.equal(b.sizing.notionalUsd, 100);
+      assert.equal(b.decision, 'require_human_approval'); assert.match(b.finalActionReasons.join(' '), /requires on-chain proof; proof state is analysis/);
+    });
+    await check('BP-13 the reproduction: the policy sees the NOTIONAL, not the entry price (BTC at 83000, 0.001 units = $83 under a $1000 cap → execute in auto mode)', async () => {
+      scenario({ agent: agentRow({ mode: 'auto', requireOnchainProof: false, maxNotionalUsd: 1000 }) });
+      const b = (await run({ agentId: 'a1', prediction: { ...prediction, entry: 83000, target: 95000, stop: 78000, quantity: 0.001 } })).body as any;
+      assert.equal(b.policyResult, 'allowed', b.policyReason); assert.equal(b.decision, 'execute'); assert.equal(b.sizing.notionalUsd, 83);
+    });
+    await check('BP-13 reduction: notional above maxNotionalUsd → reduce_size with the reduced notional', async () => {
+      scenario({ agent: agentRow({ mode: 'auto', requireOnchainProof: false, maxNotionalUsd: 50 }) });
+      const b = (await run({ agentId: 'a1', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.policyResult, 'allowed_with_reduction'); assert.equal(b.decision, 'reduce_size'); assert.equal(b.sizing.reducedNotionalUsd, 50);
+    });
+    await check('BP-13 paper mode caps at paper_only; a blocked symbol is reject regardless of score', async () => {
+      scenario({ agent: agentRow({ mode: 'paper', requireOnchainProof: false }) });
+      let b = (await run({ agentId: 'a1', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.decision, 'paper_only');
+      scenario({ agent: agentRow({ mode: 'auto', requireOnchainProof: false, allowedSymbols: ['ETH'] }) });
+      b = (await run({ agentId: 'a1', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.policyResult, 'blocked'); assert.equal(b.decision, 'reject');
+    });
+    await check('BP-13 model output outside the schema aborts the session (502) instead of steering the decision', async () => {
+      const patches = scenario({ cio: { recommendation: 'yolo', conviction: 42 } });
+      const s = await run({ agentId: 'anonymous', prediction: { ...prediction, quantity: 1 } });
+      assert.equal(s.status, 502, JSON.stringify(s.body)); assert.match(String((s.body as any).error), /CIO output rejected/);
+      assert.equal(patches.at(-1)?.status, 'failed');
+      const patches2 = scenario({ judge: { ...ALL5, novelty: 9 } });
+      const s2 = await run({ agentId: 'anonymous', prediction: { ...prediction, quantity: 1 } });
+      assert.equal(s2.status, 502); assert.match(String((s2.body as any).error), /Judge output rejected/); assert.equal(patches2.at(-1)?.status, 'failed');
+    });
+    await check('BP-13 sizing validation: inconsistent quantity/notional → 400; low score with a valid policy → reject', async () => {
+      scenario({});
+      const s = await run({ agentId: 'anonymous', prediction: { ...prediction, quantity: 1, notionalUsd: 500 } });
+      assert.equal(s.status, 400); assert.match(String((s.body as any).error), /does not equal quantity x entry/);
+      scenario({ judge: ALL1, agent: agentRow({ mode: 'auto', requireOnchainProof: false }) });
+      const b = (await run({ agentId: 'a1', prediction: { ...prediction, quantity: 1 } })).body as any;
+      assert.equal(b.hardnessScore, 20); assert.equal(b.decision, 'reject');
+    });
+    await check('BP-13 finalizeAction precedence table', async () => {
+      const policy = (result: string, reason: string, p: Record<string, unknown> = {}) => ({ result, reason, policy: { minHardnessScore: 60, maxNotionalUsd: 1000, allowedSymbols: [], requireJudge: true, requireOnchainProof: false, mode: 'auto', ...p } }) as any;
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed', 'policy_pass'), proofState: 'analysis', executable: true }).action, 'execute');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed', 'policy_pass', { requireOnchainProof: true }), proofState: 'proof_submitted', executable: true }).action, 'require_human_approval', 'a submitted-but-unconfirmed hash is not a proof');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed', 'policy_pass', { requireOnchainProof: true }), proofState: 'proof_confirmed', executable: true }).action, 'execute');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed', 'policy_pass', { requireOnchainProof: true }), proofState: 'proof_failed', executable: true }).action, 'require_human_approval');
+      assert.equal(finalizeAction({ modelAction: 'reduce_size', policy: policy('paper_only', 'paper_mode', { mode: 'paper' }), proofState: 'proof_confirmed', executable: true }).action, 'paper_only');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('allowed_with_reduction', 'max_notional_exceeded'), proofState: 'proof_confirmed', executable: true }).action, 'reduce_size');
+      assert.equal(finalizeAction({ modelAction: 'execute', policy: policy('blocked', 'judge_required'), proofState: 'proof_confirmed', executable: true }).action, 'reject');
+      assert.equal(finalizeAction({ modelAction: 'publish_only', policy: policy('allowed', 'policy_pass'), proofState: 'analysis', executable: false }).action, 'publish_only');
+    });
+  } finally { globalThis.fetch = baseFetch; }
+}
+
 console.log(`remediation-r2: ${passed}/${passed} checks passed`);

@@ -12,6 +12,7 @@ import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, LEVEL_TONE, companionName, getCompanion, getVibe, levelFor, nextLevelFor, tintFor, toolArt, toolHasArt, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
 import { isSpanish, pick, t } from '@/lib/companions/i18n';
 import { levelProgress, progressStore, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
+import { progressAuthHeaders } from '@/lib/companions/sync';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import RiskNotice from './RiskNotice';
@@ -61,6 +62,7 @@ async function resolveAsset(query: string): Promise<Resolution | null> {
 }
 
 interface Answer {
+  thesisReadId?: string;
   symbol: string; price: number | null; trend: string | null; momentum: string | null; rsi: number | null; support: number | null; resistance: number | null;
   regime: string | null; signal: string | null; direction: string | null; convictionPct: number | null; entry: number | null; stop: number | null; target: number | null; rewardRisk: number | null; overview: string | null; error: boolean;
 }
@@ -71,9 +73,12 @@ const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 async function runDebate(symbol: string): Promise<Answer> {
   const a: Answer = { symbol, price: null, trend: null, momentum: null, rsi: null, support: null, resistance: null, regime: null, signal: null, direction: null, convictionPct: null, entry: null, stop: null, target: null, rewardRisk: null, overview: null, error: false };
   try {
-    const res = await fetch('/api/voice-tool', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: 'run_debate', args: { symbol } }) });
+    const auth = progressAuthHeaders();
+    const res = await fetch('/api/voice-tool', { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: 'run_debate', args: { symbol, ...(auth ? { recordThesisRead:true } : {}) } }) });
     const obj = (await res.json()) as Record<string, unknown>;
     if (!res.ok || obj.error) { a.error = true; return a; }
+    const proof = obj.thesis_read as { id?: unknown } | null | undefined;
+    if (typeof proof?.id === 'string') a.thesisReadId = proof.id;
     a.regime = str(obj.regime);
     const m = obj.market as Record<string, unknown> | undefined;
     a.price = num(m?.price);
@@ -258,7 +263,7 @@ export default function CompanionDesk() {
     // along as the thesis the seed will be reviewed against in Trader Land.
     const level = (v: number | null) => (v !== null && Number.isFinite(v) && v > 0 ? v : null);
     const thesis: ThesisSnapshot = { symbol: snap.symbol, isEquity: snap.isEquity, direction: a.direction === 'long' ? 'long' : a.direction === 'short' ? 'short' : 'none', price: level(a.price), entry: level(a.entry), stop: level(a.stop), target: level(a.target) };
-    const result = progressStore.awardDiscipline(noTradeNow ? 'no_trade_respected' : 'read_complete', new Date(), thesis);
+    const result = progressStore.awardDiscipline(noTradeNow ? 'no_trade_respected' : 'read_complete', new Date(), thesis, a.thesisReadId);
     if (noTradeNow) setNoTrade({ symbol: snap.symbol, reason: noTradeReason(a), xp: result.awarded });
     if (result.evolvedTo) setEvolution(result.evolvedTo);
     if (result.drops.length) setDrops((d) => [...d, ...result.drops]);

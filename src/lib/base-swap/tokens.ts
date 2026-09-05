@@ -11,6 +11,9 @@
 export const BASE_SWAP_CHAIN_ID = 8453;
 /** Pinned Uniswap V3 SwapRouter02 on Base. Shared with the browser signing guard. */
 export const BASE_SWAP_ROUTER02 = '0x2626664c2603336E57B271c5C0b26F421741e481' as const;
+/** Coinbase's onchain oracle registry for B20 tokenized stocks: getOracleParams(token) → (multiplier 1e18, paused).
+ *  docs.base.org/specifications/b20/tokenized-stocks-on-base. A paused feed holds its last value during corporate actions. */
+export const BASE_B20_ORACLE_REGISTRY = '0x3f3E8cf41cdd3b1D118c16471aB0113DfDDd5CaD' as const;
 
 /** Canonical WETH9 on Base (also what ETH is wrapped into by the router). */
 export const BASE_WETH = '0x4200000000000000000000000000000000000006' as const;
@@ -70,6 +73,12 @@ export const BASE_SWAP_TOKENS: readonly BaseSwapToken[] = [
     address: '0xb20000000000000000000078ee7ce2fE4908108C', decimals: 8,
     aliases: ['NVDA'], assetClass: 'tokenized-stock', underlyingSymbol: 'NVDA',
     issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x04689a41629776563E6822F76f2e57D148d28513', maxTicketUsd: 100,
+  },
+  {
+    symbol: 'SPCXc', name: 'Coinbase Tokenized SpaceX',
+    address: '0xb2000000000000000000007b9fcbd005511aCBd5', decimals: 8,
+    aliases: ['SPCX'], assetClass: 'tokenized-stock', underlyingSymbol: 'SPCX',
+    issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x6A634B235903C4ad6376892180d6fF8612e3Fa68', maxTicketUsd: 10,
   },
 ] as const;
 

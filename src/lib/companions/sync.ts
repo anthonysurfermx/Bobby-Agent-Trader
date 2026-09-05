@@ -18,6 +18,8 @@ const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
 export function getSyncStatus(): SyncStatus { return status; }
+/** Same active credential used for progress; never persist it with a read. */
+export function progressAuthHeaders(): Record<string, string> | null { return headersFn?.() ?? null; }
 export function onSyncStatus(cb: () => void): () => void { listeners.add(cb); return () => listeners.delete(cb); }
 function setStatus(next: SyncStatus) { if (status !== next) { status = next; emit(); } }
 

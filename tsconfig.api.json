@@ -19,10 +19,12 @@
     ]
   },
   "include": [
+    "api/voice-tool.ts",
     "api/_lib/protocol-constants.ts",
     "api/_lib/protocol-payments.ts",
     "api/_lib/hardness-registry.ts",
     "api/_lib/hardness-registry.abi.ts",
+    "api/_lib/adversarial-bounties.abi.ts",
     "api/_lib/hardness-control-plane.ts",
     "api/_lib/agent-auth.ts",
     "api/activity.ts",

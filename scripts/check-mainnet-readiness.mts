@@ -188,6 +188,28 @@ for (const name of [
   requireEnv(name, positiveUint96);
 }
 
+// BP-03 (2026-09-04 review): the seven TrackRecordV2 verification params are
+// reviewed values, not defaults. They must be explicit on mainnet, in the
+// contract's bounds at FULL width (DeployBase narrows only after V2ParamsGate
+// validates), and identical to what the manifest says was deployed.
+const V2_PARAM_BOUNDS: Record<string, { env: string; min: bigint; max: bigint; width: bigint }> = {
+  entryWindowSec: { env: 'V2_ENTRY_WINDOW_SEC', min: 10n, max: 600n, width: (1n << 16n) - 1n },
+  exitWindowSec: { env: 'V2_EXIT_WINDOW_SEC', min: 10n, max: 1800n, width: (1n << 16n) - 1n },
+  maxExitLagSec: { env: 'V2_MAX_EXIT_LAG_SEC', min: 300n, max: 3600n, width: (1n << 24n) - 1n },
+  challengeWindowSec: { env: 'V2_CHALLENGE_WINDOW_SEC', min: 2n * 86400n + 1n, max: 30n * 86400n, width: (1n << 24n) - 1n },
+  entryTolBps: { env: 'V2_ENTRY_TOL_BPS', min: 10n, max: 500n, width: (1n << 16n) - 1n },
+  exitTolBps: { env: 'V2_EXIT_TOL_BPS', min: 10n, max: 500n, width: (1n << 16n) - 1n },
+  confMaxBps: { env: 'V2_CONF_MAX_BPS', min: 10n, max: 200n, width: (1n << 16n) - 1n },
+};
+for (const [key, bound] of Object.entries(V2_PARAM_BOUNDS)) {
+  requireEnv(bound.env, (value) => {
+    if (!/^[1-9][0-9]*$/.test(value)) return false;
+    const v = BigInt(value);
+    return v <= bound.width && v >= bound.min && v <= bound.max;
+  });
+  void key;
+}
+
 const configuredBountyTreasury = env('BOUNTY_TREASURY_ADDRESS');
 if (!validAddress(configuredBountyTreasury)) {
   fail('BOUNTY_TREASURY_ADDRESS is missing or invalid');
@@ -331,6 +353,18 @@ if (manifest) {
     } else pass(`${envName} matches manifest`);
   }
 
+  // BP-03: the manifest must carry the reviewed V2 params and they must equal
+  // the configured ones — a pre-BP-03 manifest (no block) is not verifiable.
+  if (!manifest.v2Params || typeof manifest.v2Params !== 'object') {
+    fail('manifest v2Params block is missing — redeploy with the BP-03 DeployBase (full-width validated params in the manifest)');
+  } else {
+    for (const [key, bound] of Object.entries(V2_PARAM_BOUNDS)) {
+      if (String(manifest.v2Params[key] ?? '') !== env(bound.env)) {
+        fail(`manifest v2Params.${key} does not match ${bound.env}`);
+      } else pass(`${bound.env} matches manifest`);
+    }
+  }
+
   const manifestResolvers = Array.isArray(manifest.quorum?.resolvers)
     ? manifest.quorum.resolvers.map(String)
     : [];
@@ -379,12 +413,40 @@ if (manifest) {
     );
     const ownershipInterface = new Interface(['function transferOwnership(address)']);
     const scorerInterface = new Interface(['function setHardnessScorer(address)']);
+    // Third round (2026-09-05, deploy review P2): the r5 broadcast configures the
+    // treasury and both bonds BEFORE the handoff (BountyEconomicsGate.configure), and
+    // finalize:base-manifest records those four calls. Readiness expected only the
+    // scorer + seven handoffs, so an honest manifest could never pass postdeploy —
+    // and the only way to "fix" it was to delete the treasury receipts by hand.
+    const treasuryInterface = new Interface(['function setTreasury(address)']);
+    const bondInterface = new Interface(['function setChallengeBond(uint96)', 'function setBountyChallengeBond(uint96)']);
+    const manifestTreasuryArg = String(manifest.treasury || '');
+    const manifestBondArg = String(manifest.fees?.challengeBondWei ?? '');
+    const bondEncodable = /^[1-9][0-9]*$/.test(manifestBondArg);
     const expectedCalls = [
       {
         to: String(manifest.addresses?.hardnessRegistry || ''),
         fn: 'setHardnessScorer(address)',
         argument: String(manifest.roles?.hardnessScorer || ''),
         inputHash: keccak256(scorerInterface.encodeFunctionData('setHardnessScorer', [manifest.roles?.hardnessScorer])),
+      },
+      ...[String(manifest.addresses?.adversarialBounties || ''), String(manifest.addresses?.hardnessRegistry || '')].map((to) => ({
+        to,
+        fn: 'setTreasury(address)',
+        argument: manifestTreasuryArg,
+        inputHash: validAddress(manifestTreasuryArg) ? keccak256(treasuryInterface.encodeFunctionData('setTreasury', [manifestTreasuryArg])) : '0x',
+      })),
+      {
+        to: String(manifest.addresses?.adversarialBounties || ''),
+        fn: 'setChallengeBond(uint96)',
+        argument: manifestBondArg,
+        inputHash: bondEncodable ? keccak256(bondInterface.encodeFunctionData('setChallengeBond', [manifestBondArg])) : '0x',
+      },
+      {
+        to: String(manifest.addresses?.hardnessRegistry || ''),
+        fn: 'setBountyChallengeBond(uint96)',
+        argument: manifestBondArg,
+        inputHash: bondEncodable ? keccak256(bondInterface.encodeFunctionData('setBountyChallengeBond', [manifestBondArg])) : '0x',
       },
       ...Object.values(manifest.addresses || {}).map((to) => ({
         to: String(to),
@@ -405,7 +467,7 @@ if (manifest) {
     }
     if (callEvidence.length !== expectedCalls.length) {
       fail('receipt evidence contains an unexpected or duplicate non-CREATE call');
-    } else pass('receipt evidence contains only the reviewed scorer and ownership calls');
+    } else pass('receipt evidence contains only the reviewed scorer, treasury, bond and ownership calls');
   }
 
   if (env('BASE_PROTOCOL_DEPLOYMENT_BLOCK') !== String(manifest.deployBlock)) {

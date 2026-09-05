@@ -15,8 +15,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { AWARD_AURA, PLANT_KINDS, applyAward, type PlantKind, type ProgressCounters } from './_lib/progress-rules.js';
-import { ThesisSchema, grantRoutePiece, type RouteGrant } from './_lib/trader-land.js';
+import { AWARD_AURA, PLANT_KINDS, applyAward, type ProgressCounters } from './_lib/progress-rules.js';
+import { ThesisSchema, type RouteGrant } from './_lib/trader-land.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -33,6 +33,7 @@ const Body = z.object({
     tzOffsetMin: z.number().int().min(-840).max(840).default(0),
     meta: z.record(z.unknown()).optional(),
     thesis: ThesisSchema.optional().catch(undefined),
+    thesisReadId: z.string().uuid().optional().catch(undefined),
   })).max(50).default([]),
   profile: z.object({
     companionId: z.string().regex(/^[a-z0-9_-]{1,32}$/).nullable().optional(),
@@ -47,6 +48,7 @@ const Body = z.object({
 
 interface ProgressRow {
   identity_id: string;
+  revision: number;
   companion_id: string | null;
   vibe_id: string;
   onboarded: boolean;
@@ -63,7 +65,7 @@ interface ProgressRow {
   updated_at: string;
 }
 
-const SELECT = 'identity_id,companion_id,vibe_id,onboarded,risk_notice_version,xp,aura,route_index,streak,last_day,daily_awards,daily_awards_day,quick_access,last_platform,updated_at';
+const SELECT = 'revision,identity_id,companion_id,vibe_id,onboarded,risk_notice_version,xp,aura,route_index,streak,last_day,daily_awards,daily_awards_day,quick_access,last_platform,updated_at';
 
 function toClient(row: ProgressRow, identity: Identity) {
   return {
@@ -92,11 +94,14 @@ async function loadOrCreate(identity: Identity): Promise<ProgressRow | null> {
   if (rows[0]) return rows[0];
   const c = await fetch(bobbyRest(`bobby_progress?on_conflict=identity_id&select=${SELECT}`), {
     method: 'POST',
-    headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=representation' }),
+    headers: bobbyServiceHeaders({ Prefer: 'resolution=ignore-duplicates,return=representation' }),
     body: JSON.stringify({ identity_id: identity.id }),
   });
   if (!c.ok) return null;
-  return ((await c.json()) as ProgressRow[])[0] ?? null;
+  const created = ((await c.json()) as ProgressRow[])[0];
+  if (created) return created;
+  const raced = await fetch(bobbyRest(`bobby_progress?identity_id=eq.${identity.id}&select=${SELECT}&limit=1`), { headers: bobbyServiceHeaders() });
+  return raced.ok ? ((await raced.json()) as ProgressRow[])[0] ?? null : null;
 }
 
 async function recentEvents(identityId: string) {
@@ -126,6 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const guarded = await guardWrite(req, res, {
     methods: ['POST'],
     scope: 'progress',
+    maxBodyBytes: 32 * 1024, // Up to 50 queued snapshots plus their origin IDs.
     schema: Body,
     auth: 'none',
     allowNoOrigin: true,
@@ -138,98 +144,85 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { platform, events, profile } = guarded.body;
 
   try {
-    const row = await loadOrCreate(identity);
-    if (!row) return res.status(502).json({ error: 'Could not load progress' });
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const row = await loadOrCreate(identity);
+      if (!row) return res.status(502).json({ error: 'Could not load progress' });
 
-    // Idempotency: drop events this identity already reported.
-    let fresh = events;
-    if (events.length) {
-      const ids = events.map((e) => e.id).join(',');
-      const seen = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${ids})&select=client_event_id`), { headers: bobbyServiceHeaders() });
-      const seenIds = new Set(seen.ok ? ((await seen.json()) as Array<{ client_event_id: string }>).map((e) => e.client_event_id) : []);
-      fresh = events.filter((e) => !seenIds.has(e.id));
-    }
-
-    // Apply in chronological order with the shared rules.
-    let counters: ProgressCounters = { xp: row.xp, streak: row.streak, lastDay: row.last_day, dailyAwards: row.daily_awards, dailyAwardsDay: row.daily_awards_day };
-    const results: Array<{ id: string; awarded: number; aura: number; xpBefore: number; xpAfter: number; duplicate: boolean; world?: RouteGrant | null }> = [];
-    let auraTotal = row.aura ?? 0;
-    let routeIndex = row.route_index ?? 0;
-    const grants: Array<{ eventId: string; kind: PlantKind }> = [];
-    const ledger: Array<Record<string, unknown>> = [];
-    const now = Date.now();
-    // One-time import of pre-sign-in XP, decided BEFORE this request's events are
-    // applied: only while the ledger is empty and xp is still 0, capped at LEGACY_IMPORT_CAP so a tampered claim buys at
-    // most level 3. Recorded in the ledger like everything else.
-    let legacyImported = 0;
-    if (profile?.localXpClaim && row.xp === 0) {
-      const any = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&select=id&limit=1`), { headers: bobbyServiceHeaders() });
-      const empty = any.ok && ((await any.json()) as unknown[]).length === 0;
-      if (empty) {
-        legacyImported = Math.min(LEGACY_IMPORT_CAP, profile.localXpClaim);
-        counters = { ...counters, xp: counters.xp + legacyImported };
-        ledger.push({ identity_id: identity.id, client_event_id: crypto.randomUUID(), kind: 'legacy_import', points: legacyImported, awarded: legacyImported, xp_after: counters.xp, platform, occurred_at: new Date(now).toISOString(), day_key: new Date(now).toISOString().slice(0, 10), meta: { claimed: profile.localXpClaim } });
+      // Idempotency: drop events this identity already reported.
+      const uniqueEvents = [...new Map(events.map((e) => [e.id, e])).values()];
+      let fresh = uniqueEvents;
+      if (events.length) {
+        const ids = events.map((e) => e.id).join(',');
+        const seen = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${ids})&select=client_event_id`), { headers: bobbyServiceHeaders() });
+        if (!seen.ok) throw new Error('Progress event read failed');
+        const seenIds = new Set(((await seen.json()) as Array<{ client_event_id: string }>).map((e) => e.client_event_id));
+        fresh = uniqueEvents.filter((e) => !seenIds.has(e.id));
       }
-    }
 
-    for (const e of [...fresh].sort((a, b) => a.at.localeCompare(b.at))) {
-      // Clock sanity: no awards from the future or older than 30 days.
-      const atMs = Date.parse(e.at);
-      const at = new Date(Math.min(Math.max(atMs, now - 30 * 86_400_000), now + 5 * 60_000));
-      const out = applyAward(counters, e.kind, at, e.tzOffsetMin);
-      counters = out.state;
-      const aura = out.awarded > 0 ? AWARD_AURA[e.kind] : 0;
-      auraTotal += aura;
-      if (out.awarded > 0) grants.push({ eventId: e.id, kind: e.kind });
-      results.push({ id: e.id, awarded: out.awarded, aura, xpBefore: out.xpBefore, xpAfter: out.xpAfter, duplicate: false });
-      const meta = e.meta || e.thesis ? { ...(e.meta ?? {}), ...(e.thesis ? { thesis: e.thesis } : {}) } : null;
-      ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, aura, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta });
-    }
-    for (const e of events) if (!fresh.includes(e)) results.push({ id: e.id, awarded: 0, aura: 0, xpBefore: row.xp, xpAfter: row.xp, duplicate: true });
-
-    if (ledger.length) {
-      const ins = await fetch(bobbyRest('bobby_progress_events'), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(ledger) });
-      if (!ins.ok) {
-        console.error('[progress] ledger insert', ins.status, await ins.text().catch(() => ''));
-        return res.status(502).json({ error: 'Could not record progress' });
+      // Apply in chronological order with the shared rules.
+      let counters: ProgressCounters = { xp: row.xp, streak: row.streak, lastDay: row.last_day, dailyAwards: row.daily_awards, dailyAwardsDay: row.daily_awards_day };
+      const results: Array<{ id: string; awarded: number; aura: number; xpBefore: number; xpAfter: number; duplicate: boolean; world?: RouteGrant | null }> = [];
+      let auraTotal = row.aura ?? 0;
+      const ledger: Array<Record<string, unknown>> = [];
+      const now = Date.now();
+      // One-time import of pre-sign-in XP, decided BEFORE this request's events are
+      // applied: only while the ledger is empty and xp is still 0, capped at LEGACY_IMPORT_CAP so a tampered claim buys at
+      // most level 3. Recorded in the ledger like everything else.
+      let legacyImported = 0;
+      if (profile?.localXpClaim && row.xp === 0) {
+        const any = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&select=id&limit=1`), { headers: bobbyServiceHeaders() });
+        if (!any.ok) throw new Error('Legacy progress read failed');
+        const empty = ((await any.json()) as unknown[]).length === 0;
+        if (empty) {
+          legacyImported = Math.min(LEGACY_IMPORT_CAP, profile.localXpClaim);
+          counters = { ...counters, xp: counters.xp + legacyImported };
+          ledger.push({ identity_id: identity.id, client_event_id: crypto.randomUUID(), kind: 'legacy_import', points: legacyImported, awarded: legacyImported, xp_after: counters.xp, platform, occurred_at: new Date(now).toISOString(), day_key: new Date(now).toISOString().slice(0, 10), meta: { claimed: profile.localXpClaim } });
+        }
       }
-    }
 
-    // Trader Land: every awarded event plants the next route piece. Seeds bloom
-    // later when their thesis is reviewed by /api/trader-land close.
-    if (grants.length) {
-      const idsQ = grants.map((g) => g.eventId).join(',');
-      const led = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${idsQ})&select=id,client_event_id`), { headers: bobbyServiceHeaders() });
-      const byClient = new Map((led.ok ? ((await led.json()) as Array<{ id: string; client_event_id: string }>) : []).map((r) => [r.client_event_id, r.id]));
-      for (const g of grants) {
-        const ledgerId = byClient.get(g.eventId);
-        if (!ledgerId) continue;
-        const grant = await grantRoutePiece(identity.id, ledgerId, g.kind, routeIndex);
-        if (grant?.routeIndex !== undefined) routeIndex = grant.routeIndex;
-        const r = results.find((x) => x.id === g.eventId);
-        if (r) r.world = grant;
+      for (const e of [...fresh].sort((a, b) => a.at.localeCompare(b.at))) {
+        // Clock sanity: no awards from the future or older than 30 days.
+        const atMs = Date.parse(e.at);
+        const at = new Date(Math.min(Math.max(atMs, now - 30 * 86_400_000), now + 5 * 60_000));
+        const out = applyAward(counters, e.kind, at, e.tzOffsetMin);
+        counters = out.state;
+        const aura = out.awarded > 0 ? AWARD_AURA[e.kind] : 0;
+        auraTotal += aura;
+        results.push({ id: e.id, awarded: out.awarded, aura, xpBefore: out.xpBefore, xpAfter: out.xpAfter, duplicate: false });
+        // A submitted snapshot is not proof of a Bobby-issued verdict. Drop raw
+        // meta rather than letting it impersonate a validated thesis/provenance.
+        const meta = e.thesis ? { thesis: e.thesis, thesisSource: 'client_snapshot' } : null;
+        // The RPC resolves this reference under the authenticated identity,
+        // replacing the submitted fields only from its immutable server row.
+        ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, aura, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta, thesis_read_id: e.thesisReadId ?? null });
       }
-    }
+      for (const e of uniqueEvents) if (!fresh.includes(e)) results.push({ id: e.id, awarded: 0, aura: 0, xpBefore: row.xp, xpAfter: row.xp, duplicate: true });
 
-    const patch: Record<string, unknown> = {
-      xp: counters.xp, aura: auraTotal, route_index: routeIndex, streak: counters.streak, last_day: counters.lastDay, daily_awards: counters.dailyAwards, daily_awards_day: counters.dailyAwardsDay,
-      last_platform: platform, updated_at: new Date().toISOString(),
-    };
-    if (profile) {
-      if (profile.companionId !== undefined) patch.companion_id = profile.companionId;
-      if (profile.vibeId !== undefined) patch.vibe_id = profile.vibeId;
-      if (profile.onboarded !== undefined) patch.onboarded = profile.onboarded;
-      // The notice version only moves forward.
-      if (profile.riskNoticeVersion !== undefined) patch.risk_notice_version = Math.max(row.risk_notice_version, profile.riskNoticeVersion);
-      if (profile.quickAccess !== undefined) patch.quick_access = profile.quickAccess;
+      const patch: Record<string, unknown> = {
+        xp: counters.xp, aura: auraTotal, streak: counters.streak, last_day: counters.lastDay, daily_awards: counters.dailyAwards, daily_awards_day: counters.dailyAwardsDay,
+        last_platform: platform, updated_at: new Date().toISOString(),
+      };
+      if (profile) {
+        if (profile.companionId !== undefined) patch.companion_id = profile.companionId;
+        if (profile.vibeId !== undefined) patch.vibe_id = profile.vibeId;
+        if (profile.onboarded !== undefined) patch.onboarded = profile.onboarded;
+        // The notice version only moves forward.
+        if (profile.riskNoticeVersion !== undefined) patch.risk_notice_version = Math.max(row.risk_notice_version, profile.riskNoticeVersion);
+        if (profile.quickAccess !== undefined) patch.quick_access = profile.quickAccess;
+      }
+      const upd = await fetch(bobbyRest('rpc/bobby_commit_progress'), {
+        method: 'POST', headers: bobbyServiceHeaders(),
+        body: JSON.stringify({ p_identity: identity.id, p_revision: row.revision, p_patch: patch, p_events: ledger }),
+      });
+      if (!upd.ok) return res.status(502).json({ error: 'Could not save progress' });
+      const committed = await upd.json() as { retry?: boolean; progress: ProgressRow; grants: Record<string, RouteGrant> };
+      if (committed.retry) continue; // Re-read and recompute; no partial writes occurred.
+      for (const result of results) if (committed.grants[result.id]) result.world = committed.grants[result.id];
+      const saved = committed.progress;
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ ok: true, progress: toClient(saved, identity), results, legacyImported });
     }
-    const upd = await fetch(bobbyRest(`bobby_progress?identity_id=eq.${identity.id}&select=${SELECT}`), {
-      method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify(patch),
-    });
-    if (!upd.ok) return res.status(502).json({ error: 'Could not save progress' });
-    const saved = ((await upd.json()) as ProgressRow[])[0] ?? row;
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json({ ok: true, progress: toClient(saved, identity), results, legacyImported });
+    return res.status(503).json({ error: 'Progress changed concurrently. Please retry.' });
   } catch (error) {
     console.error('[progress] post', error);
     return res.status(500).json({ error: 'Progress update failed' });

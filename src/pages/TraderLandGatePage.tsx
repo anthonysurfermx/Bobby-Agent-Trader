@@ -37,7 +37,7 @@ type Placement = { uid: string; itemId: string; col: number; row: number; orient
 type CatalogItem = { id: string; world: string; attribution: string; kind: string; footprint_w: number; footprint_h: number; route_index: number | null; art_url: string | null };
 // A seed waits on the thesis it was read with: the server says when it can be reviewed (see api/_lib/thesis-rules.ts).
 type SeedThesis = { symbol: string; isEquity: boolean; direction: 'long' | 'short' | 'none'; price: number | null; entry: number | null; stop: number | null; target: number | null };
-type SeedReview = { thesis: SeedThesis | null; readAt: string | null; reviewAt: string; ready: boolean };
+type SeedReview = { thesis: SeedThesis | null; readAt: string | null; executionEligibleAt?: string | null; reviewAt: string; ready: boolean };
 // The season collection: pieces earned only by reviewed theses executed on Base (api/_lib/trader-land-season.ts).
 type SeasonProgress = { id: string; name: { en: string; es: string }; rule: { en: string; es: string }; total: number; earned: number; owned: string[]; next: string | null; complete: boolean };
 type Execution = { receiptId: string; txHash: string | null; tokenIn: string; tokenOut: string; at: string | null; xp: number; aura: number };
@@ -242,7 +242,9 @@ function seedLine(review: SeedReview) {
   const timing = review.ready ? t('Ready to review.', 'Lista para revisar.') : `${t('Review from', 'Revisable desde')} ${when(review.reviewAt)}.`;
   // Only assets Bobby can swap on Base can be executed; the server decides at review time whether they were.
   const base = review.thesis && review.thesis.direction !== 'none' ? findBaseToken(review.thesis.symbol) : null;
-  const onBase = base && !base.stable ? ` ${t('Executable on Base for the season bonus.', 'Ejecutable en Base para el bono de temporada.')}` : '';
+  const onBase = base && !base.stable ? (review.executionEligibleAt
+    ? ` ${t('Only Base swaps after server sync can count toward the bonus.', 'Solo los swaps en Base posteriores a la sincronización pueden contar para el bono.')}`
+    : ` ${t('This read has no verified origin for an execution bonus.', 'Esta lectura no tiene origen verificado para el bono de ejecución.')}`) : '';
   return `${read} · ${timing}${onBase}`;
 }
 function outcomeLabel(outcome: ClosedThesis['outcome']) {

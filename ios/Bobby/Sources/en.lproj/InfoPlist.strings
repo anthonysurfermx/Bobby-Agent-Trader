@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "Bobby listens so you can ask about any asset out loud.";
+"NSSpeechRecognitionUsageDescription" = "Bobby turns your voice into questions about the markets. Audio is processed by Apple's speech recognition.";

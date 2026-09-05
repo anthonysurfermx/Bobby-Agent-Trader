@@ -124,7 +124,7 @@ export interface V2TxResult {
 }
 
 async function recorderWallet(chain: ChainConfig, recorderKey: string): Promise<ethers.Wallet> {
-  const provider = new ethers.JsonRpcProvider(chain.rpcUrl);
+  const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.id, { staticNetwork: true });
   // Refuse to sign against an RPC answering for the wrong chain — same guard
   // the v1 paths carry (Codex 282b534).
   await assertProviderChain(provider, chain.id);
@@ -347,7 +347,7 @@ export interface V2Stats {
  * keeps VERIFIED and ATTESTED ledgers separate, and so does this reader.
  */
 export async function readStatsV2(chain: ChainConfig): Promise<V2Stats> {
-  const provider = new ethers.JsonRpcProvider(chain.rpcUrl);
+  const provider = new ethers.JsonRpcProvider(chain.rpcUrl, chain.id, { staticNetwork: true });
   const contract = chain.contracts.trackRecord;
   if (!contract) throw new Error(`trackRecord address empty for ${chain.name}`);
 

@@ -1,0 +1,190 @@
+{
+  "checkedAt": "2026-09-05T14:12:54.454Z",
+  "buy": {
+    "chainId": 8453,
+    "venue": {
+      "name": "Uniswap V3 (SwapRouter02)",
+      "router": "0x2626664c2603336E57B271c5C0b26F421741e481",
+      "quoter": "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a"
+    },
+    "tokenIn": {
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "decimals": 6,
+      "native": false,
+      "assetClass": null,
+      "underlyingSymbol": null,
+      "issuer": null
+    },
+    "tokenOut": {
+      "symbol": "SPCXc",
+      "name": "Coinbase Tokenized SpaceX",
+      "address": "0xb2000000000000000000007b9fcbd005511aCBd5",
+      "decimals": 8,
+      "native": false,
+      "assetClass": "tokenized-stock",
+      "underlyingSymbol": "SPCX",
+      "issuer": "Coinbase Tokenized Stocks"
+    },
+    "amountIn": "10",
+    "amountInRaw": "10000000",
+    "amountOut": "0.06609949",
+    "amountOutRaw": "6609949",
+    "minAmountOut": "0.06576899",
+    "minAmountOutRaw": "6576899",
+    "executionPrice": 0.0066099489999999995,
+    "priceImpactPct": 0.6151424277792472,
+    "usdValue": 10,
+    "slippagePct": 0.5,
+    "deadline": 1788618774,
+    "route": {
+      "kind": "single",
+      "fees": [
+        3000
+      ],
+      "path": null,
+      "description": "USDC \u2192 SPCXc (0.3%)",
+      "gasEstimate": "100840"
+    },
+    "alternatives": [
+      {
+        "description": "USDC \u2192 SPCXc (1%)",
+        "amountOut": "0.0655581"
+      }
+    ],
+    "recipient": null,
+    "tx": null,
+    "allowanceRaw": null,
+    "simulation": {
+      "ran": false,
+      "ok": null,
+      "reason": "no recipient: quote only"
+    },
+    "txWithheld": [],
+    "warnings": [
+      "Uniswap price differs 2.15% from the official reference",
+      "SPCXc: issuer has paused some features (mint/redeem side); secondary trading still open"
+    ],
+    "limits": {
+      "maxTicketUsd": 10,
+      "minTicketUsd": 1,
+      "defaultSlippagePct": 0.5,
+      "maxSlippagePct": 3,
+      "maxPriceImpactPct": 3,
+      "deadlineSec": 1200
+    },
+    "requiresStockEligibility": true,
+    "stockReference": {
+      "symbol": "SPCXc",
+      "tokenAddress": "0xb2000000000000000000007b9fcbd005511aCBd5",
+      "feedAddress": "0x6A634B235903C4ad6376892180d6fF8612e3Fa68",
+      "usdPrice": 148.1,
+      "updatedAt": 1788551627,
+      "ageSec": 65947,
+      "multiplier": "1000000000000000000",
+      "multiplierHuman": 1,
+      "marketDeviationPct": 2.1519903285265984,
+      "pausedFeatures": "32",
+      "transferPaused": false,
+      "issuerPaused": false,
+      "registryMultiplier": "1000000000000000000",
+      "status": "fresh",
+      "usable": true
+    }
+  },
+  "sell": {
+    "chainId": 8453,
+    "venue": {
+      "name": "Uniswap V3 (SwapRouter02)",
+      "router": "0x2626664c2603336E57B271c5C0b26F421741e481",
+      "quoter": "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a"
+    },
+    "tokenIn": {
+      "symbol": "SPCXc",
+      "name": "Coinbase Tokenized SpaceX",
+      "address": "0xb2000000000000000000007b9fcbd005511aCBd5",
+      "decimals": 8,
+      "native": false,
+      "assetClass": "tokenized-stock",
+      "underlyingSymbol": "SPCX",
+      "issuer": "Coinbase Tokenized Stocks"
+    },
+    "tokenOut": {
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "decimals": 6,
+      "native": false,
+      "assetClass": null,
+      "underlyingSymbol": null,
+      "issuer": null
+    },
+    "amountIn": "0.06609949",
+    "amountInRaw": "6609949",
+    "amountOut": "9.881713",
+    "amountOutRaw": "9881713",
+    "minAmountOut": "9.832304",
+    "minAmountOutRaw": "9832304",
+    "executionPrice": 149.4975679842613,
+    "priceImpactPct": 1.001127429065829,
+    "usdValue": 9.881713,
+    "slippagePct": 0.5,
+    "deadline": 1788618774,
+    "route": {
+      "kind": "single",
+      "fees": [
+        10000
+      ],
+      "path": null,
+      "description": "SPCXc \u2192 USDC (1%)",
+      "gasEstimate": "72449"
+    },
+    "alternatives": [
+      {
+        "description": "SPCXc \u2192 USDC (0.3%)",
+        "amountOut": "9.877542"
+      }
+    ],
+    "recipient": null,
+    "tx": null,
+    "allowanceRaw": null,
+    "simulation": {
+      "ran": false,
+      "ok": null,
+      "reason": "no recipient: quote only"
+    },
+    "txWithheld": [],
+    "warnings": [
+      "price impact 1.00%",
+      "SPCXc: issuer has paused some features (mint/redeem side); secondary trading still open"
+    ],
+    "limits": {
+      "maxTicketUsd": 10,
+      "minTicketUsd": 1,
+      "defaultSlippagePct": 0.5,
+      "maxSlippagePct": 3,
+      "maxPriceImpactPct": 3,
+      "deadlineSec": 1200
+    },
+    "requiresStockEligibility": true,
+    "stockReference": {
+      "symbol": "SPCXc",
+      "tokenAddress": "0xb2000000000000000000007b9fcbd005511aCBd5",
+      "feedAddress": "0x6A634B235903C4ad6376892180d6fF8612e3Fa68",
+      "usdPrice": 148.1,
+      "updatedAt": 1788551627,
+      "ageSec": 65947,
+      "multiplier": "1000000000000000000",
+      "multiplierHuman": 1,
+      "marketDeviationPct": 0.943665080527567,
+      "pausedFeatures": "32",
+      "transferPaused": false,
+      "issuerPaused": false,
+      "registryMultiplier": "1000000000000000000",
+      "status": "fresh",
+      "usable": true
+    }
+  },
+  "interpretation": "Independent read-only buy and sell quotes, not executed transactions. No recipient or signature supplied."
+}

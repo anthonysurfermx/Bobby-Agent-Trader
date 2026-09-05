@@ -51,6 +51,13 @@ export interface ChainConfig {
   stableDecimals: number;
   weth: string;
   contracts: ContractSet;
+  /**
+   * BP-11 (2026-09-04 review): which TrackRecord ABI this deployment exposes.
+   * Readers select their stats selectors from THIS field — never from a chain-id
+   * comparison that silently picks the wrong ledger (v1 `getWinRate` does not
+   * exist on V2 and decoded as zero with ok:true).
+   */
+  trackRecordVersion: 'v1' | 'v2';
 }
 
 // Audited Base mainnet deployment. Environment overrides remain available for
@@ -121,6 +128,7 @@ export const BASE: ChainConfig = {
   stableDecimals: 6,
   weth: '0x4200000000000000000000000000000000000006',
   contracts: BASE_CONTRACTS,
+  trackRecordVersion: 'v2',
 };
 
 export const BASE_SEPOLIA: ChainConfig = {
@@ -135,6 +143,7 @@ export const BASE_SEPOLIA: ChainConfig = {
   x402SettlementToken: '0x036cbd53842c5426634e7929541ec2318f3dcf7e',
   stable: '0x036cbd53842c5426634e7929541ec2318f3dcf7e',
   contracts: BASE_SEPOLIA_CONTRACTS,
+  trackRecordVersion: 'v2',
 };
 
 export const XLAYER: ChainConfig = {
@@ -159,6 +168,7 @@ export const XLAYER: ChainConfig = {
   stableDecimals: 6,
   weth: '0xe538905cf8410324e03a5a23c1c177a474d59b2b', // WOKB
   contracts: XLAYER_CONTRACTS,
+  trackRecordVersion: 'v1',
 };
 
 /**

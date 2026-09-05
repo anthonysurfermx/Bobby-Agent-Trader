@@ -4,6 +4,7 @@ import {
   PROTOCOL_RPC_URL,
 } from './protocol-constants.js';
 import { DEFAULT_CHAIN } from './chains.js';
+import { rpcErrorMessage } from './rpc-redact.js';
 import {
   assertProviderChain,
   evaluateProtocolWriteSafety,
@@ -166,7 +167,7 @@ async function ensureBobbySetup(contract: any, signer: any, metadataURI?: string
         await tx.wait();
       }
     } catch (error) {
-      console.warn(`[Hardness] Service sync skipped for ${serviceId}:`, error instanceof Error ? error.message : error);
+      console.warn(`[Hardness] Service sync skipped for ${serviceId}:`, rpcErrorMessage(error));
     }
   }
 
@@ -198,7 +199,7 @@ export async function recordHardnessActivity(input: RecordHardnessActivityInput)
         commitTxHash = tx.hash;
       }
     } catch (error) {
-      commitError = error instanceof Error ? error.message : String(error);
+      commitError = rpcErrorMessage(error);
       console.warn('[Hardness] commitPrediction skipped:', commitError);
     }
   }
@@ -216,7 +217,7 @@ export async function recordHardnessActivity(input: RecordHardnessActivityInput)
     );
     signalTxHash = tx.hash;
   } catch (error) {
-    console.warn('[Hardness] publishSignal failed:', error instanceof Error ? error.message : error);
+    console.warn('[Hardness] publishSignal failed:', rpcErrorMessage(error));
   }
 
   return { predictionHash, commitTxHash, signalTxHash, commitError };

@@ -17,6 +17,8 @@ import { useAccount, usePublicClient, useSendTransaction, useSwitchChain } from 
 import { CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react';
 import { BASE, BASE_CHAIN_ID } from '@/config/chains';
 import { assertApprovalCalldata, assertRevokeCalldata, assertSwapCalldata } from '@/lib/base-swap/calldata-guard';
+import { assertExecutionViewConsistent, assertQuoteConsistent, type QuoteLike, type ValidatedQuote } from '@/lib/base-swap/quote-guard';
+import { BASE_SWAP_LIMITS } from '@/lib/base-swap/tokens';
 import { useBobbySession } from '@/hooks/useBobbySession';
 
 interface Tx { to: string; data: string; value?: string }
@@ -93,6 +95,8 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
   const [acknowledged, setAcknowledged] = useState(false);
   const [state, setState] = useState<SwapState>(trade.execution ? (trade.execution.swapTx ? 'ready' : 'idle') : 'intent');
   const [execution, setExecution] = useState(trade.execution);
+  // BP-01: the full /api/base-swap quote, kept alongside the reduced `execution` view.
+  const [fullQuote, setFullQuote] = useState<QuoteLike | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [swapTxHash, setSwapTxHash] = useState<`0x${string}` | undefined>();
   const [receiptNote, setReceiptNote] = useState<string | null>(null);
@@ -164,8 +168,24 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
       const why = (data.quote?.txWithheld as string[] | undefined)?.join('; ') || 'calldata withheld';
       throw new Error(why);
     }
+    // BP-01: validate the FULL quote against the request this card made, in integer units,
+    // before anything is displayed or signed — and (third round) refuse a reduced
+    // `execution` view that disagrees with it: what the card shows is what it signs.
+    const v = assertQuoteConsistent(data.quote, request());
+    assertExecutionViewConsistent(data.execution, data.quote, v);
+    setFullQuote(data.quote);
     setExecution(data.execution);
     return data.execution;
+  };
+
+  /** The request this card makes — the only source of truth for pair, amount, slippage and wallet. */
+  const request = () => ({ tokenIn: fromToken, tokenOut: toToken, amount: fromAmount, slippagePct: BASE_SWAP_LIMITS.defaultSlippagePct, wallet });
+  /** Re-validate right before a signature; refuses if no full quote was ever validated. */
+  const validated = (): ValidatedQuote => {
+    if (!fullQuote) throw new Error('No validated quote; build first');
+    const v = assertQuoteConsistent(fullQuote, request());
+    assertExecutionViewConsistent(execution, fullQuote, v);
+    return v;
   };
 
   const handleBuild = async () => {
@@ -187,7 +207,8 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
     try {
       if (!execution?.approveTx) throw new Error('No approval to sign; build first');
       notExpired();
-      assertApprovalCalldata(execution.approveTx, { tokenSymbol: fromToken, amountRaw: execution.quote.fromAmountRaw });
+      const v = validated();
+      assertApprovalCalldata(execution.approveTx, { tokenSymbol: v.tokenInSymbol, amountRaw: v.amountInRaw });
       setState('approving');
       await sendAndConfirm(execution.approveTx);
       setState('requoting');
@@ -229,13 +250,14 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
       if (!execution?.swapTx) throw new Error('No swap calldata; re-quote first');
       if (disclosure?.simulated !== true) throw new Error('Swap has not passed the post-approval simulation');
       notExpired();
+      const v = validated();
       assertSwapCalldata(execution.swapTx, {
-        tokenInSymbol: fromToken,
-        tokenOutSymbol: toToken,
-        amountInRaw: execution.quote.fromAmountRaw,
-        minAmountOutRaw: execution.quote.minReceivedRaw,
-        recipient: wallet,
-        deadline: disclosure.deadline,
+        tokenInSymbol: v.tokenInSymbol,
+        tokenOutSymbol: v.tokenOutSymbol,
+        amountInRaw: v.amountInRaw,
+        minAmountOutRaw: v.minAmountOutRaw,
+        recipient: v.recipient,
+        deadline: v.deadline,
       });
       setState('swapping');
       const hash = await sendAndConfirm(execution.swapTx);
@@ -266,7 +288,10 @@ export function SwapConfirm({ trade, walletAddress }: { trade: TradeExecution; w
 
   if (state === 'skipped') return null;
 
-  const minReceived = execution?.quote.minReceived ?? disclosure?.minReceived ?? trade.intent?.preview.minAmountOut ?? '—';
+  // Third-round BP-01: once a quote is validated, every economic field on the card comes
+  // from the VALIDATED full quote (the reduced view is refused if it disagrees). Before a
+  // build there is only the intent preview, which is labelled as an estimate.
+  const minReceived = fullQuote ? String(fullQuote.minAmountOut) : (trade.intent?.preview.minAmountOut ? `≈ ${trade.intent.preview.minAmountOut}` : '—');
   const deadlineLeftMin = disclosure?.deadline ? Math.max(0, Math.round((disclosure.deadline * 1000 - Date.now()) / 60000)) : null;
   const canSign = acknowledged && (state === 'idle' || state === 'ready');
   const canBuild = acknowledged && state === 'intent';

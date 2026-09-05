@@ -462,7 +462,9 @@ contract HardnessRegistry {
         bytes32 serviceKey = keccak256(bytes(serviceId));
         Service storage service = _services[serviceKey];
         if (service.owner == address(0)) revert NotFound();
-        if (!service.active) revert ServiceInactive();
+        // A full Safe slash unregisters the agent. Treat every service owned by
+        // that agent as inactive without an unbounded loop over serviceKeys.
+        if (!service.active || !agentProfiles[service.owner].registered) revert ServiceInactive();
         if (msg.value < service.priceWei) revert InsufficientPayment();
 
         challengeConsumed[challengeId] = true;
@@ -503,6 +505,13 @@ contract HardnessRegistry {
             if (!longSide && !shortSide) revert InvalidValue();
         }
         if (_predictions[predictionHash].agent != address(0)) revert AlreadyExists();
+        // Governance may have configured a boundary value in an earlier block.
+        // Recheck at use time so timestamps cannot truncate and every prediction
+        // retains a non-empty resolution window before expiry.
+        if (
+            minPredictionAge >= predictionTTL || !_fitsFutureTimestamp(minPredictionAge)
+                || !_fitsFutureTimestamp(predictionTTL)
+        ) revert InvalidValue();
 
         _predictions[predictionHash] = Prediction({
             agent: msg.sender,
@@ -608,6 +617,7 @@ contract HardnessRegistry {
         if (bytes(symbol).length == 0) revert InvalidValue();
         if (direction > uint8(Direction.SHORT)) revert InvalidValue();
         if (conviction > 100) revert InvalidValue();
+        if (!_fitsFutureTimestamp(defaultSignalTTL)) revert InvalidValue();
 
         bytes32 symbolHash = keccak256(bytes(symbol));
         uint64 expiry = uint64(block.timestamp + defaultSignalTTL);
@@ -1016,17 +1026,17 @@ contract HardnessRegistry {
     }
 
     function setMinPredictionAge(uint256 newAge) external onlyOwner {
-        if (newAge < 10 minutes) revert InvalidValue();
+        if (newAge < 10 minutes || newAge >= predictionTTL || !_fitsFutureTimestamp(newAge)) revert InvalidValue();
         minPredictionAge = newAge;
     }
 
     function setPredictionTTL(uint256 newTTL) external onlyOwner {
-        if (newTTL < 1 hours) revert InvalidValue();
+        if (newTTL < 1 hours || newTTL <= minPredictionAge || !_fitsFutureTimestamp(newTTL)) revert InvalidValue();
         predictionTTL = newTTL;
     }
 
     function setDefaultSignalTTL(uint256 newTTL) external onlyOwner {
-        if (newTTL < 1 minutes) revert InvalidValue();
+        if (newTTL < 1 minutes || !_fitsFutureTimestamp(newTTL)) revert InvalidValue();
         defaultSignalTTL = newTTL;
     }
 
@@ -1081,6 +1091,10 @@ contract HardnessRegistry {
             expiry += uint256(bounty.gracePeriodSnapshot);
         }
         return expiry;
+    }
+
+    function _fitsFutureTimestamp(uint256 delay) internal view returns (bool) {
+        return block.timestamp <= type(uint64).max && delay <= type(uint64).max - block.timestamp;
     }
 
     function _setResolverThreshold(uint8 newThreshold) internal {

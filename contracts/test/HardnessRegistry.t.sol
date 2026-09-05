@@ -2,9 +2,12 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import "../src/HardnessRegistry.sol";
 
 contract HardnessRegistryTest is Test {
+    using stdStorage for StdStorage;
+
     HardnessRegistry public registry;
 
     address owner = address(this);
@@ -197,6 +200,202 @@ contract HardnessRegistryTest is Test {
         assertFalse(registered);
         assertEq(stake, 0);
         assertEq(registry.pendingWithdrawals(owner), registry.REGISTRATION_STAKE());
+    }
+
+    function test_slashAgent_fullSlashStopsExistingServicePayments() public {
+        vm.prank(agent1);
+        registry.registerService("judge-mode", 0.001 ether, agent1);
+
+        registry.slashAgent(agent1, type(uint256).max, keccak256("safe-ruling"));
+
+        vm.deal(outsider, 1 ether);
+        vm.prank(outsider);
+        vm.expectRevert(HardnessRegistry.ServiceInactive.selector);
+        registry.payForService{value: 0.001 ether}(keccak256("after-slash"), "judge-mode");
+
+        vm.prank(agent1);
+        registry.registerAgent{value: 0.01 ether}("ipfs://agent-1-restaked");
+        vm.prank(outsider);
+        registry.payForService{value: 0.001 ether}(keccak256("after-restake"), "judge-mode");
+        assertEq(registry.pendingWithdrawals(agent1), 0.001 ether);
+
+        vm.prank(agent1);
+        registry.setServiceStatus("judge-mode", false);
+        vm.prank(outsider);
+        vm.expectRevert(HardnessRegistry.ServiceInactive.selector);
+        registry.payForService{value: 0.001 ether}(keccak256("manually-disabled"), "judge-mode");
+
+        vm.prank(agent1);
+        registry.setServiceStatus("judge-mode", true);
+        vm.prank(outsider);
+        registry.payForService{value: 0.001 ether}(keccak256("manually-restored"), "judge-mode");
+        assertEq(registry.pendingWithdrawals(agent1), 0.002 ether);
+    }
+
+    function test_slashAgent_partialSlashAndExitConserveWithdrawals() public {
+        vm.prank(agent1);
+        registry.registerService("judge-mode", 0.001 ether, agent1);
+
+        registry.slashAgent(agent1, 0.004 ether, keccak256("partial-ruling"));
+        (bool registered,, uint96 stake,) = registry.agentProfiles(agent1);
+        assertTrue(registered);
+        assertEq(stake, 0.006 ether);
+
+        vm.prank(outsider);
+        registry.payForService{value: 0.001 ether}(keccak256("after-partial-slash"), "judge-mode");
+        vm.prank(agent1);
+        registry.setServiceStatus("judge-mode", false);
+        vm.prank(agent1);
+        registry.requestUnregister();
+
+        registry.slashAgent(agent1, 0.002 ether, keccak256("exit-ruling"));
+        uint64 availableAt = registry.unstakeAvailableAt(agent1);
+        vm.warp(availableAt);
+        vm.prank(agent1);
+        registry.unregisterAgent();
+
+        assertEq(registry.pendingWithdrawals(owner), 0.006 ether);
+        assertEq(registry.pendingWithdrawals(agent1), 0.005 ether);
+        assertEq(address(registry).balance, 0.021 ether);
+
+        vm.prank(agent1);
+        registry.withdraw();
+        registry.withdraw();
+        assertEq(address(registry).balance, 0.01 ether);
+    }
+
+    function test_slashAgent_fullSlashDuringExitCanCleanAndReregister() public {
+        vm.prank(agent1);
+        registry.requestUnregister();
+        uint64 availableAt = registry.unstakeAvailableAt(agent1);
+
+        registry.slashAgent(agent1, type(uint256).max, keccak256("exit-full-slash"));
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InsufficientStake.selector);
+        registry.cancelUnregister();
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.registerAgent{value: 0.01 ether}("ipfs://blocked-before-cleanup");
+
+        vm.warp(availableAt);
+        vm.prank(agent1);
+        registry.unregisterAgent();
+        vm.prank(agent1);
+        registry.registerAgent{value: 0.01 ether}("ipfs://agent-1-fresh");
+
+        (bool registered,, uint96 stake,) = registry.agentProfiles(agent1);
+        assertTrue(registered);
+        assertEq(stake, registry.REGISTRATION_STAKE());
+        assertEq(registry.unstakeAvailableAt(agent1), 0);
+        assertEq(registry.pendingWithdrawals(owner), registry.REGISTRATION_STAKE());
+    }
+
+    function testFuzz_slashExitAndServiceRevenueConserveLiabilities(
+        uint96 rawInitialSlash,
+        uint96 rawExitSlash,
+        uint8 rawCalls,
+        bool ownerWithdrawsFirst
+    ) public {
+        uint256 registrationStake = registry.REGISTRATION_STAKE();
+        uint256 initialSlash = bound(uint256(rawInitialSlash), 1, registrationStake - 1);
+        uint256 calls = bound(uint256(rawCalls), 1, 5);
+
+        vm.prank(agent1);
+        registry.registerService("fuzz-service", 0.001 ether, agent1);
+        registry.slashAgent(agent1, initialSlash, keccak256("initial-partial-slash"));
+
+        for (uint256 i = 0; i < calls; i++) {
+            vm.prank(outsider);
+            registry.payForService{value: 0.001 ether}(
+                keccak256(abi.encode("fuzz-service-call", i)), "fuzz-service"
+            );
+        }
+
+        vm.prank(agent1);
+        registry.setServiceStatus("fuzz-service", false);
+        vm.prank(agent1);
+        registry.requestUnregister();
+
+        uint256 stakeBeforeExitSlash = registrationStake - initialSlash;
+        uint256 exitSlash = bound(uint256(rawExitSlash), 1, stakeBeforeExitSlash);
+        registry.slashAgent(agent1, exitSlash, keccak256("cooldown-slash"));
+
+        vm.warp(registry.unstakeAvailableAt(agent1));
+        vm.prank(agent1);
+        registry.unregisterAgent();
+
+        uint256 serviceRevenue = calls * 0.001 ether;
+        uint256 returnedStake = stakeBeforeExitSlash - exitSlash;
+        assertEq(registry.pendingWithdrawals(owner), initialSlash + exitSlash);
+        assertEq(registry.pendingWithdrawals(agent1), serviceRevenue + returnedStake);
+        assertEq(address(registry).balance, registrationStake * 2 + serviceRevenue);
+
+        if (ownerWithdrawsFirst) {
+            registry.withdraw();
+            vm.prank(agent1);
+            registry.withdraw();
+        } else {
+            vm.prank(agent1);
+            registry.withdraw();
+            registry.withdraw();
+        }
+        assertEq(registry.pendingWithdrawals(owner), 0);
+        assertEq(registry.pendingWithdrawals(agent1), 0);
+        assertEq(address(registry).balance, registrationStake);
+
+        vm.prank(agent1);
+        registry.registerAgent{value: registrationStake}("ipfs://agent-1-reregistered");
+        assertEq(registry.activeServiceCount(agent1), 0);
+        vm.prank(agent1);
+        registry.setServiceStatus("fuzz-service", true);
+        assertEq(registry.activeServiceCount(agent1), 1);
+    }
+
+    function testFuzz_activeServiceCountMatchesServiceStates(uint256 rawOperations) public {
+        string[3] memory serviceIds = ["svc-a", "svc-b", "svc-c"];
+        bool[3] memory active = [true, true, true];
+        uint256 registrationStake = registry.REGISTRATION_STAKE();
+        for (uint256 i = 0; i < serviceIds.length; i++) {
+            vm.prank(agent1);
+            registry.registerService(serviceIds[i], 0.001 ether, agent1);
+        }
+
+        for (uint256 i = 0; i < 12; i++) {
+            uint256 operation = rawOperations >> (i * 5);
+            uint256 index = operation % serviceIds.length;
+            bool registerAgain = ((operation >> 2) & 1) == 1;
+            bool nextActive = ((operation >> 3) & 1) == 1;
+
+            vm.prank(agent1);
+            if (registerAgain) {
+                registry.registerService(serviceIds[index], 0.001 ether + i + 1, agent1);
+                active[index] = true;
+            } else {
+                registry.setServiceStatus(serviceIds[index], nextActive);
+                active[index] = nextActive;
+            }
+
+            uint256 expectedActive;
+            for (uint256 j = 0; j < active.length; j++) {
+                if (active[j]) expectedActive++;
+            }
+            assertEq(registry.activeServiceCount(agent1), expectedActive);
+        }
+
+        registry.slashAgent(agent1, type(uint256).max, keccak256("full-slash"));
+        for (uint256 i = 0; i < serviceIds.length; i++) {
+            vm.prank(agent1);
+            registry.setServiceStatus(serviceIds[i], false);
+        }
+        assertEq(registry.activeServiceCount(agent1), 0);
+
+        vm.prank(agent1);
+        registry.registerAgent{value: registrationStake}("ipfs://agent-1-restaked");
+        for (uint256 i = 0; i < serviceIds.length; i++) {
+            vm.prank(agent1);
+            registry.registerService(serviceIds[i], 0.001 ether, agent1);
+        }
+        assertEq(registry.activeServiceCount(agent1), serviceIds.length);
     }
 
     function test_registerAgent_revertsWhenPaused() public {
@@ -447,13 +646,120 @@ contract HardnessRegistryTest is Test {
         registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
         uint64 expiry = registry.predictionExpiresAt(predictionHash);
 
-        registry.setPredictionTTL(1 hours);
-        vm.warp(block.timestamp + 2 hours);
+        registry.setPredictionTTL(2 hours);
+        vm.warp(block.timestamp + 3 hours);
         vm.expectRevert(HardnessRegistry.TooSoon.selector);
         registry.expirePrediction(predictionHash);
 
         vm.warp(expiry + 1);
         registry.expirePrediction(predictionHash);
+    }
+
+    function test_predictionTimeSettersRejectUint64Truncation() public {
+        uint256 largestDelay = uint256(type(uint64).max) - block.timestamp;
+        registry.setPredictionTTL(largestDelay);
+        registry.setMinPredictionAge(largestDelay - 1);
+        assertEq(registry.minPredictionAge(), largestDelay - 1);
+        assertEq(registry.predictionTTL(), largestDelay);
+
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setMinPredictionAge(largestDelay);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setMinPredictionAge(largestDelay + 1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setPredictionTTL(largestDelay + 1);
+
+        vm.warp(block.timestamp + 1);
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.commitPrediction(_predictionHash("stale-time-bound"), "BTC-USD", 66, 100, 120, 90);
+    }
+
+    function test_predictionTimeSettersPreserveResolutionWindow() public {
+        uint256 currentTTL = registry.predictionTTL();
+        uint256 currentMinAge = registry.minPredictionAge();
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setMinPredictionAge(currentTTL);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setPredictionTTL(currentMinAge);
+
+        registry.setPredictionTTL(2 hours);
+        registry.setMinPredictionAge(90 minutes);
+        bytes32 predictionHash = _predictionHash("valid-resolution-window");
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
+
+        HardnessRegistry.Prediction memory prediction = registry.getPrediction(predictionHash);
+        assertLt(prediction.minResolveAt, registry.predictionExpiresAt(predictionHash));
+    }
+
+    function test_predictionTimeSettersAcceptOneSecondResolutionWindow() public {
+        registry.setPredictionTTL(2 hours);
+        registry.setMinPredictionAge(2 hours - 1);
+
+        bytes32 predictionHash = _predictionHash("one-second-window");
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
+
+        HardnessRegistry.Prediction memory prediction = registry.getPrediction(predictionHash);
+        assertEq(registry.predictionExpiresAt(predictionHash) - prediction.minResolveAt, 1);
+    }
+
+    function testFuzz_predictionTimeSetterOrdersPreserveWindow(
+        uint256 rawMinAge,
+        uint256 rawTTL,
+        bool ttlFirst
+    ) public {
+        uint256 ttl = bound(rawTTL, 1 hours + 1, 30 days);
+        uint256 minAge = bound(rawMinAge, 10 minutes, ttl - 1);
+
+        if (ttlFirst) {
+            registry.setPredictionTTL(ttl);
+            registry.setMinPredictionAge(minAge);
+        } else {
+            registry.setMinPredictionAge(minAge);
+            registry.setPredictionTTL(ttl);
+        }
+
+        uint256 committedAt = block.timestamp;
+        bytes32 predictionHash = keccak256(abi.encode("fuzz-valid-window", rawMinAge, rawTTL, ttlFirst));
+        vm.prank(agent1);
+        registry.commitPrediction(predictionHash, "BTC-USD", 66, 100, 120, 90);
+
+        HardnessRegistry.Prediction memory prediction = registry.getPrediction(predictionHash);
+        assertEq(prediction.minResolveAt, committedAt + minAge);
+        assertEq(registry.predictionExpiresAt(predictionHash), committedAt + ttl);
+        assertLt(prediction.minResolveAt, registry.predictionExpiresAt(predictionHash));
+    }
+
+    function testFuzz_predictionTimeSettersRejectInvalidRelationship(
+        uint256 rawTTL,
+        uint256 rawMinAge,
+        uint256 rawExcess,
+        uint256 rawBadTTL
+    ) public {
+        uint256 ttl = bound(rawTTL, 1 hours + 2, 30 days);
+        uint256 minAge = bound(rawMinAge, 1 hours, ttl - 1);
+        registry.setPredictionTTL(ttl);
+        registry.setMinPredictionAge(minAge);
+
+        uint256 invalidMinAge = ttl + bound(rawExcess, 0, 30 days);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setMinPredictionAge(invalidMinAge);
+
+        uint256 invalidTTL = bound(rawBadTTL, 1 hours, minAge);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setPredictionTTL(invalidTTL);
+    }
+
+    function test_commitPrediction_rejectsInvalidStoredResolutionWindow() public {
+        // Simulate a legacy/corrupted pair that bypassed both owner setters.
+        stdstore.target(address(registry)).sig("minPredictionAge()").checked_write(2 hours);
+        stdstore.target(address(registry)).sig("predictionTTL()").checked_write(1 hours);
+
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.commitPrediction(_predictionHash("invalid-stored-window"), "BTC-USD", 66, 100, 120, 90);
     }
 
     function test_expirePrediction_revertsBeforeTtl() public {
@@ -486,6 +792,20 @@ contract HardnessRegistryTest is Test {
         vm.prank(agent1);
         vm.expectRevert(HardnessRegistry.InvalidValue.selector);
         registry.publishSignal("BTC-USD", 0, 9, 82, keccak256("ctx"));
+    }
+
+    function test_signalTimeSetterAndPublishRejectUint64Truncation() public {
+        uint256 largestDelay = uint256(type(uint64).max) - block.timestamp;
+        registry.setDefaultSignalTTL(largestDelay);
+        assertEq(registry.defaultSignalTTL(), largestDelay);
+
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.setDefaultSignalTTL(largestDelay + 1);
+
+        vm.warp(block.timestamp + 1);
+        vm.prank(agent1);
+        vm.expectRevert(HardnessRegistry.InvalidValue.selector);
+        registry.publishSignal("BTC-USD", 0, uint8(HardnessRegistry.Direction.LONG), 82, keccak256("stale-time-bound"));
     }
 
     // getConsensus tests removed — function moved to off-chain indexing (EIP-170 size limit)

@@ -1,0 +1,134 @@
+diff --git a/ios/Bobby/Sources/BaseSwap.swift b/ios/Bobby/Sources/BaseSwap.swift
+index d4ef5f6..8c0b67e 100644
+--- a/ios/Bobby/Sources/BaseSwap.swift
++++ b/ios/Bobby/Sources/BaseSwap.swift
+@@ -62,6 +62,9 @@ struct BaseSwapQuote: Decodable, Equatable {
+         let marketDeviationPct: Double
+         let pausedFeatures: String
+         let transferPaused: Bool
++        let issuerPaused: Bool?
++        let usable: Bool?
++        let status: String?
+     }
+ 
+     let chainId: Int
+@@ -112,6 +115,7 @@ enum BaseSwapGuard {
+         "GOOGLc": "0xb2000000000000000000002d0ba3164cc74f58b7",
+         "METAc": "0xb2000000000000000000008bc8786b856e61707c",
+         "NVDAc": "0xb20000000000000000000078ee7ce2fe4908108c",
++        "SPCXc": "0xb2000000000000000000007b9fcbd005511acbd5",
+     ]
+ 
+     private static let approveSelector: [UInt8] = [0x09, 0x5e, 0xa7, 0xb3]
+@@ -162,11 +166,14 @@ enum BaseSwapGuard {
+ 
+         try require(quote.requiresStockEligibility, "quote does not identify the stock eligibility gate")
+         try require(quote.route.kind == "single" && quote.route.fees.count == 1 && allowedFees.contains(quote.route.fees[0]), "route is not a pinned direct V3 pool")
+-        try require(quote.limits.minTicketUsd == 1 && quote.limits.maxTicketUsd >= 1 && quote.limits.maxTicketUsd <= 100, "server ticket limits exceed the app policy")
++        let ticketCap = symbols.contains("SPCXc") ? 10.0 : 100.0
++        try require(quote.limits.minTicketUsd == 1 && quote.limits.maxTicketUsd >= 1 && quote.limits.maxTicketUsd <= ticketCap, "server ticket limits exceed the app policy")
+         try require(quote.limits.defaultSlippagePct == 0.5 && quote.limits.maxSlippagePct == 3, "server slippage limits differ from the app policy")
+         try require(quote.limits.maxPriceImpactPct == 3 && quote.limits.deadlineSec == 1_200, "server execution limits differ from the app policy")
+         try require(quote.priceImpactPct != nil && abs(quote.priceImpactPct!) <= min(3, quote.limits.maxPriceImpactPct), "price impact is unavailable or over 3%")
+-        try require(quote.usdValue != nil && quote.usdValue! >= max(1, quote.limits.minTicketUsd) && quote.usdValue! <= min(100, quote.limits.maxTicketUsd), "ticket is outside the $1-$100 limit")
++        try require(quote.usdValue != nil && quote.usdValue! >= max(1, quote.limits.minTicketUsd) && quote.usdValue! <= min(ticketCap, quote.limits.maxTicketUsd), "ticket is outside the local USD limit")
++        let stableAmount = Double(quote.tokenIn.symbol == "USDC" ? quote.amountIn : quote.amountOut)
++        try require(stableAmount != nil && stableAmount!.isFinite && stableAmount! >= 1 && stableAmount! <= min(ticketCap, quote.limits.maxTicketUsd) && abs(stableAmount! - quote.usdValue!) <= 0.000001, "USD value differs from the USDC amount or exceeds the local limit")
+         guard let reference = quote.stockReference else { throw BaseSwapSecurityError.refused("stock reference is missing") }
+         let stock = quote.tokenIn.symbol == "USDC" ? quote.tokenOut.symbol : quote.tokenIn.symbol
+         try require(reference.symbol == stock, "stock reference is for another token")
+@@ -174,6 +181,8 @@ enum BaseSwapGuard {
+         try require(reference.ageSec >= 0 && reference.ageSec <= 96 * 60 * 60, "stock reference is stale")
+         try require(reference.marketDeviationPct >= 0 && reference.marketDeviationPct <= 5, "stock reference deviation is over 5%")
+         try require(!reference.transferPaused, "issuer has paused transfers")
++        try require(reference.issuerPaused == false, "issuer oracle availability is not confirmed")
++        try require(reference.usable == true && ["fresh", "market-closed"].contains(reference.status ?? ""), "stock reference is not usable")
+         if let transactions = quote.tx {
+             let seconds = Int(now.timeIntervalSince1970)
+             try require(transactions.chainId == chainId, "transaction set is not on Base")
+diff --git a/ios/Bobby/Sources/BaseSwapView.swift b/ios/Bobby/Sources/BaseSwapView.swift
+index 323719e..f6522c1 100644
+--- a/ios/Bobby/Sources/BaseSwapView.swift
++++ b/ios/Bobby/Sources/BaseSwapView.swift
+@@ -35,11 +35,11 @@ struct BaseSwapView: View {
+     @State private var phase: Phase = .idle
+     @State private var txHash: String?
+ 
+-    private static let stocks = ["AAPLc", "GOOGLc", "METAc", "NVDAc"]
++    private static let stocks = ["AAPLc", "GOOGLc", "METAc", "NVDAc", "SPCXc"]
+ 
+     init(defaultSymbol: String? = nil) {
+         let normalized = (defaultSymbol ?? "NVDA").uppercased().replacingOccurrences(of: "C", with: "c")
+-        let aliases = ["AAPL": "AAPLc", "GOOGL": "GOOGLc", "GOOG": "GOOGLc", "META": "METAc", "NVDA": "NVDAc"]
++        let aliases = ["AAPL": "AAPLc", "GOOGL": "GOOGLc", "GOOG": "GOOGLc", "META": "METAc", "NVDA": "NVDAc", "SPCX": "SPCXc"]
+         let selected = Self.stocks.contains(normalized) ? normalized : aliases[(defaultSymbol ?? "NVDA").uppercased()] ?? "NVDAc"
+         _stock = State(initialValue: selected)
+     }
+diff --git a/ios/Bobby/Tests/BaseSwapGuardTests.swift b/ios/Bobby/Tests/BaseSwapGuardTests.swift
+index 06d8260..750ff3a 100644
+--- a/ios/Bobby/Tests/BaseSwapGuardTests.swift
++++ b/ios/Bobby/Tests/BaseSwapGuardTests.swift
+@@ -90,16 +90,40 @@ final class BaseSwapGuardTests: XCTestCase {
+         XCTAssertThrowsError(try BaseSwapGuard.rawAmount("1.0000001", decimals: 6))
+     }
+ 
++    func testSpaceXHasIndependentTenDollarCap() throws {
++        try BaseSwapGuard.validateQuote(quote(tx: nil, stock: "SPCXc", maxTicketUsd: 10), requestedTokenIn: "USDC", requestedTokenOut: "SPCXc", inputAmount: "10", slippagePct: 0.5, wallet: wallet)
++        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, stock: "SPCXc", maxTicketUsd: 100), requestedTokenIn: "USDC", requestedTokenOut: "SPCXc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, stock: "SPCXc", maxTicketUsd: 10, ticketUsd: 11), requestedTokenIn: "USDC", requestedTokenOut: "SPCXc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, stock: "SPCXc", maxTicketUsd: 10, ticketUsd: 1), requestedTokenIn: "USDC", requestedTokenOut: "SPCXc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++    }
++
++    func testRequiresUsableIssuerReference() throws {
++        for paused: Bool? in [true, nil] {
++            XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, issuerPaused: paused), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++        }
++        for status: String? in ["stale", "issuer-paused", "unusable", nil] {
++            XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, referenceStatus: status), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++        }
++        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, referenceUsable: false), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++        try BaseSwapGuard.validateQuote(quote(tx: nil, referenceStatus: "market-closed"), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet)
++    }
++
+     private func quote(
+         tx: BaseSwapTransactionSet?,
+         minAmountOut: String = "0.04283114",
+-        minAmountOutRaw: String = "4283114"
++        minAmountOutRaw: String = "4283114",
++        issuerPaused: Bool? = false,
++        referenceUsable: Bool? = true,
++        referenceStatus: String? = "fresh",
++        stock: String = "NVDAc",
++        maxTicketUsd: Double = 100,
++        ticketUsd: Double = 10
+     ) -> BaseSwapQuote {
+         BaseSwapQuote(
+             chainId: 8453,
+             venue: .init(name: "Uniswap V3 (SwapRouter02)", router: BaseSwapGuard.router),
+             tokenIn: .init(symbol: "USDC", name: "USD Coin", address: BaseSwapGuard.tokenAddresses["USDC"]!, decimals: 6),
+-            tokenOut: .init(symbol: "NVDAc", name: "Coinbase Tokenized NVIDIA", address: BaseSwapGuard.tokenAddresses["NVDAc"]!, decimals: 8),
++            tokenOut: .init(symbol: stock, name: stock, address: BaseSwapGuard.tokenAddresses[stock]!, decimals: 8),
+             amountIn: "10",
+             amountInRaw: "10000000",
+             amountOut: "0.04304638",
+@@ -108,7 +132,7 @@ final class BaseSwapGuardTests: XCTestCase {
+             minAmountOutRaw: minAmountOutRaw,
+             executionPrice: 0.004304638,
+             priceImpactPct: 0.3,
+-            usdValue: 10,
++            usdValue: ticketUsd,
+             slippagePct: 0.5,
+             deadline: deadline,
+             route: .init(kind: "single", fees: [3000], description: "USDC → NVDAc (0.3%)", gasEstimate: "93242"),
+@@ -118,9 +142,9 @@ final class BaseSwapGuardTests: XCTestCase {
+             simulation: .init(ran: true, ok: true, reason: nil),
+             txWithheld: [],
+             warnings: [],
+-            limits: .init(maxTicketUsd: 100, minTicketUsd: 1, defaultSlippagePct: 0.5, maxSlippagePct: 3, maxPriceImpactPct: 3, deadlineSec: 1200),
++            limits: .init(maxTicketUsd: maxTicketUsd, minTicketUsd: 1, defaultSlippagePct: 0.5, maxSlippagePct: 3, maxPriceImpactPct: 3, deadlineSec: 1200),
+             requiresStockEligibility: true,
+-            stockReference: .init(symbol: "NVDAc", usdPrice: 231.14, ageSec: 60, multiplierHuman: 1, marketDeviationPct: 0.5, pausedFeatures: "0", transferPaused: false)
++            stockReference: .init(symbol: stock, usdPrice: 231.14, ageSec: 60, multiplierHuman: 1, marketDeviationPct: 0.5, pausedFeatures: "0", transferPaused: false, issuerPaused: issuerPaused, usable: referenceUsable, status: referenceStatus)
+         )
+     }
+ 

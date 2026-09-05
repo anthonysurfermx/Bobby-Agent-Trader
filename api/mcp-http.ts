@@ -9,6 +9,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { parseEther } from 'ethers';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { challengeIdToBytes32 } from './_lib/challenge-id.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -22,12 +23,7 @@ import {
   readMcpCallFee,
   verifyMcpPaymentTx,
 } from './_lib/protocol-payments.js';
-import {
-  createChallenge,
-  atomicConsumeChallenge,
-  getLatestReceipt,
-  storeReceipt,
-} from './_lib/mcp-challenges.js';
+import { createChallenge, getLatestReceipt, storeReceipt, claimChallenge, completeChallenge, failChallenge, requestHashFor } from './_lib/mcp-challenges.js';
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
 import { logHarnessEvent } from './_lib/harness-events.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
@@ -224,7 +220,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
       record: {
         trust_score: trust.score || 0,
         commitments: rep.totalCommitments || 0,
-        win_rate: rep.winRate || 0,
+        win_rate: rep.winRate ?? null, // third round: unavailable stays null, never a coerced zero
       },
       guardrails: 'fail-closed: conviction>=3.5, mandatory stop, circuit breaker, 20% drawdown kill',
       mcp: `${BASE_URL}/api/mcp-http`,
@@ -308,18 +304,23 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
     const trust = rep.trustScore as Record<string, unknown> || {};
     const cp = (cpRes as Record<string, unknown>) || {};
     const rd = cp.risk_decisions as Record<string, unknown> || {};
+    // Third round (BP-11 sibling): the reputation endpoint reports unavailable sources as null —
+    // an MCP client must see "unavailable", never a coerced zero.
+    const trackRecordAvailable = rep.ok !== false && (rep.sources as Record<string, string> | undefined)?.trackRecord !== 'unavailable';
+    const num = (v: unknown) => (trackRecordAvailable && v !== null && v !== undefined ? Number(v) : null);
     const stats = {
       protocol: 'Bobby Protocol',
+      track_record_available: trackRecordAvailable,
       track_record: {
-        total_trades_resolved: reputation.totalTrades || 0,
-        total_commitments: reputation.totalCommitments || 0,
-        wins: reputation.wins || 0,
-        losses: reputation.losses || 0,
-        win_rate_pct: reputation.winRate || 0,
-        cumulative_pnl_pct: reputation.cumulativePnlPct || 0,
-        pending_resolution: reputation.pendingResolution || 0,
+        total_trades_resolved: num(reputation.totalTrades),
+        total_commitments: num(reputation.totalCommitments),
+        wins: num(reputation.wins),
+        losses: num(reputation.losses),
+        win_rate_pct: num(reputation.winRate),
+        cumulative_pnl_pct: num(reputation.cumulativePnlPct),
+        pending_resolution: num(reputation.pendingResolution),
       },
-      trust_score: trust.score || 0,
+      trust_score: trust.score ?? null,
       last_24h: {
         debates: rd.total_debates || 0,
         executed: rd.executed || 0,
@@ -345,6 +346,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
       method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'balance', params: { chain: args.chain || 'base' } }),
     });
+    if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
   }
 
@@ -353,6 +355,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
       method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '8453' } }),
     });
+    if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
   }
 
@@ -361,6 +364,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
       method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'scan-token', params: { address: args.address, chain: args.chain || '1' } }),
     });
+    if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
   }
 
@@ -369,6 +373,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
       method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'trending', params: { chain: args.chain || '1' } }),
     });
+    if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
   }
 
@@ -377,6 +382,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
       method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ action: 'signals', params: { chain: args.chain || '1', type: args.type || 'smart_money' } }),
     });
+    if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
     return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
   }
 
@@ -456,7 +462,9 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
   if (name === 'bobby_bounty_challenge') {
     const bountyId = String(args.bounty_id || '').trim();
     if (!bountyId) throw new Error('bounty_id is required');
-    const built = buildSubmitChallengeCalldata({
+    // BP-07: the bounty's fixed challenge bond rides along as msg.value —
+    // without it the contract reverts ("Challenge bond required").
+    const built = await buildSubmitChallengeCalldata({
       bountyId,
       evidenceHash: String(args.evidence_hash || ''),
     });
@@ -466,8 +474,11 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
         chainId: PROTOCOL_CHAIN_ID,
         to: built.to,
         data: built.data,
-        value: '0x0',
-        note: 'Sign and send from your wallet. Evidence must already be pinned off-chain (IPFS/Arweave) before posting.',
+        value: built.value,
+        valueWei: built.valueWei,
+        valueNative: built.valueNative,
+        nativeSymbol: DEFAULT_CHAIN.nativeSymbol,
+        note: 'Sign and send from your wallet with exactly this value: it is the challenge bond fixed for this bounty at post time (returned to the winner; losing bonds go to the treasury). Evidence must already be pinned off-chain (IPFS/Arweave) before posting.',
       }, null, 2) }],
     };
   }
@@ -838,6 +849,7 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
 
       // x402 payment gate for premium tools
       let verifiedPayment: Awaited<ReturnType<typeof verifyMcpPaymentTx>> | null = null;
+      let claimedChallengeId: string | null = null;
 
       if (PREMIUM_TOOLS.has(toolName)) {
         const txHash = extractPaymentTxHash(
@@ -847,13 +859,15 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
         );
         const challengeIdHeader = String(req.headers['x-challenge-id'] || '').trim();
 
+        // BP-08: the challenge is issued FOR this exact request (tool + arguments).
+        const requestHash = requestHashFor(toolName, args);
         if (!txHash) {
           // No payment → create challenge, return 402
           const fee = await readMcpCallFee();
-          const { challengeId, expiresAt } = await createChallenge(
+          const { challengeId, expiresAt, clientSecret } = await createChallenge(
             toolName,
             fee.feeWei,
-            undefined,
+            requestHash,
             String(req.headers['x-agent-name'] || '').trim() || undefined,
           );
           void logAgentCommerceEvent({
@@ -881,7 +895,11 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
             chainId: fee.chainId,
             contract: BOBBY_AGENT_ECONOMY,
             method: 'payMCPCall(bytes32 challengeId, string toolName)',
-            instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol}, then retry with headers x-402-payment: <txHash> and x-challenge-id: ${challengeId}`,
+            // BP-08: the secret is shown ONCE; only its holder, repeating the SAME request, can redeem.
+            clientSecret,
+            // Third-round BP-08: the bytes32 the contract takes is the uuid left-aligned with a zero tail.
+            challengeIdBytes32: challengeIdToBytes32(challengeId),
+            instructions: `Call payMCPCall(${challengeIdToBytes32(challengeId)}, "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol} (bytes32 = the challenge uuid's 32 hex chars, left-aligned, zero-padded), then retry the identical request with headers x-402-payment: <txHash>, x-challenge-id: ${challengeId} and x-challenge-secret: ${clientSecret}`,
           });
         }
 
@@ -895,19 +913,27 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
         if (challengeIdHeader && effectiveChallengeId && challengeIdHeader.toLowerCase() !== effectiveChallengeId.toLowerCase()) {
           return jsonrpcError(id, -32402, 'Challenge id does not match the paid transaction.', { protocol: 'x402' });
         }
-        if (!effectiveChallengeId) return jsonrpcError(id, -32402, 'Paid transaction carries no challenge id.', { protocol: 'x402' });
-        {
-          const { consumed } = await atomicConsumeChallenge(effectiveChallengeId, txHash, verifiedPayment.payer);
-          if (!consumed) {
-            return jsonrpcError(id, -32402, 'Challenge already consumed, expired, or not found. Request a new challenge.', {
-              challengeId: effectiveChallengeId, txHash,
-            });
-          }
+        if (!effectiveChallengeId) return jsonrpcError(id, -32402, 'Paid transaction does not carry a Bobby challenge id (bytes32 must be the challenge uuid, left-aligned, zero-padded).', { protocol: 'x402' });
+        // BP-08: redemption is authorised by the client secret and bound to the identical request —
+        // a public tx hash is payment evidence, never a redemption credential.
+        const clientSecret = String(req.headers['x-challenge-secret'] || '').trim();
+        const claim = await claimChallenge(effectiveChallengeId, txHash, verifiedPayment.payer, clientSecret, requestHash);
+        if (claim.outcome === 'replay') return jsonrpcOk(id, claim.result); // already fulfilled for this client: no second execution
+        if (claim.outcome === 'refused') {
+          return jsonrpcError(id, -32402, claim.reason, { challengeId: effectiveChallengeId, txHash });
         }
+        claimedChallengeId = effectiveChallengeId;
       }
 
-      // Execute the tool
-      const result = await executeTool(toolName, args);
+      // Execute the tool. A paid call that fails is left retryable, never consumed.
+      let result: Awaited<ReturnType<typeof executeTool>>;
+      try {
+        result = await executeTool(toolName, args);
+      } catch (error) {
+        if (claimedChallengeId) await failChallenge(claimedChallengeId, error instanceof Error ? error.message : String(error));
+        throw error;
+      }
+      if (claimedChallengeId) await completeChallenge(claimedChallengeId, result);
 
       if (!PREMIUM_TOOLS.has(toolName)) {
         void logAgentCommerceEvent({

@@ -17,8 +17,11 @@ const MAX_DAILY_AWARDS = 3;
 export const AWARD_POINTS = { read_complete: 10, no_trade_respected: 20 } as const;
 export type AwardKind = keyof typeof AWARD_POINTS;
 
+/** Desk verdict carried by the queued read and saved by /api/progress. */
+export interface ThesisSnapshot { symbol: string; isEquity: boolean; direction: 'long' | 'short' | 'none'; price: number | null; entry: number | null; stop: number | null; target: number | null }
+
 /** An award the server has not acknowledged yet (offline / not signed in). */
-export interface PendingEvent { id: string; kind: AwardKind; at: string; tzOffsetMin: number }
+export interface PendingEvent { id: string; kind: AwardKind; at: string; tzOffsetMin: number; thesis?: ThesisSnapshot; thesisReadId?: string }
 
 /** What /api/progress returns; applied on top of local state. */
 export interface ServerProgress {
@@ -154,8 +157,8 @@ export const progressStore = {
     });
   },
 
-  /** Returns what was ACTUALLY awarded (0 when the daily cap said no). */
-  awardDiscipline(kind: AwardKind, now = new Date()): AwardResult {
+  /** Returns what was ACTUALLY awarded; preserves the thesis for offline sync. */
+  awardDiscipline(kind: AwardKind, now = new Date(), thesis?: ThesisSnapshot, thesisReadId?: string): AwardResult {
     const points = AWARD_POINTS[kind];
     const today = dayKey(now);
     let dailyAwards = state.dailyAwardsDay === today ? state.dailyAwards : 0;
@@ -181,7 +184,7 @@ export const progressStore = {
 
     // Queue for the server: it re-applies the same rules and is the authority.
     const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const pendingEvents = [...state.pendingEvents, { id, kind, at: now.toISOString(), tzOffsetMin: now.getTimezoneOffset() }].slice(-50);
+    const pendingEvents = [...state.pendingEvents, { id, kind, at: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), ...(thesis ? { thesis: { ...thesis } } : {}), ...(thesisReadId ? { thesisReadId } : {}) }].slice(-50);
     commit({ ...state, xp, streak, lastDay: today, dailyAwards, dailyAwardsDay: today, pendingEvents });
     return { awarded: points, evolvedTo, drops };
   },

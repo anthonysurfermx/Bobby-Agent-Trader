@@ -1,0 +1,700 @@
+{
+  "checkedAt": "2026-09-05T13:58:40.541Z",
+  "admission": "NO-GO",
+  "tokens": [
+    {
+      "symbol": "AAPLc",
+      "chainId": 8453,
+      "address": "0xb200000000000000000000C2e324d24d7eEcd1fb",
+      "admission": "pending-review",
+      "blockNumber": "50913686",
+      "blockHash": "0xddc36a59a9fb27b7a71bf346cf254bab904b03e5bc344e97cf7fddaff847301c",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "320.08",
+        "ageSec": 64804,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [
+        {
+          "fee": 3000,
+          "buyOutRaw": "3110678",
+          "sellOutUsdc": "9.939337"
+        },
+        {
+          "fee": 10000,
+          "buyOutRaw": "3078685",
+          "sellOutUsdc": "9.795318"
+        }
+      ],
+      "pools": [
+        {
+          "fee": 100,
+          "address": "0x41CC7D3162989a25701CEacd3c7104483b2298aE",
+          "activeLiquidityRaw": "0"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "address": "0x97F35d1E92795327614BE000cd18cba1Be2c1931",
+          "activeLiquidityRaw": "148056250640"
+        },
+        {
+          "fee": 10000,
+          "address": "0x7cB5eB63cef446168EB29f892e5759789B29bFD4",
+          "activeLiquidityRaw": "18945178721"
+        }
+      ],
+      "unverifiedFeeTiers": [
+        100
+      ],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "GOOGLc",
+      "chainId": 8453,
+      "address": "0xb2000000000000000000002D0BA3164cc74f58B7",
+      "admission": "pending-review",
+      "blockNumber": "50913687",
+      "blockHash": "0xa6f4b5fadedb955a09209035a654c356db10945d035701a56d685cd7ea62d9c3",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "338.71195",
+        "ageSec": 84840,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [
+        {
+          "fee": 3000,
+          "buyOutRaw": "2936870",
+          "sellOutUsdc": "9.939076"
+        },
+        {
+          "fee": 10000,
+          "buyOutRaw": "2902627",
+          "sellOutUsdc": "9.800931"
+        }
+      ],
+      "pools": [
+        {
+          "fee": 100,
+          "status": "no-pool"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "address": "0x8634EE4145A63E40E44e12A6Bb1B905Fcb8856a6",
+          "activeLiquidityRaw": "106211153153"
+        },
+        {
+          "fee": 10000,
+          "address": "0x1f52F46BaC657564c31122b12b43A459E09273C8",
+          "activeLiquidityRaw": "1580292349140"
+        }
+      ],
+      "unverifiedFeeTiers": [],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "METAc",
+      "chainId": 8453,
+      "address": "0xb2000000000000000000008bC8786B856E61707C",
+      "admission": "pending-review",
+      "blockNumber": "50913688",
+      "blockHash": "0x30be1884925fe3bdcad755b0297fc8b9f19841c2e81f7fb74c367b5711dea2bc",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "615.23",
+        "ageSec": 67716,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [
+        {
+          "fee": 3000,
+          "buyOutRaw": "1625467",
+          "sellOutUsdc": "9.938815"
+        }
+      ],
+      "pools": [
+        {
+          "fee": 100,
+          "address": "0xe3B613E025f5BECcD64AC800CF87998bD461CC5F",
+          "activeLiquidityRaw": "0"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "address": "0x583919ec1975a1238C50e1940911894ee6912476",
+          "activeLiquidityRaw": "62995769821"
+        },
+        {
+          "fee": 10000,
+          "status": "no-pool"
+        }
+      ],
+      "unverifiedFeeTiers": [
+        100
+      ],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "NVDAc",
+      "chainId": 8453,
+      "address": "0xb20000000000000000000078ee7ce2fE4908108C",
+      "admission": "pending-review",
+      "blockNumber": "50913688",
+      "blockHash": "0x30be1884925fe3bdcad755b0297fc8b9f19841c2e81f7fb74c367b5711dea2bc",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "229.9573",
+        "ageSec": 71668,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [
+        {
+          "fee": 3000,
+          "buyOutRaw": "4312965",
+          "sellOutUsdc": "9.93978"
+        }
+      ],
+      "pools": [
+        {
+          "fee": 100,
+          "status": "no-pool"
+        },
+        {
+          "fee": 500,
+          "address": "0xD3085c0C2605CEf89F02A742AcDfAc95DcA79BcD",
+          "activeLiquidityRaw": "0"
+        },
+        {
+          "fee": 3000,
+          "address": "0x60661b315553EB81872deEA9a66d567Cf0CCd33B",
+          "activeLiquidityRaw": "421867667009"
+        },
+        {
+          "fee": 10000,
+          "address": "0x9778AAd868418FF6c996294Ce62c9Ed2B96896D1",
+          "activeLiquidityRaw": "0"
+        }
+      ],
+      "unverifiedFeeTiers": [
+        500,
+        10000
+      ],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "AMZNc",
+      "chainId": 8453,
+      "address": "0xb200000000000000000000d9192b6B456483C2E8",
+      "admission": "pending-review",
+      "blockNumber": "50913689",
+      "blockHash": "0x99f12f6d34c0b85a3275a2a5c0d4268086cc3e4859348c7469d5e235f69ccf8e",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "257.69395",
+        "ageSec": 64250,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [],
+      "pools": [
+        {
+          "fee": 100,
+          "status": "no-pool"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "status": "no-pool"
+        },
+        {
+          "fee": 10000,
+          "status": "no-pool"
+        }
+      ],
+      "unverifiedFeeTiers": [],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "MSFTc",
+      "chainId": 8453,
+      "address": "0xB200000000000000000000Ab99cFa739E253872B",
+      "admission": "pending-review",
+      "blockNumber": "50913689",
+      "blockHash": "0x99f12f6d34c0b85a3275a2a5c0d4268086cc3e4859348c7469d5e235f69ccf8e",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "499.778",
+        "ageSec": 80420,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [],
+      "pools": [
+        {
+          "fee": 100,
+          "status": "no-pool"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "status": "no-pool"
+        },
+        {
+          "fee": 10000,
+          "status": "no-pool"
+        }
+      ],
+      "unverifiedFeeTiers": [],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "MSTRc",
+      "chainId": 8453,
+      "address": "0xb2000000000000000000004884b426556b92883d",
+      "admission": "pending-review",
+      "blockNumber": "50913690",
+      "blockHash": "0xa3a43ecd70ed29d289eff28bfa2fab7ffa95e8cdfc539e4825584840aa61ba70",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "142.63235",
+        "ageSec": 59334,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [],
+      "pools": [
+        {
+          "fee": 100,
+          "status": "no-pool"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "status": "no-pool"
+        },
+        {
+          "fee": 10000,
+          "status": "no-pool"
+        }
+      ],
+      "unverifiedFeeTiers": [],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "SNDKc",
+      "chainId": 8453,
+      "address": "0xb200000000000000000000397293Cb8cda9a10c5",
+      "admission": "pending-review",
+      "blockNumber": "50913690",
+      "blockHash": "0xa3a43ecd70ed29d289eff28bfa2fab7ffa95e8cdfc539e4825584840aa61ba70",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "1732.8674",
+        "ageSec": 63674,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [],
+      "pools": [
+        {
+          "fee": 100,
+          "status": "no-pool"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "status": "no-pool"
+        },
+        {
+          "fee": 10000,
+          "status": "no-pool"
+        }
+      ],
+      "unverifiedFeeTiers": [],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "SPCXc",
+      "chainId": 8453,
+      "address": "0xb2000000000000000000007b9fcbd005511aCBd5",
+      "admission": "pending-review",
+      "blockNumber": "50913691",
+      "blockHash": "0x096203699103e12d90ed9ab242b5befa053aa6fa8119bbeae388e293c661d6e4",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "148.1",
+        "ageSec": 65102,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [
+        {
+          "fee": 3000,
+          "buyOutRaw": "6621981",
+          "sellOutUsdc": "9.877484"
+        },
+        {
+          "fee": 10000,
+          "buyOutRaw": "6556353",
+          "sellOutUsdc": "9.800777"
+        }
+      ],
+      "pools": [
+        {
+          "fee": 100,
+          "status": "no-pool"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "address": "0xE08e2EDA9ce04009274Cf6E6543F9A234Bd910D2",
+          "activeLiquidityRaw": "2564202621"
+        },
+        {
+          "fee": 10000,
+          "address": "0x127a12FC0953ab2ab89558c67Ba6D597D7140431",
+          "activeLiquidityRaw": "710587236245"
+        }
+      ],
+      "unverifiedFeeTiers": [],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "TSLAc",
+      "chainId": 8453,
+      "address": "0xb2000000000000000000001e800a7f5189430cD0",
+      "admission": "pending-review",
+      "blockNumber": "50913691",
+      "blockHash": "0x096203699103e12d90ed9ab242b5befa053aa6fa8119bbeae388e293c661d6e4",
+      "identityMatches": true,
+      "decimals": 8,
+      "oracle": {
+        "price": "353.33495",
+        "ageSec": 64572,
+        "complete": true,
+        "positive": true,
+        "paused": false,
+        "multiplier": "1000000000000000000"
+      },
+      "tenUsdcRoundTripQuotes": [],
+      "pools": [
+        {
+          "fee": 100,
+          "status": "no-pool"
+        },
+        {
+          "fee": 500,
+          "status": "no-pool"
+        },
+        {
+          "fee": 3000,
+          "status": "no-pool"
+        },
+        {
+          "fee": 10000,
+          "status": "no-pool"
+        }
+      ],
+      "unverifiedFeeTiers": [],
+      "remainingGates": [
+        "ticket-cap depth and impact",
+        "policy and transfer checks",
+        "issuer legal review",
+        "final-candidate web/API/iOS regression",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "PYPLon",
+      "chainId": 1,
+      "address": "0x4EFD92F372898B57F292De69fCe377dd7D912bDd",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "UBERon",
+      "chainId": 1,
+      "address": "0x5Bcd8195E3Ef58f677aeF9eBC276B5087c027050",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "DISon",
+      "chainId": 1,
+      "address": "0xc3D93B45249E8E06cfeB01d25A96337E8893265d",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "AMDon",
+      "chainId": 1,
+      "address": "0x0C1f3412A44Ff99E40bF14e06e5Ea321aE7B3938",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "JPMon",
+      "chainId": 1,
+      "address": "0x03C1EC4CA9DBb168E6Db0DeF827c085999CBffaF",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "CRMon",
+      "chainId": 1,
+      "address": "0x55720eF5b023Fd043AE5F8D2e526030207978950",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "COINon",
+      "chainId": 1,
+      "address": "0xF042cfa86cf1D598a75Bdb55c3507a1F39f9493b",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "ADBEon",
+      "chainId": 1,
+      "address": "0x7042a8fFc7c7049684BfBc2fcb41b72380755a43",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "Von",
+      "chainId": 1,
+      "address": "0xaC37c20C1d0E5285035e056101a64e263Ff94a41",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    },
+    {
+      "symbol": "NFLXon",
+      "chainId": 1,
+      "address": "0x032deC3372F25C41EA8054B4987a7c4832CDB338",
+      "admission": "pending-review",
+      "blockNumber": "25911578",
+      "blockHash": "0x1d721682082364ebc2a1b1db93502607459cf530251c87c067342f2e1f8dbc40",
+      "identityMatches": true,
+      "decimals": 18,
+      "remainingGates": [
+        "issuer-specific oracle",
+        "eligible execution venue and liquidity",
+        "issuer-specific eligibility",
+        "chain adapter",
+        "web/API/iOS integration",
+        "independent release approval"
+      ]
+    }
+  ]
+}

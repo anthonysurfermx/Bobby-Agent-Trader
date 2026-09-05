@@ -31,11 +31,13 @@ generic suite as a substitute.* Every row below therefore points at a test that
 Run on `security/remediation-r2` after the last edit:
 
 - `forge test` — 14 suites, **257 passed, 0 failed** (2a: 228; 2b: 236; 3b: 243; 4: 248; 5: 250; 6 adds seven stake-exit/TTL regressions)
-- `test:remediation-r2` — 23/23 (2a: 15; 2b: 20; 3b: 22)
+- `test:remediation-r2` — 37/37 (… 12: BP-09; 12b: BP-04 parsing + precedence, BP-08 lifecycle + transports, BP-10 read-failure/owner-change)
+- `test:agent-registry-pg` — pass (BP-10 CAS + transfer + nonce on PostgreSQL 17)
 - `test:hardness-abi-anvil` — pass (generated ABI equals the artifact; bytecode-backed decode of every backend getter)
-- `test:rls-lockdown-pg` — exploit reproduced on the shipped policies, then refused; views and C-04 asserted (PostgreSQL 17, scratch schema, stand-in roles)
+- `test:rls-lockdown-pg` — pass: exploit reproduced on the shipped policies, then refused; migrations 0010 **and 0011**; real-producer rows for wallet / scheduled / manual / untagged cycles — only the scheduled one is public (PostgreSQL 17, scratch schema, stand-in roles)
 - `test:api-security` — 47/47
-- `test:base-swap` — pass
+- `test:base-swap` — pass, including BP-01 (1 consistent journey + 20 refusals) and BP-14 (reference validator matrix)
+- iOS `BaseSwapGuardTests` 9/9 + `RPCCorrelatorTests` 6/6 — 18/18 across the three suites (BaseSwapGuard 9, RPCCorrelator 6, WalletSessionValidator 3) on the iPhone 17 Pro simulator
 - `check:api` (tsc) — pass · `eslint` on every touched file — 0 errors
 - `npm run build` — pass
 
@@ -189,7 +191,276 @@ Round-6 verification: Foundry **257/257** across 14 suites; targeted new/adjacen
 83/83; `test:remediation-r2` 23/23; `test:hardness-abi-anvil`, `check:api`, lint,
 `git diff --check`, and the production Vite build all pass.
 
-## For the final round
+## Round 7 review (Codex) — NO-GO on `44a2d51`: slash and timestamp edge cases
+
+| # | Codex finding | Fix | Regression |
+|---|---|---|---|
+| P1 | A full Safe slash set `registered = false`, but an already-active service remained payable because `payForService` checked only `service.active`. The slashed agent could keep collecting service fees without stake. | `payForService` now also requires the service owner to remain registered. This disables every service after a full slash without an unbounded loop over `serviceKeys`; re-staking deliberately restores service availability. | `test_slashAgent_fullSlashStopsExistingServicePayments` registers a live service, fully slashes its owner, and proves the next payment is refused. |
+| P2 | Prediction and signal expiry snapshots cast `block.timestamp + delay` to `uint64`, while their time setters accepted arbitrarily large `uint256` values. Even a boundary value accepted by the Safe would become unsafe in a later block. | All three setters reject delays that cannot be represented as future `uint64` timestamps, and `commitPrediction`/`publishSignal` independently recheck representability when the snapshot is created. | `test_predictionTimeSettersRejectUint64Truncation` and `test_signalTimeSetterAndPublishRejectUint64Truncation` cover the first overflowing setter value and the later-block use of a formerly valid boundary. |
+
+Post-fix verification: Foundry **260/260** across 14 suites; targeted
+`HardnessRegistryTest` **59/59**; `test:remediation-r2` **30/30**;
+`test:hardness-abi-anvil` confirms all 159 ABI entries equal the compiled artifact;
+production Vite build and `check:api` pass. The `HardnessRegistry` runtime is
+23,410 bytes, 1,166 bytes below EIP-170; bounties remain 12,006 bytes.
+
+This round changes `HardnessRegistry.sol`, so the deploy remains under the standing
+three-round rule; review the exact post-round-7 bytecode rather than treating these
+tests as deployment approval.
+
+## Round 8 review (Codex) — NO-GO on `a075bc5`: impossible prediction window
+
+| # | Codex finding | Fix | Regression |
+|---|---|---|---|
+| P1 | `setMinPredictionAge` and `setPredictionTTL` enforced their own floors and timestamp widths but not their relationship. The Safe could set `minPredictionAge > predictionTTL`; the reproduced prediction reverted `TooSoon` through its expiry and `Expired` once it reached `minResolveAt`, so no successful resolution was possible. Equality reduced the valid window to a single timestamp. | Both setters now preserve the strict invariant `minPredictionAge < predictionTTL`; `commitPrediction` independently refuses an invalid stored pair before accepting an obligation. | `test_predictionTimeSettersPreserveResolutionWindow` refuses equality in either setter order and proves a valid updated pair snapshots `minResolveAt < expiresAt`; `test_commitPrediction_rejectsInvalidStoredResolutionWindow` corrupts the pair beneath the setters and proves the commit-time defense. |
+
+The round-7 historical PoCs were also reproduced directly against detached
+`44a2d51`: all three vulnerable behaviors were observed (payable service after a
+full slash, later-block prediction expiry truncation, and later-block signal expiry
+truncation). On the current code, the expanded stake/service matrix covers partial
+and full slash, slash during exit, cooldown cleanup, re-registration, manual service
+deactivation/reactivation, and exact withdrawal conservation.
+
+Post-fix verification: Foundry **264/264** across 14 suites; targeted
+`HardnessRegistryTest` **63/63**; `test:remediation-r2` **30/30**;
+`test:hardness-abi-anvil` confirms all 159 ABI entries equal the compiled artifact;
+production Vite build and `check:api` pass. The `HardnessRegistry` runtime is
+23,471 bytes, 1,105 bytes below EIP-170; bounties remain 12,006 bytes.
+
+This round changes `HardnessRegistry.sol`, so the standing three-round requirement
+restarts from the post-round-8 commit.
+
+## Round 9 review (Codex) — GO 1/3 on the round-8 bytecode
+
+The impossible-window PoC was reproduced directly on detached `a075bc5`: a
+prediction configured with a two-hour minimum age and one-hour TTL returned
+`TooSoon` at expiry and `Expired` at its minimum resolve time. The temporary
+worktree was removed after the reproduction.
+
+No production source changed in this round. Three permanent regressions add 512
+fuzz cases across both valid setter orderings and invalid relationships, plus the
+one-second valid boundary. Equality, floors, the largest representable future
+timestamp, corrupted-storage commit defense, partial/full slash, exit cleanup,
+service toggles, and withdrawal conservation all pass.
+
+A clean `forge clean` rebuild reproduced `HardnessRegistry` runtime hash
+`0x3449ac0707c855588a1a0df8d45bddbd04aabfb1e35cb66f7a704006b043e0d5`,
+23,471 bytes with 1,105 bytes of EIP-170 margin. Every production contract remains
+under EIP-170 (`BobbyTrackRecordV2` is the closest at 24,094 bytes / 482 bytes of
+margin); the size command's non-zero exit is caused only by the 39,783-byte
+`DeployerEoa` test harness.
+
+Round-9 verification: Foundry **267/267** across 14 suites; targeted
+`HardnessRegistryTest` **66/66**; `test:remediation-r2` **30/30**; backend ABI
+**159/159**; production Vite build, `check:api`, and the clean compilation pass.
+This is the first clean review of three required on the exact round-8 runtime.
+
+## Round 10 review (Codex) — GO 2/3 on the round-8 bytecode
+
+No production source changed in this round. Two new stateful fuzz regressions add
+512 randomized runs across stake liability conservation and `activeServiceCount`
+transitions; Foundry also replayed the one saved counterexample that exposed and
+then confirmed the correction of a test-harness `vm.prank` ordering error.
+
+The liability model covers partial slash, service revenue, exit during cooldown,
+full or partial cooldown slash, unregister, withdrawal in either order,
+re-registration, and service reactivation. At every terminal point the sum of
+remaining stake and pull-payment liabilities equals the contract balance, and no
+withdrawal can be credited twice. The service-count model applies idempotent
+register/enable/disable operations across three services, then full-slashes and
+re-registers the agent; the stored count matches the modeled active states after
+every transition.
+
+Partial slash preserving registration is intentional and accepted: only the Safe
+can slash, so an agent cannot self-reduce its collateral, while the Safe may choose
+a proportional penalty. Full slash still unregisters the agent and immediately
+blocks payment through every previously active service.
+
+The exact `HardnessRegistry` runtime hash remains
+`0x3449ac0707c855588a1a0df8d45bddbd04aabfb1e35cb66f7a704006b043e0d5`;
+the production source is byte-for-byte unchanged from round 8. Its runtime remains
+23,471 bytes with 1,105 bytes of EIP-170 margin.
+
+Round-10 verification: Foundry **269/269** across 14 suites; targeted
+`HardnessRegistryTest` **68/68**; deployment gates **20/20**;
+`test:remediation-r2` **30/30**; backend ABI **159/159**; production Vite build and
+`check:api` pass. The real mainnet predeploy check correctly remains **31 NO-GO / 0
+PASS** because the secure deployment environment is absent; no placeholder secret,
+role, fee, stake, treasury, or resolver input was invented. This is the second clean
+review of three required on the exact round-8 runtime.
+
+## Round 11 review (Codex) — NO-GO on deployment configuration and CI
+
+The third review did not earn GO 3/3. The reward/bond settlement, refund,
+timeout and pull-payment paths did not produce a new liability finding, and the
+full suite remains **269/269** across 14 suites. However, the deployment review
+identified two unresolved P2s:
+
+1. `DeployBase._v2Params()` narrows seven full-width environment inputs before
+   validation. The constructor validates the truncated value, not the operator's
+   original input. The manifest and live verifier also omit these verification
+   parameters. Check before narrowing and carry every parameter through
+   configuration, manifest and live verification (BP-03).
+2. The CI contracts job runs `forge build --sizes` before tests/layout checks.
+   That command currently exits 1 on the oversized `DeployerEoa` test harness,
+   so the workflow never reaches the later checks. Enforce EIP-170 on the seven
+   production artifacts explicitly while preserving compilation/testing of the
+   harness (BP-06).
+
+Production source, deployment scripts and compiler configuration remain unchanged
+from round 8. `HardnessRegistry` runtime hash is still
+`0x3449ac0707c855588a1a0df8d45bddbd04aabfb1e35cb66f7a704006b043e0d5`,
+23,471 bytes; all seven production artifacts remain under EIP-170. The two prior
+clean runtime reviews remain recorded, but this round is not a third clean
+deployment review and grants no launch approval.
+
+Current verification: bounty/final-regression/deployment suites **81/81**;
+full Foundry **269/269**; backend ABI **159/159**; remediation **30/30**;
+API typecheck and production build pass. `forge build --sizes` **fails as described
+above**. No additional exploit reproduction or live write was performed.
+
+The user also requested a broader protocol/web/iOS stock-swap audit. The first
+expanded pass, including two signing-consent P1s, is recorded separately in
+[the 2026-09-04 audit](2026-09-04-protocol-stock-swaps-audit.md). Its findings and
+remaining coverage must be closed before enabling swaps, regardless of the
+contract review count.
+
+## Round 12 — the 2026-09-04 expanded review (14 findings, NO-GO): the three P1s closed
+
+Input: `docs/security/2026-09-04-protocol-stock-swaps-audit.md` on `8c3fba8`. Remediation
+order per that report: BP-01/BP-02/BP-09 first. Each closure below is the test the report
+asked for, not a green generic suite.
+
+| # | Finding | Fix | Closure evidence |
+|---|---|---|---|
+| **BP-01** P1 | Web signing guards compared decoded calldata to raw fields *from the same response*; the human saw decimal fields nobody bound to those units; no local minimum-received derivation. | `src/lib/base-swap/quote-guard.ts` → `assertQuoteConsistent(quote, request)`: rebuilds the economics in **integer units from the user's own request** (pair resolved through the pinned list — exact symbols, addresses, decimals; `parseUnits(amount)` must equal `amountInRaw` and every displayed field must equal its raw twin; `minAmountOutRaw` must equal `amountOutRaw·(10000−bps)/10000` for the user's slippage; non-zero outputs; local ticket cap, price-impact, deadline and recipient policy; stock reference symbol and pause). Both cards run it on every response **and again immediately before approval and swap**, and pass the **validated** values — not the response's — into the calldata decoders. `SwapConfirm` keeps the full quote; the reduced `execution.quote` is display only. | `test:base-swap`: one consistent approve→re-quote→swap journey through the decoders, and **20 inconsistent responses refused** — raw≠displayed (input, output, minimum), minimum not derived from output+slippage, server-changed slippage, wrong stock, reversed direction, zero output, non-canonical integer, over-cap ticket, over-limit impact, foreign recipient, far deadline, mismatched tx deadline, wrong router, wrong token address, foreign stock reference, paused issuer. |
+| **BP-02** P1 | iOS `validateQuote` checked the response was *an* allowed USDC/stock pair, never *the* pair the user selected; the receive label used the local selection. | `BaseSwapGuard.validateQuote(_:requestedTokenIn:requestedTokenOut:…)`: the selected pair (symbols **and** pinned addresses) is the first check; all three call sites pass `tokenIn/tokenOut` from `side/stock`; `loadQuote` freezes the request before the await and refuses a response if the selection moved meanwhile; the post-approval re-quote refuses a wallet change; `.onChange` on side/stock/amount/slippage/wallet resets the quote. | `BaseSwapGuardTests` on the iPhone 17 Pro simulator, **9/9**: wrong-stock response (consistent, allow-listed) refused with "you selected …"; reversed direction refused; degenerate/unpinned requested pair refused; the four existing tests carry the requested pair. |
+| **BP-09** P1 | Manual wallet cycles were logged without `owner_address`/`user_id`; migration 0010's view read that absence as "protocol-owned" and published halt reasons, timing and capital counters. | **Positive provenance.** `api/_lib/cycle-provenance.ts`: `cycleProvenance(isManual, wallet, operator)` decides once from the authorisation — manual+wallet → private+owner; scheduled or operator-authorised → public; manual without either → private — and `buildCycleRow` makes it win over whatever the data carried. `agent-run` takes it as a **required** argument of `logToSupabase` (all four branches: halt, no-signal, success, failure); `bobby-cycle` tags its rows `public` explicitly. Migration `0011`: `agent_cycles.visibility` (default **private**, checked), the cycles view requires `visibility = 'public'`, the trades view **joins the cycle** and requires it public. Historical rows stay private; a reviewed operator statement is left as a comment. Service-role readers that feed public surfaces (`harness-events`, `protocol-heartbeat`, `bobby-intel`, `conviction-tiers`, the cycle's own history prompt) are pinned to `visibility=eq.public`. | `test:rls-lockdown-pg` writes rows with the **real producer function** for a wallet run, a scheduled run, a manual run without operator auth and a pre-fix untagged row, then reads the 0011 views as `anon`: only the scheduled cycle and its trade are public; the wallet row carries its owner lower-cased. `test:remediation-r2`: provenance rules; every `logToSupabase` call site carries provenance; every public `agent_cycles` read is scoped. |
+
+**Operational note.** After 0011 the public dashboard shows *no* historical cycles until an
+operator reviews and tags the ones the scheduled cycle produced (statement in the migration
+comment). That is the conservative reading the audit asked for.
+
+**Incident during this round.** Mid-remediation macOS revoked this session's access to
+`~/Documents` (TCC); every read and write under the repo failed with EPERM while `~/.claude`
+kept working. State and plan were persisted to memory, access was re-granted, the edits were
+re-applied from the same anchors — and one anchor guard caught a real temporal-dead-zone bug
+on the way (`hasOperatorAuth` is declared *after* `walletAddress` in `agent-run`).
+
+### Round 12b — the report's second tier: BP-04, BP-08, BP-10, BP-05, BP-14
+
+| # | Finding | Fix | Closure evidence |
+|---|---|---|---|
+| **BP-04** P2 | Successful-but-malformed dynamic control JSON was read as "writes open" (`=== true` coercion); env freeze precedence undocumented. | `parseControlRecord`: a control record must be a plain object whose `write_freeze` and `canary` are literal booleans (note string/null); anything else — array, null, missing field, string `"false"`, number, unreadable — fails **closed**. Precedence is now explicit and tested: the dynamic source decides; the env flags are an **additive emergency brake** that can only add a freeze, never open. | `test:remediation-r2`: only a well-formed explicit `false` opens; ten malformed shapes freeze; HTTP 500 freezes; `PROTOCOL_CUTOVER_FREEZE=true` overrides a well-formed open; env `false` never opens a dynamic freeze. |
+| **BP-08** P2 | A public tx hash was the redemption credential; nothing bound the redeemer to the client that obtained the challenge or to the request it was issued for; consumption preceded execution, so a tool failure ate the payment. | Migration `0013`: `client_secret_hash`, `result_json`, `error`, `attempts`, `completed_at`; statuses `pending → in_progress → completed \| retryable_failure`. `createChallenge` returns a **client secret once** (stored hashed) and stores the **canonical request hash** (`sha256` of sorted `{tool,args}`). `claimChallenge` is one conditional PATCH whose filter carries identity (secret hash), terms (request hash), liveness and state; a `completed` row for the same client + request is an **idempotent replay** of the stored result; a tool failure leaves the row `retryable_failure`; a stale `in_progress` (lambda died) is reclaimable after 5 min. Both transports issue with the request hash, require `x-challenge-secret`, and wrap execution with `completeChallenge` / `failChallenge`. | `test:remediation-r2`: against a PostgREST emulation honouring the filters — stranger with the tx hash refused; right client with different terms refused; claim → failure → retry claimed again (no second payment); completion → replay returns the stored result with no re-execution; stranger cannot replay. Source checks: the unbound consume is gone from both transports; issuance, claim, replay, failure and completion paths present in each. |
+| **BP-10** P2 | Registration read the owner, verified a signature, then did an unconditional service-role merge; a failed read looked like "not found". | Migration `0012`: `hardness_agents.row_version` (the optimistic-lock counter — `version` stays the agent's semver label); `hardness_register_agent(agent_id, expected_owner, expected_row_version, row)` is insert-only for creation and a **compare-and-swap** on owner **and** row version for updates, and refuses any owner change; `hardness_transfer_agent(agent_id, current_owner, new_owner, expected_version, request_id)` is the only way to move ownership, single-use via a nonce table. `getAgentStrict` throws on a failed read; `POST /api/agents/register` answers **502 without writing** on a read failure and **409** on an owner change; `POST /api/agents/transfer` requires a signature by the current owner over `{agentId,newOwner,expectedVersion,requestId}`. | `test:agent-registry-pg` (real Postgres): create insert-only; update CAS on owner + version; stale version, wrong owner and owner-change-through-registration refused; transfer requires the exact version and the current owner; a replayed request id refused; browser roles cannot execute either function. `test:remediation-r2`: read failure → 502 and zero registry writes; owner change → 409 and zero writes. |
+| **BP-05** P2 | The bridge forwarded only `result`; the app's UUID guarded the timeout, not the JSON-RPC id, so the next response completed whichever continuation was pending. | The bridge now **builds the Sign `Request` itself** and owns its JSON-RPC id (Coinbase's SDK path is disabled, so every session is WalletConnect); `RPCCorrelator.check` accepts a response only when its id equals the pending id and its topic/chain, when present, match this session and Base; result shape is bound to the method; a pending request is failed with `sessionReplaced` on account change, session loss or disconnect. | `RPCCorrelatorTests` on the simulator: normal accepted; late (earlier id), duplicate (nothing pending), wrong topic, wrong chain and id-less responses ignored; a tx hash cannot satisfy a signature request. |
+| **BP-14** P2 | Risk checks accepted any positive round younger than 96 h; the issuer registry's pause (feed frozen for a corporate action, transfers still open) was never read. | The registry is pinned (`0x3f3E…5CaD`; its `getOracleParams(token)` → `(multiplier, paused)` resolved from bytecode and probed on all four tokens). **One shared validator**, `evaluateStockReference`, distinguishes `fresh` / `market-closed` (warn) / `stale` / `issuer-paused` / `unusable`; a **recent timestamp never overrides a known pause**, an unreadable registry is unknown and unusable, and the registry multiplier must equal the token's. The quote path withholds calldata on any unusable verdict; the held-exposure path throws (fails closed) on the same rule; the card shows status and timestamp. | `test:base-swap`: open market, weekend (usable with warning), issuer-paused with a 10-minute-old timestamp (refused), unknown pause (refused), multiplier mismatch (refused), stale, incomplete round, non-positive answer, resumed feed. |
+
+BP-03/BP-06/BP-07/BP-11/BP-12/BP-13 are closed in round 12c below. The third deployment
+review remains pending.
+
+### Round 12c — the report's third tier: BP-03, BP-06, BP-07, BP-11, BP-12, BP-13
+
+| # | Finding | Fix | Closure evidence |
+|---|---|---|---|
+| **BP-03** P2 | `DeployBase._v2Params()` narrowed seven full-width env values to `uint16`/`uint24` *before* the constructor validated them, so a typo'd operator value could truncate into an in-range "valid" parameter; the manifest and the live verifier never carried them. | `contracts/script/V2ParamsGate.sol` (shared by deploy, verifier and tests): `Raw` holds the seven values at `uint256`; `validate` checks widths first, then the exact `_validateParams` bounds (incl. `challengeWindowSec > PYTH_ACTIVATION_DELAY`); `narrow` is the **only** path into the constructor; `live(address)` reads the deployed 7-tuple; `assertMatches(deployed, reviewed)` re-validates the reviewed values and compares field by field. `DeployBase` reads the raw values into `Config.v2Raw`, validates them in `_validateConfig` (pre-broadcast), asserts them live in `_assertDeployment`, writes `v2Params.*` to the manifest and logs them. `VerifyBaseDeployment._verifyV2Params` **requires** the block on 8453 (a pre-BP-03 manifest is verifiable on testnet only) and compares live params to the manifest. `check-mainnet-readiness` now requires the seven `V2_*` env values, bounds-checks them at full width, and cross-checks `manifest.v2Params.*` against them (fails when the block is absent). | `DeploymentGates.t.sol` **34/34** (14 new): defaults and boundary overrides narrow unchanged; `65_596` (→ `uint16` 60) and `7 days + 2^24` (→ `uint24` 7 days) are **rejected before narrowing** — both reproductions assert the silent truncation that the old path deployed; `2 days` rejected / `2 days + 1` accepted, and a **real `BobbyTrackRecordV2`** deployed through the gate proves `PYTH_ACTIVATION_DELAY` equals the contract's and the live getter round-trips; each semantic bound; drift in any field; an out-of-range reviewed value refused even when the chain agrees; mainnet manifest without the block → verify fails; testnet legacy manifest skips; live drift (`setParams` after review) fails. `test:protocol-write-safety` executes the readiness checker. |
+| **BP-06** P2 | The CI contracts job ran `forge build --sizes`, which exits on the oversized `DeployerEoa` **test harness**, so `forge test` and the layout gate never ran; the swap/remediation/ABI/Postgres suites were never executed in CI at all. | `contracts/script/check-sizes.sh`: EIP-170 enforced on exactly the seven contracts `DeployBase` broadcasts (missing artifact = failure); the harness stays compiled and tested. `ci.yml`: contracts job = `forge build` → `check-sizes.sh` → `forge test --fuzz-runs 1000` → `check-layout.sh`; application job adds `test:base-swap`, `test:stock-ticker-routing`, `test:remediation-r2`, `test:rpc-redaction`; new **integration** job (foundry + anvil + a `postgres:17` service on 54329) runs `forge build`, `test:hardness-abi-anvil`, `test:bounties-abi-anvil`, `test:rls-lockdown-pg`, `test:swap-ledger-pg`, `test:agent-registry-pg`. The three pg scripts **fail (exit 1) when `CI=true` and `DATABASE_URL` is unset** — skipping stays a local convenience only. | `check-sizes.sh` run: TrackRecordV2 24,094 B (482 B margin), HardnessRegistry 23,471 B (1,105 B margin), the other five far below; exit 0. `CI=true npx tsx scripts/test-rls-lockdown-pg.mts` without `DATABASE_URL` → exit 1. All three pg suites and both anvil suites pass locally against the same service shape CI declares. |
+| **BP-07** P2 | The MCP bounty tools decoded a hand-written 4-state enum (`PENDING_RESOLUTION`/`DISPUTED` surfaced as `STATUS_4/5` with no deadline) and `bobby_bounty_challenge` returned an unsigned tx with `value: 0x0` — `submitChallenge` requires `msg.value == bountyBond(id)`, so every challenge built by the tool reverted. | `gen:hardness-abi` now also generates `api/_lib/adversarial-bounties.abi.ts` **from the compiled artifact**; `protocol-payments` builds its interface from it. `BOUNTY_STATUS_NAMES` carries all six states. `readBounty` reads `bountyBond(id)`, and per state `resolutionFinalizeAfter`, `settlementAfter`, `disputedBy`, and reports `nextDeadline` (`submitChallenge` @ claim window, `resolveBounty` @ window+grace, `finalizeResolution` @ finalize-after, `resolveStalledDispute` @ settlement-after; null when terminal). `buildSubmitChallengeCalldata` is async and returns `value`/`valueWei`/`valueNative` = the bounty's **snapshotted** bond; `encodeSubmitChallenge` (pure) refuses a zero evidence hash. The MCP tool forwards the value and says what it is. | `test:bounties-abi-anvil` (real artifact on anvil, backend readers/builders unmodified): generated ABI equals the artifact; OPEN with bond + claim deadline; **reproduction:** value `0x0` reverts `Challenge bond required`; the built tx **mines as built**; a later `setChallengeBond` does not reprice bounty 1 while bounty 2 carries the new bond; `PENDING_RESOLUTION` (finalize-after), `DISPUTED` (settlement-after, `disputedBy`), `RESOLVED`, `WITHDRAWN` round-trip with their deadlines; list rows carry `bondWei` + named status; not-found and zero-evidence refused. |
+| **BP-11** P2 | `reputation` chose v1/v2 selectors with `DEFAULT_CHAIN.id !== PROTOCOL_CHAIN_ID` — always false — so on Base it called `getWinRate`/`wins`/`losses`/`totalPnlBps`, which do not exist on V2; `safe()` turned every revert into **zero under `ok:true`**. The heartbeat had the same inverted test and the same zero-on-decode-failure. | `ChainConfig.trackRecordVersion: 'v1' \| 'v2'` declared per deployment (Base family `v2`, X Layer `v1`); `trackrecord-stats-adapter.trackRecordSelectors(chain)` is the **only** source of selectors (throws when the version is not declared); `reputation`, `protocol-heartbeat`, `protocol-record` and `bobby-protocol-stats` select through it. `reputation` probes each source; a source that cannot be read is `sources.<x> = 'unavailable'`, its numbers are **null**, `trustScore.score` is null unless every input was read, and `ok`/`degraded` say so. The heartbeat reports `sources`, nulls the unavailable performance fields, and marks `health.overall` degraded. The two pages that render these fields tolerate null. | `test:rpc-redaction`: on Base the reputation and heartbeat readers request the **V2 selectors only** (recorded per selector; `getWinRate` never requested) and report 60 % / 6 W / 4 L / +2.5 %; **reproduction:** an undecodable result (`0x`, what Base returns for the v1 selector) yields `sources.trackRecord = 'unavailable'`, `winRate = null`, `ok:false`, `degraded:true`, `trustScore.score = null` — not zeros. |
+| **BP-12** P2 | `reputation` advertised `chain.rpc = PROTOCOL_RPC_URL` (the env override, which may carry a provider key), and the heartbeat / tx-history / stats / payments readers interpolated the endpoint URL into error strings that reach logs and the degraded response bodies. | `api/_lib/rpc-redact.ts`: `rpcEndpointLabel(url)` (`primary RPC` / `fallback RPC`), `scrubRpcSecrets(text)` (removes every configured URL and its host, userinfo, path and query, longest first) and `rpcErrorMessage(err)`. The readers label endpoints instead of naming them, scrub upstream JSON-RPC messages, and every catch that logs or returns a message goes through the scrubber; `reputation.chain.rpc` is `DEFAULT_CHAIN.publicRpcUrl`; `orchestrate`'s catch is scrubbed too. | `test:rpc-redaction` boots the four public readers with a sentinel URL (`https://rpc-user:SENTINEL-PASS@sentinel-host.example/v2/SENTINEL-PATH-KEY?apikey=SENTINEL-QUERY`, plus a sentinel fallback), captures every console line, and drives the connection-error and JSON-RPC-error (echoing the URL) paths: **no fragment** of either URL appears in any body or log; the upstream text is kept with the URL masked (`upstream rejected <rpc>`); `chain.rpc` is `https://mainnet.base.org`. |
+| **BP-13** P2 | `orchestrate` returned the score-derived action as the decision (an agent whose policy said paper-only or proof-required still got `execute`; only a *stored* `advisory` mode downgraded it, so no-policy agents were auto-`execute`); `evaluatePolicy` received the **entry price** as the notional; the session was marked `proved` with no proof; the four LLM JSON blobs were trusted verbatim. | `prediction.quantity` / `prediction.notionalUsd` validated up front (either; both must agree within 1 %); without a size the harness analyses but returns **no executable advice**. `finalizeAction({ modelAction, policy, proofState, executable })` is the decision: blocked → `reject`; unsized → `publish_only` at most; paper result/mode → `paper_only` at most; reduction → `reduce_size` with `reducedNotionalUsd`; `requireOnchainProof` without **`proof_confirmed`** → `require_human_approval`; advisory mode → `require_human_approval`. Proof state is `analysis` / `proof_submitted` / `proof_confirmed` / `proof_failed` — a tx hash is a submission; only a mined receipt with status 1 (`confirmProof`, bounded wait) confirms. The session status is the proof state (or `failed`), never `proved`. Alpha/Red/CIO/Judge outputs are zod-validated (enums, 1–5 dimensions, 1–10 conviction, bounded strings); an out-of-schema answer aborts with **502** and a `failed` session. The high-risk gate uses the validated notional; `createProof` records `DEFAULT_CHAIN.id`; the GET metadata names the Base registry. | `test:remediation-r2` (**45/45**, 8 new): score 100 + no size → `publish_only`, `analysis` session; default policy + size → `require_human_approval` (proof required, state `analysis`); **reproduction:** BTC at 83,000 × 0.001 = $83 under a $1,000 cap in auto mode → `execute` (the old code compared 83,000 to the cap); over-cap → `reduce_size` with the reduced notional; paper mode → `paper_only`; blocked symbol → `reject`; CIO `recommendation: "yolo"` and Judge `novelty: 9` → 502 + `failed`; inconsistent quantity/notional → 400; low score → `reject`; the `finalizeAction` precedence table incl. *submitted ≠ confirmed*. |
+
+**Verification record (2026-09-05, `58cd10e`).** Foundry: full suite **283/283** across 14
+suites (269 + the 14 new gate tests), `--fuzz-runs 1000`; `check-sizes.sh` 7/7 within EIP-170;
+`check-layout.sh` OK.
+Node: `test:remediation-r2` 45/45; `test:rpc-redaction` 12/12; `test:bounties-abi-anvil` and
+`test:hardness-abi-anvil` pass; `test:rls-lockdown-pg`, `test:swap-ledger-pg`,
+`test:agent-registry-pg` pass on Postgres 17; `test:api-security` 47/47; `test:base-swap`,
+`test:stock-ticker-routing`, `test:protocol-write-safety` pass; `check:api`, `eslint --quiet`
+and the production build are green. Production contract source is **unchanged** by this round
+(only `script/` and `test/`): `HardnessRegistry` runtime hash and size are as recorded above.
+No deploy, migration, flag change, Safe transaction or upload was performed.
+
+**Production preflight (2026-09-05, read-only against `qbvdqkknnuweatptjohi`).** Migration `0010`
+is already applied (anon has no SELECT on `api_cache`/`agent_cycles`); `0011`, `0012`, `0013` are
+pending and their preconditions hold (`agent_cycles.owner_address/user_id/started_at`,
+`agent_trades.cycle_id`, `mcp_payment_challenges.request_hash/tx_hash/payer_address` present).
+The preflight caught one real defect: `hardness_agents.version` already exists in production as
+a nullable **text** semver label, so the BP-10 CAS counter as first written (`add column if not
+exists version bigint`) would have been silently skipped and both functions would have compared
+text to bigint. The counter is now `row_version`; the pg suite's fixture mirrors the production
+shape (text `version` retained) and passes; `POST /api/agents/transfer` takes
+`expectedRowVersion`. `hardness_agent_sessions` (the real table name; there is no
+`hardness_sessions`) has no status check constraint, so the BP-13 statuses apply without DDL.
+Live chain reads: TrackRecordV2 `params()` = 60/120/600/604800/100/100/50 (the reviewed values),
+`activePyth` = `0x8250…487a` (the `activatePyth(0xbC16…)` Safe transaction is still pending),
+the Safe's codehash and slot-0 singleton match the manifest, threshold 2 of 3; the deployed
+bounties contract predates `treasury()`/`bountyBond()` (redeploy pending, as planned).
+
+**Client-contract changes.** `bobby_bounty_challenge` now returns `value` (the bounty's bond) —
+send it. `/api/reputation` and `/api/protocol-heartbeat` may answer `ok:false` with `sources`
+and null numbers. `POST /api/orchestrate` accepts `prediction.quantity` / `notionalUsd`; its
+`decision` is policy-derived and it answers 502 when a model output fails validation. Mainnet
+readiness requires the seven `V2_*` values. See the runbook.
+
+## Round 13 — the independent third round (2026-09-05): reopens closed
+
+Input: an adversarial multi-agent re-review of `f70743e` (one gate agent executing every
+command of the brief, one adversary per finding re-deriving the closure and attempting the
+exploit, three lenses per closed finding, a deployment reviewer), run in two passes because the
+session limit interrupted it. Kimi K3 via CLI could not complete (usage quota, then request
+timeouts); Codex is not installed on this machine. The gate agent reproduced the full matrix
+green on `f70743e` (Foundry 283/283, remediation 45/45, rpc-redaction 12/12, api-security
+47/47, both anvil suites, three Postgres suites, sizes 7/7, layout OK, runtime hash unchanged).
+The adversaries and lenses **reopened four closures and found one deployment-review P2**, all
+with reproductions. Every item is fixed below; each reproduction became a regression test.
+
+| # | What the third round found | Fix | Closure evidence |
+|---|---|---|---|
+| **BP-01** (reopen) | `SwapConfirm` validated the full quote but rendered MIN RECEIVED from the reduced `execution` view; an honest full quote with a lying reduced view showed 0.001 and signed 0.000398. | `assertExecutionViewConsistent(execution, quote, v)` binds every field the card renders (amounts, min received raw+display, deadline, router, spender, token contract, swap target) to the validated quote, on build and again inside `validated()` before each signature; the card renders MIN RECEIVED from the validated full quote (pre-build: the intent preview, labelled as an estimate). | `test:base-swap`: the server-built view of an honest quote passes; **11 lying views refused** incl. the K03/K03b reproductions. |
+| **BP-08** (reopen) | `mcp_payment_challenges.challenge_id` is a uuid; `payMCPCall` takes a bytes32; the transports compared the raw bytes32 to the uuid key → PostgREST 22P02 → every honest payer refused after paying. The lifecycle test used untyped ids, so it passed for the wrong reason. Also: an upstream HTTP 500 body was stored as a paid "result". | `api/_lib/challenge-id.ts`: canonical mapping (bytes32 = uuid hex left-aligned + 16 zero bytes, strict inverse); `verifyMcpPaymentTx` decodes it; the 402 publishes `challengeIdBytes32` and the encoding; a non-canonical bytes32 is refused before any database read; upstream non-2xx from `/api/bobby-wallet` is a tool failure (retryable), never a stored result. The remediation emulation now types the key as uuid (22P02 on anything else). | `test:mcp-payment-transport` (**13/13**, uuid-typed PostgREST emulation + confirmed-tx RPC mock, both transports end to end): 402 → pay with the published bytes32 → executed once → replay; header-less retry; non-canonical bytes32 refused with no DB read; wrong header refused; throw and HTTP 500 both leave `retryable_failure`. |
+| **BP-06** (reopen) | The `application` CI job crashed at `test:api-security` (module-load database URL) on every run — five red runs on `main`, zero runs of the remediated workflow — so the four suites BP-06 added, `build`, `lint` and `audit` never executed. `check-sizes.sh` had no coupling to `DeployBase`. | Job-level dummy `BOBBY_SUPABASE_*` env; CI also runs on push to `security/**` and via `workflow_dispatch`; `check-sizes.sh` derives the inventory from the `new X(` set in `DeployBase.s.sol` and exits 1 on drift. | `env -i … CI=true npm run test:api-security` → 47/47 with the job env; inventory drift probe (eighth contract) → `INVENTORY DRIFT`, exit 1; the first GitHub run of this branch is the closure record (see the verification record). |
+| **Deploy review** P2 | `finalize:base-manifest` writes 12 CALL receipts (scorer, treasury ×2, both bonds, 7 handoffs); readiness accepted exactly 8, so `postdeploy`/`cutover` could never pass an honest manifest — only one with the treasury receipts deleted by hand. | Readiness expects the 12 with the same `inputHash` encodings finalize uses. | `test:protocol-write-safety` **executes** `--phase=postdeploy` on a finalize-shaped 19-receipt manifest (GO) and on one with the treasury/bond receipts removed (NO-GO: "exactly one setTreasury(address) call"). |
+| Deploy review P3 ×3 | Operator steps diverged from the scripts (`finalize` needs `--write`; readiness prints `GO: configuration gates passed`; the broadcast needs a signer flag and `BASESCAN_API_KEY`; the accept batch needs a redirect); the `activatePyth` Safe transaction targets the TrackRecordV2 that the full redeploy retires. | Launch-readiness §2 and runbook §2c rewritten; env example carries `BASESCAN_API_KEY`; the redeploy-vs-keep decision is stated explicitly (default: full redeploy, step 3 skipped). | Documents. |
+| **BP-03** (reopen, P3) | `vm.envOr` returns the DEFAULT when a variable is set but unparseable (`3O`, `-5`, `""`, `1e80`): the gate never saw the operator's value, the manifest recorded the substituted default, and the verifier agreed. | `contracts/script/EnvGate.sol`: `uintOr`/`addressOr`/`bytes32Or` read through the strict parsers (`envExists ? envUint : default`), `requireSet` on 8453 for the seven `V2_*`; `DeployBase` uses them for every env value (one `envOr` left: the comma-separated resolver list). | `DeploymentGates` **37/37** (3 new): unset → default; `3O`/`-5`/`60.0`/`1e80`/`abc`/`""` → revert; mainnet requires the variable. Fork simulation: `V2_ENTRY_WINDOW_SEC=3O` fails before any transaction; the reviewed env still simulates end to end. |
+| **BP-07** (lenses) | The builder read `bountyBond(id)` without checking the bounty exists (0 for an unposted id → a 0x0 "bond" tx that reverts once posted); the listed test never drove the MCP handler; deadline assertions compared the response to itself. | `buildSubmitChallengeCalldata` resolves the bounty first and refuses unknown or non-OPEN/CHALLENGED ones. | `test:bounties-abi-anvil` drives the real `bobby_bounty_challenge` handler (value == `bountyBond(1)`; an unposted id is a JSON-RPC error), checks every deadline against the contract's own clocks (`defaultClaimWindow`, `challengeGracePeriod`, `resolutionFinalizeAfter`, `settlementAfter`), and refuses a terminal bounty through the builder. |
+| **BP-09** (lens) | The reader scan matched only the `agent_cycles?…` form; `protocol-heartbeat` reads via `sbQuery('agent_cycles', …)`, so dropping its filter kept the suite green. | The scan strips comments, matches every quoted/path reference to the base table and requires `visibility=eq.public` in the same statement; asserts the readers were actually found. | `test:remediation-r2` (mutating the heartbeat read now fails the suite). |
+| **BP-11** (lenses) | Heartbeat's stale-cache replay answered `ok:true` with all sources `ok`; the failure-path test passed only because of check ordering; `bobby-protocol-stats` / `checkpoint` / MCP `bobby_stats` still emitted zeros under `ok:true`. | Stale replay is `ok:false, degraded:true, sources: stale`; `resetHeartbeatCache()` for tests; `bobby-protocol-stats` reports `sources.trackRecord`, `degraded`, `ok`, `onchainRecord.available` and null numbers (the landing page says "TrackRecord unavailable"); `checkpoint` already nulls `on_chain` on `ok:false`; MCP `bobby_stats` / `bobby_brief` return null, never a coerced zero. | `test:rpc-redaction`: stale-replay check; every failure path asserts a fresh read (`cached !== true`); stats asserts `degraded`/`sources`/`available:false`/`stats: null`. |
+| **BP-12** (reopen) | ethers embeds `info={ requestUrl: <full keyed URL> }` in SERVER_ERROR messages and `protocol-record` logged raw error objects; viem embeds `URL: <endpoint>` and `base-swap` returned it inside the public `quote.txWithheld`; bare-key and percent-encoded echoes passed the scrubber; a non-JSON upstream body leaked its first characters. | Scrubber masks each path segment and query value (plain and percent-encoded), `requestUrl:` / `URL:` lines and any URL-shaped token; `VERIFIED_CALLS_RPC_URL` joins the configured set; `parseRpcJson` never leaks a body; every RPC consumer (`protocol-record`, `base-swap` lib + endpoint, `dex-execution`, `hardness-registry`, `verified-calls`, `challenge-scan`, the four readers, `protocol-payments`) logs and returns scrubbed messages only; ethers providers pinned with `staticNetwork`. | `test:rpc-redaction` (**28 checks**): log capture via `util.format` (a raw Error object would leak); modes throw / JSON-RPC echo / HTTP 500 HTML body / bare key / percent-encoded across the four readers; ethers-shaped, viem-shaped, bare, encoded and foreign-URL messages scrubbed; non-JSON body; source assertion that no consumer logs a raw error object or returns `err.message`. |
+| **BP-04** (residual) | `PROTOCOL_CUTOVER_FREEZE=1` (the spelling the ops docs use) did not freeze. | `envFlagIsOn`: `true`/`1`/`yes`/`on`, case-insensitive; the brake still only adds a freeze. | `test:remediation-r2`: four spellings + `BOBBY_WRITE_FREEZE=1` freeze a well-formed open; no flag leaves it open. |
+
+Closed by the adversaries without reopen: BP-02 and BP-05 (iOS, INCONCLUSIVE here — the branch is
+not in this checkout; the pre-fix hazard models were reproduced), BP-04, BP-10, BP-11, BP-13 (the
+attack agent did not complete; the precedence table and the eight remediation checks stand),
+BP-14.
+
+**Verification record (2026-09-05, round 13).** Foundry **286/286** across 14 suites
+(`--fuzz-runs 1000`, incl. the three EnvGate tests), `check-sizes.sh` 7/7 with inventory parity, `check-layout.sh` OK, remediation 45/45, rpc-redaction 28/28,
+mcp-payment-transport 13/13, bounties-abi-anvil and hardness-abi-anvil, api-security 47/47,
+base-swap, protocol-write-safety (incl. the postdeploy execution test), `check:api`, `eslint`,
+build. Fork simulations: `V2_ENTRY_WINDOW_SEC=3O` → `vm.envUint: failed parsing` before any
+transaction; the reviewed env → "post-deploy assertions: ALL PASSED", manifest restored.
+Production contract source unchanged; `HardnessRegistry` runtime hash unchanged.
+
+## For the next independent round
+
+Pin the `HardnessRegistry` runtime hash above before reviewing. Treat any different
+hash as a reset. Round 13 closed the third round's reopens: re-derive them first (the
+execution-view binding, the uuid↔bytes32 mapping, EnvGate, the CI job env, the receipt
+expectations, the scrubber), then run every closure command rather than trusting the tables. Recheck the deploy
+manifest/configuration/runbook, full suite, production sizes, ABI equality (both
+generated modules), and deployment gates. If the runtime is unchanged and the round
+is clean, record GO 3/3. All fourteen findings of the 2026-09-04 expanded audit now
+carry closure evidence; an independent pass over BP-01..BP-14 is the remaining gate
+before release. Predeploy must move from NO-GO to 0 before any broadcast.
+
+The earlier round-7 review instructions remain useful context:
+
+First reproduce the round-7 service-payment and timestamp failures on `44a2d51`,
+then confirm both refusals on the new commit. Exercise partial slash, full slash,
+re-registration, service deactivation/reactivation, withdrawal ordering, and the
+largest accepted time delay. Recheck runtime size from a clean build.
 
 Everything below is on `security/remediation-r2`. The dispute economics are new
 code: hunt for a bond that can be double-credited (settle vs timeout vs
