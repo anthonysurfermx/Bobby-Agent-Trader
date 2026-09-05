@@ -24,6 +24,16 @@ PRODUCTION=(
 )
 
 status=0
+# Third round (2026-09-05): the list above is cross-checked against the contracts
+# DeployBase.s.sol actually instantiates (`new X(`), so an eighth contract added to
+# the deploy can never be silently ungated.
+deployed="$(grep -oE 'new [A-Za-z0-9_]+\(' script/DeployBase.s.sol | sed -E 's/^new //; s/\($//' | sort -u)"
+listed="$(printf '%s\n' "${PRODUCTION[@]}" | sort -u)"
+if [[ "$deployed" != "$listed" ]]; then
+  echo "INVENTORY DRIFT: DeployBase.s.sol instantiates:"; echo "$deployed" | sed 's/^/  /'
+  echo "but check-sizes.sh gates:"; echo "$listed" | sed 's/^/  /'
+  exit 1
+fi
 printf '%-28s %8s %8s\n' "contract" "runtime" "margin"
 for c in "${PRODUCTION[@]}"; do
   artifact="out/${c}.sol/${c}.json"

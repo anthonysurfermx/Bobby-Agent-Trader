@@ -39,9 +39,14 @@ const CACHE_MS = 10_000;
 const FETCH_TIMEOUT_MS = 2_500;
 let cached: BobbyControl | null = null;
 
+/** Third round (BP-04 residual): the documented spellings `1` / `TRUE` / `yes` must freeze too — the brake only ever ADDS a freeze. */
+export function envFlagIsOn(value: string | undefined): boolean {
+  return /^(true|1|yes|on)$/i.test((value || '').trim());
+}
+
 function fromEnv(env: NodeJS.ProcessEnv = process.env): BobbyControl {
   return {
-    writeFreeze: env.PROTOCOL_CUTOVER_FREEZE === 'true' || env.BOBBY_WRITE_FREEZE === 'true',
+    writeFreeze: envFlagIsOn(env.PROTOCOL_CUTOVER_FREEZE) || envFlagIsOn(env.BOBBY_WRITE_FREEZE),
     canary: env.BOBBY_CANARY === 'true' || env.BOBBY_CYCLE_CANARY === '1',
     source: 'env',
     note: null,
@@ -76,7 +81,7 @@ export function parseControlRecord(raw: unknown, source: 'table' | 'edge-config'
  * writes — so operations can pull the plug without touching the control table.
  */
 function applyEnvEmergencyFreeze(control: BobbyControl, env: NodeJS.ProcessEnv = process.env): BobbyControl {
-  const emergency = env.PROTOCOL_CUTOVER_FREEZE === 'true' || env.BOBBY_WRITE_FREEZE === 'true';
+  const emergency = envFlagIsOn(env.PROTOCOL_CUTOVER_FREEZE) || envFlagIsOn(env.BOBBY_WRITE_FREEZE);
   if (!emergency || control.writeFreeze) return control;
   return { ...control, writeFreeze: true, note: `${control.note ? `${control.note}; ` : ''}env emergency freeze` };
 }

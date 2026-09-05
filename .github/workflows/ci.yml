@@ -3,7 +3,10 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # Third round (2026-09-05): security branches run CI on push so closure evidence
+    # can cite a real run id before a PR exists.
+    branches: [main, 'security/**']
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,6 +14,14 @@ permissions:
 jobs:
   application:
     runs-on: ubuntu-latest
+    # Third-round BP-06 reopen: test:api-security imports modules that resolve the
+    # database URL at load time; without these the step crashed on every run and
+    # nothing after it (incl. the suites BP-06 added) ever executed. Dummy values —
+    # the suite never reaches a network; secrets are not required.
+    env:
+      BOBBY_SUPABASE_URL: https://dummy.supabase.co
+      BOBBY_SUPABASE_SERVICE_ROLE_KEY: dummy-service-key
+      BOBBY_SUPABASE_ANON_KEY: dummy-anon-key
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -30,6 +41,7 @@ jobs:
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction
+      - run: npm run test:mcp-payment-transport
       - run: npm run build
       - run: npm run lint -- --quiet
       - run: npm audit --omit=dev --audit-level=high

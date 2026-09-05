@@ -35,6 +35,7 @@
     "test:hardness-abi-anvil": "tsx scripts/test-hardness-abi-anvil.mts",
     "test:bounties-abi-anvil": "tsx scripts/test-bounties-abi-anvil.mts",
     "test:rpc-redaction": "tsx scripts/test-rpc-redaction.mts",
+    "test:mcp-payment-transport": "tsx scripts/test-mcp-payment-transport.mts",
     "test:agent-registry-pg": "tsx scripts/test-agent-registry-pg.mts",
     "gen:hardness-abi": "tsx scripts/gen-hardness-abi.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts"

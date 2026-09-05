@@ -169,3 +169,43 @@ export function assertQuoteConsistent(quote: QuoteLike, req: QuoteRequest, now: 
     recipient: wallet,
   };
 }
+
+/** The reduced view /api/base-swap returns next to the full quote (what SwapConfirm renders). */
+export interface ExecutionViewLike {
+  quote?: { fromToken?: unknown; toToken?: unknown; fromAmount?: unknown; fromAmountRaw?: unknown; toAmount?: unknown; minReceived?: unknown; minReceivedRaw?: unknown };
+  disclosure?: { chainId?: unknown; router?: unknown; minReceived?: unknown; deadline?: unknown; tokenContract?: unknown; spender?: unknown } | null;
+  approveTx?: { to?: unknown } | null;
+  swapTx?: { to?: unknown } | null;
+}
+
+/**
+ * Third-round BP-01 reopen: SwapConfirm rendered its economic consent fields
+ * (MIN RECEIVED, amounts, deadline) from the reduced `execution` view while
+ * validating only the full `quote`. A response whose full quote is honest but
+ * whose reduced view lies showed one number and signed another. Every field the
+ * card can show must equal the validated quote — or the response is refused.
+ */
+export function assertExecutionViewConsistent(execution: ExecutionViewLike | null | undefined, quote: QuoteLike, v: ValidatedQuote): void {
+  const refuse = (what: string) => { throw new Error(`Quote refused: the execution view differs from the validated quote (${what})`); };
+  if (!execution || typeof execution !== 'object') refuse('missing execution view');
+  const q = execution!.quote;
+  if (!q || typeof q !== 'object') refuse('missing execution.quote');
+  if (String(q!.fromToken) !== v.tokenInSymbol) refuse('fromToken');
+  if (String(q!.toToken) !== v.tokenOutSymbol) refuse('toToken');
+  if (String(q!.fromAmountRaw) !== v.amountInRaw) refuse('fromAmountRaw');
+  if (String(q!.minReceivedRaw) !== v.minAmountOutRaw) refuse('minReceivedRaw');
+  if (String(q!.fromAmount) !== String(quote.amountIn)) refuse('fromAmount');
+  if (String(q!.toAmount) !== String(quote.amountOut)) refuse('toAmount');
+  if (String(q!.minReceived) !== String(quote.minAmountOut)) refuse('minReceived');
+  const d = execution!.disclosure;
+  if (!d || typeof d !== 'object') refuse('missing execution.disclosure');
+  if (Number(d!.chainId) !== 8453) refuse('disclosure.chainId');
+  if (String(d!.minReceived) !== String(quote.minAmountOut)) refuse('disclosure.minReceived');
+  if (String(d!.router).toLowerCase() !== String(quote.venue?.router).toLowerCase()) refuse('disclosure.router');
+  if (v.deadline !== undefined && Number(d!.deadline) !== v.deadline) refuse('disclosure.deadline');
+  if (execution!.approveTx) {
+    if (String(d!.tokenContract).toLowerCase() !== String(execution!.approveTx.to).toLowerCase()) refuse('disclosure.tokenContract');
+    if (String(d!.spender).toLowerCase() !== String(quote.venue?.router).toLowerCase()) refuse('disclosure.spender');
+  }
+  if (execution!.swapTx && String(execution!.swapTx.to).toLowerCase() !== String(quote.venue?.router).toLowerCase()) refuse('swapTx.to');
+}

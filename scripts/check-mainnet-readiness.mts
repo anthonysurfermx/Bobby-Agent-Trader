@@ -413,12 +413,40 @@ if (manifest) {
     );
     const ownershipInterface = new Interface(['function transferOwnership(address)']);
     const scorerInterface = new Interface(['function setHardnessScorer(address)']);
+    // Third round (2026-09-05, deploy review P2): the r5 broadcast configures the
+    // treasury and both bonds BEFORE the handoff (BountyEconomicsGate.configure), and
+    // finalize:base-manifest records those four calls. Readiness expected only the
+    // scorer + seven handoffs, so an honest manifest could never pass postdeploy —
+    // and the only way to "fix" it was to delete the treasury receipts by hand.
+    const treasuryInterface = new Interface(['function setTreasury(address)']);
+    const bondInterface = new Interface(['function setChallengeBond(uint96)', 'function setBountyChallengeBond(uint96)']);
+    const manifestTreasuryArg = String(manifest.treasury || '');
+    const manifestBondArg = String(manifest.fees?.challengeBondWei ?? '');
+    const bondEncodable = /^[1-9][0-9]*$/.test(manifestBondArg);
     const expectedCalls = [
       {
         to: String(manifest.addresses?.hardnessRegistry || ''),
         fn: 'setHardnessScorer(address)',
         argument: String(manifest.roles?.hardnessScorer || ''),
         inputHash: keccak256(scorerInterface.encodeFunctionData('setHardnessScorer', [manifest.roles?.hardnessScorer])),
+      },
+      ...[String(manifest.addresses?.adversarialBounties || ''), String(manifest.addresses?.hardnessRegistry || '')].map((to) => ({
+        to,
+        fn: 'setTreasury(address)',
+        argument: manifestTreasuryArg,
+        inputHash: validAddress(manifestTreasuryArg) ? keccak256(treasuryInterface.encodeFunctionData('setTreasury', [manifestTreasuryArg])) : '0x',
+      })),
+      {
+        to: String(manifest.addresses?.adversarialBounties || ''),
+        fn: 'setChallengeBond(uint96)',
+        argument: manifestBondArg,
+        inputHash: bondEncodable ? keccak256(bondInterface.encodeFunctionData('setChallengeBond', [manifestBondArg])) : '0x',
+      },
+      {
+        to: String(manifest.addresses?.hardnessRegistry || ''),
+        fn: 'setBountyChallengeBond(uint96)',
+        argument: manifestBondArg,
+        inputHash: bondEncodable ? keccak256(bondInterface.encodeFunctionData('setBountyChallengeBond', [manifestBondArg])) : '0x',
       },
       ...Object.values(manifest.addresses || {}).map((to) => ({
         to: String(to),
@@ -439,7 +467,7 @@ if (manifest) {
     }
     if (callEvidence.length !== expectedCalls.length) {
       fail('receipt evidence contains an unexpected or duplicate non-CREATE call');
-    } else pass('receipt evidence contains only the reviewed scorer and ownership calls');
+    } else pass('receipt evidence contains only the reviewed scorer, treasury, bond and ownership calls');
   }
 
   if (env('BASE_PROTOCOL_DEPLOYMENT_BLOCK') !== String(manifest.deployBlock)) {

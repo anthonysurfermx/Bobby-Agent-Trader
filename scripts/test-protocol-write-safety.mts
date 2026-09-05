@@ -224,6 +224,54 @@ assert.match(readinessSource, /OWNER_SAFE_OWNERS/);
 assert.match(readinessSource, /hardnessScorer\(\)/);
 assert.match(readinessSource, /receipt\.inputHash/);
 
+// Third round (2026-09-05, deploy review P2) — EXECUTION test of the receipt hop: the
+// manifest finalize:base-manifest writes (7 CREATE + 12 CALL, incl. the four treasury/bond
+// calls) must pass --phase=postdeploy, and a manifest whose treasury/bond receipts were
+// removed by hand must NOT. Built from the tracked manifest + the env example, in a temp root.
+{
+  const { spawnSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, writeFileSync, readFileSync: rf } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const { Interface, keccak256 } = await import('ethers');
+  const envText = rf('deploy/base-mainnet.env.example', 'utf8');
+  const env: Record<string, string> = {};
+  for (const line of envText.split('\n')) { const m = line.match(/^([A-Z0-9_]+)=([^#]*)/); if (m) env[m[1]] = m[2].trim(); }
+  const base = JSON.parse(rf('contracts/deployments/8453.json', 'utf8')) as Record<string, any>;
+  const manifest = { ...base, treasury: env.BOUNTY_TREASURY_ADDRESS, fees: { ...base.fees, challengeBondWei: Number(env.CHALLENGE_BOND_WEI) }, v2Params: { entryWindowSec: 60, exitWindowSec: 120, maxExitLagSec: 600, challengeWindowSec: 604800, entryTolBps: 100, exitTolBps: 100, confMaxBps: 50 } };
+  const a = manifest.addresses as Record<string, string>;
+  let seq = 0;
+  const receipt = (extra: Record<string, unknown>) => ({ hash: `0x${(++seq).toString(16).padStart(64, '1')}`, block: Number(manifest.deployBlock) + seq, blockHash: `0x${seq.toString(16).padStart(64, '2')}`, status: '0x1', ...extra });
+  const enc = (abi: string, fn: string, args: unknown[]) => keccak256(new Interface([abi]).encodeFunctionData(fn, args));
+  const creates = Object.entries(a).map(([name, addr]) => receipt({ transactionType: 'CREATE', contractName: name, contractAddress: addr, to: null, function: null, arguments: [], inputHash: '0x' }));
+  creates[0].block = Number(manifest.deployBlock); // deployBlock = first mined receipt
+  const call = (to: string, fn: string, arg: string, abi: string, name: string) => receipt({ transactionType: 'CALL', contractAddress: null, to, function: fn, arguments: [arg], inputHash: enc(abi, name, [arg]) });
+  const treasuryCalls = [
+    call(a.hardnessRegistry, 'setHardnessScorer(address)', manifest.roles.hardnessScorer, 'function setHardnessScorer(address)', 'setHardnessScorer'),
+    call(a.adversarialBounties, 'setTreasury(address)', manifest.treasury, 'function setTreasury(address)', 'setTreasury'),
+    call(a.hardnessRegistry, 'setTreasury(address)', manifest.treasury, 'function setTreasury(address)', 'setTreasury'),
+    call(a.adversarialBounties, 'setChallengeBond(uint96)', String(manifest.fees.challengeBondWei), 'function setChallengeBond(uint96)', 'setChallengeBond'),
+    call(a.hardnessRegistry, 'setBountyChallengeBond(uint96)', String(manifest.fees.challengeBondWei), 'function setBountyChallengeBond(uint96)', 'setBountyChallengeBond'),
+  ];
+  const handoffs = Object.values(a).map((to) => call(to, 'transferOwnership(address)', manifest.expectedOwner, 'function transferOwnership(address)', 'transferOwnership'));
+  const run = (transactions: unknown[], label: string) => {
+    const root = mkdtempSync(path.join(tmpdir(), `readiness-${label}-`));
+    mkdirSync(path.join(root, 'contracts/deployments'), { recursive: true });
+    writeFileSync(path.join(root, 'contracts/deployments/8453.json'), JSON.stringify({ ...manifest, transactions }));
+    return spawnSync('npx', ['tsx', path.resolve('scripts/check-mainnet-readiness.mts'), '--phase=postdeploy'], {
+      cwd: root, encoding: 'utf8',
+      env: { ...process.env, ...env, BASE_PROTOCOL_DEPLOYMENT_BLOCK: String(manifest.deployBlock), XLAYER_RECORD_SECRET: 'x', TRADING_API_SECRET: 'x', PROTOCOL_AUTOMATION_SECRET: 'x', PYTH_HERMES_API_KEY: 'x' },
+    });
+  };
+  const honest = run([...creates, ...treasuryCalls, ...handoffs], 'finalize-shape');
+  assert.equal(honest.status, 0, `finalize-shaped manifest (19 receipts) must pass postdeploy:\n${honest.stdout}`);
+  assert.doesNotMatch(honest.stdout, /unexpected or duplicate non-CREATE call/);
+  const stripped = run([...creates, treasuryCalls[0], ...handoffs], 'readiness-shape');
+  assert.notEqual(stripped.status, 0, 'a manifest whose treasury/bond receipts were removed must be NO-GO');
+  assert.match(stripped.stdout, /exactly one setTreasury\(address\) call/);
+  console.log('readiness postdeploy: finalize-shaped receipt evidence passes; stripped treasury receipts fail');
+}
+
 // G5 gate — EXECUTION test, not a source grep: run the predeploy checker with
 // PYTH_HERMES_API_KEY absent and assert it is a hard NO-GO, then with it set
 // and assert that specific blocker clears. Without the key the V2 recorder

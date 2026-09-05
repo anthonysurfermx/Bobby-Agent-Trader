@@ -107,7 +107,13 @@ Ready to import (2026-09-05): `contracts/deployments/safe-batches/8453-activate-
 (Safe Transaction Builder format; regenerate with `npm run build:safe-launch-batch --
 --action=activate-pyth`, which pins the address from `PythOracleGate.BASE_PYTH_UPGRADED`).
 
-Then `npm run check:mainnet:postdeploy` — the verifier that failed in round 1.
+> Third round (2026-09-05): this step only matters if the CURRENT TrackRecordV2 is kept. The
+> full redeploy in `docs/infra/2026-09-05-launch-readiness.md` deploys a new TrackRecordV2 with
+> `0xbC16…2F5` active from its constructor, and the batch goes stale once the manifest is
+> rewritten (it reads `addresses.trackRecord`). Decide before signing.
+
+`npm run check:mainnet:postdeploy` only makes sense after the redeploy (on the current manifest it
+is NO-GO regardless of this step: no treasury, no `v2Params`, no receipt evidence).
 
 ## 3. `PROTOCOL_CHAIN=base` in the production environment
 

@@ -5,12 +5,12 @@ import assert from 'node:assert/strict';
 import { decodeFunctionData, encodeFunctionData, getAddress, parseUnits } from 'viem';
 import {
   BaseSwapError, ERC20_ABI, FEE_TIERS, ROUTER_ADDRESS_THIS, SWAP_ROUTER02, QUOTER_V2, V3_FACTORY, WETH9,
-  buildApproveTx, buildRevokeTx, buildSwapTx, candidateRoutes, clampSlippage, computeMinOut, decodeSwapTx, encodePath, resolvePair, toRawAmount,
+  buildApproveTx, buildRevokeTx, buildSwapTx, candidateRoutes, clampSlippage, computeMinOut, decodeSwapTx, encodePath, resolvePair, toRawAmount, toTradeExecution,
   type QuotedRoute,
 } from '../api/_lib/base-swap.js';
 import { BASE_STOCK_SYMBOLS, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed } from '../src/lib/base-swap/tokens.js';
 import { assertApprovalCalldata, assertRevokeCalldata, assertSwapCalldata } from '../src/lib/base-swap/calldata-guard.js';
-import { assertQuoteConsistent } from '../src/lib/base-swap/quote-guard.js';
+import { assertExecutionViewConsistent, assertQuoteConsistent } from '../src/lib/base-swap/quote-guard.js';
 import { evaluateStockReference } from '../api/_lib/base-swap.js';
 
 const wallet = getAddress('0x1111111111111111111111111111111111111111');
@@ -202,6 +202,29 @@ assert.throws(
   const vs = assertQuoteConsistent(swapQuote, req, now);
   assert.doesNotThrow(() => assertSwapCalldata(guardedSwap, { tokenInSymbol: vs.tokenInSymbol, tokenOutSymbol: vs.tokenOutSymbol, amountInRaw: vs.amountInRaw, minAmountOutRaw: vs.minAmountOutRaw, recipient: vs.recipient, deadline: vs.deadline }));
   console.log('BP-01: quote validator — 1 consistent journey, 20 inconsistent responses refused');
+
+  // Third round (2026-09-05) reopen: the reduced `execution` view SwapConfirm renders must
+  // equal the validated quote — an honest full quote with a lying reduced view is refused.
+  const serverQuote = { ...structuredClone(consistent), venue: { name: 'Uniswap V3 (SwapRouter02)', router: SWAP_ROUTER02 }, route: { description: 'USDC → NVDAc (0.3%)' }, simulation: { ran: true, ok: true }, tx: { deadline, approve: null, swap: guardedSwap, revoke: null, calldataHash: null } } as any;
+  const view = toTradeExecution(serverQuote)!;
+  const vv = assertQuoteConsistent(serverQuote, req, now);
+  assert.doesNotThrow(() => assertExecutionViewConsistent(view, serverQuote, vv), 'the server-built view of an honest quote is consistent');
+  const refuseView = (label: string, mutate: (e: any) => void, re: RegExp) => {
+    const e = structuredClone(view); mutate(e);
+    assert.throws(() => assertExecutionViewConsistent(e, serverQuote, vv), re, label);
+  };
+  refuseView('reduced minReceived lies (the K03 reproduction)', (e) => { e.quote.minReceived = '0.001'; }, /execution view differs .*minReceived/);
+  refuseView('disclosure minReceived lies (K03b)', (e) => { e.disclosure.minReceived = '0.001'; }, /disclosure\.minReceived/);
+  refuseView('reduced minReceivedRaw lies', (e) => { e.quote.minReceivedRaw = '100000'; }, /minReceivedRaw/);
+  refuseView('reduced fromAmount lies', (e) => { e.quote.fromAmount = '2.5'; }, /fromAmount/);
+  refuseView('reduced fromAmountRaw lies', (e) => { e.quote.fromAmountRaw = '2500000'; }, /fromAmountRaw/);
+  refuseView('reduced toAmount lies', (e) => { e.quote.toAmount = '0.004'; }, /toAmount/);
+  refuseView('reduced pair lies', (e) => { e.quote.toToken = 'AAPLc'; }, /toToken/);
+  refuseView('disclosure deadline lies', (e) => { e.disclosure.deadline = deadline + 600; }, /disclosure\.deadline/);
+  refuseView('disclosure router lies', (e) => { e.disclosure.router = usdc.address; }, /disclosure\.router/);
+  refuseView('swap target is not the router', (e) => { e.swapTx = { ...e.swapTx, to: usdc.address }; }, /swapTx\.to/);
+  refuseView('missing view', (e) => { delete e.quote; }, /missing execution\.quote/);
+  console.log('BP-01 (third round): execution view bound to the validated quote — 11 lying views refused');
 }
 
 // --- BP-14: one reference validator for quote AND exposure; a fresh timestamp never overrides an issuer pause ---

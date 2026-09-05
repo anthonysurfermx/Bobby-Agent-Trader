@@ -415,6 +415,18 @@ await check('BP-04 getBobbyControl: dynamic source decides; env flags can only A
     delete process.env.PROTOCOL_CUTOVER_FREEZE;
     withRecord({ write_freeze: true, canary: false }); process.env.PROTOCOL_CUTOVER_FREEZE = 'false';
     assert.equal((await control.getBobbyControl()).writeFreeze, true, 'env "false" never opens a dynamic freeze');
+    // Third round (BP-04 residual): the spellings the ops docs use must freeze too — the brake only ever adds a freeze.
+    for (const spelling of ['1', 'TRUE', 'yes', 'on']) {
+      process.env.PROTOCOL_CUTOVER_FREEZE = spelling;
+      withRecord({ write_freeze: false, canary: false });
+      assert.equal((await control.getBobbyControl()).writeFreeze, true, `PROTOCOL_CUTOVER_FREEZE=${spelling} freezes`);
+    }
+    delete process.env.PROTOCOL_CUTOVER_FREEZE; process.env.BOBBY_WRITE_FREEZE = '1';
+    withRecord({ write_freeze: false, canary: false });
+    assert.equal((await control.getBobbyControl()).writeFreeze, true, 'BOBBY_WRITE_FREEZE=1 (documented) freezes');
+    delete process.env.BOBBY_WRITE_FREEZE;
+    withRecord({ write_freeze: false, canary: false });
+    assert.equal((await control.getBobbyControl()).writeFreeze, false, 'with no env flag the well-formed open stands');
   } finally {
     globalThis.fetch = realFetch; control.resetBobbyControlCache();
     if (prev.src === undefined) delete process.env.BOBBY_CONTROL_SOURCE; else process.env.BOBBY_CONTROL_SOURCE = prev.src;
@@ -451,7 +463,10 @@ await check('BP-08 challenge lifecycle: secret + identical request claim; replay
     const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
     if (!u.pathname.includes('mcp_payment_challenges')) return json([]);
     const f = parseFilter(u);
-    if (method === 'POST') { const r = { challenge_id: `c${rows.length + 1}`, status: 'pending', expires_at: new Date(Date.now() + 600_000).toISOString(), attempts: 0, ...JSON.parse(init.body) }; rows.push(r); return json([r]); }
+    // Third round: challenge_id is a uuid column in production — a non-uuid key is a 400 (22P02), never a miss.
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (f.challenge_id?.startsWith('eq.') && !UUID.test(decodeURIComponent(f.challenge_id.slice(3)))) return json({ code: '22P02', message: 'invalid input syntax for type uuid' }, 400);
+    if (method === 'POST') { const r = { challenge_id: crypto.randomUUID(), status: 'pending', expires_at: new Date(Date.now() + 600_000).toISOString(), attempts: 0, ...JSON.parse(init.body) }; rows.push(r); return json([r]); }
     if (method === 'PATCH') { const patch = JSON.parse(init.body); const hit = rows.filter((r) => matches(r, f)); hit.forEach((r) => Object.assign(r, patch)); return json(hit); }
     return json(rows.filter((r) => matches(r, f)));
   }) as typeof fetch;
@@ -489,6 +504,7 @@ await check('BP-08 transports: both issue with the request hash + secret and red
     assert.match(src, /createChallenge\(\s*toolName,\s*fee\.feeWei,\s*requestHash,/, `${f}: challenge bound to the request`);
     assert.match(src, /x-challenge-secret/, `${f}: secret header`);
     assert.match(src, /claimChallenge\(effectiveChallengeId, txHash, verifiedPayment\.payer, clientSecret, requestHash\)/, `${f}: claim`);
+    assert.match(src, /challengeIdBytes32: challengeIdToBytes32\(challengeId\)/, `${f}: the 402 publishes the bytes32 encoding`);
     assert.match(src, /claim\.outcome === 'replay'/, `${f}: replay path`);
     assert.match(src, /failChallenge\(claimedChallengeId/, `${f}: failure path`);
     assert.match(src, /completeChallenge\(claimedChallengeId, result\)/, `${f}: completion path`);

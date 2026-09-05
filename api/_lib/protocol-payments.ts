@@ -11,6 +11,7 @@ import { DEFAULT_CHAIN } from './chains.js';
 // never from a hand-written fragment list that can drift from the contract.
 import { ADVERSARIAL_BOUNTIES_ABI } from './adversarial-bounties.abi.js';
 import { rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './rpc-redact.js';
+import { bytes32ToChallengeId } from './challenge-id.js';
 
 export {
   BOBBY_ADVERSARIAL_BOUNTIES,
@@ -263,7 +264,10 @@ export interface VerifiedMcpPayment {
   txHash: string;
   payer: string;
   to: string;
+  /** The challenge uuid decoded from the paid bytes32 — '' when the bytes32 is not a canonical Bobby challenge id. */
   challengeId: string;
+  /** The raw bytes32 the payer put on-chain. */
+  challengeIdBytes32: string;
   toolName: string;
   valueWei: string;
   valueNative: string;
@@ -368,8 +372,9 @@ export async function verifyMcpPaymentTx(
     throw new Error('Payment tx is not a payMCPCall invocation');
   }
 
-  // V2: args[0] = challengeId (bytes32), args[1] = toolName (string)
-  const challengeId = String(parsed.args?.[0] || '');
+  // V2: args[0] = challengeId (bytes32 = uuid + zero tail, see challenge-id.ts), args[1] = toolName (string)
+  const challengeIdBytes32 = String(parsed.args?.[0] || '').toLowerCase();
+  const challengeId = bytes32ToChallengeId(challengeIdBytes32) ?? '';
   const toolName = String(parsed.args?.[1] || '');
   if (toolName !== expectedToolName) {
     throw new Error(`Payment tx tool mismatch: expected ${expectedToolName}, got ${toolName || 'unknown'}`);
@@ -381,6 +386,7 @@ export async function verifyMcpPaymentTx(
     payer: String(tx.from || '').toLowerCase(),
     to,
     challengeId,
+    challengeIdBytes32,
     toolName,
     valueWei: valueWei.toString(),
     valueNative,

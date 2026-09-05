@@ -16,6 +16,7 @@ import {
   verifyMcpPaymentTx,
 } from './_lib/protocol-payments.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { challengeIdToBytes32 } from './_lib/challenge-id.js';
 import { createChallenge, storeReceipt, getChallenge, claimChallenge, completeChallenge, failChallenge, requestHashFor } from './_lib/mcp-challenges.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
 import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
@@ -120,7 +121,8 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'balance', params: { chain: args.chain || 'base' } }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
+        if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
+    return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
       }
 
       if (toolName === 'bobby_wallet_portfolio') {
@@ -128,7 +130,8 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'portfolio', params: { address: args.address, chain: args.chain || '8453' } }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
+        if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
+    return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
       }
 
       if (toolName === 'bobby_security_scan') {
@@ -136,7 +139,8 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'scan-token', params: { address: args.address, chain: args.chain || '1' } }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
+        if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
+    return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
       }
 
       if (toolName === 'bobby_dex_trending') {
@@ -144,7 +148,8 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'trending', params: { chain: args.chain || '1' } }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
+        if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
+    return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
       }
 
       if (toolName === 'bobby_dex_signals') {
@@ -152,7 +157,8 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           method: 'POST', headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ action: 'signals', params: { chain: args.chain || '1', type: args.type || 'smart_money' } }),
         });
-        return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
+        if (!res.ok) throw new Error(`Upstream ${res.status} from /api/bobby-wallet`); // third round: a paid call that fails upstream stays retryable, never a stored result
+    return { content: [{ type: 'text', text: JSON.stringify(await res.json(), null, 2) }] };
       }
 
       throw new Error(`Unknown tool: ${toolName}`);
@@ -259,7 +265,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 settlementContract: BOBBY_AGENT_ECONOMY,
                 settlementMethod: 'payMCPCall(bytes32 challengeId, string toolName)',
                 clientSecret,
-                instructions: `Call payMCPCall("${challengeId}", "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol}. Then retry the identical request with x-402-payment: <txHash>, x-challenge-id: ${challengeId} and x-challenge-secret: ${clientSecret}`,
+                // Third-round BP-08: the bytes32 the contract takes is the uuid left-aligned with a zero tail.
+                challengeIdBytes32: challengeIdToBytes32(challengeId),
+                instructions: `Call payMCPCall(${challengeIdToBytes32(challengeId)}, "${toolName}") on ${BOBBY_AGENT_ECONOMY} with ${fee.feeNative} ${fee.nativeSymbol} (bytes32 = the challenge uuid's 32 hex chars, left-aligned, zero-padded). Then retry the identical request with x-402-payment: <txHash>, x-challenge-id: ${challengeId} and x-challenge-secret: ${clientSecret}`,
               },
             },
             id: body.id,
@@ -296,7 +304,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(402).json({ jsonrpc: '2.0', error: { code: -32402, message: 'Challenge id does not match the paid transaction.' }, id: body.id });
       }
       if (!effectiveChallengeId) {
-        return res.status(402).json({ jsonrpc: '2.0', error: { code: -32402, message: 'Paid transaction carries no challenge id.' }, id: body.id });
+        return res.status(402).json({ jsonrpc: '2.0', error: { code: -32402, message: 'Paid transaction does not carry a Bobby challenge id (bytes32 must be the challenge uuid, left-aligned, zero-padded).' }, id: body.id });
       }
       {
         // BP-08: authorised by the client secret, bound to the identical request; failures stay retryable.
