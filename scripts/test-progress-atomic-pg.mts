@@ -48,11 +48,16 @@ async function commit(id: string, p: Record<string, any>, events: unknown[], cha
 }
 async function plant(id: string) {
   const p=await progress(id); const e=read(p);
+  const origin=await issue(id,e.meta.thesis);
+  Object.assign(e,{thesis_read_id:origin.id});
   const saved=await commit(id,p,[e]);
   const seed=saved.grants[e.client_event_id].inventoryId as string;
   // Fast-forward only the fixture's wait, never an API parameter.
   await query("update public.tl_inventory set seeded_at=now()-interval '25 hours' where id=$1",[seed]);
   return seed;
+}
+async function issue(id: string, thesis=read({xp:0}).meta.thesis) {
+  return (await query('select public.bobby_issue_thesis_read($1,$2,$3) result',[id,thesis,asset])).rows[0].result;
 }
 async function close(id: string, seed: string, p?: Record<string, any>) {
   p ??= await progress(id);
@@ -89,18 +94,28 @@ try {
     finally { client.release(); }
   }
   pass('real prerequisite schemas and atomic migration apply to an isolated schema');
-  for (const name of ['bobby_commit_progress(uuid,bigint,jsonb,jsonb)','bobby_close_seed(uuid,bigint,uuid,jsonb,jsonb,date,text,text[],text[])']) {
+  for (const name of ['bobby_issue_thesis_read(uuid,jsonb,text)','bobby_commit_progress(uuid,bigint,jsonb,jsonb)','bobby_close_seed(uuid,bigint,uuid,jsonb,jsonb,date,text,text[],text[])']) {
     for (const role of ['anon','authenticated']) {
       assert.equal((await pool.query('select has_function_privilege($1,$2,\'execute\') ok',[role,`${schema}.${name}`])).rows[0].ok,false);
     }
     assert.equal((await pool.query('select has_function_privilege($1,$2,\'execute\') ok',['service_role',`${schema}.${name}`])).rows[0].ok,true);
   }
   pass('RPC execution is restricted to service_role');
+  for(const role of ['anon','authenticated','service_role']) {
+    for(const action of ['INSERT','UPDATE','DELETE']) {
+      assert.equal((await pool.query('select has_table_privilege($1,$2,$3) ok',[role,`${schema}.bobby_thesis_reads`,action])).rows[0].ok,false);
+    }
+    assert.equal((await pool.query('select has_table_privilege($1,$2,\'SELECT\') ok',
+      [role,`${schema}.bobby_thesis_reads`])).rows[0].ok,role==='service_role');
+  }
+  pass('server verdict rows cannot be created or mutated through direct client/service table writes');
   const id=await identity(true);
   const first=await plant(id);
   const event=(await query('select * from public.bobby_progress_events where identity_id=$1',[id])).rows[0];
   assert.ok(event.execution_eligible_at.getTime()>event.occurred_at.getTime()+86400000);
   assert.equal(event.execution_asset_address,asset);
+  assert.equal(event.meta.thesisSource,'voice_tool_technical_pulse');
+  assert.ok(event.thesis_read_id);
   assert.equal((await progress(id)).route_index,1);
   pass('a queued old read receives a new database acceptance time and its route piece atomically');
 
@@ -198,6 +213,35 @@ try {
   await receipt(new Date(Date.now()+3600000).toISOString(),'future-block',stable,asset,staleWallet);
   assert.equal((await close(staleRead,staleSeed)).closed.executed,null);
   pass('late confirmation of a pre-acceptance swap and a future block cannot satisfy the execution window');
+  const originOwner=await identity();const origin=await issue(originOwner);
+  const changed={...read(await progress(originOwner)),thesis_read_id:origin.id};
+  changed.meta.thesis.direction='short';changed.meta.thesis.symbol='BTC';
+  await commit(originOwner,await progress(originOwner),[changed]);
+  const adopted=(await query('select meta,thesis_read_id,execution_asset_address from public.bobby_progress_events where identity_id=$1',[originOwner])).rows[0];
+  assert.equal(adopted.meta.thesis.direction,'long');assert.equal(adopted.meta.thesis.symbol,'ETH');
+  assert.equal(adopted.execution_asset_address,asset);
+  const ownerAgain=await progress(originOwner);
+  await commit(originOwner,ownerAgain,[{...read(ownerAgain),thesis_read_id:origin.id}]);
+  assert.equal((await query('select count(*)::int n from public.bobby_progress_events where thesis_read_id=$1',[origin.id])).rows[0].n,1);
+  pass('ledger adopts the immutable server snapshot and consumes its read ID only once');
+  const foreign=await identity();const foreignP=await progress(foreign);
+  const freshOrigin=await issue(originOwner);
+  await commit(foreign,foreignP,[{...read(foreignP),thesis_read_id:freshOrigin.id}]);
+  assert.equal((await query('select execution_eligible_at from public.bobby_progress_events where identity_id=$1',[foreign])).rows[0].execution_eligible_at,null);
+  const expired=await issue(originOwner);
+  await query("update public.bobby_thesis_reads set issued_at=now()-interval '25 hours',expires_at=now()-interval '1 hour' where id=$1",[expired.id]);
+  const expiredP=await progress(originOwner);
+  await commit(originOwner,expiredP,[{...read(expiredP),thesis_read_id:expired.id}]);
+  assert.equal((await query('select count(*)::int n from public.bobby_progress_events where thesis_read_id=$1',[expired.id])).rows[0].n,0);
+  pass('foreign and expired read references cannot certify execution eligibility');
+  const unsigned=await identity();const unsignedP=await progress(unsigned);
+  await commit(unsigned,unsignedP,[read(unsignedP)]);
+  assert.equal((await query('select execution_eligible_at from public.bobby_progress_events where identity_id=$1',[unsigned])).rows[0].execution_eligible_at,null);
+  pass('a plain submitted thesis remains learning progress, not execution proof');
+  const quotaId=await identity();
+  const many=await Promise.all(Array.from({length:121},()=>issue(quotaId)));
+  assert.equal(many.filter(Boolean).length,120);
+  pass('per-identity issuance cap holds under concurrent requests');
   const profileId=await identity();const profileP=await progress(profileId);
   const imported={...read(profileP),client_event_id:randomUUID(),kind:'legacy_import',points:100,awarded:100,aura:0,xp_after:100,execution_asset_address:null,meta:null};
   const noTrade={...read(profileP),client_event_id:randomUUID(),kind:'no_trade_respected',points:20,awarded:20,aura:6,xp_after:120};

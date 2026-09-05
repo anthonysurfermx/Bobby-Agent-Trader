@@ -244,7 +244,7 @@ function seedLine(review: SeedReview) {
   const base = review.thesis && review.thesis.direction !== 'none' ? findBaseToken(review.thesis.symbol) : null;
   const onBase = base && !base.stable ? (review.executionEligibleAt
     ? ` ${t('Only Base swaps after server sync can count toward the bonus.', 'Solo los swaps en Base posteriores a la sincronización pueden contar para el bono.')}`
-    : ` ${t('This older read is not eligible for an execution bonus.', 'Esta lectura anterior no es elegible para el bono de ejecución.')}`) : '';
+    : ` ${t('This read has no verified origin for an execution bonus.', 'Esta lectura no tiene origen verificado para el bono de ejecución.')}`) : '';
   return `${read} · ${timing}${onBase}`;
 }
 function outcomeLabel(outcome: ClosedThesis['outcome']) {

@@ -19,6 +19,7 @@
     ]
   },
   "include": [
+    "api/voice-tool.ts",
     "api/_lib/protocol-constants.ts",
     "api/_lib/protocol-payments.ts",
     "api/_lib/hardness-registry.ts",

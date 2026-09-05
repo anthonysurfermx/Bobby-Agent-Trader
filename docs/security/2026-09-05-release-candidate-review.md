@@ -2,7 +2,57 @@
 
 Date: 2026-09-05. Verdict: **NO-GO for release / activation**.
 
-## Follow-up: atomic progress remediation (local, not deployed)
+## Current follow-up: server-issued thesis origin (local, not deployed)
+
+RC-03 now has an implemented origin boundary, in addition to the timestamp fix.
+The authenticated web desk can request an immutable server record of the exact
+technical-pulse response. Its ID is bound to the verified identity, expires for
+initial consumption after 24 hours, and is consumed once inside the atomic
+progress transaction. The database adopts the stored snapshot and contract,
+never fields submitted alongside the ID. Foreign, expired, previously consumed
+or absent references do not certify execution eligibility.
+
+The provenance is explicitly `voice_tool_technical_pulse`: this proves a Bobby
+technical-desk response, not a separately executed three-model deliberation,
+nor that a human actually read it. No new signing secret is needed. Direct
+table insertion, update and deletion are denied to client and service roles;
+issuance goes through a service-only RPC with a serialized 120-per-identity
+rolling-day cap. HTTP writes retain authentication, write freeze and limits,
+and freeze is rechecked after market reads, immediately before persistence.
+
+Guest and old-client reads keep ordinary progress but cannot earn execution
+bonuses without verified origin. The web queue preserves the read ID across
+failed sync and reload. The eligible swap window still starts at database
+acceptance, not issuance or client time: swaps before sync do not count.
+Persistence failure leaves the market answer available without an origin ID.
+The studio labels missing origin rather than promising an execution bonus.
+Native iOS clients still need to request and carry this new optional reference.
+
+Validation on this follow-up:
+
+- 19 real-PostgreSQL scenarios pass, including origin ownership/expiry/one-use,
+  immutable snapshot adoption, direct-write permissions and concurrent issuance
+  limits, in addition to the atomicity and receipt-selection scenarios.
+- Five new provenance checks run the real extraction/helper/voice handler with
+  mocked providers, identity, freeze and HTTP. Guest compatibility, authenticated
+  issuance, NO TRADE/incomplete-data rejection, freeze and persistence failure pass.
+  They do not replace testing the real authentication provider or a live browser.
+- Five API orchestration checks, offline queue/reload regression and 66 thesis
+  rule tests pass. API/progress typechecks, build and lint pass. CI includes the
+  new provenance test, and API typechecking now explicitly includes voice-tool.
+
+The never-deployed `20260905000001_atomic_progress.sql` candidate was extended
+with the origin table and RPC; apply the complete current candidate, not an
+older draft of that file. If any environment has independently applied an older
+draft, stop and prepare a forward migration rather than editing its history.
+
+RC-02/RC-03/RC-04 now have local implementations and focused passing regressions.
+Release remains **NO-GO** pending migration preflight against actual histories,
+coordinated writer cutover, final-candidate CI, independent review and iOS checks.
+No production migration, deployment, paid provider request or live wallet action
+was performed. The checkpoints below are historical evidence, not current status.
+
+## Previous checkpoint: atomic progress remediation (`7e5cc05`, not deployed)
 
 The initial review below describes candidate `57c8fee`. The follow-up implements
 RC-02 and RC-04 in the local candidate and closes the timestamp portion of RC-03.

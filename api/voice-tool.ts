@@ -3,7 +3,8 @@
 // Executes a tool the Realtime voice session asked for, server-side.
 //
 // The browser never talks to data providers directly and never holds a key.
-// Every branch here is READ-ONLY. `propose_trade` returns a draft for the UI
+// Reads are public. An authenticated run_debate may also persist its own
+// technical snapshot for Trader Land. `propose_trade` returns a draft for the UI
 // to render as a confirmation card — it does not place, sign or settle anything.
 // ============================================================
 
@@ -15,6 +16,10 @@ import { buildTechnicalMarketSummary, type TechnicalRegime } from '../src/lib/bo
 import { getBaseVenues, resolveOkxInstrument } from '../src/lib/okx-asset-search.js';
 import { fetchOkxIndicatorBundle } from './_lib/okx-indicators.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { z } from 'zod';
+import { guardWrite } from './_lib/write-guard.js';
+import { requireIdentity } from './_lib/user-identity.js';
+import { issueThesisRead } from './_lib/thesis-provenance.js';
 
 export const config = { maxDuration: 60 };
 
@@ -23,6 +28,10 @@ const SELF = process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprotocol.xyz';
 type ToolName = 'get_market' | 'run_debate' | 'get_protocol_stats' | 'propose_trade';
 
 const ALLOWED: ToolName[] = ['get_market', 'run_debate', 'get_protocol_stats', 'propose_trade'];
+const ThesisReadRequest = z.object({ tool:z.literal('run_debate'), args:z.object({
+  symbol:z.string().min(1).max(32), context:z.string().max(2000).optional(),
+  lang:z.enum(['en','es']).optional(), recordThesisRead:z.literal(true),
+}) });
 
 interface VoiceMarketResult {
   symbol: string;
@@ -233,6 +242,7 @@ async function runDebate(symbol: string, context?: string, lang: DeskBriefLangua
 
   return {
     symbol: ticker,
+    isEquity: venue.isEquity,
     context: context ?? null,
     market,
     regime: (intel as Record<string, unknown>).regime ?? null,
@@ -299,14 +309,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'get_market':
         return res.status(200).json(await getMarket(String(args?.symbol ?? '')));
 
-      case 'run_debate':
-        return res.status(200).json(
-          await runDebate(
-            String(args?.symbol ?? ''),
-            args?.context ? String(args.context) : undefined,
-            args?.lang === 'en' ? 'en' : 'es',
-          ),
-        );
+      case 'run_debate': {
+        // Opt-in keeps anonymous/native readers compatible. Never accept a
+        // supplied identity, snapshot or trade draft as origin evidence.
+        let identity = null;
+        if (args?.recordThesisRead === true) {
+          const guarded = await guardWrite(req,res,{methods:['POST'],scope:'thesis-read',schema:ThesisReadRequest,
+            auth:'none',allowNoOrigin:true,perIp:{limit:30,windowSec:60}});
+          if (!guarded) return;
+          identity = await requireIdentity(req,res);
+          if (!identity) return;
+        }
+        const result = await runDebate(String(args?.symbol ?? ''),
+          args?.context ? String(args.context) : undefined, args?.lang === 'en' ? 'en' : 'es');
+        // A persistence outage must not discard the market answer or create a
+        // false proof. The caller can read normally; no bonus eligibility.
+        const thesisRead = identity ? await issueThesisRead(identity.id,result).catch(() => null) : null;
+        res.setHeader('Cache-Control','no-store');
+        return res.status(200).json({...result,thesis_read:thesisRead});
+      }
 
       case 'get_protocol_stats':
         return res.status(200).json(await getProtocolStats());

@@ -4,6 +4,40 @@
 -- delete or silently reconcile historical user rewards in a schema migration.
 begin;
 
+-- This candidate migration has never been deployed. Issuance is server-only;
+-- service callers may read, but cannot update/delete the saved verdict directly.
+create table public.bobby_thesis_reads (
+  id uuid primary key default gen_random_uuid(),
+  identity_id uuid not null references public.bobby_identities(id) on delete cascade,
+  thesis jsonb not null check (jsonb_typeof(thesis)='object'),
+  asset_address text not null check (asset_address ~ '^0x[0-9a-f]{40}$'),
+  source text not null default 'voice_tool_technical_pulse' check (source='voice_tool_technical_pulse'),
+  issued_at timestamptz not null default clock_timestamp(),
+  expires_at timestamptz not null,
+  check (expires_at > issued_at)
+);
+create index bobby_thesis_reads_identity_time on public.bobby_thesis_reads(identity_id,issued_at);
+alter table public.bobby_thesis_reads enable row level security;
+create policy bobby_thesis_reads_service_read on public.bobby_thesis_reads for select to service_role using(true);
+revoke all on public.bobby_thesis_reads from public,anon,authenticated,service_role;
+grant select on public.bobby_thesis_reads to service_role;
+
+create function public.bobby_issue_thesis_read(p_identity uuid,p_thesis jsonb,p_asset text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare r public.bobby_thesis_reads%rowtype; at_time timestamptz;
+begin
+  perform id from public.bobby_identities where id=p_identity for update;
+  if not found then raise exception 'Identity not found'; end if;
+  at_time := clock_timestamp();
+  -- Bound storage growth independently of per-IP HTTP limits.
+  if (select count(*) from public.bobby_thesis_reads where identity_id=p_identity
+      and issued_at > at_time-interval '24 hours') >= 120 then return null; end if;
+  if coalesce(p_thesis->>'direction','') not in ('long','short') then return null; end if;
+  insert into public.bobby_thesis_reads(identity_id,thesis,asset_address,issued_at,expires_at)
+    values(p_identity,p_thesis,p_asset,at_time,at_time+interval '24 hours') returning * into r;
+  return jsonb_build_object('id',r.id,'thesis',r.thesis,'issuedAt',r.issued_at,'expiresAt',r.expires_at);
+end $$;
+
 alter table public.bobby_progress add column revision bigint not null default 0;
 create function public.bobby_progress_revision() returns trigger
 language plpgsql set search_path = public as $$
@@ -15,6 +49,7 @@ create trigger bobby_progress_revision before update on public.bobby_progress
 for each row execute function public.bobby_progress_revision();
 
 alter table public.bobby_progress_events
+  add column thesis_read_id uuid references public.bobby_thesis_reads(id) on delete set null,
   add column execution_eligible_at timestamptz,
   add column execution_asset_address text,
   add column close_inventory_id uuid references public.tl_inventory(id),
@@ -27,6 +62,7 @@ set close_inventory_id = (meta #>> '{thesis_close,inventoryId}')::uuid,
 where kind = 'thesis_closed';
 create unique index bobby_progress_close_once on public.bobby_progress_events(close_inventory_id);
 create unique index bobby_progress_receipt_once on public.bobby_progress_events(execution_receipt_id);
+create unique index bobby_progress_thesis_read_once on public.bobby_progress_events(thesis_read_id);
 alter table public.tl_inventory add column season_id text;
 update public.tl_inventory set season_id = 'onchain_s1' where source = 'season';
 create unique index tl_season_piece_once on public.tl_inventory(identity_id, season_id, item_id)
@@ -42,7 +78,8 @@ create function public.bobby_commit_progress(
 declare
   p public.bobby_progress%rowtype; e jsonb; eid uuid; inv uuid;
   item public.tl_items%rowtype; route integer; grants jsonb := '{}'::jsonb;
-  state text; eligible timestamptz; asset text;
+  state text; eligible timestamptz; asset text; event_meta jsonb; read_id uuid;
+  issued public.bobby_thesis_reads%rowtype;
 begin
   -- Identity linking already locks identities before merging their ledgers.
   perform id from public.bobby_identities where id=p_identity for update;
@@ -54,16 +91,28 @@ begin
     if e->>'kind' not in ('read_complete', 'no_trade_respected', 'legacy_import') then
       raise exception 'Invalid plant kind';
     end if;
-    -- The API supplies a canonical address, not any client meta field.
-    asset := e->>'execution_asset_address';
-    eligible := case when e->>'kind' = 'read_complete' and asset is not null
-      then clock_timestamp() else null end;
+    -- Never certify submitted fields. Resolve a single-use server read under
+    -- this identity and adopt its exact snapshot/contract inside the transaction.
+    asset := null; eligible := null; read_id := null;
+    event_meta := e->'meta';
+    if e->>'kind'='read_complete' and (e->>'awarded')::integer > 0 and e->>'thesis_read_id' is not null then
+      select r.* into issued from public.bobby_thesis_reads r
+        where r.id=(e->>'thesis_read_id')::uuid and r.identity_id=p_identity
+          and r.issued_at <= clock_timestamp() and r.expires_at > clock_timestamp()
+          and not exists(select 1 from public.bobby_progress_events pe where pe.thesis_read_id=r.id)
+        for update;
+      if found then
+        read_id := issued.id; asset := issued.asset_address; eligible := clock_timestamp();
+        event_meta := jsonb_build_object('thesis',issued.thesis,'thesisSource',issued.source,
+          'thesisReadId',issued.id,'issuedAt',issued.issued_at);
+      end if;
+    end if;
     insert into public.bobby_progress_events
       (identity_id, client_event_id, kind, points, awarded, aura, xp_after, platform,
-       occurred_at, day_key, meta, execution_eligible_at, execution_asset_address)
+       occurred_at, day_key, meta, execution_eligible_at, execution_asset_address,thesis_read_id)
     values (p_identity, (e->>'client_event_id')::uuid, e->>'kind', (e->>'points')::integer,
       (e->>'awarded')::integer, coalesce((e->>'aura')::integer,0), (e->>'xp_after')::integer,
-      e->>'platform', (e->>'occurred_at')::timestamptz, (e->>'day_key')::date, e->'meta', eligible, asset)
+      e->>'platform', (e->>'occurred_at')::timestamptz, (e->>'day_key')::date, event_meta, eligible, asset,read_id)
     returning id into eid;
     if (e->>'awarded')::integer > 0 and e->>'kind' <> 'legacy_import' then
       insert into public.tl_lands(identity_id) values (p_identity) on conflict do nothing;
@@ -186,6 +235,8 @@ begin
 end $$;
 
 revoke all on function public.bobby_progress_revision() from public,anon,authenticated;
+revoke all on function public.bobby_issue_thesis_read(uuid,jsonb,text) from public,anon,authenticated;
+grant execute on function public.bobby_issue_thesis_read(uuid,jsonb,text) to service_role;
 revoke all on function public.bobby_commit_progress(uuid,bigint,jsonb,jsonb) from public,anon,authenticated;
 revoke all on function public.bobby_close_seed(uuid,bigint,uuid,jsonb,jsonb,date,text,text[],text[]) from public,anon,authenticated;
 grant execute on function public.bobby_commit_progress(uuid,bigint,jsonb,jsonb) to service_role;

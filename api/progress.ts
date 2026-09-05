@@ -17,7 +17,6 @@ import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { AWARD_AURA, PLANT_KINDS, applyAward, type ProgressCounters } from './_lib/progress-rules.js';
 import { ThesisSchema, type RouteGrant } from './_lib/trader-land.js';
-import { findBaseToken } from '../src/lib/base-swap/tokens.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -34,6 +33,7 @@ const Body = z.object({
     tzOffsetMin: z.number().int().min(-840).max(840).default(0),
     meta: z.record(z.unknown()).optional(),
     thesis: ThesisSchema.optional().catch(undefined),
+    thesisReadId: z.string().uuid().optional().catch(undefined),
   })).max(50).default([]),
   profile: z.object({
     companionId: z.string().regex(/^[a-z0-9_-]{1,32}$/).nullable().optional(),
@@ -131,6 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const guarded = await guardWrite(req, res, {
     methods: ['POST'],
     scope: 'progress',
+    maxBodyBytes: 32 * 1024, // Up to 50 queued snapshots plus their origin IDs.
     schema: Body,
     auth: 'none',
     allowNoOrigin: true,
@@ -191,9 +192,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // A submitted snapshot is not proof of a Bobby-issued verdict. Drop raw
         // meta rather than letting it impersonate a validated thesis/provenance.
         const meta = e.thesis ? { thesis: e.thesis, thesisSource: 'client_snapshot' } : null;
-        const asset = e.thesis ? findBaseToken(e.thesis.symbol) : null;
-        const executionAsset = asset && !asset.stable ? asset.address.toLowerCase() : null;
-        ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, aura, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta, execution_asset_address: executionAsset });
+        // The RPC resolves this reference under the authenticated identity,
+        // replacing the submitted fields only from its immutable server row.
+        ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, aura, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta, thesis_read_id: e.thesisReadId ?? null });
       }
       for (const e of uniqueEvents) if (!fresh.includes(e)) results.push({ id: e.id, awarded: 0, aura: 0, xpBefore: row.xp, xpAfter: row.xp, duplicate: true });
 

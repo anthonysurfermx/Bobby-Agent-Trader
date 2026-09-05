@@ -22,7 +22,8 @@ let restored: typeof first | undefined;
 try {
   const thesis = { symbol: 'ETH', isEquity: false, direction: 'long', price: 3000, entry: 3000, stop: 2900, target: 3200 };
   const expected = { ...thesis };
-  first.progressStore.awardDiscipline('read_complete', new Date('2026-09-05T12:00:00Z'), thesis);
+  const readId='b26445f8-5b88-4e8d-aaef-7f7b1cbcf451';
+  first.progressStore.awardDiscipline('read_complete', new Date('2026-09-05T12:00:00Z'), thesis, readId);
   thesis.symbol = 'BTC'; // A later view change must not rewrite a queued verdict.
   const queued = first.progressStore.get().pendingEvents[0];
   assert.deepEqual(queued.thesis, expected);
@@ -32,6 +33,7 @@ try {
     assert.equal(url, '/api/progress');
     assert.equal(init?.method, 'POST');
     assert.deepEqual(JSON.parse(String(init?.body)).events[0].thesis, expected);
+    assert.equal(JSON.parse(String(init?.body)).events[0].thesisReadId,readId);
     return new Response('{}', { status: 503 });
   };
   first.configureProgressSync(() => ({ Authorization: 'Bearer local-test-only' }));
@@ -42,10 +44,12 @@ try {
   // Reload the real store from the persisted queue, then retry and acknowledge.
   restored = await import(`${moduleUrl}#reload`);
   assert.deepEqual(restored.progressStore.get().pendingEvents[0].thesis, expected);
+  assert.equal(restored.progressStore.get().pendingEvents[0].thesisReadId,readId);
   globalThis.fetch = async (url, init) => {
     assert.equal(url, '/api/progress');
     const body = JSON.parse(String(init?.body));
     assert.equal(body.events[0].id, queued.id);
+    assert.equal(body.events[0].thesisReadId,readId);
     assert.deepEqual(body.events[0].thesis, expected);
     return Response.json({ progress: { ...restored!.progressStore.get(), xp: 10 }, results: [{ id: queued.id }] });
   };

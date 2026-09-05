@@ -46,6 +46,7 @@ jobs:
       - run: npm run test:trader-land-thesis
       - run: npm run test:progress-thesis-sync
       - run: npm run test:progress-atomic-api
+      - run: npm run test:thesis-provenance
       - run: npm run build
       - run: npm run lint -- --quiet
       - run: npm audit --omit=dev --audit-level=high

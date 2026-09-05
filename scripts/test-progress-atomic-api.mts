@@ -3,7 +3,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { build } from 'esbuild';
-import { BASE_WETH } from '../src/lib/base-swap/tokens.js';
 
 const id=randomUUID();
 const oldFetch=globalThis.fetch;
@@ -30,7 +29,7 @@ function response() {
 const row={identity_id:id,revision:0,xp:0,aura:0,route_index:0,streak:0,last_day:null,daily_awards:0,daily_awards_day:null,
   companion_id:null,vibe_id:'directo',onboarded:false,risk_notice_version:0,quick_access:[],last_platform:null,updated_at:new Date().toISOString()};
 const thesis={symbol:'ETH',direction:'long',price:3000,entry:3000,stop:2900,target:3200,isEquity:false};
-const event={id:randomUUID(),kind:'read_complete',at:new Date().toISOString(),thesis};
+const event={id:randomUUID(),kind:'read_complete',at:new Date().toISOString(),thesis,thesisReadId:randomUUID()};
 try {
   let writes=0;
   globalThis.fetch=async (url,init)=>{
@@ -45,7 +44,8 @@ try {
     const body=JSON.parse(String(init?.body));
     assert.equal(body.p_events.length,1,'duplicate event IDs within the batch collapse');
     assert.deepEqual(body.p_events[0].meta,{thesis,thesisSource:'client_snapshot'});
-    assert.equal(body.p_events[0].execution_asset_address,BASE_WETH.toLowerCase());
+    assert.equal(body.p_events[0].execution_asset_address,undefined,'API cannot certify submitted symbols');
+    assert.equal(body.p_events[0].thesis_read_id,event.thesisReadId);
     assert.equal(body.p_events[0].execution_eligible_at,undefined,'API does not set eligibility clock');
     writes++;
     if(writes===1) return Response.json({retry:true});
