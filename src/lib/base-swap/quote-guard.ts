@@ -146,7 +146,10 @@ export function assertQuoteConsistent(quote: QuoteLike, req: QuoteRequest, now: 
   const cap = Math.min(BASE_SWAP_LIMITS.maxTicketUsd, reqIn.maxTicketUsd ?? Infinity, reqOut.maxTicketUsd ?? Infinity);
   if (typeof quote.usdValue !== 'number' || !Number.isFinite(quote.usdValue)) refuse('ticket USD value is unavailable');
   if (quote.usdValue < BASE_SWAP_LIMITS.minTicketUsd || quote.usdValue > cap) refuse(`ticket is outside the $${BASE_SWAP_LIMITS.minTicketUsd}–$${cap} limit`);
-  if (quote.priceImpactPct !== null && (typeof quote.priceImpactPct !== 'number' || Math.abs(quote.priceImpactPct) > BASE_SWAP_LIMITS.maxPriceImpactPct)) refuse('price impact is over the local limit');
+  const stableAmount = reqIn.stable ? Number(quote.amountIn) : reqOut.stable ? Number(quote.amountOut) : null;
+  if (stableAmount !== null && (!Number.isFinite(stableAmount) || stableAmount < BASE_SWAP_LIMITS.minTicketUsd || stableAmount > cap || Math.abs(stableAmount - quote.usdValue) > 0.000001)) refuse('USD value differs from the stablecoin amount or exceeds the local limit');
+  if (typeof quote.priceImpactPct !== 'number' || !Number.isFinite(quote.priceImpactPct)) refuse('price impact is unavailable');
+  if (Math.abs(quote.priceImpactPct) > BASE_SWAP_LIMITS.maxPriceImpactPct) refuse('price impact is over the local limit');
 
   // 5. Recipient and deadline, when there is anything to sign.
   const wallet = req.wallet.toLowerCase();

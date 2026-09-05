@@ -74,6 +74,12 @@ export const BASE_SWAP_TOKENS: readonly BaseSwapToken[] = [
     aliases: ['NVDA'], assetClass: 'tokenized-stock', underlyingSymbol: 'NVDA',
     issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x04689a41629776563E6822F76f2e57D148d28513', maxTicketUsd: 100,
   },
+  {
+    symbol: 'SPCXc', name: 'Coinbase Tokenized SpaceX',
+    address: '0xb2000000000000000000007b9fcbd005511aCBd5', decimals: 8,
+    aliases: ['SPCX'], assetClass: 'tokenized-stock', underlyingSymbol: 'SPCX',
+    issuer: 'Coinbase Tokenized Stocks', referenceFeed: '0x6A634B235903C4ad6376892180d6fF8612e3Fa68', maxTicketUsd: 10,
+  },
 ] as const;
 
 /** Server-enforced limits; the UI only mirrors them. */

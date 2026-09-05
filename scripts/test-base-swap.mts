@@ -30,7 +30,7 @@ assert.equal(findBaseToken(BASE_USDC.toLowerCase())?.symbol, 'USDC');
 assert.equal(findBaseToken(WETH9)?.symbol, 'WETH', 'address lookup never resolves to native ETH');
 assert.equal(findBaseToken('DOGE'), null);
 assert.equal(findBaseToken('0x0000000000000000000000000000000000000000'), null);
-assert.deepEqual(BASE_STOCK_SYMBOLS, ['AAPLc', 'GOOGLc', 'METAc', 'NVDAc']);
+assert.deepEqual(BASE_STOCK_SYMBOLS, ['AAPLc', 'GOOGLc', 'METAc', 'NVDAc', 'SPCXc']);
 assert.equal(findBaseToken('NVDA')?.symbol, 'NVDAc', 'underlying ticker resolves to the pinned B20 address');
 assert.equal(findBaseToken('aaplc')?.address, '0xb200000000000000000000C2e324d24d7eEcd1fb');
 
@@ -168,6 +168,11 @@ assert.throws(
     tx: { deadline, approve: null, swap: { to: SWAP_ROUTER02, data: '0x', value: '0' } }, txWithheld: [],
   };
   const v = assertQuoteConsistent(consistent, req, now);
+  const spcx = findBaseToken('SPCX')!;
+  const spcxQuote = { ...structuredClone(consistent), tokenOut: { symbol: spcx.symbol, address: spcx.address, decimals: spcx.decimals }, stockReference: { ...consistent.stockReference, symbol: spcx.symbol }, amountIn: '10', amountInRaw: '10000000', usdValue: 10 };
+  const spcxRequest = { ...req, tokenOut: 'SPCXc', amount: '10' };
+  assert.doesNotThrow(() => assertQuoteConsistent(spcxQuote, spcxRequest, now));
+  assert.throws(() => assertQuoteConsistent({ ...spcxQuote, amountIn: '11', amountInRaw: '11000000' }, { ...spcxRequest, amount: '11' }, now), /USD value/);
   assert.deepEqual([v.tokenInSymbol, v.tokenOutSymbol, v.amountInRaw, v.minAmountOutRaw, v.slippageBps, v.deadline, v.recipient],
     ['USDC', 'NVDAc', '25000000', '39800', 50, deadline, wallet.toLowerCase()], 'a consistent quote validates and yields integer units');
   const refuse = (label: string, mutate: (q: any) => void, reqOverride: Partial<typeof req> = {}, re: RegExp = /Quote refused/) => {
@@ -186,7 +191,11 @@ assert.throws(
   refuse('zero output', (q) => { q.amountOutRaw = '0'; q.amountOut = '0'; q.minAmountOutRaw = '0'; q.minAmountOut = '0'; }, {}, /quote output is zero/);
   refuse('non-canonical raw integer', (q) => { q.amountInRaw = '025000000'; }, {}, /not a canonical integer/);
   refuse('ticket above the local cap', (q) => { q.usdValue = 250; }, {}, /outside the \$1–\$100 limit/);
+  refuse('USD notional must match stablecoin units', (q) => { q.usdValue = 1; }, {}, /USD value/);
   refuse('price impact above the local limit', (q) => { q.priceImpactPct = 3.5; }, {}, /price impact is over/);
+  for (const impact of [null, undefined, Number.NaN, Number.POSITIVE_INFINITY]) {
+    refuse('price impact must be measurable', (q) => { q.priceImpactPct = impact; }, {}, /price impact is unavailable/);
+  }
   refuse('recipient is another wallet', (q) => { q.recipient = '0x2222222222222222222222222222222222222222'; }, {}, /recipient is not the connected wallet/);
   refuse('deadline beyond the local policy', (q) => { q.deadline = now + 3600; q.tx.deadline = now + 3600; }, {}, /deadline exceeds the local policy/);
   refuse('transaction deadline differs from the quote', (q) => { q.tx.deadline = deadline + 1; }, {}, /transaction deadline differs/);
