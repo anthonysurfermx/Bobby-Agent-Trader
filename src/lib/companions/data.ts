@@ -92,8 +92,8 @@ export interface CompanionTool { companionId: string; tier: 1 | 2 | 3; name: Bi;
 
 export function toolUnlockXP(tier: number): number { return tier === 1 ? 1 : (tier - 1) * 100; }
 export function toolArt(tool: CompanionTool): string { return `/tools/tool_${tool.companionId}_${tool.tier}.png`; }
-/** Only the four starters have Higgsfield art today; the rest use a glyph until generated. */
-export const TOOL_ART_AVAILABLE = new Set(['orb', 'byte', 'kora', 'zip']);
+/** Every companion has Higgsfield art (tools + pet); the glyph path stays as a fallback for new companions. */
+export const TOOL_ART_AVAILABLE = new Set(['orb', 'byte', 'kora', 'zip', 'glitch', 'momo', 'flux', 'rook', 'halo', 'axiom']);
 export function toolHasArt(tool: CompanionTool): boolean { return TOOL_ART_AVAILABLE.has(tool.companionId); }
 export function toolTierLabel(tier: number): Bi {
   return tier === 1 ? { en: 'COMMON', es: 'COMÚN' } : tier === 2 ? { en: 'RARE', es: 'RARO' } : { en: 'GOLDEN', es: 'DORADO' };
@@ -202,7 +202,7 @@ export function glyphSprite(glyph: string, tint: string): string {
   glyphCache.set(key, url);
   return url;
 }
-export const PET_ART_AVAILABLE = new Set(['orb', 'byte', 'kora', 'zip']);
+export const PET_ART_AVAILABLE = new Set(['orb', 'byte', 'kora', 'zip', 'glitch', 'momo', 'flux', 'rook', 'halo', 'axiom']);
 export function petArt(companionId: string): string | null { return PET_ART_AVAILABLE.has(companionId) ? `/pets/pet_${companionId}.png` : null; }
 export function newlyUnlockedTools(companionId: string, fromXP: number, toXP: number): CompanionTool[] {
   return toolsFor(companionId).filter((tool) => fromXP < toolUnlockXP(tool.tier) && toXP >= toolUnlockXP(tool.tier));
