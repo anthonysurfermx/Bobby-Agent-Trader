@@ -220,7 +220,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
       record: {
         trust_score: trust.score || 0,
         commitments: rep.totalCommitments || 0,
-        win_rate: rep.winRate || 0,
+        win_rate: rep.winRate ?? null, // third round: unavailable stays null, never a coerced zero
       },
       guardrails: 'fail-closed: conviction>=3.5, mandatory stop, circuit breaker, 20% drawdown kill',
       mcp: `${BASE_URL}/api/mcp-http`,
@@ -304,18 +304,23 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
     const trust = rep.trustScore as Record<string, unknown> || {};
     const cp = (cpRes as Record<string, unknown>) || {};
     const rd = cp.risk_decisions as Record<string, unknown> || {};
+    // Third round (BP-11 sibling): the reputation endpoint reports unavailable sources as null —
+    // an MCP client must see "unavailable", never a coerced zero.
+    const trackRecordAvailable = rep.ok !== false && (rep.sources as Record<string, string> | undefined)?.trackRecord !== 'unavailable';
+    const num = (v: unknown) => (trackRecordAvailable && v !== null && v !== undefined ? Number(v) : null);
     const stats = {
       protocol: 'Bobby Protocol',
+      track_record_available: trackRecordAvailable,
       track_record: {
-        total_trades_resolved: reputation.totalTrades || 0,
-        total_commitments: reputation.totalCommitments || 0,
-        wins: reputation.wins || 0,
-        losses: reputation.losses || 0,
-        win_rate_pct: reputation.winRate || 0,
-        cumulative_pnl_pct: reputation.cumulativePnlPct || 0,
-        pending_resolution: reputation.pendingResolution || 0,
+        total_trades_resolved: num(reputation.totalTrades),
+        total_commitments: num(reputation.totalCommitments),
+        wins: num(reputation.wins),
+        losses: num(reputation.losses),
+        win_rate_pct: num(reputation.winRate),
+        cumulative_pnl_pct: num(reputation.cumulativePnlPct),
+        pending_resolution: num(reputation.pendingResolution),
       },
-      trust_score: trust.score || 0,
+      trust_score: trust.score ?? null,
       last_24h: {
         debates: rd.total_debates || 0,
         executed: rd.executed || 0,

@@ -7,7 +7,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Interface, formatEther } from 'ethers';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
 import { trackRecordSelectors } from './_lib/trackrecord-stats-adapter.js';
-import { rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
+import { parseRpcJson, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
@@ -44,6 +44,11 @@ let heartbeatCache:
     }
   | null = null;
 
+/** Tests only: the module-level cache would otherwise make failure-path assertions order-dependent. */
+export function resetHeartbeatCache(): void {
+  heartbeatCache = null;
+}
+
 async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
   try {
@@ -72,7 +77,7 @@ async function fetchJsonWithTimeout(url: string, body: unknown, timeoutMs: numbe
     if (!res.ok) {
       throw new Error(`RPC ${res.status} from ${rpcEndpointLabel(url)}`);
     }
-    return await res.json();
+    return await parseRpcJson<unknown>(res, url);
   } finally {
     clearTimeout(timer);
   }
@@ -506,9 +511,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[ProtocolHeartbeat] Error:', msg);
 
     if (heartbeatCache) {
+      // Third round (BP-11 lens): a stale replay is last-known data, not a live read —
+      // it must never answer ok:true / degraded:false / sources ok.
       res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=30');
       return res.status(200).json({
         ...heartbeatCache.payload,
+        ok: false,
+        degraded: true,
+        sources: { economy: 'stale', trackRecord: 'stale', bounties: 'stale' },
         cached: true,
         stale: true,
         error: msg,

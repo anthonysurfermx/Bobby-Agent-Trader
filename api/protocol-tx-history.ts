@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther } from 'ethers';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
-import { rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
+import { parseRpcJson, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -111,7 +111,7 @@ async function rpcCall(method: string, params: unknown[]): Promise<unknown> {
         throw new Error(`RPC ${res.status} from ${rpcEndpointLabel(url)}`);
       }
 
-      const json = await res.json() as { result?: unknown; error?: { message?: string } };
+      const json = await parseRpcJson<{ result?: unknown; error?: { message?: string } }>(res, url);
       if (json.error) {
         throw new Error(scrubRpcSecrets(json.error.message || '') || `RPC error from ${rpcEndpointLabel(url)}`);
       }
@@ -144,7 +144,7 @@ async function fetchBlockBatch(calls: unknown[]): Promise<Array<{ result?: RpcBl
         throw new Error(`Block batch RPC ${res.status} from ${rpcEndpointLabel(url)}`);
       }
 
-      const json = await res.json() as unknown;
+      const json = await parseRpcJson<unknown>(res, url);
       if (!Array.isArray(json)) {
         throw new Error(`Block batch RPC returned non-array payload from ${rpcEndpointLabel(url)}`);
       }

@@ -6,6 +6,8 @@ import {SafeOwnerGate} from "../script/SafeOwnerGate.sol";
 import {VerifyBaseDeployment} from "../script/VerifyBaseDeployment.s.sol";
 import {BountyEconomicsGate} from "../script/BountyEconomicsGate.sol";
 import {V2ParamsGate} from "../script/V2ParamsGate.sol";
+import {EnvGate} from "../script/EnvGate.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
 import {MockPyth} from "./BobbyTrackRecordV2.t.sol";
 import {BobbyAdversarialBounties} from "../src/BobbyAdversarialBounties.sol";
@@ -105,6 +107,20 @@ contract VerifyHarness is VerifyBaseDeployment {
 
     function verifyV2Params(address trackRecord, string memory json) external {
         _verifyV2Params(trackRecord, json);
+    }
+}
+
+/// @dev Third round (BP-03 reopen): external frame around EnvGate so a strict-parser
+///      revert can be asserted with expectRevert.
+contract EnvGateCaller {
+    Vm internal constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    function uintOr(string memory name, uint256 dflt) external view returns (uint256) {
+        return EnvGate.uintOr(VM, name, dflt);
+    }
+
+    function requireSet(string memory name) external view {
+        EnvGate.requireSet(VM, name);
     }
 }
 
@@ -501,5 +517,38 @@ contract DeploymentGatesTest is Test {
         tr.set(live);
         vm.expectRevert(bytes("V2ParamsGate: maxExitLagSec out of [300,3600]"));
         verify.verifyV2Params(address(tr), _v2Manifest(reviewed));
+    }
+
+    // ── Third round (BP-03 reopen): vm.envOr silently substituted the default for a malformed value ──
+
+    function test_envGate_unsetUsesDefault_setParses() public {
+        EnvGateCaller g = new EnvGateCaller();
+        vm.setEnv("AUDIT3_ENV_UNSET_X", "");
+        // an EMPTY value is "set but malformed": strict parsing must refuse it, not default
+        vm.expectRevert();
+        g.uintOr("AUDIT3_ENV_UNSET_X", 4242);
+        assertEq(g.uintOr("AUDIT3_ENV_NEVER_SET_Y", 4242), 4242, "unset -> default");
+        vm.setEnv("AUDIT3_ENV_OK", "60");
+        assertEq(g.uintOr("AUDIT3_ENV_OK", 4242), 60, "set -> parsed value, never the default");
+    }
+
+    /// The reproduction: `3O` (letter O), `-5`, `60.0`, `1e80` all made the old
+    /// vm.envOr path deploy the audited default and log "entryWindowSec 60".
+    function test_envGate_malformedValuesRevertInsteadOfDefaulting() public {
+        EnvGateCaller g = new EnvGateCaller();
+        string[5] memory bad = ["3O", "-5", "60.0", "1e80", "abc"];
+        for (uint256 i = 0; i < bad.length; i++) {
+            vm.setEnv("AUDIT3_ENV_BAD", bad[i]);
+            vm.expectRevert();
+            g.uintOr("AUDIT3_ENV_BAD", 4242);
+        }
+    }
+
+    function test_envGate_requireSetRefusesMissingOnMainnet() public {
+        EnvGateCaller g = new EnvGateCaller();
+        vm.expectRevert(bytes("EnvGate: AUDIT3_ENV_MISSING must be set explicitly on mainnet"));
+        g.requireSet("AUDIT3_ENV_MISSING");
+        vm.setEnv("AUDIT3_ENV_MISSING", "1");
+        g.requireSet("AUDIT3_ENV_MISSING");
     }
 }

@@ -25,6 +25,7 @@ import {
 } from 'viem';
 import { base } from 'viem/chains';
 import { BASE, UNISWAP_BASE } from './chains.js';
+import { rpcErrorMessage } from './rpc-redact.js';
 import {
   BASE_B20_ORACLE_REGISTRY, BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, BASE_WETH, STOCK_COUNTRY_ALLOWLIST, findBaseToken, stockCountryAllowed, type BaseSwapToken,
 } from '../../src/lib/base-swap/tokens.js';
@@ -711,7 +712,8 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
       else if (stockReference.pausedFeatures !== '0') warnings.push(`${stock.symbol}: issuer has paused some features (mint/redeem side); secondary trading still open`);
       if (stockReference.multiplierHuman !== 1) warnings.push(`${stock.symbol}: multiplier is ${stockReference.multiplierHuman}: one token is ${stockReference.multiplierHuman} shares`);
     } catch (error) {
-      txWithheld.push(`stock metadata/reference could not be verified: ${error instanceof Error ? error.message : String(error)}`);
+      // Third round (BP-12): viem embeds `URL: <endpoint>` in transport errors and this string is PUBLIC (quote.txWithheld).
+      txWithheld.push(`stock metadata/reference could not be verified: ${rpcErrorMessage(error)}`);
     }
   }
 

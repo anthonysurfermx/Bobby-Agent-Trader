@@ -10,7 +10,7 @@ import { DEFAULT_CHAIN } from './chains.js';
 // BP-07: the bounties ABI comes FROM the compiled artifact (gen:hardness-abi),
 // never from a hand-written fragment list that can drift from the contract.
 import { ADVERSARIAL_BOUNTIES_ABI } from './adversarial-bounties.abi.js';
-import { rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './rpc-redact.js';
+import { parseRpcJson, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './rpc-redact.js';
 import { bytes32ToChallengeId } from './challenge-id.js';
 
 export {
@@ -251,7 +251,15 @@ export async function buildSubmitChallengeCalldata(params: {
   evidenceHash: string;
 }): Promise<{ to: string; data: string; value: string; valueWei: string; valueNative: string }> {
   const encoded = encodeSubmitChallenge(params);
-  const bondWei = await readBountyBond(params.bountyId);
+  // Third round (BP-07 lens): bountyBond(id) is 0 for a bounty that does not exist (yet) — the
+  // builder used to hand out value 0x0 with a "this is the bond" note. Resolve the bounty first
+  // and refuse anything that cannot be challenged, exactly like readBounty does.
+  const bounty = await readBounty(params.bountyId);
+  if (bounty.status !== 'OPEN' && bounty.status !== 'CHALLENGED') {
+    throw new Error(`Bounty ${params.bountyId} is ${bounty.status}; it does not accept challenges`);
+  }
+  const bondWei = BigInt(bounty.bondWei);
+  if (bondWei <= 0n) throw new Error(`Bounty ${params.bountyId} has no challenge bond on-chain`);
   return {
     ...encoded,
     value: `0x${bondWei.toString(16)}`,
@@ -295,7 +303,7 @@ async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
 
       if (!res.ok) throw new Error(`${DEFAULT_CHAIN.name} ${rpcEndpointLabel(url)} ${res.status}`);
 
-      const json = await res.json() as RpcEnvelope<T>;
+      const json = await parseRpcJson<RpcEnvelope<T>>(res, url);
       // BP-12: upstream messages may echo the request URL — scrub before they propagate.
       if (json.error) throw new Error(scrubRpcSecrets(json.error.message || '') || `${DEFAULT_CHAIN.name} ${rpcEndpointLabel(url)} error`);
       if (json.result == null) throw new Error(`${DEFAULT_CHAIN.name} ${rpcEndpointLabel(url)} returned no result`);

@@ -58,6 +58,26 @@ try {
   process.env.BASE_BOUNTIES_ADDRESS = address;
   const payments = await import('../api/_lib/protocol-payments.js');
   const { ADVERSARIAL_BOUNTIES_ABI } = await import('../api/_lib/adversarial-bounties.abi.js');
+  // Third round (BP-07 lenses): the audit's cited site is the MCP HANDLER, so drive it too.
+  process.env.BOBBY_SUPABASE_URL = 'https://dummy.supabase.co';
+  process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'dummy-service-key';
+  process.env.BOBBY_SUPABASE_ANON_KEY = 'dummy-anon-key';
+  process.env.INTERNAL_API_SECRET = 'test-internal-secret';
+  process.env.BOBBY_PROTOCOL_BASE_URL = 'https://dummy.bobby';
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: any, init?: any) => {
+    const url = typeof input === 'string' ? input : input.url;
+    if (url.startsWith(RPC)) return realFetch(input, init);
+    return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  const mcpHttp = (await import('../api/mcp-http.js')).default;
+  const challengeTool = async (bountyId: string) => {
+    const state: { body?: any } = {};
+    const res = { status() { return res; }, json(b: unknown) { state.body = b; return res; }, setHeader() { return res; }, getHeader() { return undefined; }, end() { return res; }, send(b: unknown) { state.body = b; return res; } };
+    await mcpHttp({ method: 'POST', query: {}, headers: { 'x-forwarded-for': '203.0.113.10', 'content-type': 'application/json' }, url: '/', body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'bobby_bounty_challenge', arguments: { bounty_id: bountyId, evidence_hash: ethers.keccak256(ethers.toUtf8Bytes(`evidence-${bountyId}`)) } } } } as any, res as any);
+    return state.body;
+  };
+  const clocks = { claimWindow: Number(await truth(owner).defaultClaimWindow()), grace: Number(await truth(owner).challengeGracePeriod()), disputeWindow: Number(await truth(owner).disputeWindow()), settlement: Number(await truth(owner).disputeSettlementTimeout()) };
 
   // 0. The generated module must BE the artifact's ABI.
   assert.equal(JSON.stringify(ADVERSARIAL_BOUNTIES_ABI), JSON.stringify(artifact.abi), 'api/_lib/adversarial-bounties.abi.ts is stale: run `npm run gen:hardness-abi` after `forge build`');
@@ -69,7 +89,11 @@ try {
   assert.equal(b.status, 'OPEN');
   assert.equal(b.bondWei, MIN_BOUNTY.toString(), 'bond == the challengeBond at post time');
   assert.equal(b.nextDeadline?.action, 'submitChallenge');
-  assert.equal(b.nextDeadline?.at, b.createdAt + b.claimWindowSecs);
+  // deadlines are checked against the CONTRACT's clocks, not against the same response
+  const onchain1 = await truth(owner).bounties(1);
+  const createdAt1 = Number(onchain1[4]);
+  assert.equal(b.createdAt, createdAt1);
+  assert.equal(b.nextDeadline?.at, createdAt1 + clocks.claimWindow, 'claim deadline = on-chain createdAt + defaultClaimWindow');
   assert.equal(b.poster, await addr(poster));
   console.log('ok  readBounty: OPEN, bondWei from bountyBond(id), claim-window deadline');
 
@@ -84,6 +108,17 @@ try {
   );
   console.log('ok  reproduction: submitChallenge with value 0x0 reverts (Challenge bond required)');
 
+  // 2b. The MCP HANDLER (the audit's cited site) forwards the bond, and refuses a bounty that does not exist yet.
+  const toolOk = await challengeTool('1');
+  const unsigned = JSON.parse(toolOk.result.content[0].text);
+  assert.equal(unsigned.kind, 'unsigned_tx'); assert.equal(BigInt(unsigned.value), MIN_BOUNTY, 'handler value == bountyBond(1)');
+  assert.equal(unsigned.valueWei, MIN_BOUNTY.toString());
+  const nextId = String(await payments.readNextBountyId());
+  const toolMissing = await challengeTool(nextId);
+  assert.ok(toolMissing.error, 'an unposted bounty id is an error, not a 0x0 transaction');
+  assert.match(String(toolMissing.error.message), /not found/);
+  console.log('ok  MCP bobby_bounty_challenge forwards bountyBond(id); an unposted id is refused (no 0x0 tx)');
+
   // 3. The fixed builder carries the bond; the tx succeeds AS BUILT.
   const built = await payments.buildSubmitChallengeCalldata({ bountyId: 1, evidenceHash: evidence });
   assert.equal(built.to.toLowerCase(), address.toLowerCase());
@@ -96,6 +131,7 @@ try {
   assert.equal(b.challengeCount, 1);
   assert.equal(b.nextDeadline?.action, 'resolveBounty');
   assert.equal(b.nextDeadline?.source, 'claimWindow+grace');
+  assert.equal(b.nextDeadline?.at, createdAt1 + clocks.claimWindow + clocks.grace, 'resolve deadline = createdAt + claimWindow + grace (contract clocks)');
   assert.equal(b.effectiveExpiry, b.nextDeadline?.at);
   console.log('ok  built challenge tx (value = bountyBond) mines; status CHALLENGED with resolve deadline');
 
@@ -115,17 +151,21 @@ try {
   await (await truth(resolver).resolveBounty(1, await challenger.getAddress())).wait();
   b = await payments.readBounty(1);
   assert.equal(b.status, 'PENDING_RESOLUTION');
-  assert.ok(b.resolutionFinalizeAfter && b.resolutionFinalizeAfter > b.createdAt);
-  assert.deepEqual(b.nextDeadline, { action: 'finalizeResolution', at: b.resolutionFinalizeAfter, source: 'resolutionFinalizeAfter' });
+  const finalizeAfterOnchain = Number(await truth(owner).resolutionFinalizeAfter(1));
+  assert.equal(b.resolutionFinalizeAfter, finalizeAfterOnchain, 'finalize-after equals the contract mapping');
+  assert.equal(finalizeAfterOnchain - Number((await truth(owner).resolutionProposedAt(1))), clocks.disputeWindow);
+  assert.deepEqual(b.nextDeadline, { action: 'finalizeResolution', at: finalizeAfterOnchain, source: 'resolutionFinalizeAfter' });
   assert.equal(b.winner, await addr(challenger));
   console.log('ok  PENDING_RESOLUTION with resolutionFinalizeAfter');
 
   await (await truth(poster).disputeResolution(1, { value: MIN_BOUNTY })).wait();
   b = await payments.readBounty(1);
   assert.equal(b.status, 'DISPUTED');
-  assert.ok(b.settlementAfter && b.settlementAfter > b.createdAt);
+  const settlementOnchain = Number(await truth(owner).settlementAfter(1));
+  assert.equal(b.settlementAfter, settlementOnchain, 'settlement-after equals the contract mapping');
+  assert.equal(settlementOnchain - Number(await truth(owner).disputedAt(1)), clocks.settlement);
   assert.equal(b.disputedBy, await addr(poster));
-  assert.deepEqual(b.nextDeadline, { action: 'resolveStalledDispute', at: b.settlementAfter, source: 'settlementAfter' });
+  assert.deepEqual(b.nextDeadline, { action: 'resolveStalledDispute', at: settlementOnchain, source: 'settlementAfter' });
   console.log('ok  DISPUTED with settlementAfter and disputedBy');
 
   await (await truth(owner).settleDispute(1, await challenger2.getAddress())).wait();
@@ -152,6 +192,8 @@ try {
 
   // 8. Not-found stays an error, and a zero evidence hash is refused before any chain read.
   await assert.rejects(payments.readBounty(99), /not found/);
+  await assert.rejects(payments.buildSubmitChallengeCalldata({ bountyId: 99, evidenceHash: evidence }), /not found/, 'the builder fails closed like readBounty');
+  await assert.rejects(payments.buildSubmitChallengeCalldata({ bountyId: 1, evidenceHash: evidence }), /RESOLVED; it does not accept challenges/, 'a terminal bounty cannot be challenged through the builder');
   assert.throws(() => payments.encodeSubmitChallenge({ bountyId: 1, evidenceHash: '0x' + '0'.repeat(64) }), /must not be zero/);
   console.log('bounties ABI (anvil) tests passed');
 } finally {

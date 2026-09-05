@@ -378,10 +378,21 @@ await check('BP-09 agent-run: every cycle write passes provenance; the history r
   assert.match(src, /agent_cycles\?visibility=eq\.public&select=llm_reasoning/);
   const cycle = await readFile(new URL('../api/bobby-cycle.ts', import.meta.url), 'utf8');
   assert.match(cycle, /sbInsert\('agent_cycles', \{\n\s+started_at: new Date\(\)\.toISOString\(\),\n\s+status: 'running',\n\s+visibility: 'public'/);
+  // Third round (BP-09 lens): the scan must see EVERY reference to the base table — the
+  // `agent_cycles?query` form and the `sbQuery('agent_cycles', 'query')` form alike — so a
+  // dropped filter in any reader fails here. Each reference is scoped if `visibility=eq.public`
+  // appears in the same statement (up to the next `;`).
+  let scopedReads = 0;
   for (const f of ['api/harness-events.ts', 'api/protocol-heartbeat.ts', 'api/bobby-intel.ts', 'api/conviction-tiers.ts']) {
-    const t = await readFile(new URL(`../${f}`, import.meta.url), 'utf8');
-    for (const m of t.matchAll(/agent_cycles\?[^`'"\n]*/g)) assert.ok(m[0].includes('visibility=eq.public'), `${f}: unscoped agent_cycles read: ${m[0].slice(0, 80)}`);
+    // comments stripped; a reference is a quoted table name or a /rest/v1/ path segment
+    const t = (await readFile(new URL(`../${f}`, import.meta.url), 'utf8')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    for (const m of t.matchAll(/(?<=['"`/])agent_cycles(?!_public)/g)) {
+      const statement = t.slice(m.index!, t.indexOf(';', m.index!) + 1);
+      assert.ok(statement.includes('visibility=eq.public'), `${f}: unscoped agent_cycles read: ${statement.slice(0, 120)}`);
+      scopedReads += 1;
+    }
   }
+  assert.ok(scopedReads >= 4, `expected the four readers' agent_cycles references to be found, saw ${scopedReads}`);
 });
 
 // ---------- BP-04: malformed dynamic controls fail CLOSED; env freeze is additive ----------

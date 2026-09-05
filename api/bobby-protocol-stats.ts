@@ -8,7 +8,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther, Interface } from 'ethers';
 import { countAgents } from './_lib/hardness-control-plane.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
-import { rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
+import { parseRpcJson, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
   BOBBY_AGENT_ECONOMY,
@@ -69,7 +69,7 @@ async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
       });
       if (!res.ok) throw new Error(`${DEFAULT_CHAIN.name} ${rpcEndpointLabel(url)} ${res.status}`);
 
-      const json = (await res.json()) as { result?: T; error?: { message?: string } };
+      const json = await parseRpcJson<{ result?: T; error?: { message?: string } }>(res, url);
       // BP-12: upstream messages may echo the request URL — scrub before they propagate.
       if (json.error) throw new Error(scrubRpcSecrets(json.error.message || '') || 'rpc error');
       if (json.result === undefined) throw new Error('rpc response missing result');
@@ -290,7 +290,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalPayments: '0',
     }),
     safe(getOracleStats, { symbolCount: '0' }),
-    safe(getTrackRecordStats, { totalTrades: '0', totalCommitments: '0', winRateBps: '0' }),
+    // Third round (BP-11 sibling): an unreadable ledger is UNAVAILABLE, never a measured zero.
+    safe(getTrackRecordStats, null as Awaited<ReturnType<typeof getTrackRecordStats>> | null),
     safe(readMinBounty, { minBountyWei: '0', minBountyNative: '0', minBountyOkb: '0' }),
     safe(readNextBountyId, 1),
     safe(() => listRecentBounties(6), []),
@@ -321,9 +322,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const bountyEscrowNative = totalBountiesPosted * Number(bountyMin.minBountyNative || '0');
   const economyVol = parseFloat(economyStats.totalVolumeNative || '0');
   const protocolNotionalNative = (economyVol + bountyEscrowNative).toFixed(4);
-  const onchainCommitments = Number(trackRecordStats.totalCommitments || 0);
-  const onchainResolved = Number(trackRecordStats.totalTrades || 0);
-  const onchainWinRate = onchainResolved > 0 ? Number((Number(trackRecordStats.winRateBps || 0) / 100).toFixed(1)) : null;
+  const trackRecordAvailable = trackRecordStats !== null;
+  const onchainCommitments = trackRecordStats ? Number(trackRecordStats.totalCommitments || 0) : null;
+  const onchainResolved = trackRecordStats ? Number(trackRecordStats.totalTrades || 0) : null;
+  const onchainWinRate = trackRecordStats && onchainResolved !== null && onchainResolved > 0 ? Number((Number(trackRecordStats.winRateBps || 0) / 100).toFixed(1)) : null;
 
   // Supabase debate + resolution stats (real activity beyond on-chain contracts)
   const SB_URL = bobbyDbUrl();
@@ -398,7 +400,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
   return res.status(200).json({
-    ok: true,
+    ok: trackRecordAvailable,
+    degraded: !trackRecordAvailable,
+    sources: { trackRecord: trackRecordAvailable ? 'ok' : 'unavailable' },
     fetchedAt: new Date().toISOString(),
     chain: {
       id: DEFAULT_CHAIN.id,
@@ -455,9 +459,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalInteractions: Number(economyStats.totalPayments || '0') + totalBountiesPosted,
     },
     onchainRecord: {
+      available: trackRecordAvailable,
       commitmentsCreated: onchainCommitments,
       decisionsResolved: onchainResolved,
-      pending: Math.max(0, onchainCommitments - onchainResolved),
+      pending: onchainCommitments !== null && onchainResolved !== null ? Math.max(0, onchainCommitments - onchainResolved) : null,
       winRate: onchainWinRate,
     },
     bounties: recentBounties,

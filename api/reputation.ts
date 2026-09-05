@@ -28,7 +28,7 @@ import {
 } from './_lib/protocol-constants.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
 import { trackRecordSelectors } from './_lib/trackrecord-stats-adapter.js';
-import { configuredRpcUrls, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
+import { configuredRpcUrls, parseRpcJson, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 
 export const config = { maxDuration: 15 };
 
@@ -68,7 +68,7 @@ async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
       });
       if (!res.ok) throw new Error(`${rpcEndpointLabel(url)} responded ${res.status}`);
-      const json = (await res.json()) as { result?: T; error?: { message?: string } };
+      const json = await parseRpcJson<{ result?: T; error?: { message?: string } }>(res, url);
       if (json.error) throw new Error(scrubRpcSecrets(json.error.message || '') || `${rpcEndpointLabel(url)} error`);
       if (json.result == null) throw new Error(`${rpcEndpointLabel(url)} returned no result`);
       return json.result as T;
@@ -85,9 +85,9 @@ async function probe<T>(label: string, fn: () => Promise<T>): Promise<Probe<T>> 
   try {
     return { ok: true, value: await fn() };
   } catch (err) {
-    const error = rpcErrorMessage(err);
-    console.error(`[reputation] ${label} unavailable:`, error);
-    return { ok: false, error };
+    const message = rpcErrorMessage(err);
+    console.error(`[reputation] ${label} unavailable:`, message);
+    return { ok: false, error: message };
   }
 }
 

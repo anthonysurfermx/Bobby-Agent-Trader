@@ -6,6 +6,7 @@ import {SafeOwnerGate} from "./SafeOwnerGate.sol";
 import {PythOracleGate} from "./PythOracleGate.sol";
 import {BountyEconomicsGate} from "./BountyEconomicsGate.sol";
 import {V2ParamsGate} from "./V2ParamsGate.sol";
+import {EnvGate} from "./EnvGate.sol";
 import {BobbyTrackRecordV2} from "../src/BobbyTrackRecordV2.sol";
 import {BobbyConvictionOracle} from "../src/BobbyConvictionOracle.sol";
 import {BobbyAgentEconomyV2} from "../src/BobbyAgentEconomyV2.sol";
@@ -94,24 +95,24 @@ contract DeployBase is Script {
                 "Mainnet economic roles must be pairwise distinct"
             );
         } else {
-            c.alpha = vm.envOr("ALPHA_ADDRESS", c.bobby);
-            c.red = vm.envOr("RED_ADDRESS", c.bobby);
-            c.cio = vm.envOr("CIO_ADDRESS", c.bobby);
-            c.resolver = vm.envOr("RESOLVER_ADDRESS", c.bobby);
+            c.alpha = EnvGate.addressOr(vm, "ALPHA_ADDRESS", c.bobby);
+            c.red = EnvGate.addressOr(vm, "RED_ADDRESS", c.bobby);
+            c.cio = EnvGate.addressOr(vm, "CIO_ADDRESS", c.bobby);
+            c.resolver = EnvGate.addressOr(vm, "RESOLVER_ADDRESS", c.bobby);
         }
         // IntentEscrow F-013 requires cio/arbiter/keeper/resolver to be four
         // DISTINCT addresses (and owner != keeper). There is no safe default
         // for these — set them explicitly per deploy.
         c.arbiter = vm.envAddress("ARBITER_ADDRESS");
         c.keeper = vm.envAddress("KEEPER_ADDRESS");
-        c.mcpCallFee = vm.envOr("FEE_MCP_CALL_WEI", uint256(0.000025 ether));
-        c.debateFeePerAgent = vm.envOr("FEE_DEBATE_PER_AGENT_WEI", uint256(0.0000025 ether));
+        c.mcpCallFee = EnvGate.uintOr(vm, "FEE_MCP_CALL_WEI", uint256(0.000025 ether));
+        c.debateFeePerAgent = EnvGate.uintOr(vm, "FEE_DEBATE_PER_AGENT_WEI", uint256(0.0000025 ether));
         // r9 L-02: validate every env value at full width BEFORE narrowing — a
         // fat-fingered value must fail loudly, never truncate into a "valid" fee.
-        uint256 rawMinBounty = vm.envOr("MIN_BOUNTY_WEI", uint256(0.000025 ether));
-        uint256 rawAbsMinBounty = vm.envOr("ABSOLUTE_MIN_BOUNTY_WEI", uint256(0.0000025 ether));
-        uint256 rawStake = vm.envOr("REGISTRATION_STAKE_WEI", uint256(0.00025 ether));
-        uint256 rawThreshold = vm.envOr("RESOLVER_THRESHOLD", uint256(1));
+        uint256 rawMinBounty = EnvGate.uintOr(vm, "MIN_BOUNTY_WEI", uint256(0.000025 ether));
+        uint256 rawAbsMinBounty = EnvGate.uintOr(vm, "ABSOLUTE_MIN_BOUNTY_WEI", uint256(0.0000025 ether));
+        uint256 rawStake = EnvGate.uintOr(vm, "REGISTRATION_STAKE_WEI", uint256(0.00025 ether));
+        uint256 rawThreshold = EnvGate.uintOr(vm, "RESOLVER_THRESHOLD", uint256(1));
         require(rawMinBounty <= type(uint96).max, "MIN_BOUNTY_WEI exceeds uint96");
         require(rawAbsMinBounty <= type(uint96).max, "ABSOLUTE_MIN_BOUNTY_WEI exceeds uint96");
         require(rawStake <= type(uint96).max, "REGISTRATION_STAKE_WEI exceeds uint96");
@@ -120,27 +121,27 @@ contract DeployBase is Script {
         c.absoluteMinBounty = uint96(rawAbsMinBounty);
         c.registrationStake = uint96(rawStake);
         c.resolverThreshold = uint8(rawThreshold);
-        c.maxSizeUsd = vm.envOr("ESCROW_MAX_SIZE_USD", uint256(10_000e18)); // $10k, 18dp encoding
+        c.maxSizeUsd = EnvGate.uintOr(vm, "ESCROW_MAX_SIZE_USD", uint256(10_000e18)); // $10k, 18dp encoding
         // r7 integration: judge-mode needs the scorer role; defaults to bobby so
         // hardness certification is never silently dead after a deploy.
-        c.hardnessScorer = vm.envOr("HARDNESS_SCORER_ADDRESS", c.bobby);
+        c.hardnessScorer = EnvGate.addressOr(vm, "HARDNESS_SCORER_ADDRESS", c.bobby);
         // Codex r5: one parameter drives BOTH bonds; defaults to the minimum bounty.
-        uint256 rawBond = vm.envOr("CHALLENGE_BOND_WEI", rawMinBounty);
+        uint256 rawBond = EnvGate.uintOr(vm, "CHALLENGE_BOND_WEI", rawMinBounty);
         require(rawBond <= type(uint96).max, "CHALLENGE_BOND_WEI exceeds uint96");
         c.challengeBond = uint96(rawBond);
         // Resolved against expectedOwner in run() (it is not known yet here): unset = the Safe.
-        c.treasury = vm.envOr("BOUNTY_TREASURY_ADDRESS", address(0));
+        c.treasury = EnvGate.addressOr(vm, "BOUNTY_TREASURY_ADDRESS", address(0));
         // r9 H-02 / D-4: the address that must END UP owning all seven
         // contracts. On mainnet this is the Safe — mandatory, and distinct from
         // the hot deployer EOA. On testnet it defaults to the deployer (no
         // handoff), keeping the canary flow unchanged.
-        c.expectedOwner = vm.envOr("OWNER_SAFE_ADDRESS", address(0));
+        c.expectedOwner = EnvGate.addressOr(vm, "OWNER_SAFE_ADDRESS", address(0));
         // r10.1 review [P1]: the Safe's exact on-chain identity, pinned after
         // creating and externally auditing it (runbook: `cast codehash <safe>`
         // and `cast storage <safe> 0`, cross-checked against the official
         // safe-deployments registry). Mandatory on 8453.
-        c.expectedOwnerCodehash = vm.envOr("OWNER_SAFE_CODEHASH", bytes32(0));
-        c.expectedOwnerSingleton = vm.envOr("OWNER_SAFE_SINGLETON", address(0));
+        c.expectedOwnerCodehash = EnvGate.bytes32Or(vm, "OWNER_SAFE_CODEHASH", bytes32(0));
+        c.expectedOwnerSingleton = EnvGate.addressOr(vm, "OWNER_SAFE_SINGLETON", address(0));
         c.v2Raw = _v2Raw();
     }
 
@@ -154,13 +155,22 @@ contract DeployBase is Script {
     ///      The constructor re-validates the narrowed struct as a second line.
     function _v2Raw() internal view returns (V2ParamsGate.Raw memory r) {
         V2ParamsGate.Raw memory d = V2ParamsGate.defaults();
-        r.entryWindowSec = vm.envOr("V2_ENTRY_WINDOW_SEC", d.entryWindowSec);
-        r.exitWindowSec = vm.envOr("V2_EXIT_WINDOW_SEC", d.exitWindowSec);
-        r.maxExitLagSec = vm.envOr("V2_MAX_EXIT_LAG_SEC", d.maxExitLagSec);
-        r.challengeWindowSec = vm.envOr("V2_CHALLENGE_WINDOW_SEC", d.challengeWindowSec);
-        r.entryTolBps = vm.envOr("V2_ENTRY_TOL_BPS", d.entryTolBps);
-        r.exitTolBps = vm.envOr("V2_EXIT_TOL_BPS", d.exitTolBps);
-        r.confMaxBps = vm.envOr("V2_CONF_MAX_BPS", d.confMaxBps);
+        // Third round: strict parsers (a malformed value reverts, never falls back
+        // to the default) and, on mainnet, the seven reviewed values must be explicit.
+        string[7] memory names = [
+            "V2_ENTRY_WINDOW_SEC", "V2_EXIT_WINDOW_SEC", "V2_MAX_EXIT_LAG_SEC", "V2_CHALLENGE_WINDOW_SEC",
+            "V2_ENTRY_TOL_BPS", "V2_EXIT_TOL_BPS", "V2_CONF_MAX_BPS"
+        ];
+        if (block.chainid == 8453) {
+            for (uint256 i = 0; i < names.length; i++) EnvGate.requireSet(vm, names[i]);
+        }
+        r.entryWindowSec = EnvGate.uintOr(vm, names[0], d.entryWindowSec);
+        r.exitWindowSec = EnvGate.uintOr(vm, names[1], d.exitWindowSec);
+        r.maxExitLagSec = EnvGate.uintOr(vm, names[2], d.maxExitLagSec);
+        r.challengeWindowSec = EnvGate.uintOr(vm, names[3], d.challengeWindowSec);
+        r.entryTolBps = EnvGate.uintOr(vm, names[4], d.entryTolBps);
+        r.exitTolBps = EnvGate.uintOr(vm, names[5], d.exitTolBps);
+        r.confMaxBps = EnvGate.uintOr(vm, names[6], d.confMaxBps);
     }
 
     function run() external returns (Deployed memory d) {

@@ -56,6 +56,32 @@ api-security 47/47, sizes 7/7, layout OK. iOS: `xcodebuild test -project ios/Bob
 | BP-13 | `api/orchestrate.ts` (`finalizeAction`, `resolveSizing`, `confirmProof`, zod schemas) | No size + score 100; default policy + size; `requireOnchainProof` with a submitted-but-unmined hash; paper mode; blocked symbol; CIO/Judge outside schema; quantity/notional disagreeing; the high-risk gate with a large entry price and a small notional. |
 | BP-14 | `api/_lib/base-swap.ts` `evaluateStockReference` | Issuer paused with a fresh round; unreadable registry; multiplier mismatch. |
 
+## Round 13 re-verification (after the first third-round pass)
+
+The first pass reopened BP-01/03/06/08/12 and found the readiness↔finalize receipt mismatch;
+all are fixed (report, "Round 13"). Re-attack these first, on the fixed commit:
+- BP-01: a response whose full `quote` is honest but whose `execution.quote` / `disclosure` lies
+  (min received, amounts, deadline, router) must be refused by `SwapConfirm`'s build and by
+  `validated()`; the rendered MIN RECEIVED must come from the validated quote.
+- BP-08: with a uuid-typed `challenge_id`, pay with the 402's `challengeIdBytes32`, retry with the
+  uuid header (and without a header) → executed once, then replayed; a bytes32 without the zero
+  tail must be refused before any database read. Run `npm run test:mcp-payment-transport`.
+- BP-03: `V2_ENTRY_WINDOW_SEC=3O` (and `-5`, `""`, `1e80`) must make the DeployBase simulation
+  revert before any transaction; on 8453 an unset `V2_*` must revert. Run the fork simulation.
+- BP-06: cite the GitHub run id of this branch's CI (all jobs, all steps); add an eighth `new X(`
+  to a scratch copy of `DeployBase.s.sol` and confirm `check-sizes.sh` exits 1.
+- Readiness: `npm run test:protocol-write-safety` executes `--phase=postdeploy` on a
+  finalize-shaped manifest (GO) and on a stripped one (NO-GO).
+- BP-12: with a keyed `BASE_RPC_URL`, drive HTTP 500 HTML bodies, ethers `requestUrl:` and viem
+  `URL:` shaped errors, bare-key and percent-encoded echoes through the readers,
+  `/api/base-swap` (txWithheld), `/api/protocol-record` and `/api/verified-calls`; capture logs
+  with `util.format`.
+- BP-07 / BP-09 / BP-11: the handler-level bounty test, the reader scan (mutate the heartbeat
+  read), stale-cache replay and `bobby-protocol-stats` under an unreadable ledger.
+
+Commands added since the first pass: `npm run test:mcp-payment-transport`; `test:rpc-redaction`
+now 28 checks; `forge test --match-contract DeploymentGatesTest` now 37.
+
 ## Deployment review checklist (third clean review)
 
 DeployBase config → manifest → `VerifyBaseDeployment` → `check:mainnet:predeploy` coherence
