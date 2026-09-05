@@ -78,9 +78,9 @@ async function counts(id: string) {
 
 try {
   await pool.query(`do $$ begin
-    if not exists(select 1 from pg_roles where rolname='anon') then create role anon; end if;
-    if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated; end if;
-    if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role; end if;
+    if not exists(select 1 from pg_roles where rolname='anon') then create role anon noinherit; end if;
+    if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated noinherit; end if;
+    if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role noinherit bypassrls; end if;
   end $$; create schema ${schema};`);
   await query(`create table public.agent_cycles(id uuid primary key,trades_executed integer,total_usd_deployed numeric);
     create table public.agent_trades(id uuid primary key,owner_address text,token_symbol text,
@@ -88,6 +88,54 @@ try {
   const base='supabase/bobby-protocol/supabase/migrations/';
   for (const file of ['20260903000005_bobby_progress.sql','20260903000006_trader_land.sql',
     '20260903000009_swap_receipts.sql','20260905000001_atomic_progress.sql']) {
+    if(file==='20260905000001_atomic_progress.sql') {
+      // Exercise the operator's exact read-only SQL BEFORE the new schema exists.
+      const preflightSql=q(readFileSync('scripts/check-progress-migration.sql','utf8'))
+        .replaceAll("table_schema='public'",`table_schema='${schema}'`);
+      async function preflight() {
+        const c=await pool.connect();
+        try {
+          const results=await c.query(preflightSql) as unknown as pg.QueryResult[];
+          return results.flatMap(r=>r.rows).find(r=>r.preflight).preflight;
+        } finally { await c.query('rollback');c.release(); }
+      }
+      assert.equal((await preflight()).verdict,'CLEAR_FOR_MIGRATION_REVIEW');
+      const legacyId=await identity();
+      await query('update public.bobby_progress set xp=10 where identity_id=$1',[legacyId]);
+      assert.equal((await preflight()).checks.balance_ledger_mismatch,1);
+      await query('update public.bobby_progress set xp=0 where identity_id=$1',[legacyId]);
+      await query(`insert into public.bobby_progress_events(identity_id,client_event_id,kind,points,awarded,aura,xp_after,platform,occurred_at,day_key,meta)
+        values($1,$2,'thesis_closed',0,0,0,0,'web',now(),current_date,$3)`,
+        [legacyId,randomUUID(),{thesis_close:{inventoryId:'invalid-reference',executed:{receiptId:'invalid-reference'}}}]);
+      const bad=await preflight();
+      assert.equal(bad.verdict,'BLOCKED');assert.equal(bad.checks.invalid_close_seed_reference,1);
+      assert.equal(bad.checks.invalid_execution_receipt_reference,1);
+      assert.equal((await query('select count(*)::int n from public.bobby_progress_events where identity_id=$1',[legacyId])).rows[0].n,1,'preflight never repairs or deletes history');
+      await query('delete from public.bobby_progress_events where identity_id=$1',[legacyId]);
+      const seedId=randomUUID();const ledgerId=randomUUID();
+      await query(`insert into public.bobby_progress_events(id,identity_id,client_event_id,kind,points,awarded,aura,xp_after,platform,occurred_at,day_key)
+        values($1,$2,$3,'read_complete',0,0,0,0,'web',now(),current_date)`,[ledgerId,legacyId,randomUUID()]);
+      await query(`insert into public.tl_inventory(id,identity_id,item_id,state,source,event_id)
+        values($1,$2,$3,'bloomed','route',$4)`,[seedId,legacyId,SEASON.pieces[0],ledgerId]);
+      assert.equal((await preflight()).checks.bloomed_reads_without_close,1);
+      const receiptId=await receipt(new Date().toISOString(),'preflight-receipt');
+      for(let n=0;n<2;n++) await query(`insert into public.bobby_progress_events(identity_id,client_event_id,kind,points,awarded,aura,xp_after,platform,occurred_at,day_key,meta)
+        values($1,$2,'thesis_closed',0,0,0,0,'web',now(),current_date,$3)`,
+        [legacyId,randomUUID(),{thesis_close:{inventoryId:n ? seedId.toUpperCase():seedId,executed:{receiptId}}}]);
+      await query(`insert into public.tl_inventory(identity_id,item_id,state,source)
+        values($1,$2,'bloomed','season'),($1,$2,'bloomed','season')`,[legacyId,SEASON.pieces[0]]);
+      const duplicates=await preflight();
+      assert.equal(duplicates.checks.duplicate_seed_closes,1);assert.equal(duplicates.checks.reused_execution_receipts,1);
+      assert.equal(duplicates.checks.duplicate_season_pieces,1);
+      await query('delete from public.tl_inventory where identity_id=$1',[legacyId]);
+      await query('delete from public.bobby_progress_events where identity_id=$1',[legacyId]);
+      await query('delete from public.bobby_swap_receipts where id=$1',[receiptId]);
+      await query('update public.tl_items set active=false where id=$1',[SEASON.pieces[0]]);
+      assert.equal((await preflight()).checks.missing_season_catalog,1);
+      await query('update public.tl_items set active=true where id=$1',[SEASON.pieces[0]]);
+      assert.equal((await preflight()).verdict,'CLEAR_FOR_MIGRATION_REVIEW');
+      pass('read-only migration preflight detects balance/reference/catalog anomalies without changing history');
+    }
     const client=await pool.connect();
     try { await client.query(q(readFileSync(base+file,'utf8'))); }
     catch (error) { await client.query('rollback'); throw error; }

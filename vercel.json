@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "codex/security-release-candidate": false
+    }
+  },
   "rewrites": [
     {
       "source": "/bobby",

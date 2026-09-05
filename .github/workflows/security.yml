@@ -3,7 +3,7 @@ name: Security
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'codex/security-release-candidate']
   schedule:
     - cron: '17 9 * * 1'
 

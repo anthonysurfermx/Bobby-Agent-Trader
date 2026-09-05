@@ -5,7 +5,7 @@ on:
   push:
     # Third round (2026-09-05): security branches run CI on push so closure evidence
     # can cite a real run id before a PR exists.
-    branches: [main, 'security/**']
+    branches: [main, 'security/**', 'codex/security-release-candidate']
   workflow_dispatch:
 
 permissions:

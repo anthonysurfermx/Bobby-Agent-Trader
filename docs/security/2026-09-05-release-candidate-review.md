@@ -2,6 +2,46 @@
 
 Date: 2026-09-05. Verdict: **NO-GO for release / activation**.
 
+## Push preparation: migration preflight and release verification
+
+Two additional blocks are prepared on top of `b67b857`:
+
+1. `scripts/check-progress-migration.sql` performs a read-only pre-migration
+   check with 12 aggregate checks. It detects malformed/dangling references,
+   duplicate seed/receipt/season rewards, ledger mismatch, partial closes,
+   catalog gaps and an already-present candidate schema. It is tested against
+   clean and deliberately inconsistent local fixtures and never repairs data.
+   `docs/infra/2026-09-05-progress-cutover-checklist.md` records target verification,
+   backup/freeze/drain, migration, schema refresh, cutover and rollback gates.
+   No production preflight has been executed: Supabase MCP is unavailable here.
+2. CI and Security now run on the exact candidate branch. Automatic Vercel Git
+   deployment is disabled for that branch alone, so pushing unpublished schema
+   dependencies does not activate an incompatible API. Main is unchanged. This
+   separation follows the Vercel CI/CD skill and official Git configuration docs.
+
+The complete local application CI suite, build, lint and scoped typecheck pass.
+The expanded atomic-progress PostgreSQL suite has 20 passing scenarios. Existing
+Postgres swap-ledger, registry and RLS suites pass after correcting the isolated
+cluster's service-role fixture to match Supabase's BYPASSRLS attribute; the first
+RLS attempt failed because the reused local role lacked it, not because of a
+production policy change. Future scratch role creation now matches the other
+test harnesses. No production roles were modified.
+
+Both backend ABI integration suites pass against temporary local Anvil chains.
+All seven production contracts pass the runtime-size gate, and the complete
+TrackRecord storage/struct layout matches its committed baseline. These checks
+do not constitute a production deployment or a live-chain fork simulation.
+Foundry completed successfully with 286 reported passing tests, fuzz runs set
+to 1,000 and invariant suites enabled. Opt-in Pyth fork cases were not activated;
+their default return paths are not evidence of live-fork coverage.
+
+The dependency audit passes the configured high-severity gate but still reports
+22 moderate dependency findings; this is not a claim of a vulnerability-free
+dependency tree. No automatic/breaking wallet-library upgrade was applied.
+Gitleaks found no leaks in the candidate commit range using the repository's
+existing configuration. The final remote CI results must be tied to the pushed
+SHA, not inferred from any prior run.
+
 ## Current follow-up: server-issued thesis origin (local, not deployed)
 
 RC-03 now has an implemented origin boundary, in addition to the timestamp fix.
