@@ -45,7 +45,8 @@
     "test:agent-registry-pg": "tsx scripts/test-agent-registry-pg.mts",
     "gen:hardness-abi": "tsx scripts/gen-hardness-abi.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts",
-    "test:stock-admission": "tsx scripts/test-stock-admission.mts"
+    "test:stock-admission": "tsx scripts/test-stock-admission.mts",
+    "test:aerodrome-codec": "tsc --noEmit --target ES2020 --module ESNext --moduleResolution bundler --skipLibCheck --strict src/lib/base-swap/aerodrome-codec.ts && tsx scripts/test-aerodrome-codec.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",
