@@ -44,7 +44,8 @@
     "test:mcp-payment-transport": "tsx scripts/test-mcp-payment-transport.mts",
     "test:agent-registry-pg": "tsx scripts/test-agent-registry-pg.mts",
     "gen:hardness-abi": "tsx scripts/gen-hardness-abi.mts",
-    "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts"
+    "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts",
+    "test:stock-admission": "tsx scripts/test-stock-admission.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

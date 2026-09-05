@@ -39,6 +39,7 @@ jobs:
       # were never executed in CI — every closure in docs/security/ ran locally.
       - run: npm run test:base-swap
       - run: npm run test:stock-ticker-routing
+      - run: npm run test:stock-admission
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction
       - run: npm run test:mcp-payment-transport

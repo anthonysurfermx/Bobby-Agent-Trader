@@ -48,7 +48,7 @@ export interface QuoteLike {
   usdValue?: unknown;
   recipient?: unknown;
   requiresStockEligibility?: unknown;
-  stockReference?: { symbol?: unknown; transferPaused?: unknown } | null;
+  stockReference?: { symbol?: unknown; transferPaused?: unknown; issuerPaused?: unknown; usable?: unknown; status?: unknown } | null;
   tx?: null | { deadline?: unknown; approve?: unknown; swap?: unknown };
   txWithheld?: unknown;
 }
@@ -116,6 +116,9 @@ export function assertQuoteConsistent(quote: QuoteLike, req: QuoteRequest, now: 
     if (quote.requiresStockEligibility !== true) refuse('quote does not identify the stock eligibility gate');
     if (quote.stockReference?.symbol !== stock.symbol) refuse('stock reference is for another token');
     if (quote.stockReference?.transferPaused === true) refuse('issuer has paused transfers');
+    if (quote.stockReference?.transferPaused !== false) refuse('issuer transfer availability is not confirmed');
+    if (quote.stockReference?.issuerPaused !== false) refuse('issuer oracle availability is not confirmed');
+    if (quote.stockReference?.usable !== true || !['fresh', 'market-closed'].includes(String(quote.stockReference?.status))) refuse('stock reference is not usable');
   }
 
   // 2. Amounts: the user's amount → raw; every human field → raw; all must agree, outputs non-zero.

@@ -1,0 +1,92 @@
+{
+  "baseline": "cfc5dd1",
+  "checks": [
+    {
+      "command": "npm run test:base-swap",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:stock-ticker-routing",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:remediation-r2",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:rpc-redaction",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:mcp-payment-transport",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:api-security",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:protocol-write-safety",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:progress-atomic-api",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:thesis-provenance",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run lint -- --quiet",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:rls-lockdown-pg",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:swap-ledger-pg",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:agent-registry-pg",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:progress-atomic-pg",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:hardness-abi-anvil",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run test:bounties-abi-anvil",
+      "exitCode": 0
+    }
+  ],
+  "finalPatch": {
+    "swapRegression": "passed",
+    "stockAdmission": "passed",
+    "tickerRouting": "passed",
+    "build": "passed",
+    "lint": "passed"
+  },
+  "foundry": {
+    "reportedPassed": 286,
+    "failed": 0,
+    "suites": 14,
+    "fuzzRuns": 1000,
+    "optInPythForkEnabled": false
+  },
+  "dependencies": {
+    "high": 0,
+    "critical": 0,
+    "moderate": 22
+  }
+}

@@ -164,7 +164,7 @@ assert.throws(
     amountOut: '0.0004', amountOutRaw: '40000',
     minAmountOut: '0.000398', minAmountOutRaw: '39800',
     slippagePct: 0.5, deadline, priceImpactPct: 0.3, usdValue: 25, recipient: wallet,
-    requiresStockEligibility: true, stockReference: { symbol: 'NVDAc', transferPaused: false },
+    requiresStockEligibility: true, stockReference: { symbol: 'NVDAc', transferPaused: false, issuerPaused: false, usable: true, status: 'fresh' },
     tx: { deadline, approve: null, swap: { to: SWAP_ROUTER02, data: '0x', value: '0' } }, txWithheld: [],
   };
   const v = assertQuoteConsistent(consistent, req, now);
@@ -193,6 +193,13 @@ assert.throws(
   refuse('router is not the pinned one', (q) => { q.venue.router = usdc.address; }, {}, /names another router/);
   refuse('output token address is not the pinned one', (q) => { q.tokenOut.address = usdc.address; }, {}, /output token address is not the pinned one/);
   refuse('stock reference for another token', (q) => { q.stockReference.symbol = 'AAPLc'; }, {}, /stock reference is for another token/);
+  for (const issuerPaused of [true, null, undefined]) {
+    refuse('issuer oracle must explicitly be available', (q) => { q.stockReference.issuerPaused = issuerPaused; }, {}, /oracle availability/);
+  }
+  for (const status of ['stale', 'issuer-paused', 'unusable', undefined]) {
+    refuse('only usable reference states are accepted', (q) => { q.stockReference.status = status; }, {}, /not usable/);
+  }
+  refuse('reference usability must be confirmed', (q) => { q.stockReference.usable = false; }, {}, /not usable/);
   refuse('issuer paused transfers', (q) => { q.stockReference.transferPaused = true; }, {}, /paused transfers/);
   // the normal journey: approval quote → (approval mines) → swap quote, both validated, decoders fed with validated values
   const approvalQuote = { ...structuredClone(consistent), tx: { deadline, approve: { to: usdc.address, data: approve.data, value: '0', spender: SWAP_ROUTER02, amount: '25000000' }, swap: null } };

@@ -1,0 +1,62 @@
+diff --git a/ios/Bobby/Sources/BaseSwap.swift b/ios/Bobby/Sources/BaseSwap.swift
+index d4ef5f6..3f7dcad 100644
+--- a/ios/Bobby/Sources/BaseSwap.swift
++++ b/ios/Bobby/Sources/BaseSwap.swift
+@@ -62,6 +62,9 @@ struct BaseSwapQuote: Decodable, Equatable {
+         let marketDeviationPct: Double
+         let pausedFeatures: String
+         let transferPaused: Bool
++        let issuerPaused: Bool?
++        let usable: Bool?
++        let status: String?
+     }
+ 
+     let chainId: Int
+@@ -174,6 +177,8 @@ enum BaseSwapGuard {
+         try require(reference.ageSec >= 0 && reference.ageSec <= 96 * 60 * 60, "stock reference is stale")
+         try require(reference.marketDeviationPct >= 0 && reference.marketDeviationPct <= 5, "stock reference deviation is over 5%")
+         try require(!reference.transferPaused, "issuer has paused transfers")
++        try require(reference.issuerPaused == false, "issuer oracle availability is not confirmed")
++        try require(reference.usable == true && ["fresh", "market-closed"].contains(reference.status ?? ""), "stock reference is not usable")
+         if let transactions = quote.tx {
+             let seconds = Int(now.timeIntervalSince1970)
+             try require(transactions.chainId == chainId, "transaction set is not on Base")
+diff --git a/ios/Bobby/Tests/BaseSwapGuardTests.swift b/ios/Bobby/Tests/BaseSwapGuardTests.swift
+index 06d8260..7b8440b 100644
+--- a/ios/Bobby/Tests/BaseSwapGuardTests.swift
++++ b/ios/Bobby/Tests/BaseSwapGuardTests.swift
+@@ -90,10 +90,24 @@ final class BaseSwapGuardTests: XCTestCase {
+         XCTAssertThrowsError(try BaseSwapGuard.rawAmount("1.0000001", decimals: 6))
+     }
+ 
++    func testRequiresUsableIssuerReference() throws {
++        for paused: Bool? in [true, nil] {
++            XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, issuerPaused: paused), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++        }
++        for status: String? in ["stale", "issuer-paused", "unusable", nil] {
++            XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, referenceStatus: status), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++        }
++        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, referenceUsable: false), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
++        try BaseSwapGuard.validateQuote(quote(tx: nil, referenceStatus: "market-closed"), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet)
++    }
++
+     private func quote(
+         tx: BaseSwapTransactionSet?,
+         minAmountOut: String = "0.04283114",
+-        minAmountOutRaw: String = "4283114"
++        minAmountOutRaw: String = "4283114",
++        issuerPaused: Bool? = false,
++        referenceUsable: Bool? = true,
++        referenceStatus: String? = "fresh"
+     ) -> BaseSwapQuote {
+         BaseSwapQuote(
+             chainId: 8453,
+@@ -120,7 +134,7 @@ final class BaseSwapGuardTests: XCTestCase {
+             warnings: [],
+             limits: .init(maxTicketUsd: 100, minTicketUsd: 1, defaultSlippagePct: 0.5, maxSlippagePct: 3, maxPriceImpactPct: 3, deadlineSec: 1200),
+             requiresStockEligibility: true,
+-            stockReference: .init(symbol: "NVDAc", usdPrice: 231.14, ageSec: 60, multiplierHuman: 1, marketDeviationPct: 0.5, pausedFeatures: "0", transferPaused: false)
++            stockReference: .init(symbol: "NVDAc", usdPrice: 231.14, ageSec: 60, multiplierHuman: 1, marketDeviationPct: 0.5, pausedFeatures: "0", transferPaused: false, issuerPaused: issuerPaused, usable: referenceUsable, status: referenceStatus)
+         )
+     }
+ 
