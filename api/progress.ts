@@ -15,8 +15,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { AWARD_AURA, AWARD_KINDS, applyAward, type AwardKind, type ProgressCounters } from './_lib/progress-rules.js';
-import { grantRoutePiece, type RouteGrant } from './_lib/trader-land.js';
+import { AWARD_AURA, PLANT_KINDS, applyAward, type PlantKind, type ProgressCounters } from './_lib/progress-rules.js';
+import { ThesisSchema, grantRoutePiece, type RouteGrant } from './_lib/trader-land.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -28,10 +28,11 @@ const Body = z.object({
   platform: z.enum(['ios', 'web']),
   events: z.array(z.object({
     id: z.string().uuid(),
-    kind: z.enum(AWARD_KINDS as [AwardKind, ...AwardKind[]]),
+    kind: z.enum(PLANT_KINDS),
     at: z.string().datetime({ offset: true }),
     tzOffsetMin: z.number().int().min(-840).max(840).default(0),
     meta: z.record(z.unknown()).optional(),
+    thesis: ThesisSchema.optional().catch(undefined),
   })).max(50).default([]),
   profile: z.object({
     companionId: z.string().regex(/^[a-z0-9_-]{1,32}$/).nullable().optional(),
@@ -154,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const results: Array<{ id: string; awarded: number; aura: number; xpBefore: number; xpAfter: number; duplicate: boolean; world?: RouteGrant | null }> = [];
     let auraTotal = row.aura ?? 0;
     let routeIndex = row.route_index ?? 0;
-    const grants: Array<{ eventId: string; kind: AwardKind }> = [];
+    const grants: Array<{ eventId: string; kind: PlantKind }> = [];
     const ledger: Array<Record<string, unknown>> = [];
     const now = Date.now();
     // One-time import of pre-sign-in XP, decided BEFORE this request's events are
@@ -181,7 +182,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       auraTotal += aura;
       if (out.awarded > 0) grants.push({ eventId: e.id, kind: e.kind });
       results.push({ id: e.id, awarded: out.awarded, aura, xpBefore: out.xpBefore, xpAfter: out.xpAfter, duplicate: false });
-      ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, aura, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta: e.meta ?? null });
+      const meta = e.meta || e.thesis ? { ...(e.meta ?? {}), ...(e.thesis ? { thesis: e.thesis } : {}) } : null;
+      ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, aura, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta });
     }
     for (const e of events) if (!fresh.includes(e)) results.push({ id: e.id, awarded: 0, aura: 0, xpBefore: row.xp, xpAfter: row.xp, duplicate: true });
 
@@ -193,8 +195,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Trader Land: every awarded event plants (or blooms) the next piece of the
-    // Discovery Route — deterministic, one per event, idempotent per event id.
+    // Trader Land: every awarded event plants the next route piece. Seeds bloom
+    // later when their thesis is reviewed by /api/trader-land close.
     if (grants.length) {
       const idsQ = grants.map((g) => g.eventId).join(',');
       const led = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${idsQ})&select=id,client_event_id`), { headers: bobbyServiceHeaders() });
