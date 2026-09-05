@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronDown, Compass, Copy, ExternalLink, Globe, Hand, HelpCircle, Layers3, LoaderCircle, Maximize, Minus, Move, Plus, RotateCw, Share2, Sparkles, Undo2, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Compass, Copy, ExternalLink, Globe, Hand, HelpCircle, Layers3, LoaderCircle, Maximize, Minus, Move, Plus, RotateCw, Share2, Sparkles, Sprout, Undo2, Volume2, VolumeX, X } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useAppKit } from '@reown/appkit/react';
 import { useBobbySession } from '@/hooks/useBobbySession';
 import { Helmet } from 'react-helmet-async';
-import { t } from '@/lib/companions/i18n';
+import { isSpanish, t } from '@/lib/companions/i18n';
+import { findBaseToken } from '@/lib/base-swap/tokens';
 import { draggedGridPosition } from '@/lib/trader-land-gestures';
 import { CATALOG_ALIASES, STUDIO_PATH, WORLDS_PATH, shareUrl, withCatalogAliases } from '@/lib/trader-land/public';
 import './trader-land.css';
@@ -34,15 +35,26 @@ type ManifestItem = {
 type Manifest = { gate: string; version: number; layer_encoding: Record<string, string>; items: ManifestItem[] };
 type Placement = { uid: string; itemId: string; col: number; row: number; orientation?: PathOrientation };
 type CatalogItem = { id: string; world: string; attribution: string; kind: string; footprint_w: number; footprint_h: number; route_index: number | null; art_url: string | null };
-type WorldInventory = { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; placed: boolean; item: CatalogItem | null };
+// A seed waits on the thesis it was read with: the server says when it can be reviewed (see api/_lib/thesis-rules.ts).
+type SeedThesis = { symbol: string; isEquity: boolean; direction: 'long' | 'short' | 'none'; price: number | null; entry: number | null; stop: number | null; target: number | null };
+type SeedReview = { thesis: SeedThesis | null; readAt: string | null; reviewAt: string; ready: boolean };
+// The season collection: pieces earned only by reviewed theses executed on Base (api/_lib/trader-land-season.ts).
+type SeasonProgress = { id: string; name: { en: string; es: string }; rule: { en: string; es: string }; total: number; earned: number; owned: string[]; next: string | null; complete: boolean };
+type Execution = { receiptId: string; txHash: string | null; tokenIn: string; tokenOut: string; at: string | null; xp: number; aura: number };
+type ClosedThesis = { inventoryId: string; itemId: string; outcome: 'hit' | 'invalidated' | 'expired'; symbol: string | null; direction: string | null; referencePx: number | null; closePx: number | null; movePct: number | null; xp: number; aura: number; executed?: Execution | null; season?: { piece: { id: string } | null; progress: SeasonProgress } | null };
+type WorldInventory = { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; placed: boolean; item: CatalogItem | null; review?: SeedReview | null };
 type ApiPlacement = { id: string; inventory_id: string; x: number; y: number; rotation: number };
 type World = {
   xp: number;
   aura: number;
   land: { size: number };
-  capabilities?: { move?: boolean };
+  capabilities?: { move?: boolean; close?: boolean };
   share?: { public: boolean; code: string | null; title: string | null; publishedAt: string | null };
   route: { index: number; total: number; complete: boolean; next: { id: string } | null };
+  review?: { windowHours: number; ready: number };
+  season?: SeasonProgress;
+  /** present on the response to a `close` action */
+  closed?: ClosedThesis;
   inventory: WorldInventory[];
   placements: ApiPlacement[];
 };
@@ -223,6 +235,27 @@ const DEMO_KEY = 'bobby.trader-land.studio-demo.v1';
 const districtColors: Record<District, string> = { crypto_bay: '#56d9e8', evidence_mines: '#a7f38a', thesis_citadel: '#8ba8ff', risk_reef: '#c3a1ff', axiom_archive: '#f5d68b' };
 const districtTraits: Record<District, [string, string]> = { crypto_bay: ['Patience', 'Paciencia'], evidence_mines: ['Clarity', 'Claridad'], thesis_citadel: ['Risk', 'Riesgo'], risk_reef: ['Contradiction', 'Contradicción'], axiom_archive: ['Closure', 'Cierre'] };
 function itemName(item: ManifestItem) { return pretty(item.id.replace(item.district + '_', '')); }
+function when(iso: string) { return new Date(iso).toLocaleString(isSpanish() ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+/** One line on what a seed is waiting on, from the server's review record. */
+function seedLine(review: SeedReview) {
+  const read = review.thesis ? `${review.thesis.symbol} ${review.thesis.direction === 'none' ? t('no edge', 'sin sesgo') : review.thesis.direction}${review.thesis.entry ?? review.thesis.price ? ` @ ${review.thesis.entry ?? review.thesis.price}` : ''}` : t('Read without a saved thesis', 'Lectura sin tesis guardada');
+  const timing = review.ready ? t('Ready to review.', 'Lista para revisar.') : `${t('Review from', 'Revisable desde')} ${when(review.reviewAt)}.`;
+  // Only assets Bobby can swap on Base can be executed; the server decides at review time whether they were.
+  const base = review.thesis && review.thesis.direction !== 'none' ? findBaseToken(review.thesis.symbol) : null;
+  const onBase = base && !base.stable ? ` ${t('Executable on Base for the season bonus.', 'Ejecutable en Base para el bono de temporada.')}` : '';
+  return `${read} · ${timing}${onBase}`;
+}
+function outcomeLabel(outcome: ClosedThesis['outcome']) {
+  return outcome === 'hit' ? t('target reached', 'objetivo alcanzado') : outcome === 'invalidated' ? t('invalidation hit', 'invalidación tocada') : t('window closed without touching a level', 'venció sin tocar niveles');
+}
+function closeNotice(closed: ClosedThesis, item?: ManifestItem, seasonItem?: ManifestItem) {
+  const piece = item ? itemName(item) : t('Your piece', 'Tu pieza');
+  const move = closed.movePct !== null ? ` (${closed.movePct > 0 ? '+' : ''}${closed.movePct}%)` : '';
+  const head = closed.symbol ? `${closed.symbol} ${closed.direction && closed.direction !== 'none' ? closed.direction : ''}: ${outcomeLabel(closed.outcome)}${move}. ` : '';
+  const executed = closed.executed ? ` ${t('Executed on Base', 'Ejecutada en Base')} (+${closed.executed.xp} XP · +${closed.executed.aura} Aura).` : '';
+  const season = closed.season?.piece ? ` ${t('Season piece', 'Pieza de temporada')}: ${seasonItem ? itemName(seasonItem) : pretty(closed.season.piece.id)}.` : '';
+  return `${head}${piece} ${t('bloomed.', 'floreció.')} +${closed.xp} XP · +${closed.aura} Aura.${executed}${season}`;
+}
 function demoWorld(manifest: Manifest, fixture: Fixture): World {
   // Alias ids exist only so account pieces resolve; the practice collection shows each artwork once.
   const inventory: WorldInventory[] = manifest.items.filter((item) => item.kind !== 'core' && !(item.id in CATALOG_ALIASES)).map((item) => ({
@@ -288,6 +321,9 @@ export default function TraderLandGatePage() {
   const world = visitor ? visited : isDemo ? demo : remote;
   // Older deployments cannot move pieces atomically. Enable only when advertised by the server.
   const canMove = !visitor && (isDemo || world?.capabilities?.move === true);
+  // Reviewing a thesis is a server verdict on a real seed; the demo has none to review.
+  const canClose = !visitor && !isDemo && world?.capabilities?.close === true;
+  const readySeeds = useMemo(() => world?.inventory.filter((entry) => entry.state === 'seed' && entry.review?.ready) ?? [], [world]);
   const items = useMemo(() => new Map(manifest?.items.map((item) => [item.id, item]) ?? []), [manifest]);
   const baseScale = Math.min(size.width / 830, size.height / 640, 1.5);
   const effectiveScale = baseScale * camera.scale;
@@ -456,6 +492,21 @@ export default function TraderLandGatePage() {
   const unpublish = async () => {
     if (await mutate({ action: 'unpublish' })) { setCopied(false); setNotice(t('Your island is private again.', 'Tu isla vuelve a ser privada.')); }
   };
+  // Review a seed: the server compares its thesis with the public price, blooms it and pays the close.
+  const closeThesis = async (entry: WorldInventory) => {
+    if (!canClose || draft || entry.state !== 'seed' || !entry.review?.ready) return;
+    const next = await mutate({ action: 'close', inventoryId: entry.id, tzOffsetMin: new Date().getTimezoneOffset(), platform: 'web' });
+    if (!next?.closed) return;
+    cue('bloom_complete');
+    const seasonPiece = next.closed.season?.piece ? items.get(next.closed.season.piece.id) : undefined;
+    setNotice(closeNotice(next.closed, items.get(entry.item_id), seasonPiece));
+  };
+  const jumpToReady = () => {
+    const first = readySeeds[0]; if (!first) return;
+    const district = items.get(first.item_id)?.district;
+    if (district && district !== 'core') setDistrict(district);
+    setSelectedId(first.id); setLibraryOpen(true); cue('placement_tick');
+  };
   const copyLink = async () => {
     const code = world?.share?.code; if (!code) return;
     try { await navigator.clipboard.writeText(shareUrl(code)); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
@@ -622,17 +673,20 @@ export default function TraderLandGatePage() {
         </aside> : <aside className={'land-library '+(!libraryOpen?'collapsed':'')} aria-label={t('Piece collection','Colección de piezas')}>
           <button className="land-library-title" onClick={()=>setLibraryOpen(!libraryOpen)} aria-expanded={libraryOpen}><span><Layers3 size={20}/>{t('Your collection','Tu colección')}<small>{available}</small></span><ChevronDown size={18}/></button>
           {libraryOpen && <div className="land-library-content">
+            {canClose && readySeeds.length>0 && !draft && <button type="button" className="land-review-banner" onClick={jumpToReady}><Sprout size={15}/>{readySeeds.length===1?t('1 thesis ready to review','1 tesis lista para revisar'):`${readySeeds.length} ${t('theses ready to review','tesis listas para revisar')}`}</button>}
             <div className="land-districts" role="tablist" aria-label={t('Districts','Distritos')}>{districts.map((value,index)=><button key={value} role="tab" aria-selected={district===value} aria-label={districtNames[value]} title={districtNames[value]} style={{'--district-color':districtColors[value]} as React.CSSProperties} className={district===value?'active':''} onClick={()=>{setDistrict(value);if(!draft)setSelectedId(null);}}><span>0{index+1}</span><i/></button>)}</div>
             <div className="land-district-heading"><h3>{districtNames[district]}</h3><span>{t(...districtTraits[district])}</span></div>
             <div className="land-inventory" role="tabpanel" aria-label={districtNames[district]}>{visibleInventory.map((entry)=>{
               const item=items.get(entry.item_id)!;const art=artFor(item,entry.state==='seed');
-              return <button key={entry.id} disabled={busy||Boolean(draft)} className={'land-piece '+(entry.id===selectedId?'selected':'')+(entry.placed?' placed':'')} onClick={()=>{setSelectedId(entry.id);cue('placement_tick');}} aria-label={itemName(item)+(entry.placed?t(', on island',', en la isla'):entry.state==='seed'?t(', seed',', semilla'):t(', available',', disponible'))} aria-pressed={entry.id===selectedId}>
-                <img src={art.thumb?.url??art.albedo.url} alt="" draggable={false}/><span>{itemName(item)}</span><small>{entry.placed?<><Check size={11}/>{t('On island','En la isla')}</>:entry.state==='seed'?t('Growing','Creciendo'):`${item.footprint.cols} × ${item.footprint.rows}`}</small>
+              const ready=entry.state==='seed'&&Boolean(entry.review?.ready);
+              return <button key={entry.id} disabled={busy||Boolean(draft)} className={'land-piece '+(entry.id===selectedId?'selected':'')+(entry.placed?' placed':'')+(ready?' ready':'')} onClick={()=>{setSelectedId(entry.id);cue('placement_tick');}} aria-label={itemName(item)+(entry.placed?t(', on island',', en la isla'):ready?t(', ready to review',', lista para revisar'):entry.state==='seed'?t(', seed',', semilla'):t(', available',', disponible'))} aria-pressed={entry.id===selectedId}>
+                <img src={art.thumb?.url??art.albedo.url} alt="" draggable={false}/><span>{itemName(item)}</span><small>{entry.placed?<><Check size={11}/>{t('On island','En la isla')}</>:ready?<><Sprout size={11}/>{t('Ready to review','Lista para revisar')}</>:entry.state==='seed'?t('Growing','Creciendo'):entry.source==='season'?<><Sparkles size={11}/>{t('Season','Temporada')} · {item.footprint.cols} × {item.footprint.rows}</>:`${item.footprint.cols} × ${item.footprint.rows}`}</small>
               </button>;
             })}{!visibleInventory.length&&<p className="land-empty">{t('Your next discoveries will find a home here. Return to the desk to continue your route.','Tus próximos descubrimientos encontrarán un hogar aquí. Vuelve al desk para continuar tu ruta.')}</p>}</div>
+            {!isDemo&&world?.season&&<div className="land-season" aria-label={isSpanish()?world.season.name.es:world.season.name.en}><span className="land-eyebrow">{t('SEASON','TEMPORADA')}</span><h4>{isSpanish()?world.season.name.es:world.season.name.en}<small>{world.season.earned} / {world.season.total}</small></h4><p>{isSpanish()?world.season.rule.es:world.season.rule.en}</p>{world.season.complete?<p className="land-season-next"><Check size={12}/>{t('Season complete.','Temporada completa.')}</p>:world.season.next&&items.get(world.season.next)&&<p className="land-season-next"><Sprout size={12}/>{t('Next piece','Siguiente pieza')}: {itemName(items.get(world.season.next)!)}</p>}</div>}
             <div className="land-collection-footer">{isDemo?<><span><Compass size={16}/>{t('Your practice island','Tu isla de práctica')}</span><p>{t('Try every piece. This layout stays in this browser, separate from your earned collection.','Prueba todas las piezas. Este diseño se guarda en este navegador, separado de tu colección ganada.')}</p><button className="land-text-link" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}}>{t('Open my earned island','Abrir mi isla ganada')} <ArrowLeft size={14} style={{transform:'rotate(180deg)'}}/></button></>:<><span><Sparkles size={16}/>{t('Built with discipline','Construida con disciplina')}</span><p>{t('Keep learning and reviewing your decisions to grow your collection.','Sigue aprendiendo y revisando tus decisiones para hacer crecer tu colección.')}</p><Link className="land-text-link" to="/agentic-world/bobby">{t('Continue my discovery route','Continuar mi ruta de descubrimiento')}</Link></>}</div>
           </div>}
-          {libraryOpen && selectedItem && selected && <div className="land-selected-detail"><div><span className="land-eyebrow">{selectedPlacement?t('ON YOUR ISLAND','EN TU ISLA'):t('BLUEPRINT','PLANO')}</span><h3>{itemName(selectedItem)}</h3><p>{footprint(selectedItem,draft?.orientation).cols} × {footprint(selectedItem,draft?.orientation).rows} {t('tiles','casillas')}</p>{selectedPlacement&&!canMove&&<p>{t('Moving saved pieces is coming soon.','Mover piezas sincronizadas estará disponible pronto.')}</p>}</div><div className="land-selected-actions"><button className="land-primary" disabled={editingBlocked||Boolean(draft)||selected.state!=='bloomed'||Boolean(selectedPlacement&&!canMove)} onClick={()=>startDraft(selected)}>{selectedPlacement?<Move size={17}/>:<Plus size={17}/>} {selectedPlacement?t('Move','Mover'):selected.state==='seed'?t('Growing','Creciendo'):t('Build','Construir')}</button>{selectedPlacement&&!draft&&<button className="land-subtle" disabled={editingBlocked} onClick={()=>void returnPiece()}>{t('Store','Guardar')}</button>}</div></div>}
+          {libraryOpen && selectedItem && selected && <div className="land-selected-detail"><div><span className="land-eyebrow">{selectedPlacement?t('ON YOUR ISLAND','EN TU ISLA'):selected.state==='seed'?t('SEED','SEMILLA'):t('BLUEPRINT','PLANO')}</span><h3>{itemName(selectedItem)}</h3><p>{footprint(selectedItem,draft?.orientation).cols} × {footprint(selectedItem,draft?.orientation).rows} {t('tiles','casillas')}</p>{selected.state==='seed'&&selected.review&&<p className="land-thesis">{seedLine(selected.review)}</p>}{selected.state==='seed'&&!selected.review&&<p>{t('This seed blooms when you review its thesis.','Esta semilla florece cuando revisas su tesis.')}</p>}{selectedPlacement&&!canMove&&<p>{t('Moving saved pieces is coming soon.','Mover piezas sincronizadas estará disponible pronto.')}</p>}</div><div className="land-selected-actions">{selected.state==='seed'?<button className="land-primary" disabled={editingBlocked||Boolean(draft)||!canClose||!selected.review?.ready} onClick={()=>void closeThesis(selected)}>{busy?<LoaderCircle size={17} className="animate-spin"/>:<Sprout size={17}/>} {selected.review?.ready?t('Review thesis','Revisar tesis'):t('Growing','Creciendo')}</button>:<button className="land-primary" disabled={editingBlocked||Boolean(draft)||Boolean(selectedPlacement&&!canMove)} onClick={()=>startDraft(selected)}>{selectedPlacement?<Move size={17}/>:<Plus size={17}/>} {selectedPlacement?t('Move','Mover'):t('Build','Construir')}</button>}{selectedPlacement&&!draft&&<button className="land-subtle" disabled={editingBlocked} onClick={()=>void returnPiece()}>{t('Store','Guardar')}</button>}</div></div>}
         </aside>}
       </div>
     </main>

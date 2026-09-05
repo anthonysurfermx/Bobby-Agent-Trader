@@ -6,17 +6,24 @@
 //   POST { action: 'remove', placementId }                → removed
 //   POST { action: 'publish', title? }                     → island public + share code
 //   POST { action: 'unpublish' }                           → island private (code kept)
+//   POST { action: 'close', inventoryId, tzOffsetMin?, platform? } → a seed is
+//        reviewed against the public price, blooms and pays thesis_closed;
+//        a thesis the wallet executed on Base also pays the execution bonus
+//        and the next season piece (closed.executed / closed.season)
 // Placement rules (v1): the piece must belong to the caller, be bloomed, fit
 // inside the 8×8 grid with its footprint, and not overlap another piece.
-// capabilities.move tells clients that moves are arbitrated atomically by the
-// database (tl_placement_cells trigger, migration 20260904222250); clients built
-// against older servers keep the move button disabled until they see it.
+// Every seed carries `review`: the thesis it was read with, when it can be
+// reviewed and whether that moment has come. capabilities.close advertises
+// the action; capabilities.move tells clients that moves are arbitrated
+// atomically by the database (tl_placement_cells trigger, migration
+// 20260904222250); clients built against older servers keep those buttons
+// disabled until they see it.
 // Auth: wallet session or Supabase access token (same as /api/progress).
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { catalog, cleanTitle, ensureLand, newShareCode } from './_lib/trader-land.js';
+import { THESIS_REVIEW_HOURS, catalog, cleanTitle, closeSeed, ensureLand, newShareCode, seasonProgress, seedReviews } from './_lib/trader-land.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -28,16 +35,17 @@ const Body = z.discriminatedUnion('action', [
   z.object({ action: z.literal('remove'), placementId: z.string().uuid() }),
   z.object({ action: z.literal('publish'), title: z.string().max(80).optional() }),
   z.object({ action: z.literal('unpublish') }),
+  z.object({ action: z.literal('close'), inventoryId: z.string().uuid(), tzOffsetMin: z.number().int().min(-840).max(840).default(0), platform: z.enum(['ios', 'web']).default('web') }),
 ]);
 
-interface Inv { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; seeded_at: string; bloomed_at: string | null }
+interface Inv { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; seeded_at: string; bloomed_at: string | null; event_id: string | null }
 interface Placement { id: string; inventory_id: string; x: number; y: number; rotation: number; placed_at: string }
 
 async function world(identity: Identity) {
   const [land, items, invR, plR, progR] = await Promise.all([
     ensureLand(identity.id),
     catalog(),
-    fetch(bobbyRest(`tl_inventory?identity_id=eq.${identity.id}&order=seeded_at.asc&select=id,item_id,state,source,seeded_at,bloomed_at`), { headers: bobbyServiceHeaders() }),
+    fetch(bobbyRest(`tl_inventory?identity_id=eq.${identity.id}&order=seeded_at.asc&select=id,item_id,state,source,seeded_at,bloomed_at,event_id`), { headers: bobbyServiceHeaders() }),
     fetch(bobbyRest(`tl_placements?identity_id=eq.${identity.id}&select=id,inventory_id,x,y,rotation,placed_at`), { headers: bobbyServiceHeaders() }),
     fetch(bobbyRest(`bobby_progress?identity_id=eq.${identity.id}&select=xp,aura,route_index&limit=1`), { headers: bobbyServiceHeaders() }),
   ]);
@@ -52,14 +60,21 @@ async function world(identity: Identity) {
   }
   const route = items.filter((i) => i.route_index !== null).sort((a, b) => (a.route_index! - b.route_index!));
   const next = route.find((i) => i.route_index === prog.route_index + 1) ?? null;
+  // What each seed is waiting on: its thesis and the moment it can be reviewed.
+  const reviews = await seedReviews(inventory.filter((r) => r.state === 'seed'));
+  let ready = 0;
+  for (const review of reviews.values()) if (review.ready) ready += 1;
   return {
     land,
     xp: prog.xp, aura: prog.aura,
     route: { index: prog.route_index, total: route.length, next: next ? { id: next.id, world: next.world, attribution: next.attribution, kind: next.kind, footprint: [next.footprint_w, next.footprint_h] } : null, complete: prog.route_index >= route.length },
-    inventory: inventory.map((r) => ({ ...r, item: byId.get(r.item_id) ?? null, placed: placements.some((p) => p.inventory_id === r.id) })),
+    review: { windowHours: THESIS_REVIEW_HOURS, ready },
+    // The season collection: earned only by reviewed theses executed on Base.
+    season: seasonProgress(inventory),
+    inventory: inventory.map(({ event_id: _eventId, ...r }) => ({ ...r, item: byId.get(r.item_id) ?? null, placed: placements.some((p) => p.inventory_id === r.id), review: reviews.get(r.id) ?? null })),
     placements,
     catalog: items,
-    capabilities: { move: true },
+    capabilities: { move: true, close: true },
     share: { public: land.visibility === 'public', code: land.share_code, title: land.title, publishedAt: land.published_at },
   };
 }
@@ -108,6 +123,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const rows = (await r.json()) as unknown[];
       if (!rows.length) return res.status(404).json({ error: 'Placement not found' });
       return res.status(200).json({ ok: true, removed: body.placementId, ...(await world(identity)) });
+    }
+    if (body.action === 'close') {
+      const result = await closeSeed({ id: identity.id, wallet: identity.wallet }, body.inventoryId, { platform: body.platform, tzOffsetMin: body.tzOffsetMin });
+      if (result.ok === false) return res.status(result.status).json({ error: result.error, ...(result.reviewAt ? { reviewAt: result.reviewAt } : {}) });
+      return res.status(200).json({ ok: true, closed: result.closed, ...(await world(identity)) });
     }
     const w = await world(identity);
     if (body.action === 'move') {

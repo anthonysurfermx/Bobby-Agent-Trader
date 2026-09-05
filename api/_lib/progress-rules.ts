@@ -1,8 +1,10 @@
 // ============================================================
 // Companion progress rules — the ONE implementation of what iOS
 // (CompanionStore.awardDiscipline) and the web (progressStore) do locally:
-//   · points per kind: a full read 10, respecting NO TRADE 20
-//   · at most 3 awards per local day (grinding is pointless)
+//   · points per kind: a full read 10, respecting NO TRADE 20, closing a
+//     thesis 15 (minted by the server when a seed is reviewed, never by a client)
+//   · at most 3 plants per local day (grinding is pointless); a close is
+//     bounded by the seeds it blooms, so it never competes with today's reads
 //   · streak grows on consecutive days, one skipped day is grace (held,
 //     not grown), a longer gap resets to 1
 // Pure and deterministic so it can be unit-tested and replayed from the
@@ -12,14 +14,26 @@
 export const AWARD_POINTS = {
   read_complete: 10,
   no_trade_respected: 20,
-  /** the thesis of an earlier read came back and was closed (hit / invalidated / expired) — the seed blooms */
+  /** the thesis of an earlier read came back and was reviewed (hit / invalidated / expired) — the seed blooms */
   thesis_closed: 15,
 } as const;
 /** Aura (Trader Land soft currency) per kind — SYSTEM-DESIGN v0.2 "Distribución inicial". */
 export const AWARD_AURA: Record<AwardKind, number> = { read_complete: 2, no_trade_respected: 6, thesis_closed: 6 };
 export type AwardKind = keyof typeof AWARD_POINTS;
 export const AWARD_KINDS = Object.keys(AWARD_POINTS) as AwardKind[];
+/** What a client may report. A close is minted server-side by /api/trader-land when a seed is reviewed. */
+export const PLANT_KINDS = ['read_complete', 'no_trade_respected'] as const;
+export type PlantKind = (typeof PLANT_KINDS)[number];
 export const MAX_DAILY_AWARDS = 3;
+/** Kinds the daily cap does not count: each is already limited to one per seed, after the review window. */
+export const DAILY_CAP_EXEMPT: ReadonlySet<AwardKind> = new Set<AwardKind>(['thesis_closed']);
+/**
+ * Paid on top of thesis_closed when the thesis was EXECUTED on Base between
+ * the read and the review: a confirmed swap of the thesis' asset, in its
+ * direction, by the reviewer's own wallet. Process, not volume — one swap
+ * executes at most one thesis and a swap without a thesis pays nothing.
+ */
+export const EXECUTION_BONUS = { xp: 10, aura: 4 } as const;
 
 export interface ProgressCounters {
   xp: number;
@@ -66,11 +80,12 @@ export function applyAward(state: ProgressCounters, kind: AwardKind, at: Date, t
   const today = dayKey(at, tzOffsetMin);
   const xpBefore = state.xp;
 
+  const capped = !DAILY_CAP_EXEMPT.has(kind);
   let dailyAwards = state.dailyAwardsDay === today ? state.dailyAwards : 0;
-  if (dailyAwards >= MAX_DAILY_AWARDS) {
+  if (capped && dailyAwards >= MAX_DAILY_AWARDS) {
     return { state, points, awarded: 0, xpBefore, xpAfter: xpBefore, dayKey: today };
   }
-  dailyAwards += 1;
+  if (capped) dailyAwards += 1;
 
   let streak = state.streak;
   if (state.lastDay) {
