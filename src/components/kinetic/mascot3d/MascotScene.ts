@@ -414,7 +414,7 @@ export class MascotScene {
       kora: {
         // Calibrated against Kora's cat silhouette and mirrored in iOS 13.
         // The previous depth made the right cup look detached at her neck.
-        headset: { p: [0, 0.58 * R, 0.64 * R], size: 0.68 * R },
+        headset: { p: [0, 0.64 * R, 0.72 * R], size: 0.70 * R },
         shoulder: { p: [-0.22 * R, 0.14 * R, 0.78 * R], size: 0.28 * R },
         hand: { p: [0.24 * R, -0.46 * R, 0.80 * R], size: 0.30 * R },
       },
@@ -423,12 +423,12 @@ export class MascotScene {
         shoulder: { p: [-0.32 * R, 0.20 * R, 0.72 * R], size: 0.29 * R },
         head: { p: [0, 1.02 * R, 0.08 * R], size: 0.38 * R },
       },
-      glitch: { hand: { p: [0.62 * R, -0.34 * R, 0.60 * R], size: 0.38 * R }, chest: { p: [0, 0.05 * R, 0.92 * R], size: 0.36 * R } },
-      momo: { hand: { p: [0.58 * R, -0.22 * R, 0.62 * R], size: 0.36 * R }, face: { p: [0, 0.20 * R, 0.94 * R], size: 0.58 * R }, head: { p: [0, 0.98 * R, 0.08 * R], size: 0.40 * R } },
-      flux: { hand: { p: [0.58 * R, -0.30 * R, 0.62 * R], size: 0.34 * R }, chest: { p: [0, -0.02 * R, 0.92 * R], size: 0.36 * R }, head: { p: [0, 1.10 * R, 0.08 * R], size: 0.38 * R } },
-      rook: { chest: { p: [0, 0.18 * R, 0.94 * R], size: 0.36 * R }, head: { p: [0, 1.06 * R, 0.08 * R], size: 0.38 * R }, hand: { p: [0.60 * R, -0.48 * R, 0.58 * R], size: 0.36 * R } },
-      halo: { chest: { p: [0, 0, 0.94 * R], size: 0.40 * R }, shoulder: { p: [-0.66 * R, 0.10 * R, 0.56 * R], size: 0.34 * R }, head: { p: [0, 0.96 * R, 0.08 * R], size: 0.40 * R } },
-      axiom: { hand: { p: [0.62 * R, -0.28 * R, 0.62 * R], size: 0.34 * R }, chest: { p: [0, 0.04 * R, 0.94 * R], size: 0.34 * R }, head: { p: [0, 1.00 * R, 0.08 * R], size: 0.38 * R } },
+      glitch: { hand: { p: [0.54 * R, -0.34 * R, 0.66 * R], size: 0.44 * R }, chest: { p: [0, 0.05 * R, 0.92 * R], size: 0.36 * R } },
+      momo: { hand: { p: [0.50 * R, -0.22 * R, 0.68 * R], size: 0.44 * R }, face: { p: [0, 0.20 * R, 0.94 * R], size: 0.58 * R }, head: { p: [0, 1.08 * R, 0.30 * R], size: 0.40 * R } },
+      flux: { hand: { p: [0.50 * R, -0.30 * R, 0.68 * R], size: 0.40 * R }, chest: { p: [0, -0.02 * R, 0.92 * R], size: 0.36 * R }, head: { p: [0, 1.10 * R, 0.08 * R], size: 0.38 * R } },
+      rook: { chest: { p: [0, 0.18 * R, 0.94 * R], size: 0.36 * R }, head: { p: [0, 1.10 * R, 0.30 * R], size: 0.38 * R }, hand: { p: [0.52 * R, -0.48 * R, 0.64 * R], size: 0.42 * R } },
+      halo: { chest: { p: [0, 0, 0.94 * R], size: 0.40 * R }, shoulder: { p: [-0.66 * R, 0.10 * R, 0.56 * R], size: 0.34 * R }, head: { p: [0, 1.06 * R, 0.30 * R], size: 0.40 * R } },
+      axiom: { hand: { p: [0.54 * R, -0.28 * R, 0.68 * R], size: 0.40 * R }, chest: { p: [0, 0.04 * R, 0.94 * R], size: 0.34 * R }, head: { p: [0, 1.08 * R, 0.30 * R], size: 0.38 * R } },
     };
     const profile = profiles[this.avatarId] ?? {};
     const loader = new TextureLoader();
@@ -442,7 +442,7 @@ export class MascotScene {
       // art but actually inherits the character's rotation like worn gear.
       const sprite = item.slot === 'pet'
         ? new Sprite(new SpriteMaterial({ map: tex, transparent: true, depthWrite: false }))
-        : new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: DoubleSide }));
+        : new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, side: DoubleSide }));
       sprite.position.set(a.p[0], a.p[1], a.p[2]);
       sprite.scale.set(a.size, a.size, 1);
       sprite.renderOrder = 10 + i;
@@ -450,7 +450,7 @@ export class MascotScene {
       if (item.spin) this.spinners.push(sprite);
       this.gearGroup.add(sprite);
       if (item.glow) {
-        const glowMat = new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: DoubleSide, color: new Color(item.glow), opacity: 0.35, blending: AdditiveBlending });
+        const glowMat = new MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, side: DoubleSide, color: new Color(item.glow), opacity: 0.35, blending: AdditiveBlending });
         const glow = new Mesh(new PlaneGeometry(1, 1), glowMat);
         glow.scale.set(a.size * 1.35, a.size * 1.35, 1);
         glow.position.set(a.p[0], a.p[1], a.p[2] - 0.01);
