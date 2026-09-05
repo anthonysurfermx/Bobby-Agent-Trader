@@ -172,6 +172,7 @@ function SectionMedia({ name, className = '' }: { name: string; className?: stri
 }
 
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  if (value === '0') return null;
   return (
     <div className="border-t border-white/15 pt-4">
       <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/40">{label}</div>
@@ -229,7 +230,7 @@ export default function BobbyProtocolLanding() {
   const c = stats?.contracts;
   const proofPoints = [
     {
-      label: 'On-chain record',
+      label: 'On-chain record (since the Base cut-over)',
       value: formatWinRate(onchainRecord?.winRate, onchainRecord?.decisionsResolved),
       detail: onchainRecord
         ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
@@ -282,8 +283,9 @@ export default function BobbyProtocolLanding() {
     ['Bobby is online', true],
     [btc ? `BTC $${btc.price.toLocaleString('en-US')}` : 'BTC —', false],
     [stats?.chain?.blockNumber ? `${chainLabel} block ${formatNumber(stats.chain.blockNumber)}` : 'On-chain verification', false],
-    ['Every thesis gets challenged', false],
-    ['Proof-of-debate', true],
+    ['In plain words: ChatGPT answers. Bobby checks the market first.', true],
+    ['Every answer is challenged before it ships', false],
+    ['Every call is written down before the outcome', false],
     [`${formatNumber(totalTrades, '—')} decisions committed`, false],
   ] as const;
 
@@ -291,7 +293,7 @@ export default function BobbyProtocolLanding() {
     <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet>
         <title>Bobby Protocol — Refuted before execution</title>
-        <meta name="description" content="The verification layer for financial intelligence. Every decision is refuted before execution and published before its outcome is known." />
+        <meta name="description" content="The rules behind every answer Bobby gives about a market. Before you see an answer, a second system tries to break it, a risk check can block it, and the call is written down before the outcome." />
       </Helmet>
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
@@ -322,10 +324,11 @@ export default function BobbyProtocolLanding() {
           <div className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl flex-col justify-center px-5 pb-20 pt-20 lg:px-8 lg:pb-28 lg:pt-24">
             <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
               <a href="/agentic-world/bobby/history" className="mb-8 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff] transition hover:text-white">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />The verification layer for financial intelligence <span aria-hidden>›</span>
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />The rules behind every answer Bobby gives about a market <span aria-hidden>›</span>
               </a>
               <h1 className="max-w-4xl text-[clamp(2.4rem,5.2vw,5rem)] font-extrabold leading-[.96] tracking-[-0.085em]">No decision is approved<br />without being <span className="text-[#0052ff]">refuted.</span></h1>
-              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">Every idea follows a fixed procedure — case, refutation, risk gate and verdict — and the verdict is published on Base before any outcome exists to justify it.</p>
+              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">When an AI answers a question about an asset, this is what happens before you see it: a second system tries to break the answer, a risk check can block it, and the call is written down before the market settles it.</p>
+              <p className="mt-5 max-w-2xl border-l-2 border-[#0052ff] pl-4 text-sm leading-6 text-white/45 md:text-base">Bobby runs on the same models everyone else uses. The difference is not the model, it is the procedure around it.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
                 <a href="/agentic-world/bobby" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a verdict <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
                 <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the procedure <ChevronDown className="h-4 w-4" /></a>
@@ -333,10 +336,10 @@ export default function BobbyProtocolLanding() {
               <div className="mt-14 grid max-w-xl grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4">
                 {[
                   ['Debates', formatNumber(totalDebates)],
-                  ['Decisions', formatNumber(totalTrades)],
-                  ['MCP calls', formatNumber(totalMcpCalls)],
+                  ['Resolved', formatNumber(publicRecord?.decisionsResolved)],
                   ['Win rate', formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)],
-                ].map(([label, value]) => (
+                  ['Resolution', publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'],
+                ].filter(([, value]) => value !== '0').map(([label, value]) => (
                   <div key={label}>
                     <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</div>
                     <div className="font-mono text-3xl font-bold tracking-[-0.04em] text-white md:text-4xl">{value}</div>
@@ -360,6 +363,30 @@ export default function BobbyProtocolLanding() {
           </div>
         </div>
 
+
+        <section className="relative overflow-hidden border-b border-white/10 bg-[#08080a]" id="what-it-does">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(0,82,255,.18),transparent_36%)]" />
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 max-w-3xl">
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / What it does</div>
+              <h2 className="text-5xl font-extrabold leading-[.96] tracking-[-0.08em] md:text-7xl">It turns an idea<br />into a decision.</h2>
+              <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">Bring a thesis. Bobby challenges it, checks the downside, and gives you one clear decision before the result.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                { step: '01', title: 'Bring the idea', text: 'Start with a market thesis.' },
+                { step: '02', title: 'Test the downside', text: 'Opposing agents look for what breaks it.' },
+                { step: '03', title: 'Get the call', text: 'Pass, pause or block — with a public record.' },
+              ].map((item) => (
+                <div key={item.step} className="rounded-2xl border border-white/10 bg-white/[0.035] p-7 transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:bg-[#0052ff]/[0.08]">
+                  <div className="mb-12 font-mono text-sm font-bold text-[#7da6ff]">{item.step}</div>
+                  <h3 className="text-2xl font-extrabold tracking-[-0.05em]">{item.title}</h3>
+                  <p className="mt-3 max-w-xs text-sm leading-6 text-white/45">{item.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
         <section id="rules" className="relative overflow-hidden border-b border-white/10 bg-[#050505]">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.10),transparent_44%)]" />
@@ -387,7 +414,7 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
-                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / The procedure</div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The procedure</div>
                 <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One procedure,<br />end to end.</h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">Four checks before capital moves.</p>
@@ -424,7 +451,7 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.25 }}
               className="max-w-3xl"
             >
-              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / Before capital moves</div>
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Before capital moves</div>
               <h2 className="text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
                 No blind decisions.<br />
                 <span className="text-white/72">Just four checks.</span>
@@ -440,7 +467,7 @@ export default function BobbyProtocolLanding() {
                 ['Decisions', formatNumber(totalTrades)],
                 ['Agent calls', formatNumber(totalMcpCalls)],
                 ['Interactions', formatNumber(totalInteractions)],
-              ].map(([label, value]) => (
+              ].filter(([, value]) => value !== '0').map(([label, value]) => (
                 <div key={label} className="border-l border-white/20 pl-4">
                   <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{label}</div>
                   <div className="mt-2 font-mono text-2xl tracking-[-0.04em] text-white md:text-3xl">{value}</div>
@@ -504,7 +531,7 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
             <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
-                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Capabilities</div>
+                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Capabilities</div>
                 <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
                   Four checks.<br />One clear decision.
                 </h2>
@@ -592,7 +619,7 @@ export default function BobbyProtocolLanding() {
           <SectionMedia name="nebula" className="opacity-50" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Integration</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give any agent<br />a second layer.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">Connect over MCP.</p></div>
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Integration</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give any agent<br />a second layer.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">Connect over MCP.</p></div>
           <div className="grid items-start gap-5 md:grid-cols-[1.55fr_1fr]">
             <a
               href="/protocol/docs"
@@ -661,29 +688,6 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="what-it-does">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(0,82,255,.18),transparent_36%)]" />
-          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-            <div className="mb-12 max-w-3xl">
-              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / The outcome</div>
-              <h2 className="text-5xl font-extrabold leading-[.96] tracking-[-0.08em] md:text-7xl">It turns an idea<br />into a decision.</h2>
-              <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">Bring a thesis. Bobby challenges it, checks the downside, and gives you one clear decision before the result.</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {[
-                { step: '01', title: 'Bring the idea', text: 'Start with a market thesis.' },
-                { step: '02', title: 'Test the downside', text: 'Opposing agents look for what breaks it.' },
-                { step: '03', title: 'Get the call', text: 'Pass, pause or block — with a public record.' },
-              ].map((item) => (
-                <div key={item.step} className="rounded-2xl border border-white/10 bg-white/[0.035] p-7 transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:bg-[#0052ff]/[0.08]">
-                  <div className="mb-12 font-mono text-sm font-bold text-[#7da6ff]">{item.step}</div>
-                  <h3 className="text-2xl font-extrabold tracking-[-0.05em]">{item.title}</h3>
-                  <p className="mt-3 max-w-xs text-sm leading-6 text-white/45">{item.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
         <section className="relative overflow-hidden border-t border-white/10 bg-[#050505]" id="contracts">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />

@@ -255,3 +255,18 @@ playful without costing the protocol its credibility. Keep it.
 **Open question:** the aura names are Spanish on an English page. Kept on purpose — they are the
 app's real vocabulary and read as brand, not as an untranslated string. Translate only if the iOS
 build renames them.
+
+---
+
+## Addendum 2026-09-03 — consumer one-liner (locked)
+
+Use this wherever Bobby has to be explained in one sentence to a consumer (video, ads, social bio,
+App Store subtitle). Source of truth: `core-message.md` §12.
+
+```
+ES:  ChatGPT te responde. Bobby comprueba el mercado antes de responder.
+EN:  ChatGPT answers. Bobby checks the market first.
+```
+
+Rules: always name the market; say the order (Bobby answers too, after checking); no protocol
+words on the consumer surface; write lines that flow like speech.
