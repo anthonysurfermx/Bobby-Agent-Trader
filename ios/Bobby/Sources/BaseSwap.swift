@@ -62,6 +62,9 @@ struct BaseSwapQuote: Decodable, Equatable {
         let marketDeviationPct: Double
         let pausedFeatures: String
         let transferPaused: Bool
+        let issuerPaused: Bool?
+        let usable: Bool?
+        let status: String?
     }
 
     let chainId: Int
@@ -112,6 +115,7 @@ enum BaseSwapGuard {
         "GOOGLc": "0xb2000000000000000000002d0ba3164cc74f58b7",
         "METAc": "0xb2000000000000000000008bc8786b856e61707c",
         "NVDAc": "0xb20000000000000000000078ee7ce2fe4908108c",
+        "SPCXc": "0xb2000000000000000000007b9fcbd005511acbd5",
     ]
 
     private static let approveSelector: [UInt8] = [0x09, 0x5e, 0xa7, 0xb3]
@@ -162,11 +166,14 @@ enum BaseSwapGuard {
 
         try require(quote.requiresStockEligibility, "quote does not identify the stock eligibility gate")
         try require(quote.route.kind == "single" && quote.route.fees.count == 1 && allowedFees.contains(quote.route.fees[0]), "route is not a pinned direct V3 pool")
-        try require(quote.limits.minTicketUsd == 1 && quote.limits.maxTicketUsd >= 1 && quote.limits.maxTicketUsd <= 100, "server ticket limits exceed the app policy")
+        let ticketCap = symbols.contains("SPCXc") ? 10.0 : 100.0
+        try require(quote.limits.minTicketUsd == 1 && quote.limits.maxTicketUsd >= 1 && quote.limits.maxTicketUsd <= ticketCap, "server ticket limits exceed the app policy")
         try require(quote.limits.defaultSlippagePct == 0.5 && quote.limits.maxSlippagePct == 3, "server slippage limits differ from the app policy")
         try require(quote.limits.maxPriceImpactPct == 3 && quote.limits.deadlineSec == 1_200, "server execution limits differ from the app policy")
         try require(quote.priceImpactPct != nil && abs(quote.priceImpactPct!) <= min(3, quote.limits.maxPriceImpactPct), "price impact is unavailable or over 3%")
-        try require(quote.usdValue != nil && quote.usdValue! >= max(1, quote.limits.minTicketUsd) && quote.usdValue! <= min(100, quote.limits.maxTicketUsd), "ticket is outside the $1-$100 limit")
+        try require(quote.usdValue != nil && quote.usdValue! >= max(1, quote.limits.minTicketUsd) && quote.usdValue! <= min(ticketCap, quote.limits.maxTicketUsd), "ticket is outside the local USD limit")
+        let stableAmount = Double(quote.tokenIn.symbol == "USDC" ? quote.amountIn : quote.amountOut)
+        try require(stableAmount != nil && stableAmount!.isFinite && stableAmount! >= 1 && stableAmount! <= min(ticketCap, quote.limits.maxTicketUsd) && abs(stableAmount! - quote.usdValue!) <= 0.000001, "USD value differs from the USDC amount or exceeds the local limit")
         guard let reference = quote.stockReference else { throw BaseSwapSecurityError.refused("stock reference is missing") }
         let stock = quote.tokenIn.symbol == "USDC" ? quote.tokenOut.symbol : quote.tokenIn.symbol
         try require(reference.symbol == stock, "stock reference is for another token")
@@ -174,6 +181,8 @@ enum BaseSwapGuard {
         try require(reference.ageSec >= 0 && reference.ageSec <= 96 * 60 * 60, "stock reference is stale")
         try require(reference.marketDeviationPct >= 0 && reference.marketDeviationPct <= 5, "stock reference deviation is over 5%")
         try require(!reference.transferPaused, "issuer has paused transfers")
+        try require(reference.issuerPaused == false, "issuer oracle availability is not confirmed")
+        try require(reference.usable == true && ["fresh", "market-closed"].contains(reference.status ?? ""), "stock reference is not usable")
         if let transactions = quote.tx {
             let seconds = Int(now.timeIntervalSince1970)
             try require(transactions.chainId == chainId, "transaction set is not on Base")

@@ -90,16 +90,40 @@ final class BaseSwapGuardTests: XCTestCase {
         XCTAssertThrowsError(try BaseSwapGuard.rawAmount("1.0000001", decimals: 6))
     }
 
+    func testSpaceXHasIndependentTenDollarCap() throws {
+        try BaseSwapGuard.validateQuote(quote(tx: nil, stock: "SPCXc", maxTicketUsd: 10), requestedTokenIn: "USDC", requestedTokenOut: "SPCXc", inputAmount: "10", slippagePct: 0.5, wallet: wallet)
+        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, stock: "SPCXc", maxTicketUsd: 100), requestedTokenIn: "USDC", requestedTokenOut: "SPCXc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
+        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, stock: "SPCXc", maxTicketUsd: 10, ticketUsd: 11), requestedTokenIn: "USDC", requestedTokenOut: "SPCXc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
+        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, stock: "SPCXc", maxTicketUsd: 10, ticketUsd: 1), requestedTokenIn: "USDC", requestedTokenOut: "SPCXc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
+    }
+
+    func testRequiresUsableIssuerReference() throws {
+        for paused: Bool? in [true, nil] {
+            XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, issuerPaused: paused), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
+        }
+        for status: String? in ["stale", "issuer-paused", "unusable", nil] {
+            XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, referenceStatus: status), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
+        }
+        XCTAssertThrowsError(try BaseSwapGuard.validateQuote(quote(tx: nil, referenceUsable: false), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet))
+        try BaseSwapGuard.validateQuote(quote(tx: nil, referenceStatus: "market-closed"), requestedTokenIn: "USDC", requestedTokenOut: "NVDAc", inputAmount: "10", slippagePct: 0.5, wallet: wallet)
+    }
+
     private func quote(
         tx: BaseSwapTransactionSet?,
         minAmountOut: String = "0.04283114",
-        minAmountOutRaw: String = "4283114"
+        minAmountOutRaw: String = "4283114",
+        issuerPaused: Bool? = false,
+        referenceUsable: Bool? = true,
+        referenceStatus: String? = "fresh",
+        stock: String = "NVDAc",
+        maxTicketUsd: Double = 100,
+        ticketUsd: Double = 10
     ) -> BaseSwapQuote {
         BaseSwapQuote(
             chainId: 8453,
             venue: .init(name: "Uniswap V3 (SwapRouter02)", router: BaseSwapGuard.router),
             tokenIn: .init(symbol: "USDC", name: "USD Coin", address: BaseSwapGuard.tokenAddresses["USDC"]!, decimals: 6),
-            tokenOut: .init(symbol: "NVDAc", name: "Coinbase Tokenized NVIDIA", address: BaseSwapGuard.tokenAddresses["NVDAc"]!, decimals: 8),
+            tokenOut: .init(symbol: stock, name: stock, address: BaseSwapGuard.tokenAddresses[stock]!, decimals: 8),
             amountIn: "10",
             amountInRaw: "10000000",
             amountOut: "0.04304638",
@@ -108,7 +132,7 @@ final class BaseSwapGuardTests: XCTestCase {
             minAmountOutRaw: minAmountOutRaw,
             executionPrice: 0.004304638,
             priceImpactPct: 0.3,
-            usdValue: 10,
+            usdValue: ticketUsd,
             slippagePct: 0.5,
             deadline: deadline,
             route: .init(kind: "single", fees: [3000], description: "USDC → NVDAc (0.3%)", gasEstimate: "93242"),
@@ -118,9 +142,9 @@ final class BaseSwapGuardTests: XCTestCase {
             simulation: .init(ran: true, ok: true, reason: nil),
             txWithheld: [],
             warnings: [],
-            limits: .init(maxTicketUsd: 100, minTicketUsd: 1, defaultSlippagePct: 0.5, maxSlippagePct: 3, maxPriceImpactPct: 3, deadlineSec: 1200),
+            limits: .init(maxTicketUsd: maxTicketUsd, minTicketUsd: 1, defaultSlippagePct: 0.5, maxSlippagePct: 3, maxPriceImpactPct: 3, deadlineSec: 1200),
             requiresStockEligibility: true,
-            stockReference: .init(symbol: "NVDAc", usdPrice: 231.14, ageSec: 60, multiplierHuman: 1, marketDeviationPct: 0.5, pausedFeatures: "0", transferPaused: false)
+            stockReference: .init(symbol: stock, usdPrice: 231.14, ageSec: 60, multiplierHuman: 1, marketDeviationPct: 0.5, pausedFeatures: "0", transferPaused: false, issuerPaused: issuerPaused, usable: referenceUsable, status: referenceStatus)
         )
     }
 

@@ -35,11 +35,11 @@ struct BaseSwapView: View {
     @State private var phase: Phase = .idle
     @State private var txHash: String?
 
-    private static let stocks = ["AAPLc", "GOOGLc", "METAc", "NVDAc"]
+    private static let stocks = ["AAPLc", "GOOGLc", "METAc", "NVDAc", "SPCXc"]
 
     init(defaultSymbol: String? = nil) {
         let normalized = (defaultSymbol ?? "NVDA").uppercased().replacingOccurrences(of: "C", with: "c")
-        let aliases = ["AAPL": "AAPLc", "GOOGL": "GOOGLc", "GOOG": "GOOGLc", "META": "METAc", "NVDA": "NVDAc"]
+        let aliases = ["AAPL": "AAPLc", "GOOGL": "GOOGLc", "GOOG": "GOOGLc", "META": "METAc", "NVDA": "NVDAc", "SPCX": "SPCXc"]
         let selected = Self.stocks.contains(normalized) ? normalized : aliases[(defaultSymbol ?? "NVDA").uppercased()] ?? "NVDAc"
         _stock = State(initialValue: selected)
     }
