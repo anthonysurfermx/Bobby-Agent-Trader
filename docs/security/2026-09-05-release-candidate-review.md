@@ -2,6 +2,77 @@
 
 Date: 2026-09-05. Verdict: **NO-GO for release / activation**.
 
+## Follow-up: atomic progress remediation (local, not deployed)
+
+The initial review below describes candidate `57c8fee`. The follow-up implements
+RC-02 and RC-04 in the local candidate and closes the timestamp portion of RC-03.
+It does **not** establish that a client-supplied thesis was issued by Bobby.
+
+- `20260905000001_atomic_progress.sql` introduces service-only commit/close RPCs.
+  Ledger, seed, receipt reservation, season item and progress now commit together.
+  Both API writers compare a locked progress revision and rebase at most four
+  times. A trigger also invalidates snapshots when other code updates progress.
+  Identity rows are locked first to serialize with the existing identity-link RPC.
+- Ordinary progress commits also include route grants and profile changes. Event
+  IDs are deduplicated before rule calculation; history-read failures stop writes.
+  A lost close response can replay its stored result without another price lookup.
+- Receipt selection is a database query over the full confirmed Base history,
+  bounded by server acceptance and review time, using recorded token addresses.
+  No 100-row/PostgREST-page cutoff, client clock, or confirmation-time fallback.
+  Unique constraints reserve each receipt and seed once, and each season piece
+  once per identity. Missing season catalog entries abort the complete close.
+- New accepted reads pin the asset address and database timestamp. Raw client
+  metadata cannot supply either; the API labels snapshots `client_snapshot`.
+  The studio distinguishes the claimed read time from `executionEligibleAt`.
+  Offline swaps before sync do not qualify. Pre-migration reads are deliberately
+  not retroactively certified; ordinary close XP/Aura still work. Their UI does
+  not promise an execution bonus. Existing paid receipts remain reserved.
+
+### Evidence for the follow-up
+
+PostgreSQL 17 was started in a fresh, temporary local cluster. The regression
+applies the real prerequisite schemas and the new migration inside a random
+test schema. No production data was read or changed.
+
+- `test:progress-atomic-pg`: 14 scenarios pass: function permissions, server
+  acceptance time, late-write rollback for plants and closes, bonus/season rollback,
+  missing catalog rollback, lookup beyond 1,100 old receipts, address/wallet/side
+  matching, replay, concurrent closes, stale sync, legacy wait rules, window
+  boundaries, legacy import/NO TRADE/profile compatibility and final
+  ledger-to-balance reconciliation.
+- `test:progress-atomic-api`: five checks pass against the actual API orchestration
+  with mocked identity, market and HTTP: deduplication/canonicalization/rebase,
+  bounded contention, fail-closed history reads, replay and close RPC dispatch.
+  This is not an authentication or live PostgREST integration test.
+- Existing thesis rules: 66 pass. Real browser queue regression, scoped progress
+  typecheck, API typecheck, production build and lint pass. The two new suites
+  are included in CI; the Postgres suite refuses non-local URLs and never skips.
+- No new Foundry/fork run, paid generation, remote CI run or independent audit
+  verdict was obtained in this follow-up. These remain separate evidence gates.
+
+### Remaining release requirements
+
+1. **RC-03 remains partially open:** bind the read to an authenticated,
+   server-issued verdict identifier and immutable snapshot. The current code proves
+   only when the server accepted the submitted snapshot, not who authored it.
+   Do not advertise it as proof of a Bobby-issued prior recommendation.
+2. Validate historical references/uniqueness on the actual Bobby database before
+   applying the migration. Duplicate season rewards, reused receipts or missing
+   historical references intentionally abort migration; no user data is deleted
+   or automatically rewritten to make the constraints pass. Historical partial
+   closes need a separate reviewed reconciliation, not inferred backpayment.
+3. Coordinate migration and API cutover with progress writers frozen and drained.
+   The new APIs require the new columns/RPCs; old API deployments must not keep
+   writing absolute balances alongside them. A revision trigger does not make an
+   old writer concurrency-safe. Do not simply roll back to the old writer after
+   enabling the new ledger. Verify identity linking with real migrated histories.
+4. Apply only through the configured Supabase migration workflow after verifying
+   the Bobby project; no production migration was attempted here. Re-run CI on
+   the final candidate and collect the outstanding independent/iOS verdicts.
+
+The original security release/activation gates below still apply. Local passing
+regressions are not a production GO or proof that migration preflight will pass.
+
 This is a bounded defensive source review and local regression check, not a
 completed independent third audit or GO 3/3. No production deployment, database
 change, wallet transaction, paid model call or new agent workflow was performed.

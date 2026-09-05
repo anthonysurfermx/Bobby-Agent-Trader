@@ -10,6 +10,8 @@
     "check:api": "tsc -p tsconfig.api.json",
     "check:progress": "tsc -p tsconfig.progress.json",
     "test:progress-thesis-sync": "tsx scripts/test-progress-thesis-sync.mts",
+    "test:progress-atomic-pg": "tsx scripts/test-progress-atomic-pg.mts",
+    "test:progress-atomic-api": "tsx scripts/test-progress-atomic-api.mts",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:playbooks": "tsx scripts/test-playbooks.mts",

@@ -45,6 +45,7 @@ jobs:
       - run: npm run check:progress
       - run: npm run test:trader-land-thesis
       - run: npm run test:progress-thesis-sync
+      - run: npm run test:progress-atomic-api
       - run: npm run build
       - run: npm run lint -- --quiet
       - run: npm audit --omit=dev --audit-level=high
@@ -86,6 +87,7 @@ jobs:
       - run: npm run test:bounties-abi-anvil
       - run: npm run test:rls-lockdown-pg
       - run: npm run test:swap-ledger-pg
+      - run: npm run test:progress-atomic-pg
       - run: npm run test:agent-registry-pg
 
   contracts:
