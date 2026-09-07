@@ -528,8 +528,16 @@ struct GearCatalogSheet: View {
                 Label(L.t("Hold any item to see it worn.", "Mantén presionado un item para verlo puesto."), systemImage: "hand.tap")
                     .font(.mono(10, .medium)).kerning(0.6).foregroundStyle(Theme.muted)
 
+                // Your own companion showed only the pet here, so your own three
+                // pieces were the one gear in the game you could never hold to
+                // see worn — the belt opens the flat card, not the 3D preview.
+                section(L.t("YOUR GEAR", "TU EQUIPO"))
+                ForEach(CompanionToolkit.tools(for: current.id)) { tool in
+                    row(glyph: nil, symbol: tool.symbol, art: tool.hasArt ? tool.assetName : nil, title: tool.name, subtitle: tool.lore,
+                        needXP: tool.unlockXP, needLevel: nil, tint: tool.isGolden ? gold : current.tint,
+                        item: .tool(tool, current))
+                }
                 if let pet = CompanionToolkit.pet(for: current.id) {
-                    section(L.t("YOUR PET", "TU MASCOTA"))
                     row(glyph: pet.hasArt ? nil : pet.emoji, art: pet.hasArt ? pet.assetName : nil, title: pet.name,
                         subtitle: pet.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu companion."),
                         needXP: CompanionPet.unlockXP, needLevel: nil, tint: current.tint, item: .pet(pet, current))

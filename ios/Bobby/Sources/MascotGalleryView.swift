@@ -562,6 +562,9 @@ struct MascotSceneView: UIViewRepresentable {
             }
         }
 
+        /// The eight standing humans of wave 2 — they share one anchor profile.
+        static let wave2Ids: Set<String> = ["iris", "sol", "zuri", "mira", "nalu", "vega", "noor", "keo"]
+
         /// Worn gear + pet. Re-applied only when the set changes or the model reloads.
         func applyGearIfNeeded(_ tools: [CompanionTool], pet: CompanionPet?, force: Bool = false) {
             let key = tools.map { $0.id }.joined(separator: ",") + "|" + (pet?.id ?? "")
@@ -581,6 +584,14 @@ struct MascotSceneView: UIViewRepresentable {
                     .hip: (0.36, -0.12, 0.70, 0.36), .shoulder: (-0.60, 0.50, 0.42, 0.44),
                     .chest: (0, 0.12, 0.86, 0.44),
                 ]
+                let wave2Human: [BodySlot: (CGFloat, CGFloat, CGFloat, CGFloat)] = [
+                    .face: (0, 0.46, 0.30, 0.36), .headset: (0, 0.44, 0.22, 0.40),
+                    .head: (0, 0.95, 0.10, 0.30), .hand: (0.26, -0.37, 0.34, 0.22),
+                    .hip: (0.18, -0.37, 0.34, 0.18), .shoulder: (-0.30, 0.06, 0.30, 0.20),
+                    .chest: (0, -0.11, 0.34, 0.20),
+                ]
+                var zuriProfile = wave2Human
+                zuriProfile[.headset] = (-0.30, 0.42, 0.22, 0.24)
                 let profiles: [String: [BodySlot: (CGFloat, CGFloat, CGFloat, CGFloat)]] = [
                     "orb": [.hand: (0.45,-0.18,0.76,0.34), .chest: (0,0.02,0.94,0.38), .head: (0,0.96,0.08,0.42)],
                     "byte": [.hip: (0.32,-0.18,0.76,0.30), .face: (0,0.45,0.92,0.62), .hand: (0.53,-0.42,0.68,0.34)],
@@ -592,6 +603,15 @@ struct MascotSceneView: UIViewRepresentable {
                     "rook": [.chest: (0,0.18,0.94,0.36), .head: (0,1.06,0.08,0.38), .hand: (0.60,-0.48,0.58,0.36)],
                     "halo": [.chest: (0,0,0.94,0.40), .shoulder: (-0.66,0.10,0.56,0.34), .head: (0,0.96,0.08,0.40)],
                     "axiom": [.hand: (0.62,-0.28,0.62,0.34), .chest: (0,0.04,0.94,0.34), .head: (0,1.00,0.08,0.38)],
+                    // Wave 2 are standing humans, not blobs whose body IS the
+                    // head: the defaults above put the chest piece on the chin.
+                    // Measured against the models and mirrored from web.
+                    "iris": wave2Human, "sol": wave2Human, "mira": wave2Human,
+                    "nalu": wave2Human, "vega": wave2Human, "noor": wave2Human,
+                    "keo": wave2Human,
+                    // Zuri's tier-1 art is a single headphone cup: centred it
+                    // covers her face, so it goes on the ear and stays small.
+                    "zuri": zuriProfile,
                 ]
                 let itemOverrides: [String: (CGFloat, CGFloat, CGFloat, CGFloat)] = [
                     // Glitch dual-wields: keep the hammer and blade visible on
@@ -650,7 +670,7 @@ struct MascotSceneView: UIViewRepresentable {
                 holder.addChildNode(node)
             }
             if let pet {
-                let size = r * 0.70
+                let size = r * (Self.wave2Ids.contains(owner?.assetName ?? "") ? 0.35 : 0.70)
                 let plane = SCNPlane(width: size, height: size)
                 plane.firstMaterial?.diffuse.contents = UIImage(named: pet.assetName) ?? Self.glyphImage(pet.emoji, tint: .white, symbolic: false)
                 plane.firstMaterial?.isDoubleSided = true
@@ -659,7 +679,13 @@ struct MascotSceneView: UIViewRepresentable {
                 plane.firstMaterial?.blendMode = .alpha
                 plane.firstMaterial?.writesToDepthBuffer = false
                 let node = SCNNode(geometry: plane)
-                node.position = SCNVector3(Float(-r * 0.72), Float(-r * 0.66), Float(r * 0.55))
+                // The blob default sits the pet against a round body; on a
+                // standing human it floats at knee height, so wave 2 gets its
+                // own spot at the feet (mirrored from web).
+                let petAnchor: (CGFloat, CGFloat, CGFloat) = Self.wave2Ids.contains(owner?.assetName ?? "")
+                    ? (-0.31, -0.89, 0.50)
+                    : (-0.72, -0.66, 0.55)
+                node.position = SCNVector3(Float(r * petAnchor.0), Float(r * petAnchor.1), Float(r * petAnchor.2))
                 node.renderingOrder = 14
                 let billboard = SCNBillboardConstraint()
                 billboard.freeAxes = .Y

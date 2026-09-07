@@ -161,7 +161,7 @@ let bobbyCompanions: [Companion] = [
           selectLine: L.t("Sit with me a minute. The good one always comes.", "Siéntate un minuto. La buena siempre llega."),
           secretPhrase: L.t("Waiting is not doing nothing. It is the hardest part.", "Esperar no es no hacer nada. Es la parte más difícil."),
           hue: 0.115, requiredLevel: 1,
-          voicePersona: "verse",
+          voicePersona: "mellow",
           evolutionNames: ["KEO", "KEO DRIFT", "KEO GLIDE", "KEO SOUL", "KEO ETERNAL"]),
 ]
 
