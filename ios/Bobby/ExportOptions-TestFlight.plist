@@ -12,6 +12,8 @@
     <string>automatic</string>
     <key>teamID</key>
     <string>QZRTV6CMTT</string>
+    <key>testFlightInternalTestingOnly</key>
+    <true/>
     <key>uploadSymbols</key>
     <true/>
 </dict>
