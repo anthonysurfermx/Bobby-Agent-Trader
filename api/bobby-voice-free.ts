@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // against its own strict allowlist.
   // Personas plus raw OpenAI voice ids: the 10-companion squad needs 10 voices.
   const VALID_VOICES = ['alpha', 'red', 'cio', 'male', 'female', 'coral', 'ballad', 'sage', 'ash',
-    'nova', 'echo', 'shimmer', 'verse', 'alloy', 'marin', 'cedar', 'onyx', 'fable'];
+    'nova', 'echo', 'shimmer', 'verse', 'alloy', 'marin', 'cedar', 'onyx', 'fable', 'mellow'];
   const VALID_LANGS = ['es', 'en', 'pt'];
   const VALID_VIBES = ['direct', 'analytical', 'wise'];
   const voice = VALID_VOICES.includes(body.voice || '') ? body.voice : 'cio';

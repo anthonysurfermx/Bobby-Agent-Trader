@@ -27,7 +27,7 @@ export interface SpeechResult {
 
 export interface SpeechOptions {
   lang?: string;
-  /** Voice persona id: coral | ballad | sage | ash | male | female | alpha | red | cio */
+  /** Voice persona id: coral | ballad | sage | ash | mellow | male | female | alpha | red | cio */
   voice?: string;
   /** Agent vibe — modulates delivery style: direct | analytical | wise */
   vibe?: string;
@@ -57,6 +57,11 @@ const PERSONA_VOICE: Record<string, string> = {
   sage: 'shimmer',    // calm · wise → young light fem
   ash: 'verse',       // steady · direct → young energetic masc
   ballad: 'echo',     // chill · smooth → young relaxed masc
+  // KEO is a thirty-year soul surfer, not a 22-year-old: the Gen Z remap above
+  // left him sharing BOBBY's `verse`, young and quick, which is the opposite of
+  // the character. `mellow` is the way to reach the raw `ash` voice — deeper and
+  // unhurried, and the only catalog voice nobody else resolves to.
+  mellow: 'ash',      // unhurried · grounded masc
 };
 
 /** Feminine-voiced personas get feminine-gendered Spanish instructions. */
@@ -115,7 +120,19 @@ const BASE_INSTRUCTIONS_FEM_EN = 'You are a 22-year-old woman talking with your 
 
 const BASE_INSTRUCTIONS_MASC_EN = 'You are a 23-year-old guy talking with your best friend. Young, fresh, naturally energetic — but relaxed and confident, never cartoonish or forced. Native American English. Talk like real Gen Z: fluid, close, self-assured. Lower your tone a bit when mentioning risk, like you are looking out for him. Pronounce tickers and numbers naturally. Zero robot, zero announcer, no filler words.';
 
-function buildInstructions(lang: string, vibe?: string, resolvedVoice?: string): string {
+// Every persona above reads as the same 22-year-old, which is right for the
+// squad but wrong for a character built on patience. A persona listed here
+// replaces the age/energy persona entirely — the accent rule is repeated
+// verbatim, because it is what kept Spanish from sounding foreign.
+const PERSONA_INSTRUCTIONS: Record<string, Record<string, string>> = {
+  mellow: {
+    es: 'Eres un surfista mexicano de unos treinta y cinco años, de costa, platicando con un amigo en la arena. Voz grave, tranquila y sin ninguna prisa: hablas despacio, con pausas cómodas, como quien lleva media vida esperando la ola buena y sabe que llega. Español mexicano nativo auténtico; JAMÁS suenes como extranjero. Nada de energía forzada, nada de vender: solo calma. Baja todavía más el tono al hablar de riesgo. Pronuncia siglas y números con naturalidad. Cero robot, cero locutor, sin muletillas.',
+    en: 'You are a Mexican surfer in your mid-thirties talking with a friend on the sand. Low, calm voice with no hurry at all: you speak slowly, with comfortable pauses, like someone who has spent half a life waiting for the good wave and knows it comes. Native English, warm and unhurried. No forced energy, nothing to sell: just calm. Drop your tone further when mentioning risk. Pronounce tickers and numbers naturally. Zero robot, zero announcer, no filler words.',
+    pt: 'Você é um surfista de uns trinta e cinco anos conversando com um amigo na areia. Voz grave, tranquila e sem nenhuma pressa: fala devagar, com pausas confortáveis, como quem passou meia vida esperando a onda boa e sabe que ela vem. Português brasileiro nativo. Nada de energia forçada. Abaixe ainda mais o tom ao falar de risco. Zero robô, zero locutor.',
+  },
+};
+
+function buildInstructions(lang: string, vibe?: string, resolvedVoice?: string, persona?: string): string {
   let base = process.env.TTS_INSTRUCTIONS || BASE_INSTRUCTIONS[lang] || BASE_INSTRUCTIONS.es;
   // A masculine voice reading feminine self-references ("una chava…
   // extranjera") breaks the illusion instantly, and the reverse leaves the
@@ -125,6 +142,8 @@ function buildInstructions(lang: string, vibe?: string, resolvedVoice?: string):
     if (lang === 'es' && !feminine) base = BASE_INSTRUCTIONS_MASC_ES;
     else if (lang === 'en') base = feminine ? BASE_INSTRUCTIONS_FEM_EN : BASE_INSTRUCTIONS_MASC_EN;
   }
+  const character = persona ? PERSONA_INSTRUCTIONS[persona] : undefined;
+  if (!process.env.TTS_INSTRUCTIONS && character) base = character[lang] || character.es;
   const extra = vibe && VIBE_INSTRUCTIONS[vibe] ? (VIBE_INSTRUCTIONS[vibe][lang] || VIBE_INSTRUCTIONS[vibe].es) : '';
   return base + extra;
 }
@@ -208,7 +227,7 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
   };
   // gpt-4o-mini-tts steers delivery via `instructions`; tts-1 only has `speed`.
   if (model.includes('gpt-4o')) {
-    body.instructions = buildInstructions(opts.lang, opts.vibe, resolvedVoice);
+    body.instructions = buildInstructions(opts.lang, opts.vibe, resolvedVoice, opts.voice);
   } else {
     body.speed = Number(process.env.TTS_SPEED || '1.0');
   }

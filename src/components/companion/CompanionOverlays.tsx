@@ -239,7 +239,14 @@ export function GearCatalog({ current, xp, level, onClose }: { current: Companio
       <div className="mx-auto max-w-2xl p-4 space-y-4">
         <div className="flex items-center justify-between"><div><div className="text-white font-mono tracking-[0.2em]">{t('STILL TO EARN', 'POR CONSEGUIR')}</div><div className="text-[10px] font-mono text-white/40 tracking-[0.15em]">{t('DISCIPLINE XP ONLY · NEVER VOLUME', 'SOLO XP DE DISCIPLINA · NUNCA VOLUMEN')}</div></div><button onClick={onClose} className="h-9 w-9 rounded-full bg-white/[0.05] text-white/70">✕</button></div>
         <div className="text-[10px] font-mono tracking-[0.1em] text-white/45">{t('Hold any item to see it worn.', 'Mantén presionado un item para verlo puesto.')}</div>
-        {myPet && (<div className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]"><div className="text-[10px] font-mono tracking-[0.2em] text-white/50 mb-1">{t('YOUR PET', 'TU MASCOTA')}</div><CatalogRow art={petArt(current.id)} glyph={myPet.emoji} title={pick(myPet.name)} subtitle={myPet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.')} needXP={PET_UNLOCK_XP} needLevel={null} tint={tintFor(current)} xp={xp} item={{ kind: 'pet', pet: myPet, companion: current }} onPreview={setPreview} /></div>)}
+        {/* Your own companion used to show only the pet here, so your own three
+            pieces were the one gear in the game you could never hold to see
+            worn — the belt opens the flat card, not the 3D preview. */}
+        <div className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]">
+          <div className="flex items-center gap-2 mb-1"><img src={`/mascots/${current.id}.webp`} alt="" className="h-7 w-7 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} /><span className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t('YOUR GEAR', 'TU EQUIPO')}</span></div>
+          {toolsFor(current.id).map((tool) => <CatalogRow key={`mine-${tool.tier}`} art={toolHasArt(tool) ? toolArt(tool) : null} glyph={tool.glyph} title={pick(tool.name)} subtitle={pick(tool.lore)} needXP={toolUnlockXP(tool.tier)} needLevel={null} tint={tool.tier === 3 ? GOLD : tintFor(current)} xp={xp} item={{ kind: 'tool', tool, companion: current }} onPreview={setPreview} />)}
+          {myPet && <CatalogRow art={petArt(current.id)} glyph={myPet.emoji} title={pick(myPet.name)} subtitle={myPet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.')} needXP={PET_UNLOCK_XP} needLevel={null} tint={tintFor(current)} xp={xp} item={{ kind: 'pet', pet: myPet, companion: current }} onPreview={setPreview} />}
+        </div>
         <div className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t("OTHER COMPANIONS' GEAR", 'EQUIPO DE OTROS COMPAÑEROS')}</div>
         {COMPANIONS.filter((c) => c.id !== current.id).map((c) => {
           const needLevel = level < c.requiredLevel ? c.requiredLevel : null;

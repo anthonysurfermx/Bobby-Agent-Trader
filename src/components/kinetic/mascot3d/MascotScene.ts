@@ -430,6 +430,30 @@ export class MascotScene {
       halo: { chest: { p: [0, 0, 0.94 * R], size: 0.40 * R }, shoulder: { p: [-0.66 * R, 0.10 * R, 0.56 * R], size: 0.34 * R }, head: { p: [0, 1.06 * R, 0.30 * R], size: 0.40 * R } },
       axiom: { hand: { p: [0.54 * R, -0.28 * R, 0.68 * R], size: 0.40 * R }, chest: { p: [0, 0.04 * R, 0.94 * R], size: 0.34 * R }, head: { p: [0, 1.08 * R, 0.30 * R], size: 0.38 * R } },
     };
+    // Wave 2 shipped without profiles, so all eight fell back to the anchors
+    // above — tuned for a blob whose body IS its head. On a standing human the
+    // chest anchor lands on the chin and the piece covers the face. These are
+    // human proportions (~3.5 heads): eyes high, chest and hands well below,
+    // and smaller pieces, since a human torso is a fraction of a blob's width.
+    const WAVE2_HUMAN: Partial<Record<string, { p: [number, number, number]; size: number }>> = {
+      face: { p: [0, 0.46 * R, 0.30 * R], size: 0.36 * R },
+      headset: { p: [0, 0.44 * R, 0.22 * R], size: 0.40 * R },
+      head: { p: [0, 0.95 * R, 0.10 * R], size: 0.30 * R },
+      hand: { p: [0.26 * R, -0.37 * R, 0.34 * R], size: 0.22 * R },
+      hip: { p: [0.18 * R, -0.37 * R, 0.34 * R], size: 0.18 * R },
+      shoulder: { p: [-0.30 * R, 0.06 * R, 0.30 * R], size: 0.20 * R },
+      chest: { p: [0, -0.11 * R, 0.34 * R], size: 0.20 * R },
+      pet: { p: [-0.31 * R, -0.89 * R, 0.50 * R], size: 0.35 * R },
+    };
+    // Per-character corrections on top of the shared human profile.
+    const WAVE2_OVERRIDES: Record<string, Partial<Record<string, { p: [number, number, number]; size: number }>>> = {
+      // Zuri's tier-1 art is a single headphone cup: centred it covers her
+      // face, so it goes on the ear, beside the braids, and stays small.
+      zuri: { headset: { p: [-0.30 * R, 0.42 * R, 0.22 * R], size: 0.24 * R } },
+    };
+    for (const id of ['iris', 'sol', 'zuri', 'mira', 'nalu', 'vega', 'noor', 'keo']) {
+      profiles[id] = { ...WAVE2_HUMAN, ...(WAVE2_OVERRIDES[id] ?? {}) };
+    }
     const profile = profiles[this.avatarId] ?? {};
     const loader = new TextureLoader();
     items.forEach((item, i) => {
