@@ -282,9 +282,9 @@ export function newlyUnlockedTools(companionId: string, fromXP: number, toXP: nu
 export interface LoadoutGear { id: string; glyph: string; title: Bi; line: Bi }
 
 export const LOADOUT_GEAR: LoadoutGear[] = [
-  { id: 'radar', glyph: '((·))', title: { en: 'LIVE RADAR', es: 'RADAR EN VIVO' }, line: { en: 'Real OKX and Yahoo candles. No delay, no smoke.', es: 'Velas reales de OKX y Yahoo. Sin retraso, sin humo.' } },
+  { id: 'radar', glyph: '((·))', title: { en: 'LIVE RADAR', es: 'RADAR EN VIVO' }, line: { en: 'Real OKX and Yahoo candles. Market data may be delayed.', es: 'Velas reales de OKX y Yahoo. Los datos pueden retrasarse.' } },
   { id: 'shield', glyph: '⛨', title: { en: 'NO TRADE SHIELD', es: 'ESCUDO NO TRADE' }, line: { en: 'No clean setup? It blocks. Protecting capital also scores.', es: '¿No hay setup limpio? Bloquea. Proteger capital también suma.' } },
-  { id: 'lock', glyph: '🔒', title: { en: 'VAULT LOCK', es: 'CANDADO' }, line: { en: 'Never touches your money or your exchange. Analysis only.', es: 'Nunca toca tu dinero ni tu exchange. Solo análisis.' } },
+  { id: 'lock', glyph: '🔒', title: { en: 'VAULT LOCK', es: 'CANDADO' }, line: { en: 'Your funds stay in your wallet. Only you sign swaps.', es: 'Tus fondos quedan en tu wallet. Solo tú firmas los swaps.' } },
   { id: 'core', glyph: '⚡', title: { en: 'DISCIPLINE CORE', es: 'NÚCLEO DE DISCIPLINA' }, line: { en: 'Levels up with your discipline, never with your volume.', es: 'Sube de nivel con tu disciplina, nunca con tu volumen.' } },
 ];
 

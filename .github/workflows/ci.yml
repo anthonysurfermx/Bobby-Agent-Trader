@@ -38,6 +38,7 @@ jobs:
       # BP-06 (2026-09-04 review): the swap rail and the remediation regressions
       # were never executed in CI — every closure in docs/security/ ran locally.
       - run: npm run test:base-swap
+      - run: npm run test:desk-audit
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction

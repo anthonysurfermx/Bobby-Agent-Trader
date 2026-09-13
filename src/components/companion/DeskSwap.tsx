@@ -8,6 +8,9 @@
 //   SwapSheet    — from the menu, with a token picker, for any allow-listed pair
 import { useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { formatUnits } from 'viem';
+import { deskJson } from '@/lib/desk-request';
+import { canPrepareDeskSwap, tokenAmount } from '@/lib/desk-swap-validation';
 import { useAccount } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
 import { ArrowLeftRight, Wallet, X } from 'lucide-react';
@@ -31,13 +34,6 @@ interface QuotePreview {
   usdValue: number | null;
 }
 
-/** Token units → the decimal string the API takes. Never scientific notation, no trailing zeros. */
-function unitsToString(units: number, decimals: number): string {
-  if (!Number.isFinite(units) || units <= 0) return '0';
-  const text = units.toFixed(Math.min(decimals, 18)).replace(/\.?0+$/, '');
-  return text === '' ? '0' : text;
-}
-
 /** A public, wallet-free quote so the human sees the size of the trade before touching a wallet. */
 function useQuotePreview(tokenIn: string, tokenOut: string, amount: string | null) {
   const [preview, setPreview] = useState<QuotePreview | null>(null);
@@ -45,14 +41,14 @@ function useQuotePreview(tokenIn: string, tokenOut: string, amount: string | nul
   useEffect(() => {
     if (!amount) { setPreview(null); setError(null); return; }
     let active = true;
+    const controller = new AbortController();
     setPreview(null);
     setError(null);
     const id = window.setTimeout(async () => {
       try {
-        const res = await fetch(`/api/base-swap?tokenIn=${encodeURIComponent(tokenIn)}&tokenOut=${encodeURIComponent(tokenOut)}&amount=${encodeURIComponent(amount)}`);
-        const data = (await res.json()) as { ok?: boolean; error?: string; quote?: { amountOut?: unknown; priceImpactPct?: unknown; txWithheld?: unknown; usdValue?: unknown; limits?: { maxTicketUsd?: unknown } } };
+        const { ok, data } = await deskJson<{ ok?: boolean; error?: string; quote?: { amountOut?: unknown; priceImpactPct?: unknown; txWithheld?: unknown; usdValue?: unknown; limits?: { maxTicketUsd?: unknown } } }>(`/api/base-swap?tokenIn=${encodeURIComponent(tokenIn)}&tokenOut=${encodeURIComponent(tokenOut)}&amount=${encodeURIComponent(amount)}`, { signal: controller.signal });
         if (!active) return;
-        if (!res.ok || !data.ok || !data.quote) { setError(data.error || t('Quote unavailable right now.', 'Cotización no disponible ahora.')); return; }
+        if (!ok || !data.ok || !data.quote) { setError(data.error || t('Quote unavailable right now.', 'Cotización no disponible ahora.')); return; }
         setPreview({
           amountOut: String(data.quote.amountOut ?? '—'),
           priceImpactPct: typeof data.quote.priceImpactPct === 'number' ? data.quote.priceImpactPct : null,
@@ -64,7 +60,7 @@ function useQuotePreview(tokenIn: string, tokenOut: string, amount: string | nul
         if (active) setError(t('Quote unavailable right now.', 'Cotización no disponible ahora.'));
       }
     }, 350);
-    return () => { active = false; window.clearTimeout(id); };
+    return () => { active = false; controller.abort(); window.clearTimeout(id); };
   }, [tokenIn, tokenOut, amount]);
   return { preview, error };
 }
@@ -85,15 +81,16 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
   const assetBalance = balances[token.symbol] ?? null;
   useEffect(() => { setToken(initial); }, [initial]);
   // A new pair, side or size means a new card: SwapConfirm validates what it signs against what it asked for.
-  useEffect(() => { setArmed(false); }, [token, side, usd, qty]);
+  useEffect(() => { setArmed(false); }, [token, side, usd, qty, address]);
 
   const codeCap = Math.min(BASE_SWAP_LIMITS.maxTicketUsd, token.maxTicketUsd ?? BASE_SWAP_LIMITS.maxTicketUsd);
   const buyValid = Number.isFinite(usd) && usd >= BASE_SWAP_LIMITS.minTicketUsd && usd <= codeCap;
-  const qtyUnits = Number(qty);
-  const sellValid = qty.trim() !== '' && Number.isFinite(qtyUnits) && qtyUnits > 0 && (assetBalance === null || qtyUnits <= assetBalance.units * (1 + 1e-9));
+  const normalizedQty = tokenAmount(qty, token.decimals);
+  const qtyUnits = Number(normalizedQty);
+  const sellValid = normalizedQty !== null && Number.isFinite(qtyUnits) && qtyUnits > 0 && (assetBalance === null || qtyUnits <= assetBalance.units * (1 + 1e-9));
   const tokenIn = side === 'buy' ? 'USDC' : token.symbol;
   const tokenOut = side === 'buy' ? token.symbol : 'USDC';
-  const amountForQuote = side === 'buy' ? (buyValid ? usd.toFixed(2) : null) : (sellValid ? unitsToString(qtyUnits, token.decimals) : null);
+  const amountForQuote = side === 'buy' ? (buyValid ? usd.toFixed(2) : null) : (sellValid ? normalizedQty! : null);
   const { preview, error } = useQuotePreview(tokenIn, tokenOut, amountForQuote);
   // The server may be running a lower cap than the code (canary rollout). The
   // first quote reveals it; an untouched default follows it, a typed amount never does.
@@ -105,8 +102,17 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
   const valid = side === 'buy' ? buyValid : sellValid;
   const trade = useMemo<TradeExecution>(() => (side === 'buy'
     ? { tokenSymbol: token.symbol, amountUsd: usd, confidence: conviction !== null ? Math.round(conviction) : 0, sizingMethod: 'manual', chain: 'base' }
-    : { tokenSymbol: token.symbol, side: 'sell', amountIn: unitsToString(qtyUnits, token.decimals), amountUsd: preview?.usdValue ?? 0, confidence: conviction !== null ? Math.round(conviction) : 0, sizingMethod: 'manual', chain: 'base' }
-  ), [side, token.symbol, token.decimals, usd, qtyUnits, preview?.usdValue, conviction]);
+    : { tokenSymbol: token.symbol, side: 'sell', amountIn: normalizedQty!, amountUsd: preview?.usdValue ?? 0, confidence: conviction !== null ? Math.round(conviction) : 0, sizingMethod: 'manual', chain: 'base' }
+  ), [side, token.symbol, token.decimals, usd, qtyUnits, preview?.usdValue, conviction, normalizedQty]);
+
+  const spendBalance = side === 'buy' ? usdcBalance : assetBalance;
+  const readyToPrepare = canPrepareDeskSwap({
+    amount: amountForQuote, decimals: side === 'buy' ? 6 : token.decimals,
+    balance: spendBalance?.raw ?? null, usdValue: side === 'buy' ? usd : preview?.usdValue ?? null,
+    cap, hasQuote: Boolean(preview) && !error,
+  });
+  const insufficient = isConnected && spendBalance !== null && (side === 'buy' ? usd : qtyUnits) > spendBalance.units;
+  const overCap = (side === 'buy' ? usd : preview?.usdValue ?? 0) > cap;
 
   const crypto = BUYABLE.filter((item) => !isStockToken(item));
   const stocks = BUYABLE.filter((item) => isStockToken(item));
@@ -153,7 +159,7 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
             <span className="block text-[9px] font-mono tracking-[0.2em] text-white/40">{t('WITH USDC', 'CON USDC')}</span>
             <div className="mt-1 flex items-center rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2 text-sm text-white focus-within:border-sky-400/50">
               <span className="text-white/45">$</span>
-              <input type="number" inputMode="decimal" min={BASE_SWAP_LIMITS.minTicketUsd} max={cap} step={1} value={Number.isFinite(usd) ? usd : ''} onChange={(e) => { setTouched(true); setUsd(Number(e.target.value)); }} aria-label={t('Amount in USDC', 'Monto en USDC')} className="w-full min-w-0 bg-transparent pl-1 outline-none" />
+              <input type="number" inputMode="decimal" min={BASE_SWAP_LIMITS.minTicketUsd} max={cap} step="0.01" value={Number.isFinite(usd) ? usd : ''} onChange={(e) => { setTouched(true); setUsd(Number(e.target.value)); }} aria-label={t('Amount in USDC', 'Monto en USDC')} className="w-full min-w-0 bg-transparent pl-1 outline-none" />
               {usdcBalance && usdcBalance.units >= BASE_SWAP_LIMITS.minTicketUsd && (
                 <button type="button" onClick={() => { setTouched(true); setUsd(Math.floor(Math.min(usdcBalance.units, cap) * 100) / 100); }} className="ml-1 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">MAX</button>
               )}
@@ -165,8 +171,8 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
             <div className="mt-1 flex items-center rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2 text-sm text-white focus-within:border-sky-400/50">
               <input type="number" inputMode="decimal" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" aria-label={t(`Amount of ${token.symbol} to sell`, `Cantidad de ${token.symbol} a vender`)} className="w-full min-w-0 bg-transparent outline-none" />
               <span className="ml-1 text-[10px] text-white/45">{token.symbol}</span>
-              {assetBalance && assetBalance.units > 0 && (
-                <button type="button" onClick={() => setQty(unitsToString(assetBalance.units, token.decimals))} className="ml-2 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">MAX</button>
+              {assetBalance && assetBalance.units > 0 && !token.native && (
+                <button type="button" onClick={() => setQty(formatUnits(assetBalance.raw, token.decimals))} className="ml-2 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">MAX</button>
               )}
             </div>
           </label>
@@ -194,6 +200,14 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
           {side === 'buy' && usd > cap && <button type="button" onClick={() => { setTouched(true); setUsd(Math.max(BASE_SWAP_LIMITS.minTicketUsd, Math.floor(cap))); }} className="rounded-md border border-amber-300/40 px-2 py-0.5 font-mono text-[10px] text-amber-200 hover:bg-amber-300/10">{t(`Use $${Math.floor(cap)}`, `Usar $${Math.floor(cap)}`)}</button>}
         </div>
       ) : null}
+      {isConnected && valid && (insufficient || overCap || !spendBalance) && (
+        <p role="status" className="text-xs text-amber-200">
+          {insufficient ? t('Insufficient balance on Base for this amount.', 'Saldo insuficiente en Base para este monto.')
+            : overCap ? t(`The current ticket limit is $${cap}. Reduce the amount.`, `El límite actual es $${cap}. Reduce el monto.`)
+            : t('Waiting for your Base balance before preparing a swap.', 'Esperando tu saldo en Base antes de preparar el swap.')}
+        </p>
+      )}
+      {side === 'sell' && token.native && <p className="text-xs text-white/50">{t('Leave some ETH in your wallet for network fees.', 'Deja algo de ETH en tu wallet para las comisiones de red.')}</p>}
       {stock && (
         <div className="text-[10px] font-mono leading-relaxed text-white/40">
           {t('Coinbase tokenized stock (B20). It is not the underlying share. Not offered to U.S. persons or restricted countries; you attest before anything is built, buying or selling.', 'Acción tokenizada por Coinbase (B20). No es la acción subyacente. No se ofrece a personas de EE. UU. ni a países restringidos; tú lo atestiguas antes de construir nada, al comprar o al vender.')}
@@ -206,7 +220,7 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
         </button>
       ) : !armed ? (
         <div className="flex items-center gap-3">
-          <button type="button" disabled={!valid} onClick={() => setArmed(true)} className="h-11 flex-1 rounded-xl bg-sky-400 font-mono text-xs font-bold tracking-[0.14em] text-black transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-40">{side === 'buy' ? t('PREPARE BUY', 'PREPARAR COMPRA') : t('PREPARE SELL', 'PREPARAR VENTA')}</button>
+          <button type="button" disabled={!valid || !readyToPrepare} onClick={() => setArmed(true)} className="h-11 flex-1 rounded-xl bg-sky-400 font-mono text-xs font-bold tracking-[0.14em] text-black transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-40">{side === 'buy' ? t('PREPARE BUY', 'PREPARAR COMPRA') : t('PREPARE SELL', 'PREPARAR VENTA')}</button>
           <span className="font-mono text-[10px] text-white/40">{shortAddress}</span>
         </div>
       ) : (
