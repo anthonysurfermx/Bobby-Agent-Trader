@@ -23,7 +23,10 @@ try {
   assert.equal(status, 200);
   assert.equal(headers['X-TTS-Provider'], 'edge');
   assert.equal(paidCalls, 0);
-  Communicate.prototype.stream = async function* () { throw new Error('Simulated free provider outage'); };
+  Communicate.prototype.stream = async function* () {
+    yield* [];
+    throw new Error('Simulated free provider outage');
+  };
   await handler(req as any, res as any);
   assert.equal(status, 502);
   assert.equal(paidCalls, 0, 'Free provider failure must not spend the OpenAI balance');
