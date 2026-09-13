@@ -27,20 +27,24 @@ import { DeskSwapCard, SwapSheet } from './DeskSwap';
 import { WalletBalancePill } from './DeskWallet';
 import { PET_UNLOCK_XP, petArt, petFor, petUnlocked, toolSlot, wornGear } from '@/lib/companions/data';
 
+import { deskJson } from '@/lib/desk-request';
+import { deskPrice as money } from '@/lib/desk-price';
+
 // ---- API (mirrors BobbyAPI.swift) ----
 
 interface Snapshot { symbol: string; name?: string; isEquity: boolean }
 interface Resolution { snapshot: Snapshot; needsConfirmation: boolean; confirmName: string; proxyNote: string | null }
 
-async function assetSearch(q: string, limit?: number): Promise<Record<string, unknown> | null> {
+async function assetSearch(q: string, limit?: number, signal?: AbortSignal): Promise<Record<string, unknown> | null> {
   try {
-    const res = await fetch('/api/bobby-asset-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q, ...(limit ? { limit } : {}) }) });
-    if (res.ok) return (await res.json()) as Record<string, unknown>;
-  } catch { /* fall through */ }
+    const { ok, data } = await deskJson<Record<string, unknown>>('/api/bobby-asset-search', { signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q, ...(limit ? { limit } : {}) }) });
+    if (ok) return data;
+  } catch { /* Fall back only while this search is still current. */ }
+  if (signal?.aborted) return null;
   try {
-    const res = await fetch(`/api/bobby-asset-search?q=${encodeURIComponent(q)}${limit ? `&limit=${limit}` : ''}`);
-    if (res.ok) return (await res.json()) as Record<string, unknown>;
-  } catch { /* ignore */ }
+    const { ok, data } = await deskJson<Record<string, unknown>>(`/api/bobby-asset-search?q=${encodeURIComponent(q)}${limit ? `&limit=${limit}` : ''}`, { signal });
+    if (ok) return data;
+  } catch { /* Surface an unavailable result to the caller. */ }
   return null;
 }
 
@@ -50,8 +54,8 @@ function prettyName(raw: string, symbol: string): string {
   return raw.toLowerCase().split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-async function resolveAsset(query: string): Promise<Resolution | null> {
-  const obj = await assetSearch(query);
+async function resolveAsset(query: string, signal?: AbortSignal): Promise<Resolution | null> {
+  const obj = await assetSearch(query, undefined, signal);
   if (!obj) return null;
   const resolution = obj.resolution as Record<string, unknown> | undefined;
   const resolved = (obj.resolved ?? (obj.results as Record<string, unknown>[] | undefined)?.[0]) as Record<string, unknown> | undefined;
@@ -75,12 +79,11 @@ interface Answer {
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 
-async function runDebate(symbol: string): Promise<Answer> {
+async function runDebate(symbol: string, signal: AbortSignal): Promise<Answer> {
   const a: Answer = { symbol, price: null, trend: null, momentum: null, rsi: null, support: null, resistance: null, atrPct: null, regime: null, signal: null, direction: null, convictionPct: null, entry: null, stop: null, target: null, rewardRisk: null, overview: null, error: false };
   try {
-    const res = await fetch('/api/voice-tool', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: 'run_debate', args: { symbol } }) });
-    const obj = (await res.json()) as Record<string, unknown>;
-    if (!res.ok || obj.error) { a.error = true; return a; }
+    const { ok, data: obj } = await deskJson<Record<string, unknown>>('/api/voice-tool', { signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: 'run_debate', args: { symbol } }) }, 45_000);
+    if (!ok || obj.error) { a.error = true; return a; }
     a.regime = str(obj.regime);
     const m = obj.market as Record<string, unknown> | undefined;
     a.price = num(m?.price);
@@ -112,7 +115,6 @@ function noTradeReason(a: Answer) {
   if ((a.convictionPct ?? 0) < 55) return t("Conviction stayed below Bobby's 55% risk gate.", 'La convicción quedó debajo del filtro de riesgo de 55% de Bobby.');
   return t('The setup did not include a complete entry, stop and target.', 'El setup no incluyó entrada, stop y objetivo completos.');
 }
-const money = (v: number) => (v >= 1000 ? `$${Math.round(v).toLocaleString('en-US')}` : v >= 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(4)}`);
 function localizedTrend(raw: string) {
   const s = raw.toLowerCase();
   if (s.includes('alcista') || s.includes('bull') || s.includes('up')) return t('bullish', 'alcista');
@@ -187,6 +189,10 @@ function debateFor(a: Answer): Debate {
       `Alpha Hunter no ve un setup limpio${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a)}`,
     );
   return { stances: [alpha, red, cio], headline, spoken, noTrade, direction };
+}
+
+function DeskReadSource() {
+  return <p className="mt-2 text-[11px] text-white/50">{t('Based on 1H market indicators. ', 'Basado en indicadores de mercado de 1H. ')}<a href="/protocol" className="text-sky-300 underline">{t('View public agent activity', 'Ver actividad pública de los agentes')}</a></p>;
 }
 
 /** The three stances as three rows — the simplest honest picture of the desk. */
@@ -289,13 +295,18 @@ export default function CompanionDesk() {
   const [equip, setEquip] = useState<{ url: string; token: number }>({ url: '', token: 0 });
   const [muted, setMuted] = useState(sfxMuted());
   const [speakEnabled, setSpeakEnabled] = useState(true);
+  const speakEnabledRef = useRef(speakEnabled);
+  speakEnabledRef.current = speakEnabled;
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const booted = useRef(false);
+  const requestRef = useRef<AbortController | null>(null);
+  const [deskError, setDeskError] = useState<string | null>(null);
+  useEffect(() => () => { requestRef.current?.abort(); recognitionRef.current?.stop(); }, []);
 
   const say = useCallback((text: string, essential = true) => {
-    if (!speakEnabled) return;
+    if (!speakEnabledRef.current) return;
     void voice.speak(text, { voice: companion.voicePersona, vibe: vibe.server, essential, mode: 'free' });
   }, [voice, companion.voicePersona, vibe.server, speakEnabled]);
 
@@ -318,26 +329,34 @@ export default function CompanionDesk() {
         else text = t(`${name}: Session open. Lead mover ${f.symbol} ${pct(f)} over 24h.${tail} Pick one and I run the desk.`, `${name}: Sesión abierta. Líder del día: ${f.symbol} ${pct(f)} en 24 horas.${tail} Elige uno y corro el desk.`);
       }
       text += pick(LEVEL_TONE[level.number] ?? { en: '', es: '' });
-      setMessages([{ from: 'bobby', text }]);
-      say(text, false);
+      if (!requestRef.current) {
+        setMessages((m) => [...m, { from: 'bobby', text }]);
+        say(text, false);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const analyze = useCallback(async (snap: Snapshot) => {
+  const analyze = useCallback(async (snap: Snapshot, controller?: AbortController) => {
+    if (!controller) { requestRef.current?.abort(); controller = new AbortController(); requestRef.current = controller; }
+    const { signal } = controller;
+    if (signal.aborted) return;
+    setDeskError(null);
     setSnapshot(snap);
     setAnswer(null);
     setNoTrade(null);
     setSeries([]);
     setPhase('alpha');
-    void candles(snap.symbol, snap.isEquity).then(setSeries);
-    const stage = setTimeout(() => setPhase('redTeam'), 700);
-    const stage2 = setTimeout(() => setPhase('cio'), 1400);
-    const a = await runDebate(snap.symbol);
+    void candles(snap.symbol, snap.isEquity).then((rows) => { if (!signal.aborted) setSeries(rows); });
+    const stage = setTimeout(() => { if (!signal.aborted) setPhase('redTeam'); }, 700);
+    const stage2 = setTimeout(() => { if (!signal.aborted) setPhase('cio'); }, 1400);
+    const a = await runDebate(snap.symbol, signal);
     clearTimeout(stage); clearTimeout(stage2);
+    if (signal.aborted) return;
     if (isUnavailable(a)) {
       setPhase('error');
       const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`);
+      setDeskError(msg);
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       say(msg);
       return;
@@ -366,6 +385,16 @@ export default function CompanionDesk() {
   const ask = useCallback(async (query: string) => {
     const q = query.trim();
     if (!q) return;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    voice.stop();
+    setDeskError(null);
+    setAnswer(null);
+    setSnapshot(null);
+    setPending(null);
+    setNoTrade(null);
+    setSeries([]);
     // The soft "keep your points" ask: raised once, after the visitor has
     // actually got value out of the desk, never as a gate in front of it.
     if (shouldPromptAfterAsk(recordAsk(), getSyncStatus() === 'synced')) setSignInPrompt(true);
@@ -373,16 +402,18 @@ export default function CompanionDesk() {
     setInput('');
     setMessages((m) => [...m, { from: 'you', text: q }]);
     setPhase('resolving');
-    const r = await resolveAsset(q);
+    const r = await resolveAsset(q, controller.signal);
+    if (controller.signal.aborted) return;
     if (!r) {
       setPhase('error');
       const msg = t('I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.', 'No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro.');
+      setDeskError(msg);
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       return;
     }
     if (r.needsConfirmation) { setPending(r); setPhase('confirm'); return; }
-    await analyze(r.snapshot);
-  }, [analyze]);
+    await analyze(r.snapshot, controller);
+  }, [analyze, voice]);
 
   const toggleDictation = () => {
     voice.stop();
@@ -549,7 +580,7 @@ export default function CompanionDesk() {
                   ].map((item) => (
                     <button key={item.label} onClick={() => { setMenu(false); item.act(); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/80 hover:bg-white/[0.05] text-left">{item.icon}{item.label}</button>
                   ))}
-                  <div className="px-3 py-2 text-[10px] font-mono text-white/35">{t('READ ONLY — Bobby never executes', 'SOLO LECTURA — Bobby nunca ejecuta')}</div>
+                  <div className="px-3 py-2 text-[10px] font-mono text-white/35">{t('Your wallet signs every swap', 'Tu wallet firma cada swap')}</div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -579,6 +610,7 @@ export default function CompanionDesk() {
   );
   const confirmNode = (
     <>
+      {deskError && <div role="alert" className="rounded-xl border border-red-400/30 bg-red-400/[0.06] p-4 text-sm text-red-200">{deskError}</div>}
       {/* confirm */}
       {phase === 'confirm' && pending && (
         <div className="rounded-xl p-4 bg-white/[0.02] border border-amber-400/30 text-sm text-white/80">
@@ -611,7 +643,7 @@ export default function CompanionDesk() {
             <span className="text-[10px] font-mono tracking-[0.15em] text-white/40">{snapshot.isEquity ? 'EQUITY' : 'CRYPTO'}</span>
           </div>
           {answer.price !== null && <div className="text-4xl font-mono text-white">{money(answer.price)}</div>}
-          {debate && <StanceRows debate={debate} />}
+          {debate && <><StanceRows debate={debate} /><DeskReadSource /></>}
         </div>
       )}
       {snapshot && answer && debate && debate.direction === 'long' && <DeskSwapCard symbol={snapshot.symbol} conviction={answer.convictionPct} />}
@@ -718,8 +750,9 @@ export default function CompanionDesk() {
               {noTradeNode()}
               {snapshot && answer && debate && (
                 <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] p-4">
-                  <div className="flex justify-between text-[10px] font-mono tracking-[0.2em]"><span className="text-amber-300">{t('ADVERSARIAL DESK', 'DESK ADVERSARIAL')} · {snapshot.symbol}</span><span className="text-white/40">{t('REFERENCE ONLY', 'SOLO REFERENCIA')}</span></div>
+                  <div className="flex justify-between text-[10px] font-mono tracking-[0.2em]"><span className="text-amber-300">{t('TECHNICAL DESK', 'DESK TÉCNICO')} · {snapshot.symbol}</span><span className="text-white/40">{t('REFERENCE ONLY', 'SOLO REFERENCIA')}</span></div>
                   <div className="mt-3"><StanceRows debate={debate} /></div>
+                  <DeskReadSource />
                 </div>
               )}
               {snapshot && answer && debate && debate.direction === 'long' && <DeskSwapCard symbol={snapshot.symbol} conviction={answer.convictionPct} />}
@@ -829,15 +862,18 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
   }, []);
   useEffect(() => {
     if (q.trim().length < 2) { setHits([]); return; }
+    const controller = new AbortController();
+    setHits([]);
     const id = setTimeout(async () => {
-      const obj = await assetSearch(q.trim(), 12);
+      const obj = await assetSearch(q.trim(), 12, controller.signal);
+      if (controller.signal.aborted) return;
       const results = (obj?.results as Array<Record<string, unknown>> | undefined) ?? [];
       const seen = new Set<string>();
       const out: Array<{ symbol: string; name: string; assetClass: string }> = [];
       for (const r of results) { const sym = String(r.symbol ?? ''); if (!sym || seen.has(sym)) continue; seen.add(sym); const aliases = (r.aliases as string[] | undefined) ?? []; out.push({ symbol: sym, name: prettyName(aliases.find((a) => a !== sym) ?? sym, sym), assetClass: String(r.assetClass ?? 'crypto') }); }
       setHits(out);
     }, 200);
-    return () => clearTimeout(id);
+    return () => { controller.abort(); clearTimeout(id); };
   }, [q]);
   return (
     <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -862,7 +898,7 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
         {q.trim().length >= 2 ? (
           <div className="space-y-2">{hits.length === 0 ? <div className="text-white/40 text-sm">{t('Nothing yet — keep typing or say it your way; Bobby resolves typos.', 'Nada aún — sigue escribiendo o dilo a tu manera; Bobby resuelve typos.')}</div> : hits.map((h) => (<button key={h.symbol} onClick={() => onPick(h.symbol)} className="w-full flex justify-between rounded-xl px-4 py-3 bg-white/[0.02] border border-white/[0.05] text-left"><span><span className="text-white font-semibold">{h.symbol}</span><span className="block text-white/50 text-xs">{h.name}</span></span><span className="text-[10px] font-mono text-white/40 tracking-[0.15em] self-center">{h.assetClass.toUpperCase()}</span></button>))}</div>
         ) : sections.map((s) => (
-          <div key={s.title}><div className="flex justify-between text-[10px] font-mono tracking-[0.2em] text-sky-300 mb-2"><span>{s.title}</span><span className="text-white/40">{s.rows.length}</span></div><div className="space-y-2">{s.rows.map((r) => (<button key={r.symbol} onClick={() => onPick(r.symbol)} className="w-full flex justify-between rounded-xl px-4 py-3 bg-white/[0.02] border border-white/[0.05] text-left"><span><span className="text-white font-semibold">{r.symbol}</span>{r.name !== r.symbol && <span className="block text-white/50 text-xs">{r.name}</span>}</span><span className="font-mono text-white/80 self-center">{r.last !== null ? `$${r.last >= 1000 ? Math.round(r.last).toLocaleString('en-US') : r.last.toFixed(r.last >= 1 ? 2 : 4)}` : ''} ↗</span></button>))}</div></div>
+          <div key={s.title}><div className="flex justify-between text-[10px] font-mono tracking-[0.2em] text-sky-300 mb-2"><span>{s.title}</span><span className="text-white/40">{s.rows.length}</span></div><div className="space-y-2">{s.rows.map((r) => (<button key={r.symbol} onClick={() => onPick(r.symbol)} className="w-full flex justify-between rounded-xl px-4 py-3 bg-white/[0.02] border border-white/[0.05] text-left"><span><span className="text-white font-semibold">{r.symbol}</span>{r.name !== r.symbol && <span className="block text-white/50 text-xs">{r.name}</span>}</span><span className="font-mono text-white/80 self-center">{r.last !== null ? money(r.last) : ''} ↗</span></button>))}</div></div>
         ))}
           </div>
         </Dialog.Content>

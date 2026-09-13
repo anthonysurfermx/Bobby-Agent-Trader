@@ -40,7 +40,8 @@
     "test:agent-registry-pg": "tsx scripts/test-agent-registry-pg.mts",
     "gen:hardness-abi": "tsx scripts/gen-hardness-abi.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts",
-    "test:realtime-session": "tsx scripts/test-realtime-session.mts"
+    "test:realtime-session": "tsx scripts/test-realtime-session.mts",
+    "test:desk-audit": "tsx scripts/test-desk-audit.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

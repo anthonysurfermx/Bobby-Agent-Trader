@@ -540,12 +540,12 @@ export function MarketCanvas({
         {compact && <summary className="cursor-pointer px-4 py-2 font-mono text-[10px] text-white/40">{language === 'es' ? 'Indicadores' : 'Indicators'}</summary>}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/10 bg-black/25 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em]">
         {([
-          { label: 'Tendencia', value: analysis?.trend, tone: analysis?.trend === 'alcista' ? 'text-green-400' : analysis?.trend === 'bajista' ? 'text-[#ff716a]' : 'text-white/50' },
+          { label: language === 'es' ? 'Tendencia' : 'Trend', value: language === 'es' ? analysis?.trend : ({ alcista: 'bullish', bajista: 'bearish', lateral: 'sideways' }[analysis?.trend ?? ''] ?? analysis?.trend), tone: analysis?.trend === 'alcista' ? 'text-green-400' : analysis?.trend === 'bajista' ? 'text-[#ff716a]' : 'text-white/50' },
           { label: 'RSI 14', value: analysis?.rsi14, tone: analysis?.momentum === 'sobrecompra' ? 'text-[#ff716a]' : analysis?.momentum === 'sobreventa' ? 'text-green-400' : 'text-white/55' },
           { label: 'EMA 20', value: analysis?.ema20 && formatPrice(analysis.ema20), tone: 'text-[#7da6ff]' },
           { label: 'EMA 50', value: analysis?.ema50 && formatPrice(analysis.ema50), tone: 'text-[#c4b5fd]' },
-          { label: 'Soporte', value: analysis?.support && formatPrice(analysis.support), tone: 'text-white/55' },
-          { label: 'Resist.', value: analysis?.resistance && formatPrice(analysis.resistance), tone: 'text-white/55' },
+          { label: language === 'es' ? 'Soporte' : 'Support', value: analysis?.support && formatPrice(analysis.support), tone: 'text-white/55' },
+          { label: language === 'es' ? 'Resist.' : 'Resistance', value: analysis?.resistance && formatPrice(analysis.resistance), tone: 'text-white/55' },
           { label: 'ATR', value: analysis?.atrPct !== null && analysis?.atrPct !== undefined ? `${analysis.atrPct}%` : null, tone: 'text-white/55' },
         ] as const).map((item) => (
           <span key={item.label} className="flex items-baseline gap-1">
@@ -563,9 +563,9 @@ export function MarketCanvas({
           the chart in VoiceRoom, so it is not repeated here. */}
       {(!compact || showAgents) && <div className="grid grid-cols-3 gap-1 border-b border-white/10 bg-black/20 px-2 py-2">
         {([
-          { key: 'alpha', label: 'ALPHA', score: debate?.alphaConviction, waiting: 'busca el setup' },
-          { key: 'red', label: 'RED TEAM', score: debate?.redTeamSeverity, waiting: 'ataca la tesis' },
-          { key: 'cio', label: 'CIO', score: debate?.cioConviction, waiting: 'decide' },
+          { key: 'alpha', label: 'ALPHA', score: debate?.alphaConviction, waiting: language === 'es' ? 'busca el setup' : 'finds the setup' },
+          { key: 'red', label: 'RED TEAM', score: debate?.redTeamSeverity, waiting: language === 'es' ? 'ataca la tesis' : 'tests the thesis' },
+          { key: 'cio', label: 'CIO', score: debate?.cioConviction, waiting: language === 'es' ? 'decide' : 'decides' },
         ] as const).map((agent) => {
           const line = thesisPrices[agent.key];
           return (

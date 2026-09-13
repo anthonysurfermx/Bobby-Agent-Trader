@@ -52,8 +52,14 @@ export function useBaseBalances(symbols: readonly string[]) {
       const units = Number(formatUnits(raw, token.decimals));
       out[token.symbol] = { token, raw, units, text: formatUnitsText(units, token) };
     });
+    const native = findBaseToken('ETH');
+    if (native && eth.data) {
+      const raw = eth.data.value;
+      const units = Number(formatUnits(raw, native.decimals));
+      out.ETH = { token: native, raw, units, text: formatUnitsText(units, native) };
+    }
     return out;
-  }, [tokens, reads.data]);
+  }, [tokens, reads.data, eth.data]);
   const ethUnits = eth.data ? Number(formatUnits(eth.data.value, 18)) : null;
   return { address, isConnected, balances, ethUnits, loading: eth.isLoading || reads.isLoading };
 }
@@ -74,7 +80,7 @@ export function WalletBalancePill({ onClick }: { onClick?: () => void }) {
       className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 font-mono text-[10px] tracking-[0.12em] text-white/80 transition hover:bg-white/[0.08]"
     >
       <Wallet size={13} className="text-sky-300" />
-      <span>{usdc ? usdc.text : loading ? '…' : '0'} USDC</span>
+      <span>{usdc ? usdc.text : loading ? '…' : '—'} USDC</span>
       {eth !== null && <span className="hidden text-white/40 sm:inline">· {eth} ETH</span>}
     </button>
   );
