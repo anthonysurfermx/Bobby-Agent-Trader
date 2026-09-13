@@ -23,7 +23,7 @@ jobs:
       BOBBY_SUPABASE_SERVICE_ROLE_KEY: offline-test-service-key
       BOBBY_SUPABASE_ANON_KEY: offline-test-anon-key
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
@@ -69,7 +69,7 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:54329/postgres
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           submodules: recursive
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -92,7 +92,7 @@ jobs:
       run:
         working-directory: contracts
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           submodules: recursive
       - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09
