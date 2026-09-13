@@ -258,10 +258,10 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
                   ? (micMuted ? startTalking : stopTalking)
                   : undefined}
               aria-label={!live
-                ? 'Abrir sesión de voz'
+                ? (voiceLang === 'es' ? 'Abrir sesión de voz' : 'Start voice session')
                 : inputMode === 'tap-to-talk'
-                  ? (micMuted ? 'Toca para hablar' : 'Silenciar micrófono')
-                  : 'Sesión de voz activa'}
+                  ? (micMuted ? (voiceLang === 'es' ? 'Toca para hablar' : 'Tap to talk') : (voiceLang === 'es' ? 'Silenciar micrófono' : 'Mute microphone'))
+                  : (voiceLang === 'es' ? 'Sesión de voz activa' : 'Voice session active')}
               className={`group relative grid h-14 w-14 place-items-center rounded-full transition ${
                 live ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)] active:scale-95' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff] active:scale-95'
               }`}

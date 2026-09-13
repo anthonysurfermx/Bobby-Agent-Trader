@@ -17,6 +17,7 @@ import {
   type ISeriesApi,
   type IPriceLine,
 } from 'lightweight-charts';
+import { deskPrice } from '@/lib/desk-price';
 import { ASSET_GROUPS, getVoiceAsset, isEquitySymbol, type AssetVenue } from '@/lib/voice-assets';
 import { analyzeCandles, type Candle, type MarketAnalysis } from '@/lib/market-indicators';
 
@@ -489,7 +490,7 @@ export function MarketCanvas({
           {last && (
             <>
               <span className="font-mono text-lg font-bold text-white">
-                ${last.price.toLocaleString('en-US', { maximumFractionDigits: last.price < 10 ? 4 : 2 })}
+                {deskPrice(last.price)}
               </span>
               <span className={`font-mono text-xs ${positive ? 'text-green-400' : 'text-red-400'}`}>
                 {positive ? '+' : ''}{last.change.toFixed(2)}%
@@ -499,7 +500,7 @@ export function MarketCanvas({
         </div>
         <div className="flex items-center gap-2">
           {showSymbolSelector && <select
-            aria-label="Seleccionar activo"
+            aria-label={language === 'es' ? 'Seleccionar activo' : 'Select asset'}
             value={symbol}
             onChange={(event) => onSymbolChange(event.target.value)}
             className="max-w-[118px] rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 font-mono text-[10px] uppercase text-white/70 outline-none transition hover:border-white/25"
@@ -509,7 +510,7 @@ export function MarketCanvas({
                 silently snapping the picker back to BTC. */}
             {!getVoiceAsset(symbol) && <option value={symbol}>{symbol}</option>}
             {ASSET_GROUPS.map((group) => (
-              <optgroup key={group.label} label={group.label}>
+              <optgroup key={group.label} label={language === 'es' ? group.label : ({ Cripto: 'Crypto', Acciones: 'Stocks' }[group.label] ?? group.label)}>
                 {group.assets.map((asset) => (
                   <option key={asset.symbol} value={asset.symbol}>
                     {asset.symbol} · {asset.name}
@@ -537,7 +538,7 @@ export function MarketCanvas({
       {/* The reading behind the call: computed from the same candles on screen,
           and from the same function the voice tool runs server-side. */}
       <details open={compact ? undefined : true} className="border-b border-white/10">
-        {compact && <summary className="cursor-pointer px-4 py-2 font-mono text-[10px] text-white/40">{language === 'es' ? 'Indicadores' : 'Indicators'}</summary>}
+        <summary className="cursor-pointer px-4 py-2 font-mono text-[10px] text-white/40">{language === 'es' ? 'Indicadores' : 'Indicators'}</summary>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/10 bg-black/25 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em]">
         {([
           { label: language === 'es' ? 'Tendencia' : 'Trend', value: language === 'es' ? analysis?.trend : ({ alcista: 'bullish', bajista: 'bearish', lateral: 'sideways' }[analysis?.trend ?? ''] ?? analysis?.trend), tone: analysis?.trend === 'alcista' ? 'text-green-400' : analysis?.trend === 'bajista' ? 'text-[#ff716a]' : 'text-white/50' },
