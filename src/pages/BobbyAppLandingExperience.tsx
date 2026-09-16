@@ -8,19 +8,20 @@
 // Aura, Trader Land and the companions are supports, never co-headlines.
 // Every number and name comes from the companion data pack or the live
 // protocol stats — nothing is invented for the pitch.
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Apple, ArrowRight, Check, ChevronRight, Flame, Loader2, Lock, Map as MapIcon, Menu, Mic, PawPrint, ShieldCheck, Sparkles, X, UserRound, Smartphone, ArrowLeftRight } from 'lucide-react';
+import { Apple, ArrowRight, ChevronRight, Flame, Lock, Map as MapIcon, Menu, Mic, PawPrint, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { COMPANIONS, tintFor } from '@/lib/companions/data';
 import { isSpanish, pick, t } from '@/lib/companions/i18n';
 import TraderLandPreview, { TRADER_LAND_URL } from '@/components/companion/TraderLandPreview';
 
 interface DebateActivity { commitmentsCreated?: number; decisionsResolved?: number; wins?: number; losses?: number; breakEven?: number; pending?: number; winRate?: number }
 interface ProtocolStats { debateActivity?: DebateActivity }
-type SignupState = 'idle' | 'loading' | 'success' | 'error';
 
 const TRY_IT_URL = '/desk';
+// Public App Store listing (live since 2026-09-15). Locale-less so Apple geo-routes it.
+const APP_STORE_URL = 'https://apps.apple.com/app/bobby-the-market-argues-back/id6804460489';
 const WIN_RATE_MIN_SAMPLE = 20;
 const GOLD = '#F5C542';
 const GREEN = '#5cff91';
@@ -77,15 +78,15 @@ function LangToggle() {
   );
 }
 
-function ComingSoonBadge({ compact = false }: { compact?: boolean }) {
+function AppStoreBadge({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`inline-flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] text-left shadow-[inset_0_1px_rgba(255,255,255,.08)] ${compact ? 'px-4 py-2.5' : 'px-5 py-3.5'}`} role="img" aria-label={t('Coming soon on the App Store', 'Próximamente en el App Store')}>
+    <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.07] text-left shadow-[inset_0_1px_rgba(255,255,255,.08)] ${compact ? 'px-4 py-2.5' : 'px-5 py-3.5'}`} aria-label={t('Download Bobby on the App Store', 'Descarga Bobby en el App Store')}>
       <Apple className={compact ? 'h-6 w-6' : 'h-8 w-8'} strokeWidth={1.7} aria-hidden="true" />
       <span className="leading-none">
-        <span className="block font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-white/45">{t('Coming soon on the', 'Muy pronto en el')}</span>
+        <span className="block font-mono text-[8px] font-bold uppercase tracking-[0.2em] text-white/45">{t('Download on the', 'Descárgala en el')}</span>
         <span className={`${compact ? 'text-sm' : 'text-lg'} mt-1 block font-semibold tracking-[-0.03em]`}>App Store</span>
       </span>
-    </div>
+    </a>
   );
 }
 
@@ -146,9 +147,6 @@ export default function BobbyAppLandingExperience() {
   const reduceMotion = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeCompanion, setActiveCompanion] = useState(1);
-  const [email, setEmail] = useState('');
-  const [signupState, setSignupState] = useState<SignupState>('idle');
-  const [signupMessage, setSignupMessage] = useState('');
 
   const pageTitle = t('Bobby — Asking an AI is no longer an edge.', 'Bobby — Preguntarle a una IA ya no es ventaja.');
   useEffect(() => { document.title = pageTitle; }, [pageTitle]);
@@ -185,29 +183,6 @@ export default function BobbyAppLandingExperience() {
     { step: '03', eyebrow: t('Your tone, same data', 'Tu tono, los mismos datos'), title: t('The tone changes. The data never does.', 'El tono cambia. Los datos nunca.'), image: '/app/shot-vibe.webp', alt: t('Choosing how Byte speaks: the tone changes, the data never does', 'Eligiendo cómo habla Byte: el tono cambia, los datos nunca'), accent: GOLD },
   ];
 
-  const submitEarlyAccess = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      setSignupState('error');
-      setSignupMessage(t('Enter a valid email so we know where to find you.', 'Escribe un correo válido para saber dónde encontrarte.'));
-      return;
-    }
-    setSignupState('loading');
-    setSignupMessage('');
-    const website = new FormData(form).get('website');
-    try {
-      const response = await fetch('/api/bobby-early-access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: normalizedEmail, website, language: isSpanish() ? 'es' : 'en', page: '/app', referrer: document.referrer ? document.referrer.slice(0, 300) : undefined }) });
-      if (!response.ok) throw new Error('Signup failed');
-      setSignupState('success');
-      setSignupMessage(t("You're on the list. We only email when Bobby is ready for you.", 'Estás en la lista. Solo escribimos cuando Bobby esté listo para ti.'));
-      setEmail('');
-    } catch {
-      setSignupState('error');
-      setSignupMessage(t("We couldn't save your spot right now. Try again in a moment.", 'No pudimos guardar tu lugar ahora. Intenta en un momento.'));
-    }
-  };
 
   const reveal = reduceMotion ? {} : { initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.18 } };
 
@@ -268,9 +243,8 @@ export default function BobbyAppLandingExperience() {
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <a href={TRY_IT_URL} className="group inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-[#5cff91] px-7 font-mono text-xs font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white">{t('Try the live desk', 'Prueba el live desk')} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
-                <a href="/app#record" className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]">{t('See the record', 'Ver el historial')}</a>
+                <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]"><Apple className="h-4 w-4" aria-hidden="true" /> {t('Download the iOS app', 'Descarga la app iOS')}</a>
               </div>
-              <a href="#early-access" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-white/60 underline decoration-white/20 underline-offset-4 hover:text-white">{t('Prefer iPhone? Join the early-access list', '¿Prefieres iPhone? Únete al acceso anticipado')}<ChevronRight size={15} /></a>
               <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 font-mono text-[9px] uppercase tracking-[0.12em] text-white/38">
                 <span className="inline-flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-[#5cff91]" /> {t('Talk to it about BTC, NVDA or gold', 'Háblale de BTC, NVDA u oro')}</span>
                 <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> {t('Three agents · one verdict', 'Tres agentes · un veredicto')}</span>
@@ -428,47 +402,15 @@ export default function BobbyAppLandingExperience() {
         </section>
 
         {/* CLOSING — one CTA, on the same message as the hero */}
-        <section id="early-access" className="relative overflow-hidden border-t border-white/10 bg-[#050706] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+        <section id="download" className="relative overflow-hidden border-t border-white/10 bg-[#050706] px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(245,197,66,.16),transparent_50%),radial-gradient(circle_at_82%_24%,rgba(92,255,145,.12),transparent_38%)]" />
           <motion.div {...reveal} className="relative mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.045] p-6 text-center shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-xl sm:p-10 lg:p-14">
-            <div className="mx-auto mb-7 flex w-fit"><ComingSoonBadge /></div>
             <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Stop asking.', 'Deja de preguntar.')}<br /><span className="text-[#F5C542]">{t('Start checking.', 'Empieza a comprobar.')}</span></h2>
-            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t('The latest Bobby build has been sent to TestFlight. Join the list for future invitations and launch updates. While you wait, the Live Desk is open on the web.', 'El último build de Bobby fue enviado a TestFlight. Únete a la lista para futuras invitaciones y novedades del lanzamiento. Mientras esperas, el Live Desk ya está en la web.')}</p>
-            {signupState === 'success' ? (
-              <div className="mx-auto mt-9 flex max-w-xl items-center justify-center gap-3 rounded-2xl border border-[#5cff91]/25 bg-[#5cff91]/10 px-5 py-5 text-left text-sm text-[#baffcc]" role="status">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#5cff91] text-[#041009]"><Check className="h-4 w-4" /></span>
-                {signupMessage}
-              </div>
-            ) : (
-              <form onSubmit={submitEarlyAccess} className="mx-auto mt-9 max-w-xl" noValidate>
-                <label className="sr-only" aria-hidden="true">Website<input name="website" type="text" tabIndex={-1} autoComplete="off" /></label>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <label htmlFor="early-access-email" className="sr-only">{t('Email address', 'Correo electrónico')}</label>
-                  <input id="early-access-email" type="email" inputMode="email" autoComplete="email" value={email} onChange={(event) => { setEmail(event.target.value); if (signupState === 'error') setSignupState('idle'); }} placeholder={t('you@email.com', 'tu@correo.com')} disabled={signupState === 'loading'} aria-describedby="signup-note signup-message" aria-invalid={signupState === 'error'} className="min-h-14 flex-1 rounded-xl border border-white/15 bg-black/35 px-5 text-base text-white outline-none transition placeholder:text-white/25 focus:border-[#5cff91]/65 focus:ring-4 focus:ring-[#5cff91]/10 disabled:opacity-60" />
-                  <button type="submit" disabled={signupState === 'loading'} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#5cff91] px-7 font-mono text-[10px] font-black uppercase tracking-[0.14em] text-[#041009] transition hover:bg-white disabled:cursor-wait disabled:opacity-70">
-                    {signupState === 'loading' ? <><Loader2 className="h-4 w-4 animate-spin" /> {t('Saving', 'Guardando')}</> : <>{t('Save my spot', 'Aparta mi lugar')} <ArrowRight className="h-4 w-4" /></>}
-                  </button>
-                </div>
-                <p id="signup-message" className={`mt-3 min-h-5 text-left text-xs ${signupState === 'error' ? 'text-[#ff8f83]' : 'text-transparent'}`} role={signupState === 'error' ? 'alert' : undefined}>{signupMessage || ' '}</p>
-                <p id="signup-note" className="mt-1 text-center font-mono text-[8px] uppercase tracking-[0.13em] text-white/28">{t('Early-access updates only · Unsubscribe anytime · No spam', 'Solo avisos de acceso anticipado · Cancela cuando quieras · Sin spam')}</p>
-              </form>
-            )}
-            {/* What the beta actually contains — kept here as small print instead of its own section. */}
-            <dl className="mx-auto mt-10 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
-              {[
-                { icon: Smartphone, term: t('In the iPhone beta', 'En la beta de iPhone'), desc: t('The Live Desk, your companion and the Trader Land island editor.', 'El Live Desk, tu companion y el editor de islas de Trader Land.') },
-                { icon: UserRound, term: t('Account & privacy', 'Cuenta y privacidad'), desc: t('Sign in with Apple, and delete your account from inside the app.', 'Inicia sesión con Apple y borra tu cuenta desde la app.') },
-                { icon: ArrowLeftRight, term: t('Base swaps', 'Swaps en Base'), desc: t('Self-custodial and you confirm every one. Eligibility applies; not open to everyone.', 'Sin custodia y tú confirmas cada uno. Sujeto a elegibilidad; no está abierto para todos.') },
-              ].map(({ icon: Icon, term, desc }) => (
-                <div key={term} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <Icon size={18} className="mb-3 text-[#b8d6eb]" />
-                  <dt className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-[#92ac9b]">{term}</dt>
-                  <dd className="mt-2 text-xs leading-5 text-white/55">{desc}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mx-auto mt-4 max-w-2xl text-xs leading-5 text-white/40">{t('iPhone access is by invitation, not a public App Store release. Joining the list does not guarantee a TestFlight place.', 'El acceso a iPhone es por invitación, no un lanzamiento público en el App Store. Unirte a la lista no garantiza un cupo en TestFlight.')}</p>
-            <a href={TRY_IT_URL} className="mt-8 inline-flex items-center gap-2 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-white/42 transition hover:text-white">{t("Can't wait? Open the desk on the web", '¿No aguantas? Abre el desk en la web')} <ChevronRight className="h-3.5 w-3.5" /></a>
+            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t('Bobby is on the App Store for iPhone. The Live Desk is also open on the web.', 'Bobby ya está en el App Store para iPhone. El Live Desk también está abierto en la web.')}</p>
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <AppStoreBadge />
+              <a href={TRY_IT_URL} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]">{t('Open the desk on the web', 'Abre el desk en la web')} <ArrowRight className="h-4 w-4" /></a>
+            </div>
           </motion.div>
         </section>
       </main>
