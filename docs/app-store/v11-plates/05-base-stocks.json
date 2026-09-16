@@ -1,0 +1,23 @@
+[
+  {
+    "created_at": "2026-09-16T08:08:14.972677Z",
+    "display_name": "GPT Image 2",
+    "id": "25b62e35-7455-4d7b-8459-9bd41e0127a0",
+    "job_type": "gpt_image_2",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Ad40PnxXLo53885AIeiYiPxEpd/hf_20260916_080814_25b62e35-7455-4d7b-8459-9bd41e0127a0_min.webp",
+    "params": {
+      "aspect_ratio": "9:16",
+      "height": 2688,
+      "medias": [],
+      "model": "videotape-alpha",
+      "prompt": "A young person on a bright modern rooftop at blue hour overlooking a city skyline, leaning on a railing, relaxed and confident, warm amber sunset rim light on one side and cool blue ambient on the other. Serious, adult, in-control mood, aspirational but not flashy or wealthy-luxury. Vertical cinematic editorial photograph, shot on 35mm, shallow depth of field, moody dark graphite base tones with electric blue and a distinct mint-green accent light. Gen Z energy, real person, natural skin, candid and unposed, premium fashion-campaign quality. IMPORTANT COMPOSITION: the subject sits in the lower-left or lower-right third, leaving the top third and the center-right area as clean empty negative space for later text and a phone mockup overlay. Absolutely no text, no letters, no words, no watermarks, no logos, no brand marks, no screens showing charts or numbers, no phone visible in frame.",
+      "quality": "high",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "2k",
+      "width": 1520
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Ad40PnxXLo53885AIeiYiPxEpd/hf_20260916_080814_25b62e35-7455-4d7b-8459-9bd41e0127a0.png",
+    "status": "completed"
+  }
+]

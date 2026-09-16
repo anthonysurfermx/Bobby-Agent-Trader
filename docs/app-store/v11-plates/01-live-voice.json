@@ -1,0 +1,23 @@
+[
+  {
+    "created_at": "2026-09-16T08:01:49.258564Z",
+    "display_name": "GPT Image 2",
+    "id": "893a9732-da68-4426-9ccd-3370de3e7cc0",
+    "job_type": "gpt_image_2",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Ad40PnxXLo53885AIeiYiPxEpd/hf_20260916_080149_893a9732-da68-4426-9ccd-3370de3e7cc0_min.webp",
+    "params": {
+      "aspect_ratio": "9:16",
+      "height": 2688,
+      "medias": [],
+      "model": "videotape-alpha",
+      "prompt": "A young woman at night in her bedroom studio, wearing over-ear headphones, mid-sentence talking out loud with a relaxed half-smile, lit by a soft mint-green glow from off-camera and a cool blue window behind her. Intimate late-night conversation energy, like talking to a trusted friend. Vertical cinematic editorial photograph, shot on 35mm, shallow depth of field, moody dark graphite base tones with electric blue and a distinct mint-green accent light. Gen Z energy, real person, natural skin, candid and unposed, premium fashion-campaign quality. IMPORTANT COMPOSITION: the subject sits in the lower-left or lower-right third, leaving the top third and the center-right area as clean empty negative space for later text and a phone mockup overlay. Absolutely no text, no letters, no words, no watermarks, no logos, no brand marks, no screens showing charts or numbers, no phone visible in frame.",
+      "quality": "high",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "2k",
+      "width": 1520
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Ad40PnxXLo53885AIeiYiPxEpd/hf_20260916_080149_893a9732-da68-4426-9ccd-3370de3e7cc0.png",
+    "status": "completed"
+  }
+]

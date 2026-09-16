@@ -1,0 +1,23 @@
+[
+  {
+    "created_at": "2026-09-16T08:17:39.08282Z",
+    "display_name": "GPT Image 2",
+    "id": "79d86ac1-5cec-4c4a-846b-9bd76fdf7bbe",
+    "job_type": "gpt_image_2",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Ad40PnxXLo53885AIeiYiPxEpd/hf_20260916_081739_79d86ac1-5cec-4c4a-846b-9bd76fdf7bbe_min.webp",
+    "params": {
+      "aspect_ratio": "9:16",
+      "height": 2688,
+      "medias": [],
+      "model": "videotape-alpha",
+      "prompt": "A young person sitting cross-legged on the floor at the far left edge of a dark minimal room, looking up and off to the right with quiet delight, as if watching something small and wonderful being built in the empty air beside them. Soft pastel mint-green and violet light washes the empty right side of the room. Playful, creative, world-building energy. Vertical cinematic editorial photograph, shot on 35mm, shallow depth of field, moody dark graphite base tones with electric blue and a distinct mint-green accent light. Gen Z energy, real person, natural skin, candid and unposed, premium fashion-campaign quality. CRITICAL COMPOSITION RULE: the human subject must be pushed fully into the far LEFT edge of the frame, occupying at most the left third. The entire right two-thirds and the whole center of the frame must be clean, dark, uncluttered empty negative space with no subject and no busy detail. Absolutely no text, no letters, no words, no watermarks, no logos, no brand marks, no screens, no phone visible in frame.",
+      "quality": "high",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "2k",
+      "width": 1520
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Ad40PnxXLo53885AIeiYiPxEpd/hf_20260916_081739_79d86ac1-5cec-4c4a-846b-9bd76fdf7bbe.png",
+    "status": "completed"
+  }
+]

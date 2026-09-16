@@ -1,0 +1,23 @@
+[
+  {
+    "created_at": "2026-09-16T08:10:00.383349Z",
+    "display_name": "GPT Image 2",
+    "id": "f67ac2e7-1c99-4d38-bede-8ace77c1e3b7",
+    "job_type": "gpt_image_2",
+    "min_result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Ad40PnxXLo53885AIeiYiPxEpd/hf_20260916_081000_f67ac2e7-1c99-4d38-bede-8ace77c1e3b7_min.webp",
+    "params": {
+      "aspect_ratio": "9:16",
+      "height": 2688,
+      "medias": [],
+      "model": "videotape-alpha",
+      "prompt": "A young man standing still at the far left edge of a rain-slick city street at night, hands in pockets, calm and unhurried, seen from a distance. The right side of the frame is deep empty darkness with only faint blurred traffic light streaks far in the background and one clean mint-green reflection on the wet asphalt. A protective, grounded mood of deliberately choosing to wait. Vertical cinematic editorial photograph, shot on 35mm, shallow depth of field, moody dark graphite base tones with electric blue and a distinct mint-green accent light. Gen Z energy, real person, natural skin, candid and unposed, premium fashion-campaign quality. CRITICAL COMPOSITION RULE: the human subject must be pushed fully into the far LEFT edge of the frame, occupying at most the left third. The entire right two-thirds and the whole center of the frame must be clean, dark, uncluttered empty negative space with no subject and no busy detail, reserved for a phone mockup overlay. Absolutely no text, no letters, no words, no watermarks, no logos, no brand marks, no screens, no phone visible in frame.",
+      "quality": "high",
+      "reference_elements": [],
+      "remove_bg": false,
+      "resolution": "2k",
+      "width": 1520
+    },
+    "result_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3Ad40PnxXLo53885AIeiYiPxEpd/hf_20260916_081000_f67ac2e7-1c99-4d38-bede-8ace77c1e3b7.png",
+    "status": "completed"
+  }
+]
