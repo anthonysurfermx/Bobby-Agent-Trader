@@ -1,9 +1,56 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
+import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 
+// Installable app (Android TWA, desktop install). The worker lives in src/sw.ts.
+//
+// Rollback: set PWA_SELF_DESTROY=1 in Vercel and redeploy. That ships a worker
+// which unregisters itself and clears its caches on every device that had it.
+// Reverting the PR alone does not: the old worker keeps running in browsers.
+const pwaSelfDestroy = process.env.PWA_SELF_DESTROY === '1'
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      registerType: 'autoUpdate',
+      injectRegister: 'script-defer',
+      selfDestroying: pwaSelfDestroy,
+      devOptions: { enabled: false },
+      injectManifest: {
+        // Precache only the offline page. The plugin adds the manifest and its
+        // icons on its own. public/ is ~190 MB; everything else is fetched and
+        // cached on demand.
+        globPatterns: ['offline.html'],
+        globIgnores: ['**/node_modules/**'],
+      },
+      manifest: {
+        id: '/',
+        name: 'Bobby: The Market Argues Back',
+        short_name: 'Bobby',
+        description:
+          'Three agents argue about a market before you get an answer. The verdict goes on the record before the market settles it.',
+        lang: 'en',
+        dir: 'ltr',
+        start_url: '/desk',
+        scope: '/',
+        display: 'standalone',
+        orientation: 'portrait',
+        background_color: '#050505',
+        theme_color: '#050505',
+        categories: ['finance', 'education'],
+        icons: [
+          { src: '/pwa/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/pwa/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/pwa/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+    }),
+  ],
   base: '/',
   define: {
     global: 'globalThis',

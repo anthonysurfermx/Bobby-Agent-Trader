@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#050505" />
+    <meta name="robots" content="noindex" />
+    <title>Bobby is offline</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: #050505;
+        color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Avenir Next", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      main { width: 100%; max-width: 360px; text-align: center; }
+      img { width: 88px; height: 88px; border-radius: 22px; }
+      .rule { width: 36px; height: 2px; margin: 28px auto 14px; background: #7bf5a6; opacity: 0.9; }
+      .kicker { margin: 0; font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.24em; color: #7bf5a6; }
+      h1 { margin: 14px 0 0; font-size: 28px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.15; }
+      p { margin: 12px 0 0; font-size: 15px; line-height: 1.5; color: rgba(255, 255, 255, 0.55); }
+      button {
+        margin-top: 28px;
+        min-height: 48px;
+        padding: 0 26px;
+        border: 0;
+        border-radius: 12px;
+        background: #7bf5a6;
+        color: #041009;
+        font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+        letter-spacing: 0.14em;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/pwa/icon-192.png" alt="" />
+      <div class="rule"></div>
+      <p class="kicker" data-en="NO CONNECTION" data-es="SIN CONEXIÓN">NO CONNECTION</p>
+      <h1 data-en="Bobby needs the market to answer." data-es="Bobby necesita el mercado para responder.">Bobby needs the market to answer.</h1>
+      <p
+        data-en="Live prices, the three agents and your progress all come from the network. Nothing here is stale data pretending to be live."
+        data-es="Los precios en vivo, los tres agentes y tu progreso vienen de la red. Aquí no hay datos viejos haciéndose pasar por actuales."
+      >Live prices, the three agents and your progress all come from the network. Nothing here is stale data pretending to be live.</p>
+      <button type="button" data-en="TRY AGAIN" data-es="REINTENTAR" onclick="location.reload()">TRY AGAIN</button>
+    </main>
+    <script>
+      // Same rule as src/lib/companions/i18n.ts: English unless the person
+      // explicitly chose Spanish, stored under bobby_lang.
+      (function () {
+        var lang = 'en';
+        try { lang = localStorage.getItem('bobby_lang') || 'en'; } catch (e) {}
+        if (lang !== 'es') return;
+        document.documentElement.lang = 'es';
+        document.title = 'Bobby está sin conexión';
+        var nodes = document.querySelectorAll('[data-es]');
+        for (var i = 0; i < nodes.length; i++) nodes[i].textContent = nodes[i].getAttribute('data-es');
+      })();
+      // Come back on its own as soon as the network does.
+      window.addEventListener('online', function () { location.reload(); });
+    </script>
+  </body>
+</html>
