@@ -15,13 +15,13 @@ import { Apple, ArrowRight, ChevronRight, Flame, Lock, Map as MapIcon, Menu, Mic
 import { COMPANIONS, tintFor } from '@/lib/companions/data';
 import { isSpanish, pick, t } from '@/lib/companions/i18n';
 import TraderLandPreview, { TRADER_LAND_URL } from '@/components/companion/TraderLandPreview';
+import { APP_STORE_URL } from '@/lib/app-store';
 
 interface DebateActivity { commitmentsCreated?: number; decisionsResolved?: number; wins?: number; losses?: number; breakEven?: number; pending?: number; winRate?: number }
 interface ProtocolStats { debateActivity?: DebateActivity }
 
 const TRY_IT_URL = '/desk';
 // Public App Store listing (live since 2026-09-15). Locale-less so Apple geo-routes it.
-const APP_STORE_URL = 'https://apps.apple.com/app/bobby-the-market-argues-back/id6804460489';
 const WIN_RATE_MIN_SAMPLE = 20;
 const GOLD = '#F5C542';
 const GREEN = '#5cff91';
