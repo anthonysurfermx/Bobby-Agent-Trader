@@ -12,6 +12,7 @@ import { useSmartMoneyScan } from '@/hooks/useSmartMoneyScan';
 import { DiscoverPanel } from './DiscoverPanel';
 import { AnalyzePanel } from './AnalyzePanel';
 import { ExecutePanel } from './ExecutePanel';
+import { STOCK_SWAPS_VISIBLE } from '@/lib/base-swap/stock-visibility';
 import { OKXTickerStrip } from './OKXTickerStrip';
 import { AgentDashboard } from './AgentDashboard';
 import { AdvisorSetup, useAdvisorProfile } from './AdvisorSetup';
@@ -357,18 +358,20 @@ export function AgentRadarLanding({ onSwitchToAdvanced }: Props) {
             <AnalyzePanel onSwitchToAdvanced={() => onSwitchToAdvanced('market')} />
           </div>
 
-          <div className="md:col-span-3 bg-[#131313] border border-neutral-800 rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-7 h-7 rounded-lg bg-green-500/10 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-green-400" />
+          {STOCK_SWAPS_VISIBLE && (
+            <div className="md:col-span-3 bg-[#131313] border border-neutral-800 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-7 h-7 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-green-400" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-medium text-neutral-200">Execute</h2>
+                  <p className="text-[11px] text-neutral-500">Real on-chain swaps</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-sm font-medium text-neutral-200">Execute</h2>
-                <p className="text-[11px] text-neutral-500">Real on-chain swaps</p>
-              </div>
+              <ExecutePanel />
             </div>
-            <ExecutePanel />
-          </div>
+          )}
         </div>
 
         {/* Footer badge */}
