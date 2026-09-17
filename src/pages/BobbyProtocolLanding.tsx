@@ -76,6 +76,10 @@ interface ActivityItem {
   txHash?: string | null;
 }
 
+// Where "The app" points. The lifestyle landing lives at /app-a while /app still
+// serves the previous one; change this one line when /app-a is promoted.
+const APP_LANDING_URL = '/app-a';
+
 const formatNumber = (value: unknown, fallback = '—') => {
   if (value === null || value === undefined || value === '') return fallback;
   const number = Number(value);
@@ -270,7 +274,7 @@ export default function BobbyProtocolLanding() {
     ['The procedure', '#how-it-works'],
     ['Integration', '#for-agents'],
     ['The record', '#contracts'],
-    ['The app', '/app'],
+    ['The app', APP_LANDING_URL],
   ];
 
   const filteredActivity = useMemo(() => {
@@ -655,7 +659,7 @@ export default function BobbyProtocolLanding() {
             </a>
 
             <a
-              href="/app"
+              href={APP_LANDING_URL}
               className="group relative min-h-[380px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
             >
               <motion.img
