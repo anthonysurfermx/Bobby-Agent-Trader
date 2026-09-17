@@ -115,6 +115,54 @@ enum CompanionToolkit {
                 t(2, "link", "Chain Link", "Eslabón", "Anchors the record where anyone can check it.", "Ancla el historial donde cualquiera puede revisarlo."),
                 t(3, "seal.fill", "Golden Seal", "Sello dorado", "Verified, not promised.", "Comprobado, no prometido."),
             ]
+        case "iris":
+            return [
+                t(1, "gauge.with.dots.needle.33percent", "Regime Dial", "Dial de régimen", "Says calm, caution or storm before you read a single candle.", "Dice calma, cuidado o tormenta antes de que leas una sola vela."),
+                t(2, "water.waves", "Horizon Band", "Banda de horizonte", "One thin line for where the whole market is leaning.", "Una línea delgada para saber hacia dónde se inclina todo el mercado."),
+                t(3, "sun.max.fill", "Golden Forecast", "Pronóstico dorado", "Every regime you respected instead of fighting, kept in gold.", "Cada régimen que respetaste en vez de pelear, guardado en oro."),
+            ]
+        case "sol":
+            return [
+                t(1, "ruler", "Builder Tape", "Cinta de constructor", "Measures what you actually finished, never what you planned.", "Mide lo que sí terminaste, nunca lo que planeaste."),
+                t(2, "leaf", "Sprout Pin", "Prendedor de brote", "Grows one leaf per tier. Only discipline waters it.", "Le sale una hoja por nivel. Solo la disciplina la riega."),
+                t(3, "square.grid.3x3.fill", "Golden Blueprint", "Plano dorado", "The plan of a world you built one earned piece at a time.", "El plano de un mundo que construiste pieza ganada por pieza ganada."),
+            ]
+        case "zuri":
+            return [
+                t(1, "scope", "Trail Monocle", "Monóculo de rastreo", "Follows one wallet without losing it in the noise.", "Sigue una wallet sin perderla en el ruido."),
+                t(2, "circle.grid.2x1", "Bead Ledger", "Cuentas de registro", "One bead per wallet worth watching. No bead is free.", "Una cuenta por cada wallet que vale la pena mirar. Ninguna es gratis."),
+                t(3, "point.topleft.down.to.point.bottomright.curvepath.fill", "Golden Thread", "Hilo dorado", "Where the money went, drawn end to end.", "A dónde se fue el dinero, trazado de punta a punta."),
+            ]
+        case "mira":
+            return [
+                t(1, "timer", "Rehearsal Timer", "Cronómetro de ensayo", "Counts the reps, not the wins.", "Cuenta las repeticiones, no las victorias."),
+                t(2, "square.split.diagonal", "Wireframe Half", "Mitad de malla", "The part of you still being drafted. Everyone has one.", "La parte de ti que todavía es borrador. Todos tenemos una."),
+                t(3, "star.fill", "Golden Replay", "Repetición dorada", "Every move you rewound until you understood it.", "Cada jugada que rebobinaste hasta entenderla."),
+            ]
+        case "nalu":
+            return [
+                t(1, "wind", "Flow Fin", "Quilla de flujo", "Feels the current before it shows on the chart.", "Siente la corriente antes de que se vea en la gráfica."),
+                t(2, "clock.arrow.circlepath", "Tide Watch", "Reloj de marea", "Tells you the wave is not yours yet.", "Te dice que la ola todavía no es tuya."),
+                t(3, "surfboard.fill", "Golden Board", "Tabla dorada", "Earned by the waves you let pass.", "Se gana con las olas que dejaste pasar."),
+            ]
+        case "vega":
+            return [
+                t(1, "cone", "Probability Cone", "Cono de probabilidad", "Shows the spread, not a single confident number.", "Muestra el rango, no un solo número seguro."),
+                t(2, "plusminus", "Error Bar", "Barra de error", "The part of the forecast nobody likes to publish.", "La parte del pronóstico que nadie quiere publicar."),
+                t(3, "eyeglasses", "Golden Monocle", "Monóculo dorado", "Collapses the cone to one number, and shows its cost.", "Colapsa el cono a un número, y enseña lo que cuesta."),
+            ]
+        case "noor":
+            return [
+                t(1, "circle", "First Ring", "Primer anillo", "Given for showing up again, not for being right.", "Se da por volver, no por acertar."),
+                t(2, "book.closed", "Review Ledger", "Libro de revisión", "The week read back to you, without flattery.", "La semana leída de vuelta, sin adulaciones."),
+                t(3, "crown.fill", "Golden Crown", "Corona dorada", "The third ring. It is set above your head, never sold.", "El tercer anillo. Se pone sobre tu cabeza, no se vende."),
+            ]
+        case "keo":
+            return [
+                t(1, "number.circle", "Set Counter", "Contador de series", "Counts the waves you let go before the good one.", "Cuenta las olas que dejas ir antes de la buena."),
+                t(2, "fish", "Reef Sense", "Sentido de arrecife", "Knows what is under the water before you drop in.", "Sabe qué hay bajo el agua antes de que entres."),
+                t(3, "hourglass", "Golden Patience", "Paciencia dorada", "Thirty years of waiting, cast in gold.", "Treinta años de espera, fundidos en oro."),
+            ]
         default:
             return []
         }
@@ -133,6 +181,14 @@ enum CompanionToolkit {
         "rook-1": .chest, "rook-2": .head, "rook-3": .hand,
         "halo-1": .chest, "halo-2": .shoulder, "halo-3": .head,
         "axiom-1": .hand, "axiom-2": .chest, "axiom-3": .head,
+        "iris-1": .hand, "iris-2": .face, "iris-3": .head,
+        "sol-1": .hand, "sol-2": .head, "sol-3": .hand,
+        "zuri-1": .headset, "zuri-2": .shoulder, "zuri-3": .hand,
+        "mira-1": .hand, "mira-2": .chest, "mira-3": .head,
+        "nalu-1": .hand, "nalu-2": .hip, "nalu-3": .shoulder,
+        "vega-1": .hand, "vega-2": .chest, "vega-3": .head,
+        "noor-1": .hand, "noor-2": .chest, "noor-3": .head,
+        "keo-1": .hand, "keo-2": .chest, "keo-3": .shoulder,
     ]
 
     static func unlocked(_ tool: CompanionTool, xp: Int) -> Bool { xp >= tool.unlockXP }
