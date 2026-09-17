@@ -1,0 +1,45 @@
+{
+  "packageId": "xyz.bobbyprotocol.app",
+  "host": "bobbyprotocol.xyz",
+  "name": "Bobby: The Market Argues Back",
+  "launcherName": "Bobby",
+  "display": "standalone",
+  "themeColor": "#050505",
+  "themeColorDark": "#050505",
+  "navigationColor": "#050505",
+  "navigationColorDark": "#050505",
+  "navigationDividerColor": "#050505",
+  "navigationDividerColorDark": "#050505",
+  "backgroundColor": "#050505",
+  "enableNotifications": false,
+  "startUrl": "/desk",
+  "iconUrl": "https://bobbyprotocol.xyz/pwa/icon-512.png",
+  "maskableIconUrl": "https://bobbyprotocol.xyz/pwa/icon-maskable-512.png",
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Trader Land",
+      "short_name": "Land",
+      "url": "/trader-land",
+      "chosenIconUrl": "https://bobbyprotocol.xyz/pwa/icon-192.png"
+    },
+    {
+      "name": "Public record",
+      "short_name": "Record",
+      "url": "/protocol/calls",
+      "chosenIconUrl": "https://bobbyprotocol.xyz/pwa/icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://bobbyprotocol.xyz/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": { "enabled": false },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://bobbyprotocol.xyz/",
+  "minSdkVersion": 23,
+  "orientation": "portrait"
+}

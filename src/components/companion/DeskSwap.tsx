@@ -16,13 +16,17 @@ import { useAppKit } from '@reown/appkit/react';
 import { ArrowLeftRight, Wallet, X } from 'lucide-react';
 import { SwapConfirm, type TradeExecution } from '@/components/adams/SwapConfirm';
 import { BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, findBaseToken, isStockToken, type BaseSwapToken } from '@/lib/base-swap/tokens';
+import { STOCK_SWAPS_VISIBLE } from '@/lib/base-swap/stock-visibility';
 import { t } from '@/lib/companions/i18n';
 import { useBaseBalances } from './DeskWallet';
 
 const DEFAULT_TICKET_USD = 25;
 type Side = 'buy' | 'sell';
-/** What the desk trades: every allow-listed token except the stables you pay with and WETH (ETH covers it). */
-const BUYABLE: readonly BaseSwapToken[] = BASE_SWAP_TOKENS.filter((token) => !token.stable && token.symbol !== 'WETH');
+/** What the desk trades: every allow-listed token except the stables you pay with and WETH
+ *  (ETH covers it), and — unless the tokenized-stock switch is on — the B20 equities. */
+const BUYABLE: readonly BaseSwapToken[] = BASE_SWAP_TOKENS.filter(
+  (token) => !token.stable && token.symbol !== 'WETH' && (STOCK_SWAPS_VISIBLE || !isStockToken(token)),
+);
 
 interface QuotePreview {
   amountOut: string;
@@ -145,7 +149,7 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
             <span className="block text-[9px] font-mono tracking-[0.2em] text-white/40">{side === 'buy' ? t('BUY', 'COMPRAR') : t('SELL', 'VENDER')}</span>
             <select value={token.symbol} onChange={(e) => { const next = findBaseToken(e.target.value); if (next) { setToken(next); setQty(''); } }} aria-label={t('Token', 'Token')} className="mt-1 w-full rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-sky-400/50">
               <optgroup label={t('Crypto', 'Cripto')}>{crypto.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol} · {item.name}</option>)}</optgroup>
-              <optgroup label={t('Tokenized stocks (Coinbase B20)', 'Acciones tokenizadas (Coinbase B20)')}>{stocks.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol} · {item.underlyingSymbol}</option>)}</optgroup>
+              {stocks.length > 0 && <optgroup label={t('Tokenized stocks (Coinbase B20)', 'Acciones tokenizadas (Coinbase B20)')}>{stocks.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol} · {item.underlyingSymbol}</option>)}</optgroup>}
             </select>
           </label>
         ) : (
@@ -237,7 +241,8 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
 /** Under a LONG verdict: the analyzed asset, if it lives on Bobby's Base allow-list (BTC → cbBTC, NVDA → NVDAc…). */
 export function DeskSwapCard({ symbol, conviction }: { symbol: string; conviction: number | null }) {
   const token = useMemo(() => findBaseToken(symbol), [symbol]);
-  if (!token || token.stable) return null;
+  // A LONG on NVDA maps to NVDAc; with the equity class hidden there is nothing to offer.
+  if (!token || token.stable || (!STOCK_SWAPS_VISIBLE && isStockToken(token))) return null;
   return <SwapPanel initial={token} conviction={conviction} pickable={false} />;
 }
 
@@ -245,7 +250,7 @@ export function DeskSwapCard({ symbol, conviction }: { symbol: string; convictio
 export function SwapSheet({ initialSymbol, onClose }: { initialSymbol?: string | null; onClose: () => void }) {
   const initial = useMemo(() => {
     const hit = findBaseToken(initialSymbol);
-    return hit && !hit.stable ? hit : BUYABLE[0];
+    return hit && !hit.stable && BUYABLE.includes(hit) ? hit : BUYABLE[0];
   }, [initialSymbol]);
   return (
     <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>

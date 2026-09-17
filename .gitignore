@@ -51,3 +51,20 @@ supabase/.temp/
 .vercel
 # migration exports contain private rows — never commit
 .ai/migration/export/
+
+# Android TWA build (Bubblewrap). The keystore is the upload key: keep it out of git.
+android/*.keystore
+android/*.jks
+android/app/
+android/build/
+android/gradle/
+android/gradlew
+android/gradlew.bat
+android/build.gradle
+android/settings.gradle
+android/gradle.properties
+android/local.properties
+android/*.aab
+android/*.apk
+android/*.idsig
+android/store_icon.png
