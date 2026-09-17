@@ -6,7 +6,7 @@
 // would say out loud — not as a dashboard. Green stops being the wallpaper and
 // becomes a signal: it appears only on the live dot and the record link.
 //
-// Preview route: /app-a
+// Routed at /app. /app-a stays as an alias for links already shared.
 import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -72,20 +72,17 @@ function Chapter({ image, alt, title, body, focus = '50% 50%', reverse = false, 
         <div className="absolute inset-0 hidden bg-[linear-gradient(90deg,rgba(7,9,10,.35)_0%,transparent_45%)] lg:block" />
         {/* phone inset, when the chapter has one */}
         {children}
-        {/* mobile copy sits over the photograph, exactly like the store plates */}
-        <div className="absolute inset-x-0 top-14 px-6 lg:hidden">
-          <motion.h2 {...reveal} className="max-w-[340px] text-[36px] font-bold leading-[1.02] tracking-[-0.04em]">{title}</motion.h2>
-        </div>
-        <div className="absolute inset-x-0 bottom-9 px-6 lg:hidden">
-          <motion.p {...reveal} className="max-w-[320px] text-[17px] leading-[1.5] text-[#F6F3EC]/80">{body}</motion.p>
-        </div>
       </div>
-      <div className="hidden items-center bg-[#07090A] px-16 py-24 lg:flex xl:px-24">
-        <motion.div {...reveal} className="max-w-xl">
-          <h2 className="text-[clamp(2.75rem,3.6vw,4.25rem)] font-bold leading-[0.98] tracking-[-0.045em]">{title}</h2>
-          <p className="mt-7 max-w-lg text-xl leading-[1.5] text-[#F6F3EC]/75">{body}</p>
-        </motion.div>
-      </div>
+      {/* One heading in the DOM, not two: laid over the photograph on phones —
+          title up, sentence down, like the store plates — and moved into the
+          second column on desktop. */}
+      <motion.div
+        {...reveal}
+        className={`pointer-events-none absolute inset-0 z-10 flex flex-col justify-between px-6 pb-9 pt-14 lg:pointer-events-auto lg:static lg:justify-center lg:bg-[#07090A] lg:px-16 lg:py-24 xl:px-24 ${reverse ? 'lg:order-1' : ''}`}
+      >
+        <h2 className="max-w-[340px] text-[36px] font-bold leading-[1.02] tracking-[-0.04em] lg:max-w-xl lg:text-[clamp(2.75rem,3.6vw,4.25rem)] lg:leading-[0.98] lg:tracking-[-0.045em]">{title}</h2>
+        <p className="max-w-[280px] text-[17px] leading-[1.5] text-[#F6F3EC]/80 lg:mt-7 lg:max-w-lg lg:text-xl lg:text-[#F6F3EC]/75">{body}</p>
+      </motion.div>
     </section>
   );
 }
@@ -109,6 +106,10 @@ export default function BobbyAppLandingA() {
   }, [record?.commitmentsCreated, record?.losses]);
 
   const pageTitle = t('Bobby — Ask out loud.', 'Bobby — Dilo en voz alta.');
+  const pageDescription = t(
+    'Talk to Bobby about Bitcoin, Nvidia, gold and 600 more. Three agents argue it out, the verdict is written down before the market settles it, and sometimes the answer is: not today.',
+    'Háblale a Bobby de Bitcoin, Nvidia, oro y 600 activos más. Tres agentes lo discuten, el veredicto queda escrito antes de que el mercado lo resuelva, y a veces la respuesta es: hoy no.',
+  );
   useEffect(() => { document.title = pageTitle; }, [pageTitle]);
 
   const heroReveal = reduceMotion ? {} : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.7 } };
@@ -118,7 +119,17 @@ export default function BobbyAppLandingA() {
       <Helmet>
         <title>{pageTitle}</title>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" />
-        <meta name="robots" content="noindex" />
+        <meta name="description" content={pageDescription} />
+        <link rel="canonical" href="https://bobbyprotocol.xyz/app" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://bobbyprotocol.xyz/app" />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDescription} />
+        <meta property="og:image" content="https://bobbyprotocol.xyz/favicon-bobby-v3.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDescription} />
+        <meta name="twitter:image" content="https://bobbyprotocol.xyz/favicon-bobby-v3.png" />
       </Helmet>
 
       {/* ============ HERO ============ */}
@@ -134,7 +145,7 @@ export default function BobbyAppLandingA() {
 
         {/* nav */}
         <header className="absolute inset-x-0 top-0 z-20 flex h-[62px] items-center justify-between px-5 lg:h-[88px] lg:px-14">
-          <a href="/app-a" className="flex items-center gap-2.5">
+          <a href="/app" className="flex items-center gap-2.5">
             <img src="/favicon-bobby-v3.png" alt="" className="h-7 w-7 rounded-[9px] object-cover lg:h-8 lg:w-8" />
             <span className="text-[15px] font-bold tracking-[-0.02em] lg:text-[17px]">Bobby</span>
           </a>
@@ -214,7 +225,7 @@ export default function BobbyAppLandingA() {
           'Tres agentes destrozan la idea. Si nada sobrevive, Bobby te lo dice y te quedas con tu dinero.',
         )}
       >
-        <div className="absolute bottom-7 right-6 w-[46%] max-w-[200px] overflow-hidden rounded-[26px] border border-white/15 shadow-[0_26px_60px_rgba(0,0,0,.6)] lg:bottom-14 lg:right-12 lg:w-[240px] lg:max-w-none">
+        <div className="absolute bottom-32 right-5 w-[44%] max-w-[190px] overflow-hidden rounded-[26px] border border-white/15 shadow-[0_26px_60px_rgba(0,0,0,.6)] lg:bottom-14 lg:right-12 lg:w-[240px] lg:max-w-none">
           <img src="/app/shot-notrade.webp" alt={t('A real NO TRADE verdict on Bitcoin', 'Un NO TRADE real sobre Bitcoin')} loading="lazy" className="block w-full" />
         </div>
       </Chapter>
@@ -256,7 +267,7 @@ export default function BobbyAppLandingA() {
           'Lee el análisis completo. Acepta un no. Vuelve mañana. Eso es lo que hace crecer tu isla — nunca cuánto operas.',
         )}
       >
-        <div className="absolute bottom-24 right-6 w-[42%] max-w-[180px] overflow-hidden rounded-[24px] border border-white/15 shadow-[0_24px_56px_rgba(0,0,0,.6)] lg:bottom-14 lg:right-12 lg:w-[220px] lg:max-w-none">
+        <div className="absolute bottom-36 right-5 w-[40%] max-w-[170px] overflow-hidden rounded-[24px] border border-white/15 shadow-[0_24px_56px_rgba(0,0,0,.6)] lg:bottom-14 lg:right-12 lg:w-[220px] lg:max-w-none">
           <img src="/app/shot-world.webp" alt={t('Trader Land, the island that grows with each good decision', 'Trader Land, la isla que crece con cada buena decisión')} loading="lazy" className="block w-full" />
         </div>
       </Chapter>

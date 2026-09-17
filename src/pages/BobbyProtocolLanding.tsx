@@ -78,7 +78,7 @@ interface ActivityItem {
 
 // Where "The app" points. The lifestyle landing lives at /app-a while /app still
 // serves the previous one; change this one line when /app-a is promoted.
-const APP_LANDING_URL = '/app-a';
+const APP_LANDING_URL = '/app';
 
 const formatNumber = (value: unknown, fallback = '—') => {
   if (value === null || value === undefined || value === '') return fallback;

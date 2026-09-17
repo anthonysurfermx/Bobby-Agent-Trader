@@ -20,8 +20,8 @@ import UserLayout from '@/pages/user/UserLayout';
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
-// Lifestyle redesign candidates for /app, directions A and B. Both are noindex;
-// /app stays canonical until one of them is promoted.
+// Direction A is now /app itself; /app-a stays as an alias for links already shared,
+// /app-v1 keeps the previous landing, and direction B stays a candidate at /app-b.
 const BobbyAppLandingA = lazyWithRetry(() => import('@/pages/BobbyAppLandingA'), 'app-landing-a');
 const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'), 'app-landing-b');
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
@@ -306,6 +306,15 @@ const router = createBrowserRouter(
         },
         {
           path: 'app',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAppLandingA />
+            </Suspense>
+          ),
+        },
+        {
+          // The previous /app, one click away so a rollback is a route change.
+          path: 'app-v1',
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAppLanding />
