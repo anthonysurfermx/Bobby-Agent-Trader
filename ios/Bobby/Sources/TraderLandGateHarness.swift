@@ -444,6 +444,8 @@ struct TraderLandGateHarnessView: View {
     @StateObject private var sync = TraderLandSync()
     @ObservedObject private var account = AccountSession.shared
     @State private var remoteUndo: TraderLandMutation?
+    @State private var shareOpen = false
+    @State private var shareTitle = ""
 
     private var previewOnly: Bool {
 #if DEBUG
@@ -527,6 +529,7 @@ struct TraderLandGateHarnessView: View {
                 focusLevel = 2
             }
             .sheet(isPresented: $help) { helpSheet.presentationDetents([.medium]).presentationDragIndicator(.visible) }
+            .sheet(isPresented: $shareOpen) { shareSheet.presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
         }
     }
 
@@ -540,6 +543,11 @@ struct TraderLandGateHarnessView: View {
             Spacer(minLength: 0)
             icon(sound.enabled ? "speaker.wave.2" : "speaker.slash", label: L.t("Toggle sound", "Activar o silenciar sonido")) { sound.toggle() }
                 .accessibilityIdentifier("land-sound-toggle")
+            if accountIsland {
+                icon(sync.world?.share?.public == true ? "globe" : "square.and.arrow.up", label: L.t("Share your island", "Compartir tu isla")) {
+                    shareTitle = sync.world?.share?.title ?? ""; shareOpen = true
+                }.accessibilityIdentifier("land-share")
+            }
             icon("questionmark.circle", label: L.t("How to play", "Cómo jugar")) { help = true }
         }.padding(.horizontal, 12).padding(.vertical, 10)
             .background(ink).overlay(alignment: .bottom) { Rectangle().fill(.white.opacity(0.08)).frame(height: 1) }
@@ -691,6 +699,7 @@ struct TraderLandGateHarnessView: View {
             if collectionOpen {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
+                        if accountIsland { reviewSection }
                         HStack(spacing: 6) {
                             ForEach(Array(districts.enumerated()), id: \.element) { index, value in
                                 Button { district = value; selectedItemId = nil; selectedPlacementId = nil } label: {
@@ -839,6 +848,128 @@ struct TraderLandGateHarnessView: View {
         placements = previous.placements; focusLevel = previous.focusLevel; selectedPlacementId = nil; save()
         notice = L.t("Last change undone.", "Último cambio deshecho.")
     }
+    // MARK: Thesis review, season and shared islands — parity with the web studio.
+
+    private static let site = URL(string: "https://bobbyprotocol.xyz")!
+    private static let worldsURL = site.appendingPathComponent("agentic-world/bobby/trader-land/worlds")
+    private static func shareURL(_ code: String) -> URL { site.appendingPathComponent("trader-land/w/\(code)") }
+
+    private var seeds: [TraderLandWorld.Inventory] {
+        (sync.world?.inventory ?? []).filter { $0.state == "seed" && $0.review != nil }
+            .sorted { ($0.review?.ready == true ? 0 : 1) < ($1.review?.ready == true ? 0 : 1) }
+    }
+    private var canClose: Bool { sync.world?.capabilities?.close == true && !editsDisabled && draft == nil }
+
+    @ViewBuilder private var reviewSection: some View {
+        if let season = sync.world?.season {
+            HStack(spacing: 8) {
+                Image(systemName: season.complete ? "checkmark.seal.fill" : "sparkles")
+                Text(season.name.text).font(.system(size: 13, weight: .medium))
+                Spacer(minLength: 0)
+                Text("\(season.earned) / \(season.total)").font(.system(size: 12, design: .monospaced))
+            }.foregroundStyle(mint).padding(10).background(mint.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                .accessibilityElement(children: .combine).accessibilityIdentifier("land-season")
+        }
+        if !seeds.isEmpty {
+            Text(L.t("Theses to review", "Tesis por revisar")).font(.system(size: 14, weight: .medium))
+            ForEach(seeds) { seed in
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(itemName(seed.item_id)).font(.system(size: 13, weight: .medium))
+                        Text(seedLine(seed.review!)).font(.system(size: 11)).foregroundStyle(mint.opacity(0.6)).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    if seed.review?.ready == true {
+                        Button { closeThesis(seed) } label: {
+                            Text(L.t("Review", "Revisar")).font(.system(size: 13, weight: .semibold)).padding(.horizontal, 12).frame(height: 40)
+                                .background(mint, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(ink)
+                        }.disabled(!canClose).accessibilityIdentifier("land-review-\(seed.id)")
+                    }
+                }.padding(10).background(ink.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+
+    private func itemName(_ itemID: String) -> String {
+        manifest.items.first { $0.id == itemID }.map(landName) ?? itemID.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    private func seedLine(_ review: TraderLandWorld.SeedReview) -> String {
+        var read = L.t("Read without a saved thesis", "Lectura sin tesis guardada")
+        if let thesis = review.thesis {
+            let bias = thesis.direction == "none" ? L.t("no edge", "sin sesgo") : thesis.direction
+            let level = (thesis.entry ?? thesis.price).map { " @ \($0.formatted(.number.precision(.significantDigits(1...6))))" } ?? ""
+            read = "\(thesis.symbol) \(bias)\(level)"
+        }
+        if review.ready { return "\(read) · \(L.t("Ready to review.", "Lista para revisar."))" }
+        let date = ISO8601DateFormatter().date(from: review.reviewAt) ?? {
+            let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f.date(from: review.reviewAt)
+        }()
+        let when = date.map { $0.formatted(date: .abbreviated, time: .shortened) } ?? review.reviewAt
+        return "\(read) · \(L.t("Review from", "Revisable desde")) \(when)."
+    }
+
+    private func closeThesis(_ seed: TraderLandWorld.Inventory) {
+        guard canClose, seed.review?.ready == true else { return }
+        Task {
+            guard let closed = await sync.mutate(.close(inventoryID: seed.id))?.closed else { return }
+            let outcome = closed.outcome == "hit" ? L.t("target reached", "objetivo alcanzado")
+                : closed.outcome == "invalidated" ? L.t("invalidation hit", "invalidación tocada")
+                : L.t("window closed without touching a level", "venció sin tocar niveles")
+            let move = closed.movePct.map { " (\($0 > 0 ? "+" : "")\($0.formatted(.number.precision(.fractionLength(0...2))))%)" } ?? ""
+            let direction = closed.direction.flatMap { $0 == "none" ? nil : " \($0)" } ?? ""
+            let head = closed.symbol.map { "\($0)\(direction): \(outcome)\(move). " } ?? ""
+            var text = "\(head)\(itemName(closed.itemId)) \(L.t("bloomed.", "floreció.")) +\(closed.xp) XP · +\(closed.aura) Aura."
+            if let executed = closed.executed { text += " \(L.t("Execution bonus", "Bono de ejecución")) +\(executed.xp) XP · +\(executed.aura) Aura." }
+            if let piece = closed.season?.piece { text += " \(L.t("Season piece", "Pieza de temporada")): \(itemName(piece.id))." }
+            notice = text
+            remoteUndo = nil
+            sound.play("bloom_complete"); UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+    }
+
+    private var shareSheet: some View {
+        let share = sync.world?.share
+        return VStack(alignment: .leading, spacing: 14) {
+            Text(share?.public == true ? L.t("Your island is public.", "Tu isla es pública.") : L.t("Share your island.", "Comparte tu isla.")).font(.title2.bold())
+            Text(L.t("A public island shows your pieces and districts to anyone with the link. Your XP, account and readings stay private.", "Una isla pública muestra tus piezas y distritos a quien tenga el enlace. Tu XP, cuenta y lecturas siguen siendo privadas."))
+                .font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            TextField(L.t("Island name (optional)", "Nombre de la isla (opcional)"), text: $shareTitle)
+                .textFieldStyle(.roundedBorder).submitLabel(.done).onChange(of: shareTitle) { _, value in if value.count > 80 { shareTitle = String(value.prefix(80)) } }
+            if share?.public == true, let code = share?.code {
+                ShareLink(item: Self.shareURL(code)) { Label(L.t("Share link", "Compartir enlace"), systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }
+                    .buttonStyle(.borderedProminent).tint(mint).foregroundStyle(ink)
+                HStack {
+                    Button(L.t("Update name", "Actualizar nombre")) { publish() }.disabled(sync.busy)
+                    Spacer()
+                    Button(L.t("Make private", "Hacer privada"), role: .destructive) { unpublish() }.disabled(sync.busy)
+                }.font(.system(size: 14)).frame(minHeight: 44)
+            } else {
+                Button { publish() } label: { Label(L.t("Publish island", "Publicar isla"), systemImage: "globe").frame(maxWidth: .infinity, minHeight: 44) }
+                    .buttonStyle(.borderedProminent).tint(mint).foregroundStyle(ink).disabled(sync.busy || sync.world == nil)
+            }
+            Link(destination: Self.worldsURL) { Label(L.t("Visit other islands", "Visitar otras islas"), systemImage: "map").frame(maxWidth: .infinity, minHeight: 44) }
+                .foregroundStyle(mint)
+            if let error = sync.error { Text(error).font(.footnote).foregroundStyle(.orange) }
+            Spacer(minLength: 0)
+        }.padding(22).background(ink.ignoresSafeArea()).foregroundStyle(Color(red: 0.9, green: 0.95, blue: 0.91))
+    }
+
+    private func publish() {
+        Task {
+            guard let world = await sync.mutate(.publish(title: shareTitle.trimmingCharacters(in: .whitespacesAndNewlines))), world.share?.public == true else { return }
+            notice = L.t("Your island is public. Share the link.", "Tu isla es pública. Comparte el enlace.")
+            sound.play("placement_confirm")
+        }
+    }
+
+    private func unpublish() {
+        Task {
+            guard await sync.mutate(.unpublish) != nil else { return }
+            notice = L.t("Your island is private again.", "Tu isla vuelve a ser privada.")
+        }
+    }
+
     private func commitRemote(_ action: TraderLandMutation, inverse: TraderLandMutation?, addedInventoryID: String? = nil) {
         Task {
             guard let result = await sync.mutate(action) else { return }

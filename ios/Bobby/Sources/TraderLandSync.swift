@@ -10,6 +10,34 @@ struct TraderLandWorld: Decodable {
         let item_id: String
         let state: String
         let placed: Bool
+        let source: String?
+        let review: SeedReview?
+    }
+    /// A seed waits on the thesis it was read with; the server says when it can be reviewed.
+    struct SeedReview: Decodable {
+        struct Thesis: Decodable { let symbol: String; let direction: String; let price: Double?; let entry: Double? }
+        let thesis: Thesis?
+        let reviewAt: String
+        let ready: Bool
+    }
+    struct Bilingual: Decodable { let en: String; let es: String; var text: String { L.t(en, es) } }
+    struct Season: Decodable { let name: Bilingual; let total: Int; let earned: Int; let next: String?; let complete: Bool }
+    struct Share: Decodable { let `public`: Bool; let code: String?; let title: String? }
+    struct Capabilities: Decodable { let move: Bool?; let close: Bool? }
+    /// Present only on the response to a `close` action.
+    struct Closed: Decodable {
+        struct Piece: Decodable { let id: String }
+        struct SeasonAward: Decodable { let piece: Piece? }
+        struct Execution: Decodable { let xp: Int; let aura: Int }
+        let itemId: String
+        let outcome: String
+        let symbol: String?
+        let direction: String?
+        let movePct: Double?
+        let xp: Int
+        let aura: Int
+        let executed: Execution?
+        let season: SeasonAward?
     }
     struct Placement: Decodable, Identifiable {
         let id: String
@@ -24,12 +52,19 @@ struct TraderLandWorld: Decodable {
     let placements: [Placement]
     let xp: Int
     let aura: Int
+    let capabilities: Capabilities?
+    let share: Share?
+    let season: Season?
+    let closed: Closed?
 }
 
 enum TraderLandMutation {
     case place(inventoryID: String, x: Int, y: Int, rotation: Int)
     case move(placementID: String, x: Int, y: Int, rotation: Int)
     case remove(placementID: String)
+    case close(inventoryID: String)
+    case publish(title: String)
+    case unpublish
 
     var body: [String: Any] {
         switch self {
@@ -39,6 +74,12 @@ enum TraderLandMutation {
             return ["action": "move", "placementId": id, "x": x, "y": y, "rotation": rotation]
         case let .remove(id):
             return ["action": "remove", "placementId": id]
+        case let .close(id):
+            return ["action": "close", "inventoryId": id, "tzOffsetMin": -TimeZone.current.secondsFromGMT() / 60, "platform": "ios"]
+        case let .publish(title):
+            return ["action": "publish", "title": String(title.prefix(80))]
+        case .unpublish:
+            return ["action": "unpublish"]
         }
     }
 }

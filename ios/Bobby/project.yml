@@ -84,6 +84,7 @@ targets:
             CFBundleURLSchemes:
               - bobbyprotocol
         ITSAppUsesNonExemptEncryption: false
+        NSCameraUsageDescription: "Bobby never turns on your camera. This entry is required only because the real-time voice library (WebRTC) includes video-call code that Bobby does not use."
         NSMicrophoneUsageDescription: "Bobby sends your microphone audio to OpenAI to answer market questions in real time."
         NSSpeechRecognitionUsageDescription: "Bobby turns your voice into questions about the markets. Audio is processed by Apple's speech recognition."
         UILaunchScreen: {}
@@ -104,4 +105,4 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.1"
-        CURRENT_PROJECT_VERSION: "25"
+        CURRENT_PROJECT_VERSION: "26"
