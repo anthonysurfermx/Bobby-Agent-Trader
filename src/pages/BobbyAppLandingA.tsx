@@ -11,8 +11,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
 import { isSpanish, t } from '@/lib/companions/i18n';
+import { APP_STORE_URL } from '@/lib/app-store';
 
-const APP_STORE_URL = 'https://apps.apple.com/app/id6753016758';
 const DESK_URL = '/desk';
 const GREEN = '#5CFF91';
 
@@ -49,7 +49,7 @@ function AppleGlyph({ className = 'h-5 w-[17px]' }: { className?: string }) {
 function StoreButton({ light = true }: { light?: boolean }) {
   return (
     <a
-      href={APP_STORE_URL}
+      href={APP_STORE_URL} target="_blank" rel="noopener noreferrer"
       className={`inline-flex min-h-[54px] items-center justify-center gap-3 whitespace-nowrap rounded-2xl px-7 text-base font-semibold transition ${light ? 'bg-[#F6F3EC] text-[#07090A] hover:bg-white' : 'bg-[#07090A] text-[#F6F3EC] hover:bg-black'}`}
     >
       <AppleGlyph />
@@ -146,7 +146,7 @@ export default function BobbyAppLandingA() {
             <button type="button" onClick={() => setLang(isSpanish() ? 'en' : 'es')} className="min-h-11 px-1 text-[13px] font-semibold text-[#F6F3EC]/60 transition hover:text-white lg:text-[15px]">
               {isSpanish() ? 'EN' : 'ES'}
             </button>
-            <a href={APP_STORE_URL} className="inline-flex h-9 items-center rounded-full bg-[#F6F3EC] px-4 text-[13px] font-semibold text-[#07090A] transition hover:bg-white lg:h-11 lg:px-6 lg:text-[15px]">
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-full bg-[#F6F3EC] px-4 text-[13px] font-semibold text-[#07090A] transition hover:bg-white lg:h-11 lg:px-6 lg:text-[15px]">
               {t('Get the app', 'Descárgala')}
             </a>
           </div>

@@ -10,8 +10,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
 import { isSpanish, t } from '@/lib/companions/i18n';
+import { APP_STORE_URL } from '@/lib/app-store';
 
-const APP_STORE_URL = 'https://apps.apple.com/app/id6753016758';
 const DESK_URL = '/desk';
 
 const CREAM = '#F4EDE1';
@@ -114,7 +114,7 @@ export default function BobbyAppLandingB() {
             <button type="button" onClick={() => setLang(isSpanish() ? 'en' : 'es')} className="min-h-11 px-1 text-[13px] font-semibold text-[#14120F]/60 transition hover:text-[#14120F] lg:text-[15px]">
               {isSpanish() ? 'EN' : 'ES'}
             </button>
-            <a href={APP_STORE_URL} className="inline-flex h-9 items-center rounded-full px-4 text-[13px] font-semibold transition hover:opacity-85 lg:h-11 lg:px-6 lg:text-[15px]" style={{ background: INK, color: CREAM }}>
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-full px-4 text-[13px] font-semibold transition hover:opacity-85 lg:h-11 lg:px-6 lg:text-[15px]" style={{ background: INK, color: CREAM }}>
               {t('Get the app', 'Descárgala')}
             </a>
           </div>
@@ -131,7 +131,7 @@ export default function BobbyAppLandingB() {
               <span className="rounded-md px-1.5 py-0.5 font-semibold" style={{ background: GOLD, color: INK }}>{t("don't.", 'no.')}</span>
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center lg:mt-10">
-              <a href={APP_STORE_URL} className="inline-flex min-h-[54px] items-center justify-center gap-2.5 rounded-full px-8 text-base font-semibold transition hover:opacity-90 lg:min-h-[60px] lg:text-[17px]" style={{ background: INK, color: CREAM }}>
+              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[54px] items-center justify-center gap-2.5 rounded-full px-8 text-base font-semibold transition hover:opacity-90 lg:min-h-[60px] lg:text-[17px]" style={{ background: INK, color: CREAM }}>
                 <AppleGlyph />
                 {t('Free on iPhone', 'Gratis en iPhone')}
               </a>
@@ -307,7 +307,7 @@ export default function BobbyAppLandingB() {
             </p>
           </div>
           <div className="flex flex-col gap-3 lg:w-[380px]">
-            <a href={APP_STORE_URL} className="inline-flex min-h-[54px] items-center justify-center gap-2.5 rounded-full px-8 text-base font-semibold transition hover:opacity-90 lg:min-h-[60px] lg:text-[17px]" style={{ background: CREAM, color: INK }}>
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[54px] items-center justify-center gap-2.5 rounded-full px-8 text-base font-semibold transition hover:opacity-90 lg:min-h-[60px] lg:text-[17px]" style={{ background: CREAM, color: INK }}>
               <AppleGlyph />
               {t('Download on the App Store', 'Descárgala en el App Store')}
             </a>
