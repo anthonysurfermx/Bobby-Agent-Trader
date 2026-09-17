@@ -1,5 +1,5 @@
 // Bobby — the trading assistant. Thin native client over the live
-// bobbyprotocol.xyz brain. Wallets sign externally; Bobby stores no keys.
+// bobbyprotocol.xyz brain. Analysis only: no wallet, no swaps, no keys.
 import SwiftUI
 
 @main
@@ -20,12 +20,6 @@ struct BobbyApp: App {
 #endif
     }
 
-    init() {
-        // The offline island fixture must not create wallet pairings or depend
-        // on keychain entitlements in an unsigned simulator build.
-        if !Self.isLandPreview && !Self.isUnitTestHost { WalletBridge.configure() }
-    }
-
     var body: some Scene {
         WindowGroup {
             Group {
@@ -44,7 +38,6 @@ struct BobbyApp: App {
 #endif
             }
             .preferredColorScheme(.dark)
-            .onOpenURL { if !Self.isLandPreview { WalletBridge.shared.handleDeepLink($0) } }
         }
     }
 }

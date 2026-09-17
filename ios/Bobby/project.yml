@@ -11,15 +11,6 @@ packages:
   GLTFKit2:
     url: https://github.com/warrenm/GLTFKit2
     from: "0.5.0"
-  ReownSwift:
-    url: https://github.com/reown-com/reown-swift
-    exactVersion: "2.3.2"
-  Web3:
-    url: https://github.com/Boilertalk/Web3.swift
-    exactVersion: "0.8.8"
-  CryptoSwift:
-    url: https://github.com/krzyzanowskim/CryptoSwift.git
-    exactVersion: "1.8.3"
 schemes:
   Bobby:
     build:
@@ -81,10 +72,6 @@ targets:
     dependencies:
       - package: WebRTC
       - package: GLTFKit2
-      - package: ReownSwift
-        product: ReownAppKit
-      - package: Web3
-      - package: CryptoSwift
     info:
       path: Sources/Info.plist
       properties:
@@ -97,19 +84,6 @@ targets:
             CFBundleURLSchemes:
               - bobbyprotocol
         ITSAppUsesNonExemptEncryption: false
-        LSApplicationQueriesSchemes:
-          - metamask
-          - trust
-          - safe
-          - zerion
-          - rainbow
-          - spot
-          - okex
-          - cbwallet
-          - safepalwallet
-          - tpoutside
-          - bnc
-        NSCameraUsageDescription: "Bobby does not take photos or video. This entry is required only because the wallet-connection library used for QR pairing includes a camera scanner that Bobby never turns on."
         NSMicrophoneUsageDescription: "Bobby sends your microphone audio to OpenAI to answer market questions in real time."
         NSSpeechRecognitionUsageDescription: "Bobby turns your voice into questions about the markets. Audio is processed by Apple's speech recognition."
         UILaunchScreen: {}
@@ -130,4 +104,4 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.1"
-        CURRENT_PROJECT_VERSION: "24"
+        CURRENT_PROJECT_VERSION: "25"

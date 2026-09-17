@@ -51,3 +51,14 @@ walkthrough), #83 (protocol claims Base-only).
 
 Suggested order for 1.2: (1) wallet balance pill + Max, (2) second-wave stocks + block-list,
 (3) Google sign-in, (4) EN/ES toggle, (5) Trader Land thesis close + Season I, (6) track record.
+
+## 2026-09-17 — 1.1 (24) rejected → build 25 without swaps
+App Review rejected 1.1 (24) on 2026-09-17 06:01 local under Guideline 2.1 (Information Needed) →
+3.1.5(iii): crypto exchange services (centralized *or* decentralized) require per-country licensing.
+Trigger: the "Base swaps" sheet (Buy/Sell USDC → AAPLc/GOOGLc/METAc/NVDAc via Uniswap V3).
+We hold no exchange licenses, so build 25 removes the feature from iOS entirely (web keeps it):
+- deleted BaseSwap.swift, BaseSwapView.swift, WalletBridge.swift, RPCCorrelator.swift + their tests
+- dropped ReownSwift / Web3 / CryptoSwift packages, wallet LSApplicationQueriesSchemes and the
+  Reown-only NSCameraUsageDescription
+- menu item + sheet removed; risk notice now says the app does not connect wallets, move funds or trade
+- What's New must not mention swaps; reply to Apple in the App Review thread before resubmitting
