@@ -20,6 +20,10 @@ import UserLayout from '@/pages/user/UserLayout';
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
+// Lifestyle redesign candidates for /app, directions A and B. Both are noindex;
+// /app stays canonical until one of them is promoted.
+const BobbyAppLandingA = lazyWithRetry(() => import('@/pages/BobbyAppLandingA'), 'app-landing-a');
+const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'), 'app-landing-b');
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
@@ -305,6 +309,22 @@ const router = createBrowserRouter(
           element: (
             <Suspense fallback={<PageLoader />}>
               <BobbyAppLanding />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'app-a',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAppLandingA />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'app-b',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAppLandingB />
             </Suspense>
           ),
         },
