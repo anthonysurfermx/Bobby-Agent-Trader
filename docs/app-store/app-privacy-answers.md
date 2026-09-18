@@ -1,5 +1,10 @@
 # Bobby iOS — App Privacy (App Store Connect)
 
+> **Build 27:** la app ya no usa micrófono, reconocimiento de voz ni cámara
+> (Bobby Live retirado). Quitar **User Content → Audio Data** en App Store
+> Connect. La voz del companion es texto a voz: sólo sale el texto de la
+> respuesta, no audio del usuario.
+
 Actualizado para el código del build 21, 2026-09-10. Estas respuestas
 sustituyen la antigua declaración “Data Not Collected”: la app ya ofrece cuenta
 opcional, sincronización de progreso y swaps no custodiales.
@@ -13,7 +18,6 @@ opcional, sincronización de progreso y swaps no custodiales.
 | Dirección pública de wallet y prueba firmada | Sesión temporal; la dirección se conserva con recibos | Probar control de la wallet y limitar calldata a su dueño |
 | Par, importes, ruta, hash de calldata y transacción confirmada | Sí, ligados a la dirección pública | Auditoría y historial de swaps |
 | País inferido por el edge | Se procesa para elegibilidad; no se guarda en el recibo | Bloqueo geográfico fail-closed |
-| Audio de voz en vivo | Se transmite a OpenAI; Bobby no guarda grabaciones. La retención del proveedor depende de la configuración de la organización | Conversación de mercados solicitada por el usuario |
 | Pregunta de mercado y texto TTS | Sólo durante la petición; Bobby no los retiene | Análisis y audio solicitados |
 | Perfil creativo (nombre, voz, vibe y aura) | No sale del dispositivo | Personalización local |
 
@@ -35,8 +39,9 @@ y **Used for Tracking: No**:
   swaps solicitados por la persona.
 
 No declarar ubicación: el país del edge no se retiene después de resolver la
-elegibilidad. Declarar **User Content → Audio Data**, App Functionality, sin tracking y no ligado por la app a cuenta o wallet: Realtime recibe audio directamente. La autorización de micrófono explica el envío a OpenAI. No usar la antigua explicación de dictado de Apple para este build. No declarar Search History mientras las
-preguntas no se almacenen.
+elegibilidad. No declarar Audio Data: desde el build 27 no hay micrófono ni
+audio del usuario. No declarar Search History mientras las preguntas no se
+almacenen.
 
 **Tracking / ATT** → No.
 **Privacy Policy URL** → https://bobbyprotocol.xyz/privacy
@@ -55,4 +60,4 @@ Antes de cada submit hay que comprobar que:
 
 1. la política pública describe wallet, Reown, Supabase y recibos on-chain;
 2. los privacy manifests de todas las dependencias resueltas no cambiaron;
-3. App Store Connect conserva las categorías anteriores y Audio Data y no “Data Not Collected”.
+3. App Store Connect conserva las categorías anteriores, sin Audio Data, y no “Data Not Collected”.

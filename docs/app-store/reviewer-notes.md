@@ -10,55 +10,41 @@ activarse un bypass geográfico secreto para Review.
 
 ## Texto para App Store Connect (English)
 
+Actualizado para el build 27 (1.1): sin swaps ni wallet (retirados en el build
+25) y sin micrófono ni Bobby Live (retirados en el build 27).
+
 ```text
-Bobby combines an educational market-analysis companion with an optional,
-non-custodial Base swap interface. Key facts for review:
+Bobby is an educational market-analysis companion. Key facts for review:
 
 MARKET ANALYSIS
-- A three-agent debate shows an opportunity case, a risk case and a final read.
+- The user types an asset; a three-agent debate shows an opportunity case, a
+  risk case and a final read over a live chart.
 - Analysis is generic and is always labeled as analysis, not personalized
   investment advice. “NO TRADE” is a normal outcome.
 - The companion earns Discipline XP for reviewing analysis and respecting
   no-trade outcomes, never for transaction volume, frequency or P&L.
+- Bobby never executes trades, never connects to an exchange or wallet and
+  never takes custody of funds.
 
-OPTIONAL BASE SWAPS
-- The app clearly exposes “Base swaps” in the main menu; it is not hidden or
-  remotely introduced after review.
-- Supported assets are direct USDC pairs with Coinbase B20 tokenized-equity
-  tokens (AAPLc, GOOGLc, METAc and NVDAc) on Base, chain ID 8453. These tokens
-  are not the underlying shares.
-- Availability is limited to approved jurisdictions outside the United States.
-  The backend fails closed when country or eligibility cannot be established.
-- Each ticket is limited to USD 1–100. The app independently verifies the
-  token addresses, pinned Uniswap router, direct pool fee, exact input,
-  slippage-derived minimum output, recipient, deadline and successful server
-  simulation before showing a wallet request.
-- Reown transports the request to the user's external wallet. The user reviews
-  and confirms every signature, approval and swap in that wallet. Bobby never
-  receives a private key, never signs, and never takes custody.
-- Confirmed swaps are verified against Base and recorded as an auditable
-  receipt. Reown analytics are disabled.
+VOICE
+- Input is typed only. The app does not use the microphone, speech
+  recognition or the camera.
+- The companion reads its answer aloud with synthesized speech: the answer
+  text is sent to our text-to-speech endpoint and nothing is recorded. The
+  speaker button on the desk mutes it.
 
 ACCOUNTS AND DATA
 - The analysis experience requires no account.
-- Sign in with Apple is optional and only syncs companion progress. It is
-  separate from the optional wallet connection.
-- A free wallet ownership signature creates a short-lived, wallet-bound Bobby
-  session before transaction calldata can be requested. It cannot move funds.
-- The privacy label declares linked User ID, Product Interaction and Other
-  Financial Info for app functionality, with no tracking.
-
-VOICE
-- Microphone and speech recognition are optional and requested only after the
-  mic is tapped. The full app works by typing.
+- Sign in with Apple (or X) is optional and only syncs companion progress.
+- Account deletion: top-right menu → Delete account (with confirmation). It is
+  also in the menu's account screen.
+- The privacy label declares linked User ID and Product Interaction for app
+  functionality, with no tracking.
 
 TESTING
 - The app follows the device language (English or Spanish).
-- “Base swaps” is available from the top-right menu. The wallet picker and all
-  disclosures are visible without Sign in with Apple.
-- Real transaction calldata is available only when the production jurisdiction
-  gate is enabled and the review device is in an approved country. See the
-  attached review instructions/evidence for the approved-country test path.
+- Share my skin (top-right menu) exports an image through the system share
+  sheet; saving to Photos asks for add-only permission.
 ```
 
 No declarar “Sign-in required” para el análisis. Si App Store Connect pide una

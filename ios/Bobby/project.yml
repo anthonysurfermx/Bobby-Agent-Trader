@@ -82,6 +82,9 @@ targets:
             CFBundleURLSchemes:
               - bobbyprotocol
         ITSAppUsesNonExemptEncryption: false
+        LSApplicationQueriesSchemes:
+          - instagram-stories
+        NSPhotoLibraryAddUsageDescription: "Bobby saves your skin card to Photos only when you tap Save Image."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -100,4 +103,4 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.1"
-        CURRENT_PROJECT_VERSION: "26"
+        CURRENT_PROJECT_VERSION: "27"

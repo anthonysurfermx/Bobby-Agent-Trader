@@ -15,6 +15,7 @@ enum DeskPhase: Int, CaseIterable {
 
     var label: String {
         switch self {
+        // "LIVE" on every device: the owner asked for this exact word.
         case .idle: return "LIVE"
         case .resolving: return L.t("RESOLVING ASSET", "LOCALIZANDO ACTIVO")
         case .alpha: return L.t("ALPHA HUNTER", "CAZADOR")
@@ -25,11 +26,6 @@ enum DeskPhase: Int, CaseIterable {
         }
     }
 
-    /// The desk stays quiet; the only line under the status is the way out
-    /// of a failed lookup.
-    var hint: String? {
-        self == .error ? L.t("Try the name or the ticker", "Prueba con el nombre o el símbolo") : nil
-    }
 }
 
 struct NoTradeMoment: Identifiable, Equatable {
@@ -52,10 +48,18 @@ final class BobbyViewModel: ObservableObject {
     @Published var phase: DeskPhase = .idle
     @Published var timeframe: MarketTimeframe = .oneHour
     @Published var noTradeMoment: NoTradeMoment? = nil
+    /// The one line under the status after a failure, worded by its cause.
+    @Published var errorHint: String?
+    /// "Did you mean…?" stays on screen next to its chip: with the speaker
+    /// muted it would otherwise be a bare chip with no question and no
+    /// proxy warning.
+    @Published var confirmPrompt: String?
 
     let voice = NeuralVoice()
-    /// The desk speaks its opening line once per launch.
+    /// The desk speaks its opening line once per launch, and never over the
+    /// answer to a question already asked.
     private var greeted = false
+    private var asked = false
     let profile = AgentProfile()
     let companions = CompanionStore()
     private let memory = DeskMemory()
@@ -86,11 +90,6 @@ final class BobbyViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    /// The companion IS the identity: its evolved name and its own voice.
-    /// Falls back to the onboarding profile when no companion is chosen.
-    var displayName: String {
-        companions.companion?.name(at: companions.level.number) ?? profile.name
-    }
     var voicePersona: String? { companions.companion?.voicePersona }
 
     func say(_ text: String) {
@@ -107,30 +106,29 @@ final class BobbyViewModel: ObservableObject {
     /// now, with the real 24h number, so the first feeling is "there is
     /// something happening today" — not a lobby.
     private func hypeGreeting(_ movers: [BobbyAPI.Mover]) -> String {
-        let name = displayName
         func pct(_ m: BobbyAPI.Mover) -> String {
             let sign = m.changePct >= 0 ? "+" : "-"
             return "\(sign)\(String(format: "%.1f", abs(m.changePct)))%"
         }
         guard let first = movers.first else {
-            return L.t("\(name): I'm in. Welcome to the desk — name an asset and we go.",
-                       "\(name): Ya estoy dentro. Bienvenido a la mesa: nombra un activo y le entramos.")
+            return L.t("I'm in. Welcome to the desk — name an asset and we go.",
+                       "Ya estoy dentro. Bienvenido a la mesa: nombra un activo y le entramos.")
         }
         let firstUp = first.changePct >= 0
         let tail: String = movers.dropFirst().first.map { " \($0.symbol) \(pct($0))." } ?? ""
         switch profile.vibe {
         case .chill:
             return firstUp
-                ? L.t("\(name): Yo, we're live. \(first.symbol) is up \(pct(first)) in 24h.\(tail) Wanna take a look?",
-                      "\(name): Ey, ya estamos en vivo. \(first.symbol) subió \(pct(first)) en 24 horas.\(tail) ¿Le echamos un ojo?")
-                : L.t("\(name): Yo, we're live. \(first.symbol) dropped \(pct(first)) in 24h.\(tail) Wanna see if it's a chance?",
-                      "\(name): Ey, ya estamos en vivo. \(first.symbol) cayó \(pct(first)) en 24 horas.\(tail) ¿Vemos si es oportunidad?")
+                ? L.t("Yo, we're live. \(first.symbol) is up \(pct(first)) in 24h.\(tail) Wanna take a look?",
+                      "Ey, ya estamos en vivo. \(first.symbol) subió \(pct(first)) en 24 horas.\(tail) ¿Le echamos un ojo?")
+                : L.t("Yo, we're live. \(first.symbol) dropped \(pct(first)) in 24h.\(tail) Wanna see if it's a chance?",
+                      "Ey, ya estamos en vivo. \(first.symbol) cayó \(pct(first)) en 24 horas.\(tail) ¿Vemos si es oportunidad?")
         case .directo:
-            return L.t("\(name): Desk open. Biggest move: \(first.symbol) \(pct(first)) in 24h.\(tail) Say the word.",
-                       "\(name): Mesa abierta. Mayor movimiento: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Tú dices.")
+            return L.t("Desk open. Biggest move: \(first.symbol) \(pct(first)) in 24h.\(tail) Say the word.",
+                       "Mesa abierta. Mayor movimiento: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Tú dices.")
         case .pro:
-            return L.t("\(name): Session open. Lead mover \(first.symbol) \(pct(first)) over 24h.\(tail) Pick one and I run the desk.",
-                       "\(name): Sesión abierta. Líder del día: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Elige uno y lo analizo.")
+            return L.t("Session open. Lead mover \(first.symbol) \(pct(first)) over 24h.\(tail) Pick one and I run the desk.",
+                       "Sesión abierta. Líder del día: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Elige uno y lo analizo.")
         }
     }
 
@@ -142,7 +140,7 @@ final class BobbyViewModel: ObservableObject {
         greeted = true
         Task {
             let movers = await BobbyAPI.topMovers(limit: 2)
-            guard !thinking, snapshot == nil, speakEnabled else { return }
+            guard !asked, speakEnabled else { return }
             sayAmbient(hypeGreeting(movers))
         }
     }
@@ -172,8 +170,11 @@ final class BobbyViewModel: ObservableObject {
         assetHits = []
         let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !thinking else { return }
+        asked = true
         input = ""
         voice.stop()
+        errorHint = nil
+        confirmPrompt = nil
         thinking = true
         phase = .resolving
         lastAnswer = nil
@@ -184,6 +185,7 @@ final class BobbyViewModel: ObservableObject {
 
             guard let resolution = await BobbyAPI.resolveAsset(q) else {
                 phase = .error
+                errorHint = L.t("No match for “\(q)” · try the name or the ticker", "No encontré “\(q)” · prueba con el nombre o el símbolo")
                 if speakEnabled { say(L.t("I could not find that asset. Try the name or the ticker.", "No encontré ese activo. Prueba con el nombre o el símbolo.")) }
                 return
             }
@@ -198,6 +200,7 @@ final class BobbyViewModel: ObservableObject {
                 if let note = resolution.proxyNote {
                     text += " " + L.t("Heads up: that listing is \(note).", "Ojo: ese listado es \(note).")
                 }
+                confirmPrompt = text
                 text += " " + L.t("Tap it to confirm.", "Tócalo para confirmar.")
                 if speakEnabled { say(text) }
                 assetHits = [BobbyAPI.AssetHit(
@@ -250,6 +253,7 @@ final class BobbyViewModel: ObservableObject {
                 phase = .error
                 let msg = L.t("The desk did not answer for \(answer.symbol). Try again in a moment.",
                               "La mesa no respondió por \(answer.symbol). Inténtalo de nuevo en un momento.")
+                errorHint = msg
                 if speakEnabled { say(msg) }
                 return
             }
@@ -305,7 +309,6 @@ struct ContentView: View {
     @StateObject private var vm = BobbyViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @FocusState private var focused: Bool
-    @State private var showAuraCard = false
     @State private var showSquad = false
     @State private var showBoard = false
     @State private var showRiskNotice = false
@@ -316,7 +319,9 @@ struct ContentView: View {
     @State private var showWorld = false
     @State private var petDetail = false
     @State private var skinSnapshotToken = 0
-    @State private var skinCard: UIImage?
+    @State private var skinShot: UIImage?
+    @State private var confirmDelete = false
+    @State private var accountError: String?
     @State private var equipToolId: String?
     @State private var equipToken = 0
     /// The desk never shows an empty hole: if the companion GLB fails to
@@ -340,6 +345,12 @@ struct ContentView: View {
             if let evo = vm.companions.pendingEvolution, let comp = vm.companions.companion {
                 EvolutionOverlay(companion: comp, level: evo) {
                     vm.companions.pendingEvolution = nil
+                    // Spoken on dismiss, never over the answer that earned it.
+                    if vm.speakEnabled {
+                        let evolvedName = comp.name(at: evo.number)
+                        vm.say(L.t("I evolved. Call me \(evolvedName) now.\(levelTone(evo.number))",
+                                   "Evolucioné. Ahora dime \(evolvedName).\(levelTone(evo.number))"))
+                    }
                 }
                 .transition(.opacity)
                 .zIndex(10)
@@ -359,11 +370,12 @@ struct ContentView: View {
             }
         }
         .onChange(of: vm.companions.pendingEvolution?.number) { _, newLevel in
-            guard let newLevel, let comp = vm.companions.companion else { return }
+            guard newLevel != nil else { return }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            let evolvedName = comp.name(at: newLevel)
-            vm.say(L.t("I evolved. Call me \(evolvedName) now.\(levelTone(newLevel))",
-                       "Evolucioné. Ahora dime \(evolvedName).\(levelTone(newLevel))"))
+        }
+        .onChange(of: vm.profile.acceptedRiskNotice) { _, accepted in
+            // A new risk-notice version gates an onboarded user: greet once it is accepted.
+            if accepted && vm.profile.onboarded { vm.bootGreetingIfNeeded() }
         }
         .onAppear {
             if vm.profile.acceptedRiskNotice && vm.profile.onboarded { vm.bootGreetingIfNeeded() }
@@ -399,8 +411,13 @@ struct ContentView: View {
                 .presentationDetents([.medium])
                 .presentationBackground(Theme.bg)
         }
-        .sheet(item: $skinCard) { card in
-            ShareSheet(items: [card, L.t("My Bobby skin — earned with discipline, never volume. bobbyprotocol.xyz", "Mi estilo de Bobby — ganado con disciplina, nunca con volumen. bobbyprotocol.xyz")])
+        .sheet(item: $skinShot) { card in
+            if let comp = vm.companions.companion {
+                SkinShareSheet(card: card, companion: comp, level: vm.companions.level,
+                               gear: CompanionToolkit.wornGear(companionId: comp.id, xp: vm.companions.disciplineXP),
+                               pet: CompanionToolkit.petUnlocked(companionId: comp.id, xp: vm.companions.disciplineXP) ? CompanionToolkit.pet(for: comp.id) : nil,
+                               xp: vm.companions.disciplineXP)
+            }
         }
         .sheet(isPresented: $showRiskNotice) {
             RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
@@ -409,23 +426,32 @@ struct ContentView: View {
             AccountSheet(store: vm.companions, profile: vm.profile) { showAccount = false }
         }
         .sheet(isPresented: $showSquad) {
-            MascotGalleryView(store: vm.companions, voice: vm.voice, voiceId: vm.profile.voiceId)
-        }
-        .sheet(isPresented: $showAuraCard) {
-            AuraCardSheet(data: AuraCardData(
-                agentName: vm.profile.name,
-                auraText: vm.profile.auraText,
-                tint: vm.profile.auraTint,
-                tintSoft: vm.profile.auraTintSoft,
-                archetype: vm.profile.auraArchetype,
-                streak: vm.streak,
-                insight: vm.lastAnswer.flatMap { answer in
-                    vm.snapshot.map { ($0.symbol, answer.summary) }
-                }
-            ), soundEnabled: vm.speakEnabled)
+            // Muted means muted: the gallery's pick line stays silent too.
+            MascotGalleryView(store: vm.companions, voice: vm.speakEnabled ? vm.voice : nil, voiceId: vm.profile.voiceId)
         }
         .onChange(of: vm.profile.onboarded) { _, onboarded in
             if onboarded { vm.bootGreetingIfNeeded() }
+        }
+        .confirmationDialog(L.t("Delete your Bobby account?", "¿Eliminar tu cuenta de Bobby?"),
+                            isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button(L.t("Delete account permanently", "Eliminar cuenta para siempre"), role: .destructive) {
+                Task {
+                    if await account.deleteAccount(store: vm.companions) {
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    } else {
+                        accountError = account.lastError
+                    }
+                }
+            }
+            Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
+        } message: {
+            Text(L.t("This deletes your account and your synced XP, streak, gear and Trader Land. Public blockchain transactions cannot be erased and limited security or audit records may remain.",
+                     "Esto borra tu cuenta y tu XP, racha, accesorios y Trader Land sincronizados. Las transacciones públicas de blockchain no se pueden borrar y pueden conservarse registros limitados de seguridad o auditoría."))
+        }
+        .alert(L.t("Account", "Cuenta"), isPresented: Binding(get: { accountError != nil }, set: { if !$0 { accountError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(accountError ?? "")
         }
 
         .animation(.easeOut(duration: 0.35), value: vm.profile.onboarded)
@@ -437,10 +463,10 @@ struct ContentView: View {
             deskHeader
             ScrollView {
                 LazyVStack(spacing: 12) {
+                    // Your companion never leaves the stage; a NO TRADE lands under it.
+                    liveConsole
                     if let moment = vm.noTradeMoment {
                         noTradeSignature(moment)
-                    } else {
-                        liveConsole
                     }
                     if vm.snapshot == nil && !vm.thinking { commandDeck }
                     if vm.snapshot != nil { marketSurface }
@@ -452,6 +478,15 @@ struct ContentView: View {
             }
             .scrollDismissesKeyboard(.interactively)
             if !vm.assetHits.isEmpty {
+                if let prompt = vm.confirmPrompt {
+                    Text(prompt)
+                        .font(.rounded(13, .semibold))
+                        .foregroundStyle(Theme.text.opacity(0.85))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 6)
+                        .transition(.opacity)
+                }
                 assetSuggestions
             }
             commandBar
@@ -512,19 +547,6 @@ struct ContentView: View {
             }
             // Progress, account and the custody promise live in the menu.
             Menu {
-                // The explore board must stay reachable after the first
-                // analysis (commandDeck hides once a snapshot exists).
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showBoard = true
-                } label: {
-                    Label(L.t("Explore markets", "Explorar mercados"), systemImage: "square.grid.2x2")
-                }
-                Button {
-                    showAuraCard = true
-                } label: {
-                    Label(L.t("My aura", "Mi aura"), systemImage: "sparkles")
-                }
                 Button {
                     showWorld = true
                 } label: {
@@ -533,11 +555,10 @@ struct ContentView: View {
                 Section {
                     Label(vm.streak >= 1 ? L.t("Discipline streak: \(vm.streak) day\(vm.streak == 1 ? "" : "s") 🔥", "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥") : L.t("No streak yet — review an analysis", "Sin racha aún — revisa un análisis"),
                           systemImage: "flame")
-                    Label(L.t("YOU SIGN — Bobby never takes custody", "TÚ FIRMAS — Bobby nunca toma custodia"), systemImage: "lock.shield")
                 }
                 Section {
                     // Reachable from every screen, not just first-run onboarding.
-                    Button { skinSnapshotToken += 1 } label: {
+                    Button { shareSkin() } label: {
                         Label(L.t("Share my skin", "Compartir mi estilo"), systemImage: "square.and.arrow.up")
                     }
                     Button { showAccount = true } label: {
@@ -548,6 +569,19 @@ struct ContentView: View {
                     }
                     Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
                         Label(L.t("Privacy Policy", "Aviso de privacidad"), systemImage: "hand.raised")
+                    }
+                }
+                if account.isSignedIn {
+                    Section {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            account.signOut(store: vm.companions)
+                        } label: {
+                            Label(L.t("Sign out", "Cerrar sesión"), systemImage: "rectangle.portrait.and.arrow.right")
+                        }
+                        Button(role: .destructive) { confirmDelete = true } label: {
+                            Label(L.t("Delete account", "Eliminar cuenta"), systemImage: "trash")
+                        }
                     }
                 }
             } label: {
@@ -588,13 +622,7 @@ struct ContentView: View {
                             equipToolId: equipToolId,
                             equipToken: equipToken,
                             snapshotToken: skinSnapshotToken,
-                            onSnapshot: { shot in
-                                skinCard = SkinCard.render(
-                                    snapshot: shot, companion: comp, level: vm.companions.level,
-                                    gear: CompanionToolkit.wornGear(companionId: comp.id, xp: vm.companions.disciplineXP),
-                                    pet: CompanionToolkit.petUnlocked(companionId: comp.id, xp: vm.companions.disciplineXP) ? CompanionToolkit.pet(for: comp.id) : nil,
-                                    xp: vm.companions.disciplineXP)
-                            }
+                            onSnapshot: { shot in skinShot = shot }
                         )
                             .allowsHitTesting(false)
                             .frame(width: 206, height: 208)
@@ -623,6 +651,8 @@ struct ContentView: View {
             }
             .buttonStyle(.plain)
             .disabled(vm.thinking)
+            .accessibilityLabel(vm.companions.companion?.label ?? vm.profile.name)
+            .accessibilityHint(L.t("Opens the keyboard to ask", "Abre el teclado para preguntar"))
             .onChange(of: vm.companions.companionId) { deskModelFailed = false }
 
             HStack(spacing: 7) {
@@ -637,7 +667,7 @@ struct ContentView: View {
             }
             .contentTransition(.opacity)
 
-            if let hint = vm.phase.hint {
+            if vm.phase == .error, let hint = vm.errorHint {
                 Text(hint)
                     .font(.mono(10, .medium))
                     .kerning(0.6)
@@ -690,23 +720,12 @@ struct ContentView: View {
                 .accessibilityLabel(L.t("Dismiss no trade moment", "Cerrar aviso de no operar"))
             }
 
-            ZStack {
-                Circle()
-                    .fill(halo.tint.opacity(0.08))
-                    .frame(width: 224, height: 224)
-                    .overlay(Circle().stroke(halo.tint.opacity(0.28), lineWidth: 1))
-                    .shadow(color: halo.tint.opacity(0.34), radius: 32)
-                MascotSceneView(assetName: halo.id, interactive: false, emoteEvent: CompanionEmoteEvent(id: moment.id, emote: .shield))
-                    .allowsHitTesting(false)
-                    .frame(width: 206, height: 206)
-                Image(systemName: "checkmark.shield.fill")
-                    .font(.system(size: 42, weight: .bold))
-                    .foregroundStyle(halo.tintSoft.opacity(0.92))
-                    .offset(y: 72)
-                    .shadow(color: halo.tint, radius: 14)
-                    .symbolEffect(.pulse, options: .repeating.speed(0.7))
-            }
-            .frame(height: 224)
+            Image(systemName: "checkmark.shield.fill")
+                .font(.system(size: 54, weight: .bold))
+                .foregroundStyle(halo.tintSoft.opacity(0.92))
+                .shadow(color: halo.tint, radius: 18)
+                .symbolEffect(.pulse, options: .repeating.speed(0.7))
+                .frame(height: 76)
 
             Text(L.t("NO TRADE", "NO OPERAR"))
                 .font(.mono(24, .black))
@@ -1178,6 +1197,18 @@ struct ContentView: View {
         case .cio: return Theme.cio
         case .complete: return Theme.up
         default: return Theme.accentSoft
+        }
+    }
+
+    /// Share my skin: the live 3D pose when the model is on stage, the
+    /// companion's portrait otherwise — the menu item must always answer.
+    private func shareSkin() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        guard let comp = vm.companions.companion else { return }
+        if deskModelFailed {
+            if let portrait = UIImage(named: "\(comp.id)_thumb") { skinShot = portrait }
+        } else {
+            skinSnapshotToken += 1
         }
     }
 

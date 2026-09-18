@@ -482,7 +482,12 @@ struct MascotSceneView: UIViewRepresentable {
         }
         if snapshotToken != context.coordinator.lastSnapshotToken {
             context.coordinator.lastSnapshotToken = snapshotToken
-            if snapshotToken > 0 { onSnapshot?(view.snapshot()) }
+            // Next runloop: this is a view update, and the callback sets SwiftUI
+            // state — done synchronously the share sheet never appeared.
+            if snapshotToken > 0 {
+                let callback = onSnapshot
+                DispatchQueue.main.async { callback?(view.snapshot()) }
+            }
         }
         if let event = emoteEvent, context.coordinator.lastEmoteId != event.id {
             context.coordinator.lastEmoteId = event.id

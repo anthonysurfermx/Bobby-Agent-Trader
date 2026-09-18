@@ -805,9 +805,12 @@ struct ItemPreviewSheet: View {
 
 enum SkinCard {
     /// Composes the share card: the live scene snapshot, the companion's name,
-    /// level, worn gear and pet. 1080×1350 (Instagram portrait).
-    static func render(snapshot: UIImage, companion: Companion, level: CompanionLevel, gear: [CompanionTool], pet: CompanionPet?, xp: Int) -> UIImage {
-        let size = CGSize(width: 1080, height: 1350)
+    /// level, worn gear and pet. 1080×1350 (feed portrait) or, with `story`,
+    /// 1080×1920 for Instagram and WhatsApp stories — content kept clear of
+    /// the top and bottom bands their own UI covers.
+    static func render(snapshot: UIImage, companion: Companion, level: CompanionLevel, gear: [CompanionTool], pet: CompanionPet?, xp: Int, story: Bool = false) -> UIImage {
+        let size = CGSize(width: 1080, height: story ? 1920 : 1350)
+        let dy: CGFloat = story ? 260 : 0          // everything below the header shifts down
         return UIGraphicsImageRenderer(size: size).image { ctx in
             let c = ctx.cgContext
             UIColor(red: 0.01, green: 0.012, blue: 0.019, alpha: 1).setFill()
@@ -815,28 +818,28 @@ enum SkinCard {
             let tint = UIColor(hue: companion.hue, saturation: 0.7, brightness: 0.95, alpha: 1)
             let glowColors = [tint.withAlphaComponent(0.35).cgColor, tint.withAlphaComponent(0).cgColor] as CFArray
             if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: glowColors, locations: [0, 1]) {
-                c.drawRadialGradient(gradient, startCenter: CGPoint(x: 540, y: 560), startRadius: 0, endCenter: CGPoint(x: 540, y: 560), endRadius: 620, options: [])
+                c.drawRadialGradient(gradient, startCenter: CGPoint(x: 540, y: 560 + dy), startRadius: 0, endCenter: CGPoint(x: 540, y: 560 + dy), endRadius: 620, options: [])
             }
             let mono = UIFont.monospacedSystemFont(ofSize: 30, weight: .bold)
             let head = NSAttributedString(string: "BOBBY // \(L.t("MY SKIN", "MI ESTILO"))", attributes: [.font: mono, .foregroundColor: UIColor.white.withAlphaComponent(0.75), .kern: 6])
-            head.draw(at: CGPoint(x: 72, y: 72))
+            head.draw(at: CGPoint(x: 72, y: 72 + (story ? 200 : 0)))
             let aspect = snapshot.size.width / max(snapshot.size.height, 1)
             let shotH: CGFloat = 760
             let shotW = shotH * aspect
-            snapshot.draw(in: CGRect(x: (size.width - shotW) / 2, y: 150, width: shotW, height: shotH))
+            snapshot.draw(in: CGRect(x: (size.width - shotW) / 2, y: 150 + dy, width: shotW, height: shotH))
             let name = NSAttributedString(string: companion.name(at: level.number), attributes: [.font: UIFont.systemFont(ofSize: 76, weight: .bold), .foregroundColor: UIColor.white, .kern: 4])
             let nameW = name.size().width
-            name.draw(at: CGPoint(x: (size.width - nameW) / 2, y: 930))
+            name.draw(at: CGPoint(x: (size.width - nameW) / 2, y: 930 + dy))
             let sub = NSAttributedString(string: "\(L.t("LEVEL", "NIVEL")) \(level.number) · \(level.name) · \(xp) XP", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 26, weight: .bold), .foregroundColor: tint, .kern: 4])
-            sub.draw(at: CGPoint(x: (size.width - sub.size().width) / 2, y: 1024))
+            sub.draw(at: CGPoint(x: (size.width - sub.size().width) / 2, y: 1024 + dy))
             var line = gear.map { $0.name }
             if let pet { line.append(pet.name) }
             let gearText = line.isEmpty ? L.t("No gear yet — first read drops the first tool.", "Aún sin accesorios — tu primera lectura suelta el primero.") : line.joined(separator: " · ")
             let gearAttr = NSAttributedString(string: gearText, attributes: [.font: UIFont.systemFont(ofSize: 28, weight: .medium), .foregroundColor: UIColor.white.withAlphaComponent(0.8)])
-            let gearRect = CGRect(x: 90, y: 1090, width: size.width - 180, height: 120)
+            let gearRect = CGRect(x: 90, y: 1090 + dy, width: size.width - 180, height: 120)
             gearAttr.draw(with: gearRect, options: [.usesLineFragmentOrigin], context: nil)
             let foot = NSAttributedString(string: "bobbyprotocol.xyz · \(L.t("earned with discipline, never volume", "ganado con disciplina, nunca volumen"))", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 22, weight: .medium), .foregroundColor: UIColor.white.withAlphaComponent(0.4), .kern: 2])
-            foot.draw(at: CGPoint(x: (size.width - foot.size().width) / 2, y: 1270))
+            foot.draw(at: CGPoint(x: (size.width - foot.size().width) / 2, y: 1270 + dy))
         }
     }
 }

@@ -170,6 +170,10 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     }
 
     private func speakFallback(_ text: String) {
+        // The on-device voice needs the same spoken-audio session as play():
+        // the aura forge leaves an ambient one behind, which the silent switch mutes.
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setActive(true)
         let u = AVSpeechUtterance(string: text)
         u.voice = bestSystemVoice()
         u.rate = min(AVSpeechUtteranceMaximumSpeechRate, max(AVSpeechUtteranceMinimumSpeechRate, 0.5 * fallbackPlaybackRate))
