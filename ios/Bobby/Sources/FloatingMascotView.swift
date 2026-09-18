@@ -268,9 +268,11 @@ struct FloatingMascotView: UIViewRepresentable {
             if sincePulse >= 0, sincePulse < 0.7 { scale += exp(-sincePulse * 7) * sin(sincePulse * 26) * 0.09 }
 
             if reduceMotion {
-                if let scan, !scan.revealed {
+                // Every frame, not just once: Reduce Motion can switch on in
+                // the middle of an idle slice, which must not freeze on screen.
+                if let scan {
+                    if !scan.revealed { report(4) }
                     scan.revealNow()
-                    report(4)
                 }
                 pivot.position = SCNVector3Zero
                 pivot.eulerAngles = SCNVector3Zero
@@ -359,7 +361,9 @@ final class XRayScan {
             material.setValue(height, forKey: "u_height")
         }
 
-        let radius = CGFloat(footprint) * 0.56
+        // Capped by height too: a long, deep model (KORA's tail) would push the
+        // ring's front rim out of the top of the frame at the start of a sweep.
+        let radius = CGFloat(min(footprint * 0.56, height * 0.42))
         let plane = SCNPlane(width: radius * 2, height: radius * 2)
         let disc = plane.firstMaterial ?? SCNMaterial()
         disc.diffuse.contents = Self.ringImage(tint)
@@ -380,8 +384,8 @@ final class XRayScan {
 
     /// Advances the scan. Returns the first-pass milestone (1…4), if any.
     func update(clock t: Double, lift: Float) -> Int? {
-        let top = height * 0.55 + lift
-        let bottom = -height * 0.55 + lift
+        let top = height * 0.52 + lift
+        let bottom = -height * 0.54 + lift
         if !revealed {
             let q = (t - Self.startAt) / Self.sweep
             // Half linear, half eased: a scanner, not a bounce.

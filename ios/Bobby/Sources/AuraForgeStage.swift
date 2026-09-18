@@ -108,9 +108,15 @@ private struct SpawnBurst: View {
         let spin: Double
     }
 
-    private let particles: [Particle] = (0..<30).map { i in
-        let a = Double(i) / 30 * .pi * 2 + Double.random(in: -0.12...0.12)
-        return Particle(angle: a, speed: Double.random(in: 90...170), size: Double.random(in: 3...7), spin: Double.random(in: -3...3))
+    // Drawn once per burst: the parent re-renders mid-flight (a tap on the
+    // companion) and a fresh random set would teleport every particle.
+    @State private var particles: [Particle] = SpawnBurst.makeParticles()
+
+    private static func makeParticles() -> [Particle] {
+        (0..<30).map { i in
+            let a = Double(i) / 30 * .pi * 2 + Double.random(in: -0.12...0.12)
+            return Particle(angle: a, speed: Double.random(in: 90...170), size: Double.random(in: 3...7), spin: Double.random(in: -3...3))
+        }
     }
 
     var body: some View {
@@ -139,9 +145,10 @@ private struct SpawnBurst: View {
     }
 }
 
-/// The forge's sound: one bright hit when the aura maxes out, on whatever
-/// audio session the app already runs. No drone under the scan — the machine
-/// hum read as a spaceship engine and it is gone.
+/// The forge's sound: one bright hit when the aura maxes out. Ambient, so it
+/// mixes with the user's music and respects the silent switch — onboarding may
+/// not have spoken yet, so no session is set up. No drone under the scan: the
+/// machine hum read as a spaceship engine and it is gone.
 final class ForgeAudio {
     static let shared = ForgeAudio()
     private var oneShot: AVAudioPlayer?
@@ -149,6 +156,8 @@ final class ForgeAudio {
     func auraMax() {
         guard let data = NSDataAsset(name: "sfx_aura_max")?.data,
               let player = try? AVAudioPlayer(data: data, fileTypeHint: "wav") else { return }
+        try? AVAudioSession.sharedInstance().setCategory(.ambient)
+        try? AVAudioSession.sharedInstance().setActive(true)
         player.volume = 0.6
         player.prepareToPlay()
         player.play()

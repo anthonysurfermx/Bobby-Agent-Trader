@@ -9,13 +9,13 @@ struct CompanionOnboarding: View {
     @ObservedObject var profile: AgentProfile
     @ObservedObject var companions: CompanionStore
     @ObservedObject var voice: NeuralVoice
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var step = 0
     @State private var selected: Companion = bobbyCompanions.first(where: { $0.id != "orb" }) ?? bobbyCompanions[0]
     /// The carousel page. `selected` follows it once a swipe or tap lands.
     @State private var pageId: String = (bobbyCompanions.first(where: { $0.id != "orb" }) ?? bobbyCompanions[0]).id
     @State private var pulses: [String: Int] = [:]
-    @State private var greeting: Task<Void, Never>?
     @State private var auraReady = false
     /// Quarters of the forge's first X-ray pass, 0…4.
     @State private var auraCharge = 0
@@ -58,21 +58,19 @@ struct CompanionOnboarding: View {
                 cta
             }
         }
-        .task(id: step) {
+        .task(id: step == 2 && scenePhase == .active) {
             // The scan reports its own finish; this only guarantees the CTA
             // can never stay locked if the model is slow or the render stalls.
-            guard step == 2 else { return }
+            // It counts only while the app is on screen: the scan runs on the
+            // render clock, which stops in the background.
+            guard step == 2, scenePhase == .active else { return }
             try? await Task.sleep(for: .seconds(8))
             if !Task.isCancelled { scanned(4) }
         }
-        .onAppear {
-            MascotAssetCache.preload(starters.map(\.id))
-            greet(selected, after: 0.9)
-        }
-        .onDisappear {
-            greeting?.cancel()
-            MascotAssetCache.purge()
-        }
+        // Step 1 stays silent: the companion's voice arrives in step 2, when
+        // you choose how it talks.
+        .onAppear { MascotAssetCache.preload(starters.map(\.id)) }
+        .onDisappear { MascotAssetCache.purge() }
     }
 
     // MARK: stage
@@ -133,21 +131,7 @@ struct CompanionOnboarding: View {
     private func land(on id: String) {
         guard let comp = starters.first(where: { $0.id == id }), comp.id != selected.id else { return }
         selected = comp
-        voice.stop()
         UISelectionFeedbackGenerator().selectionChanged()
-        greet(comp, after: 0.3)
-    }
-
-    /// Bundled clip, so it starts the moment the swipe settles. A short wait
-    /// keeps a fast flick through the squad from firing every line.
-    private func greet(_ comp: Companion, after delay: Double) {
-        greeting?.cancel()
-        greeting = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled, step == 0, selected.id == comp.id else { return }
-            voice.speakClip("select-\(comp.id)-\(L.ttsLang)", fallbackText: comp.selectLine,
-                            persona: comp.voicePersona, playbackRate: 1.12)
-        }
     }
 
     private func pulse(_ id: String) {
@@ -331,7 +315,6 @@ struct CompanionOnboarding: View {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             switch step {
             case 0:
-                greeting?.cancel()
                 commitCompanion()
                 withAnimation(.spring(duration: 0.42)) { step = 1 }
             case 1:
