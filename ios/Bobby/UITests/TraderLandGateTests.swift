@@ -55,4 +55,52 @@ final class TraderLandGateTests: XCTestCase {
         app.buttons["Restore"].tap()
         XCTAssertEqual(status.label, "FOCUS 1/2 · 8 PLACED")
     }
+
+    private func shot(_ name: String) {
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    /// The archipelago opens from the header, the arrows fly between public
+    /// islands (read-only visits) and "Back to my island" returns home.
+    func testArchipelagoArrowsVisitNeighboursAndReturnHome() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-trader-land-gate", "-land-neighbors-fixture", "-AppleLanguages", "(en)"]
+        app.launch()
+        let status = app.staticTexts["land-fixed-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        shot("practice-island")
+
+        app.buttons["blueprint-crypto_bay_data_dock"].tap()
+        app.buttons["land-build-or-move"].tap()
+        XCTAssertTrue(app.buttons["land-confirm"].waitForExistence(timeout: 5))
+        shot("placement-draft")
+        app.buttons["Cancel placement"].tap()
+
+        app.buttons["land-archipelago"].tap()
+        let card = app.descendants(matching: .any)["land-archipelago-card"]
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        XCTAssertFalse(status.exists)
+        let focused = app.staticTexts["land-focused-island"]
+        XCTAssertTrue(focused.waitForExistence(timeout: 5))
+        XCTAssertEqual(focused.label, "Your practice island")
+        sleep(1)
+        shot("archipelago-fixture")
+
+        app.buttons["land-next-island"].tap()
+        XCTAssertEqual(focused.label, "Harbor of Patience")
+        app.buttons["land-next-island"].tap()
+        XCTAssertEqual(focused.label, "Quiet Reef")
+        sleep(1)
+        shot("visiting-neighbour")
+        app.buttons["land-prev-island"].tap()
+        XCTAssertEqual(focused.label, "Harbor of Patience")
+
+        app.buttons["land-home-island"].tap()
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertFalse(card.exists)
+        XCTAssertTrue(status.label.hasPrefix("FOCUS "))
+    }
 }
