@@ -2,7 +2,7 @@
 // FloatingMascotView — the onboarding stage. One companion, big
 // and alive: framed by its own height so every model reads at the
 // same size, hovering over a soft floor shadow with a slow sway
-// and a faint tremble. The SCNView takes no touches: horizontal
+// (no tremble). The SCNView takes no touches: horizontal
 // drags belong to the pager and taps arrive as `pulseToken` bumps.
 // In the aura forge the sway becomes a 360° turntable and an X-ray
 // scan materializes the companion head to toe (XRayScan, below).
@@ -142,7 +142,7 @@ struct FloatingMascotView: UIViewRepresentable {
         private var statueApplied = false
         private var model: SCNNode?    // the imported model, for the silver pass
 
-        private var pivot: SCNNode?   // hover, sway, tremble
+        private var pivot: SCNNode?   // hover, sway
         private var body: SCNNode?    // breathing, talking, tap pulse
         private var shadow: SCNNode?
         private var cameraNode: SCNNode?
@@ -328,11 +328,10 @@ struct FloatingMascotView: UIViewRepresentable {
                 pivot.eulerAngles = SCNVector3(0, Float(spin), 0)
                 if let step = scan.update(clock: t, lift: pivot.position.y) { report(step) }
             } else {
-                // The tremble: two fast, tiny, out-of-phase wobbles read as a
-                // hum of energy rather than a shake.
-                let tremble = (sin(t * 2 * .pi * 9.1) + 0.6 * sin(t * 2 * .pi * 13.7)) * 0.0045
-                pivot.position = SCNVector3(Float(sin(t * 2 * .pi * 7.3)) * h * 0.0016, Float(hover) * h * 0.035, 0)
-                pivot.eulerAngles = SCNVector3(0, Float(sin(t * 2 * .pi / 7.0) * 0.30), Float(tremble))
+                // Float only: a slow hover and a slow sway. The fast tremble
+                // read as the model vibrating, so it is gone.
+                pivot.position = SCNVector3(0, Float(hover) * h * 0.035, 0)
+                pivot.eulerAngles = SCNVector3(0, Float(sin(t * 2 * .pi / 7.0) * 0.30), 0)
             }
             scale += sin(t * 2 * .pi / 1.9) * 0.010      // breathing
             body.scale = SCNVector3(Float(scale), Float(scale), Float(scale))
