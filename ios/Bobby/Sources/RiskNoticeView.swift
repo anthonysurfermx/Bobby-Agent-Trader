@@ -17,17 +17,19 @@ struct RiskNoticeView: View {
 
     @State private var checks: [Bool] = [false, false, false]
 
+    // Copy rule: every title fits one line and every body at most three,
+    // down to a 375 pt screen. Same three commitments, fewer words.
     private var statements: [(title: String, body: String)] {
         [
             (L.t("Not investment advice.", "No es asesoría de inversión."),
-             L.t("Everything Bobby says — verdicts, levels, entries, stops, XP — is educational market analysis produced by software. It is not a recommendation to buy, sell or hold anything, and it is not tailored to you.",
-                 "Todo lo que dice Bobby (veredictos, niveles, entradas, stops, XP) es análisis educativo generado por software. No es una recomendación de comprar, vender o mantener nada, y no está hecho a tu medida.")),
-            (L.t("Bobby never takes custody or signs for you.", "Bobby nunca toma custodia ni firma por ti."),
-             L.t("The app does not connect wallets, move funds or execute trades. Bobby never holds your money or keys.",
-                 "La app no conecta wallets, no mueve fondos ni ejecuta operaciones. Bobby nunca guarda tu dinero ni tus llaves.")),
-            (L.t("Markets involve risk. You decide.", "Los mercados implican riesgo. Tú decides."),
-             L.t("Prices move against you, data can be delayed or wrong, and you can lose money. Only you own your decisions and their results. If you need advice, talk to a licensed professional.",
-                 "Los precios se mueven en tu contra, los datos pueden llegar tarde o mal, y puedes perder dinero. Solo tú eres dueño de tus decisiones y de sus resultados. Si necesitas asesoría, acude a un profesional autorizado.")),
+             L.t("Verdicts, levels and stops are educational analysis made by software, not recommendations for you.",
+                 "Veredictos, niveles y stops son análisis educativo hecho por software, no recomendaciones para ti.")),
+            (L.t("Bobby never touches your money.", "Bobby nunca toca tu dinero."),
+             L.t("It doesn't connect wallets, move funds, execute trades or hold your keys.",
+                 "No conecta wallets, no mueve fondos, no ejecuta operaciones y no guarda tus llaves.")),
+            (L.t("You can lose money. You decide.", "Puedes perder dinero. Tú decides."),
+             L.t("Data can be late or wrong. If you need advice, talk to a licensed professional.",
+                 "Los datos pueden llegar tarde o mal. Si necesitas asesoría, acude a un profesional autorizado.")),
         ]
     }
 
@@ -65,8 +67,8 @@ struct RiskNoticeView: View {
                         Text(L.t("Read this once. It matters.", "Léelo una vez. Importa."))
                             .font(.rounded(26, .bold))
                             .foregroundStyle(Theme.text)
-                        Text(L.t("Bobby is a market-analysis companion built to make you think, not to tell you what to do with your money.",
-                                 "Bobby es un compañero de análisis de mercado hecho para hacerte pensar, no para decirte qué hacer con tu dinero."))
+                        Text(L.t("Bobby is here to make you think, not to tell you what to do with your money.",
+                                 "Bobby está para hacerte pensar, no para decirte qué hacer con tu dinero."))
                             .font(.rounded(15, .medium))
                             .foregroundStyle(Theme.text.opacity(0.75))
 
@@ -103,8 +105,8 @@ struct RiskNoticeView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(L.t("Data comes from public market sources and can be delayed. Bobby's public calls are recorded on-chain so anyone can check them; that is a track record, not a promise.",
-                                     "Los datos vienen de fuentes públicas de mercado y pueden llegar con retraso. Las llamadas públicas de Bobby se registran on-chain para que cualquiera las revise; eso es historial, no promesa."))
+                            Text(L.t("Bobby's public calls are recorded on-chain so anyone can check them. A track record, not a promise.",
+                                     "Las llamadas públicas de Bobby quedan on-chain para que cualquiera las revise. Historial, no promesa."))
                                 .font(.mono(10, .medium))
                                 .foregroundStyle(Theme.muted)
                             Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
@@ -152,5 +154,10 @@ struct RiskNoticeView: View {
             }
         }
         .interactiveDismissDisabled(!readOnly)
+        .onAppear {
+            // First launch: parse the starters while the human reads, so the
+            // first companion is already on stage when onboarding opens.
+            if !readOnly { MascotAssetCache.preload(bobbyCompanions.filter { $0.requiredLevel == 1 }.map(\.id)) }
+        }
     }
 }

@@ -267,11 +267,11 @@ struct MascotGalleryView: View {
             justChosen = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             // In its OWN voice persona — the whole point of choosing it
-            voice?.speak(selected.selectLine, voiceId: voiceId, persona: selected.voicePersona, playbackRate: 1.12)
+            voice?.speakClip("select-\(selected.id)-\(L.ttsLang)", fallbackText: selected.selectLine, persona: selected.voicePersona, playbackRate: 1.12)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { justChosen = false }
         } label: {
-            Text(isActive ? (justChosen ? L.t("✓ YOUR COMPANION NOW", "✓ AHORA ES TU COMPANION") : L.t("✓ YOUR COMPANION", "✓ TU COMPANION")) :
-                 isUnlocked ? L.t("MAKE IT MY COMPANION", "HACER MI COMPANION") : L.t("🔒 LEVEL \(selected.requiredLevel) REQUIRED", "🔒 NIVEL \(selected.requiredLevel) REQUERIDO"))
+            Text(isActive ? (justChosen ? L.t("✓ YOUR FRIEND NOW", "✓ AHORA ESTÁ CONTIGO") : L.t("✓ YOUR FRIEND", "✓ ESTÁ CONTIGO")) :
+                 isUnlocked ? L.t("PICK \(selected.label)", "ELEGIR A \(selected.label)") : L.t("🔒 LEVEL \(selected.requiredLevel) REQUIRED", "🔒 NIVEL \(selected.requiredLevel) REQUERIDO"))
                 .font(.mono(12, .black))
                 .kerning(2.0)
                 .frame(maxWidth: .infinity)

@@ -33,7 +33,7 @@ enum DeskPhase: Int, CaseIterable {
 
     var hint: String {
         switch self {
-        case .idle: return L.t("Tap your companion and name an asset", "Toca a tu companion y nombra un activo")
+        case .idle: return L.t("Tap your companion and name an asset", "Toca a tu amigo y nombra un activo")
         case .resolving: return L.t("Resolving ticker and venue", "Resolviendo ticker y venue")
         case .alpha: return L.t("Hunting the opportunity", "Buscando la oportunidad")
         case .redTeam: return L.t("Attacking the thesis", "Atacando la tesis")
@@ -1432,7 +1432,7 @@ struct ContentView: View {
                 ? L.t("Hands-free · say your next question", "Manos libres · di tu siguiente pregunta")
                 : L.t("Speak normally · it sends when you stop", "Habla normal · se envía cuando terminas")
         }
-        if vm.voice.speaking { return L.t("Your companion reacts to the voice in real time", "Tu companion reacciona a la voz en tiempo real") }
+        if vm.voice.speaking { return L.t("Your companion reacts to the voice in real time", "Tu amigo reacciona a tu voz en tiempo real") }
         return vm.phase.hint
     }
 

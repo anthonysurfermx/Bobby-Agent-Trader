@@ -12,8 +12,10 @@ struct CompanionOnboarding: View {
 
     @State private var step = 0
     @State private var selected: Companion = bobbyCompanions.first(where: { $0.id != "orb" }) ?? bobbyCompanions[0]
-    @State private var sceneLoading = false
-    @State private var sceneFailed = false
+    /// The carousel page. `selected` follows it once a swipe or tap lands.
+    @State private var pageId: String = (bobbyCompanions.first(where: { $0.id != "orb" }) ?? bobbyCompanions[0]).id
+    @State private var pulses: [String: Int] = [:]
+    @State private var greeting: Task<Void, Never>?
     @State private var loadoutReady = false
     @State private var auraCharge = 0
 
@@ -57,32 +59,94 @@ struct CompanionOnboarding: View {
                 cta
             }
         }
+        .onAppear {
+            MascotAssetCache.preload(starters.map(\.id))
+            greet(selected, after: 0.9)
+        }
+        .onDisappear {
+            greeting?.cancel()
+            MascotAssetCache.purge()
+        }
     }
 
     // MARK: stage
 
+    @ViewBuilder
     private var stage: some View {
-        ZStack {
-            MascotSceneView(
-                assetName: selected.id,
-                interactive: true,
-                speaking: voice.speaking,
-                voiceLevel: voice.level,
-                onLoading: { loading, failed in
-                    sceneLoading = loading
-                    sceneFailed = failed
-                }
-            )
-            .id(selected.id)
-            if sceneLoading && !sceneFailed {
-                ProgressView().tint(tint)
-            }
-            if sceneFailed {
-                CompanionThumb(companion: selected)
-                    .frame(width: 160, height: 160)
-                    .clipShape(Circle())
+        if step == 0 {
+            carousel
+        } else {
+            CompanionStagePage(companion: selected, active: true,
+                               speaking: voice.speaking, voiceLevel: voice.level,
+                               pulseToken: pulses[selected.id, default: 0])
+                .contentShape(Rectangle())
+                .onTapGesture { pulse(selected.id) }
+        }
+    }
+
+    /// Swipe the companion itself. Every starter is the same size on stage
+    /// and only the page on screen floats; its line plays once the swipe lands.
+    private var carousel: some View {
+        TabView(selection: $pageId) {
+            ForEach(starters) { comp in
+                let onStage = comp.id == pageId
+                CompanionStagePage(companion: comp, active: onStage,
+                                   speaking: onStage && voice.speaking,
+                                   voiceLevel: onStage ? voice.level : 0,
+                                   pulseToken: pulses[comp.id, default: 0])
+                    .contentShape(Rectangle())
+                    .onTapGesture { pulse(comp.id) }
+                    .tag(comp.id)
             }
         }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .overlay(alignment: .leading) { pageArrow(-1) }
+        .overlay(alignment: .trailing) { pageArrow(1) }
+        .onChange(of: pageId) { _, id in land(on: id) }
+    }
+
+    private func pageArrow(_ direction: Int) -> some View {
+        let ids = starters.map(\.id)
+        let target = (ids.firstIndex(of: pageId) ?? 0) + direction
+        let exists = ids.indices.contains(target)
+        return Button {
+            guard ids.indices.contains(target) else { return }
+            withAnimation(.spring(duration: 0.45)) { pageId = ids[target] }
+        } label: {
+            Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Theme.text.opacity(0.4))
+                .frame(width: 44, height: 96)
+                .contentShape(Rectangle())
+        }
+        .opacity(exists ? 1 : 0)
+        .disabled(!exists)
+        .accessibilityLabel(direction < 0 ? L.t("Previous friend", "Amigo anterior") : L.t("Next friend", "Siguiente amigo"))
+    }
+
+    private func land(on id: String) {
+        guard let comp = starters.first(where: { $0.id == id }), comp.id != selected.id else { return }
+        selected = comp
+        voice.stop()
+        UISelectionFeedbackGenerator().selectionChanged()
+        greet(comp, after: 0.3)
+    }
+
+    /// Bundled clip, so it starts the moment the swipe settles. A short wait
+    /// keeps a fast flick through the squad from firing every line.
+    private func greet(_ comp: Companion, after delay: Double) {
+        greeting?.cancel()
+        greeting = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, step == 0, selected.id == comp.id else { return }
+            voice.speakClip("select-\(comp.id)-\(L.ttsLang)", fallbackText: comp.selectLine,
+                            persona: comp.voicePersona, playbackRate: 1.12)
+        }
+    }
+
+    private func pulse(_ id: String) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        pulses[id, default: 0] += 1
     }
 
     // MARK: header
@@ -92,9 +156,9 @@ struct CompanionOnboarding: View {
             HStack {
                 HStack(spacing: 8) {
                     Circle().fill(tint).frame(width: 7, height: 7).shadow(color: tint, radius: 7)
-                    Text(step == 2
-                         ? L.t("BOBBY // PREPPING AURA", "BOBBY // PREPARANDO AURA")
-                         : L.t("BOBBY // MEET YOUR SQUAD", "BOBBY // CONOCE AL SQUAD"))
+                    Text(step == 2 ? L.t("BOBBY // PREPPING AURA", "BOBBY // PREPARANDO AURA")
+                         : step == 1 ? L.t("BOBBY // THEIR VIBE", "BOBBY // SU VIBRA")
+                         : L.t("BOBBY // PICK YOUR FRIEND", "BOBBY // ELIGE A TU AMIGO"))
                         .font(.mono(11, .bold))
                         .kerning(1.9)
                         .foregroundStyle(Theme.text.opacity(0.78))
@@ -137,14 +201,13 @@ struct CompanionOnboarding: View {
             }
             .animation(.easeOut(duration: 0.25), value: selected.id)
 
+            ScrollViewReader { strip in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(starters) { comp in
                         Button {
-                            guard comp.id != selected.id else { return }
-                            selected = comp
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            voice.speak(comp.selectLine, voiceId: comp.voicePersona, persona: comp.voicePersona, essential: false, playbackRate: 1.12)
+                            guard comp.id != pageId else { return }
+                            withAnimation(.spring(duration: 0.45)) { pageId = comp.id }
                         } label: {
                             VStack(spacing: 5) {
                                 CompanionThumb(companion: comp)
@@ -160,15 +223,20 @@ struct CompanionOnboarding: View {
                                     .foregroundStyle(comp.id == selected.id ? comp.tintSoft : Theme.muted)
                             }
                         }
+                        .id(comp.id)
                         .accessibilityLabel(comp.label)
                         .accessibilityAddTraits(comp.id == selected.id ? [.isSelected] : [])
                     }
                 }
                 .padding(.horizontal, 2)
             }
+            .onChange(of: pageId) { _, id in
+                withAnimation(.easeOut(duration: 0.3)) { strip.scrollTo(id, anchor: .center) }
+            }
+            }
 
-            Text(L.t("Tap one — it introduces itself. More of the squad unlocks as you level up.",
-                     "Toca uno — se presenta solo. El resto del squad se desbloquea al subir de nivel."))
+            Text(L.t("Swipe to meet them. More friends unlock as you level up.",
+                     "Desliza para conocerlos. Más amigos se desbloquean al subir de nivel."))
                 .font(.mono(9, .medium))
                 .kerning(0.6)
                 .foregroundStyle(Theme.muted.opacity(0.8))
@@ -194,7 +262,8 @@ struct CompanionOnboarding: View {
                     Button {
                         profile.vibeId = vibe.rawValue
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speak(vibe.sample, voiceId: selected.voicePersona, persona: selected.voicePersona, vibe: vibe.rawValue, essential: false, playbackRate: 1.12)
+                        voice.speakClip("vibe-\(vibe.rawValue)-\(selected.voicePersona)-\(L.ttsLang)", fallbackText: vibe.sample,
+                                        persona: selected.voicePersona, vibe: vibe.rawValue, playbackRate: 1.12)
                     } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
@@ -229,6 +298,7 @@ struct CompanionOnboarding: View {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             switch step {
             case 0:
+                greeting?.cancel()
                 commitCompanion()
                 withAnimation(.spring(duration: 0.42)) { step = 1 }
             case 1:
@@ -246,7 +316,7 @@ struct CompanionOnboarding: View {
         } label: {
             HStack {
                 Text(step == 0
-                     ? L.t("MAKE IT MY COMPANION", "HACER MI COMPANION")
+                     ? L.t("PICK \(selected.name(at: 1))", "ELEGIR A \(selected.name(at: 1))")
                      : step == 1 ? L.t("NEXT", "SIGUE")
                      : loadoutReady ? L.t("DROP INTO THE DESK", "ENTRAR AL DESK") : L.t("EQUIPPING…", "EQUIPANDO…"))
                     .font(.mono(12, .bold))
@@ -277,5 +347,38 @@ struct CompanionOnboarding: View {
         companions.companionId = selected.id
         profile.voiceId = selected.voicePersona
         profile.auraText = AuraForge.keyword(nearest: selected.hue)
+    }
+}
+
+/// One companion on the onboarding stage: fades in once its model is built,
+/// falls back to the portrait only if the GLB cannot load at all.
+private struct CompanionStagePage: View {
+    let companion: Companion
+    let active: Bool
+    let speaking: Bool
+    let voiceLevel: CGFloat
+    let pulseToken: Int
+    @State private var ready = false
+    @State private var failed = false
+
+    var body: some View {
+        ZStack {
+            FloatingMascotView(assetName: companion.id, active: active, speaking: speaking,
+                               voiceLevel: voiceLevel, pulseToken: pulseToken) { loaded in
+                withAnimation(.easeOut(duration: 0.3)) {
+                    ready = loaded
+                    failed = !loaded
+                }
+            }
+            .opacity(ready ? 1 : 0)
+            .scaleEffect(ready ? 1 : 0.94)
+            if failed {
+                CompanionThumb(companion: companion)
+                    .frame(width: 220, height: 220)
+                    .clipShape(Circle())
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(companion.label)
     }
 }

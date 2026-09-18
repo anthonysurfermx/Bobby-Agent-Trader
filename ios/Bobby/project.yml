@@ -61,6 +61,8 @@ targets:
       - Assets.xcassets
       - path: Resources/Mascots
         buildPhase: resources
+      - path: Resources/Voice
+        buildPhase: resources
       - path: ../../public/land/v1/gate-A
         type: folder
         buildPhase: resources

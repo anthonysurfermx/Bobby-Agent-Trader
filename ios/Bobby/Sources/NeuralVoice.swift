@@ -74,35 +74,54 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                     if attempt < 2 { try? await Task.sleep(nanoseconds: 1_200_000_000) }
                 }
                 guard gen == self.generation else { return }
-                guard let (data, _) = payload else {
+                guard let (data, _) = payload, self.play(data, playbackRate: playbackRate) else {
                     if essential { self.speakFallback(text) } else { self.speaking = false }
                     return
                 }
-                try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
-                try? AVAudioSession.sharedInstance().setActive(true)
-                let p = try AVAudioPlayer(data: data)
-                p.delegate = self
-                p.isMeteringEnabled = true
-                // Short character introductions need a little more momentum
-                // than data-heavy analysis. Keep the default at 1× and let
-                // onboarding/squad previews opt into the livelier cadence.
-                p.enableRate = playbackRate != 1.0
-                p.rate = min(1.25, max(0.85, playbackRate))
-                self.player = p
-                self.speaking = true
-                guard p.play() else {
-                    self.player = nil
-                    self.speaking = false
-                    self.speakFallback(text)
-                    return
-                }
-                self.startMetering(p)
             } catch {
                 if gen == self.generation {
                     if essential { self.speakFallback(text) } else { self.speaking = false }
                 }
             }
         }
+    }
+
+    /// A clip bundled with the app, rendered offline by the same
+    /// /api/bobby-voice-free voice: it starts instantly and needs no network.
+    /// A missing clip falls back to the network voice for `fallbackText`.
+    func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
+        guard let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
+              let data = try? Data(contentsOf: url) else {
+            speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)
+            return
+        }
+        stop()
+        fallbackPersona = persona
+        fallbackPlaybackRate = playbackRate
+        play(data, playbackRate: playbackRate)
+    }
+
+    @discardableResult
+    private func play(_ data: Data, playbackRate: Float) -> Bool {
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        guard let p = try? AVAudioPlayer(data: data) else { return false }
+        p.delegate = self
+        p.isMeteringEnabled = true
+        // Short character introductions need a little more momentum
+        // than data-heavy analysis. Keep the default at 1× and let
+        // onboarding/squad previews opt into the livelier cadence.
+        p.enableRate = playbackRate != 1.0
+        p.rate = min(1.25, max(0.85, playbackRate))
+        player = p
+        speaking = true
+        guard p.play() else {
+            player = nil
+            speaking = false
+            return false
+        }
+        startMetering(p)
+        return true
     }
 
     /// The app's vibe ids (chill/directo/pro) are not the TTS endpoint's

@@ -595,7 +595,7 @@ struct GearCatalogSheet: View {
                 }
                 if let pet = CompanionToolkit.pet(for: current.id) {
                     row(glyph: pet.hasArt ? nil : pet.emoji, art: pet.hasArt ? pet.assetName : nil, title: pet.name,
-                        subtitle: pet.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu companion."),
+                        subtitle: pet.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."),
                         needXP: CompanionPet.unlockXP, needLevel: nil, tint: current.tint, item: .pet(pet, current))
                 }
 
@@ -681,7 +681,7 @@ struct GearCatalogSheet: View {
             preview = item
         }
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint(L.t("Shows the item worn by its companion", "Muestra el item puesto en su companion"))
+        .accessibilityHint(L.t("Shows the item worn by its companion", "Muestra el item que lleva tu amigo"))
     }
 }
 
@@ -719,7 +719,7 @@ struct ItemPreviewSheet: View {
     private var lore: String {
         switch item {
         case .tool(let t, _): return t.lore
-        case .pet(let p, _): return p.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu companion.")
+        case .pet(let p, _): return p.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo.")
         }
     }
     private var needXP: Int {
@@ -866,7 +866,7 @@ struct PetDetailSheet: View {
             }
             Text(pet?.name ?? "").font(.rounded(22, .bold)).foregroundStyle(Theme.text)
             Text(has
-                 ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu companion."))
+                 ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."))
                  : L.t("Unlocks at \(CompanionPet.unlockXP) XP · you have \(xp). Discipline only.", "Se desbloquea a \(CompanionPet.unlockXP) XP · llevas \(xp). Solo disciplina."))
                 .font(.rounded(14, .medium)).foregroundStyle(Theme.text.opacity(0.75)).multilineTextAlignment(.center).padding(.horizontal, 28)
             Spacer()
