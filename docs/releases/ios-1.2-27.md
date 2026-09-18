@@ -61,6 +61,39 @@ the model" in the Squad, and locked ones read as black holes behind a lock.
 - Tests: unit 4/4, CompanionLoadTests 18/18, SquadGalleryTests 4/4 (18/18
   companions on the Squad stage); Release configuration compiles.
 
+## Build 30: the desk's "+" becomes the locker (VITRINA)
+Anthony's report (screens from live 1.1): the "+" was a long list of every
+companion and item that overwhelmed, and the preview of many companions was
+empty (1.1's Draco models; the 3D preview itself worked in 29).
+- New `SquadLockerSheet` (Sources/SquadLocker.swift), designed by a three-lens
+  judge panel: the onboarding carousel for the whole squad, yours first, then
+  by unlock level. Each page is one big companion (silver figurine if locked,
+  with "LEVEL 3 · +20 XP") and four boxes: three gear pieces and the pet.
+- Boxes: owned in colour, locked in silver with a lock and the exact XP it
+  takes ("+70", "1ST READ"), golden with a gold hairline and, once owned, a
+  shimmer. The next drop carries a thin progress bar.
+- Tap a box: the piece floats next to the companion with its lore. Locked
+  pieces open in full colour, then cool to silver; hold to see the colour
+  again. Your own owned gear offers SEE IT WORN: the sheet closes and the
+  piece flies onto you on the desk (the existing equip animation), instead of
+  a flat plane pinned on a model in a nested sheet.
+- A counter (24/72, gold star at 72/72) and a strip of faces with loot dots.
+  NEW flags only pieces that dropped after your first open; a dot on "+"
+  says there is something new.
+- At most three SCNViews (the page and its neighbours), only the one on
+  screen renders; parsed models are windowed to ±2 and purged on close; the
+  desk scene pauses under the sheet; a memory warning drops to one live model.
+- Removed: GearCatalogSheet, ItemPreviewSheet, BodySlot.label.
+- Pets: iOS had 10 of 18 defined and 12 of 18 PNGs. Added the 8 wave 2 pets
+  (names from web; Zuri's is "Trace el zorro" on iOS, web says "la zorra")
+  and copied the 6 missing wave 1 PNGs from `public/pets`. Nothing generated.
+- Inventory for Anthony: none of the 72 items is 3D (only the 18 companions
+  are); `docs/qa/gear-inventory-2026-09-18.md` has the full table.
+- DEBUG: `-qa-locker [-qa-locker-fresh] [-qa-focus <itemId>]`.
+- Tests: unit 12/12 (LockerLedgerTests 8), CompanionLoadTests 18/18,
+  SquadGalleryTests 4/4, LockerTests 6/6 (all 18 pages load, never more than
+  3 live SCNViews).
+
 ## Before App Review (not done here)
 - Sign in with Apple token revocation on account deletion is missing
   (api/account.ts deletes the Supabase user but never calls Apple's

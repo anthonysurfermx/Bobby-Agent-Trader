@@ -371,6 +371,8 @@ struct ContentView: View {
                 ToolUnlockOverlay(companion: comp, tool: drop) {
                     withAnimation(.easeOut(duration: 0.3)) { _ = vm.companions.pendingToolUnlocks.removeFirst() }
                     // Now it is worn: play the equip flight on the desk scene.
+                    // Celebrated here, so the locker does not flag it NEW.
+                    LockerSeen.mark([drop.id])
                     equipToolId = drop.id
                     equipToken += 1
                 }
@@ -412,9 +414,16 @@ struct ContentView: View {
                 .presentationBackground(Theme.bg)
         }
         .sheet(isPresented: $showCatalog) {
-            GearCatalogSheet(current: vm.companions.companion ?? bobbyCompanions[0], xp: vm.companions.disciplineXP, level: vm.companions.level.number)
-                .presentationDetents([.large])
-                .presentationBackground(Theme.bg)
+            // The locker. SEE IT WORN closes it, then the piece flies onto the desk companion.
+            SquadLockerSheet(store: vm.companions) { tool in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    equipToolId = tool.id
+                    equipToken += 1
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Theme.bg)
         }
         .sheet(isPresented: $showWorld) {
             TraderLandGateHarnessView()
@@ -651,7 +660,9 @@ struct ContentView: View {
                             equipToolId: equipToolId,
                             equipToken: equipToken,
                             snapshotToken: skinSnapshotToken,
-                            onSnapshot: { shot in skinShot = shot }
+                            onSnapshot: { shot in skinShot = shot },
+                            // Hidden under the locker sheet: hold still, save the GPU.
+                            paused: showCatalog
                         )
                             .allowsHitTesting(false)
                             .frame(width: 206, height: 208)
@@ -716,6 +727,8 @@ struct ContentView: View {
                     petDetail = true
                 }, onPlus: {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    // Parse the first pages before the sheet slides up.
+                    MascotAssetCache.preload(LockerLedger.order(ownId: vm.companions.companionId).prefix(3).map(\.id))
                     showCatalog = true
                 }, onWorld: {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()

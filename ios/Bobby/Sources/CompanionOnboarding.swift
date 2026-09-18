@@ -368,32 +368,40 @@ struct CompanionOnboarding: View {
 
 /// One companion on the onboarding stage: fades in once its model is built,
 /// falls back to the portrait only if the GLB cannot load at all.
-private struct CompanionStagePage: View {
+struct CompanionStagePage: View {
     let companion: Companion
     let active: Bool
     let speaking: Bool
     let voiceLevel: CGFloat
     let pulseToken: Int
     var forge: FloatingMascotView.ForgeScan? = nil
+    /// Locked companion (the locker): the silver figurine, portrait included.
+    var statue = false
+    /// The locker never shows an empty stage: the portrait holds the spot
+    /// until the model is in.
+    var portraitUntilReady = false
+    var onReady: ((Bool) -> Void)? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var ready = false
     @State private var failed = false
 
     var body: some View {
         ZStack {
+            if failed || (portraitUntilReady && !ready) {
+                CompanionPortrait(companion: companion, silver: statue, size: portraitUntilReady ? 180 : 220)
+                    .transition(.opacity)
+            }
             FloatingMascotView(assetName: companion.id, active: active, speaking: speaking,
-                               voiceLevel: voiceLevel, pulseToken: pulseToken, forge: forge) { loaded in
+                               voiceLevel: voiceLevel, pulseToken: pulseToken, forge: forge,
+                               statue: statue) { loaded in
                 withAnimation(.easeOut(duration: 0.3)) {
                     ready = loaded
                     failed = !loaded
                 }
+                onReady?(loaded)
             }
             .opacity(ready ? 1 : 0)
-            .scaleEffect(ready ? 1 : 0.94)
-            if failed {
-                CompanionThumb(companion: companion)
-                    .frame(width: 220, height: 220)
-                    .clipShape(Circle())
-            }
+            .scaleEffect(ready || reduceMotion ? 1 : 0.94)
         }
         .accessibilityElement()
         .accessibilityLabel(companion.label)

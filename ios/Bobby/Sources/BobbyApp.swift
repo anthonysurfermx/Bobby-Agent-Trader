@@ -32,6 +32,8 @@ struct BobbyApp: App {
                     GearSkinQAFixtureView()
                 } else if ProcessInfo.processInfo.arguments.contains("-qa-squad") {
                     SquadQAFixtureView()
+                } else if ProcessInfo.processInfo.arguments.contains("-qa-locker") {
+                    LockerQAFixtureView()
                 } else {
                     ContentView()
                 }

@@ -39,6 +39,10 @@ enum MascotAssetCache {
 
     static func preload(_ names: [String]) { names.forEach { load($0) { _ in } } }
 
+    /// The locker's sliding window: parsed models outside it are dropped.
+    /// Loads still in flight are left alone.
+    static func keep(only names: Set<String>) { assets = assets.filter { names.contains($0.key) } }
+
     /// Onboarding is over: the desk has its own loader.
     static func purge() { assets.removeAll() }
 }
@@ -54,6 +58,8 @@ struct FloatingMascotView: UIViewRepresentable {
     /// Set on the aura forge: the companion spins 360° and an X-ray scan
     /// sweeps it head to toe. Read once, when the model is built.
     var forge: ForgeScan? = nil
+    /// Locked companion: the silver figurine (see MascotStatue).
+    var statue = false
     var onReady: ((_ loaded: Bool) -> Void)? = nil
 
     struct ForgeScan {
@@ -64,9 +70,19 @@ struct FloatingMascotView: UIViewRepresentable {
         let onProgress: (Int) -> Void
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    // Seeded with the current tap count: a stage rebuilt later (the locker's
+    // sliding window) must not replay a tap from before it existed.
+    func makeCoordinator() -> Coordinator { Coordinator(pulseToken: pulseToken) }
+
+#if DEBUG
+    /// SCNViews alive right now — the locker's UI test caps it at 3.
+    static var liveViews = 0
+#endif
 
     func makeUIView(context: Context) -> SCNView {
+#if DEBUG
+        Self.liveViews += 1
+#endif
         let view = LayoutReportingSCNView()
         view.backgroundColor = .clear
         view.isUserInteractionEnabled = false
@@ -87,6 +103,9 @@ struct FloatingMascotView: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ view: SCNView, coordinator: Coordinator) {
+#if DEBUG
+        liveViews -= 1
+#endif
         coordinator.token += 1
         view.delegate = nil
         view.isPlaying = false
@@ -112,7 +131,16 @@ struct FloatingMascotView: UIViewRepresentable {
         private var level: Double = 0
         private var reduceMotion = false
         private var lastPulseToken = 0
+
+        init(pulseToken: Int) {
+            lastPulseToken = pulseToken
+            super.init()
+        }
         private var pulseAt: Double = -10
+
+        private var statue = false
+        private var statueApplied = false
+        private var model: SCNNode?    // the imported model, for the silver pass
 
         private var pivot: SCNNode?   // hover, sway, tremble
         private var body: SCNNode?    // breathing, talking, tap pulse
@@ -139,6 +167,11 @@ struct FloatingMascotView: UIViewRepresentable {
             level = Double(owner.voiceLevel)
             reduceMotion = UIAccessibility.isReduceMotionEnabled
             forge = owner.forge
+            statue = owner.statue
+            if let model, statue != statueApplied {
+                statueApplied = statue
+                MascotStatue.apply(statue, to: model)
+            }
             view.isPlaying = owner.active
             view.rendersContinuously = owner.active
             if owner.pulseToken != lastPulseToken {
@@ -213,6 +246,9 @@ struct FloatingMascotView: UIViewRepresentable {
             cameraNode.camera = camera
             scene.rootNode.addChildNode(cameraNode)
 
+            self.model = offset
+            statueApplied = statue
+            if statue { MascotStatue.apply(true, to: offset) }
             self.pivot = pivot
             self.body = body
             self.shadow = shadow
