@@ -396,17 +396,28 @@ final class CompanionStore: ObservableObject {
     /// a single day keeps the streak; two or more resets it).
     private let maxDailyAwards = 3
 
+    /// What one award granted: the points the cap allowed and the queued
+    /// event id the server answers about (nil when the cap rejected it).
+    struct DisciplineAward: Equatable { let points: Int; let eventID: String? }
+
     /// Returns the points actually awarded — 0 when the daily cap already
     /// rejected the award. The UI must show THIS number, never the intent.
     @discardableResult
-    func awardDiscipline(_ points: Int, kind: String = "read_complete", now: Date = Date()) -> Int {
+    func awardDiscipline(_ points: Int, kind: String = "read_complete", thesis: AwardThesis? = nil, now: Date = Date()) -> Int {
+        awardDisciplineEvent(points, kind: kind, thesis: thesis, now: now).points
+    }
+
+    /// Same award, also returning the queued event id so the desk can follow
+    /// the Trader Land piece the server plants for it.
+    @discardableResult
+    func awardDisciplineEvent(_ points: Int, kind: String = "read_complete", thesis: AwardThesis? = nil, now: Date = Date()) -> DisciplineAward {
         let cal = Calendar.current
 
         // Daily cap
         var dailyCount = defaults.integer(forKey: Key.dailyAwards)
         if let day = defaults.object(forKey: Key.dailyAwardsDay) as? Date,
            cal.isDate(day, inSameDayAs: now) {
-            guard dailyCount < maxDailyAwards else { return 0 }
+            guard dailyCount < maxDailyAwards else { return DisciplineAward(points: 0, eventID: nil) }
             dailyCount += 1
         } else {
             dailyCount = 1
@@ -444,7 +455,8 @@ final class CompanionStore: ObservableObject {
         }
         defaults.set(now, forKey: Key.lastDay)
         // Queue for the server (same rules there; it is the authority once signed in).
-        pendingAwards.append(PendingAward(id: UUID().uuidString.lowercased(), kind: kind, at: ISO8601DateFormatter().string(from: now), tzOffsetMin: -TimeZone.current.secondsFromGMT(for: now) / 60))
-        return points
+        let eventID = UUID().uuidString.lowercased()
+        pendingAwards.append(PendingAward(id: eventID, kind: kind, at: ISO8601DateFormatter().string(from: now), tzOffsetMin: -TimeZone.current.secondsFromGMT(for: now) / 60, thesis: thesis))
+        return DisciplineAward(points: points, eventID: eventID)
     }
 }

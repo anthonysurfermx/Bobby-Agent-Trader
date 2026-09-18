@@ -3,12 +3,109 @@
 // re-applies the rules server-side and answers with the authoritative state
 // (XP, streak, aura, Discovery Route). Mirrors src/lib/companions/sync.ts.
 import Foundation
+import Combine
 
 struct PendingAward: Codable, Equatable {
     let id: String
     let kind: String      // read_complete | no_trade_respected | thesis_closed
     let at: String        // ISO-8601
     let tzOffsetMin: Int
+    /// The read this award came from; its seed is reviewed against it in 24 h.
+    /// Queues persisted before build 31 have none and still decode.
+    var thesis: AwardThesis? = nil
+}
+
+/// The read a Trader Land seed is reviewed against. Mirrors ThesisSchema
+/// (api/_lib/thesis-rules.ts) and the web desk's ThesisSnapshot.
+struct AwardThesis: Codable, Equatable {
+    let symbol: String
+    let isEquity: Bool
+    let direction: String   // long | short | none
+    let price: Double?
+    let entry: Double?
+    let stop: Double?
+    let target: Double?
+
+    /// nil when the symbol fails the server's pattern (it would drop the thesis anyway).
+    /// Levels keep only positive finite values, like the web's `level(v)`.
+    static func make(symbol: String, isEquity: Bool, direction: String?, price: Double?, entry: Double?, stop: Double?, target: Double?) -> AwardThesis? {
+        let sym = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard sym.range(of: #"^[A-Z0-9][A-Z0-9.-]{0,19}$"#, options: .regularExpression) != nil else { return nil }
+        func level(_ v: Double?) -> Double? { v.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } }
+        let dir = direction?.lowercased() ?? ""
+        return AwardThesis(symbol: sym, isEquity: isEquity, direction: dir == "long" || dir == "short" ? dir : "none",
+                           price: level(price), entry: level(entry), stop: level(stop), target: level(target))
+    }
+
+    /// `events[i].thesis` for /api/progress; a missing level travels as null.
+    var body: [String: Any] {
+        func json(_ v: Double?) -> Any { v.map { $0 as Any } ?? NSNull() }
+        return ["symbol": symbol, "isEquity": isEquity, "direction": direction,
+                "price": json(price), "entry": json(entry), "stop": json(stop), "target": json(target)]
+    }
+}
+
+/// The Trader Land piece an awarded event planted (RouteGrant in api/_lib/trader-land.ts).
+struct RouteGrant: Equatable {
+    struct Piece: Equatable {
+        let id: String
+        let world: String?
+        let kind: String?
+        let nameEN: String?
+        let footprint: [Int]
+        /// The database keeps English on both sides; Spanish comes from the bundled names.
+        var displayName: String {
+            L.isSpanish ? TraderLandCatalog.name(id, district: world) : (nameEN ?? TraderLandCatalog.name(id, district: world))
+        }
+    }
+    let routeIndex: Int
+    /// nil once the route is complete.
+    let item: Piece?
+    let inventoryId: String?
+    /// seed (a read, reviewable in 24 h) | bloomed (NO TRADE respected, buildable now) | nil
+    let state: String?
+    let routeComplete: Bool
+}
+
+/// What /api/progress did with one queued award.
+struct AwardOutcome: Equatable {
+    enum Grant: Equatable {
+        /// No `world` key: nothing planted (daily cap, or an event already counted).
+        case notPlanted
+        /// `world: null`: the grant failed server-side; the island catches up later.
+        case failed
+        case planted(RouteGrant)
+    }
+    let id: String
+    let awarded: Int
+    let duplicate: Bool
+    let grant: Grant
+
+    /// Parses `results[]` of a POST /api/progress response.
+    static func parse(results: [[String: Any]]) -> [AwardOutcome] {
+        results.compactMap { r in
+            guard let id = r["id"] as? String else { return nil }
+            let grant: Grant
+            if let raw = r["world"] {
+                // null (or anything unreadable) = the grant failed on the server.
+                if let w = raw as? [String: Any] {
+                    let item = (w["item"] as? [String: Any]).flatMap { i -> RouteGrant.Piece? in
+                        guard let pid = i["id"] as? String else { return nil }
+                        return RouteGrant.Piece(id: pid, world: i["world"] as? String, kind: i["kind"] as? String,
+                                                nameEN: (i["name"] as? [String: Any])?["en"] as? String,
+                                                footprint: i["footprint"] as? [Int] ?? [1, 1])
+                    }
+                    grant = .planted(RouteGrant(routeIndex: w["routeIndex"] as? Int ?? 0, item: item, inventoryId: w["inventoryId"] as? String,
+                                                state: w["state"] as? String, routeComplete: w["routeComplete"] as? Bool ?? false))
+                } else {
+                    grant = .failed
+                }
+            } else {
+                grant = .notPlanted
+            }
+            return AwardOutcome(id: id, awarded: r["awarded"] as? Int ?? 0, duplicate: r["duplicate"] as? Bool ?? false, grant: grant)
+        }
+    }
 }
 
 struct ServerProgress {
@@ -18,10 +115,14 @@ struct ServerProgress {
 }
 
 @MainActor
-final class ProgressSync {
+final class ProgressSync: ObservableObject {
     static let shared = ProgressSync()
     enum Status { case idle, syncing, synced, unauthenticated, error }
-    private(set) var status: Status = .idle
+    @Published private(set) var status: Status = .idle
+    /// The server's answer per queued award id (this launch): what it awarded and planted.
+    @Published private(set) var outcomes: [String: AwardOutcome] = [:]
+    /// Bumps after every round that acknowledged awards: the island may hold a new piece.
+    @Published private(set) var acknowledgedRounds = 0
     private var inflight = false
 
     /// One round trip: POST when awards are pending (or never synced), GET otherwise.
@@ -44,6 +145,18 @@ final class ProgressSync {
         status = .synced
     }
 
+    /// Syncs, then waits (bounded) for the server's answer about one queued award.
+    /// A sync already in flight carries it in its next round. nil = no answer
+    /// (offline, signed out, server error): the award stays queued for later.
+    func outcome(for eventID: String, store: CompanionStore, profile: AgentProfile, timeout: TimeInterval = 45) async -> AwardOutcome? {
+        await sync(store: store, profile: profile)
+        let deadline = Date().addingTimeInterval(timeout)
+        while outcomes[eventID] == nil, inflight, Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return outcomes[eventID]
+    }
+
     private func round(store: CompanionStore, profile: AgentProfile, platform: String, token: String, pending: [PendingAward], mustPost: Bool, uid: String) async -> Bool {
         do {
             var req = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/progress"))
@@ -54,7 +167,11 @@ final class ProgressSync {
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 var profileBody: [String: Any] = ["companionId": store.companionId as Any, "onboarded": profile.onboarded, "riskNoticeVersion": profile.riskNoticeVersion]
                 if store.syncedAt == nil, store.disciplineXP > 0 { profileBody["localXpClaim"] = store.disciplineXP }
-                let events = pending.map { ["id": $0.id, "kind": $0.kind, "at": $0.at, "tzOffsetMin": $0.tzOffsetMin] as [String: Any] }
+                let events = pending.map { award -> [String: Any] in
+                    var event: [String: Any] = ["id": award.id, "kind": award.kind, "at": award.at, "tzOffsetMin": award.tzOffsetMin]
+                    if let thesis = award.thesis { event["thesis"] = thesis.body }
+                    return event
+                }
                 req.httpBody = try JSONSerialization.data(withJSONObject: ["platform": platform, "events": events, "profile": profileBody])
             }
             let (data, response) = try await URLSession.shared.data(for: req)
@@ -62,13 +179,17 @@ final class ProgressSync {
             if code == 401 { AccountSession.shared.signOut(); status = .unauthenticated; return false }
             guard (200..<300).contains(code), let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let p = json["progress"] as? [String: Any] else { status = .error; return false }
-            let acked = ((json["results"] as? [[String: Any]]) ?? []).compactMap { $0["id"] as? String }
+            let results = (json["results"] as? [[String: Any]]) ?? []
+            let acked = results.compactMap { $0["id"] as? String }
             let server = ServerProgress(xp: p["xp"] as? Int ?? 0, streak: p["streak"] as? Int ?? 0, aura: p["aura"] as? Int ?? 0, routeIndex: p["routeIndex"] as? Int ?? 0,
                                         lastDay: p["lastDay"] as? String, dailyAwards: p["dailyAwards"] as? Int ?? 0, dailyAwardsDay: p["dailyAwardsDay"] as? String, companionId: p["companionId"] as? String)
             // Signed out or deleted while this request was in flight: the
             // account's numbers must not land back on the device.
             guard AccountSession.shared.session?.userId == uid, store.ownerUserId == uid else { return false }
             store.applyServer(server, acknowledged: acked)
+            let answered = AwardOutcome.parse(results: results)
+            for outcome in answered { outcomes[outcome.id] = outcome }
+            if !acked.isEmpty { acknowledgedRounds += 1 }
             return true
         } catch {
             status = .error
