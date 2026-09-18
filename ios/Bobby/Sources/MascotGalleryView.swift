@@ -494,6 +494,47 @@ private struct SelectionBurst: View {
     }
 }
 
+// ---- Locked = silver statue (Squad stage and Explore carousel) ----
+
+enum MascotStatue {
+    /// Adds or removes the silver pass on a model's own materials. Gear and
+    /// pet planes (the "gear" subtree) are skipped: not part of the character.
+    static func apply(_ on: Bool, to root: SCNNode) {
+        var seen = Set<ObjectIdentifier>()
+        func visit(_ node: SCNNode) {
+            if node.name == "gear" { return }
+            for material in node.geometry?.materials ?? [] where seen.insert(ObjectIdentifier(material)).inserted {
+                var modifiers = material.shaderModifiers ?? [:]
+                // GLTFKit2 may already put an alpha-cutoff discard here; it stays first.
+                let existing = (modifiers[.fragment] ?? "").replacingOccurrences(of: shader, with: "")
+                let next = on ? existing + shader : existing
+                modifiers[.fragment] = next.isEmpty ? nil : next
+                material.shaderModifiers = modifiers
+            }
+            node.childNodes.forEach(visit)
+        }
+        visit(root)
+    }
+
+    // Metal fragment pass, appended after any GLTFKit2 snippet. The texture's
+    // luminance is lifted into a silver range (black cloth becomes graphite,
+    // not a hole) and shaded by facing + a rim so the silhouette always reads.
+    // Output is linear and premultiplied, like the lit colour it replaces.
+    static let shader = """
+
+    {
+        float stA = max(_output.color.a, 0.0001);
+        float stLum = dot(_output.color.rgb / stA, float3(0.2126, 0.7152, 0.0722));
+        float stDetail = pow(saturate(stLum), 0.4545);
+        float stFacing = saturate(dot(normalize(_surface.normal), normalize(_surface.view)));
+        float stRim = pow(1.0 - stFacing, 3.0);
+        float stG = (0.24 + 0.52 * stDetail) * (0.60 + 0.40 * stFacing) + 0.32 * stRim;
+        float3 stTone = saturate(float3(stG * 0.94, stG * 0.97, stG));
+        _output.color.rgb = pow(stTone, float3(2.2)) * _output.color.a;
+    }
+    """
+}
+
 // ---- SceneKit stage ------------------------------------------
 
 struct MascotSceneView: UIViewRepresentable {
@@ -524,6 +565,8 @@ struct MascotSceneView: UIViewRepresentable {
     /// Locked companion: every material turns into brushed silver that keeps
     /// the texture detail and the shape — visible, clearly not yours yet.
     var statue = false
+    /// Freeze the scene (the desk while the locker sheet covers it).
+    var paused = false
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
@@ -556,7 +599,8 @@ struct MascotSceneView: UIViewRepresentable {
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.owner = self
         context.coordinator.applyStatue(statue)
-        context.coordinator.setTalking(speaking, level: voiceLevel)
+        if view.scene?.isPaused != paused { view.scene?.isPaused = paused }
+        context.coordinator.setTalking(speaking && !paused, level: voiceLevel)
         context.coordinator.applyGearIfNeeded(gear, pet: pet)
         if equipToken != context.coordinator.lastEquipToken {
             context.coordinator.lastEquipToken = equipToken
@@ -617,20 +661,7 @@ struct MascotSceneView: UIViewRepresentable {
         func applyStatue(_ on: Bool) {
             guard let root = modelRoot, on != statueApplied else { return }
             statueApplied = on
-            var seen = Set<ObjectIdentifier>()
-            func visit(_ node: SCNNode) {
-                if node.name == "gear" { return }
-                for material in node.geometry?.materials ?? [] where seen.insert(ObjectIdentifier(material)).inserted {
-                    var modifiers = material.shaderModifiers ?? [:]
-                    // GLTFKit2 may already put an alpha-cutoff discard here; it stays first.
-                    let existing = (modifiers[.fragment] ?? "").replacingOccurrences(of: MascotSceneView.statueShader, with: "")
-                    let next = on ? existing + MascotSceneView.statueShader : existing
-                    modifiers[.fragment] = next.isEmpty ? nil : next
-                    material.shaderModifiers = modifiers
-                }
-                node.childNodes.forEach(visit)
-            }
-            visit(root)
+            MascotStatue.apply(on, to: root)
         }
 
         /// The skin moment: the new piece appears big in front of the
@@ -1026,6 +1057,7 @@ struct MascotSceneView: UIViewRepresentable {
                 scene.rootNode.addChildNode(cameraNode)
 
                 view.scene = scene
+                scene.isPaused = coordinator.owner?.paused ?? false
                 view.pointOfView = cameraNode
                 coordinator.modelRoot = root
                 coordinator.initialCameraPosition = cameraNode.position
@@ -1060,24 +1092,6 @@ struct MascotSceneView: UIViewRepresentable {
             }
         }
     }
-
-    // Metal fragment pass, appended after any GLTFKit2 snippet. The texture's
-    // luminance is lifted into a silver range (black cloth becomes graphite,
-    // not a hole) and shaded by facing + a rim so the silhouette always reads.
-    // Output is linear and premultiplied, like the lit colour it replaces.
-    static let statueShader = """
-
-    {
-        float stA = max(_output.color.a, 0.0001);
-        float stLum = dot(_output.color.rgb / stA, float3(0.2126, 0.7152, 0.0722));
-        float stDetail = pow(saturate(stLum), 0.4545);
-        float stFacing = saturate(dot(normalize(_surface.normal), normalize(_surface.view)));
-        float stRim = pow(1.0 - stFacing, 3.0);
-        float stG = (0.24 + 0.52 * stDetail) * (0.60 + 0.40 * stFacing) + 0.32 * stRim;
-        float3 stTone = saturate(float3(stG * 0.94, stG * 0.97, stG));
-        _output.color.rgb = pow(stTone, float3(2.2)) * _output.color.a;
-    }
-    """
 
     private static func appFootprintBytes() -> UInt64 {
         var info = task_vm_info_data_t()

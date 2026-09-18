@@ -11,18 +11,6 @@ import AudioToolbox
 /// model's normalized bounding-box unit so every companion wears it in the same place.
 enum BodySlot: String {
     case face, headset, head, hand, hip, shoulder, chest
-    /// Where it sits, for previews: "ON THE FACE" / "EN LA CARA".
-    var label: String {
-        switch self {
-        case .face: return L.t("ON THE FACE", "EN LA CARA")
-        case .headset: return L.t("ON THE EARS", "EN LAS OREJAS")
-        case .head: return L.t("ABOVE THE HEAD", "SOBRE LA CABEZA")
-        case .hand: return L.t("IN THE HAND", "EN LA MANO")
-        case .hip: return L.t("ON THE HIP", "EN LA CADERA")
-        case .shoulder: return L.t("ON THE SHOULDER", "EN EL HOMBRO")
-        case .chest: return L.t("ON THE CHEST", "EN EL PECHO")
-        }
-    }
 }
 
 struct CompanionTool: Identifiable, Equatable {
@@ -210,6 +198,7 @@ struct ToolBelt: View {
     var onPlus: (() -> Void)? = nil
     var onWorld: (() -> Void)? = nil
     @State private var worldPulse = false
+    @AppStorage(LockerSeen.key) private var lockerSeen: String?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -239,7 +228,7 @@ struct ToolBelt: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(unlocked ? tool.name : L.t("\(tool.name), unlocks at \(tool.unlockXP) XP", "\(tool.name), se desbloquea con \(tool.unlockXP) XP"))
             }
-            // The pet slot: the companion's own animal, at 300 XP.
+            // The pet slot: the companion's own animal, at 500 XP.
             if let pet = CompanionToolkit.pet(for: companion.id) {
                 let has = CompanionToolkit.petUnlocked(companionId: companion.id, xp: xp)
                 Button { onPet?() } label: {
@@ -256,16 +245,23 @@ struct ToolBelt: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(has ? pet.name : L.t("Pet, unlocks at \(CompanionPet.unlockXP) XP", "Mascota, se desbloquea con \(CompanionPet.unlockXP) XP"))
             }
-            // "+": everything still out there, priced in XP.
+            // "+": the locker — the whole squad and everything it can earn.
+            let fresh = LockerSeen.unseen(ownId: companion.id, xp: xp, raw: lockerSeen).count
             Button { onPlus?() } label: {
                 ZStack {
                     Circle().stroke(Theme.stroke, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.muted)
                 }
                 .frame(width: 38, height: 38)
+                .overlay(alignment: .topTrailing) {
+                    if fresh > 0 { Circle().fill(companion.tint).frame(width: 7, height: 7).offset(x: -1, y: 1) }
+                }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(L.t("What else you can earn", "Qué más puedes conseguir"))
+            .accessibilityLabel(fresh > 0
+                ? L.t("Locker, \(fresh) new", "Vitrina, \(fresh) \(fresh == 1 ? "nuevo" : "nuevos")")
+                : L.t("Locker: everything you can earn", "Vitrina: todo lo que puedes ganar"))
+            .accessibilityIdentifier("belt-plus")
             // The world: the map we build next (Focus-Tree style), fog of war and all.
             Button { onWorld?() } label: {
                 ZStack {
@@ -542,6 +538,15 @@ extension CompanionToolkit {
         case "rook": return CompanionPet(companionId: companionId, name: L.t("Sage the owl", "Sabio el búho"), emoji: "🦉", spins: false)
         case "halo": return CompanionPet(companionId: companionId, name: L.t("Peace the dove", "Paz la paloma"), emoji: "🕊️", spins: false)
         case "axiom": return CompanionPet(companionId: companionId, name: L.t("Ledger the turtle", "Libreta la tortuga"), emoji: "🐢", spins: false)
+        // Wave 2 — mirrors PETS in src/lib/companions/data.ts (art shipped 2026-09-07).
+        case "iris": return CompanionPet(companionId: companionId, name: L.t("Cirrus the crane", "Cirrus la grulla"), emoji: "🐦", spins: false)
+        case "sol": return CompanionPet(companionId: companionId, name: L.t("Root the hedgehog", "Root el erizo"), emoji: "🦔", spins: false)
+        case "zuri": return CompanionPet(companionId: companionId, name: L.t("Trace the fox", "Trace el zorro"), emoji: "🦊", spins: false)
+        case "mira": return CompanionPet(companionId: companionId, name: L.t("Pace the hare", "Pace la liebre"), emoji: "🐇", spins: false)
+        case "nalu": return CompanionPet(companionId: companionId, name: L.t("Kai the dolphin", "Kai el delfín"), emoji: "🐬", spins: false)
+        case "vega": return CompanionPet(companionId: companionId, name: L.t("Sigma the raven", "Sigma el cuervo"), emoji: "🐦‍⬛", spins: false)
+        case "noor": return CompanionPet(companionId: companionId, name: L.t("Elder the tortoise", "Elder la tortuga"), emoji: "🐢", spins: false)
+        case "keo": return CompanionPet(companionId: companionId, name: L.t("Sombra the sea turtle", "Sombra la tortuga marina"), emoji: "🐢", spins: false)
         default: return nil
         }
     }
@@ -551,9 +556,7 @@ extension CompanionToolkit {
     }
 }
 
-/// The "+" slot: what is still out there — your pet and the other companions'
-/// gear — with the exact points it takes. Aspiration, priced honestly.
-/// One thing you can still earn, with the companion that wears it.
+/// One thing you can earn, with the companion that wears it (the locker).
 enum CatalogItem: Identifiable {
     case tool(CompanionTool, Companion)
     case pet(CompanionPet, Companion)
@@ -561,242 +564,6 @@ enum CatalogItem: Identifiable {
         switch self {
         case .tool(let t, _): return t.id
         case .pet(let p, _): return "pet-\(p.companionId)"
-        }
-    }
-}
-
-struct GearCatalogSheet: View {
-    let current: Companion
-    let xp: Int
-    let level: Int
-    @State private var preview: CatalogItem?
-
-    private var gold: Color { Color(red: 0.96, green: 0.77, blue: 0.26) }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                Capsule().fill(Theme.stroke).frame(width: 36, height: 4).frame(maxWidth: .infinity).padding(.top, 8)
-                Text(L.t("STILL TO EARN", "POR CONSEGUIR"))
-                    .font(.mono(11, .bold)).kerning(1.8).foregroundStyle(Theme.muted)
-                Text(L.t("Discipline XP only. Reads and coming back — never volume.", "Solo XP de disciplina. Lecturas y volver — nunca volumen."))
-                    .font(.rounded(13, .medium)).foregroundStyle(Theme.text.opacity(0.7))
-                Label(L.t("Hold any item to see it worn.", "Mantén presionado un accesorio para verlo puesto."), systemImage: "hand.tap")
-                    .font(.mono(10, .medium)).kerning(0.6).foregroundStyle(Theme.muted)
-
-                // Your own companion showed only the pet here, so your own three
-                // pieces were the one gear in the game you could never hold to
-                // see worn — the belt opens the flat card, not the 3D preview.
-                section(L.t("YOUR GEAR", "TUS ACCESORIOS"))
-                ForEach(CompanionToolkit.tools(for: current.id)) { tool in
-                    row(glyph: nil, symbol: tool.symbol, art: tool.hasArt ? tool.assetName : nil, title: tool.name, subtitle: tool.lore,
-                        needXP: tool.unlockXP, needLevel: nil, tint: tool.isGolden ? gold : current.tint,
-                        item: .tool(tool, current))
-                }
-                if let pet = CompanionToolkit.pet(for: current.id) {
-                    row(glyph: pet.hasArt ? nil : pet.emoji, art: pet.hasArt ? pet.assetName : nil, title: pet.name,
-                        subtitle: pet.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en la mesa.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."),
-                        needXP: CompanionPet.unlockXP, needLevel: nil, tint: current.tint, item: .pet(pet, current))
-                }
-
-                section(L.t("OTHER COMPANIONS' GEAR", "ACCESORIOS DE OTROS AMIGOS"))
-                ForEach(bobbyCompanions.filter { $0.id != current.id }) { comp in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            CompanionThumb(companion: comp).frame(width: 28, height: 28).clipShape(Circle())
-                            Text(comp.label).font(.mono(11, .bold)).kerning(1.2).foregroundStyle(comp.tint)
-                            if level < comp.requiredLevel {
-                                Text(L.t("LEVEL \(comp.requiredLevel) TO UNLOCK", "NIVEL \(comp.requiredLevel) PARA DESBLOQUEAR"))
-                                    .font(.mono(9, .bold)).kerning(1).foregroundStyle(Theme.muted)
-                            }
-                        }
-                        ForEach(CompanionToolkit.tools(for: comp.id)) { tool in
-                            row(glyph: nil, symbol: tool.symbol, art: tool.hasArt ? tool.assetName : nil, title: tool.name, subtitle: tool.lore,
-                                needXP: tool.unlockXP, needLevel: level < comp.requiredLevel ? comp.requiredLevel : nil, tint: tool.isGolden ? gold : comp.tint,
-                                item: .tool(tool, comp))
-                        }
-                        if let pet = CompanionToolkit.pet(for: comp.id) {
-                            row(glyph: pet.hasArt ? nil : pet.emoji, art: pet.hasArt ? pet.assetName : nil, title: pet.name, subtitle: L.t("Pet", "Mascota"), needXP: CompanionPet.unlockXP,
-                                needLevel: level < comp.requiredLevel ? comp.requiredLevel : nil, tint: comp.tint, item: .pet(pet, comp))
-                        }
-                    }
-                    .padding(12)
-                    .background(Theme.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 24)
-        }
-        .sheet(item: $preview) { item in
-            ItemPreviewSheet(item: item, xp: xp, level: level)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Theme.bg)
-        }
-    }
-
-    private func section(_ title: String) -> some View {
-        Text(title).font(.mono(10, .bold)).kerning(1.6).foregroundStyle(Theme.muted)
-    }
-
-    private func row(glyph: String?, symbol: String? = nil, art: String? = nil, title: String, subtitle: String, needXP: Int, needLevel: Int?, tint: Color, item: CatalogItem) -> some View {
-        let have = xp >= needXP && needLevel == nil
-        let missing = max(0, needXP - xp)
-        return HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(tint.opacity(have ? 0.16 : 0.06)).frame(width: 40, height: 40)
-                Circle().stroke(tint.opacity(have ? 0.7 : 0.25), lineWidth: 1).frame(width: 40, height: 40)
-                if let art {
-                    Image(art).resizable().scaledToFit().frame(width: 34, height: 34).clipShape(Circle()).saturation(have ? 1 : 0.2)
-                } else if let glyph {
-                    Text(glyph).font(.system(size: 20)).saturation(have ? 1 : 0.2)
-                } else if let symbol {
-                    Image(systemName: symbol).font(.system(size: 14, weight: .bold)).foregroundStyle(have ? tint : Theme.muted)
-                }
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.rounded(13, .bold)).foregroundStyle(Theme.text)
-                Text(subtitle).font(.rounded(11, .medium)).foregroundStyle(Theme.text.opacity(0.6)).lineLimit(2)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                if have {
-                    Text(L.t("YOURS", "TUYO")).font(.mono(9, .bold)).kerning(1).foregroundStyle(Theme.up)
-                } else {
-                    Text("+\(missing) XP").font(.mono(11, .bold)).foregroundStyle(tint)
-                    if let needLevel { Text(L.t("LVL \(needLevel)", "NVL \(needLevel)")).font(.mono(9, .bold)).foregroundStyle(Theme.muted) }
-                }
-            }
-        }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        // Hold (or tap) to see it worn by its companion — the preview that sells the grind.
-        .onTapGesture {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            preview = item
-        }
-        .onLongPressGesture(minimumDuration: 0.35) {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            preview = item
-        }
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint(L.t("Shows the item worn by its companion", "Muestra el accesorio puesto en su amigo"))
-    }
-}
-
-/// The preview: the companion wearing the item in 3D, what it is, where it
-/// sits and what it takes. Works for every companion, art or glyph.
-struct ItemPreviewSheet: View {
-    let item: CatalogItem
-    let xp: Int
-    let level: Int
-    @Environment(\.dismiss) private var dismiss
-    @State private var loading = true
-
-    private var gold: Color { Color(red: 0.96, green: 0.77, blue: 0.26) }
-    private var companion: Companion {
-        switch item {
-        case .tool(_, let c), .pet(_, let c): return c
-        }
-    }
-    private var tint: Color {
-        if case .tool(let t, _) = item, t.isGolden { return gold }
-        return companion.tint
-    }
-    private var title: String {
-        switch item {
-        case .tool(let t, _): return t.name
-        case .pet(let p, _): return p.name
-        }
-    }
-    private var subtitle: String {
-        switch item {
-        case .tool(let t, _): return "\(t.tierLabel) · \(t.slot.label)"
-        case .pet(let p, _): return p.spins ? L.t("PET · SPINS NEXT TO YOU", "MASCOTA · GIRA A TU LADO") : L.t("PET · AT THE FEET", "MASCOTA · A LOS PIES")
-        }
-    }
-    private var lore: String {
-        switch item {
-        case .tool(let t, _): return t.lore
-        case .pet(let p, _): return p.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en la mesa.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo.")
-        }
-    }
-    private var needXP: Int {
-        switch item {
-        case .tool(let t, _): return t.unlockXP
-        case .pet: return CompanionPet.unlockXP
-        }
-    }
-    private var needLevel: Int? { level < companion.requiredLevel ? companion.requiredLevel : nil }
-    private var have: Bool { xp >= needXP && needLevel == nil }
-
-    var body: some View {
-        VStack(spacing: 14) {
-            Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
-            HStack(spacing: 8) {
-                CompanionThumb(companion: companion).frame(width: 26, height: 26).clipShape(Circle())
-                Text(L.t("WORN BY \(companion.label)", "LO LLEVA \(companion.label)")).font(.mono(10, .bold)).kerning(1.4).foregroundStyle(companion.tint)
-                Spacer()
-                Text(L.t("PREVIEW", "VISTA PREVIA")).font(.mono(10, .bold)).kerning(1.4).foregroundStyle(Theme.muted)
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Theme.text.opacity(0.8))
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(Theme.card))
-                        .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(L.t("Close preview", "Cerrar vista previa"))
-            }
-            .padding(.horizontal, 18)
-
-            ZStack {
-                RadialGradient(colors: [tint.opacity(0.22), .clear], center: .center, startRadius: 20, endRadius: 220)
-                Group {
-                    switch item {
-                    case .tool(let t, let c):
-                        MascotSceneView(assetName: c.id, interactive: true, onLoading: { l, _ in loading = l }, gear: [t])
-                    case .pet(let p, let c):
-                        MascotSceneView(assetName: c.id, interactive: true, onLoading: { l, _ in loading = l }, pet: p)
-                    }
-                }
-                .id(item.id)
-                if loading { ProgressView().tint(tint) }
-                if !have {
-                    VStack {
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Image(systemName: "lock.fill").font(.system(size: 10, weight: .bold))
-                            Text(needLevel.map { L.t("LEVEL \($0) · +\(max(0, needXP - xp)) XP", "NIVEL \($0) · +\(max(0, needXP - xp)) XP") }
-                                 ?? L.t("+\(max(0, needXP - xp)) XP TO GO", "FALTAN \(max(0, needXP - xp)) XP"))
-                                .font(.mono(10, .bold)).kerning(1.2)
-                        }
-                        .foregroundStyle(Theme.text)
-                        .padding(.horizontal, 12).padding(.vertical, 7)
-                        .background(Capsule().fill(Theme.bg.opacity(0.85)))
-                        .overlay(Capsule().stroke(tint.opacity(0.5), lineWidth: 1))
-                        .padding(.bottom, 10)
-                    }
-                }
-            }
-            .frame(height: 340)
-            .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(tint.opacity(0.35), lineWidth: 1))
-            .padding(.horizontal, 18)
-
-            VStack(spacing: 6) {
-                Text(title).font(.rounded(22, .bold)).foregroundStyle(Theme.text)
-                Text(subtitle).font(.mono(10, .bold)).kerning(1.4).foregroundStyle(tint)
-                Text(lore).font(.rounded(14, .medium)).foregroundStyle(Theme.text.opacity(0.75)).multilineTextAlignment(.center).padding(.horizontal, 28)
-                Text(have ? L.t("YOURS", "TUYO") : L.t("Discipline only: full reads and coming back. Never volume.", "Solo disciplina: lecturas completas y volver. Nunca volumen."))
-                    .font(.mono(10, .medium)).kerning(0.6).foregroundStyle(have ? Theme.up : Theme.muted).multilineTextAlignment(.center).padding(.top, 4)
-            }
-            Spacer()
         }
     }
 }

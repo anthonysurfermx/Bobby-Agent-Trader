@@ -326,6 +326,7 @@ final class CompanionStore: ObservableObject {
     /// already spent on another device is not shown optimistically here.
     func applyServer(_ server: ServerProgress, acknowledged: [String]) {
         let ack = Set(acknowledged)
+        let firstReconcile = syncedAt == nil
         disciplineXP = server.xp
         disciplineStreak = server.streak
         aura = server.aura
@@ -336,6 +337,10 @@ final class CompanionStore: ObservableObject {
         defaults.set(server.dailyAwards, forKey: Key.dailyAwards)
         if let d = server.dailyAwardsDay.flatMap({ iso.date(from: $0) }) { defaults.set(d, forKey: Key.dailyAwardsDay) } else { defaults.removeObject(forKey: Key.dailyAwardsDay) }
         pendingAwards.removeAll { ack.contains($0.id) }
+        // First reconcile for this owner (new phone, sign-in, account switch):
+        // what the account already had is not "new" in the locker. Drops that
+        // arrive in later syncs still are.
+        if firstReconcile { LockerSeen.mark(LockerLedger.ownedIds(ownId: companionId, xp: server.xp), defaults: defaults) }
         syncedAt = Date()
     }
 
