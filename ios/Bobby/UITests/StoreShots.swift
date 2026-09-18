@@ -114,21 +114,25 @@ final class StoreShots: XCTestCase {
         }
     }
 
-    /// Aura share preview: the live sheet opens from the desk menu and remains
-    /// dismissible after its orbital animation and sound have started.
-    func test04_AuraPreview() throws {
+    /// Share my skin: the desk menu opens the share sheet with the card and the
+    /// Instagram, WhatsApp and X destinations, and it closes cleanly.
+    func test04_ShareSkin() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         let more = app.buttons["More"]
         XCTAssertTrue(more.waitForExistence(timeout: 15))
+        sleep(4)   // let the desk model load so the card carries the 3D pose
         more.tap()
-        tapLabeled(app, "My aura")
+        tapLabeled(app, "Share my skin")
 
-        XCTAssertTrue(app.staticTexts["MY AURA TODAY"].waitForExistence(timeout: 5))
-        sleep(2)
-        shot("11-aura-floating")
+        XCTAssertTrue(app.staticTexts["SHARE MY SKIN"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["Share to Instagram"].exists)
+        XCTAssertTrue(app.buttons["Share to WhatsApp"].exists)
+        XCTAssertTrue(app.buttons["Share to X"].exists)
+        sleep(1)
+        shot("11-share-skin")
 
         app.buttons["Close"].firstMatch.tap()
         XCTAssertTrue(more.waitForExistence(timeout: 5))

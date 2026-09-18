@@ -42,9 +42,14 @@ final class AccountSession: ObservableObject {
             let refreshed = try await exchange(body: ["refresh_token": s.refreshToken], grant: "refresh_token")
             s = refreshed; session = s; Keychain.write(s, service: keychainService)
             return s.accessToken
-        } catch {
+        } catch let error as NSError where error.domain == Self.authHTTPDomain && (400..<500).contains(error.code) {
+            // Supabase rejected the refresh token: the session is really over.
             lastError = L.t("Session expired — sign in again", "La sesión caducó — inicia sesión de nuevo")
             signOut(); return nil
+        } catch {
+            // Offline or a server hiccup: keep the session and try again later.
+            lastError = L.t("You're offline — try again in a moment", "Sin conexión — inténtalo de nuevo en un momento")
+            return nil
         }
     }
 
@@ -58,7 +63,9 @@ final class AccountSession: ObservableObject {
     /// their Bobby account link before deleting the Auth user.
     func deleteAccount(store: CompanionStore? = nil) async -> Bool {
         guard let token = await accessToken() else {
-            lastError = L.t("Sign in again before deleting your account", "Inicia sesión de nuevo antes de borrar tu cuenta")
+            if session == nil {
+                lastError = L.t("Sign in again before deleting your account", "Inicia sesión de nuevo antes de borrar tu cuenta")
+            }
             return false
         }
         var request = URLRequest(url: URL(string: "https://bobbyprotocol.xyz/api/account")!)
@@ -159,6 +166,8 @@ final class AccountSession: ObservableObject {
         return json["sub"] as? String
     }
 
+    private static let authHTTPDomain = "supabase.auth.http"
+
     private func exchange(body: [String: Any], grant: String) async throws -> StoredSession {
         var req = URLRequest(url: SupabaseConfig.url.appendingPathComponent("auth/v1/token").appending(queryItems: [URLQueryItem(name: "grant_type", value: grant)]))
         req.httpMethod = "POST"
@@ -167,8 +176,10 @@ final class AccountSession: ObservableObject {
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error_description"] as? String ?? "HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)"
-            throw NSError(domain: "supabase.auth", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error_description"] as? String ?? "HTTP \(status)"
+            // The status travels as the code so callers can tell "rejected" from "unreachable".
+            throw NSError(domain: Self.authHTTPDomain, code: status, userInfo: [NSLocalizedDescriptionKey: msg])
         }
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let access = json["access_token"] as? String, let refresh = json["refresh_token"] as? String,

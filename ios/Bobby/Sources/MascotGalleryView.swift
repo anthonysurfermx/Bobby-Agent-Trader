@@ -468,6 +468,8 @@ struct MascotSceneView: UIViewRepresentable {
             [tap, doubleTap, press, pan].forEach { view.addGestureRecognizer($0) }
         }
 
+        // A new scene must not replay a share request an older scene already served.
+        context.coordinator.lastSnapshotToken = snapshotToken
         load(into: view, coordinator: context.coordinator)
         return view
     }
@@ -480,7 +482,8 @@ struct MascotSceneView: UIViewRepresentable {
             context.coordinator.lastEquipToken = equipToken
             if let equipToolId { context.coordinator.playEquip(toolId: equipToolId) }
         }
-        if snapshotToken != context.coordinator.lastSnapshotToken {
+        // Only once the model is in the scene; until then the request waits for the next update.
+        if snapshotToken != context.coordinator.lastSnapshotToken, context.coordinator.modelRoot != nil {
             context.coordinator.lastSnapshotToken = snapshotToken
             // Next runloop: this is a view update, and the callback sets SwiftUI
             // state — done synchronously the share sheet never appeared.

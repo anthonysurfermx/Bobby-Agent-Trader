@@ -348,8 +348,12 @@ final class CompanionStore: ObservableObject {
         let previous = ownerUserId
         if previous == nil {
             let local = pendingAwards
+            // Signing back in: what this account still owed the server from an
+            // earlier session stays queued next to anything earned signed out.
+            let saved = defaults.data(forKey: Key.pending + "." + userId)
+                .flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
             ownerUserId = userId
-            pendingAwards = local           // migrates the anonymous queue to this account
+            pendingAwards = saved + local.filter { award in !saved.contains { $0.id == award.id } }
             defaults.removeObject(forKey: Key.pending + ".local")
             return
         }

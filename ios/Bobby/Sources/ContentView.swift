@@ -56,6 +56,10 @@ final class BobbyViewModel: ObservableObject {
     @Published var confirmPrompt: String?
 
     let voice = NeuralVoice()
+    /// A line that must not cut the companion off (the evolution call): it is
+    /// spoken as soon as the voice is idle.
+    var pendingLine: String?
+
     /// The desk speaks its opening line once per launch, and never over the
     /// answer to a question already asked.
     private var greeted = false
@@ -64,7 +68,8 @@ final class BobbyViewModel: ObservableObject {
     let companions = CompanionStore()
     private let memory = DeskMemory()
     static let defaultQuickAccess = ["BTC", "NVDA", "ETH", "TSLA", L.t("GOLD", "ORO")]
-    @Published var streak = 0
+    /// Read through to the store: sign-out, deletion and sync change it there.
+    var streak: Int { companions.disciplineStreak }
     @Published var quickAccess: [String] = BobbyViewModel.defaultQuickAccess
 
     private var cancellables = Set<AnyCancellable>()
@@ -72,7 +77,6 @@ final class BobbyViewModel: ObservableObject {
     init() {
         // Discipline streak, not an open-the-app streak: it only grows when
         // the user does something process-quality (see awardDiscipline).
-        streak = companions.disciplineStreak
         quickAccess = memory.quickAccess(fallback: Self.defaultQuickAccess)
         // Nested ObservableObject: forward the store's changes or the desk
         // never reacts to picking a companion (same pitfall as AgentProfile).
@@ -154,6 +158,7 @@ final class BobbyViewModel: ObservableObject {
         // suggest just like single tickers — the backend understands phrases.
         guard q.count >= 2, q.count <= 32 else {
             if !assetHits.isEmpty { assetHits = [] }
+            confirmPrompt = nil
             return
         }
         suggestTask = Task { @MainActor in
@@ -161,6 +166,7 @@ final class BobbyViewModel: ObservableObject {
             guard !Task.isCancelled else { return }
             let hits = await BobbyAPI.searchAssets(q)
             guard !Task.isCancelled else { return }
+            self.confirmPrompt = nil
             self.assetHits = hits
         }
     }
@@ -175,6 +181,7 @@ final class BobbyViewModel: ObservableObject {
         voice.stop()
         errorHint = nil
         confirmPrompt = nil
+        pendingLine = nil
         thinking = true
         phase = .resolving
         lastAnswer = nil
@@ -273,7 +280,6 @@ final class BobbyViewModel: ObservableObject {
             // awardedXP is what the daily cap ACTUALLY granted — the UI shows
             // that number, never the intent.
             let awardedXP = companions.awardDiscipline(answer.isNoTrade ? 20 : 10, kind: answer.isNoTrade ? "no_trade_respected" : "read_complete")
-            if awardedXP > 0 { streak = companions.disciplineStreak }
             Task { await ProgressSync.shared.sync(store: companions, profile: profile) }
             if answer.isNoTrade {
                 withAnimation(.spring(duration: 0.52, bounce: 0.24)) {
@@ -321,7 +327,9 @@ struct ContentView: View {
     @State private var skinSnapshotToken = 0
     @State private var skinShot: UIImage?
     @State private var confirmDelete = false
+    @State private var deleting = false
     @State private var accountError: String?
+    @State private var accountDeleted = false
     @State private var equipToolId: String?
     @State private var equipToken = 0
     /// The desk never shows an empty hole: if the companion GLB fails to
@@ -345,11 +353,12 @@ struct ContentView: View {
             if let evo = vm.companions.pendingEvolution, let comp = vm.companions.companion {
                 EvolutionOverlay(companion: comp, level: evo) {
                     vm.companions.pendingEvolution = nil
-                    // Spoken on dismiss, never over the answer that earned it.
+                    // Spoken on dismiss, and never over the answer that earned it.
                     if vm.speakEnabled {
                         let evolvedName = comp.name(at: evo.number)
-                        vm.say(L.t("I evolved. Call me \(evolvedName) now.\(levelTone(evo.number))",
-                                   "Evolucioné. Ahora dime \(evolvedName).\(levelTone(evo.number))"))
+                        let line = L.t("I evolved. Call me \(evolvedName) now.\(levelTone(evo.number))",
+                                       "Evolucioné. Ahora dime \(evolvedName).\(levelTone(evo.number))")
+                        if vm.voice.speaking { vm.pendingLine = line } else { vm.say(line) }
                     }
                 }
                 .transition(.opacity)
@@ -385,8 +394,14 @@ struct ContentView: View {
             if next == .background { vm.voice.stop() }
         }
         .onDisappear { vm.voice.stop() }
-        // A new companion must not finish the old one's sentence.
-        .onChange(of: vm.companions.companionId) { _, _ in vm.voice.stop() }
+        // A new companion must not finish the old one's sentence — unless the
+        // pick came from SQUAD, which plays the new companion's line itself.
+        .onChange(of: vm.companions.companionId) { _, _ in if !showSquad { vm.voice.stop() } }
+        .onChange(of: vm.voice.speaking) { _, speaking in
+            guard !speaking, let line = vm.pendingLine else { return }
+            vm.pendingLine = nil
+            if vm.speakEnabled { vm.say(line) }
+        }
         .onChange(of: vm.input) { vm.updateSuggestions() }
         .sheet(isPresented: $showBoard) {
             AssetBoardView(vm: vm)
@@ -435,12 +450,17 @@ struct ContentView: View {
         .confirmationDialog(L.t("Delete your Bobby account?", "¿Eliminar tu cuenta de Bobby?"),
                             isPresented: $confirmDelete, titleVisibility: .visible) {
             Button(L.t("Delete account permanently", "Eliminar cuenta para siempre"), role: .destructive) {
+                guard !deleting else { return }
+                deleting = true
                 Task {
                     if await account.deleteAccount(store: vm.companions) {
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        accountDeleted = true
                     } else {
-                        accountError = account.lastError
+                        accountError = account.lastError ?? L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
+                        account.lastError = nil
                     }
+                    deleting = false
                 }
             }
             Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
@@ -452,6 +472,12 @@ struct ContentView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(accountError ?? "")
+        }
+        .alert(L.t("Account deleted", "Cuenta eliminada"), isPresented: $accountDeleted) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(L.t("Your account and its synced progress were deleted. Bobby keeps working on this phone without an account.",
+                     "Se borraron tu cuenta y su progreso sincronizado. Bobby sigue funcionando en este teléfono sin cuenta."))
         }
 
         .animation(.easeOut(duration: 0.35), value: vm.profile.onboarded)
@@ -472,6 +498,8 @@ struct ContentView: View {
                     if vm.snapshot != nil { marketSurface }
                     if vm.snapshot != nil || vm.thinking { debateRail }
                     if vm.lastAnswer != nil { verdictCard }
+                    // The board's only door (the menu item is gone): back under the read.
+                    if vm.snapshot != nil && !vm.thinking { commandDeck }
                 }
                 .padding(.horizontal, 14)
                 .padding(.bottom, 16)
@@ -580,8 +608,9 @@ struct ContentView: View {
                             Label(L.t("Sign out", "Cerrar sesión"), systemImage: "rectangle.portrait.and.arrow.right")
                         }
                         Button(role: .destructive) { confirmDelete = true } label: {
-                            Label(L.t("Delete account", "Eliminar cuenta"), systemImage: "trash")
+                            Label(deleting ? L.t("Deleting account…", "Eliminando cuenta…") : L.t("Delete account", "Eliminar cuenta"), systemImage: "trash")
                         }
+                        .disabled(deleting)
                     }
                 }
             } label: {
