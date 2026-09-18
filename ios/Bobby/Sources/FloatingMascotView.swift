@@ -4,6 +4,8 @@
 // same size, hovering over a soft floor shadow with a slow sway
 // and a faint tremble. The SCNView takes no touches: horizontal
 // drags belong to the pager and taps arrive as `pulseToken` bumps.
+// In the aura forge the sway becomes a 360° turntable and an X-ray
+// scan materializes the companion head to toe (XRayScan, below).
 // ============================================================
 
 import SwiftUI
@@ -49,7 +51,18 @@ struct FloatingMascotView: UIViewRepresentable {
     var voiceLevel: CGFloat = 0
     /// Bump to play a quick squash-and-stretch (a tap on the companion).
     var pulseToken = 0
+    /// Set on the aura forge: the companion spins 360° and an X-ray scan
+    /// sweeps it head to toe. Read once, when the model is built.
+    var forge: ForgeScan? = nil
     var onReady: ((_ loaded: Bool) -> Void)? = nil
+
+    struct ForgeScan {
+        let tint: UIColor
+        /// 1, 2, 3 at each quarter of the first sweep; 4 once the companion
+        /// is fully materialized (also sent right away if there is nothing
+        /// to scan). Main thread.
+        let onProgress: (Int) -> Void
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -113,11 +126,19 @@ struct FloatingMascotView: UIViewRepresentable {
         private var clock: Double = 0
         private var lastTime: Double?
 
+        // Aura forge. The scan lives on the render clock so the sweep, the
+        // ring and the spin stay in lockstep.
+        private var forge: ForgeScan?
+        private var scan: XRayScan?
+        private var spin: Double = 0
+        private var milestone = 0
+
         func apply(_ owner: FloatingMascotView, to view: SCNView) {
             active = owner.active
             speaking = owner.speaking
             level = Double(owner.voiceLevel)
             reduceMotion = UIAccessibility.isReduceMotionEnabled
+            forge = owner.forge
             view.isPlaying = owner.active
             view.rendersContinuously = owner.active
             if owner.pulseToken != lastPulseToken {
@@ -135,7 +156,17 @@ struct FloatingMascotView: UIViewRepresentable {
                 if let asset { self.build(asset, in: view) }
                 // Never flip SwiftUI state inside makeUIView (cache hits are synchronous).
                 DispatchQueue.main.async { onReady?(asset != nil) }
+                // No model, nothing to scan: the forge must never wait on it.
+                if asset == nil { self.report(4) }
             }
+        }
+
+        /// Milestones go out once each, in order. `forge` is only touched on
+        /// main — it holds a closure, and apply() replaces it on every update.
+        private func report(_ step: Int) {
+            guard step > milestone else { return }
+            milestone = step
+            DispatchQueue.main.async { [weak self] in self?.forge?.onProgress(step) }
         }
 
         private func build(_ asset: GLTFAsset, in view: SCNView) {
@@ -152,6 +183,8 @@ struct FloatingMascotView: UIViewRepresentable {
             let height = max(hi.y - lo.y, 0.001)
             modelHeight = height
             modelWidth = max(hi.x - lo.x, 0.001)
+            // A turntable shows every side, so frame the widest one.
+            if forge != nil { modelWidth = max(modelWidth, hi.z - lo.z) }
             offset.position = SCNVector3(-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -(lo.z + hi.z) / 2)
             let body = SCNNode()
             body.addChildNode(offset)
@@ -186,6 +219,16 @@ struct FloatingMascotView: UIViewRepresentable {
             self.cameraNode = cameraNode
             clock = 0
             lastTime = nil
+            spin = 0
+            scan = nil
+            if let forge {
+                scan = XRayScan(model: offset, in: scene.rootNode, height: height,
+                                footprint: modelWidth, tint: forge.tint)
+                if reduceMotion {
+                    scan?.revealNow()
+                    report(4)
+                }
+            }
             view.scene = scene
             view.pointOfView = cameraNode
             frame(for: view.bounds.size)
@@ -225,6 +268,10 @@ struct FloatingMascotView: UIViewRepresentable {
             if sincePulse >= 0, sincePulse < 0.7 { scale += exp(-sincePulse * 7) * sin(sincePulse * 26) * 0.09 }
 
             if reduceMotion {
+                if let scan, !scan.revealed {
+                    scan.revealNow()
+                    report(4)
+                }
                 pivot.position = SCNVector3Zero
                 pivot.eulerAngles = SCNVector3Zero
                 body.scale = SCNVector3(Float(scale), Float(scale), Float(scale))
@@ -234,11 +281,21 @@ struct FloatingMascotView: UIViewRepresentable {
 
             let hover = sin(t * 2 * .pi / 2.8)          // −1…1, the float
             let lift = Float((hover + 1) / 2)            // 0 on the floor, 1 at the top
-            // The tremble: two fast, tiny, out-of-phase wobbles read as a hum
-            // of energy rather than a shake.
-            let tremble = (sin(t * 2 * .pi * 9.1) + 0.6 * sin(t * 2 * .pi * 13.7)) * 0.0045
-            pivot.position = SCNVector3(Float(sin(t * 2 * .pi * 7.3)) * h * 0.0016, Float(hover) * h * 0.035, 0)
-            pivot.eulerAngles = SCNVector3(0, Float(sin(t * 2 * .pi / 7.0) * 0.30), Float(tremble))
+            if let scan {
+                // Turntable: exactly one turn during the scan, so the companion
+                // faces you the moment it materializes, then a slow idle spin.
+                let settle = XRayScan.ease((t - XRayScan.revealAt) / 1.6)
+                spin += dt * 2 * .pi / (XRayScan.revealAt + settle * (9 - XRayScan.revealAt))
+                pivot.position = SCNVector3(0, Float(hover) * h * 0.03, 0)
+                pivot.eulerAngles = SCNVector3(0, Float(spin), 0)
+                if let step = scan.update(clock: t, lift: pivot.position.y) { report(step) }
+            } else {
+                // The tremble: two fast, tiny, out-of-phase wobbles read as a
+                // hum of energy rather than a shake.
+                let tremble = (sin(t * 2 * .pi * 9.1) + 0.6 * sin(t * 2 * .pi * 13.7)) * 0.0045
+                pivot.position = SCNVector3(Float(sin(t * 2 * .pi * 7.3)) * h * 0.0016, Float(hover) * h * 0.035, 0)
+                pivot.eulerAngles = SCNVector3(0, Float(sin(t * 2 * .pi / 7.0) * 0.30), Float(tremble))
+            }
             scale += sin(t * 2 * .pi / 1.9) * 0.010      // breathing
             body.scale = SCNVector3(Float(scale), Float(scale), Float(scale))
             body.eulerAngles.x = Float(nod)
@@ -257,5 +314,180 @@ struct FloatingMascotView: UIViewRepresentable {
                 }
             }
         }()
+    }
+}
+
+/// The aura forge's X-ray. A horizontal scan plane sweeps the companion head
+/// to toe: the first pass materializes it out of an X-ray hologram, later
+/// passes run a thin X-ray slice through it while it keeps turning. One
+/// fragment modifier on every material, plus a glowing ring at the same height.
+/// Created on main; updated on the render thread only.
+final class XRayScan {
+    static let startAt = 0.45        // lets the model fade in first
+    static let sweep = 2.8           // the materializing pass
+    static var revealAt: Double { startAt + sweep }
+    static let loopEvery = 4.8       // then a quick slice, now and then
+    static let loopSweep = 1.6
+
+    private(set) var revealed = false
+    private let materials: [SCNMaterial]
+    private let ring: SCNNode
+    private let height: Float
+
+    init(model: SCNNode, in root: SCNNode, height: Float, footprint: Float, tint: UIColor) {
+        self.height = height
+        var found: [SCNMaterial] = []
+        var seen = Set<ObjectIdentifier>()
+        model.enumerateHierarchy { node, _ in
+            for material in node.geometry?.materials ?? [] where seen.insert(ObjectIdentifier(material)).inserted {
+                found.append(material)
+            }
+        }
+        materials = found
+
+        // Shading is linear; the tint arrives as sRGB.
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        tint.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let linear = SCNVector3(Float(pow(max(r, 0), 2.2)), Float(pow(max(g, 0), 2.2)), Float(pow(max(b, 0), 2.2)))
+        for material in materials {
+            var modifiers = material.shaderModifiers ?? [:]
+            // GLTFKit2 may already put an alpha-cutoff discard here; keep it first.
+            let existing = modifiers[.fragment] ?? ""
+            modifiers[.fragment] = Self.header + existing + Self.body
+            material.shaderModifiers = modifiers
+            material.setValue(NSValue(scnVector3: linear), forKey: "u_tint")
+            material.setValue(height, forKey: "u_height")
+        }
+
+        let radius = CGFloat(footprint) * 0.56
+        let plane = SCNPlane(width: radius * 2, height: radius * 2)
+        let disc = plane.firstMaterial ?? SCNMaterial()
+        disc.diffuse.contents = Self.ringImage(tint)
+        disc.lightingModel = .constant
+        disc.blendMode = .add
+        disc.writesToDepthBuffer = false
+        disc.isDoubleSided = true
+        plane.firstMaterial = disc
+        ring = SCNNode(geometry: plane)
+        ring.eulerAngles.x = -.pi / 2
+        ring.renderingOrder = 10
+        ring.opacity = 0
+        root.addChildNode(ring)
+
+        // Before the first frame: all X-ray, nothing scanned yet.
+        set(scanY: height, band: 0, below: 1, glow: 0)
+    }
+
+    /// Advances the scan. Returns the first-pass milestone (1…4), if any.
+    func update(clock t: Double, lift: Float) -> Int? {
+        let top = height * 0.55 + lift
+        let bottom = -height * 0.55 + lift
+        if !revealed {
+            let q = (t - Self.startAt) / Self.sweep
+            // Half linear, half eased: a scanner, not a bounce.
+            let p = Float(0.5 * min(max(q, 0), 1) + 0.5 * Self.ease(q))
+            let y = top + (bottom - top) * p
+            let fade = Float(min(1, max(0, q * 8)) * min(1, max(0, (1 - q) * 8)))
+            set(scanY: y, band: 0, below: 1, glow: fade)
+            place(ring: y, opacity: fade)
+            if q >= 1 {
+                revealed = true
+                set(scanY: bottom, band: 0, below: 0, glow: 0)
+                place(ring: bottom, opacity: 0)
+                return 4
+            }
+            return q >= 0.25 ? min(3, Int(q * 4)) : nil
+        }
+        // Idle: rest right after the reveal, then a slice every few seconds.
+        let phase = (t - Self.revealAt).truncatingRemainder(dividingBy: Self.loopEvery) - (Self.loopEvery - Self.loopSweep)
+        guard phase >= 0 else {
+            set(scanY: bottom, band: 0, below: 0, glow: 0)
+            place(ring: bottom, opacity: 0)
+            return nil
+        }
+        let q = phase / Self.loopSweep
+        let envelope = Float(sin(.pi * q))
+        let y = top + (bottom - top) * Float(Self.ease(q))
+        set(scanY: y, band: height * 0.05 * envelope, below: 0, glow: envelope)
+        place(ring: y, opacity: envelope * 0.85)
+        return nil
+    }
+
+    /// Straight to the finished companion (Reduce Motion, or nothing to wait for).
+    func revealNow() {
+        revealed = true
+        set(scanY: -height, band: 0, below: 0, glow: 0)
+        ring.opacity = 0
+    }
+
+    static func ease(_ x: Double) -> Double {
+        let c = min(max(x, 0), 1)
+        return c * c * (3 - 2 * c)
+    }
+
+    private func set(scanY: Float, band: Float, below: Float, glow: Float) {
+        for material in materials {
+            material.setValue(scanY, forKey: "u_scanY")
+            material.setValue(band, forKey: "u_band")
+            material.setValue(below, forKey: "u_below")
+            material.setValue(glow, forKey: "u_glow")
+        }
+    }
+
+    private func place(ring y: Float, opacity: Float) {
+        ring.position = SCNVector3(0, y, 0)
+        ring.opacity = CGFloat(opacity)
+    }
+
+    // Metal. `_surface` is readable here and its geometry is in view space,
+    // so the fragment goes back to world space to meet the horizontal plane.
+    private static let header = """
+    #pragma arguments
+    float u_scanY;
+    float u_band;
+    float u_below;
+    float u_glow;
+    float u_height;
+    float3 u_tint;
+    #pragma body
+
+    """
+
+    private static let body = """
+
+    {
+        float3 xrWorld = (scn_frame.inverseViewTransform * float4(_surface.position, 1.0)).xyz;
+        float xrD = xrWorld.y - u_scanY;
+        float xrSoft = u_height * 0.004;
+        float xrFacing = saturate(dot(normalize(_surface.normal), normalize(_surface.view)));
+        float xrRim = pow(1.0 - xrFacing, 2.0);
+        float xrLines = smoothstep(0.72, 1.0, 0.5 + 0.5 * sin(xrWorld.y / u_height * 260.0 + scn_frame.time * 5.0));
+        float3 xrColor = u_tint * (0.025 + 1.6 * pow(xrRim, 1.4) + 0.16 * xrLines) + float3(0.9) * pow(xrRim, 6.0);
+        float xrUnscanned = u_below * (1.0 - smoothstep(-xrSoft, xrSoft, xrD));
+        float xrSlice = step(0.00001, u_band) * (1.0 - smoothstep(u_band, u_band + xrSoft * 3.0, abs(xrD)));
+        float xrMask = max(xrUnscanned, xrSlice);
+        _output.color.rgb = mix(_output.color.rgb, xrColor * _output.color.a, xrMask);
+        float xrLine = exp(-abs(xrD) / (u_height * 0.008)) * u_glow;
+        _output.color.rgb += (u_tint * 1.8 + float3(0.35)) * xrLine * _output.color.a;
+    }
+    """
+
+    /// The scan plane seen edge-on: a faint tinted disc with a hot rim.
+    private static func ringImage(_ tint: UIColor) -> UIImage {
+        let side: CGFloat = 256
+        return UIGraphicsImageRenderer(size: CGSize(width: side, height: side)).image { ctx in
+            let colors = [
+                tint.withAlphaComponent(0.0).cgColor,
+                tint.withAlphaComponent(0.10).cgColor,
+                tint.withAlphaComponent(0.28).cgColor,
+                UIColor.white.withAlphaComponent(0.95).cgColor,
+                tint.withAlphaComponent(0.55).cgColor,
+                tint.withAlphaComponent(0.0).cgColor,
+            ] as CFArray
+            let stops: [CGFloat] = [0, 0.45, 0.84, 0.95, 0.975, 1]
+            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: stops) else { return }
+            let c = CGPoint(x: side / 2, y: side / 2)
+            ctx.cgContext.drawRadialGradient(gradient, startCenter: c, startRadius: 0, endCenter: c, endRadius: side / 2, options: [])
+        }
     }
 }

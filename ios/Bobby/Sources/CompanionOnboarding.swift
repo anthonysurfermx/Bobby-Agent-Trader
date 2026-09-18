@@ -1,8 +1,8 @@
 // Companion-first onboarding. The user lands INSIDE the squad world from
 // second one — same dark stage, same 3D companions, same tokens as the rest
 // of the app. Three beats: choose your companion (it speaks when you pick
-// it), choose its vibe (you hear it live), seal the pact (honesty as a
-// product moment). No orb, no separate "blue app".
+// it), choose its vibe (you hear it live), then watch the aura forge scan it
+// to life — pure animation, no cards. No orb, no separate "blue app".
 import SwiftUI
 
 struct CompanionOnboarding: View {
@@ -16,7 +16,8 @@ struct CompanionOnboarding: View {
     @State private var pageId: String = (bobbyCompanions.first(where: { $0.id != "orb" }) ?? bobbyCompanions[0]).id
     @State private var pulses: [String: Int] = [:]
     @State private var greeting: Task<Void, Never>?
-    @State private var loadoutReady = false
+    @State private var auraReady = false
+    /// Quarters of the forge's first X-ray pass, 0…4.
     @State private var auraCharge = 0
 
     private var starters: [Companion] { bobbyCompanions.filter { $0.requiredLevel == 1 } }
@@ -37,27 +38,32 @@ struct CompanionOnboarding: View {
                 // last step it stands inside the aura forge.
                 Group {
                     if step == 2 {
-                        AuraForgeStage(tint: tint, charged: auraCharge, ready: loadoutReady) { stage }
-                            .padding(.horizontal, 36)
-                            .padding(.vertical, 6)
+                        AuraForgeStage(tint: tint, charged: auraCharge, ready: auraReady) { forgeStage }
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
                     } else {
                         stage
                     }
                 }
                 .frame(maxHeight: .infinity)
 
-                Group {
-                    switch step {
-                    case 0: chooseStep
-                    case 1: vibeStep
-                    default: LoadoutStep(companion: selected, tint: tint, ready: $loadoutReady, onCharge: { auraCharge = $0 })
+                if step < 2 {
+                    Group {
+                        if step == 0 { chooseStep } else { vibeStep }
                     }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 6)
                 }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 6)
 
                 cta
             }
+        }
+        .task(id: step) {
+            // The scan reports its own finish; this only guarantees the CTA
+            // can never stay locked if the model is slow or the render stalls.
+            guard step == 2 else { return }
+            try? await Task.sleep(for: .seconds(8))
+            if !Task.isCancelled { scanned(4) }
         }
         .onAppear {
             MascotAssetCache.preload(starters.map(\.id))
@@ -147,6 +153,33 @@ struct CompanionOnboarding: View {
     private func pulse(_ id: String) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         pulses[id, default: 0] += 1
+    }
+
+    // MARK: step 2 — the aura forge
+
+    /// The companion inside the forge: turning 360° while the X-ray scan
+    /// materializes it. A tap still squashes it.
+    private var forgeStage: some View {
+        CompanionStagePage(companion: selected, active: true, speaking: false, voiceLevel: 0,
+                           pulseToken: pulses[selected.id, default: 0],
+                           forge: .init(tint: UIColor(tint), onProgress: scanned))
+            .contentShape(Rectangle())
+            .onTapGesture { pulse(selected.id) }
+    }
+
+    /// Each quarter of the first X-ray pass charges the platform with a soft
+    /// tick; the last one maxes the aura out. Milestones only move forward.
+    private func scanned(_ quarter: Int) {
+        guard quarter > auraCharge else { return }
+        auraCharge = quarter
+        guard quarter >= 4 else {
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
+            return
+        }
+        guard !auraReady else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        ForgeAudio.shared.auraMax()
+        withAnimation(.spring(duration: 0.5, bounce: 0.35)) { auraReady = true }
     }
 
     // MARK: header
@@ -305,7 +338,7 @@ struct CompanionOnboarding: View {
                 voice.stop()
                 withAnimation(.spring(duration: 0.42)) { step = 2 }
             default:
-                guard loadoutReady else { return }
+                guard auraReady else { return }
                 // The payoff happens on the desk: one greeting, in the
                 // companion's own voice, with today's real movers. Nothing is
                 // spoken here so the two lines never overlap.
@@ -318,7 +351,7 @@ struct CompanionOnboarding: View {
                 Text(step == 0
                      ? L.t("PICK \(selected.name(at: 1))", "ELEGIR A \(selected.name(at: 1))")
                      : step == 1 ? L.t("NEXT", "SIGUE")
-                     : loadoutReady ? L.t("DROP INTO THE DESK", "ENTRAR AL DESK") : L.t("EQUIPPING…", "EQUIPANDO…"))
+                     : auraReady ? L.t("DROP INTO THE DESK", "ENTRAR A LA MESA") : L.t("SCANNING…", "ESCANEANDO…"))
                     .font(.mono(12, .bold))
                     .kerning(1.7)
                 Spacer()
@@ -331,10 +364,10 @@ struct CompanionOnboarding: View {
             .background(tint)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .shadow(color: tint.opacity(0.30), radius: 14, y: 4)
-            .opacity(step == 2 && !loadoutReady ? 0.45 : 1)
-            .animation(.easeOut(duration: 0.3), value: loadoutReady)
+            .opacity(step == 2 && !auraReady ? 0.45 : 1)
+            .animation(.easeOut(duration: 0.3), value: auraReady)
         }
-        .disabled(step == 2 && !loadoutReady)
+        .disabled(step == 2 && !auraReady)
         .padding(.horizontal, 18)
         .padding(.top, 8)
         .padding(.bottom, 10)
@@ -358,13 +391,14 @@ private struct CompanionStagePage: View {
     let speaking: Bool
     let voiceLevel: CGFloat
     let pulseToken: Int
+    var forge: FloatingMascotView.ForgeScan? = nil
     @State private var ready = false
     @State private var failed = false
 
     var body: some View {
         ZStack {
             FloatingMascotView(assetName: companion.id, active: active, speaking: speaking,
-                               voiceLevel: voiceLevel, pulseToken: pulseToken) { loaded in
+                               voiceLevel: voiceLevel, pulseToken: pulseToken, forge: forge) { loaded in
                 withAnimation(.easeOut(duration: 0.3)) {
                     ready = loaded
                     failed = !loaded
