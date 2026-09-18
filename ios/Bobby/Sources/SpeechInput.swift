@@ -26,7 +26,7 @@ enum SpeechInputIssue: String, Identifiable {
                        "Permite acceso al micrófono en Ajustes para que Bobby escuche tu pregunta.")
         case .recognizerUnavailable:
             return L.t("Apple Speech Recognition is temporarily unavailable. You can keep using text and try voice again.",
-                       "El reconocimiento de voz de Apple no está disponible temporalmente. Puedes seguir usando texto e intentar voz de nuevo.")
+                       "El reconocimiento de voz de Apple no está disponible temporalmente. Puedes seguir usando texto y volver a intentar con voz.")
         case .audioCapture:
             return L.t("The microphone could not start. Check your audio route and try again.",
                        "El micrófono no pudo iniciar. Revisa la salida de audio e inténtalo de nuevo.")

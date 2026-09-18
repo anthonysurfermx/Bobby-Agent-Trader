@@ -25,14 +25,14 @@ enum LoadoutKit {
                             "Velas en vivo de cripto y acciones. Sin retraso, sin humo."),
                   sound: 1104),
             .init(id: "shield", icon: "shield.checkered",
-                  title: L.t("NO TRADE SHIELD", "ESCUDO NO TRADE"),
+                  title: L.t("NO TRADE SHIELD", "ESCUDO NO OPERAR"),
                   line: L.t("No clean setup? It blocks. Protecting capital also scores.",
-                            "¿No hay setup limpio? Bloquea. Proteger capital también suma."),
+                            "¿No hay entrada limpia? Bloquea. Proteger capital también suma."),
                   sound: 1105),
             .init(id: "lock", icon: "lock.shield.fill",
                   title: L.t("VAULT LOCK", "CANDADO"),
                   line: L.t("Never touches your money or your exchange. Analysis only.",
-                            "Nunca toca tu dinero ni tu exchange. Solo análisis."),
+                            "Nunca toca tu dinero ni tus cuentas. Solo análisis."),
                   sound: 1103),
             .init(id: "core", icon: "bolt.circle.fill",
                   title: L.t("DISCIPLINE CORE", "NÚCLEO DE DISCIPLINA"),
@@ -48,36 +48,36 @@ enum LoadoutKit {
         switch companion.id {
         case "orb":
             return L.t("Born in a Base node, raised on 4H candles at 3 a.m. Never runs — waits. Today it drops with you to hunt setups that actually hold.",
-                       "Nació en un nodo de Base y creció leyendo velas de 4H a las 3 a.m. No corre: espera. Hoy sale contigo a cazar setups que sí aguantan.")
+                       "Nació en un nodo de Base y creció leyendo velas de 4H a las 3 a.m. No corre: espera. Hoy sale contigo a cazar entradas que sí aguantan.")
         case "byte":
             return L.t("Grew up in a trading forum full of gurus and came out immune to hype. Translates the market into plain words. Mission: you never trade what you cannot explain.",
                        "Creció en un foro de trading lleno de gurús y salió inmune al humo. Traduce el mercado a español de a pie. Misión: que nunca operes lo que no puedas explicar.")
         case "kora":
             return L.t("The friend who actually read the whitepaper. Talks markets like gossip: full detail, zero fear. Your social radar on the desk.",
-                       "La compa que sí leyó el whitepaper. Habla de mercados como de chisme: con detalle y sin miedo. Tu radar social en el desk.")
+                       "La compa que sí se leyó la letra chiquita. Habla de mercados como de chisme: con detalle y sin miedo. Tu radar social en la mesa.")
         case "zip":
             return L.t("Lives on the 15-minute chart. If it moved, ZIP already saw it. Fast alerts, no drama, a stop always within reach.",
                        "Vive en la gráfica de 15 minutos. Si algo se movió, ZIP ya lo vio. Alertas rápidas, cero drama y un stop siempre a la mano.")
         case "glitch":
             return L.t("The Red Team. Its job is to break your thesis before the market does. If it survives GLITCH, it survives the candle.",
-                       "El Red Team. Su trabajo es romper tu tesis antes que el mercado. Si sobrevive a GLITCH, sobrevive a la vela.")
+                       "El abogado del diablo. Su trabajo es romper tu tesis antes que el mercado. Si sobrevive a GLITCH, sobrevive a la vela.")
         case "momo":
             return L.t("Explores the weird corners: new tokens, tokenized stocks, whatever nobody is watching yet.",
                        "Explora los rincones raros: tokens nuevos, acciones tokenizadas, lo que nadie mira todavía.")
         case "flux":
             return L.t("Reads signals like sheet music: RSI, EMA, funding. When something is off-key, it says so.",
-                       "Lee señales como partituras: RSI, EMA, funding. Cuando algo desafina, lo dice.")
+                       "Lee señales como partituras: RSI, EMA, financiamiento. Cuando algo desafina, lo dice.")
         case "rook":
             return L.t("Thinks in theses, not candles. Entry, stop, invalidation. Chess, not roulette.",
                        "Piensa en tesis, no en velas. Entrada, stop, invalidación. Ajedrez, no ruleta.")
         case "halo":
             return L.t("The shield. Guards your capital when the setup is not there. Its NO TRADE also wins.",
-                       "El escudo. Cuida tu capital cuando el setup no está. Su NO TRADE también gana.")
+                       "El escudo. Cuida tu capital cuando no hay entrada. Su NO OPERAR también gana.")
         case "axiom":
             return L.t("Keeps the track record on-chain. Every call gets written down and anyone can challenge it.",
-                       "Guarda el track record on-chain. Cada llamada queda escrita y cualquiera puede retarla.")
+                       "Guarda el historial on-chain. Cada veredicto queda escrito y cualquiera puede retarlo.")
         default:
-            return L.t("Ready to drop into the desk with you.", "Listo para entrar al desk contigo.")
+            return L.t("Ready to drop into the desk with you.", "Todo listo para entrar a la mesa contigo.")
         }
     }
 }
@@ -102,7 +102,7 @@ struct LoadoutStep: View {
             header
             Text(ready
                  ? L.t("You just built the avatar with the best aura in the market. Now go farm it.",
-                       "Acabas de crear el avatar con mejor aura del mercado. Ahora a farmearla.")
+                       "Acabas de crear el avatar con mejor aura del mercado. Ahora a hacerla crecer.")
                  : LoadoutKit.origin(for: companion))
                 .font(.rounded(12.5, .medium))
                 .foregroundStyle(Theme.text.opacity(0.82))

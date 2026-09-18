@@ -65,7 +65,7 @@ struct AssetBoardView: View {
                 .font(.rounded(14, .semibold))
                 .foregroundStyle(Theme.text)
             Text(L.t("Search up top still works — try a name or ticker.",
-                     "La búsqueda de arriba sí funciona — prueba un nombre o ticker."))
+                     "La búsqueda de arriba sí funciona — prueba un nombre o símbolo."))
                 .font(.rounded(12, .medium))
                 .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
@@ -99,8 +99,8 @@ struct AssetBoardView: View {
                     // the search reaches every listed base.
                     Text(totalBases > 0
                          ? L.t("TOP BY 24H VOLUME · SEARCH REACHES ALL \(totalBases)",
-                               "TOP POR VOLUMEN 24H · LA BÚSQUEDA LLEGA A LOS \(totalBases)")
-                         : L.t("TOP BY 24H VOLUME", "TOP POR VOLUMEN 24H"))
+                               "MAYOR VOLUMEN 24H · LA BÚSQUEDA LLEGA A LOS \(totalBases)")
+                         : L.t("TOP BY 24H VOLUME", "MAYOR VOLUMEN 24H"))
                         .font(.mono(8, .medium))
                         .kerning(1)
                         .foregroundStyle(Theme.muted)
@@ -126,7 +126,7 @@ struct AssetBoardView: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Theme.muted)
-            TextField(L.t("Search 600+ assets — name or ticker", "Busca 600+ activos — nombre o ticker"), text: $query)
+            TextField(L.t("Search 600+ assets — name or ticker", "Busca 600+ activos — nombre o símbolo"), text: $query)
                 .font(.rounded(14, .medium))
                 .foregroundStyle(Theme.text)
                 .autocorrectionDisabled(true)
@@ -158,7 +158,7 @@ struct AssetBoardView: View {
     @ViewBuilder private var searchResults: some View {
         if hits.isEmpty {
             Text(L.t("Nothing yet — keep typing or say it your way; Bobby resolves typos.",
-                     "Nada aún — sigue escribiendo o dilo a tu manera; Bobby resuelve typos."))
+                     "Nada aún — sigue escribiendo o dilo a tu manera; Bobby corrige errores de dedo."))
                 .font(.rounded(12, .medium))
                 .foregroundStyle(Theme.muted)
                 .padding(.top, 24)

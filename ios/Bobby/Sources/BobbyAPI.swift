@@ -98,7 +98,7 @@ struct BobbyAnswer {
         let normalizedSignal = signal?.lowercased() ?? ""
         if normalizedSignal.contains("neutral") || normalizedSignal.contains("wait") {
             return L.t("No clean directional signal passed the desk.",
-                       "Ninguna señal direccional limpia pasó el desk.")
+                       "La mesa no encontró una señal direccional clara.")
         }
         if direction == nil {
             return L.t("The agents did not reach directional consensus.",
@@ -109,7 +109,7 @@ struct BobbyAnswer {
                        "La convicción quedó debajo del filtro de riesgo de 55% de Bobby.")
         }
         return L.t("The setup did not include a complete entry, stop and target.",
-                   "El setup no incluyó entrada, stop y objetivo completos.")
+                   "La oportunidad no incluyó entrada, stop y objetivo completos.")
     }
 
     /// The spoken/written summary — terminal-honest, never advice-flavored.
@@ -124,7 +124,7 @@ struct BobbyAnswer {
             var s = L.t("Trend \(trendWord)", "Tendencia \(trendWord)")
             if let m = momentum, m != "neutral" {
                 let momentumWord = Self.localizedMomentum(m)
-                s += L.t(", momentum \(momentumWord)", ", momentum \(momentumWord)")
+                s += L.t(", momentum \(momentumWord)", ", impulso en \(momentumWord)")
             }
             if let r = rsi { s += ", RSI \(Int(r))" }
             lines.append(s + ".")
@@ -145,10 +145,13 @@ struct BobbyAnswer {
         if let e = entry, let st = stop, let tg = target {
             var plan = L.t("Reference plan: entry \(Self.money(e)), stop \(Self.money(st)), target \(Self.money(tg))",
                            "Plan de referencia: entrada \(Self.money(e)), stop \(Self.money(st)), objetivo \(Self.money(tg))")
-            if let rr = rewardRisk { plan += " (R:R \(String(format: "%.1f", rr)))" }
+            if let rr = rewardRisk {
+                plan += L.t(" (R:R \(String(format: "%.1f", rr)))",
+                            " (beneficio/riesgo \(String(format: "%.1f", rr)))")
+            }
             lines.append(plan + ".")
         }
-        if isNoTrade { lines.append(L.t("No setup yet. Capital protected.", "Sin setup todavía. Capital protegido.")) }
+        if isNoTrade { lines.append(L.t("No setup yet. Capital protected.", "Sin oportunidad todavía. Capital protegido.")) }
         if lines.isEmpty {
             lines.append(L.t("I do not have enough data on \(symbol) right now.",
                              "No tengo datos suficientes de \(symbol) ahora mismo."))

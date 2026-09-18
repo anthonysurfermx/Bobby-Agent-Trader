@@ -26,9 +26,9 @@ struct ChartView: View {
                 ForEach(Array(visibleCandles.enumerated()), id: \.element.id) { index, candle in
                     if candle.volume > 0 {
                         RectangleMark(
-                            x: .value("bar", index),
-                            yStart: .value("volume base", volumeBase),
-                            yEnd: .value("volume", volumeHeight(candle.volume)),
+                            x: .value(L.t("bar", "vela"), index),
+                            yStart: .value(L.t("volume base", "base de volumen"), volumeBase),
+                            yEnd: .value(L.t("volume", "volumen"), volumeHeight(candle.volume)),
                             width: .fixed(candleBodyWidth)
                         )
                         .foregroundStyle(
@@ -39,17 +39,17 @@ struct ChartView: View {
                     }
 
                     RuleMark(
-                        x: .value("bar", index),
-                        yStart: .value("low", candle.low),
-                        yEnd: .value("high", candle.high)
+                        x: .value(L.t("bar", "vela"), index),
+                        yStart: .value(L.t("low", "mínimo"), candle.low),
+                        yEnd: .value(L.t("high", "máximo"), candle.high)
                     )
                     .foregroundStyle(candle.close >= candle.open ? Theme.accentSoft : Color.white.opacity(0.30))
                     .lineStyle(StrokeStyle(lineWidth: 1))
 
                     RectangleMark(
-                        x: .value("bar", index),
-                        yStart: .value("open", candle.open),
-                        yEnd: .value("close", candle.close),
+                        x: .value(L.t("bar", "vela"), index),
+                        yStart: .value(L.t("open", "apertura"), candle.open),
+                        yEnd: .value(L.t("close", "cierre"), candle.close),
                         width: .fixed(candleBodyWidth)
                     )
                     .foregroundStyle(candle.close >= candle.open ? Theme.accent : downBody)
@@ -57,14 +57,14 @@ struct ChartView: View {
                 }
 
                 ForEach(ema20) { point in
-                    LineMark(x: .value("bar", point.index), y: .value("EMA20", point.value))
+                    LineMark(x: .value(L.t("bar", "vela"), point.index), y: .value("EMA20", point.value))
                         .foregroundStyle(ema20Color)
                         .lineStyle(StrokeStyle(lineWidth: 1.35))
                         .interpolationMethod(.catmullRom)
                 }
 
                 ForEach(ema50) { point in
-                    LineMark(x: .value("bar", point.index), y: .value("EMA50", point.value))
+                    LineMark(x: .value(L.t("bar", "vela"), point.index), y: .value("EMA50", point.value))
                         .foregroundStyle(ema50Color.opacity(0.82))
                         .lineStyle(StrokeStyle(lineWidth: 1.15))
                         .interpolationMethod(.catmullRom)
@@ -74,13 +74,13 @@ struct ChartView: View {
                 planLines
 
                 if let last = visibleCandles.last {
-                    RuleMark(y: .value("last", last.close))
+                    RuleMark(y: .value(L.t("last", "último"), last.close))
                         .foregroundStyle(Theme.accent.opacity(0.72))
                         .lineStyle(StrokeStyle(lineWidth: 0.8, dash: [2, 3]))
                 }
 
                 if let selectedIndex, visibleCandles.indices.contains(selectedIndex) {
-                    RuleMark(x: .value("selected", selectedIndex))
+                    RuleMark(x: .value(L.t("selected", "seleccionada"), selectedIndex))
                         .foregroundStyle(Theme.accentSoft.opacity(0.55))
                         .lineStyle(StrokeStyle(lineWidth: 0.8, dash: [3, 3]))
                 }
@@ -127,7 +127,7 @@ struct ChartView: View {
     @ChartContentBuilder
     private var structureLines: some ChartContent {
         if let support = answer?.support {
-            RuleMark(y: .value("support", support))
+            RuleMark(y: .value(L.t("support", "soporte"), support))
                 .foregroundStyle(Color.white.opacity(0.25))
                 .lineStyle(StrokeStyle(lineWidth: 0.8, dash: [2, 4]))
                 .annotation(position: .top, alignment: .trailing,
@@ -136,7 +136,7 @@ struct ChartView: View {
                 }
         }
         if let resistance = answer?.resistance {
-            RuleMark(y: .value("resistance", resistance))
+            RuleMark(y: .value(L.t("resistance", "resistencia"), resistance))
                 .foregroundStyle(Color.white.opacity(0.25))
                 .lineStyle(StrokeStyle(lineWidth: 0.8, dash: [2, 4]))
                 .annotation(position: .bottom, alignment: .trailing,
@@ -149,11 +149,11 @@ struct ChartView: View {
     @ChartContentBuilder
     private var planLines: some ChartContent {
         if let entry = answer?.entry {
-            RuleMark(y: .value("entry", entry))
+            RuleMark(y: .value(L.t("entry", "entrada"), entry))
                 .foregroundStyle(Theme.accentSoft.opacity(0.90))
                 .lineStyle(StrokeStyle(lineWidth: 1.1, dash: [5, 4]))
                 .annotation(position: .top, alignment: .trailing) {
-                    lineLabel("ENTRY", entry, Theme.accentSoft)
+                    lineLabel(L.t("ENTRY", "ENTRADA"), entry, Theme.accentSoft)
                 }
         }
         if let stop = answer?.stop {
@@ -165,11 +165,11 @@ struct ChartView: View {
                 }
         }
         if let target = answer?.target {
-            RuleMark(y: .value("target", target))
+            RuleMark(y: .value(L.t("target", "objetivo"), target))
                 .foregroundStyle(Theme.up.opacity(0.88))
                 .lineStyle(StrokeStyle(lineWidth: 1.1, dash: [4, 4]))
                 .annotation(position: .bottom, alignment: .trailing) {
-                    lineLabel("TARGET", target, Theme.up)
+                    lineLabel(L.t("TARGET", "OBJETIVO"), target, Theme.up)
                 }
         }
     }
@@ -181,9 +181,9 @@ struct ChartView: View {
             if let candle {
                 Text(formatTimestamp(candle.time))
                     .foregroundStyle(Theme.muted)
-                metric("O", candle.open)
-                metric("H", candle.high)
-                metric("L", candle.low)
+                metric(L.t("O", "A"), candle.open)
+                metric(L.t("H", "Máx"), candle.high)
+                metric(L.t("L", "Mín"), candle.low)
                 metric("C", candle.close)
             }
             Spacer(minLength: 0)

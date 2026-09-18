@@ -318,7 +318,7 @@ struct CompanionOnboarding: View {
                 Text(step == 0
                      ? L.t("PICK \(selected.name(at: 1))", "ELEGIR A \(selected.name(at: 1))")
                      : step == 1 ? L.t("NEXT", "SIGUE")
-                     : loadoutReady ? L.t("DROP INTO THE DESK", "ENTRAR AL DESK") : L.t("EQUIPPING…", "EQUIPANDO…"))
+                     : loadoutReady ? L.t("DROP INTO THE DESK", "ENTRAR A LA MESA") : L.t("EQUIPPING…", "EQUIPANDO…"))
                     .font(.mono(12, .bold))
                     .kerning(1.7)
                 Spacer()

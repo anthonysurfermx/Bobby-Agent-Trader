@@ -196,7 +196,7 @@ struct AuraCardSheet: View {
             if let image = renderCard() {
                 ShareLink(
                     item: Image(uiImage: image),
-                    preview: SharePreview("Mi aura — \(data.agentName)", image: Image(uiImage: image))
+                    preview: SharePreview(L.t("My aura — \(data.agentName)", "Mi aura — \(data.agentName)"), image: Image(uiImage: image))
                 ) {
                     HStack {
                         Image(systemName: "square.and.arrow.up")

@@ -21,8 +21,8 @@ struct AccountSheet: View {
             Text(account.isSignedIn ? L.t("Your progress is saved", "Tu progreso está guardado") : L.t("Keep your XP everywhere", "Conserva tu XP en todas partes"))
                 .font(.system(size: 22, weight: .heavy)).foregroundStyle(.white)
             Text(account.isSignedIn
-                 ? L.t("XP, streak, gear and your Trader Land follow this account on the phone and on bobbyprotocol.xyz. Bobby never takes custody or signs wallet transactions.", "XP, racha, equipo y tu Trader Land siguen a esta cuenta en el teléfono y en bobbyprotocol.xyz. Bobby nunca toma custodia ni firma transacciones de wallet.")
-                 : L.t("Sign in with Apple so XP, streak, gear and Trader Land survive a reinstall and follow you across your Apple devices. This account is separate from the optional wallet connection; no keys or email are required.", "Inicia sesión con Apple para que XP, racha, equipo y Trader Land sobrevivan a una reinstalación y te sigan entre tus dispositivos Apple. Esta cuenta es distinta de la conexión opcional de wallet; no requiere llaves ni correo."))
+                 ? L.t("XP, streak, gear and your Trader Land follow this account on the phone and on bobbyprotocol.xyz. Bobby never takes custody or signs wallet transactions.", "XP, racha, accesorios y tu Trader Land quedan guardados en esta cuenta, en el teléfono y en bobbyprotocol.xyz. Bobby nunca toma custodia ni firma transacciones de wallet.")
+                 : L.t("Sign in with Apple so XP, streak, gear and Trader Land survive a reinstall and follow you across your Apple devices. This account is separate from the optional wallet connection; no keys or email are required.", "Inicia sesión con Apple para que XP, racha, accesorios y Trader Land no se pierdan si reinstalas Bobby y te acompañen en tus dispositivos Apple. Esta cuenta es distinta de la conexión opcional de wallet; no requiere llaves ni correo."))
                 .font(.system(size: 14)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 14) {
                 stat(L.t("XP", "XP"), "\(store.disciplineXP)")
@@ -98,7 +98,7 @@ struct AccountSheet: View {
         } message: {
             Text(L.t(
                 "This deletes your Apple-backed account and synced XP, streak, gear and Trader Land. Public blockchain transactions cannot be erased and limited security or audit records may remain.",
-                "Esto borra tu cuenta vinculada a Apple y el XP, racha, equipo y Trader Land sincronizados. Las transacciones públicas de blockchain no se pueden borrar y pueden conservarse registros limitados de seguridad o auditoría."
+                "Esto borra tu cuenta vinculada a Apple y tu XP, racha, accesorios y Trader Land sincronizados. Las transacciones públicas de blockchain no se pueden borrar y pueden conservarse registros limitados de seguridad o auditoría."
             ))
         }
     }

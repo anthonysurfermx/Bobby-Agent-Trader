@@ -23,7 +23,7 @@ struct RiskNoticeView: View {
         [
             (L.t("Not investment advice.", "No es asesoría de inversión."),
              L.t("Verdicts, levels and stops are educational analysis made by software, not recommendations for you.",
-                 "Veredictos, niveles y stops son análisis educativo hecho por software, no recomendaciones para ti.")),
+                 "Veredictos, niveles y stops son análisis educativo hecho por un programa, no recomendaciones para ti.")),
             (L.t("Bobby never touches your money.", "Bobby nunca toca tu dinero."),
              L.t("It doesn't connect wallets, move funds, execute trades or hold your keys.",
                  "No conecta wallets, no mueve fondos, no ejecuta operaciones y no guarda tus llaves.")),
@@ -106,7 +106,7 @@ struct RiskNoticeView: View {
 
                         VStack(alignment: .leading, spacing: 6) {
                             Text(L.t("Bobby's public calls are recorded on-chain so anyone can check them. A track record, not a promise.",
-                                     "Las llamadas públicas de Bobby quedan on-chain para que cualquiera las revise. Historial, no promesa."))
+                                     "Los veredictos públicos de Bobby quedan on-chain para que cualquiera los revise. Historial, no promesa."))
                                 .font(.mono(10, .medium))
                                 .foregroundStyle(Theme.muted)
                             Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {

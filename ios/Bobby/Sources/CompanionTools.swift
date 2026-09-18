@@ -69,9 +69,9 @@ enum CompanionToolkit {
             ]
         case "kora":
             return [
-                t(1, "headphones", "Radar Headset", "Auriculares radar", "Hears the desk before the crowd does.", "Escucha el desk antes que la multitud."),
+                t(1, "headphones", "Radar Headset", "Auriculares radar", "Hears the desk before the crowd does.", "Escucha la mesa antes que la multitud."),
                 t(2, "antenna.radiowaves.left.and.right", "Gossip Antenna", "Antena de chisme", "Picks up what the market is whispering, with receipts.", "Capta lo que el mercado susurra, con pruebas."),
-                t(3, "mic.fill", "Golden Mic", "Micrófono dorado", "When Kora speaks with this, the whole squad listens.", "Cuando Kora habla con esto, todo el squad escucha."),
+                t(3, "mic.fill", "Golden Mic", "Micrófono dorado", "When Kora speaks with this, the whole squad listens.", "Cuando Kora habla con esto, todo el equipo escucha."),
             ]
         case "zip":
             return [
@@ -94,7 +94,7 @@ enum CompanionToolkit {
         case "flux":
             return [
                 t(1, "waveform", "Tuning Fork", "Diapasón", "Rings when an indicator is off-key.", "Suena cuando un indicador desafina."),
-                t(2, "chart.xyaxis.line", "Signal Score", "Partitura de señales", "RSI, EMA and funding on one staff.", "RSI, EMA y funding en un solo pentagrama."),
+                t(2, "chart.xyaxis.line", "Signal Score", "Partitura de señales", "RSI, EMA and funding on one staff.", "RSI, EMA y financiamiento en un solo pentagrama."),
                 t(3, "music.note", "Golden Note", "Nota dorada", "Perfect pitch for the market's rhythm.", "Oído absoluto para el ritmo del mercado."),
             ]
         case "rook":
@@ -105,13 +105,13 @@ enum CompanionToolkit {
             ]
         case "halo":
             return [
-                t(1, "shield", "Capital Shield", "Escudo de capital", "Blocks the trade that was not there.", "Bloquea el trade que no estaba."),
-                t(2, "shield.checkered", "Risk Gate", "Puerta de riesgo", "Only clean setups get through.", "Solo pasan los setups limpios."),
-                t(3, "shield.fill", "Golden Halo", "Halo dorado", "NO TRADE, made legendary.", "NO TRADE, hecho leyenda."),
+                t(1, "shield", "Capital Shield", "Escudo de capital", "Blocks the trade that was not there.", "Bloquea la operación que no estaba."),
+                t(2, "shield.checkered", "Risk Gate", "Filtro de riesgo", "Only clean setups get through.", "Solo pasan las entradas limpias."),
+                t(3, "shield.fill", "Golden Halo", "Halo dorado", "NO TRADE, made legendary.", "NO OPERAR, hecho leyenda."),
             ]
         case "axiom":
             return [
-                t(1, "doc.text", "Ledger", "Libro mayor", "Every call written down.", "Cada llamada queda escrita."),
+                t(1, "doc.text", "Ledger", "Libro mayor", "Every call written down.", "Cada veredicto queda escrito."),
                 t(2, "link", "Chain Link", "Eslabón", "Anchors the record where anyone can check it.", "Ancla el historial donde cualquiera puede revisarlo."),
                 t(3, "seal.fill", "Golden Seal", "Sello dorado", "Verified, not promised.", "Comprobado, no prometido."),
             ]
@@ -296,7 +296,7 @@ struct WorldMapSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var breathe = false
     static let gold = Color(red: 0.96, green: 0.77, blue: 0.26)
-    static let regions = ["CRYPTO BAY", "GOLD MINES", "WALL STREET CITADEL", "RISK REEF"]
+    static let regions = [L.t("CRYPTO BAY", "BAHÍA CRIPTO"), L.t("GOLD MINES", "MINAS DE ORO"), L.t("WALL STREET CITADEL", "CIUDADELA WALL STREET"), L.t("RISK REEF", "ARRECIFE DE RIESGO")]
 
     var body: some View {
         ScrollView {
@@ -331,7 +331,7 @@ struct WorldMapSheet: View {
                 }
                 .padding(.horizontal, 16)
                 Button { dismiss() } label: {
-                    Text(L.t("BACK TO THE DESK", "VOLVER AL DESK")).font(.mono(12, .bold)).kerning(2)
+                    Text(L.t("BACK TO THE DESK", "VOLVER A LA MESA")).font(.mono(12, .bold)).kerning(2)
                         .foregroundStyle(.black).frame(maxWidth: .infinity).padding(.vertical, 14)
                         .background(Capsule().fill(Self.gold))
                 }
@@ -367,7 +367,7 @@ struct WorldMapSheet: View {
                 Text(L.t("Your world is built with discipline.", "Tu mundo se construye con disciplina."))
                     .font(.rounded(24, .bold)).foregroundStyle(Theme.text)
                 Text(L.t("Every full read and every NO TRADE raises your base camp. Regions open with XP, never with volume.",
-                         "Cada lectura completa y cada NO TRADE levanta tu campamento. Las regiones se abren con XP, nunca con volumen."))
+                         "Cada lectura completa y cada NO OPERAR levanta tu campamento. Las regiones se abren con XP, nunca con volumen."))
                     .font(.rounded(13.5, .medium)).foregroundStyle(Theme.text.opacity(0.75))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -402,7 +402,7 @@ struct ToolUnlockOverlay: View {
             RadialGradient(colors: [tint.opacity(0.28), .clear], center: .center, startRadius: 20, endRadius: 360)
                 .ignoresSafeArea()
             VStack(spacing: 14) {
-                Text(tool.isGolden ? L.t("GOLDEN GEAR UNLOCKED", "EQUIPO DORADO DESBLOQUEADO") : L.t("NEW GEAR UNLOCKED", "NUEVO EQUIPO DESBLOQUEADO"))
+                Text(tool.isGolden ? L.t("GOLDEN GEAR UNLOCKED", "ACCESORIO DORADO DESBLOQUEADO") : L.t("NEW GEAR UNLOCKED", "NUEVO ACCESORIO DESBLOQUEADO"))
                     .font(.mono(11, .bold))
                     .kerning(2)
                     .foregroundStyle(tint)
@@ -536,12 +536,12 @@ extension CompanionToolkit {
         case "byte": return CompanionPet(companionId: companionId, name: L.t("Bit the dog", "Bit el perro"), emoji: "🐶", spins: false)
         case "kora": return CompanionPet(companionId: companionId, name: L.t("Nova the cat", "Nova la gata"), emoji: "🐱", spins: false)
         case "zip": return CompanionPet(companionId: companionId, name: L.t("Turbo the monkey", "Turbo el mono"), emoji: "🐵", spins: false)
-        case "glitch": return CompanionPet(companionId: companionId, name: L.t("Bug the gecko", "Bug el geco"), emoji: "🦎", spins: false)
-        case "momo": return CompanionPet(companionId: companionId, name: L.t("Ink the octopus", "Ink el pulpo"), emoji: "🐙", spins: false)
-        case "flux": return CompanionPet(companionId: companionId, name: L.t("Echo the parrot", "Echo el loro"), emoji: "🦜", spins: false)
-        case "rook": return CompanionPet(companionId: companionId, name: L.t("Sage the owl", "Sage el búho"), emoji: "🦉", spins: false)
+        case "glitch": return CompanionPet(companionId: companionId, name: L.t("Bug the gecko", "Bicho el geco"), emoji: "🦎", spins: false)
+        case "momo": return CompanionPet(companionId: companionId, name: L.t("Ink the octopus", "Tinta el pulpo"), emoji: "🐙", spins: false)
+        case "flux": return CompanionPet(companionId: companionId, name: L.t("Echo the parrot", "Eco el loro"), emoji: "🦜", spins: false)
+        case "rook": return CompanionPet(companionId: companionId, name: L.t("Sage the owl", "Sabio el búho"), emoji: "🦉", spins: false)
         case "halo": return CompanionPet(companionId: companionId, name: L.t("Peace the dove", "Paz la paloma"), emoji: "🕊️", spins: false)
-        case "axiom": return CompanionPet(companionId: companionId, name: L.t("Ledger the turtle", "Ledger la tortuga"), emoji: "🐢", spins: false)
+        case "axiom": return CompanionPet(companionId: companionId, name: L.t("Ledger the turtle", "Libreta la tortuga"), emoji: "🐢", spins: false)
         default: return nil
         }
     }
@@ -581,13 +581,13 @@ struct GearCatalogSheet: View {
                     .font(.mono(11, .bold)).kerning(1.8).foregroundStyle(Theme.muted)
                 Text(L.t("Discipline XP only. Reads and coming back — never volume.", "Solo XP de disciplina. Lecturas y volver — nunca volumen."))
                     .font(.rounded(13, .medium)).foregroundStyle(Theme.text.opacity(0.7))
-                Label(L.t("Hold any item to see it worn.", "Mantén presionado un item para verlo puesto."), systemImage: "hand.tap")
+                Label(L.t("Hold any item to see it worn.", "Mantén presionado un accesorio para verlo puesto."), systemImage: "hand.tap")
                     .font(.mono(10, .medium)).kerning(0.6).foregroundStyle(Theme.muted)
 
                 // Your own companion showed only the pet here, so your own three
                 // pieces were the one gear in the game you could never hold to
                 // see worn — the belt opens the flat card, not the 3D preview.
-                section(L.t("YOUR GEAR", "TU EQUIPO"))
+                section(L.t("YOUR GEAR", "TUS ACCESORIOS"))
                 ForEach(CompanionToolkit.tools(for: current.id)) { tool in
                     row(glyph: nil, symbol: tool.symbol, art: tool.hasArt ? tool.assetName : nil, title: tool.name, subtitle: tool.lore,
                         needXP: tool.unlockXP, needLevel: nil, tint: tool.isGolden ? gold : current.tint,
@@ -595,11 +595,11 @@ struct GearCatalogSheet: View {
                 }
                 if let pet = CompanionToolkit.pet(for: current.id) {
                     row(glyph: pet.hasArt ? nil : pet.emoji, art: pet.hasArt ? pet.assetName : nil, title: pet.name,
-                        subtitle: pet.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."),
+                        subtitle: pet.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en la mesa.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."),
                         needXP: CompanionPet.unlockXP, needLevel: nil, tint: current.tint, item: .pet(pet, current))
                 }
 
-                section(L.t("OTHER COMPANIONS' GEAR", "EQUIPO DE OTROS COMPAÑEROS"))
+                section(L.t("OTHER COMPANIONS' GEAR", "ACCESORIOS DE OTROS AMIGOS"))
                 ForEach(bobbyCompanions.filter { $0.id != current.id }) { comp in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
@@ -681,7 +681,7 @@ struct GearCatalogSheet: View {
             preview = item
         }
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint(L.t("Shows the item worn by its companion", "Muestra el item que lleva tu amigo"))
+        .accessibilityHint(L.t("Shows the item worn by its companion", "Muestra el accesorio puesto en su amigo"))
     }
 }
 
@@ -719,7 +719,7 @@ struct ItemPreviewSheet: View {
     private var lore: String {
         switch item {
         case .tool(let t, _): return t.lore
-        case .pet(let p, _): return p.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo.")
+        case .pet(let p, _): return p.spins ? L.t("Spins next to you on the desk.", "Gira a tu lado en la mesa.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo.")
         }
     }
     private var needXP: Int {
@@ -738,7 +738,7 @@ struct ItemPreviewSheet: View {
                 CompanionThumb(companion: companion).frame(width: 26, height: 26).clipShape(Circle())
                 Text(L.t("WORN BY \(companion.label)", "LO LLEVA \(companion.label)")).font(.mono(10, .bold)).kerning(1.4).foregroundStyle(companion.tint)
                 Spacer()
-                Text("PREVIEW").font(.mono(10, .bold)).kerning(1.4).foregroundStyle(Theme.muted)
+                Text(L.t("PREVIEW", "VISTA PREVIA")).font(.mono(10, .bold)).kerning(1.4).foregroundStyle(Theme.muted)
                 Button {
                     dismiss()
                 } label: {
@@ -750,7 +750,7 @@ struct ItemPreviewSheet: View {
                         .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(L.t("Close preview", "Cerrar preview"))
+                .accessibilityLabel(L.t("Close preview", "Cerrar vista previa"))
             }
             .padding(.horizontal, 18)
 
@@ -818,7 +818,7 @@ enum SkinCard {
                 c.drawRadialGradient(gradient, startCenter: CGPoint(x: 540, y: 560), startRadius: 0, endCenter: CGPoint(x: 540, y: 560), endRadius: 620, options: [])
             }
             let mono = UIFont.monospacedSystemFont(ofSize: 30, weight: .bold)
-            let head = NSAttributedString(string: "BOBBY // \(L.t("MY SKIN", "MI SKIN"))", attributes: [.font: mono, .foregroundColor: UIColor.white.withAlphaComponent(0.75), .kern: 6])
+            let head = NSAttributedString(string: "BOBBY // \(L.t("MY SKIN", "MI ESTILO"))", attributes: [.font: mono, .foregroundColor: UIColor.white.withAlphaComponent(0.75), .kern: 6])
             head.draw(at: CGPoint(x: 72, y: 72))
             let aspect = snapshot.size.width / max(snapshot.size.height, 1)
             let shotH: CGFloat = 760
@@ -831,7 +831,7 @@ enum SkinCard {
             sub.draw(at: CGPoint(x: (size.width - sub.size().width) / 2, y: 1024))
             var line = gear.map { $0.name }
             if let pet { line.append(pet.name) }
-            let gearText = line.isEmpty ? L.t("No gear yet — first read drops the first tool.", "Sin equipo aún — la primera lectura suelta la primera herramienta.") : line.joined(separator: " · ")
+            let gearText = line.isEmpty ? L.t("No gear yet — first read drops the first tool.", "Aún sin accesorios — tu primera lectura suelta el primero.") : line.joined(separator: " · ")
             let gearAttr = NSAttributedString(string: gearText, attributes: [.font: UIFont.systemFont(ofSize: 28, weight: .medium), .foregroundColor: UIColor.white.withAlphaComponent(0.8)])
             let gearRect = CGRect(x: 90, y: 1090, width: size.width - 180, height: 120)
             gearAttr.draw(with: gearRect, options: [.usesLineFragmentOrigin], context: nil)
@@ -866,7 +866,7 @@ struct PetDetailSheet: View {
             }
             Text(pet?.name ?? "").font(.rounded(22, .bold)).foregroundStyle(Theme.text)
             Text(has
-                 ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en el desk.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."))
+                 ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en la mesa.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."))
                  : L.t("Unlocks at \(CompanionPet.unlockXP) XP · you have \(xp). Discipline only.", "Se desbloquea a \(CompanionPet.unlockXP) XP · llevas \(xp). Solo disciplina."))
                 .font(.rounded(14, .medium)).foregroundStyle(Theme.text.opacity(0.75)).multilineTextAlignment(.center).padding(.horizontal, 28)
             Spacer()

@@ -14,8 +14,56 @@ private func landCells(_ item: ManifestItem, _ placement: LandPlacement) -> Set<
     let size = landFootprint(item, placement.orientation)
     return Set((0..<size.cols).flatMap { x in (0..<size.rows).map { y in "\(placement.col + x):\(placement.row + y)" } })
 }
+/// Spanish display names for the bundled pieces and districts. The English
+/// side is still derived from the id, so English copy is unchanged; an id
+/// missing here falls back to that English name.
+private let landNamesES: [String: String] = [
+    "aura_core": "Núcleo de Aura",
+    "crypto_bay_data_dock": "Muelle de Datos",
+    "crypto_bay_water_walkway": "Pasarela de Agua",
+    "crypto_bay_context_buoy": "Boya de Contexto",
+    "crypto_bay_candle_tower": "Torre de Velas",
+    "crypto_bay_waiting_lighthouse": "Faro de la Espera",
+    "evidence_mines_crystal_vein_rock": "Roca con Veta de Cristal",
+    "evidence_mines_open_tunnel": "Túnel Abierto",
+    "evidence_mines_lantern_drone": "Dron Linterna",
+    "evidence_mines_evidence_workshop": "Taller de Evidencia",
+    "evidence_mines_mother_crystal": "Cristal Madre",
+    "thesis_citadel_wall_slab": "Losa de Muralla",
+    "thesis_citadel_fortified_ramp": "Rampa Fortificada",
+    "thesis_citadel_risk_shield": "Escudo de Riesgo",
+    "thesis_citadel_double_gate": "Puerta Doble",
+    "thesis_citadel_three_gate_citadel": "Ciudadela de Tres Puertas",
+    "risk_reef_reef_tile": "Loseta de Arrecife",
+    "risk_reef_blue_sluice": "Compuerta Azul",
+    "risk_reef_dual_orbit_antenna": "Antena de Doble Órbita",
+    "risk_reef_red_team_observatory": "Observatorio del Crítico",
+    "risk_reef_double_bridge": "Puente Doble",
+    "axiom_archive_archive_ring_tile": "Loseta del Anillo",
+    "axiom_archive_path_straight": "Camino Recto",
+    "axiom_archive_return_path_curve": "Curva de Regreso",
+    "axiom_archive_aura_flower": "Flor de Aura",
+    "axiom_archive_lit_archive": "Archivo Iluminado",
+    "axiom_archive_base_ring_seal": "Sello del Anillo Base",
+]
+private let districtNamesES: [String: String] = [
+    "crypto_bay": "Bahía Cripto",
+    "evidence_mines": "Minas de Evidencia",
+    "thesis_citadel": "Ciudadela de Tesis",
+    "risk_reef": "Arrecife de Riesgo",
+    "axiom_archive": "Archivo de Axiomas",
+]
 private func landName(_ item: ManifestItem) -> String {
-    item.id.replacingOccurrences(of: item.district + "_", with: "").replacingOccurrences(of: "_", with: " ").capitalized
+    let en = item.id.replacingOccurrences(of: item.district + "_", with: "").replacingOccurrences(of: "_", with: " ").capitalized
+    return L.t(en, landNamesES[item.id] ?? en)
+}
+private func districtName(_ id: String) -> String {
+    let en = id.replacingOccurrences(of: "_", with: " ").capitalized
+    return L.t(en, districtNamesES[id] ?? en)
+}
+/// Server direction values ("long"/"short") in the reader's language; English keeps the raw value.
+private func landDirection(_ raw: String) -> String {
+    L.t(raw, raw == "long" ? "alcista" : raw == "short" ? "bajista" : raw)
 }
 private enum LandImageCache {
     static let images = NSCache<NSString, UIImage>()
@@ -153,7 +201,7 @@ private struct GateBundleImage: View {
             if let image = LandImageCache.image(path) {
                 Image(uiImage: image).resizable().scaledToFit()
             } else {
-                RoundedRectangle(cornerRadius: 8).fill(.red.opacity(0.35)).overlay(Text("Missing").font(.caption2))
+                RoundedRectangle(cornerRadius: 8).fill(.red.opacity(0.35)).overlay(Text(L.t("Missing", "Sin imagen")).font(.caption2))
             }
         }
     }
@@ -535,9 +583,9 @@ struct TraderLandGateHarnessView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            icon("arrow.left", label: L.t("Back to desk", "Volver al desk")) { dismiss() }
+            icon("arrow.left", label: L.t("Back to desk", "Volver a la mesa")) { dismiss() }
             VStack(alignment: .leading, spacing: 3) {
-                Text("BOBBY WORLD").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).foregroundStyle(mint.opacity(0.6))
+                Text(L.t("BOBBY WORLD", "MUNDO BOBBY")).font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).foregroundStyle(mint.opacity(0.6))
                 Text("Trader Land").font(.system(size: 23, weight: .semibold, design: .rounded)).tracking(-1)
             }
             Spacer(minLength: 0)
@@ -623,7 +671,7 @@ struct TraderLandGateHarnessView: View {
                 VStack {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("FIRST LIGHT · ISLAND 01").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1.6).foregroundStyle(mint.opacity(0.55))
+                            Text(L.t("FIRST LIGHT · ISLAND 01", "PRIMERA LUZ · ISLA 01")).font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1.6).foregroundStyle(mint.opacity(0.55))
                             Text(draft == nil ? L.t("A little world. All yours.", "Un pequeño mundo. Muy tuyo.") : L.t("Find its place.", "Encuentra su lugar."))
                                 .font(.system(size: 21, weight: .medium, design: .rounded)).tracking(-0.6)
                             Text(draft == nil ? L.t("Drag to explore. Pinch to zoom.", "Arrastra para explorar. Pellizca para acercar.") : L.t("Tap a tile or drag the piece, then confirm.", "Toca una casilla o arrastra la pieza y confirma."))
@@ -647,7 +695,7 @@ struct TraderLandGateHarnessView: View {
                     if draft != nil { placementControls.padding(12) }
                     else {
                         HStack {
-                            Text("FOCUS \(focusLevel)/2 · \(placements.count + 1) PLACED")
+                            Text(L.t("FOCUS \(focusLevel)/2 · \(placements.count + 1) PLACED", "ENFOQUE \(focusLevel)/2 · \(placements.count + 1) COLOCADAS"))
                                 .font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(mint.opacity(0.6))
                                 .accessibilityIdentifier("land-fixed-status")
                             Spacer()
@@ -663,7 +711,7 @@ struct TraderLandGateHarnessView: View {
     private var cameraControls: some View {
         VStack(spacing: 0) {
             icon("minus", label: L.t("Zoom out", "Alejar")) { zoom = max(0.7, zoom / 1.2) }
-            Button { resetView() } label: { Text("\(Int(zoom * 100))%").font(.system(size: 11, design: .monospaced)).frame(width: 44, height: 30) }.accessibilityLabel("Reset view")
+            Button { resetView() } label: { Text("\(Int(zoom * 100))%").font(.system(size: 11, design: .monospaced)).frame(width: 44, height: 30) }.accessibilityLabel(L.t("Reset view", "Restablecer vista"))
             icon("plus", label: L.t("Zoom in", "Acercar")) { zoom = min(2.6, zoom * 1.2) }
         }.background(ink.opacity(0.85), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(mint.opacity(0.15)))
     }
@@ -710,7 +758,7 @@ struct TraderLandGateHarnessView: View {
                                 }.buttonStyle(.plain).accessibilityIdentifier("land-district-\(value)")
                             }
                         }
-                        Text(district.replacingOccurrences(of: "_", with: " ").capitalized).font(.system(size: 14, weight: .medium))
+                        Text(districtName(district)).font(.system(size: 14, weight: .medium))
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(manifest.items.filter { $0.district == district }) { item in
@@ -897,7 +945,7 @@ struct TraderLandGateHarnessView: View {
     private func seedLine(_ review: TraderLandWorld.SeedReview) -> String {
         var read = L.t("Read without a saved thesis", "Lectura sin tesis guardada")
         if let thesis = review.thesis {
-            let bias = thesis.direction == "none" ? L.t("no edge", "sin sesgo") : thesis.direction
+            let bias = thesis.direction == "none" ? L.t("no edge", "sin sesgo") : landDirection(thesis.direction)
             let level = (thesis.entry ?? thesis.price).map { " @ \($0.formatted(.number.precision(.significantDigits(1...6))))" } ?? ""
             read = "\(thesis.symbol) \(bias)\(level)"
         }
@@ -917,7 +965,7 @@ struct TraderLandGateHarnessView: View {
                 : closed.outcome == "invalidated" ? L.t("invalidation hit", "invalidación tocada")
                 : L.t("window closed without touching a level", "venció sin tocar niveles")
             let move = closed.movePct.map { " (\($0 > 0 ? "+" : "")\($0.formatted(.number.precision(.fractionLength(0...2))))%)" } ?? ""
-            let direction = closed.direction.flatMap { $0 == "none" ? nil : " \($0)" } ?? ""
+            let direction = closed.direction.flatMap { $0 == "none" ? nil : " \(landDirection($0))" } ?? ""
             let head = closed.symbol.map { "\($0)\(direction): \(outcome)\(move). " } ?? ""
             var text = "\(head)\(itemName(closed.itemId)) \(L.t("bloomed.", "floreció.")) +\(closed.xp) XP · +\(closed.aura) Aura."
             if let executed = closed.executed { text += " \(L.t("Execution bonus", "Bono de ejecución")) +\(executed.xp) XP · +\(executed.aura) Aura." }

@@ -71,7 +71,7 @@ final class AccountSession: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
-                lastError = message ?? L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
+                lastError = L.t(message ?? "Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
                 return false
             }
             signOut(store: store)
@@ -98,12 +98,12 @@ final class AccountSession: ObservableObject {
         case .success(let auth):
             guard let cred = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = cred.identityToken, let idToken = String(data: tokenData, encoding: .utf8),
-                  let nonce = currentNonce else { lastError = "Apple returned no identity token"; return }
+                  let nonce = currentNonce else { lastError = L.t("Apple returned no identity token", "Apple no devolvió un token de identidad"); return }
             do {
                 let s = try await exchange(body: ["provider": "apple", "id_token": idToken, "nonce": nonce], grant: "id_token")
                 session = s; Keychain.write(s, service: keychainService); lastError = nil
             } catch {
-                lastError = L.t("Could not sign in: \(error.localizedDescription)", "No se pudo iniciar sesión: \(error.localizedDescription)")
+                lastError = L.t("Could not sign in: \(error.localizedDescription)", "No se pudo iniciar sesión — inténtalo de nuevo")
             }
         }
     }
@@ -123,10 +123,10 @@ final class AccountSession: ObservableObject {
     func signInWithOAuth(provider: String) async {
         var comps = URLComponents(url: SupabaseConfig.url.appendingPathComponent("auth/v1/authorize"), resolvingAgainstBaseURL: false)!
         comps.queryItems = [URLQueryItem(name: "provider", value: provider), URLQueryItem(name: "redirect_to", value: Self.oauthCallback)]
-        guard let authURL = comps.url else { lastError = "bad authorize URL"; return }
+        guard let authURL = comps.url else { lastError = L.t("bad authorize URL", "URL de autorización no válida"); return }
         do {
             let callback = try await WebAuthPresenter.shared.run(url: authURL, scheme: "bobbyprotocol")
-            guard let s = Self.session(fromCallback: callback) else { lastError = "Supabase returned no session"; return }
+            guard let s = Self.session(fromCallback: callback) else { lastError = L.t("Supabase returned no session", "Supabase no devolvió una sesión"); return }
             session = s; Keychain.write(s, service: keychainService); lastError = nil
         } catch {
             // The visitor closing the sheet is not an error worth showing.
@@ -173,7 +173,7 @@ final class AccountSession: ObservableObject {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let access = json["access_token"] as? String, let refresh = json["refresh_token"] as? String,
               let expiresIn = json["expires_in"] as? Double, let user = json["user"] as? [String: Any], let id = user["id"] as? String
-        else { throw NSError(domain: "supabase.auth", code: 2, userInfo: [NSLocalizedDescriptionKey: "malformed token response"]) }
+        else { throw NSError(domain: "supabase.auth", code: 2, userInfo: [NSLocalizedDescriptionKey: L.t("malformed token response", "respuesta de token no válida")]) }
         return StoredSession(accessToken: access, refreshToken: refresh, expiresAt: Date().addingTimeInterval(expiresIn), userId: id)
     }
 
@@ -213,7 +213,7 @@ final class WebAuthPresenter: NSObject, ASWebAuthenticationPresentationContextPr
         try await withCheckedThrowingContinuation { cont in
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: scheme) { callback, error in
                 if let error { cont.resume(throwing: error) } else if let callback { cont.resume(returning: callback) }
-                else { cont.resume(throwing: NSError(domain: "supabase.auth", code: 3, userInfo: [NSLocalizedDescriptionKey: "no callback"])) }
+                else { cont.resume(throwing: NSError(domain: "supabase.auth", code: 3, userInfo: [NSLocalizedDescriptionKey: L.t("no callback", "sin respuesta")])) }
             }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false

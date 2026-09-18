@@ -34,8 +34,8 @@ struct Companion: Identifiable, Equatable {
 }
 
 let bobbyCompanions: [Companion] = [
-    .init(id: "orb", label: "BOBBY", role: L.t("ORB · CORE", "ORB · NÚCLEO"),
-          personality: L.t("the core that orchestrates the squad", "el núcleo que orquesta al squad"),
+    .init(id: "orb", label: "BOBBY", role: L.t("ORB · CORE", "ORBE · NÚCLEO"),
+          personality: L.t("the core that orchestrates the squad", "el núcleo que orquesta al equipo"),
           selectLine: L.t("Ready. We read the market together, calmly.", "Listo. Leemos el mercado juntos, con calma."),
           secretPhrase: L.t("The market rewards who waits better, not who runs faster.", "El mercado premia al que espera mejor, no al que corre más."),
           hue: 0.415, requiredLevel: 1,
@@ -49,7 +49,7 @@ let bobbyCompanions: [Companion] = [
           voicePersona: "ballad",
           evolutionNames: ["BYTE", "KILOBYTE", "MEGABYTE", "GIGABYTE", "TERABYTE"]),
     .init(id: "kora", label: "KORA", role: L.t("CONVERSATION", "CONVERSACIÓN"),
-          personality: L.t("talks markets like your best friend", "platica del mercado como tu bestie"),
+          personality: L.t("talks markets like your best friend", "platica del mercado como tu mejor amiga"),
           selectLine: L.t("I am here. Tell me what is on your mind.", "Aquí andamos. Cuéntame qué traes en mente."),
           secretPhrase: L.t("The best decisions come from better questions.", "Las mejores decisiones salen de las buenas preguntas."),
           hue: 0.415, requiredLevel: 1,
@@ -62,7 +62,7 @@ let bobbyCompanions: [Companion] = [
           hue: 0.415, requiredLevel: 1,
           voicePersona: "sage",
           evolutionNames: ["ZIP", "ZIP PULSE", "ZIP STORM", "ZIP SONIC", "ZIP LIGHTSPEED"]),
-    .init(id: "glitch", label: "GLITCH", role: "RED TEAM",
+    .init(id: "glitch", label: "GLITCH", role: L.t("RED TEAM", "ABOGADO DEL DIABLO"),
           personality: L.t("questions you before you get excited", "te cuestiona antes de que te emociones"),
           selectLine: L.t("Sure about that? Let me break your thesis first.", "¿Seguro? Déjame romper tu tesis primero."),
           secretPhrase: L.t("Every thesis deserves an enemy before your money.", "Toda tesis merece un enemigo antes que tu dinero."),
@@ -90,14 +90,14 @@ let bobbyCompanions: [Companion] = [
           hue: 0.415, requiredLevel: 3,
           voicePersona: "onyx",
           evolutionNames: ["ROOK", "ROOK GAMBIT", "ROOK TACTICIAN", "ROOK MASTER", "GRANDMASTER"]),
-    .init(id: "halo", label: "HALO", role: "RISK GATE",
+    .init(id: "halo", label: "HALO", role: L.t("RISK GATE", "FILTRO DE RIESGO"),
           personality: L.t("celebrates not trading with you", "celebra contigo el no operar"),
           selectLine: L.t("Protecting capital today also counts as winning.", "Hoy proteger capital también cuenta como ganar."),
-          secretPhrase: "No setup yet. Capital protected.",
+          secretPhrase: L.t("No setup yet. Capital protected.", "Todavía no hay entrada. Capital protegido."),
           hue: 0.560, requiredLevel: 4,
           voicePersona: "shimmer",
           evolutionNames: ["HALO", "HALO SHIELD", "HALO WARDEN", "HALO AEGIS", "HALO SANCTUM"]),
-    .init(id: "axiom", label: "AXIOM", role: "TRACK RECORD",
+    .init(id: "axiom", label: "AXIOM", role: L.t("TRACK RECORD", "HISTORIAL"),
           personality: L.t("remembers everything so you can verify", "recuerda todo para que compruebes"),
           selectLine: L.t("Everything gets recorded. Verifying is the edge.", "Todo queda registrado. Comprobar es la ventaja."),
           secretPhrase: L.t("On-chain memory does not argue: it verifies.", "La memoria on-chain no discute: comprueba."),
@@ -110,7 +110,7 @@ let bobbyCompanions: [Companion] = [
     .init(id: "iris", label: "IRIS", role: L.t("MARKET REGIME", "RÉGIMEN DE MERCADO"),
           personality: L.t("reads the weather of the whole market", "lee el clima de todo el mercado"),
           selectLine: L.t("Let me read the weather first. Today there is wind.", "Déjame leer el clima primero. Hoy hay viento."),
-          secretPhrase: L.t("The regime decides more than the setup does.", "El régimen decide más que el setup."),
+          secretPhrase: L.t("The regime decides more than the setup does.", "El régimen decide más que la entrada."),
           hue: 0.545, requiredLevel: 1,
           voicePersona: "sage",
           evolutionNames: ["IRIS", "IRIS CLEAR", "IRIS FRONT", "IRIS STORM", "IRIS HORIZON"]),
@@ -136,7 +136,7 @@ let bobbyCompanions: [Companion] = [
           voicePersona: "alloy",
           evolutionNames: ["MIRA", "MIRA DRILL", "MIRA PACE", "MIRA FORM", "MIRA STAR"]),
     .init(id: "nalu", label: "NALU", role: L.t("LIQUIDITY", "LIQUIDEZ"),
-          personality: L.t("reads flow like a wave, everything is timing", "lee el flujo como una ola, todo es timing"),
+          personality: L.t("reads flow like a wave, everything is timing", "lee el flujo como una ola, todo es saber cuándo"),
           selectLine: L.t("Not every wave is yours. Let us wait for the good one.", "No toda ola es tuya. Esperemos la buena."),
           secretPhrase: L.t("You do not fight the current. You time it.", "A la corriente no se le pelea. Se le agarra el tiempo."),
           hue: 0.075, requiredLevel: 1,
@@ -151,7 +151,7 @@ let bobbyCompanions: [Companion] = [
           evolutionNames: ["VEGA", "VEGA SIGMA", "VEGA CONE", "VEGA PRIME", "VEGA ABSOLUTE"]),
     .init(id: "noor", label: "NOOR", role: L.t("MENTORSHIP", "MENTORÍA"),
           personality: L.t("unhurried, firm, has seen every cycle", "sin prisa, firme, ya vio todos los ciclos"),
-          selectLine: L.t("Sit down. Let us review the week before the next trade.", "Siéntate. Revisemos la semana antes del próximo trade."),
+          selectLine: L.t("Sit down. Let us review the week before the next trade.", "Siéntate. Revisemos la semana antes de la próxima operación."),
           secretPhrase: L.t("I have seen this cycle before. It ended the same way.", "Ya vi este ciclo antes. Terminó igual."),
           hue: 0.115, requiredLevel: 4,
           voicePersona: "fable",
@@ -203,11 +203,11 @@ enum CompanionEmote: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .pulse: return "PULSE"
-        case .orbit: return "ORBIT"
-        case .victory: return "VICTORY"
-        case .shield: return "SHIELD"
-        case .legend: return "LEGEND"
+        case .pulse: return L.t("PULSE", "PULSO")
+        case .orbit: return L.t("ORBIT", "ÓRBITA")
+        case .victory: return L.t("VICTORY", "VICTORIA")
+        case .shield: return L.t("SHIELD", "ESCUDO")
+        case .legend: return L.t("LEGEND", "LEYENDA")
         }
     }
 
@@ -243,11 +243,11 @@ struct CompanionEmoteEvent: Equatable {
 }
 
 let companionLevels: [CompanionLevel] = [
-    .init(number: 1, name: "SPAWNED", minXP: 0),
-    .init(number: 2, name: "LOCKED IN", minXP: 50),
-    .init(number: 3, name: "MARKET READER", minXP: 150),
-    .init(number: 4, name: "RISK GUARDIAN", minXP: 400),
-    .init(number: 5, name: "ON-CHAIN LEGEND", minXP: 1000),
+    .init(number: 1, name: L.t("SPAWNED", "EN ESCENA"), minXP: 0),
+    .init(number: 2, name: L.t("LOCKED IN", "EN LA ZONA"), minXP: 50),
+    .init(number: 3, name: L.t("MARKET READER", "LEE EL MERCADO"), minXP: 150),
+    .init(number: 4, name: L.t("RISK GUARDIAN", "CUIDA EL RIESGO"), minXP: 400),
+    .init(number: 5, name: L.t("ON-CHAIN LEGEND", "LEYENDA ON-CHAIN"), minXP: 1000),
 ]
 
 /// How the companion SPEAKS at each level — the same character, more

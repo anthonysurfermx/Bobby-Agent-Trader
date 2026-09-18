@@ -110,7 +110,7 @@ struct MascotGalleryView: View {
 
     private var header: some View {
         HStack {
-            Text("BOBBY SQUAD // 3D")
+            Text(L.t("BOBBY SQUAD // 3D", "EQUIPO BOBBY // 3D"))
                 .font(.mono(11, .bold))
                 .kerning(2.0)
                 .foregroundStyle(Theme.text.opacity(0.75))
@@ -234,7 +234,7 @@ struct MascotGalleryView: View {
                     }
                     .frame(height: 5)
                     HStack {
-                        Text("DISCIPLINE XP \(store.disciplineXP)")
+                        Text(L.t("DISCIPLINE XP \(store.disciplineXP)", "XP DE DISCIPLINA \(store.disciplineXP)"))
                         Spacer()
                         if let next = store.nextLevel {
                             Text(L.t("NEXT: \(next.name) · \(next.minXP)", "SIG: \(next.name) · \(next.minXP)"))
@@ -292,12 +292,12 @@ struct MascotGalleryView: View {
     private var emoteDeck: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text("EARNED EMOTES")
+                Text(L.t("EARNED EMOTES", "GESTOS GANADOS"))
                     .font(.mono(8, .bold))
                     .kerning(1.4)
                     .foregroundStyle(Theme.muted)
                 Spacer()
-                Text("DISCIPLINE, NOT SPEND")
+                Text(L.t("DISCIPLINE, NOT SPEND", "DISCIPLINA, NO DINERO"))
                     .font(.mono(7, .semibold))
                     .foregroundStyle(selected.tintSoft.opacity(0.62))
             }
@@ -315,7 +315,7 @@ struct MascotGalleryView: View {
                         VStack(spacing: 4) {
                             Image(systemName: unlocked ? emote.symbol : "lock.fill")
                                 .font(.system(size: 12, weight: .bold))
-                            Text(unlocked ? emote.label : "LVL \(emote.requiredLevel)")
+                            Text(unlocked ? emote.label : L.t("LVL \(emote.requiredLevel)", "NVL \(emote.requiredLevel)"))
                                 .font(.mono(6.5, .bold))
                                 .lineLimit(1)
                         }
@@ -1078,7 +1078,7 @@ struct EvolutionOverlay: View {
                         .kerning(3.0)
                         .foregroundStyle(companion.tint)
                         .shadow(color: companion.tint.opacity(0.7), radius: 14)
-                    Text("LEVEL \(level.number) · \(level.name)")
+                    Text(L.t("LEVEL \(level.number) · \(level.name)", "NIVEL \(level.number) · \(level.name)"))
                         .font(.mono(10, .bold))
                         .kerning(2.4)
                         .foregroundStyle(Theme.text.opacity(0.7))

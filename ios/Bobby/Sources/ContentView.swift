@@ -21,11 +21,11 @@ enum DeskPhase: Int, CaseIterable {
 
     var label: String {
         switch self {
-        case .idle: return "DESK ONLINE"
+        case .idle: return L.t("DESK ONLINE", "MESA EN LÍNEA")
         case .resolving: return L.t("RESOLVING ASSET", "LOCALIZANDO ACTIVO")
-        case .alpha: return "ALPHA HUNTER"
-        case .redTeam: return "RED TEAM"
-        case .cio: return L.t("CIO DECIDES", "CIO DECIDE")
+        case .alpha: return L.t("ALPHA HUNTER", "CAZADOR")
+        case .redTeam: return L.t("RED TEAM", "CRÍTICO")
+        case .cio: return L.t("CIO DECIDES", "EL DIRECTOR DECIDE")
         case .complete: return L.t("VERDICT READY", "VEREDICTO LISTO")
         case .error: return L.t("INCOMPLETE LINK", "ENLACE INCOMPLETO")
         }
@@ -34,12 +34,12 @@ enum DeskPhase: Int, CaseIterable {
     var hint: String {
         switch self {
         case .idle: return L.t("Tap your companion and name an asset", "Toca a tu amigo y nombra un activo")
-        case .resolving: return L.t("Resolving ticker and venue", "Resolviendo ticker y venue")
+        case .resolving: return L.t("Resolving ticker and venue", "Buscando símbolo y mercado")
         case .alpha: return L.t("Hunting the opportunity", "Buscando la oportunidad")
         case .redTeam: return L.t("Attacking the thesis", "Atacando la tesis")
         case .cio: return L.t("Weighing risk against conviction", "Cruzando riesgo y convicción")
         case .complete: return L.t("Market, levels and thesis in sync", "Mercado, niveles y tesis sincronizados")
-        case .error: return L.t("Try the name or the ticker", "Prueba con el nombre o ticker")
+        case .error: return L.t("Try the name or the ticker", "Prueba con el nombre o el símbolo")
         }
     }
 }
@@ -75,7 +75,7 @@ final class BobbyViewModel: ObservableObject {
     let profile = AgentProfile()
     let companions = CompanionStore()
     private let memory = DeskMemory()
-    static let defaultQuickAccess = ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]
+    static let defaultQuickAccess = ["BTC", "NVDA", "ETH", "TSLA", L.t("GOLD", "ORO")]
     @Published var streak = 0
     @Published var quickAccess: [String] = BobbyViewModel.defaultQuickAccess
 
@@ -158,7 +158,7 @@ final class BobbyViewModel: ObservableObject {
         }
         guard let first = movers.first else {
             return L.t("\(name): I'm in. Welcome to the desk — name an asset and we go.",
-                       "\(name): Ya estoy dentro. Bienvenido al desk: nombra un activo y le entramos.")
+                       "\(name): Ya estoy dentro. Bienvenido a la mesa: nombra un activo y le entramos.")
         }
         let firstUp = first.changePct >= 0
         let tail: String = movers.dropFirst().first.map { " \($0.symbol) \(pct($0))." } ?? ""
@@ -171,10 +171,10 @@ final class BobbyViewModel: ObservableObject {
                       "\(name): Ey, ya estamos en vivo. \(first.symbol) cayó \(pct(first)) en 24 horas.\(tail) ¿Vemos si es oportunidad?")
         case .directo:
             return L.t("\(name): Desk open. Biggest move: \(first.symbol) \(pct(first)) in 24h.\(tail) Say the word.",
-                       "\(name): Desk abierto. Mayor movimiento: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Tú dices.")
+                       "\(name): Mesa abierta. Mayor movimiento: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Tú dices.")
         case .pro:
             return L.t("\(name): Session open. Lead mover \(first.symbol) \(pct(first)) over 24h.\(tail) Pick one and I run the desk.",
-                       "\(name): Sesión abierta. Líder del día: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Elige uno y corro el desk.")
+                       "\(name): Sesión abierta. Líder del día: \(first.symbol) \(pct(first)) en 24 horas.\(tail) Elige uno y lo analizo.")
         }
     }
 
@@ -266,7 +266,7 @@ final class BobbyViewModel: ObservableObject {
 
             guard let resolution = await BobbyAPI.resolveAsset(q) else {
                 phase = .error
-                messages.append(ChatMessage(fromBobby: true, text: L.t("I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.", "No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro.")))
+                messages.append(ChatMessage(fromBobby: true, text: L.t("I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.", "No pude ubicar ese activo. Prueba con el nombre o el símbolo: bitcoin, NVDA, oro.")))
                 return
             }
 
@@ -280,7 +280,7 @@ final class BobbyViewModel: ObservableObject {
                 if let note = resolution.proxyNote {
                     text += " " + L.t("Heads up: that listing is \(note).", "Ojo: ese listado es \(note).")
                 }
-                text += " " + L.t("Tap the chip to confirm.", "Toca el chip para confirmar.")
+                text += " " + L.t("Tap the chip to confirm.", "Toca la sugerencia para confirmar.")
                 messages.append(ChatMessage(fromBobby: true, text: text))
                 assetHits = [BobbyAPI.AssetHit(
                     symbol: sym,
@@ -331,7 +331,7 @@ final class BobbyViewModel: ObservableObject {
             if answer.isUnavailable {
                 phase = .error
                 let msg = L.t("The desk did not answer for \(answer.symbol). Try again in a moment.",
-                              "El desk no respondió por \(answer.symbol). Inténtalo de nuevo en un momento.")
+                              "La mesa no respondió por \(answer.symbol). Inténtalo de nuevo en un momento.")
                 messages.append(ChatMessage(fromBobby: true, text: msg))
                 if speakEnabled { say(msg) }
                 return
@@ -562,7 +562,7 @@ struct ContentView: View {
                 .presentationBackground(Theme.bg)
         }
         .sheet(item: $skinCard) { card in
-            ShareSheet(items: [card, L.t("My Bobby skin — earned with discipline, never volume. bobbyprotocol.xyz", "Mi skin de Bobby — ganada con disciplina, nunca volumen. bobbyprotocol.xyz")])
+            ShareSheet(items: [card, L.t("My Bobby skin — earned with discipline, never volume. bobbyprotocol.xyz", "Mi estilo de Bobby — ganado con disciplina, nunca con volumen. bobbyprotocol.xyz")])
         }
         .sheet(isPresented: $showRiskNotice) {
             RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
@@ -657,7 +657,7 @@ struct ContentView: View {
             }
             .accessibilityIdentifier("squad-portrait")
             VStack(alignment: .leading, spacing: 1) {
-                Text("BOBBY // LIVE DESK")
+                Text(L.t("BOBBY // LIVE DESK", "BOBBY // EN VIVO"))
                     .font(.mono(12, .bold))
                     .kerning(2.4)
                     .foregroundStyle(Theme.text.opacity(0.80))
@@ -709,7 +709,7 @@ struct ContentView: View {
                 Section {
                     // Reachable from every screen, not just first-run onboarding.
                     Button { skinSnapshotToken += 1 } label: {
-                        Label(L.t("Share my skin", "Compartir mi skin"), systemImage: "square.and.arrow.up")
+                        Label(L.t("Share my skin", "Compartir mi estilo"), systemImage: "square.and.arrow.up")
                     }
                     Button { showAccount = true } label: {
                         Label(account.isSignedIn ? L.t("Progress saved · account", "Progreso guardado · cuenta") : L.t("Save progress", "Guardar progreso"), systemImage: account.isSignedIn ? "checkmark.icloud" : "icloud")
@@ -853,7 +853,7 @@ struct ContentView: View {
         let halo = bobbyCompanions.first { $0.id == "halo" }!
         return VStack(spacing: 8) {
             HStack {
-                Text("HALO // RISK GATE")
+                Text(L.t("HALO // RISK GATE", "HALO // FILTRO DE RIESGO"))
                     .font(.mono(9, .bold))
                     .kerning(1.8)
                     .foregroundStyle(halo.tintSoft)
@@ -867,7 +867,7 @@ struct ContentView: View {
                         .frame(width: 28, height: 28)
                         .background(Circle().fill(Theme.cardSoft))
                 }
-                .accessibilityLabel("Dismiss no trade moment")
+                .accessibilityLabel(L.t("Dismiss no trade moment", "Cerrar aviso de no operar"))
             }
 
             ZStack {
@@ -888,11 +888,11 @@ struct ContentView: View {
             }
             .frame(height: 224)
 
-            Text("NO TRADE")
+            Text(L.t("NO TRADE", "NO OPERAR"))
                 .font(.mono(24, .black))
                 .kerning(4)
                 .foregroundStyle(halo.tintSoft)
-            Text(L.t("No setup yet. Capital protected.", "Sin setup todavía. Capital protegido."))
+            Text(L.t("No setup yet. Capital protected.", "Sin oportunidad todavía. Capital protegido."))
                 .font(.rounded(16, .bold))
                 .foregroundStyle(Theme.text)
             Text(moment.reason)
@@ -914,7 +914,7 @@ struct ContentView: View {
                     Image(systemName: "seal.fill")
                     // Honest until the server/on-chain ledger exists: this
                     // record lives only in this device's storage.
-                    Text(L.t("SAVED ON THIS DEVICE", "GUARDADO EN ESTE EQUIPO"))
+                    Text(L.t("SAVED ON THIS DEVICE", "GUARDADO EN ESTE TELÉFONO"))
                 }
                 .font(.mono(7.5, .bold))
                 .foregroundStyle(Color(hue: 0.115, saturation: 0.52, brightness: 1))
@@ -937,18 +937,19 @@ struct ContentView: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(halo.tint.opacity(0.32), lineWidth: 1))
         .transition(.scale(scale: 0.92).combined(with: .opacity))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("No trade for \(moment.symbol). Capital protected. Plus \(moment.disciplineXP) discipline XP.")
+        .accessibilityLabel(L.t("No trade for \(moment.symbol). Capital protected. Plus \(moment.disciplineXP) discipline XP.",
+                                "No operar \(moment.symbol). Capital protegido. Más \(moment.disciplineXP) XP de disciplina."))
     }
 
     private var commandDeck: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("QUICK ACCESS")
+                Text(L.t("QUICK ACCESS", "ACCESO RÁPIDO"))
                     .font(.mono(9, .bold))
                     .kerning(1.8)
                     .foregroundStyle(Theme.muted)
                 Spacer()
-                Text("VOICE OR TEXT")
+                Text(L.t("VOICE OR TEXT", "VOZ O TEXTO"))
                     .font(.mono(9, .medium))
                     .foregroundStyle(Theme.accentSoft.opacity(0.72))
             }
@@ -962,7 +963,7 @@ struct ContentView: View {
                             Text(L.t("EXPLORE", "EXPLORA"))
                                 .font(.mono(13, .bold))
                                 .foregroundStyle(Theme.accentSoft)
-                            Text(L.t("TOP MARKETS →", "TOP MERCADOS →"))
+                            Text(L.t("TOP MARKETS →", "VER MERCADOS →"))
                                 .font(.mono(8, .bold))
                                 .kerning(1)
                                 .foregroundStyle(Theme.muted)
@@ -1011,7 +1012,7 @@ struct ContentView: View {
                             Text(snapshot.symbol)
                                 .font(.mono(15, .bold))
                                 .foregroundStyle(Theme.text)
-                            Text(snapshot.isEquity ? "EQUITY" : "CRYPTO")
+                            Text(snapshot.isEquity ? L.t("EQUITY", "ACCIÓN") : L.t("CRYPTO", "CRIPTO"))
                                 .font(.mono(8, .bold))
                                 .kerning(1.2)
                                 .foregroundStyle(Theme.muted)
@@ -1025,7 +1026,7 @@ struct ContentView: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 6) {
-                        Text("\(vm.timeframe.rawValue) // LIVE")
+                        Text("\(vm.timeframe.rawValue) // " + L.t("LIVE", "EN VIVO"))
                             .font(.mono(9, .bold))
                             .foregroundStyle(Theme.muted)
                         if let change = snapshot.changePct {
@@ -1062,7 +1063,7 @@ struct ContentView: View {
                     if vm.candles.isEmpty {
                         VStack(spacing: 9) {
                             ProgressView().tint(Theme.accentSoft)
-                            Text("SYNCING CANDLES")
+                            Text(L.t("SYNCING CANDLES", "SINCRONIZANDO VELAS"))
                                 .font(.mono(9, .bold))
                                 .kerning(1.5)
                                 .foregroundStyle(Theme.muted)
@@ -1081,9 +1082,11 @@ struct ContentView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.stroke, lineWidth: 1))
 
                 HStack {
-                    Text(snapshot.isEquity ? "EQUITIES · LIVE MARKET" : "CRYPTO · LIVE MARKET")
+                    Text(snapshot.isEquity
+                         ? L.t("EQUITIES · LIVE MARKET", "ACCIONES · MERCADO EN VIVO")
+                         : L.t("CRYPTO · LIVE MARKET", "CRIPTO · MERCADO EN VIVO"))
                     Spacer()
-                    Text("100 OHLCV · LIVE")
+                    Text(L.t("100 OHLCV · LIVE", "100 VELAS · EN VIVO"))
                 }
                 .font(.mono(7.5, .bold))
                 .kerning(0.7)
@@ -1117,11 +1120,11 @@ struct ContentView: View {
 
     private func levelStrip(_ answer: BobbyAnswer) -> some View {
         HStack(spacing: 0) {
-            levelCell("ENTRY", answer.entry, Theme.accentSoft)
+            levelCell(L.t("ENTRY", "ENTRADA"), answer.entry, Theme.accentSoft)
             divider
             levelCell("STOP", answer.stop, Theme.down)
             divider
-            levelCell("TARGET", answer.target, Theme.up)
+            levelCell(L.t("TARGET", "OBJETIVO"), answer.target, Theme.up)
         }
         .padding(.vertical, 8)
         .background(Theme.panel.opacity(0.74))
@@ -1145,19 +1148,19 @@ struct ContentView: View {
     private var debateRail: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("ADVERSARIAL DESK")
+                Text(L.t("ADVERSARIAL DESK", "MESA DE DEBATE"))
                     .font(.mono(9, .bold))
                     .kerning(1.8)
                     .foregroundStyle(Theme.muted)
                 Spacer()
-                Text(vm.thinking ? "LIVE" : "COMPLETE")
+                Text(vm.thinking ? L.t("LIVE", "EN VIVO") : L.t("COMPLETE", "COMPLETO"))
                     .font(.mono(9, .bold))
                     .foregroundStyle(vm.thinking ? Theme.accentSoft : Theme.up)
             }
             HStack(spacing: 7) {
-                agentCard(name: "ALPHA", role: L.t("hunts", "busca"), phase: .alpha, color: Theme.up)
-                agentCard(name: "RED TEAM", role: L.t("attacks", "ataca"), phase: .redTeam, color: Theme.down)
-                agentCard(name: "CIO", role: L.t("decides", "decide"), phase: .cio, color: Theme.cio)
+                agentCard(name: L.t("ALPHA", "CAZADOR"), role: L.t("hunts", "busca"), phase: .alpha, color: Theme.up)
+                agentCard(name: L.t("RED TEAM", "CRÍTICO"), role: L.t("attacks", "ataca"), phase: .redTeam, color: Theme.down)
+                agentCard(name: L.t("CIO", "DIRECTOR"), role: L.t("decides", "decide"), phase: .cio, color: Theme.cio)
             }
         }
         .padding(13)
@@ -1214,7 +1217,10 @@ struct ContentView: View {
                 ?? fallback
         case .cio:
             if let direction = answer.direction, let conviction = answer.convictionPct {
-                if direction == "long" || direction == "short" { return "\(direction) \(Int(conviction))%" }
+                if direction == "long" || direction == "short" {
+                    return L.t("\(direction) \(Int(conviction))%",
+                               "\(direction == "long" ? "alcista" : "bajista") \(Int(conviction))%")
+                }
                 return L.t("no edge \(Int(conviction))%", "sin sesgo \(Int(conviction))%")
             }
             return fallback
@@ -1227,12 +1233,12 @@ struct ContentView: View {
             if let answer = vm.lastAnswer {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("CIO // VERDICT")
+                        Text(L.t("CIO // VERDICT", "DIRECTOR // VEREDICTO"))
                             .font(.mono(10, .bold))
                             .kerning(1.6)
                             .foregroundStyle(Theme.cio)
                         Spacer()
-                        Text("REFERENCE ONLY")
+                        Text(L.t("REFERENCE ONLY", "SOLO REFERENCIA"))
                             .font(.mono(8, .bold))
                             .foregroundStyle(Theme.muted)
                     }
@@ -1256,7 +1262,7 @@ struct ContentView: View {
 
     private var deskLog: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("DESK LOG")
+            Text(L.t("DESK LOG", "BITÁCORA"))
                 .font(.mono(9, .bold))
                 .kerning(1.8)
                 .foregroundStyle(Theme.muted)
@@ -1288,11 +1294,11 @@ struct ContentView: View {
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.accentSoft)
             VStack(alignment: .leading, spacing: 3) {
-                Text("BOBBY LEARNS IN PUBLIC")
+                Text(L.t("BOBBY LEARNS IN PUBLIC", "BOBBY APRENDE EN PÚBLICO"))
                     .font(.mono(9, .bold))
                     .kerning(1.1)
                     .foregroundStyle(Theme.accentSoft)
-                Text(L.t("His calls are recorded on-chain and anyone can challenge them · this query does not mint an individual receipt yet", "Sus calls se graban on-chain y cualquiera puede retarlas · esta consulta aún no genera receipt individual"))
+                Text(L.t("His calls are recorded on-chain and anyone can challenge them · this query does not mint an individual receipt yet", "Sus veredictos se graban on-chain y cualquiera puede retarlos · esta consulta aún no genera comprobante individual"))
                     .font(.mono(8, .medium))
                     .foregroundStyle(Theme.muted)
             }
@@ -1341,7 +1347,7 @@ struct ContentView: View {
     private var commandBar: some View {
         HStack(spacing: 10) {
             Button { vm.toggleVoiceMode() } label: {
-                Text(vm.freeVoice ? L.t("Free", "Gratis") : "Live")
+                Text(vm.freeVoice ? L.t("Free", "Gratis") : L.t("Live", "En vivo"))
                     .font(.mono(10, .bold)).foregroundStyle(Theme.accentSoft)
                     .frame(minWidth: 36, minHeight: 44)
             }
@@ -1413,13 +1419,13 @@ struct ContentView: View {
         if vm.realtime.active {
             switch vm.realtime.state {
             case .connecting: return L.t("CONNECTING", "CONECTANDO")
-            case .speaking: return L.t("SPEAKING", "BOBBY HABLA")
+            case .speaking: return L.t("SPEAKING", "HABLANDO")
             case .thinking: return L.t("ANALYZING", "ANALIZANDO")
             default: return vm.realtime.muted ? L.t("YOUR TURN", "TU TURNO") : L.t("LISTENING", "ESCUCHANDO")
             }
         }
         if vm.listening { return L.t("LISTENING", "ESCUCHANDO") }
-        if vm.voice.speaking { return L.t("SPEAKING", "BOBBY HABLA") }
+        if vm.voice.speaking { return L.t("SPEAKING", "HABLANDO") }
         return vm.phase.label
     }
 
@@ -1432,7 +1438,7 @@ struct ContentView: View {
                 ? L.t("Hands-free · say your next question", "Manos libres · di tu siguiente pregunta")
                 : L.t("Speak normally · it sends when you stop", "Habla normal · se envía cuando terminas")
         }
-        if vm.voice.speaking { return L.t("Your companion reacts to the voice in real time", "Tu amigo reacciona a tu voz en tiempo real") }
+        if vm.voice.speaking { return L.t("Your companion reacts to the voice in real time", "Reacciona a la voz en tiempo real") }
         return vm.phase.hint
     }
 

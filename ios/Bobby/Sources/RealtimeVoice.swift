@@ -397,7 +397,7 @@ final class RealtimeVoice: ObservableObject {
         }
         switch reason {
         case .connection, .dailyLimit, .busy, .limit, .update:
-            error = L.t("Live paused · free voice ready", "Live en pausa · voz gratis lista")
+            error = L.t("Live paused · free voice ready", "En vivo pausado · voz gratis lista")
             onFallback?()
         case .microphone, .signIn: break
         }
