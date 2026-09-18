@@ -30,6 +30,8 @@ struct BobbyApp: App {
                     TraderLandGateHarnessView()
                 } else if ProcessInfo.processInfo.arguments.contains("-qa-skin") {
                     GearSkinQAFixtureView()
+                } else if ProcessInfo.processInfo.arguments.contains("-qa-squad") {
+                    SquadQAFixtureView()
                 } else {
                     ContentView()
                 }

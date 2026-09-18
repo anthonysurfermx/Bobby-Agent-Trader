@@ -33,6 +33,34 @@ XP, Delete account runs once and confirms, EXPLORE returns under the verdict,
 share never replays an old request, evolution line waits for the answer.
 Tests: unit 4/4, CompanionLoadTests 18/18, StoreShots test04_ShareSkin.
 
+## Build 29 (branch `ios/release-29`, from 28): the Squad sells the next unlock
+Anthony's report (screens from live 1.1): some companions show "Could not load
+the model" in the Squad, and locked ones read as black holes behind a lock.
+- The load failure was 1.1's Draco GLBs (fixed in 27). New `SquadGalleryTests`
+  loads all 18 on the Squad stage itself, not only on the desk fixture.
+- Locked companions are an unpainted silver figurine: a Metal fragment pass
+  (`MascotSceneView.statue`) lifts the texture's luminance into silver, shaded by
+  facing and rim, so the whole character is on show and the colour is what
+  discipline earns. The lock card no longer covers the face: a chip above the
+  figure reads "LEVEL 3 · MARKET READER".
+- Under the name, a locked companion shows the real distance to it: "60
+  DISCIPLINE XP TO GO · 90/150" (same ladder as the evolution bar).
+- Rail portraits of locked companions are silver and fully visible with a small
+  lock badge, instead of a desaturated tile under a black veil. The rail opens
+  scrolled to the selected portrait.
+- A tinted dot sat on every companion's chest: the particle burst was drawn at
+  rest. It is now visible only while it flies (never with Reduce Motion), and
+  every pick replays it (only the first one did).
+- Your own companion is never shown locked: sign-out resets XP to 0 but keeps
+  it, and it now stays in colour in the Squad instead of turning grey.
+- DEBUG: `-qa-squad -qa-select <id> -companion.disciplineXP <n>` opens the
+  Squad without a backend.
+- Review: 4 lenses (SceneKit, SwiftUI, UX, tests) + one refuter per finding,
+  20 agents; 3 confirmed (Reduce Motion dot, simulator-state leak into the
+  test, active companion shown locked), all fixed; 10 refuted.
+- Tests: unit 4/4, CompanionLoadTests 18/18, SquadGalleryTests 4/4 (18/18
+  companions on the Squad stage); Release configuration compiles.
+
 ## Before App Review (not done here)
 - Sign in with Apple token revocation on account deletion is missing
   (api/account.ts deletes the Supabase user but never calls Apple's

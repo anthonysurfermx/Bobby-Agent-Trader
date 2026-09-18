@@ -37,19 +37,21 @@ struct MascotGalleryView: View {
     @State private var emoteEvent: CompanionEmoteEvent?
     @State private var performanceMetrics: MascotPerformanceMetrics?
 
-    init(store: CompanionStore, voice: NeuralVoice? = nil, voiceId: String = AgentVoice.coral.rawValue) {
+    init(store: CompanionStore, voice: NeuralVoice? = nil, voiceId: String = AgentVoice.coral.rawValue, initialId: String? = nil) {
         self.store = store
         self.voice = voice
         self.voiceId = voiceId
         // Open on YOUR companion, not on a hardcoded default
-        _selectedId = State(initialValue: store.companionId ?? bobbyCompanions[0].id)
+        _selectedId = State(initialValue: initialId ?? store.companionId ?? bobbyCompanions[0].id)
     }
 
     private var selected: Companion {
         bobbyCompanions.first { $0.id == selectedId } ?? bobbyCompanions[0]
     }
     private var isActive: Bool { store.companionId == selected.id }
-    private var isUnlocked: Bool { store.isUnlocked(selected) }
+    /// The companion you already have stays yours in full colour, even when the
+    /// level drops under it (sign-out or a new account resets XP to 0).
+    private var isUnlocked: Bool { isActive || store.isUnlocked(selected) }
 
     private func megabytes<T: BinaryInteger>(_ bytes: T) -> String {
         String(format: "%.1f", Double(Int64(bytes)) / 1_048_576)
@@ -145,14 +147,15 @@ struct MascotGalleryView: View {
                     secretPhrase = selected.secretPhrase
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) { secretPhrase = nil }
-                }
+                },
+                // Locked = an unpainted silver figurine: the whole character
+                // is on show, the colour is what discipline earns.
+                statue: !isUnlocked
             )
             .id(selected.id) // portal: fresh scene per companion
             .opacity(stageLoading ? 0 : 1)
             .scaleEffect(stageLoading ? 0.72 : 1)
             .animation(.spring(duration: 0.5, bounce: 0.35), value: stageLoading)
-            .saturation(isUnlocked ? 1 : 0)
-            .opacity(isUnlocked ? 1 : 0.6)
 
             if stageLoading && !stageFailed {
                 ProgressView()
@@ -171,29 +174,56 @@ struct MascotGalleryView: View {
             }
 
             if !isUnlocked {
-                // Locked: you can still look — grey, behind a lock. That is the FOMO.
-                VStack(spacing: 8) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 30, weight: .bold))
-                        .foregroundStyle(Theme.text.opacity(0.85))
-                    Text(L.t("UNLOCKS AT LEVEL \(selected.requiredLevel)", "SE DESBLOQUEA EN NIVEL \(selected.requiredLevel)"))
-                        .font(.mono(9, .bold))
-                        .kerning(1.6)
-                        .foregroundStyle(Theme.text.opacity(0.8))
-                    Text(L.t("Discipline gets you there, never volume.", "La disciplina te lleva, nunca el volumen."))
-                        .font(.rounded(11, .medium))
-                        .foregroundStyle(Theme.muted)
+                // A chip above the figure, never over its face.
+                VStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10, weight: .bold))
+                        Text(L.t("LEVEL \(selected.requiredLevel) · \(requiredLevelName)",
+                                 "NIVEL \(selected.requiredLevel) · \(requiredLevelName)"))
+                            .font(.mono(9, .bold))
+                            .kerning(1.4)
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(Theme.text.opacity(0.82))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(Theme.bg.opacity(0.72)))
+                    .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("squad-locked-chip")
+                    Spacer()
                 }
-                .padding(18)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Theme.bg.opacity(0.6)))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.stroke, lineWidth: 1))
+                .padding(.top, 10)
             }
 
             // Selection burst
             SelectionBurst(trigger: burst, tint: selected.tint)
                 .allowsHitTesting(false)
+
+#if DEBUG
+            // Load state for SquadGalleryTests — metrics only arrive on a successful load.
+            let stageState = stageFailed ? "failed" : (!stageLoading && performanceMetrics?.assetName == selected.id ? "ready" : "loading")
+            Text(stageState)
+                .font(.system(size: 1))
+                .opacity(0.01)
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("squad-stage-\(stageState)")
+#endif
         }
         .frame(maxHeight: .infinity)
+    }
+
+    // MARK: unlock target (real XP, same ladder as the evolution bar)
+
+    private var requiredLevel: CompanionLevel? {
+        companionLevels.first { $0.number == selected.requiredLevel }
+    }
+    private var requiredLevelName: String { requiredLevel?.name ?? "" }
+    private var xpToUnlock: Int { max(0, (requiredLevel?.minXP ?? 0) - store.disciplineXP) }
+    private var unlockProgress: Double {
+        guard let target = requiredLevel?.minXP, target > 0 else { return 1 }
+        return min(1, Double(store.disciplineXP) / Double(target))
     }
 
     // MARK: identity
@@ -204,7 +234,7 @@ struct MascotGalleryView: View {
                 Text(isActive ? selected.name(at: store.level.number) : selected.label)
                     .font(.mono(22, .black))
                     .kerning(3.0)
-                    .foregroundStyle(selected.tint)
+                    .foregroundStyle(isUnlocked ? selected.tint : Theme.text.opacity(0.72))
                 if isActive {
                     Text("· \(store.level.name)")
                         .font(.mono(10, .bold))
@@ -248,6 +278,31 @@ struct MascotGalleryView: View {
                 }
                 .padding(.horizontal, 52)
                 .padding(.top, 8)
+            } else if !isUnlocked {
+                // The incentive: how far YOUR discipline is from this one.
+                VStack(spacing: 3) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Theme.card)
+                            Capsule()
+                                .fill(Theme.text.opacity(0.55))
+                                .frame(width: max(6, geo.size.width * unlockProgress))
+                        }
+                    }
+                    .frame(height: 5)
+                    HStack {
+                        Text(L.t("\(xpToUnlock.formatted()) DISCIPLINE XP TO GO", "TE FALTAN \(xpToUnlock.formatted()) XP DE DISCIPLINA"))
+                        Spacer()
+                        Text(verbatim: "\(store.disciplineXP.formatted())/\((requiredLevel?.minXP ?? 0).formatted())")
+                    }
+                    .font(.mono(7.5, .semibold))
+                    .kerning(0.8)
+                    .foregroundStyle(Theme.muted)
+                }
+                .padding(.horizontal, 52)
+                .padding(.top, 8)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("squad-unlock-progress")
             } else {
                 Text(L.t("Drag to spin · tap for a reaction · hold for a secret…", "Arrastra para girarlo · toca para su reacción · mantén presionado…"))
                     .font(.mono(8, .regular))
@@ -334,10 +389,11 @@ struct MascotGalleryView: View {
     // MARK: squad rail (portraits)
 
     private var squadRail: some View {
+        ScrollViewReader { proxy in
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(bobbyCompanions) { c in
-                    let unlocked = store.isUnlocked(c)
+                    let unlocked = store.companionId == c.id || store.isUnlocked(c)
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         selectedId = c.id
@@ -347,18 +403,20 @@ struct MascotGalleryView: View {
                                 CompanionThumb(companion: c)
                                     .frame(width: 62, height: 62)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .saturation(unlocked ? 1 : 0)
-                                    .opacity(unlocked ? 1 : 0.8)
-                                    .overlay {
+                                    // Locked = silver, fully visible: you see who is
+                                    // waiting for you, the colour is what you earn.
+                                    .grayscale(unlocked ? 0 : 1)
+                                    .brightness(unlocked ? 0 : 0.10)
+                                    .contrast(unlocked ? 1 : 1.12)
+                                    .overlay(alignment: .topTrailing) {
                                         if !unlocked {
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.35))
-                                                Image(systemName: "lock.fill")
-                                                    .font(.system(size: 15, weight: .bold))
-                                                    .foregroundStyle(Theme.text.opacity(0.9))
-                                                    .padding(7)
-                                                    .background(Circle().fill(Theme.bg.opacity(0.85)))
-                                            }
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundStyle(Theme.text.opacity(0.9))
+                                                .frame(width: 18, height: 18)
+                                                .background(Circle().fill(Theme.bg.opacity(0.8)))
+                                                .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 1))
+                                                .padding(4)
                                         }
                                     }
                                     .overlay(
@@ -384,9 +442,14 @@ struct MascotGalleryView: View {
                                 .foregroundStyle(Theme.muted.opacity(0.7))
                         }
                     }
+                    .accessibilityIdentifier("squad-rail-\(c.id)")
+                    .id(c.id)
                 }
             }
             .padding(.horizontal, 16)
+        }
+        // Open with the selected portrait in view, even at the far end of the roster.
+        .onAppear { proxy.scrollTo(selectedId, anchor: .center) }
         }
     }
 }
@@ -396,6 +459,8 @@ struct MascotGalleryView: View {
 private struct SelectionBurst: View {
     let trigger: Int
     let tint: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var launched = false     // a burst has been fired
     @State private var animating = false
 
     var body: some View {
@@ -406,14 +471,25 @@ private struct SelectionBurst: View {
                     .frame(width: 6, height: 6)
                     .offset(y: animating ? -120 : 0)
                     .rotationEffect(.degrees(Double(i) / 12 * 360))
-                    .opacity(animating ? 0 : 0.9)
+                    // Visible only while flying out: at rest the twelve dots
+                    // stacked into one tinted dot on the companion's chest.
+                    .opacity(launched && !animating ? 0.9 : 0)
                     .scaleEffect(animating ? 0.3 : 1)
             }
         }
         .onChange(of: trigger) {
-            guard trigger > 0, !UIAccessibility.isReduceMotionEnabled else { return }
-            animating = false
-            withAnimation(.easeOut(duration: 0.7)) { animating = true }
+            guard trigger > 0, !reduceMotion else { return }
+            // Reset without animation, then fly on the next runloop — in one
+            // pass the two writes coalesce and every burst after the first is lost.
+            var reset = Transaction()
+            reset.disablesAnimations = true
+            withTransaction(reset) {
+                animating = false
+                launched = true
+            }
+            DispatchQueue.main.async {
+                withAnimation(.easeOut(duration: 0.7)) { animating = true }
+            }
         }
     }
 }
@@ -445,6 +521,9 @@ struct MascotSceneView: UIViewRepresentable {
     var onSnapshot: ((UIImage) -> Void)? = nil
     /// Deterministic pose for the DEBUG attachment matrix: no spin, bob or hop.
     var staticPose = false
+    /// Locked companion: every material turns into brushed silver that keeps
+    /// the texture detail and the shape — visible, clearly not yours yet.
+    var statue = false
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView()
@@ -476,6 +555,7 @@ struct MascotSceneView: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.owner = self
+        context.coordinator.applyStatue(statue)
         context.coordinator.setTalking(speaking, level: voiceLevel)
         context.coordinator.applyGearIfNeeded(gear, pet: pet)
         if equipToken != context.coordinator.lastEquipToken {
@@ -530,6 +610,28 @@ struct MascotSceneView: UIViewRepresentable {
         var appliedGearKey = ""
         var lastSnapshotToken = 0
         var lastEquipToken = 0
+        var statueApplied = false
+
+        /// Adds or removes the silver pass on the figure's own materials. Gear
+        /// and pet planes are skipped: they are not part of the character.
+        func applyStatue(_ on: Bool) {
+            guard let root = modelRoot, on != statueApplied else { return }
+            statueApplied = on
+            var seen = Set<ObjectIdentifier>()
+            func visit(_ node: SCNNode) {
+                if node.name == "gear" { return }
+                for material in node.geometry?.materials ?? [] where seen.insert(ObjectIdentifier(material)).inserted {
+                    var modifiers = material.shaderModifiers ?? [:]
+                    // GLTFKit2 may already put an alpha-cutoff discard here; it stays first.
+                    let existing = (modifiers[.fragment] ?? "").replacingOccurrences(of: MascotSceneView.statueShader, with: "")
+                    let next = on ? existing + MascotSceneView.statueShader : existing
+                    modifiers[.fragment] = next.isEmpty ? nil : next
+                    material.shaderModifiers = modifiers
+                }
+                node.childNodes.forEach(visit)
+            }
+            visit(root)
+        }
 
         /// The skin moment: the new piece appears big in front of the
         /// companion, flies to its slot, snaps with a squash-and-stretch pop,
@@ -927,7 +1029,11 @@ struct MascotSceneView: UIViewRepresentable {
                 view.pointOfView = cameraNode
                 coordinator.modelRoot = root
                 coordinator.initialCameraPosition = cameraNode.position
-                if let owner = coordinator.owner { coordinator.applyGearIfNeeded(owner.gear, pet: owner.pet, force: true) }
+                coordinator.statueApplied = false
+                if let owner = coordinator.owner {
+                    coordinator.applyStatue(owner.statue)
+                    coordinator.applyGearIfNeeded(owner.gear, pet: owner.pet, force: true)
+                }
                 coordinator.startSpin()
                 var nodeCount = 1
                 var geometryCount = root.geometry == nil ? 0 : 1
@@ -955,6 +1061,24 @@ struct MascotSceneView: UIViewRepresentable {
         }
     }
 
+    // Metal fragment pass, appended after any GLTFKit2 snippet. The texture's
+    // luminance is lifted into a silver range (black cloth becomes graphite,
+    // not a hole) and shaded by facing + a rim so the silhouette always reads.
+    // Output is linear and premultiplied, like the lit colour it replaces.
+    static let statueShader = """
+
+    {
+        float stA = max(_output.color.a, 0.0001);
+        float stLum = dot(_output.color.rgb / stA, float3(0.2126, 0.7152, 0.0722));
+        float stDetail = pow(saturate(stLum), 0.4545);
+        float stFacing = saturate(dot(normalize(_surface.normal), normalize(_surface.view)));
+        float stRim = pow(1.0 - stFacing, 3.0);
+        float stG = (0.24 + 0.52 * stDetail) * (0.60 + 0.40 * stFacing) + 0.32 * stRim;
+        float3 stTone = saturate(float3(stG * 0.94, stG * 0.97, stG));
+        _output.color.rgb = pow(stTone, float3(2.2)) * _output.color.a;
+    }
+    """
+
     private static func appFootprintBytes() -> UInt64 {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
@@ -968,6 +1092,24 @@ struct MascotSceneView: UIViewRepresentable {
 }
 
 #if DEBUG
+/// Backend-free Squad gallery for QA and UI tests: `-qa-squad -qa-select vega`.
+/// The level comes from the UserDefaults argument domain, e.g.
+/// `-companion.disciplineXP 90` (level 2), and is never persisted; PICK still
+/// saves companion.id like the real app, so tests pin it with `-companion.id`.
+struct SquadQAFixtureView: View {
+    @StateObject private var store = CompanionStore()
+    private let initialId: String?
+
+    init(arguments: [String] = ProcessInfo.processInfo.arguments) {
+        initialId = arguments.firstIndex(of: "-qa-select")
+            .flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+    }
+
+    var body: some View {
+        MascotGalleryView(store: store, initialId: initialId)
+    }
+}
+
 /// Direct, backend-free fixture for the complete skin matrix. One launch
 /// renders the exact desk and preview sizes side by side for the same loadout.
 struct GearSkinQAFixtureView: View {
