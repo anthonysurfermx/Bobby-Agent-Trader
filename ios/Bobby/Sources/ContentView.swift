@@ -337,7 +337,8 @@ final class BobbyViewModel: ObservableObject {
         let next: HarvestMoment.Stage
         if let outcome {
             next = HarvestMoment.stage(for: outcome)
-        } else if !AccountSession.shared.isSignedIn || ProgressSync.shared.status == .unauthenticated {
+        } else if !AccountSession.shared.isSignedIn {
+            // A 401 ended the session. Offline token refreshes keep it: those stay pending.
             next = .signedOut(planted: true)
         } else {
             next = .pending
