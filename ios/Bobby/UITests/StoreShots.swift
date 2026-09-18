@@ -28,7 +28,7 @@ final class StoreShots: XCTestCase {
         }
     }
 
-    /// Fresh install → companion-first onboarding (choose, vibe, pact) →
+    /// Fresh install → companion-first onboarding (choose, vibe, aura forge) →
     /// desk with the chosen companion → SQUAD gallery. Uninstall the app
     /// before running for a clean slate.
     func test01_OnboardingAndCompanion() throws {
@@ -39,12 +39,12 @@ final class StoreShots: XCTestCase {
         app.launch()
 
         // 01 — choose your companion (3D stage + roster)
-        let cta = app.staticTexts["MAKE IT MY COMPANION"]
+        let cta = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'PICK '")).firstMatch
         XCTAssertTrue(cta.waitForExistence(timeout: 15))
         sleep(7)   // let the GLB stage settle
         shot("01-choose-companion")
 
-        // Meet another one, come back to BYTE (its select line plays)
+        // Meet another one, come back to BYTE
         let kora = app.buttons["KORA"].firstMatch
         if kora.waitForExistence(timeout: 3) {
             kora.tap()
@@ -56,7 +56,7 @@ final class StoreShots: XCTestCase {
             byte.tap()
             sleep(3)
         }
-        tapLabeled(app, "MAKE IT MY COMPANION")
+        tapLabeled(app, "PICK BYTE")
 
         // 03 — vibe, heard in the companion's own voice
         XCTAssertTrue(app.staticTexts["NEXT"].waitForExistence(timeout: 8))
@@ -64,11 +64,11 @@ final class StoreShots: XCTestCase {
         shot("03-vibe")
         tapLabeled(app, "NEXT")
 
-        // 04 — the pact
-        XCTAssertTrue(app.staticTexts["OPEN THE DESK"].waitForExistence(timeout: 8))
+        // 04 — the aura forge: the X-ray scan finishes, then the CTA unlocks
+        XCTAssertTrue(app.staticTexts["DROP INTO THE DESK"].waitForExistence(timeout: 15))
         sleep(1)
-        shot("04-pact")
-        tapLabeled(app, "OPEN THE DESK")
+        shot("04-aura-forge")
+        tapLabeled(app, "DROP INTO THE DESK")
 
         // 05 — desk with the living companion (chosen in onboarding)
         sleep(10)
