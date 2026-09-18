@@ -28,9 +28,28 @@ enum LandImageCache {
         guard let url = Bundle.main.resourceURL?.appendingPathComponent(path), let image = UIImage(contentsOfFile: url.path) else { return nil }
         images.setObject(image, forKey: path as NSString); return image
     }
+    private static func glowKey(_ path: String, half: Bool) -> NSString { "\(path)-glow-\(half)" as NSString }
+    /// A glow pass that is already built. Never builds one, so it is safe inside a Canvas.
+    static func cachedGlow(_ path: String, half: Bool = false) -> UIImage? { images.object(forKey: glowKey(path, half: half)) }
+    private static var warming: Task<Void, Never>?
+    /// Decodes the albedos and builds the half-size glows off the main thread (about 30 ms per glow),
+    /// so the archipelago Canvas only reads from the cache. Runs queue behind each other, so none repeats work.
+    @MainActor static func warm(albedos: [String], glows: [String]) async {
+        let previous = warming
+        let task = Task.detached(priority: .userInitiated) {
+            await previous?.value
+            for path in albedos where images.object(forKey: path as NSString) == nil {
+                guard let url = Bundle.main.resourceURL?.appendingPathComponent(path), let raw = UIImage(contentsOfFile: url.path) else { continue }
+                images.setObject(raw.preparingForDisplay() ?? raw, forKey: path as NSString)
+            }
+            for path in glows { _ = glow(path, half: true) }
+        }
+        warming = task
+        await task.value
+    }
     /// The glow pass with luminance as alpha, for screen blending. `half` downsamples it for the archipelago.
     static func glow(_ path: String, half: Bool = false) -> UIImage? {
-        let key = "\(path)-glow-\(half)" as NSString
+        let key = glowKey(path, half: half)
         if let cached = images.object(forKey: key) { return cached }
         guard let url = Bundle.main.resourceURL?.appendingPathComponent(path), var input = CIImage(contentsOf: url),
               let filter = CIFilter(name: "CIColorMatrix") else { return nil }
@@ -458,6 +477,10 @@ struct TraderLandGateHarnessView: View {
     @State private var publishHint = false
     @State private var focusHandled = false
     @State private var scrollTarget: String?
+    /// Bumped when the neighbours' glow passes are warm, so the sea redraws with them.
+    @State private var artVersion = 0
+    /// 1 while visiting a neighbour: keeps the sea at full strength there, and fades it with the camera on the way home.
+    @State private var seaFocus: CGFloat = 0
 
     private var previewOnly: Bool {
 #if DEBUG
@@ -545,7 +568,18 @@ struct TraderLandGateHarnessView: View {
                 collection(maxHeight: root.size.height * 0.39)
             }
             .background(Theme.bg.ignoresSafeArea()).foregroundStyle(Theme.text)
-            .onChange(of: scenePhase) { _, phase in if phase != .active { sound.stop() } }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { sound.stop() }
+                else if let due = nextReviewAt, due <= Date() { Task { await reloadIsland() } }
+            }
+            .task(id: nextReviewAt) {
+                // The headline counts down to a review from the last snapshot; reload once it opens.
+                guard let due = nextReviewAt else { return }
+                let wait = due.timeIntervalSinceNow + 2
+                if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+                guard !Task.isCancelled else { return }
+                await reloadIsland()
+            }
             .onDisappear { sound.stop() }
             .onChange(of: handleDragging) { _, active in if !active { handleOrigin = nil } }
             .task(id: previewOnly ? "practice" : account.session?.userId ?? "guest") {
@@ -614,11 +648,11 @@ struct TraderLandGateHarnessView: View {
             let scale = fit * zoom
             ZStack {
                 Theme.bg
-                if seaVisible {
-                    ArchipelagoLayer(scene: scene, zoom: zoom, pan: pan, fit: fit, visited: visited,
-                                     ownLabel: accountIsland ? L.t("Your island", "Tu isla") : L.t("Your practice island", "Tu isla de práctica"),
-                                     labels: zoom < Self.archipelagoZoom)
-                }
+                // Always mounted, so camera flights interpolate the sea both ways; it draws nothing
+                // above 75% zoom unless a neighbour is being visited.
+                ArchipelagoLayer(scene: scene, zoom: zoom, pan: pan, visiting: seaFocus, fit: fit, visited: visited,
+                                 ownLabel: accountIsland ? L.t("Your island", "Tu isla") : L.t("Your practice island", "Tu isla de práctica"),
+                                 labels: zoom < Self.archipelagoZoom, artVersion: artVersion)
                 GateCanvas(fixture: fixture, placements: placements, focusLevel: focusLevel, seed: false, corePulse: 0, draft: draft, draftValid: validDraft, selectedID: selectedPlacementId, place: choose)
                     .scaleEffect(scale)
                     .position(x: proxy.size.width / 2 + pan.width, y: proxy.size.height / 2 + pan.height + (GateLayout.canvas.height / 2 - GateLayout.viewCenter.y) * scale)
@@ -663,7 +697,7 @@ struct TraderLandGateHarnessView: View {
                 }
                 VStack(spacing: 0) {
                     HStack(alignment: .top) {
-                        if !archipelagoMode { headline }
+                        if !archipelagoMode { headline.fixedSize(horizontal: false, vertical: true).background { seaBackdrop } }
                         Spacer(minLength: 14)
                         cameraControls
                     }.padding(16)
@@ -723,7 +757,7 @@ struct TraderLandGateHarnessView: View {
                             Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accentSoft)
                         }.contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("land-next-action")
-                    if let route = routeLine(world) {
+                    if let route = world.route.map(LandIslandStatus.routeLine) {
                         Text(route).font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true).allowsHitTesting(false)
                     }
                 } else {
@@ -760,13 +794,6 @@ struct TraderLandGateHarnessView: View {
         }
     }
 
-    private func routeLine(_ world: TraderLandWorld) -> String? {
-        guard let route = world.route else { return nil }
-        if route.complete || route.next == nil { return L.t("Route complete · XP still counts", "Ruta completa · la XP sigue contando") }
-        let name = TraderLandCatalog.name(route.next!.id, district: route.next?.world)
-        return L.t("Next on the route: \(name) · \(route.index)/\(route.total)", "Siguiente en la ruta: \(name) · \(route.index)/\(route.total)")
-    }
-
     private func perform(_ action: LandIslandStatus.NextAction) {
         switch action {
         case .review, .growing: collectionOpen = true; scrollTarget = "land-reviews"
@@ -790,12 +817,21 @@ struct TraderLandGateHarnessView: View {
         case let .build(itemID):
             // `sync.world` still holds the previous value here (Published emits on willSet).
             let id = TraderLandCatalog.artID(itemID)
+            // Not ready any more (built on the web, say): show the ready row and let the player pick.
             if LandIslandStatus.readyPieces(world).contains(where: { $0.id == id }) { selectPiece(id) }
-            else if let first = LandIslandStatus.readyPieces(world).first { selectPiece(first.id) }
             else { collectionOpen = true; scrollTarget = "land-top" }
         case .review:
             collectionOpen = true; scrollTarget = "land-reviews"
         }
+    }
+
+    /// When the soonest growing seed's review opens, per the last snapshot.
+    private var nextReviewAt: Date? { accountIsland ? sync.world.flatMap(LandIslandStatus.nextReviewAt) : nil }
+
+    /// Refreshes the account island unless the player is mid-edit.
+    private func reloadIsland() async {
+        guard accountIsland, draft == nil, !sync.busy else { return }
+        await sync.load()
     }
 
     private var islandFooter: some View {
@@ -825,9 +861,15 @@ struct TraderLandGateHarnessView: View {
                     Spacer()
                     Button(action: undo) { Label(L.t("Undo", "Deshacer"), systemImage: "arrow.uturn.backward").font(.system(size: 13)).frame(minHeight: 44) }
                         .disabled(!canUndo).foregroundStyle(Theme.text).opacity(canUndo ? 1 : 0.3).accessibilityIdentifier("land-undo")
-                }.padding(.horizontal, 20).padding(.bottom, 4)
+                }.background { seaBackdrop }.padding(.horizontal, 20).padding(.bottom, 4)
             }
         }
+    }
+
+    /// Between the island and the archipelago the neighbours drift under your island's text; this keeps it legible.
+    private var seaBackdrop: some View {
+        RoundedRectangle(cornerRadius: 14).fill(Theme.bg.opacity(seaVisible ? 0.82 : 0)).padding(-8)
+            .animation(.easeInOut(duration: 0.2), value: seaVisible).allowsHitTesting(false)
     }
 
     private var cameraControls: some View {
@@ -882,32 +924,36 @@ struct TraderLandGateHarnessView: View {
                 }.frame(minHeight: 50).padding(.horizontal, 18).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("land-collection-toggle")
             if collectionOpen {
-                ScrollViewReader { reader in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Color.clear.frame(height: 0).id("land-top")
-                            if accountIsland {
-                                readyRow
-                                VStack(alignment: .leading, spacing: 10) { reviewSection }.id("land-reviews")
+                VStack(spacing: 0) {
+                    ScrollViewReader { reader in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Color.clear.frame(height: 0).id("land-top")
+                                if accountIsland {
+                                    readyRow
+                                    VStack(alignment: .leading, spacing: 10) { reviewSection }.id("land-reviews")
+                                }
+                                districtTabs
+                                piecesRow
+                                Text(accountIsland ? L.t("Every completed read plants a seed. It blooms when you review its thesis or respect a NO TRADE.", "Cada lectura completa planta una semilla. Florece cuando revisas su tesis o respetas un NO OPERAR.") : L.t("Practice island · saved on this device. Your earned collection stays separate.", "Isla de práctica · guardada en este dispositivo. Tu colección ganada se mantiene separada."))
+                                    .font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                            }.padding(.horizontal, 16).padding(.bottom, 16)
+                        }.frame(maxHeight: maxHeight - 50 - (selectedItem == nil ? 0 : 80))
+                            .onChange(of: scrollTarget) { _, target in
+                                guard let target else { return }
+                                withAnimation(.easeInOut(duration: 0.3)) { reader.scrollTo(target, anchor: .top) }
+                                scrollTarget = nil
                             }
-                            districtTabs
-                            piecesRow
-                            Text(accountIsland ? L.t("Every completed read plants a seed. It blooms when you review its thesis or respect a NO TRADE.", "Cada lectura completa planta una semilla. Florece cuando revisas su tesis o respetas un NO OPERAR.") : L.t("Practice island · saved on this device. Your earned collection stays separate.", "Isla de práctica · guardada en este dispositivo. Tu colección ganada se mantiene separada."))
-                                .font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
-                        }.padding(.horizontal, 16).padding(.bottom, 16)
-                    }.frame(maxHeight: maxHeight - 50 - (selectedItem == nil ? 0 : 80))
-                        .onChange(of: scrollTarget) { _, target in
-                            guard let target else { return }
-                            withAnimation(.easeInOut(duration: 0.3)) { reader.scrollTo(target, anchor: .top) }
-                            scrollTarget = nil
-                        }
-                        .onAppear {
-                            // Opening the panel and asking for a section happen in the same update.
-                            guard let target = scrollTarget else { return }
-                            DispatchQueue.main.async { reader.scrollTo(target, anchor: .top); scrollTarget = nil }
-                        }
+                            .onAppear {
+                                // Opening the panel and asking for a section happen in the same update.
+                                guard let target = scrollTarget else { return }
+                                DispatchQueue.main.async { reader.scrollTo(target, anchor: .top); scrollTarget = nil }
+                            }
+                    }
+                    if let item = selectedItem { selectionBar(item) }
                 }
-                if let item = selectedItem { selectionBar(item) }
+                // Slides with the header when the panel grows or folds, so the two never overlap.
+                .transition(.move(edge: .bottom))
             }
         }.background(Theme.panel).overlay(alignment: .top) { Rectangle().fill(Theme.stroke).frame(height: 1) }
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20))
@@ -1057,8 +1103,16 @@ struct TraderLandGateHarnessView: View {
         }
     }
 
-    private func animateCamera(zoom target: CGFloat, pan offset: CGSize) {
-        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.6, dampingFraction: 0.88)) { zoom = target; pan = offset }
+    private func animateCamera(zoom target: CGFloat, pan offset: CGSize, visit: Int?) {
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.6, dampingFraction: 0.88)) {
+            zoom = target; pan = offset; setVisited(visit)
+        }
+    }
+
+    /// Arriving at a neighbour shows the sea at once; leaving fades it with whatever animation is running.
+    private func setVisited(_ index: Int?) {
+        if index != nil { withTransaction(Transaction(animation: nil)) { seaFocus = 1 } } else { seaFocus = 0 }
+        visited = index
     }
 
     /// Pan that puts an island's centre (a slot offset from yours) in the middle of the space above the card.
@@ -1086,9 +1140,8 @@ struct TraderLandGateHarnessView: View {
 
     private func openArchipelago() {
         atSea {
-            visited = nil
             let zoom = overviewZoom, ring = ArchipelagoLayout.ringOneBounds
-            animateCamera(zoom: zoom, pan: panTarget(CGPoint(x: 0, y: ring.midY), zoom: zoom))
+            animateCamera(zoom: zoom, pan: panTarget(CGPoint(x: 0, y: ring.midY), zoom: zoom), visit: nil)
             sound.play("fog_reveal", volume: 0.3)
         }
     }
@@ -1096,8 +1149,7 @@ struct TraderLandGateHarnessView: View {
     private func flyTo(_ index: Int) {
         guard scene.islands.indices.contains(index) else { return }
         atSea {
-            visited = index
-            animateCamera(zoom: Self.visitZoom, pan: panTarget(scene.islands[index].offset, zoom: Self.visitZoom))
+            animateCamera(zoom: Self.visitZoom, pan: panTarget(scene.islands[index].offset, zoom: Self.visitZoom), visit: index)
             sound.play("placement_tick")
         }
     }
@@ -1110,8 +1162,7 @@ struct TraderLandGateHarnessView: View {
     }
 
     private func goHome() {
-        visited = nil
-        animateCamera(zoom: 1, pan: .zero)
+        animateCamera(zoom: 1, pan: .zero, visit: nil)
         if !archipelagoMode { withAnimation(.easeInOut(duration: 0.25)) { archipelagoChrome(false) } }
     }
 
@@ -1138,7 +1189,7 @@ struct TraderLandGateHarnessView: View {
         for (index, island) in scene.islands.enumerated() where distance(island.offset) < bestDistance {
             best = index; bestDistance = distance(island.offset)
         }
-        if best != visited { visited = best }
+        if best != visited { setVisited(best) }
     }
 
     private enum IslandHit { case own, neighbor(Int) }
@@ -1202,12 +1253,18 @@ struct TraderLandGateHarnessView: View {
     private func rebuildScene() {
         let previous = visited.flatMap { scene.islands.indices.contains($0) ? scene.islands[$0].info.code : nil }
         scene = ArchipelagoScene(islands: publicNeighbors, showLots: neighborsReady && (fixtureIslands != nil || !neighbors.failed))
-        visited = previous.flatMap { code in scene.islands.firstIndex { $0.info.code == code } }
+        setVisited(previous.flatMap { code in scene.islands.firstIndex { $0.info.code == code } })
+        let art = scene.artPaths
+        guard !art.glows.isEmpty || !art.albedos.isEmpty else { return }
+        Task { await LandImageCache.warm(albedos: art.albedos, glows: art.glows); artVersion += 1 }
     }
 
     private var archipelagoCard: some View {
         let islands = scene.islands
         let current = visited.flatMap { islands.indices.contains($0) ? islands[$0].info : nil }
+        let loadFailed = islands.isEmpty && neighbors.failed && fixtureIslands == nil
+        // Loaded, nobody else public: the empty state speaks for your own island too.
+        let emptySea = neighborsReady && islands.isEmpty && !loadFailed
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text(archipelagoEyebrow).font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(1.4).foregroundStyle(Theme.muted)
@@ -1220,7 +1277,7 @@ struct TraderLandGateHarnessView: View {
             }
             if !neighborsReady {
                 Text(L.t("Looking for public islands…", "Buscando islas públicas…")).font(.system(size: 14)).foregroundStyle(Theme.muted)
-            } else if islands.isEmpty && neighbors.failed && fixtureIslands == nil {
+            } else if loadFailed {
                 HStack(spacing: 10) {
                     Text(L.t("The archipelago could not load. Check your connection.", "No se pudo cargar el archipiélago. Revisa tu conexión."))
                         .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
@@ -1228,8 +1285,9 @@ struct TraderLandGateHarnessView: View {
                     Button(L.t("Retry", "Reintentar")) { Task { await loadNeighbors() } }
                         .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accentSoft).frame(minHeight: 44)
                 }
-            } else if islands.isEmpty {
-                Text(L.t("No public islands yet. Publish yours and be the first.", "Todavía no hay islas públicas. Publica la tuya y sé la primera."))
+            } else if emptySea {
+                Text(ownPublic ? L.t("Your island is the first on the map. Others appear here as they publish.", "Tu isla es la primera del mapa. Las demás aparecerán aquí cuando se publiquen.")
+                     : L.t("No public islands yet. Publish yours and be the first.", "Todavía no hay islas públicas. Publica la tuya y abre el archipiélago."))
                     .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
             } else {
                 HStack(spacing: 6) {
@@ -1247,7 +1305,9 @@ struct TraderLandGateHarnessView: View {
                 }
             }
             if ownPublic {
-                Label(L.t("Your island is on the map.", "Tu isla está en el mapa."), systemImage: "globe").font(.system(size: 12)).foregroundStyle(Theme.accentSoft)
+                if !emptySea {
+                    Label(L.t("Your island is on the map.", "Tu isla está en el mapa."), systemImage: "globe").font(.system(size: 12)).foregroundStyle(Theme.accentSoft)
+                }
             } else if publishHint {
                 Text(L.t("Sign in on the desk to publish. Your practice island stays on this device.", "Inicia sesión en la mesa para publicar. Tu isla de práctica se queda en este dispositivo."))
                     .font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)

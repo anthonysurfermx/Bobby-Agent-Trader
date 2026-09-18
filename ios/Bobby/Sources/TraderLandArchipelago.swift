@@ -204,6 +204,17 @@ struct ArchipelagoScene {
     let lots: [CGPoint]
     var offsets: [CGPoint] { islands.map(\.offset) + lots }
 
+    /// Bundle paths of every albedo and glow pass the neighbours use, for warming the image cache.
+    var artPaths: (albedos: [String], glows: [String]) {
+        var albedos = Set<String>(), glows = Set<String>()
+        for sprite in islands.flatMap(\.sprites) {
+            guard let state = sprite.item.artState else { continue }
+            if let albedo = state.variants["albedo_512"] ?? state.variants["albedo_1024"] { albedos.insert(RuntimeBundle.bundlePath(albedo.url)) }
+            if let glow = state.variants["glow_1024"] { glows.insert(RuntimeBundle.bundlePath(glow.url)) }
+        }
+        return (albedos.sorted(), glows.sorted())
+    }
+
     static let empty = ArchipelagoScene(islands: [], showLots: false)
 
     init(islands: [PublicIsland], showLots: Bool) {
@@ -244,21 +255,33 @@ struct ArchipelagoLayer: View, Animatable {
     let scene: ArchipelagoScene
     var zoom: CGFloat
     var pan: CGSize
+    /// 1 while a neighbour is being visited, 0 otherwise; animates with the camera so leaving a visit fades the sea out.
+    var visiting: CGFloat
     let fit: CGFloat
     let visited: Int?
     let ownLabel: String
     let labels: Bool
+    /// Bumped when the glow passes finish warming, so the Canvas redraws with them.
+    let artVersion: Int
 
-    var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>> {
-        get { AnimatablePair(zoom, AnimatablePair(pan.width, pan.height)) }
-        set { zoom = newValue.first; pan = CGSize(width: newValue.second.first, height: newValue.second.second) }
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+        get { AnimatablePair(AnimatablePair(zoom, visiting), AnimatablePair(pan.width, pan.height)) }
+        set {
+            zoom = newValue.first.first; visiting = newValue.first.second
+            pan = CGSize(width: newValue.second.first, height: newValue.second.second)
+        }
     }
+
+    /// Nothing above 75% zoom unless visiting; the sea fades in down to 70%, so no flight pops the neighbours in or out.
+    private var alpha: CGFloat { max(visiting, min(1, max(0, (0.75 - zoom) / 0.05))) }
 
     /// Island content box around its canvas origin, including tall art and the slab.
     private static let islandBox = CGRect(x: 40, y: -110, width: 780, height: 740)
 
     var body: some View {
         Canvas { ctx, size in
+            guard alpha > 0.01 else { return }
+            ctx.opacity = alpha
             let scale = fit * zoom
             let origin = CGPoint(x: size.width / 2 + pan.width - GateLayout.viewCenter.x * scale,
                                  y: size.height / 2 + pan.height - GateLayout.viewCenter.y * scale)
@@ -299,9 +322,10 @@ struct ArchipelagoLayer: View, Animatable {
                     var art = layer
                     if sprite.geometry.flip { art.translateBy(x: rect.midX, y: 0); art.scaleBy(x: -1, y: 1); art.translateBy(x: -rect.midX, y: 0) }
                     if let body = image(path, { LandImageCache.image(path) }) { art.draw(body, in: rect) }
+                    // Cache only: building a glow here would stall the first frame; the albedo shows until it is warm.
                     if let glow = state.variants["glow_1024"] {
                         let glowPath = RuntimeBundle.bundlePath(glow.url)
-                        if let light = image(glowPath + "#half", { LandImageCache.glow(glowPath, half: true) }) {
+                        if let light = image(glowPath + "#half", { LandImageCache.cachedGlow(glowPath, half: true) }) {
                             var screenBlend = art; screenBlend.blendMode = .screen; screenBlend.draw(light, in: rect)
                         }
                     }
@@ -349,12 +373,22 @@ enum LandIslandStatus {
         if let first = readyPieces(world).first {
             return .build(count: world.inventory.filter { $0.state == "bloomed" && !$0.placed }.count, first: first.id)
         }
-        let growing = world.inventory.filter { $0.state == "seed" && $0.review?.ready != true }
-        if !growing.isEmpty {
-            let soonest = growing.compactMap { date($0.review?.reviewAt) }.min()
-            return .growing(count: growing.count, reviewAt: soonest)
-        }
+        if world.seedsGrowing > 0 { return .growing(count: world.seedsGrowing, reviewAt: nextReviewAt(world)) }
         return .read
+    }
+
+    /// When the soonest growing seed's review opens, per this snapshot.
+    static func nextReviewAt(_ world: TraderLandWorld) -> Date? {
+        world.inventory.filter { $0.state == "seed" && $0.review?.ready != true }.compactMap { date($0.review?.reviewAt) }.min()
+    }
+
+    /// "Next on the route: Risk Shield · piece 4 of 8". `route.index` counts the pieces already granted,
+    /// so the next one is the piece after them.
+    static func routeLine(_ route: TraderLandWorld.Route) -> String {
+        guard !route.complete, let next = route.next else { return L.t("Route complete · XP still counts", "Ruta completa · la XP sigue contando") }
+        let name = TraderLandCatalog.name(next.id, district: next.world)
+        let number = min(route.index + 1, route.total)
+        return L.t("Next on the route: \(name) · piece \(number) of \(route.total)", "Siguiente en la ruta: \(name) · pieza \(number) de \(route.total)")
     }
 
     /// Bloomed pieces waiting in the collection, as manifest ids with how many of each.

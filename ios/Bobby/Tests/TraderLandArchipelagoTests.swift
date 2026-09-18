@@ -100,6 +100,38 @@ final class TraderLandArchipelagoTests: XCTestCase {
         XCTAssertEqual(LandIslandStatus.nextAction(try world("")), .read)
     }
 
+    /// The server's `route.index` counts pieces already granted: index 3 means the next piece is the 4th.
+    func testRouteLineNamesThePieceAfterTheGrantedOnes() throws {
+        let json = #"{"ok":true,"xp":40,"aura":8,"land":{"size":8,"theme":"night"},"placements":[],"inventory":[],"route":{"index":3,"total":8,"next":{"id":"thesis_citadel_risk_shield","world":"thesis_citadel"},"complete":false}}"#
+        let route = try XCTUnwrap(try JSONDecoder().decode(TraderLandWorld.self, from: Data(json.utf8)).route)
+        let line = LandIslandStatus.routeLine(route)
+        XCTAssertTrue(line.hasSuffix(L.t("piece 4 of 8", "pieza 4 de 8")), line)
+        XCTAssertTrue(line.contains(TraderLandCatalog.name("thesis_citadel_risk_shield", district: "thesis_citadel")), line)
+        let done = TraderLandWorld.Route(index: 8, total: 8, next: nil, complete: true)
+        XCTAssertEqual(LandIslandStatus.routeLine(done), L.t("Route complete · XP still counts", "Ruta completa · la XP sigue contando"))
+    }
+
+    /// The island reloads itself when the soonest growing seed's review opens.
+    func testNextReviewAtIsTheSoonestGrowingSeed() throws {
+        let open = #"{"id":"s1","item_id":"crypto_bay_data_dock","state":"seed","placed":false,"review":{"thesis":null,"reviewAt":"2026-01-01T00:00:00.000Z","ready":true}}"#
+        let later = #"{"id":"s2","item_id":"crypto_bay_data_dock","state":"seed","placed":false,"review":{"thesis":null,"reviewAt":"2099-01-02T00:00:00.000Z","ready":false}}"#
+        let sooner = #"{"id":"s3","item_id":"crypto_bay_data_dock","state":"seed","placed":false,"review":{"thesis":null,"reviewAt":"2099-01-01T00:00:00.000Z","ready":false}}"#
+        XCTAssertEqual(LandIslandStatus.nextReviewAt(try world([open, later, sooner].joined(separator: ","))), LandIslandStatus.date("2099-01-01T00:00:00.000Z"))
+        XCTAssertNil(LandIslandStatus.nextReviewAt(try world(open)))
+    }
+
+    /// Warming builds the archipelago's half-size glows off the main thread; the Canvas only reads the cache.
+    func testWarmingFillsTheGlowCache() async throws {
+        let scene = ArchipelagoScene(islands: [PublicIsland(code: "warm", title: nil, size: 8, publishedAt: nil,
+                                                            placements: [.init(item_id: "crypto_bay_data_dock", x: 1, y: 1, rotation: 0)], stats: nil)],
+                                     showLots: false)
+        let art = scene.artPaths
+        XCTAssertFalse(art.glows.isEmpty)
+        await LandImageCache.warm(albedos: art.albedos, glows: art.glows)
+        for path in art.glows { XCTAssertNotNil(LandImageCache.cachedGlow(path, half: true), path) }
+        for path in art.albedos { XCTAssertNotNil(LandImageCache.images.object(forKey: path as NSString), path) }
+    }
+
     func testServerTimestampsAndCountdown() throws {
         XCTAssertNotNil(LandIslandStatus.date("2026-09-10T02:31:12.123456+00:00"))
         XCTAssertNotNil(LandIslandStatus.date("2026-09-19T12:00:00.000Z"))
