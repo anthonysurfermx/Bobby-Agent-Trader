@@ -20,6 +20,15 @@ struct BobbyApp: App {
 #endif
     }
 
+#if DEBUG
+    /// The value after a launch flag (`-qa-harvest seed`); "all" when the flag has none.
+    private static func argument(after flag: String) -> String? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let i = args.firstIndex(of: flag) else { return nil }
+        return args.indices.contains(i + 1) && !args[i + 1].hasPrefix("-") ? args[i + 1] : "all"
+    }
+#endif
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -32,6 +41,8 @@ struct BobbyApp: App {
                     GearSkinQAFixtureView()
                 } else if ProcessInfo.processInfo.arguments.contains("-qa-squad") {
                     SquadQAFixtureView()
+                } else if let state = Self.argument(after: "-qa-harvest") {
+                    HarvestQAFixtureView(state: state)
                 } else {
                     ContentView()
                 }
