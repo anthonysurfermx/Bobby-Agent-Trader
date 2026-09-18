@@ -48,6 +48,10 @@ final class BobbyViewModel: ObservableObject {
     @Published var phase: DeskPhase = .idle
     @Published var timeframe: MarketTimeframe = .oneHour
     @Published var noTradeMoment: NoTradeMoment? = nil
+    /// What the last finished read did on the island (the harvest card).
+    @Published var harvest: HarvestMoment?
+    /// Bumps when a read planted a piece: the header's Trader Land chip pops.
+    @Published var landBump = 0
     /// The one line under the status after a failure, worded by its cause.
     @Published var errorHint: String?
     /// "Did you mean…?" stays on screen next to its chip: with the speaker
@@ -91,6 +95,15 @@ final class BobbyViewModel: ObservableObject {
         // The old wizard only re-rendered because a speak() fired alongside.
         profile.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        // Any sync that answers about the harvest's award settles the card —
+        // including the one that runs after signing in from it.
+        ProgressSync.shared.$outcomes
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] outcomes in
+                guard let self, let id = self.harvest?.eventID, let outcome = outcomes[id] else { return }
+                self.settleHarvest(eventID: id, outcome: outcome)
+            }
             .store(in: &cancellables)
     }
 
@@ -186,6 +199,7 @@ final class BobbyViewModel: ObservableObject {
         phase = .resolving
         lastAnswer = nil
         noTradeMoment = nil
+        harvest = nil
 
         Task {
             defer { thinking = false }
@@ -279,8 +293,13 @@ final class BobbyViewModel: ObservableObject {
             // earns more because restraint is the behavior Bobby is teaching.
             // awardedXP is what the daily cap ACTUALLY granted — the UI shows
             // that number, never the intent.
-            let awardedXP = companions.awardDiscipline(answer.isNoTrade ? 20 : 10, kind: answer.isNoTrade ? "no_trade_respected" : "read_complete")
-            Task { await ProgressSync.shared.sync(store: companions, profile: profile) }
+            // The read rides along as the thesis its seed is reviewed against
+            // in Trader Land (same snapshot as the web desk).
+            let thesis = AwardThesis.make(symbol: asset.symbol, isEquity: asset.isEquity, direction: answer.direction,
+                                          price: answer.price, entry: answer.entry, stop: answer.stop, target: answer.target)
+            let award = companions.awardDisciplineEvent(answer.isNoTrade ? 20 : 10, kind: answer.isNoTrade ? "no_trade_respected" : "read_complete", thesis: thesis)
+            let awardedXP = award.points
+            beginHarvest(award, noTrade: answer.isNoTrade, thesis: thesis)
             if answer.isNoTrade {
                 withAnimation(.spring(duration: 0.52, bounce: 0.24)) {
                     noTradeMoment = NoTradeMoment(
@@ -290,6 +309,48 @@ final class BobbyViewModel: ObservableObject {
                     )
                 }
             }
+        }
+    }
+
+    /// Shows what this read did on the island, then follows the server's answer.
+    private func beginHarvest(_ award: CompanionStore.DisciplineAward, noTrade: Bool, thesis: AwardThesis?) {
+        let signedIn = AccountSession.shared.isSignedIn
+        let stage: HarvestMoment.Stage = !signedIn ? .signedOut(planted: award.eventID != nil)
+            : award.eventID == nil ? .capped : .syncing
+        withAnimation(.spring(duration: 0.52, bounce: 0.24)) {
+            harvest = HarvestMoment(eventID: award.eventID, noTrade: noTrade, thesis: thesis, xp: award.points, stage: stage)
+        }
+        guard signedIn, let eventID = award.eventID else {
+            Task { await ProgressSync.shared.sync(store: companions, profile: profile) }
+            return
+        }
+        Task {
+            let outcome = await ProgressSync.shared.outcome(for: eventID, store: companions, profile: profile)
+            settleHarvest(eventID: eventID, outcome: outcome)
+        }
+    }
+
+    /// Applies the server's answer to an open harvest card. nil = no answer:
+    /// signed out while syncing, or the piece waits for the next sync.
+    func settleHarvest(eventID: String, outcome: AwardOutcome?) {
+        guard var moment = harvest, moment.eventID == eventID, moment.isOpen else { return }
+        let next: HarvestMoment.Stage
+        if let outcome {
+            next = HarvestMoment.stage(for: outcome)
+        } else if !AccountSession.shared.isSignedIn || ProgressSync.shared.status == .unauthenticated {
+            next = .signedOut(planted: true)
+        } else {
+            next = .pending
+        }
+        guard next != moment.stage else { return }
+        moment.stage = next
+        if let outcome { moment.xp = outcome.awarded }
+        withAnimation(.spring(duration: 0.45, bounce: 0.2)) { harvest = moment }
+        switch next {
+        case .seed, .bloomed:
+            landBump += 1
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        default: break
         }
     }
 
@@ -323,6 +384,10 @@ struct ContentView: View {
     @State private var inspectedTool: CompanionTool?
     @State private var showCatalog = false
     @State private var showWorld = false
+    /// Where the next Trader Land sheet opens (a piece to build, the reviews, or nil).
+    @State private var landFocus: TraderLandFocus?
+    @StateObject private var pulse = LandPulse()
+    @ObservedObject private var progressSync = ProgressSync.shared
     @State private var petDetail = false
     @State private var skinSnapshotToken = 0
     @State private var skinShot: UIImage?
@@ -389,7 +454,12 @@ struct ContentView: View {
         .onAppear {
             if vm.profile.acceptedRiskNotice && vm.profile.onboarded { vm.bootGreetingIfNeeded() }
             Task { await ProgressSync.shared.sync(store: vm.companions, profile: vm.profile) }
+            Task { await pulse.refresh() }
         }
+        // A round that acknowledged awards may have planted pieces; signing in
+        // or out changes whose island the chip reads.
+        .onChange(of: progressSync.acknowledgedRounds) { Task { await pulse.refresh() } }
+        .onChange(of: account.isSignedIn) { Task { await pulse.refresh() } }
         .onChange(of: scenePhase) { _, next in
             if next == .background { vm.voice.stop() }
         }
@@ -416,8 +486,14 @@ struct ContentView: View {
                 .presentationDetents([.large])
                 .presentationBackground(Theme.bg)
         }
-        .sheet(isPresented: $showWorld) {
-            TraderLandGateHarnessView()
+        .sheet(isPresented: $showWorld, onDismiss: {
+            // A thesis closed on the island earns XP: bring the desk up to date.
+            Task {
+                await ProgressSync.shared.sync(store: vm.companions, profile: vm.profile)
+                await pulse.refresh()
+            }
+        }) {
+            TraderLandGateHarnessView(focus: landFocus)
                 .presentationDetents([.large])
                 .presentationBackground(Theme.bg)
         }
@@ -494,10 +570,14 @@ struct ContentView: View {
                     if let moment = vm.noTradeMoment {
                         noTradeSignature(moment)
                     }
+                    // A respected NO TRADE blooms its piece right away: say so under the shield.
+                    if let harvest = vm.harvest, harvest.noTrade { harvestCard(harvest) }
                     if vm.snapshot == nil && !vm.thinking { commandDeck }
                     if vm.snapshot != nil { marketSurface }
                     if vm.snapshot != nil || vm.thinking { debateRail }
                     if vm.lastAnswer != nil { verdictCard }
+                    // A read's seed lands right after the verdict it will be reviewed against.
+                    if let harvest = vm.harvest, !harvest.noTrade { harvestCard(harvest) }
                     // The board's only door (the menu item is gone): back under the read.
                     if vm.snapshot != nil && !vm.thinking { commandDeck }
                 }
@@ -561,6 +641,10 @@ struct ContentView: View {
                 .foregroundStyle(vm.companions.companion?.tintSoft ?? Theme.text.opacity(0.85))
                 .lineLimit(1)
             Spacer()
+            // Trader Land stays one tap away, with what waits there.
+            LandChip(badge: account.isSignedIn ? pulse.badge : 0, bump: vm.landBump) {
+                openLand(account.isSignedIn ? pulse.focus : nil, haptic: .light)
+            }
             Button {
                 vm.speakEnabled.toggle()
                 if !vm.speakEnabled { vm.voice.stop() }
@@ -576,7 +660,7 @@ struct ContentView: View {
             // Progress, account and the custody promise live in the menu.
             Menu {
                 Button {
-                    showWorld = true
+                    openLand(nil)
                 } label: {
                     Label("Trader Land", systemImage: "map")
                 }
@@ -718,8 +802,7 @@ struct ContentView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     showCatalog = true
                 }, onWorld: {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    showWorld = true
+                    openLand(nil, haptic: .medium)
                 })
                 .padding(.top, 4)
             }
@@ -779,10 +862,11 @@ struct ContentView: View {
                     .foregroundStyle(halo.tintSoft)
                 Spacer()
                 HStack(spacing: 6) {
-                    Image(systemName: "seal.fill")
-                    // Honest until the server/on-chain ledger exists: this
-                    // record lives only in this device's storage.
-                    Text(L.t("SAVED ON THIS DEVICE", "GUARDADO EN ESTE TELÉFONO"))
+                    Image(systemName: account.isSignedIn ? "checkmark.icloud.fill" : "seal.fill")
+                    // Signed in, the award syncs to /api/progress; otherwise
+                    // it lives only in this device's storage.
+                    Text(account.isSignedIn ? L.t("SAVED TO YOUR ACCOUNT", "GUARDADO EN TU CUENTA")
+                                            : L.t("SAVED ON THIS DEVICE", "GUARDADO EN ESTE TELÉFONO"))
                 }
                 .font(.mono(7.5, .bold))
                 .foregroundStyle(Color(hue: 0.115, saturation: 0.52, brightness: 1))
@@ -807,6 +891,16 @@ struct ContentView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L.t("No trade for \(moment.symbol). Capital protected. Plus \(moment.disciplineXP) discipline XP.",
                                 "No operar \(moment.symbol). Capital protegido. Más \(moment.disciplineXP) XP de disciplina."))
+    }
+
+    private func harvestCard(_ moment: HarvestMoment) -> some View {
+        HarvestCard(moment: moment, onOpen: { focus in openLand(focus) }, onSaveProgress: { showAccount = true })
+    }
+
+    private func openLand(_ focus: TraderLandFocus?, haptic: UIImpactFeedbackGenerator.FeedbackStyle? = nil) {
+        if let haptic { UIImpactFeedbackGenerator(style: haptic).impactOccurred() }
+        landFocus = focus
+        showWorld = true
     }
 
     private var commandDeck: some View {
