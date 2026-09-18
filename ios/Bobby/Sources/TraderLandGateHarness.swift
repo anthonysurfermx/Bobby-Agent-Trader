@@ -14,53 +14,8 @@ private func landCells(_ item: ManifestItem, _ placement: LandPlacement) -> Set<
     let size = landFootprint(item, placement.orientation)
     return Set((0..<size.cols).flatMap { x in (0..<size.rows).map { y in "\(placement.col + x):\(placement.row + y)" } })
 }
-/// Spanish display names for the bundled pieces and districts. The English
-/// side is still derived from the id, so English copy is unchanged; an id
-/// missing here falls back to that English name.
-private let landNamesES: [String: String] = [
-    "aura_core": "Núcleo de Aura",
-    "crypto_bay_data_dock": "Muelle de Datos",
-    "crypto_bay_water_walkway": "Pasarela de Agua",
-    "crypto_bay_context_buoy": "Boya de Contexto",
-    "crypto_bay_candle_tower": "Torre de Velas",
-    "crypto_bay_waiting_lighthouse": "Faro de la Espera",
-    "evidence_mines_crystal_vein_rock": "Roca con Veta de Cristal",
-    "evidence_mines_open_tunnel": "Túnel Abierto",
-    "evidence_mines_lantern_drone": "Dron Linterna",
-    "evidence_mines_evidence_workshop": "Taller de Evidencia",
-    "evidence_mines_mother_crystal": "Cristal Madre",
-    "thesis_citadel_wall_slab": "Losa de Muralla",
-    "thesis_citadel_fortified_ramp": "Rampa Fortificada",
-    "thesis_citadel_risk_shield": "Escudo de Riesgo",
-    "thesis_citadel_double_gate": "Puerta Doble",
-    "thesis_citadel_three_gate_citadel": "Ciudadela de Tres Puertas",
-    "risk_reef_reef_tile": "Loseta de Arrecife",
-    "risk_reef_blue_sluice": "Compuerta Azul",
-    "risk_reef_dual_orbit_antenna": "Antena de Doble Órbita",
-    "risk_reef_red_team_observatory": "Observatorio del Crítico",
-    "risk_reef_double_bridge": "Puente Doble",
-    "axiom_archive_archive_ring_tile": "Loseta del Anillo",
-    "axiom_archive_path_straight": "Camino Recto",
-    "axiom_archive_return_path_curve": "Curva de Regreso",
-    "axiom_archive_aura_flower": "Flor de Aura",
-    "axiom_archive_lit_archive": "Archivo Iluminado",
-    "axiom_archive_base_ring_seal": "Sello del Anillo Base",
-]
-private let districtNamesES: [String: String] = [
-    "crypto_bay": "Bahía Cripto",
-    "evidence_mines": "Minas de Evidencia",
-    "thesis_citadel": "Ciudadela de Tesis",
-    "risk_reef": "Arrecife de Riesgo",
-    "axiom_archive": "Archivo de Axiomas",
-]
-private func landName(_ item: ManifestItem) -> String {
-    let en = item.id.replacingOccurrences(of: item.district + "_", with: "").replacingOccurrences(of: "_", with: " ").capitalized
-    return L.t(en, landNamesES[item.id] ?? en)
-}
-private func districtName(_ id: String) -> String {
-    let en = id.replacingOccurrences(of: "_", with: " ").capitalized
-    return L.t(en, districtNamesES[id] ?? en)
-}
+private func landName(_ item: ManifestItem) -> String { TraderLandCatalog.name(item.id, district: item.district) }
+private func districtName(_ id: String) -> String { TraderLandCatalog.districtName(id) }
 /// Server direction values ("long"/"short") in the reader's language; English keeps the raw value.
 private func landDirection(_ raw: String) -> String {
     L.t(raw, raw == "long" ? "alcista" : raw == "short" ? "bajista" : raw)
