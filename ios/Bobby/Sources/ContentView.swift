@@ -32,7 +32,8 @@ struct NoTradeMoment: Identifiable, Equatable {
     let id = UUID()
     let symbol: String
     let reason: String
-    let disciplineXP: Int
+    /// What the award actually granted; the server's answer replaces the local one.
+    var disciplineXP: Int
 }
 
 @MainActor
@@ -343,10 +344,20 @@ final class BobbyViewModel: ObservableObject {
         } else {
             next = .pending
         }
-        guard next != moment.stage else { return }
+        // A duplicate was counted by an earlier round: the local number stands.
+        if let outcome, !outcome.duplicate {
+            moment.xp = outcome.awarded
+            // Both cards show the server's number (a cap reached on another device reads 0).
+            if moment.noTrade, var shield = noTradeMoment, shield.disciplineXP != outcome.awarded {
+                shield.disciplineXP = outcome.awarded
+                withAnimation(.easeOut(duration: 0.25)) { noTradeMoment = shield }
+            }
+        }
+        let moved = next != moment.stage
         moment.stage = next
-        if let outcome { moment.xp = outcome.awarded }
+        guard moment != harvest else { return }
         withAnimation(.spring(duration: 0.45, bounce: 0.2)) { harvest = moment }
+        guard moved else { return }
         switch next {
         case .seed, .bloomed:
             landBump += 1
@@ -384,9 +395,10 @@ struct ContentView: View {
     @ObservedObject private var account = AccountSession.shared
     @State private var inspectedTool: CompanionTool?
     @State private var showCatalog = false
-    @State private var showWorld = false
-    /// Where the next Trader Land sheet opens (a piece to build, the reviews, or nil).
-    @State private var landFocus: TraderLandFocus?
+    /// The open Trader Land sheet and where it opens (a piece to build, the reviews, or nil).
+    /// The focus rides in the item: a separate @State read only by the sheet's
+    /// closure is stale on the first presentation after launch.
+    @State private var landRequest: LandRequest?
     @StateObject private var pulse = LandPulse()
     @ObservedObject private var progressSync = ProgressSync.shared
     @State private var petDetail = false
@@ -487,14 +499,14 @@ struct ContentView: View {
                 .presentationDetents([.large])
                 .presentationBackground(Theme.bg)
         }
-        .sheet(isPresented: $showWorld, onDismiss: {
+        .sheet(item: $landRequest, onDismiss: {
             // A thesis closed on the island earns XP: bring the desk up to date.
             Task {
                 await ProgressSync.shared.sync(store: vm.companions, profile: vm.profile)
                 await pulse.refresh()
             }
-        }) {
-            TraderLandGateHarnessView(focus: landFocus)
+        }) { request in
+            TraderLandGateHarnessView(focus: request.focus)
                 .presentationDetents([.large])
                 .presentationBackground(Theme.bg)
         }
@@ -570,15 +582,16 @@ struct ContentView: View {
                     liveConsole
                     if let moment = vm.noTradeMoment {
                         noTradeSignature(moment)
+                        // A respected NO TRADE blooms its piece right away: say so under the shield.
+                        if let harvest = vm.harvest, harvest.noTrade { harvestCard(harvest, showsXP: false) }
                     }
-                    // A respected NO TRADE blooms its piece right away: say so under the shield.
-                    if let harvest = vm.harvest, harvest.noTrade { harvestCard(harvest) }
                     if vm.snapshot == nil && !vm.thinking { commandDeck }
                     if vm.snapshot != nil { marketSurface }
                     if vm.snapshot != nil || vm.thinking { debateRail }
                     if vm.lastAnswer != nil { verdictCard }
-                    // A read's seed lands right after the verdict it will be reviewed against.
-                    if let harvest = vm.harvest, !harvest.noTrade { harvestCard(harvest) }
+                    // A read's seed lands right after the verdict it will be reviewed against —
+                    // and so does a NO TRADE's piece once its shield is closed: never a banner over the chart.
+                    if let harvest = vm.harvest, !harvest.noTrade || vm.noTradeMoment == nil { harvestCard(harvest) }
                     // The board's only door (the menu item is gone): back under the read.
                     if vm.snapshot != nil && !vm.thinking { commandDeck }
                 }
@@ -890,18 +903,20 @@ struct ContentView: View {
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(halo.tint.opacity(0.32), lineWidth: 1))
         .transition(.scale(scale: 0.92).combined(with: .opacity))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(L.t("No trade for \(moment.symbol). Capital protected. Plus \(moment.disciplineXP) discipline XP.",
-                                "No operar \(moment.symbol). Capital protegido. Más \(moment.disciplineXP) XP de disciplina."))
+        .accessibilityLabel(moment.disciplineXP > 0
+            ? L.t("No trade for \(moment.symbol). Capital protected. Plus \(moment.disciplineXP) discipline XP.",
+                  "No operar \(moment.symbol). Capital protegido. Más \(moment.disciplineXP) XP de disciplina.")
+            : L.t("No trade for \(moment.symbol). Capital protected. Daily XP complete.",
+                  "No operar \(moment.symbol). Capital protegido. XP diario completo."))
     }
 
-    private func harvestCard(_ moment: HarvestMoment) -> some View {
-        HarvestCard(moment: moment, onOpen: { focus in openLand(focus) }, onSaveProgress: { showAccount = true })
+    private func harvestCard(_ moment: HarvestMoment, showsXP: Bool = true) -> some View {
+        HarvestCard(moment: moment, showsXP: showsXP, onOpen: { focus in openLand(focus) }, onSaveProgress: { showAccount = true })
     }
 
     private func openLand(_ focus: TraderLandFocus?, haptic: UIImpactFeedbackGenerator.FeedbackStyle? = nil) {
         if let haptic { UIImpactFeedbackGenerator(style: haptic).impactOccurred() }
-        landFocus = focus
-        showWorld = true
+        landRequest = LandRequest(focus: focus)
     }
 
     private var commandDeck: some View {

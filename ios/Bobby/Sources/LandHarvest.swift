@@ -5,6 +5,12 @@
 import SwiftUI
 import Combine
 
+/// One Trader Land presentation from the desk, and where it opens.
+struct LandRequest: Identifiable {
+    let id = UUID()
+    let focus: TraderLandFocus?
+}
+
 /// What a finished desk read did on the island.
 struct HarvestMoment: Identifiable, Equatable {
     enum Stage: Equatable {
@@ -64,6 +70,8 @@ final class LandPulse: ObservableObject {
     @Published private(set) var reviewsReady = 0
     @Published private(set) var firstReadyItemID: String?
     private var inflight = false
+    /// A refresh asked for mid-flight (a piece planted during the GET) runs once more after it.
+    private var stale = false
     private let transport: URLSession
 
     init(transport: URLSession = .shared) { self.transport = transport }
@@ -77,10 +85,18 @@ final class LandPulse: ObservableObject {
     }
 
     func refresh() async {
-        guard let userID = AccountSession.shared.session?.userId else { apply(nil); return }
-        guard !inflight else { return }
+        guard AccountSession.shared.session?.userId != nil else { apply(nil); return }
+        guard !inflight else { stale = true; return }
         inflight = true
         defer { inflight = false }
+        repeat {
+            stale = false
+            await fetch()
+        } while stale
+    }
+
+    private func fetch() async {
+        guard let userID = AccountSession.shared.session?.userId else { apply(nil); return }
         guard let token = await AccountSession.shared.accessToken() else { return }
         var request = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/trader-land"))
         request.timeoutInterval = 20
@@ -155,6 +171,8 @@ struct LandChip: View {
 /// island, why, and the one tap that goes there.
 struct HarvestCard: View {
     let moment: HarvestMoment
+    /// Off while the NO TRADE card above already shows this read's XP.
+    var showsXP = true
     let onOpen: (TraderLandFocus?) -> Void
     let onSaveProgress: () -> Void
 
@@ -171,14 +189,13 @@ struct HarvestCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                         Spacer(minLength: 4)
-                        // The NO TRADE card above already shows its XP.
-                        if !moment.noTrade, moment.xp > 0 {
+                        if showsXP, moment.xp > 0 {
                             Text("+\(moment.xp) XP")
                                 .font(.mono(8.5, .black))
-                                .foregroundStyle(Theme.up)
+                                .foregroundStyle(Theme.accentSoft)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 3)
-                                .background(Capsule().fill(Theme.up.opacity(0.10)))
+                                .background(Capsule().fill(Theme.accent.opacity(0.14)))
                         }
                     }
                     Text(title)
@@ -205,6 +222,8 @@ struct HarvestCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(tone.opacity(0.26), lineWidth: 1))
         .transition(.scale(scale: 0.94).combined(with: .opacity))
+        // A container, so the card's identifier does not overwrite its buttons'.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("desk-harvest")
     }
 
@@ -219,7 +238,8 @@ struct HarvestCard: View {
 
     private var tone: Color {
         switch moment.stage {
-        case .seed: return Theme.up
+        // Blue, not the desk's price-up green: a seed from a short thesis is not bullish.
+        case .seed: return Theme.accent
         case .bloomed: return Theme.cio
         case .signedOut: return Theme.accentSoft
         default: return Theme.accentSoft.opacity(0.8)
