@@ -516,7 +516,11 @@ struct TraderLandGateHarnessView: View {
         return L.t("Not earned yet", "Por desbloquear")
     }
 
-    init() {
+    /// Where the desk asked the island to open (a piece to build, or the reviews).
+    private let focus: TraderLandFocus?
+
+    init(focus: TraderLandFocus? = nil) {
+        self.focus = focus
         let fixture = RuntimeBundle.fixture
         let saved = Self.load() ?? SavedWorld(placements: fixture.placements, focusLevel: fixture.focusLevel)
         var signedIn = AccountSession.shared.isSignedIn
@@ -900,7 +904,8 @@ struct TraderLandGateHarnessView: View {
 
     private static let site = URL(string: "https://bobbyprotocol.xyz")!
     private static let worldsURL = site.appendingPathComponent("agentic-world/bobby/trader-land/worlds")
-    private static func shareURL(_ code: String) -> URL { site.appendingPathComponent("trader-land/w/\(code)") }
+    // The web routes visitors under /agentic-world/bobby/trader-land/w/:code (App.tsx); /trader-land/w/ is a 404.
+    private static func shareURL(_ code: String) -> URL { site.appendingPathComponent("agentic-world/bobby/trader-land/w/\(code)") }
 
     private var seeds: [TraderLandWorld.Inventory] {
         (sync.world?.inventory ?? []).filter { $0.state == "seed" && $0.review != nil }

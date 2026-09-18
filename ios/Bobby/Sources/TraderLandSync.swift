@@ -12,6 +12,8 @@ struct TraderLandWorld: Decodable {
         let placed: Bool
         let source: String?
         let review: SeedReview?
+        let seeded_at: String?
+        let bloomed_at: String?
     }
     /// A seed waits on the thesis it was read with; the server says when it can be reviewed.
     struct SeedReview: Decodable {
@@ -22,7 +24,17 @@ struct TraderLandWorld: Decodable {
     }
     struct Bilingual: Decodable { let en: String; let es: String; var text: String { L.t(en, es) } }
     struct Season: Decodable { let name: Bilingual; let total: Int; let earned: Int; let next: String?; let complete: Bool }
-    struct Share: Decodable { let `public`: Bool; let code: String?; let title: String? }
+    struct Share: Decodable { let `public`: Bool; let code: String?; let title: String?; let publishedAt: String? }
+    /// The Discovery Route: every awarded read or respected no-trade grants the next piece.
+    struct Route: Decodable {
+        struct Next: Decodable { let id: String; let world: String? }
+        let index: Int
+        let total: Int
+        let next: Next?
+        let complete: Bool
+    }
+    /// Server count of seeds whose 24 h review window is already open.
+    struct ReviewWindow: Decodable { let windowHours: Int?; let ready: Int? }
     struct Capabilities: Decodable { let move: Bool?; let close: Bool? }
     /// Present only on the response to a `close` action.
     struct Closed: Decodable {
@@ -56,6 +68,29 @@ struct TraderLandWorld: Decodable {
     let share: Share?
     let season: Season?
     let closed: Closed?
+    let route: Route?
+    let review: ReviewWindow?
+
+    /// Pieces that bloomed and wait in the collection.
+    var readyToBuild: Int { inventory.filter { $0.state == "bloomed" && !$0.placed }.count }
+    /// Seeds whose thesis can be reviewed now.
+    var reviewsReady: Int { inventory.filter { $0.state == "seed" && $0.review?.ready == true }.count }
+    /// Seeds still waiting for the market.
+    var seedsGrowing: Int { inventory.filter { $0.state == "seed" && $0.review?.ready != true }.count }
+}
+
+/// Where the desk asks Trader Land to open.
+enum TraderLandFocus: Equatable {
+    /// A bloomed piece is waiting: open the collection on it, ready to build.
+    case build(itemID: String)
+    /// Open the collection on the theses to review.
+    case review
+}
+
+enum TraderLandCatalog {
+    /// Database ids whose art ships under another manifest id (web: CATALOG_ALIASES).
+    static let aliases = ["axiom_archive_return_path": "axiom_archive_return_path_curve"]
+    static func artID(_ id: String) -> String { aliases[id] ?? id }
 }
 
 enum TraderLandMutation {
@@ -133,7 +168,12 @@ final class TraderLandSync: ObservableObject {
             guard generation == epoch, AccountSession.shared.session?.userId == userID else { return nil }
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard (200..<300).contains(status) else {
-                let message = status == 409
+                let serverError = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+                let message = status == 409 && serverError == "This piece already bloomed"
+                    ? L.t("This piece already bloomed. Reload your island.", "Esta pieza ya floreció. Recarga tu isla.")
+                    : status == 409 && serverError == "The market has not had time to answer yet"
+                    ? L.t("The market has not had time to answer yet. Come back when the review opens.", "El mercado aún no ha tenido tiempo de responder. Vuelve cuando se abra la revisión.")
+                    : status == 409
                     ? L.t("The island changed. Reload before trying again.", "La isla cambió. Recarga antes de intentarlo de nuevo.")
                     : status == 401
                     ? L.t("Sign in again to save your island.", "Inicia sesión de nuevo para guardar tu isla.")
