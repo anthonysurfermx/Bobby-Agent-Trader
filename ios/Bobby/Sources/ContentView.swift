@@ -1,14 +1,8 @@
-// Bobby Pocket War Room. The primary object is not a chat transcript: it is a
-// live market surface with a voice-driven orb, adversarial review and an honest
-// proof boundary. Text is the desk log, not the product shell.
+// Bobby Pocket War Room. One direction: the human types, the desk resolves the
+// asset, and the companion answers out loud over a live market surface with an
+// adversarial review. No transcript, no microphone — the voice is the reply.
 import SwiftUI
 import Combine
-
-struct ChatMessage: Identifiable, Equatable {
-    let id = UUID()
-    let fromBobby: Bool
-    let text: String
-}
 
 enum DeskPhase: Int, CaseIterable {
     case idle = 0
@@ -21,7 +15,7 @@ enum DeskPhase: Int, CaseIterable {
 
     var label: String {
         switch self {
-        case .idle: return L.t("DESK ONLINE", "MESA EN LÍNEA")
+        case .idle: return "LIVE"
         case .resolving: return L.t("RESOLVING ASSET", "LOCALIZANDO ACTIVO")
         case .alpha: return L.t("ALPHA HUNTER", "CAZADOR")
         case .redTeam: return L.t("RED TEAM", "CRÍTICO")
@@ -31,16 +25,10 @@ enum DeskPhase: Int, CaseIterable {
         }
     }
 
-    var hint: String {
-        switch self {
-        case .idle: return L.t("Tap your companion and name an asset", "Toca a tu amigo y nombra un activo")
-        case .resolving: return L.t("Resolving ticker and venue", "Buscando símbolo y mercado")
-        case .alpha: return L.t("Hunting the opportunity", "Buscando la oportunidad")
-        case .redTeam: return L.t("Attacking the thesis", "Atacando la tesis")
-        case .cio: return L.t("Weighing risk against conviction", "Cruzando riesgo y convicción")
-        case .complete: return L.t("Market, levels and thesis in sync", "Mercado, niveles y tesis sincronizados")
-        case .error: return L.t("Try the name or the ticker", "Prueba con el nombre o el símbolo")
-        }
+    /// The desk stays quiet; the only line under the status is the way out
+    /// of a failed lookup.
+    var hint: String? {
+        self == .error ? L.t("Try the name or the ticker", "Prueba con el nombre o el símbolo") : nil
     }
 }
 
@@ -53,7 +41,6 @@ struct NoTradeMoment: Identifiable, Equatable {
 
 @MainActor
 final class BobbyViewModel: ObservableObject {
-    @Published var messages: [ChatMessage] = []
     @Published var input = ""
     @Published var assetHits: [BobbyAPI.AssetHit] = []
     private var suggestTask: Task<Void, Never>?
@@ -67,11 +54,8 @@ final class BobbyViewModel: ObservableObject {
     @Published var noTradeMoment: NoTradeMoment? = nil
 
     let voice = NeuralVoice()
-    let realtime = RealtimeVoice()
-    let speech = SpeechInput()
-    @Published var freeVoice = false
-    var listening: Bool { realtime.listening || speech.listening }
-    private var voiceChartGeneration = UUID()
+    /// The desk speaks its opening line once per launch.
+    private var greeted = false
     let profile = AgentProfile()
     let companions = CompanionStore()
     private let memory = DeskMemory()
@@ -95,25 +79,6 @@ final class BobbyViewModel: ObservableObject {
         voice.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
-        realtime.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
-        speech.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
-        realtime.onFallback = { [weak self] in
-            guard let self else { return }
-            self.freeVoice = true
-            self.handsFree = false
-            // Keep an unanswered question available without running it twice.
-            if let last = self.messages.last, !last.fromBobby { self.input = last.text }
-        }
-        realtime.onTranscript = { [weak self] fromBobby, text in
-            guard let self else { return }
-            self.messages = Array(self.messages.suffix(39)) + [ChatMessage(fromBobby: fromBobby, text: text)]
-        }
-        realtime.onEvidence = { [weak self] symbol, packet in self?.applyVoiceEvidence(symbol, packet: packet) }
-        realtime.onChart = { [weak self] symbol, timeframe in self?.selectVoiceAsset(symbol, timeframe: timeframe) }
         // And the profile: flipping onboarded must swap onboarding → desk.
         // The old wizard only re-rendered because a speak() fired alongside.
         profile.objectWillChange
@@ -128,22 +93,13 @@ final class BobbyViewModel: ObservableObject {
     }
     var voicePersona: String? { companions.companion?.voicePersona }
 
-    /// Greeting in the companion's own words (selectLine is first person and
-    /// grammatical in both languages), with the tone its level earned.
-    var companionGreeting: String {
-        guard let comp = companions.companion else { return profile.greeting }
-        return "\(displayName): \(comp.selectLine)" + levelTone(companions.level.number)
-    }
-
     func say(_ text: String) {
-        guard !realtime.active else { return }
         voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue, free: true)
     }
 
     /// Greetings and flavor lines: the companion's voice or nothing — never
     /// the robotic system voice.
     func sayAmbient(_ text: String) {
-        guard !realtime.active else { return }
         voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue, essential: false, free: true)
     }
 
@@ -178,48 +134,18 @@ final class BobbyViewModel: ObservableObject {
         }
     }
 
+    /// The desk opens with one spoken line built on live movers: real numbers,
+    /// in the companion's own voice, once per launch. Nothing is written — the
+    /// screen stays clean — and a question already in flight wins.
     func bootGreetingIfNeeded() {
-        guard messages.isEmpty else { return }
-        messages.append(ChatMessage(fromBobby: true, text: companionGreeting))
-
-        // Live movers make the greeting: real numbers, spoken in the
-        // companion's own voice, once. Replaces the static line as soon as
-        // the tickers arrive (~300 ms) so the desk never opens flat.
+        guard !greeted else { return }
+        greeted = true
         Task {
             let movers = await BobbyAPI.topMovers(limit: 2)
-            guard messages.count == 1 else { return }
-            let hype = hypeGreeting(movers)
-            withAnimation(.spring(duration: 0.35)) { messages[0] = ChatMessage(fromBobby: true, text: hype) }
-            if speakEnabled { sayAmbient(hype) }
-        }
-
-        // Memory v1 recap: if the user asked about something on a previous
-        // day, follow up with its live daily move — real data or nothing.
-        guard let recap = memory.recapAsset() else { return }
-        Task {
-            let market = await BobbyAPI.market(recap.symbol)
-            let move: String
-            if let change = market.changePct {
-                move = L.t(" It is \(change >= 0 ? "up " : "down ")\(String(format: "%.1f", abs(change)))% today.", " Hoy va \(change >= 0 ? "+" : "-")\(String(format: "%.1f", abs(change)))%.")
-            } else {
-                move = ""
-            }
-            let text: String
-            switch profile.vibe {
-            case .chill: text = L.t("Last time you were watching \(recap.symbol).\(move) Want another look?", "La última vez andabas viendo \(recap.symbol).\(move) ¿Le damos otra vuelta?")
-            case .directo: text = L.t("Your last query: \(recap.symbol).\(move) Should I run it again?", "Tu última consulta: \(recap.symbol).\(move) ¿Analizo de nuevo?")
-            case .pro: text = L.t("Following up on \(recap.symbol):\(move.isEmpty ? " no intraday data." : move) Refresh the read?", "Seguimiento de \(recap.symbol):\(move.isEmpty ? " sin dato intradía." : move) ¿Actualizo la lectura?")
-            }
-            guard messages.count == 1 else { return }
-            withAnimation(.spring(duration: 0.4)) {
-                messages.append(ChatMessage(fromBobby: true, text: text))
-            }
+            guard !thinking, snapshot == nil, speakEnabled else { return }
+            sayAmbient(hypeGreeting(movers))
         }
     }
-
-    /// Hands-free mode: true while the conversation is voice-driven — after
-    /// Bobby finishes speaking an answer, the mic reopens on its own.
-    @Published var handsFree = false
 
     /// Search-as-you-type over the full universe: quiet, debounced, and it
     /// never fires while a question is in flight.
@@ -241,21 +167,13 @@ final class BobbyViewModel: ObservableObject {
         }
     }
 
-    func ask(_ preset: String? = nil, fromVoice: Bool = false) {
+    func ask(_ preset: String? = nil) {
         suggestTask?.cancel()
         assetHits = []
         let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !thinking else { return }
-        if realtime.active {
-            realtime.sendText(q)
-            input = ""
-            return
-        }
-        speech.cancel()
-        handsFree = fromVoice
         input = ""
         voice.stop()
-        messages.append(ChatMessage(fromBobby: false, text: q))
         thinking = true
         phase = .resolving
         lastAnswer = nil
@@ -266,7 +184,7 @@ final class BobbyViewModel: ObservableObject {
 
             guard let resolution = await BobbyAPI.resolveAsset(q) else {
                 phase = .error
-                messages.append(ChatMessage(fromBobby: true, text: L.t("I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.", "No pude ubicar ese activo. Prueba con el nombre o el símbolo: bitcoin, NVDA, oro.")))
+                if speakEnabled { say(L.t("I could not find that asset. Try the name or the ticker.", "No encontré ese activo. Prueba con el nombre o el símbolo.")) }
                 return
             }
 
@@ -280,8 +198,8 @@ final class BobbyViewModel: ObservableObject {
                 if let note = resolution.proxyNote {
                     text += " " + L.t("Heads up: that listing is \(note).", "Ojo: ese listado es \(note).")
                 }
-                text += " " + L.t("Tap the chip to confirm.", "Toca la sugerencia para confirmar.")
-                messages.append(ChatMessage(fromBobby: true, text: text))
+                text += " " + L.t("Tap it to confirm.", "Tócalo para confirmar.")
+                if speakEnabled { say(text) }
                 assetHits = [BobbyAPI.AssetHit(
                     symbol: sym,
                     name: resolution.confirmName,
@@ -332,7 +250,6 @@ final class BobbyViewModel: ObservableObject {
                 phase = .error
                 let msg = L.t("The desk did not answer for \(answer.symbol). Try again in a moment.",
                               "La mesa no respondió por \(answer.symbol). Inténtalo de nuevo en un momento.")
-                messages.append(ChatMessage(fromBobby: true, text: msg))
                 if speakEnabled { say(msg) }
                 return
             }
@@ -345,7 +262,6 @@ final class BobbyViewModel: ObservableObject {
             try? await Task.sleep(for: .milliseconds(360))
             phase = .complete
             let text = answer.summary
-            messages.append(ChatMessage(fromBobby: true, text: text))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if speakEnabled { say(text) }
             // A full review earns discipline. Respecting a fail-closed verdict
@@ -367,82 +283,9 @@ final class BobbyViewModel: ObservableObject {
         }
     }
 
-    func toggleRealtime() {
-        guard !thinking else { return }
-        voice.stop()
-        handsFree = false
-        speakEnabled = true
-        if freeVoice {
-            speech.toggle(onPartial: { [weak self] in self?.input = $0 }, onFinal: { [weak self] text in
-                self?.input = text
-                self?.ask(fromVoice: true)
-            })
-            return
-        }
-        speech.cancel()
-        if realtime.active { realtime.toggleMicrophone() }
-        else { realtime.start(symbol: snapshot?.symbol ?? "BTC", timeframe: timeframe.cryptoBar, voice: voicePersona) }
-    }
-
-    func stopVoice() {
-        speech.cancel()
-        realtime.stop()
-    }
-
-    func toggleVoiceMode() {
-        stopVoice()
-        voice.stop()
-        freeVoice.toggle()
-        realtime.dismissError()
-    }
-
-    private func selectVoiceAsset(_ symbol: String, timeframe interval: String) {
-        let next = MarketTimeframe.allCases.first { $0.cryptoBar == interval } ?? .oneHour
-        let requestID = UUID()
-        voiceChartGeneration = requestID
-        lastAnswer = nil
-        candles = []
-        timeframe = next
-        Task {
-            guard let resolution = await BobbyAPI.resolveAsset(symbol), !resolution.needsConfirmation,
-                  voiceChartGeneration == requestID, realtime.active else { return }
-            snapshot = resolution.snapshot
-            let rows = await BobbyAPI.candles(symbol: symbol, isEquity: resolution.snapshot.isEquity, timeframe: next)
-            guard voiceChartGeneration == requestID, realtime.active else { return }
-            candles = rows
-        }
-    }
-
-    private func applyVoiceEvidence(_ symbol: String, packet: [String: Any]) {
-        let answer = BobbyAPI.decodeEvidence(packet, symbol: symbol)
-        guard !answer.isUnavailable else { phase = .error; return }
-        // Canonical evidence owns the native chart and NO TRADE gate. A model's
-        // show_debate/update_thesis arguments never manufacture an actionable plan.
-        let brief = packet["quick_brief"] as? [String: Any] ?? [:]
-        let market = packet["market"] as? [String: Any] ?? [:]
-        let isEquity = (brief["assetType"] as? String ?? market["assetType"] as? String) == "equity"
-        let requestID = UUID()
-        voiceChartGeneration = requestID
-        snapshot = MarketSnapshot(symbol: symbol, isEquity: isEquity, price: answer.price,
-                                  changePct: market["change_24h_pct"] as? Double)
-        lastAnswer = answer
-        phase = .complete
-        noTradeMoment = nil
-        memory.recordQuery(symbol: symbol, isEquity: isEquity)
-        quickAccess = memory.quickAccess(fallback: Self.defaultQuickAccess)
-        realtime.updateScreen(symbol: symbol, timeframe: timeframe.cryptoBar)
-        let interval = timeframe
-        Task {
-            let rows = await BobbyAPI.candles(symbol: symbol, isEquity: isEquity, timeframe: interval)
-            guard voiceChartGeneration == requestID, realtime.active, timeframe == interval else { return }
-            candles = rows
-        }
-    }
-
     func selectTimeframe(_ next: MarketTimeframe) {
         guard next != timeframe else { return }
         timeframe = next
-        realtime.updateScreen(symbol: snapshot?.symbol ?? "BTC", timeframe: next.cryptoBar)
         candles = []
         guard let snapshot else { return }
 
@@ -477,7 +320,7 @@ struct ContentView: View {
     @State private var equipToolId: String?
     @State private var equipToken = 0
     /// The desk never shows an empty hole: if the companion GLB fails to
-    /// load, fall back to the orb until the companion changes.
+    /// load, its own portrait stands in until the companion changes.
     @State private var deskModelFailed = false
 
     var body: some View {
@@ -527,16 +370,11 @@ struct ContentView: View {
             Task { await ProgressSync.shared.sync(store: vm.companions, profile: vm.profile) }
         }
         .onChange(of: scenePhase) { _, next in
-            if next == .background { vm.stopVoice(); vm.voice.stop() }
+            if next == .background { vm.voice.stop() }
         }
-        .onDisappear { vm.stopVoice() }
-        .onChange(of: vm.realtime.needsSignIn) { _, needsSignIn in
-            if needsSignIn { showAccount = true }
-        }
-        .onChange(of: showWorld || showSquad || showAccount) { _, covered in
-            if covered { vm.stopVoice() }
-        }
-        .onChange(of: vm.companions.companionId) { _, _ in vm.stopVoice() }
+        .onDisappear { vm.voice.stop() }
+        // A new companion must not finish the old one's sentence.
+        .onChange(of: vm.companions.companionId) { _, _ in vm.voice.stop() }
         .onChange(of: vm.input) { vm.updateSuggestions() }
         .sheet(isPresented: $showBoard) {
             AssetBoardView(vm: vm)
@@ -586,9 +424,8 @@ struct ContentView: View {
                 }
             ), soundEnabled: vm.speakEnabled)
         }
-        .onChange(of: vm.profile.onboarded) {
-            vm.messages = []
-            vm.bootGreetingIfNeeded()
+        .onChange(of: vm.profile.onboarded) { _, onboarded in
+            if onboarded { vm.bootGreetingIfNeeded() }
         }
 
         .animation(.easeOut(duration: 0.35), value: vm.profile.onboarded)
@@ -609,8 +446,6 @@ struct ContentView: View {
                     if vm.snapshot != nil { marketSurface }
                     if vm.snapshot != nil || vm.thinking { debateRail }
                     if vm.lastAnswer != nil { verdictCard }
-                    deskLog
-                    proofBoundary
                 }
                 .padding(.horizontal, 14)
                 .padding(.bottom, 16)
@@ -656,22 +491,16 @@ struct ContentView: View {
                 }
             }
             .accessibilityIdentifier("squad-portrait")
-            VStack(alignment: .leading, spacing: 1) {
-                Text(L.t("BOBBY // LIVE DESK", "BOBBY // EN VIVO"))
-                    .font(.mono(12, .bold))
-                    .kerning(2.4)
-                    .foregroundStyle(Theme.text.opacity(0.80))
-                if let comp = vm.companions.companion {
-                    Text("\(comp.name(at: vm.companions.level.number)) · \(vm.companions.level.name)")
-                        .font(.mono(7.5, .semibold))
-                        .kerning(1.2)
-                        .foregroundStyle(comp.tintSoft.opacity(0.8))
-                }
-            }
+            // One title: the companion's name. Level and rank live in SQUAD.
+            Text(vm.companions.companion?.label ?? vm.profile.name.uppercased())
+                .font(.mono(13, .bold))
+                .kerning(2.6)
+                .foregroundStyle(vm.companions.companion?.tintSoft ?? Theme.text.opacity(0.85))
+                .lineLimit(1)
             Spacer()
             Button {
                 vm.speakEnabled.toggle()
-                if !vm.speakEnabled { vm.voice.stop(); vm.stopVoice() }
+                if !vm.speakEnabled { vm.voice.stop() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             } label: {
                 Image(systemName: vm.speakEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
@@ -737,15 +566,16 @@ struct ContentView: View {
 
     private var liveConsole: some View {
         VStack(spacing: 4) {
-            Button(action: toggleSpeech) {
+            // Tapping the companion opens the keyboard: you type, it answers out loud.
+            Button(action: focusAsk) {
                 Group {
                     if let comp = vm.companions.companion, !deskModelFailed {
                         // The chosen companion IS Bobby's face on the desk
                         MascotSceneView(
                             assetName: comp.id,
                             interactive: false,
-                            speaking: vm.realtime.active ? vm.realtime.speaking : vm.voice.speaking,
-                            voiceLevel: vm.realtime.active ? vm.realtime.level : vm.voice.level,
+                            speaking: vm.voice.speaking,
+                            voiceLevel: vm.voice.level,
                             onLoading: { _, failed in
                                 if failed { deskModelFailed = true }
                             },
@@ -769,12 +599,19 @@ struct ContentView: View {
                             .allowsHitTesting(false)
                             .frame(width: 206, height: 208)
                             .shadow(color: comp.tint.opacity(0.35), radius: 26)
+                    } else if let comp = vm.companions.companion {
+                        // Still the chosen avatar, never the generic orb.
+                        CompanionThumb(companion: comp)
+                            .frame(width: 180, height: 180)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(comp.tint.opacity(0.5), lineWidth: 1.5))
+                            .shadow(color: comp.tint.opacity(0.35), radius: 26)
+                            .frame(height: 208)
                     } else {
                         BobbyOrb(
                             size: 206,
                             thinking: vm.thinking,
-                            speaking: vm.realtime.active ? vm.realtime.speaking : vm.voice.speaking,
-                            listening: vm.listening,
+                            speaking: vm.voice.speaking,
                             level: liveLevel,
                             tint: vm.profile.auraTint,
                             tintSoft: vm.profile.auraTintSoft
@@ -800,16 +637,18 @@ struct ContentView: View {
             }
             .contentTransition(.opacity)
 
-            Text(statusHint)
-                .font(.mono(10, .medium))
-                .kerning(0.6)
-                .foregroundStyle(Theme.muted)
-                .multilineTextAlignment(.center)
-                .frame(minHeight: 18)
+            if let hint = vm.phase.hint {
+                Text(hint)
+                    .font(.mono(10, .medium))
+                    .kerning(0.6)
+                    .foregroundStyle(Theme.muted)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+            }
 
             // The gear belt: three slots that fill with discipline — first
             // read, then every 100 XP, the last one golden.
-            if let comp = vm.companions.companion, !vm.listening {
+            if let comp = vm.companions.companion {
                 ToolBelt(companion: comp, xp: vm.companions.disciplineXP, onTap: { tool in
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     inspectedTool = tool
@@ -824,25 +663,6 @@ struct ContentView: View {
                     showWorld = true
                 })
                 .padding(.top, 4)
-            }
-
-            if !vm.realtime.caption.isEmpty || vm.realtime.error != nil {
-                Text(vm.realtime.error ?? vm.realtime.caption)
-                    .font(.rounded(14, .medium))
-                    .foregroundStyle(vm.realtime.error == nil ? Theme.text : Theme.down)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-                    .padding(.horizontal, 18)
-                    .accessibilityIdentifier("realtime-caption")
-            }
-            if vm.listening && !vm.input.isEmpty {
-                Text("“\(vm.input)”")
-                    .font(.rounded(16, .semibold))
-                    .foregroundStyle(Theme.text)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 18)
-                    .padding(.top, 5)
-                    .transition(.opacity)
             }
         }
         .padding(.top, 2)
@@ -943,16 +763,10 @@ struct ContentView: View {
 
     private var commandDeck: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(L.t("QUICK ACCESS", "ACCESO RÁPIDO"))
-                    .font(.mono(9, .bold))
-                    .kerning(1.8)
-                    .foregroundStyle(Theme.muted)
-                Spacer()
-                Text(L.t("VOICE OR TEXT", "VOZ O TEXTO"))
-                    .font(.mono(9, .medium))
-                    .foregroundStyle(Theme.accentSoft.opacity(0.72))
-            }
+            Text(L.t("QUICK ACCESS", "ACCESO RÁPIDO"))
+                .font(.mono(9, .bold))
+                .kerning(1.8)
+                .foregroundStyle(Theme.muted)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     Button {
@@ -1260,56 +1074,6 @@ struct ContentView: View {
         }
     }
 
-    private var deskLog: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(L.t("DESK LOG", "BITÁCORA"))
-                .font(.mono(9, .bold))
-                .kerning(1.8)
-                .foregroundStyle(Theme.muted)
-                .padding(.bottom, 8)
-            ForEach(vm.messages.suffix(3)) { message in
-                HStack(alignment: .top, spacing: 10) {
-                    Text(message.fromBobby ? "BOBBY" : L.t("YOU", "TÚ"))
-                        .font(.mono(8, .bold))
-                        .kerning(1)
-                        .foregroundStyle(message.fromBobby ? Theme.accentSoft : Theme.muted)
-                        .frame(width: 42, alignment: .leading)
-                    Text(message.text)
-                        .font(.rounded(13, .medium))
-                        .foregroundStyle(Theme.text.opacity(message.fromBobby ? 0.78 : 0.58))
-                        .lineLimit(message.fromBobby ? 4 : 2)
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, 9)
-                .overlay(alignment: .bottom) { Rectangle().fill(Theme.stroke).frame(height: 1) }
-            }
-        }
-        .padding(13)
-        .card()
-    }
-
-    private var proofBoundary: some View {
-        HStack(spacing: 11) {
-            Image(systemName: "checkmark.shield.fill")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Theme.accentSoft)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L.t("BOBBY LEARNS IN PUBLIC", "BOBBY APRENDE EN PÚBLICO"))
-                    .font(.mono(9, .bold))
-                    .kerning(1.1)
-                    .foregroundStyle(Theme.accentSoft)
-                Text(L.t("His calls are recorded on-chain and anyone can challenge them · this query does not mint an individual receipt yet", "Sus veredictos se graban on-chain y cualquiera puede retarlos · esta consulta aún no genera comprobante individual"))
-                    .font(.mono(8, .medium))
-                    .foregroundStyle(Theme.muted)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(13)
-        .background(Theme.accent.opacity(0.045))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.accent.opacity(0.15), lineWidth: 1))
-    }
-
     /// Search-as-you-type: the universe answers while the user types.
     private var assetSuggestions: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -1344,15 +1108,11 @@ struct ContentView: View {
         .transition(.opacity)
     }
 
+    /// Type only. The send button wakes up once there is something to send.
     private var commandBar: some View {
-        HStack(spacing: 10) {
-            Button { vm.toggleVoiceMode() } label: {
-                Text(vm.freeVoice ? L.t("Free", "Gratis") : L.t("Live", "En vivo"))
-                    .font(.mono(10, .bold)).foregroundStyle(Theme.accentSoft)
-                    .frame(minWidth: 36, minHeight: 44)
-            }
-            .accessibilityLabel(L.t("Voice mode", "Modo de voz"))
-            TextField(vm.listening ? L.t("Listening…", "Te escucho…") : L.t("Ask about BTC, NVDA, gold…", "Pregunta por BTC, NVDA, oro…"), text: $vm.input)
+        let canSend = !vm.thinking && !vm.input.trimmingCharacters(in: .whitespaces).isEmpty
+        return HStack(spacing: 10) {
+            TextField(L.t("Type…", "Escribe…"), text: $vm.input)
                 .font(.rounded(14, .medium))
                 .foregroundStyle(Theme.text)
                 .focused($focused)
@@ -1360,6 +1120,7 @@ struct ContentView: View {
                 .textInputAutocapitalization(.never)
                 .submitLabel(.send)
                 .onSubmit { vm.ask() }
+                .accessibilityLabel(L.t("Ask your companion", "Pregúntale a tu amigo"))
                 .accessibilityIdentifier("ask-field")
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
@@ -1368,28 +1129,20 @@ struct ContentView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(focused ? Theme.accent.opacity(0.50) : Theme.stroke, lineWidth: 1))
 
             Button {
-                if vm.input.isEmpty && !vm.thinking { toggleSpeech() }
-                else { vm.ask() }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                vm.ask()
             } label: {
-                Image(systemName: vm.input.isEmpty ? (vm.listening ? "waveform" : "mic.fill") : "arrow.up")
+                Image(systemName: "arrow.up")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(vm.listening ? Theme.down : Theme.accent))
-                    .shadow(color: (vm.listening ? Theme.down : Theme.accent).opacity(0.30), radius: 10)
-                    .symbolEffect(.variableColor.iterative, options: .repeating, isActive: vm.listening)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Theme.accent))
+                    .shadow(color: Theme.accent.opacity(canSend ? 0.30 : 0), radius: 10)
+                    .opacity(canSend ? 1 : 0.4)
             }
-            .accessibilityLabel(L.t("Talk to Bobby", "Hablar con Bobby"))
-            .accessibilityIdentifier("realtime-microphone")
-            .disabled(vm.thinking || vm.realtime.state == .connecting || (!vm.input.isEmpty && vm.input.trimmingCharacters(in: .whitespaces).isEmpty))
-            if vm.realtime.active || vm.speech.listening {
-                Button { vm.stopVoice() } label: {
-                    Image(systemName: "xmark").frame(width: 44, height: 44)
-                }
-                .foregroundStyle(Theme.muted)
-                .accessibilityLabel(L.t("End voice", "Cerrar voz"))
-                .accessibilityIdentifier("realtime-close")
-            }
+            .accessibilityLabel(L.t("Send", "Enviar"))
+            .accessibilityIdentifier("ask-send")
+            .disabled(!canSend)
         }
         .padding(.horizontal, 14)
         .padding(.top, 8)
@@ -1409,41 +1162,16 @@ struct ContentView: View {
     }
 
     private var liveLevel: CGFloat {
-        if vm.realtime.active { return vm.realtime.level }
-        if vm.speech.listening { return vm.speech.level }
         if vm.voice.speaking { return max(0.08, vm.voice.level) }
         return vm.thinking ? 0.34 : 0.08
     }
 
     private var statusLabel: String {
-        if vm.realtime.active {
-            switch vm.realtime.state {
-            case .connecting: return L.t("CONNECTING", "CONECTANDO")
-            case .speaking: return L.t("SPEAKING", "HABLANDO")
-            case .thinking: return L.t("ANALYZING", "ANALIZANDO")
-            default: return vm.realtime.muted ? L.t("YOUR TURN", "TU TURNO") : L.t("LISTENING", "ESCUCHANDO")
-            }
-        }
-        if vm.listening { return L.t("LISTENING", "ESCUCHANDO") }
         if vm.voice.speaking { return L.t("SPEAKING", "HABLANDO") }
         return vm.phase.label
     }
 
-    private var statusHint: String {
-        if vm.realtime.active { return String(format: "%d:%02d", vm.realtime.remainingSeconds / 60, vm.realtime.remainingSeconds % 60) }
-        if let issue = vm.speech.issue { return issue.message }
-        if vm.freeVoice && !vm.listening { return L.t("Free voice · tap to talk", "Voz gratis · toca para hablar") }
-        if vm.listening {
-            return vm.handsFree
-                ? L.t("Hands-free · say your next question", "Manos libres · di tu siguiente pregunta")
-                : L.t("Speak normally · it sends when you stop", "Habla normal · se envía cuando terminas")
-        }
-        if vm.voice.speaking { return L.t("Your companion reacts to the voice in real time", "Reacciona a la voz en tiempo real") }
-        return vm.phase.hint
-    }
-
     private var statusColor: Color {
-        if vm.listening { return Theme.up }
         if vm.voice.speaking { return Theme.accentSoft }
         switch vm.phase {
         case .redTeam, .error: return Theme.down
@@ -1453,10 +1181,9 @@ struct ContentView: View {
         }
     }
 
-    private func toggleSpeech() {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        focused = false
-        vm.toggleRealtime()
+    private func focusAsk() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        focused = true
     }
 
 }

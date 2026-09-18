@@ -168,19 +168,4 @@ final class AgentProfile: ObservableObject {
     var auraTint: Color { AuraForge.tint(hue: auraHue) }
     var auraTintSoft: Color { AuraForge.tintSoft(hue: auraHue) }
     var auraArchetype: (name: String, motto: String) { AuraForge.archetype(hue: auraHue) }
-
-    /// Vibe-flavored greeting for the first bubble.
-    var greeting: String {
-        switch vibe {
-        case .chill: return L.t(
-            "Hey — I am \(name). Ask me about any asset: bitcoin, NVIDIA, gold, whatever you bring.",
-            "Qué onda — soy \(name). Pregúntame por cualquier activo: bitcoin, NVIDIA, oro, lo que traigas.")
-        case .directo: return L.t(
-            "I am \(name). Name an asset and I give you price, levels and the read. No fluff.",
-            "Soy \(name). Dime un activo y te doy precio, niveles y la lectura. Sin rodeos.")
-        case .pro: return L.t(
-            "I am \(name), your analysis desk. Query any asset: crypto, equities, commodities.",
-            "Soy \(name), tu mesa de análisis. Consulta cualquier activo: cripto, acciones, materias primas.")
-        }
-    }
 }

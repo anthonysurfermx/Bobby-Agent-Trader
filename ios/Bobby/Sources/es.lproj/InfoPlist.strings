@@ -1,3 +1,1 @@
-"NSMicrophoneUsageDescription" = "Bobby envía el audio de tu micrófono a OpenAI para responder preguntas de mercados en tiempo real.";
-"NSSpeechRecognitionUsageDescription" = "Bobby convierte tu voz en preguntas sobre los mercados. El audio lo procesa el reconocimiento de voz de Apple.";
-"NSCameraUsageDescription" = "Bobby nunca enciende tu cámara. Este permiso solo existe porque la biblioteca de voz en tiempo real (WebRTC) incluye código de videollamadas que Bobby no usa.";
+"CFBundleDisplayName" = "Bobby";

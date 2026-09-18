@@ -5,9 +5,6 @@ options:
   deploymentTarget:
     iOS: "17.0"
 packages:
-  WebRTC:
-    url: https://github.com/stasel/WebRTC.git
-    exactVersion: "152.0.0"
   GLTFKit2:
     url: https://github.com/warrenm/GLTFKit2
     from: "0.5.0"
@@ -72,7 +69,6 @@ targets:
         type: folder
         buildPhase: resources
     dependencies:
-      - package: WebRTC
       - package: GLTFKit2
     info:
       path: Sources/Info.plist
@@ -86,9 +82,6 @@ targets:
             CFBundleURLSchemes:
               - bobbyprotocol
         ITSAppUsesNonExemptEncryption: false
-        NSCameraUsageDescription: "Bobby never turns on your camera. This entry is required only because the real-time voice library (WebRTC) includes video-call code that Bobby does not use."
-        NSMicrophoneUsageDescription: "Bobby sends your microphone audio to OpenAI to answer market questions in real time."
-        NSSpeechRecognitionUsageDescription: "Bobby turns your voice into questions about the markets. Audio is processed by Apple's speech recognition."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

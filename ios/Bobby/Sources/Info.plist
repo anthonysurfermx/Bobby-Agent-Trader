@@ -35,12 +35,6 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<key>NSCameraUsageDescription</key>
-	<string>Bobby never turns on your camera. This entry is required only because the real-time voice library (WebRTC) includes video-call code that Bobby does not use.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Bobby sends your microphone audio to OpenAI to answer market questions in real time.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Bobby turns your voice into questions about the markets. Audio is processed by Apple's speech recognition.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

@@ -77,11 +77,4 @@ final class DeskMemory {
         }
         return row
     }
-
-    /// Most recent asset asked on a PREVIOUS day — the hook for the
-    /// "yesterday you asked about…" recap bubble.
-    func recapAsset(now: Date = Date()) -> WatchedAsset? {
-        let calendar = Calendar.current
-        return watchlist.first { !calendar.isDate($0.lastAskedAt, inSameDayAs: now) }
-    }
 }
