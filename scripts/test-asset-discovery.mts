@@ -24,6 +24,7 @@ if (!live) {
     ctValCcy: base, settleCcy: 'USDT', instCategory: '3',
   });
   __setTestCatalog([
+    spot('SONIC'), spot('NET'), spot('ARPA'), spot('MAIN'),
     spot('BTC'), spot('ETH'), spot('SOL'), spot('ADA'), spot('WLD'), spot('WIF'),
     spot('TIA'), spot('XAUT'), spot('XAG'), spot('USDT'), spot('CHZ'), spot('APE'),
     equitySwap('NVDA'), equitySwap('PLTR'), equitySwap('TSM'), equitySwap('SPCX'),
@@ -76,6 +77,17 @@ await kindOf('solanna', 'SOL', 'fuzzy', true, 'fuzzy typo');
 await kindOf('palantr', 'PLTR', 'fuzzy', true, 'fuzzy typo');
 await kindOf('oro', 'XAUT', 'proxy', true, 'proxy es');
 await kindOf('oil', 'USO', 'proxy', true, 'proxy en');
+// Build-34 review: a prefix of a question word must never beat the asset the
+// question names ("¿Cuáles son…" resolved SONIC via SON; "What are…" NET).
+await kindOf('¿Cuáles son los riesgos de BTC?', 'BTC', 'exact', false, 'es question, ticker last');
+await kindOf('¿Cuáles son los principales riesgos de NVIDIA?', 'NVDA', 'exact', false, 'es question, name last');
+await kindOf("What are the main risks in NVIDIA's current chart?", 'NVDA', 'exact', false, 'possessive name');
+await kindOf('What are the main risks in Bitcoin right now?', 'BTC', 'exact', false, 'en question');
+await kindOf('¿Qué opinas de Solana esta semana?', 'SOL', 'exact', false, 'es opinion question');
+const sonOnly = await resolveOkxAssetFromText('son');
+assert.ok(!sonOnly || sonOnly.needsConfirmation || sonOnly.instrument.symbol !== 'SONIC', 'a bare short prefix must not analyze SONIC without confirmation');
+passed += 1;
+await kindOf('sonic', 'SONIC', 'exact', false, 'the real name still resolves');
 const oil = await resolveOkxAssetFromText('petroleo');
 assert.ok(oil?.proxyNote?.includes('ETF'), 'proxy note missing the honest ETF wording');
 passed += 1;
