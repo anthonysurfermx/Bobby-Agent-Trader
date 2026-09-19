@@ -5,16 +5,16 @@ No demo account or credentials are needed. Market analysis works without an acco
 Core experience (no account needed):
 1. On first launch, read and acknowledge the four notices, including permission to send a typed question and public market context to OpenAI.
 2. Complete companion onboarding and open the desk.
-3. Type a question such as "What supports and weakens the case for Bitcoin?" or "What are the main risks in NVIDIA's current chart?"
-4. Read the three perspectives (Alpha Hunter builds the case, Red Team challenges it, CIO weighs both) and the market chart. The analysis shows its data source, instrument, 1-hour timeframe, and timestamp. "Wait" is a valid outcome.
+3. Type a question such as "What supports and weakens the case for Bitcoin?" or "What supports and weakens the case for NVIDIA?"
+4. Read the three perspectives (Alpha Hunter builds the case, Red Team challenges it, CIO weighs both) and the market chart. The analysis shows its data source, instrument, 1-hour timeframe, and timestamp. A "NO TRADE" (wait) verdict is a valid outcome.
 
 Account, sync, and Trader Land (optional):
 5. Tap the "..." button at the top right of the desk, choose "Save progress", and use Sign in with Apple. It is the only sign-in option in this version and requests no name or email.
-6. Completed reads sync to the account and add seeds and pieces to its private Trader Land island (open "Trader Land" from the same "..." menu). A seed becomes a piece when the read is reviewed against the market after its time horizon. In this version the island cannot be published; "Island settings" only sets a private name. A separate execution bonus exists only on the Bobby website, for reads the user acted on with their own wallet; the iPhone app has no wallet or trading.
+6. Completed reads sync to the account and add seeds and pieces to its private Trader Land island (open "Trader Land" from the same "..." menu). Up to 3 completed reads a day count: each plants a seed that becomes a piece when it is reviewed against the market after its time horizon, and a read that ends in NO TRADE grows a piece right away. In this version the island cannot be published; "Island settings" only sets a private name. A separate execution bonus exists only on the Bobby website, for reads the user acted on with their own wallet; the iPhone app has no wallet or trading.
 
 Account deletion:
 7. Tap "..." > "Delete account" (or "..." > "Progress saved · account" > "Delete account and synced progress"), then confirm "Delete account permanently".
 8. The app asks for a fresh Sign in with Apple authorization so the server can revoke Bobby's Apple token. It then deletes the account, its synced progress, and its Trader Land data, and shows "Account deleted".
-9. If automatic revocation is unavailable, the account is still deleted, and the "Account deleted" message includes a "Manage Sign in with Apple" button that opens Apple's instructions (https://support.apple.com/en-us/102571) for stopping Sign in with Apple for Bobby. If Apple cannot be reached at that moment, nothing is deleted and the app asks the user to try again.
+9. If automatic revocation is unavailable, the account is still deleted, and the "Account deleted" message lists Apple's steps (Settings > your name > Sign-In & Security > Sign in with Apple > Bobby > Stop Using) with an "Open Apple's steps" button that opens https://support.apple.com/en-us/102571. If Apple cannot be reached at that moment, nothing is deleted and the app asks the user to try again.
 
 Privacy policy: https://bobbyprotocol.xyz/privacy (Spanish: https://bobbyprotocol.xyz/privacy?lang=es). It is also linked from the first-launch notice and the "..." menu. Typed questions are sent to OpenAI only after the in-app permission and without the account identifier; they are not stored in the account or published. Bobby's AI output is educational, can be incorrect, and is not personalized investment advice.

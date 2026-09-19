@@ -15,6 +15,7 @@ This folder replaces the build-33 handoff metadata. The changes follow the indep
 | `metadata/app-review-notes-en.txt` | App Review Information → Notes. Leave the sign-in fields empty: no credentials are needed. |
 | `APP-PRIVACY-ANSWERS.md` | App Privacy questionnaire |
 | `metadata-validation.json` | Length and keyword checks, produced by a script. Every field passes. |
+| `check-review-examples.mts` | Checks that the example questions in review-notes step 3 resolve to the right asset with no confirmation prompt. |
 
 Locales are `en-US` and `es-MX`. Paste the plain text only, with no Markdown.
 
@@ -29,16 +30,23 @@ Locales are `en-US` and `es-MX`. Paste the plain text only, with no Markdown.
 1. `/api/desk-debate` is live in production (a GET returns 405, not 404), and migrations `20260919183000_atomic_progress.sql` and `20260919190000_desk_quota.sql` are applied. Every field describes the three-perspective analysis.
 2. The build-34 binary hides "Continue with X". The review notes and the privacy answers assume Sign in with Apple only.
 3. The build-34 `PrivacyInfo.xcprivacy` declares Other User Content as **linked** (see `APP-PRIVACY-ANSWERS.md`).
-4. The labels quoted in the review notes still match the build-34 UI: "Save progress", "Progress saved · account", "Delete account", "Delete account and synced progress", "Delete account permanently", "Account deleted", "Manage Sign in with Apple", "Island settings" and "Trader Land". Update the notes if the iOS change renames any of them.
+4. The labels quoted in the review notes still match the build-34 UI: "Save progress", "Progress saved · account", "Delete account", "Delete account and synced progress", "Delete account permanently", "Account deleted", "Open Apple's steps", "NO TRADE", "Island settings" and "Trader Land". The manual Apple steps in note 9 must match `AccountSession.manualRevocationSteps`. Re-check after the build-34 iOS change is committed, and update the notes if it renames any label.
 5. The deployed `/privacy` shows "Effective September 19, 2026".
+6. **Apple token revocation is configured in production.** Vercel Production has all four of `APPLE_SIGN_IN_TEAM_ID`, `APPLE_SIGN_IN_KEY_ID`, `APPLE_SIGN_IN_CLIENT_ID` (= the app's bundle ID, `xyz.bobbyprotocol.bobby`) and `APPLE_SIGN_IN_PRIVATE_KEY` (a key enabled for Sign in with Apple). Without them, `GET /api/account` never asks for Apple's sheet (`appleRevocationReady()` is false), so note 8 would not happen. Prove it on a real device with a test Apple account: deletion shows Apple's re-authorization sheet, the DELETE returns `appleRevocation: "revoked"`, and Bobby disappears from Settings > your name > Sign-In & Security > Sign in with Apple. `docs/audits/ios-remediation-33.md` still lists the key as pending.
+   If this gate cannot be met before submission, replace notes 8 and 9 with the text below. The account is still deleted, but Apple's rule 5.1.1(v) expects apps with Sign in with Apple to revoke tokens through Apple's REST API, so expect a rejection risk.
+   > 8. The app deletes the account, its synced progress, and its Trader Land data, and shows "Account deleted".
+   > 9. In this build the server cannot yet revoke Apple access automatically, so the "Account deleted" message lists Apple's steps (Settings > your name > Sign-In & Security > Sign in with Apple > Bobby > Stop Using) with an "Open Apple's steps" button that opens https://support.apple.com/en-us/102571.
+7. `npx tsx docs/app-store/build-34/check-review-examples.mts` passes. The asset resolver currently misreads some phrasings: "What are the main risks in NVIDIA's current chart?" asks "Did you mean NET?" (it matches "are"), and Spanish questions with "son" ("¿Cuáles son los riesgos de NVIDIA?") are analyzed as SONIC with no confirmation. Until `src/lib/okx-asset-search.ts` is fixed and deployed, keep those phrasings out of the notes, screenshots and videos.
 
 ## Fixes compared with the build-33 metadata
 
 - **Keywords:** removed `nvidia`, a third-party trademark. Keeping NVIDIA as an example in the description is fine. Spanish keywords now have accents and use Mexican terms (`gráficas`, `bolsa`).
 - **Spanish What's New:** "mejora … los errores de los gráficos" said the errors were improved. It now reads "el manejo de errores en las gráficas". Spain-Spanish and calqued phrases were replaced: `añade`, `asesoramiento`, `si no hay un caso claro`.
-- **How pieces are earned:** "eligible learning activities" is replaced with the actual rule. A completed read plants a seed, and the seed becomes a piece when the read is reviewed against the market after its time horizon, right or wrong. The review notes state that the execution bonus exists only on the website.
+- **How pieces are earned:** "eligible learning activities" is replaced with the actual rule. Up to three completed reads a day count (`MAX_DAILY_AWARDS = 3`). Each plants a seed, and the seed becomes a piece when the read is reviewed against the market after its time horizon, right or wrong. A read that ends in NO TRADE grows a piece right away. The review notes state that the execution bonus exists only on the website.
 - **What's New disclosures:** it now says that voice conversations and public island sharing are not available in this version, since 1.1 had voice.
 - **Review notes:**
   - X sign-in removed.
   - No credentials needed; any Apple ID works.
-  - Exact deletion path added, including Apple token revocation, the manual fallback, and the retry case when Apple cannot be reached.
+  - Exact deletion path added, including Apple token revocation (gate 6), the manual fallback with the "Open Apple's steps" button, and the retry case when Apple cannot be reached.
+  - The example questions resolve cleanly (gate 7). The build-33 example "What are the main risks in NVIDIA's current chart?" triggered a "Did you mean … (NET)?" prompt.
+  - The verdict is quoted as it appears on screen: "NO TRADE".

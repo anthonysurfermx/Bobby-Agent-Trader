@@ -10,7 +10,7 @@ Usa Bobby para:
 • Explorar acciones y cripto por nombre o símbolo.
 • Ver la oportunidad y el riesgo en un mismo lugar, junto a la gráfica del mercado.
 • Crear el hábito de aprender con un compañero 3D y un progreso que puedes ver.
-• Hacer crecer tu propia isla en Trader Land. Cada lectura completa siembra una semilla; cuando termina su plazo, la revisas contra el mercado y se convierte en una pieza, haya acertado o no.
+• Hacer crecer tu propia isla en Trader Land. Hasta tres lecturas completadas al día siembran semillas; cuando termina el plazo de una semilla, la revisas contra el mercado y se convierte en pieza, sin importar si la lectura acertó. Cuando la respuesta de Bobby es esperar, la pieza llega al instante.
 
 Puedes explorar el mercado sin cuenta. Inicia sesión con Apple para sincronizar tu progreso y conservar tu isla personal de Trader Land. En la app, el progreso viene de completar y revisar lecturas, y las recompensas nunca dependen del monto que operes.
 

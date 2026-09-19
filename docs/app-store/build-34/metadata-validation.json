@@ -53,9 +53,9 @@
     {
       "locale": "en-US",
       "field": "description",
-      "characters": 1615,
-      "utf16Units": 1615,
-      "utf8Bytes": 1623,
+      "characters": 1692,
+      "utf16Units": 1692,
+      "utf8Bytes": 1700,
       "limit": 4000,
       "limitUnit": "characters",
       "passes": true
@@ -119,9 +119,9 @@
     {
       "locale": "es-MX",
       "field": "description",
-      "characters": 1753,
-      "utf16Units": 1753,
-      "utf8Bytes": 1779,
+      "characters": 1863,
+      "utf16Units": 1863,
+      "utf8Bytes": 1891,
       "limit": 4000,
       "limitUnit": "characters",
       "passes": true
@@ -129,9 +129,9 @@
     {
       "locale": "es-MX",
       "field": "whats-new",
-      "characters": 771,
-      "utf16Units": 771,
-      "utf8Bytes": 794,
+      "characters": 782,
+      "utf16Units": 782,
+      "utf8Bytes": 805,
       "limit": 4000,
       "limitUnit": "characters",
       "passes": true
@@ -139,9 +139,9 @@
     {
       "locale": "en-US",
       "field": "app-review-notes",
-      "characters": 2929,
-      "utf16Units": 2929,
-      "utf8Bytes": 2930,
+      "characters": 3084,
+      "utf16Units": 3084,
+      "utf8Bytes": 3085,
       "limit": 4000,
       "limitUnit": "bytes",
       "passes": true,

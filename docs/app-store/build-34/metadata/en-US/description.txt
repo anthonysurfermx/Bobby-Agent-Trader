@@ -10,7 +10,7 @@ Use Bobby to:
 • Explore stocks and crypto by name or ticker.
 • Read the opportunity and the risk side by side, next to a market chart.
 • Build a learning habit with a 3D companion and visible progress.
-• Grow your own Trader Land island. Each completed read plants a seed; when its time horizon ends, you review it against the market and it becomes a piece, right or wrong.
+• Grow your own Trader Land island. Up to three completed reads a day plant seeds; when a seed's time horizon ends, you review it against the market and it becomes a piece, right or wrong. When Bobby's answer is to wait, the piece comes right away.
 
 You can explore the market without an account. Sign in with Apple to sync your progress and keep your personal Trader Land island. In the app, progress comes from completing and reviewing reads, and rewards never scale with how much money you trade.
 

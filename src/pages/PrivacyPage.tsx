@@ -3,8 +3,11 @@
 // true to the code. The per-data-type mapping lives in
 // docs/app-store/build-34/APP-PRIVACY-ANSWERS.md; keep both in step.
 // Scope rule: the iPhone app (1.2) is text-only analysis with an optional
-// Sign in with Apple account. Anything else (wallets, swaps, voice, Google
-// sign-in, public islands) is labelled website-only or earlier-iPhone-only.
+// Sign in with Apple account. Anything else (wallets and wallet accounts,
+// swaps, voice, Google sign-in, the website's Apple sign-in with name and
+// email, public islands) is labelled website-only or earlier-iPhone-only.
+// Account deletion copy must hold with or without the APPLE_SIGN_IN_* keys:
+// without them the app skips Apple's sheet and shows the manual steps.
 // Update EFFECTIVE_DATE whenever the substance changes.
 // Language: ?lang=es|en wins (App Store Connect can link a localized URL),
 // then the web's stored choice, then a Spanish browser, then English.
@@ -116,8 +119,8 @@ export default function PrivacyPage() {
         <Section title={tr('Your optional account and what it syncs', 'Tu cuenta opcional y lo que sincroniza')}>
           <p>
             {tr(
-              'In the iPhone app, the only way to sign in is Sign in with Apple. Bobby does not request your name or email address from Apple, so our authentication provider receives only an Apple account identifier and session credentials. (On the website you can also sign in with Google; see “Website only” below.)',
-              'En la app para iPhone, la única forma de iniciar sesión es Iniciar sesión con Apple. Bobby no le pide a Apple tu nombre ni tu correo, así que nuestro proveedor de autenticación solo recibe un identificador de tu cuenta de Apple y las credenciales de la sesión. (En el sitio web también puedes entrar con Google; consulta “Solo en el sitio web” más abajo).',
+              'In the iPhone app, the only way to sign in is Sign in with Apple. The app does not request your name or email address from Apple, so from the app our authentication provider receives only an Apple account identifier and session credentials. (On the website you can also sign in with Apple, Google, or a wallet, and the website’s Apple sign-in asks for more; see “Website only” below.)',
+              'En la app para iPhone, la única forma de iniciar sesión es Iniciar sesión con Apple. La app no le pide a Apple tu nombre ni tu correo, así que desde la app nuestro proveedor de autenticación solo recibe un identificador de tu cuenta de Apple y las credenciales de la sesión. (En el sitio web también puedes entrar con Apple, con Google o con una wallet, y el inicio de sesión con Apple del sitio pide más datos; consulta “Solo en el sitio web” más abajo).',
             )}
           </p>
           <p>{tr('When you sign in, Bobby stores an internal user ID together with the progress you sync:', 'Cuando inicias sesión, Bobby guarda un ID interno de usuario junto con el progreso que sincronizas:')}</p>
@@ -180,19 +183,19 @@ export default function PrivacyPage() {
         <Section title={tr('Deleting your account', 'Cómo borrar tu cuenta')}>
           <p>
             {tr(
-              'On iPhone, open the “…” menu on the desk and choose “Delete account” (or open “Progress saved · account” and choose “Delete account and synced progress”), then confirm. The app asks you to confirm with Apple once more so Bobby can revoke its Sign in with Apple access, then deletes your account, your synced progress, and your Trader Land data.',
-              'En iPhone, abre el menú “…” del desk y elige “Eliminar cuenta” (o abre “Progreso guardado · cuenta” y elige “Borrar cuenta y progreso sincronizado”), y confirma. La app te pide confirmar una vez más con Apple para que Bobby pueda revocar su acceso de Iniciar sesión con Apple, y después borra tu cuenta, tu progreso sincronizado y tus datos de Trader Land.',
+              'On iPhone, open the “…” menu on the desk and choose “Delete account” (or open “Progress saved · account” and choose “Delete account and synced progress”), then confirm. When Bobby can revoke its Sign in with Apple access automatically, the app first asks you to confirm with Apple once more. It then deletes your account, your synced progress, and your Trader Land data.',
+              'En iPhone, abre el menú “…” del desk y elige “Eliminar cuenta” (o abre “Progreso guardado · cuenta” y elige “Borrar cuenta y progreso sincronizado”), y confirma. Cuando Bobby puede revocar automáticamente su acceso de Iniciar sesión con Apple, la app primero te pide confirmar una vez más con Apple. Después borra tu cuenta, tu progreso sincronizado y tus datos de Trader Land.',
             )}
           </p>
           <p>
-            {tr('If automatic revocation is not available, your account is still deleted and the app shows you how to disconnect Bobby yourself in your Apple Account settings, as described in ', 'Si la revocación automática no está disponible, tu cuenta se borra de todos modos y la app te muestra cómo desconectar Bobby tú mismo en los ajustes de tu cuenta de Apple, como se explica en ')}
+            {tr('If automatic revocation is not available, your account is still deleted and the app shows you how to stop using Sign in with Apple for Bobby yourself (Settings > your name > Sign-In & Security > Sign in with Apple > Bobby > Stop Using), as described in ', 'Si la revocación automática no está disponible, tu cuenta se borra de todos modos y la app te muestra cómo dejar de usar Iniciar sesión con Apple en Bobby tú mismo (Ajustes > tu nombre > Inicio de sesión y seguridad > Iniciar sesión con Apple > Bobby > Dejar de usar), como se explica en ')}
             <a href={APPLE_STOP_USING_URL} className={linkClass}>{tr('Apple’s instructions', 'las instrucciones de Apple')}</a>
             {tr('. If Apple cannot be reached at that moment, nothing is deleted and the app asks you to try again. Signing out alone does not delete the account.', '. Si en ese momento no es posible comunicarse con Apple, no se borra nada y la app te pide intentarlo de nuevo. Cerrar sesión no borra la cuenta.')}
           </p>
           <p>
             {tr(
-              'Accounts created on the website with Google can be deleted on request; see “Contact” below.',
-              'Las cuentas creadas en el sitio web con Google se pueden borrar a petición tuya; consulta “Contacto” más abajo.',
+              'Accounts created on the website with Google or a wallet can be deleted on request; see “Contact” below. An account created on the website with Apple is the same account the iPhone app uses with that Apple ID, so you can delete it from the app as described above, or on request.',
+              'Las cuentas creadas en el sitio web con Google o con una wallet se pueden borrar a petición tuya; consulta “Contacto” más abajo. Una cuenta creada en el sitio web con Apple es la misma que usa la app para iPhone con ese Apple ID, así que puedes borrarla desde la app como se describe arriba, o a petición tuya.',
             )}
           </p>
         </Section>
@@ -209,6 +212,14 @@ export default function PrivacyPage() {
         <Section title={tr('Website only', 'Solo en el sitio web')}>
           <p>
             <Scope>{tr('Website', 'Sitio web')}</Scope>
+            {strong(tr('Sign in with Apple on the website. ', 'Iniciar sesión con Apple en el sitio web. '))}
+            {tr(
+              'Unlike the iPhone app, the website asks Apple for your name and email address (Apple may give us a private relay address instead of your real one). Bobby uses them only to identify your account. If you use the same Apple ID in the iPhone app, they are stored with that same account.',
+              'A diferencia de la app para iPhone, el sitio web le pide a Apple tu nombre y tu correo (Apple puede darnos una dirección de reenvío privada en lugar de tu correo real). Bobby solo los usa para identificar tu cuenta. Si usas el mismo Apple ID en la app para iPhone, se guardan en esa misma cuenta.',
+            )}
+          </p>
+          <p>
+            <Scope>{tr('Website', 'Sitio web')}</Scope>
             {strong(tr('Sign in with Google. ', 'Iniciar sesión con Google. '))}
             {tr(
               'If you use it, Google shares your name, email address, and profile picture with our authentication provider. Bobby uses them only to identify your account.',
@@ -219,8 +230,8 @@ export default function PrivacyPage() {
             <Scope>{tr('Website', 'Sitio web')}</Scope>
             {strong(tr('Wallets and Base swaps. ', 'Wallets y swaps en Base. '))}
             {tr(
-              'The iPhone app does not offer wallet connections or swaps. On the website, connecting a wallet is optional and separate from your account. Reown AppKit helps your chosen external wallet connect to Bobby. Bobby processes your public wallet address, a signed proof that you control it, and the quote and transaction data needed for the swap you request. Your wallet shows the final transaction and only you can sign it.',
-              'La app para iPhone no ofrece conexión de wallets ni swaps. En el sitio web, conectar una wallet es opcional y es independiente de tu cuenta. Reown AppKit ayuda a que la wallet externa que elijas se conecte con Bobby. Bobby procesa tu dirección pública de wallet, una prueba firmada de que la controlas y los datos de cotización y de transacción necesarios para el swap que pides. Tu wallet te muestra la transacción final y solo tú puedes firmarla.',
+              'The iPhone app does not offer wallet connections or swaps. On the website, connecting a wallet is optional, and a wallet can also be your account: if you sign in with a wallet, Bobby keeps your progress and island under your public wallet address. Reown AppKit helps your chosen external wallet connect to Bobby. Bobby processes your public wallet address, a signed proof that you control it, and the quote and transaction data needed for the swap you request. Your wallet shows the final transaction and only you can sign it.',
+              'La app para iPhone no ofrece conexión de wallets ni swaps. En el sitio web, conectar una wallet es opcional, y una wallet también puede ser tu cuenta: si entras con una wallet, Bobby guarda tu progreso y tu isla bajo tu dirección pública de wallet. Reown AppKit ayuda a que la wallet externa que elijas se conecte con Bobby. Bobby procesa tu dirección pública de wallet, una prueba firmada de que la controlas y los datos de cotización y de transacción necesarios para el swap que pides. Tu wallet te muestra la transacción final y solo tú puedes firmarla.',
             )}
           </p>
           <p>

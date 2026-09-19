@@ -5,4 +5,4 @@ También en esta versión:
 • En la app, tu isla de Trader Land es privada. Compartir islas públicas no está disponible en esta versión.
 • Bobby ahora te pide permiso antes de enviar tus preguntas a OpenAI para analizarlas.
 • Mejoras en las sesiones de la cuenta, la sincronización del progreso, la compatibilidad de Trader Land y el manejo de errores en las gráficas.
-• Al borrar tu cuenta, ahora también te ayudamos a desconectar Iniciar sesión con Apple.
+• Al borrar tu cuenta, ahora también te ayudamos a dejar de usar Iniciar sesión con Apple en Bobby.
