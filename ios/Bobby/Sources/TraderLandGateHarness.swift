@@ -496,6 +496,14 @@ struct TraderLandGateHarnessView: View {
     private var archipelagoMode: Bool { zoom < Self.archipelagoZoom || visited != nil }
     private var seaVisible: Bool { zoom <= Self.seaZoom || visited != nil }
     private var ownCode: String? { accountIsland ? sync.world?.share?.code : nil }
+    /// The name its builder gave the island in the share sheet (kept while private too), if any.
+    private var islandName: String? {
+        guard accountIsland, let title = sync.world?.share?.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else { return nil }
+        return title
+    }
+    private var ownIslandLabel: String {
+        islandName ?? (accountIsland ? L.t("Your island", "Tu isla") : L.t("Your practice island", "Tu isla de práctica"))
+    }
     private var ownPublic: Bool { accountIsland && sync.world?.share?.public == true }
     private var publicNeighbors: [PublicIsland] {
         Array((fixtureIslands ?? neighbors.islands).filter { $0.code != ownCode }.prefix(24))
@@ -621,9 +629,10 @@ struct TraderLandGateHarnessView: View {
         HStack(spacing: 4) {
             icon("arrow.left", label: L.t("Back to desk", "Volver a la mesa")) { dismiss() }
             VStack(alignment: .leading, spacing: 3) {
-                Text(L.t("BOBBY WORLD", "MUNDO BOBBY")).font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).foregroundStyle(Theme.muted)
-                Text("Trader Land").font(.system(size: 22, weight: .semibold, design: .rounded)).tracking(-0.8)
-                    .lineLimit(1).minimumScaleFactor(0.75)
+                // A named island leads with its own name; Trader Land moves up to the eyebrow.
+                Text(islandName == nil ? L.t("BOBBY WORLD", "MUNDO BOBBY") : "TRADER LAND").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).foregroundStyle(Theme.muted)
+                Text(islandName ?? "Trader Land").font(.system(size: 22, weight: .semibold, design: .rounded)).tracking(-0.8)
+                    .lineLimit(1).minimumScaleFactor(0.75).accessibilityIdentifier("land-title")
             }.padding(.leading, 4)
             Spacer(minLength: 0)
             icon(sound.enabled ? "speaker.wave.2" : "speaker.slash", label: L.t("Toggle sound", "Activar o silenciar sonido")) { sound.toggle() }
@@ -651,7 +660,7 @@ struct TraderLandGateHarnessView: View {
                 // Always mounted, so camera flights interpolate the sea both ways; it draws nothing
                 // above 75% zoom unless a neighbour is being visited.
                 ArchipelagoLayer(scene: scene, zoom: zoom, pan: pan, visiting: seaFocus, fit: fit, visited: visited,
-                                 ownLabel: accountIsland ? L.t("Your island", "Tu isla") : L.t("Your practice island", "Tu isla de práctica"),
+                                 ownLabel: ownIslandLabel,
                                  labels: zoom < Self.archipelagoZoom, artVersion: artVersion)
                 GateCanvas(fixture: fixture, placements: placements, focusLevel: focusLevel, seed: false, corePulse: 0, draft: draft, draftValid: validDraft, selectedID: selectedPlacementId, place: choose)
                     .scaleEffect(scale)
@@ -1293,7 +1302,7 @@ struct TraderLandGateHarnessView: View {
                 HStack(spacing: 6) {
                     arrow("chevron.left", label: L.t("Previous island", "Isla anterior"), id: "land-prev-island") { step(-1) }
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(current.map(LandIslandStatus.title) ?? (accountIsland ? L.t("Your island", "Tu isla") : L.t("Your practice island", "Tu isla de práctica")))
+                        Text(current.map(LandIslandStatus.title) ?? ownIslandLabel)
                             .font(.system(size: 16, weight: .medium)).lineLimit(1).accessibilityIdentifier("land-focused-island")
                         Text(current.map(LandIslandStatus.summary) ?? L.t("Tap an island or use the arrows to visit.", "Toca una isla o usa las flechas para visitarla."))
                             .font(.system(size: 12)).foregroundStyle(Theme.muted).lineLimit(2)
