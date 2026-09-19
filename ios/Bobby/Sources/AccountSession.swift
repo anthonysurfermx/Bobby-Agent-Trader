@@ -222,7 +222,11 @@ final class AccountSession: ObservableObject {
     /// with `manualRevocationURL` when it cannot revoke Apple access itself.
     nonisolated static let accountClientHeader = "X-Bobby-Account-Client"
     nonisolated static let accountClientVersion = "2"
-    nonisolated static let defaultManualRevocationURL = URL(string: "https://support.apple.com/en-us/102571")!
+    /// Apple's "Stop using Sign in with Apple" page, in the device's language.
+    nonisolated static var defaultManualRevocationURL: URL { defaultManualRevocationURL(spanish: L.isSpanish) }
+    nonisolated static func defaultManualRevocationURL(spanish: Bool) -> URL {
+        URL(string: spanish ? "https://support.apple.com/es-mx/102571" : "https://support.apple.com/en-us/102571")!
+    }
 
     /// `GET` asks what deletion needs; `DELETE` deletes. Both carry the client header.
     nonisolated static func accountRequest(method: String) -> URLRequest {
@@ -235,17 +239,29 @@ final class AccountSession: ObservableObject {
         return request
     }
 
-    /// Apple's own page only: anything else the server names falls back to it.
-    nonisolated static func manualRevocationURL(from raw: Any?) -> URL {
+    /// Apple's own page only: anything else the server names falls back to it. A Spanish phone
+    /// opens the es-MX edition, so the page matches the Spanish steps in the alert.
+    nonisolated static func manualRevocationURL(from raw: Any?, spanish: Bool = L.isSpanish) -> URL {
         guard let text = raw as? String, let url = URL(string: text), url.scheme == "https",
-              let host = url.host?.lowercased(), host == "apple.com" || host.hasSuffix(".apple.com") else { return defaultManualRevocationURL }
-        return url
+              let host = url.host?.lowercased(), host == "apple.com" || host.hasSuffix(".apple.com") else {
+            return defaultManualRevocationURL(spanish: spanish)
+        }
+        guard spanish, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        // support.apple.com/<lang>-<region>/102571: swap the locale segment, keep the article.
+        var segments = parts.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard segments.count > 1, segments[1].range(of: "^[A-Za-z]{2}-[A-Za-z]{2}$", options: .regularExpression) != nil else { return url }
+        segments[1] = "es-mx"
+        parts.path = segments.joined(separator: "/")
+        return parts.url ?? url
     }
 
-    /// The steps Apple documents for stopping Sign in with Apple for one app.
-    static var manualRevocationSteps: String {
-        L.t("To finish, open Settings > your name > Sign-In & Security > Sign in with Apple, choose Bobby and tap Stop Using.",
-            "Para terminar, abre Ajustes > tu nombre > Inicio de sesión y seguridad > Iniciar sesión con Apple, elige Bobby y toca Dejar de usar.")
+    /// The steps Apple documents for iPhone (support.apple.com/102571, September 2026), in the
+    /// words the Settings app uses: "Configuración", not "Ajustes", on an es-MX phone.
+    nonisolated static var manualRevocationSteps: String { manualRevocationSteps(spanish: L.isSpanish) }
+    nonisolated static func manualRevocationSteps(spanish: Bool) -> String {
+        L.t("To finish, open Settings, tap your name, tap Sign in with Apple, choose Bobby and tap Delete.",
+            "Para terminar, abre Configuración, toca tu nombre, toca Iniciar sesión con Apple, elige Bobby y toca Eliminar.",
+            spanish: spanish)
     }
 
     /// Permanently remove the Bobby account and its synced data. Apple accounts re-authorize
@@ -329,6 +345,26 @@ final class AccountSession: ObservableObject {
     }
 
     // ---- Sign in with Apple ----
+
+    /// What the account sheet says when Apple's sheet fails: never the raw system text
+    /// ("com.apple.AuthenticationServices.AuthorizationError error 1000"). Closing the sheet
+    /// is a choice, not an error (nil).
+    nonisolated static func appleSignInFailure(_ error: Error) -> String? {
+        guard let code = (error as? ASAuthorizationError)?.code else {
+            return L.t("Sign in with Apple did not finish — try again.", "Iniciar sesión con Apple no terminó — inténtalo de nuevo.")
+        }
+        switch code {
+        case .canceled:
+            return nil
+        case .unknown, .notHandled, .notInteractive:
+            // 1000 is what a phone with no Apple Account signed in returns.
+            return L.t("Sign in with Apple is not available right now — check that you are signed in to your Apple Account in Settings.",
+                       "Iniciar sesión con Apple no está disponible ahora — revisa que tengas sesión en tu cuenta de Apple en Configuración.")
+        default:
+            return L.t("Sign in with Apple did not finish — try again.", "Iniciar sesión con Apple no terminó — inténtalo de nuevo.")
+        }
+    }
+
     func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
         let nonce = Self.randomNonce()
         currentNonce = nonce
@@ -340,7 +376,7 @@ final class AccountSession: ObservableObject {
         let started = generation
         switch result {
         case .failure(let error):
-            if (error as? ASAuthorizationError)?.code != .canceled { lastError = error.localizedDescription }
+            lastError = Self.appleSignInFailure(error)
         case .success(let auth):
             guard let cred = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = cred.identityToken, let idToken = String(data: tokenData, encoding: .utf8),

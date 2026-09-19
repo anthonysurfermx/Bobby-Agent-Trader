@@ -429,6 +429,11 @@ extension LandHorizon {
 /// tests and screenshots.
 @MainActor final class TraderLandAccountFixture {
     static var enabled: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-account-fixture") }
+    /// `-trader-land-release-island`: the fixture on the Release path — public worlds off, so the
+    /// header opens the private "Island settings" sheet, there is no archipelago and zoom stops at 0.7.
+    nonisolated static var releaseIsland: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-release-island") }
+    /// `-trader-land-fixture-public`: the island starts public, as one published before public worlds were switched off.
+    nonisolated static var startsPublic: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-fixture-public") }
 
     struct Refusal: Error { let status: Int; let error: String }
 
@@ -466,8 +471,9 @@ extension LandHorizon {
     private var xp = 180
     private var aura = 36
 
-    init(now: Date = Date()) {
+    init(now: Date = Date(), startsPublic: Bool = TraderLandAccountFixture.startsPublic) {
         self.now = now
+        isPublic = startsPublic
         let hour: TimeInterval = 3600
         rows = [
             Row(id: "fx-dock", itemID: "crypto_bay_data_dock", state: "bloomed", hours: 24, seededAt: now - 90 * hour, bloomedAt: now - 60 * hour, thesis: nil),

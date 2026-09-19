@@ -38,7 +38,6 @@ struct AccountSheet: View {
             if !store.pendingAwards.isEmpty {
                 Text(L.t("\(store.pendingAwards.count) award(s) waiting to sync", "\(store.pendingAwards.count) premio(s) por sincronizar")).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.muted)
             }
-            if let err = account.lastError { Text(err).font(.system(size: 12)).foregroundStyle(.red) }
             Spacer(minLength: 8)
             if account.isSignedIn {
                 Button {
@@ -86,7 +85,11 @@ struct AccountSheet: View {
                     .accessibilityIdentifier("account-x-sign-in")
                 }
 #endif
-                if let err = account.lastError { Text(err).font(.footnote).foregroundStyle(.red) }
+            }
+            // One line, next to the button that failed, signed in or out.
+            if let err = account.lastError {
+                Text(err).font(.footnote).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("account-error")
             }
         }
         .padding(22)
@@ -100,7 +103,7 @@ struct AccountSheet: View {
             Button(L.t("Delete account permanently", "Borrar cuenta permanentemente"), role: .destructive) {
                 busy = true
                 Task {
-                    // A cancelled Apple sheet says nothing; a failure shows `lastError` above.
+                    // A cancelled Apple sheet says nothing; a failure shows `lastError` under the buttons.
                     let result = await account.deleteAccount(store: store)
                     busy = false
                     if result == .deleted { accountDeleted = true }

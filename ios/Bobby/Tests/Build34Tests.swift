@@ -140,6 +140,61 @@ final class Build34Tests: XCTestCase {
         XCTAssertEqual(B34Stub.requests.filter { $0.method == "DELETE" }.count, 2)
     }
 
+    // MARK: Apple's manual steps, as Apple words them (support.apple.com/102571, Sep 2026)
+
+    func testManualAppleStepsMatchApplesIPhoneStepsInBothLanguages() {
+        let en = AccountSession.manualRevocationSteps(spanish: false)
+        let es = AccountSession.manualRevocationSteps(spanish: true)
+        XCTAssertEqual(en, "To finish, open Settings, tap your name, tap Sign in with Apple, choose Bobby and tap Delete.")
+        XCTAssertEqual(es, "Para terminar, abre Configuración, toca tu nombre, toca Iniciar sesión con Apple, elige Bobby y toca Eliminar.")
+        // Not the web path (Sign-In & Security), not the old button, not Spain's "Ajustes".
+        for stale in ["Sign-In & Security", "Stop Using", "Inicio de sesión y seguridad", "Dejar de usar", "Ajustes"] {
+            XCTAssertFalse(en.contains(stale) || es.contains(stale), stale)
+        }
+        XCTAssertEqual(AccountSession.manualRevocationSteps, L.t(en, es))
+    }
+
+    func testApplesPageOpensInTheLanguageOfTheSteps() {
+        let server = "https://support.apple.com/en-us/102571"
+        XCTAssertEqual(AccountSession.manualRevocationURL(from: server, spanish: false).absoluteString, server)
+        XCTAssertEqual(AccountSession.manualRevocationURL(from: server, spanish: true).absoluteString, "https://support.apple.com/es-mx/102571")
+        XCTAssertEqual(AccountSession.manualRevocationURL(from: "https://support.apple.com/es-es/102571?x=1", spanish: true).absoluteString,
+                       "https://support.apple.com/es-mx/102571?x=1")
+        XCTAssertEqual(AccountSession.manualRevocationURL(from: nil, spanish: true).absoluteString, "https://support.apple.com/es-mx/102571")
+        XCTAssertEqual(AccountSession.manualRevocationURL(from: nil, spanish: false).absoluteString, server)
+        XCTAssertEqual(AccountSession.manualRevocationURL(from: "https://evil.example/en-us/102571", spanish: true).absoluteString,
+                       "https://support.apple.com/es-mx/102571", "never a non-Apple link, in either language")
+        XCTAssertEqual(AccountSession.manualRevocationURL(from: "https://support.apple.com/102571", spanish: true).absoluteString,
+                       "https://support.apple.com/102571", "no locale segment: Apple picks the language")
+        XCTAssertEqual(AccountSession.defaultManualRevocationURL, AccountSession.defaultManualRevocationURL(spanish: L.isSpanish))
+    }
+
+    // MARK: Sign-in errors, worded once
+
+    func testAppleSignInFailuresAreWordedNotRaw() {
+        XCTAssertNil(AccountSession.appleSignInFailure(ASAuthorizationError(.canceled)), "closing Apple's sheet is not an error")
+        let unavailable = AccountSession.appleSignInFailure(ASAuthorizationError(.unknown))
+        XCTAssertEqual(unavailable, L.t("Sign in with Apple is not available right now — check that you are signed in to your Apple Account in Settings.",
+                                        "Iniciar sesión con Apple no está disponible ahora — revisa que tengas sesión en tu cuenta de Apple en Configuración."))
+        let retry = L.t("Sign in with Apple did not finish — try again.", "Iniciar sesión con Apple no terminó — inténtalo de nuevo.")
+        XCTAssertEqual(AccountSession.appleSignInFailure(ASAuthorizationError(.failed)), retry)
+        XCTAssertEqual(AccountSession.appleSignInFailure(ASAuthorizationError(.invalidResponse)), retry)
+        XCTAssertEqual(AccountSession.appleSignInFailure(URLError(.timedOut)), retry)
+        for code: ASAuthorizationError.Code in [.unknown, .failed, .invalidResponse, .notHandled, .notInteractive] {
+            let text = AccountSession.appleSignInFailure(ASAuthorizationError(code)) ?? ""
+            XCTAssertFalse(text.contains("AuthorizationError") || text.contains("\(code.rawValue)"), text)
+        }
+    }
+
+    @MainActor func testASignInFailureIsStoredAsTheWordedCopy() async {
+        let account = AccountSession()
+        XCTAssertNil(account.session)
+        await account.completeApple(.failure(ASAuthorizationError(.unknown)))
+        XCTAssertEqual(account.lastError, AccountSession.appleSignInFailure(ASAuthorizationError(.unknown)))
+        await account.completeApple(.failure(ASAuthorizationError(.canceled)))
+        XCTAssertNil(account.lastError, "a cancel clears the line instead of keeping an old error")
+    }
+
     // MARK: A token that expired mid-operation
 
     @MainActor func testA401RefreshesOnceAndRetries() async throws {
@@ -294,6 +349,77 @@ final class Build34Tests: XCTestCase {
         XCTAssertEqual(DeskFailure.quota.message, L.t("Bobby reached today's analysis limit. Try again tomorrow.",
                                                       "Bobby llegó al límite de análisis de hoy. Intenta mañana."))
         XCTAssertEqual(DeskFailure.questionTooLong.message, DeskQuestion.tooLongMessage)
+    }
+
+    // MARK: A refusal is not an outage
+
+    func testARefusalNamesItsCauseInTheStatusPill() {
+        XCTAssertEqual(DeskPhase.refused.label(refusal: .quota), L.t("LIMIT REACHED", "LÍMITE ALCANZADO"))
+        XCTAssertEqual(DeskPhase.refused.label(refusal: .questionTooLong), L.t("QUESTION TOO LONG", "PREGUNTA MUY LARGA"))
+        XCTAssertEqual(DeskPhase.error.label(refusal: nil), L.t("INCOMPLETE LINK", "ENLACE INCOMPLETO"), "an outage keeps its word")
+        XCTAssertEqual(DeskPhase.error.label(refusal: .quota), DeskPhase.error.label, "only a refusal is relabelled")
+        XCTAssertTrue(DeskPhase.refused.showsHint)
+        XCTAssertTrue(DeskPhase.error.showsHint)
+        XCTAssertFalse(DeskPhase.complete.showsHint)
+    }
+
+    @MainActor func testTheDesksDailyLimitShowsAsARefusalNotABrokenLink() async throws {
+        let watchlist = UserDefaults.standard.data(forKey: "desk.watchlist")
+        defer { UserDefaults.standard.set(watchlist, forKey: "desk.watchlist") }
+        B34Stub.install { seen in
+            switch seen.path {
+            case "/api/bobby-asset-search":
+                return .json(200, #"{"resolved":{"symbol":"BTC","assetClass":"crypto"},"resolution":{"needsConfirmation":false}}"#)
+            case "/api/desk-debate":
+                return .json(429, #"{"error":"Bobby reached today's analysis limit.","code":"daily_limit"}"#)
+            default:
+                return .json(200, "{}")
+            }
+        }
+        let vm = BobbyViewModel()
+        vm.ask("BTC")
+        let deadline = Date().addingTimeInterval(10)
+        while vm.thinking, Date() < deadline { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertFalse(vm.thinking)
+        XCTAssertEqual(vm.phase, .refused)
+        XCTAssertEqual(vm.refusal, .quota)
+        XCTAssertEqual(vm.phase.label(refusal: vm.refusal), L.t("LIMIT REACHED", "LÍMITE ALCANZADO"))
+        XCTAssertEqual(vm.errorHint, DeskFailure.quota.message)
+        XCTAssertTrue(B34Stub.requests.contains { $0.path == "/api/desk-debate" })
+
+        // An outage right after it is an outage again: the refusal does not stick.
+        B34Stub.install { seen in
+            seen.path == "/api/bobby-asset-search"
+                ? .json(200, #"{"resolved":{"symbol":"BTC","assetClass":"crypto"},"resolution":{"needsConfirmation":false}}"#)
+                : seen.path == "/api/desk-debate" ? .json(503, #"{"error":"The analysis could not finish."}"#) : .json(200, "{}")
+        }
+        vm.ask("BTC")
+        while vm.thinking, Date() < deadline.addingTimeInterval(10) { try await Task.sleep(nanoseconds: 50_000_000) }
+        XCTAssertEqual(vm.phase, .error)
+        XCTAssertNil(vm.refusal)
+        XCTAssertEqual(vm.phase.label(refusal: vm.refusal), L.t("INCOMPLETE LINK", "ENLACE INCOMPLETO"))
+    }
+
+    @MainActor func testATooLongQuestionIsRefusedOnThePhoneWithItsHintVisible() {
+        let vm = BobbyViewModel()
+        vm.input = String(repeating: "a", count: 1201)
+        vm.ask()
+        XCTAssertFalse(vm.thinking, "nothing was sent")
+        XCTAssertEqual(vm.phase, .refused)
+        XCTAssertEqual(vm.refusal, .questionTooLong)
+        XCTAssertTrue(vm.phase.showsHint, "the hint renders under the status")
+        XCTAssertEqual(vm.errorHint, DeskQuestion.tooLongMessage)
+        XCTAssertEqual(vm.input.count, 1201, "the question stays to be shortened")
+        XCTAssertTrue(B34Stub.requests.isEmpty)
+    }
+
+    // MARK: The Spanish desk
+
+    func testTheChartsSourceLineFollowsTheLanguage() {
+        XCTAssertEqual(MarketSnapshot.sourceLabel(isEquity: false, spanish: false), "CRYPTO · OKX")
+        XCTAssertEqual(MarketSnapshot.sourceLabel(isEquity: false, spanish: true), "CRIPTO · OKX")
+        XCTAssertEqual(MarketSnapshot.sourceLabel(isEquity: true, spanish: false), "EQUITIES · YAHOO")
+        XCTAssertEqual(MarketSnapshot.sourceLabel(isEquity: true, spanish: true), "ACCIONES · YAHOO")
     }
 
     func testDebateCarriesTheServersRefusal() async {

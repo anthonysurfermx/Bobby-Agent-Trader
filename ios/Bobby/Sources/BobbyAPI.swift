@@ -51,6 +51,11 @@ struct MarketSnapshot {
     var isEquity: Bool
     var price: Double?
     var changePct: Double?
+
+    /// The data source line under the chart, in the desk's language like the card around it.
+    static func sourceLabel(isEquity: Bool, spanish: Bool = L.isSpanish) -> String {
+        isEquity ? L.t("EQUITIES · YAHOO", "ACCIONES · YAHOO", spanish: spanish) : L.t("CRYPTO · OKX", "CRIPTO · OKX", spanish: spanish)
+    }
 }
 
 /// The question typed at the desk, measured the way /api/desk-debate measures it:
@@ -94,6 +99,14 @@ enum DeskFailure: Equatable {
                        "Bobby llegó al límite de análisis de hoy. Intenta mañana.")
         case .questionTooLong:
             return DeskQuestion.tooLongMessage
+        }
+    }
+
+    /// The desk's status pill for this refusal (`DeskPhase.refused`).
+    var status: String {
+        switch self {
+        case .quota: return L.t("LIMIT REACHED", "LÍMITE ALCANZADO")
+        case .questionTooLong: return L.t("QUESTION TOO LONG", "PREGUNTA MUY LARGA")
         }
     }
 }
