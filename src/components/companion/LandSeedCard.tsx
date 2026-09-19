@@ -6,11 +6,14 @@
 //     it would bloom into; a longer one asks to confirm ("You can't shorten
 //     it later") and extends the seed through POST /api/trader-land
 //   · a respected NO TRADE bloomed a 1×1 piece at once: no picker
+// A new read replaces the card; an extend still in flight then reports
+// through a toast instead of vanishing (seed.ts submitExtend).
 // One question = one seed; patience decides the piece (GROWTH-v1 §4).
 // ============================================================
-import { useReducer, useSyncExternalStore } from 'react';
+import { useEffect, useReducer, useRef, useSyncExternalStore } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Check, Sprout, X } from 'lucide-react';
 import { isSpanish, t } from '@/lib/companions/i18n';
 import { sfxSuccess, sfxTock } from '@/lib/companions/sfx';
@@ -18,12 +21,15 @@ import { getGrant, onGrants, progressHeaders, setGrant } from '@/lib/companions/
 import { artOf, STUDIO_PATH } from '@/lib/trader-land/public';
 import { useLandManifest } from '@/lib/trader-land/useLandManifest';
 import { NO_SHORTEN, horizonLabel, horizonOptionLabel, pieceName, tierLabel, type HorizonHours, type PieceSummary } from '@/lib/trader-land/growth';
-import { applyExtended, extendSeed, seedCardReducer, seedOptions } from '@/lib/trader-land/seed';
+import { seedCardReducer, seedOptions, submitExtend } from '@/lib/trader-land/seed';
 
 export default function LandSeedCard({ eventId, onClose, compact = false }: { eventId: string; onClose: () => void; compact?: boolean }) {
   const grant = useSyncExternalStore(onGrants, () => getGrant(eventId), () => getGrant(eventId));
   const { manifest } = useLandManifest();
   const [state, dispatch] = useReducer(seedCardReducer, { phase: 'choose' });
+  // Whether this card is still on screen when its extend settles (a new read unmounts it).
+  const onScreen = useRef(true);
+  useEffect(() => { onScreen.current = true; return () => { onScreen.current = false; }; }, []);
   if (!grant || !grant.item) return null;
   const spanish = isSpanish();
   const art = (piece: PieceSummary | null) => {
@@ -60,15 +66,15 @@ export default function LandSeedCard({ eventId, onClose, compact = false }: { ev
   const pick = (hours: HorizonHours) => { sfxTock(); dispatch({ type: 'pick', hours, options }); };
   const submit = async () => {
     if (!asking || !grant.inventoryId || (state.phase !== 'confirm' && state.phase !== 'error')) return;
-    // The identity that synced this grant is the one that owns the seed.
-    const auth = progressHeaders();
     dispatch({ type: 'submit' });
-    if (!auth) { dispatch({ type: 'failure', message: t('Sign in again to extend it.', 'Vuelve a iniciar sesión para extenderla.') }); return; }
-    const result = await extendSeed(auth, grant.inventoryId, asking.hours);
-    if (!result.ok || !result.extended) { dispatch({ type: 'failure', message: result.message }); return; }
-    setGrant(eventId, applyExtended(grant, result.extended));
-    dispatch({ type: 'success' });
-    sfxSuccess();
+    // The identity that synced this grant is the one that owns the seed.
+    const outcome = await submitExtend({
+      auth: progressHeaders(), eventId, grant, hours: asking.hours, pieceLabel: name, saveGrant: setGrant,
+      onScreen: () => onScreen.current,
+      card: (result) => dispatch(result.ok ? { type: 'success' } : { type: 'failure', message: result.message }),
+      notice: (result) => { if (result.ok) toast.success(result.message); else toast.error(result.message); },
+    });
+    if (outcome.ok) sfxSuccess();
   };
   const reviewAt = grant.horizon?.reviewAt ? new Date(grant.horizon.reviewAt) : null;
 

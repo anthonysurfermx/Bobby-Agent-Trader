@@ -4,7 +4,8 @@
 // 24 h (selected), 3 days, 7 days, upward only, with a confirm step.
 // Pure state + one POST; the card component renders it.
 // ============================================================
-import { TRADER_LAND_CLIENT_HEADER, HORIZONS, extendErrorMessage, type Extended, type Horizon, type HorizonHours, type PieceSummary, type Tier } from './growth';
+import { t } from '@/lib/companions/i18n';
+import { TRADER_LAND_CLIENT_HEADER, HORIZONS, extendErrorMessage, extendedNotice, reviewOpened, type Extended, type Horizon, type HorizonHours, type PieceSummary, type Tier } from './growth';
 
 /** A read's grant (RouteGrant + the Growth v1 additions). */
 export interface WorldGrant {
@@ -72,14 +73,15 @@ export interface SeedOption {
 }
 
 /** The three horizons of a seed: its current one selected, longer ones offered while its review is closed. */
-export function seedOptions(grant: WorldGrant): SeedOption[] {
+export function seedOptions(grant: WorldGrant, now = Date.now()): SeedOption[] {
   if (grant.state !== 'seed') return [];
   const current = grant.horizon?.hours ?? 24;
+  const open = Boolean(grant.horizon?.extendable) && !reviewOpened(grant.horizon, now);
   return HORIZONS.map((h) => ({
     ...h,
     piece: h.hours === current ? grant.item : grant.tiers?.[h.tier] ?? null,
     current: h.hours === current,
-    available: h.hours > current && Boolean(grant.horizon?.extendable) && Boolean(grant.horizon?.extendTo.includes(h.hours)),
+    available: h.hours > current && open && Boolean(grant.horizon?.extendTo.includes(h.hours)),
   }));
 }
 
@@ -139,4 +141,35 @@ export async function extendSeed(auth: Record<string, string>, inventoryId: stri
   } catch {
     return { ok: false, extended: null, status: 0, message: extendErrorMessage(0, null) };
   }
+}
+
+/** How an extend ended, in the reader's language. */
+export type ExtendOutcome = { ok: true; message: string } | { ok: false; message: string };
+
+/**
+ * One extend from the desk card, start to finish: POST with the credential
+ * that synced the grant, keep the new grant, and tell the builder how it
+ * ended — on the card while it is still on screen, else through `notice`:
+ * a new read replaces the card, and a request in flight at that moment
+ * must not end in silence (a failed extend would look like it worked).
+ */
+export async function submitExtend(io: {
+  auth: Record<string, string> | null;
+  eventId: string;
+  grant: WorldGrant;
+  hours: HorizonHours;
+  /** is the card that started it still mounted? */
+  onScreen: () => boolean;
+  card: (outcome: ExtendOutcome) => void;
+  notice: (outcome: ExtendOutcome) => void;
+  saveGrant: (eventId: string, grant: WorldGrant) => void;
+  pieceLabel: (piece: PieceSummary) => string;
+  fetchImpl?: typeof fetch;
+}): Promise<ExtendOutcome> {
+  const report = (outcome: ExtendOutcome) => { (io.onScreen() ? io.card : io.notice)(outcome); return outcome; };
+  if (!io.auth || !io.grant.inventoryId) return report({ ok: false, message: t('Sign in again to extend it.', 'Vuelve a iniciar sesión para extenderla.') });
+  const result = await extendSeed(io.auth, io.grant.inventoryId, io.hours, io.fetchImpl);
+  if (!result.ok || !result.extended) return report({ ok: false, message: result.message });
+  io.saveGrant(io.eventId, applyExtended(io.grant, result.extended));
+  return report({ ok: true, message: extendedNotice(result.extended.horizon.hours, io.pieceLabel(result.extended.item)) });
 }

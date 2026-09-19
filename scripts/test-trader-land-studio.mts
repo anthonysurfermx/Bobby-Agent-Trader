@@ -3,10 +3,11 @@
 // validity and spawn, land-change detection, the seed card's horizon choice
 // and the extend request (docs/trader-land/GROWTH-v1.md §3–§4).
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { canvasPoint, draggedGridPosition, SCENE_CENTER } from '../src/lib/trader-land-gestures';
-import { CORE_FOOTPRINT, coreCells, footprintCells, homeZoom, landGeometry, maxZoom, spriteFrame } from '../src/lib/trader-land/geometry';
-import { CORE_UID, FALLBACK_CORE, TRADER_LAND_CLIENT_HEADER, draftFits, extendChoices, extendErrorMessage, findSpawn, growthLabel, horizonOptionLabel, landChanged, landCore, occupiedCells, type TierInfo } from '../src/lib/trader-land/growth';
-import { applyExtended, extendSeed, grantsFromResults, parseGrant, seedCardReducer, seedOptions, type SeedCardState } from '../src/lib/trader-land/seed';
+import { CORE_FOOTPRINT, DORMANT_CORE_SCALE, SLAB, coreCells, footprintCells, homeZoom, landGeometry, maxZoom, spriteFrame } from '../src/lib/trader-land/geometry';
+import { CORE_HIT_Z, CORE_UID, EXTEND_REFUSALS, FALLBACK_CORE, FIT_ZOOM, TRADER_LAND_CLIENT_HEADER, coreHitBox, draftFits, extendChoices, extendErrorMessage, findSpawn, growthLabel, horizonOptionLabel, isExtendRefusal, landChanged, landCore, landCredential, occupiedCells, pieceHitBox, reviewOpened, studioHomeZoom, type HitBox, type TierInfo } from '../src/lib/trader-land/growth';
+import { applyExtended, extendSeed, grantsFromResults, parseGrant, seedCardReducer, seedOptions, submitExtend, type ExtendOutcome, type SeedCardState, type WorldGrant } from '../src/lib/trader-land/seed';
 
 let cases = 0;
 const ok = (value: unknown, message: string) => { assert.ok(value, message); cases += 1; };
@@ -71,6 +72,71 @@ for (const size of [8, 10, 12, 16]) {
   ok(flipped.flip && Math.abs(flipped.x + flipped.size * (1 - 0.4) - geom.iso(2, 2.5).x) < 1e-9, 'a rotated piece mirrors around its anchor');
 }
 
+// ---------- tap targets: every piece outranks the Aura Core's tall box ----------
+// The core's box is its whole visible art (sphere included), so it reaches over the
+// pieces standing behind it. Before CORE_HIT_Z it was stacked by its own bottom
+// vertex: a piece at core.x-1, core.y-1 sat 100 % under it and a tap there selected
+// (or, in Build, started moving) the core instead.
+{
+  const manifest = JSON.parse(readFileSync(new URL('../public/land/v1/gate-A/asset-manifest.json', import.meta.url), 'utf8')) as { items: Array<{ id: string; orientations: Record<string, { states: Record<string, { anchor: number[]; contentBounds: number[] }> }> }> };
+  const coreStates = Object.values(manifest.items.find((item) => item.id === 'aura_core')!.orientations)[0].states;
+  const inside = (box: HitBox, x: number, y: number) => x >= box.left && x <= box.left + box.width && y >= box.top && y <= box.top + box.height;
+  const overlap = (a: HitBox, b: HitBox) => Math.max(0, Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top));
+  for (const size of [8, 10, 12, 16]) {
+    const geom = landGeometry(size);
+    // The lowest piece target on any island (a 1×1 at 0,0) still outranks the core's.
+    ok(pieceHitBox(geom, { cols: 1, rows: 1 }, 0, 0).zIndex > CORE_HIT_Z, `N=${size} the back corner piece outranks the core`);
+    for (const stage of [0, 1] as const) {
+      const art = coreStates[stage === 0 ? 'stage0' : 'stage1'];
+      let covered = 0;
+      for (let cx = 0; cx + 2 <= size; cx += 1) for (let cy = 0; cy + 2 <= size; cy += 1) {
+        const core = coreHitBox(spriteFrame(geom, CORE_FOOTPRINT, cx, cy, 0, art, { scale: stage === 0 ? DORMANT_CORE_SCALE : 1 }), art.contentBounds);
+        assert.equal(core.zIndex, CORE_HIT_Z);
+        // The core still answers on its own tiles.
+        const centre = geom.iso(cx + 0.5, cy + 0.5);
+        assert.ok(inside(core, centre.x, centre.y), `N=${size} stage ${stage} core ${cx},${cy} is tappable on its tiles`);
+        const taken = new Set(coreCells({ x: cx, y: cy }));
+        for (const area of [{ cols: 1, rows: 1 }, { cols: 2, rows: 1 }, { cols: 1, rows: 2 }, { cols: 2, rows: 2 }]) {
+          for (let col = 0; col + area.cols <= size; col += 1) for (let row = 0; row + area.rows <= size; row += 1) {
+            if (footprintCells(area, col, row).some((cell) => taken.has(cell))) continue;
+            const piece = pieceHitBox(geom, area, col, row);
+            if (overlap(piece, core) > 0) covered += 1;
+            assert.ok(piece.zIndex > core.zIndex, `N=${size} stage ${stage} core ${cx},${cy}: a ${area.cols}×${area.rows} at ${col},${row} outranks the core`);
+            cases += 1;
+          }
+        }
+      }
+      ok(covered > 0, `N=${size} stage ${stage}: the core's box does reach over pieces (so the stacking matters)`);
+    }
+  }
+  // The reviewer's case, spelled out: 8×8, core 3,3 awake, a piece at 2,2 (fully under the core's box).
+  const geom = landGeometry(8), art = coreStates.stage1;
+  const core = coreHitBox(spriteFrame(geom, CORE_FOOTPRINT, 3, 3, 0, art), art.contentBounds);
+  const behind = pieceHitBox(geom, { cols: 1, rows: 1 }, 2, 2);
+  ok(overlap(behind, core) === behind.width * behind.height && behind.zIndex > core.zIndex, 'a piece at core.x-1, core.y-1 is under the core box yet wins the tap');
+  eq(CORE_HIT_Z, Math.round(SLAB.top.y) + 102, 'the core stacks from the slab top corner');
+}
+
+// ---------- the home view: builders zoom in on big islands, visitors see all of it ----------
+for (const size of [8, 10, 12, 16]) {
+  eq(studioHomeZoom(size, false), homeZoom(size), `N=${size} the builder's home is homeZoom`);
+  eq(studioHomeZoom(size, true), FIT_ZOOM, `N=${size} a visitor's home fits the island`);
+}
+{
+  // The slab (736 canvas units wide) at the studio's base scale: it fits at FIT_ZOOM and is cropped at 1.25.
+  for (const pane of [{ width: 390, height: 520 }, { width: 556, height: 600 }, { width: 1200, height: 800 }]) {
+    const base = Math.min(pane.width / 830, pane.height / 640, 1.5);
+    const slab = (SLAB.right.x - SLAB.left.x) * base;
+    ok(slab * FIT_ZOOM <= pane.width, `Fit island shows the whole slab in a ${pane.width} px map`);
+    if (pane.width < 1000) ok(slab * homeZoom(16) > pane.width, `1.25 crops a 16×16 in a ${pane.width} px map (why visitors do not get it)`);
+  }
+}
+
+// ---------- the studio's credential: wallet session, else the Apple/Google session ----------
+eq(landCredential({ 'x-bobby-session': 'bws' }, 'sb-token'), { 'x-bobby-session': 'bws' }, 'the wallet session wins');
+eq(landCredential({}, 'sb-token'), { Authorization: 'Bearer sb-token' }, 'an Apple/Google builder sends the Supabase bearer');
+eq(landCredential({}, null), null, 'signed out');
+
 // ---------- the core, occupancy, drafts, spawn ----------
 eq(landCore(undefined), FALLBACK_CORE, 'no core from an older server = 3,3 awake');
 eq(landCore({ x: 6, y: 1, stage: 0 }, 10), { x: 6, y: 1, stage: 0 }, 'a moved dormant core is kept');
@@ -117,12 +183,23 @@ const tiers: TierInfo[] = [
   { id: 'building', hours: 72, footprint: [2, 1], length: 5, held: 0, next: piece('thesis_citadel_double_gate', 'building', [2, 1]) },
   { id: 'landmark', hours: 168, footprint: [2, 2], length: 5, held: 0, next: piece('crypto_bay_waiting_lighthouse', 'landmark', [2, 2]) },
 ];
+// Fixtures review at 2026-09-20T10:00Z; `now` is pinned so the cases do not expire.
+const NOW = Date.parse('2026-09-19T12:00:00Z');
 {
   const fresh = { hours: 24 as const, tier: 'common' as const, reviewAt: '2026-09-20T10:00:00Z', extendable: true, extendTo: [72, 168] };
-  eq(extendChoices(fresh, tiers).map((c) => [c.hours, c.piece?.id]), [[72, 'thesis_citadel_double_gate'], [168, 'crypto_bay_waiting_lighthouse']], 'a 24 h seed offers 3 and 7 days with the next piece of each tier');
-  eq(extendChoices({ ...fresh, hours: 72, tier: 'building', extendTo: [168] }, tiers).map((c) => c.hours), [168], 'a 3-day seed can only go to 7 days');
-  eq(extendChoices({ ...fresh, extendable: false }, tiers), [], 'an open review offers nothing');
-  eq(extendChoices({ ...fresh, extendTo: [24, 72] }, tiers).map((c) => c.hours), [72], 'never shorter or equal');
+  eq(extendChoices(fresh, tiers, NOW).map((c) => [c.hours, c.piece?.id]), [[72, 'thesis_citadel_double_gate'], [168, 'crypto_bay_waiting_lighthouse']], 'a 24 h seed offers 3 and 7 days with the next piece of each tier');
+  eq(extendChoices({ ...fresh, hours: 72, tier: 'building', extendTo: [168] }, tiers, NOW).map((c) => c.hours), [168], 'a 3-day seed can only go to 7 days');
+  eq(extendChoices({ ...fresh, extendable: false }, tiers, NOW), [], 'an open review offers nothing');
+  eq(extendChoices({ ...fresh, extendTo: [24, 72] }, tiers, NOW).map((c) => c.hours), [72], 'never shorter or equal');
+  // The studio stays open past reviewAt: `extendable` was true at load, the server would now answer review_open.
+  eq(extendChoices(fresh, tiers, Date.parse(fresh.reviewAt)), [], 'no extension offered once reviewAt has come');
+  eq(extendChoices(fresh, tiers, Date.parse(fresh.reviewAt) + 60_000), [], 'nor after it');
+  ok(!reviewOpened(fresh, NOW) && reviewOpened(fresh, Date.parse(fresh.reviewAt)), 'reviewOpened follows reviewAt');
+  ok(!reviewOpened({ reviewAt: '' }, NOW), 'no reviewAt: trust the server\'s extendable');
+  // Expected refusals are a notice, not a broken studio.
+  eq(EXTEND_REFUSALS, [400, 404, 409], 'not_upward, not_found, not_seed/review_open');
+  ok([400, 404, 409].every(isExtendRefusal) && ![0, 401, 403, 429, 500, 503].some(isExtendRefusal), 'auth and server failures stay page errors');
+  eq(extendErrorMessage(409, 'Its review is already open'), 'Its review is already open.', 'review_open reads as a sentence, localized');
   eq(horizonOptionLabel(72), '3 days · building 2×1', 'option copy');
   eq(horizonOptionLabel(168), '7 days · landmark 2×2', 'option copy');
 }
@@ -147,13 +224,14 @@ const seedWorld = {
 }
 const grant = parseGrant(seedWorld)!;
 {
-  const options = seedOptions(grant);
+  const options = seedOptions(grant, NOW);
   eq(options.map((o) => [o.hours, o.piece?.id, o.current, o.available]), [
     [24, 'thesis_citadel_risk_shield', true, false],
     [72, 'thesis_citadel_double_gate', false, true],
     [168, 'crypto_bay_waiting_lighthouse', false, true],
   ], 'after a read: 24 h selected, 3 days · building and 7 days · landmark offered with their pieces');
-  eq(seedOptions(parseGrant({ ...seedWorld, state: 'bloomed' })!), [], 'NO TRADE: no picker');
+  eq(seedOptions(parseGrant({ ...seedWorld, state: 'bloomed' })!, NOW), [], 'NO TRADE: no picker');
+  eq(seedOptions(grant, Date.parse(seedWorld.horizon.reviewAt)).filter((o) => o.available), [], 'once the review opens the desk offers nothing longer');
 
   let state: SeedCardState = { phase: 'choose' };
   state = seedCardReducer(state, { type: 'pick', hours: 24, options });
@@ -169,7 +247,7 @@ const grant = parseGrant(seedWorld)!;
   eq(seedCardReducer(state, { type: 'success' }), { phase: 'choose' }, 'success returns to the choice');
 
   const extended = applyExtended(grant, { inventoryId: 'inv-1', item: piece('thesis_citadel_double_gate', 'building', [2, 1]), horizon: { hours: 72, tier: 'building', reviewAt: '2026-09-22T10:00:00Z', extendable: true, extendTo: [168] } });
-  eq(seedOptions(extended).map((o) => [o.hours, o.piece?.id, o.current, o.available]), [
+  eq(seedOptions(extended, NOW).map((o) => [o.hours, o.piece?.id, o.current, o.available]), [
     [24, 'thesis_citadel_risk_shield', false, false],
     [72, 'thesis_citadel_double_gate', true, false],
     [168, 'crypto_bay_waiting_lighthouse', false, true],
@@ -194,6 +272,41 @@ const grant = parseGrant(seedWorld)!;
   ok(!down.ok && down.status === 0, 'a network failure is a refusal, not a throw');
   eq(extendErrorMessage(400, 'A horizon can only grow'), 'A horizon can only grow.', 'not_upward copy');
   eq(extendErrorMessage(404, 'not_found'), 'This seed is no longer on your island.', 'not_found copy');
+}
+// ---------- the desk card's extend: it reports even after a new read replaced the card ----------
+{
+  const extendedBody = { ok: true, extended: { inventoryId: 'inv-1', item: piece('thesis_citadel_double_gate', 'building', [2, 1]), horizon: { hours: 72, tier: 'building', reviewAt: '2026-09-22T10:00:00Z', extendable: true, extendTo: [168] } }, inventory: [], placements: [] };
+  // A fetch that answers when the test says so: the card can unmount in between.
+  const later = (status: number, body: unknown) => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const fetchImpl = (async () => { await gate; return Response.json(body, { status }); }) as typeof fetch;
+    return { fetchImpl, release };
+  };
+  const run = async (status: number, body: unknown, unmountMidway: boolean, auth: Record<string, string> | null = { 'x-bobby-session': 'tok' }) => {
+    const log = { card: [] as ExtendOutcome[], notice: [] as ExtendOutcome[], saved: [] as Array<[string, WorldGrant]> };
+    let mounted = true;
+    const { fetchImpl, release } = later(status, body);
+    const pending = submitExtend({
+      auth, eventId: 'e1', grant, hours: 72, fetchImpl, onScreen: () => mounted,
+      card: (o) => log.card.push(o), notice: (o) => log.notice.push(o), saveGrant: (id, g) => log.saved.push([id, g]),
+      pieceLabel: (p) => (p.name as { en: string }).en,
+    });
+    if (unmountMidway) mounted = false; // a new read: setLandEvent(null) unmounts the card
+    release();
+    return { outcome: await pending, ...log };
+  };
+  const shown = await run(200, extendedBody, false);
+  ok(shown.outcome.ok && shown.card.length === 1 && shown.card[0].ok && !shown.notice.length, 'on screen: the card shows the extend');
+  eq(shown.saved.map(([id, g]) => [id, g.item?.id, g.horizon?.hours]), [['e1', 'thesis_citadel_double_gate', 72]], 'the grant keeps the new piece');
+  const refusedGone = await run(409, { error: 'Its review is already open', reviewAt: '2026-09-20T10:00:00Z' }, true);
+  eq([refusedGone.card, refusedGone.notice], [[], [{ ok: false, message: 'Its review is already open.' }]], 'card gone: a refusal still reaches the builder');
+  eq(refusedGone.saved, [], 'a refused extend changes no grant');
+  const landedGone = await run(200, extendedBody, true);
+  eq([landedGone.card, landedGone.notice], [[], [{ ok: true, message: 'Horizon set to 3 days. It will bloom as thesis_citadel_double_gate.' }]], 'card gone: a landed extend is still announced');
+  eq(landedGone.saved.length, 1, 'and still saved');
+  const signedOut = await run(200, extendedBody, false, null);
+  eq(signedOut.card, [{ ok: false, message: 'Sign in again to extend it.' }], 'no credential: ask to sign in again');
 }
 eq(CORE_UID, 'aura-core', 'the core draft uid');
 

@@ -8,7 +8,7 @@
 // No React, no DOM: the web test scripts import this directly.
 // ============================================================
 import { t } from '@/lib/companions/i18n';
-import { coreCells, footprintCells, landSize } from './geometry';
+import { SLAB, coreCells, footprintCells, homeZoom, landSize, type LandGeometry, type SpriteFrame } from './geometry';
 
 /** Every /api/trader-land request declares it implements this contract (growth is only triggered for such clients). */
 export const TRADER_LAND_CLIENT_HEADER = { 'X-Trader-Land-Client': '2' } as const;
@@ -133,13 +133,37 @@ export function pieceName(piece: PieceSummary | null | undefined, spanish: boole
   return (spanish ? name?.es : name?.en) ?? name?.en ?? prettyId(piece.id, piece.world);
 }
 
+/**
+ * Has the seed's review opened? `extendable` is the server's word at load
+ * time; a studio left open past `reviewAt` must stop offering extensions
+ * the server would refuse.
+ */
+export function reviewOpened(horizon: Pick<Horizon, 'reviewAt'> | null | undefined, now = Date.now()): boolean {
+  const at = Date.parse(horizon?.reviewAt ?? '');
+  return Number.isFinite(at) && at <= now;
+}
+
 /** The upward extensions a seed can still take, each with the piece it would bloom into. */
-export function extendChoices(horizon: Horizon | null | undefined, tiers: TierInfo[] | null | undefined): Array<{ hours: HorizonHours; tier: Tier; footprint: [number, number]; piece: PieceSummary | null }> {
-  if (!horizon?.extendable) return [];
+export function extendChoices(horizon: Horizon | null | undefined, tiers: TierInfo[] | null | undefined, now = Date.now()): Array<{ hours: HorizonHours; tier: Tier; footprint: [number, number]; piece: PieceSummary | null }> {
+  if (!horizon?.extendable || reviewOpened(horizon, now)) return [];
   return HORIZONS.filter((h) => h.hours > horizon.hours && horizon.extendTo.includes(h.hours)).map((h) => ({
     ...h,
     piece: tiers?.find((tier) => tier.id === h.tier || tier.hours === h.hours)?.next ?? null,
   }));
+}
+
+/**
+ * The statuses `extend` answers when it refuses on purpose (contract §3):
+ * 400 not_upward, 404 not_found, 409 not_seed / review_open. They explain
+ * themselves and leave the island intact; anything else (401, 5xx) is a
+ * broken studio.
+ */
+export const EXTEND_REFUSALS: readonly number[] = [400, 404, 409];
+export const isExtendRefusal = (status: number) => EXTEND_REFUSALS.includes(status);
+
+/** What the builder is told once an extend lands: "Horizon set to 3 days. It will bloom as Evidence Workshop." */
+export function extendedNotice(hours: number, piece: string): string {
+  return t(`Horizon set to ${horizonLabel(hours)}. It will bloom as ${piece}.`, `Horizonte de ${horizonLabel(hours)}. Florecerá como ${piece}.`);
 }
 
 /** Server refusals of `extend`, in the reader's language (contract §3). */
@@ -150,4 +174,50 @@ export function extendErrorMessage(status: number, error: unknown): string {
   if (/review/i.test(text)) return t('Its review is already open.', 'Su revisión ya está abierta.');
   if (/only grow/i.test(text) || status === 400) return t('A horizon can only grow.', 'Un horizonte solo puede crecer.');
   return text || t('The seed could not be extended. Try again.', 'No se pudo extender la semilla. Inténtalo de nuevo.');
+}
+
+/** A transparent tap target over the art, in island canvas units. */
+export interface HitBox { left: number; top: number; width: number; height: number; zIndex: number }
+/**
+ * A piece's tap target: 60×85 (× 8/N) standing on its footprint's bottom
+ * vertex, stacked by that vertex like the art. `area` is the footprint as it
+ * lies on the ground (rotation already applied).
+ */
+export function pieceHitBox(geom: LandGeometry, area: { cols: number; rows: number }, col: number, row: number): HitBox {
+  const center = geom.iso(col + (area.cols - 1) / 2, row + (area.rows - 1) / 2);
+  const ground = center.y + (geom.tileH * (area.cols + area.rows)) / 4, u = geom.unit;
+  return { left: center.x - 30 * u, top: ground - 70 * u, width: 60 * u, height: 85 * u, zIndex: Math.round(ground) + 102 };
+}
+/**
+ * Stack level of the Aura Core's tap target: under every piece's. A piece's
+ * bottom vertex is always below the slab's top corner, so any piece — in
+ * front of the core or hidden behind its tall art — wins the tap; the core
+ * answers on its own tiles and wherever its art covers no piece.
+ */
+export const CORE_HIT_Z = Math.round(SLAB.top.y) + 102;
+/** The Aura Core's tap target: the visible part of its art, down to its footprint's bottom vertex. */
+export function coreHitBox(frame: SpriteFrame, contentBounds: readonly number[]): HitBox {
+  const top = frame.y + frame.size * contentBounds[1];
+  return { left: frame.x + frame.size * contentBounds[0], top, width: frame.size * (contentBounds[2] - contentBounds[0]), height: frame.depth - top, zIndex: CORE_HIT_Z };
+}
+
+/** "Fit island": the whole slab on screen, whatever its size. */
+export const FIT_ZOOM = 1;
+/**
+ * The studio's home view. The builder's is `homeZoom` (1.25 from 12×12 up so
+ * 1×1 tiles stay tappable); a read-only visitor taps nothing and sees the
+ * whole island instead of a crop.
+ */
+export function studioHomeZoom(rawSize: unknown, readOnly: boolean): number {
+  return readOnly ? FIT_ZOOM : homeZoom(rawSize);
+}
+
+/**
+ * The credential for /api/trader-land: the wallet session first, else the
+ * Apple/Google (Supabase) session — the same order as ProgressSync, and the
+ * API accepts either (api/_lib/user-identity.ts). Null = signed out.
+ */
+export function landCredential(walletHeaders: Record<string, string>, supabaseToken: string | null | undefined): Record<string, string> | null {
+  if (walletHeaders['x-bobby-session']) return walletHeaders;
+  return supabaseToken ? { Authorization: `Bearer ${supabaseToken}` } : null;
 }

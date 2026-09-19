@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Check, ChevronDown, Copy, ExternalLink, Globe, Hand, HelpCircle, Layers3, LoaderCircle, Maximize, Minus, Move, Plus, RotateCw, Share2, Sparkles, Sprout, Undo2, Volume2, VolumeX, X } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useAppKit } from '@reown/appkit/react';
-import { useBobbySession } from '@/hooks/useBobbySession';
 import { Helmet } from 'react-helmet-async';
 import { isSpanish, t } from '@/lib/companions/i18n';
 import { findBaseToken } from '@/lib/base-swap/tokens';
 import { canvasPoint, draggedGridPosition } from '@/lib/trader-land-gestures';
 import { CATALOG_ALIASES, STUDIO_PATH, WORLDS_PATH, shareUrl, withCatalogAliases } from '@/lib/trader-land/public';
-import { CAMERA_ZOOM, CORE_FOOTPRINT, DORMANT_CORE_SCALE, coreCells, footprintCells, homeZoom, landGeometry, maxZoom, spriteFrame, type LandGeometry } from '@/lib/trader-land/geometry';
-import { CORE_UID, FALLBACK_CORE, NO_SHORTEN, TRADER_LAND_CLIENT_HEADER, coreStateLabel, draftFits, extendChoices, findSpawn, grewNotice, growthLabel, horizonLabel, horizonOptionLabel, landChanged, landCore, occupiedCells, pieceName, type Extended, type Grew, type Horizon, type HorizonHours, type LandCore, type LandGrowth, type PieceSummary, type TierInfo } from '@/lib/trader-land/growth';
+import { CAMERA_ZOOM, CORE_FOOTPRINT, DORMANT_CORE_SCALE, coreCells, footprintCells, landGeometry, maxZoom, spriteFrame, type LandGeometry } from '@/lib/trader-land/geometry';
+import { CORE_UID, FALLBACK_CORE, FIT_ZOOM, NO_SHORTEN, TRADER_LAND_CLIENT_HEADER, coreHitBox, coreStateLabel, draftFits, extendChoices, extendErrorMessage, extendedNotice, findSpawn, grewNotice, growthLabel, horizonLabel, horizonOptionLabel, isExtendRefusal, landChanged, landCore, occupiedCells, pieceHitBox, pieceName, studioHomeZoom, type Extended, type Grew, type Horizon, type HorizonHours, type LandCore, type LandGrowth, type PieceSummary, type TierInfo } from '@/lib/trader-land/growth';
+import { useLandCredential } from '@/lib/trader-land/useLandCredential';
 import LandGrowthGuide from '@/components/companion/LandGrowthGuide';
 import './trader-land.css';
 
@@ -320,10 +320,13 @@ export default function TraderLandGatePage() {
   const gesture = useRef<{ start: { x: number; y: number }; dragged: boolean; piece: boolean; handle: boolean; origin?: { col: number; row: number }; targetId?: string } | null>(null);
   const lock = useRef(false);
   const requestEpoch = useRef(0);
-  const { wallet, ready, ensureSession, headers } = useBobbySession({ auto: false });
+  // Wallet session, else the Apple/Google session: whoever syncs progress on the desk builds here.
+  const { wallet, signedIn, known, identity, ensureSession, headers } = useLandCredential();
   const { open } = useAppKit();
   const { enabled: soundEnabled, toggle: toggleSound, cue } = useLandSound();
-  const isDemo = !ready && !visitor;
+  const isDemo = !visitor && known && !signedIn;
+  // Until the Apple/Google session is looked up we do not know whose island to draw.
+  const identifying = !visitor && !known;
   const editingBlocked = visitor || busy || (!isDemo && Boolean(error));
   const world = visitor ? visited : isDemo ? demo : remote;
   // Older deployments cannot move pieces atomically. Enable only when advertised by the server.
@@ -369,14 +372,25 @@ export default function TraderLandGatePage() {
     const bounded = { scale, x: Math.min(size.width * reach, Math.max(-size.width * reach, next.x)), y: Math.min(size.height * reach, Math.max(-size.height * reach, next.y)) };
     cameraRef.current = bounded; setCamera(bounded);
   }, [size, zoomLimit]);
-  const resetView = () => updateCamera({ x: 0, y: 0, scale: homeZoom(geom.size) });
-  // A new island size gets its own home view (1.25 from 12×12 up, so 1×1 tiles stay tappable).
+  // Home: 1.25 from 12×12 up for the builder, so 1×1 tiles stay tappable; a visitor sees the whole island.
+  const resetView = () => updateCamera({ x: 0, y: 0, scale: studioHomeZoom(geom.size, visitor) });
+  const fitView = () => updateCamera({ x: 0, y: 0, scale: FIT_ZOOM });
+  // A new island size gets its own home view.
   const homedSize = useRef<number>(PRACTICE_SIZE);
   useEffect(() => {
     if (homedSize.current === geom.size) return;
     homedSize.current = geom.size;
-    updateCamera({ x: 0, y: 0, scale: homeZoom(geom.size) });
-  }, [geom.size, updateCamera]);
+    updateCamera({ x: 0, y: 0, scale: studioHomeZoom(geom.size, visitor) });
+  }, [geom.size, visitor, updateCamera]);
+  // A selected seed's review can open while the studio is open: draw it again then, so its extend options go.
+  const [, setClock] = useState(0);
+  const selectedReviewAt = world?.inventory.find((entry) => entry.id === selectedId && entry.state === 'seed')?.horizon?.reviewAt;
+  useEffect(() => {
+    const wait = Date.parse(selectedReviewAt ?? '') - Date.now();
+    if (!(wait > 0) || wait > 2 ** 31 - 1) return;
+    const timer = window.setTimeout(() => setClock((tick) => tick + 1), wait + 50);
+    return () => window.clearTimeout(timer);
+  }, [selectedReviewAt]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -422,7 +436,7 @@ export default function TraderLandGatePage() {
     if (visitor) return;
     requestEpoch.current += 1; const epoch = requestEpoch.current;
     setRemote(null); setDraft(null); setSelectedId(null); setUndoWorld(null); setUndoAction(null); setExtendAsk(null); setError('');
-    if (!ready) { setBusy(false); return; }
+    if (!signedIn) { setBusy(false); return; }
     setBusy(true);
     fetch('/api/trader-land', { headers: { ...headers(), ...TRADER_LAND_CLIENT_HEADER } }).then(async (response) => {
       const value = await response.json();
@@ -432,7 +446,7 @@ export default function TraderLandGatePage() {
     return () => { requestEpoch.current += 1; };
   // The identity is the invalidation boundary; headers reads the current token.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, wallet]);
+  }, [identity]);
   useEffect(() => {
     setVisited(null); setVisitorMeta(null);
     if (!visitorCode) return;
@@ -447,20 +461,34 @@ export default function TraderLandGatePage() {
     return () => controller.abort();
   }, [visitorCode]);
   useEffect(() => { setShareTitle(remote?.share?.title ?? ''); }, [remote?.share?.title]);
-  const mutate = async (action: Record<string, unknown>): Promise<World | null> => {
+  // `refusal` takes the refusals an action expects (an extend after its review opened): the caller
+  // explains them as a notice and the studio stays usable, instead of the page-level error that
+  // blocks every edit until a reload.
+  const mutate = async (action: Record<string, unknown>, refusal?: { expected: (status: number) => boolean; explain: (status: number, error: unknown) => void }): Promise<World | null> => {
     if (visitor || lock.current || error || (action.action === 'move' && !canMove)) return null;
     lock.current = true; setBusy(true); setError('');
     const epoch = requestEpoch.current;
     const before = remote;
-    try {
-      const response = await fetch('/api/trader-land', { method: 'POST', headers: { ...headers(), ...TRADER_LAND_CLIENT_HEADER, 'Content-Type': 'application/json' }, body: JSON.stringify(action) });
-      const value = await response.json();
-      if (!response.ok || !Array.isArray(value.inventory) || !Array.isArray(value.placements)) throw new Error(value.error || 'Could not save your world');
-      if (epoch !== requestEpoch.current) return null;
+    const apply = (value: World) => {
       setRemote(value);
       // A grown island shifted every coordinate and a moved core changed what is free:
       // the open draft and the undo step no longer describe this land.
-      if (landChanged(before?.land, (value as World).land)) { setDraft(null); setUndoAction(null); }
+      if (landChanged(before?.land, value.land)) { setDraft(null); setUndoAction(null); }
+    };
+    try {
+      const response = await fetch('/api/trader-land', { method: 'POST', headers: { ...headers(), ...TRADER_LAND_CLIENT_HEADER, 'Content-Type': 'application/json' }, body: JSON.stringify(action) });
+      const value = await response.json().catch(() => ({}));
+      if (refusal?.expected(response.status)) {
+        // Read the world again so the refused piece shows its real state (review open, bloomed, gone).
+        const fresh = await fetch('/api/trader-land', { headers: { ...headers(), ...TRADER_LAND_CLIENT_HEADER } }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (epoch !== requestEpoch.current) return null;
+        if (fresh && Array.isArray(fresh.inventory) && Array.isArray(fresh.placements)) apply(fresh);
+        refusal.explain(response.status, value.error);
+        return null;
+      }
+      if (!response.ok || !Array.isArray(value.inventory) || !Array.isArray(value.placements)) throw new Error(value.error || 'Could not save your world');
+      if (epoch !== requestEpoch.current) return null;
+      apply(value);
       return value;
     } catch (err) { if (epoch === requestEpoch.current) setError(err instanceof Error ? err.message : String(err)); return null; }
     finally { lock.current = false; if (epoch === requestEpoch.current) setBusy(false); }
@@ -561,12 +589,12 @@ export default function TraderLandGatePage() {
   const extendSeed = async () => {
     if (!extendAsk || !canExtend || draft) return;
     const ask = extendAsk;
-    const next = await mutate({ action: 'extend', inventoryId: ask.inventoryId, hours: ask.hours });
+    // not_upward / not_found / not_seed / review_open are answers, not failures: say why, keep building.
+    const next = await mutate({ action: 'extend', inventoryId: ask.inventoryId, hours: ask.hours }, { expected: isExtendRefusal, explain: (status, refused) => setNotice(extendErrorMessage(status, refused)) });
     setExtendAsk(null);
     if (!next?.extended) return;
     cue('seed_reveal');
-    const name = tierPieceName(next.extended.item);
-    setNotice(t(`Horizon set to ${horizonLabel(next.extended.horizon.hours)}. It will bloom as ${name}.`, `Horizonte de ${horizonLabel(next.extended.horizon.hours)}. Florecerá como ${name}.`));
+    setNotice(extendedNotice(next.extended.horizon.hours, tierPieceName(next.extended.item)));
   };
   /** Name of a server piece: the art catalog's when it has the piece, else the server's. */
   const tierPieceName = (piece: PieceSummary) => { const item = items.get(piece.id); return item ? itemName(item) : pieceName(piece, isSpanish()); };
@@ -666,15 +694,13 @@ export default function TraderLandGatePage() {
   if(artError)return <main className="land-loading"><p role="alert">{artError}</p><button onClick={()=>window.location.reload()}>{t('Reload','Recargar')}</button><Link to="/desk">{t('Back to desk','Volver al desk')}</Link></main>;
   if(!manifest)return <main className="land-loading"><LoaderCircle className="animate-spin"/><h1>Trader Land</h1><p>{t('Waking up your island…','Despertando tu isla…')}</p></main>;
   const coreArt=coreItem!;
-  const u=geom.unit;
   const selectedPlacement=world?.placements.find((p)=>p.inventory_id===selectedId);
   const coreSelected=selectedId===CORE_UID&&coreSelectable;
   const draftSize=draftItem?footprint(draftItem,draft?.orientation):null;
   const draftCenter=draft&&draftSize?geom.iso(draft.col+(draftSize.cols-1)/2,draft.row+(draftSize.rows-1)/2):null;
-  // The core's tappable box is its art's visible content, so it scales with the island.
+  // The core's tappable box is its art's visible content, so it scales with the island; it sits under every piece's (growth.ts CORE_HIT_Z).
   const coreState=artFor(coreArt,false,core.stage===0?'stage0':'stage1');
-  const coreFrame=spriteFrame(geom,CORE_FOOTPRINT,core.x,core.y,0,coreState,{scale:core.stage===0?DORMANT_CORE_SCALE:1});
-  const coreBounds=coreState.contentBounds;
+  const coreHit=coreHitBox(spriteFrame(geom,CORE_FOOTPRINT,core.x,core.y,0,coreState,{scale:core.stage===0?DORMANT_CORE_SCALE:1}),coreState.contentBounds);
   const extendOptions=selected?.state==='seed'&&canExtend?extendChoices(selected.horizon,world?.tiers):[];
   const pendingExtend=extendAsk&&extendAsk.inventoryId===selected?.id?extendOptions.find((choice)=>choice.hours===extendAsk.hours)??null:null;
   // The island's own name leads once its builder gave it one (share panel); visitors see the builder's title.
@@ -685,7 +711,7 @@ export default function TraderLandGatePage() {
       <header className="land-header">
         <Link className="land-icon" to={visitor?WORLDS_PATH:'/desk'} aria-label={visitor?t('Back to worlds','Volver a mundos'):t('Back to desk','Volver al desk')}><ArrowLeft size={20}/></Link>
         <div className="land-wordmark"><h1>{islandName||(visitor?t('Community island','Isla de la comunidad'):'Trader Land')}</h1></div>
-        <span className="land-mode"><i/>{visitor?t('Visiting','Visitando'):isDemo?t('Practice','Práctica'):t('My island','Mi isla')}</span>
+        <span className="land-mode"><i/>{visitor?t('Visiting','Visitando'):signedIn?t('My island','Mi isla'):t('Practice','Práctica')}</span>
         <div className="land-header-right">
           <Link className="land-icon" to={`${WORLDS_PATH}#comunidad`} aria-label={t('Explore islands','Ver islas')} title={t('Explore islands','Ver islas')}><Globe size={19}/></Link>
           {!visitor && <button className="land-icon" onClick={()=>{setShareOpen(!shareOpen);setHelp(false);}} aria-label={t('Share island','Compartir isla')} aria-expanded={shareOpen} title={t('Share island','Compartir isla')}><Share2 size={19}/></button>}
@@ -704,13 +730,13 @@ export default function TraderLandGatePage() {
             })}
             {placements.filter((p)=>p.uid!==draft?.placementId).map((p)=>{
               const item=items.get(p.itemId)!;const entry=world!.inventory.find((i)=>i.id===world!.placements.find((a)=>a.id===p.uid)?.inventory_id);
-              const area=footprint(item,p.orientation), center=geom.iso(p.col+(area.cols-1)/2,p.row+(area.rows-1)/2), ground=center.y+geom.tileH*(area.cols+area.rows)/4;
               // The hit box sits on the footprint's bottom vertex like the art, and scales with the tile.
-              return <div key={p.uid}><ArtSprite item={item} placement={p} seed={entry?.state==='seed'} selected={entry?.id===selectedId} geom={geom}/>{!draft&&<button className="land-object-hit" aria-label={itemName(item)} data-placement={p.uid} style={{left:center.x-30*u,top:ground-70*u,width:60*u,height:85*u,zIndex:Math.round(ground)+102}} onClick={(event)=>{if(event.detail===0)chooseCell(p.col,p.row,p.uid);}}/>}</div>;
+              const hit=pieceHitBox(geom,footprint(item,p.orientation),p.col,p.row);
+              return <div key={p.uid}><ArtSprite item={item} placement={p} seed={entry?.state==='seed'} selected={entry?.id===selectedId} geom={geom}/>{!draft&&<button className="land-object-hit" aria-label={itemName(item)} data-placement={p.uid} data-testid={`land-piece-hit-${p.col}-${p.row}`} style={{left:hit.left,top:hit.top,width:hit.width,height:hit.height,zIndex:hit.zIndex}} onClick={(event)=>{if(event.detail===0)chooseCell(p.col,p.row,p.uid);}}/>}</div>;
             })}
             {placements.filter((p)=>p.uid!==draft?.placementId&&items.get(p.itemId)?.kind==='path_pavement').map((p)=><PathFilament key={'path-'+p.uid} placement={p} placements={placements} itemsById={items} selected={false} geom={geom}/>)}
             {!coreDraft&&<AuraCore item={coreArt} core={core} geom={geom} selected={coreSelected}/>}
-            {!coreDraft&&!draft&&coreSelectable&&<button className="land-object-hit" aria-label="Aura Core" data-placement={CORE_UID} data-testid="land-core-hit" style={{left:coreFrame.x+coreFrame.size*coreBounds[0],top:coreFrame.y+coreFrame.size*coreBounds[1],width:coreFrame.size*(coreBounds[2]-coreBounds[0]),height:coreFrame.depth-(coreFrame.y+coreFrame.size*coreBounds[1]),zIndex:Math.round(coreFrame.depth)+102}} onClick={(event)=>{if(event.detail===0)chooseCell(core.x,core.y,CORE_UID);}}/>}
+            {!coreDraft&&!draft&&coreSelectable&&<button className="land-object-hit" aria-label="Aura Core" data-placement={CORE_UID} data-testid="land-core-hit" style={{left:coreHit.left,top:coreHit.top,width:coreHit.width,height:coreHit.height,zIndex:coreHit.zIndex}} onClick={(event)=>{if(event.detail===0)chooseCell(core.x,core.y,CORE_UID);}}/>}
             {draft && draftItem && <>
               {draftCells.map((cell)=>{const [col,row]=cell.split(':').map(Number),p=geom.iso(col,row);return <svg key={cell} className="land-footprint" style={{left:p.x-geom.tileW/2,top:p.y-geom.tileH/2,zIndex:850}} width={geom.tileW} height={geom.tileH} viewBox="0 0 92 46"><path d="M46 2 L90 23 L46 44 L2 23 Z" fill={validDraft?'#64ffb6':'#ff627a'} fillOpacity=".22" stroke={validDraft?'#9fffcc':'#ff8f9e'} strokeWidth="2"/>{!validDraft&&<path d="M39 19 L53 27 M53 19 L39 27" stroke="#ffbdc7" strokeWidth="2"/>}</svg>;})}
               <div className="land-ghost" style={{opacity:.8}}>{coreDraft?<ArtSprite item={draftItem} placement={{uid:'draft',itemId:draftItem.id,col:draft.col,row:draft.row}} seed={false} selected geom={geom} stateName={core.stage===0?'stage0':'stage1'} scale={core.stage===0?DORMANT_CORE_SCALE:1}/>:<ArtSprite item={draftItem} placement={{uid:'draft',itemId:draftItem.id,col:draft.col,row:draft.row,orientation:draft.orientation}} seed={false} selected geom={geom}/>}</div>
@@ -721,7 +747,7 @@ export default function TraderLandGatePage() {
             <button className="land-icon" onClick={()=>zoomAt(1/1.2,0,0)} aria-label={t('Zoom out','Alejar')}><Minus size={18}/></button>
             <button className="land-zoom-value" onClick={resetView} aria-label={t('Center island','Centrar isla')}>{Math.round(camera.scale*100)}%</button>
             <button className="land-icon" onClick={()=>zoomAt(1.2,0,0)} aria-label={t('Zoom in','Acercar')}><Plus size={18}/></button>
-            <span/><button className="land-icon" onClick={resetView} aria-label={t('Fit island','Ajustar isla')}><Maximize size={18}/></button>
+            <span/><button className="land-icon" onClick={fitView} aria-label={t('Fit island','Ajustar isla')}><Maximize size={18}/></button>
           </div>
           <div className="land-map-bottom" data-land-ui>
             {!visitor && <div className="land-tools" role="group" aria-label={t('Map tools','Herramientas del mapa')}>
@@ -738,7 +764,7 @@ export default function TraderLandGatePage() {
             {notice && <div role="status" className="land-notice">{notice}</div>}
             {error && <div role="alert" className="land-error">{error}<button onClick={()=>window.location.reload()} aria-label={t('Reload saved island','Recargar isla guardada')}><RotateCw size={16}/></button></div>}
           </div>
-          {!world && <div className="land-load-overlay">{busy?<><LoaderCircle className="animate-spin"/><p>{visitor?t('Loading the island…','Cargando la isla…'):t('Loading your island…','Cargando tu isla…')}</p></>:<><p>{error||t('Your island is unavailable.','Tu isla no está disponible.')}</p><button className="land-primary" onClick={()=>window.location.reload()}>{t('Retry','Reintentar')}</button></>}</div>}
+          {!world && <div className="land-load-overlay">{busy||identifying?<><LoaderCircle className="animate-spin"/><p>{visitor?t('Loading the island…','Cargando la isla…'):t('Loading your island…','Cargando tu isla…')}</p></>:<><p>{error||t('Your island is unavailable.','Tu isla no está disponible.')}</p><button className="land-primary" onClick={()=>window.location.reload()}>{t('Retry','Reintentar')}</button></>}</div>}
           {help && <div className="land-help" data-land-ui role="region" aria-label={t('How to play','Cómo jugar')}><button className="land-icon" onClick={()=>setHelp(false)} aria-label={t('Close help','Cerrar ayuda')}><X size={18}/></button><h3>{t('How to play','Cómo jugar')}</h3><p>{t('Choose a piece from your collection. Tap a tile, rotate, then confirm. Tap a built piece to move it or return it to your collection.','Elige una pieza de tu colección. Toca una casilla, gira y confirma. Toca una pieza construida para moverla o devolverla a tu colección.')}{coreSelectable?' '+t('Tap the Aura Core to move it.','Toca el Aura Core para moverlo.'):''}</p><p>{t('Drag the ground to explore. Scroll to pan. Pinch or Ctrl + scroll to zoom. Keyboard: arrows to move, + / − to zoom, 0 to center, R to rotate, Enter to place, Esc to cancel.','Arrastra el suelo para explorar. Desplaza para mover la vista. Pellizca o usa Ctrl + rueda para zoom. Teclado: flechas para mover, + / − para zoom, 0 para centrar, R para girar, Enter para colocar y Esc para cancelar.')}</p>
             {world && !visitor && <LandGrowthGuide practice={isDemo} available={available}
               seeds={world.inventory.filter((entry)=>entry.state==='seed').length}

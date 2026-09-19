@@ -76,9 +76,10 @@ console.log('PASS: IslandThumb — sizes 8/10/12/16 on the same slab, scaled str
 
 // ---------- LandSeedCard: the desk card after a read ----------
 const piece = (id: string, kind: string, footprint: [number, number], en: string) => ({ id, world: id.split('_').slice(0, 2).join('_'), attribution: '', kind, name: { en, es: `ES ${en}` }, footprint });
+// The card reads the clock (no extension once the review opens), so the fixture reviews a day from now.
 const seedWorld = {
   routeIndex: 3, item: piece('thesis_citadel_risk_shield', 'decor', [1, 1], 'Risk Shield'), inventoryId: 'inv-1', state: 'seed', bloomedInventoryId: null, routeComplete: false,
-  horizon: { hours: 24, tier: 'common', reviewAt: '2026-09-20T10:00:00Z', extendable: true, extendTo: [72, 168] },
+  horizon: { hours: 24, tier: 'common', reviewAt: new Date(Date.now() + 24 * 3600_000).toISOString(), extendable: true, extendTo: [72, 168] },
   tiers: { common: piece('thesis_citadel_risk_shield', 'decor', [1, 1], 'Risk Shield'), building: piece('thesis_citadel_double_gate', 'building', [2, 1], 'Double Gate'), landmark: piece('crypto_bay_waiting_lighthouse', 'landmark', [2, 2], 'Waiting Lighthouse') },
 };
 const card = (eventId: string) => renderToStaticMarkup(<MemoryRouter><LandSeedCard eventId={eventId} onClose={() => {}} /></MemoryRouter>);
@@ -95,6 +96,9 @@ assert.doesNotMatch(seedCard, /role="radio"[^>]*disabled=""/, 'every offered hor
 assert.match(seedCard, /href="\/trader-land"/);
 setGrant('e-late', parseGrant({ ...seedWorld, horizon: { ...seedWorld.horizon, extendable: false, extendTo: [] } })!);
 assert.equal((card('e-late').match(/role="radio"[^>]*disabled=""/g) ?? []).length, 2, 'an open review locks the longer horizons');
+// The server said extendable at sync time, but the desk stayed open past reviewAt.
+setGrant('e-stale', parseGrant({ ...seedWorld, horizon: { ...seedWorld.horizon, reviewAt: new Date(Date.now() - 60_000).toISOString() } })!);
+assert.equal((card('e-stale').match(/role="radio"[^>]*disabled=""/g) ?? []).length, 2, 'a review that opened since the sync locks the longer horizons too');
 setGrant('e-old', parseGrant({ ...seedWorld, horizon: undefined, tiers: undefined })!);
 assert.equal((card('e-old').match(/role="radio"/g) ?? []).length, 1, 'an older server (no horizon): the planted piece only');
 setGrant('e-nt', parseGrant({ ...seedWorld, inventoryId: 'inv-2', state: 'bloomed', item: piece('crypto_bay_data_dock', 'ground', [1, 1], 'Data Dock'), horizon: undefined, tiers: undefined })!);
@@ -102,7 +106,7 @@ const bloomedCard = card('e-nt');
 assert.match(bloomedCard, /PIECE READY/);
 assert.match(bloomedCard, /Data Dock.*1×1/s);
 assert.doesNotMatch(bloomedCard, /role="radio"/, 'NO TRADE: bloomed 1×1, no picker');
-console.log('PASS: seed card — hidden until granted, 24 h planted + 3 days · building + 7 days · landmark with their pieces, locked once the review opens, NO TRADE bloomed card without picker');
+console.log('PASS: seed card — hidden until granted, 24 h planted + 3 days · building + 7 days · landmark with their pieces, locked once the review opens (by the server or the clock), NO TRADE bloomed card without picker');
 
 const { fetchPublicWorlds } = await import('../src/lib/trader-land/public');
 const originalFetch = globalThis.fetch;
