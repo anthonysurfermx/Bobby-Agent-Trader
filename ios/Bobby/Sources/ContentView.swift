@@ -200,7 +200,8 @@ final class BobbyViewModel: ObservableObject {
         phase = .resolving
         lastAnswer = nil
         noTradeMoment = nil
-        harvest = nil
+        // A card whose extend is on its way stays until it answers (then the new read's card replaces it).
+        if harvest?.holdsThroughNextRead != true { harvest = nil }
 
         Task {
             defer { thinking = false }
@@ -344,6 +345,8 @@ final class BobbyViewModel: ObservableObject {
         } else {
             next = .pending
         }
+        // The seed's row, horizon and tier previews: what the horizon choice needs, for this account.
+        if let outcome { moment.adopt(outcome, owner: AccountSession.shared.session?.userId) }
         // A duplicate was counted by an earlier round: the local number stands.
         if let outcome, !outcome.duplicate {
             moment.xp = outcome.awarded
@@ -364,6 +367,59 @@ final class BobbyViewModel: ObservableObject {
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         default: break
         }
+    }
+
+    /// Extends the harvest card's seed to a longer horizon (docs/trader-land/GROWTH-v1.md §1):
+    /// one POST, never twice at once, and its answer lands only on the card that asked —
+    /// a new read may have replaced it meanwhile. A refusal or a lost answer reads the seed's
+    /// row again, so the card never keeps a horizon the server no longer has. true = a request went out.
+    @discardableResult
+    func extendSeed(to target: LandHorizon, extender: DeskSeedExtender = DeskSeedExtender()) async -> Bool {
+        guard let moment = harvest, let eventID = moment.eventID, let inventoryID = moment.inventoryID,
+              let started = moment.startingExtend(to: target) else { return false }
+        withAnimation(.easeOut(duration: 0.2)) { harvest = started }
+        let result = await extender.extend(inventoryID: inventoryID, to: target)
+        var truth: DeskSeedExtender.Extended?
+        if case let .failure(failure) = result, failure.rereads,
+           harvest?.eventID == eventID, harvest?.inventoryID == inventoryID {
+            truth = await extender.seedRow(inventoryID: inventoryID)
+        }
+        guard let settled = HarvestMoment.settlingExtend(harvest, eventID: eventID, inventoryID: inventoryID, target: target,
+                                                         result: result, truth: truth) else {
+            // The card is gone (a newer read, another account): a success still pops the chip;
+            // anything else is said once, since no card is left to show it.
+            if case .success = result {
+                landBump += 1
+            } else {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                AccessibilityNotification.Announcement(DeskSeedExtender.droppedMessage).post()
+            }
+            return true
+        }
+        withAnimation(.spring(duration: 0.45, bounce: 0.2)) { harvest = settled }
+        if settled.extendError == nil {
+            landBump += 1
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+        // The confirm button that had focus is gone either way: say what happened.
+        if let line = settled.extendAnnouncement { AccessibilityNotification.Announcement(line).post() }
+        return true
+    }
+
+    /// The seed's row belongs to the account that planted it: signed out, or into another
+    /// account, the card keeps its story but no longer offers that seed's horizon.
+    func accountChanged(to userID: String?) {
+        guard var moment = harvest, moment.forgetSeedRow(unlessOwnedBy: userID) else { return }
+        withAnimation(.easeOut(duration: 0.2)) { harvest = moment }
+    }
+
+    /// A card left open past its review shows its choice closed. The card's own clock does
+    /// this while the desk is on screen; this catches a return from the background.
+    func closeExpiredHorizon(now: Date = Date()) {
+        guard var moment = harvest, moment.closeHorizonIfReviewOpen(at: now) else { return }
+        harvest = moment
     }
 
     func selectTimeframe(_ next: MarketTimeframe) {
@@ -475,8 +531,12 @@ struct ContentView: View {
         // or out changes whose island the chip reads.
         .onChange(of: progressSync.acknowledgedRounds) { Task { await pulse.refresh() } }
         .onChange(of: account.isSignedIn) { Task { await pulse.refresh() } }
+        // Signed out, or into another account: the harvest card's seed is not this desk's to extend.
+        .onChange(of: account.session?.userId) { _, userID in vm.accountChanged(to: userID) }
         .onChange(of: scenePhase) { _, next in
             if next == .background { vm.voice.stop() }
+            // Back from the background: a seed whose review opened meanwhile shows its choice closed.
+            if next == .active { vm.closeExpiredHorizon() }
         }
         .onDisappear { vm.voice.stop() }
         // A new companion must not finish the old one's sentence — unless the
@@ -536,7 +596,7 @@ struct ContentView: View {
             RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
         }
         .sheet(isPresented: $showAccount) {
-            AccountSheet(store: vm.companions, profile: vm.profile) { showAccount = false }
+            AccountSheet(store: vm.companions, profile: vm.profile, pieces: account.isSignedIn ? pulse.pieces : nil) { showAccount = false }
         }
         .sheet(isPresented: $showSquad) {
             // Muted means muted: the gallery's pick line stays silent too.
@@ -924,7 +984,11 @@ struct ContentView: View {
     }
 
     private func harvestCard(_ moment: HarvestMoment, showsXP: Bool = true) -> some View {
-        HarvestCard(moment: moment, showsXP: showsXP, onOpen: { focus in openLand(focus) }, onSaveProgress: { showAccount = true })
+        HarvestCard(moment: moment, showsXP: showsXP, onOpen: { focus in openLand(focus) }, onSaveProgress: { showAccount = true },
+                    onExtend: { horizon in
+                        // The island changed: the chip reads it again once the answer is in.
+                        Task { if await vm.extendSeed(to: horizon) { await pulse.refresh() } }
+                    })
     }
 
     private func openLand(_ focus: TraderLandFocus?, haptic: UIImpactFeedbackGenerator.FeedbackStyle? = nil) {
