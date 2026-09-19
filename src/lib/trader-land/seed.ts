@@ -1,0 +1,142 @@
+// ============================================================
+// The desk's seed card — what /api/progress granted for a read (contract §3
+// `results[].world`) and the horizon choice offered right after it:
+// 24 h (selected), 3 days, 7 days, upward only, with a confirm step.
+// Pure state + one POST; the card component renders it.
+// ============================================================
+import { TRADER_LAND_CLIENT_HEADER, HORIZONS, extendErrorMessage, type Extended, type Horizon, type HorizonHours, type PieceSummary, type Tier } from './growth';
+
+/** A read's grant (RouteGrant + the Growth v1 additions). */
+export interface WorldGrant {
+  routeIndex: number | null;
+  item: PieceSummary | null;
+  inventoryId: string | null;
+  state: 'seed' | 'bloomed' | null;
+  /** seeds only */
+  horizon: Horizon | null;
+  /** what a 24 h / 3 days / 7 days horizon would bloom into */
+  tiers: Partial<Record<Tier, PieceSummary>> | null;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+function piece(value: unknown): PieceSummary | null {
+  if (!isRecord(value) || typeof value.id !== 'string') return null;
+  const footprint = Array.isArray(value.footprint) && value.footprint.length === 2 ? value.footprint.map(Number) as [number, number] : [1, 1] as [number, number];
+  return { id: value.id, world: String(value.world ?? ''), attribution: String(value.attribution ?? ''), kind: String(value.kind ?? ''), name: value.name, footprint };
+}
+function horizon(value: unknown): Horizon | null {
+  if (!isRecord(value) || !HORIZONS.some((h) => h.hours === value.hours)) return null;
+  const hours = value.hours as HorizonHours;
+  return {
+    hours,
+    tier: HORIZONS.find((h) => h.hours === hours)!.tier,
+    reviewAt: typeof value.reviewAt === 'string' ? value.reviewAt : '',
+    extendable: value.extendable === true,
+    extendTo: Array.isArray(value.extendTo) ? value.extendTo.filter((h): h is number => h === 72 || h === 168) : [],
+  };
+}
+
+/** One `results[i].world` → a grant the card can render, or null (capped, duplicate, route error). */
+export function parseGrant(raw: unknown): WorldGrant | null {
+  if (!isRecord(raw)) return null;
+  const state = raw.state === 'seed' || raw.state === 'bloomed' ? raw.state : null;
+  const item = piece(raw.item);
+  if (!state || !item || typeof raw.inventoryId !== 'string') return null;
+  let tiers: WorldGrant['tiers'] = null;
+  if (isRecord(raw.tiers)) {
+    tiers = {};
+    for (const tier of ['common', 'building', 'landmark'] as Tier[]) { const p = piece(raw.tiers[tier]); if (p) tiers[tier] = p; }
+  }
+  return { routeIndex: typeof raw.routeIndex === 'number' ? raw.routeIndex : null, item, inventoryId: raw.inventoryId, state, horizon: state === 'seed' ? horizon(raw.horizon) : null, tiers };
+}
+
+/** Grants keyed by the client event id that earned them. */
+export function grantsFromResults(results: unknown): Array<[string, WorldGrant]> {
+  if (!Array.isArray(results)) return [];
+  return results.flatMap((r) => {
+    if (!isRecord(r) || typeof r.id !== 'string') return [];
+    const grant = parseGrant(r.world);
+    return grant ? [[r.id, grant] as [string, WorldGrant]] : [];
+  });
+}
+
+export interface SeedOption {
+  hours: HorizonHours;
+  tier: Tier;
+  footprint: [number, number];
+  /** the piece this horizon blooms into (the seed's own piece for its current horizon) */
+  piece: PieceSummary | null;
+  current: boolean;
+  /** an upward extension the server still accepts */
+  available: boolean;
+}
+
+/** The three horizons of a seed: its current one selected, longer ones offered while its review is closed. */
+export function seedOptions(grant: WorldGrant): SeedOption[] {
+  if (grant.state !== 'seed') return [];
+  const current = grant.horizon?.hours ?? 24;
+  return HORIZONS.map((h) => ({
+    ...h,
+    piece: h.hours === current ? grant.item : grant.tiers?.[h.tier] ?? null,
+    current: h.hours === current,
+    available: h.hours > current && Boolean(grant.horizon?.extendable) && Boolean(grant.horizon?.extendTo.includes(h.hours)),
+  }));
+}
+
+/** The grant after the server extended it: new piece, new horizon, the tier's slot now holds that piece. */
+export function applyExtended(grant: WorldGrant, extended: Extended): WorldGrant {
+  const tier = extended.horizon.tier;
+  return { ...grant, item: extended.item, horizon: extended.horizon, tiers: { ...(grant.tiers ?? {}), [tier]: extended.item } };
+}
+
+export type SeedCardState =
+  | { phase: 'choose' }
+  | { phase: 'confirm'; hours: HorizonHours }
+  | { phase: 'saving'; hours: HorizonHours }
+  | { phase: 'error'; hours: HorizonHours; message: string };
+export type SeedCardAction =
+  | { type: 'pick'; hours: HorizonHours; options: SeedOption[] }
+  | { type: 'cancel' }
+  | { type: 'submit' }
+  | { type: 'success' }
+  | { type: 'failure'; message: string };
+
+/** choose → confirm ("You can't shorten it later") → saving → choose | error. */
+export function seedCardReducer(state: SeedCardState, action: SeedCardAction): SeedCardState {
+  switch (action.type) {
+    case 'pick': {
+      if (state.phase === 'saving') return state;
+      const option = action.options.find((o) => o.hours === action.hours);
+      return option?.available ? { phase: 'confirm', hours: action.hours } : { phase: 'choose' };
+    }
+    case 'cancel': return state.phase === 'saving' ? state : { phase: 'choose' };
+    case 'submit': return state.phase === 'confirm' || state.phase === 'error' ? { phase: 'saving', hours: state.hours } : state;
+    case 'success': return { phase: 'choose' };
+    case 'failure': return state.phase === 'saving' ? { phase: 'error', hours: state.hours, message: action.message } : state;
+  }
+}
+
+/** `extended` on success; otherwise the HTTP status (0 = network) and a message for the reader. */
+export interface ExtendResult { ok: boolean; extended: Extended | null; status: number; message: string }
+
+/**
+ * POST /api/trader-land {action:'extend'} with the caller's credential. The
+ * response carries the whole world too; the desk only needs `extended`.
+ */
+export async function extendSeed(auth: Record<string, string>, inventoryId: string, hours: HorizonHours, fetchImpl: typeof fetch = fetch): Promise<ExtendResult> {
+  try {
+    const response = await fetchImpl('/api/trader-land', {
+      method: 'POST',
+      headers: { ...auth, ...TRADER_LAND_CLIENT_HEADER, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'extend', inventoryId, hours }),
+    });
+    const value = (await response.json().catch(() => ({}))) as { extended?: unknown; error?: unknown };
+    const extended = isRecord(value.extended) ? value.extended : null;
+    const item = piece(extended?.item);
+    const next = horizon(extended?.horizon);
+    if (!response.ok || !extended || !item || !next) return { ok: false, extended: null, status: response.status, message: extendErrorMessage(response.ok ? 0 : response.status, value.error) };
+    return { ok: true, extended: { inventoryId: String(extended.inventoryId ?? inventoryId), item, horizon: next }, status: response.status, message: '' };
+  } catch {
+    return { ok: false, extended: null, status: 0, message: extendErrorMessage(0, null) };
+  }
+}

@@ -21,8 +21,9 @@ export const KIND_LABEL: Record<string, [string, string]> = {
 };
 
 export type PublicPlacement = { item_id: string; x: number; y: number; rotation: number };
-export type PublicWorld = { code: string; title: string | null; size: number; theme: string; publishedAt: string | null; placements: PublicPlacement[]; stats: { pieces: number; districts: string[] } };
-export type CatalogItem = { id: string; world: string; attribution: string; kind: string; footprint_w: number; footprint_h: number; name: unknown; route_index: number | null; art_url: string | null };
+/** `core` is the island's Aura Core (Growth v1); older servers omit it and the core is 3,3, awake. */
+export type PublicWorld = { code: string; title: string | null; size: number; theme: string; publishedAt: string | null; core?: { x: number; y: number; stage: 0 | 1 } | null; placements: PublicPlacement[]; stats: { pieces: number; districts: string[] } };
+export type CatalogItem = { id: string; world: string; attribution: string; kind: string; footprint_w: number; footprint_h: number; name: unknown; route_index: number | null; tier?: 'common' | 'building' | 'landmark' | null; tier_index?: number | null; art_url: string | null };
 
 export type ManifestVariant = { url: string; w: number; h: number };
 export type ManifestState = { anchor: [number, number]; contentBounds: [number, number, number, number]; variants: Record<string, ManifestVariant> };
@@ -53,9 +54,10 @@ export function loadManifest(): Promise<LandManifest> {
   return manifestPromise;
 }
 
-export function artOf(item: ManifestItem) {
+/** Art of a piece; `stateName` picks a specific state (the dormant core draws 'stage0'). */
+export function artOf(item: ManifestItem, stateName?: string) {
   const orientation = Object.values(item.orientations)[0];
-  const state = orientation.states.stage1 ?? orientation.states.bloom ?? Object.values(orientation.states)[0];
+  const state = (stateName ? orientation.states[stateName] : undefined) ?? orientation.states.stage1 ?? orientation.states.bloom ?? Object.values(orientation.states)[0];
   return { albedo: state.variants.albedo_512 ?? state.variants.albedo_1024, thumb: state.variants.thumb_256, anchor: state.anchor, contentBounds: state.contentBounds };
 }
 

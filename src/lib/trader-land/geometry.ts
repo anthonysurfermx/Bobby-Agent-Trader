@@ -138,3 +138,14 @@ export function footprintCells(footprint: { cols: number; rows: number }, col: n
 export function coreCells(core: { x: number; y: number } = { x: 3, y: 3 }): string[] {
   return footprintCells(CORE_FOOTPRINT, core.x, core.y);
 }
+
+/** Camera zoom limits of an 8×8 island; a grown island zooms further in (× N/8). */
+export const CAMERA_ZOOM = { min: 0.7, max: 2.6 } as const;
+/** Deepest zoom for an island of `rawSize`: the 8×8 limit scaled by N/8, so a 16×16 tile can reach the size an 8×8 one does. */
+export function maxZoom(rawSize: unknown = 8): number {
+  return (CAMERA_ZOOM.max * landSize(rawSize)) / 8;
+}
+/** The zoom "fit island" returns to: 1.25 from 12×12 up, so 1×1 tiles stay tappable on a phone. */
+export function homeZoom(rawSize: unknown = 8): number {
+  return landSize(rawSize) >= 12 ? 1.25 : 1;
+}
