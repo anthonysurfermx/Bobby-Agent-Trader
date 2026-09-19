@@ -490,7 +490,8 @@ export default function TraderLandGatePage() {
     setNotice(''); cue('placement_tick');
   };
   const chooseCore = () => {
-    if (!coreSelectable) return;
+    // Practice and visited islands keep the core as scenery: a tap there just clears the selection.
+    if (!coreSelectable) { setSelectedId(null); return; }
     if (tool === 'build' && canMoveCore) { startCoreDraft(); return; }
     setSelectedId(CORE_UID); setLibraryOpen(true); cue('placement_tick');
   };
