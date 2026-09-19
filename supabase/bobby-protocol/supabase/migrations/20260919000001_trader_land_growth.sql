@@ -25,6 +25,13 @@
 -- ============================================================
 begin;
 
+-- Take the table locks up front, in the order a live placement write takes
+-- them (tl_inventory through its FK check, then tl_items and tl_lands in the
+-- reservation trigger), so this migration can never deadlock with the running
+-- API. If a write is in flight it waits for it, at most 5 s, then fails whole.
+set local lock_timeout = '5s';
+lock table public.tl_inventory, public.tl_items, public.tl_lands in access exclusive mode;
+
 -- ---------- tier sequences ----------
 alter table public.tl_items add column if not exists tier text;
 alter table public.tl_items add column if not exists tier_index smallint;

@@ -98,10 +98,12 @@ File: `supabase/bobby-protocol/supabase/migrations/<timestamp>_trader_land_growt
     `{ ok, inventory_id, item_id, tier, horizon_hours, review_at }`.
   - `tl_move_core(p_identity uuid, p_x int, p_y int, p_size int default null)` — locks the land
     `for update`; errors `outside` | `occupied` (any `tl_placement_cells` row inside the target
-    rectangle) | `stale` (`p_size` given and ≠ the land's size). Returns `{ ok, core_x, core_y }`.
+    rectangle) | `resized` (`p_size` given and ≠ the land's size) | `not_found` (no land). Returns
+    `{ ok, core_x, core_y }`.
   - `tl_place_piece`, `tl_move_piece`, `tl_remove_piece` — every placement write goes through
     these. They lock the land first (the same lock order as growth, so a place/move never
-    deadlocks with a growth) and refuse coordinates drawn on a stale size; trigger refusals map to 409.
+    deadlocks with a growth) and refuse coordinates drawn on another size (`resized`); a trigger or
+    key refusal is `changed`. The API maps `occupied` / `resized` / `changed` to 409.
   - `tl_grow_land(p_identity uuid)` — locks the land `for update`; sets `core_stage = 1` when ≥ 5
     placements; then while occupied ≥ threshold(size) and size < 16: `delete from
     tl_placement_cells where identity_id = p_identity`, update the land (new size, core + shift),

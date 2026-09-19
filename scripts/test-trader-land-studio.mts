@@ -307,6 +307,18 @@ const grant = parseGrant(seedWorld)!;
   eq(landedGone.saved.length, 1, 'and still saved');
   const signedOut = await run(200, extendedBody, false, null);
   eq(signedOut.card, [{ ok: false, message: 'Sign in again to extend it.' }], 'no credential: ask to sign in again');
+  // A lost answer, then a retry refused as not_upward: the card adopts the seed as the server has it.
+  const saved: Array<[string, WorldGrant]> = [];
+  const serverSeed = { id: 'inv-1', state: 'seed', item: { id: 'thesis_citadel_double_gate', world: 'thesis_citadel', attribution: '', kind: 'building', name: { en: 'Double Gate', es: 'Doble Puerta' }, footprint_w: 2, footprint_h: 1 }, horizon: { hours: 72, tier: 'building', reviewAt: '2026-09-22T10:00:00Z', extendable: true, extendTo: [168] } };
+  const refusedThenRead = (async (_url: unknown, init?: RequestInit) => init?.method === 'POST'
+    ? Response.json({ error: 'A horizon can only grow' }, { status: 400 })
+    : Response.json({ ok: true, inventory: [serverSeed], placements: [] })) as typeof fetch;
+  const lostAnswer = await submitExtend({
+    auth: { 'x-bobby-session': 'tok' }, eventId: 'e1', grant, hours: 72, fetchImpl: refusedThenRead, onScreen: () => true,
+    card: () => undefined, notice: () => undefined, saveGrant: (id, g) => saved.push([id, g]), pieceLabel: (p) => (p.name as { en: string }).en,
+  });
+  ok(!lostAnswer.ok, 'the refusal is still reported');
+  eq(saved.map(([id, g]) => [id, g.item?.id, g.item?.footprint, g.horizon?.hours, g.tiers?.building?.id]), [['e1', 'thesis_citadel_double_gate', [2, 1], 72, 'thesis_citadel_double_gate']], 'after a refusal the card adopts the server seed (72 h building)');
 }
 eq(CORE_UID, 'aura-core', 'the core draft uid');
 

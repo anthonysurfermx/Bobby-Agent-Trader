@@ -55,6 +55,8 @@ let inventory: InvRow[] = [];
 let placements: Array<{ id: string; inventory_id: string; x: number; y: number; rotation: number; placed_at: string }> = [];
 let progressRow: Record<string, unknown> = {};
 let ledgerRows: Array<{ id: string; client_event_id: string }> = [];
+/** Events already in the ledger (the request's duplicates), with what they were awarded. */
+let seenRows: Array<{ client_event_id: string; kind: string; awarded: number }> = [];
 const rpcAnswers: Record<string, (args: Record<string, unknown>) => unknown> = {};
 let casRows: unknown[] = [];
 let calls: Array<{ method: string; url: string; body: unknown }> = [];
@@ -72,6 +74,7 @@ function reset() {
   placements = [{ id: U(201), inventory_id: U(4), x: 5, y: 5, rotation: 0, placed_at: iso(NOW - 20 * H) }];
   progressRow = { identity_id: ID, companion_id: null, vibe_id: 'directo', onboarded: true, risk_notice_version: 1, xp: 100, aura: 10, route_index: 5, streak: 1, last_day: null, daily_awards: 0, daily_awards_day: null, quick_access: [], last_platform: 'ios', updated_at: iso(NOW) };
   ledgerRows = [];
+  seenRows = [];
   casRows = [];
   calls = [];
   for (const key of Object.keys(rpcAnswers)) delete rpcAnswers[key];
@@ -129,7 +132,8 @@ globalThis.fetch = (async (input: string | URL, init: RequestInit = {}) => {
   if (path.startsWith('bobby_progress_events')) {
     if (method === 'POST') return json([{ id: U(399) }], 201);
     if (path.includes('select=id,client_event_id')) return json(ledgerRows);
-    if (path.includes('select=client_event_id')) return json([]);
+    if (path.includes('select=client_event_id,kind,awarded')) return json(seenRows);
+    if (path.includes('select=client_event_id')) return json(seenRows.map((r) => ({ client_event_id: r.client_event_id })));
     return json([]);  // seed events: none of the fixtures carries a thesis
   }
   if (path.startsWith('bobby_progress')) {
@@ -450,6 +454,26 @@ reset();
   const failed = await call(progressHandler, 'POST', { platform: 'web', events: [{ id: e4, kind: 'read_complete', at: iso(NOW - 1000) }] });
   eq(failed.body.results[0].world, null, 'a refused grant is world: null, the XP still counts');
   assert(failed.body.results[0].awarded > 0, 'awarded');
+}
+
+reset();
+{
+  // A retry of a request whose answer was lost: the event is a duplicate. Its XP is not paid again,
+  // but its piece is granted again — tl_grant_piece replays the same row.
+  const e5 = 'cccccccc-cccc-4ccc-8ccc-000000000005', e6 = 'cccccccc-cccc-4ccc-8ccc-000000000006';
+  seenRows = [{ client_event_id: e5, kind: 'read_complete', awarded: 10 }, { client_event_id: e6, kind: 'read_complete', awarded: 0 }];
+  ledgerRows = [{ id: U(405), client_event_id: e5 }];
+  rpcAnswers.tl_grant_piece = () => ({ ok: true, inventory_id: U(505), item_id: 'crypto_bay_context_buoy', tier: 'common', horizon_hours: 24, state: 'seed', held: 9, seeded_at: iso(NOW - 5000), replay: true });
+  const r = await call(progressHandler, 'POST', { platform: 'ios', events: [{ id: e5, kind: 'read_complete', at: iso(NOW - 6000) }, { id: e6, kind: 'read_complete', at: iso(NOW - 6000) }] });
+  const awarded = r.body.results.find((x: any) => x.id === e5), capped = r.body.results.find((x: any) => x.id === e6);
+  eq([awarded.duplicate, awarded.awarded, awarded.world?.inventoryId, awarded.world?.state], [true, 0, U(505), 'seed'], 'a duplicate of an awarded read gets its piece back, no XP');
+  eq(rpcCalls('tl_grant_piece').map((c) => (c.body as { p_event: string }).p_event), [U(405)], 'only the awarded duplicate is re-granted, keyed on its ledger row');
+  assert(!('world' in capped), 'a duplicate of a capped read still plants nothing');
+  // An awarded duplicate whose ledger row cannot be read: the grant failed, say so.
+  reset();
+  seenRows = [{ client_event_id: e5, kind: 'read_complete', awarded: 10 }];
+  const lost = await call(progressHandler, 'POST', { platform: 'ios', events: [{ id: e5, kind: 'read_complete', at: iso(NOW - 6000) }] });
+  eq(lost.body.results[0].world, null, 'no ledger id: world null (failed), not absent (nothing planted)');
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

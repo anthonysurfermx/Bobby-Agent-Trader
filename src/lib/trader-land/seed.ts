@@ -144,6 +144,30 @@ export async function extendSeed(auth: Record<string, string>, inventoryId: stri
   }
 }
 
+/**
+ * The seed as the server has it now, from GET /api/trader-land: after a
+ * refusal or a lost answer the card must not keep offering what already
+ * happened (an extend that committed before its response was cut off).
+ * World inventory rows carry the catalog item (footprint_w/h), not a PieceSummary.
+ */
+export async function rereadSeed(auth: Record<string, string>, inventoryId: string, fetchImpl: typeof fetch = fetch): Promise<Pick<WorldGrant, 'item' | 'horizon' | 'state'> | null> {
+  try {
+    const response = await fetchImpl('/api/trader-land', { headers: { ...auth, ...TRADER_LAND_CLIENT_HEADER } });
+    if (!response.ok) return null;
+    const value = (await response.json().catch(() => ({}))) as { inventory?: unknown };
+    const row = Array.isArray(value.inventory) ? value.inventory.find((r) => isRecord(r) && r.id === inventoryId) : null;
+    if (!isRecord(row)) return null;
+    const state = row.state === 'seed' || row.state === 'bloomed' ? row.state : null;
+    const raw = isRecord(row.item) ? row.item : null;
+    const item = raw && typeof raw.id === 'string'
+      ? piece({ ...raw, footprint: Array.isArray(raw.footprint) ? raw.footprint : [Number(raw.footprint_w ?? 1), Number(raw.footprint_h ?? 1)] })
+      : null;
+    return state && item ? { state, item, horizon: state === 'seed' ? horizon(row.horizon) : null } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** How an extend ended, in the reader's language. */
 export type ExtendOutcome = { ok: true; message: string } | { ok: false; message: string };
 
@@ -170,7 +194,13 @@ export async function submitExtend(io: {
   const report = (outcome: ExtendOutcome) => { (io.onScreen() ? io.card : io.notice)(outcome); return outcome; };
   if (!io.auth || !io.grant.inventoryId) return report({ ok: false, message: t('Sign in again to extend it.', 'Vuelve a iniciar sesión para extenderla.') });
   const result = await extendSeed(io.auth, io.grant.inventoryId, io.hours, io.fetchImpl);
-  if (!result.ok || !result.extended) return report({ ok: false, message: result.message });
+  if (!result.ok || !result.extended) {
+    // A refusal or a lost answer: adopt the seed as the server has it, so the card
+    // stops offering an extend that already happened (or a review that opened).
+    const fresh = result.status === 400 || result.status === 409 || result.status === 0 ? await rereadSeed(io.auth, io.grant.inventoryId, io.fetchImpl) : null;
+    if (fresh) io.saveGrant(io.eventId, { ...io.grant, ...fresh, tiers: fresh.horizon && fresh.item ? { ...(io.grant.tiers ?? {}), [fresh.horizon.tier]: fresh.item } : io.grant.tiers });
+    return report({ ok: false, message: result.message });
+  }
   const grant = applyExtended(io.grant, result.extended);
   io.saveGrant(io.eventId, grant);
   return report({ ok: true, message: grant.item ? extendedNotice(result.extended.horizon.hours, io.pieceLabel(grant.item)) : t('Horizon extended.', 'Horizonte extendido.') });
