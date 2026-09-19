@@ -4,7 +4,8 @@
 .land-studio button:disabled{opacity:.35;cursor:default}
 .land-studio button:focus-visible,.land-studio a:focus-visible,.land-map:focus-visible{outline:2px solid #e4ffab;outline-offset:3px}
 .land-header{height:84px;flex-shrink:0;display:flex;align-items:center;gap:22px;padding:0 28px;border-bottom:1px solid var(--land-border);background:#0a1514;z-index:4}
-.land-wordmark h1{font-size:25px;font-weight:650;letter-spacing:-1.2px;line-height:1.15;margin-top:3px}
+.land-wordmark{min-width:0}
+.land-wordmark h1{font-size:25px;font-weight:650;letter-spacing:-1.2px;line-height:1.15;margin-top:3px;max-width:min(46vw,420px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .land-wordmark h1>span{font-size:11px;vertical-align:top;margin-left:5px;color:#759a8d}
 .land-eyebrow{font:500 11px/1.4 'JetBrains Mono',monospace;letter-spacing:.19em;color:#83a697}
 .land-header-divider{height:29px;width:1px;background:var(--land-border)}

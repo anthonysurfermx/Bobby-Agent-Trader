@@ -513,6 +513,15 @@ const router = createBrowserRouter(
           ),
         },
         {
+          // Same visitor page, outside the share-card rewrite: the fallback when the card cannot load the app shell.
+          path: 'trader-land/w/:code',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <TraderLandGatePage />
+            </Suspense>
+          ),
+        },
+        {
           path: 'agentic-world/bobby/trader-land/w/:code',
           element: (
             <Suspense fallback={<PageLoader />}>

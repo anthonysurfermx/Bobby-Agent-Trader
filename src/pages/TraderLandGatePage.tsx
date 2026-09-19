@@ -604,12 +604,14 @@ export default function TraderLandGatePage() {
   const selectedPlacement=world?.placements.find((p)=>p.inventory_id===selectedId);
   const draftSize=draftItem?footprint(draftItem,draft?.orientation):null;
   const draftCenter=draft&&draftSize?iso(draft.col+(draftSize.cols-1)/2,draft.row+(draftSize.rows-1)/2):null;
+  // The island's own name leads once its builder gave it one (share panel); visitors see the builder's title.
+  const islandName=visitor?visitorMeta?.title??null:isDemo?null:remote?.share?.title??null;
   return (
     <main className="land-studio">
-      <Helmet><title>Trader Land · Bobby</title><meta name="description" content="Build your island, one thoughtful decision at a time."/></Helmet>
+      <Helmet><title>{`${islandName??'Trader Land'} · Bobby`}</title><meta name="description" content="Build your island, one thoughtful decision at a time."/></Helmet>
       <header className="land-header">
         <Link className="land-icon" to={visitor?WORLDS_PATH:'/desk'} aria-label={visitor?t('Back to worlds','Volver a mundos'):t('Back to desk','Volver al desk')}><ArrowLeft size={20}/></Link>
-        <div className="land-wordmark"><h1>{visitor?(visitorMeta?.title||t('Community island','Isla de la comunidad')):'Trader Land'}</h1></div>
+        <div className="land-wordmark"><h1>{islandName||(visitor?t('Community island','Isla de la comunidad'):'Trader Land')}</h1></div>
         <span className="land-mode"><i/>{visitor?t('Visiting','Visitando'):isDemo?t('Practice','Práctica'):t('My island','Mi isla')}</span>
         <div className="land-header-right">
           <Link className="land-icon" to={`${WORLDS_PATH}#comunidad`} aria-label={t('Explore islands','Ver islas')} title={t('Explore islands','Ver islas')}><Globe size={19}/></Link>

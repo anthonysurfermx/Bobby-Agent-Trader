@@ -17,6 +17,10 @@
       "destination": "https://clob.polymarket.com/:path*"
     },
     {
+      "source": "/agentic-world/bobby/trader-land/w/:code",
+      "destination": "/api/trader-land-share?code=:code"
+    },
+    {
       "source": "/((?!api/|assets/|ai-judge-manifest\\.json$).*)",
       "destination": "/"
     }
@@ -154,6 +158,11 @@
     }
   ],
   "functions": {
+    "api/trader-land-share.ts": {
+      "maxDuration": 15,
+      "memory": 1024,
+      "includeFiles": "public/land/v1/gate-A/**/{asset-manifest.json,bloom_albedo_1024.png,stage1_albedo_1024.png}"
+    },
     "api/mcp-http.ts": {
       "maxDuration": 60,
       "memory": 512
