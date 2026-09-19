@@ -8,23 +8,46 @@ final class TraderLandArchipelagoTests: XCTestCase {
         return try JSONDecoder().decode(TraderLandWorld.self, from: Data(json.utf8))
     }
 
-    /// The manifest anchor (bottom vertex of the footprint) lands on the footprint's bottom vertex.
+    /// The manifest anchor (bottom vertex of the footprint) lands on the footprint's bottom vertex,
+    /// on every island size and for both core stages.
     func testSpritesStandOnTheirFootprintBottomVertex() throws {
-        for (id, col, row) in [("crypto_bay_data_dock", 2, 5), ("thesis_citadel_double_gate", 1, 1), ("crypto_bay_candle_tower", 4, 6), ("aura_core", 3, 3)] {
-            let item = try XCTUnwrap(RuntimeBundle.items[id])
-            let state = try XCTUnwrap(item.artState)
-            let geometry = try XCTUnwrap(LandSpriteGeometry(item: item, col: col, row: row, orientation: .neSW))
-            let bottom = GateLayout.iso(column: CGFloat(col + item.footprint.cols - 1), row: CGFloat(row + item.footprint.rows - 1))
-            let anchorY = geometry.frame.minY + state.anchor[1] * geometry.frame.height
-            XCTAssertEqual(anchorY, bottom.y + GateLayout.tileHeight / 2, accuracy: 0.01, id)
-            XCTAssertEqual(geometry.depth, bottom.y + GateLayout.tileHeight / 2, accuracy: 0.01, id)
-            XCTAssertTrue(geometry.footprint.boundingRect.insetBy(dx: -1, dy: -1).contains(CGPoint(x: geometry.frame.midX, y: anchorY - 1)), id)
+        for n in GateLayout.sizes {
+            let layout = GateLayout(size: n)
+            for (id, col, row, stage) in [("crypto_bay_data_dock", 2, 5, 1), ("thesis_citadel_double_gate", 1, 1, 1), ("crypto_bay_candle_tower", 4, 6, 1),
+                                          ("aura_core", 3, 3, 1), ("aura_core", n - 2, 0, 0)] {
+                let item = try XCTUnwrap(RuntimeBundle.items[id])
+                let state = try XCTUnwrap(item.kind == "core" ? item.artState(stage == 0 ? "stage0" : "stage1") : item.artState)
+                let geometry = try XCTUnwrap(LandSpriteGeometry(item: item, col: col, row: row, orientation: .neSW, layout: layout, coreStage: stage))
+                let bottom = layout.iso(column: CGFloat(col + item.footprint.cols - 1), row: CGFloat(row + item.footprint.rows - 1))
+                let anchorY = geometry.frame.minY + state.anchor[1] * geometry.frame.height
+                let label = "\(id) @\(n) stage \(stage)"
+                XCTAssertEqual(anchorY, bottom.y + layout.tileHeight / 2, accuracy: 0.01, label)
+                XCTAssertEqual(geometry.depth, bottom.y + layout.tileHeight / 2, accuracy: 0.01, label)
+                XCTAssertTrue(geometry.footprint.boundingRect.insetBy(dx: -1, dy: -1).contains(CGPoint(x: geometry.frame.midX, y: anchorY - 1)), label)
+                XCTAssertLessThanOrEqual(geometry.frame.width, 360 * layout.unit + 0.001, label)
+            }
+        }
+    }
+
+    /// A dormant core draws its stage0 art at 72 % of the awake core's frame, standing on the same vertex.
+    func testDormantCoreIsSmallerOnTheSameVertex() throws {
+        let item = try XCTUnwrap(RuntimeBundle.items["aura_core"])
+        for n in GateLayout.sizes {
+            let layout = GateLayout(size: n)
+            let awake = try XCTUnwrap(LandSpriteGeometry(item: item, col: 1, row: 1, orientation: nil, layout: layout, coreStage: 1))
+            let dormant = try XCTUnwrap(LandSpriteGeometry(item: item, col: 1, row: 1, orientation: nil, layout: layout, coreStage: 0))
+            XCTAssertEqual(dormant.depth, awake.depth, accuracy: 0.001)
+            XCTAssertLessThan(dormant.frame.width, awake.frame.width)
+            let stage0 = try XCTUnwrap(item.artState("stage0")), stage1 = try XCTUnwrap(item.artState("stage1"))
+            let full = layout.spriteFrame(footprint: (2, 2), col: 1, row: 1, flip: false, anchor: stage0.anchor, contentBounds: stage0.contentBounds)
+            XCTAssertEqual(dormant.frame.width, full.frame.width * GateLayout.dormantCoreScale, accuracy: 0.001)
+            XCTAssertNotEqual(stage0.contentBounds, stage1.contentBounds)
         }
     }
 
     func testPathFilamentRunsOnTheSlabTopFace() throws {
         let item = try XCTUnwrap(RuntimeBundle.items["axiom_archive_path_straight"])
-        let geometry = try XCTUnwrap(LandSpriteGeometry(item: item, col: 3, row: 2, orientation: .neSW))
+        let geometry = try XCTUnwrap(LandSpriteGeometry(item: item, col: 3, row: 2, orientation: .neSW, layout: .practice))
         let face = try XCTUnwrap(geometry.topFace)
         XCTAssertLessThan(face.midY, geometry.depth)
         XCTAssertEqual(face.height, face.width / 2, accuracy: 0.01)
@@ -66,20 +89,46 @@ final class TraderLandArchipelagoTests: XCTestCase {
         XCTAssertEqual(ArchipelagoScene(islands: [island], showLots: false).lots.count, 0)
     }
 
+    /// A grown neighbour is drawn with its own N-scaled tiles and its own core (moved, dormant).
+    func testSceneDrawsGrownIslandsWithTheirOwnCore() throws {
+        let grown = PublicIsland(code: "grown12345", title: "Tall", size: 12, publishedAt: nil,
+                                 placements: [.init(item_id: "crypto_bay_data_dock", x: 11, y: 11, rotation: 0),
+                                              .init(item_id: "crypto_bay_candle_tower", x: 11, y: 0, rotation: 0),
+                                              .init(item_id: "aura_core", x: 0, y: 0, rotation: 0)],
+                                 stats: nil, core: .init(x: 8, y: 2, stage: 0))
+        let scene = ArchipelagoScene(islands: [grown], showLots: false)
+        let island = try XCTUnwrap(scene.islands.first)
+        XCTAssertEqual(island.layout.size, 12)
+        // The 2×1 tower at x 11 overflows a 12-wide island and the core never comes from placements.
+        XCTAssertEqual(island.sprites.map(\.item.id).sorted(), ["aura_core", "crypto_bay_data_dock"])
+        let core = try XCTUnwrap(island.sprites.first { $0.item.kind == "core" })
+        XCTAssertEqual(core.state.contentBounds, RuntimeBundle.items["aura_core"]?.artState("stage0")?.contentBounds)
+        let bottom = island.layout.iso(column: 9, row: 3)
+        XCTAssertEqual(core.geometry.depth, bottom.y + island.layout.tileHeight / 2, accuracy: 0.01)
+        XCTAssertEqual(island.freeCells.count, 144 - 1 - 4)
+        XCTAssertFalse(island.freeCells.contains { $0 == (8, 2) || $0 == (9, 3) })
+        // An older server sends no core: 3,3 awake.
+        let old = ArchipelagoScene(islands: [PublicIsland(code: "old", title: nil, size: 8, publishedAt: nil, placements: [], stats: nil)], showLots: false)
+        XCTAssertEqual(old.islands.first?.freeCells.count, 60)
+        XCTAssertEqual(old.islands.first?.sprites.first?.state.contentBounds, RuntimeBundle.items["aura_core"]?.artState("stage1")?.contentBounds)
+    }
+
 #if DEBUG
     func testFixtureIslandsAreValidAndDistinct() throws {
         let islands = ArchipelagoFixture.islands()
         XCTAssertEqual(islands.count, 5)
         XCTAssertEqual(Set(islands.map(\.code)).count, 5)
+        XCTAssertEqual(islands.map(\.size), [8, 8, 10, 12, 16])
+        XCTAssertTrue(islands.contains { $0.core?.stage == 0 })
         for island in islands {
             XCTAssertGreaterThanOrEqual(island.placements.count, 7, island.code)
-            var cells = LandPainter.coreCells
+            var cells = island.coreSpot.cells
             for placement in island.placements {
                 let item = try XCTUnwrap(RuntimeBundle.items[TraderLandCatalog.artID(placement.item_id)])
                 let footprint = landCells(item, LandPlacement(uid: "t", itemId: item.id, col: placement.x, row: placement.y, orientation: placement.rotation == 90 ? .nwSE : .neSW))
                 for key in footprint {
                     let xy = key.split(separator: ":").compactMap { Int($0) }
-                    XCTAssertTrue((0..<8).contains(xy[0]) && (0..<8).contains(xy[1]), "\(island.code) \(key)")
+                    XCTAssertTrue(GateLayout(size: island.size).contains(col: xy[0], row: xy[1]), "\(island.code) \(key)")
                     XCTAssertFalse(cells.contains(key), "\(island.code) overlaps at \(key)")
                 }
                 cells.formUnion(footprint)
@@ -139,6 +188,8 @@ final class TraderLandArchipelagoTests: XCTestCase {
         let now = Date()
         XCTAssertEqual(LandIslandStatus.until(now.addingTimeInterval(4.2 * 3600), now: now), "5 h")
         XCTAssertEqual(LandIslandStatus.until(now.addingTimeInterval(39 * 60 + 5), now: now), "40 min")
+        XCTAssertEqual(LandIslandStatus.until(now.addingTimeInterval(47 * 3600), now: now), "47 h")
+        XCTAssertEqual(LandIslandStatus.until(now.addingTimeInterval(167.5 * 3600), now: now), "7 d")
         XCTAssertNil(LandIslandStatus.until(now.addingTimeInterval(-60), now: now))
     }
 }

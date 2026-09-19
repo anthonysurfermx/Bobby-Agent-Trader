@@ -18,28 +18,20 @@ struct LandSpriteGeometry {
     /// Path slabs only: the top face the filament runs on.
     let topFace: CGRect?
 
-    init?(item: LandItem, col: Int, row: Int, orientation: LandOrientation?) {
-        guard let state = item.artState, state.contentBounds.count == 4, state.anchor.count == 2 else { return nil }
+    /// `coreStage` only matters for the Aura Core: stage 0 draws the dormant art at `GateLayout.dormantCoreScale`.
+    init?(item: LandItem, col: Int, row: Int, orientation: LandOrientation?, layout: GateLayout, coreStage: Int = 1) {
+        let dormant = item.kind == "core" && coreStage == 0
+        guard let state = item.kind == "core" ? item.artState(dormant ? "stage0" : "stage1") : item.artState,
+              state.contentBounds.count == 4, state.anchor.count == 2 else { return nil }
+        let sprite = layout.spriteFrame(footprint: (item.footprint.cols, item.footprint.rows), col: col, row: row, flip: orientation == .nwSE,
+                                        anchor: state.anchor, contentBounds: state.contentBounds, path: item.kind == "path_pavement",
+                                        scale: dormant ? GateLayout.dormantCoreScale : 1)
+        frame = sprite.frame
+        flip = sprite.flip
+        depth = sprite.depth
+        topFace = sprite.face
         let area = landFootprint(item, orientation)
-        let center = GateLayout.iso(column: CGFloat(col) + CGFloat(area.cols - 1) / 2, row: CGFloat(row) + CGFloat(area.rows - 1) / 2)
-        let ground = center.y + GateLayout.tileHeight * CGFloat(area.cols + area.rows) / 4
-        let bounds = state.contentBounds
-        let visible = max(0.2, bounds[2] - bounds[0])
-        let size = min(360, GateLayout.tileWidth * CGFloat(item.footprint.cols + item.footprint.rows) / 2 * 0.9 / visible)
-        flip = orientation == .nwSE
-        let midX = center.x + (flip ? -1 : 1) * size * (0.5 - state.anchor[0])
-        let midY = ground + size * (0.5 - state.anchor[1])
-        frame = CGRect(x: midX - size / 2, y: midY - size / 2, width: size, height: size)
-        depth = ground
-        footprint = LandPainter.footprint(col: col, row: row, cols: area.cols, rows: area.rows)
-        if item.kind == "path_pavement" {
-            let width = visible * size
-            let contentMid = (bounds[0] + bounds[2]) / 2
-            let x = flip ? frame.maxX - size * contentMid : frame.minX + size * contentMid
-            topFace = CGRect(x: x - width / 2, y: frame.minY + bounds[1] * size, width: width, height: width / 2)
-        } else {
-            topFace = nil
-        }
+        footprint = LandPainter.footprint(layout, col: col, row: row, cols: area.cols, rows: area.rows)
     }
 }
 
@@ -52,36 +44,33 @@ enum LandPainter {
     static let sideDark = Color(red: 5 / 255, green: 6 / 255, blue: 8 / 255)
     /// Matches the mint baked into the art's glow; only filaments and core particles use it.
     static let artMint = Color(red: 0.38, green: 1, blue: 0.77)
-    static let slabDepth: CGFloat = 22
-    static let islandCenter = CGPoint(x: 430, y: 391)
-    static let coreCells: Set<String> = ["3:3", "3:4", "4:3", "4:4"]
+    static let slabDepth = GateLayout.slabDepth
+    static let islandCenter = GateLayout.islandCenter
 
-    static func footprint(col: Int, row: Int, cols: Int, rows: Int) -> Path {
-        let hw = GateLayout.tileWidth / 2, hh = GateLayout.tileHeight / 2
-        let top = GateLayout.iso(column: CGFloat(col), row: CGFloat(row))
-        let right = GateLayout.iso(column: CGFloat(col + cols - 1), row: CGFloat(row))
-        let bottom = GateLayout.iso(column: CGFloat(col + cols - 1), row: CGFloat(row + rows - 1))
-        let left = GateLayout.iso(column: CGFloat(col), row: CGFloat(row + rows - 1))
+    static func footprint(_ layout: GateLayout, col: Int, row: Int, cols: Int, rows: Int) -> Path {
         var path = Path()
-        path.move(to: CGPoint(x: top.x, y: top.y - hh))
-        path.addLine(to: CGPoint(x: right.x + hw, y: right.y))
-        path.addLine(to: CGPoint(x: bottom.x, y: bottom.y + hh))
-        path.addLine(to: CGPoint(x: left.x - hw, y: left.y))
+        path.addLines(layout.diamond(col: col, row: row, cols: cols, rows: rows))
         path.closeSubpath()
         return path
     }
 
-    static let island = footprint(col: 0, row: 0, cols: 8, rows: 8)
-
-    static func cells(_ list: [(Int, Int)]) -> Path {
+    /// The slab's top face: the same diamond for every island size (constant extent).
+    static let island: Path = {
         var path = Path()
-        for (col, row) in list { path.addPath(footprint(col: col, row: row, cols: 1, rows: 1)) }
+        path.addLines([GateLayout.slabTop, GateLayout.slabRight, GateLayout.slabBottom, GateLayout.slabLeft])
+        path.closeSubpath()
+        return path
+    }()
+
+    static func cells(_ layout: GateLayout, _ list: [(Int, Int)]) -> Path {
+        var path = Path()
+        for (col, row) in list { path.addPath(footprint(layout, col: col, row: row, cols: 1, rows: 1)) }
         return path
     }
 
     /// The island as a slab floating in the dark: two visible side faces under a uniform top.
     static func slab(_ ctx: GraphicsContext) {
-        let left = CGPoint(x: 62, y: 391), bottom = CGPoint(x: 430, y: 575), right = CGPoint(x: 798, y: 391)
+        let left = GateLayout.slabLeft, bottom = GateLayout.slabBottom, right = GateLayout.slabRight
         let d = slabDepth
         var west = Path(); west.addLines([left, bottom, CGPoint(x: bottom.x, y: bottom.y + d), CGPoint(x: left.x, y: left.y + d)]); west.closeSubpath()
         var east = Path(); east.addLines([bottom, right, CGPoint(x: right.x, y: right.y + d), CGPoint(x: bottom.x, y: bottom.y + d)]); east.closeSubpath()
@@ -94,15 +83,15 @@ enum LandPainter {
     static func rim(_ ctx: GraphicsContext, color: Color) {
         ctx.stroke(island, with: .color(color), lineWidth: 1)
         var base = Path()
-        base.addLines([CGPoint(x: 62, y: 391 + slabDepth), CGPoint(x: 430, y: 575 + slabDepth), CGPoint(x: 798, y: 391 + slabDepth)])
+        base.addLines([GateLayout.slabLeft, GateLayout.slabBottom, GateLayout.slabRight].map { CGPoint(x: $0.x, y: $0.y + slabDepth) })
         ctx.stroke(base, with: .color(.white.opacity(0.05)), lineWidth: 1)
     }
 
-    /// Soft contact shadows from each piece's true footprint.
-    static func shadows(_ ctx: GraphicsContext, _ footprints: [Path]) {
+    /// Soft contact shadows from each piece's true footprint; `unit` scales the blur with the tile.
+    static func shadows(_ ctx: GraphicsContext, _ footprints: [Path], unit: CGFloat = 1) {
         guard !footprints.isEmpty else { return }
         ctx.drawLayer { layer in
-            layer.addFilter(.blur(radius: 4))
+            layer.addFilter(.blur(radius: 4 * unit))
             for path in footprints { layer.fill(shrunk(path), with: .color(.black.opacity(0.5))) }
         }
     }
@@ -124,7 +113,8 @@ enum LandPainter {
     }
 
     /// The light running along a path slab, from the centre of its top face to the joined edges.
-    static func filament(_ ctx: GraphicsContext, face: CGRect, connectors: Set<LandConnector>, dimmed: Bool) {
+    /// `unit` (8/N) keeps the stroke in proportion to the tile.
+    static func filament(_ ctx: GraphicsContext, face: CGRect, connectors: Set<LandConnector>, dimmed: Bool, unit: CGFloat = 1) {
         let center = CGPoint(x: face.midX, y: face.midY)
         let ends: [LandConnector: CGPoint] = [
             .NE: CGPoint(x: face.minX + face.width * 0.75, y: face.minY + face.height * 0.25),
@@ -135,16 +125,18 @@ enum LandPainter {
         for connector in connectors {
             guard let end = ends[connector] else { continue }
             var line = Path(); line.move(to: center); line.addLine(to: end)
-            ctx.stroke(line, with: .color(artMint.opacity(dimmed ? 0.15 : 0.95)), style: StrokeStyle(lineWidth: dimmed ? 2 : 4, lineCap: .round))
+            ctx.stroke(line, with: .color(artMint.opacity(dimmed ? 0.15 : 0.95)), style: StrokeStyle(lineWidth: (dimmed ? 2 : 4) * unit, lineCap: .round))
         }
-        ctx.fill(Path(ellipseIn: CGRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8)), with: .color(artMint.opacity(dimmed ? 0.15 : 1)))
+        let dot = 4 * unit
+        ctx.fill(Path(ellipseIn: CGRect(x: center.x - dot, y: center.y - dot, width: 2 * dot, height: 2 * dot)), with: .color(artMint.opacity(dimmed ? 0.15 : 1)))
     }
 }
 
 // MARK: Archipelago layout — public islands around yours.
 
 enum ArchipelagoLayout {
-    /// Island origins sit on a coarse iso grid 14 tiles apart: 8-tile islands with a 6-tile sea between them.
+    /// Island origins sit on a coarse iso grid 14 base tiles apart: an island's slab is 8 base tiles wide
+    /// whatever its size (constant extent), with a 6-tile sea between them.
     static let spacing: CGFloat = 14
     private static let directions = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)]
 
@@ -166,13 +158,13 @@ enum ArchipelagoLayout {
     /// A slot's offset from your island, in island canvas units: axial q runs down-right, r up-right.
     static func offset(_ slot: Int) -> CGPoint {
         let hex = slots[min(slot, slots.count - 1)]
-        return CGPoint(x: CGFloat(hex.q + hex.r) * GateLayout.tileWidth / 2 * spacing,
-                       y: CGFloat(hex.q - hex.r) * GateLayout.tileHeight / 2 * spacing)
+        return CGPoint(x: CGFloat(hex.q + hex.r) * GateLayout.baseTile.width / 2 * spacing,
+                       y: CGFloat(hex.q - hex.r) * GateLayout.baseTile.height / 2 * spacing)
     }
 
     /// Ring 1 around the island centre, in canvas units (tall art above, slab and label below).
     static let ringOneBounds: CGRect = {
-        let step = GateLayout.tileWidth / 2 * spacing
+        let step = GateLayout.baseTile.width / 2 * spacing
         return CGRect(x: -(step + 368), y: -(step + 184 + 160), width: 2 * (step + 368), height: 2 * step + 184 + 160 + 184 + 60)
     }()
 
@@ -189,12 +181,16 @@ enum ArchipelagoLayout {
 struct ArchipelagoScene {
     struct Sprite {
         let item: LandItem
+        /// The art state drawn (the core's stage, or the piece's bloom).
+        let state: LandArtState
         let geometry: LandSpriteGeometry
         let connectors: Set<LandConnector>?
     }
     struct Island {
         let info: PublicIsland
         let offset: CGPoint
+        /// Each neighbour is drawn with its own N-scaled tiles.
+        let layout: GateLayout
         let sprites: [Sprite]
         let freeCells: [(Int, Int)]
     }
@@ -208,7 +204,7 @@ struct ArchipelagoScene {
     var artPaths: (albedos: [String], glows: [String]) {
         var albedos = Set<String>(), glows = Set<String>()
         for sprite in islands.flatMap(\.sprites) {
-            guard let state = sprite.item.artState else { continue }
+            let state = sprite.state
             if let albedo = state.variants["albedo_512"] ?? state.variants["albedo_1024"] { albedos.insert(RuntimeBundle.bundlePath(albedo.url)) }
             if let glow = state.variants["glow_1024"] { glows.insert(RuntimeBundle.bundlePath(glow.url)) }
         }
@@ -225,27 +221,30 @@ struct ArchipelagoScene {
 
     private static func resolve(_ island: PublicIsland, offset: CGPoint) -> Island {
         let items = RuntimeBundle.items
+        let layout = GateLayout(size: island.size)
+        let core = island.coreSpot
         let placed: [(LandItem, LandPlacement)] = island.placements.compactMap { p in
-            guard let item = items[TraderLandCatalog.artID(p.item_id)], item.kind != "core",
-                  (0..<8).contains(p.x), (0..<8).contains(p.y) else { return nil }
+            guard let item = items[TraderLandCatalog.artID(p.item_id)], item.kind != "core" else { return nil }
             let orientation: LandOrientation = p.rotation == 90 || p.rotation == 270 ? .nwSE : .neSW
-            return (item, LandPlacement(uid: "\(p.x):\(p.y)", itemId: item.id, col: p.x, row: p.y, orientation: orientation))
+            let placement = LandPlacement(uid: "\(p.x):\(p.y)", itemId: item.id, col: p.x, row: p.y, orientation: orientation)
+            return layout.contains(landCells(item, placement)) ? (item, placement) : nil
         }
         let pathCells = Set(placed.filter { $0.0.kind == "path_pavement" }.map { "\($0.1.col):\($0.1.row)" })
-        var occupied = LandPainter.coreCells
+        var occupied = core.cells
         var sprites: [Sprite] = placed.compactMap { item, placement in
-            guard let geometry = LandSpriteGeometry(item: item, col: placement.col, row: placement.row, orientation: placement.orientation) else { return nil }
+            guard let state = item.artState,
+                  let geometry = LandSpriteGeometry(item: item, col: placement.col, row: placement.row, orientation: placement.orientation, layout: layout) else { return nil }
             occupied.formUnion(landCells(item, placement))
             let connectors = item.kind == "path_pavement"
                 ? LandPainter.connectors(col: placement.col, row: placement.row, orientation: placement.orientation, pathCells: pathCells) : nil
-            return Sprite(item: item, geometry: geometry, connectors: connectors)
+            return Sprite(item: item, state: state, geometry: geometry, connectors: connectors)
         }
-        let core = RuntimeBundle.fixture.core
-        if let item = items[core.itemId], let geometry = LandSpriteGeometry(item: item, col: core.col, row: core.row, orientation: nil) {
-            sprites.append(Sprite(item: item, geometry: geometry, connectors: nil))
+        if let item = items[LandCore.itemID], let state = item.artState(core.stateKey),
+           let geometry = LandSpriteGeometry(item: item, col: core.col, row: core.row, orientation: nil, layout: layout, coreStage: core.stage) {
+            sprites.append(Sprite(item: item, state: state, geometry: geometry, connectors: nil))
         }
-        let free = (0..<64).map { ($0 % 8, $0 / 8) }.filter { !occupied.contains("\($0.0):\($0.1)") }
-        return Island(info: island, offset: offset, sprites: sprites.sorted { $0.geometry.depth < $1.geometry.depth }, freeCells: free)
+        let free = (0..<(layout.size * layout.size)).map { ($0 % layout.size, $0 / layout.size) }.filter { !occupied.contains("\($0.0):\($0.1)") }
+        return Island(info: island, offset: offset, layout: layout, sprites: sprites.sorted { $0.geometry.depth < $1.geometry.depth }, freeCells: free)
     }
 }
 
@@ -311,12 +310,12 @@ struct ArchipelagoLayer: View, Animatable {
                 layer.translateBy(x: origin.x + island.offset.x * scale, y: origin.y + island.offset.y * scale)
                 layer.scaleBy(x: scale, y: scale)
                 LandPainter.slab(layer)
-                layer.stroke(LandPainter.cells(island.freeCells), with: .color(.white.opacity(0.035)), lineWidth: 1)
+                layer.stroke(LandPainter.cells(island.layout, island.freeCells), with: .color(.white.opacity(0.035)), lineWidth: island.layout.unit)
                 LandPainter.rim(layer, color: visited == index ? Theme.cio.opacity(0.6) : Theme.accentSoft.opacity(0.22))
-                LandPainter.shadows(layer, island.sprites.map(\.geometry.footprint))
+                LandPainter.shadows(layer, island.sprites.map(\.geometry.footprint), unit: island.layout.unit)
                 for sprite in island.sprites {
-                    guard let state = sprite.item.artState,
-                          let albedo = state.variants["albedo_512"] ?? state.variants["albedo_1024"] else { continue }
+                    let state = sprite.state
+                    guard let albedo = state.variants["albedo_512"] ?? state.variants["albedo_1024"] else { continue }
                     let path = RuntimeBundle.bundlePath(albedo.url)
                     let rect = sprite.geometry.frame
                     var art = layer
@@ -330,7 +329,7 @@ struct ArchipelagoLayer: View, Animatable {
                         }
                     }
                     if let face = sprite.geometry.topFace, let connectors = sprite.connectors {
-                        LandPainter.filament(layer, face: face, connectors: connectors, dimmed: false)
+                        LandPainter.filament(layer, face: face, connectors: connectors, dimmed: false, unit: island.layout.unit)
                     }
                 }
             }
@@ -382,8 +381,47 @@ enum LandIslandStatus {
         world.inventory.filter { $0.state == "seed" && $0.review?.ready != true }.compactMap { date($0.review?.reviewAt) }.min()
     }
 
+    /// "Next seed: Aura Flower · 3 days: Candle Tower · 7 days: Waiting Lighthouse" — what the next read
+    /// plants and what patience would turn it into (`tiers[].next`). Nil from an older server.
+    static func tiersLine(_ world: TraderLandWorld) -> String? {
+        guard let common = world.tier(.day)?.next else { return nil }
+        var line = L.t("Next seed: \(TraderLandCatalog.name(common.id, district: common.world))", "Próxima semilla: \(TraderLandCatalog.name(common.id, district: common.world))")
+        for horizon in LandHorizon.day.upward {
+            guard let next = world.tier(horizon)?.next else { continue }
+            line += " · \(horizon.label): \(TraderLandCatalog.name(next.id, district: next.world))"
+        }
+        return line
+    }
+
+    /// Cells taken on the island: every placement's footprint plus the 2×2 core. The server's
+    /// `land.growth.occupied` wins when present.
+    static func occupied(_ world: TraderLandWorld) -> Int {
+        if let occupied = world.land.growth?.occupied { return occupied }
+        return world.placements.reduce(4) { total, placement in
+            guard let entry = world.inventory.first(where: { $0.id == placement.inventory_id }),
+                  let item = RuntimeBundle.items[TraderLandCatalog.artID(entry.item_id)] else { return total }
+            return total + item.footprint.cols * item.footprint.rows
+        }
+    }
+
+    /// Footer status of an account island: "10×10 · 22/60 · CORE DORMANT" (size, cells against the next
+    /// growth step, and the core's stage); a full-size island says so instead of a threshold.
+    static func growthStatus(_ world: TraderLandWorld) -> String {
+        let size = world.land.size
+        let occupied = occupied(world)
+        let threshold = world.land.growth.map { $0.threshold } ?? GateLayout.growth[size]?.threshold
+        let cells = threshold.map { "\(occupied)/\($0)" } ?? L.t("FULL SIZE", "TAMAÑO MÁXIMO")
+        let core = world.core.dormant ? L.t("CORE DORMANT", "NÚCLEO DORMIDO") : L.t("CORE AWAKE", "NÚCLEO DESPIERTO")
+        return "\(size)×\(size) · \(cells) · \(core)"
+    }
+
+    /// The notice after a placement made the island grow a ring.
+    static func grewNotice(_ grew: TraderLandWorld.Grew) -> String {
+        L.t("Your island grew to \(grew.to)×\(grew.to).", "Tu isla creció a \(grew.to)×\(grew.to).")
+    }
+
     /// "Next on the route: Risk Shield · piece 4 of 8". `route.index` counts the pieces already granted,
-    /// so the next one is the piece after them.
+    /// so the next one is the piece after them. Only for a server that sends no `tiers`.
     static func routeLine(_ route: TraderLandWorld.Route) -> String {
         guard !route.complete, let next = route.next else { return L.t("Route complete · XP still counts", "Ruta completa · la XP sigue contando") }
         let name = TraderLandCatalog.name(next.id, district: next.world)
@@ -415,11 +453,14 @@ enum LandIslandStatus {
         return formatter.date(from: trimmed)
     }
 
-    /// "5 h" / "40 min" until a moment; nil once it has passed.
+    /// "3 d" / "5 h" / "40 min" until a moment; nil once it has passed. Days from 48 h, so a
+    /// 7-day horizon never reads "168 h".
     static func until(_ date: Date?, now: Date = Date()) -> String? {
         guard let date, date > now else { return nil }
         let minutes = Int(ceil(date.timeIntervalSince(now) / 60))
-        return minutes < 60 ? "\(max(1, minutes)) min" : "\(Int(ceil(Double(minutes) / 60))) h"
+        if minutes < 60 { return "\(max(1, minutes)) min" }
+        let hours = Int(ceil(Double(minutes) / 60))
+        return hours < 48 ? "\(hours) h" : "\(Int(ceil(Double(hours) / 24))) d"
     }
 
     static func title(_ island: PublicIsland) -> String {
@@ -453,8 +494,12 @@ enum ArchipelagoFixture {
     static var enabled: Bool { ProcessInfo.processInfo.arguments.contains("-land-neighbors-fixture") }
 
     /// Five islands built from the bundled practice snapshot, each transformed and extended differently.
+    /// Three of them have grown (10, 12, 16) with their pieces shifted like a server growth step,
+    /// and two carry a moved core (one still dormant).
     static func islands(now: Date = Date()) -> [PublicIsland] {
         let titles: [String?] = ["Harbor of Patience", "Quiet Reef", nil, "Three Gates", "Night Ledger"]
+        let sizes = [8, 8, 10, 12, 16]
+        let cores: [PublicIsland.Core?] = [nil, .init(x: 3, y: 3, stage: 1), .init(x: 1, y: 6, stage: 0), .init(x: 8, y: 2, stage: 1), .init(x: 7, y: 7, stage: 1)]
         let extras: [[String]] = [
             ["crypto_bay_candle_tower", "crypto_bay_waiting_lighthouse", "crypto_bay_data_dock"],
             ["thesis_citadel_double_gate", "evidence_mines_mother_crystal", "evidence_mines_lantern_drone"],
@@ -464,15 +509,15 @@ enum ArchipelagoFixture {
         ]
         let formatter = ISO8601DateFormatter()
         return titles.indices.map { k in
-            var occupied = LandPainter.coreCells
+            let layout = GateLayout(size: sizes[k])
+            let n = layout.size, shift = (n - 8) / 2
+            let core = cores[k] ?? .init(x: 3, y: 3, stage: 1)
+            var occupied = LandCore.cells(col: core.x, row: core.y)
             var placements: [PublicIsland.Placement] = []
             func place(_ id: String, _ col: Int, _ row: Int, _ rotation: Int) -> Bool {
                 guard let item = RuntimeBundle.items[TraderLandCatalog.artID(id)] else { return false }
                 let cells = landCells(item, LandPlacement(uid: "fixture", itemId: item.id, col: col, row: row, orientation: rotation == 90 ? .nwSE : .neSW))
-                guard cells.allSatisfy({ key in
-                    let xy = key.split(separator: ":").compactMap { Int($0) }
-                    return xy.count == 2 && (0..<8).contains(xy[0]) && (0..<8).contains(xy[1]) && !occupied.contains(key)
-                }) else { return false }
+                guard layout.contains(cells), occupied.isDisjoint(with: cells) else { return false }
                 occupied.formUnion(cells)
                 placements.append(.init(item_id: id, x: col, y: row, rotation: rotation))
                 return true
@@ -480,20 +525,21 @@ enum ArchipelagoFixture {
             for placement in RuntimeBundle.fixture.placements.dropFirst(k == 4 ? 2 : 0) {
                 let rotation = placement.orientation == .nwSE ? 90 : 0
                 switch k {
-                case 1: _ = place(placement.itemId, placement.row, placement.col, 90 - rotation)
-                case 2: _ = place(placement.itemId, 7 - placement.row, 7 - placement.col, 90 - rotation)
-                case 3: _ = place(placement.itemId, 7 - placement.col, 7 - placement.row, rotation)
-                default: _ = place(placement.itemId, placement.col, placement.row, rotation)
+                case 1: _ = place(placement.itemId, placement.row + shift, placement.col + shift, 90 - rotation)
+                case 2: _ = place(placement.itemId, 7 - placement.row + shift, 7 - placement.col + shift, 90 - rotation)
+                case 3: _ = place(placement.itemId, 7 - placement.col + shift, 7 - placement.row + shift, rotation)
+                default: _ = place(placement.itemId, placement.col + shift, placement.row + shift, rotation)
                 }
             }
-            for (n, id) in extras[k].enumerated() {
-                let order = (0..<64).sorted { ($0 * 37 + k * 11 + n * 5) % 64 < ($1 * 37 + k * 11 + n * 5) % 64 }
-                for cell in order where place(id, cell % 8, cell / 8, (k + n) % 2 == 0 ? 0 : 90) { break }
+            let cellCount = n * n
+            for (m, id) in extras[k].enumerated() {
+                let order = (0..<cellCount).sorted { ($0 * 37 + k * 11 + m * 5) % cellCount < ($1 * 37 + k * 11 + m * 5) % cellCount }
+                for cell in order where place(id, cell % n, cell / n, (k + m) % 2 == 0 ? 0 : 90) { break }
             }
             let districts = Set(placements.compactMap { RuntimeBundle.items[TraderLandCatalog.artID($0.item_id)]?.district }).sorted()
-            return PublicIsland(code: "qafixture\(k)", title: titles[k], size: 8,
+            return PublicIsland(code: "qafixture\(k)", title: titles[k], size: n,
                                 publishedAt: formatter.string(from: now.addingTimeInterval(-Double(k + 1) * 97_000)),
-                                placements: placements, stats: .init(pieces: placements.count, districts: districts))
+                                placements: placements, stats: .init(pieces: placements.count, districts: districts), core: cores[k])
         }
     }
 }

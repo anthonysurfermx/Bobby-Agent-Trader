@@ -15,13 +15,19 @@ struct PublicIsland: Decodable, Identifiable, Equatable {
         let pieces: Int
         let districts: [String]
     }
+    /// The Aura Core's spot and stage (GROWTH-v1 §3); absent from an older server.
+    struct Core: Decodable, Equatable { let x: Int; let y: Int; let stage: Int }
     let code: String
     let title: String?
+    /// 8, 10, 12 or 16: every size is drawn with its own tiles, in the same slab.
     let size: Int
     let publishedAt: String?
     let placements: [Placement]
     let stats: Stats?
+    var core: Core? = nil
     var id: String { code }
+    /// The core to draw: 3,3 awake when the server sends none.
+    var coreSpot: LandCore { core.map { LandCore(col: $0.x, row: $0.y, stage: $0.stage) } ?? .practice }
 }
 
 /// Public islands for the archipelago. No account needed: the gallery endpoint
@@ -51,7 +57,7 @@ final class TraderLandNeighbors: ObservableObject {
             guard (200..<300).contains((response as? HTTPURLResponse)?.statusCode ?? 0) else { throw URLError(.badServerResponse) }
             let gallery = try JSONDecoder().decode(Gallery.self, from: data)
             guard gallery.ok else { throw URLError(.cannotParseResponse) }
-            islands = gallery.worlds.filter { $0.size == 8 && $0.code != ownCode }
+            islands = gallery.worlds.filter { GateLayout.supports($0.size) && $0.code != ownCode }
             failed = false
         } catch {
             failed = true
