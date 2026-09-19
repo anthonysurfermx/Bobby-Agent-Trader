@@ -28,7 +28,7 @@ final class StoreShots: XCTestCase {
         }
     }
 
-    /// Fresh install → companion-first onboarding (choose, vibe, aura forge) →
+    /// Fresh install → companion-first onboarding (choose, vibe when voice is on, aura forge) →
     /// desk with the chosen companion → SQUAD gallery. Uninstall the app
     /// before running for a clean slate.
     func test01_OnboardingAndCompanion() throws {
@@ -58,11 +58,13 @@ final class StoreShots: XCTestCase {
         }
         tapLabeled(app, "PICK BYTE")
 
-        // 03 — vibe, heard in the companion's own voice
-        XCTAssertTrue(app.staticTexts["NEXT"].waitForExistence(timeout: 8))
-        sleep(1)
-        shot("03-vibe")
-        tapLabeled(app, "NEXT")
+        // 03 — vibe, heard in the companion's own voice. Only builds with voice ask it:
+        // the text-only release goes straight to the aura forge.
+        if app.staticTexts["NEXT"].waitForExistence(timeout: 4) {
+            sleep(1)
+            shot("03-vibe")
+            tapLabeled(app, "NEXT")
+        }
 
         // 04 — the aura forge: the X-ray scan finishes, then the CTA unlocks
         XCTAssertTrue(app.staticTexts["DROP INTO THE DESK"].waitForExistence(timeout: 15))

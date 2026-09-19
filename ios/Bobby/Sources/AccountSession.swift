@@ -1,8 +1,8 @@
 // Account — Sign in with Apple → Supabase session, kept in the Keychain.
-// Apple sign-in never creates or holds a wallet or private key: this identity
-// is separate from the optional non-custodial wallet connection and is
-// exchanged for a Supabase access token that Bobby verifies server-side.
-// No SDK: REST calls go to the bobby-protocol Auth service.
+// Apple sign-in never creates or holds a wallet or private key: the Apple
+// identity is exchanged for a Supabase access token that Bobby verifies
+// server-side. 1.2 offers Sign in with Apple only (X is Debug-only, see
+// SignInMethods). No SDK: REST calls go to the bobby-protocol Auth service.
 import AuthenticationServices
 import CryptoKit
 import Foundation
@@ -20,8 +20,45 @@ struct StoredSession: Codable {
     var refreshToken: String
     var expiresAt: Date
     var userId: String
+    /// Sessions saved by build 32 or earlier have none; `backfillIdentity()` reads it from Auth.
     var appleUserId: String? = nil
+    /// "apple" | "twitter"; nil = unknown (a session saved before build 33).
     var provider: String? = nil
+}
+
+/// The sign-in methods this build offers. 1.2 ships Sign in with Apple only: X is
+/// switched off in production Auth, so its button (and its copy) is compiled into
+/// Debug builds alone.
+enum SignInMethods {
+    static let isDebugBuild: Bool = {
+#if DEBUG
+        true
+#else
+        false
+#endif
+    }()
+
+    static func offersX(debugBuild: Bool) -> Bool { debugBuild }
+    static var offersX: Bool { offersX(debugBuild: isDebugBuild) }
+}
+
+/// What an authorized request came to (`AccountSession.send`).
+enum AuthorizedResponse: Equatable {
+    /// No session, or Auth refused its refresh token: the session is over.
+    case signedOut
+    /// No bearer could be had right now (a refresh that failed offline), or the account
+    /// changed while the request flew: nothing is known, the session stays.
+    case unavailable
+    case answered(Data, Int)
+}
+
+/// What deleting the account came to.
+enum AccountDeletion: Equatable {
+    case deleted
+    /// The person closed Apple's re-authorization sheet: nothing was deleted and nothing needs saying.
+    case cancelled
+    /// `lastError` says why.
+    case failed
 }
 
 @MainActor
@@ -30,39 +67,83 @@ final class AccountSession: ObservableObject {
     @Published private(set) var session: StoredSession?
     @Published var lastError: String?
     @Published var manualAppleRevocationRequired = false
+    /// Where Apple explains how to stop using Sign in with Apple for an app (the server may name it).
+    @Published private(set) var manualRevocationURL = AccountSession.defaultManualRevocationURL
     private var currentNonce: String?
     /// Invalidates every pending request when the account changes or signs out.
     private(set) var generation = UUID()
     private var refreshTask: Task<StoredSession, Error>?
     private var revocationObserver: NSObjectProtocol?
     private let keychainService = "xyz.bobbyprotocol.bobby.session"
+    /// Apple's re-authorization for deletion; tests stand in for the sheet.
+    var appleDeletionCode: @MainActor () async throws -> String = { try await AppleDeletionAuthorization.shared.authorize() }
 
     init() {
         session = Keychain.read(service: keychainService)
         revocationObserver = NotificationCenter.default.addObserver(forName: ASAuthorizationAppleIDProvider.credentialRevokedNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.session?.provider != "twitter" else { return }
-                self.signOut()
+                guard let self, let s = self.session, s.provider != "twitter" else { return }
+                // A known Apple session ends now; a session of unknown provider (saved before
+                // build 33) is asked about first, so an X account is never signed out for Apple.
+                if s.provider == "apple" || s.appleUserId != nil { self.signOut() } else { await self.checkAppleCredential() }
             }
         }
     }
 
     deinit { if let revocationObserver { NotificationCenter.default.removeObserver(revocationObserver) } }
 
+    /// Signs out when Apple says this Apple ID no longer authorizes Bobby. Runs at launch and on
+    /// every return to the foreground; a session saved before build 33 first learns its Apple ID.
     func checkAppleCredential() async {
-        guard let appleID = session?.appleUserId else { return }
+        guard let s = session, s.provider != "twitter" else { return }
         let started = generation
+        if s.appleUserId == nil { await backfillIdentity() }
+        guard generation == started, let appleID = session?.appleUserId else { return }
         let state = try? await ASAuthorizationAppleIDProvider().credentialState(forUserID: appleID)
         guard generation == started else { return }
         if state == .revoked || state == .notFound { signOut() }
     }
 
+    /// Sessions saved by build 32 or earlier carry no Apple user ID or provider, so the credential
+    /// check had nothing to ask Apple about. The account's own Auth record names both.
+    func backfillIdentity() async {
+        guard let s = session, s.appleUserId == nil, s.provider != "twitter" else { return }
+        var request = URLRequest(url: SupabaseConfig.url.appendingPathComponent("auth/v1/user"))
+        request.timeoutInterval = 15
+        request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        guard case let .answered(data, 200)? = try? await send(request),
+              let user = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              user["id"] as? String == s.userId,
+              var current = session, current.userId == s.userId else { return }
+        let identity = Self.identity(fromUser: user)
+        current.appleUserId = current.appleUserId ?? identity.appleUserId
+        current.provider = current.provider ?? identity.provider
+        guard current.appleUserId != s.appleUserId || current.provider != s.provider else { return }
+        session = current
+        Keychain.write(current, service: keychainService)
+    }
+
+    /// The Apple user ID (`identities[provider=apple].identity_data.sub`, the same value as
+    /// `ASAuthorizationAppleIDCredential.user`) and the provider of a Supabase user object.
+    static func identity(fromUser user: [String: Any]) -> (appleUserId: String?, provider: String?) {
+        let identities = user["identities"] as? [[String: Any]] ?? []
+        let apple = identities.first { $0["provider"] as? String == "apple" }
+        let data = apple?["identity_data"] as? [String: Any]
+        let appleUserId = (data?["sub"] as? String) ?? (data?["provider_id"] as? String) ?? (apple?["id"] as? String)
+        let provider = (user["app_metadata"] as? [String: Any])?["provider"] as? String
+            ?? identities.first?["provider"] as? String
+        return (appleUserId.flatMap { $0.isEmpty ? nil : $0 }, provider)
+    }
+
     var isSignedIn: Bool { session != nil }
 
     /// A valid access token, refreshed when it is about to expire. nil = signed out.
-    func accessToken() async -> String? {
+    /// `replacing` a token the server just refused (401) forces the refresh whatever its
+    /// clock says, unless another request already replaced it.
+    func accessToken(replacing stale: String? = nil) async -> String? {
         guard let s = session else { return nil }
-        if s.expiresAt.timeIntervalSinceNow > 60 { return s.accessToken }
+        let refused = stale != nil && s.accessToken == stale
+        if !refused, s.expiresAt.timeIntervalSinceNow > 60 { return s.accessToken }
         let started = generation
         let task: Task<StoredSession, Error>
         if let running = refreshTask { task = running }
@@ -75,8 +156,9 @@ final class AccountSession: ObservableObject {
             var refreshed = try await task.value
             guard generation == started, session?.userId == s.userId,
                   refreshed.userId == s.userId else { return nil }
-            refreshed.appleUserId = s.appleUserId
-            refreshed.provider = refreshed.provider ?? s.provider
+            // The refresh answer names the account's identities: a session saved before build 33 learns its Apple ID here.
+            refreshed.appleUserId = s.appleUserId ?? refreshed.appleUserId
+            refreshed.provider = s.provider ?? refreshed.provider
             session = refreshed; Keychain.write(refreshed, service: keychainService)
             lastError = nil
             return refreshed.accessToken
@@ -93,6 +175,31 @@ final class AccountSession: ObservableObject {
         }
     }
 
+    /// Sends `request` with the account's bearer. An access token can expire between being
+    /// read and being checked (a slow drain, a long Apple sheet): the first 401 forces one
+    /// refresh and one retry, so only a token the server still refuses after a refresh comes
+    /// back as `answered(_, 401)`. Transport errors are thrown.
+    func send(_ request: URLRequest, via transport: URLSession = .shared) async throws -> AuthorizedResponse {
+        let started = generation
+        guard let token = await accessToken() else { return session == nil ? .signedOut : .unavailable }
+        guard generation == started else { return .unavailable }
+        let first = try await Self.data(for: request, token: token, via: transport)
+        guard first.status == 401 else { return .answered(first.data, first.status) }
+        guard generation == started else { return .unavailable }
+        guard let fresh = await accessToken(replacing: token) else { return session == nil ? .signedOut : .unavailable }
+        guard generation == started else { return .unavailable }
+        guard fresh != token else { return .answered(first.data, first.status) }
+        let second = try await Self.data(for: request, token: fresh, via: transport)
+        return .answered(second.data, second.status)
+    }
+
+    private static func data(for request: URLRequest, token: String, via transport: URLSession) async throws -> (data: Data, status: Int) {
+        var request = request
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await transport.data(for: request)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+    }
+
     func signOut(store: CompanionStore? = nil) {
         generation = UUID()
         refreshTask?.cancel(); refreshTask = nil
@@ -100,7 +207,7 @@ final class AccountSession: ObservableObject {
         store?.unbind()
     }
 
-    private func accept(_ newSession: StoredSession) {
+    func accept(_ newSession: StoredSession) {
         generation = UUID()
         refreshTask?.cancel(); refreshTask = nil
         session = newSession
@@ -108,59 +215,156 @@ final class AccountSession: ObservableObject {
         lastError = nil
     }
 
-    /// Permanently remove the Apple-backed account and synced Bobby data.
-    /// Confirmed public-chain transactions cannot be erased; the server removes
-    /// their Bobby account link before deleting the Auth user.
-    func deleteAccount(store: CompanionStore? = nil) async -> Bool {
-        let started = generation
-        let deletingUserId = session?.userId
-        manualAppleRevocationRequired = false
-        guard let token = await accessToken() else {
-            if session == nil {
-                lastError = L.t("Sign in again before deleting your account", "Inicia sesión de nuevo antes de borrar tu cuenta")
-            }
-            return false
-        }
-        var request = URLRequest(url: URL(string: "https://bobbyprotocol.xyz/api/account")!)
-        request.httpMethod = "DELETE"
-        request.timeoutInterval = 45
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
+    // MARK: - Account deletion
 
+    /// Clients that send it get the build-34 contract of /api/account: the server asks this client
+    /// (and only this client) for Apple's authorization code, and answers `appleRevocation:'manual'`
+    /// with `manualRevocationURL` when it cannot revoke Apple access itself.
+    nonisolated static let accountClientHeader = "X-Bobby-Account-Client"
+    nonisolated static let accountClientVersion = "2"
+    /// Apple's "Stop using Sign in with Apple" page, in the device's language.
+    nonisolated static var defaultManualRevocationURL: URL { defaultManualRevocationURL(spanish: L.isSpanish) }
+    nonisolated static func defaultManualRevocationURL(spanish: Bool) -> URL {
+        URL(string: spanish ? "https://support.apple.com/es-mx/102571" : "https://support.apple.com/en-us/102571")!
+    }
+
+    /// `GET` asks what deletion needs; `DELETE` deletes. Both carry the client header.
+    nonisolated static func accountRequest(method: String) -> URLRequest {
+        var request = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/account"))
+        request.httpMethod = method
+        request.timeoutInterval = 45
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
+        request.setValue(accountClientVersion, forHTTPHeaderField: accountClientHeader)
+        return request
+    }
+
+    /// Apple's own page only: anything else the server names falls back to it. A Spanish phone
+    /// opens the es-MX edition, so the page matches the Spanish steps in the alert.
+    nonisolated static func manualRevocationURL(from raw: Any?, spanish: Bool = L.isSpanish) -> URL {
+        guard let text = raw as? String, let url = URL(string: text), url.scheme == "https",
+              let host = url.host?.lowercased(), host == "apple.com" || host.hasSuffix(".apple.com") else {
+            return defaultManualRevocationURL(spanish: spanish)
+        }
+        guard spanish, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        // support.apple.com/<lang>-<region>/102571: swap the locale segment, keep the article.
+        var segments = parts.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard segments.count > 1, segments[1].range(of: "^[A-Za-z]{2}-[A-Za-z]{2}$", options: .regularExpression) != nil else { return url }
+        segments[1] = "es-mx"
+        parts.path = segments.joined(separator: "/")
+        return parts.url ?? url
+    }
+
+    /// The steps Apple documents for iPhone (support.apple.com/102571, September 2026), in the
+    /// words the Settings app uses: "Configuración", not "Ajustes", on an es-MX phone.
+    nonisolated static var manualRevocationSteps: String { manualRevocationSteps(spanish: L.isSpanish) }
+    nonisolated static func manualRevocationSteps(spanish: Bool) -> String {
+        L.t("To finish, open Settings, tap your name, tap Sign in with Apple, choose Bobby and tap Delete.",
+            "Para terminar, abre Configuración, toca tu nombre, toca Iniciar sesión con Apple, elige Bobby y toca Eliminar.",
+            spanish: spanish)
+    }
+
+    /// Permanently remove the Bobby account and its synced data. Apple accounts re-authorize
+    /// first so the server can revoke Apple access; when it cannot, the answer says so and the
+    /// app shows Apple's manual steps. Closing Apple's sheet is a quiet cancel.
+    func deleteAccount(store: CompanionStore? = nil) async -> AccountDeletion {
+        let started = generation
+        manualAppleRevocationRequired = false
+        manualRevocationURL = Self.defaultManualRevocationURL
+        guard let deletingUserId = session?.userId else {
+            lastError = L.t("Sign in again before deleting your account", "Inicia sesión de nuevo antes de borrar tu cuenta")
+            return .failed
+        }
+        var request = Self.accountRequest(method: "DELETE")
+        var sentAppleCode = false
         do {
-            var check = request
-            check.httpMethod = "GET"
-            let (requirements, checkResponse) = try await URLSession.shared.data(for: check)
-            guard (checkResponse as? HTTPURLResponse)?.statusCode == 200,
-                  let body = try JSONSerialization.jsonObject(with: requirements) as? [String: Any] else { throw URLError(.badServerResponse) }
-            if body["appleAuthorizationRequired"] as? Bool == true {
-                let code = try await AppleDeletionAuthorization.shared.authorize()
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                request.httpBody = try JSONSerialization.data(withJSONObject: ["appleAuthorizationCode": code])
+            // 1) What deletion needs. A backend that predates the check (405) never asks for Apple.
+            let check = try await send(Self.accountRequest(method: "GET"))
+            guard generation == started else { return interrupted() }
+            switch check {
+            case .signedOut: return interrupted()
+            case .unavailable: throw URLError(.networkConnectionLost)
+            case let .answered(data, status):
+                if status != 405 {
+                    guard status == 200, let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                        return fail(data: data, status: status)
+                    }
+                    if body["appleAuthorizationRequired"] as? Bool == true {
+                        try await attachAppleCode(to: &request); sentAppleCode = true
+                    }
+                }
             }
-            guard generation == started else { return false }
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
-                lastError = L.t(message ?? "Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
-                return false
+            // 2) Delete. The bearer is read again: Apple's sheet may have outlived the old one.
+            guard generation == started else { return interrupted() }
+            var result = try await send(request)
+            // A server that began requiring Apple after the check says so once.
+            if case let .answered(data, 409) = result, !sentAppleCode,
+               (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["appleAuthorizationRequired"] as? Bool == true {
+                try await attachAppleCode(to: &request); sentAppleCode = true
+                guard generation == started else { return interrupted() }
+                result = try await send(request)
             }
+            guard case let .answered(data, status) = result else {
+                if case .signedOut = result { return interrupted() }
+                throw URLError(.networkConnectionLost)
+            }
+            guard (200..<300).contains(status) else { return fail(data: data, status: status) }
             // A late deletion response must never sign out a different account.
-            if let deletingUserId { store?.forgetAccount(deletingUserId) }
-            guard generation == started else { return true }
-            let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            manualAppleRevocationRequired = result?["appleRevocation"] as? String == "manual"
+            store?.forgetAccount(deletingUserId)
+            guard generation == started else { return .deleted }
+            let answer = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            manualAppleRevocationRequired = answer?["appleRevocation"] as? String == "manual"
+            manualRevocationURL = Self.manualRevocationURL(from: answer?["manualRevocationURL"])
             signOut(store: store)
             lastError = nil
-            return true
+            return .deleted
         } catch {
-            if (error as? ASAuthorizationError)?.code == .canceled { return false }
+            if (error as? ASAuthorizationError)?.code == .canceled { lastError = nil; return .cancelled }
             lastError = L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
-            return false
+            return .failed
         }
     }
 
+    private func attachAppleCode(to request: inout URLRequest) async throws {
+        let code = try await appleDeletionCode()
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["appleAuthorizationCode": code])
+    }
+
+    /// Signed out (or into another account) mid-deletion: nothing was deleted.
+    private func interrupted() -> AccountDeletion {
+        lastError = L.t("Sign in again before deleting your account", "Inicia sesión de nuevo antes de borrar tu cuenta")
+        return .failed
+    }
+
+    private func fail(data: Data, status: Int) -> AccountDeletion {
+        if status == 401 { return interrupted() }
+        let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+        lastError = L.t(message ?? "Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
+        return .failed
+    }
+
     // ---- Sign in with Apple ----
+
+    /// What the account sheet says when Apple's sheet fails: never the raw system text
+    /// ("com.apple.AuthenticationServices.AuthorizationError error 1000"). Closing the sheet
+    /// is a choice, not an error (nil).
+    nonisolated static func appleSignInFailure(_ error: Error) -> String? {
+        guard let code = (error as? ASAuthorizationError)?.code else {
+            return L.t("Sign in with Apple did not finish — try again.", "Iniciar sesión con Apple no terminó — inténtalo de nuevo.")
+        }
+        switch code {
+        case .canceled:
+            return nil
+        case .unknown, .notHandled, .notInteractive:
+            // 1000 is what a phone with no Apple Account signed in returns.
+            return L.t("Sign in with Apple is not available right now — check that you are signed in to your Apple Account in Settings.",
+                       "Iniciar sesión con Apple no está disponible ahora — revisa que tengas sesión en tu cuenta de Apple en Configuración.")
+        default:
+            return L.t("Sign in with Apple did not finish — try again.", "Iniciar sesión con Apple no terminó — inténtalo de nuevo.")
+        }
+    }
+
     func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
         let nonce = Self.randomNonce()
         currentNonce = nonce
@@ -172,7 +376,7 @@ final class AccountSession: ObservableObject {
         let started = generation
         switch result {
         case .failure(let error):
-            if (error as? ASAuthorizationError)?.code != .canceled { lastError = error.localizedDescription }
+            lastError = Self.appleSignInFailure(error)
         case .success(let auth):
             guard let cred = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = cred.identityToken, let idToken = String(data: tokenData, encoding: .utf8),
@@ -194,11 +398,14 @@ final class AccountSession: ObservableObject {
     // Supabase's /authorize in an ASWebAuthenticationSession; Supabase answers on
     // the app's own scheme with the session in the URL fragment. The redirect
     // `bobbyprotocol://auth-callback` must be on Supabase's Redirect URLs list.
+    // X is off in production Auth: 1.2 compiles its entry point into Debug only.
     static let oauthCallback = "bobbyprotocol://auth-callback"
 
+#if DEBUG
     func signInWithX() async {
         await signInWithOAuth(provider: "twitter")
     }
+#endif
 
     func signInWithOAuth(provider: String) async {
         let started = generation
@@ -261,7 +468,9 @@ final class AccountSession: ObservableObject {
               let access = json["access_token"] as? String, let refresh = json["refresh_token"] as? String,
               let expiresIn = json["expires_in"] as? Double, let user = json["user"] as? [String: Any], let id = user["id"] as? String
         else { throw NSError(domain: "supabase.auth", code: 2, userInfo: [NSLocalizedDescriptionKey: L.t("malformed token response", "respuesta de token no válida")]) }
-        return StoredSession(accessToken: access, refreshToken: refresh, expiresAt: Date().addingTimeInterval(expiresIn), userId: id)
+        let identity = Self.identity(fromUser: user)
+        return StoredSession(accessToken: access, refreshToken: refresh, expiresAt: Date().addingTimeInterval(expiresIn), userId: id,
+                             appleUserId: identity.appleUserId, provider: identity.provider)
     }
 
     private static func randomNonce(length: Int = 32) -> String {

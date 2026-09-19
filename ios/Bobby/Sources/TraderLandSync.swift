@@ -376,23 +376,25 @@ final class TraderLandSync: ObservableObject {
         ownerID = userID; busy = true; error = nil
         defer { if generation == epoch { busy = false } }
         do {
-            guard let token = await AccountSession.shared.accessToken() else {
-                throw URLError(.userAuthenticationRequired)
-            }
-            guard generation == epoch, AccountSession.shared.session?.userId == userID else { return nil }
             var request = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/trader-land"))
             request.timeoutInterval = 20
             request.cachePolicy = .reloadIgnoringLocalCacheData
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue(Self.clientVersion, forHTTPHeaderField: Self.clientHeader)
             if let action {
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.httpBody = try JSONSerialization.data(withJSONObject: action.payload(drawnOn: world?.land.size))
             }
-            let (data, response) = try await transport.data(for: request)
+            // The bearer rides in `send`, which refreshes and retries once when a token expired on the
+            // way (the server refuses before touching the island, so the retry cannot apply twice).
+            let answer = try await AccountSession.shared.send(request, via: transport)
             guard generation == epoch, AccountSession.shared.session?.userId == userID else { return nil }
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let data: Data, status: Int
+            switch answer {
+            case let .answered(body, code): data = body; status = code
+            case .signedOut: throw NSError(domain: "TraderLand", code: 401, userInfo: [NSLocalizedDescriptionKey: Self.failure(status: 401, serverError: nil)])
+            case .unavailable: throw URLError(.userAuthenticationRequired)
+            }
             guard (200..<300).contains(status) else {
                 let serverError = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
                 let message = Self.failure(status: status, serverError: serverError)
@@ -427,6 +429,11 @@ extension LandHorizon {
 /// tests and screenshots.
 @MainActor final class TraderLandAccountFixture {
     static var enabled: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-account-fixture") }
+    /// `-trader-land-release-island`: the fixture on the Release path — public worlds off, so the
+    /// header opens the private "Island settings" sheet, there is no archipelago and zoom stops at 0.7.
+    nonisolated static var releaseIsland: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-release-island") }
+    /// `-trader-land-fixture-public`: the island starts public, as one published before public worlds were switched off.
+    nonisolated static var startsPublic: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-fixture-public") }
 
     struct Refusal: Error { let status: Int; let error: String }
 
@@ -464,8 +471,9 @@ extension LandHorizon {
     private var xp = 180
     private var aura = 36
 
-    init(now: Date = Date()) {
+    init(now: Date = Date(), startsPublic: Bool = TraderLandAccountFixture.startsPublic) {
         self.now = now
+        isPublic = startsPublic
         let hour: TimeInterval = 3600
         rows = [
             Row(id: "fx-dock", itemID: "crypto_bay_data_dock", state: "bloomed", hours: 24, seededAt: now - 90 * hour, bloomedAt: now - 60 * hour, thesis: nil),

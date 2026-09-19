@@ -11,8 +11,11 @@
     <dict>
       <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+      <!-- Linked: the private Trader Land island name is saved with the account token.
+           Typed desk questions stay unlinked in practice (sent without an account token),
+           but App Store Connect asks one "linked?" per data type. -->
       <key>NSPrivacyCollectedDataTypeLinked</key>
-      <false/>
+      <true/>
       <key>NSPrivacyCollectedDataTypeTracking</key>
       <false/>
       <key>NSPrivacyCollectedDataTypePurposes</key>

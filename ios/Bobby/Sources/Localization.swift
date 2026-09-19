@@ -17,7 +17,10 @@ enum L {
     }()
 
     /// t("English", "Español")
-    static func t(_ en: String, _ es: String) -> String { isSpanish ? es : en }
+    static func t(_ en: String, _ es: String) -> String { t(en, es, spanish: isSpanish) }
+
+    /// The same pick for an explicit language (tests check both sides of one string).
+    static func t(_ en: String, _ es: String, spanish: Bool) -> String { spanish ? es : en }
 
     /// What the TTS backend should pronounce — the companion's voice
     /// follows the device, so an English phone never gets Spanish audio.

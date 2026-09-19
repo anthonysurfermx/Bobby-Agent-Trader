@@ -51,6 +51,64 @@ struct MarketSnapshot {
     var isEquity: Bool
     var price: Double?
     var changePct: Double?
+
+    /// The data source line under the chart, in the desk's language like the card around it.
+    static func sourceLabel(isEquity: Bool, spanish: Bool = L.isSpanish) -> String {
+        isEquity ? L.t("EQUITIES · YAHOO", "ACCIONES · YAHOO", spanish: spanish) : L.t("CRYPTO · OKX", "CRIPTO · OKX", spanish: spanish)
+    }
+}
+
+/// The question typed at the desk, measured the way /api/desk-debate measures it:
+/// Unicode code points of the trimmed text, against the same limit.
+enum DeskQuestion {
+    static let maxLength = 1200
+
+    static func length(_ question: String) -> Int {
+        question.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count
+    }
+
+    static func isTooLong(_ question: String) -> Bool { length(question) > maxLength }
+
+    static var tooLongMessage: String {
+        L.t("Your question is too long. Keep it to 1,200 characters or fewer.",
+            "Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.")
+    }
+}
+
+/// Refusals /api/desk-debate words on purpose: retrying in a moment fixes neither.
+enum DeskFailure: Equatable {
+    /// 429: the desk's analysis limit for today is used up.
+    case quota
+    /// 400 with the code `question_too_long`.
+    case questionTooLong
+
+    init?(status: Int, body: Any?) {
+        let json = body as? [String: Any]
+        let codes = ["code", "error", "errorCode"].compactMap { json?[$0] as? String }
+        switch status {
+        case 429: self = .quota
+        case 400 where codes.contains("question_too_long"): self = .questionTooLong
+        default: return nil
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .quota:
+            return L.t("Bobby reached today's analysis limit. Try again tomorrow.",
+                       "Bobby llegó al límite de análisis de hoy. Intenta mañana.")
+        case .questionTooLong:
+            return DeskQuestion.tooLongMessage
+        }
+    }
+
+    /// The desk's status pill for this refusal (`DeskPhase.refused`).
+    var status: String {
+        switch self {
+        case .quota: return L.t("LIMIT REACHED", "LÍMITE ALCANZADO")
+        case .questionTooLong: return L.t("QUESTION TOO LONG", "PREGUNTA MUY LARGA")
+        }
+    }
 }
 
 struct BobbyAnswer {
@@ -76,6 +134,8 @@ struct BobbyAnswer {
     var cioArgument: String?
     var agentVerdict: String?
     var evidenceLabel: String?
+    /// Why the desk refused, when it said so (nil = no answer or an unexplained failure).
+    var failure: DeskFailure?
 
     /// True when the debate simply never came back — no market data and no
     /// verdict of any kind. A backend failure must NEVER masquerade as a
@@ -328,21 +388,24 @@ enum BobbyAPI {
         return Array((names + tickers).prefix(300))
     }
 
-    /// Asset search with a transport fallback: the server accepts POST, but a
-    /// deploy that predates it answers 405 — and the app went "could not
-    /// resolve" for every asset. GET with the same fields is always there.
+    /// Asset search, POST only: the typed text is often the whole question, and a
+    /// URL query string lands in platform runtime logs (api/bobby-asset-search.ts).
+    /// A failed POST is a failed search — it is never resent as GET `?q=`.
     static func assetSearch(_ q: String, limit: Int? = nil) async -> [String: Any]? {
         var body: [String: Any] = ["q": q]
         if let limit { body["limit"] = limit }
-        if let obj = try? await json("api/bobby-asset-search", method: "POST", body: body, allowedStatus: 200...299) as? [String: Any] {
-            return obj
-        }
-        var query = "api/bobby-asset-search?q=" + (q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? q)
-        if let limit { query += "&limit=\(limit)" }
-        return try? await json(query) as? [String: Any]
+        return try? await json("api/bobby-asset-search", method: "POST", body: body, allowedStatus: 200...299) as? [String: Any]
     }
 
     static func json(_ path: String, method: String = "GET", body: [String: Any]? = nil, allowedStatus: ClosedRange<Int>? = nil) async throws -> Any {
+        let (object, status) = try await response(path, method: method, body: body)
+        if let allowedStatus, !allowedStatus.contains(status) { throw URLError(.badServerResponse) }
+        guard let object else { throw URLError(.cannotParseResponse) }
+        return object
+    }
+
+    /// The decoded body (nil when it is not JSON) and the HTTP status.
+    static func response(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> (json: Any?, status: Int) {
         // NOT appendingPathComponent: it percent-encodes '?' and turns every
         // query string into a 404.
         guard let url = URL(string: base.absoluteString + "/" + path) else {
@@ -357,10 +420,7 @@ enum BobbyAPI {
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
         let (data, response) = try await URLSession.shared.data(for: req)
-        if let allowedStatus, let http = response as? HTTPURLResponse, !allowedStatus.contains(http.statusCode) {
-            throw URLError(.badServerResponse)
-        }
-        return try JSONSerialization.jsonObject(with: data)
+        return (try? JSONSerialization.jsonObject(with: data), (response as? HTTPURLResponse)?.statusCode ?? 0)
     }
 
     /// Words that carry no asset meaning in a natural question, es/en.
@@ -451,8 +511,15 @@ enum BobbyAPI {
 
     /// Shared technical evidence: regime, indicators, signal and risk plan.
     static func debate(_ symbol: String, question: String, isEquity: Bool = false) async -> BobbyAnswer {
-        guard let obj = try? await json("api/desk-debate", method: "POST",
-                                        body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto"]) as? [String: Any],
+        guard let reply = try? await response("api/desk-debate", method: "POST",
+                                              body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto"])
+        else { return BobbyAnswer(symbol: symbol) }
+        if let failure = DeskFailure(status: reply.status, body: reply.json) {
+            var refused = BobbyAnswer(symbol: symbol)
+            refused.failure = failure
+            return refused
+        }
+        guard (200..<300).contains(reply.status), let obj = reply.json as? [String: Any],
               let agents = obj["agents"] as? [String: String],
               let alpha = agents["alpha"], !alpha.isEmpty,
               let red = agents["red"], !red.isEmpty,

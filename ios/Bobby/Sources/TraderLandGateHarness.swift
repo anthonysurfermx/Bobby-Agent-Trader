@@ -535,7 +535,8 @@ struct TraderLandGateHarnessView: View {
     // Public UGC stays disabled until reporting, blocking and moderation are available.
     private var publicWorldsEnabled: Bool {
 #if DEBUG
-        return ArchipelagoFixture.enabled || accountFixture
+        // `-trader-land-release-island` keeps a fixture on the Release path: private settings, no sea.
+        return !TraderLandAccountFixture.releaseIsland && (ArchipelagoFixture.enabled || accountFixture)
 #else
         return false
 #endif
@@ -983,6 +984,7 @@ struct TraderLandGateHarnessView: View {
             icon("minus", label: L.t("Zoom out", "Alejar")) { zoomBy(1 / 1.2) }
             Button { goHome() } label: { Text("\(Int((zoom * 100).rounded()))%").font(.system(size: 11, design: .monospaced)).frame(width: 44, height: 30) }
                 .buttonStyle(.plain).accessibilityLabel(L.t("Reset view", "Restablecer vista"))
+                .accessibilityValue("\(Int((zoom * 100).rounded()))%").accessibilityIdentifier("land-zoom")
             icon("plus", label: L.t("Zoom in", "Acercar")) { zoomBy(1.2) }
         }.background(Theme.panel.opacity(0.85), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(Theme.stroke))
     }
