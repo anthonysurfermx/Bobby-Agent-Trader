@@ -16,7 +16,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { AWARD_AURA, PLANT_KINDS, applyAward, type PlantKind, type ProgressCounters } from './_lib/progress-rules.js';
-import { ThesisSchema, grantRoutePiece, type RouteGrant } from './_lib/trader-land.js';
+import { ThesisSchema, catalog, grantPiece, heldPieces, nextPieces, type RouteGrant } from './_lib/trader-land.js';
+import { LEGACY_ROUTE_CAP } from './_lib/trader-land-growth.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -197,19 +198,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Trader Land: every awarded event plants the next route piece. Seeds bloom
-    // later when their thesis is reviewed by /api/trader-land close.
+    // A duplicate is a retry of a request whose answer never arrived. If that
+    // event was awarded, its piece is granted again: tl_grant_piece is
+    // idempotent on the ledger row, so the retry gets the same piece — or the
+    // one a cut-off run never granted. XP is never re-awarded.
+    const duplicateIds = events.filter((e) => !fresh.includes(e)).map((e) => e.id);
+    if (duplicateIds.length) {
+      const dup = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${duplicateIds.join(',')})&select=client_event_id,kind,awarded`), { headers: bobbyServiceHeaders() });
+      const rows = dup.ok ? ((await dup.json()) as Array<{ client_event_id: string; kind: string; awarded: number }>) : [];
+      for (const row of rows) {
+        if (row.awarded > 0 && (PLANT_KINDS as readonly string[]).includes(row.kind)) grants.push({ eventId: row.client_event_id, kind: row.kind as PlantKind });
+      }
+    }
+
+    // Trader Land: one awarded read = one 24 h common seed, a NO TRADE the next
+    // common piece bloomed (tl_grant_piece, keyed on the ledger row). Seeds
+    // bloom later when their thesis is reviewed by /api/trader-land close.
     if (grants.length) {
       const idsQ = grants.map((g) => g.eventId).join(',');
-      const led = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${idsQ})&select=id,client_event_id`), { headers: bobbyServiceHeaders() });
+      const [led, firstRead] = await Promise.all([
+        fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${idsQ})&select=id,client_event_id`), { headers: bobbyServiceHeaders() }),
+        catalog(),
+      ]);
+      // An empty catalog is a failed read (catalog() swallows errors): one retry,
+      // so a granted piece is not reported as item:null to the desk.
+      const items = firstRead.length ? firstRead : await catalog();
       const byClient = new Map((led.ok ? ((await led.json()) as Array<{ id: string; client_event_id: string }>) : []).map((r) => [r.client_event_id, r.id]));
+      const byItem = new Map(items.map((item) => [item.id, item]));
       for (const g of grants) {
         const ledgerId = byClient.get(g.eventId);
-        if (!ledgerId) continue;
-        const grant = await grantRoutePiece(identity.id, ledgerId, g.kind, routeIndex);
-        if (grant?.routeIndex !== undefined) routeIndex = grant.routeIndex;
+        // No ledger row to key the grant on: say the grant failed (null), not "nothing planted".
+        if (!ledgerId) { const r = results.find((x) => x.id === g.eventId); if (r) r.world = null; continue; }
+        const grant = await grantPiece(identity.id, ledgerId, g.kind, routeIndex, byItem);
+        // The legacy counter (iOS 1.1 shows it as n/8) never moves back and never passes 8.
+        if (grant) routeIndex = Math.min(LEGACY_ROUTE_CAP, Math.max(routeIndex, grant.routeIndex));
         const r = results.find((x) => x.id === g.eventId);
         if (r) r.world = grant;
+      }
+      // What a longer horizon would bloom into, so the desk can offer the choice
+      // right after the read: the seed's own piece at 24 h, the next building at
+      // 3 days, the next landmark at 7 days.
+      const seeds = results.filter((r) => r.world?.state === 'seed');
+      if (seeds.length) {
+        try {
+          const next = nextPieces(items, await heldPieces(identity.id));
+          for (const r of seeds) r.world!.tiers = { common: r.world!.item, building: next.building, landmark: next.landmark };
+        } catch (error) {
+          console.error('[progress] tier preview', error);
+        }
       }
     }
 

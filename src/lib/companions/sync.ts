@@ -6,6 +6,7 @@
 // answering with the authoritative state.
 // ============================================================
 import { progressStore, type Progress, type ServerProgress } from './progress';
+import { grantsFromResults, type WorldGrant } from '@/lib/trader-land/seed';
 
 type HeadersFn = () => Record<string, string> | null;
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'unauthenticated' | 'error';
@@ -16,6 +17,23 @@ let inflight: Promise<SyncStatus> | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+
+// Trader Land grants (`results[].world`) keyed by the event that earned them,
+// so the desk can show the seed a read just planted and extend its horizon.
+const grants = new Map<string, WorldGrant>();
+const grantListeners = new Set<() => void>();
+export function getGrant(eventId: string | null | undefined): WorldGrant | null { return eventId ? grants.get(eventId) ?? null : null; }
+export function onGrants(cb: () => void): () => void { grantListeners.add(cb); return () => grantListeners.delete(cb); }
+/** The desk replaces a grant after extending it, so every reader sees the new piece. */
+export function setGrant(eventId: string, grant: WorldGrant): void { grants.set(eventId, grant); grantListeners.forEach((l) => l()); }
+function recordGrants(results: unknown) {
+  const fresh = grantsFromResults(results);
+  if (!fresh.length) return;
+  for (const [id, grant] of fresh) grants.set(id, grant);
+  grantListeners.forEach((l) => l());
+}
+/** The credential progress syncs with (wallet session first, else the Apple/Google session): the identity that owns the grants. */
+export function progressHeaders(): Record<string, string> | null { return headersFn?.() ?? null; }
 
 export function getSyncStatus(): SyncStatus { return status; }
 export function onSyncStatus(cb: () => void): () => void { listeners.add(cb); return () => listeners.delete(cb); }
@@ -64,8 +82,9 @@ export async function syncProgress(): Promise<SyncStatus> {
         : { headers });
       if (res.status === 401) { setStatus('unauthenticated'); return status; }
       if (!res.ok) { setStatus('error'); return status; }
-      const data = (await res.json()) as { progress: ServerProgress; results?: Array<{ id: string }> };
+      const data = (await res.json()) as { progress: ServerProgress; results?: Array<{ id: string; world?: unknown }> };
       progressStore.applyServer(data.progress, (data.results ?? []).map((r) => r.id));
+      recordGrants(data.results);
       setStatus('synced');
       return status;
     } catch {

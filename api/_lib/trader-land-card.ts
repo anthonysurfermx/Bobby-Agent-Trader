@@ -2,8 +2,12 @@
 // Trader Land share card — what a link preview (iMessage, WhatsApp, X,
 // Telegram…) shows for a published island: its own title, what it holds and
 // a picture of the island itself, instead of the site-wide Bobby metadata.
-// Pure: the handler (api/trader-land-share.ts) does the I/O.
+// Pure: the handler (api/trader-land-share.ts) does the I/O. The island is
+// drawn with the shared geometry (src/lib/trader-land/geometry.ts), so an
+// island of any size keeps the same extent and the core sits where the land
+// keeps it, dormant or awake.
 // ============================================================
+import { DORMANT_CORE_SCALE, SLAB, landGeometry, spriteFrame as frameOf, type LandGeometry } from '../../src/lib/trader-land/geometry.js';
 
 export const SITE = 'https://bobbyprotocol.xyz';
 export const VISIT_PATH = '/agentic-world/bobby/trader-land/w/';
@@ -17,11 +21,19 @@ export interface ManifestVariant { url: string; w: number; h: number }
 export interface ManifestState { anchor: [number, number]; contentBounds: [number, number, number, number]; variants: Record<string, ManifestVariant> }
 export interface ManifestItem { id: string; district: string; kind: string; footprint: { cols: number; rows: number }; orientations: Record<string, { states: Record<string, ManifestState> }> }
 export interface CardPlacement { item_id: string; x: number; y: number; rotation: number }
-export interface CardIsland { code: string; title: string | null; size: number; placements: CardPlacement[] }
+export interface CardCore { x: number; y: number; stage: number }
+export interface CardIsland { code: string; title: string | null; size: number; placements: CardPlacement[]; core?: CardCore | null }
 
-export function artState(item: ManifestItem): ManifestState | null {
+/** The island's core; an island read from an older server has today's: 3,3, awake. */
+export function cardCore(island: CardIsland): CardCore {
+  const core = island.core;
+  return core && Number.isInteger(core.x) && Number.isInteger(core.y) ? { x: core.x, y: core.y, stage: core.stage === 0 ? 0 : 1 } : { x: 3, y: 3, stage: 1 };
+}
+
+export function artState(item: ManifestItem, stage?: number): ManifestState | null {
   const orientation = Object.values(item.orientations)[0];
   if (!orientation) return null;
+  if (stage === 0 && orientation.states.stage0) return orientation.states.stage0;
   return orientation.states.stage1 ?? orientation.states.bloom ?? Object.values(orientation.states)[0] ?? null;
 }
 
@@ -55,10 +67,11 @@ export function cardCopy(island: CardIsland, stats: { pieces: number; districts:
   };
 }
 
-/** Changes whenever what the picture shows changes, so previews never keep an old island. */
+/** Changes whenever what the picture shows changes (a moved or waking core too), so previews never keep an old island. */
 export function cardVersion(island: CardIsland, hash: (value: string) => string): string {
   const shape = island.placements.map((p) => `${p.item_id}@${p.x},${p.y},${p.rotation}`).sort().join('|');
-  return hash(`${island.title ?? ''}#${island.size}#${shape}`).slice(0, 12);
+  const core = cardCore(island);
+  return hash(`${island.title ?? ''}#${island.size}#core@${core.x},${core.y},${core.stage}#${shape}`).slice(0, 12);
 }
 
 // ---------- the page ----------
@@ -94,36 +107,28 @@ export function withIslandMeta(html: string, meta: PageMeta): string {
 }
 
 // ---------- the picture ----------
-// The island is drawn in the studio's canvas units (tile 92×46, origin 430,230,
-// iOS LandSpriteGeometry / web IslandThumb) and scaled into the card.
-const TILE_W = 92;
-const TILE_H = 46;
-const ORIGIN = { x: 430, y: 230 };
-const SLAB_DEPTH = 22;
-const CORE = { col: 3, row: 3 };
+// The island is drawn in the studio's canvas units (the 860×720 island
+// canvas; an 8×8 has tile 92×46 and origin 430,230 — iOS LandSpriteGeometry,
+// web IslandThumb) and scaled into the card. A grown island packs smaller
+// tiles into the same slab (landGeometry).
 /** The part of the canvas the island and its tallest pieces occupy. */
 const VIEW = { x: 40, y: 96, w: 780, h: 530 };
-const iso = (col: number, row: number) => ({ x: ORIGIN.x + (col - row) * TILE_W / 2, y: ORIGIN.y + (col + row) * TILE_H / 2 });
 
 type El = { type: string; key?: string; props: Record<string, unknown> };
 const el = (type: string, style: Record<string, unknown>, children?: unknown, extra: Record<string, unknown> = {}): El => ({ type, props: { style, children, ...extra } });
 
 type Connector = 'NE' | 'SE' | 'SW' | 'NW';
 
-interface Sprite { item: ManifestItem; state: ManifestState; col: number; row: number; flip: boolean; depth: number; path: boolean; connectors: Connector[] }
+interface Sprite { item: ManifestItem; state: ManifestState; col: number; row: number; rotation: number; flip: boolean; scale: number; depth: number; path: boolean; connectors: Connector[] }
 
 /** Paint-ordered sprites, anchored on the footprint's bottom vertex like the apps. */
-export function islandSprites(island: CardIsland, items: Map<string, ManifestItem>): Sprite[] {
+export function islandSprites(island: CardIsland, items: Map<string, ManifestItem>, geom: LandGeometry = landGeometry(island.size)): Sprite[] {
   const pathCells = new Set<string>();
   for (const p of island.placements) if (items.get(artId(p.item_id))?.kind === 'path_pavement') pathCells.add(`${p.x}:${p.y}`);
   const sprites: Sprite[] = [];
-  const add = (item: ManifestItem, col: number, row: number, rotation: number) => {
-    const state = artState(item);
+  const add = (item: ManifestItem, state: ManifestState | null, col: number, row: number, rotation: number, scale = 1) => {
     if (!state) return;
     const flip = rotation % 180 === 90;
-    const cols = flip ? item.footprint.rows : item.footprint.cols;
-    const rows = flip ? item.footprint.cols : item.footprint.rows;
-    const center = iso(col + (cols - 1) / 2, row + (rows - 1) / 2);
     const connectors: Connector[] = [];
     if (item.kind === 'path_pavement') {
       if (pathCells.has(`${col}:${row - 1}`)) connectors.push('NE');
@@ -132,40 +137,23 @@ export function islandSprites(island: CardIsland, items: Map<string, ManifestIte
       if (pathCells.has(`${col - 1}:${row}`)) connectors.push('NW');
       if (!connectors.length) connectors.push(...(flip ? ['NW', 'SE'] as Connector[] : ['NE', 'SW'] as Connector[]));
     }
-    sprites.push({ item, state, col, row, flip, depth: center.y + TILE_H * (cols + rows) / 4, path: item.kind === 'path_pavement', connectors });
+    const depth = frameOf(geom, item.footprint, col, row, rotation, state).depth;
+    sprites.push({ item, state, col, row, rotation, flip, scale, depth, path: item.kind === 'path_pavement', connectors });
   };
-  for (const p of island.placements) { const item = items.get(artId(p.item_id)); if (item) add(item, p.x, p.y, p.rotation); }
+  for (const p of island.placements) { const item = items.get(artId(p.item_id)); if (item) add(item, artState(item), p.x, p.y, p.rotation); }
   const core = items.get('aura_core');
-  if (core) add(core, CORE.col, CORE.row, 0);
+  if (core) {
+    const at = cardCore(island);
+    // Dormant: the stage-0 art, static, at DORMANT_CORE_SCALE of its awake size.
+    add(core, artState(core, at.stage), at.x, at.y, 0, at.stage === 0 ? DORMANT_CORE_SCALE : 1);
+  }
   return sprites.sort((a, b) => a.depth - b.depth);
 }
 
-function spriteFrame(s: Sprite) {
-  const cols = s.flip ? s.item.footprint.rows : s.item.footprint.cols;
-  const rows = s.flip ? s.item.footprint.cols : s.item.footprint.rows;
-  const center = iso(s.col + (cols - 1) / 2, s.row + (rows - 1) / 2);
-  const ground = center.y + TILE_H * (cols + rows) / 4;
-  const [x0, y0, x1] = s.state.contentBounds;
-  const visible = Math.max(0.2, x1 - x0);
-  const size = Math.min(360, TILE_W * (s.item.footprint.cols + s.item.footprint.rows) / 2 * 0.9 / visible);
-  const midX = center.x + (s.flip ? -1 : 1) * size * (0.5 - s.state.anchor[0]);
-  const midY = ground + size * (0.5 - s.state.anchor[1]);
-  const frame = { x: midX - size / 2, y: midY - size / 2, size };
-  let face: { x: number; y: number; w: number; h: number } | null = null;
-  if (s.path) {
-    const width = visible * size;
-    const contentMid = (x0 + s.state.contentBounds[2]) / 2;
-    const x = s.flip ? frame.x + size - size * contentMid : frame.x + size * contentMid;
-    face = { x: x - width / 2, y: frame.y + y0 * size, w: width, h: width / 2 };
-  }
-  return { frame, face };
+function spriteFrame(geom: LandGeometry, s: Sprite) {
+  const f = frameOf(geom, s.item.footprint, s.col, s.row, s.rotation, s.state, { path: s.path, scale: s.scale });
+  return { frame: { x: f.x, y: f.y, size: f.size }, face: f.face };
 }
-
-const diamond = (col: number, row: number, cols = 1, rows = 1) => {
-  const hw = TILE_W / 2, hh = TILE_H / 2;
-  const top = iso(col, row), right = iso(col + cols - 1, row), bottom = iso(col + cols - 1, row + rows - 1), left = iso(col, row + rows - 1);
-  return `${top.x},${top.y - hh} ${right.x + hw},${right.y} ${bottom.x},${bottom.y + hh} ${left.x - hw},${left.y}`;
-};
 
 /**
  * The 1200×630 card as a Satori element tree. `art(url)` resolves a manifest
@@ -174,8 +162,9 @@ const diamond = (col: number, row: number, cols = 1, rows = 1) => {
 export function cardElement(island: CardIsland, items: Map<string, ManifestItem>, lang: Lang, art: (url: string) => string | null): El {
   const stats = islandStats(island, items);
   const copy = cardCopy(island, stats, lang);
-  const sprites = islandSprites(island, items);
-  const n = Math.max(1, Math.min(16, island.size || 8));
+  const geom = landGeometry(island.size);
+  const sprites = islandSprites(island, items, geom);
+  const n = geom.size;
 
   // The island box on the right of the card.
   const box = { x: 430, y: 34, w: 750, h: 562 };
@@ -185,17 +174,17 @@ export function cardElement(island: CardIsland, items: Map<string, ManifestItem>
   const X = (u: number) => ox + u * scale;
   const Y = (v: number) => oy + v * scale;
 
-  const left = { x: 62, y: 391 }, bottom = { x: 430, y: 575 }, right = { x: 798, y: 391 };
-  const grid = Array.from({ length: n * n }, (_, i) => ({ type: 'polygon', props: { points: diamond(i % n, Math.floor(i / n)), fill: 'none', stroke: 'rgba(255,255,255,0.05)', 'stroke-width': 1 } }));
+  const { left, bottom, right, depth: SLAB_DEPTH } = SLAB;
+  const grid = Array.from({ length: n * n }, (_, i) => ({ type: 'polygon', props: { points: geom.diamond(i % n, Math.floor(i / n)), fill: 'none', stroke: 'rgba(255,255,255,0.05)', 'stroke-width': geom.unit } }));
   const shadows = sprites.map((s) => {
     const cols = s.flip ? s.item.footprint.rows : s.item.footprint.cols;
     const rows = s.flip ? s.item.footprint.cols : s.item.footprint.rows;
-    return { type: 'polygon', props: { points: diamond(s.col, s.row, cols, rows), fill: 'rgba(0,0,0,0.45)' } };
+    return { type: 'polygon', props: { points: geom.diamond(s.col, s.row, cols, rows), fill: 'rgba(0,0,0,0.45)' } };
   });
   const ground = el('svg', { position: 'absolute', left: 0, top: 0 }, [
     { type: 'polygon', props: { points: `${left.x},${left.y} ${bottom.x},${bottom.y} ${bottom.x},${bottom.y + SLAB_DEPTH} ${left.x},${left.y + SLAB_DEPTH}`, fill: '#0c0e13' } },
     { type: 'polygon', props: { points: `${bottom.x},${bottom.y} ${right.x},${right.y} ${right.x},${right.y + SLAB_DEPTH} ${bottom.x},${bottom.y + SLAB_DEPTH}`, fill: '#050608' } },
-    { type: 'polygon', props: { points: diamond(0, 0, n, n), fill: '#111319', stroke: 'rgba(125,166,255,0.22)', 'stroke-width': 1 } },
+    { type: 'polygon', props: { points: geom.diamond(0, 0, n, n), fill: '#111319', stroke: 'rgba(125,166,255,0.22)', 'stroke-width': 1 } },
     ...grid,
     ...shadows,
   ], { width: CARD.width, height: CARD.height, viewBox: `${-ox / scale} ${-oy / scale} ${CARD.width / scale} ${CARD.height / scale}` });
@@ -204,7 +193,7 @@ export function cardElement(island: CardIsland, items: Map<string, ManifestItem>
   sprites.forEach((s, index) => {
     const variant = s.state.variants.albedo_1024 ?? s.state.variants.albedo_512;
     const src = variant ? art(variant.url) : null;
-    const { frame, face } = spriteFrame(s);
+    const { frame, face } = spriteFrame(geom, s);
     if (src) {
       layers.push(el('img', { position: 'absolute', left: X(frame.x), top: Y(frame.y), width: frame.size * scale, height: frame.size * scale, ...(s.flip ? { transform: 'scaleX(-1)' } : {}) }, undefined, { src, width: Math.round(frame.size * scale), height: Math.round(frame.size * scale), key: `s${index}` }));
     }
@@ -215,8 +204,8 @@ export function cardElement(island: CardIsland, items: Map<string, ManifestItem>
         SW: { x: face.x + face.w * 0.25, y: face.y + face.h * 0.75 }, NW: { x: face.x + face.w * 0.25, y: face.y + face.h * 0.25 },
       };
       layers.push(el('svg', { position: 'absolute', left: 0, top: 0 }, [
-        ...s.connectors.map((k) => ({ type: 'line', props: { x1: c.x, y1: c.y, x2: ends[k].x, y2: ends[k].y, stroke: '#61ffc4', 'stroke-width': 4, 'stroke-linecap': 'round' } })),
-        { type: 'circle', props: { cx: c.x, cy: c.y, r: 4, fill: '#baffdd' } },
+        ...s.connectors.map((k) => ({ type: 'line', props: { x1: c.x, y1: c.y, x2: ends[k].x, y2: ends[k].y, stroke: '#61ffc4', 'stroke-width': 4 * geom.unit, 'stroke-linecap': 'round' } })),
+        { type: 'circle', props: { cx: c.x, cy: c.y, r: 4 * geom.unit, fill: '#baffdd' } },
       ], { width: CARD.width, height: CARD.height, viewBox: `${-ox / scale} ${-oy / scale} ${CARD.width / scale} ${CARD.height / scale}`, key: `f${index}` }));
     }
   });

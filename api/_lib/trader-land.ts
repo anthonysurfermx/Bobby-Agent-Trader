@@ -1,54 +1,95 @@
 // ============================================================
-// Trader Land — server rules for the world (SYSTEM-DESIGN v0.2):
-//   · pieces come from a deterministic Discovery Route (tl_items.route_index),
-//     one per awarded discipline event, never random
-//   · a read plants a SEED; a respected NO TRADE arrives already BLOOMED
+// Trader Land — server rules for the world (SYSTEM-DESIGN v0.2, GROWTH-v1):
+//   · one awarded read = one seed; pieces come from fixed, repeating tier
+//     sequences (tl_items.tier / tier_index), never random — tl_grant_piece
+//   · a read plants a 24 h common SEED; a respected NO TRADE blooms the next
+//     common piece at once
+//   · the builder may EXTEND a seed to 72 h (building) or 168 h (landmark),
+//     upward only, before its review opens — tl_extend_seed
 //   · a seed BLOOMS when its thesis is reviewed against the public price
-//     after THESIS_REVIEW_HOURS (closeSeed) — that close pays thesis_closed
-//     and is minted here, never accepted from a client
+//     after its horizon (closeSeed) — that close pays thesis_closed and is
+//     minted here, never accepted from a client; patience earns the piece,
+//     the verdict never does
 //   · a reviewed thesis the reviewer EXECUTED on Base (own wallet, asset and
 //     direction of the thesis, between read and review) pays EXECUTION_BONUS
 //     and the next piece of the season collection (trader-land-season.ts)
-//   · after the route ends, awards keep giving XP/Aura but no piece (v1)
-//   · every land is 8×8, one per identity, created on first touch
+//   · one land per identity, created on first touch: 8×8 that grows to
+//     10/12/16 as it fills (tl_grow_land, only for clients that declare
+//     support), with a movable Aura Core that wakes at 5 pieces
 // All writes go through the service role; callers are /api/progress and
-// /api/trader-land, which already proved the identity.
+// /api/trader-land, which already proved the identity. The land-shaping
+// writes are RPCs that lock the land row (migration 20260919120516).
 // ============================================================
 import { randomInt, randomUUID } from 'node:crypto';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { AWARD_AURA, EXECUTION_BONUS, applyAward, type PlantKind, type ProgressCounters } from './progress-rules.js';
 import { publicLastPrice } from './public-price.js';
-import { resolveThesis, reviewAt, swapExecutesThesis, thesisFrom, type SwapCandidate, type Thesis, type ThesisOutcome } from './thesis-rules.js';
+import { horizonAt, horizonHours, resolveThesis, reviewAt, seedHorizon, swapExecutesThesis, thesisFrom, type SeedHorizon, type SwapCandidate, type Thesis, type ThesisOutcome, type Tier } from './thesis-rules.js';
+import { LEGACY_LAND_SIZE, LEGACY_ROUTE_CAP, TIER_ORDER, coreOf, growthOf, heldByTier, nextInTier, tierSequence, type Core, type Growth } from './trader-land-growth.js';
 import { seasonProgress, type SeasonProgress } from './trader-land-season.js';
 
-export { THESIS_REVIEW_HOURS, ThesisSchema, resolveThesis, reviewAt, thesisFrom, type Thesis, type ThesisOutcome } from './thesis-rules.js';
+export { THESIS_REVIEW_HOURS, ThesisSchema, resolveThesis, reviewAt, seedHorizon, thesisFrom, type SeedHorizon, type Thesis, type ThesisOutcome, type Tier } from './thesis-rules.js';
 export { SEASON, seasonProgress, type SeasonProgress } from './trader-land-season.js';
 
+/**
+ * What /api/progress returns per planted event (`results[i].world`). Every
+ * field keeps its pre-growth meaning and type: iOS release 31 parses it
+ * strictly and iOS 1.1 shows the progress `routeIndex` as `n/8`.
+ */
 export interface RouteGrant {
+  /** common pieces held after this grant, capped at LEGACY_ROUTE_CAP (8) */
   routeIndex: number;
-  /** piece planted or bloomed by this event, null when the route is complete */
-  item: { id: string; world: string; attribution: string; kind: string; name: unknown; footprint: [number, number] } | null;
+  /** piece planted or bloomed by this event; null only if it left the catalog */
+  item: PieceSummary | null;
   inventoryId: string | null;
   state: 'seed' | 'bloomed' | null;
   /** kept for older clients; a plant never blooms another seed any more (closes do, see closeSeed) */
   bloomedInventoryId: null;
-  routeComplete: boolean;
+  /** kept for older clients: the sequences repeat, so a grant never completes a route */
+  routeComplete: false;
+  /** seeds only: its 24 h horizon and what an extend would turn it into (GROWTH-v1 §3) */
+  horizon?: SeedHorizon;
+  tiers?: Record<Tier, PieceSummary | null>;
 }
 
-export interface Item { id: string; world: string; attribution: string; kind: string; footprint_w: number; footprint_h: number; name: unknown; route_index: number | null; art_url: string | null }
+export interface Item { id: string; world: string; attribution: string; kind: string; footprint_w: number; footprint_h: number; name: unknown; route_index: number | null; tier: string | null; tier_index: number | null; art_url: string | null }
 export interface PieceSummary { id: string; world: string; attribution: string; kind: string; name: unknown; footprint: [number, number] }
 const PIECE_COLUMNS = 'id,world,attribution,kind,footprint_w,footprint_h,name';
-function pieceSummary(item: Item): PieceSummary {
+export function pieceSummary(item: Item): PieceSummary {
   return { id: item.id, world: item.world, attribution: item.attribution, kind: item.kind, name: item.name, footprint: [item.footprint_w, item.footprint_h] };
 }
 
 export async function catalog(): Promise<Item[]> {
-  const r = await fetch(bobbyRest('tl_items?active=eq.true&order=route_index.asc.nullslast,world.asc,id.asc&select=id,world,attribution,kind,footprint_w,footprint_h,name,route_index,art_url'), { headers: bobbyServiceHeaders() });
+  const r = await fetch(bobbyRest('tl_items?active=eq.true&order=route_index.asc.nullslast,world.asc,id.asc&select=id,world,attribution,kind,footprint_w,footprint_h,name,route_index,tier,tier_index,art_url'), { headers: bobbyServiceHeaders() });
   return r.ok ? ((await r.json()) as Item[]) : [];
 }
 
-export interface Land { size: number; theme: string; visibility: 'private' | 'public'; share_code: string | null; title: string | null; published_at: string | null }
-const LAND_COLUMNS = 'size,theme,visibility,share_code,title,published_at';
+/** The next piece of every tier for a player holding `held` (sequence[n mod len] among the active catalog). */
+export function nextPieces(items: Item[], held: Record<Tier, number>): Record<Tier, PieceSummary | null> {
+  const out = {} as Record<Tier, PieceSummary | null>;
+  for (const tier of TIER_ORDER) {
+    const next = nextInTier(tierSequence(items, tier), held[tier]);
+    out[tier] = next ? pieceSummary(next) : null;
+  }
+  return out;
+}
+
+/** n per tier for an identity: its route pieces by the tier of their current item. */
+export async function heldPieces(identityId: string): Promise<Record<Tier, number>> {
+  const r = await fetch(bobbyRest(`tl_inventory?identity_id=eq.${identityId}&source=eq.route&select=source,tl_items(tier)`), { headers: bobbyServiceHeaders() });
+  if (!r.ok) throw new Error('Inventory read failed');
+  const rows = (await r.json()) as Array<{ source: string; tl_items: { tier: string | null } | null }>;
+  return heldByTier(rows.map((row) => ({ source: row.source, tier: row.tl_items?.tier ?? null })));
+}
+
+export interface Land { size: number; theme: string; visibility: 'private' | 'public'; share_code: string | null; title: string | null; published_at: string | null; core_x: number; core_y: number; core_stage: number }
+const LAND_COLUMNS = 'size,theme,visibility,share_code,title,published_at,core_x,core_y,core_stage';
+
+/** The land as clients read it: the stored fields plus the core and how far the island is from growing. */
+export interface LandView { size: number; theme: string; visibility: 'private' | 'public'; share_code: string | null; title: string | null; published_at: string | null; core: Core; growth: Growth }
+export function landView(land: Land, occupied: number, pieces: number): LandView {
+  return { size: land.size, theme: land.theme, visibility: land.visibility, share_code: land.share_code, title: land.title, published_at: land.published_at, core: coreOf(land, pieces), growth: growthOf(land.size, occupied) };
+}
 
 export async function ensureLand(identityId: string): Promise<Land> {
   const r = await fetch(bobbyRest(`tl_lands?on_conflict=identity_id&select=${LAND_COLUMNS}`), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'resolution=ignore-duplicates,return=representation' }), body: JSON.stringify({ identity_id: identityId }) });
@@ -79,8 +120,8 @@ export function cleanTitle(raw: unknown): string | null {
 }
 
 export interface PublicPlacement { item_id: string; x: number; y: number; rotation: number }
-export interface PublicLandRow { identity_id: string; size: number; theme: string; title: string | null; published_at: string | null; share_code: string | null }
-export const PUBLIC_LAND_COLUMNS = 'identity_id,size,theme,title,published_at,share_code';
+export interface PublicLandRow { identity_id: string; size: number; theme: string; title: string | null; published_at: string | null; share_code: string | null; core_x?: number | null; core_y?: number | null; core_stage?: number | null }
+export const PUBLIC_LAND_COLUMNS = 'identity_id,size,theme,title,published_at,share_code,core_x,core_y,core_stage';
 
 /** Placements of several lands in one read, keyed by identity (ids come from our own rows). */
 export async function placementsFor(identityIds: string[]): Promise<Map<string, PublicPlacement[]>> {
@@ -104,35 +145,186 @@ export function worldStats(placements: PublicPlacement[], items: Map<string, Ite
   return { pieces: placements.length, districts: [...districts].sort() };
 }
 
-/** What a visitor may see: the builder's title and the art positions, never who built it. */
+/** What a visitor may see: the builder's title and the art positions (the core's too), never who built it. */
 export function publicWorld(row: PublicLandRow, placements: PublicPlacement[], items: Map<string, Item>) {
-  return { code: row.share_code, title: row.title, size: row.size, theme: row.theme, publishedAt: row.published_at, placements, stats: worldStats(placements, items) };
+  return { code: row.share_code, title: row.title, size: row.size, theme: row.theme, publishedAt: row.published_at, core: coreOf(row, placements.length), placements, stats: worldStats(placements, items) };
 }
 
+// ---------- land-shaping RPCs (service role, migration 20260919120516) ----------
+// Each one locks the identity's land row first, so concurrent requests of the
+// same player serialize in the database. Expected refusals come back as
+// { ok: false, error: '<code>' }; a transport or SQL failure throws.
+type RpcRefusal = { ok: false; error: string; review_at?: string };
+async function rpc<T extends { ok: true }>(fn: string, args: Record<string, unknown>): Promise<T | RpcRefusal> {
+  const r = await fetch(bobbyRest(`rpc/${fn}`), { method: 'POST', headers: bobbyServiceHeaders(), body: JSON.stringify(args) });
+  if (!r.ok) throw new Error(`${fn} failed (${r.status}): ${(await r.text().catch(() => '')).slice(0, 200)}`);
+  return (await r.json()) as T | RpcRefusal;
+}
+const iso = (value: string) => new Date(value).toISOString();
+
 // ---------- planting ----------
-export async function grantRoutePiece(identityId: string, ledgerEventId: string, kind: PlantKind, routeIndex: number): Promise<RouteGrant | null> {
+interface GrantRow { ok: true; inventory_id: string; item_id: string; tier: Tier; horizon_hours: number; state: 'seed' | 'bloomed'; held: number; seeded_at: string; replay: boolean }
+
+/**
+ * One awarded event → the next piece of its tier (a read: a 24 h common
+ * seed; a NO TRADE: the next common piece, bloomed). Idempotent on the
+ * ledger event. `routeIndex` is the caller's legacy counter, kept when the
+ * grant is not a common piece (a replay of a seed that was extended since).
+ * Returns null when the grant could not be made; the event keeps its XP.
+ */
+export async function grantPiece(identityId: string, ledgerEventId: string, kind: PlantKind, routeIndex: number, items: Map<string, Item>, now = Date.now()): Promise<RouteGrant | null> {
   try {
-    await ensureLand(identityId);
-    const next = await fetch(bobbyRest(`tl_items?active=eq.true&route_index=eq.${routeIndex + 1}&select=${PIECE_COLUMNS}&limit=1`), { headers: bobbyServiceHeaders() });
-    const item = ((next.ok ? await next.json() : []) as Item[])[0];
-    if (!item) return { routeIndex, item: null, inventoryId: null, state: null, bloomedInventoryId: null, routeComplete: true };
-    const state: 'seed' | 'bloomed' = kind === 'read_complete' ? 'seed' : 'bloomed';
-    const ins = await fetch(bobbyRest('tl_inventory?select=id'), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ identity_id: identityId, item_id: item.id, state, source: 'route', event_id: ledgerEventId, bloomed_at: state === 'bloomed' ? new Date().toISOString() : null }) });
-    if (!ins.ok) { console.error('[trader-land] grant', ins.status, await ins.text().catch(() => '')); return null; }
-    const inventoryId = ((await ins.json()) as Array<{ id: string }>)[0]?.id ?? null;
-    return { routeIndex: routeIndex + 1, item: pieceSummary(item), inventoryId, state, bloomedInventoryId: null, routeComplete: false };
+    const out = await rpc<GrantRow>('tl_grant_piece', { p_identity: identityId, p_event: ledgerEventId, p_state: kind === 'read_complete' ? 'seed' : 'bloomed', p_hours: 24 });
+    if (out.ok === false) { console.error('[trader-land] grant refused', out.error); return null; }
+    const item = items.get(out.item_id);
+    if (!item) console.error('[trader-land] granted piece missing from the active catalog', out.item_id);
+    const grant: RouteGrant = {
+      routeIndex: out.tier === 'common' ? Math.min(out.held, LEGACY_ROUTE_CAP) : routeIndex,
+      item: item ? pieceSummary(item) : null,
+      inventoryId: out.inventory_id,
+      state: out.state,
+      bloomedInventoryId: null,
+      routeComplete: false,
+    };
+    if (out.state === 'seed') grant.horizon = seedHorizon(out.seeded_at, out.horizon_hours, 'seed', now);
+    return grant;
   } catch (error) {
-    console.error('[trader-land] grantRoutePiece', error);
+    console.error('[trader-land] grantPiece', error);
     return null;
   }
 }
 
+// ---------- extending a seed ----------
+interface ExtendRow { ok: true; inventory_id: string; item_id: string; tier: Tier; horizon_hours: number; review_at: string }
+export type ExtendResult =
+  | { ok: true; inventoryId: string; itemId: string; horizon: SeedHorizon }
+  | { ok: false; status: number; error: string; reviewAt?: string };
+
+/** Give a seed more time: 72 h → the next building, 168 h → the next landmark. */
+export async function extendSeed(identityId: string, inventoryId: string, hours: number, now = Date.now()): Promise<ExtendResult> {
+  const out = await rpc<ExtendRow>('tl_extend_seed', { p_identity: identityId, p_inventory: inventoryId, p_hours: hours });
+  if (out.ok === false) {
+    if (out.error === 'not_found') return { ok: false, status: 404, error: 'Piece not in your inventory' };
+    if (out.error === 'not_seed') return { ok: false, status: 409, error: 'This seed already bloomed' };
+    if (out.error === 'review_open') return { ok: false, status: 409, error: 'Its review is already open', ...(out.review_at ? { reviewAt: iso(out.review_at) } : {}) };
+    if (out.error === 'not_upward') return { ok: false, status: 400, error: 'A horizon can only grow' };
+    console.error('[trader-land] extend refused', out.error);
+    return { ok: false, status: 502, error: 'Could not extend the seed' };
+  }
+  return { ok: true, inventoryId: out.inventory_id, itemId: out.item_id, horizon: horizonAt(out.horizon_hours, iso(out.review_at), 'seed', now) };
+}
+
+// ---------- the Aura Core and the island's size ----------
+/**
+ * Clients that implement GROWTH-v1 send `X-Trader-Land-Client: 2`. Only they
+ * may grow an island: every shipped iOS build (1.1 (26), 1.2 (31)) refuses
+ * an island that is not 8×8.
+ */
+export function growthClient(headers: Record<string, string | string[] | undefined>): boolean {
+  const raw = headers['x-trader-land-client'];
+  const value = Number(Array.isArray(raw) ? raw[0] : raw);
+  return Number.isInteger(value) && value >= 2;
+}
+
+/**
+ * The island size a request's coordinates were drawn on. A growth shifts
+ * every cell by a ring, so coordinates from another size must be refused,
+ * not applied one ring off. A client may say it (`size`); one without
+ * `X-Trader-Land-Client: 2` only ever draws 8×8; otherwise it is unknown.
+ */
+export function drawnSize(size: number | undefined, headers: Record<string, string | string[] | undefined>): number | null {
+  if (size !== undefined) return size;
+  return growthClient(headers) ? null : LEGACY_LAND_SIZE;
+}
+
+/** The same words as a placement collision: the cells were taken since the client last read the island. */
+export const ISLAND_CHANGED = 'The island changed. Reload before trying again.';
+
+// ---------- placement writes (tl_place_piece / tl_move_piece / tl_remove_piece) ----------
+// The RPCs lock the land row before the placement, the order tl_grow_land
+// uses, so a write can never deadlock with a growth step. `size` is the island
+// size the caller validated the coordinates on; a growth that commits first
+// makes the write come back 'resized'. The API checked everything against a
+// fresh read, so any refusal ('resized', or 'changed': a key or trigger said
+// no) means the island changed under the request.
+interface PlacementRow { ok: true; placement_id: string }
+export type PlacementResult = { ok: true; placementId: string } | { ok: false; status: number; error: string };
+
+async function placementWrite(fn: string, args: Record<string, unknown>, failed: string): Promise<PlacementResult> {
+  let out: PlacementRow | RpcRefusal;
+  try { out = await rpc<PlacementRow>(fn, args); } catch (error) { console.error(`[trader-land] ${fn}`, error); return { ok: false, status: 502, error: failed }; }
+  if (out.ok !== false) return { ok: true, placementId: out.placement_id };
+  // move/remove: the placement is gone; place: the land is (only a placement is addressed by id).
+  if (out.error === 'not_found' && fn !== 'tl_place_piece') return { ok: false, status: 404, error: 'Placement not found' };
+  if (out.error !== 'resized' && out.error !== 'changed' && out.error !== 'not_found') console.error(`[trader-land] ${fn} refused`, out.error);
+  return { ok: false, status: 409, error: ISLAND_CHANGED };
+}
+
+export function placePiece(identityId: string, inventoryId: string, x: number, y: number, rotation: number, size: number): Promise<PlacementResult> {
+  return placementWrite('tl_place_piece', { p_identity: identityId, p_inventory: inventoryId, p_x: x, p_y: y, p_rotation: rotation, p_size: size }, 'Could not place the piece');
+}
+
+export function movePiece(identityId: string, placementId: string, x: number, y: number, rotation: number, size: number): Promise<PlacementResult> {
+  return placementWrite('tl_move_piece', { p_identity: identityId, p_placement: placementId, p_x: x, p_y: y, p_rotation: rotation, p_size: size }, 'Could not move the piece');
+}
+
+/** Store a placed piece back in the inventory (addressed by id: no frame to check). */
+export function removePiece(identityId: string, placementId: string): Promise<PlacementResult> {
+  return placementWrite('tl_remove_piece', { p_identity: identityId, p_placement: placementId }, 'Could not store the piece. Reload the island before retrying.');
+}
+
+interface CoreRow { ok: true; core_x: number; core_y: number }
+export type MoveCoreResult = { ok: true; x: number; y: number } | { ok: false; status: number; error: string };
+
+/** `size`: the island size the target was drawn on (null = unknown); another size is refused as a change. */
+export async function moveCore(identityId: string, x: number, y: number, size: number | null): Promise<MoveCoreResult> {
+  const out = await rpc<CoreRow>('tl_move_core', { p_identity: identityId, p_x: x, p_y: y, p_size: size });
+  if (out.ok === false) {
+    if (out.error === 'outside') return { ok: false, status: 400, error: 'Outside the island' };
+    if (out.error === 'occupied' || out.error === 'resized') return { ok: false, status: 409, error: ISLAND_CHANGED };
+    if (out.error === 'not_found') return { ok: false, status: 404, error: 'Island not found' };
+    console.error('[trader-land] move_core refused', out.error);
+    return { ok: false, status: 502, error: 'Could not move the core' };
+  }
+  return { ok: true, x: out.core_x, y: out.core_y };
+}
+
+interface GrowRow { ok: true; grew: boolean; from: number; to: number; shift: number; size: number; core_x: number; core_y: number; core_stage: number; woke: boolean }
+export interface Grew { from: number; to: number; shift: number }
+
+/** After a placement: wake the core at 5 pieces and add rings once the island is full enough. */
+export async function growLand(identityId: string): Promise<Grew | null> {
+  const out = await rpc<GrowRow>('tl_grow_land', { p_identity: identityId });
+  if (out.ok === false) { console.error('[trader-land] grow refused', out.error); return null; }
+  return out.grew ? { from: out.from, to: out.to, shift: out.shift } : null;
+}
+
+/**
+ * Wake the core of a land that already stands on WAKE_PIECES pieces. Growth
+ * clients get it from tl_grow_land after each placement; every other land
+ * (pieces placed by an older client, or before the API woke cores) wakes on
+ * its owner's next world read. Waking is permanent and changes nothing an
+ * older client draws, so a conditional PATCH is enough. True when the land
+ * is awake afterwards.
+ */
+export async function wakeCore(identityId: string): Promise<boolean> {
+  try {
+    const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identityId}&core_stage=eq.0`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify({ core_stage: 1, updated_at: new Date().toISOString() }) });
+    if (!r.ok) console.error('[trader-land] wake core', r.status, await r.text().catch(() => ''));
+    return r.ok;
+  } catch (error) {
+    console.error('[trader-land] wake core', error);
+    return false;
+  }
+}
+
 // ---------- reviewing a seed ----------
-export interface SeedRow { id: string; item_id: string; state: 'seed' | 'bloomed'; seeded_at: string; event_id: string | null }
+export interface SeedRow { id: string; item_id: string; state: 'seed' | 'bloomed'; seeded_at: string; event_id: string | null; horizon_hours: number }
+/** reviewAt stays a non-null string: iOS 1.1 / release 31 decode it as required. */
 export interface SeedReview { thesis: Thesis | null; readAt: string | null; reviewAt: string; ready: boolean }
 
 /** The plant events behind the caller's seeds, so the studio can say what each seed is waiting on. */
-export async function seedReviews(seeds: Array<Pick<SeedRow, 'id' | 'seeded_at' | 'event_id'>>, now = Date.now()): Promise<Map<string, SeedReview>> {
+export async function seedReviews(seeds: Array<Pick<SeedRow, 'id' | 'seeded_at' | 'event_id'> & { horizon_hours?: number | null }>, now = Date.now()): Promise<Map<string, SeedReview>> {
   const out = new Map<string, SeedReview>();
   if (!seeds.length) return out;
   const ids = seeds.map((s) => s.event_id).filter((id): id is string => Boolean(id));
@@ -144,7 +336,7 @@ export async function seedReviews(seeds: Array<Pick<SeedRow, 'id' | 'seeded_at' 
   }
   for (const seed of seeds) {
     const event = seed.event_id ? byEvent.get(seed.event_id) : undefined;
-    const at = reviewAt(seed.seeded_at);
+    const at = reviewAt(seed.seeded_at, horizonHours(seed.horizon_hours));
     out.set(seed.id, { thesis: thesisFrom(event?.meta), readAt: event?.occurred_at ?? null, reviewAt: at, ready: Date.parse(at) <= now });
   }
   return out;
@@ -212,7 +404,7 @@ export type CloseResult = { ok: true; closed: ClosedThesis } | { ok: false; stat
  */
 export async function closeSeed(identity: { id: string; wallet: string | null }, inventoryId: string, opts: { platform: 'ios' | 'web'; tzOffsetMin: number; now?: Date }): Promise<CloseResult> {
   const now = opts.now ?? new Date();
-  const r = await fetch(bobbyRest(`tl_inventory?id=eq.${inventoryId}&identity_id=eq.${identity.id}&select=id,item_id,state,seeded_at,event_id&limit=1`), { headers: bobbyServiceHeaders() });
+  const r = await fetch(bobbyRest(`tl_inventory?id=eq.${inventoryId}&identity_id=eq.${identity.id}&select=id,item_id,state,seeded_at,event_id,horizon_hours&limit=1`), { headers: bobbyServiceHeaders() });
   if (!r.ok) throw new Error('Seed read failed');
   const seed = ((await r.json()) as SeedRow[])[0];
   if (!seed) return { ok: false, status: 404, error: 'Piece not in your inventory' };
@@ -235,9 +427,16 @@ export async function closeSeed(identity: { id: string; wallet: string | null },
   const row = ((prog.ok ? await prog.json() : []) as Array<{ xp: number; aura: number; streak: number; last_day: string | null; daily_awards: number; daily_awards_day: string | null }>)[0];
   if (!row) return { ok: false, status: 502, error: 'Could not load progress' };
 
-  const cas = await fetch(bobbyRest(`tl_inventory?id=eq.${seed.id}&identity_id=eq.${identity.id}&state=eq.seed&select=id`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ state: 'bloomed', bloomed_at: bloomedAt }) });
+  // The horizon that was read is part of the compare-and-set: an extend that
+  // lands between the readiness check and here moved the review later.
+  const cas = await fetch(bobbyRest(`tl_inventory?id=eq.${seed.id}&identity_id=eq.${identity.id}&state=eq.seed&horizon_hours=eq.${horizonHours(seed.horizon_hours)}&select=id`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ state: 'bloomed', bloomed_at: bloomedAt }) });
   if (!cas.ok) throw new Error('Bloom write failed');
-  if (!((await cas.json()) as unknown[]).length) return { ok: false, status: 409, error: 'This piece already bloomed' };
+  if (!((await cas.json()) as unknown[]).length) {
+    const again = await fetch(bobbyRest(`tl_inventory?id=eq.${seed.id}&identity_id=eq.${identity.id}&select=state,seeded_at,horizon_hours&limit=1`), { headers: bobbyServiceHeaders() });
+    const current = again.ok ? ((await again.json()) as Array<Pick<SeedRow, 'state' | 'seeded_at' | 'horizon_hours'>>)[0] : undefined;
+    if (current?.state === 'seed') return { ok: false, status: 409, error: 'The market has not had time to answer yet', reviewAt: reviewAt(current.seeded_at, horizonHours(current.horizon_hours)) };
+    return { ok: false, status: 409, error: 'This piece already bloomed' };
+  }
 
   const counters: ProgressCounters = { xp: row.xp, streak: row.streak, lastDay: row.last_day, dailyAwards: row.daily_awards, dailyAwardsDay: row.daily_awards_day };
   const award = applyAward(counters, 'thesis_closed', now, opts.tzOffsetMin);

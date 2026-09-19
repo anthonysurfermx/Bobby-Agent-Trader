@@ -114,3 +114,15 @@
 .land-library .land-library-title>svg{transform:rotate(180deg)}
 .land-library.collapsed .land-library-title>svg{transform:none}
 @media(max-width:760px){.land-mode{display:flex;font-size:10px;gap:4px}.land-mode i{width:4px;height:4px}}
+
+/* Growth v1: island size / core status, a seed's horizon and its extension. */
+.land-growth-status{display:flex;align-items:center;gap:8px;padding:8px 12px;min-height:36px;border:1px solid var(--land-border);border-radius:12px;background:#10211eda;backdrop-filter:blur(16px);font:500 11px/1.4 'JetBrains Mono',monospace;color:#b1cabb;pointer-events:auto}
+.land-horizon{font:500 11px/1.5 'JetBrains Mono',monospace;color:#c5e9b3;margin-top:6px}
+.land-extend-options{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.land-extend-options .land-eyebrow{font-size:10px}
+.land-extend-options .land-subtle{justify-content:space-between;width:100%;text-align:left}
+.land-extend-options .land-subtle small{font-size:11px;color:#f5d68b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50%}
+.land-extend-confirm{margin-top:10px;padding:10px;border:1px solid #f5d68b55;border-radius:10px;background:#2a2515}
+.land-studio .land-extend-confirm p{color:#f5d68b}
+.land-extend-confirm .land-selected-actions{margin-top:8px}
+@media(max-width:760px){.land-growth-status{font-size:10px;padding:6px 10px}}

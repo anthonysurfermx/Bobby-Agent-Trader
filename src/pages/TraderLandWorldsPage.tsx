@@ -75,7 +75,7 @@ export default function TraderLandWorldsPage() {
                 return (
                   <Link key={world.code} to={visitorPath(world.code)} className="group flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] transition hover:border-emerald-200/35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">
                     <div className="bg-[radial-gradient(ellipse_at_center,#20423755,transparent_70%)] bg-[#101e1b]">
-                      {manifest ? <IslandThumb manifest={manifest} placements={world.placements} size={world.size} title={name} className="block w-full" /> : <div className="aspect-[800/520] animate-pulse bg-white/[0.03]" />}
+                      {manifest ? <IslandThumb manifest={manifest} placements={world.placements} size={world.size} core={world.core} title={name} className="block w-full" /> : <div className="aspect-[800/520] animate-pulse bg-white/[0.03]" />}
                     </div>
                     <div className="flex items-center justify-between gap-3 p-4">
                       <div className="min-w-0">
@@ -126,7 +126,7 @@ export default function TraderLandWorldsPage() {
               );
             })}
             <article className="flex flex-col justify-between rounded-2xl border border-dashed border-emerald-200/20 p-5">
-              <div><span className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-200/65">{t('HOW YOU EARN THEM', 'CÓMO SE GANAN')}</span><p className="mt-3 text-sm leading-relaxed text-emerald-50/70">{t('A completed read plants a seed. Reviewing its thesis makes it bloom; a respected no-trade earns a ready piece. These rewards follow your discovery route. Only bloomed pieces can be built.', 'Una lectura completa planta una semilla. Revisar su tesis la hace florecer; un no-trade respetado gana una pieza lista. Estas recompensas siguen tu ruta de descubrimiento. Solo las piezas florecidas se construyen.')}</p></div>
+              <div><span className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-200/65">{t('HOW YOU EARN THEM', 'CÓMO SE GANAN')}</span><p className="mt-3 text-sm leading-relaxed text-emerald-50/70">{t('One question = one seed, and patience decides the piece: a seed you give 24 hours blooms into a 1×1 piece, 3 days into a 2×1 building, 7 days into a 2×2 landmark. Review its thesis and it blooms, whatever the verdict. A respected no-trade blooms a 1×1 piece at once. Each tier repeats its own sequence, and your island grows from 8×8 to 16×16 as you build.', 'Una pregunta = una semilla, y la paciencia decide la pieza: una semilla a la que das 24 horas florece en una pieza de 1×1, a 3 días en un edificio de 2×1, a 7 días en un monumento de 2×2. Revisa su tesis y florece, sea cual sea el veredicto. Un no-trade respetado florece una pieza de 1×1 al instante. Cada nivel repite su propia secuencia y tu isla crece de 8×8 a 16×16 mientras construyes.')}</p></div>
               <Link to="/desk" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#d1edb8]">{t('Start at the desk', 'Empezar en el desk')}<ArrowUpRight size={16} /></Link>
             </article>
           </div>
