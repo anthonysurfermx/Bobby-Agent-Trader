@@ -107,8 +107,8 @@ struct RiskNoticeView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(L.t("Bobby's public calls are recorded on-chain so anyone can check them. A track record, not a promise.",
-                                     "Los veredictos públicos de Bobby quedan on-chain para que cualquiera los revise. Historial, no promesa."))
+                            Text(L.t("Bobby does not publish your questions.",
+                                     "Bobby no publica tus preguntas."))
                                 .font(.mono(10, .medium))
                                 .foregroundStyle(Theme.muted)
                             Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {

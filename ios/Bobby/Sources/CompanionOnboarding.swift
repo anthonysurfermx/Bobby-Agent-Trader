@@ -1,8 +1,10 @@
 // Companion-first onboarding. The user lands INSIDE the squad world from
 // second one — same dark stage, same 3D companions, same tokens as the rest
-// of the app. Three beats: choose your companion (it speaks when you pick
-// it), choose its vibe (you hear it live), then watch the aura forge scan it
-// to life — pure animation, no cards. No orb, no separate "blue app".
+// of the app. Choose your companion, choose its vibe (heard live — only in a
+// build with voice), then watch the aura forge scan it to life — pure
+// animation, no cards. No orb, no separate "blue app". The text-only release
+// has no voice, so the vibe step (a choice that only changes how it sounds)
+// is skipped there: two beats.
 import SwiftUI
 
 struct CompanionOnboarding: View {
@@ -22,6 +24,12 @@ struct CompanionOnboarding: View {
 
     private var starters: [Companion] { bobbyCompanions.filter { $0.requiredLevel == 1 } }
     private var tint: Color { selected.tint }
+    /// The vibe only changes how the companion sounds: without voice it is a choice with no effect.
+    private var showsVibeStep: Bool { Self.showsVibeStep(voiceEnabled: NeuralVoice.enabled) }
+    static func showsVibeStep(voiceEnabled: Bool) -> Bool { voiceEnabled }
+    /// Beats on screen: 3 with the vibe step, 2 without. Step indices stay 0 / 1 / 2.
+    private var beats: Int { showsVibeStep ? 3 : 2 }
+    private var beat: Int { step == 2 ? beats : step + 1 }
 
     var body: some View {
         ZStack {
@@ -49,7 +57,7 @@ struct CompanionOnboarding: View {
 
                 if step < 2 {
                     Group {
-                        if step == 0 { chooseStep } else { vibeStep }
+                        if step == 0 { chooseStep } else if showsVibeStep { vibeStep }
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 6)
@@ -181,7 +189,7 @@ struct CompanionOnboarding: View {
                         .foregroundStyle(Theme.text.opacity(0.78))
                 }
                 Spacer()
-                Text("0\(step + 1) / 03")
+                Text("0\(beat) / 0\(beats)")
                     .font(.mono(10, .bold))
                     .foregroundStyle(selected.tintSoft)
             }
@@ -190,7 +198,7 @@ struct CompanionOnboarding: View {
                     Capsule().fill(Theme.cardSoft).frame(height: 2)
                     Capsule()
                         .fill(tint)
-                        .frame(width: geometry.size.width * CGFloat(step + 1) / 3, height: 2)
+                        .frame(width: geometry.size.width * CGFloat(beat) / CGFloat(beats), height: 2)
                 }
             }
             .frame(height: 2)
@@ -316,7 +324,7 @@ struct CompanionOnboarding: View {
             switch step {
             case 0:
                 commitCompanion()
-                withAnimation(.spring(duration: 0.42)) { step = 1 }
+                withAnimation(.spring(duration: 0.42)) { step = showsVibeStep ? 1 : 2 }
             case 1:
                 voice.stop()
                 withAnimation(.spring(duration: 0.42)) { step = 2 }

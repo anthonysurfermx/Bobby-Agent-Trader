@@ -182,12 +182,13 @@ private enum DeskLandClient {
     static let header = "X-Trader-Land-Client"
     static let version = "2"
 
-    /// `GET /api/trader-land`: the account island, read fresh.
-    static func worldRequest(token: String) -> URLRequest {
+    /// `GET /api/trader-land`: the account island, read fresh. Without a token the bearer is
+    /// left to `AccountSession.send`.
+    static func worldRequest(token: String? = nil) -> URLRequest {
         var request = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/trader-land"))
         request.timeoutInterval = 20
         request.cachePolicy = .reloadIgnoringLocalCacheData
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         request.setValue(version, forHTTPHeaderField: header)
         return request
     }
@@ -230,9 +231,8 @@ final class LandPulse: ObservableObject {
 
     private func fetch() async {
         guard let userID = AccountSession.shared.session?.userId else { apply(nil); return }
-        guard let token = await AccountSession.shared.accessToken() else { return }
-        guard let (data, response) = try? await transport.data(for: DeskLandClient.worldRequest(token: token)),
-              (200..<300).contains((response as? HTTPURLResponse)?.statusCode ?? 0),
+        guard case let .answered(data, status)? = try? await AccountSession.shared.send(DeskLandClient.worldRequest(), via: transport),
+              (200..<300).contains(status),
               let world = try? JSONDecoder().decode(TraderLandWorld.self, from: data), world.ok,
               AccountSession.shared.session?.userId == userID else { return }
         apply(world)
@@ -251,10 +251,13 @@ struct DeskAccount {
     var userID: @MainActor () -> String?
     /// nil when no token could be had: signed out, or a refresh that failed offline.
     var token: @MainActor () async -> String?
+    /// A new bearer after the server refused `stale` with 401 (it expired on the way); nil when none could be had.
+    var refresh: @MainActor (_ stale: String) async -> String? = { _ in nil }
 
     static var live: DeskAccount {
         DeskAccount(userID: { AccountSession.shared.session?.userId },
-                    token: { await AccountSession.shared.accessToken() })
+                    token: { await AccountSession.shared.accessToken() },
+                    refresh: { await AccountSession.shared.accessToken(replacing: $0) })
     }
 }
 
@@ -327,11 +330,26 @@ struct DeskSeedExtender {
         guard let userID = account.userID() else { return .failure(.signedOut) }
         // A refresh that failed offline keeps the session: that is an outage to retry, not a sign-out.
         guard let token = await account.token() else { return .failure(account.userID() == nil ? .signedOut : .unavailable) }
-        guard let request = try? Self.request(inventoryID: inventoryID, to: horizon, token: token),
-              let (data, response) = try? await transport.data(for: request) else { return .failure(.unavailable) }
+        guard let answer = await send({ try Self.request(inventoryID: inventoryID, to: horizon, token: $0) }, token: token)
+        else { return .failure(.unavailable) }
         // Signed out, or into another account, while it flew: nothing lands on this desk.
         guard account.userID() == userID else { return .failure(.signedOut) }
-        return Self.interpret(data: data, status: (response as? HTTPURLResponse)?.statusCode ?? 0, inventoryID: inventoryID)
+        return Self.interpret(data: answer.data, status: answer.status, inventoryID: inventoryID)
+    }
+
+    /// One authorized request. A 401 from a token that expired on the way gets one refreshed
+    /// retry (the server refuses before it touches the seed); nil = the network failed, or no
+    /// new token could be had while still signed in (an outage, not a sign-out).
+    @MainActor
+    private func send(_ build: (String) throws -> URLRequest, token: String) async -> (data: Data, status: Int)? {
+        guard let request = try? build(token), let (data, response) = try? await transport.data(for: request) else { return nil }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 401 else { return (data, status) }
+        guard let fresh = await account.refresh(token), fresh != token else {
+            return account.userID() == nil ? (data, status) : nil
+        }
+        guard let retry = try? build(fresh), let (again, retried) = try? await transport.data(for: retry) else { return nil }
+        return (again, (retried as? HTTPURLResponse)?.statusCode ?? 0)
     }
 
     /// The seed's row as the island reads it now (`GET /api/trader-land`): nil when it cannot be
@@ -339,8 +357,8 @@ struct DeskSeedExtender {
     @MainActor
     func seedRow(inventoryID: String) async -> Extended? {
         guard let userID = account.userID(), let token = await account.token(),
-              let (data, response) = try? await transport.data(for: DeskLandClient.worldRequest(token: token)),
-              (200..<300).contains((response as? HTTPURLResponse)?.statusCode ?? 0),
+              let (data, status) = await send({ DeskLandClient.worldRequest(token: $0) }, token: token),
+              (200..<300).contains(status),
               account.userID() == userID,
               let world = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
               world["ok"] as? Bool == true else { return nil }

@@ -376,23 +376,25 @@ final class TraderLandSync: ObservableObject {
         ownerID = userID; busy = true; error = nil
         defer { if generation == epoch { busy = false } }
         do {
-            guard let token = await AccountSession.shared.accessToken() else {
-                throw URLError(.userAuthenticationRequired)
-            }
-            guard generation == epoch, AccountSession.shared.session?.userId == userID else { return nil }
             var request = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/trader-land"))
             request.timeoutInterval = 20
             request.cachePolicy = .reloadIgnoringLocalCacheData
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue(Self.clientVersion, forHTTPHeaderField: Self.clientHeader)
             if let action {
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 request.httpBody = try JSONSerialization.data(withJSONObject: action.payload(drawnOn: world?.land.size))
             }
-            let (data, response) = try await transport.data(for: request)
+            // The bearer rides in `send`, which refreshes and retries once when a token expired on the
+            // way (the server refuses before touching the island, so the retry cannot apply twice).
+            let answer = try await AccountSession.shared.send(request, via: transport)
             guard generation == epoch, AccountSession.shared.session?.userId == userID else { return nil }
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let data: Data, status: Int
+            switch answer {
+            case let .answered(body, code): data = body; status = code
+            case .signedOut: throw NSError(domain: "TraderLand", code: 401, userInfo: [NSLocalizedDescriptionKey: Self.failure(status: 401, serverError: nil)])
+            case .unavailable: throw URLError(.userAuthenticationRequired)
+            }
             guard (200..<300).contains(status) else {
                 let serverError = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
                 let message = Self.failure(status: status, serverError: serverError)

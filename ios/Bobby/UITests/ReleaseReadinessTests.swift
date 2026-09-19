@@ -21,6 +21,20 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertTrue(consent.waitForNonExistence(timeout: 5))
     }
 
+    /// The text-only release has no voice: onboarding never asks how the companion should talk.
+    func testTextOnlyOnboardingHasNoVoiceStyleStep() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
+        app.launch()
+        let pick = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'PICK '")).firstMatch
+        XCTAssertTrue(pick.waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["01 / 02"].exists, "two beats: choose, then the aura forge")
+        pick.tap()
+        XCTAssertTrue(app.staticTexts["02 / 02"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["NEXT"].exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'talk to you'")).firstMatch.exists)
+    }
+
     func testOrdinaryIslandDoesNotExposePublicGallery() {
         let app = XCUIApplication()
         app.launchArguments = ["-trader-land-gate", "-AppleLanguages", "(en)"]

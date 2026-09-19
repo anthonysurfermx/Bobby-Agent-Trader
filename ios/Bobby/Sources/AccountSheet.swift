@@ -1,5 +1,5 @@
 // Account sheet — why to sign in (progress follows you to the web and back)
-// and the Apple button. This account is separate from the optional wallet.
+// and the Apple button. 1.2 offers Sign in with Apple only; the X button is Debug-only.
 import AuthenticationServices
 import SwiftUI
 
@@ -25,8 +25,8 @@ struct AccountSheet: View {
             Text(account.isSignedIn ? L.t("Your progress is saved", "Tu progreso está guardado") : L.t("Keep your XP everywhere", "Conserva tu XP en todas partes"))
                 .font(.system(size: 22, weight: .heavy)).foregroundStyle(.white)
             Text(account.isSignedIn
-                 ? L.t("XP, streak, gear and your Trader Land follow this account on the phone and on bobbyprotocol.xyz. Bobby never takes custody or signs wallet transactions.", "XP, racha, accesorios y tu Trader Land quedan guardados en esta cuenta, en el teléfono y en bobbyprotocol.xyz. Bobby nunca toma custodia ni firma transacciones de wallet.")
-                 : L.t("Sign in with Apple so XP, streak, gear and Trader Land survive a reinstall and follow you across your Apple devices. This account is separate from the optional wallet connection; no keys or email are required.", "Inicia sesión con Apple para que XP, racha, accesorios y Trader Land no se pierdan si reinstalas Bobby y te acompañen en tus dispositivos Apple. Esta cuenta es distinta de la conexión opcional de wallet; no requiere llaves ni correo."))
+                 ? L.t("XP, streak, gear and your Trader Land follow this account on the phone and on bobbyprotocol.xyz. Bobby never holds your money or keys.", "XP, racha, accesorios y tu Trader Land quedan guardados en esta cuenta, en el teléfono y en bobbyprotocol.xyz. Bobby nunca guarda tu dinero ni tus llaves.")
+                 : L.t("Sign in with Apple so XP, streak, gear and Trader Land survive a reinstall and follow you across your devices. No keys or email are required.", "Inicia sesión con Apple para que XP, racha, accesorios y Trader Land no se pierdan si reinstalas Bobby y te acompañen en tus dispositivos. No requiere llaves ni correo."))
                 .font(.system(size: 14)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 14) {
                 stat(L.t("XP", "XP"), "\(store.disciplineXP)")
@@ -66,20 +66,26 @@ struct AccountSheet: View {
                 .signInWithAppleButtonStyle(.white)
                 .frame(height: 50)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                Button {
-                    busy = true
-                    Task {
-                        await account.signInWithX()
-                        if account.isSignedIn { await ProgressSync.shared.sync(store: store, profile: profile) }
-                        busy = false
+#if DEBUG
+                // X is off in production Auth: its button and copy never reach a Release build.
+                if SignInMethods.offersX {
+                    Button {
+                        busy = true
+                        Task {
+                            await account.signInWithX()
+                            if account.isSignedIn { await ProgressSync.shared.sync(store: store, profile: profile) }
+                            busy = false
+                        }
+                    } label: {
+                        HStack(spacing: 8) { Text("𝕏").font(.system(size: 17, weight: .bold)); Text(L.t("Continue with X", "Continuar con X")) }
+                            .frame(maxWidth: .infinity).frame(height: 50)
                     }
-                } label: {
-                    HStack(spacing: 8) { Text("𝕏").font(.system(size: 17, weight: .bold)); Text(L.t("Continue with X", "Continuar con X")) }
-                        .frame(maxWidth: .infinity).frame(height: 50)
+                    .buttonStyle(.bordered)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .disabled(busy)
+                    .accessibilityIdentifier("account-x-sign-in")
                 }
-                .buttonStyle(.bordered)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .disabled(busy)
+#endif
                 if let err = account.lastError { Text(err).font(.footnote).foregroundStyle(.red) }
             }
         }
@@ -94,30 +100,26 @@ struct AccountSheet: View {
             Button(L.t("Delete account permanently", "Borrar cuenta permanentemente"), role: .destructive) {
                 busy = true
                 Task {
-                    let deleted = await account.deleteAccount(store: store)
+                    // A cancelled Apple sheet says nothing; a failure shows `lastError` above.
+                    let result = await account.deleteAccount(store: store)
                     busy = false
-                    if deleted { accountDeleted = true }
+                    if result == .deleted { accountDeleted = true }
                 }
             }
             Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
         } message: {
-            Text(L.t(
-                "This deletes your Apple-backed account and synced XP, streak, gear and Trader Land. Public blockchain transactions cannot be erased and limited security or audit records may remain.",
-                "Esto borra tu cuenta vinculada a Apple y tu XP, racha, accesorios y Trader Land sincronizados. Las transacciones públicas de blockchain no se pueden borrar y pueden conservarse registros limitados de seguridad o auditoría."
-            ))
+            Text(AccountDeletionCopy.confirmation)
         }
         .alert(L.t("Account deleted", "Cuenta eliminada"), isPresented: $accountDeleted) {
             if account.manualAppleRevocationRequired {
-                Button(L.t("Manage Sign in with Apple", "Gestionar acceso con Apple")) {
-                    openURL(URL(string: "https://support.apple.com/en-us/102571")!)
+                Button(AccountDeletionCopy.manageAppleButton) {
+                    openURL(account.manualRevocationURL)
                     onClose()
                 }
             }
             Button("OK", role: .cancel) { onClose() }
         } message: {
-            Text(account.manualAppleRevocationRequired
-                ? L.t("Your Bobby account and synced progress were deleted. Finish disconnecting Bobby in your Apple Account's Sign in with Apple settings.", "Se borraron tu cuenta de Bobby y su progreso. Para desconectar también el acceso con Apple, elimina Bobby en los ajustes de Iniciar sesión con Apple de tu cuenta de Apple.")
-                : L.t("Your account and synced progress were deleted.", "Se borraron tu cuenta y su progreso sincronizado."))
+            Text(AccountDeletionCopy.deleted(manualAppleSteps: account.manualAppleRevocationRequired))
         }
     }
 
@@ -130,5 +132,24 @@ struct AccountSheet: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke, lineWidth: 1))
+    }
+}
+
+/// The deletion copy both entry points (this sheet and the desk menu) show.
+enum AccountDeletionCopy {
+    static var confirmation: String {
+        L.t("This deletes your Bobby account and synced XP, streak, gear and Trader Land. Limited security or audit records may remain.",
+            "Esto borra tu cuenta de Bobby y tu XP, racha, accesorios y Trader Land sincronizados. Pueden conservarse registros limitados de seguridad o auditoría.")
+    }
+
+    static var manageAppleButton: String { L.t("Open Apple's steps", "Ver los pasos de Apple") }
+
+    /// With `manualAppleSteps`, the server could not revoke Apple access itself: say how to finish.
+    @MainActor static func deleted(manualAppleSteps: Bool) -> String {
+        manualAppleSteps
+            ? L.t("Your Bobby account and synced progress were deleted.", "Se borraron tu cuenta de Bobby y su progreso sincronizado.")
+                + " " + AccountSession.manualRevocationSteps
+            : L.t("Your account and synced progress were deleted. Bobby keeps working on this phone without an account.",
+                  "Se borraron tu cuenta y su progreso sincronizado. Bobby sigue funcionando en este teléfono sin cuenta.")
     }
 }

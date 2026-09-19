@@ -190,27 +190,45 @@ final class ProgressSync: ObservableObject {
     /// Bumps after every round that acknowledged awards: the island may hold a new piece.
     @Published private(set) var acknowledgedRounds = 0
     private var inflight = false
+    /// A sync asked for while another was in flight — typically the first sync of an account that
+    /// signed in while the previous account's round was still out — runs once that one ends,
+    /// instead of being dropped (its bind and restore would otherwise wait for a later trigger).
+    private var rerun: (store: CompanionStore, profile: AgentProfile, platform: String)?
+    private let account: AccountSession
+
+    init(account: AccountSession? = nil) { self.account = account ?? .shared }
 
     /// One round trip: POST when awards are pending (or never synced), GET otherwise.
     func sync(store: CompanionStore, profile: AgentProfile, platform: String = "ios") async {
-        guard !inflight else { return }
-        inflight = true; status = .syncing
+        guard !inflight else { rerun = (store, profile, platform); return }
+        inflight = true
         defer { inflight = false }
-        let generation = AccountSession.shared.generation
-        guard let token = await AccountSession.shared.accessToken() else {
-            status = AccountSession.shared.isSignedIn ? .error : .unauthenticated
+        var next: (store: CompanionStore, profile: AgentProfile, platform: String)? = (store, profile, platform)
+        while let job = next {
+            rerun = nil
+            await drain(store: job.store, profile: job.profile, platform: job.platform)
+            next = rerun
+        }
+    }
+
+    private func drain(store: CompanionStore, profile: AgentProfile, platform: String) async {
+        status = .syncing
+        let generation = account.generation
+        guard await account.accessToken() != nil else {
+            status = account.isSignedIn ? .error : .unauthenticated
             return
         }
-        guard AccountSession.shared.generation == generation else { return }
-        guard let uid = AccountSession.shared.session?.userId else { status = .unauthenticated; return }
+        guard account.generation == generation else { return }
+        guard let uid = account.session?.userId else { status = .unauthenticated; return }
         store.bind(to: uid)
         // The server accepts 50 events per request: drain the queue in batches, never drop.
+        // Each round reads the bearer again: a long drain can outlive one access token.
         var rounds = 0
         repeat {
             rounds += 1
             let pending = Array(store.pendingAwards.prefix(50))
             let mustPost = !pending.isEmpty || store.syncedAt == nil || store.profileNeedsSync
-            let ok = await round(store: store, profile: profile, platform: platform, token: token, pending: pending, mustPost: mustPost, uid: uid, generation: generation)
+            let ok = await round(store: store, profile: profile, platform: platform, pending: pending, mustPost: mustPost, uid: uid, generation: generation)
             if !ok { return }
         } while !store.pendingAwards.isEmpty && rounds < 20
         status = .synced
@@ -228,10 +246,9 @@ final class ProgressSync: ObservableObject {
         return outcomes[eventID]
     }
 
-    private func round(store: CompanionStore, profile: AgentProfile, platform: String, token: String, pending: [PendingAward], mustPost: Bool, uid: String, generation: UUID) async -> Bool {
+    private func round(store: CompanionStore, profile: AgentProfile, platform: String, pending: [PendingAward], mustPost: Bool, uid: String, generation: UUID) async -> Bool {
         do {
             var req = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/progress"))
-            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             req.timeoutInterval = 30
             if mustPost {
                 req.httpMethod = "POST"
@@ -246,11 +263,19 @@ final class ProgressSync: ObservableObject {
                 }
                 req.httpBody = try JSONSerialization.data(withJSONObject: ["platform": platform, "events": events, "profile": profileBody])
             }
-            let (data, response) = try await URLSession.shared.data(for: req)
-            guard AccountSession.shared.generation == generation,
-                  AccountSession.shared.session?.userId == uid, store.ownerUserId == uid else { return false }
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if code == 401 { AccountSession.shared.signOut(store: store); status = .unauthenticated; return false }
+            // A 401 from a token that expired on the way is refreshed and retried once inside send.
+            let answer = try await account.send(req)
+            guard account.generation == generation,
+                  account.session?.userId == uid, store.ownerUserId == uid else {
+                if !account.isSignedIn { status = .unauthenticated }
+                return false
+            }
+            guard case let .answered(data, code) = answer else {
+                status = answer == .signedOut ? .unauthenticated : .error
+                return false
+            }
+            // Refused even with a freshly refreshed token: the session is really over.
+            if code == 401 { account.signOut(store: store); status = .unauthenticated; return false }
             guard (200..<300).contains(code), let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let p = json["progress"] as? [String: Any] else { status = .error; return false }
             let results = (json["results"] as? [[String: Any]]) ?? []
@@ -259,7 +284,7 @@ final class ProgressSync: ObservableObject {
                                         lastDay: p["lastDay"] as? String, dailyAwards: p["dailyAwards"] as? Int ?? 0, dailyAwardsDay: p["dailyAwardsDay"] as? String, companionId: p["companionId"] as? String)
             // Signed out or deleted while this request was in flight: the
             // account's numbers must not land back on the device.
-            guard AccountSession.shared.session?.userId == uid, store.ownerUserId == uid else { return false }
+            guard account.session?.userId == uid, store.ownerUserId == uid else { return false }
             store.applyServer(server, acknowledged: acked)
             let answered = AwardOutcome.parse(results: results)
             for outcome in answered { outcomes[outcome.id] = outcome }

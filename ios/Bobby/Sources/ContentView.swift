@@ -192,8 +192,9 @@ final class BobbyViewModel: ObservableObject {
         assetHits = []
         let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !thinking else { return }
-        guard q.count <= 1200 else {
-            errorHint = L.t("Keep your question under 1200 characters.", "Escribe tu pregunta en menos de 1200 caracteres.")
+        // Counted the way the server counts (Unicode code points), against the same limit.
+        guard !DeskQuestion.isTooLong(q) else {
+            errorHint = DeskQuestion.tooLongMessage
             return
         }
         let originalQuestion = confirmedQuestion?.symbol == q ? confirmedQuestion!.question : q
@@ -243,7 +244,6 @@ final class BobbyViewModel: ObservableObject {
                 )]
                 return
             }
-            guard AccountSession.shared.generation == accountGeneration else { phase = .idle; return }
             let asset = resolution.snapshot
             if asset.isEquity && timeframe == .fourHours { timeframe = .oneHour }
             candlesLoading = true
@@ -276,7 +276,6 @@ final class BobbyViewModel: ObservableObject {
             }
 
             var answer = await debateRequest
-            guard AccountSession.shared.generation == accountGeneration else { phase = .idle; return }
             withAnimation(.spring(duration: 0.38)) {
                 lastAnswer = answer
                 phase = .cio
@@ -288,9 +287,13 @@ final class BobbyViewModel: ObservableObject {
             // failed debate into a disciplined NO TRADE.
             if answer.isUnavailable {
                 phase = .error
-                let msg = L.t("The desk did not answer for \(answer.symbol). Try again in a moment.",
-                              "La mesa no respondió por \(answer.symbol). Inténtalo de nuevo en un momento.")
+                // The server's own refusals (today's limit, a question too long) say what they are:
+                // retrying in a moment cannot fix either.
+                let msg = answer.failure?.message
+                    ?? L.t("The desk did not answer for \(answer.symbol). Try again in a moment.",
+                           "La mesa no respondió por \(answer.symbol). Inténtalo de nuevo en un momento.")
                 errorHint = msg
+                if answer.failure == .questionTooLong, input.isEmpty { input = originalQuestion }
                 if speakEnabled { say(msg) }
                 return
             }
@@ -304,6 +307,9 @@ final class BobbyViewModel: ObservableObject {
             let text = answer.summary
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if speakEnabled { say(text) }
+            // Signed in or out while it ran: the answer still shows, but its award belongs to the
+            // account that asked, which is gone — no XP, no seed, no harvest card for this read.
+            guard AccountSession.shared.generation == accountGeneration else { return }
             // A full review earns discipline. Respecting a fail-closed verdict
             // earns more because restraint is the behavior Bobby is teaching.
             // awardedXP is what the daily cap ACTUALLY granted — the UI shows
@@ -541,6 +547,9 @@ struct ContentView: View {
             if vm.profile.acceptedRiskNotice && vm.profile.onboarded { vm.bootGreetingIfNeeded() }
             Task { await ProgressSync.shared.sync(store: vm.companions, profile: vm.profile) }
             Task { await pulse.refresh() }
+            // Cold launch too, not only a return from the background: a revocation made
+            // while the app was closed ends the session before anything is synced to it.
+            Task { await account.checkAppleCredential() }
         }
         // A round that acknowledged awards may have planted pieces; signing in
         // or out changes whose island the chip reads.
@@ -632,10 +641,14 @@ struct ContentView: View {
                 guard !deleting else { return }
                 deleting = true
                 Task {
-                    if await account.deleteAccount(store: vm.companions) {
+                    switch await account.deleteAccount(store: vm.companions) {
+                    case .deleted:
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                         accountDeleted = true
-                    } else {
+                    case .cancelled:
+                        // Closing Apple's sheet is a choice, not an error.
+                        break
+                    case .failed:
                         accountError = account.lastError ?? L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
                         account.lastError = nil
                     }
@@ -644,8 +657,7 @@ struct ContentView: View {
             }
             Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
         } message: {
-            Text(L.t("This deletes your account and your synced XP, streak, gear and Trader Land. Public blockchain transactions cannot be erased and limited security or audit records may remain.",
-                     "Esto borra tu cuenta y tu XP, racha, accesorios y Trader Land sincronizados. Las transacciones públicas de blockchain no se pueden borrar y pueden conservarse registros limitados de seguridad o auditoría."))
+            Text(AccountDeletionCopy.confirmation)
         }
         .alert(L.t("Account", "Cuenta"), isPresented: Binding(get: { accountError != nil }, set: { if !$0 { accountError = nil } })) {
             Button("OK", role: .cancel) {}
@@ -654,15 +666,13 @@ struct ContentView: View {
         }
         .alert(L.t("Account deleted", "Cuenta eliminada"), isPresented: $accountDeleted) {
             if account.manualAppleRevocationRequired {
-                Button(L.t("Manage Sign in with Apple", "Gestionar acceso con Apple")) {
-                    UIApplication.shared.open(URL(string: "https://support.apple.com/en-us/102571")!)
+                Button(AccountDeletionCopy.manageAppleButton) {
+                    UIApplication.shared.open(account.manualRevocationURL)
                 }
             }
             Button("OK", role: .cancel) {}
         } message: {
-            Text(account.manualAppleRevocationRequired
-                 ? L.t("Your Bobby account and progress were deleted. Finish disconnecting Bobby in your Apple Account's Sign in with Apple settings.", "Se borraron tu cuenta de Bobby y su progreso. Para desconectar también el acceso con Apple, elimina Bobby en los ajustes de Iniciar sesión con Apple de tu cuenta de Apple.")
-                 : L.t("Your account and its synced progress were deleted. Bobby keeps working on this phone without an account.", "Se borraron tu cuenta y su progreso sincronizado. Bobby sigue funcionando en este teléfono sin cuenta."))
+            Text(AccountDeletionCopy.deleted(manualAppleSteps: account.manualAppleRevocationRequired))
         }
 
         .animation(.easeOut(duration: 0.35), value: vm.profile.onboarded)
@@ -1245,9 +1255,9 @@ struct ContentView: View {
                 agentCard(name: L.t("CIO", "DIRECTOR"), role: L.t("decides", "decide"), phase: .cio, color: Theme.cio)
             }
             if let answer = vm.lastAnswer, let alpha = answer.alphaArgument, let red = answer.redArgument {
-                Text("ALPHA").font(.mono(10, .bold)).foregroundStyle(Theme.up)
+                Text(L.t("ALPHA", "CAZADOR")).font(.mono(10, .bold)).foregroundStyle(Theme.up)
                 Text(alpha).font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
-                Text("RED TEAM").font(.mono(10, .bold)).foregroundStyle(Theme.down)
+                Text(L.t("RED TEAM", "CRÍTICO")).font(.mono(10, .bold)).foregroundStyle(Theme.down)
                 Text(red).font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                 if let label = answer.evidenceLabel {
                     Text(label).font(.mono(9, .medium)).foregroundStyle(Theme.muted)
