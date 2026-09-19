@@ -1,0 +1,43 @@
+{
+  "nativeBase": "a85b2ad",
+  "integratedCommits": [
+    "162a19b",
+    "72ea3b2"
+  ],
+  "workInProgressSource": "/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.claude/worktrees/ios-login",
+  "workInProgressFiles": [
+    {
+      "path": "ios/Bobby/Sources/BobbyApp.swift",
+      "sha256": "69b894b4da67443c574f04ff83f2552ef04c44705a467a2641f77150596d1b96"
+    },
+    {
+      "path": "ios/Bobby/Sources/TraderLandGateHarness.swift",
+      "sha256": "ec55cad4e2eb728793243a4d1dbff87ab54fe3b0b2b6a24288d52835da2b32ab"
+    },
+    {
+      "path": "ios/Bobby/Sources/TraderLandGeometry.swift",
+      "sha256": "3db5066c239558c8f2bddaaa5a4fc246daba1dcc5553e690a852bb9c2a219ed7"
+    },
+    {
+      "path": "ios/Bobby/Sources/TraderLandSync.swift",
+      "sha256": "dc453d350bfa0c697291d8c9ff0a01b2b40df4b1b6b1ef678084e3ac42ee5175"
+    },
+    {
+      "path": "ios/Bobby/UITests/TraderLandGateTests.swift",
+      "sha256": "250107fb6a13c0e9e46e55ce81601129881180c3824b5a6d3513f827fcaebb65"
+    },
+    {
+      "path": "ios/Bobby/scripts/TraderLandGeometryContract.swift",
+      "sha256": "8bae93eef338f0a0830864024bbe6b942b429035889d49a566a3a73cc4944b0b"
+    },
+    {
+      "path": "ios/Bobby/scripts/TraderLandSyncContract.swift",
+      "sha256": "cf3398d4b6fa8996ca363df65752e7b82e5bd7e8874aaf4af32fed15d2ad6e09"
+    }
+  ],
+  "buildNumber": "19",
+  "version": "1.0",
+  "integrationNotes": [
+    "Simulator UI test uses tile-center physical taps and asserts received grid coordinates. Application sources match the archive."
+  ]
+}
