@@ -2,13 +2,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { getClientIpKey } from './_lib/rate-limit.js';
+import { getClientQuotaKeys } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, loadDeskEvidence, runDeskDebate } from './_lib/desk-debate.js';
 
 export const config = { maxDuration: 95 };
 
-/** Mirrors bobby_consume_desk_quota (20260919190000): a key over its ceiling is exhausted. */
-const QUOTA_CEILING = { global: 600, caller: 30 } as const;
+/**
+ * Mirrors bobby_consume_desk_quota (20260919200000). A refused call consumes
+ * nothing, so an exhausted key holds exactly its ceiling.
+ */
+const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
+const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
 const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es']).default('en') });
 
@@ -25,14 +29,14 @@ function refuse(res: VercelResponse, status: number, code: string, error: string
 }
 
 /** Seconds until the exhausted quota window reopens; best effort, never blocks the answer. */
-async function quotaRetryAfter(caller: string): Promise<number> {
+async function quotaRetryAfter(quota: { caller: string; network: string }): Promise<number> {
   const DAY = 86_400;
   try {
-    const keys = `("caller:${caller}",global)`;
+    const keys = `("caller:${quota.caller}","net:${quota.network}",global)`;
     const r = await fetch(bobbyRest(`bobby_desk_quotas?key=in.${encodeURIComponent(keys)}&select=key,hits,expires_at`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000) });
     if (!r.ok) return DAY;
     const rows = await r.json() as Array<{ key: string; hits: number; expires_at: string }>;
-    const waits = rows.filter(row => row.hits > (row.key === 'global' ? QUOTA_CEILING.global : QUOTA_CEILING.caller))
+    const waits = rows.filter(row => row.hits >= quotaCeiling(row.key))
       .map(row => Math.ceil((Date.parse(row.expires_at) - Date.now()) / 1000)).filter(Number.isFinite);
     return waits.length ? Math.min(DAY, Math.max(60, ...waits)) : 60;
   } catch {
@@ -58,15 +62,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (!process.env.OPENAI_API_KEY) return refuse(res, 503, 'desk_unavailable', unavailable);
     // Atomic, cross-instance, fail-closed limits. No model calls if storage fails.
-    const caller = getClientIpKey(req);
+    // Caller (IPv4 address / IPv6 /64) and network (/24 / /48) budgets keep a
+    // handful of addresses from spending everyone's global budget.
+    const keys = getClientQuotaKeys(req);
+    if (!keys) return refuse(res, 503, 'desk_unavailable', unavailable);
     const quota = await fetch(bobbyRest('rpc/bobby_consume_desk_quota'), {
       method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({ p_caller: caller }),
+      body: JSON.stringify({ p_caller: keys.caller, p_network: keys.network }),
     });
     if (!quota.ok) return refuse(res, 503, 'desk_unavailable', unavailable);
     if (await quota.json() !== true) {
-      // Per-caller and global windows are both 24 h: this is not "retry in a moment".
-      res.setHeader('Retry-After', String(await quotaRetryAfter(caller)));
+      // Caller, network and global windows are all 24 h: this is not "retry in a moment".
+      res.setHeader('Retry-After', String(await quotaRetryAfter(keys)));
       return refuse(res, 429, 'daily_limit', copy(language, "Bobby reached today's analysis limit. Try again tomorrow.", 'Bobby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.'));
     }
     return res.status(200).json(await runDeskDebate(question, await loadDeskEvidence(symbol, assetType), language));

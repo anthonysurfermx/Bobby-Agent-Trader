@@ -73,9 +73,12 @@ export class DeskOutputRejected extends Error {
   }
 }
 
-// Affirmative claims only. Every pattern is skipped when its own clause
-// negates or hedges it ("no trade is risk-free", "whether you should buy…",
-// "no deberías comprar…"), so the desk's usual disclaimers pass untouched.
+// Affirmative claims only (see affirmedMatches): a negation earlier in the
+// sentence ("no trade is risk-free", "No indicator, however strong, guarantees
+// returns"), a conditional in the same clause ("whether you should buy…"), or
+// a negated predicate right after a guarantee ("guaranteed returns do not
+// exist", "las ganancias garantizadas no existen") skips the match, so the
+// desk's usual disclaimers pass untouched.
 const GUARANTEE: RegExp[] = [
   /\bguarantee[ds]?\s+(?:\S+\s+){0,2}?(?:profits?|returns?|gains?|wins?|income|payouts?)\b/giu,
   /\b(?:profits?|returns?|gains?|income)\s+(?:is|are|will\s+be)\s+guaranteed\b/giu,
@@ -86,50 +89,102 @@ const GUARANTEE: RegExp[] = [
   /\bgarantiz\w*\s+(?:\S+\s+){0,2}?(?:ganancias?|rentabilidad(?:es)?|retornos?|beneficios?|utilidad(?:es)?|rendimientos?)\b/giu,
   /\b(?:ganancias?|rentabilidad(?:es)?|retornos?|beneficios?|rendimientos?)\s+(?:garantizad[oa]s?|segur[oa]s?|asegurad[oa]s?)\b/giu,
   /\b(?:ganancias?|rentabilidad(?:es)?|retornos?|beneficios?|rendimientos?|subida|alza)\s+(?:est[aá]n?|estar[aá]n?|es|son)\s+(?:garantizad|asegurad)[oa]s?\b/giu,
-  /\b(?:sin\s+(?:ning[uú]n\s+)?riesgos?(?!\s+(?:definido|controlado|limitado|claro|acotado|gestionado|calculado)s?\b)|cero\s+riesgo|riesgo\s+cero|apuesta\s+segura|jugada\s+segura|dinero\s+f[aá]cil)(?![\p{L}])/giu,
+  // "sin riesgo de quedar atrapado" describes waiting, not a trade: only
+  // "sin riesgo de pérdida/perder" keeps the claim.
+  /\b(?:sin\s+(?:ning[uú]n\s+)?riesgos?(?!\s+(?:definido|controlado|limitado|claro|acotado|gestionado|calculado)s?\b)(?!\s+de\s+(?!p[eé]rd))|cero\s+riesgo|riesgo\s+cero|apuesta\s+segura|jugada\s+segura|dinero\s+f[aá]cil)(?![\p{L}])/giu,
   /\b(?:tu|su|el)\s+(?:capital|dinero|inversi[oó]n)\s+(?:est[aá]|estar[aá]|queda(?:r[aá])?)\s+(?:totalmente\s+|completamente\s+)?(?:protegid[oa]|a\s+salvo)\b/giu,
   /\bproteg\w*\b[^.;]{0,25}\bde\s+(?:cualquier|toda)\s+p[eé]rdida\b/giu,
 ];
+// "short-term caution" or "a short while" is not a short trade.
 const ADVICE: RegExp[] = [
-  /\byou\s+(?:should|must|need\s+to|ought\s+to|have\s+to)\s+(?:definitely\s+|now\s+)?(?:buy|sell|short|go\s+long|go\s+short|open\s+a\s+(?:long|short)|load\s+up|go\s+all[- ]in)\b/giu,
-  /\bI\s+(?:recommend|advise|suggest)\s+(?:that\s+)?(?:you\s+)?(?:to\s+)?(?:buy|buying|sell|selling|short|shorting|go\s+long|going\s+long|go\s+short|going\s+short)\b/giu,
-  /(?:(?<=^)|(?<=[.!?]\s+))(?:buy|sell|short)\s+(?:\w+\s+)?(?:now|immediately|right\s+now|right\s+away|today)\b/giu,
+  /\byou\s+(?:should|must|need\s+to|ought\s+to|have\s+to)\s+(?:definitely\s+|now\s+)?(?:buy|sell|short(?![- ](?:term|run|while|lived))|go\s+long|go\s+short|open\s+a\s+(?:long|short)|load\s+up|go\s+all[- ]in)\b/giu,
+  /\bI\s+(?:recommend|advise|suggest)\s+(?:that\s+)?(?:you\s+)?(?:to\s+)?(?:buy|buying|sell|selling|short(?![- ](?:term|run|while|lived))|shorting|go\s+long|going\s+long|go\s+short|going\s+short)\b/giu,
+  // A sentence-initial imperative. Case-sensitive on purpose: the optional
+  // object is a pronoun, a ticker or "the dip", so "Sell volume today
+  // exceeded buy volume" reads as data, not an order.
+  /(?:(?<=^)|(?<=[.!?]\s+))(?:[Bb]uy|[Ss]ell|[Ss]hort|BUY|SELL|SHORT)\s+(?:(?:it|this|that|these|those|them|here|more|everything|the\s+(?:dip|rip|bounce|breakout|rally)|[Bb]itcoin|[Ee]ther(?:eum)?|[Ss]olana|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:now|immediately|right\s+(?:now|away)|today|NOW|TODAY)\b/gu,
   /(?<![\p{L}])(?:deber[ií]as|debes|tienes\s+que|te\s+conviene|necesitas)\s+(?:ya\s+|ahora\s+)?(?:comprar|vender|shortear|abrir\s+(?:un\s+)?(?:largo|corto|long|short)|ponerte\s+(?:largo|corto))\b/giu,
-  /\b(?:te\s+)?(?:recomiendo|aconsejo|sugiero)\s+(?:que\s+)?(?:compr|vend|shorte)\w*/giu,
-  /(?:(?<=^)|(?<=[.!?¡]\s*))(?:compra|vende|compre|venda|compren|vendan)\s+(?:\S+\s+)?(?:ya|ahora|hoy|de\s+inmediato|inmediatamente)\b/giu,
+  // Trade verbs only: "sugiero comprobar…", "te recomiendo comprender…" pass.
+  /(?<![\p{L}])(?:te\s+)?(?:recomiendo|aconsejo|sugiero)\s+(?:que\s+)?(?:comprar|compres|compre|compren|vender|vendas|venda|vendan|shortear|shortees|abrir\s+(?:un\s+)?(?:largo|corto)|abras\s+(?:un\s+)?(?:largo|corto))(?![\p{L}])/giu,
+  // Same shape as the English imperative: "Compra neta hoy…" is data.
+  /(?:(?<=^)|(?<=[.!?¡]\s*))(?:[Cc]ompra|[Vv]ende|[Cc]ompre|[Vv]enda|[Cc]ompren|[Vv]endan)\s+(?:(?:lo|la|los|las|esto|eso|todo|más|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:ya|ahora|hoy|de\s+inmediato|inmediatamente)(?![\p{L}])/gu,
 ];
-const HEDGES = new Set(['no', 'not', 'never', 'nothing', 'none', 'nobody', 'cannot', "can't", "isn't", "aren't", "won't", "doesn't", "don't", 'without', 'whether', 'if', 'nor', 'neither', 'avoid',
-  'nunca', 'jamás', 'ningún', 'ninguna', 'ninguno', 'nada', 'ni', 'sin', 'si', 'tampoco', 'evita', 'evitar']);
 
-function affirmed(text: string, pattern: RegExp): boolean {
-  for (const match of text.matchAll(pattern)) {
-    const before = text.slice(0, match.index).toLowerCase().replace(/’/g, "'");
-    const clause = before.slice(Math.max(...[...'.;:!?,'].map(mark => before.lastIndexOf(mark))) + 1);
-    const words = clause.split(/[^\p{L}']+/u).filter(Boolean).slice(-6);
-    if (!words.some(word => HEDGES.has(word))) return true;
-  }
-  return false;
+// Any of these up to eight words back in the same sentence negates a match…
+const NEGATIONS = new Set(['no', 'not', 'never', 'nothing', 'none', 'nobody', 'cannot', "can't", "isn't", "aren't", "won't", "doesn't", "don't", 'without', 'nor', 'neither', 'avoid',
+  'nunca', 'jamás', 'ningún', 'ninguna', 'ninguno', 'nada', 'ni', 'sin', 'tampoco', 'evita', 'evitar']);
+// …unless the argument turns in between: "Nothing is certain, but this is risk-free."
+const TURNS = new Set(['but', 'so', 'yet', 'therefore', 'thus', 'hence', 'because', 'although', 'though',
+  'pero', 'sino', 'aunque', 'así', 'entonces', 'porque', 'pues']);
+// A conditional only hedges its own clause: "Si rompe, la ganancia está garantizada" is still a claim.
+const CONDITIONALS = new Set(['whether', 'if', 'si']);
+// A guarantee negated by its own predicate: "…do not exist", "…no existen", "…is not a sure bet".
+const NEGATED_AFTER = new Set(['not', 'no', 'never', 'nunca', 'jamás', "isn't", "aren't", "don't", "doesn't", "won't", 'cannot', "can't"]);
+
+const words = (text: string) => text.toLowerCase().replace(/’/g, "'").split(/[^\p{L}']+/u).filter(Boolean);
+
+/** Where the sentence holding `before`'s end starts: a terminator followed by a space ("20.5" is no boundary), or ¡/¿. */
+function sentenceStart(before: string): number {
+  let start = 0;
+  for (const mark of before.matchAll(/[.!?;:…]+(?=\s)|[¡¿]/gu)) start = (mark.index ?? 0) + mark[0].length;
+  return start;
 }
 
-const BULLISH = /\b(?:bullish|uptrend|long(?![- ]term)|alcista|largo(?!\s+plazo))\b/iu;
-const BEARISH = /\b(?:bearish|downtrend|short(?![- ](?:term|run|while))|bajista|corto(?!\s+plazo))\b/iu;
+function negatedBefore(text: string, at: number): boolean {
+  const sentence = text.slice(0, at).slice(sentenceStart(text.slice(0, at)));
+  const reach = words(sentence).slice(-8);
+  const turn = reach.map(word => TURNS.has(word)).lastIndexOf(true);
+  if (reach.slice(turn + 1).some(word => NEGATIONS.has(word))) return true;
+  return words(sentence.slice(sentence.lastIndexOf(',') + 1)).slice(-6).some(word => CONDITIONALS.has(word));
+}
+
+function negatedAfter(text: string, end: number): boolean {
+  const rest = text.slice(end).split(/[,.;:!?]/u)[0].replace(/\bno\s+(?:matter|importa)\b/giu, '');
+  return words(rest).slice(0, 4).some(word => NEGATED_AFTER.has(word));
+}
+
+/** The matches of `pattern` that `text` actually asserts. */
+function affirmedMatches(text: string, pattern: RegExp, checkAfter: boolean): RegExpMatchArray[] {
+  return [...text.matchAll(pattern)].filter(match => {
+    const at = match.index ?? 0;
+    return !negatedBefore(text, at) && !(checkAfter && negatedAfter(text, at + match[0].length));
+  });
+}
+
+// The CIO's own thesis, only where it is named as one. Bare long/short/bullish
+// words describe charts, time or the other agents ("as long as", "a lo largo
+// de", "falls short", "the Red Team's bearish points"); they never count.
+const THESIS: Record<'long' | 'short', RegExp> = {
+  long: /(?<![\p{L}])(?:(?:long|bullish)\s+(?:thesis|theses)|bullish\s+case|conditional\s+(?:long|upside|bullish)|thesis\s+(?:is|remains|stays)\s+(?:long|bullish)|tesis\s+(?:larga|alcista)s?|(?:larg[oa]|alza)\s+condicional(?:es)?|condicional(?:es)?\s+(?:al\s+alza|alcista)|tesis\s+(?:es|sigue\s+siendo)\s+(?:larga|alcista))(?![\p{L}])/giu,
+  short: /(?<![\p{L}])(?:(?:short|bearish)\s+(?:thesis|theses)|bearish\s+case|conditional\s+(?:short|downside|bearish)|thesis\s+(?:is|remains|stays)\s+(?:short|bearish)|tesis\s+(?:corta|bajista)s?|(?:cort[oa]|baja)\s+condicional(?:es)?|condicional(?:es)?\s+(?:a\s+la\s+baja|bajista)|tesis\s+(?:es|sigue\s+siendo)\s+(?:corta|bajista))(?![\p{L}])/giu,
+};
+/** "the Red Team's bearish case", "la tesis larga de Alpha": another agent's thesis, not the CIO's. */
+function attributed(text: string, match: RegExpMatchArray): boolean {
+  const at = match.index ?? 0;
+  return /(?:red\s+team|alpha(?:\s+hunter)?)['’]s\s+$/iu.test(text.slice(Math.max(0, at - 40), at))
+    || /^\s+(?:del?|from|of|by)\s+(?:the\s+)?(?:red\s+team|alpha)\b/iu.test(text.slice(at + match[0].length));
+}
+function namesThesis(cio: string, side: 'long' | 'short'): boolean {
+  return affirmedMatches(cio, THESIS[side], true).some(match => !attributed(cio, match));
+}
 const STATED_VERDICT = /\b(?:verdict|veredicto)\b\W{0,4}(?:(?:is|es)\W{1,4})?(wait|review|esperar|revisar)\b/iu;
 
 /**
  * Post-generation guard, deliberately narrow: an affirmative guarantee /
  * risk-free / sure-profit claim or a personal buy/sell instruction (EN/ES) in
- * any role, or a CIO whose own words contradict its verdict or direction,
- * fails the analysis. No verdict is substituted.
+ * any role, or a CIO whose own words contradict its verdict or name only the
+ * opposite thesis, fails the analysis. No verdict is substituted.
  */
 export function reviewDeskOutput(agents: { alpha: string; red: string; cio: string; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none' }): void {
   for (const text of [agents.alpha, agents.red, agents.cio]) {
-    if (GUARANTEE.some(pattern => affirmed(text, pattern))) throw new DeskOutputRejected('guarantee');
-    if (ADVICE.some(pattern => affirmed(text, pattern))) throw new DeskOutputRejected('advice');
+    if (GUARANTEE.some(pattern => affirmedMatches(text, pattern, true).length > 0)) throw new DeskOutputRejected('guarantee');
+    if (ADVICE.some(pattern => affirmedMatches(text, pattern, false).length > 0)) throw new DeskOutputRejected('advice');
   }
   const stated = agents.cio.match(STATED_VERDICT)?.[1]?.toLowerCase();
   if (stated && (stated === 'wait' || stated === 'esperar' ? 'wait' : 'review') !== agents.verdict) throw new DeskOutputRejected('verdict');
-  const bullish = BULLISH.test(agents.cio), bearish = BEARISH.test(agents.cio);
-  if ((agents.direction === 'long' && bearish && !bullish) || (agents.direction === 'short' && bullish && !bearish)) throw new DeskOutputRejected('verdict');
+  if (agents.direction === 'none') return;
+  const opposite = agents.direction === 'long' ? 'short' : 'long';
+  if (namesThesis(agents.cio, opposite) && !namesThesis(agents.cio, agents.direction)) throw new DeskOutputRejected('verdict');
 }
 
 /** Three isolated model calls. The judge sees both arguments and the original question. */

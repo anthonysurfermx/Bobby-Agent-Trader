@@ -3,7 +3,8 @@
 //     still delete (data + auth user) with the manual Apple path;
 //   · X-Bobby-Account-Client: 2 (build 34) is asked for a code, revoked with it;
 //   · Apple configuration/grant rejections fall back to the manual path and
-//     are logged by class only; transient Apple failures are a retryable 503;
+//     are logged by class only; transient Apple failures (including a 200
+//     whose body read times out or resets) are a retryable 503;
 //   · APPLE_SIGN_IN_* values are trimmed everywhere, agent_trades is de-linked.
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
@@ -37,7 +38,13 @@ function configureApple(overrides: Record<string, string> = {}) {
   Object.assign(process.env, { APPLE_SIGN_IN_TEAM_ID: 'TEAMID1234', APPLE_SIGN_IN_KEY_ID: 'KEYID12345', APPLE_SIGN_IN_CLIENT_ID: CLIENT_ID, APPLE_SIGN_IN_PRIVATE_KEY: EC_PEM, ...overrides });
 }
 
-type Apple = { token?: () => Response | Promise<Response>; revoke?: () => Response; subject?: string };
+type Apple = { token?: () => Response | Promise<Response>; keys?: () => Response; revoke?: () => Response; subject?: string };
+/** A 200 whose body stream fails after the headers arrived (a timeout or reset mid-body). */
+const failingBody = (error: unknown, prefix: string) => new Response(new ReadableStream<Uint8Array>({
+  start(controller) { controller.enqueue(new TextEncoder().encode(prefix)); },
+  pull(controller) { controller.error(error); },
+}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+const bodyTimeout = () => new DOMException('The operation was aborted due to timeout', 'TimeoutError');
 interface World { writes: Array<{ method: string; url: string; body: unknown }>; apple: string[]; tokenForm?: URLSearchParams; errors: string[] }
 let ipSeq = 0;
 async function call(method: 'GET' | 'DELETE', opts: { body?: unknown; header?: string; apple?: Apple; failTradesUnlink?: boolean } = {}) {
@@ -48,7 +55,7 @@ async function call(method: 'GET' | 'DELETE', opts: { body?: unknown; header?: s
     if (url.startsWith('https://appleid.apple.com/')) {
       world.apple.push(url.slice('https://appleid.apple.com'.length));
       if (url.endsWith('/auth/token')) { world.tokenForm = new URLSearchParams(String(init.body)); return opts.apple?.token ? opts.apple.token() : json({ id_token: idToken(opts.apple?.subject ?? 'apple-user'), refresh_token: REFRESH }); }
-      if (url.endsWith('/auth/keys')) return json({ keys: [{ ...rsa.publicKey.export({ format: 'jwk' }), kid: 'test-rsa', alg: 'RS256' }] });
+      if (url.endsWith('/auth/keys')) return opts.apple?.keys ? opts.apple.keys() : json({ keys: [{ ...rsa.publicKey.export({ format: 'jwk' }), kid: 'test-rsa', alg: 'RS256' }] });
       if (url.endsWith('/auth/revoke')) return opts.apple?.revoke ? opts.apple.revoke() : json({});
     }
     if (url.includes('api_cache')) return json([]);
@@ -139,11 +146,40 @@ try {
     ['network error', { token: () => { throw new TypeError('fetch failed'); } }],
     ['timeout', { token: () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError'); } }],
     ['revoke 500', { revoke: () => json({}, 500) }],
+    // Apple answered 200, then the body read timed out or reset: Apple already
+    // issued a token, so deleting on the manual path would orphan it.
+    ['token body timeout', { token: () => failingBody(bodyTimeout(), `{"id_token":"${idToken('apple-user').slice(0, 20)}`) }],
+    ['token body reset', { token: () => failingBody(new TypeError('terminated'), '{"refresh_token":"') }],
+    ['keys body timeout', { keys: () => failingBody(bodyTimeout(), '{"keys":[{"kty":"RSA"') }],
+    ['keys body reset', { keys: () => failingBody(new TypeError('terminated'), '{"keys":') }],
   ] as Array<[string, Apple]>) {
     const { res, world } = await call('DELETE', { header: '2', body: { appleAuthorizationCode: CODE }, apple });
     eq([res.statusCode, res.body.code], [503, 'apple_unavailable'], `${name}: retryable 503`);
     eq(world.writes, [], `${name}: nothing deleted`);
     ok(world.errors.some(line => line.includes('[account-delete] apple revoke failed transient')), `${name}: logged as transient`);
+    noSecretsLogged(world, name);
+  }
+  {
+    const timedOut = await call('DELETE', { header: '2', body: { appleAuthorizationCode: CODE }, apple: { token: () => failingBody(bodyTimeout(), '{"id_token":"') } });
+    ok(timedOut.world.errors.some(line => line.includes('transient token TimeoutError')), 'a timed-out token body is logged as transient token TimeoutError, not no_id_token');
+    eq(timedOut.world.apple, ['/auth/token'], 'a timed-out token body goes no further');
+    const keysTimedOut = await call('DELETE', { header: '2', body: { appleAuthorizationCode: CODE }, apple: { keys: () => failingBody(bodyTimeout(), '{"keys":') } });
+    ok(keysTimedOut.world.errors.some(line => line.includes('transient keys TimeoutError')), 'a timed-out keys body is logged as transient keys TimeoutError');
+    ok(!keysTimedOut.world.apple.includes('/auth/revoke'), 'no revoke is attempted without verified keys');
+  }
+
+  // ---------- a complete 200 body that is not usable stays a rejection ----------
+  for (const [name, apple, detail] of [
+    ['token body not JSON', { token: () => new Response('<html>busy</html>', { status: 200 }) }, 'rejected token malformed_body'],
+    ['token body without id_token', { token: () => json({ refresh_token: REFRESH }) }, 'rejected token no_id_token'],
+    ['keys body not JSON', { keys: () => new Response('not json', { status: 200 }) }, 'rejected keys malformed_body'],
+    ['keys body without keys', { keys: () => json({ keys: 'none' }) }, 'rejected keys malformed_body'],
+    ['keys with a malformed JWK', { keys: () => json({ keys: [{ kty: 'RSA', kid: 'test-rsa', alg: 'RS256', n: '!!', e: '??' }] }) }, 'rejected identity signature'],
+  ] as Array<[string, Apple, string]>) {
+    const { res, world } = await call('DELETE', { header: '2', body: { appleAuthorizationCode: CODE }, apple });
+    eq([res.statusCode, res.body.appleRevocation, res.body.manualRevocationURL], [200, 'manual', MANUAL], `${name}: manual path, deletion completes`);
+    eq(deleted(world), FULL_DELETE, `${name}: data and auth user deleted`);
+    ok(world.errors.some(line => line.includes(detail)), `${name}: logged as ${detail}`);
     noSecretsLogged(world, name);
   }
 

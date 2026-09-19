@@ -8,7 +8,9 @@
 //     (EN/ES) and verdicts contradicting the CIO fail the analysis — while the
 //     desk's ordinary disclaimers pass;
 //   · the question limit is measured in code points, with its own 400 code;
-//     an exhausted quota is a distinct 429 'daily_limit' (EN/ES).
+//     an exhausted quota is a distinct 429 'daily_limit' (EN/ES);
+//   · quota identities: an IPv4 address or IPv6 /64 per caller, the /24 or
+//     /48 around it per network, both salted hashes, never an address.
 import assert from 'node:assert/strict';
 
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
@@ -19,6 +21,7 @@ process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
 const { loadDeskEvidence, runDeskDebate, reviewDeskOutput, DeskOutputRejected, MIN_DESK_BARS, DESK_QUESTION_MAX } = await import('../api/_lib/desk-debate.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
 const { default: stockCandles } = await import('../api/stock-candles.ts');
+const { getClientQuotaKeys, getClientIpKey } = await import('../api/_lib/rate-limit.ts');
 
 const original = globalThis.fetch;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -152,6 +155,35 @@ try {
   passes({ cio: 'No deberías comprar solo por este análisis; la tesis larga necesita confirmación.' }, 'ES negated advice passes');
   passes({ cio: 'The short-term trend is bearish, but the long-term structure is bullish enough for a conditional long review.' }, 'mixed wording with the same-side term passes');
   passes({ cio: 'The verdict is to review the conditional long once volume confirms.' }, 'verdict wording that agrees passes');
+  // Ordinary wording that must never cost a quota unit and three model calls
+  // (review of 2386571: each of these returned 503 analysis_failed).
+  passes({ alpha: 'Sugiero comprobar si el volumen confirma la ruptura antes de sacar conclusiones.' }, 'ES sugiero comprobar is not advice');
+  passes({ red: 'Recomiendo comprobar el contexto macro; el RSI solo no basta.' }, 'ES recomiendo comprobar is not advice');
+  passes({ cio: 'Te recomiendo comprender que el RSI no es una señal por sí solo; la tesis larga necesita volumen.' }, 'ES te recomiendo comprender is not advice');
+  passes({ red: 'I suggest short-term caution until volume confirms the breakout.' }, 'EN I suggest short-term caution is not advice');
+  passes({ red: 'Sell volume today exceeded buy volume. That weakens the breakout.' }, 'EN "Sell volume today…" is data, not an order');
+  passes({ alpha: 'Compra neta hoy superó a la venta, lo que apoya la ruptura.' }, 'ES "Compra neta hoy…" is data, not an order');
+  passes({ red: 'Guaranteed returns do not exist in markets, and this setup is no exception.' }, 'EN guaranteed returns negated afterwards');
+  passes({ red: 'A risk-free entry does not exist here; the stop must sit below support.' }, 'EN risk-free negated afterwards');
+  passes({ red: 'Las ganancias garantizadas no existen; el stop debe ir bajo el soporte.' }, 'ES ganancias garantizadas negated afterwards');
+  passes({ red: 'No indicator, however strong, guarantees returns.' }, 'a negation before a comma still negates');
+  passes({ cio: 'Esperar permite observar sin riesgo de quedar atrapado en una ruptura falsa, así que una tesis larga merece revisión.' }, 'ES sin riesgo de quedar atrapado is not a claim');
+  passes({ cio: "The Red Team's bearish points on fading volume are fair, but price holds above both averages, so a conditional upside idea merits review." }, "a long review may cite the Red Team's bearish points");
+  passes({ cio: "The Red Team's bearish case is fair, but price holds above both averages, so the idea merits review." }, "another agent's bearish case is not the CIO's thesis");
+  passes({ cio: 'El precio se mantuvo débil a lo largo de la semana, así que una tesis corta merece revisión.', direction: 'short' }, 'ES "a lo largo de" is not a long thesis');
+  passes({ cio: 'As long as price stays under the 50-EMA, the short thesis merits review.', direction: 'short' }, 'EN "as long as" is not a long thesis');
+  passes({ cio: 'The rally falls short of resistance, so a short thesis merits review.', direction: 'short' }, 'EN "falls short" next to a short thesis');
+  passes({ cio: 'A short thesis is not supported by this evidence; the conditional long merits review.' }, 'a negated opposite thesis passes');
+  rejected({ alpha: 'Nothing is certain, but this is a guaranteed return if support holds.' }, 'guarantee', 'a negation does not reach across "but"');
+  rejected({ alpha: 'It is a guaranteed return, not a gamble.' }, 'guarantee', 'a negation after the clause does not negate the claim');
+  rejected({ red: 'Entrar aquí es sin riesgo de pérdida porque el soporte aguanta.' }, 'guarantee', 'ES sin riesgo de pérdida is still a claim');
+  rejected({ alpha: 'Sugiero comprar antes del cierre si el volumen acompaña.' }, 'advice', 'ES sugiero comprar is advice');
+  rejected({ alpha: 'Te recomiendo que vendas si pierde el soporte.' }, 'advice', 'ES te recomiendo que vendas is advice');
+  rejected({ alpha: 'The trend is intact. Sell NVDA today before the close.' }, 'advice', 'EN imperative with a ticker');
+  rejected({ alpha: 'The trend is intact. Buy the dip now.' }, 'advice', 'EN imperative buy the dip now');
+  rejected({ red: 'I suggest shorting into strength.' }, 'advice', 'EN I suggest shorting');
+  rejected({ cio: 'Los datos solo respaldan tesis alcistas.', direction: 'short' }, 'verdict', 'ES plural thesis contradicting a short direction');
+  rejected({ cio: 'Only bearish theses fit this evidence, so it merits review.' }, 'verdict', 'EN plural thesis contradicting a long direction');
 
   // runDeskDebate: 'wait' carries no direction; a rejected answer is no answer.
   const evidence = { symbol: 'BTC', technicals: { price: 100 }, provenance: { provider: 'OKX', instrument: 'BTC-USDT', assetType: 'crypto', timeframe: '1H', asOf: new Date().toISOString() } } as never;
@@ -171,11 +203,31 @@ try {
     await deskHandler(request(body, ip) as never, res as never);
     return res;
   }
+  // ---------- quota identities ----------
+  const keysFor = (ip?: string) => getClientQuotaKeys({ headers: ip === undefined ? {} : { 'x-forwarded-for': ip } } as never);
+  {
+    const a = keysFor('203.0.113.7')!, b = keysFor('203.0.113.200')!, c = keysFor('203.0.114.7')!;
+    ok(a.caller !== b.caller && a.network === b.network, 'IPv4: one caller per address, one network per /24');
+    ok(a.network !== c.network, 'IPv4: another /24 is another network');
+    eq(a.caller, getClientIpKey({ headers: { 'x-forwarded-for': '203.0.113.7' } } as never), 'IPv4 caller key is the existing per-address key');
+    eq(keysFor('203.0.113.7, 10.0.0.1'), a, 'the first forwarded address is the client');
+    eq(keysFor('::ffff:203.0.113.7'), a, 'IPv4-mapped IPv6 is the IPv4 caller');
+    const v6 = keysFor('2001:db8:1:2::1')!;
+    eq(keysFor('2001:db8:1:2:ffff:ffff:ffff:ffff'), v6, 'IPv6: every address in a /64 is one caller (no rotation)');
+    eq(keysFor('2001:0DB8:0001:0002:0000:0000:0000:0009%en0'), v6, 'IPv6: expanded, upper-case and zoned forms are the same caller');
+    const sibling = keysFor('2001:db8:1:3::1')!, far = keysFor('2001:db8:2:2::1')!;
+    ok(sibling.caller !== v6.caller && sibling.network === v6.network, 'IPv6: another /64 in the same /48 is another caller on the same network');
+    ok(far.network !== v6.network, 'IPv6: another /48 is another network');
+    for (const key of [a.caller, a.network, v6.caller, v6.network]) ok(/^[0-9a-f]{24}$/.test(key), 'quota keys are 24-hex salted hashes');
+    for (const bad of [undefined, 'unknown', 'not-an-ip', '203.0.113', '2001:db8::1::2', '']) eq(keysFor(bad), null, `no usable address (${JSON.stringify(bad)}) → null`);
+  }
+
   let quotaCalls = 0;
+  const quotaBodies: Array<Record<string, unknown>> = [];
   const quotaAnswer = { value: false as unknown, rows: [] as unknown[] };
-  globalThis.fetch = (async (input: string | URL) => {
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.includes('rpc/bobby_consume_desk_quota')) { quotaCalls++; return json(quotaAnswer.value); }
+    if (url.includes('rpc/bobby_consume_desk_quota')) { quotaCalls++; quotaBodies.push(JSON.parse(String(init?.body))); return json(quotaAnswer.value); }
     if (url.includes('bobby_desk_quotas?')) return json(quotaAnswer.rows);
     throw new Error(`Unexpected request ${url}`);
   }) as typeof fetch;
@@ -184,6 +236,8 @@ try {
   ok(emoji.length > DESK_QUESTION_MAX && Array.from(emoji).length === 700, 'fixture: 700 code points, 1400 UTF-16 units');
   const allowed = await post({ symbol: 'NVDA', question: emoji });
   eq([allowed.statusCode, allowed.body.code, quotaCalls], [429, 'daily_limit', 1], '700 emoji pass the length check (then meet the exhausted quota)');
+  eq(quotaBodies[0], { p_caller: keysFor('10.8.0.1')!.caller, p_network: keysFor('10.8.0.1')!.network }, 'the quota RPC gets caller + network hashes');
+  ok(!JSON.stringify(quotaBodies[0]).includes('10.8.0'), 'no address reaches the database');
   for (const [question, what] of [['a'.repeat(1201), '1201 ASCII'], ['📈'.repeat(1201), '1201 emoji'], ['x'.repeat(50_000), '50k characters']] as const) {
     const res = await post({ symbol: 'NVDA', question, language: 'es' });
     eq([res.statusCode, res.body.code, res.body.maxLength], [400, 'question_too_long', 1200], `${what}: distinct too-long code`);
@@ -194,11 +248,16 @@ try {
   eq(exact.body.code, 'daily_limit', 'exactly 1,200 code points is allowed');
   const invalid = await post({ symbol: 'nvda!', question: 'Is this real?', language: 'es' });
   eq([invalid.statusCode, invalid.body.code], [400, 'invalid_request'], 'a malformed request keeps its own code');
+  const before = quotaCalls, anonymous = await post({ symbol: 'NVDA', question: 'Is this real?' }, 'unknown');
+  eq([anonymous.statusCode, anonymous.body.code, quotaCalls], [503, 'desk_unavailable', before], 'no client address: fail closed before the quota and the model');
 
   quotaAnswer.rows = [{ key: 'global', hits: 601, expires_at: new Date(Date.now() + 5 * H * 1000).toISOString() }, { key: 'caller:x', hits: 3, expires_at: new Date(Date.now() + 20 * H * 1000).toISOString() }];
   const en = await post({ symbol: 'NVDA', question: 'Is this real?' });
   eq([en.statusCode, en.body.code, en.body.error], [429, 'daily_limit', "Bobby reached today's analysis limit. Try again tomorrow."], 'EN daily-limit message');
   ok(Math.abs(Number(en.headers['retry-after']) - 5 * H) < 5, 'Retry-After is the exhausted window, not an hour');
+  quotaAnswer.rows = [{ key: 'net:x', hits: 60, expires_at: new Date(Date.now() + 7 * H * 1000).toISOString() }, { key: 'caller:x', hits: 29, expires_at: new Date(Date.now() + 20 * H * 1000).toISOString() }, { key: 'global', hits: 12, expires_at: new Date(Date.now() + 2 * H * 1000).toISOString() }];
+  const network = await post({ symbol: 'NVDA', question: 'Is this real?' });
+  ok(network.statusCode === 429 && Math.abs(Number(network.headers['retry-after']) - 7 * H) < 5, 'a network at exactly its ceiling is the exhausted window (refusals consume nothing)');
   const es = await post({ symbol: 'NVDA', question: '¿Es real?', language: 'es' });
   eq(es.body.error, 'Bobby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.', 'ES daily-limit message');
   ok(!('agents' in es.body), 'no verdict on a refused request');

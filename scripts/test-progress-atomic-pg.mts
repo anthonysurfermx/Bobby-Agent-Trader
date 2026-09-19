@@ -69,6 +69,8 @@ try {
   eq(await xp(retry),25);
   eq(Number((await pool.query("select count(*) from bobby_progress_events where identity_id=$1 and kind='thesis_closed'",[retry])).rows[0].count),1);
   eq((await pool.query("select has_function_privilege('anon','public.bobby_apply_progress(uuid,text,jsonb,jsonb)','EXECUTE') as allowed")).rows[0].allowed,false);
+  // Rerunnable on the same scratch DB: 20260919190000 must not meet 200000's overload.
+  await pool.query('drop function if exists public.bobby_consume_desk_quota(text,text)');
   await pool.query(readFileSync('supabase/bobby-protocol/supabase/migrations/20260919190000_desk_quota.sql','utf8'));
   await pool.query('truncate bobby_desk_quotas');
   const quota = await Promise.all(Array.from({length:40},()=>pool.query("select bobby_consume_desk_quota('test-caller') as ok")));
@@ -76,11 +78,37 @@ try {
   eq((await pool.query("select hits from bobby_desk_quotas where key='global'")).rows[0].hits,30);
   eq((await pool.query("select has_function_privilege('anon','public.bobby_consume_desk_quota(text)','EXECUTE') as allowed")).rows[0].allowed,false);
   await pool.query('truncate bobby_desk_quotas');
+  // 20260919200000: caller (30) → network (60) → global (600); a refusal consumes nothing.
+  await pool.query(readFileSync('supabase/bobby-protocol/supabase/migrations/20260919200000_desk_quota_networks.sql','utf8'));
+  const consume=async(caller:string,network:string|null)=>(await pool.query('select bobby_consume_desk_quota($1,$2) as ok',[caller,network])).rows[0].ok as boolean;
+  const hits=async(key:string)=>(await pool.query('select hits from bobby_desk_quotas where key=$1',[key])).rows[0]?.hits ?? 0;
+  eq((await pool.query("select to_regprocedure('public.bobby_consume_desk_quota(text)') is null as gone")).rows[0].gone,true);
+  eq((await pool.query("select bobby_consume_desk_quota(p_caller => 'legacy-caller') as ok")).rows[0].ok,true);
+  eq([await hits('caller:legacy-caller'),await hits('global')],[1,1]);
+  await pool.query('truncate bobby_desk_quotas');
+  const burst=await Promise.all(Array.from({length:40},()=>pool.query("select bobby_consume_desk_quota('caller-a01','network-a') as ok")));
+  eq(burst.filter(x=>x.rows[0].ok).length,30);
+  eq([await hits('caller:caller-a01'),await hits('net:network-a'),await hits('global')],[30,30,30]);
+  for (let i=0;i<30;i++) eq(await consume('caller-a02','network-a'),true);
+  eq(await consume('caller-a03','network-a'),false);
+  eq([await hits('caller:caller-a03'),await hits('net:network-a'),await hits('global')],[0,60,60]);
+  await pool.query("update bobby_desk_quotas set hits=599 where key='global'");
+  eq(await consume('caller-b01','network-b'),true);
+  eq(await consume('caller-c01','network-c'),false);
+  eq([await hits('caller:caller-c01'),await hits('net:network-c'),await hits('global')],[0,0,600]);
+  await pool.query("update bobby_desk_quotas set expires_at=now()-interval '1 second' where key='global'");
+  eq(await consume('caller-c01','network-c'),true);
+  eq(await hits('global'),1);
+  await assert.rejects(consume('caller-d01','short'));checks++;
+  await assert.rejects(consume('short','network-d'));checks++;
+  eq((await pool.query("select has_function_privilege('anon','public.bobby_consume_desk_quota(text,text)','EXECUTE') as a, has_function_privilege('authenticated','public.bobby_consume_desk_quota(text,text)','EXECUTE') as b, has_function_privilege('service_role','public.bobby_consume_desk_quota(text,text)','EXECUTE') as c")).rows[0],{a:false,b:false,c:true});
+  await pool.query('truncate bobby_desk_quotas');
   const serviceIdentity = await person(), serviceConnection = await pool.connect();
   try {
     await serviceConnection.query('set role service_role');
     const applied = await serviceConnection.query('select bobby_apply_progress($1,$2,$3,$4) as result',[serviceIdentity,'ios',JSON.stringify([event()]),'{}']);
     eq(applied.rows[0].result.progress.xp,10);
+    eq((await serviceConnection.query("select bobby_consume_desk_quota('service-caller','service-network') as ok")).rows[0].ok,true);
     await serviceConnection.query('set role anon');
     await assert.rejects(serviceConnection.query('select bobby_consume_desk_quota($1)',['test-caller']));checks++;
   } finally {await serviceConnection.query('reset role');serviceConnection.release();}

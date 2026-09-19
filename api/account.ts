@@ -18,8 +18,9 @@
 //   · A DELETE carrying appleAuthorizationCode is revoked through Apple's REST
 //     API whatever its header says.
 // Apple failures never block deletion indefinitely:
-//   · transient (Apple 5xx/429, timeout, network) → 503, nothing deleted; the
-//     client retries with a fresh code.
+//   · transient (Apple 5xx/429, timeout, network — including a 200 whose body
+//     read times out or resets) → 503, nothing deleted; the client retries
+//     with a fresh code.
 //   · rejected (key cannot sign, invalid_client, unauthorized_client,
 //     invalid_grant, a different Apple ID, any 4xx) → logged by class and the
 //     deletion completes on the manual path. invalid_grant is deliberately NOT

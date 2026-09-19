@@ -56,6 +56,21 @@ async function appleFetch(stage: 'token' | 'keys' | 'revoke', url: string, init:
   throw new AppleRevocationError(transient ? 'transient' : 'rejected', stage, `${response.status} ${code}`);
 }
 
+/**
+ * A 2xx body from Apple, parsed. The request's timeout still runs while the
+ * body streams in, so a read that aborts or resets is transient like the
+ * request itself; only a complete body that is not JSON is a rejection.
+ */
+async function appleJson(stage: 'token' | 'keys', url: string, init: RequestInit): Promise<Record<string, unknown>> {
+  const response = await appleFetch(stage, url, init);
+  let text: string;
+  try { text = await response.text(); } catch (error) { throw new AppleRevocationError('transient', stage, errorClass(error)); }
+  let body: unknown;
+  try { body = JSON.parse(text); } catch { throw new AppleRevocationError('rejected', stage, 'malformed_body'); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new AppleRevocationError('rejected', stage, 'malformed_body');
+  return body as Record<string, unknown>;
+}
+
 function clientSecret(config: AppleConfig): string {
   try {
     const now = Math.floor(Date.now() / 1000);
@@ -99,12 +114,14 @@ export async function verifyAppleIdentity(token: string, expectedSubject: string
      typeof claims.exp !== 'number' || claims.exp <= now || typeof claims.iat !== 'number' || claims.iat > now + 60) {
     throw new AppleRevocationError('rejected', 'identity', claims.sub !== expectedSubject ? 'subject_mismatch' : 'claims');
   }
-  const response = await appleFetch('keys', `${APPLE}/auth/keys`, { signal: AbortSignal.timeout(5000) });
-  const { keys } = await response.json() as { keys: Array<JsonWebKey & { kid?: string; alg?: string }> };
-  const key = keys.find(key => key.kid === header.kid && key.kty === 'RSA' && key.alg === 'RS256');
-  if (!key || !verify('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), createPublicKey({ key, format: 'jwk' }), Buffer.from(parts[2], 'base64url'))) {
-    throw new AppleRevocationError('rejected', 'identity', 'signature');
-  }
+  const { keys } = await appleJson('keys', `${APPLE}/auth/keys`, { signal: AbortSignal.timeout(5000) }) as { keys?: unknown };
+  if (!Array.isArray(keys)) throw new AppleRevocationError('rejected', 'keys', 'malformed_body');
+  const key = (keys as Array<JsonWebKey & { kid?: string; alg?: string }>).find(key => key?.kid === header.kid && key.kty === 'RSA' && key.alg === 'RS256');
+  let valid = false;
+  try {
+    valid = Boolean(key) && verify('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), createPublicKey({ key: key!, format: 'jwk' }), Buffer.from(parts[2], 'base64url'));
+  } catch { valid = false; }
+  if (!valid) throw new AppleRevocationError('rejected', 'identity', 'signature');
 }
 
 /**
@@ -118,17 +135,22 @@ export async function revokeAppleAuthorization(code: string, subject: string): P
   if (!config) throw new AppleRevocationError('rejected', 'config', 'not_configured');
   const client_id = config.clientId;
   const client_secret = clientSecret(config);
-  const tokenResponse = await appleFetch('token', `${APPLE}/auth/token`, {
+  // A body read that times out after Apple answered 200 is transient (503,
+  // nothing deleted): Apple already issued a token, and a retry with a fresh
+  // code revokes it. It must not read as a missing id_token.
+  const tokens = await appleJson('token', `${APPLE}/auth/token`, {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(8000),
     body: new URLSearchParams({ client_id, client_secret, code, grant_type: 'authorization_code' }),
   });
-  const tokens = await tokenResponse.json().catch(() => ({})) as { id_token?: string; refresh_token?: string; access_token?: string };
-  if (!tokens.id_token) throw new AppleRevocationError('rejected', 'token', 'no_id_token');
-  await verifyAppleIdentity(tokens.id_token, subject, client_id);
-  const token = tokens.refresh_token ?? tokens.access_token;
+  const text = (value: unknown) => typeof value === 'string' && value ? value : undefined;
+  const idToken = text(tokens.id_token), refreshToken = text(tokens.refresh_token);
+  if (!idToken) throw new AppleRevocationError('rejected', 'token', 'no_id_token');
+  await verifyAppleIdentity(idToken, subject, client_id);
+  const token = refreshToken ?? text(tokens.access_token);
   if (!token) throw new AppleRevocationError('rejected', 'token', 'no_revocable_token');
+  // Apple's revoke answers 200 with an empty body; nothing is read from it.
   await appleFetch('revoke', `${APPLE}/auth/revoke`, {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(8000),
-    body: new URLSearchParams({ client_id, client_secret, token, token_type_hint: tokens.refresh_token ? 'refresh_token' : 'access_token' }),
+    body: new URLSearchParams({ client_id, client_secret, token, token_type_hint: refreshToken ? 'refresh_token' : 'access_token' }),
   });
 }
