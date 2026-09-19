@@ -2,12 +2,18 @@
 useDefault = true
 
 [allowlist]
-description = "Known public identifiers: Supabase anon JWT, EVM addresses, and a localStorage key"
-regexTarget = "match"
+description = "Known public identifiers: Supabase anon JWT, EVM addresses, anvil test keys, and a localStorage key"
+# Tested against the extracted secret, not the whole match: an unanchored
+# address pattern on the match also swallowed 0x-prefixed 64-hex private keys.
+regexTarget = "secret"
 regexes = [
   # Bobby iOS publishable Supabase anon key; exact token only, never service-role keys.
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFidmRxa2tubnV3ZWF0cHRqb2hpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MTcxODEsImV4cCI6MjEwMzA5MzE4MX0\.RnLq8W0O\-S7L4BGkck\-yG8NaaMFMsGN6QX3sjfVPkd8''',
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncGl4YXVubG56YXV6dGJybnV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUyOTc3MDQsImV4cCI6MjA3MDg3MzcwNH0\.jlWxBgUiBLOOptESdBYzisWAbiMnDa5ktzFaCGskew4''',
-  '''0x[a-fA-F0-9]{40}''',
+  # An EVM address is exactly 0x + 40 hex. Anchored, so 0x + 64 hex (a private key) is still reported.
+  '''^0x[a-fA-F0-9]{40}$''',
+  # Anvil/Hardhat default accounts #0 and #1: public test keys (scripts/e2e-trackrecord-v2.mts), exact values only.
+  '''^0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80$''',
+  '''^0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d$''',
   '''mercado-lp-enhancements-v1''',
 ]

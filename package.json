@@ -45,7 +45,9 @@
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts",
     "test:realtime-session": "tsx scripts/test-realtime-session.mts",
     "test:desk-audit": "tsx scripts/test-desk-audit.mts",
-    "test:ios-remediation": "tsx scripts/test-ios-remediation.mts",
+    "test:ios-remediation": "tsx scripts/test-ios-remediation.mts && tsx scripts/test-desk-debate.mts && tsx scripts/test-account-delete.mts",
+    "test:desk-debate": "tsx scripts/test-desk-debate.mts",
+    "test:account-delete": "tsx scripts/test-account-delete.mts",
     "test:progress-atomic-pg": "tsx scripts/test-progress-atomic-pg.mts"
   },
   "dependencies": {

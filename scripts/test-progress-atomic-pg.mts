@@ -84,6 +84,32 @@ try {
     await serviceConnection.query('set role anon');
     await assert.rejects(serviceConnection.query('select bobby_consume_desk_quota($1)',['test-caller']));checks++;
   } finally {await serviceConnection.query('reset role');serviceConnection.release();}
+  // A close stored before the atomic review (Growth v1 meta: no xp/aura/xpAfter/
+  // ledgerEventId) replays as stored; the API completes it from the ledger row
+  // with exactly this filter (api/_lib/trader-land.ts closedLedgerFields).
+  const legacy=await person(),legacyEvent=event();
+  await apply(legacy,[legacyEvent]);
+  const legacySeed=(await pool.query('select id,item_id,event_id from tl_inventory where identity_id=$1',[legacy])).rows[0];
+  await pool.query("update tl_inventory set state='bloomed',bloomed_at=now(),seeded_at=now()-interval '26 hours' where id=$1",[legacySeed.id]);
+  const growthV1Meta={closePx:101.5,direction:'long',executed:null,inventoryId:legacySeed.id,itemId:legacySeed.item_id,movePct:1.5,outcome:'confirmed',plantEventId:legacySeed.event_id,referencePx:100,reviewedAt:new Date().toISOString(),symbol:'BTC'};
+  const ledger=(await pool.query(`insert into bobby_progress_events(identity_id,client_event_id,kind,points,awarded,aura,xp_after,platform,occurred_at,day_key,meta)
+    values($1,gen_random_uuid(),'thesis_closed',15,15,6,25,'ios',now(),current_date,jsonb_build_object('thesis_close',$2::jsonb)) returning id`,[legacy,JSON.stringify(growthV1Meta)])).rows[0].id;
+  const replayed=(await pool.query('select bobby_close_seed($1,$2,24,$3,0,$4) as result',[legacy,legacySeed.id,'ios','{}'])).rows[0].result;
+  eq([replayed.ok,replayed.replay,'xp' in replayed.closed,replayed.closed.inventoryId],[true,true,false,legacySeed.id]);
+  const filled=(await pool.query("select id,awarded,aura,xp_after from bobby_progress_events where identity_id=$1 and kind='thesis_closed' and meta->'thesis_close'->>'inventoryId'=$2 limit 1",[legacy,legacySeed.id])).rows[0];
+  eq([filled.id,filled.awarded,filled.aura,filled.xp_after],[ledger,15,6,25]);
+
+  // Account deletion de-links agent_trades (no FK) as service_role before the identity goes.
+  const trader=await person(),trade=randomUUID();
+  await pool.query("insert into agent_trades(id,chain,token_address,token_symbol,direction,amount_usd,user_id) values($1,'base','0x0','NVDA','BUY',1,$2)",[trade,trader]);
+  const unlink=await pool.connect();
+  try {
+    await unlink.query('set role service_role');
+    eq((await unlink.query('update agent_trades set user_id=null where user_id=$1',[trader])).rowCount,1);
+    await unlink.query('delete from bobby_identities where id=$1',[trader]);
+  } finally {await unlink.query('reset role');unlink.release();}
+  eq((await pool.query('select user_id from agent_trades where id=$1',[trade])).rows[0].user_id,null);
+  await pool.query('delete from agent_trades where id=$1',[trade]);
   console.log(`progress-atomic-pg: ${checks} checks passed`);
 } finally {
   await pool.query('drop trigger if exists audit_progress_failure on public.bobby_progress;drop function if exists public.audit_progress_failure()');

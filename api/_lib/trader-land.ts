@@ -413,8 +413,17 @@ export async function closeSeed(identity: { id: string; wallet: string | null },
   });
 }
 
+/** What a stored thesis_closed ledger row paid, in ClosedThesis field names. */
+async function closedLedgerFields(identityId: string, inventoryId: string): Promise<Pick<ClosedThesis, 'xp' | 'aura' | 'xpAfter' | 'ledgerEventId'>> {
+  const r = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identityId}&kind=eq.thesis_closed&meta->thesis_close->>inventoryId=eq.${inventoryId}&select=id,awarded,aura,xp_after&limit=1`), { headers: bobbyServiceHeaders() });
+  if (!r.ok) throw new Error('Review ledger read failed');
+  const row = ((await r.json()) as Array<{ id: string; awarded: number; aura: number | null; xp_after: number }>)[0];
+  if (!row) throw new Error('Review ledger row missing');
+  return { xp: row.awarded, aura: row.aura ?? 0, xpAfter: row.xp_after, ledgerEventId: row.id };
+}
+
 async function commitSeedReview(identityId: string, seed: SeedRow, opts: { platform: 'ios' | 'web'; tzOffsetMin: number }, closed: Record<string, unknown>): Promise<CloseResult> {
-  const result = await rpc<{ ok: true; closed: ClosedThesis & { seasonItemId?: string | null } }>('bobby_close_seed', {
+  const result = await rpc<{ ok: true; replay?: boolean; closed: ClosedThesis & { seasonItemId?: string | null } }>('bobby_close_seed', {
     p_identity: identityId, p_inventory: seed.id, p_hours: horizonHours(seed.horizon_hours),
     p_platform: opts.platform, p_tz: opts.tzOffsetMin, p_closed: closed, p_season: SEASON.pieces,
   });
@@ -422,7 +431,13 @@ async function commitSeedReview(identityId: string, seed: SeedRow, opts: { platf
     const status = result.error === 'not_found' ? 404 : result.error === 'progress_unavailable' ? 503 : 409;
     return { ok: false, status, error: result.error === 'review_not_ready' ? 'The review window or horizon changed. Reload the island.' : 'The seed could not be reviewed. Reload the island and retry.' };
   }
-  const value = result.closed;
+  let value = result.closed;
+  // A retry of a close stored before the atomic review (Growth v1) replays
+  // meta without xp/aura/xpAfter/ledgerEventId; every shipped iOS build
+  // decodes xp and aura as required Ints. The ledger row has them.
+  if (result.replay && (typeof value.xp !== 'number' || typeof value.aura !== 'number' || typeof value.xpAfter !== 'number' || typeof value.ledgerEventId !== 'string')) {
+    value = { ...value, ...await closedLedgerFields(identityId, seed.id) };
+  }
   let season: SeasonGrant | null = null;
   if (value.executed) {
     const items = await catalog();

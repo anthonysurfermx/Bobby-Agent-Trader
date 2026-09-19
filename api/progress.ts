@@ -16,7 +16,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { PLANT_KINDS } from './_lib/progress-rules.js';
-import { ThesisSchema, catalog, heldPieces, nextPieces, pieceSummary, seedHorizon, type RouteGrant } from './_lib/trader-land.js';
+import { ThesisSchema, catalog, heldPieces, nextPieces, pieceSummary, seedHorizon, type Item, type RouteGrant, type Tier } from './_lib/trader-land.js';
+import { LEGACY_ROUTE_CAP } from './_lib/trader-land-growth.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -152,20 +153,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const saved = await applied.json() as {
       progress: ProgressRow; legacyImported: number;
       results: Array<{ id: string; awarded: number; aura: number; xpBefore: number; xpAfter: number; duplicate: boolean;
-        grant: { inventory_id: string; item_id: string; state: 'seed' | 'bloomed'; seeded_at: string; horizon_hours: number } | null }>;
+        grant: { inventory_id: string; item_id: string; tier: Tier | null; held: number; state: 'seed' | 'bloomed'; seeded_at: string; horizon_hours: number } | null }>;
     };
-    const items = await catalog();
+    // Everything below is presentation of a transaction that already
+    // committed: a failed read degrades the preview, never the answer (a 500
+    // here would make the client retry and see its planted piece as pending).
+    const grants = saved.results.flatMap(result => result.grant ? [result.grant] : []);
+    let items: Item[] = [];
+    let next: Record<Tier, ReturnType<typeof pieceSummary> | null> | null = null;
+    if (grants.length) {
+      // catalog() turns a failed read into []: one retry, so a granted piece is not reported as item:null.
+      items = await catalog().catch(() => [] as Item[]);
+      if (!items.length) items = await catalog().catch(() => [] as Item[]);
+      if (items.length && grants.some(grant => grant.state === 'seed')) {
+        try { next = nextPieces(items, await heldPieces(identity.id)); } catch (error) { console.error('[progress] tier preview', error); }
+      }
+    }
     const byItem = new Map(items.map(item => [item.id, item]));
-    const next = nextPieces(items, await heldPieces(identity.id));
     const results = saved.results.map(({ grant, ...result }) => {
       if (!grant) return result;
       const item = byItem.get(grant.item_id);
+      const summary = item ? pieceSummary(item) : null;
       const world: RouteGrant = {
-        routeIndex: saved.progress.route_index, item: item ? pieceSummary(item) : null,
-        inventoryId: grant.inventory_id, state: grant.state, routeComplete: false, bloomedInventoryId: null,
+        // GROWTH-v1 §3: a common grant reports min(held_common, 8) at that grant;
+        // any other tier keeps the caller's legacy counter.
+        routeIndex: grant.tier === 'common' && Number.isFinite(grant.held) ? Math.min(grant.held, LEGACY_ROUTE_CAP) : saved.progress.route_index,
+        item: summary, inventoryId: grant.inventory_id, state: grant.state, routeComplete: false, bloomedInventoryId: null,
         ...(grant.state === 'seed' ? {
           horizon: seedHorizon(grant.seeded_at, grant.horizon_hours, grant.state),
-          tiers: { common: item ? pieceSummary(item) : null, building: next.building, landmark: next.landmark },
+          ...(next ? { tiers: { common: summary, building: next.building, landmark: next.landmark } } : {}),
         } : {}),
       };
       return { ...result, world };

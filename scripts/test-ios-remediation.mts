@@ -31,7 +31,7 @@ try {
   globalThis.fetch=async(input)=>{urls.push(String(input));return json({candles});};
   const evidence=await loadDeskEvidence('NVDA');
   eq([evidence.provenance.instrument,evidence.provenance.provider,evidence.provenance.timeframe],['NVDA','Yahoo Finance','1H']);
-  eq(urls.length,1);assert.match(urls[0],/stock-candles.*interval=1h/);checks++;
+  eq(urls.length,1);assert.match(urls[0],/stock-candles.*range=30d&interval=1h/);checks++;
   globalThis.fetch=async()=>json({candles:[]});
   await assert.rejects(loadDeskEvidence('NVDA'));checks++;
   globalThis.fetch=async()=>json({candles:candles.map(c=>({...c,ts:c.ts-10*86400000}))});
@@ -53,9 +53,9 @@ try {
   globalThis.fetch=async()=>json({choices:[{finish_reason:'length',message:{content:'{}'}}]});
   await assert.rejects(runDeskDebate(question,evidence,'en'));checks++;
   for(const [quota,status] of [[json({},503),503],[json(false),429]] as const) {
-    let calls=0;globalThis.fetch=async()=>{calls++;return quota;};
+    let calls=0,model=0;globalThis.fetch=async(input)=>{if(String(input).includes('openai'))model++;if(String(input).includes('rpc/bobby_consume_desk_quota'))calls++;return String(input).includes('bobby_desk_quotas?')?json([]):quota;};
     const res=response();await deskHandler({...req,body:{symbol:'BTC',question}} as never,res as never);
-    eq(res.statusCode,status);eq(calls,1);eq(res.body.agents,undefined);
+    eq(res.statusCode,status);eq(calls,1);eq(model,0);eq(res.body.agents,undefined);
   }
 
   // Apple code exchange verifies signed subject/audience before revoking anything.
@@ -88,12 +88,13 @@ try {
     if(url.includes('api_cache'))return json([]);
     if(url.endsWith('/auth/v1/user'))return json({id:ID,app_metadata:{provider:'apple'}});
     if(url.includes('bobby_identities')&&method==='POST')return json([{id:ID,auth_user_id:ID,wallet_address:null}]);
-    if(method==='DELETE'){deletes.push(url);return json({});}
+    if(method==='DELETE'||method==='PATCH'){deletes.push(`${method} ${url}`);return json({});}
     if(url.includes('/admin/users/'))return json({identities:[{provider:'apple',identity_data:{sub:'apple-user'}}]});
     throw new Error(`Unexpected test request: ${url}`);
   };
   const account=response();await accountHandler({...req,method:'DELETE'} as never,account as never);
-  eq(account.statusCode,200);eq(account.body.appleRevocation,'manual');eq(deletes.length,2);
+  eq(account.statusCode,200);eq(account.body.appleRevocation,'manual');eq(deletes.length,3);
+  eq(deletes[0].startsWith(`PATCH https://db.test/rest/v1/agent_trades?user_id=eq.${ID}`),true);
   eq(account.body.manualRevocationURL,'https://support.apple.com/en-us/102571');
   console.log(`ios-remediation: ${checks} checks passed`);
 } finally {globalThis.fetch=original;}
