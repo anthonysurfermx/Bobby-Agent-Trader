@@ -344,6 +344,8 @@ final class BobbyViewModel: ObservableObject {
         } else {
             next = .pending
         }
+        // The seed's row, horizon and tier previews: what the horizon choice needs.
+        if let outcome { moment.adopt(outcome) }
         // A duplicate was counted by an earlier round: the local number stands.
         if let outcome, !outcome.duplicate {
             moment.xp = outcome.awarded
@@ -364,6 +366,26 @@ final class BobbyViewModel: ObservableObject {
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
         default: break
         }
+    }
+
+    /// Grows the harvest card's seed to a longer horizon (docs/trader-land/GROWTH-v1.md §1):
+    /// one POST, never twice at once, and its answer lands only on the card that asked —
+    /// a new read may have replaced it meanwhile. true = a request went out.
+    @discardableResult
+    func extendSeed(to target: LandHorizon, extender: DeskSeedExtender = DeskSeedExtender()) async -> Bool {
+        guard let moment = harvest, let eventID = moment.eventID, let inventoryID = moment.inventoryID,
+              let started = moment.startingExtend(to: target) else { return false }
+        withAnimation(.easeOut(duration: 0.2)) { harvest = started }
+        let result = await extender.extend(inventoryID: inventoryID, to: target)
+        guard let settled = HarvestMoment.settlingExtend(harvest, eventID: eventID, inventoryID: inventoryID, result: result) else { return true }
+        withAnimation(.spring(duration: 0.45, bounce: 0.2)) { harvest = settled }
+        if case .success = result {
+            landBump += 1
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } else {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+        return true
     }
 
     func selectTimeframe(_ next: MarketTimeframe) {
@@ -536,7 +558,7 @@ struct ContentView: View {
             RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
         }
         .sheet(isPresented: $showAccount) {
-            AccountSheet(store: vm.companions, profile: vm.profile) { showAccount = false }
+            AccountSheet(store: vm.companions, profile: vm.profile, pieces: account.isSignedIn ? pulse.pieces : nil) { showAccount = false }
         }
         .sheet(isPresented: $showSquad) {
             // Muted means muted: the gallery's pick line stays silent too.
@@ -924,7 +946,11 @@ struct ContentView: View {
     }
 
     private func harvestCard(_ moment: HarvestMoment, showsXP: Bool = true) -> some View {
-        HarvestCard(moment: moment, showsXP: showsXP, onOpen: { focus in openLand(focus) }, onSaveProgress: { showAccount = true })
+        HarvestCard(moment: moment, showsXP: showsXP, onOpen: { focus in openLand(focus) }, onSaveProgress: { showAccount = true },
+                    onExtend: { horizon in
+                        // The island changed: the chip reads it again once the answer is in.
+                        Task { if await vm.extendSeed(to: horizon) { await pulse.refresh() } }
+                    })
     }
 
     private func openLand(_ focus: TraderLandFocus?, haptic: UIImpactFeedbackGenerator.FeedbackStyle? = nil) {

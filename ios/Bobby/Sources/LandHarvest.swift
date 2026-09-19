@@ -1,7 +1,8 @@
-// The desk → Trader Land bridge. Every finished read plants the next route
-// piece on the server (a seed for a read, a bloomed piece for a respected
-// NO TRADE); the harvest card says so right where the read ends, and the
-// header chip keeps the island one tap away with what is waiting there.
+// The desk → Trader Land bridge. One question = one seed: every finished read
+// plants a piece on the server (a seed for a read, a bloomed piece for a
+// respected NO TRADE); the harvest card says so right where the read ends and
+// offers the seed's horizon (patience decides the piece), and the header chip
+// keeps the island one tap away with what is waiting there.
 import SwiftUI
 import Combine
 
@@ -16,7 +17,7 @@ struct HarvestMoment: Identifiable, Equatable {
     enum Stage: Equatable {
         /// Signed in, waiting for /api/progress.
         case syncing
-        /// A read planted a seed: it blooms when its thesis is reviewed in 24 h.
+        /// A read planted a seed: it blooms when its thesis is reviewed, once its horizon ends.
         case seed(RouteGrant.Piece)
         /// A respected NO TRADE: the piece is ready to build now.
         case bloomed(RouteGrant.Piece)
@@ -35,6 +36,68 @@ struct HarvestMoment: Identifiable, Equatable {
     let thesis: AwardThesis?
     var xp: Int
     var stage: Stage
+    /// The seed's island row, once the server answered: what an extend names.
+    var inventoryID: String? = nil
+    /// The seed's horizon as the server applied it. nil = a server before Growth v1: 24 h, no choice.
+    var horizon: RouteGrant.Horizon? = nil
+    /// What each horizon would bloom into (the server's `tiers`): the choice's preview.
+    var tiers: [LandHorizon: RouteGrant.Piece] = [:]
+    /// The horizon being asked for right now: one extend at a time.
+    var extending: LandHorizon? = nil
+    /// Why the last extend did not happen, in the reader's language.
+    var extendError: String? = nil
+
+    /// When the seed's review opens, per the server.
+    var reviewAt: Date? { horizon?.reviewAt }
+    /// The seed's horizon: 24 h unless the server says otherwise.
+    var span: LandHorizon { horizon?.hours ?? .day }
+    /// The card offers the horizon choice: a read's seed whose row and horizon the server named.
+    var offersHorizon: Bool {
+        guard case .seed = stage, !noTrade, inventoryID != nil, horizon != nil else { return false }
+        return true
+    }
+    /// The horizons this seed may grow to now (upward only, before its review opens).
+    var extendOptions: [LandHorizon] { offersHorizon ? horizon?.options ?? [] : [] }
+
+    /// Keeps what the server planted beyond the stage: the seed's row, its horizon, the previews.
+    mutating func adopt(_ outcome: AwardOutcome) {
+        guard case let .planted(grant) = outcome.grant else { return }
+        inventoryID = grant.inventoryId
+        horizon = grant.horizon
+        tiers = grant.tiers
+    }
+
+    /// The card with an extend to `target` in flight; nil when it cannot ask for that now
+    /// (not an offered horizon, or one already on its way: never a double submit).
+    func startingExtend(to target: LandHorizon) -> HarvestMoment? {
+        guard extending == nil, extendOptions.contains(target) else { return nil }
+        var next = self
+        next.extending = target
+        next.extendError = nil
+        return next
+    }
+
+    /// Applies an extend's answer to the card it was sent from. nil = that card is gone
+    /// (a new read replaced it, or it names another seed): the answer is dropped.
+    static func settlingExtend(_ current: HarvestMoment?, eventID: String, inventoryID: String,
+                               result: Result<DeskSeedExtender.Extended, DeskSeedExtender.Failure>) -> HarvestMoment? {
+        guard var moment = current, moment.eventID == eventID, moment.inventoryID == inventoryID,
+              case .seed = moment.stage else { return nil }
+        moment.extending = nil
+        switch result {
+        case let .success(extended):
+            // The seed now points at the next piece of its new tier.
+            moment.stage = .seed(extended.item)
+            moment.horizon = extended.horizon
+            moment.extendError = nil
+        case let .failure(failure):
+            moment.extendError = failure.message
+            if failure.closesChoice, let h = moment.horizon {
+                moment.horizon = RouteGrant.Horizon(hours: h.hours, reviewAt: h.reviewAt, extendable: false, extendTo: [])
+            }
+        }
+        return moment
+    }
 
     /// Maps the server's answer about this award to what the card says.
     static func stage(for outcome: AwardOutcome) -> Stage {
@@ -62,6 +125,13 @@ extension AwardThesis {
     }
 }
 
+/// Every desk request to /api/trader-land declares the Growth v1 contract
+/// (docs/trader-land/GROWTH-v1.md §3), like the island's own requests.
+private enum DeskLandClient {
+    static let header = "X-Trader-Land-Client"
+    static let version = "2"
+}
+
 /// A light read of the account island for the desk chip: pieces waiting to be
 /// built and theses waiting to be reviewed. Signed out or failing: no badge, no noise.
 @MainActor
@@ -69,6 +139,8 @@ final class LandPulse: ObservableObject {
     @Published private(set) var readyToBuild = 0
     @Published private(set) var reviewsReady = 0
     @Published private(set) var firstReadyItemID: String?
+    /// Every piece the account holds on Trader Land (seeds, bloomed, built); nil = not read yet.
+    @Published private(set) var pieces: Int?
     private var inflight = false
     /// A refresh asked for mid-flight (a piece planted during the GET) runs once more after it.
     private var stale = false
@@ -102,6 +174,7 @@ final class LandPulse: ObservableObject {
         request.timeoutInterval = 20
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(DeskLandClient.version, forHTTPHeaderField: DeskLandClient.header)
         guard let (data, response) = try? await transport.data(for: request),
               (200..<300).contains((response as? HTTPURLResponse)?.statusCode ?? 0),
               let world = try? JSONDecoder().decode(TraderLandWorld.self, from: data), world.ok,
@@ -113,6 +186,99 @@ final class LandPulse: ObservableObject {
         readyToBuild = world?.readyToBuild ?? 0
         reviewsReady = world?.reviewsReady ?? 0
         firstReadyItemID = world?.inventory.first { $0.state == "bloomed" && !$0.placed }?.item_id
+        pieces = world?.inventory.count
+    }
+}
+
+/// The desk's own `extend` (GROWTH-v1 §3): one authenticated POST with LandPulse's
+/// bearer, never through TraderLandSync (that one needs a loaded island and shares
+/// the island's busy flag). The server re-points the seed to the next piece of its new tier.
+struct DeskSeedExtender {
+    /// `extended` in the answer: the seed's new piece and horizon.
+    struct Extended: Equatable {
+        let inventoryID: String
+        let item: RouteGrant.Piece
+        let horizon: RouteGrant.Horizon
+    }
+
+    enum Failure: Error, Equatable {
+        case signedOut
+        /// 404: the seed is not on this account's island any more.
+        case gone
+        /// 409 `not_seed`.
+        case bloomed
+        /// 409 `review_open`: too late to grow.
+        case reviewOpen
+        /// 400 `not_upward`: it already grew that far (a lost answer, another device).
+        case notUpward
+        /// Offline, a server error, an unreadable answer: nothing is known to have changed.
+        case unavailable
+
+        var message: String {
+            switch self {
+            case .signedOut: return L.t("Sign in again to grow this seed.", "Inicia sesión de nuevo para hacer crecer esta semilla.")
+            case .gone: return L.t("This seed is no longer on your island.", "Esta semilla ya no está en tu isla.")
+            case .bloomed: return L.t("This seed already bloomed.", "Esta semilla ya floreció.")
+            case .reviewOpen: return L.t("Its review is already open: its horizon is set.", "Su revisión ya está abierta: su horizonte quedó fijo.")
+            case .notUpward: return L.t("This seed already grew that far. Open your island to see it.", "Esta semilla ya creció hasta ahí. Abre tu isla para verla.")
+            case .unavailable: return L.t("Your seed could not grow right now. Try again.", "Tu semilla no pudo crecer ahora. Inténtalo de nuevo.")
+            }
+        }
+
+        /// The server says this seed will not grow from here: the choice closes.
+        var closesChoice: Bool {
+            switch self {
+            case .gone, .bloomed, .reviewOpen, .notUpward: return true
+            case .signedOut, .unavailable: return false
+            }
+        }
+    }
+
+    var transport: URLSession = .shared
+
+    @MainActor
+    func extend(inventoryID: String, to horizon: LandHorizon) async -> Result<Extended, Failure> {
+        guard let userID = AccountSession.shared.session?.userId,
+              let token = await AccountSession.shared.accessToken() else { return .failure(.signedOut) }
+        guard let request = try? Self.request(inventoryID: inventoryID, to: horizon, token: token),
+              let (data, response) = try? await transport.data(for: request) else { return .failure(.unavailable) }
+        // Signed out, or into another account, while it flew: nothing lands on this desk.
+        guard AccountSession.shared.session?.userId == userID else { return .failure(.signedOut) }
+        return Self.interpret(data: data, status: (response as? HTTPURLResponse)?.statusCode ?? 0, inventoryID: inventoryID)
+    }
+
+    /// `POST /api/trader-land { action: 'extend', inventoryId, hours }` with the bearer and the client header.
+    static func request(inventoryID: String, to horizon: LandHorizon, token: String) throws -> URLRequest {
+        var request = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/trader-land"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(DeskLandClient.version, forHTTPHeaderField: DeskLandClient.header)
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["action": "extend", "inventoryId": inventoryID, "hours": horizon.hours])
+        return request
+    }
+
+    /// Reads the answer: `{ ok, extended: { inventoryId, item, horizon }, ...world }` or `{ error }`.
+    static func interpret(data: Data, status: Int, inventoryID: String) -> Result<Extended, Failure> {
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        guard (200..<300).contains(status) else {
+            let error = (json?["error"] as? String ?? "").lowercased()
+            switch status {
+            case 401: return .failure(.signedOut)
+            case 404: return .failure(.gone)
+            case 409 where error.contains("already bloomed"): return .failure(.bloomed)
+            case 409 where error.contains("review is already open"): return .failure(.reviewOpen)
+            case 400 where error.contains("can only grow"): return .failure(.notUpward)
+            default: return .failure(.unavailable)
+            }
+        }
+        guard json?["ok"] as? Bool == true, let extended = json?["extended"] as? [String: Any],
+              (extended["inventoryId"] as? String).map({ $0 == inventoryID }) ?? true,
+              let item = RouteGrant.Piece.parse(extended["item"]),
+              let horizon = RouteGrant.Horizon.parse(extended["horizon"]) else { return .failure(.unavailable) }
+        return .success(Extended(inventoryID: inventoryID, item: item, horizon: horizon))
     }
 }
 
@@ -167,6 +333,16 @@ struct LandChip: View {
     }
 }
 
+/// A horizon chip draws its own states: the seed's current horizon is not tappable
+/// yet must read at full strength, so no system dimming for disabled.
+private struct HorizonChipStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+    }
+}
+
 /// The reward line under a finished read: which piece it planted on the
 /// island, why, and the one tap that goes there.
 struct HarvestCard: View {
@@ -175,8 +351,31 @@ struct HarvestCard: View {
     var showsXP = true
     let onOpen: (TraderLandFocus?) -> Void
     let onSaveProgress: () -> Void
+    /// A confirmed horizon for the seed: the desk sends the extend.
+    var onExtend: (LandHorizon) -> Void = { _ in }
+    /// The horizon tapped but not confirmed yet (the card's own confirm step).
+    @State private var proposed: LandHorizon?
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            summary
+            if moment.offersHorizon { horizonChoice }
+        }
+        .padding(12)
+        .background(
+            LinearGradient(colors: [tone.opacity(0.11), Theme.card], startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(tone.opacity(0.26), lineWidth: 1))
+        .transition(.scale(scale: 0.94).combined(with: .opacity))
+        // A new read's card never inherits the last one's unconfirmed choice.
+        .onChange(of: moment.id) { proposed = nil }
+        // A container, so the card's identifier does not overwrite its buttons'.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("desk-harvest")
+    }
+
+    private var summary: some View {
         HStack(alignment: .top, spacing: 12) {
             thumbnail
             VStack(alignment: .leading, spacing: 4) {
@@ -215,16 +414,6 @@ struct HarvestCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
-        .background(
-            LinearGradient(colors: [tone.opacity(0.11), Theme.card], startPoint: .topLeading, endPoint: .bottomTrailing)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(tone.opacity(0.26), lineWidth: 1))
-        .transition(.scale(scale: 0.94).combined(with: .opacity))
-        // A container, so the card's identifier does not overwrite its buttons'.
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("desk-harvest")
     }
 
     // MARK: Pieces
@@ -255,7 +444,8 @@ struct HarvestCard: View {
             Group {
                 if let art {
                     // The 256 px thumbs carry a wide transparent margin: frame the piece itself.
-                    Image(uiImage: art).resizable().scaledToFit().scaleEffect(1.3)
+                    // A building or landmark fills more of its thumb than a 1×1 does.
+                    Image(uiImage: art).resizable().scaledToFit().scaleEffect(Self.thumbScale(piece))
                 } else {
                     Image(systemName: "leaf.fill").font(.system(size: 22, weight: .bold)).foregroundStyle(tone)
                 }
@@ -279,6 +469,16 @@ struct HarvestCard: View {
         }
         .frame(width: 66, height: 66)
         .accessibilityHidden(true)
+    }
+
+    /// How far a thumb zooms past its transparent margin: less for wider pieces.
+    private static func thumbScale(_ piece: RouteGrant.Piece?) -> CGFloat {
+        guard let piece else { return 1.3 }
+        switch piece.footprint.reduce(1, *) {
+        case ..<2: return 1.3
+        case 2: return 1.18
+        default: return 1.08
+        }
     }
 
     private var isSeed: Bool { if case .seed = moment.stage { return true }; return false }
@@ -343,11 +543,13 @@ struct HarvestCard: View {
                 ? L.t("Respecting NO TRADE earns a piece you can build today.", "Respetar el NO OPERAR te da una pieza para construir hoy.")
                 : L.t("This read becomes a seed on your island.", "Esta lectura se vuelve una semilla en tu isla.")
         case .seed:
+            // The seed's own horizon: 24 h as planted, 3 or 7 days once grown.
+            let when = moment.span.label
             if let thesis = moment.thesis {
-                return L.t("It blooms when you review this thesis in 24 h: \(thesis.line).",
-                           "Florece cuando revises esta tesis en 24 h: \(thesis.line).")
+                return L.t("It blooms when you review this thesis in \(when): \(thesis.line).",
+                           "Florece cuando revises esta tesis en \(when): \(thesis.line).")
             }
-            return L.t("It blooms when you review this read in 24 h.", "Florece cuando revises esta lectura en 24 h.")
+            return L.t("It blooms when you review this read in \(when).", "Florece cuando revises esta lectura en \(when).")
         case .bloomed:
             return L.t("Respecting NO TRADE made it bloom right away.", "Respetar el NO OPERAR la hizo florecer al instante.")
         case .capped:
@@ -368,7 +570,8 @@ struct HarvestCard: View {
         case .syncing:
             EmptyView()
         case .seed:
-            primary(L.t("See it on my island", "Verla en mi isla")) { onOpen(nil) }
+            // The reviews list is where a growing seed waits on the island.
+            primary(L.t("See it on my island", "Verla en mi isla")) { onOpen(.review) }
         case let .bloomed(p):
             primary(L.t("Build it", "Constrúyela")) { onOpen(.build(itemID: p.id)) }
         case .capped, .routeComplete, .pending:
@@ -392,6 +595,188 @@ struct HarvestCard: View {
                 .accessibilityIdentifier("harvest-secondary")
             }
         }
+    }
+
+    // MARK: Horizon
+
+    /// The tapped horizon while it waits for its confirmation, or the one on its way to the server.
+    private var pendingChoice: LandHorizon? {
+        if let inFlight = moment.extending { return inFlight }
+        guard let proposed, moment.extendOptions.contains(proposed) else { return nil }
+        return proposed
+    }
+
+    /// Patience decides the piece: the planted 24 h, or 3 or 7 days for a bigger piece.
+    /// Upward only, confirmed once, and never while an answer is on its way.
+    private var horizonChoice: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L.t("PATIENCE DECIDES THE PIECE", "LA PACIENCIA DECIDE LA PIEZA"))
+                .font(.mono(7.5, .bold))
+                .kerning(1.3)
+                .foregroundStyle(Theme.muted)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(LandHorizon.allCases) { horizonChip($0) }
+            if let choice = pendingChoice { confirmStep(choice) }
+            if let error = moment.extendError {
+                Label(error, systemImage: "exclamationmark.circle")
+                    .font(.rounded(11, .medium))
+                    .foregroundStyle(Theme.down.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("harvest-horizon-error")
+            }
+        }
+        .animation(.spring(duration: 0.3, bounce: 0.15), value: pendingChoice)
+        .animation(.easeOut(duration: 0.2), value: moment.extendError)
+    }
+
+    /// "24 h · common 1×1", "3 days · building 2×1", "7 days · landmark 2×2".
+    private static func horizonLine(_ h: LandHorizon) -> String {
+        let tier: String
+        switch h {
+        case .day: tier = L.t("common", "común")
+        case .threeDays: tier = L.t("building", "edificio")
+        case .week: tier = L.t("landmark", "monumento")
+        }
+        return "\(h.label) · \(tier) \(h.footprintLabel)"
+    }
+
+    /// The piece a horizon blooms into: the seed's own for its horizon, the server's preview otherwise.
+    private func bloomPiece(_ h: LandHorizon) -> RouteGrant.Piece? {
+        h == moment.span ? piece ?? moment.tiers[h] : moment.tiers[h]
+    }
+
+    private func horizonChip(_ h: LandHorizon) -> some View {
+        let current = h == moment.span
+        let open = moment.extending == nil && moment.extendOptions.contains(h)
+        let chosen = pendingChoice == h
+        let bloom = bloomPiece(h)
+        let ink = chosen ? Theme.accentSoft : Theme.text
+        return Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            proposed = chosen ? nil : h
+        } label: {
+            HStack(spacing: 8) {
+                Group {
+                    if let art = bloom.flatMap({ TraderLandArt.thumb($0.id) }) {
+                        Image(uiImage: art).resizable().scaledToFit().scaleEffect(Self.thumbScale(bloom))
+                    } else {
+                        Image(systemName: h == .day ? "square.fill" : h == .threeDays ? "building.2.fill" : "building.columns.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(ink.opacity(0.8))
+                    }
+                }
+                .frame(width: 26, height: 26)
+                .background(Circle().fill(Theme.panel.opacity(0.9)))
+                .clipShape(Circle())
+                .saturation(current || chosen ? 1 : 0.55)
+                Text(Self.horizonLine(h))
+                    .font(.rounded(12, .bold))
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+                    .layoutPriority(1)
+                Spacer(minLength: 6)
+                if let bloom {
+                    Text(bloom.displayName)
+                        .font(.rounded(10.5, .medium))
+                        .foregroundStyle(Theme.text.opacity(0.58))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                Image(systemName: current ? "checkmark.circle.fill" : chosen ? "largecircle.fill.circle" : open ? "circle" : "lock.fill")
+                    .font(.system(size: current || chosen || open ? 13 : 9, weight: .bold))
+                    .foregroundStyle(current ? tone : chosen ? Theme.accent : Theme.muted)
+                    .frame(width: 15)
+            }
+            .padding(.leading, 4)
+            .padding(.trailing, 10)
+            .frame(height: 34)
+            .background(Capsule().fill(current ? tone.opacity(0.16) : chosen ? Theme.accent.opacity(0.07) : Theme.cardSoft))
+            // Dashed while it waits for its confirmation: proposed, not the seed's yet.
+            .overlay(Capsule().stroke(current ? tone.opacity(0.5) : chosen ? Theme.accentSoft.opacity(0.8) : Theme.stroke,
+                                      style: StrokeStyle(lineWidth: 1, dash: chosen ? [4, 3] : [])))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(HorizonChipStyle())
+        .disabled(!open)
+        // The seed's own horizon reads at full strength; closed ones step back.
+        .opacity(current || open || chosen ? 1 : 0.45)
+        .accessibilityIdentifier("harvest-horizon-\(Self.horizonKey(h))")
+        .accessibilityLabel(Self.horizonLine(h) + (bloom.map { " · \($0.displayName)" } ?? ""))
+        .accessibilityAddTraits(current ? .isSelected : [])
+    }
+
+    /// Stable test ids: 24h, 3d, 7d.
+    private static func horizonKey(_ h: LandHorizon) -> String {
+        switch h {
+        case .day: return "24h"
+        case .threeDays: return "3d"
+        case .week: return "7d"
+        }
+    }
+
+    /// The one confirmation: what the longer horizon earns, and that it cannot come back.
+    private func confirmStep(_ h: LandHorizon) -> some View {
+        let busy = moment.extending == h
+        let bloomLine: String
+        if let bloom = bloomPiece(h) {
+            bloomLine = L.t("It blooms into \(bloom.displayName) when you review it in \(h.label).",
+                            "Florece como \(bloom.displayName) cuando la revises en \(h.label).")
+        } else {
+            bloomLine = L.t("It blooms into a bigger piece when you review it in \(h.label).",
+                            "Florece como una pieza más grande cuando la revises en \(h.label).")
+        }
+        return VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(bloomLine)
+                    .font(.rounded(11.5, .medium))
+                    .foregroundStyle(Theme.text.opacity(0.78))
+                Text(L.t("You can't shorten it later.", "No se puede acortar después."))
+                    .font(.rounded(11.5, .bold))
+                    .foregroundStyle(Theme.cio)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .combine)
+            HStack(spacing: 12) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onExtend(h)
+                } label: {
+                    HStack(spacing: 6) {
+                        if busy { ProgressView().controlSize(.mini).tint(.white) }
+                        Text(busy ? L.t("Growing…", "Extendiendo…") : L.t("Grow to \(h.label)", "Extender a \(h.label)"))
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                    .font(.rounded(12.5, .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 13)
+                    .frame(height: 31)
+                    .background(Capsule().fill(Theme.accent.opacity(busy ? 0.6 : 1)))
+                }
+                .buttonStyle(.plain)
+                .disabled(busy)
+                .accessibilityIdentifier("harvest-horizon-confirm")
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    proposed = nil
+                } label: {
+                    Text(L.t("Keep \(moment.span.label)", "Dejar en \(moment.span.label)"))
+                        .font(.rounded(12.5, .semibold))
+                        .foregroundStyle(Theme.accentSoft)
+                        .lineLimit(1)
+                        .frame(height: 31)
+                }
+                .buttonStyle(.plain)
+                .disabled(busy)
+                .opacity(busy ? 0.4 : 1)
+                .accessibilityIdentifier("harvest-horizon-cancel")
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.panel.opacity(0.78)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Theme.accent.opacity(0.3), lineWidth: 1))
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     private func primary(_ label: String, arrow: Bool = true, _ action: @escaping () -> Void) -> some View {
@@ -435,30 +820,67 @@ struct HarvestCard: View {
 }
 
 #if DEBUG
-/// `-qa-harvest <seed|bloomed|capped|signedout|syncing|complete|pending|all>`:
-/// the harvest card states on a desk background, for screenshots. Fixture data, DEBUG only.
+/// `-qa-harvest <seed|picker|seed-3d|seed-7d|bloomed|capped|signedout|syncing|complete|pending|all>`:
+/// the harvest card states on a desk background, for screenshots and UI tests. `seed` is a
+/// server before Growth v1 (no horizon); `picker` is a fresh 24 h seed with its choice, and
+/// `seed-3d` / `seed-7d` are seeds already grown. Fixture data, DEBUG only: an extend here
+/// answers locally after a beat, through the same transitions as the desk.
 struct HarvestQAFixtureView: View {
     let state: String
+    /// Cards an extend changed, by fixture key.
+    @State private var grown: [String: HarvestMoment] = [:]
 
+    private typealias Piece = RouteGrant.Piece
     private static let thesis = AwardThesis.make(symbol: "BTC", isEquity: false, direction: "long", price: 64210.5, entry: 64000, stop: 62500, target: 67000)
-    private static let seedPiece = RouteGrant.Piece(id: "risk_reef_dual_orbit_antenna", world: "risk_reef", kind: "decor", nameEN: "Dual Orbit Antenna", footprint: [1, 1])
-    private static let bloomPiece = RouteGrant.Piece(id: "thesis_citadel_risk_shield", world: "thesis_citadel", kind: "decor", nameEN: "Risk Shield", footprint: [1, 1])
+    private static let seedPiece = Piece(id: "risk_reef_dual_orbit_antenna", world: "risk_reef", kind: "decor", nameEN: "Dual Orbit Antenna", footprint: [1, 1])
+    private static let bloomPiece = Piece(id: "thesis_citadel_risk_shield", world: "thesis_citadel", kind: "decor", nameEN: "Risk Shield", footprint: [1, 1])
+    /// The first building and landmark of their tier sequences (GROWTH-v1 §1).
+    private static let tiers: [LandHorizon: Piece] = [
+        .day: seedPiece,
+        .threeDays: Piece(id: "thesis_citadel_double_gate", world: "thesis_citadel", kind: "building", nameEN: "Double Gate", footprint: [2, 1]),
+        .week: Piece(id: "crypto_bay_waiting_lighthouse", world: "crypto_bay", kind: "landmark", nameEN: "Waiting Lighthouse", footprint: [2, 2]),
+    ]
 
-    private static func moment(_ key: String) -> HarvestMoment? {
-        switch key {
-        case "seed": return HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .seed(seedPiece))
-        case "bloomed": return HarvestMoment(eventID: "qa", noTrade: true, thesis: thesis, xp: 20, stage: .bloomed(bloomPiece))
-        case "capped": return HarvestMoment(eventID: nil, noTrade: false, thesis: thesis, xp: 0, stage: .capped)
-        case "signedout": return HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .signedOut(planted: true))
-        case "syncing": return HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .syncing)
-        case "complete": return HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .routeComplete)
-        case "pending": return HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .pending)
-        default: return nil
-        }
+    private static func horizon(_ h: LandHorizon) -> RouteGrant.Horizon {
+        RouteGrant.Horizon(hours: h, reviewAt: Date(timeIntervalSinceNow: Double(h.hours) * 3600), extendable: !h.upward.isEmpty, extendTo: h.upward)
     }
 
-    private var keys: [String] {
-        Self.moment(state) == nil ? ["syncing", "seed", "bloomed", "capped", "complete", "signedout", "pending"] : [state]
+    private static func seed(_ h: LandHorizon) -> HarvestMoment {
+        var moment = HarvestMoment(eventID: "qa-\(h.hours)", noTrade: false, thesis: thesis, xp: 10, stage: .seed(tiers[h] ?? seedPiece))
+        moment.inventoryID = "qa-inventory-\(h.hours)"
+        moment.horizon = horizon(h)
+        moment.tiers = tiers
+        return moment
+    }
+
+    /// Built once: a card keeps its identity across renders (its confirm step lives on it).
+    private static let fixtures: [String: HarvestMoment] = [
+        "seed": HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .seed(seedPiece)),
+        "picker": seed(.day),
+        "seed-3d": seed(.threeDays),
+        "seed-7d": seed(.week),
+        "bloomed": HarvestMoment(eventID: "qa", noTrade: true, thesis: thesis, xp: 20, stage: .bloomed(bloomPiece)),
+        "capped": HarvestMoment(eventID: nil, noTrade: false, thesis: thesis, xp: 0, stage: .capped),
+        "signedout": HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .signedOut(planted: true)),
+        "syncing": HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .syncing),
+        "complete": HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .routeComplete),
+        "pending": HarvestMoment(eventID: "qa", noTrade: false, thesis: thesis, xp: 10, stage: .pending),
+    ]
+    private static let order = ["syncing", "seed", "picker", "seed-3d", "seed-7d", "bloomed", "capped", "complete", "signedout", "pending"]
+
+    private var keys: [String] { Self.fixtures[state] == nil ? Self.order : [state] }
+
+    private func moment(_ key: String) -> HarvestMoment? { grown[key] ?? Self.fixtures[key] }
+
+    private func extend(_ key: String, to target: LandHorizon) {
+        guard let current = moment(key), let eventID = current.eventID, let inventoryID = current.inventoryID,
+              let started = current.startingExtend(to: target), let piece = Self.tiers[target] else { return }
+        grown[key] = started
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            let answer = DeskSeedExtender.Extended(inventoryID: inventoryID, item: piece, horizon: Self.horizon(target))
+            guard let settled = HarvestMoment.settlingExtend(grown[key], eventID: eventID, inventoryID: inventoryID, result: .success(answer)) else { return }
+            withAnimation(.spring(duration: 0.45, bounce: 0.2)) { grown[key] = settled }
+        }
     }
 
     var body: some View {
@@ -474,9 +896,9 @@ struct HarvestQAFixtureView: View {
                     }
                     .padding(.vertical, 6)
                     ForEach(keys, id: \.self) { key in
-                        if let m = Self.moment(key) {
+                        if let m = moment(key) {
                             Text(key.uppercased()).font(.mono(8, .bold)).kerning(1.4).foregroundStyle(Theme.muted)
-                            HarvestCard(moment: m, onOpen: { _ in }, onSaveProgress: {})
+                            HarvestCard(moment: m, onOpen: { _ in }, onSaveProgress: {}, onExtend: { extend(key, to: $0) })
                         }
                     }
                 }

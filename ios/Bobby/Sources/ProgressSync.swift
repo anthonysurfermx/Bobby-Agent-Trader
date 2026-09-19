@@ -1,7 +1,7 @@
 // Progress sync — the phone keeps working offline with the same XP rules;
 // when an account exists, every award is reported to /api/progress, which
 // re-applies the rules server-side and answers with the authoritative state
-// (XP, streak, aura, Discovery Route). Mirrors src/lib/companions/sync.ts.
+// (XP, streak, aura, the piece each award planted). Mirrors src/lib/companions/sync.ts.
 import Foundation
 import Combine
 
@@ -10,7 +10,7 @@ struct PendingAward: Codable, Equatable {
     let kind: String      // read_complete | no_trade_respected | thesis_closed
     let at: String        // ISO-8601
     let tzOffsetMin: Int
-    /// The read this award came from; its seed is reviewed against it in 24 h.
+    /// The read this award came from; its seed is reviewed against it when its horizon ends.
     /// Queues persisted before build 31 have none and still decode.
     var thesis: AwardThesis? = nil
 }
@@ -57,14 +57,73 @@ struct RouteGrant: Equatable {
         var displayName: String {
             L.isSpanish ? TraderLandCatalog.name(id, district: world) : (nameEN ?? TraderLandCatalog.name(id, district: world))
         }
+
+        /// Reads a PieceSummary `{ id, world, attribution, kind, name: { en, es }, footprint: [w, h] }`.
+        static func parse(_ raw: Any?) -> Piece? {
+            guard let i = raw as? [String: Any], let pid = i["id"] as? String else { return nil }
+            return Piece(id: pid, world: i["world"] as? String, kind: i["kind"] as? String,
+                         nameEN: (i["name"] as? [String: Any])?["en"] as? String,
+                         footprint: i["footprint"] as? [Int] ?? [1, 1])
+        }
     }
+
+    /// A seed's horizon as the server applied it (docs/trader-land/GROWTH-v1.md §3):
+    /// when its review opens and how far it may still grow. Servers before Growth v1 send none.
+    struct Horizon: Equatable {
+        let hours: LandHorizon
+        /// seeded_at + horizon: the review opens then.
+        let reviewAt: Date?
+        /// False once the review opened: the horizon is set.
+        let extendable: Bool
+        /// The upward horizons the server accepts (⊆ 72, 168).
+        let extendTo: [LandHorizon]
+
+        /// What the builder can pick right now: upward only, and only while extendable.
+        var options: [LandHorizon] { extendable ? extendTo.filter { $0.hours > hours.hours } : [] }
+
+        /// `{ hours: 24 | 72 | 168, tier, reviewAt, extendable, extendTo }`; nil when the hours are unknown.
+        static func parse(_ raw: Any?) -> Horizon? {
+            guard let h = raw as? [String: Any],
+                  let hours = (h["hours"] as? Int).flatMap(LandHorizon.init(rawValue:)) ?? (h["tier"] as? String).flatMap(LandHorizon.init(tier:))
+            else { return nil }
+            return Horizon(hours: hours, reviewAt: RouteGrant.date(h["reviewAt"] as? String),
+                           extendable: h["extendable"] as? Bool ?? false,
+                           extendTo: (h["extendTo"] as? [Int] ?? []).compactMap(LandHorizon.init(rawValue:)))
+        }
+    }
+
     let routeIndex: Int
     /// nil once the route is complete.
     let item: Piece?
     let inventoryId: String?
-    /// seed (a read, reviewable in 24 h) | bloomed (NO TRADE respected, buildable now) | nil
+    /// seed (a read, reviewable when its horizon ends) | bloomed (NO TRADE respected, buildable now) | nil
     let state: String?
     let routeComplete: Bool
+    /// A seed's horizon (a read plants at 24 h). nil for a bloomed piece or an older server.
+    var horizon: Horizon? = nil
+    /// What a 24 h / 3 days / 7 days horizon would bloom into: the desk's horizon preview.
+    var tiers: [LandHorizon: Piece] = [:]
+
+    /// `tiers: { common, building, landmark: PieceSummary }` keyed by horizon; unknown tiers are skipped.
+    static func parseTiers(_ raw: Any?) -> [LandHorizon: Piece] {
+        guard let t = raw as? [String: Any] else { return [:] }
+        var out: [LandHorizon: Piece] = [:]
+        for (tier, summary) in t {
+            guard let horizon = LandHorizon(tier: tier), let piece = Piece.parse(summary) else { continue }
+            out[horizon] = piece
+        }
+        return out
+    }
+
+    /// The server's ISO timestamps, with or without milliseconds.
+    static func date(_ iso: String?) -> Date? {
+        guard let iso else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: iso) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: iso)
+    }
 }
 
 /// What /api/progress did with one queued award.
@@ -89,14 +148,11 @@ struct AwardOutcome: Equatable {
             if let raw = r["world"] {
                 // null (or anything unreadable) = the grant failed on the server.
                 if let w = raw as? [String: Any] {
-                    let item = (w["item"] as? [String: Any]).flatMap { i -> RouteGrant.Piece? in
-                        guard let pid = i["id"] as? String else { return nil }
-                        return RouteGrant.Piece(id: pid, world: i["world"] as? String, kind: i["kind"] as? String,
-                                                nameEN: (i["name"] as? [String: Any])?["en"] as? String,
-                                                footprint: i["footprint"] as? [Int] ?? [1, 1])
-                    }
-                    grant = .planted(RouteGrant(routeIndex: w["routeIndex"] as? Int ?? 0, item: item, inventoryId: w["inventoryId"] as? String,
-                                                state: w["state"] as? String, routeComplete: w["routeComplete"] as? Bool ?? false))
+                    // Growth v1 adds `horizon` (a seed's) and `tiers` (the horizon preview); both optional.
+                    grant = .planted(RouteGrant(routeIndex: w["routeIndex"] as? Int ?? 0, item: RouteGrant.Piece.parse(w["item"]),
+                                                inventoryId: w["inventoryId"] as? String, state: w["state"] as? String,
+                                                routeComplete: w["routeComplete"] as? Bool ?? false,
+                                                horizon: RouteGrant.Horizon.parse(w["horizon"]), tiers: RouteGrant.parseTiers(w["tiers"])))
                 } else {
                     grant = .failed
                 }

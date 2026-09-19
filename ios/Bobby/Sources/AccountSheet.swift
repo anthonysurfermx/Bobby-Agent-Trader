@@ -6,6 +6,8 @@ import SwiftUI
 struct AccountSheet: View {
     @ObservedObject var store: CompanionStore
     @ObservedObject var profile: AgentProfile
+    /// Pieces the account holds on Trader Land (the desk's island read); nil = unknown.
+    var pieces: Int? = nil
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
     @State private var busy = false
@@ -28,7 +30,8 @@ struct AccountSheet: View {
                 stat(L.t("XP", "XP"), "\(store.disciplineXP)")
                 stat(L.t("Streak", "Racha"), "\(store.disciplineStreak)")
                 stat(L.t("Aura", "Aura"), "\(store.aura)")
-                stat(L.t("Route", "Ruta"), "\(store.routeIndex)/8")
+                // Pieces repeat and the island grows: no fixed route to count against.
+                stat(L.t("Pieces", "Piezas"), pieces.map { "\($0)" } ?? "—")
             }
             if !store.pendingAwards.isEmpty {
                 Text(L.t("\(store.pendingAwards.count) award(s) waiting to sync", "\(store.pendingAwards.count) premio(s) por sincronizar")).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.muted)
