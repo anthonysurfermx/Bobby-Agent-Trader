@@ -47,7 +47,7 @@ jobs:
       - run: npm run test:mcp-payment-transport
       - run: npm run build
       - run: npm run lint -- --quiet
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --audit-level=high
 
   # BP-06: the suites that need a real Postgres (RLS lock-down, swap ledger,
   # agent-registry CAS) and a real EVM (backend ABI vs compiled artifact). The

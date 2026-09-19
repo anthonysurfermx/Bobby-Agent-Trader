@@ -36,6 +36,7 @@ La respuesta del CIO distingue **esperar** de **una idea que merece más investi
 - Análisis real de BTC y NVDA: datos públicos y tres llamadas reales al modelo; respuestas completas en aproximadamente 7 y 4 segundos. BTC utilizó OKX; NVDA, Yahoo. Evidencia guardada en `output/audit-remediation/live-*.json`.
 - Archivo nativo Release firmado `output/audit-remediation/Bobby-1.2-33.xcarchive` creado correctamente (1.2, build 33). No exportado ni enviado a App Store Connect.
 - `npm run build`, comprobación TypeScript de API, lint de los archivos de producción modificados y validación del manifiesto de privacidad pasan.
+- Dependencias de desarrollo: Vite 6.4.3, js-yaml 4.3.2 y versiones corregidas de undici/path-to-regexp para las herramientas de Vercel. Auditoría completa: **0 altas, 0 críticas; 26 moderadas pendientes** (dependencias transitivas, documentadas en `output/audit-remediation/dependency-audit-all.json`). No se afirma ausencia total de vulnerabilidades.
 - Nuevas regresiones incorporadas a CI; la integración PostgreSQL tiene un servicio aislado propio.
 
 Los tests de Apple usan claves sintéticas y firmas válidas generadas durante la prueba. No sustituyen una prueba de inicio y borrado con una cuenta Apple real. Los tests de interfaz de la isla usan datos locales de QA; las transacciones del servidor se verificaron por separado en PostgreSQL real.
@@ -54,3 +55,5 @@ Los tests de Apple usan claves sintéticas y firmas válidas generadas durante l
 
 - [App Review Guidelines: contenido generado por usuarios y privacidad](https://developer.apple.com/app-store/review/guidelines/).
 - [TN3194: borrado de cuenta y revocación de Sign in with Apple](https://developer.apple.com/documentation/technotes/tn3194-handling-account-deletions-and-revoking-tokens-for-sign-in-with-apple).
+
+Las actualizaciones de herramientas corrigen, entre otras, [la lectura de archivos por rutas alternativas en Vite para Windows](https://github.com/vitejs/vite/security/advisories/GHSA-fx2h-pf6j-xcff) y [el consumo de CPU por combinaciones YAML](https://github.com/nodeca/js-yaml/security/advisories/GHSA-2883-xcg3-v3hh).
