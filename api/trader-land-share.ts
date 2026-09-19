@@ -5,7 +5,8 @@
 //         and picture, so iMessage / WhatsApp / X show the island itself
 //   GET /api/trader-land-share?code=<code>&img=1 → the 1200×630 PNG card
 // Read-only and public like /api/trader-land-public: the card carries the
-// builder's chosen title and the art positions, never who built the island.
+// builder's chosen title and the art positions (the island's size and its
+// core, dormant or awake, where the builder put it), never who built it.
 // A private or unknown code gets the untouched shell (the app explains it).
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -15,6 +16,7 @@ import { join } from 'node:path';
 import { ImageResponse } from '@vercel/og';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { placementsFor, PUBLIC_LAND_COLUMNS, SHARE_CODE, type PublicLandRow } from './_lib/trader-land.js';
+import { coreOf } from './_lib/trader-land-growth.js';
 import { CARD, SITE, VISIT_PATH, cardCopy, cardElement, cardVersion, islandStats, langFrom, withIslandMeta, type CardIsland, type ManifestItem } from './_lib/trader-land-card.js';
 
 export const config = { maxDuration: 15 };
@@ -46,7 +48,7 @@ async function publicIsland(code: string): Promise<CardIsland | null> {
   const row = ((await r.json()) as PublicLandRow[])[0];
   if (!row) return null;
   const placements = (await placementsFor([row.identity_id])).get(row.identity_id) ?? [];
-  return { code, title: row.title, size: row.size, placements };
+  return { code, title: row.title, size: row.size, core: coreOf(row), placements };
 }
 
 /** This deployment's public origin (production: bobbyprotocol.xyz). */

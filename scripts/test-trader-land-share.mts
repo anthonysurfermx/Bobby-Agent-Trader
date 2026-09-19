@@ -1,14 +1,17 @@
 // ============================================================
 // scripts/test-trader-land-share.mts
 // Tests for the link preview of a published island:
-//   · api/_lib/trader-land-card.ts — copy, version, meta injection + escaping
+//   · api/_lib/trader-land-card.ts — copy, version (size + core), meta
+//     injection + escaping, the picture's geometry at every island size and
+//     the core where the land keeps it, dormant or awake
 //   · api/trader-land-share.ts     — page/image/fallback paths, with the
 //     database and the app shell stubbed (no network, no production data)
 // Run: `npx tsx scripts/test-trader-land-share.mts`
 // ============================================================
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { cardCopy, cardVersion, escapeHtml, islandStats, langFrom, withIslandMeta, type CardIsland, type ManifestItem } from '../api/_lib/trader-land-card.ts';
+import { artState, cardCopy, cardCore, cardVersion, escapeHtml, islandSprites, islandStats, langFrom, withIslandMeta, type CardIsland, type ManifestItem } from '../api/_lib/trader-land-card.ts';
+import { DORMANT_CORE_SCALE, landGeometry, spriteFrame } from '../src/lib/trader-land/geometry.ts';
 
 const failures: string[] = [];
 let passed = 0;
@@ -39,6 +42,39 @@ const v1 = cardVersion(anthony, sha);
 assert(v1 === cardVersion({ ...anthony, placements: [...anthony.placements].reverse() }, sha), 'version ignores placement order');
 assert(v1 !== cardVersion({ ...anthony, placements: [{ ...anthony.placements[0], x: 6 }, anthony.placements[1]] }, sha), 'moving a piece changes the version');
 assert(v1 !== cardVersion({ ...anthony, title: 'Otra' }, sha), 'renaming changes the version');
+assert(v1 === cardVersion({ ...anthony, core: { x: 3, y: 3, stage: 1 } }, sha), 'an island without a core (older server) is the 3,3 awake core');
+assert(v1 !== cardVersion({ ...anthony, core: { x: 0, y: 5, stage: 1 } }, sha), 'moving the core changes the version');
+assert(v1 !== cardVersion({ ...anthony, core: { x: 3, y: 3, stage: 0 } }, sha), 'a dormant core changes the version');
+assert(v1 !== cardVersion({ ...anthony, size: 10 }, sha), 'a grown island changes the version');
+
+// ---------- picture geometry ----------
+{
+  // An 8×8 card draws exactly what it drew before growth: tile 92×46, origin 430,230.
+  const dock = items.get('crypto_bay_data_dock')!;
+  const state = artState(dock)!;
+  const [x0, , x1] = state.contentBounds;
+  const oldSize = Math.min(360, 92 * 2 / 2 * 0.9 / Math.max(0.2, x1 - x0));
+  const oldCenter = { x: 430 + (5 - 3) * 46, y: 230 + (5 + 3) * 23 };
+  const oldGround = oldCenter.y + 46 * 2 / 4;
+  const f = spriteFrame(landGeometry(8), dock.footprint, 5, 3, 0, state);
+  assert(Math.abs(f.size - oldSize) < 1e-9 && Math.abs(f.x - (oldCenter.x + oldSize * (0.5 - state.anchor[0]) - oldSize / 2)) < 1e-9 && Math.abs(f.y - (oldGround + oldSize * (0.5 - state.anchor[1]) - oldSize / 2)) < 1e-9, '8×8 frames are unchanged');
+
+  const coreSprite = (island: CardIsland) => islandSprites(island, items).find((sp) => sp.item.id === 'aura_core')!;
+  const awake = coreSprite(anthony);
+  assert(awake.col === 3 && awake.row === 3 && awake.scale === 1 && awake.state === artState(items.get('aura_core')!, 1), 'no core in the payload: 3,3, stage-1 art, full size');
+  const dormant = coreSprite({ ...anthony, core: { x: 0, y: 5, stage: 0 } });
+  const stage0 = Object.values(items.get('aura_core')!.orientations)[0].states.stage0;
+  assert(dormant.col === 0 && dormant.row === 5, 'the core is drawn where the land keeps it');
+  assert(dormant.state === stage0 && dormant.scale === DORMANT_CORE_SCALE, 'a dormant core uses the stage-0 art at 72 %');
+  const geom10 = landGeometry(10);
+  const grown: CardIsland = { ...anthony, size: 10, core: { x: 4, y: 4, stage: 1 }, placements: anthony.placements.map((p) => ({ ...p, x: p.x + 1, y: p.y + 1 })) };
+  const sprites10 = islandSprites(grown, items);
+  const dock10 = sprites10.find((sp) => sp.item.id === 'crypto_bay_data_dock')!;
+  assert(dock10.col === 6 && dock10.row === 4 && Math.abs(dock10.depth - spriteFrame(geom10, dock.footprint, 6, 4, 0, state).depth) < 1e-9, 'a 10×10 island paints with the 10×10 geometry');
+  assert(geom10.tileW < 92 && Math.abs(geom10.diamond(0, 0, 10, 10).split(' ')[0].split(',').map(Number)[1] - 207) < 1e-9, 'smaller tiles, same slab');
+  assert(sprites10.every((sp, i) => i === 0 || sprites10[i - 1].depth <= sp.depth), 'paint order by depth');
+  assert(cardCore({ code: 'x', title: null, size: 8, placements: [], core: { x: 1, y: 2, stage: 7 } }).stage === 1, 'any stage but 0 is awake');
+}
 
 // ---------- meta injection ----------
 const meta = { title: es.title, description: es.description, url: 'https://bobbyprotocol.xyz/agentic-world/bobby/trader-land/w/np4dl6dyys', image: 'https://bobbyprotocol.xyz/api/trader-land-share?code=np4dl6dyys&img=1&lang=es&v=abc', alt: es.alt, locale: 'es_MX' };
@@ -68,8 +104,8 @@ assert(escapeHtml(`&<>"'`) === '&amp;&lt;&gt;&quot;&#39;', 'escapeHtml covers th
 // ---------- handler ----------
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-key';
-type Row = { identity_id: string; size: number; theme: string; title: string | null; published_at: string | null; share_code: string | null };
-let lands: Row[] = [{ identity_id: '11111111-1111-1111-1111-111111111111', size: 8, theme: 'default', title: 'Anthony Land', published_at: '2026-09-18T00:00:00Z', share_code: 'np4dl6dyys' }];
+type Row = { identity_id: string; size: number; theme: string; title: string | null; published_at: string | null; share_code: string | null; core_x: number; core_y: number; core_stage: number };
+let lands: Row[] = [{ identity_id: '11111111-1111-1111-1111-111111111111', size: 8, theme: 'default', title: 'Anthony Land', published_at: '2026-09-18T00:00:00Z', share_code: 'np4dl6dyys', core_x: 0, core_y: 5, core_stage: 0 }];
 let shellStatus = 200;
 const requested: string[] = [];
 globalThis.fetch = (async (input: string | URL) => {
@@ -108,6 +144,10 @@ assert(visit.status === 200 && visit.headers['content-type']?.startsWith('text/h
 const html = String(visit.body);
 assert(html.includes('<title>Anthony Land · Trader Land</title>'), 'served page carries the island title');
 assert(/og:image" content="https:\/\/bobbyprotocol\.xyz\/api\/trader-land-share\?code=np4dl6dyys&amp;img=1&amp;lang=es&amp;v=[0-9a-f]{12}"/.test(html), 'served og:image is the versioned island card');
+const servedPlacements = [{ item_id: 'crypto_bay_data_dock', x: 5, y: 3, rotation: 0 }, { item_id: 'crypto_bay_water_walkway', x: 0, y: 7, rotation: 0 }];
+const withCore = cardVersion({ code: 'np4dl6dyys', title: 'Anthony Land', size: 8, core: { x: 0, y: 5, stage: 0 }, placements: servedPlacements }, sha);
+assert(html.includes(`v=${withCore}"`), 'the served version carries the land\'s core (moved, dormant)');
+assert(requested.some((u) => u.includes('tl_lands') && u.includes('core_x,core_y,core_stage')), 'the public land read selects the core');
 assert(html.includes('2 piezas · 1 distrito'), 'served description counts the real placements');
 assert(visit.headers['vary'] === 'Accept-Language', 'language varies the cache');
 
@@ -124,6 +164,10 @@ const png = image.body as Buffer;
 assert(image.status === 200 && image.headers['content-type'] === 'image/png', `the card renders (${image.status})`);
 assert(Buffer.isBuffer(png) && png.subarray(1, 4).toString() === 'PNG' && png.length > 50_000, 'the card is a real PNG with the art in it');
 assert(/s-maxage=604800/.test(image.headers['cache-control'] ?? ''), 'the versioned card caches long');
+lands = [{ ...lands[0], size: 12, core_x: 5, core_y: 5, core_stage: 1 }];
+const grownImage = await call({ code: 'np4dl6dyys', img: '1', lang: 'en' });
+assert(grownImage.status === 200 && Buffer.isBuffer(grownImage.body) && (grownImage.body as Buffer).length > 50_000, `a 12×12 island renders its card (${grownImage.status})`);
+lands = [{ ...lands[0], size: 8, core_x: 0, core_y: 5, core_stage: 0 }];
 const noImage = await call({ code: 'zzzzzzzzzz', img: '1' });
 assert(noImage.status === 404, 'no card for an unpublished island');
 const badImage = await call({ code: 'nope', img: '1' });

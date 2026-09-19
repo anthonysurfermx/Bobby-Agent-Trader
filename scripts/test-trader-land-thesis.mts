@@ -2,14 +2,20 @@
 // scripts/test-trader-land-thesis.mts
 // Unit tests for the thesis loop that blooms Trader Land seeds:
 //   · api/_lib/progress-rules.ts — the daily cap bounds plants, not closes
-//   · api/_lib/thesis-rules.ts   — review window, verdict from public price,
-//                                  tolerant thesis parsing
+//   · api/_lib/thesis-rules.ts   — review window, horizons (24/72/168 h, extend
+//                                  upward only before the review), verdict from
+//                                  public price, tolerant thesis parsing
+//   · api/_lib/trader-land-growth.ts — tier sequences (checked against the
+//                                  migration's backfill), wrap, released slots,
+//                                  growth thresholds, the core on the land
 // Run: `npx tsx scripts/test-trader-land-thesis.mts`
 // Zero runtime deps beyond tsx — same pattern as test-risk-gate.mts.
 // ============================================================
 
 import { applyAward, AWARD_POINTS, EXECUTION_BONUS, MAX_DAILY_AWARDS, type ProgressCounters } from '../api/_lib/progress-rules.ts';
-import { resolveThesis, reviewAt, swapAsset, swapExecutesThesis, thesisFrom, THESIS_REVIEW_HOURS, ThesisSchema, type SwapCandidate, type Thesis } from '../api/_lib/thesis-rules.ts';
+import { readFileSync } from 'node:fs';
+import { HORIZONS, horizonHours, resolveThesis, reviewAt, seedHorizon, swapAsset, swapExecutesThesis, thesisFrom, THESIS_REVIEW_HOURS, ThesisSchema, type SwapCandidate, type Thesis, type Tier } from '../api/_lib/thesis-rules.ts';
+import { CORE_CELLS, LEGACY_ROUTE_CAP, TIER_FOOTPRINT, TIER_HOURS, TIER_ORDER, coreCellKeys, coreOf, growthOf, heldByTier, nextInTier, pieceCells, tierSequence } from '../api/_lib/trader-land-growth.ts';
 import { SEASON, seasonProgress } from '../api/_lib/trader-land-season.ts';
 
 const failures: string[] = [];
@@ -53,6 +59,81 @@ const eq = (a: unknown, b: unknown, msg: string) => assert(JSON.stringify(a) ===
 {
   eq(THESIS_REVIEW_HOURS, 24, 'review window is one day');
   eq(reviewAt('2026-09-04T10:00:00.000Z'), '2026-09-05T10:00:00.000Z', 'reviewAt = seeded + window');
+}
+
+// ---------- horizons (GROWTH-v1 §1.2) ----------
+{
+  const seeded = '2026-09-04T10:00:00.000Z';
+  eq(HORIZONS, { 24: 'common', 72: 'building', 168: 'landmark' }, 'each horizon picks a tier');
+  eq(reviewAt(seeded, 72), '2026-09-07T10:00:00.000Z', 'a 3-day seed is reviewed 72 h after it was planted');
+  eq(reviewAt(seeded, 168), '2026-09-11T10:00:00.000Z', 'a 7-day seed is reviewed a week after it was planted');
+  eq([horizonHours(72), horizonHours('168'), horizonHours(null), horizonHours(48), horizonHours(undefined)], [72, 168, 24, 24, 24], 'stored horizons read defensively, default 24 h');
+
+  const at = Date.parse(seeded);
+  const fresh = seedHorizon(seeded, 24, 'seed', at + 60_000);
+  eq(fresh, { hours: 24, tier: 'common', reviewAt: '2026-09-05T10:00:00.000Z', extendable: true, extendTo: [72, 168] }, 'a fresh seed can wait 3 or 7 days');
+  eq(seedHorizon(seeded, 72, 'seed', at).extendTo, [168], 'a 3-day seed can only go to 7 days');
+  eq(seedHorizon(seeded, 72, 'seed', at).tier, 'building', 'a 3-day seed is a building');
+  eq(seedHorizon(seeded, 168, 'seed', at), { hours: 168, tier: 'landmark', reviewAt: '2026-09-11T10:00:00.000Z', extendable: false, extendTo: [] }, 'a 7-day seed cannot grow further');
+  eq(seedHorizon(seeded, 24, 'seed', Date.parse('2026-09-05T09:59:59.999Z')).extendable, true, 'one ms before the review it can still grow');
+  eq(seedHorizon(seeded, 24, 'seed', Date.parse('2026-09-05T10:00:00.000Z')), { ...fresh, extendable: false, extendTo: [] }, 'at the review moment it can no longer grow');
+  eq(seedHorizon(seeded, 72, 'seed', Date.parse('2026-09-06T10:00:00.000Z')).extendable, true, 'a 3-day seed still grows on day 2');
+  eq(seedHorizon(seeded, 24, 'bloomed', at).extendable, false, 'a bloomed piece keeps its horizon but never grows');
+  for (const option of seedHorizon(seeded, 24, 'seed', at).extendTo) assert(option === 72 || option === 168, 'extendTo ⊆ [72, 168]');
+}
+
+// ---------- tier sequences: the migration's backfill is the source (GROWTH-v1 §1.3) ----------
+{
+  const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql', 'utf8');
+  const items = [...migration.matchAll(/\('([a-z_]+)',\s*'(common|building|landmark)',\s*(\d+)\)/g)].map((m) => ({ id: m[1], tier: m[2], tier_index: Number(m[3]) }));
+  eq(items.length, 25, 'the migration tiers 25 pieces');
+  eq(TIER_ORDER.map((t) => tierSequence(items, t).length), [15, 5, 5], '15 common, 5 buildings, 5 landmarks');
+  eq(tierSequence(items, 'common').slice(0, 3).map((i) => i.id), ['crypto_bay_data_dock', 'crypto_bay_water_walkway', 'risk_reef_dual_orbit_antenna'], 'common starts with the old route pieces');
+  eq(tierSequence(items, 'building')[0].id, 'thesis_citadel_double_gate', 'building #1 is the Double Gate');
+  eq(tierSequence(items, 'landmark')[0].id, 'crypto_bay_waiting_lighthouse', 'landmark #1 is the Waiting Lighthouse');
+  eq(tierSequence([...items].reverse(), 'building').map((i) => i.id), tierSequence(items, 'building').map((i) => i.id), 'the order is tier_index, not catalog order');
+  const common = tierSequence(items, 'common');
+  eq(nextInTier(common, 0)?.id, common[0].id, 'n = 0 → #1');
+  eq(nextInTier(common, 14)?.id, common[14].id, 'n = 14 → #15');
+  eq(nextInTier(common, 15)?.id, common[0].id, 'n = 15 wraps to #1');
+  eq(nextInTier(common, 31)?.id, common[1].id, 'and keeps repeating in the open');
+  eq(nextInTier([], 3), null, 'an empty tier has no next piece');
+  eq(TIER_HOURS, { common: 24, building: 72, landmark: 168 }, 'tiers map back to horizons');
+  eq(TIER_FOOTPRINT, { common: [1, 1], building: [2, 1], landmark: [2, 2] }, 'tier footprints');
+
+  const tierOf = new Map(items.map((i) => [i.id, i.tier]));
+  const row = (id: string, source = 'route') => ({ source, tier: tierOf.get(id) });
+  eq(heldByTier([row(common[0].id), row(common[1].id), row('crypto_bay_candle_tower', 'season'), row('crypto_bay_waiting_lighthouse')]), { common: 2, building: 0, landmark: 1 }, 'season pieces never count toward n');
+  // A seed extended from common to building left its common slot: the next common read gets it again.
+  const before = [row(common[0].id), row(common[1].id)];
+  const after = [row(common[0].id), row('thesis_citadel_double_gate')];
+  eq(nextInTier(common, heldByTier(before).common)?.id, common[2].id, 'two commons held → #3 next');
+  eq(nextInTier(common, heldByTier(after).common)?.id, common[1].id, 'extending #2 releases its slot → #2 next');
+  eq(heldByTier(after).building, 1, 'the extended seed counts as a building now');
+
+  // The API's thresholds are the database's.
+  const sql = migration.match(/v_threshold := case v_land\.size (.*?) end;/)?.[1] ?? '';
+  const nextSql = migration.match(/v_next := case v_land\.size (.*?) end;/)?.[1] ?? '';
+  for (const [size, next, threshold] of [[8, 10, 39], [10, 12, 60], [12, 16, 87]]) {
+    eq(growthOf(size, 0), { occupied: 0, threshold, nextSize: next }, `growth step of ${size}×${size}`);
+    assert(sql.includes(`when ${size} then ${threshold}`) && nextSql.includes(`when ${size} then ${next}`), `tl_grow_land uses the same step for ${size}`);
+  }
+  eq(growthOf(16, 200), { occupied: 200, threshold: null, nextSize: null }, '16×16 is the last size');
+  eq(LEGACY_ROUTE_CAP, 8, 'the legacy route counter stops at 8 (iOS 1.1 shows n/8)');
+}
+
+// ---------- the core on the land ----------
+{
+  eq(coreOf({}), { x: 3, y: 3, stage: 1 }, 'an older land row is today\'s core: 3,3, awake');
+  eq(coreOf({ core_x: 0, core_y: 5, core_stage: 0 }), { x: 0, y: 5, stage: 0 }, 'the stored core');
+  eq(coreCellKeys({ x: 4, y: 4 }).sort(), ['4:4', '4:5', '5:4', '5:5'], 'the core reserves its 2×2');
+  eq(CORE_CELLS, 4, 'four core cells count as occupied');
+  eq(pieceCells({ w: 2, h: 1 }, 1, 4, 90).sort(), ['1:4', '1:5'], 'a rotated 2×1 stands on 1×2');
+  eq(pieceCells({ w: 2, h: 2 }, 0, 2, 0).length, 4, 'a landmark covers four cells');
+  const growth = growthOf(8, 4 + 35);
+  assert(growth.threshold !== null && growth.occupied >= growth.threshold, '35 piece cells + the core reach the 8×8 threshold');
+  const tiers: Tier[] = ['common', 'building', 'landmark'];
+  eq(TIER_ORDER, tiers, 'tiers in contract order');
 }
 
 // ---------- verdicts ----------

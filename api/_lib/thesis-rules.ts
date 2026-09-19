@@ -4,7 +4,10 @@
 // test replays them without a database or a market.
 //
 //   · a read stores the desk's verdict as a THESIS in the plant event's meta
-//   · a seed can be reviewed once THESIS_REVIEW_HOURS have passed
+//   · a seed can be reviewed once its HORIZON has passed: 24 h by default
+//     (THESIS_REVIEW_HOURS), 72 h or 168 h when the builder extended it —
+//     upward only, only before the review opens; the horizon picks the tier
+//     of the piece it blooms (GROWTH-v1 §1), never the verdict
 //   · the verdict is `hit` past the target, `invalidated` past the stop and
 //     `expired` when the window closed without touching a level; XP and Aura
 //     are identical for the three — the P&L never enters (SYSTEM-DESIGN v0.2)
@@ -30,10 +33,37 @@ export const ThesisSchema = z.object({
 export type Thesis = z.infer<typeof ThesisSchema>;
 export type ThesisOutcome = 'hit' | 'invalidated' | 'expired';
 
-/** A seed can be reviewed once the market had time to answer. */
+/** A seed can be reviewed once the market had time to answer: the plant-time horizon (and the legacy window). */
 export const THESIS_REVIEW_HOURS = 24;
-export function reviewAt(seededAt: string): string {
-  return new Date(Date.parse(seededAt) + THESIS_REVIEW_HOURS * 3_600_000).toISOString();
+
+/** Patience decides the piece: each horizon blooms a piece of its tier. */
+export const HORIZONS = { 24: 'common', 72: 'building', 168: 'landmark' } as const;
+export type HorizonHours = keyof typeof HORIZONS;
+export type Tier = (typeof HORIZONS)[HorizonHours];
+export const HORIZON_HOURS: readonly HorizonHours[] = [24, 72, 168];
+
+/** A stored horizon, read defensively: anything but 72 / 168 is the default 24 h. */
+export function horizonHours(raw: unknown): HorizonHours {
+  const hours = Number(raw);
+  return hours === 72 || hours === 168 ? hours : THESIS_REVIEW_HOURS;
+}
+
+export function reviewAt(seededAt: string, hours: number = THESIS_REVIEW_HOURS): string {
+  return new Date(Date.parse(seededAt) + hours * 3_600_000).toISOString();
+}
+
+/** A seed's horizon as clients see it (GROWTH-v1 §3 `inventory[i].horizon`). */
+export interface SeedHorizon { hours: HorizonHours; tier: Tier; reviewAt: string; extendable: boolean; extendTo: HorizonHours[] }
+
+/** The horizon once its review moment is known: a seed can still grow while its review has not opened. */
+export function horizonAt(hours: unknown, at: string, state: 'seed' | 'bloomed', now = Date.now()): SeedHorizon {
+  const h = horizonHours(hours);
+  const extendTo = state === 'seed' && now < Date.parse(at) ? HORIZON_HOURS.filter((option) => option > h) : [];
+  return { hours: h, tier: HORIZONS[h], reviewAt: at, extendable: extendTo.length > 0, extendTo };
+}
+
+export function seedHorizon(seededAt: string, hours: unknown, state: 'seed' | 'bloomed', now = Date.now()): SeedHorizon {
+  return horizonAt(hours, reviewAt(seededAt, horizonHours(hours)), state, now);
 }
 
 /** The thesis stored in a plant event's meta, or null when the read carried none (older seeds, iOS). */

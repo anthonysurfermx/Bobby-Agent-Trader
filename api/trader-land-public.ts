@@ -3,7 +3,8 @@
 //   GET ?code=<share code> → { world, catalog }   one published island
 //   GET                    → { worlds, catalog }  the latest published islands
 // Public and read-only. The response carries the builder's chosen title and
-// the art positions, never who built the island. An island leaves the moment
+// the art positions — the island's size and its core { x, y, stage } too
+// (GROWTH-v1) — never who built the island. An island leaves the moment
 // its builder unpublishes it (visibility flips to private; the code is kept so
 // a re-publish restores the same link).
 // ============================================================
