@@ -1,71 +1,74 @@
 // A still, read-only render of an island: the same isometric grid, art anchors
 // and path filaments as the studio, drawn as one SVG so a gallery can show many.
+// A grown island (10/12/16) packs smaller tiles into the same slab
+// (src/lib/trader-land/geometry.ts); its Aura Core sits where its builder moved it.
+import { CORE_FOOTPRINT, DORMANT_CORE_SCALE, landGeometry, spriteFrame } from '@/lib/trader-land/geometry';
+import { landCore } from '@/lib/trader-land/growth';
 import { artOf, type LandManifest, type ManifestItem, type PublicPlacement } from '@/lib/trader-land/public';
 
-const TILE_W = 92;
-const TILE_H = 46;
-const ORIGIN_X = 430;
-const ORIGIN_Y = 230;
-const iso = (col: number, row: number) => ({ x: ORIGIN_X + (col - row) * TILE_W / 2, y: ORIGIN_Y + (col + row) * TILE_H / 2 });
-const diamond = (col: number, row: number) => {
-  const { x, y } = iso(col, row);
-  return `${x},${y - TILE_H / 2} ${x + TILE_W / 2},${y} ${x},${y + TILE_H / 2} ${x - TILE_W / 2},${y}`;
-};
 type Connector = 'NE' | 'SE' | 'SW' | 'NW';
-const connectorOffset: Record<Connector, [number, number]> = { NE: [TILE_W / 4, -TILE_H / 4], SE: [TILE_W / 4, TILE_H / 4], SW: [-TILE_W / 4, TILE_H / 4], NW: [-TILE_W / 4, -TILE_H / 4] };
+/** Filament ends on a path slab's top face, as fractions of the face box (share card, studio). */
+const connectorEnd: Record<Connector, [number, number]> = { NE: [0.75, 0.25], SE: [0.75, 0.75], SW: [0.25, 0.75], NW: [0.25, 0.25] };
 
-type Sprite = { key: string; item: ManifestItem; col: number; row: number; flipped: boolean; depth: number };
+type Sprite = { key: string; item: ManifestItem; col: number; row: number; rotation: number; path: boolean; state?: string; scale?: number; connectors: Connector[] };
 
-export default function IslandThumb({ placements, manifest, size = 8, title, className }: { placements: PublicPlacement[]; manifest: LandManifest; size?: number; title?: string; className?: string }) {
+export default function IslandThumb({ placements, manifest, size = 8, core: rawCore, title, className }: { placements: PublicPlacement[]; manifest: LandManifest; size?: number; core?: { x: number; y: number; stage: 0 | 1 } | null; title?: string; className?: string }) {
   const items = new Map(manifest.items.map((item) => [item.id, item]));
-  const n = Math.max(1, Math.min(16, size));
-  const sprites: Sprite[] = [];
+  const geom = landGeometry(size);
+  const core = landCore(rawCore, geom.size);
+  const u = geom.unit;
   const pathCells = new Set<string>();
+  for (const p of placements) if (items.get(p.item_id)?.kind === 'path_pavement') pathCells.add(`${p.x}:${p.y}`);
+  const sprites: Sprite[] = [];
   for (const p of placements) {
     const item = items.get(p.item_id);
     if (!item) continue;
-    const flipped = p.rotation % 180 === 90;
-    const cols = flipped ? item.footprint.rows : item.footprint.cols;
-    const rows = flipped ? item.footprint.cols : item.footprint.rows;
-    if (item.kind === 'path_pavement') pathCells.add(`${p.x}:${p.y}`);
-    sprites.push({ key: `${p.item_id}-${p.x}-${p.y}`, item, col: p.x, row: p.y, flipped, depth: iso(p.x + (cols - 1) / 2, p.y + (rows - 1) / 2).y });
+    const path = item.kind === 'path_pavement';
+    const connectors: Connector[] = [];
+    if (path) {
+      if (pathCells.has(`${p.x}:${p.y - 1}`)) connectors.push('NE');
+      if (pathCells.has(`${p.x + 1}:${p.y}`)) connectors.push('SE');
+      if (pathCells.has(`${p.x}:${p.y + 1}`)) connectors.push('SW');
+      if (pathCells.has(`${p.x - 1}:${p.y}`)) connectors.push('NW');
+      if (!connectors.length) connectors.push(...((p.rotation % 180 === 90 ? ['NW', 'SE'] : ['NE', 'SW']) as Connector[]));
+    }
+    sprites.push({ key: `${p.item_id}-${p.x}-${p.y}`, item, col: p.x, row: p.y, rotation: p.rotation, path, connectors });
   }
-  const core = items.get('aura_core');
-  if (core) sprites.push({ key: 'core', item: core, col: 3, row: 3, flipped: false, depth: iso(3.5, 3.5).y });
-  sprites.sort((a, b) => a.depth - b.depth);
+  const coreItem = items.get('aura_core');
+  // A dormant core draws its stage-0 art, smaller; an awake one its stage-1 art.
+  if (coreItem) sprites.push({ key: 'core', item: coreItem, col: core.x, row: core.y, rotation: 0, path: false, state: core.stage === 0 ? 'stage0' : 'stage1', scale: core.stage === 0 ? DORMANT_CORE_SCALE : 1, connectors: [] });
+  const drawn = sprites.map((s) => {
+    const art = artOf(s.item, s.state);
+    const footprint = s.item.kind === 'core' ? CORE_FOOTPRINT : s.item.footprint;
+    return { s, art, frame: spriteFrame(geom, footprint, s.col, s.row, s.rotation, art, { path: s.path, scale: s.scale }) };
+  }).sort((a, b) => a.frame.depth - b.frame.depth);
   return (
     <svg viewBox="30 110 800 520" className={className} role="img" aria-label={title}>
       {title && <title>{title}</title>}
+      {/* The slab never changes with the size (constant extent). */}
       <path d="M62 391 L430 575 L798 391 L798 412 L430 602 L62 412 Z" fill="#0a2527" stroke="#496b60" />
-      {Array.from({ length: n * n }, (_, index) => <polygon key={index} points={diamond(index % n, Math.floor(index / n))} fill={(index + Math.floor(index / n)) % 2 ? '#213e35' : '#244438'} stroke="#92c4a6" strokeOpacity=".17" />)}
-      {placements.filter((p) => items.get(p.item_id)?.kind === 'path_pavement').map((p) => {
-        const c = iso(p.x, p.y);
-        const active: Connector[] = [];
-        if (pathCells.has(`${p.x}:${p.y - 1}`)) active.push('NE');
-        if (pathCells.has(`${p.x + 1}:${p.y}`)) active.push('SE');
-        if (pathCells.has(`${p.x}:${p.y + 1}`)) active.push('SW');
-        if (pathCells.has(`${p.x - 1}:${p.y}`)) active.push('NW');
-        if (!active.length) active.push(...((p.rotation % 180 === 90 ? ['NW', 'SE'] : ['NE', 'SW']) as Connector[]));
+      {Array.from({ length: geom.size * geom.size }, (_, index) => {
+        const col = index % geom.size, row = Math.floor(index / geom.size);
+        return <polygon key={index} points={geom.diamond(col, row)} fill={(col + row) % 2 ? '#213e35' : '#244438'} stroke="#92c4a6" strokeOpacity=".17" strokeWidth={u} />;
+      })}
+      {drawn.map(({ s, art, frame }) => {
+        const x = frame.x, y = frame.y, px = frame.size;
+        const face = frame.face;
         return (
-          <g key={`path-${p.x}-${p.y}`}>
-            {active.map((k) => <line key={`halo-${k}`} x1={c.x} y1={c.y} x2={c.x + connectorOffset[k][0]} y2={c.y + connectorOffset[k][1]} stroke="#2cf5a4" strokeOpacity=".25" strokeWidth="13" strokeLinecap="round" />)}
-            {active.map((k) => <line key={k} x1={c.x} y1={c.y} x2={c.x + connectorOffset[k][0]} y2={c.y + connectorOffset[k][1]} stroke="#62ffc5" strokeWidth="4" strokeLinecap="round" />)}
-            <circle cx={c.x} cy={c.y} r="4" fill="#baffdd" />
+          <g key={s.key}>
+            <g transform={frame.flip ? `translate(${(x + px / 2) * 2} 0) scale(-1 1)` : undefined}><image href={art.albedo.url} x={x} y={y} width={px} height={px} /></g>
+            {face && s.connectors.length > 0 && (() => {
+              const c = { x: face.x + face.w / 2, y: face.y + face.h / 2 };
+              return <g>
+                {s.connectors.map((k) => <line key={`halo-${k}`} x1={c.x} y1={c.y} x2={face.x + face.w * connectorEnd[k][0]} y2={face.y + face.h * connectorEnd[k][1]} stroke="#2cf5a4" strokeOpacity=".25" strokeWidth={13 * u} strokeLinecap="round" />)}
+                {s.connectors.map((k) => <line key={k} x1={c.x} y1={c.y} x2={face.x + face.w * connectorEnd[k][0]} y2={face.y + face.h * connectorEnd[k][1]} stroke="#62ffc5" strokeWidth={4 * u} strokeLinecap="round" />)}
+                <circle cx={c.x} cy={c.y} r={4 * u} fill="#baffdd" />
+              </g>;
+            })()}
           </g>
         );
-      })}
-      {sprites.map((s) => {
-        const art = artOf(s.item);
-        const isCore = s.item.kind === 'core';
-        const cols = s.flipped ? s.item.footprint.rows : s.item.footprint.cols;
-        const rows = s.flipped ? s.item.footprint.cols : s.item.footprint.rows;
-        const c = isCore ? iso(s.col + .5, s.row + .5) : iso(s.col + (cols - 1) / 2, s.row + (rows - 1) / 2);
-        const visible = Math.max(.2, art.contentBounds[2] - art.contentBounds[0]);
-        const px = Math.min(360, isCore ? TILE_W * 1.8 / visible : TILE_W * (s.item.footprint.cols + s.item.footprint.rows) / 2 * .9 / visible);
-        const x = isCore ? c.x - px / 2 : c.x - px * art.anchor[0];
-        const y = c.y - px * art.anchor[1];
-        return <g key={s.key} transform={s.flipped ? `translate(${c.x * 2} 0) scale(-1 1)` : undefined}><image href={art.albedo.url} x={x} y={y} width={px} height={px} /></g>;
       })}
     </svg>
   );
 }
+

@@ -23,6 +23,7 @@ import SignInPrompt, { recordAsk, shouldPromptAfterAsk, shouldPromptNow } from '
 import { getSyncStatus } from '@/lib/companions/sync';
 import { MarketCanvas, type ChartLevel, type Timeframe } from '@/components/adams/MarketCanvas';
 import { EvolutionOverlay, GearCatalog, NoTradeCard, ToolBelt, ToolDetail, ToolUnlockOverlay, WorldMapTeaser } from './CompanionOverlays';
+import LandSeedCard from './LandSeedCard';
 import { DeskSwapCard, SwapSheet } from './DeskSwap';
 import { WalletBalancePill } from './DeskWallet';
 import { PET_UNLOCK_XP, petArt, petFor, petUnlocked, toolSlot, wornGear } from '@/lib/companions/data';
@@ -281,6 +282,8 @@ export default function CompanionDesk() {
   const [series, setSeries] = useState<Candle[]>([]);
   const [pending, setPending] = useState<Resolution | null>(null);
   const [noTrade, setNoTrade] = useState<{ symbol: string; reason: string; xp: number } | null>(null);
+  // The award event of the last read: its Trader Land grant (seed or bloomed piece) shows once the server answers.
+  const [landEvent, setLandEvent] = useState<string | null>(null);
   const [evolution, setEvolution] = useState<CompanionLevel | null>(null);
   const [drops, setDrops] = useState<CompanionTool[]>([]);
   const [inspected, setInspected] = useState<CompanionTool | null>(null);
@@ -345,6 +348,7 @@ export default function CompanionDesk() {
     setSnapshot(snap);
     setAnswer(null);
     setNoTrade(null);
+    setLandEvent(null);
     setSeries([]);
     setPhase('alpha');
     void candles(snap.symbol, snap.isEquity).then((rows) => { if (!signal.aborted) setSeries(rows); });
@@ -375,6 +379,8 @@ export default function CompanionDesk() {
     const thesis: ThesisSnapshot = { symbol: snap.symbol, isEquity: snap.isEquity, direction: a.direction === 'long' ? 'long' : a.direction === 'short' ? 'short' : 'none', price: level(a.price), entry: level(a.entry), stop: level(a.stop), target: level(a.target) };
     const result = progressStore.awardDiscipline(noTradeNow ? 'no_trade_respected' : 'read_complete', new Date(), thesis);
     if (noTradeNow) setNoTrade({ symbol: snap.symbol, reason: noTradeReason(a), xp: result.awarded });
+    // One question = one seed: the card appears when sync brings back what it planted (nothing at the daily cap).
+    setLandEvent(result.eventId);
     if (result.evolvedTo) setEvolution(result.evolvedTo);
     if (result.drops.length) setDrops((d) => [...d, ...result.drops]);
     // Quick access remembers what you actually read.
@@ -394,6 +400,7 @@ export default function CompanionDesk() {
     setSnapshot(null);
     setPending(null);
     setNoTrade(null);
+    setLandEvent(null);
     setSeries([]);
     // The soft "keep your points" ask: raised once, after the visitor has
     // actually got value out of the desk, never as a gate in front of it.
@@ -630,6 +637,8 @@ export default function CompanionDesk() {
     <>
       {/* NO TRADE halo */}
       {noTrade && <NoTradeCard compact={compact} symbol={noTrade.symbol} reason={noTrade.reason} xp={noTrade.xp} onClose={() => setNoTrade(null)} />}
+      {/* Trader Land: the seed a read planted (with its horizon choice) or the piece a NO TRADE bloomed. */}
+      {landEvent && <LandSeedCard key={landEvent} compact={compact} eventId={landEvent} onClose={() => setLandEvent(null)} />}
 
     </>
   );
