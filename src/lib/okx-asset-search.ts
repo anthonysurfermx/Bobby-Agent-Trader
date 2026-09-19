@@ -596,10 +596,10 @@ export type OkxMatchKind = 'exact' | 'partial' | 'proxy' | 'fuzzy';
  * `proxy` (gold→XAUT, oil→USO) and `fuzzy` (typos, dictation mangles) must
  * be confirmed by the user before any analysis runs.
  */
-function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score: number; kind: OkxMatchKind } {
+function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score: number; kind: OkxMatchKind; strong: boolean } {
   const normalized = normalizeQueryValue(query);
   const compact = compactQueryValue(query);
-  if (!normalized) return { score: 0, kind: 'partial' };
+  if (!normalized) return { score: 0, kind: 'partial', strong: false };
 
   const searchText = instrument.searchText;
   const compactSearchText = compactQueryValue(searchText);
@@ -607,6 +607,10 @@ function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score
 
   let score = 0;
   let kind: OkxMatchKind = 'partial';
+  // An exact kind can come from equality (the whole ticker, id or spoken
+  // name) or only from a prefix ("SON" starts SONIC). Free text needs to
+  // tell them apart: a prefix of a short word is a guess, not an answer.
+  let strong = false;
 
   const applyTerm = (term: string, asKind: OkxMatchKind) => {
     let termScore = 0;
@@ -620,6 +624,7 @@ function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score
     if (termScore > score) {
       score = termScore;
       kind = termScore >= 840 ? asKind : 'partial';
+      strong = termScore >= 910 && asKind === 'exact';
     }
   };
 
@@ -635,6 +640,7 @@ function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score
   if (compact && compactSearchText.includes(compact) && score < 700) {
     score = 700;
     kind = 'partial';
+    strong = false;
   }
 
   // Fuzzy net: dictation and typos never match exactly ("SOLNA", "ETHERUM",
@@ -650,13 +656,14 @@ function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score
         if (d <= budget && 620 - d * 40 > score) {
           score = 620 - d * 40;
           kind = 'fuzzy';
+          strong = false;
         }
       }
     }
   }
 
-  if (!score) return { score: 0, kind: 'partial' };
-  return { score: score + instrument.priority, kind };
+  if (!score) return { score: 0, kind: 'partial', strong: false };
+  return { score: score + instrument.priority, kind, strong };
 }
 
 function rankInstrument(instrument: OkxAssetInstrument, query: string): number {
@@ -710,6 +717,8 @@ export async function resolveOkxInstrument(
 // ---- Canonical free-text resolution (the ONE brain for phrases) ----
 
 // Conversational filler in both product languages — never an asset name.
+// Only function words and question vocabulary: real tickers that are also
+// words (ONE, NEAR, SUN, GAS, HOT…) must stay searchable.
 const QUERY_STOPWORDS = new Set([
   'QUE', 'QUÉ', 'PASA', 'PASARA', 'PASARÁ', 'CON', 'EL', 'LA', 'LO', 'LOS', 'LAS', 'DE', 'DEL',
   'UN', 'UNA', 'PARA', 'POR', 'COMO', 'CÓMO', 'VES', 'VA', 'VAN', 'HOY', 'MANANA', 'MAÑANA',
@@ -717,6 +726,12 @@ const QUERY_STOPWORDS = new Set([
   'A', 'EN', 'ME', 'TE', 'SE', 'ES', 'ESTA', 'ESTÁ', 'BOBBY', 'SENAL', 'SEÑAL', 'HABLA',
   'CUENTA', 'ACTUAL', 'VER', 'VEO', 'DEBO', 'HACER', 'COMPRAR', 'VENDER', 'BUENO', 'MALO',
   'WHAT', 'ABOUT', 'WITH', 'THE', 'IS', 'PRICE', 'OF', 'HOW', 'NOW', 'TODAY', 'TOMORROW',
+  // Question vocabulary (build-34 review: "¿Cuáles son…" resolved SONIC via SON).
+  'SON', 'SOY', 'SUS', 'CUAL', 'CUÁL', 'CUALES', 'CUÁLES', 'RIESGO', 'RIESGOS', 'GRAFICO', 'GRÁFICO',
+  'GRAFICA', 'GRÁFICA', 'TENDENCIA', 'PRINCIPALES', 'PRINCIPAL', 'ESTE', 'ESTOS', 'ESTAS', 'ESE',
+  'ESO', 'PIENSAS', 'OPINAS', 'CREES', 'DEBERIA', 'DEBERÍA', 'SEMANA', 'MES', 'HAY', 'TIENE', 'PERO', 'MAS', 'MÁS',
+  'ARE', 'MAIN', 'RISK', 'RISKS', 'CHART', 'CHARTS', 'CURRENT', 'TREND', 'THINK', 'SHOULD', 'DOES',
+  'THIS', 'THAT', 'THESE', 'FOR', 'AND', 'WHY', 'WHEN', 'WILL', 'CAN', 'WEEK', 'MONTH', 'LOOK', 'LOOKS',
 ]);
 
 export interface OkxResolvedAsset {
@@ -732,15 +747,15 @@ export interface OkxResolvedAsset {
 async function bestScoredMatch(
   query: string,
   allowedTypes: Set<OkxSearchInstType>,
-): Promise<{ instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind } | null> {
+): Promise<{ instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind; strong: boolean } | null> {
   const catalog = await getOkxInstrumentCatalog();
-  let best: { instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind } | null = null;
+  let best: { instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind; strong: boolean } | null = null;
   for (const instrument of catalog) {
     if (!allowedTypes.has(instrument.instType)) continue;
-    const { score, kind } = scoreInstrument(instrument, query);
+    const { score, kind, strong } = scoreInstrument(instrument, query);
     if (score <= 0) continue;
     if (!best || score > best.score || (score === best.score && instrument.priority > best.instrument.priority)) {
-      best = { instrument, score, kind };
+      best = { instrument, score, kind, strong };
     }
   }
   return best;
@@ -750,37 +765,44 @@ async function bestScoredMatch(
  * Resolve free text ("que pasa con eterium", "taiwan semiconductor hoy") to
  * one instrument with an honest match kind. Candidate order: the whole
  * phrase first (multi-word names), then each non-stopword word. The first
- * exact hit wins immediately; proxy beats fuzzy; fuzzy only if nothing else.
+ * EQUALITY hit (a whole ticker, id or spoken name) wins immediately, wherever
+ * it sits in the question; a prefix-only exact hit waits for one, and a short
+ * prefix ("SON" → SONIC) is a guess that must be confirmed. Then proxy beats
+ * partial, and fuzzy only if nothing else.
  */
 export async function resolveOkxAssetFromText(
   text: string,
   options?: { instTypes?: OkxSearchInstType[] },
 ): Promise<OkxResolvedAsset | null> {
   const allowedTypes = new Set(options?.instTypes || OKX_SEARCH_INST_TYPES);
-  const upper = normalizeQueryValue(text).replace(/[¿?¡!.,;:]/g, '');
+  // Possessives first ("NVIDIA'S" → NVIDIA), then punctuation.
+  const upper = normalizeQueryValue(text).replace(/([A-Z0-9])['’]S\b/g, '$1').replace(/[¿?¡!.,;:'’"]/g, '');
   if (!upper) return null;
 
   // Three characters minimum per word: "in video" must not resolve INJ via "IN".
   const words = upper.split(/\s+/).filter((w) => w.length >= 3 && !QUERY_STOPWORDS.has(w));
   const candidates = upper.includes(' ') ? [upper, ...words] : [upper];
 
-  let fallback: OkxResolvedAsset | null = null;
+  let fallback: { resolved: OkxResolvedAsset; rank: number } | null = null;
   for (const candidate of candidates) {
     const hit = await bestScoredMatch(candidate, allowedTypes);
     if (!hit) continue;
+    // A prefix-only "exact" hit from a short word is as much a guess as a short substring.
+    const shortPrefix = hit.kind === 'exact' && !hit.strong && candidate.length <= 4;
     const resolved: OkxResolvedAsset = {
       instrument: hit.instrument,
       matchKind: hit.kind,
       matchedTerm: candidate,
       // Short substring hits ("GLD" inside AGLD) are guesses too — ask first.
-      needsConfirmation: hit.kind === 'fuzzy' || hit.kind === 'proxy' || (hit.kind === 'partial' && candidate.length <= 4),
+      needsConfirmation: hit.kind === 'fuzzy' || hit.kind === 'proxy' || shortPrefix || (hit.kind === 'partial' && candidate.length <= 4),
       proxyNote: hit.kind === 'proxy' ? (PROXY_ALIASES[candidate]?.note ?? null) : null,
     };
-    if (hit.kind === 'exact') return resolved;
-    const rankOf = (k: OkxMatchKind) => (k === 'proxy' ? 2 : k === 'partial' ? 1 : 0);
-    if (!fallback || rankOf(resolved.matchKind) > rankOf(fallback.matchKind)) fallback = resolved;
+    if (hit.kind === 'exact' && hit.strong) return resolved;
+    // Prefix exact (long word) > proxy > short prefix guess > partial > fuzzy.
+    const rank = hit.kind === 'exact' ? (shortPrefix ? 1.5 : 3) : hit.kind === 'proxy' ? 2 : hit.kind === 'partial' ? 1 : 0;
+    if (!fallback || rank > fallback.rank) fallback = { resolved, rank };
   }
-  return fallback;
+  return fallback?.resolved ?? null;
 }
 
 /** SPOT + SWAP venues for one base symbol, from the cached catalog. */

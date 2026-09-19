@@ -15,8 +15,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { AWARD_AURA, PLANT_KINDS, applyAward, type PlantKind, type ProgressCounters } from './_lib/progress-rules.js';
-import { ThesisSchema, catalog, grantPiece, heldPieces, nextPieces, type RouteGrant } from './_lib/trader-land.js';
+import { PLANT_KINDS } from './_lib/progress-rules.js';
+import { ThesisSchema, catalog, heldPieces, nextPieces, pieceSummary, seedHorizon, type Item, type RouteGrant, type Tier } from './_lib/trader-land.js';
 import { LEGACY_ROUTE_CAP } from './_lib/trader-land-growth.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
@@ -24,7 +24,6 @@ import { guardWrite } from './_lib/write-guard.js';
 export const config = { maxDuration: 15 };
 
 const SYMBOL_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
-const LEGACY_IMPORT_CAP = 300;
 const Body = z.object({
   platform: z.enum(['ios', 'web']),
   events: z.array(z.object({
@@ -42,7 +41,9 @@ const Body = z.object({
     riskNoticeVersion: z.number().int().min(0).max(100).optional(),
     quickAccess: z.array(z.string().regex(SYMBOL_RE)).max(6).optional(),
     /** XP earned on this device before the first sign-in. Honoured once, capped. */
-    localXpClaim: z.number().int().min(1).max(100_000).optional(),
+    restore: z.boolean().optional(),
+    localXpIncludesPending: z.boolean().optional(),
+    localXpClaim: z.number().int().min(0).max(100_000).optional(),
   }).optional(),
 });
 
@@ -139,135 +140,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { platform, events, profile } = guarded.body;
 
   try {
-    const row = await loadOrCreate(identity);
-    if (!row) return res.status(502).json({ error: 'Could not load progress' });
-
-    // Idempotency: drop events this identity already reported.
-    let fresh = events;
-    if (events.length) {
-      const ids = events.map((e) => e.id).join(',');
-      const seen = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${ids})&select=client_event_id`), { headers: bobbyServiceHeaders() });
-      const seenIds = new Set(seen.ok ? ((await seen.json()) as Array<{ client_event_id: string }>).map((e) => e.client_event_id) : []);
-      fresh = events.filter((e) => !seenIds.has(e.id));
-    }
-
-    // Apply in chronological order with the shared rules.
-    let counters: ProgressCounters = { xp: row.xp, streak: row.streak, lastDay: row.last_day, dailyAwards: row.daily_awards, dailyAwardsDay: row.daily_awards_day };
-    const results: Array<{ id: string; awarded: number; aura: number; xpBefore: number; xpAfter: number; duplicate: boolean; world?: RouteGrant | null }> = [];
-    let auraTotal = row.aura ?? 0;
-    let routeIndex = row.route_index ?? 0;
-    const grants: Array<{ eventId: string; kind: PlantKind }> = [];
-    const ledger: Array<Record<string, unknown>> = [];
-    const now = Date.now();
-    // One-time import of pre-sign-in XP, decided BEFORE this request's events are
-    // applied: only while the ledger is empty and xp is still 0, capped at LEGACY_IMPORT_CAP so a tampered claim buys at
-    // most level 3. Recorded in the ledger like everything else.
-    let legacyImported = 0;
-    if (profile?.localXpClaim && row.xp === 0) {
-      const any = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&select=id&limit=1`), { headers: bobbyServiceHeaders() });
-      const empty = any.ok && ((await any.json()) as unknown[]).length === 0;
-      if (empty) {
-        legacyImported = Math.min(LEGACY_IMPORT_CAP, profile.localXpClaim);
-        counters = { ...counters, xp: counters.xp + legacyImported };
-        // Same key set as the event rows below: PostgREST inserts the ledger as one
-        // batch and rejects it ("All object keys must match") if one row lacks a key.
-        ledger.push({ identity_id: identity.id, client_event_id: crypto.randomUUID(), kind: 'legacy_import', points: legacyImported, awarded: legacyImported, aura: 0, xp_after: counters.xp, platform, occurred_at: new Date(now).toISOString(), day_key: new Date(now).toISOString().slice(0, 10), meta: { claimed: profile.localXpClaim } });
-      }
-    }
-
-    for (const e of [...fresh].sort((a, b) => a.at.localeCompare(b.at))) {
-      // Clock sanity: no awards from the future or older than 30 days.
-      const atMs = Date.parse(e.at);
-      const at = new Date(Math.min(Math.max(atMs, now - 30 * 86_400_000), now + 5 * 60_000));
-      const out = applyAward(counters, e.kind, at, e.tzOffsetMin);
-      counters = out.state;
-      const aura = out.awarded > 0 ? AWARD_AURA[e.kind] : 0;
-      auraTotal += aura;
-      if (out.awarded > 0) grants.push({ eventId: e.id, kind: e.kind });
-      results.push({ id: e.id, awarded: out.awarded, aura, xpBefore: out.xpBefore, xpAfter: out.xpAfter, duplicate: false });
-      const meta = e.meta || e.thesis ? { ...(e.meta ?? {}), ...(e.thesis ? { thesis: e.thesis } : {}) } : null;
-      ledger.push({ identity_id: identity.id, client_event_id: e.id, kind: e.kind, points: out.points, awarded: out.awarded, aura, xp_after: out.xpAfter, platform, occurred_at: at.toISOString(), day_key: out.dayKey, meta });
-    }
-    for (const e of events) if (!fresh.includes(e)) results.push({ id: e.id, awarded: 0, aura: 0, xpBefore: row.xp, xpAfter: row.xp, duplicate: true });
-
-    if (ledger.length) {
-      const ins = await fetch(bobbyRest('bobby_progress_events'), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(ledger) });
-      if (!ins.ok) {
-        console.error('[progress] ledger insert', ins.status, await ins.text().catch(() => ''));
-        return res.status(502).json({ error: 'Could not record progress' });
-      }
-    }
-
-    // A duplicate is a retry of a request whose answer never arrived. If that
-    // event was awarded, its piece is granted again: tl_grant_piece is
-    // idempotent on the ledger row, so the retry gets the same piece — or the
-    // one a cut-off run never granted. XP is never re-awarded.
-    const duplicateIds = events.filter((e) => !fresh.includes(e)).map((e) => e.id);
-    if (duplicateIds.length) {
-      const dup = await fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${duplicateIds.join(',')})&select=client_event_id,kind,awarded`), { headers: bobbyServiceHeaders() });
-      const rows = dup.ok ? ((await dup.json()) as Array<{ client_event_id: string; kind: string; awarded: number }>) : [];
-      for (const row of rows) {
-        if (row.awarded > 0 && (PLANT_KINDS as readonly string[]).includes(row.kind)) grants.push({ eventId: row.client_event_id, kind: row.kind as PlantKind });
-      }
-    }
-
-    // Trader Land: one awarded read = one 24 h common seed, a NO TRADE the next
-    // common piece bloomed (tl_grant_piece, keyed on the ledger row). Seeds
-    // bloom later when their thesis is reviewed by /api/trader-land close.
-    if (grants.length) {
-      const idsQ = grants.map((g) => g.eventId).join(',');
-      const [led, firstRead] = await Promise.all([
-        fetch(bobbyRest(`bobby_progress_events?identity_id=eq.${identity.id}&client_event_id=in.(${idsQ})&select=id,client_event_id`), { headers: bobbyServiceHeaders() }),
-        catalog(),
-      ]);
-      // An empty catalog is a failed read (catalog() swallows errors): one retry,
-      // so a granted piece is not reported as item:null to the desk.
-      const items = firstRead.length ? firstRead : await catalog();
-      const byClient = new Map((led.ok ? ((await led.json()) as Array<{ id: string; client_event_id: string }>) : []).map((r) => [r.client_event_id, r.id]));
-      const byItem = new Map(items.map((item) => [item.id, item]));
-      for (const g of grants) {
-        const ledgerId = byClient.get(g.eventId);
-        // No ledger row to key the grant on: say the grant failed (null), not "nothing planted".
-        if (!ledgerId) { const r = results.find((x) => x.id === g.eventId); if (r) r.world = null; continue; }
-        const grant = await grantPiece(identity.id, ledgerId, g.kind, routeIndex, byItem);
-        // The legacy counter (iOS 1.1 shows it as n/8) never moves back and never passes 8.
-        if (grant) routeIndex = Math.min(LEGACY_ROUTE_CAP, Math.max(routeIndex, grant.routeIndex));
-        const r = results.find((x) => x.id === g.eventId);
-        if (r) r.world = grant;
-      }
-      // What a longer horizon would bloom into, so the desk can offer the choice
-      // right after the read: the seed's own piece at 24 h, the next building at
-      // 3 days, the next landmark at 7 days.
-      const seeds = results.filter((r) => r.world?.state === 'seed');
-      if (seeds.length) {
-        try {
-          const next = nextPieces(items, await heldPieces(identity.id));
-          for (const r of seeds) r.world!.tiers = { common: r.world!.item, building: next.building, landmark: next.landmark };
-        } catch (error) {
-          console.error('[progress] tier preview', error);
-        }
-      }
-    }
-
-    const patch: Record<string, unknown> = {
-      xp: counters.xp, aura: auraTotal, route_index: routeIndex, streak: counters.streak, last_day: counters.lastDay, daily_awards: counters.dailyAwards, daily_awards_day: counters.dailyAwardsDay,
-      last_platform: platform, updated_at: new Date().toISOString(),
-    };
-    if (profile) {
-      if (profile.companionId !== undefined) patch.companion_id = profile.companionId;
-      if (profile.vibeId !== undefined) patch.vibe_id = profile.vibeId;
-      if (profile.onboarded !== undefined) patch.onboarded = profile.onboarded;
-      // The notice version only moves forward.
-      if (profile.riskNoticeVersion !== undefined) patch.risk_notice_version = Math.max(row.risk_notice_version, profile.riskNoticeVersion);
-      if (profile.quickAccess !== undefined) patch.quick_access = profile.quickAccess;
-    }
-    const upd = await fetch(bobbyRest(`bobby_progress?identity_id=eq.${identity.id}&select=${SELECT}`), {
-      method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify(patch),
+    // The RPC locks this identity's land and progress, then commits ledger,
+    // daily cap, counters and piece grants together. A retry cannot lose XP.
+    const applied = await fetch(bobbyRest('rpc/bobby_apply_progress'), {
+      method: 'POST', headers: bobbyServiceHeaders(),
+      body: JSON.stringify({ p_identity: identity.id, p_platform: platform, p_events: events, p_profile: profile ?? {} }),
     });
-    if (!upd.ok) return res.status(502).json({ error: 'Could not save progress' });
-    const saved = ((await upd.json()) as ProgressRow[])[0] ?? row;
+    if (!applied.ok) {
+      console.error('[progress] transaction failed', applied.status);
+      return res.status(503).json({ error: 'Progress could not be saved. Your events remain queued; retry shortly.' });
+    }
+    const saved = await applied.json() as {
+      progress: ProgressRow; legacyImported: number;
+      results: Array<{ id: string; awarded: number; aura: number; xpBefore: number; xpAfter: number; duplicate: boolean;
+        grant: { inventory_id: string; item_id: string; tier: Tier | null; held: number; state: 'seed' | 'bloomed'; seeded_at: string; horizon_hours: number } | null }>;
+    };
+    // Everything below is presentation of a transaction that already
+    // committed: a failed read degrades the preview, never the answer (a 500
+    // here would make the client retry and see its planted piece as pending).
+    const grants = saved.results.flatMap(result => result.grant ? [result.grant] : []);
+    let items: Item[] = [];
+    let next: Record<Tier, ReturnType<typeof pieceSummary> | null> | null = null;
+    if (grants.length) {
+      // catalog() turns a failed read into []: one retry, so a granted piece is not reported as item:null.
+      items = await catalog().catch(() => [] as Item[]);
+      if (!items.length) items = await catalog().catch(() => [] as Item[]);
+      if (items.length && grants.some(grant => grant.state === 'seed')) {
+        try { next = nextPieces(items, await heldPieces(identity.id)); } catch (error) { console.error('[progress] tier preview', error); }
+      }
+    }
+    const byItem = new Map(items.map(item => [item.id, item]));
+    const results = saved.results.map(({ grant, ...result }) => {
+      if (!grant) return result;
+      const item = byItem.get(grant.item_id);
+      const summary = item ? pieceSummary(item) : null;
+      const world: RouteGrant = {
+        // GROWTH-v1 §3: a common grant reports min(held_common, 8) at that grant;
+        // any other tier keeps the caller's legacy counter.
+        routeIndex: grant.tier === 'common' && Number.isFinite(grant.held) ? Math.min(grant.held, LEGACY_ROUTE_CAP) : saved.progress.route_index,
+        item: summary, inventoryId: grant.inventory_id, state: grant.state, routeComplete: false, bloomedInventoryId: null,
+        ...(grant.state === 'seed' ? {
+          horizon: seedHorizon(grant.seeded_at, grant.horizon_hours, grant.state),
+          ...(next ? { tiers: { common: summary, building: next.building, landmark: next.landmark } } : {}),
+        } : {}),
+      };
+      return { ...result, world };
+    });
     res.setHeader('Cache-Control', 'no-store');
-    return res.status(200).json({ ok: true, progress: toClient(saved, identity), results, legacyImported });
+    return res.status(200).json({ ok: true, progress: toClient(saved.progress, identity), results, legacyImported: saved.legacyImported });
   } catch (error) {
     console.error('[progress] post', error);
     return res.status(500).json({ error: 'Progress update failed' });

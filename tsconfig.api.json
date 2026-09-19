@@ -71,6 +71,8 @@
     "api/agent-run.ts",
     "api/okx-onchain.ts",
     "api/progress.ts",
+    "api/account.ts",
+    "api/desk-debate.ts",
     "api/trader-land.ts",
     "api/trader-land-public.ts",
     "api/identity-link.ts",

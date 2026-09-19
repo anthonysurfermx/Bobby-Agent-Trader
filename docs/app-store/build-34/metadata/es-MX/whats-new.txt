@@ -1,0 +1,8 @@
+Tus preguntas ahora pasan por tres perspectivas de IA: una arma el argumento a favor, otra lo cuestiona y una tercera evalúa ambas posturas, para que puedas leer el razonamiento detrás de la respuesta.
+
+También en esta versión:
+• Las preguntas y respuestas son solo por texto. Las conversaciones por voz no están disponibles en esta versión.
+• En la app, tu isla de Trader Land es privada. Compartir islas públicas no está disponible en esta versión.
+• Bobby ahora te pide permiso antes de enviar tus preguntas a OpenAI para analizarlas.
+• Mejoras en las sesiones de la cuenta, la sincronización del progreso, la compatibilidad de Trader Land y el manejo de errores en las gráficas.
+• Al borrar tu cuenta, ahora también te ayudamos a dejar de usar Iniciar sesión con Apple en Bobby.

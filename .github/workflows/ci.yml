@@ -38,6 +38,8 @@ jobs:
       # BP-06 (2026-09-04 review): the swap rail and the remediation regressions
       # were never executed in CI — every closure in docs/security/ ran locally.
       - run: npm run test:base-swap
+      - run: npm run test:ios-remediation
+      - run: npm run test:trader-land-api
       - run: npm run test:desk-audit
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2
@@ -45,7 +47,7 @@ jobs:
       - run: npm run test:mcp-payment-transport
       - run: npm run build
       - run: npm run lint -- --quiet
-      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --audit-level=high
 
   # BP-06: the suites that need a real Postgres (RLS lock-down, swap ledger,
   # agent-registry CAS) and a real EVM (backend ABI vs compiled artifact). The
@@ -85,6 +87,34 @@ jobs:
       - run: npm run test:rls-lockdown-pg
       - run: npm run test:swap-ledger-pg
       - run: npm run test:agent-registry-pg
+
+  ios-progress-transactions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['54392:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres@127.0.0.1:54392/postgres
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/test-trader-land-growth.sql
+      - run: npm run test:progress-atomic-pg
 
   contracts:
     runs-on: ubuntu-latest

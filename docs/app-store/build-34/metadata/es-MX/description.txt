@@ -1,0 +1,19 @@
+Estás a punto de comprar Bitcoin. O de vender NVIDIA. Antes de actuar, pon a prueba tu idea.
+
+Escríbele tu pregunta a Bobby. Lee qué respalda la idea, qué podría salir mal y qué te pueden decir realmente los datos de mercado disponibles.
+
+Tres perspectivas de IA analizan tu pregunta: una arma el argumento a favor, otra lo cuestiona y una tercera evalúa ambas posturas. Ves los argumentos detrás de la respuesta, incluidos los puntos donde falta evidencia.
+
+A veces, la respuesta es esperar. Si la evidencia no es clara, Bobby te lo dice.
+
+Usa Bobby para:
+• Explorar acciones y cripto por nombre o símbolo.
+• Ver la oportunidad y el riesgo en un mismo lugar, junto a la gráfica del mercado.
+• Crear el hábito de aprender con un compañero 3D y un progreso que puedes ver.
+• Hacer crecer tu propia isla en Trader Land. Hasta tres lecturas completadas al día siembran semillas; cuando termina el plazo de una semilla, la revisas contra el mercado y se convierte en pieza, sin importar si la lectura acertó. Cuando la respuesta de Bobby es esperar, la pieza llega al instante.
+
+Puedes explorar el mercado sin cuenta. Inicia sesión con Apple para sincronizar tu progreso y conservar tu isla personal de Trader Land. En la app, el progreso viene de completar y revisar lecturas, y las recompensas nunca dependen del monto que operes.
+
+Con tu permiso, tus preguntas escritas se envían a OpenAI para generar el análisis, sin el identificador de tu cuenta. Bobby no publica tus preguntas.
+
+En esta versión, las preguntas y respuestas son por texto. Bobby ofrece análisis educativo de mercados, no asesoría financiera personalizada. La app para iPhone no ejecuta operaciones, no conecta wallets, no custodia activos ni accede a tus fondos o llaves privadas. Los datos de mercado y las respuestas de IA pueden llegar con retraso o ser incorrectos. Invertir implica riesgos.

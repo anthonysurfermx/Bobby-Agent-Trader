@@ -9,7 +9,7 @@
 //     through the land-locking RPCs, coordinates drawn on another island
 //     size refused with 409, growth only with X-Trader-Land-Client: 2
 //   · the core wakes at 5 pieces on the owner's read (and in public views)
-//   · POST close: the bloom CAS carries the horizon it read
+//   · POST close: the atomic review rechecks the horizon it read
 //   · POST /api/progress: tl_grant_piece grants, RouteGrant compatibility,
 //     routeIndex capped at 8, horizon + tier preview for seeds
 // The SQL behind the RPCs is covered by scripts/test-trader-land-growth.sql.
@@ -59,6 +59,10 @@ let ledgerRows: Array<{ id: string; client_event_id: string }> = [];
 let seenRows: Array<{ client_event_id: string; kind: string; awarded: number }> = [];
 const rpcAnswers: Record<string, (args: Record<string, unknown>) => unknown> = {};
 let casRows: unknown[] = [];
+/** Read failures to inject after a transaction committed (tier preview must degrade, not 500). */
+let failReads: { catalog: boolean; inventory: boolean } = { catalog: false, inventory: false };
+/** The thesis_closed ledger row a replayed pre-Growth close is completed from. */
+let closeLedgerRows: Array<{ id: string; awarded: number; aura: number; xp_after: number }> = [];
 let calls: Array<{ method: string; url: string; body: unknown }> = [];
 
 function reset() {
@@ -77,6 +81,8 @@ function reset() {
   seenRows = [];
   casRows = [];
   calls = [];
+  failReads = { catalog: false, inventory: false };
+  closeLedgerRows = [];
   for (const key of Object.keys(rpcAnswers)) delete rpcAnswers[key];
   // The placement RPCs, as a tiny database: they succeed and change the fixture.
   rpcAnswers.tl_place_piece = (args) => {
@@ -113,11 +119,12 @@ globalThis.fetch = (async (input: string | URL, init: RequestInit = {}) => {
     return answer ? json(answer(body)) : json({ message: `no ${fn}` }, 500);
   }
   if (path.startsWith('tl_lands')) {
-    if (method === 'PATCH') return json([]);
+    if (method === 'PATCH') { Object.assign(land, body); return json([land]); }
     return json([land]);
   }
-  if (path.startsWith('tl_items')) return json(catalogRows);
+  if (path.startsWith('tl_items')) return failReads.catalog ? json({ message: 'catalog down' }, 503) : json(catalogRows);
   if (path.startsWith('tl_inventory')) {
+    if (failReads.inventory && method === 'GET') return json({ message: 'inventory down' }, 503);
     if (method === 'PATCH') return json(casRows);
     const byId = path.match(/[?&]id=eq\.([0-9a-f-]+)/)?.[1];
     const rows = byId ? inventory.filter((r) => r.id === byId) : inventory;
@@ -131,6 +138,7 @@ globalThis.fetch = (async (input: string | URL, init: RequestInit = {}) => {
   }
   if (path.startsWith('bobby_progress_events')) {
     if (method === 'POST') return json([{ id: U(399) }], 201);
+    if (path.includes('select=id,awarded,aura,xp_after')) return json(closeLedgerRows);
     if (path.includes('select=id,client_event_id')) return json(ledgerRows);
     if (path.includes('select=client_event_id,kind,awarded')) return json(seenRows);
     if (path.includes('select=client_event_id')) return json(seenRows.map((r) => ({ client_event_id: r.client_event_id })));
@@ -385,95 +393,120 @@ reset();
   eq([publicWorld(row, pieces(4), items as never).core, publicWorld(row, pieces(5), items as never).core], [{ x: 0, y: 5, stage: 0 }, { x: 0, y: 5, stage: 1 }], 'a public island on 5 pieces is drawn awake even if its row lags');
 }
 
-// ---------- close: the CAS carries the horizon that was read ----------
+// ---------- close: transaction rechecks horizon under lock ----------
 reset();
 {
-  casRows = [];
-  inventory[2] = { ...inventory[2], horizon_hours: 24 };
-  const r = await (async () => {
-    // The first read sees 24 h (ready); an extend lands before the CAS, the re-read sees 72 h.
-    let reads = 0;
-    const original = globalThis.fetch;
-    globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes(`tl_inventory?id=eq.${U(3)}`) && (init?.method ?? 'GET') === 'GET' && ++reads > 1) {
-        calls.push({ method: 'GET', url, body: undefined });
-        return json([{ ...inventory[2], horizon_hours: 72 }]);
-      }
-      return original(input, init);
-    }) as typeof fetch;
-    try { return await call(landHandler, 'POST', { action: 'close', inventoryId: U(3), platform: 'ios' }); } finally { globalThis.fetch = original; }
-  })();
-  const cas = calls.find((c) => c.method === 'PATCH' && c.url.includes('tl_inventory'));
-  assert(cas?.url.includes('state=eq.seed') && cas.url.includes('horizon_hours=eq.24'), 'the bloom CAS matches the horizon it read');
-  eq([r.status, r.body], [409, { error: 'The market has not had time to answer yet', reviewAt: iso(NOW - 25 * H + 72 * H) }], 'a concurrent extend makes the close wait for the new review');
+  rpcAnswers.bobby_close_seed = () => ({ ok: false, error: 'review_not_ready' });
+  const result = await call(landHandler, 'POST', { action: 'close', inventoryId: U(3), platform: 'ios' });
+  eq(result.status, 409, 'concurrent horizon change is refused');
+  const args = rpcCalls('bobby_close_seed')[0]?.body as any;
+  eq([args?.p_identity, args?.p_inventory, args?.p_hours], [ID, U(3), 24], 'review transaction receives owner, inventory and observed horizon');
+  assert(!calls.some(c => c.method === 'PATCH' && c.url.includes('tl_inventory')), 'no partial bloom outside the transaction');
   const early = await call(landHandler, 'POST', { action: 'close', inventoryId: U(2), platform: 'ios' });
-  eq([early.status, early.body], [409, { error: 'The market has not had time to answer yet', reviewAt: iso(NOW - 30 * H + 72 * H) }], 'a 72 h seed cannot close after 30 h');
+  eq(early.status, 409, '72 h seed cannot close after 30 h');
 }
 
-// ---------- /api/progress: grants through tl_grant_piece ----------
+// ---------- progress: RPC wire contract and native-compatible grants ----------
 reset();
 {
-  const e1 = 'cccccccc-cccc-4ccc-8ccc-000000000001', e2 = 'cccccccc-cccc-4ccc-8ccc-000000000002';
-  ledgerRows = [{ id: U(401), client_event_id: e1 }, { id: U(402), client_event_id: e2 }];
-  const seededAt = iso(NOW - 1000);
-  rpcAnswers.tl_grant_piece = (args) => args.p_event === U(401)
-    ? { ok: true, inventory_id: U(501), item_id: 'crypto_bay_context_buoy', tier: 'common', horizon_hours: 24, state: 'seed', held: 9, seeded_at: seededAt.replace('Z', '+00:00'), replay: false }
-    : { ok: true, inventory_id: U(502), item_id: 'evidence_mines_open_tunnel', tier: 'common', horizon_hours: 24, state: 'bloomed', held: 10, seeded_at: seededAt, replay: false };
-  const at = iso(NOW - 60_000);
-  const r = await call(progressHandler, 'POST', { platform: 'ios', events: [{ id: e1, kind: 'read_complete', at }, { id: e2, kind: 'no_trade_respected', at: iso(NOW - 30_000) }] });
-  assert(r.status === 200 && r.body.ok, `progress POST (${r.status} ${JSON.stringify(r.body).slice(0, 200)})`);
-  eq(rpcCalls('tl_grant_piece').map((c) => c.body), [
-    { p_identity: ID, p_event: U(401), p_state: 'seed', p_hours: 24 },
-    { p_identity: ID, p_event: U(402), p_state: 'bloomed', p_hours: 24 },
-  ], 'a read plants a 24 h seed, a NO TRADE blooms, keyed on the ledger row');
-  const seed = r.body.results.find((x: any) => x.id === e1).world;
-  const bloom = r.body.results.find((x: any) => x.id === e2).world;
-  eq({ routeIndex: seed.routeIndex, item: seed.item, inventoryId: seed.inventoryId, state: seed.state, bloomedInventoryId: seed.bloomedInventoryId, routeComplete: seed.routeComplete },
-    { routeIndex: 8, item: summary('crypto_bay_context_buoy'), inventoryId: U(501), state: 'seed', bloomedInventoryId: null, routeComplete: false }, 'RouteGrant keeps its shape; routeIndex = min(held_common, 8)');
-  eq(seed.horizon, { hours: 24, tier: 'common', reviewAt: iso(Date.parse(seededAt) + 24 * H), extendable: true, extendTo: [72, 168] }, 'a seed carries its horizon');
-  // The stub inventory holds one route building (the Double Gate; the season Candle Tower never counts).
-  eq(seed.tiers, { common: summary('crypto_bay_context_buoy'), building: summary('crypto_bay_candle_tower'), landmark: summary('crypto_bay_waiting_lighthouse') }, 'tiers preview: own piece, next building, next landmark');
-  eq([bloom.state, bloom.routeIndex, 'horizon' in bloom, 'tiers' in bloom], ['bloomed', 8, false, false], 'a NO TRADE: bloomed, no horizon picker');
-  const patch = calls.find((c) => c.method === 'PATCH' && c.url.includes('bobby_progress?'));
-  eq((patch?.body as { route_index: number }).route_index, 8, 'bobby_progress.route_index capped at 8');
-  eq(r.body.progress.routeIndex, 8, 'progress.routeIndex capped at 8');
+  const event = { id: U(401), kind: 'read_complete', at: iso(NOW - 1000) };
+  rpcAnswers.bobby_apply_progress = () => ({
+    progress: { ...progressRow, xp: 110, route_index: 8 }, legacyImported: 0,
+    results: [{ id: event.id, awarded: 10, aura: 2, xpBefore: 100, xpAfter: 110, duplicate: false,
+      grant: { inventory_id: U(501), item_id: 'crypto_bay_context_buoy', tier: 'common', held: 9, state: 'seed', horizon_hours: 24, seeded_at: event.at } }],
+  });
+  const result = await call(progressHandler, 'POST', { platform: 'ios', events: [event], profile: { restore: true, localXpIncludesPending: false, localXpClaim: 10 } });
+  eq(result.status, 200, 'atomic progress response');
+  const args = rpcCalls('bobby_apply_progress')[0]?.body as any;
+  eq([args.p_identity, args.p_platform, args.p_profile.restore, args.p_events[0].id], [ID, 'ios', true, event.id], 'authenticated identity and event/profile payload reach RPC');
+  const world = result.body.results[0].world;
+  eq([world.inventoryId, world.routeIndex, world.item], [U(501), 8, summary('crypto_bay_context_buoy')], 'grant response keeps inventory, catalog and route compatibility');
+  eq(world.horizon, { hours: 24, tier: 'common', reviewAt: iso(NOW - 1000 + 24*H), extendable: true, extendTo: [72,168] }, 'native seed horizon remains available');
+  assert(!calls.some(c => c.method === 'PATCH' && c.url.includes('bobby_progress')), 'handler never writes counters separately');
+  rpcAnswers.bobby_apply_progress = () => { throw new Error('database rollback'); };
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (input, init) => String(input).includes('rpc/bobby_apply_progress') ? new Response('{}', {status:503}) : original(input,init)) as typeof fetch;
+  const failed = await call(progressHandler, 'POST', { platform:'ios', events:[event] });
+  globalThis.fetch = original;
+  eq(failed.status,503,'failed transaction remains retryable and returns no acknowledgements');
+  assert(!failed.body.results,'failed transaction never acknowledges lost awards');
 }
+
+// ---------- progress: routeIndex per grant, as GROWTH-v1 §3 and main reported it ----------
 reset();
 {
-  // After an extend released a common slot, held can fall under the stored counter: it never moves back.
-  const e3 = 'cccccccc-cccc-4ccc-8ccc-000000000003';
-  ledgerRows = [{ id: U(403), client_event_id: e3 }];
-  rpcAnswers.tl_grant_piece = () => ({ ok: true, inventory_id: U(503), item_id: 'crypto_bay_water_walkway', tier: 'common', horizon_hours: 24, state: 'seed', held: 2, seeded_at: iso(NOW), replay: false });
-  const r = await call(progressHandler, 'POST', { platform: 'web', events: [{ id: e3, kind: 'read_complete', at: iso(NOW - 1000) }] });
-  eq(r.body.results[0].world.routeIndex, 2, 'the grant reports min(held_common, 8)');
-  eq(r.body.progress.routeIndex, 5, 'the stored counter stays at 5');
-  rpcAnswers.tl_grant_piece = () => ({ ok: false, error: 'empty_tier' });
-  const e4 = 'cccccccc-cccc-4ccc-8ccc-000000000004';
-  ledgerRows = [{ id: U(404), client_event_id: e4 }];
-  const failed = await call(progressHandler, 'POST', { platform: 'web', events: [{ id: e4, kind: 'read_complete', at: iso(NOW - 1000) }] });
-  eq(failed.body.results[0].world, null, 'a refused grant is world: null, the XP still counts');
-  assert(failed.body.results[0].awarded > 0, 'awarded');
+  const events = [1, 2, 3].map((n) => ({ id: U(410 + n), kind: 'read_complete', at: iso(NOW - 5000 + n) }));
+  const grant = (n: number, extra: Record<string, unknown> = {}) => ({ inventory_id: U(510 + n), item_id: 'crypto_bay_context_buoy', tier: 'common', held: n, state: 'seed', horizon_hours: 24, seeded_at: iso(NOW - 1000), ...extra });
+  rpcAnswers.bobby_apply_progress = () => ({
+    progress: { ...progressRow, route_index: 3 }, legacyImported: 0,
+    results: events.map((e, i) => ({ id: e.id, awarded: 10, aura: 2, xpBefore: 100 + 10 * i, xpAfter: 110 + 10 * i, duplicate: false, grant: grant(i + 1) })),
+  });
+  const batch = await call(progressHandler, 'POST', { platform: 'ios', events });
+  eq(batch.body.results.map((r: any) => r.world.routeIndex), [1, 2, 3], 'a batch of three plants reports 1, 2, 3 — not the final counter three times');
+  // After an extend released a common slot, held falls under the stored counter: the grant reports held.
+  rpcAnswers.bobby_apply_progress = () => ({ progress: { ...progressRow, route_index: 6 }, legacyImported: 0,
+    results: [{ id: events[0].id, awarded: 10, aura: 2, xpBefore: 100, xpAfter: 110, duplicate: false, grant: grant(2) }] });
+  const afterExtend = await call(progressHandler, 'POST', { platform: 'web', events: [events[0]] });
+  eq([afterExtend.body.results[0].world.routeIndex, afterExtend.body.progress.routeIndex], [2, 6], 'the grant reports min(held_common, 8); the stored counter stays');
+  rpcAnswers.bobby_apply_progress = () => ({ progress: { ...progressRow, route_index: 8 }, legacyImported: 0,
+    results: [{ id: events[0].id, awarded: 0, aura: 0, xpBefore: 100, xpAfter: 100, duplicate: true, grant: grant(12) },
+      { id: events[1].id, awarded: 0, aura: 0, xpBefore: 100, xpAfter: 100, duplicate: true, grant: grant(3, { tier: 'building', item_id: 'thesis_citadel_double_gate', horizon_hours: 72 }) }] });
+  const capped = await call(progressHandler, 'POST', { platform: 'ios', events: events.slice(0, 2) });
+  eq(capped.body.results.map((r: any) => r.world.routeIndex), [8, 8], 'held_common capped at 8; a replayed extended seed keeps the legacy counter');
+}
+
+// ---------- progress: the preview after the commit is best effort ----------
+reset();
+{
+  const event = { id: U(421), kind: 'read_complete', at: iso(NOW - 1000) };
+  rpcAnswers.bobby_apply_progress = () => ({ progress: { ...progressRow, xp: 110 }, legacyImported: 0,
+    results: [{ id: event.id, awarded: 10, aura: 2, xpBefore: 100, xpAfter: 110, duplicate: false,
+      grant: { inventory_id: U(521), item_id: 'crypto_bay_context_buoy', tier: 'common', held: 2, state: 'seed', horizon_hours: 24, seeded_at: event.at } }] });
+  failReads.inventory = true;
+  const noInventory = await call(progressHandler, 'POST', { platform: 'ios', events: [event] });
+  const world = noInventory.body.results?.[0]?.world;
+  eq([noInventory.status, world?.inventoryId, world?.item?.id, 'tiers' in (world ?? {}), world?.horizon?.hours], [200, U(521), 'crypto_bay_context_buoy', false, 24], 'an inventory read failure after commit: 200, the piece reported, no tier preview');
+  failReads = { catalog: true, inventory: false };
+  calls = [];
+  const noCatalog = await call(progressHandler, 'POST', { platform: 'ios', events: [event] });
+  eq([noCatalog.status, noCatalog.body.results[0].awarded, noCatalog.body.results[0].world.item, noCatalog.body.results[0].world.inventoryId], [200, 10, null, U(521)], 'a catalog failure after commit: 200, award kept, item null');
+  eq(calls.filter((c) => c.url.includes('/rest/v1/tl_items')).length, 2, 'an empty catalog read is retried once');
+  failReads = { catalog: false, inventory: false };
+  rpcAnswers.bobby_apply_progress = () => ({ progress: { ...progressRow, companion_id: 'byte' }, legacyImported: 0, results: [] });
+  calls = [];
+  const profileOnly = await call(progressHandler, 'POST', { platform: 'ios', profile: { companionId: 'byte' } });
+  eq(profileOnly.status, 200, 'a profile-only POST succeeds');
+  assert(!calls.some((c) => c.url.includes('/rest/v1/tl_items') || c.url.includes('/rest/v1/tl_inventory')), 'a profile-only POST reads no catalog or inventory');
+}
+
+// ---------- close: a retry on a seed closed before the atomic review ----------
+reset();
+{
+  // U(4) bloomed before the deploy; its stored meta has the Growth-v1 keys only.
+  const legacyMeta = { closePx: 101.5, direction: 'long', executed: null, inventoryId: U(4), itemId: 'risk_reef_dual_orbit_antenna', movePct: 1.5, outcome: 'confirmed', plantEventId: U(104), referencePx: 100, reviewedAt: iso(NOW - 26 * H), symbol: 'BTC' };
+  rpcAnswers.bobby_close_seed = () => ({ ok: true, replay: true, closed: legacyMeta });
+  closeLedgerRows = [{ id: U(777), awarded: 15, aura: 6, xp_after: 115 }];
+  const replay = await call(landHandler, 'POST', { action: 'close', inventoryId: U(4), platform: 'ios' });
+  eq(replay.status, 200, 'a replayed legacy close answers 200');
+  const closed = replay.body.closed;
+  eq([closed.xp, closed.aura, closed.xpAfter, closed.ledgerEventId, closed.itemId, closed.outcome], [15, 6, 115, U(777), 'risk_reef_dual_orbit_antenna', 'confirmed'], 'the replay carries xp/aura/xpAfter/ledgerEventId from the ledger row (iOS decodes xp and aura as required Ints)');
+  const read = calls.find((c) => c.url.includes('select=id,awarded,aura,xp_after'))?.url ?? '';
+  assert(read.includes(`identity_id=eq.${ID}`) && read.includes(`meta->thesis_close->>inventoryId=eq.${U(4)}`) && read.includes('kind=eq.thesis_closed'), 'the ledger read is scoped to this identity, kind and inventory');
+  // A replay that already has every field (closed after the deploy) reads nothing more.
+  rpcAnswers.bobby_close_seed = () => ({ ok: true, replay: true, closed: { ...legacyMeta, xp: 25, aura: 10, xpAfter: 140, ledgerEventId: U(778) } });
+  calls = [];
+  const modern = await call(landHandler, 'POST', { action: 'close', inventoryId: U(4), platform: 'ios' });
+  eq([modern.body.closed.xp, modern.body.closed.ledgerEventId], [25, U(778)], 'a complete replay is returned as stored');
+  assert(!calls.some((c) => c.url.includes('select=id,awarded,aura,xp_after')), 'no ledger read for a complete replay');
 }
 
 reset();
 {
-  // A retry of a request whose answer was lost: the event is a duplicate. Its XP is not paid again,
-  // but its piece is granted again — tl_grant_piece replays the same row.
-  const e5 = 'cccccccc-cccc-4ccc-8ccc-000000000005', e6 = 'cccccccc-cccc-4ccc-8ccc-000000000006';
-  seenRows = [{ client_event_id: e5, kind: 'read_complete', awarded: 10 }, { client_event_id: e6, kind: 'read_complete', awarded: 0 }];
-  ledgerRows = [{ id: U(405), client_event_id: e5 }];
-  rpcAnswers.tl_grant_piece = () => ({ ok: true, inventory_id: U(505), item_id: 'crypto_bay_context_buoy', tier: 'common', horizon_hours: 24, state: 'seed', held: 9, seeded_at: iso(NOW - 5000), replay: true });
-  const r = await call(progressHandler, 'POST', { platform: 'ios', events: [{ id: e5, kind: 'read_complete', at: iso(NOW - 6000) }, { id: e6, kind: 'read_complete', at: iso(NOW - 6000) }] });
-  const awarded = r.body.results.find((x: any) => x.id === e5), capped = r.body.results.find((x: any) => x.id === e6);
-  eq([awarded.duplicate, awarded.awarded, awarded.world?.inventoryId, awarded.world?.state], [true, 0, U(505), 'seed'], 'a duplicate of an awarded read gets its piece back, no XP');
-  eq(rpcCalls('tl_grant_piece').map((c) => (c.body as { p_event: string }).p_event), [U(405)], 'only the awarded duplicate is re-granted, keyed on its ledger row');
-  assert(!('world' in capped), 'a duplicate of a capped read still plants nothing');
-  // An awarded duplicate whose ledger row cannot be read: the grant failed, say so.
-  reset();
-  seenRows = [{ client_event_id: e5, kind: 'read_complete', awarded: 10 }];
-  const lost = await call(progressHandler, 'POST', { platform: 'ios', events: [{ id: e5, kind: 'read_complete', at: iso(NOW - 6000) }] });
-  eq(lost.body.results[0].world, null, 'no ledger id: world null (failed), not absent (nothing planted)');
+  land.visibility = 'public';
+  const result = await call(landHandler, 'POST', {action:'rename_private',title:'My quiet island'});
+  eq(result.status,200,'private island name can be saved');
+  const patch = calls.find(c => c.method === 'PATCH' && c.url.includes('tl_lands'))?.body as any;
+  eq([patch?.visibility,patch?.title],['private','My quiet island'],'renaming from native cannot publish UGC');
 }
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

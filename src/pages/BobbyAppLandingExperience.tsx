@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Apple, ArrowRight, ChevronRight, Flame, Lock, Map as MapIcon, Menu, Mic, PawPrint, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { Apple, ArrowRight, ChevronRight, Flame, Lock, Map as MapIcon, Menu, MessageSquareText, PawPrint, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { COMPANIONS, tintFor } from '@/lib/companions/data';
 import { isSpanish, pick, t } from '@/lib/companions/i18n';
 import TraderLandPreview, { TRADER_LAND_URL } from '@/components/companion/TraderLandPreview';
@@ -178,9 +178,9 @@ export default function BobbyAppLandingExperience() {
   ];
 
   const moments = [
-    { step: '01', eyebrow: t('Ask out loud', 'Pregunta en voz alta'), title: t('Say the ticker. The desk wakes up.', 'Di el ticker. El desk despierta.'), image: '/app/shot-desk.webp', alt: t('The Live Desk with Byte ready for a spoken or typed market question', 'El Live Desk con Byte listo para una pregunta hablada o escrita'), accent: GREEN },
+    { step: '01', eyebrow: t('Ask your question', 'Haz tu pregunta'), title: t('Type the ticker. The desk wakes up.', 'Escribe el ticker. El desk despierta.'), image: '/app/shot-desk.webp', alt: t('The Live Desk with Byte ready for a market question (earlier iPhone build; voice is now on the web only)', 'El Live Desk con Byte listo para una pregunta de mercado (versión anterior para iPhone; la voz ahora solo está en la web)'), accent: GREEN },
     { step: '02', eyebrow: t('The answer gets challenged', 'La respuesta se refuta'), title: t('Three agents argue. Risk can close the gate.', 'Tres agentes discuten. El riesgo puede cerrar la puerta.'), image: '/app/shot-notrade.webp', alt: t('A real NO TRADE verdict on BTC with the live chart', 'Un NO TRADE real en BTC con la gráfica en vivo'), accent: '#7ea6ff' },
-    { step: '03', eyebrow: t('Your tone, same data', 'Tu tono, los mismos datos'), title: t('The tone changes. The data never does.', 'El tono cambia. Los datos nunca.'), image: '/app/shot-vibe.webp', alt: t('Choosing how Byte speaks: the tone changes, the data never does', 'Eligiendo cómo habla Byte: el tono cambia, los datos nunca'), accent: GOLD },
+    { step: '03', eyebrow: t('Voice tone · web', 'Tono de voz · web'), title: t('The tone changes. The data never does.', 'El tono cambia. Los datos nunca.'), image: '/app/shot-vibe.webp', alt: t('Choosing how Byte sounds in live voice, which is on the web desk (earlier iPhone build shown)', 'Eligiendo cómo suena Byte en la voz en vivo, que está en el desk web (se muestra una versión anterior para iPhone)'), accent: GOLD },
   ];
 
 
@@ -246,7 +246,7 @@ export default function BobbyAppLandingExperience() {
                 <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]"><Apple className="h-4 w-4" aria-hidden="true" /> {t('Download the iOS app', 'Descarga la app iOS')}</a>
               </div>
               <div className="mt-7 flex flex-wrap gap-x-6 gap-y-3 font-mono text-[9px] uppercase tracking-[0.12em] text-white/38">
-                <span className="inline-flex items-center gap-2"><Mic className="h-3.5 w-3.5 text-[#5cff91]" /> {t('Talk to it about BTC, NVDA or gold', 'Háblale de BTC, NVDA u oro')}</span>
+                <span className="inline-flex items-center gap-2"><MessageSquareText className="h-3.5 w-3.5 text-[#5cff91]" /> {t('Ask about BTC, NVDA or gold', 'Pregunta por BTC, NVDA u oro')}</span>
                 <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-[#8dc9ff]" /> {t('Three agents · one verdict', 'Tres agentes · un veredicto')}</span>
                 <span className="inline-flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-[#F5C542]" /> {t('On the record before the outcome', 'Registrado antes del resultado')}</span>
               </div>
@@ -299,6 +299,7 @@ export default function BobbyAppLandingExperience() {
             <motion.div {...reveal} className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">02 / {t('How a call is made', 'Cómo se decide')}</div>
               <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-5xl lg:text-7xl">{t('Ask the same question.', 'Haz la misma pregunta.')}<br /><span className="text-white/38">{t('Get an answer that was tested.', 'Recibe una respuesta que ya fue probada.')}</span></h2>
+              <p className="mt-5 max-w-xl font-mono text-[10px] uppercase leading-5 tracking-[0.12em] text-white/40">{t('Screens from an earlier iPhone build. In the current iPhone app you type your question; live voice is on the web desk.', 'Pantallas de una versión anterior para iPhone. En la app actual para iPhone escribes tu pregunta; la voz en vivo está en el desk web.')}</p>
             </motion.div>
             <div className="grid gap-5 lg:grid-cols-3">
               {moments.map((moment, index) => (
@@ -406,7 +407,7 @@ export default function BobbyAppLandingExperience() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(245,197,66,.16),transparent_50%),radial-gradient(circle_at_82%_24%,rgba(92,255,145,.12),transparent_38%)]" />
           <motion.div {...reveal} className="relative mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.045] p-6 text-center shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-xl sm:p-10 lg:p-14">
             <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Stop asking.', 'Deja de preguntar.')}<br /><span className="text-[#F5C542]">{t('Start checking.', 'Empieza a comprobar.')}</span></h2>
-            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t('Bobby is on the App Store for iPhone. The Live Desk is also open on the web.', 'Bobby ya está en el App Store para iPhone. El Live Desk también está abierto en la web.')}</p>
+            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t('Bobby is on the App Store for iPhone, where you type your question and read the answer. The Live Desk is also open on the web, with live voice.', 'Bobby ya está en el App Store para iPhone: escribes tu pregunta y lees la respuesta. El Live Desk también está abierto en la web, con voz en vivo.')}</p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <AppStoreBadge />
               <a href={TRY_IT_URL} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]">{t('Open the desk on the web', 'Abre el desk en la web')} <ArrowRight className="h-4 w-4" /></a>

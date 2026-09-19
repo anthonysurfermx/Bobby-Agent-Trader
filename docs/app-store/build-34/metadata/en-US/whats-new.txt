@@ -1,0 +1,8 @@
+Your questions now reach three AI perspectives: one builds the case, one challenges it, and one weighs both, so you can read the reasoning behind the answer.
+
+Also in this version:
+• Questions and replies are text only. Voice conversations are not available in this version.
+• Your Trader Land island stays private in the app. Public island sharing is not available in this version.
+• Bobby now asks for your permission before sending your questions to OpenAI for analysis.
+• Improved account sessions, progress syncing, Trader Land compatibility, and chart error handling.
+• Deleting your account now also helps you disconnect Sign in with Apple.
