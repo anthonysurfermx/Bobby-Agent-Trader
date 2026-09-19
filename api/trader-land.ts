@@ -27,7 +27,7 @@
 // core moves and growth are arbitrated by the database: every one of them is
 // an RPC that locks the land row first (so none can deadlock with a growth
 // step) and the tl_placement_cells trigger (migrations 20260904222250 and
-// 20260919000001). Coordinates are refused with 409 when they were drawn on
+// 20260919120516). Coordinates are refused with 409 when they were drawn on
 // another island size than the land has now (`size`, or 8 for a client that
 // never grows islands), since a growth shifts every cell by a ring.
 // Auth: wallet session or Supabase access token (same as /api/progress).

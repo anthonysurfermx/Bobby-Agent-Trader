@@ -18,7 +18,7 @@
 //     support), with a movable Aura Core that wakes at 5 pieces
 // All writes go through the service role; callers are /api/progress and
 // /api/trader-land, which already proved the identity. The land-shaping
-// writes are RPCs that lock the land row (migration 20260919000001).
+// writes are RPCs that lock the land row (migration 20260919120516).
 // ============================================================
 import { randomInt, randomUUID } from 'node:crypto';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
@@ -150,7 +150,7 @@ export function publicWorld(row: PublicLandRow, placements: PublicPlacement[], i
   return { code: row.share_code, title: row.title, size: row.size, theme: row.theme, publishedAt: row.published_at, core: coreOf(row, placements.length), placements, stats: worldStats(placements, items) };
 }
 
-// ---------- land-shaping RPCs (service role, migration 20260919000001) ----------
+// ---------- land-shaping RPCs (service role, migration 20260919120516) ----------
 // Each one locks the identity's land row first, so concurrent requests of the
 // same player serialize in the database. Expected refusals come back as
 // { ok: false, error: '<code>' }; a transport or SQL failure throws.

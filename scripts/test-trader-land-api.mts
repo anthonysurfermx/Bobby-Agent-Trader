@@ -32,7 +32,7 @@ delete process.env.BOBBY_CONTROL_SOURCE;
 
 // ---------- the catalog, read from the migrations (ids, kinds, footprints, tiers) ----------
 const base = readFileSync('supabase/bobby-protocol/supabase/migrations/20260903000006_trader_land.sql', 'utf8');
-const growth = readFileSync('supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql', 'utf8');
+const growth = readFileSync('supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql', 'utf8');
 const tiers = new Map([...growth.matchAll(/\('([a-z_]+)',\s*'(common|building|landmark)',\s*(\d+)\)/g)].map((m) => [m[1], { tier: m[2], tier_index: Number(m[3]) }]));
 const catalogRows = [...base.matchAll(/\('([a-z_]+)', '([a-z_]+)', '([^']+)', '([a-z]+)', (\d), (\d), '([^']+)'::jsonb, (null|\d+), '([^']+)'\)/g)].map((m) => ({
   id: m[1], world: m[2], attribution: m[3], kind: m[4], footprint_w: Number(m[5]), footprint_h: Number(m[6]), name: JSON.parse(m[7]),

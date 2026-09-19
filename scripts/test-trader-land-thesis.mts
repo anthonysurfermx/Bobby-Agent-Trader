@@ -84,7 +84,7 @@ const eq = (a: unknown, b: unknown, msg: string) => assert(JSON.stringify(a) ===
 
 // ---------- tier sequences: the migration's backfill is the source (GROWTH-v1 §1.3) ----------
 {
-  const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql', 'utf8');
+  const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql', 'utf8');
   const items = [...migration.matchAll(/\('([a-z_]+)',\s*'(common|building|landmark)',\s*(\d+)\)/g)].map((m) => ({ id: m[1], tier: m[2], tier_index: Number(m[3]) }));
   eq(items.length, 25, 'the migration tiers 25 pieces');
   eq(TIER_ORDER.map((t) => tierSequence(items, t).length), [15, 5, 5], '15 common, 5 buildings, 5 landmarks');

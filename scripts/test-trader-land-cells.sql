@@ -17,7 +17,7 @@ insert into tl_inventory values
  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3','11111111-1111-4111-8111-111111111111','small','seed');
 \ir ../supabase/bobby-protocol/supabase/migrations/20260904222250_trader_land_occupied_cells.sql
 -- Growth v1 replaces the trigger: the core rectangle comes from the land (default 3,3).
-\ir ../supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql
+\ir ../supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql
 
 do $$
 declare owner uuid := '11111111-1111-4111-8111-111111111111'; placement uuid;

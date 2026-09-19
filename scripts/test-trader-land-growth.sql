@@ -25,9 +25,9 @@ create role service_role;
 \ir ../supabase/bobby-protocol/supabase/migrations/20260903000006_trader_land.sql
 \ir ../supabase/bobby-protocol/supabase/migrations/20260904222250_trader_land_occupied_cells.sql
 \ir ../supabase/bobby-protocol/supabase/migrations/20260904230244_trader_land_public_worlds.sql
-\ir ../supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql
+\ir ../supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql
 -- Idempotent: a second run changes nothing and fails nothing.
-\ir ../supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql
+\ir ../supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql
 -- bobby_link_identities re-parents swap receipts; the real table (migration
 -- 20260903000009) needs the agent schema, so a stand-in with the same key.
 create table if not exists public.bobby_swap_receipts (id uuid primary key default gen_random_uuid(), identity_id uuid references public.bobby_identities(id) on delete set null);
@@ -497,7 +497,7 @@ begin
   for i in 0..3 loop perform pg_temp.put(h, 'crypto_bay_data_dock', i, 0); end loop;
 end $$;
 set client_min_messages = warning;
-\ir ../supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql
+\ir ../supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql
 set client_min_messages = notice;
 do $$
 begin
