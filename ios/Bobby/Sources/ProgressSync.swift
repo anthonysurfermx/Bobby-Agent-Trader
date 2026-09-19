@@ -58,12 +58,14 @@ struct RouteGrant: Equatable {
             L.isSpanish ? TraderLandCatalog.name(id, district: world) : (nameEN ?? TraderLandCatalog.name(id, district: world))
         }
 
-        /// Reads a PieceSummary `{ id, world, attribution, kind, name: { en, es }, footprint: [w, h] }`.
+        /// Reads a PieceSummary `{ id, world, attribution, kind, name: { en, es }, footprint: [w, h] }`,
+        /// or an island catalog row, which spells its footprint `footprint_w` / `footprint_h`.
         static func parse(_ raw: Any?) -> Piece? {
             guard let i = raw as? [String: Any], let pid = i["id"] as? String else { return nil }
+            let row = (i["footprint_w"] as? Int).flatMap { w in (i["footprint_h"] as? Int).map { [w, $0] } }
             return Piece(id: pid, world: i["world"] as? String, kind: i["kind"] as? String,
                          nameEN: (i["name"] as? [String: Any])?["en"] as? String,
-                         footprint: i["footprint"] as? [Int] ?? [1, 1])
+                         footprint: i["footprint"] as? [Int] ?? row ?? [1, 1])
         }
     }
 
@@ -78,8 +80,16 @@ struct RouteGrant: Equatable {
         /// The upward horizons the server accepts (⊆ 72, 168).
         let extendTo: [LandHorizon]
 
-        /// What the builder can pick right now: upward only, and only while extendable.
-        var options: [LandHorizon] { extendable ? extendTo.filter { $0.hours > hours.hours } : [] }
+        /// What the builder can pick at `now`: upward only, only while extendable, and never once
+        /// the review opened (§1: extend only while now < seeded_at + horizon). `extendable` is
+        /// the server's word when it answered; a card left open past `reviewAt` must not trust it.
+        func options(at now: Date = Date()) -> [LandHorizon] {
+            guard extendable, reviewAt.map({ $0 > now }) ?? true else { return [] }
+            return extendTo.filter { $0.hours > hours.hours }
+        }
+
+        /// The same horizon with its choice closed: the review opened, or the server refused.
+        var closed: Horizon { Horizon(hours: hours, reviewAt: reviewAt, extendable: false, extendTo: []) }
 
         /// `{ hours: 24 | 72 | 168, tier, reviewAt, extendable, extendTo }`; nil when the hours are unknown.
         static func parse(_ raw: Any?) -> Horizon? {

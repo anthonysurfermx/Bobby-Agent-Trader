@@ -52,17 +52,20 @@ final class DeskHarvestCardTests: XCTestCase {
         XCTAssertFalse(day.isEnabled)
         XCTAssertTrue(threeDays.isEnabled)
         XCTAssertTrue(week.isEnabled)
-        XCTAssertTrue(threeDays.label.hasPrefix("3 days · building 2×1"), threeDays.label)
+        // VoiceOver hears the footprint as words, never "2 multiplied by 1".
+        XCTAssertTrue(threeDays.label.hasPrefix("3 days · building 2 by 1"), threeDays.label)
         XCTAssertTrue(threeDays.label.contains("Double Gate"), threeDays.label)
-        XCTAssertTrue(week.label.contains("landmark 2×2"), week.label)
+        XCTAssertTrue(week.label.contains("landmark 2 by 2"), week.label)
         XCTAssertFalse(app.buttons["harvest-horizon-confirm"].exists, "nothing is sent without a confirmation")
 
         threeDays.tap()
         let confirm = app.buttons["harvest-horizon-confirm"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 5))
-        XCTAssertEqual(confirm.label, "Grow to 3 days")
+        // The contract's verb on every client; the horizon never wraps inside itself.
+        XCTAssertEqual(confirm.label, "Extend to 3\u{00A0}days")
         XCTAssertTrue(anything(app, containing: "You can't shorten it later.").exists)
-        XCTAssertEqual(app.buttons["harvest-horizon-cancel"].label, "Keep 24 h")
+        XCTAssertEqual(app.buttons["harvest-horizon-cancel"].label, "Keep 24\u{00A0}h")
+        XCTAssertEqual(threeDays.value as? String, "Waiting for confirmation", "the pending choice is spoken, not only dashed")
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "harvest-picker-confirm"
         shot.lifetime = .keepAlways
@@ -84,7 +87,7 @@ final class DeskHarvestCardTests: XCTestCase {
         confirm.tap()
         // The fixture answers like the server: the seed now blooms into the building in 3 days.
         XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(anything(app, containing: "review this thesis in 3 days").waitForExistence(timeout: 5))
+        XCTAssertTrue(anything(app, containing: "review this thesis in 3\u{00A0}days").waitForExistence(timeout: 5))
         XCTAssertTrue(threeDays.isSelected)
         XCTAssertFalse(app.buttons["harvest-horizon-24h"].isEnabled, "a horizon cannot shrink")
         XCTAssertTrue(app.buttons["harvest-horizon-7d"].isEnabled)
@@ -96,7 +99,7 @@ final class DeskHarvestCardTests: XCTestCase {
         XCTAssertTrue(app.buttons["harvest-horizon-3d"].isSelected)
         XCTAssertFalse(app.buttons["harvest-horizon-24h"].isEnabled)
         XCTAssertTrue(app.buttons["harvest-horizon-7d"].isEnabled)
-        XCTAssertTrue(anything(app, containing: "in 3 days").exists)
+        XCTAssertTrue(anything(app, containing: "in 3\u{00A0}days").exists)
         app.terminate()
 
         app = launch("seed-7d")
@@ -104,7 +107,7 @@ final class DeskHarvestCardTests: XCTestCase {
         XCTAssertTrue(app.buttons["harvest-horizon-7d"].isSelected)
         XCTAssertFalse(app.buttons["harvest-horizon-24h"].isEnabled)
         XCTAssertFalse(app.buttons["harvest-horizon-3d"].isEnabled)
-        XCTAssertTrue(anything(app, containing: "in 7 days").exists)
+        XCTAssertTrue(anything(app, containing: "in 7\u{00A0}days").exists)
     }
 
     func testNoTradeAndOlderServersShowNoPicker() {
@@ -116,7 +119,29 @@ final class DeskHarvestCardTests: XCTestCase {
         app = launch("seed")
         XCTAssertTrue(app.buttons["harvest-primary"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["harvest-horizon-3d"].exists)
-        XCTAssertTrue(anything(app, containing: "in 24 h").exists)
+        XCTAssertTrue(anything(app, containing: "in 24\u{00A0}h").exists)
+    }
+
+    func testAReviewThatOpenedLocksTheChoice() {
+        // The server said extendable at grant time; the review opened since: nothing to send.
+        let app = launch("review-open")
+        let threeDays = app.buttons["harvest-horizon-3d"]
+        XCTAssertTrue(threeDays.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["harvest-horizon-24h"].isSelected)
+        XCTAssertFalse(threeDays.isEnabled)
+        XCTAssertFalse(app.buttons["harvest-horizon-7d"].isEnabled)
+    }
+
+    func testTheChoiceLocksWhenTheReviewOpensOnScreen() {
+        // Its review opens 6 s after launch, with the confirm step up if the card was quick enough.
+        let app = launch("picker-closing")
+        let threeDays = app.buttons["harvest-horizon-3d"]
+        XCTAssertTrue(threeDays.waitForExistence(timeout: 10))
+        if threeDays.isEnabled { threeDays.tap() }
+        let locked = expectation(for: NSPredicate(format: "isEnabled == false"), evaluatedWith: threeDays)
+        wait(for: [locked], timeout: 15)
+        XCTAssertFalse(app.buttons["harvest-horizon-7d"].isEnabled)
+        XCTAssertFalse(app.buttons["harvest-horizon-confirm"].exists, "no confirmation for a horizon that is set")
     }
 
     func testChipCarriesItsBadge() {
