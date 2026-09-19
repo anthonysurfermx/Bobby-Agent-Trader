@@ -20,7 +20,22 @@
 set client_min_messages = warning;
 create role anon;
 create role authenticated;
-create role service_role;
+-- Production's service_role carries BYPASSRLS (verified on bobby-protocol);
+-- without it a service-role write to an RLS table fails only in the fixture.
+create role service_role bypassrls;
+
+-- agent_trades as production shapes it (the columns the deletion path touches;
+-- user_id carries an identity id and has no FK, so deletion must null it).
+create table if not exists public.agent_trades (
+  id uuid primary key default gen_random_uuid(),
+  chain text not null,
+  token_address text not null,
+  token_symbol text not null,
+  direction text not null,
+  amount_usd numeric not null,
+  user_id uuid
+);
+grant all on public.agent_trades to service_role;
 \ir ../supabase/bobby-protocol/supabase/migrations/20260903000005_bobby_progress.sql
 \ir ../supabase/bobby-protocol/supabase/migrations/20260903000006_trader_land.sql
 \ir ../supabase/bobby-protocol/supabase/migrations/20260904222250_trader_land_occupied_cells.sql
