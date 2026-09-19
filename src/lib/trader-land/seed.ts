@@ -88,7 +88,8 @@ export function seedOptions(grant: WorldGrant, now = Date.now()): SeedOption[] {
 /** The grant after the server extended it: new piece, new horizon, the tier's slot now holds that piece. */
 export function applyExtended(grant: WorldGrant, extended: Extended): WorldGrant {
   const tier = extended.horizon.tier;
-  return { ...grant, item: extended.item, horizon: extended.horizon, tiers: { ...(grant.tiers ?? {}), [tier]: extended.item } };
+  const item = extended.item ?? grant.tiers?.[tier] ?? grant.item;
+  return { ...grant, item, horizon: extended.horizon, tiers: { ...(grant.tiers ?? {}), ...(item ? { [tier]: item } : {}) } };
 }
 
 export type SeedCardState =
@@ -136,7 +137,7 @@ export async function extendSeed(auth: Record<string, string>, inventoryId: stri
     const extended = isRecord(value.extended) ? value.extended : null;
     const item = piece(extended?.item);
     const next = horizon(extended?.horizon);
-    if (!response.ok || !extended || !item || !next) return { ok: false, extended: null, status: response.status, message: extendErrorMessage(response.ok ? 0 : response.status, value.error) };
+    if (!response.ok || !extended || !next) return { ok: false, extended: null, status: response.status, message: extendErrorMessage(response.ok ? 0 : response.status, value.error) };
     return { ok: true, extended: { inventoryId: String(extended.inventoryId ?? inventoryId), item, horizon: next }, status: response.status, message: '' };
   } catch {
     return { ok: false, extended: null, status: 0, message: extendErrorMessage(0, null) };
@@ -170,6 +171,7 @@ export async function submitExtend(io: {
   if (!io.auth || !io.grant.inventoryId) return report({ ok: false, message: t('Sign in again to extend it.', 'Vuelve a iniciar sesión para extenderla.') });
   const result = await extendSeed(io.auth, io.grant.inventoryId, io.hours, io.fetchImpl);
   if (!result.ok || !result.extended) return report({ ok: false, message: result.message });
-  io.saveGrant(io.eventId, applyExtended(io.grant, result.extended));
-  return report({ ok: true, message: extendedNotice(result.extended.horizon.hours, io.pieceLabel(result.extended.item)) });
+  const grant = applyExtended(io.grant, result.extended);
+  io.saveGrant(io.eventId, grant);
+  return report({ ok: true, message: grant.item ? extendedNotice(result.extended.horizon.hours, io.pieceLabel(grant.item)) : t('Horizon extended.', 'Horizonte extendido.') });
 }

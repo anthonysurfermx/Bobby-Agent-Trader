@@ -25,8 +25,9 @@ disagree, this file wins; change it first.
    A respected NO TRADE blooms the next `common` piece at once (never a building).
 3. **Pieces repeat, in the open.** Each tier has a fixed sequence (`tl_items.tier`, `tier_index`).
    A player's next piece of tier T is `sequence[n mod len]`, where `n` = inventory rows of that
-   player with `source = 'route'` whose item is in tier T, in any state. When a seed is extended,
-   the common slot it held is released (the next common read gets that piece again). No randomness.
+   player with `source = 'route'` whose item is in tier T, in any state. When a seed is extended it
+   leaves the common count (n drops by one), so a later common read may repeat a piece already held;
+   the formula is the rule. No randomness.
 4. **The island grows.** `tl_lands.size` goes 8 → 10 → 12 → 16, never back. After a placement,
    if occupied cells (all placement cells + the 4 core cells) ≥ threshold, the island grows one
    step: 8×8 at 39 cells → 10×10 · 10×10 at 60 → 12×12 · 12×12 at 87 → 16×16. Growing adds rings
@@ -35,7 +36,12 @@ disagree, this file wins; change it first.
    Growth is only triggered by a client that declares support (header, §3), because every shipped
    iOS build (1.1 (26) live, 1.2 (31) TestFlight) rejects any island whose size is not 8 and
    shows "This island version is not supported yet". An account only grows after it used a new
-   client; old clients on that account then show that message until they update.
+   client; old clients on that account then show that message until they update. The same holds
+   for a moved core: a request without the header on an island that grew OR whose core is not at
+   3,3 gets the world with `ok: false, error: 'Update Bobby to open this island'` (§3), so a shipped
+   build shows its "not supported" message instead of drawing a phantom core at 3,3. Accepted
+   degradation: build 31's archipelago (TestFlight only; 1.1 has none) draws a public 8×8
+   neighbour's moved core at 3,3 — the public endpoint is CDN-cached and cannot tell clients apart.
 5. **The Aura Core moves and wakes.** Its 2×2 position lives on the land (`core_x`, `core_y`,
    default 3,3). On an account island the builder can move it like a piece (tap it → Move); it
    cannot be stored or rotated. It starts **dormant** (`core_stage = 0`: stage0 art, static, drawn
@@ -44,6 +50,8 @@ disagree, this file wins; change it first.
    Existing islands: stage 1 if they already have ≥ 5 placements, else 0 (migration backfill).
 6. **The practice island** (signed out, `-trader-land-gate` tests, web demo) stays 8×8 with the
    core fixed at 3,3, stage 1, not movable. Only account islands change.
+7. **Words.** Tiers are "common piece / building / landmark" and "pieza común / edificio /
+   monumento"; the action is "Extend" / "Extender" on every client.
 
 ### Tier sequences (`tl_items.tier`, `tl_items.tier_index`, set by the migration)
 - `common`: 1 `crypto_bay_data_dock`, 2 `crypto_bay_water_walkway`, 3 `risk_reef_dual_orbit_antenna`,
@@ -88,9 +96,12 @@ File: `supabase/bobby-protocol/supabase/migrations/<timestamp>_trader_land_growt
     in 72/168) | `review_open` (`now() >= seeded_at + horizon_hours`). Picks the next item of the
     new tier (the seed itself excluded from `n`), updates `item_id` + `horizon_hours`. Returns
     `{ ok, inventory_id, item_id, tier, horizon_hours, review_at }`.
-  - `tl_move_core(p_identity uuid, p_x int, p_y int)` — locks the land `for update`; errors
-    `outside` | `occupied` (any `tl_placement_cells` row inside the target rectangle). Returns
-    `{ ok, core_x, core_y }`.
+  - `tl_move_core(p_identity uuid, p_x int, p_y int, p_size int default null)` — locks the land
+    `for update`; errors `outside` | `occupied` (any `tl_placement_cells` row inside the target
+    rectangle) | `stale` (`p_size` given and ≠ the land's size). Returns `{ ok, core_x, core_y }`.
+  - `tl_place_piece`, `tl_move_piece`, `tl_remove_piece` — every placement write goes through
+    these. They lock the land first (the same lock order as growth, so a place/move never
+    deadlocks with a growth) and refuse coordinates drawn on a stale size; trigger refusals map to 409.
   - `tl_grow_land(p_identity uuid)` — locks the land `for update`; sets `core_stage = 1` when ≥ 5
     placements; then while occupied ≥ threshold(size) and size < 16: `delete from
     tl_placement_cells where identity_id = p_identity`, update the land (new size, core + shift),
@@ -125,13 +136,20 @@ capabilities: { move: true, close: true, extend: true, moveCore: true, grow: tru
 
 ### `POST /api/trader-land` actions (new ones)
 - `{ action: 'extend', inventoryId, hours: 72 | 168 }` → `tl_extend_seed`. Response
-  `{ ok, extended: { inventoryId, item: PieceSummary, horizon: {…as above} }, ...world }`.
+  `{ ok, extended: { inventoryId, item: PieceSummary | null, horizon: {…as above} }, ...world }`
+  (`item` falls back to the seed row; null only if the catalog changed mid-request — the extend
+  still happened).
   Errors: 404 `not_found`, 409 `{ error: 'This seed already bloomed' }` (`not_seed`),
   409 `{ error: 'Its review is already open', reviewAt }` (`review_open`),
   400 `{ error: 'A horizon can only grow' }` (`not_upward`).
-- `{ action: 'move_core', x, y }` (ints 0..15) → `tl_move_core`. Response `{ ok, coreMoved: { x, y },
-  ...world }`. Errors: 400 `{ error: 'Outside the island' }`, 409 `{ error: 'The island changed.
-  Reload and try again.' }` (occupied — same message as a placement collision).
+- `{ action: 'move_core', x, y, size? }` (ints 0..15) → `tl_move_core`. Response `{ ok, coreMoved:
+  { x, y }, ...world }`. Errors: 400 `{ error: 'Outside the island' }`, 409 `{ error: 'The island
+  changed. Reload before trying again.' }` (occupied or stale — the placement collision message).
+- `size?: 8 | 10 | 12 | 16` on `place`, `move` and `move_core` is the `land.size` the client drew
+  its coordinates on. Growth clients always send it; a mismatch is 409 (the island grew
+  elsewhere). A request without the header is taken to have drawn 8×8.
+- A world response to a request WITHOUT the header, on an island that grew or whose core moved,
+  carries `ok: false, error: 'Update Bobby to open this island'` (§1.4).
 - `place`: bounds are the land's size and the core rectangle from the land (no hardcoded 3,3).
   When the request carries `X-Trader-Land-Client: 2`, after a successful placement the API calls
   `tl_grow_land` and adds `grew: { from, to, shift } | null` to the response (world re-read after).
@@ -163,7 +181,8 @@ sprite: frame side = min(360·8/N, tileW·(w + h)/2·0.9/visibleWidth) · scale;
 core:   2×2 at (core.x, core.y); stage 0 → stage0 albedo (+glow), static, scale 0.72; stage 1 → animated.
 ```
 Slab corners, island centre, canvas and the archipelago layout never change. Max camera zoom
-scales by N/8; for N ≥ 12 the "home" zoom is 1.25 so 1×1 tiles stay tappable. Stroke widths and
+scales by N/8; for N ≥ 12 the builder's "home" zoom is 1.25 so 1×1 tiles stay tappable (read-only
+visitors and "Fit island" use 1, so nothing is cropped). Stroke widths and
 fixed hit boxes scale by `8/N`.
 
 ### Behaviour both clients implement

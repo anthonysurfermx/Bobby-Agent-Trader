@@ -26,7 +26,8 @@ export interface Horizon { hours: HorizonHours; tier: Tier; reviewAt: string; ex
 export interface PieceSummary { id: string; world: string; attribution: string; kind: string; name?: unknown; footprint: [number, number] }
 export interface TierInfo { id: Tier; hours: HorizonHours; footprint: [number, number]; length: number; held: number; next: PieceSummary | null }
 export interface Grew { from: number; to: number; shift: number }
-export interface Extended { inventoryId: string; item: PieceSummary; horizon: Horizon }
+/** `item` is null only when the server could not name the new piece (catalog changed mid-request); the extend itself happened. */
+export interface Extended { inventoryId: string; item: PieceSummary | null; horizon: Horizon }
 
 /** The contract's horizon table: how long a thesis plays out decides the piece's tier and footprint. */
 export const HORIZONS: ReadonlyArray<{ hours: HorizonHours; tier: Tier; footprint: [number, number] }> = [
@@ -113,7 +114,7 @@ export function horizonLabel(hours: number): string {
   return hours === 72 ? t('3 days', '3 días') : hours === 168 ? t('7 days', '7 días') : `${hours} h`;
 }
 export function tierLabel(tier: Tier): string {
-  return tier === 'building' ? t('building', 'edificio') : tier === 'landmark' ? t('landmark', 'hito') : t('common', 'común');
+  return tier === 'building' ? t('building', 'edificio') : tier === 'landmark' ? t('landmark', 'monumento') : t('common', 'común');
 }
 /** "3 days · building 2×1" */
 export function horizonOptionLabel(hours: number): string {

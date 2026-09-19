@@ -36,7 +36,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { ISLAND_CHANGED, THESIS_REVIEW_HOURS, catalog, cleanTitle, closeSeed, drawnSize, ensureLand, extendSeed, growLand, growthClient, landView, moveCore, movePiece, newShareCode, nextPieces, pieceSummary, placePiece, removePiece, seasonProgress, seedHorizon, seedReviews, wakeCore, type Grew } from './_lib/trader-land.js';
-import { CORE_CELLS, TIER_FOOTPRINT, TIER_HOURS, TIER_ORDER, WAKE_PIECES, coreCellKeys, heldByTier, pieceCells, tierSequence } from './_lib/trader-land-growth.js';
+import { CORE_CELLS, LEGACY_LAND_SIZE, TIER_FOOTPRINT, TIER_HOURS, TIER_ORDER, WAKE_PIECES, coreCellKeys, heldByTier, pieceCells, tierSequence } from './_lib/trader-land-growth.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
@@ -59,7 +59,13 @@ const Body = z.discriminatedUnion('action', [
 interface Inv { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; seeded_at: string; bloomed_at: string | null; event_id: string | null; horizon_hours: number; tl_items: { tier: string | null } | null }
 interface Placement { id: string; inventory_id: string; x: number; y: number; rotation: number; placed_at: string }
 
-async function world(identity: Identity) {
+// Shipped iOS builds (1.1 (26), 1.2 (31)) draw every island as 8×8 with the core
+// at 3,3 and send no client header. An island that grew or whose core moved
+// would draw wrong there, so they get ok:false and show their own "not
+// supported yet" message instead (GROWTH-v1 §1.4).
+const LEGACY_UNSUPPORTED = 'Update Bobby to open this island';
+
+async function world(identity: Identity, headers?: VercelRequest['headers']) {
   const [land, items, invR, plR, progR] = await Promise.all([
     ensureLand(identity.id),
     catalog(),
@@ -94,8 +100,11 @@ async function world(identity: Identity) {
   const reviews = await seedReviews(inventory.filter((r) => r.state === 'seed'), now);
   let ready = 0;
   for (const review of reviews.values()) if (review.ready) ready += 1;
+  const view = landView(land, occupied, placements.length);
+  const legacyBlocked = headers !== undefined && !growthClient(headers) && (view.size !== LEGACY_LAND_SIZE || view.core.x !== 3 || view.core.y !== 3);
   return {
-    land: landView(land, occupied, placements.length),
+    ...(legacyBlocked ? { ok: false as const, error: LEGACY_UNSUPPORTED } : {}),
+    land: view,
     xp: prog.xp, aura: prog.aura,
     tiers,
     // Legacy (iOS release 31 reads index/total/complete): the common sequence, which repeats and never completes.
@@ -139,7 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const identity = await requireIdentity(req, res);
     if (!identity) return;
-    try { res.setHeader('Cache-Control', 'no-store'); return res.status(200).json({ ok: true, ...(await world(identity)) }); } catch (error) { console.error('[trader-land] get', error); return res.status(500).json({ error: 'World read failed' }); }
+    try { res.setHeader('Cache-Control', 'no-store'); return res.status(200).json({ ok: true, ...(await world(identity, req.headers)) }); } catch (error) { console.error('[trader-land] get', error); return res.status(500).json({ error: 'World read failed' }); }
   }
   const guarded = await guardWrite(req, res, { methods: ['POST'], scope: 'trader-land', schema: Body, auth: 'none', allowNoOrigin: true, perIp: { limit: 60, windowSec: 60 }, perSubject: { key: () => null, limit: 60, windowSec: 60 } });
   if (!guarded) return;
@@ -150,7 +159,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.action === 'unpublish') {
       const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identity.id}`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ visibility: 'private' }) });
       if (!r.ok || !((await r.json()) as unknown[]).length) return res.status(502).json({ error: 'Could not hide the island' });
-      return res.status(200).json({ ok: true, unpublished: true, ...(await world(identity)) });
+      return res.status(200).json({ ok: true, unpublished: true, ...(await world(identity, req.headers)) });
     }
     if (body.action === 'publish') {
       const land = await ensureLand(identity.id);
@@ -162,34 +171,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identity.id}`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ visibility: 'public', share_code: code, title, published_at: new Date().toISOString() }) });
         if (r.status === 409 && !land.share_code) continue; // another land drew the same code
         if (!r.ok || !((await r.json()) as unknown[]).length) return res.status(502).json({ error: 'Could not publish the island' });
-        return res.status(200).json({ ok: true, published: code, ...(await world(identity)) });
+        return res.status(200).json({ ok: true, published: code, ...(await world(identity, req.headers)) });
       }
       return res.status(502).json({ error: 'Could not publish the island' });
     }
     if (body.action === 'remove') {
       const removed = await removePiece(identity.id, body.placementId);
       if (removed.ok === false) return res.status(removed.status).json({ error: removed.error });
-      return res.status(200).json({ ok: true, removed: body.placementId, ...(await world(identity)) });
+      return res.status(200).json({ ok: true, removed: body.placementId, ...(await world(identity, req.headers)) });
     }
     if (body.action === 'close') {
       const result = await closeSeed({ id: identity.id, wallet: identity.wallet }, body.inventoryId, { platform: body.platform, tzOffsetMin: body.tzOffsetMin });
       if (result.ok === false) return res.status(result.status).json({ error: result.error, ...(result.reviewAt ? { reviewAt: result.reviewAt } : {}) });
-      return res.status(200).json({ ok: true, closed: result.closed, ...(await world(identity)) });
+      return res.status(200).json({ ok: true, closed: result.closed, ...(await world(identity, req.headers)) });
     }
     if (body.action === 'extend') {
       const result = await extendSeed(identity.id, body.inventoryId, body.hours);
       if (result.ok === false) return res.status(result.status).json({ error: result.error, ...(result.reviewAt ? { reviewAt: result.reviewAt } : {}) });
-      const w = await world(identity);
-      const item = w.catalog.find((candidate) => candidate.id === result.itemId);
+      const w = await world(identity, req.headers);
+      // The seed row of the same read is the fallback if the catalog moved under us.
+      const item = w.catalog.find((candidate) => candidate.id === result.itemId) ?? w.inventory.find((row) => row.id === result.inventoryId)?.item ?? null;
       return res.status(200).json({ ok: true, extended: { inventoryId: result.inventoryId, item: item ? pieceSummary(item) : null, horizon: result.horizon }, ...w });
     }
     if (body.action === 'move_core') {
       await ensureLand(identity.id);
       const result = await moveCore(identity.id, body.x, body.y, drawnSize(body.size, req.headers));
       if (result.ok === false) return res.status(result.status).json({ error: result.error });
-      return res.status(200).json({ ok: true, coreMoved: { x: result.x, y: result.y }, ...(await world(identity)) });
+      return res.status(200).json({ ok: true, coreMoved: { x: result.x, y: result.y }, ...(await world(identity, req.headers)) });
     }
-    const w = await world(identity);
+    const w = await world(identity, req.headers);
     // Coordinates drawn on another size are one ring off on this island.
     const drawn = drawnSize(body.size, req.headers);
     if (drawn !== null && drawn !== w.land.size) return res.status(409).json({ error: ISLAND_CHANGED });
@@ -205,7 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Validated on w.land.size: a growth that commits first makes the database refuse it.
       const moved = await movePiece(identity.id, placement.id, body.x, body.y, body.rotation, w.land.size);
       if (moved.ok === false) return res.status(moved.status).json({ error: moved.error });
-      return res.status(200).json({ ok: true, moved: placement.id, ...(await world(identity)) });
+      return res.status(200).json({ ok: true, moved: placement.id, ...(await world(identity, req.headers)) });
     }
     const piece = w.inventory.find((i) => i.id === body.inventoryId);
     if (!piece || !piece.item) return res.status(404).json({ error: 'Piece not in your inventory' });
@@ -224,10 +234,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // The piece is saved; growing (and waking the core) is best effort and
     // runs again after the next placement if it fails here. An older client
     // never grows the island; the world read below wakes its core.
-    if (!growthClient(req.headers)) return res.status(200).json({ ok: true, placed, ...(await world(identity)) });
+    if (!growthClient(req.headers)) return res.status(200).json({ ok: true, placed, ...(await world(identity, req.headers)) });
     let grew: Grew | null = null;
     try { grew = await growLand(identity.id); } catch (error) { console.error('[trader-land] grow', error); }
-    return res.status(200).json({ ok: true, placed, grew, ...(await world(identity)) });
+    return res.status(200).json({ ok: true, placed, grew, ...(await world(identity, req.headers)) });
   } catch (error) {
     console.error('[trader-land] post', error);
     return res.status(500).json({ error: 'World update failed' });

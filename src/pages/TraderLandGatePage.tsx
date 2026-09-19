@@ -527,7 +527,7 @@ export default function TraderLandGatePage() {
     if (!validDraft || !draft || !world || editingBlocked) return;
     if (draft.inventoryId === CORE_UID) {
       // The response carries the moved core; mutate() clears draft and undo because the land changed.
-      if (!await mutate({ action: 'move_core', x: draft.col, y: draft.row })) return;
+      if (!await mutate({ action: 'move_core', x: draft.col, y: draft.row, size: geom.size })) return;
       setDraft(null); setLibraryOpen(true); cue('placement_confirm'); setNotice(t('Aura Core moved.', 'Aura Core movido.'));
       return;
     }
@@ -538,7 +538,7 @@ export default function TraderLandGatePage() {
       setUndoWorld(previous);
       setDemo(withPlacements(previous,[...previous.placements.filter((entry)=>entry.id!==p.id),p]));
     } else {
-      const next = await mutate(draft.placementId ? { action:'move',placementId:draft.placementId,x:p.x,y:p.y,rotation:p.rotation } : { action:'place',inventoryId:draft.inventoryId,x:p.x,y:p.y,rotation:p.rotation });
+      const next = await mutate(draft.placementId ? { action:'move',placementId:draft.placementId,x:p.x,y:p.y,rotation:p.rotation,size:geom.size } : { action:'place',inventoryId:draft.inventoryId,x:p.x,y:p.y,rotation:p.rotation,size:geom.size });
       if (!next) return;
       const created = next.placements.find((entry)=>entry.inventory_id===p.inventory_id);
       // A placement that grew the island shifted every coordinate: there is nothing safe to undo.
@@ -562,7 +562,8 @@ export default function TraderLandGatePage() {
     if (editingBlocked || draft) return;
     if (isDemo && undoWorld) { setDemo(undoWorld); setUndoWorld(null); }
     else if (!isDemo && undoAction) {
-      const next = await mutate(undoAction); if (!next) return;
+      // Undo coordinates are on the current island (undo is cleared when it grows).
+      const next = await mutate(undoAction.action === 'remove' ? undoAction : { ...undoAction, size: geom.size }); if (!next) return;
       setUndoAction(null);
       // Undoing a return places the piece again, which can grow the island.
       if (next.grew) { setNotice(grewNotice(next.grew)); return; }
@@ -594,7 +595,7 @@ export default function TraderLandGatePage() {
     setExtendAsk(null);
     if (!next?.extended) return;
     cue('seed_reveal');
-    setNotice(extendedNotice(next.extended.horizon.hours, tierPieceName(next.extended.item)));
+    setNotice(next.extended.item ? extendedNotice(next.extended.horizon.hours, tierPieceName(next.extended.item)) : t('Horizon extended.', 'Horizonte extendido.'));
   };
   /** Name of a server piece: the art catalog's when it has the piece, else the server's. */
   const tierPieceName = (piece: PieceSummary) => { const item = items.get(piece.id); return item ? itemName(item) : pieceName(piece, isSpanish()); };

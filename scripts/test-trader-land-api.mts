@@ -190,6 +190,21 @@ reset();
   eq(w.share, { public: false, code: null, title: null, publishedAt: null }, 'share unchanged');
 }
 
+// ---------- shipped iOS (no client header) on an island it would draw wrong ----------
+reset();
+{
+  const plain = await call(landHandler, 'GET');
+  assert(plain.body.ok === true && !('error' in plain.body), 'an 8x8 island with the core at 3,3 still opens on shipped iOS');
+  land = { ...land, core_x: 0, core_y: 5 };
+  const moved = await call(landHandler, 'GET');
+  eq([moved.status, moved.body.ok, moved.body.error], [200, false, 'Update Bobby to open this island'], 'a moved core: shipped iOS gets ok:false (it shows "not supported yet")');
+  assert(moved.body.land?.core?.x === 0, 'the world still rides along for readers that ignore ok');
+  eq((await call(landHandler, 'GET', undefined, V2)).body.ok, true, 'a growth client opens the same island');
+  land = { ...land, core_x: 3, core_y: 3, size: 10 };
+  eq((await call(landHandler, 'GET')).body.ok, false, 'a grown island: shipped iOS gets ok:false');
+  eq((await call(landHandler, 'GET', undefined, V2)).body.ok, true, 'a grown island opens for a growth client');
+}
+
 // ---------- extend ----------
 reset();
 {

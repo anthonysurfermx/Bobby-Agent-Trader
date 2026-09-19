@@ -17,7 +17,7 @@ export const DISTRICT_META: Record<District, { name: string; color: string; trai
   axiom_archive: { name: 'Axiom Archive', color: '#f5d68b', trait: ['Closure', 'Cierre'], line: ['Paths and flowers for closed theses.', 'Caminos y flores para las tesis cerradas.'] },
 };
 export const KIND_LABEL: Record<string, [string, string]> = {
-  ground: ['Ground', 'Suelo'], path_pavement: ['Path', 'Camino'], path: ['Path', 'Camino'], decor: ['Decor', 'Decoración'], building: ['Building', 'Edificio'], landmark: ['Landmark', 'Hito'], core: ['Core', 'Núcleo'],
+  ground: ['Ground', 'Suelo'], path_pavement: ['Path', 'Camino'], path: ['Path', 'Camino'], decor: ['Decor', 'Decoración'], building: ['Building', 'Edificio'], landmark: ['Landmark', 'Monumento'], core: ['Core', 'Núcleo'],
 };
 
 export type PublicPlacement = { item_id: string; x: number; y: number; rotation: number };
