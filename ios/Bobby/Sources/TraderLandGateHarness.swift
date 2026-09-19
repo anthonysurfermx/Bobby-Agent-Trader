@@ -97,6 +97,11 @@ struct LandItem: Codable, Identifiable {
         guard let orientation = orientations.values.first else { return nil }
         return orientation.states["stage1"] ?? orientation.states["bloom"] ?? orientation.states.values.first
     }
+
+    /// A named art state ("stage0" of the Aura Core), or the default one when the item has no such state.
+    func artState(_ key: String) -> LandArtState? {
+        orientations.values.first?.states[key] ?? artState
+    }
 }
 struct LandManifest: Codable { let items: [LandItem] }
 
@@ -162,20 +167,6 @@ enum RuntimeBundle {
     }
 }
 
-enum GateLayout {
-    static let tileWidth: CGFloat = 92
-    static let tileHeight: CGFloat = 46
-    static let origin = CGPoint(x: 430, y: 230)
-    static let canvas = CGSize(width: 860, height: 720)
-    /// The island canvas point shown at the centre of the map when the camera is at home.
-    static let viewCenter = CGPoint(x: 430, y: 335)
-
-    static func iso(column: CGFloat, row: CGFloat) -> CGPoint {
-        CGPoint(x: origin.x + (column - row) * tileWidth / 2,
-                y: origin.y + (column + row) * tileHeight / 2)
-    }
-}
-
 private struct LandDiamond: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -214,9 +205,11 @@ private struct GlowBundleImage: View {
 private struct LayeredManifestImage: View {
     let item: LandItem
     let seed: Bool
+    /// A named art state (the dormant core's "stage0"); nil draws the default one.
+    var stateKey: String? = nil
 
     var body: some View {
-        if let state = item.artState,
+        if let state = stateKey.map(item.artState) ?? item.artState,
            let bloom = state.variants["albedo_512"] ?? state.variants["albedo_1024"] {
             let albedo = seed ? (state.derivedSeed ?? bloom) : bloom
             ZStack {
@@ -233,6 +226,8 @@ private struct AnimatedAuraCore: View {
     let item: LandItem
     let seed: Bool
     let pulse: Int
+    /// 0 dormant: the stage0 art (albedo + glow), static. 1 awake: the stage1 layers, animated.
+    let stage: Int
     /// Side of the art frame; the layers and particles are laid out in its units.
     let size: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -240,9 +235,12 @@ private struct AnimatedAuraCore: View {
     @State private var orbiting = false
 
     var body: some View {
-        if seed || item.animationLayers == nil {
-            LayeredManifestImage(item: item, seed: seed)
-        } else if let animation = item.animationLayers, let state = item.artState {
+        if stage == 0 {
+            // The animation layers are cut from the stage1 albedo, so a dormant core never uses them.
+            LayeredManifestImage(item: item, seed: seed, stateKey: "stage0")
+        } else if seed || item.animationLayers == nil {
+            LayeredManifestImage(item: item, seed: seed, stateKey: "stage1")
+        } else if let animation = item.animationLayers, let state = item.artState("stage1") {
             let unit = size / 360
             ZStack {
                 layer("body", animation)
@@ -277,19 +275,23 @@ private struct AnimatedAuraCore: View {
 private struct ProceduralFilament: View {
     let connectors: Set<LandConnector>
     let dimmed: Bool
+    let unit: CGFloat
 
     var body: some View {
         Canvas { context, size in
-            LandPainter.filament(context, face: CGRect(origin: .zero, size: size), connectors: connectors, dimmed: dimmed)
+            LandPainter.filament(context, face: CGRect(origin: .zero, size: size), connectors: connectors, dimmed: dimmed, unit: unit)
         }
     }
 }
 
 /// Your island: one ground Canvas (slab, grid, fog, shadows, footprints) under the art.
+/// Everything is laid out on the island's own N×N tiles (`layout`); the slab never changes size.
 private struct GateCanvas: View {
-    let fixture: LandWorldFixture
+    let layout: GateLayout
+    let core: LandCore
     let placements: [LandPlacement]
-    let focusLevel: Int
+    /// Fog radius in rings around the grid centre; nil reveals the whole island.
+    let revealRadius: CGFloat?
     let seed: Bool
     let corePulse: Int
     let draft: LandPlacement?
@@ -298,36 +300,38 @@ private struct GateCanvas: View {
     let place: (Int, Int) -> Void
 
     private var items: [String: LandItem] { RuntimeBundle.items }
-    private func revealed(_ col: Int, _ row: Int) -> Bool {
-        max(abs(CGFloat(col) - 3.5), abs(CGFloat(row) - 3.5)) <= CGFloat(focusLevel) + 1.5
-    }
+    private func revealed(_ col: Int, _ row: Int) -> Bool { layout.revealed(col: col, row: row, radius: revealRadius) }
     private var pathCells: Set<String> {
         Set(placements.filter { items[$0.itemId]?.kind == "path_pavement" }.map { "\($0.col):\($0.row)" })
     }
     private var corePlacement: LandPlacement {
-        LandPlacement(uid: "aura-core", itemId: fixture.core.itemId, col: fixture.core.col, row: fixture.core.row, orientation: nil)
+        LandPlacement(uid: LandCore.uid, itemId: LandCore.itemID, col: core.col, row: core.row, orientation: nil)
     }
+    /// The core is the draft being moved: drawn lifted at the draft, not where it stands.
+    private var coreLifted: Bool { draft?.uid == LandCore.uid }
     private func geometry(_ placement: LandPlacement) -> LandSpriteGeometry? {
-        items[placement.itemId].flatMap { LandSpriteGeometry(item: $0, col: placement.col, row: placement.row, orientation: placement.orientation) }
+        items[placement.itemId].flatMap {
+            LandSpriteGeometry(item: $0, col: placement.col, row: placement.row, orientation: placement.orientation, layout: layout, coreStage: core.stage)
+        }
     }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             ground
-            ForEach(0..<(fixture.gridSize * fixture.gridSize), id: \.self) { index in
-                let col = index % fixture.gridSize, row = index / fixture.gridSize
+            ForEach(0..<(layout.size * layout.size), id: \.self) { index in
+                let col = index % layout.size, row = index / layout.size
                 // Invisible targets: the map's gesture surface does the real hit mapping (cellAt);
                 // these keep each tile addressable for VoiceOver and UI tests.
                 Button { place(col, row) } label: { LandDiamond().fill(Color.white.opacity(0.001)) }
-                    .buttonStyle(.plain).frame(width: GateLayout.tileWidth, height: GateLayout.tileHeight)
-                    .position(GateLayout.iso(column: CGFloat(col), row: CGFloat(row)))
+                    .buttonStyle(.plain).frame(width: layout.tileWidth, height: layout.tileHeight)
+                    .position(layout.iso(column: CGFloat(col), row: CGFloat(row)))
                     .accessibilityLabel(L.t("Tile \(col + 1), \(row + 1)", "Casilla \(col + 1), \(row + 1)"))
                     .accessibilityIdentifier("land-tile-\(col)-\(row)")
             }
             ForEach(placements.filter { $0.uid != draft?.uid }) { placement in
                 if let item = items[placement.itemId] { sprite(item: item, placement: placement) }
             }
-            if let core = items[fixture.core.itemId] { sprite(item: core, placement: corePlacement) }
+            if !coreLifted, let core = items[LandCore.itemID] { sprite(item: core, placement: corePlacement) }
             if let draft, let item = items[draft.itemId] { sprite(item: item, placement: draft, lifted: true) }
         }
         .frame(width: GateLayout.canvas.width, height: GateLayout.canvas.height)
@@ -336,37 +340,40 @@ private struct GateCanvas: View {
     /// Slab, fog, grid and contact shadows in one pass, always below every piece.
     private var ground: some View {
         let standing = placements.filter { $0.uid != draft?.uid }
-        var occupied = LandPainter.coreCells
-        for placement in standing { if let item = items[placement.itemId] { occupied.formUnion(landCells(item, placement)) } }
-        let cells = (0..<(fixture.gridSize * fixture.gridSize)).map { ($0 % fixture.gridSize, $0 / fixture.gridSize) }
+        let fixed = standing + (coreLifted ? [] : [corePlacement])
+        var occupied = Set<String>()
+        for placement in fixed { if let item = items[placement.itemId] { occupied.formUnion(landCells(item, placement)) } }
+        let cells = (0..<(layout.size * layout.size)).map { ($0 % layout.size, $0 / layout.size) }
         let fog = cells.filter { !revealed($0.0, $0.1) }
         let open = cells.filter { revealed($0.0, $0.1) && !occupied.contains("\($0.0):\($0.1)") }
-        let shadows = (standing + [corePlacement]).compactMap { geometry($0)?.footprint }
-        let selected = standing.first { $0.uid == selectedID }.flatMap(geometry)?.footprint
+        let shadows = fixed.compactMap { geometry($0)?.footprint }
+        let selected = fixed.first { $0.uid == selectedID }.flatMap(geometry)?.footprint
         let draftArea = draft.flatMap(geometry)?.footprint
         let placing = draft != nil
         let valid = draftValid
+        let unit = layout.unit
         return Canvas { ctx, _ in
             ctx.fill(Path(ellipseIn: CGRect(x: 430 - 470, y: 391 - 330, width: 940, height: 660)),
                      with: .radialGradient(Gradient(colors: [Theme.accent.opacity(0.06), .clear]), center: LandPainter.islandCenter, startRadius: 0, endRadius: 470))
             LandPainter.slab(ctx)
-            ctx.fill(LandPainter.cells(fog), with: .color(Theme.bg.opacity(0.9)))
-            ctx.stroke(LandPainter.cells(open), with: .color(.white.opacity(placing ? 0.10 : 0.04)), lineWidth: placing ? 1 : 0.8)
+            ctx.fill(LandPainter.cells(layout, fog), with: .color(Theme.bg.opacity(0.9)))
+            ctx.stroke(LandPainter.cells(layout, open), with: .color(.white.opacity(placing ? 0.10 : 0.04)), lineWidth: (placing ? 1 : 0.8) * unit)
             LandPainter.rim(ctx, color: Theme.accentSoft.opacity(0.22))
-            LandPainter.shadows(ctx, shadows)
+            LandPainter.shadows(ctx, shadows, unit: unit)
             if let selected {
-                ctx.stroke(selected, with: .color(Theme.cio.opacity(0.9)), lineWidth: 2)
+                ctx.stroke(selected, with: .color(Theme.cio.opacity(0.9)), lineWidth: 2 * unit)
             }
             if let draftArea {
                 let tone = valid ? Theme.text : Theme.down
                 ctx.fill(draftArea, with: .color(tone.opacity(valid ? 0.08 : 0.2)))
-                ctx.stroke(draftArea, with: .color(tone.opacity(valid ? 0.85 : 0.95)), lineWidth: 1.5)
+                ctx.stroke(draftArea, with: .color(tone.opacity(valid ? 0.85 : 0.95)), lineWidth: 1.5 * unit)
                 if !valid {
                     let box = draftArea.boundingRect
+                    let w = 9 * unit, h = 5 * unit
                     var cross = Path()
-                    cross.move(to: CGPoint(x: box.midX - 9, y: box.midY - 5)); cross.addLine(to: CGPoint(x: box.midX + 9, y: box.midY + 5))
-                    cross.move(to: CGPoint(x: box.midX + 9, y: box.midY - 5)); cross.addLine(to: CGPoint(x: box.midX - 9, y: box.midY + 5))
-                    ctx.stroke(cross, with: .color(Theme.down), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    cross.move(to: CGPoint(x: box.midX - w, y: box.midY - h)); cross.addLine(to: CGPoint(x: box.midX + w, y: box.midY + h))
+                    cross.move(to: CGPoint(x: box.midX + w, y: box.midY - h)); cross.addLine(to: CGPoint(x: box.midX - w, y: box.midY + h))
+                    ctx.stroke(cross, with: .color(Theme.down), style: StrokeStyle(lineWidth: 2 * unit, lineCap: .round))
                 }
             }
         }
@@ -376,10 +383,10 @@ private struct GateCanvas: View {
     }
 
     @ViewBuilder private func sprite(item: LandItem, placement: LandPlacement, lifted: Bool = false) -> some View {
-        if let g = LandSpriteGeometry(item: item, col: placement.col, row: placement.row, orientation: placement.orientation) {
-            let lift: CGFloat = lifted ? 6 : 0
+        if let g = geometry(placement) {
+            let lift: CGFloat = lifted ? 6 * layout.unit : 0
             Group {
-                if item.kind == "core" { AnimatedAuraCore(item: item, seed: seed, pulse: corePulse, size: g.frame.width) }
+                if item.kind == "core" { AnimatedAuraCore(item: item, seed: seed, pulse: corePulse, stage: core.stage, size: g.frame.width) }
                 else { LayeredManifestImage(item: item, seed: seed).scaleEffect(x: g.flip ? -1 : 1, y: 1) }
             }
                 .frame(width: g.frame.width, height: g.frame.height)
@@ -388,7 +395,7 @@ private struct GateCanvas: View {
                 .zIndex(lifted ? 900 : 100 + g.depth).allowsHitTesting(false).accessibilityHidden(true)
             if let face = g.topFace {
                 let active = LandPainter.connectors(col: placement.col, row: placement.row, orientation: placement.orientation, pathCells: pathCells)
-                ProceduralFilament(connectors: active, dimmed: seed)
+                ProceduralFilament(connectors: active, dimmed: seed, unit: layout.unit)
                     .frame(width: face.width, height: face.height)
                     .position(x: face.midX, y: face.midY - lift).zIndex(lifted ? 901 : 101 + g.depth).allowsHitTesting(false)
                     .accessibilityIdentifier("path-\(placement.uid)-connectors-\(active.map(\.rawValue).sorted().joined(separator: "-"))")
@@ -434,6 +441,10 @@ struct TraderLandGateHarnessView: View {
     private static let seaZoom: CGFloat = 0.75
     private static let visitZoom: CGFloat = 0.9
     private static let minZoom: CGFloat = 0.22
+    /// Closest zoom on an 8×8 island; a grown island scales it by N/8 so its smaller tiles get as close.
+    private static let baseMaxZoom: CGFloat = 2.6
+    /// The practice island's core, from the bundled snapshot (3,3, awake).
+    private static let practiceCore = LandCore(col: RuntimeBundle.fixture.core.col, row: RuntimeBundle.fixture.core.row, stage: 1)
     /// Archipelago framing centres islands in the space above the bottom card.
     private static let archipelagoLift: CGFloat = 115
     private let manifest = RuntimeBundle.manifest
@@ -444,6 +455,13 @@ struct TraderLandGateHarnessView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var placements: [LandPlacement]
     @State private var focusLevel: Int
+    /// The account island's size and core, from the last world (the practice island stays 8×8, core 3,3).
+    @State private var landSize = 8
+    @State private var core = TraderLandGateHarnessView.practiceCore
+    /// The seed row the desk asked to show (`TraderLandFocus.seed`).
+    @State private var highlightedSeed: String?
+    /// An extend option picked in a review row, waiting for its confirmation.
+    @State private var extendChoice: ExtendChoice?
     @State private var selectedItemId: String?
     @State private var selectedPlacementId: String?
     @State private var draft: LandPlacement?
@@ -484,12 +502,30 @@ struct TraderLandGateHarnessView: View {
 
     private var previewOnly: Bool {
 #if DEBUG
-        ProcessInfo.processInfo.arguments.contains("-trader-land-gate")
+        ProcessInfo.processInfo.arguments.contains("-trader-land-gate") && !accountFixture
 #else
         false
 #endif
     }
-    private var accountIsland: Bool { !previewOnly && account.isSignedIn }
+    /// `-trader-land-account-fixture` (with `-trader-land-gate`): the account island from an in-memory world.
+    private var accountFixture: Bool {
+#if DEBUG
+        TraderLandAccountFixture.enabled
+#else
+        false
+#endif
+    }
+    private var accountIsland: Bool { accountFixture || (!previewOnly && account.isSignedIn) }
+    /// The island's tile geometry: grown account islands pack N×N smaller tiles into the same slab.
+    private var layout: GateLayout { accountIsland ? GateLayout(size: landSize) : .practice }
+    /// Account islands are fully revealed; the practice island keeps its focus rings.
+    private var revealRadius: CGFloat? { accountIsland ? nil : CGFloat(focusLevel) + 1.5 }
+    private var maxZoom: CGFloat { Self.baseMaxZoom * CGFloat(layout.size) / 8 }
+    /// Home zoom: 12×12 and 16×16 islands start closer so their 1×1 tiles stay tappable.
+    private var homeZoom: CGFloat { layout.size >= 12 ? 1.25 : 1 }
+    /// The server can move the core (capabilities.moveCore); never on the practice island.
+    private var canMoveCore: Bool { accountIsland && sync.world?.capabilities?.moveCore == true }
+    private var canExtend: Bool { accountIsland && sync.world?.capabilities?.extend == true && !editsDisabled && draft == nil }
     private var editsDisabled: Bool { accountIsland && (sync.busy || sync.world == nil || sync.error != nil) }
     private var canUndo: Bool { accountIsland ? remoteUndo != nil && !editsDisabled : !history.isEmpty }
     /// The camera is out at sea or on someone else's island: your island is read-only here.
@@ -542,7 +578,7 @@ struct TraderLandGateHarnessView: View {
         let saved = Self.load() ?? SavedWorld(placements: fixture.placements, focusLevel: fixture.focusLevel)
         var signedIn = AccountSession.shared.isSignedIn
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-trader-land-gate") { signedIn = false }
+        if ProcessInfo.processInfo.arguments.contains("-trader-land-gate") { signedIn = TraderLandAccountFixture.enabled }
 #endif
         _placements = State(initialValue: signedIn ? [] : saved.placements)
         _focusLevel = State(initialValue: signedIn ? 2 : saved.focusLevel)
@@ -550,21 +586,24 @@ struct TraderLandGateHarnessView: View {
 
     private var items: [String: LandItem] { RuntimeBundle.items }
     private var selectedItem: LandItem? { selectedItemId.flatMap { items[$0] } }
+    /// The core's standing placement: a 2×2 that moves like a piece but is never stored or rotated.
+    private var corePlacement: LandPlacement {
+        LandPlacement(uid: LandCore.uid, itemId: LandCore.itemID, col: core.col, row: core.row, orientation: nil)
+    }
+    /// Cells taken by everything except the draft (the core included unless it is the draft).
     private var occupied: Set<String> {
-        var cells = LandPainter.coreCells
+        var cells = draft?.uid == LandCore.uid ? Set<String>() : core.cells
         for placement in placements where placement.uid != draft?.uid {
             if let item = items[placement.itemId] { cells.formUnion(landCells(item, placement)) }
         }
         return cells
     }
-    private func revealed(_ col: Int, _ row: Int) -> Bool {
-        max(abs(CGFloat(col) - 3.5), abs(CGFloat(row) - 3.5)) <= CGFloat(focusLevel) + 1.5
-    }
+    private func revealed(_ col: Int, _ row: Int) -> Bool { layout.revealed(col: col, row: row, radius: revealRadius) }
     private var validDraft: Bool {
         guard let draft, let item = items[draft.itemId] else { return false }
         return landCells(item, draft).allSatisfy { key in
             let c = key.split(separator: ":").compactMap { Int($0) }
-            return c.count == 2 && c[0] >= 0 && c[1] >= 0 && c[0] < 8 && c[1] < 8 && revealed(c[0], c[1]) && !occupied.contains(key)
+            return c.count == 2 && layout.contains(col: c[0], row: c[1]) && revealed(c[0], c[1]) && !occupied.contains(key)
         }
     }
 
@@ -590,11 +629,14 @@ struct TraderLandGateHarnessView: View {
             }
             .onDisappear { sound.stop() }
             .onChange(of: handleDragging) { _, active in if !active { handleOrigin = nil } }
-            .task(id: previewOnly ? "practice" : account.session?.userId ?? "guest") {
+            .task(id: previewOnly ? "practice" : accountFixture ? "account-fixture" : account.session?.userId ?? "guest") {
                 sync.reset(); draft = nil; remoteUndo = nil; history = []; selectedItemId = nil; selectedPlacementId = nil; notice = ""
-                focusHandled = false
+                focusHandled = false; highlightedSeed = nil; landSize = 8; core = Self.practiceCore
                 if accountIsland {
                     placements = []; focusLevel = 2
+#if DEBUG
+                    if accountFixture { sync.useFixture(TraderLandAccountFixture()); return }
+#endif
                     await sync.load()
                 } else {
                     let saved = Self.load() ?? SavedWorld(placements: fixture.placements, focusLevel: fixture.focusLevel)
@@ -609,6 +651,7 @@ struct TraderLandGateHarnessView: View {
                     return LandPlacement(uid: placement.id, itemId: TraderLandCatalog.artID(inventory.item_id), col: placement.x, row: placement.y, orientation: placement.rotation == 90 || placement.rotation == 270 ? .nwSE : .neSW)
                 }
                 focusLevel = 2
+                adoptLand(size: GateLayout(size: world.land.size).size, core: world.core)
                 applyFocus(world)
             }
             .onChange(of: publicNeighbors) { _, _ in rebuildScene() }
@@ -621,6 +664,13 @@ struct TraderLandGateHarnessView: View {
             }
             .sheet(isPresented: $shareOpen) {
                 shareSheet.presentationDetents([.medium, .large]).presentationDragIndicator(.visible).presentationBackground(Theme.bg)
+            }
+            .alert(extendChoice.map { L.t("Give this seed \($0.horizon.label)?", "¿Darle \($0.horizon.label) a esta semilla?") } ?? "",
+                   isPresented: Binding(get: { extendChoice != nil }, set: { if !$0 { extendChoice = nil } }), presenting: extendChoice) { choice in
+                Button(L.t("Extend", "Extender")) { extend(choice) }
+                Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
+            } message: { choice in
+                Text(extendMessage(choice))
             }
         }
     }
@@ -662,7 +712,8 @@ struct TraderLandGateHarnessView: View {
                 ArchipelagoLayer(scene: scene, zoom: zoom, pan: pan, visiting: seaFocus, fit: fit, visited: visited,
                                  ownLabel: ownIslandLabel,
                                  labels: zoom < Self.archipelagoZoom, artVersion: artVersion)
-                GateCanvas(fixture: fixture, placements: placements, focusLevel: focusLevel, seed: false, corePulse: 0, draft: draft, draftValid: validDraft, selectedID: selectedPlacementId, place: choose)
+                GateCanvas(layout: layout, core: core, placements: placements, revealRadius: revealRadius, seed: false, corePulse: 0,
+                           draft: draft, draftValid: validDraft, selectedID: selectedPlacementId, place: choose)
                     .scaleEffect(scale)
                     .position(x: proxy.size.width / 2 + pan.width, y: proxy.size.height / 2 + pan.height + (GateLayout.canvas.height / 2 - GateLayout.viewCenter.y) * scale)
                 LandGestureSurface(
@@ -678,7 +729,7 @@ struct TraderLandGateHarnessView: View {
                         if state == .changed || state == .ended {
                             if dragPiece, let current = draft, let origin = dragOrigin {
                                 guard !editsDisabled else { return }
-                                let cell = TraderLandGeometry.draggedPosition(col: origin.col, row: origin.row, translation: translation, scale: scale)
+                                let cell = TraderLandGeometry.draggedPosition(col: origin.col, row: origin.row, translation: translation, scale: scale, size: layout.size)
                                 draft = LandPlacement(uid: current.uid, itemId: current.itemId, col: cell.col, row: cell.row, orientation: current.orientation)
                             } else { pan = boundedPan(CGSize(width: panOrigin.width + translation.width, height: panOrigin.height + translation.height), size: proxy.size) }
                         }
@@ -690,7 +741,7 @@ struct TraderLandGateHarnessView: View {
                             pinchAnchor = CGPoint(x: (point.x - proxy.size.width / 2 - pan.width) / zoom, y: (point.y - proxy.size.height / 2 - pan.height) / zoom)
                         }
                         if state == .changed || state == .ended {
-                            zoom = min(2.6, max(draft == nil ? Self.minZoom : 0.7, pinchZoom * value))
+                            zoom = min(maxZoom, max(draft == nil ? Self.minZoom : 0.7, pinchZoom * value))
                             let raw = CGSize(width: point.x - proxy.size.width / 2 - pinchAnchor.x * zoom, height: point.y - proxy.size.height / 2 - pinchAnchor.y * zoom)
                             refocus(pan: raw, size: proxy.size)
                             pan = boundedPan(raw, size: proxy.size)
@@ -699,10 +750,10 @@ struct TraderLandGateHarnessView: View {
                 ).accessibilityHidden(true)
                 if let draft, let item = items[draft.itemId], !archipelagoMode {
                     let area = landFootprint(item, draft.orientation)
-                    let bottom = GateLayout.iso(column: CGFloat(draft.col + area.cols - 1), row: CGFloat(draft.row + area.rows - 1))
+                    let bottom = layout.iso(column: CGFloat(draft.col + area.cols - 1), row: CGFloat(draft.row + area.rows - 1))
                     moveHandle(scale: scale)
                         .position(x: proxy.size.width / 2 + pan.width + (bottom.x - GateLayout.viewCenter.x) * scale,
-                                  y: proxy.size.height / 2 + pan.height + (bottom.y + GateLayout.tileHeight / 2 - GateLayout.viewCenter.y) * scale + 30)
+                                  y: proxy.size.height / 2 + pan.height + (bottom.y + layout.tileHeight / 2 - GateLayout.viewCenter.y) * scale + 30)
                 }
                 VStack(spacing: 0) {
                     HStack(alignment: .top) {
@@ -732,13 +783,13 @@ struct TraderLandGateHarnessView: View {
                     guard !editsDisabled else { return }
                     if handleOrigin == nil { handleOrigin = self.draft }
                     if let origin = handleOrigin {
-                        let cell = TraderLandGeometry.draggedPosition(col: origin.col, row: origin.row, translation: value.translation, scale: scale)
+                        let cell = TraderLandGeometry.draggedPosition(col: origin.col, row: origin.row, translation: value.translation, scale: scale, size: layout.size)
                         self.draft = LandPlacement(uid: origin.uid, itemId: origin.itemId, col: cell.col, row: cell.row, orientation: origin.orientation)
                     }
                 }
                 .onEnded { value in
                     if !editsDisabled, let origin = handleOrigin {
-                        let cell = TraderLandGeometry.draggedPosition(col: origin.col, row: origin.row, translation: value.translation, scale: scale)
+                        let cell = TraderLandGeometry.draggedPosition(col: origin.col, row: origin.row, translation: value.translation, scale: scale, size: layout.size)
                         self.draft = LandPlacement(uid: origin.uid, itemId: origin.itemId, col: cell.col, row: cell.row, orientation: origin.orientation)
                     }
                     handleOrigin = nil
@@ -753,7 +804,8 @@ struct TraderLandGateHarnessView: View {
             Text(eyebrow).font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1.6).foregroundStyle(Theme.muted)
                 .lineLimit(1).minimumScaleFactor(0.8).allowsHitTesting(false)
             if draft != nil {
-                Text(L.t("Find its place.", "Encuentra su lugar.")).font(.system(size: 20, weight: .medium, design: .rounded)).tracking(-0.5).allowsHitTesting(false)
+                Text(draft?.uid == LandCore.uid ? L.t("Move the Aura Core.", "Mueve el Núcleo de Aura.") : L.t("Find its place.", "Encuentra su lugar."))
+                    .font(.system(size: 20, weight: .medium, design: .rounded)).tracking(-0.5).allowsHitTesting(false)
                 Text(L.t("Tap a tile or drag the piece, then confirm.", "Toca una casilla o arrastra la pieza y confirma."))
                     .font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true).allowsHitTesting(false)
             } else if accountIsland {
@@ -766,7 +818,7 @@ struct TraderLandGateHarnessView: View {
                             Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.accentSoft)
                         }.contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("land-next-action")
-                    if let route = world.route.map(LandIslandStatus.routeLine) {
+                    if let route = LandIslandStatus.tiersLine(world) ?? world.route.map(LandIslandStatus.routeLine) {
                         Text(route).font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true).allowsHitTesting(false)
                     }
                 } else {
@@ -831,7 +883,27 @@ struct TraderLandGateHarnessView: View {
             else { collectionOpen = true; scrollTarget = "land-top" }
         case .review:
             collectionOpen = true; scrollTarget = "land-reviews"
+        case let .seed(inventoryID):
+            // The seed the desk just planted: its row, where the horizon can still grow.
+            collectionOpen = true
+            let known = world.inventory.contains { $0.id == inventoryID && $0.state == "seed" }
+            highlightedSeed = known ? inventoryID : nil
+            scrollTarget = known ? Self.seedAnchor(inventoryID) : "land-reviews"
         }
+    }
+
+    private static func seedAnchor(_ inventoryID: String) -> String { "land-seed-\(inventoryID)" }
+
+    /// A world with another size or core invalidates everything that holds cells: a growth step
+    /// shifted every placement and the core, so an open draft or a stored inverse move would land on
+    /// the wrong cells. A camera resting at home follows the new home zoom.
+    private func adoptLand(size: Int, core next: LandCore) {
+        guard size != landSize || next != core else { return }
+        let atHome = zoom == homeZoom && pan == .zero && visited == nil
+        landSize = size; core = next
+        draft = nil; remoteUndo = nil
+        if selectedPlacementId == LandCore.uid { selectedPlacementId = nil; selectedItemId = nil }
+        if atHome && zoom != homeZoom { withAnimation(.easeInOut(duration: 0.3)) { zoom = homeZoom } }
     }
 
     /// When the soonest growing seed's review opens, per the last snapshot.
@@ -864,8 +936,9 @@ struct TraderLandGateHarnessView: View {
             if draft != nil { placementControls.padding(12) }
             else {
                 HStack {
-                    Text(L.t("FOCUS \(focusLevel)/2 · \(placements.count + 1) PLACED", "ENFOQUE \(focusLevel)/2 · \(placements.count + 1) COLOCADAS"))
+                    Text(footerStatus)
                         .font(.system(size: 10, weight: .medium, design: .monospaced)).foregroundStyle(Theme.muted)
+                        .lineLimit(1).minimumScaleFactor(0.8)
                         .accessibilityIdentifier("land-fixed-status")
                     Spacer()
                     Button(action: undo) { Label(L.t("Undo", "Deshacer"), systemImage: "arrow.uturn.backward").font(.system(size: 13)).frame(minHeight: 44) }
@@ -873,6 +946,12 @@ struct TraderLandGateHarnessView: View {
                 }.background { seaBackdrop }.padding(.horizontal, 20).padding(.bottom, 4)
             }
         }
+    }
+
+    /// Account islands show their growth ("10×10 · 22/60 · CORE DORMANT"); the practice island its focus rings.
+    private var footerStatus: String {
+        if accountIsland, let world = sync.world { return LandIslandStatus.growthStatus(world) }
+        return L.t("FOCUS \(focusLevel)/2 · \(placements.count + 1) PLACED", "ENFOQUE \(focusLevel)/2 · \(placements.count + 1) COLOCADAS")
     }
 
     /// Between the island and the archipelago the neighbours drift under your island's text; this keeps it legible.
@@ -899,7 +978,9 @@ struct TraderLandGateHarnessView: View {
             }.frame(maxWidth: .infinity, alignment: .leading)
             icon("xmark", label: L.t("Cancel placement", "Cancelar colocación")) { draft = nil; collectionOpen = true }
                 .disabled(accountIsland && sync.busy)
-            icon("arrow.clockwise", label: L.t("Rotate piece", "Girar pieza"), action: rotate).accessibilityIdentifier("land-rotate")
+            if draft?.uid != LandCore.uid {
+                icon("arrow.clockwise", label: L.t("Rotate piece", "Girar pieza"), action: rotate).accessibilityIdentifier("land-rotate")
+            }
             Button(action: confirm) {
                 Label(L.t("Place", "Colocar"), systemImage: "checkmark").font(.system(size: 13, weight: .semibold)).padding(.horizontal, 13).frame(height: 44)
                     .background(Theme.accent, in: RoundedRectangle(cornerRadius: 11)).foregroundStyle(.white)
@@ -944,7 +1025,7 @@ struct TraderLandGateHarnessView: View {
                                 }
                                 districtTabs
                                 piecesRow
-                                Text(accountIsland ? L.t("Every completed read plants a seed. It blooms when you review its thesis or respect a NO TRADE.", "Cada lectura completa planta una semilla. Florece cuando revisas su tesis o respetas un NO OPERAR.") : L.t("Practice island · saved on this device. Your earned collection stays separate.", "Isla de práctica · guardada en este dispositivo. Tu colección ganada se mantiene separada."))
+                                Text(accountIsland ? L.t("One question = one seed. Patience decides the piece: 24 h blooms a 1×1, 3 days a 2×1 building, 7 days a 2×2 landmark.", "Una pregunta = una semilla. La paciencia decide la pieza: 24 h florece en 1×1, 3 días en un edificio 2×1, 7 días en un monumento 2×2.") : L.t("Practice island · saved on this device. Your earned collection stays separate.", "Isla de práctica · guardada en este dispositivo. Tu colección ganada se mantiene separada."))
                                     .font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
                             }.padding(.horizontal, 16).padding(.bottom, 16)
                         }.frame(maxHeight: maxHeight - 50 - (selectedItem == nil ? 0 : 80))
@@ -1042,13 +1123,16 @@ struct TraderLandGateHarnessView: View {
     }
 
     private func selectionBar(_ item: LandItem) -> some View {
-        HStack(spacing: 12) {
+        let isCore = selectedPlacementId == LandCore.uid
+        return HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(landName(item)).font(.system(size: 14, weight: .medium))
-                Text(selectedPlacementId == nil ? L.t("Blueprint", "Plano") : L.t("On your island", "En tu isla")).font(.system(size: 11)).foregroundStyle(Theme.muted)
+                Text(isCore ? (core.dormant ? L.t("Dormant · wakes when 5 pieces stand", "Dormido · despierta con 5 piezas") : L.t("Awake · the heart of your island", "Despierto · el corazón de tu isla"))
+                     : selectedPlacementId == nil ? L.t("Blueprint", "Plano") : L.t("On your island", "En tu isla"))
+                    .font(.system(size: 11)).foregroundStyle(Theme.muted).accessibilityIdentifier("land-selection-detail")
             }
             Spacer(minLength: 0)
-            if selectedPlacementId != nil {
+            if selectedPlacementId != nil && !isCore {
                 Button(L.t("Store", "Guardar"), action: store).font(.system(size: 12)).frame(minWidth: 44, minHeight: 44).disabled(editsDisabled).accessibilityIdentifier("land-store")
             }
             let blocked = editsDisabled || (accountIsland && selectedPlacementId == nil && availableInventory(item.id) == nil)
@@ -1066,9 +1150,11 @@ struct TraderLandGateHarnessView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text(L.t("How your island grows", "Cómo crece tu isla")).font(.title2.bold())
-                helpStep(1, L.t("A completed read on the desk plants a seed of the next piece on the route.", "Una lectura completa en la mesa planta la semilla de la siguiente pieza de la ruta."))
-                helpStep(2, L.t("It blooms when you review its thesis 24 h later — or right away when you respect a NO TRADE.", "Florece cuando revisas su tesis 24 h después, o al instante cuando respetas un NO OPERAR."))
-                helpStep(3, L.t("Build it here, publish your island and it joins the archipelago. Visits never give XP.", "Constrúyela aquí, publica tu isla y se une al archipiélago. Las visitas nunca dan XP."))
+                helpStep(1, L.t("One question = one seed. Every completed read on the desk plants one, up to 3 a day.", "Una pregunta = una semilla. Cada lectura completa en la mesa planta una, hasta 3 al día."))
+                helpStep(2, L.t("Patience decides the piece. A seed reviewed after 24 h blooms into a 1×1 piece; give it 3 days for a 2×1 building or 7 days for a 2×2 landmark. A horizon only grows, and only before its review opens.", "La paciencia decide la pieza. Una semilla revisada a las 24 h florece en una pieza 1×1; dale 3 días para un edificio 2×1 o 7 días para un monumento 2×2. Un horizonte solo crece, y solo antes de que abra su revisión."))
+                helpStep(3, L.t("Whatever the market says, it blooms at its review — or right away when you respect a NO TRADE. Pieces repeat, so there is always a next one.", "Diga lo que diga el mercado, florece en su revisión, o al instante cuando respetas un NO OPERAR. Las piezas se repiten, así que siempre hay una siguiente."))
+                helpStep(4, L.t("Your island grows as you fill it: 8×8, then 10×10, 12×12 and 16×16. The Aura Core wakes once 5 pieces stand; tap it to move it.", "Tu isla crece a medida que la llenas: 8×8, luego 10×10, 12×12 y 16×16. El Núcleo de Aura despierta cuando hay 5 piezas; tócalo para moverlo."))
+                helpStep(5, L.t("Build here, publish your island and it joins the archipelago. Visits never give XP.", "Construye aquí, publica tu isla y se une al archipiélago. Las visitas nunca dan XP."))
                 Text(L.t("Tap a built piece to move or store it. Drag to explore, pinch out to see the archipelago.", "Toca una pieza construida para moverla o guardarla. Arrastra para explorar y pellizca para ver el archipiélago."))
                     .font(.subheadline).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
                 if !accountIsland { HStack {
@@ -1171,12 +1257,12 @@ struct TraderLandGateHarnessView: View {
     }
 
     private func goHome() {
-        animateCamera(zoom: 1, pan: .zero, visit: nil)
+        animateCamera(zoom: homeZoom, pan: .zero, visit: nil)
         if !archipelagoMode { withAnimation(.easeInOut(duration: 0.25)) { archipelagoChrome(false) } }
     }
 
     private func zoomBy(_ factor: CGFloat) {
-        let target = min(2.6, max(draft == nil ? Self.minZoom : 0.7, zoom * factor))
+        let target = min(maxZoom, max(draft == nil ? Self.minZoom : 0.7, zoom * factor))
         let ratio = target / zoom
         withAnimation(.easeOut(duration: 0.25)) {
             zoom = target
@@ -1227,7 +1313,9 @@ struct TraderLandGateHarnessView: View {
         func clamp(_ v: CGSize, _ low: CGSize, _ high: CGSize) -> CGSize {
             CGSize(width: min(high.width, max(low.width, v.width)), height: min(high.height, max(low.height, v.height)))
         }
-        let slack = CGSize(width: size.width * 0.7, height: size.height * 0.7)
+        // Close in on a grown island and its far edges still come into view.
+        let scale = Self.fit(size) * zoom
+        let slack = CGSize(width: max(size.width * 0.7, 368 * scale), height: max(size.height * 0.7, (184 + 60) * scale))
         if zoom <= Self.seaZoom, !scene.offsets.isEmpty {
             let targets = [CGSize.zero] + scene.offsets.map { panTarget($0, zoom: zoom, size: size) }
             let xs = targets.map(\.width), ys = targets.map(\.height)
@@ -1245,15 +1333,16 @@ struct TraderLandGateHarnessView: View {
     private func cellAt(_ point: CGPoint, size: CGSize, scale: CGFloat) -> (Int, Int) {
         let x = (point.x - size.width / 2 - pan.width) / scale + GateLayout.viewCenter.x
         let y = (point.y - size.height / 2 - pan.height) / scale + GateLayout.viewCenter.y
-        let dx = (x - GateLayout.origin.x) / 46, dy = (y - GateLayout.origin.y) / 23
-        return (Int(((dx + dy) / 2).rounded()), Int(((dy - dx) / 2).rounded()))
+        let cell = layout.cellAt(CGPoint(x: x, y: y))
+        return (cell.col, cell.row)
     }
 
     // MARK: Archipelago data and card
 
     private func loadNeighbors() async {
 #if DEBUG
-        if ArchipelagoFixture.enabled { fixtureIslands = ArchipelagoFixture.islands(); rebuildScene(); return }
+        // The account fixture stays offline: its sea is the neighbours fixture too.
+        if ArchipelagoFixture.enabled || accountFixture { fixtureIslands = ArchipelagoFixture.islands(); rebuildScene(); return }
 #endif
         await neighbors.load(excluding: ownCode)
         rebuildScene()
@@ -1353,44 +1442,57 @@ struct TraderLandGateHarnessView: View {
     // MARK: Editing your island
 
     private func choose(_ col: Int, _ row: Int) {
-        guard !editsDisabled, !archipelagoMode, col >= 0, row >= 0, col < 8, row < 8 else { return }
+        guard !editsDisabled, !archipelagoMode, layout.contains(col: col, row: row) else { return }
         if let current = draft {
             draft = LandPlacement(uid: current.uid, itemId: current.itemId, col: col, row: row, orientation: current.orientation)
             return
         }
-        let placement = placements.first { p in items[p.itemId].map { landCells($0, p).contains("\(col):\(row)") } ?? false }
+        // On an account island the Aura Core is selectable too, to move it.
+        let standing = placements + (canMoveCore ? [corePlacement] : [])
+        let placement = standing.first { p in items[p.itemId].map { landCells($0, p).contains("\(col):\(row)") } ?? false }
         selectedPlacementId = placement?.uid; selectedItemId = placement?.itemId
-        if let item = selectedItem { district = item.district; collectionOpen = true; sound.play("placement_tick") }
+        if let item = selectedItem {
+            if item.kind != "core" { district = item.district }
+            collectionOpen = true; sound.play("placement_tick")
+        }
     }
     private func startDraft() {
         guard !editsDisabled, let item = selectedItem else { return }
         guard !accountIsland || selectedPlacementId != nil || availableInventory(item.id) != nil else { return }
         if archipelagoMode { collectionBeforeArchipelago = nil; goHome() }
-        if let selectedPlacementId, let existing = placements.first(where: { $0.uid == selectedPlacementId }) { draft = existing }
+        if selectedPlacementId == LandCore.uid, canMoveCore { draft = corePlacement }
+        else if let selectedPlacementId, let existing = placements.first(where: { $0.uid == selectedPlacementId }) { draft = existing }
         else {
-            let candidates = (0..<64).map { (col: $0 % 8, row: $0 / 8) }.sorted { a, b in
-                (a.col - 1) * (a.col - 1) + (a.row - 5) * (a.row - 5) < (b.col - 1) * (b.col - 1) + (b.row - 5) * (b.row - 5)
+            // The first free spot nearest the lower-left (1,5 on an 8×8), scaled to the island's size.
+            let n = layout.size, preferred = (col: n / 8, row: 5 * n / 8)
+            let candidates = (0..<(n * n)).map { (col: $0 % n, row: $0 / n) }.sorted { a, b in
+                (a.col - preferred.col) * (a.col - preferred.col) + (a.row - preferred.row) * (a.row - preferred.row)
+                    < (b.col - preferred.col) * (b.col - preferred.col) + (b.row - preferred.row) * (b.row - preferred.row)
             }
             let cell = candidates.first { c in
                 let area = LandPlacement(uid: "preview", itemId: item.id, col: c.col, row: c.row, orientation: .neSW)
-                return c.col + item.footprint.cols <= 8 && c.row + item.footprint.rows <= 8 && landCells(item, area).allSatisfy { key in
+                return landCells(item, area).allSatisfy { key in
                     let xy = key.split(separator: ":").compactMap { Int($0) }
-                    return xy.count == 2 && revealed(xy[0], xy[1]) && !occupied.contains(key)
+                    return xy.count == 2 && layout.contains(col: xy[0], row: xy[1]) && revealed(xy[0], xy[1]) && !occupied.contains(key)
                 }
-            } ?? (col: 1, row: 5)
+            } ?? preferred
             draft = LandPlacement(uid: "\(item.id)-\(UUID().uuidString)", itemId: item.id, col: cell.col, row: cell.row, orientation: .neSW)
         }
         collectionOpen = false; notice = ""
     }
     private func rotate() {
-        guard !editsDisabled, let current = draft else { return }
+        guard !editsDisabled, let current = draft, current.uid != LandCore.uid else { return }
         draft = LandPlacement(uid: current.uid, itemId: current.itemId, col: current.col, row: current.row, orientation: current.orientation == .nwSE ? .neSW : .nwSE)
     }
     private func confirm() {
         guard !editsDisabled, validDraft, let current = draft else { return }
         if accountIsland {
             let rotation = current.orientation == .nwSE ? 90 : 0
-            if let previous = sync.world?.placements.first(where: { $0.id == current.uid }) {
+            if current.uid == LandCore.uid {
+                // Same spot: nothing to save.
+                guard current.col != core.col || current.row != core.row else { draft = nil; collectionOpen = true; return }
+                commitRemote(.moveCore(x: current.col, y: current.row), inverse: nil)
+            } else if let previous = sync.world?.placements.first(where: { $0.id == current.uid }) {
                 commitRemote(.move(placementID: previous.id, x: current.col, y: current.row, rotation: rotation), inverse: .move(placementID: previous.id, x: previous.x, y: previous.y, rotation: previous.rotation))
             } else if let inventory = availableInventory(current.itemId) {
                 commitRemote(.place(inventoryID: inventory.id, x: current.col, y: current.row, rotation: rotation), inverse: nil, addedInventoryID: inventory.id)
@@ -1406,7 +1508,7 @@ struct TraderLandGateHarnessView: View {
         notice = L.t("Piece placed. Make it yours.", "Pieza colocada. Dale tu estilo.")
     }
     private func store() {
-        guard !editsDisabled, let selectedPlacementId else { return }
+        guard !editsDisabled, let selectedPlacementId, selectedPlacementId != LandCore.uid else { return }
         if accountIsland {
             guard let previous = sync.world?.placements.first(where: { $0.id == selectedPlacementId }) else { return }
             commitRemote(.remove(placementID: previous.id), inverse: .place(inventoryID: previous.inventory_id, x: previous.x, y: previous.y, rotation: previous.rotation))
@@ -1437,6 +1539,14 @@ struct TraderLandGateHarnessView: View {
         (sync.world?.inventory ?? []).filter { $0.state == "seed" && $0.review != nil }
             .sorted { ($0.review?.ready == true ? 0 : 1) < ($1.review?.ready == true ? 0 : 1) }
     }
+
+    /// An extend option picked in a review row: the seed, its new horizon and the piece it will bloom into.
+    private struct ExtendChoice: Identifiable {
+        let inventoryID: String
+        let horizon: LandHorizon
+        let pieceName: String?
+        var id: String { "\(inventoryID)-\(horizon.hours)" }
+    }
     private var canClose: Bool { sync.world?.capabilities?.close == true && !editsDisabled && draft == nil }
 
     @ViewBuilder private var reviewSection: some View {
@@ -1452,21 +1562,71 @@ struct TraderLandGateHarnessView: View {
         if !seeds.isEmpty {
             Text(L.t("Theses to review", "Tesis por revisar")).font(.system(size: 14, weight: .medium))
             ForEach(seeds) { seed in
+                let ready = seed.review?.ready == true
+                let highlighted = highlightedSeed == seed.id
                 HStack(spacing: 10) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(itemName(seed.item_id)).font(.system(size: 13, weight: .medium))
+                        if let horizon = seed.horizon?.value {
+                            Text(horizon.optionLabel).font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundStyle(horizon == .day ? Theme.muted : Theme.cio.opacity(0.9))
+                                .accessibilityIdentifier("land-horizon-\(seed.id)")
+                        }
                         Text(seedLine(seed.review!)).font(.system(size: 11)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
-                    if seed.review?.ready == true {
+                    if ready {
                         Button { closeThesis(seed) } label: {
                             Text(L.t("Review", "Revisar")).font(.system(size: 13, weight: .semibold)).padding(.horizontal, 12).frame(height: 40)
                                 .background(Theme.accent, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(.white)
                         }.buttonStyle(.plain).disabled(!canClose).opacity(canClose ? 1 : 0.4).accessibilityIdentifier("land-review-\(seed.id)")
+                    } else if let options = seed.horizon?.options, !options.isEmpty, sync.world?.capabilities?.extend == true {
+                        extendMenu(seed, options: options)
                     }
                 }.padding(10).background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(seed.review?.ready == true ? Theme.cio.opacity(0.5) : Theme.stroke))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(highlighted ? Theme.accentSoft : ready ? Theme.cio.opacity(0.5) : Theme.stroke, lineWidth: highlighted ? 1.5 : 1))
+                    .id(Self.seedAnchor(seed.id))
             }
+        }
+    }
+
+    /// "Give it time": the horizons this seed can still grow to, each naming the piece it would bloom into.
+    private func extendMenu(_ seed: TraderLandWorld.Inventory, options: [LandHorizon]) -> some View {
+        Menu {
+            ForEach(options) { horizon in
+                let next = sync.world?.tier(horizon)?.next
+                let name = next.map { TraderLandCatalog.name($0.id, district: $0.world) }
+                Button {
+                    extendChoice = ExtendChoice(inventoryID: seed.id, horizon: horizon, pieceName: name)
+                } label: {
+                    Text(name.map { "\(horizon.optionLabel) · \($0)" } ?? horizon.optionLabel)
+                }.accessibilityIdentifier("land-extend-\(seed.id)-\(horizon.hours)")
+            }
+        } label: {
+            Label(L.t("More time", "Más tiempo"), systemImage: "hourglass").font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 10).frame(height: 40)
+                .background(Theme.cardSoft, in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(Theme.text)
+        }
+        .disabled(!canExtend).opacity(canExtend ? 1 : 0.4)
+        .accessibilityLabel(L.t("Give this seed more time", "Dale más tiempo a esta semilla"))
+        .accessibilityIdentifier("land-extend-\(seed.id)")
+    }
+
+    private func extendMessage(_ choice: ExtendChoice) -> String {
+        let piece = choice.pieceName.map { L.t("It will bloom into \($0), a \(choice.horizon.tierLabel.lowercased()) \(choice.horizon.footprintLabel).", "Florecerá en \($0), \(choice.horizon.tierLabel.lowercased()) \(choice.horizon.footprintLabel).") }
+            ?? L.t("It will bloom into a \(choice.horizon.tierLabel.lowercased()) \(choice.horizon.footprintLabel).", "Florecerá en \(choice.horizon.tierLabel.lowercased()) \(choice.horizon.footprintLabel).")
+        return "\(piece) \(L.t("Its review opens \(choice.horizon.label) after the read. You can't shorten it later.", "Su revisión abre \(choice.horizon.label) después de la lectura. No se puede acortar después."))"
+    }
+
+    private func extend(_ choice: ExtendChoice) {
+        guard canExtend else { return }
+        Task {
+            guard let world = await sync.mutate(.extend(inventoryID: choice.inventoryID, hours: choice.horizon.hours)) else { return }
+            let id = world.extended?.item?.id ?? world.inventory.first { $0.id == choice.inventoryID }?.item_id
+            let name = id.map { itemName($0) } ?? choice.pieceName ?? choice.horizon.tierLabel
+            notice = L.t("Seed extended to \(choice.horizon.label): it will bloom into \(name).", "Semilla extendida a \(choice.horizon.label): florecerá en \(name).")
+            highlightedSeed = choice.inventoryID
+            sound.play("placement_confirm"); UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 
@@ -1554,14 +1714,22 @@ struct TraderLandGateHarnessView: View {
     }
 
     private func commitRemote(_ action: TraderLandMutation, inverse: TraderLandMutation?, addedInventoryID: String? = nil) {
+        let before = sync.world.map { ($0.land.size, $0.core) }
         Task {
             guard let result = await sync.mutate(action) else { return }
             remoteUndo = inverse
             if let addedInventoryID, let placed = result.placements.first(where: { $0.inventory_id == addedInventoryID }) {
                 remoteUndo = .remove(placementID: placed.id)
             }
+            // A growth step shifted every cell (and a core move changes what is free): no stale inverse.
+            if let before, before.0 != result.land.size || before.1 != result.core { remoteUndo = nil }
             draft = nil; selectedPlacementId = nil; selectedItemId = nil; collectionOpen = true
-            notice = L.t("Island saved to your account.", "Isla guardada en tu cuenta.")
+            if let grew = result.grew {
+                notice = LandIslandStatus.grewNotice(grew)
+                sound.play("fog_reveal"); UINotificationFeedbackGenerator().notificationOccurred(.success)
+                return
+            }
+            notice = result.coreMoved != nil ? L.t("Aura Core moved.", "Núcleo de Aura movido.") : L.t("Island saved to your account.", "Isla guardada en tu cuenta.")
             sound.play("placement_confirm"); UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
@@ -1572,14 +1740,14 @@ struct TraderLandGateHarnessView: View {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let saved = try? JSONDecoder().decode(SavedWorld.self, from: data) else { return nil }
         let items = Dictionary(uniqueKeysWithValues: RuntimeBundle.manifest.items.map { ($0.id, $0) })
-        var occupied = LandPainter.coreCells
+        var occupied = practiceCore.cells
         var ids = Set<String>()
         let clean = saved.placements.filter { placement in
             guard !ids.contains(placement.uid), let item = items[placement.itemId], item.kind != "core" else { return false }
             let cells = landCells(item, placement)
             guard cells.allSatisfy({ key in
                 let xy = key.split(separator: ":").compactMap { Int($0) }
-                return xy.count == 2 && xy[0] >= 0 && xy[1] >= 0 && xy[0] < 8 && xy[1] < 8 && !occupied.contains(key)
+                return xy.count == 2 && GateLayout.practice.contains(col: xy[0], row: xy[1]) && !occupied.contains(key)
             }) else { return false }
             occupied.formUnion(cells); ids.insert(placement.uid); return true
         }

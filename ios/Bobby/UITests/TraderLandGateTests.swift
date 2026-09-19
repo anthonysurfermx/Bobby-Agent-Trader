@@ -56,6 +56,68 @@ final class TraderLandGateTests: XCTestCase {
         XCTAssertEqual(status.label, "FOCUS 1/2 · 8 PLACED")
     }
 
+    /// The account island from `-trader-land-account-fixture` (in memory, no network): a 10×10 island
+    /// whose dormant Aura Core moves like a piece, and a seed whose horizon grows through the extend menu.
+    func testAccountFixtureMovesTheCoreAndExtendsASeed() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-trader-land-gate", "-trader-land-account-fixture", "-AppleLanguages", "(en)"]
+        app.launch()
+        let status = app.staticTexts["land-fixed-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        XCTAssertEqual(status.label, "10×10 · 9/60 · CORE DORMANT")
+        shot("account-fixture")
+
+        // Tap the core: the Aura Core, with Move and neither Store nor Rotate.
+        app.buttons["land-tile-6-2"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let move = app.buttons["land-build-or-move"]
+        XCTAssertTrue(move.waitForExistence(timeout: 5))
+        XCTAssertEqual(move.label, "Move")
+        XCTAssertTrue(app.staticTexts["land-selection-detail"].label.hasPrefix("Dormant"))
+        XCTAssertFalse(app.buttons["land-store"].exists)
+        move.tap()
+        XCTAssertTrue(app.buttons["land-confirm"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["land-rotate"].exists)
+        // Onto the Double Gate: no room. Then a free corner.
+        tapTile(app, col: 3, row: 3)
+        XCTAssertFalse(app.buttons["land-confirm"].isEnabled)
+        tapTile(app, col: 1, row: 1)
+        XCTAssertTrue(app.buttons["land-confirm"].isEnabled)
+        shot("core-draft")
+        app.buttons["land-confirm"].tap()
+        let notice = app.staticTexts["land-notice"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertEqual(notice.label, "Aura Core moved.")
+        XCTAssertEqual(status.label, "10×10 · 9/60 · CORE DORMANT")
+        // The core answers where it now stands, and its old spot is free ground.
+        app.buttons["land-tile-2-2"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.staticTexts["land-selection-detail"].waitForExistence(timeout: 5))
+        XCTAssertEqual(move.label, "Move")
+        app.buttons["land-tile-7-3"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertFalse(app.staticTexts["land-selection-detail"].exists)
+
+        // A 24 h seed can grow to 3 or 7 days; each option names the piece it would bloom into.
+        let horizon = app.staticTexts["land-horizon-fx-seed-growing"]
+        XCTAssertTrue(horizon.waitForExistence(timeout: 5))
+        XCTAssertEqual(horizon.label, "24 h · common piece 1×1")
+        let menu = app.buttons["land-extend-fx-seed-growing"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        let threeDays = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "3 days · building 2×1")).firstMatch
+        XCTAssertTrue(threeDays.waitForExistence(timeout: 5))
+        XCTAssertEqual(threeDays.label, "3 days · building 2×1 · Candle Tower")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "7 days · landmark 2×2")).firstMatch.exists)
+        shot("extend-menu")
+        threeDays.tap()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        XCTAssertTrue(alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "You can't shorten it later")).firstMatch.exists)
+        alert.buttons["Extend"].tap()
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertEqual(notice.label, "Seed extended to 3 days: it will bloom into Candle Tower.")
+        XCTAssertEqual(horizon.label, "3 days · building 2×1")
+        shot("seed-extended")
+    }
+
     private func shot(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name

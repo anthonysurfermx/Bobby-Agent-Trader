@@ -1,5 +1,8 @@
-// Standalone contract tests. Compile this file with Sources/TraderLandSync.swift.
+// Standalone contract tests. From ios/Bobby:
+//   swiftc -parse-as-library scripts/TraderLandSyncContract.swift Sources/TraderLandSync.swift \
+//     Sources/TraderLandGeometry.swift Sources/LandHorizon.swift -o <out> && <out>
 // The URLProtocol fixture intercepts every request; no real accounts or network.
+import CoreGraphics
 import Foundation
 
 enum L { static func t(_ english: String, _ spanish: String) -> String { english } }
@@ -16,11 +19,12 @@ final class LandFixtureProtocol: URLProtocol {
     static var fail = false
     static var onRequest: (() -> Void)?
     static var requests: [URLRequest] = []
-    static let body = Data("""
-      {"ok":true,"land":{"size":8,"theme":"night"},"xp":24,"aura":2,
+    static var size = 8
+    static var body: Data { Data("""
+      {"ok":true,"land":{"size":\(size),"theme":"night"},"xp":24,"aura":2,
        "inventory":[{"id":"inventory-a","item_id":"crypto_bay_data_dock","state":"bloomed","placed":true}],
        "placements":[{"id":"placement-a","inventory_id":"inventory-a","x":1,"y":2,"rotation":90}]}
-      """.utf8)
+      """.utf8) }
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
@@ -47,11 +51,28 @@ func expect(_ condition: Bool, _ message: String) { precondition(condition, mess
         await sync.load()
         expect(sync.world?.xp == 24 && !sync.busy && sync.error == nil, "Decode authoritative world")
         expect(LandFixtureProtocol.requests.last?.value(forHTTPHeaderField: "Authorization") == "Bearer test-fixture-only", "Use account auth")
+        expect(LandFixtureProtocol.requests.last?.value(forHTTPHeaderField: "X-Trader-Land-Client") == "2", "GET declares Growth v1 client")
         expect(sync.world?.placements.first?.rotation == 90, "Preserve rotation")
         let action = TraderLandMutation.move(placementID: "placement-a", x: 2, y: 3, rotation: 90)
         expect(action.body["placementId"] as? String == "placement-a", "Move by placement ID")
         expect(await sync.mutate(action) != nil, "Accept confirmed move")
         expect(LandFixtureProtocol.requests.last?.httpMethod == "POST", "Mutation uses POST")
+        expect(LandFixtureProtocol.requests.last?.value(forHTTPHeaderField: "X-Trader-Land-Client") == "2", "POST declares Growth v1 client")
+        let extend = TraderLandMutation.extend(inventoryID: "inventory-a", hours: 72).body
+        expect(extend["action"] as? String == "extend" && extend["inventoryId"] as? String == "inventory-a" && extend["hours"] as? Int == 72 && extend.count == 3, "Extend body")
+        let moveCore = TraderLandMutation.moveCore(x: 5, y: 2).body
+        expect(moveCore["action"] as? String == "move_core" && moveCore["x"] as? Int == 5 && moveCore["y"] as? Int == 2 && moveCore.count == 3, "Move-core body")
+        for grown in [10, 12, 16] {
+            LandFixtureProtocol.size = grown
+            await sync.load()
+            expect(sync.world?.land.size == grown && sync.error == nil, "Accept a grown \(grown)×\(grown) island")
+        }
+        LandFixtureProtocol.size = 9
+        await sync.load()
+        expect(sync.error != nil, "Reject an island size this build cannot draw")
+        LandFixtureProtocol.size = 8
+        await sync.load()
+        expect(sync.error == nil && sync.world?.core == LandCore.practice, "Older world falls back to the 3,3 awake core")
         LandFixtureProtocol.status = 409
         expect(await sync.mutate(action) == nil, "Reject stale world")
         expect(sync.world?.xp == 24 && sync.error != nil, "Retain last confirmed state")
@@ -72,6 +93,6 @@ func expect(_ condition: Bool, _ message: String) { precondition(condition, mess
         AccountSession.shared.session = nil
         await sync.load()
         expect(sync.world == nil, "Guest is not a server world")
-        print("PASS: decode, auth, rotation, move, conflict, reload, timeout, identity isolation, sign-out")
+        print("PASS: decode, auth, client header, rotation, move, extend/move_core bodies, grown sizes, core fallback, conflict, reload, timeout, identity isolation, sign-out")
     }
 }
