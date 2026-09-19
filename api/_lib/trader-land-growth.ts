@@ -41,11 +41,22 @@ export function heldByTier(rows: Array<{ source: string; tier: string | null | u
 
 // ---------- the island ----------
 export interface Core { x: number; y: number; stage: 0 | 1 }
+/** The core wakes once this many pieces stand on the island, and never sleeps again (GROWTH-v1 §1.5). */
+export const WAKE_PIECES = 5;
+/**
+ * The only size a client without `X-Trader-Land-Client: 2` ever draws: every
+ * shipped iOS build refuses any other, and the pre-growth web was 8×8 only.
+ */
+export const LEGACY_LAND_SIZE = 8;
 
-/** The core as the land stores it; an older row (or server) without it is today's rule: 3,3, awake. */
-export function coreOf(land: { core_x?: number | null; core_y?: number | null; core_stage?: number | null }): Core {
+/**
+ * The core as the land stores it; an older row (or server) without it is
+ * today's rule: 3,3, awake. `pieces` placed on the island wake it by the rule
+ * even when the stored stage lags (placed before the API woke cores).
+ */
+export function coreOf(land: { core_x?: number | null; core_y?: number | null; core_stage?: number | null }, pieces = 0): Core {
   if (land.core_x == null || land.core_y == null) return { x: 3, y: 3, stage: 1 };
-  return { x: land.core_x, y: land.core_y, stage: land.core_stage === 0 ? 0 : 1 };
+  return { x: land.core_x, y: land.core_y, stage: land.core_stage === 0 && pieces < WAKE_PIECES ? 0 : 1 };
 }
 
 /** Cells a piece covers ("x:y", rotation-aware), the same keys as the web geometry. */

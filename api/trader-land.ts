@@ -3,8 +3,8 @@
 //   GET  → { land (with core + growth), inventory (with item, review, horizon),
 //            placements, tiers, route (legacy), review, season, catalog,
 //            capabilities, share }
-//   POST { action: 'place', inventoryId, x, y, rotation } → placed (+ grew)
-//   POST { action: 'move', placementId, x, y, rotation }  → moved
+//   POST { action: 'place', inventoryId, x, y, rotation, size? } → placed (+ grew)
+//   POST { action: 'move', placementId, x, y, rotation, size? }  → moved
 //   POST { action: 'remove', placementId }                → removed
 //   POST { action: 'publish', title? }                     → island public + share code
 //   POST { action: 'unpublish' }                           → island private (code kept)
@@ -14,7 +14,7 @@
 //        and the next season piece (closed.executed / closed.season)
 //   POST { action: 'extend', inventoryId, hours: 72 | 168 } → extended: the
 //        seed waits longer and blooms the next building / landmark
-//   POST { action: 'move_core', x, y }                     → coreMoved
+//   POST { action: 'move_core', x, y, size? }              → coreMoved
 // Placement rules: the piece must belong to the caller, be bloomed, fit
 // inside the land (8, 10, 12 or 16 a side) and stay off the Aura Core and
 // every other piece. Growth (docs/trader-land/GROWTH-v1.md): only a client
@@ -23,31 +23,37 @@
 // Every seed carries `review` (its thesis, when it can be reviewed and
 // whether that moment has come) and every route piece its `horizon`.
 // capabilities advertise the actions; clients built against older servers
-// keep those buttons disabled until they see them. Moves, core moves and
-// growth are arbitrated by the database (tl_placement_cells trigger and the
-// land-row lock of the growth RPCs, migrations 20260904222250 and 20260919000001).
+// keep those buttons disabled until they see them. Placements, moves, stores,
+// core moves and growth are arbitrated by the database: every one of them is
+// an RPC that locks the land row first (so none can deadlock with a growth
+// step) and the tl_placement_cells trigger (migrations 20260904222250 and
+// 20260919000001). Coordinates are refused with 409 when they were drawn on
+// another island size than the land has now (`size`, or 8 for a client that
+// never grows islands), since a growth shifts every cell by a ring.
 // Auth: wallet session or Supabase access token (same as /api/progress).
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { ISLAND_CHANGED, THESIS_REVIEW_HOURS, catalog, cleanTitle, closeSeed, ensureLand, extendSeed, growLand, growthClient, landView, moveCore, newShareCode, nextPieces, pieceSummary, seasonProgress, seedHorizon, seedReviews, wakeCore, type Grew } from './_lib/trader-land.js';
-import { CORE_CELLS, TIER_FOOTPRINT, TIER_HOURS, TIER_ORDER, coreCellKeys, heldByTier, pieceCells, tierSequence } from './_lib/trader-land-growth.js';
+import { ISLAND_CHANGED, THESIS_REVIEW_HOURS, catalog, cleanTitle, closeSeed, drawnSize, ensureLand, extendSeed, growLand, growthClient, landView, moveCore, movePiece, newShareCode, nextPieces, pieceSummary, placePiece, removePiece, seasonProgress, seedHorizon, seedReviews, wakeCore, type Grew } from './_lib/trader-land.js';
+import { CORE_CELLS, TIER_FOOTPRINT, TIER_HOURS, TIER_ORDER, WAKE_PIECES, coreCellKeys, heldByTier, pieceCells, tierSequence } from './_lib/trader-land-growth.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
 import { guardWrite } from './_lib/write-guard.js';
 
 export const config = { maxDuration: 15 };
 
+// The island size the client drew its coordinates on (optional; see drawnSize).
+const DrawnSize = z.union([z.literal(8), z.literal(10), z.literal(12), z.literal(16)]).optional();
 const Body = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('place'), inventoryId: z.string().uuid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0) }),
-  z.object({ action: z.literal('move'), placementId: z.string().uuid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0) }),
+  z.object({ action: z.literal('place'), inventoryId: z.string().uuid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0), size: DrawnSize }),
+  z.object({ action: z.literal('move'), placementId: z.string().uuid(), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).default(0), size: DrawnSize }),
   z.object({ action: z.literal('remove'), placementId: z.string().uuid() }),
   z.object({ action: z.literal('publish'), title: z.string().max(80).optional() }),
   z.object({ action: z.literal('unpublish') }),
   z.object({ action: z.literal('close'), inventoryId: z.string().uuid(), tzOffsetMin: z.number().int().min(-840).max(840).default(0), platform: z.enum(['ios', 'web']).default('web') }),
   // Any whole number reaches the database, which answers 'A horizon can only grow' for all but an upward 72 / 168.
   z.object({ action: z.literal('extend'), inventoryId: z.string().uuid(), hours: z.number().int().min(0).max(1000) }),
-  z.object({ action: z.literal('move_core'), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15) }),
+  z.object({ action: z.literal('move_core'), x: z.number().int().min(0).max(15), y: z.number().int().min(0).max(15), size: DrawnSize }),
 ]);
 
 interface Inv { id: string; item_id: string; state: 'seed' | 'bloomed'; source: string; seeded_at: string; bloomed_at: string | null; event_id: string | null; horizon_hours: number; tl_items: { tier: string | null } | null }
@@ -66,6 +72,10 @@ async function world(identity: Identity) {
   const inventory = (await invR.json()) as Inv[];
   const placements = (await plR.json()) as Placement[];
   const prog = ((progR.ok ? await progR.json() : []) as Array<{ xp: number; aura: number }>)[0] ?? { xp: 0, aura: 0 };
+  // Waking is due at WAKE_PIECES and permanent: a land that crossed it without
+  // waking (pieces placed before the API woke cores, or a wake that failed)
+  // wakes on its owner's next read.
+  if (land.core_stage === 0 && placements.length >= WAKE_PIECES && (await wakeCore(identity.id))) land.core_stage = 1;
   const byId = new Map(items.map((i) => [i.id, i]));
   const invById = new Map(inventory.map((i) => [i.id, i]));
   let occupied = CORE_CELLS;
@@ -85,7 +95,7 @@ async function world(identity: Identity) {
   let ready = 0;
   for (const review of reviews.values()) if (review.ready) ready += 1;
   return {
-    land: landView(land, occupied),
+    land: landView(land, occupied, placements.length),
     xp: prog.xp, aura: prog.aura,
     tiers,
     // Legacy (iOS release 31 reads index/total/complete): the common sequence, which repeats and never completes.
@@ -157,10 +167,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({ error: 'Could not publish the island' });
     }
     if (body.action === 'remove') {
-      const r = await fetch(bobbyRest(`tl_placements?id=eq.${body.placementId}&identity_id=eq.${identity.id}`), { method: 'DELETE', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }) });
-      if (!r.ok) return res.status(502).json({ error: 'Could not store the piece. Reload the island before retrying.' });
-      const rows = (await r.json()) as unknown[];
-      if (!rows.length) return res.status(404).json({ error: 'Placement not found' });
+      const removed = await removePiece(identity.id, body.placementId);
+      if (removed.ok === false) return res.status(removed.status).json({ error: removed.error });
       return res.status(200).json({ ok: true, removed: body.placementId, ...(await world(identity)) });
     }
     if (body.action === 'close') {
@@ -177,11 +185,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (body.action === 'move_core') {
       await ensureLand(identity.id);
-      const result = await moveCore(identity.id, body.x, body.y);
+      const result = await moveCore(identity.id, body.x, body.y, drawnSize(body.size, req.headers));
       if (result.ok === false) return res.status(result.status).json({ error: result.error });
       return res.status(200).json({ ok: true, coreMoved: { x: result.x, y: result.y }, ...(await world(identity)) });
     }
     const w = await world(identity);
+    // Coordinates drawn on another size are one ring off on this island.
+    const drawn = drawnSize(body.size, req.headers);
+    if (drawn !== null && drawn !== w.land.size) return res.status(409).json({ error: ISLAND_CHANGED });
     if (body.action === 'move') {
       const placement = w.placements.find((candidate) => candidate.id === body.placementId);
       if (!placement) return res.status(404).json({ error: 'Placement not found' });
@@ -191,14 +202,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (outside(mine, w.land.size)) return res.status(400).json({ error: `Outside the ${w.land.size}×${w.land.size} land` });
       const occupied = occupiedCells(w, placement.id);
       if (mine.some((cell) => occupied.has(cell))) return res.status(409).json({ error: 'Overlaps another piece' });
-      const moved = await fetch(bobbyRest(`tl_placements?id=eq.${placement.id}&identity_id=eq.${identity.id}`), {
-        method: 'PATCH',
-        headers: bobbyServiceHeaders({ Prefer: 'return=representation' }),
-        body: JSON.stringify({ x: body.x, y: body.y, rotation: body.rotation }),
-      });
-      if (moved.status === 409) return res.status(409).json({ error: ISLAND_CHANGED });
-      const rows = moved.ok ? ((await moved.json()) as Array<{ id: string }>) : [];
-      if (!rows.length) return res.status(502).json({ error: 'Could not move the piece' });
+      // Validated on w.land.size: a growth that commits first makes the database refuse it.
+      const moved = await movePiece(identity.id, placement.id, body.x, body.y, body.rotation, w.land.size);
+      if (moved.ok === false) return res.status(moved.status).json({ error: moved.error });
       return res.status(200).json({ ok: true, moved: placement.id, ...(await world(identity)) });
     }
     const piece = w.inventory.find((i) => i.id === body.inventoryId);
@@ -212,16 +218,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // is reserved here, in the database trigger and in both clients.
     const occupied = occupiedCells(w);
     if (mine.some((cell) => occupied.has(cell))) return res.status(409).json({ error: 'Overlaps another piece' });
-    const ins = await fetch(bobbyRest('tl_placements?select=id'), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ identity_id: identity.id, inventory_id: piece.id, x: body.x, y: body.y, rotation: body.rotation }) });
-    if (ins.status === 409) return res.status(409).json({ error: ISLAND_CHANGED });
-    if (!ins.ok) return res.status(502).json({ error: 'Could not place the piece' });
-    const placed = ((await ins.json()) as Array<{ id: string }>)[0]?.id;
+    const ins = await placePiece(identity.id, piece.id, body.x, body.y, body.rotation, w.land.size);
+    if (ins.ok === false) return res.status(ins.status).json({ error: ins.error });
+    const placed = ins.placementId;
     // The piece is saved; growing (and waking the core) is best effort and
-    // runs again after the next placement if it fails here.
-    if (!growthClient(req.headers)) {
-      await wakeCore(identity.id, w.placements.length + 1).catch((error) => console.error('[trader-land] wake', error));
-      return res.status(200).json({ ok: true, placed, ...(await world(identity)) });
-    }
+    // runs again after the next placement if it fails here. An older client
+    // never grows the island; the world read below wakes its core.
+    if (!growthClient(req.headers)) return res.status(200).json({ ok: true, placed, ...(await world(identity)) });
     let grew: Grew | null = null;
     try { grew = await growLand(identity.id); } catch (error) { console.error('[trader-land] grow', error); }
     return res.status(200).json({ ok: true, placed, grew, ...(await world(identity)) });

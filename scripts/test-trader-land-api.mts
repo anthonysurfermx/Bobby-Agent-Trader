@@ -5,8 +5,10 @@
 //   · GET /api/trader-land: land.core / land.growth, tiers, legacy route,
 //     per-seed horizon and reviewAt, capabilities, iOS-compatible fields
 //   · POST extend / move_core: RPC arguments and the error mapping
-//   · POST place: core and bounds from the land, growth only with
-//     X-Trader-Land-Client: 2, the core woken for older clients
+//   · POST place / move / remove: core and bounds from the land, writes
+//     through the land-locking RPCs, coordinates drawn on another island
+//     size refused with 409, growth only with X-Trader-Land-Client: 2
+//   · the core wakes at 5 pieces on the owner's read (and in public views)
 //   · POST close: the bloom CAS carries the horizon it read
 //   · POST /api/progress: tl_grant_piece grants, RouteGrant compatibility,
 //     routeIndex capped at 8, horizon + tier preview for seeds
@@ -73,6 +75,23 @@ function reset() {
   casRows = [];
   calls = [];
   for (const key of Object.keys(rpcAnswers)) delete rpcAnswers[key];
+  // The placement RPCs, as a tiny database: they succeed and change the fixture.
+  rpcAnswers.tl_place_piece = (args) => {
+    const id = U(300 + placements.length);
+    placements.push({ id, inventory_id: String(args.p_inventory), x: Number(args.p_x), y: Number(args.p_y), rotation: Number(args.p_rotation), placed_at: iso(NOW) });
+    return { ok: true, placement_id: id };
+  };
+  rpcAnswers.tl_move_piece = (args) => {
+    const row = placements.find((p) => p.id === args.p_placement);
+    if (!row) return { ok: false, error: 'not_found' };
+    Object.assign(row, { x: Number(args.p_x), y: Number(args.p_y), rotation: Number(args.p_rotation) });
+    return { ok: true, placement_id: row.id };
+  };
+  rpcAnswers.tl_remove_piece = (args) => {
+    const before = placements.length;
+    placements = placements.filter((p) => p.id !== args.p_placement);
+    return placements.length < before ? { ok: true, placement_id: args.p_placement } : { ok: false, error: 'not_found' };
+  };
 }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -103,7 +122,8 @@ globalThis.fetch = (async (input: string | URL, init: RequestInit = {}) => {
     return json(rows.filter((r) => !routeOnly || r.source === 'route').map((r) => ({ ...r, tl_items: { tier: tierOf(r.item_id) } })));
   }
   if (path.startsWith('tl_placements')) {
-    if (method === 'POST') return json([{ id: U(299) }], 201);
+    // Every write goes through the RPCs; a direct write would bypass the land lock.
+    if (method !== 'GET') return json({ message: `direct ${method} on tl_placements` }, 599);
     return json(placements);
   }
   if (path.startsWith('bobby_progress_events')) {
@@ -120,6 +140,7 @@ globalThis.fetch = (async (input: string | URL, init: RequestInit = {}) => {
 }) as typeof fetch;
 
 const { default: landHandler } = await import('../api/trader-land.ts');
+const { publicWorld } = await import('../api/_lib/trader-land.ts');
 const { default: progressHandler } = await import('../api/progress.ts');
 type Out = { status: number; body: any };
 function call(handler: unknown, method: string, body?: unknown, headers: Record<string, string> = {}): Promise<Out> {
@@ -205,7 +226,7 @@ reset();
 {
   rpcAnswers.tl_move_core = (args) => args.p_x === 7 ? { ok: false, error: 'outside' } : args.p_x === 4 && args.p_y === 4 ? { ok: false, error: 'occupied' } : { ok: true, core_x: args.p_x, core_y: args.p_y };
   const ok = await call(landHandler, 'POST', { action: 'move_core', x: 0, y: 5 }, V2);
-  eq(rpcCalls('tl_move_core')[0]?.body, { p_identity: ID, p_x: 0, p_y: 5 }, 'move_core calls tl_move_core');
+  eq(rpcCalls('tl_move_core')[0]?.body, { p_identity: ID, p_x: 0, p_y: 5, p_size: null }, 'move_core calls tl_move_core (client 2 without a size: the frame is not checked)');
   assert(calls.findIndex((c) => c.url.includes('tl_lands?on_conflict')) < calls.findIndex((c) => c.url.endsWith('rpc/tl_move_core')), 'the land exists before the core moves');
   eq([ok.status, ok.body.coreMoved], [200, { x: 0, y: 5 }], 'coreMoved');
   assert(ok.body.land?.core, 'move_core returns the world');
@@ -214,11 +235,21 @@ reset();
   const occupiedStatus = (await call(landHandler, 'POST', { action: 'move_core', x: 4, y: 4 })).status;
   eq([outsideStatus, occupiedStatus], [400, 409], 'outside 400, occupied 409');
   eq((await call(landHandler, 'POST', { action: 'move_core', x: 16, y: 0 })).status, 400, 'x beyond 15 is refused by the schema');
+  // The frame the target was drawn on reaches the database, which compares it under the land lock.
+  calls = [];
+  await call(landHandler, 'POST', { action: 'move_core', x: 1, y: 1 });
+  await call(landHandler, 'POST', { action: 'move_core', x: 1, y: 1, size: 10 }, V2);
+  eq(rpcCalls('tl_move_core').map((c) => (c.body as { p_size: unknown }).p_size), [8, 10], 'an older client draws 8×8; a growth client may say its size');
+  rpcAnswers.tl_move_core = () => ({ ok: false, error: 'resized', size: 10 });
+  eq(await call(landHandler, 'POST', { action: 'move_core', x: 1, y: 1, size: 8 }, V2), { status: 409, body: { error: 'The island changed. Reload before trying again.' } }, 'a core target drawn on the pre-growth island is refused with 409');
+  eq((await call(landHandler, 'POST', { action: 'move_core', x: 1, y: 1, size: 9 }, V2)).status, 400, 'a size that no island has is refused by the schema');
 }
 
 // ---------- place: bounds and core from the land, growth only for client 2 ----------
 reset();
 {
+  // The same bloomed piece is placed again and again: take it back in hand after each placement.
+  const inHand = () => { placements = placements.filter((p) => p.inventory_id !== U(6)); };
   rpcAnswers.tl_grow_land = () => ({ ok: true, grew: true, from: 8, to: 10, shift: 1, size: 10, core_x: 4, core_y: 4, core_stage: 1, woke: false });
   const onCore = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 4, y: 4 }, V2);
   eq([onCore.status, onCore.body.error], [409, 'Overlaps another piece'], 'the core at 3,3 blocks 4,4');
@@ -227,6 +258,7 @@ reset();
   eq(oldCore.status, 200, 'with the core moved to 0,0, the old core cells take pieces');
   eq(oldCore.body.grew, { from: 8, to: 10, shift: 1 }, 'client 2: the response carries grew');
   eq(rpcCalls('tl_grow_land').map((c) => c.body), [{ p_identity: ID }], 'client 2: tl_grow_land after the placement');
+  inHand();
   const onMoved = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 1, y: 1 }, V2);
   eq([onMoved.status, onMoved.body.error], [409, 'Overlaps another piece'], 'the moved core blocks 1,1');
   const outside8 = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 8, y: 2 }, V2);
@@ -234,34 +266,104 @@ reset();
   land.size = 10;
   const inside10 = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 9, y: 9 }, V2);
   eq(inside10.status, 200, 'a 10×10 takes a piece at 9,9');
+  inHand();
   rpcAnswers.tl_grow_land = () => ({ ok: true, grew: false, from: 10, to: 10, shift: 0, size: 10, core_x: 0, core_y: 0, core_stage: 0, woke: false });
   const noGrowth = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 9, y: 8 }, V2);
   assert(noGrowth.status === 200 && 'grew' in noGrowth.body && noGrowth.body.grew === null, 'client 2 without growth: grew null');
+  inHand();
 
+  eq(rpcCalls('tl_place_piece').map((c) => (c.body as { p_size: number }).p_size), [8, 10, 10], 'each placement carries the size it was validated on');
+
+  // An older client only ever draws 8×8: its coordinates mean nothing on a 10×10.
   calls = [];
-  const old = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 9, y: 7 });
-  assert(old.status === 200 && !('grew' in old.body), 'an older client gets no grew key');
+  const stale = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 7, y: 7 });
+  eq([stale.status, stale.body], [409, { error: 'The island changed. Reload before trying again.' }], 'an older client on a grown island: 409, nothing written');
+  eq(rpcCalls('tl_place_piece').length, 0, 'the stale placement never reaches the database');
+  const staleV2 = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 7, y: 7, size: 8 }, V2);
+  eq(staleV2.status, 409, 'a growth client that drew the 8×8 is refused on the 10×10');
+  const fresh = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 8, y: 7, size: 10 }, V2);
+  eq(fresh.status, 200, 'the same client that drew the 10×10 places');
+
+  reset();
+  calls = [];
+  const old = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 7, y: 7 });
+  assert(old.status === 200 && !('grew' in old.body), 'an older client on an 8×8 places, and gets no grew key');
+  eq(rpcCalls('tl_place_piece')[0]?.body, { p_identity: ID, p_inventory: U(6), p_x: 7, p_y: 7, p_rotation: 0, p_size: 8 }, 'through tl_place_piece');
   eq(rpcCalls('tl_grow_land').length, 0, 'an older client never grows the island');
   eq(calls.filter((c) => c.method === 'PATCH' && c.url.includes('tl_lands')).length, 0, 'under 5 pieces the core is not woken');
   placements = [0, 1, 2, 3].map((i) => ({ id: U(210 + i), inventory_id: U(4), x: 6 + (i % 2), y: 6 + Math.floor(i / 2), rotation: 0, placed_at: iso(NOW) }));
   calls = [];
-  await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 9, y: 7 });
+  const fifth = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 0, y: 7 });
   const wake = calls.find((c) => c.method === 'PATCH' && c.url.includes('tl_lands'));
   assert(wake && wake.url.includes(`identity_id=eq.${ID}`) && wake.url.includes('core_stage=eq.0') && (wake.body as { core_stage: number }).core_stage === 1, 'the 5th piece from an older client wakes the core, nothing else');
+  eq(fifth.body.land?.core?.stage, 1, 'and the response shows it awake');
   eq(rpcCalls('tl_grow_land').length, 0, 'still no growth');
+
+  // Every database refusal of the write is "the island changed".
+  reset();
+  for (const error of ['resized', 'changed', 'not_found']) {
+    rpcAnswers.tl_place_piece = () => ({ ok: false, error, detail: 'x' });
+    const r = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 0, y: 0 }, V2);
+    eq([r.status, r.body], [409, { error: 'The island changed. Reload before trying again.' }], `place refused as ${error} → 409`);
+  }
+  delete rpcAnswers.tl_place_piece;  // the stub answers 500 without an answer: a transport failure
+  const down = await call(landHandler, 'POST', { action: 'place', inventoryId: U(6), x: 0, y: 0 }, V2);
+  eq([down.status, down.body], [502, { error: 'Could not place the piece' }], 'a failed write is still 502');
+  eq(calls.filter((c) => c.url.includes('/tl_placements') && c.method !== 'GET').length, 0, 'no direct write to tl_placements');
 }
 
-// ---------- move: the core from the land ----------
+// ---------- move / remove: the core from the land, writes through the RPCs ----------
 reset();
 {
   const toCore = await call(landHandler, 'POST', { action: 'move', placementId: U(201), x: 3, y: 4 });
   eq(toCore.status, 409, 'a piece cannot move under the core');
+  eq(rpcCalls('tl_move_piece').length, 0, 'refused before the database');
   land.core_x = 6; land.core_y = 6;
-  const toOld = await call(landHandler, 'POST', { action: 'move', placementId: U(201), x: 3, y: 4 });
-  const patch = calls.find((c) => c.method === 'PATCH' && c.url.includes('tl_placements'));
-  // The stub answers PATCH on tl_placements with the list; any row means "moved".
-  assert(patch && toOld.status !== 409, 'the old core cell is free once the core moved');
+  const toOld = await call(landHandler, 'POST', { action: 'move', placementId: U(201), x: 3, y: 4, rotation: 90 });
+  eq([toOld.status, toOld.body.moved], [200, U(201)], 'the old core cell is free once the core moved');
+  eq(rpcCalls('tl_move_piece')[0]?.body, { p_identity: ID, p_placement: U(201), p_x: 3, p_y: 4, p_rotation: 90, p_size: 8 }, 'through tl_move_piece, with the size it was validated on');
   eq((await call(landHandler, 'POST', { action: 'move', placementId: U(201), x: 7, y: 7 })).status, 409, 'the piece cannot move onto the moved core');
+  land.size = 10;
+  calls = [];
+  eq((await call(landHandler, 'POST', { action: 'move', placementId: U(201), x: 1, y: 1 })).status, 409, 'an older client cannot move a piece on a grown island');
+  eq((await call(landHandler, 'POST', { action: 'move', placementId: U(201), x: 1, y: 1, size: 8 }, V2)).status, 409, 'nor can a growth client that drew the 8×8');
+  eq(rpcCalls('tl_move_piece').length, 0, 'neither reaches the database');
+  rpcAnswers.tl_move_piece = () => ({ ok: false, error: 'resized', size: 12 });
+  eq((await call(landHandler, 'POST', { action: 'move', placementId: U(201), x: 1, y: 1 }, V2)).body, { error: 'The island changed. Reload before trying again.' }, 'a growth that commits between the read and the write: 409');
+  rpcAnswers.tl_move_piece = () => ({ ok: false, error: 'not_found' });
+  eq((await call(landHandler, 'POST', { action: 'move', placementId: U(201), x: 1, y: 1 }, V2)).status, 404, 'stored meanwhile: 404');
+
+  reset();
+  const removed = await call(landHandler, 'POST', { action: 'remove', placementId: U(201) });
+  eq([removed.status, removed.body.removed, removed.body.placements.length], [200, U(201), 0], 'remove stores the piece');
+  eq(rpcCalls('tl_remove_piece')[0]?.body, { p_identity: ID, p_placement: U(201) }, 'through tl_remove_piece');
+  eq([(await call(landHandler, 'POST', { action: 'remove', placementId: U(201) })).status], [404], 'storing it again: 404');
+  delete rpcAnswers.tl_remove_piece;
+  eq((await call(landHandler, 'POST', { action: 'remove', placementId: U(201) })).body, { error: 'Could not store the piece. Reload the island before retrying.' }, 'a failed store keeps its message');
+}
+
+// ---------- the core wakes at 5 pieces: on the owner's read and in public views ----------
+reset();
+{
+  placements = [0, 1, 2, 3, 4].map((i) => ({ id: U(220 + i), inventory_id: U(4), x: i, y: 0, rotation: 0, placed_at: iso(NOW) }));
+  const w = await call(landHandler, 'GET');
+  const wake = calls.filter((c) => c.method === 'PATCH' && c.url.includes('tl_lands'));
+  eq(wake.length, 1, 'a dormant land on 5 pieces (placed before cores woke) is woken by its owner\'s read');
+  assert(wake[0]?.url.includes('core_stage=eq.0'), 'conditionally');
+  eq(w.body.land.core, { x: 3, y: 3, stage: 1 }, 'and read awake');
+  land.core_stage = 1;
+  calls = [];
+  await call(landHandler, 'GET');
+  eq(calls.filter((c) => c.method === 'PATCH').length, 0, 'an awake land is not written again');
+  land.core_stage = 0;
+  placements = placements.slice(0, 4);
+  calls = [];
+  eq((await call(landHandler, 'GET')).body.land.core.stage, 0, 'four pieces: still dormant');
+  eq(calls.filter((c) => c.method === 'PATCH').length, 0, 'and not written');
+  const items = new Map(catalogRows.map((i) => [i.id, i]));
+  const row = { identity_id: ID, size: 8, theme: 'night', title: null, published_at: null, share_code: 'abcdefghij', core_x: 0, core_y: 5, core_stage: 0 };
+  const pieces = (n: number) => Array.from({ length: n }, (_, i) => ({ item_id: 'crypto_bay_data_dock', x: i, y: 0, rotation: 0 }));
+  eq([publicWorld(row, pieces(4), items as never).core, publicWorld(row, pieces(5), items as never).core], [{ x: 0, y: 5, stage: 0 }, { x: 0, y: 5, stage: 1 }], 'a public island on 5 pieces is drawn awake even if its row lags');
 }
 
 // ---------- close: the CAS carries the horizon that was read ----------

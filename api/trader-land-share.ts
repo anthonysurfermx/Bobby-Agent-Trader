@@ -48,7 +48,7 @@ async function publicIsland(code: string): Promise<CardIsland | null> {
   const row = ((await r.json()) as PublicLandRow[])[0];
   if (!row) return null;
   const placements = (await placementsFor([row.identity_id])).get(row.identity_id) ?? [];
-  return { code, title: row.title, size: row.size, core: coreOf(row), placements };
+  return { code, title: row.title, size: row.size, core: coreOf(row, placements.length), placements };
 }
 
 /** This deployment's public origin (production: bobbyprotocol.xyz). */

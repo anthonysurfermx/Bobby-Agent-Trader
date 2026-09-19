@@ -25,7 +25,7 @@ import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { AWARD_AURA, EXECUTION_BONUS, applyAward, type PlantKind, type ProgressCounters } from './progress-rules.js';
 import { publicLastPrice } from './public-price.js';
 import { horizonAt, horizonHours, resolveThesis, reviewAt, seedHorizon, swapExecutesThesis, thesisFrom, type SeedHorizon, type SwapCandidate, type Thesis, type ThesisOutcome, type Tier } from './thesis-rules.js';
-import { LEGACY_ROUTE_CAP, TIER_ORDER, coreOf, growthOf, heldByTier, nextInTier, tierSequence, type Core, type Growth } from './trader-land-growth.js';
+import { LEGACY_LAND_SIZE, LEGACY_ROUTE_CAP, TIER_ORDER, coreOf, growthOf, heldByTier, nextInTier, tierSequence, type Core, type Growth } from './trader-land-growth.js';
 import { seasonProgress, type SeasonProgress } from './trader-land-season.js';
 
 export { THESIS_REVIEW_HOURS, ThesisSchema, resolveThesis, reviewAt, seedHorizon, thesisFrom, type SeedHorizon, type Thesis, type ThesisOutcome, type Tier } from './thesis-rules.js';
@@ -87,8 +87,8 @@ const LAND_COLUMNS = 'size,theme,visibility,share_code,title,published_at,core_x
 
 /** The land as clients read it: the stored fields plus the core and how far the island is from growing. */
 export interface LandView { size: number; theme: string; visibility: 'private' | 'public'; share_code: string | null; title: string | null; published_at: string | null; core: Core; growth: Growth }
-export function landView(land: Land, occupied: number): LandView {
-  return { size: land.size, theme: land.theme, visibility: land.visibility, share_code: land.share_code, title: land.title, published_at: land.published_at, core: coreOf(land), growth: growthOf(land.size, occupied) };
+export function landView(land: Land, occupied: number, pieces: number): LandView {
+  return { size: land.size, theme: land.theme, visibility: land.visibility, share_code: land.share_code, title: land.title, published_at: land.published_at, core: coreOf(land, pieces), growth: growthOf(land.size, occupied) };
 }
 
 export async function ensureLand(identityId: string): Promise<Land> {
@@ -147,7 +147,7 @@ export function worldStats(placements: PublicPlacement[], items: Map<string, Ite
 
 /** What a visitor may see: the builder's title and the art positions (the core's too), never who built it. */
 export function publicWorld(row: PublicLandRow, placements: PublicPlacement[], items: Map<string, Item>) {
-  return { code: row.share_code, title: row.title, size: row.size, theme: row.theme, publishedAt: row.published_at, core: coreOf(row), placements, stats: worldStats(placements, items) };
+  return { code: row.share_code, title: row.title, size: row.size, theme: row.theme, publishedAt: row.published_at, core: coreOf(row, placements.length), placements, stats: worldStats(placements, items) };
 }
 
 // ---------- land-shaping RPCs (service role, migration 20260919000001) ----------
@@ -226,17 +226,62 @@ export function growthClient(headers: Record<string, string | string[] | undefin
   return Number.isInteger(value) && value >= 2;
 }
 
+/**
+ * The island size a request's coordinates were drawn on. A growth shifts
+ * every cell by a ring, so coordinates from another size must be refused,
+ * not applied one ring off. A client may say it (`size`); one without
+ * `X-Trader-Land-Client: 2` only ever draws 8×8; otherwise it is unknown.
+ */
+export function drawnSize(size: number | undefined, headers: Record<string, string | string[] | undefined>): number | null {
+  if (size !== undefined) return size;
+  return growthClient(headers) ? null : LEGACY_LAND_SIZE;
+}
+
 /** The same words as a placement collision: the cells were taken since the client last read the island. */
 export const ISLAND_CHANGED = 'The island changed. Reload before trying again.';
+
+// ---------- placement writes (tl_place_piece / tl_move_piece / tl_remove_piece) ----------
+// The RPCs lock the land row before the placement, the order tl_grow_land
+// uses, so a write can never deadlock with a growth step. `size` is the island
+// size the caller validated the coordinates on; a growth that commits first
+// makes the write come back 'resized'. The API checked everything against a
+// fresh read, so any refusal ('resized', or 'changed': a key or trigger said
+// no) means the island changed under the request.
+interface PlacementRow { ok: true; placement_id: string }
+export type PlacementResult = { ok: true; placementId: string } | { ok: false; status: number; error: string };
+
+async function placementWrite(fn: string, args: Record<string, unknown>, failed: string): Promise<PlacementResult> {
+  let out: PlacementRow | RpcRefusal;
+  try { out = await rpc<PlacementRow>(fn, args); } catch (error) { console.error(`[trader-land] ${fn}`, error); return { ok: false, status: 502, error: failed }; }
+  if (out.ok !== false) return { ok: true, placementId: out.placement_id };
+  // move/remove: the placement is gone; place: the land is (only a placement is addressed by id).
+  if (out.error === 'not_found' && fn !== 'tl_place_piece') return { ok: false, status: 404, error: 'Placement not found' };
+  if (out.error !== 'resized' && out.error !== 'changed' && out.error !== 'not_found') console.error(`[trader-land] ${fn} refused`, out.error);
+  return { ok: false, status: 409, error: ISLAND_CHANGED };
+}
+
+export function placePiece(identityId: string, inventoryId: string, x: number, y: number, rotation: number, size: number): Promise<PlacementResult> {
+  return placementWrite('tl_place_piece', { p_identity: identityId, p_inventory: inventoryId, p_x: x, p_y: y, p_rotation: rotation, p_size: size }, 'Could not place the piece');
+}
+
+export function movePiece(identityId: string, placementId: string, x: number, y: number, rotation: number, size: number): Promise<PlacementResult> {
+  return placementWrite('tl_move_piece', { p_identity: identityId, p_placement: placementId, p_x: x, p_y: y, p_rotation: rotation, p_size: size }, 'Could not move the piece');
+}
+
+/** Store a placed piece back in the inventory (addressed by id: no frame to check). */
+export function removePiece(identityId: string, placementId: string): Promise<PlacementResult> {
+  return placementWrite('tl_remove_piece', { p_identity: identityId, p_placement: placementId }, 'Could not store the piece. Reload the island before retrying.');
+}
 
 interface CoreRow { ok: true; core_x: number; core_y: number }
 export type MoveCoreResult = { ok: true; x: number; y: number } | { ok: false; status: number; error: string };
 
-export async function moveCore(identityId: string, x: number, y: number): Promise<MoveCoreResult> {
-  const out = await rpc<CoreRow>('tl_move_core', { p_identity: identityId, p_x: x, p_y: y });
+/** `size`: the island size the target was drawn on (null = unknown); another size is refused as a change. */
+export async function moveCore(identityId: string, x: number, y: number, size: number | null): Promise<MoveCoreResult> {
+  const out = await rpc<CoreRow>('tl_move_core', { p_identity: identityId, p_x: x, p_y: y, p_size: size });
   if (out.ok === false) {
     if (out.error === 'outside') return { ok: false, status: 400, error: 'Outside the island' };
-    if (out.error === 'occupied') return { ok: false, status: 409, error: ISLAND_CHANGED };
+    if (out.error === 'occupied' || out.error === 'resized') return { ok: false, status: 409, error: ISLAND_CHANGED };
     if (out.error === 'not_found') return { ok: false, status: 404, error: 'Island not found' };
     console.error('[trader-land] move_core refused', out.error);
     return { ok: false, status: 502, error: 'Could not move the core' };
@@ -255,15 +300,22 @@ export async function growLand(identityId: string): Promise<Grew | null> {
 }
 
 /**
- * Wake the core for a client that does not grow islands (no
- * X-Trader-Land-Client: 2). Waking changes nothing an older client draws, and
- * it is permanent, so a conditional PATCH is enough; growth stays with
- * tl_grow_land.
+ * Wake the core of a land that already stands on WAKE_PIECES pieces. Growth
+ * clients get it from tl_grow_land after each placement; every other land
+ * (pieces placed by an older client, or before the API woke cores) wakes on
+ * its owner's next world read. Waking is permanent and changes nothing an
+ * older client draws, so a conditional PATCH is enough. True when the land
+ * is awake afterwards.
  */
-export async function wakeCore(identityId: string, placements: number): Promise<void> {
-  if (placements < 5) return;
-  const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identityId}&core_stage=eq.0`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify({ core_stage: 1, updated_at: new Date().toISOString() }) });
-  if (!r.ok) console.error('[trader-land] wake core', r.status, await r.text().catch(() => ''));
+export async function wakeCore(identityId: string): Promise<boolean> {
+  try {
+    const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identityId}&core_stage=eq.0`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify({ core_stage: 1, updated_at: new Date().toISOString() }) });
+    if (!r.ok) console.error('[trader-land] wake core', r.status, await r.text().catch(() => ''));
+    return r.ok;
+  } catch (error) {
+    console.error('[trader-land] wake core', error);
+    return false;
+  }
 }
 
 // ---------- reviewing a seed ----------

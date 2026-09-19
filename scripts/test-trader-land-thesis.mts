@@ -15,7 +15,7 @@
 import { applyAward, AWARD_POINTS, EXECUTION_BONUS, MAX_DAILY_AWARDS, type ProgressCounters } from '../api/_lib/progress-rules.ts';
 import { readFileSync } from 'node:fs';
 import { HORIZONS, horizonHours, resolveThesis, reviewAt, seedHorizon, swapAsset, swapExecutesThesis, thesisFrom, THESIS_REVIEW_HOURS, ThesisSchema, type SwapCandidate, type Thesis, type Tier } from '../api/_lib/thesis-rules.ts';
-import { CORE_CELLS, LEGACY_ROUTE_CAP, TIER_FOOTPRINT, TIER_HOURS, TIER_ORDER, coreCellKeys, coreOf, growthOf, heldByTier, nextInTier, pieceCells, tierSequence } from '../api/_lib/trader-land-growth.ts';
+import { CORE_CELLS, LEGACY_LAND_SIZE, LEGACY_ROUTE_CAP, TIER_FOOTPRINT, TIER_HOURS, TIER_ORDER, WAKE_PIECES, coreCellKeys, coreOf, growthOf, heldByTier, nextInTier, pieceCells, tierSequence } from '../api/_lib/trader-land-growth.ts';
 import { SEASON, seasonProgress } from '../api/_lib/trader-land-season.ts';
 
 const failures: string[] = [];
@@ -126,6 +126,9 @@ const eq = (a: unknown, b: unknown, msg: string) => assert(JSON.stringify(a) ===
 {
   eq(coreOf({}), { x: 3, y: 3, stage: 1 }, 'an older land row is today\'s core: 3,3, awake');
   eq(coreOf({ core_x: 0, core_y: 5, core_stage: 0 }), { x: 0, y: 5, stage: 0 }, 'the stored core');
+  eq([coreOf({ core_x: 0, core_y: 5, core_stage: 0 }, 4).stage, coreOf({ core_x: 0, core_y: 5, core_stage: 0 }, WAKE_PIECES).stage], [0, 1], 'five pieces wake the core even when the stored stage lags');
+  eq(coreOf({ core_x: 0, core_y: 5, core_stage: 1 }, 0).stage, 1, 'waking is permanent: an awake core stays awake with fewer pieces');
+  eq(LEGACY_LAND_SIZE, 8, 'a client without X-Trader-Land-Client: 2 draws 8×8');
   eq(coreCellKeys({ x: 4, y: 4 }).sort(), ['4:4', '4:5', '5:4', '5:5'], 'the core reserves its 2×2');
   eq(CORE_CELLS, 4, 'four core cells count as occupied');
   eq(pieceCells({ w: 2, h: 1 }, 1, 4, 90).sort(), ['1:4', '1:5'], 'a rotated 2×1 stands on 1×2');
