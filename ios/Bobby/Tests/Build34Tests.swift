@@ -455,6 +455,14 @@ final class Build34Tests: XCTestCase {
         let first = calls.first.flatMap(\.body).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         XCTAssertEqual(first?["q"] as? String, question, "the question travels in the body")
     }
+
+    // Preflight of claude/build34: a current server that found no asset is final;
+    // the phone must not word-walk "¿Cuáles son los riesgos?" into SONIC.
+    func testNoAssetFromCurrentServerIsFinal() {
+        XCTAssertFalse(BobbyAPI.shouldWalkWords(serverResponse: ["ok": true, "resolved": NSNull(), "resolution": NSNull()]))
+        XCTAssertTrue(BobbyAPI.shouldWalkWords(serverResponse: nil), "search failed: fall back")
+        XCTAssertTrue(BobbyAPI.shouldWalkWords(serverResponse: ["ok": true, "results": []]), "a server without the resolution key: fall back")
+    }
 }
 
 /// Answers the app's requests to bobbyprotocol.xyz and the Supabase Auth host in-process.

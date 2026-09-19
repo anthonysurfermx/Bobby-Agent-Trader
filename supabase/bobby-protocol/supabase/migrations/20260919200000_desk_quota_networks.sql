@@ -24,6 +24,12 @@ declare k text; n integer; ceiling integer; keys text[];
 begin
   if p_caller is null or length(p_caller) < 8 or length(p_caller) > 128 then raise exception 'invalid caller'; end if;
   if p_network is not null and (length(p_network) < 8 or length(p_network) > 128) then raise exception 'invalid network'; end if;
+  -- Sweep keys that expired more than a day ago BEFORE this call locks any
+  -- row, skipping rows another call holds: the sweep never waits on (and so
+  -- never deadlocks with) a concurrent consume, and it runs on refusals too,
+  -- so stale hashes do not outlive the ~2 days the privacy policy states.
+  delete from bobby_desk_quotas where key in (
+    select key from bobby_desk_quotas where expires_at < now() - interval '1 day' for update skip locked);
   -- Narrowest first. Any refusal rolls back every increment of this call.
   keys := array['caller:' || p_caller];
   if p_network is not null then keys := keys || ('net:' || p_network); end if;
@@ -41,7 +47,6 @@ begin
   exception when sqlstate 'BQ429' then
     return false;
   end;
-  delete from bobby_desk_quotas where expires_at < now() - interval '1 day';
   return true;
 end;
 $$;

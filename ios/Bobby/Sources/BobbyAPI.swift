@@ -428,7 +428,8 @@ enum BobbyAPI {
         "como", "cómo", "va", "esta", "está", "estan", "están", "el", "la", "los", "las",
         "de", "del", "un", "una", "que", "qué", "cual", "cuál", "es", "precio", "y", "o",
         "dime", "dame", "sobre", "hoy", "ahora", "ve", "veo", "analiza", "analizame",
-        "how", "is", "the", "whats", "what", "price", "of", "doing", "about", "tell", "me", "a"
+        "how", "is", "the", "whats", "what", "price", "of", "doing", "about", "tell", "me", "a",
+        "son", "soy", "sus", "cuales", "cuáles", "riesgos", "do", "does", "are", "main", "risks", "chart"
     ]
 
     /// One resolution with the server's safety verdict attached. Fuzzy and
@@ -446,7 +447,12 @@ enum BobbyAPI {
     /// word-walk below stays only as a fallback for servers that predate
     /// the `resolution` metadata.
     static func resolveAsset(_ query: String) async -> AssetResolution? {
-        if let resolved = await resolveViaServer(query) { return resolved }
+        let server = await assetSearch(query)
+        if let server, let resolved = resolution(from: server) { return resolved }
+        // A current server answered and found no asset in the question: guessing
+        // word by word ("¿Cuáles son…" → SONIC) would analyze something the user
+        // never named. Only a server without the `resolution` key gets the walk.
+        guard shouldWalkWords(serverResponse: server) else { return nil }
 
         let cleaned = query.lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
@@ -458,16 +464,24 @@ enum BobbyAPI {
 
         for candidate in candidates {
             if let snap = await searchAsset(candidate) {
-                return AssetResolution(snapshot: snap, needsConfirmation: false,
+                // A word-walk hit is a guess: always ask before analyzing it.
+                return AssetResolution(snapshot: snap, needsConfirmation: true,
                                        confirmName: snap.symbol, proxyNote: nil)
             }
         }
         return nil
     }
 
-    private static func resolveViaServer(_ query: String) async -> AssetResolution? {
-        guard let obj = await assetSearch(query),
-              let resolution = obj["resolution"] as? [String: Any],
+    /// The word-walk fallback runs only when no current server answered: the
+    /// search failed, or a server that predates `resolution` replied. A reply
+    /// carrying `resolution: null` means "no asset named" and is final.
+    static func shouldWalkWords(serverResponse: [String: Any]?) -> Bool {
+        guard let serverResponse else { return true }
+        return !serverResponse.keys.contains("resolution")
+    }
+
+    private static func resolution(from obj: [String: Any]) -> AssetResolution? {
+        guard let resolution = obj["resolution"] as? [String: Any],
               let resolved = obj["resolved"] as? [String: Any],
               let symbol = (resolved["baseSymbol"] as? String) ?? (resolved["symbol"] as? String)
         else { return nil }

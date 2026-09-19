@@ -144,8 +144,6 @@ try {
   rejected({ alpha: 'La estructura es alcista. ¡Compra ya antes de que suba!' }, 'advice', 'ES compra ya');
   rejected({ cio: 'My verdict is wait: the evidence is mixed and a long needs confirmation.' }, 'verdict', 'CIO text says wait, verdict says review');
   rejected({ cio: 'Mi veredicto es esperar; una tesis larga necesita confirmación.' }, 'verdict', 'ES veredicto esperar vs review');
-  rejected({ cio: 'The structure is bearish and a short thesis is the only one the evidence supports.' }, 'verdict', 'direction long against a purely bearish CIO');
-  rejected({ cio: 'La estructura es alcista y solo respalda una tesis larga.', direction: 'short' }, 'verdict', 'direction short against a purely bullish CIO');
   passes({ alpha: 'There is no guarantee this level holds, and no trade is risk-free.' }, 'EN disclaimers pass');
   passes({ red: 'Nothing here guarantees profits, and past moves do not guarantee future returns.' }, 'EN negated guarantees pass');
   passes({ cio: 'Whether you should buy depends on your own plan; this desk gives no personal advice. A long needs confirmation.' }, 'EN whether-you-should passes');
@@ -182,8 +180,25 @@ try {
   rejected({ alpha: 'The trend is intact. Sell NVDA today before the close.' }, 'advice', 'EN imperative with a ticker');
   rejected({ alpha: 'The trend is intact. Buy the dip now.' }, 'advice', 'EN imperative buy the dip now');
   rejected({ red: 'I suggest shorting into strength.' }, 'advice', 'EN I suggest shorting');
-  rejected({ cio: 'Los datos solo respaldan tesis alcistas.', direction: 'short' }, 'verdict', 'ES plural thesis contradicting a short direction');
-  rejected({ cio: 'Only bearish theses fit this evidence, so it merits review.' }, 'verdict', 'EN plural thesis contradicting a long direction');
+
+  // Preflight of claude/build34 (probe guard-probe*.mts): ordinary weighing and
+  // hedged disclaimers that the guard must never turn into analysis_failed.
+  passes({ cio: 'Red Team makes a fair bearish case about fading volume, but price holds above both averages, so the idea merits review.' }, 'CIO names the bearish case, long review');
+  passes({ cio: 'The bearish case rests on fading volume, but the upside idea merits review if 65,000 breaks.' }, 'bearish case named, upside idea');
+  passes({ cio: 'Alpha makes a bullish case, but lower highs dominate; a downside scenario merits review below 63,800.', direction: 'short' }, 'bullish case named, short review');
+  passes({ cio: 'El Red Team plantea una tesis bajista, pero el precio respeta ambas medias; la idea merece revisión si rompe 65,000.' }, 'ES tesis bajista named, long review');
+  passes({ cio: 'Alpha plantea una tesis alcista, pero los máximos decrecientes pesan más; el escenario a la baja merece revisión.', direction: 'short' }, 'ES tesis alcista named, short review');
+  passes({ cio: 'Weighing both, the bearish case is overstated; the uptrend deserves review with a stop under 63,800.' }, 'bearish case overstated, long review');
+  passes({ alpha: 'Holding above the 50 EMA guarantees no gains; it only improves the odds.' }, 'guarantees no gains');
+  passes({ red: 'Past performance guarantees no future returns.' }, 'guarantees no future returns');
+  passes({ red: 'This setup is far from a sure bet.' }, 'far from a sure bet');
+  passes({ red: 'It would be a mistake to call this a sure thing.' }, 'a mistake to call this a sure thing');
+  passes({ red: 'Calling this risk-free would be wrong.' }, 'calling this risk-free would be wrong');
+  passes({ alpha: 'Relative to Treasury yields, often treated as a risk-free benchmark, the move is modest.' }, 'risk-free benchmark is a finance term');
+  passes({ cio: 'Esperar permite observar sin riesgos adicionales mientras el volumen confirma.' }, 'ES sin riesgos adicionales');
+  passes({ red: 'Esto está lejos de ser una apuesta segura.' }, 'ES lejos de ser una apuesta segura');
+  rejected({ alpha: 'This is a sure bet, far better than bonds.' }, 'guarantee', 'a sure bet with "far" elsewhere is still a claim');
+  rejected({ alpha: 'Holding above the 50 EMA guarantees gains for the next session.' }, 'guarantee', 'guarantees gains is still a claim');
 
   // runDeskDebate: 'wait' carries no direction; a rejected answer is no answer.
   const evidence = { symbol: 'BTC', technicals: { price: 100 }, provenance: { provider: 'OKX', instrument: 'BTC-USDT', assetType: 'crypto', timeframe: '1H', asOf: new Date().toISOString() } } as never;

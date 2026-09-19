@@ -83,7 +83,7 @@ const GUARANTEE: RegExp[] = [
   /\bguarantee[ds]?\s+(?:\S+\s+){0,2}?(?:profits?|returns?|gains?|wins?|income|payouts?)\b/giu,
   /\b(?:profits?|returns?|gains?|income)\s+(?:is|are|will\s+be)\s+guaranteed\b/giu,
   /\bguaranteed\s+to\s+(?:rise|go\s+up|climb|rally|win|profit|pay\s+off|double)\b/giu,
-  /\b(?:risk[- ]free(?![- ]rates?\b)|riskless|zero[- ]risk|sure[- ](?:thing|bet|profit|win)|free\s+money|easy\s+money)\b/giu,
+  /\b(?:risk[- ]free(?![- ](?:rates?|benchmarks?|assets?|yields?|returns?|bonds?|treasur\w*|instruments?)\b)|riskless|zero[- ]risk|sure[- ](?:thing|bet|profit|win)|free\s+money|easy\s+money)\b/giu,
   /\b(?:your|the)\s+(?:capital|money|investment|principal|funds)\s+(?:is|are|will\s+be|stays?|remains?)\s+(?:fully\s+|completely\s+)?(?:protected|safe)\b/giu,
   /\bprotect(?:s|ed)?\b[^.;]{0,25}\bfrom\s+(?:any|all)\s+loss(?:es)?\b/giu,
   /\bgarantiz\w*\s+(?:\S+\s+){0,2}?(?:ganancias?|rentabilidad(?:es)?|retornos?|beneficios?|utilidad(?:es)?|rendimientos?)\b/giu,
@@ -91,7 +91,7 @@ const GUARANTEE: RegExp[] = [
   /\b(?:ganancias?|rentabilidad(?:es)?|retornos?|beneficios?|rendimientos?|subida|alza)\s+(?:est[aá]n?|estar[aá]n?|es|son)\s+(?:garantizad|asegurad)[oa]s?\b/giu,
   // "sin riesgo de quedar atrapado" describes waiting, not a trade: only
   // "sin riesgo de pérdida/perder" keeps the claim.
-  /\b(?:sin\s+(?:ning[uú]n\s+)?riesgos?(?!\s+(?:definido|controlado|limitado|claro|acotado|gestionado|calculado)s?\b)(?!\s+de\s+(?!p[eé]rd))|cero\s+riesgo|riesgo\s+cero|apuesta\s+segura|jugada\s+segura|dinero\s+f[aá]cil)(?![\p{L}])/giu,
+  /\b(?:sin\s+(?:ning[uú]n\s+)?riesgos?(?!\s+(?:definido|controlado|limitado|claro|acotado|gestionado|calculado|adicional)(?:e?s)?\b)(?!\s+de\s+(?!p[eé]rd))|cero\s+riesgo|riesgo\s+cero|apuesta\s+segura|jugada\s+segura|dinero\s+f[aá]cil)(?![\p{L}])/giu,
   /\b(?:tu|su|el)\s+(?:capital|dinero|inversi[oó]n)\s+(?:est[aá]|estar[aá]|queda(?:r[aá])?)\s+(?:totalmente\s+|completamente\s+)?(?:protegid[oa]|a\s+salvo)\b/giu,
   /\bproteg\w*\b[^.;]{0,25}\bde\s+(?:cualquier|toda)\s+p[eé]rdida\b/giu,
 ];
@@ -130,8 +130,15 @@ function sentenceStart(before: string): number {
   return start;
 }
 
+// Hedges that deny what follows them: "far from a sure bet", "it would be a
+// mistake to call this a sure thing", "lejos de ser una apuesta segura".
+const HEDGE_BEFORE = /(?:\bfar\s+from(?:\s+(?:being|an?|the))*\s*$|\blejos\s+de(?:\s+(?:ser|una?|el|la))*\s*$|\b(?:mistake|wrong|misleading|incorrect)\s+to\s+(?:call|say|treat|describe|label)\b|\b(?:error|equivocado|enga[ñn]oso)\s+(?:llamar|decir|tratar|describir)\b)/iu;
+// …and ones that deny what came before them: "Calling this risk-free would be wrong."
+const HEDGE_AFTER = /^\s*(?:would|is|was|will)\s+(?:be\s+)?(?:wrong|a\s+mistake|misleading|incorrect|an?\s+(?:exaggeration|overstatement))\b|^\s*(?:ser[ií]a|es)\s+(?:un\s+error|enga[ñn]oso|incorrecto|una\s+exageraci[oó]n)/iu;
+
 function negatedBefore(text: string, at: number): boolean {
   const sentence = text.slice(0, at).slice(sentenceStart(text.slice(0, at)));
+  if (HEDGE_BEFORE.test(sentence)) return true;
   const reach = words(sentence).slice(-8);
   const turn = reach.map(word => TURNS.has(word)).lastIndexOf(true);
   if (reach.slice(turn + 1).some(word => NEGATIONS.has(word))) return true;
@@ -139,6 +146,7 @@ function negatedBefore(text: string, at: number): boolean {
 }
 
 function negatedAfter(text: string, end: number): boolean {
+  if (HEDGE_AFTER.test(text.slice(end))) return true;
   const rest = text.slice(end).split(/[,.;:!?]/u)[0].replace(/\bno\s+(?:matter|importa)\b/giu, '');
   return words(rest).slice(0, 4).some(word => NEGATED_AFTER.has(word));
 }
@@ -147,33 +155,22 @@ function negatedAfter(text: string, end: number): boolean {
 function affirmedMatches(text: string, pattern: RegExp, checkAfter: boolean): RegExpMatchArray[] {
   return [...text.matchAll(pattern)].filter(match => {
     const at = match.index ?? 0;
+    // A negation inside the match itself: "guarantees no gains", "guarantees nothing".
+    // Its first word is the pattern's own ("sin riesgo" is the claim, not a negation).
+    if (checkAfter && words(match[0]).slice(1).some(word => NEGATIONS.has(word))) return false;
     return !negatedBefore(text, at) && !(checkAfter && negatedAfter(text, at + match[0].length));
   });
 }
 
-// The CIO's own thesis, only where it is named as one. Bare long/short/bullish
-// words describe charts, time or the other agents ("as long as", "a lo largo
-// de", "falls short", "the Red Team's bearish points"); they never count.
-const THESIS: Record<'long' | 'short', RegExp> = {
-  long: /(?<![\p{L}])(?:(?:long|bullish)\s+(?:thesis|theses)|bullish\s+case|conditional\s+(?:long|upside|bullish)|thesis\s+(?:is|remains|stays)\s+(?:long|bullish)|tesis\s+(?:larga|alcista)s?|(?:larg[oa]|alza)\s+condicional(?:es)?|condicional(?:es)?\s+(?:al\s+alza|alcista)|tesis\s+(?:es|sigue\s+siendo)\s+(?:larga|alcista))(?![\p{L}])/giu,
-  short: /(?<![\p{L}])(?:(?:short|bearish)\s+(?:thesis|theses)|bearish\s+case|conditional\s+(?:short|downside|bearish)|thesis\s+(?:is|remains|stays)\s+(?:short|bearish)|tesis\s+(?:corta|bajista)s?|(?:cort[oa]|baja)\s+condicional(?:es)?|condicional(?:es)?\s+(?:a\s+la\s+baja|bajista)|tesis\s+(?:es|sigue\s+siendo)\s+(?:corta|bajista))(?![\p{L}])/giu,
-};
-/** "the Red Team's bearish case", "la tesis larga de Alpha": another agent's thesis, not the CIO's. */
-function attributed(text: string, match: RegExpMatchArray): boolean {
-  const at = match.index ?? 0;
-  return /(?:red\s+team|alpha(?:\s+hunter)?)['’]s\s+$/iu.test(text.slice(Math.max(0, at - 40), at))
-    || /^\s+(?:del?|from|of|by)\s+(?:the\s+)?(?:red\s+team|alpha)\b/iu.test(text.slice(at + match[0].length));
-}
-function namesThesis(cio: string, side: 'long' | 'short'): boolean {
-  return affirmedMatches(cio, THESIS[side], true).some(match => !attributed(cio, match));
-}
 const STATED_VERDICT = /\b(?:verdict|veredicto)\b\W{0,4}(?:(?:is|es)\W{1,4})?(wait|review|esperar|revisar)\b/iu;
 
 /**
  * Post-generation guard, deliberately narrow: an affirmative guarantee /
  * risk-free / sure-profit claim or a personal buy/sell instruction (EN/ES) in
- * any role, or a CIO whose own words contradict its verdict or name only the
- * opposite thesis, fails the analysis. No verdict is substituted.
+ * any role, or a CIO that states a verdict other than the one it returned,
+ * fails the analysis. No verdict is substituted. The CIO naming the other
+ * side's case is normal weighing, not a contradiction: a text-vs-direction
+ * rule rejected most real "review" answers and was dropped.
  */
 export function reviewDeskOutput(agents: { alpha: string; red: string; cio: string; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none' }): void {
   for (const text of [agents.alpha, agents.red, agents.cio]) {
@@ -182,9 +179,6 @@ export function reviewDeskOutput(agents: { alpha: string; red: string; cio: stri
   }
   const stated = agents.cio.match(STATED_VERDICT)?.[1]?.toLowerCase();
   if (stated && (stated === 'wait' || stated === 'esperar' ? 'wait' : 'review') !== agents.verdict) throw new DeskOutputRejected('verdict');
-  if (agents.direction === 'none') return;
-  const opposite = agents.direction === 'long' ? 'short' : 'long';
-  if (namesThesis(agents.cio, opposite) && !namesThesis(agents.cio, agents.direction)) throw new DeskOutputRejected('verdict');
 }
 
 /** Three isolated model calls. The judge sees both arguments and the original question. */

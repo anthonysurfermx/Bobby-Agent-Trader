@@ -35,7 +35,10 @@ final class StoreShots: XCTestCase {
         let app = XCUIApplication()
         // Force English so the App Store captures are deterministic instead of
         // inheriting whatever language the simulator happens to be set to.
-        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        // The four-acknowledgement risk/AI notice (v3) is covered by
+        // ReleaseReadinessTests; this rig starts right after it.
+        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
         app.launch()
 
         // 01 — choose your companion (3D stage + roster)

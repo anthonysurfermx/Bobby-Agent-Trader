@@ -188,7 +188,7 @@ export default function PrivacyPage() {
             )}
           </p>
           <p>
-            {tr('If automatic revocation is not available, your account is still deleted and the app shows you how to stop using Sign in with Apple for Bobby yourself (Settings > your name > Sign-In & Security > Sign in with Apple > Bobby > Stop Using), as described in ', 'Si la revocación automática no está disponible, tu cuenta se borra de todos modos y la app te muestra cómo dejar de usar Iniciar sesión con Apple en Bobby tú mismo (Ajustes > tu nombre > Inicio de sesión y seguridad > Iniciar sesión con Apple > Bobby > Dejar de usar), como se explica en ')}
+            {tr('If automatic revocation is not available, your account is still deleted and the app shows you how to stop using Sign in with Apple for Bobby yourself (Settings > your name > Sign in with Apple > Bobby > Delete), as described in ', 'Si la revocación automática no está disponible, tu cuenta se borra de todos modos y la app te muestra cómo dejar de usar Iniciar sesión con Apple en Bobby tú mismo (Configuración > tu nombre > Iniciar sesión con Apple > Bobby > Eliminar), como se explica en ')}
             <a href={APPLE_STOP_USING_URL} className={linkClass}>{tr('Apple’s instructions', 'las instrucciones de Apple')}</a>
             {tr('. If Apple cannot be reached at that moment, nothing is deleted and the app asks you to try again. Signing out alone does not delete the account.', '. Si en ese momento no es posible comunicarse con Apple, no se borra nada y la app te pide intentarlo de nuevo. Cerrar sesión no borra la cuenta.')}
           </p>
