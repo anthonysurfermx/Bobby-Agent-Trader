@@ -50,6 +50,7 @@ const Body = z.discriminatedUnion('action', [
   z.object({ action: z.literal('remove'), placementId: z.string().uuid() }),
   z.object({ action: z.literal('publish'), title: z.string().max(80).optional() }),
   z.object({ action: z.literal('unpublish') }),
+  z.object({ action: z.literal('rename_private'), title: z.string().max(80) }),
   z.object({ action: z.literal('close'), inventoryId: z.string().uuid(), tzOffsetMin: z.number().int().min(-840).max(840).default(0), platform: z.enum(['ios', 'web']).default('web') }),
   // Any whole number reaches the database, which answers 'A horizon can only grow' for all but an upward 72 / 168.
   z.object({ action: z.literal('extend'), inventoryId: z.string().uuid(), hours: z.number().int().min(0).max(1000) }),
@@ -156,6 +157,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!identity) return;
   const body = guarded.body;
   try {
+    if (body.action === 'rename_private') {
+      await ensureLand(identity.id);
+      const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identity.id}`), {
+        method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ title: cleanTitle(body.title), visibility: 'private' }),
+      });
+      if (!r.ok || !((await r.json()) as unknown[]).length) return res.status(502).json({ error: 'Could not save the island name' });
+      return res.status(200).json({ ok: true, ...(await world(identity, req.headers)) });
+    }
     if (body.action === 'unpublish') {
       const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identity.id}`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ visibility: 'private' }) });
       if (!r.ok || !((await r.json()) as unknown[]).length) return res.status(502).json({ error: 'Could not hide the island' });

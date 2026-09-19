@@ -84,6 +84,13 @@ export default function PrivacyPage() {
 
         <Section title="Questions, voice, and operational data">
           <p>
+            iPhone version 1.2 (build 33) uses text only. Before asking a question, you explicitly
+            allow Bobby to send that question and public market context to OpenAI for analysis.
+            This request does not include your Bobby account identifier. Avoid including personal
+            information, account numbers, passwords, or financial account details in your questions.
+            The iPhone build does not record microphone audio or generate speech.
+          </p>
+          <p>
             To answer or speak, the app sends the text you provide, recent conversation context,
             requested voice, language, and selected asset and chart context to our backend and the relevant AI or speech provider.
             Bobby processes this content for the request and does not add it to your account or

@@ -12,6 +12,7 @@ type HeadersFn = () => Record<string, string> | null;
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'unauthenticated' | 'error';
 
 let headersFn: HeadersFn | null = null;
+let generation = 0;
 let status: SyncStatus = 'idle';
 let inflight: Promise<SyncStatus> | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -41,7 +42,9 @@ function setStatus(next: SyncStatus) { if (status !== next) { status = next; emi
 
 /** Register (or clear) the credential provider. Registering triggers a sync. */
 export function configureProgressSync(fn: HeadersFn | null): void {
+  generation++;
   headersFn = fn;
+  grants.clear();
   if (!fn) { setStatus('idle'); return; }
   void syncProgress();
 }
@@ -53,13 +56,9 @@ function profilePayload(p: Progress) {
     onboarded: p.onboarded,
     riskNoticeVersion: p.riskNoticeVersion,
     quickAccess: p.quickAccess,
-    // XP earned on this device before THIS account existed. Sent on every
-    // sync: the server only honours it for an empty account (xp 0, no ledger)
-    // and caps it, so repeating it is harmless. Gating it on "never synced"
-    // lost the points of anyone who had synced with a wallet and then signed
-    // in with Apple or Google — the new account came back at 0 and the desk
-    // overwrote the local XP with it.
-    ...(p.xp > 0 ? { localXpClaim: p.xp } : {}),
+    restore: p.syncedAt === null,
+    localXpIncludesPending: false,
+    localXpClaim: Math.max(0, p.xp - p.pendingEvents.reduce((sum, event) => sum + (event.kind === 'no_trade_respected' ? 20 : 10), 0)),
   };
 }
 
@@ -71,27 +70,36 @@ export async function syncProgress(): Promise<SyncStatus> {
   if (inflight) return inflight;
   const headers = headersFn?.();
   if (!headers) { setStatus('unauthenticated'); return status; }
+  const started = generation;
+  const credential = JSON.stringify(headers);
   inflight = (async () => {
     setStatus('syncing');
     try {
-      const local = progressStore.get();
-      const pending = local.pendingEvents;
-      const mustPost = pending.length > 0 || local.syncedAt === null;
-      const res = await fetch('/api/progress', mustPost
-        ? { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ platform: 'web', events: pending, profile: profilePayload(local) }) }
-        : { headers });
-      if (res.status === 401) { setStatus('unauthenticated'); return status; }
-      if (!res.ok) { setStatus('error'); return status; }
-      const data = (await res.json()) as { progress: ServerProgress; results?: Array<{ id: string; world?: unknown }> };
-      progressStore.applyServer(data.progress, (data.results ?? []).map((r) => r.id));
-      recordGrants(data.results);
+      for (let batch = 0; batch < 20; batch++) {
+        const local = progressStore.get();
+        const pending = local.pendingEvents.slice(0, 50);
+        const mustPost = pending.length > 0 || local.syncedAt === null;
+        const res = await fetch('/api/progress', mustPost
+          ? { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ platform: 'web', events: pending, profile: profilePayload(local) }) }
+          : { headers });
+        if (started !== generation || JSON.stringify(headersFn?.()) !== credential) return status;
+        if (res.status === 401) { setStatus('unauthenticated'); return status; }
+        if (!res.ok) { setStatus('error'); return status; }
+        const data = (await res.json()) as { progress: ServerProgress; results?: Array<{ id: string; world?: unknown }> };
+        if (started !== generation || JSON.stringify(headersFn?.()) !== credential) return status;
+        progressStore.applyServer(data.progress, (data.results ?? []).map((r) => r.id));
+        recordGrants(data.results);
+        if (pending.length < 50 || !progressStore.get().pendingEvents.length) break;
+      }
       setStatus('synced');
       return status;
     } catch {
+      if (started !== generation) return status;
       setStatus('error');
       return status;
     } finally {
       inflight = null;
+      if (started !== generation && headersFn) queueMicrotask(() => void syncProgress());
     }
   })();
   return inflight;
