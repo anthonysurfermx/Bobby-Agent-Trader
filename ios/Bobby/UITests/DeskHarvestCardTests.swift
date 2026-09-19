@@ -35,6 +35,90 @@ final class DeskHarvestCardTests: XCTestCase {
         XCTAssertFalse(app.buttons["harvest-primary"].exists)
     }
 
+    // MARK: Horizon choice (Growth v1)
+
+    private func anything(_ app: XCUIApplication, containing text: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+    }
+
+    func testPickerAsksBeforeGrowingTheSeed() {
+        let app = launch("picker")
+        let day = app.buttons["harvest-horizon-24h"]
+        let threeDays = app.buttons["harvest-horizon-3d"]
+        let week = app.buttons["harvest-horizon-7d"]
+        XCTAssertTrue(threeDays.waitForExistence(timeout: 10))
+        // Planted at 24 h: that chip is the seed's own, only upward ones are open.
+        XCTAssertTrue(day.isSelected)
+        XCTAssertFalse(day.isEnabled)
+        XCTAssertTrue(threeDays.isEnabled)
+        XCTAssertTrue(week.isEnabled)
+        XCTAssertTrue(threeDays.label.hasPrefix("3 days · building 2×1"), threeDays.label)
+        XCTAssertTrue(threeDays.label.contains("Double Gate"), threeDays.label)
+        XCTAssertTrue(week.label.contains("landmark 2×2"), week.label)
+        XCTAssertFalse(app.buttons["harvest-horizon-confirm"].exists, "nothing is sent without a confirmation")
+
+        threeDays.tap()
+        let confirm = app.buttons["harvest-horizon-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        XCTAssertEqual(confirm.label, "Grow to 3 days")
+        XCTAssertTrue(anything(app, containing: "You can't shorten it later.").exists)
+        XCTAssertEqual(app.buttons["harvest-horizon-cancel"].label, "Keep 24 h")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "harvest-picker-confirm"
+        shot.lifetime = .keepAlways
+        add(shot)
+
+        // Cancel keeps the seed as it is.
+        app.buttons["harvest-horizon-cancel"].tap()
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(day.isSelected)
+    }
+
+    func testConfirmedHorizonBecomesTheSeeds() {
+        let app = launch("picker")
+        let threeDays = app.buttons["harvest-horizon-3d"]
+        XCTAssertTrue(threeDays.waitForExistence(timeout: 10))
+        threeDays.tap()
+        let confirm = app.buttons["harvest-horizon-confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        // The fixture answers like the server: the seed now blooms into the building in 3 days.
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(anything(app, containing: "review this thesis in 3 days").waitForExistence(timeout: 5))
+        XCTAssertTrue(threeDays.isSelected)
+        XCTAssertFalse(app.buttons["harvest-horizon-24h"].isEnabled, "a horizon cannot shrink")
+        XCTAssertTrue(app.buttons["harvest-horizon-7d"].isEnabled)
+    }
+
+    func testGrownSeedsNameTheirHorizon() {
+        var app = launch("seed-3d")
+        XCTAssertTrue(app.buttons["harvest-horizon-3d"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["harvest-horizon-3d"].isSelected)
+        XCTAssertFalse(app.buttons["harvest-horizon-24h"].isEnabled)
+        XCTAssertTrue(app.buttons["harvest-horizon-7d"].isEnabled)
+        XCTAssertTrue(anything(app, containing: "in 3 days").exists)
+        app.terminate()
+
+        app = launch("seed-7d")
+        XCTAssertTrue(app.buttons["harvest-horizon-7d"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["harvest-horizon-7d"].isSelected)
+        XCTAssertFalse(app.buttons["harvest-horizon-24h"].isEnabled)
+        XCTAssertFalse(app.buttons["harvest-horizon-3d"].isEnabled)
+        XCTAssertTrue(anything(app, containing: "in 7 days").exists)
+    }
+
+    func testNoTradeAndOlderServersShowNoPicker() {
+        var app = launch("bloomed")
+        XCTAssertTrue(app.buttons["harvest-primary"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["harvest-horizon-24h"].exists)
+        app.terminate()
+        // A seed from a server before Growth v1: planted at 24 h, nothing to choose.
+        app = launch("seed")
+        XCTAssertTrue(app.buttons["harvest-primary"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["harvest-horizon-3d"].exists)
+        XCTAssertTrue(anything(app, containing: "in 24 h").exists)
+    }
+
     func testChipCarriesItsBadge() {
         let app = launch("seed")
         let chip = app.buttons.matching(identifier: "desk-land").firstMatch
