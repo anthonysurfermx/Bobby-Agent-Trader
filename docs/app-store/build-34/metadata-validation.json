@@ -1,0 +1,152 @@
+{
+  "generatedFor": "Bobby 1.2 (34)",
+  "method": "Trailing newline removed. characters = Unicode code points; utf16Units = UTF-16 code units; utf8Bytes = UTF-8 bytes. Keywords are checked in bytes.",
+  "allPass": true,
+  "problems": [],
+  "fields": [
+    {
+      "locale": "en-US",
+      "field": "name",
+      "characters": 29,
+      "utf16Units": 29,
+      "utf8Bytes": 29,
+      "limit": 30,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "en-US",
+      "field": "subtitle",
+      "characters": 26,
+      "utf16Units": 26,
+      "utf8Bytes": 26,
+      "limit": 30,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "en-US",
+      "field": "promotional-text",
+      "characters": 151,
+      "utf16Units": 151,
+      "utf8Bytes": 151,
+      "limit": 170,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "en-US",
+      "field": "keywords",
+      "characters": 99,
+      "utf16Units": 99,
+      "utf8Bytes": 99,
+      "limit": 100,
+      "limitUnit": "bytes",
+      "passes": true,
+      "keywordCount": 14,
+      "noSpacesAroundCommas": true,
+      "noDuplicates": true,
+      "noNameOrSubtitleWords": true,
+      "noTrademarks": true,
+      "noAppName": true
+    },
+    {
+      "locale": "en-US",
+      "field": "description",
+      "characters": 1615,
+      "utf16Units": 1615,
+      "utf8Bytes": 1623,
+      "limit": 4000,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "en-US",
+      "field": "whats-new",
+      "characters": 647,
+      "utf16Units": 647,
+      "utf8Bytes": 657,
+      "limit": 4000,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "es-MX",
+      "field": "name",
+      "characters": 22,
+      "utf16Units": 22,
+      "utf8Bytes": 22,
+      "limit": 30,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "es-MX",
+      "field": "subtitle",
+      "characters": 26,
+      "utf16Units": 26,
+      "utf8Bytes": 26,
+      "limit": 30,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "es-MX",
+      "field": "promotional-text",
+      "characters": 166,
+      "utf16Units": 166,
+      "utf8Bytes": 169,
+      "limit": 170,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "es-MX",
+      "field": "keywords",
+      "characters": 93,
+      "utf16Units": 93,
+      "utf8Bytes": 97,
+      "limit": 100,
+      "limitUnit": "bytes",
+      "passes": true,
+      "keywordCount": 11,
+      "noSpacesAroundCommas": true,
+      "noDuplicates": true,
+      "noNameOrSubtitleWords": true,
+      "noTrademarks": true,
+      "noAppName": true
+    },
+    {
+      "locale": "es-MX",
+      "field": "description",
+      "characters": 1753,
+      "utf16Units": 1753,
+      "utf8Bytes": 1779,
+      "limit": 4000,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "es-MX",
+      "field": "whats-new",
+      "characters": 771,
+      "utf16Units": 771,
+      "utf8Bytes": 794,
+      "limit": 4000,
+      "limitUnit": "characters",
+      "passes": true
+    },
+    {
+      "locale": "en-US",
+      "field": "app-review-notes",
+      "characters": 2929,
+      "utf16Units": 2929,
+      "utf8Bytes": 2930,
+      "limit": 4000,
+      "limitUnit": "bytes",
+      "passes": true,
+      "mentionsX": false,
+      "mentionsCredentials": false
+    }
+  ]
+}
