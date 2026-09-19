@@ -59,7 +59,7 @@ export interface Progress {
   dailyAwards: number;
   dailyAwardsDay: string | null;
   quickAccess: string[];
-  /** Trader Land soft currency and Discovery Route position — server-owned, mirrored here. */
+  /** Trader Land soft currency and the legacy route position (capped at 8 for iOS 1.1) — server-owned, mirrored here. */
   aura: number;
   routeIndex: number;
   pendingEvents: PendingEvent[];
@@ -123,6 +123,8 @@ export interface AwardResult {
   awarded: number;
   evolvedTo: CompanionLevel | null;
   drops: CompanionTool[];
+  /** The queued event (null when capped): its Trader Land grant comes back keyed by this id (sync.ts getGrant). */
+  eventId: string | null;
 }
 
 export const progressStore = {
@@ -170,7 +172,7 @@ export const progressStore = {
     const points = AWARD_POINTS[kind];
     const today = dayKey(now);
     let dailyAwards = state.dailyAwardsDay === today ? state.dailyAwards : 0;
-    if (dailyAwards >= MAX_DAILY_AWARDS) return { awarded: 0, evolvedTo: null, drops: [] };
+    if (dailyAwards >= MAX_DAILY_AWARDS) return { awarded: 0, evolvedTo: null, drops: [], eventId: null };
     dailyAwards += 1;
 
     const xpBefore = state.xp;
@@ -194,7 +196,7 @@ export const progressStore = {
     const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const pendingEvents = [...state.pendingEvents, { id, kind, at: now.toISOString(), tzOffsetMin: now.getTimezoneOffset(), ...(thesis ? { thesis: { ...thesis } } : {}) }].slice(-50);
     commit({ ...state, xp, streak, lastDay: today, dailyAwards, dailyAwardsDay: today, pendingEvents });
-    return { awarded: points, evolvedTo, drops };
+    return { awarded: points, evolvedTo, drops, eventId: id };
   },
 };
 
