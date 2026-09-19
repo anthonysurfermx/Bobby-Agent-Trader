@@ -9,9 +9,16 @@
 --   · tl_reserve_placement_cells() reserves the core where the land keeps it,
 --     reading the land FOR SHARE so a core move or a growth step serializes
 --     with every placement
---   · four RPCs, service_role only, that lock the land row before they touch
---     anything: tl_grant_piece, tl_extend_seed, tl_move_core, tl_grow_land.
+--   · RPCs, service_role only, that lock the land row before they touch
+--     anything: tl_grant_piece, tl_extend_seed, tl_move_core, tl_grow_land,
+--     and the placement writes tl_place_piece / tl_move_piece /
+--     tl_remove_piece. Every write that touches an island's pieces takes the
+--     land row first, so a growth step (land, then each placement) can never
+--     deadlock against a place/move/remove (a plain write takes the placement
+--     first).
 --     Expected refusals return {ok:false,error:'<code>'}, never an exception.
+--   · bobby_link_identities keeps progress.route_index from moving back now
+--     that the common tier repeats (the legacy route_index no longer grows)
 -- Additive and safe under the deployed API: every default reproduces today's
 -- rules (core at 3,3, 24 h seeds, 8×8) and nothing calls the RPCs until the
 -- API ships. Idempotent: re-running it changes nothing.
@@ -92,7 +99,9 @@ begin
     from public.tl_inventory i join public.tl_items t on t.id = i.item_id
     where i.id = new.inventory_id;
   -- FOR SHARE: a concurrent core move or growth step (FOR UPDATE) waits for
-  -- this placement, or this placement reads the land they committed.
+  -- this placement, or this placement reads the land they committed. The
+  -- API's writes (tl_place_piece / tl_move_piece) already hold the land
+  -- FOR UPDATE by now, which is what keeps them clear of a growth deadlock.
   select l.size, l.core_x, l.core_y into land_size, core_col, core_row
     from public.tl_lands l where l.identity_id = new.identity_id for share;
   if piece.identity_id is distinct from new.identity_id or piece.state is distinct from 'bloomed' then
@@ -233,7 +242,11 @@ revoke execute on function public.tl_extend_seed(uuid, uuid, smallint) from publ
 grant execute on function public.tl_extend_seed(uuid, uuid, smallint) to service_role;
 
 -- ---------- tl_move_core: the 2×2 core goes where no piece stands ----------
-create or replace function public.tl_move_core(p_identity uuid, p_x int, p_y int)
+-- p_size: the island size the client drew the target on (null = unknown). A
+-- growth shifts every cell by a ring, so a target drawn on another size is
+-- refused ('resized') instead of landing one ring off.
+drop function if exists public.tl_move_core(uuid, int, int);
+create or replace function public.tl_move_core(p_identity uuid, p_x int, p_y int, p_size int default null)
 returns jsonb
 language plpgsql security invoker set search_path = public, pg_temp as $$
 declare
@@ -242,6 +255,9 @@ begin
   select size into v_size from public.tl_lands where identity_id = p_identity for update;
   if not found then
     return jsonb_build_object('ok', false, 'error', 'not_found');
+  end if;
+  if p_size is not null and p_size <> v_size then
+    return jsonb_build_object('ok', false, 'error', 'resized', 'size', v_size);
   end if;
   if p_x is null or p_y is null or p_x < 0 or p_y < 0 or p_x + 2 > v_size or p_y + 2 > v_size then
     return jsonb_build_object('ok', false, 'error', 'outside');
@@ -254,8 +270,97 @@ begin
   return jsonb_build_object('ok', true, 'core_x', p_x, 'core_y', p_y);
 end;
 $$;
-revoke execute on function public.tl_move_core(uuid, int, int) from public, anon, authenticated;
-grant execute on function public.tl_move_core(uuid, int, int) to service_role;
+revoke execute on function public.tl_move_core(uuid, int, int, int) from public, anon, authenticated;
+grant execute on function public.tl_move_core(uuid, int, int, int) to service_role;
+
+-- ---------- placement writes: the land row first, then the piece ----------
+-- tl_grow_land holds the land FOR UPDATE, drops the island's cells and then
+-- shifts each placement. A plain write on tl_placements waits the other way
+-- round: an INSERT/UPDATE holds its row (and unique index entry) when the
+-- AFTER trigger asks for the land FOR SHARE, and a DELETE holds its row when
+-- its cascade reaches the cells the growth already took. Either can deadlock
+-- with a growth step, so these three take the land first.
+-- p_size is the island size the caller validated the coordinates on (null =
+-- unchecked): a growth that commits in between shifts every cell, so the
+-- write is refused ('resized') rather than applied one ring off. Any refusal
+-- by the trigger or a key means the island changed since the caller read it
+-- ('changed'; `detail` is the database's message).
+create or replace function public.tl_place_piece(p_identity uuid, p_inventory uuid, p_x int, p_y int, p_rotation int default 0, p_size int default null)
+returns jsonb
+language plpgsql security invoker set search_path = public, pg_temp as $$
+declare
+  v_size integer;
+  v_id uuid;
+begin
+  select size into v_size from public.tl_lands where identity_id = p_identity for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'error', 'not_found');
+  end if;
+  if p_size is not null and p_size <> v_size then
+    return jsonb_build_object('ok', false, 'error', 'resized', 'size', v_size);
+  end if;
+  begin
+    insert into public.tl_placements(identity_id, inventory_id, x, y, rotation)
+      values (p_identity, p_inventory, p_x, p_y, coalesce(p_rotation, 0))
+      returning id into v_id;
+  exception when unique_violation or check_violation or foreign_key_violation or not_null_violation then
+    return jsonb_build_object('ok', false, 'error', 'changed', 'detail', sqlerrm);
+  end;
+  return jsonb_build_object('ok', true, 'placement_id', v_id);
+end;
+$$;
+revoke execute on function public.tl_place_piece(uuid, uuid, int, int, int, int) from public, anon, authenticated;
+grant execute on function public.tl_place_piece(uuid, uuid, int, int, int, int) to service_role;
+
+create or replace function public.tl_move_piece(p_identity uuid, p_placement uuid, p_x int, p_y int, p_rotation int default 0, p_size int default null)
+returns jsonb
+language plpgsql security invoker set search_path = public, pg_temp as $$
+declare
+  v_size integer;
+  v_id uuid;
+begin
+  select size into v_size from public.tl_lands where identity_id = p_identity for update;
+  if not found then
+    return jsonb_build_object('ok', false, 'error', 'not_found');
+  end if;
+  if p_size is not null and p_size <> v_size then
+    return jsonb_build_object('ok', false, 'error', 'resized', 'size', v_size);
+  end if;
+  begin
+    update public.tl_placements set x = p_x, y = p_y, rotation = coalesce(p_rotation, 0)
+      where id = p_placement and identity_id = p_identity
+      returning id into v_id;
+  exception when unique_violation or check_violation or not_null_violation then
+    return jsonb_build_object('ok', false, 'error', 'changed', 'detail', sqlerrm);
+  end;
+  if v_id is null then
+    return jsonb_build_object('ok', false, 'error', 'not_found');
+  end if;
+  return jsonb_build_object('ok', true, 'placement_id', v_id);
+end;
+$$;
+revoke execute on function public.tl_move_piece(uuid, uuid, int, int, int, int) from public, anon, authenticated;
+grant execute on function public.tl_move_piece(uuid, uuid, int, int, int, int) to service_role;
+
+-- Storing a piece needs no frame: it is addressed by id. The land lock only
+-- keeps it from interleaving with a growth step (its cascade deletes the
+-- cells the growth is re-reserving).
+create or replace function public.tl_remove_piece(p_identity uuid, p_placement uuid)
+returns jsonb
+language plpgsql security invoker set search_path = public, pg_temp as $$
+declare
+  v_id uuid;
+begin
+  perform 1 from public.tl_lands where identity_id = p_identity for update;
+  delete from public.tl_placements where id = p_placement and identity_id = p_identity returning id into v_id;
+  if v_id is null then
+    return jsonb_build_object('ok', false, 'error', 'not_found');
+  end if;
+  return jsonb_build_object('ok', true, 'placement_id', v_id);
+end;
+$$;
+revoke execute on function public.tl_remove_piece(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.tl_remove_piece(uuid, uuid) to service_role;
 
 -- ---------- tl_grow_land: wake the core at 5 pieces, add rings at the thresholds ----------
 -- occupied = placement cells + the 4 core cells. 8×8 at 39 → 10×10, 10×10
@@ -315,5 +420,87 @@ end;
 $$;
 revoke execute on function public.tl_grow_land(uuid) from public, anon, authenticated;
 grant execute on function public.tl_grow_land(uuid) to service_role;
+
+-- ---------- bobby_link_identities: progress.route_index never moves back ----------
+-- The merge recomputed route_index as the count of distinct legacy route
+-- pieces (tl_items.route_index 1..8). Common grants now cycle through 15
+-- pieces and only 7 of them carry a legacy index (the Double Gate is a
+-- building), so an account showing 8 would drop to 7 on a link. The counter
+-- is now the largest of: what either identity already showed, the common
+-- pieces held (GROWTH-v1 §3, capped at 8) and the legacy count. Only the
+-- v_stored / v_common reads and the `v_route := greatest(…)` line differ
+-- from 20260903000010 (no API calls this RPC today; /api/identity-link is
+-- retired, but this is its durable definition).
+create or replace function public.bobby_link_identities(p_keep uuid, p_merge uuid)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_catalog as $$
+declare
+  v_keep public.bobby_identities%rowtype;
+  v_merge public.bobby_identities%rowtype;
+  v_xp integer; v_aura integer; v_events integer; v_streak integer; v_route integer;
+  v_last_day date; v_daily integer; v_daily_day date;
+  v_stored integer; v_common integer;
+begin
+  if p_keep is null or p_merge is null or p_keep = p_merge then
+    raise exception 'bobby_link_identities: need two different identities' using errcode = '22023';
+  end if;
+  select * into v_keep from public.bobby_identities where id = p_keep for update;
+  select * into v_merge from public.bobby_identities where id = p_merge for update;
+  if v_keep.id is null or v_merge.id is null then
+    raise exception 'bobby_link_identities: identity not found' using errcode = '22023';
+  end if;
+  if v_keep.auth_user_id is not null and v_merge.auth_user_id is not null and v_keep.auth_user_id <> v_merge.auth_user_id then
+    raise exception 'bobby_link_identities: both identities already belong to different accounts' using errcode = '22023';
+  end if;
+  if v_keep.wallet_address is not null and v_merge.wallet_address is not null and v_keep.wallet_address <> v_merge.wallet_address then
+    raise exception 'bobby_link_identities: both identities already have different wallets' using errcode = '22023';
+  end if;
+  -- Read before the merged row (and its progress, on delete cascade) goes away.
+  select coalesce(max(route_index), 0) into v_stored from public.bobby_progress where identity_id in (p_keep, p_merge);
+
+  delete from public.tl_placements where identity_id = p_merge;
+  delete from public.tl_lands where identity_id = p_merge;
+  update public.bobby_progress_events set identity_id = p_keep where identity_id = p_merge;
+  update public.tl_inventory set identity_id = p_keep where identity_id = p_merge;
+  update public.bobby_pre_calls set identity_id = p_keep where identity_id = p_merge;
+  -- C-04 (final audit): receipts follow the person, they are not orphaned.
+  update public.bobby_swap_receipts set identity_id = p_keep where identity_id = p_merge;
+  update public.bobby_identities set
+    auth_user_id = coalesce(v_keep.auth_user_id, v_merge.auth_user_id),
+    email = coalesce(v_keep.email, v_merge.email),
+    provider = coalesce(v_keep.provider, v_merge.provider),
+    last_seen_at = now()
+  where id = p_keep;
+  delete from public.bobby_identities where id = p_merge;
+  if v_merge.wallet_address is not null and v_keep.wallet_address is null then
+    update public.bobby_identities set wallet_address = v_merge.wallet_address where id = p_keep;
+  end if;
+  select coalesce(sum(awarded), 0), coalesce(sum(aura), 0), count(*) into v_xp, v_aura, v_events
+    from public.bobby_progress_events where identity_id = p_keep;
+  select count(distinct i.route_index) into v_route
+    from public.tl_inventory inv join public.tl_items i on i.id = inv.item_id
+    where inv.identity_id = p_keep and inv.source = 'route' and i.route_index is not null;
+  select count(*) into v_common
+    from public.tl_inventory inv join public.tl_items i on i.id = inv.item_id
+    where inv.identity_id = p_keep and inv.source = 'route' and i.tier = 'common';
+  v_route := greatest(v_stored, least(v_common, 8), least(v_route, 8));
+  select max(day_key) into v_last_day from public.bobby_progress_events where identity_id = p_keep and awarded > 0;
+  select count(*) into v_daily from public.bobby_progress_events where identity_id = p_keep and awarded > 0 and day_key = v_last_day;
+  v_daily_day := v_last_day;
+  with days as (select distinct day_key d from public.bobby_progress_events where identity_id = p_keep and awarded > 0),
+       ordered as (select d, lag(d) over (order by d) prev from days),
+       breaks as (select d, case when prev is null or d - prev > 2 then 1 else 0 end brk from ordered),
+       runs as (select d, sum(brk) over (order by d) run from breaks)
+  select count(*) into v_streak from runs where run = (select max(run) from runs);
+  insert into public.bobby_progress (identity_id) values (p_keep) on conflict (identity_id) do nothing;
+  update public.bobby_progress set
+    xp = v_xp, aura = v_aura, route_index = least(v_route, 8), streak = coalesce(v_streak, 0),
+    last_day = v_last_day, daily_awards = coalesce(v_daily, 0), daily_awards_day = v_daily_day,
+    updated_at = now()
+  where identity_id = p_keep;
+  return jsonb_build_object('kept', p_keep, 'merged', p_merge, 'xp', v_xp, 'aura', v_aura, 'events', v_events, 'streak', coalesce(v_streak, 0), 'route_index', least(v_route, 8));
+end $$;
+revoke all on function public.bobby_link_identities(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.bobby_link_identities(uuid, uuid) to service_role;
 
 commit;

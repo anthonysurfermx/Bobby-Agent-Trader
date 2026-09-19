@@ -2,7 +2,11 @@
 -- scripts/test-trader-land-growth.sql — Trader Land Growth v1 on a real
 -- Postgres (docs/trader-land/GROWTH-v1.md §2): tier backfill and sequences,
 -- grants and replays, NO TRADE blooms, horizon extends, the movable core,
--- island growth with the ring shift, the core waking, checks and revokes.
+-- island growth with the ring shift, the core waking, the placement writes
+-- (land lock first, stale frames refused) and their races with a growth
+-- step, the identity link's route counter, checks and revokes.
+-- The race section drives extra sessions through dblink (contrib, shipped
+-- with every PostgreSQL build) back into this same throwaway cluster.
 --
 -- Run only against an isolated, EMPTY, throwaway local cluster — never
 -- production. It creates roles and applies the real migrations in order:
@@ -24,6 +28,10 @@ create role service_role;
 \ir ../supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql
 -- Idempotent: a second run changes nothing and fails nothing.
 \ir ../supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql
+-- bobby_link_identities re-parents swap receipts; the real table (migration
+-- 20260903000009) needs the agent schema, so a stand-in with the same key.
+create table if not exists public.bobby_swap_receipts (id uuid primary key default gen_random_uuid(), identity_id uuid references public.bobby_identities(id) on delete set null);
+create extension if not exists dblink;
 -- Supabase grants table access to service_role; RLS policies do the rest.
 grant all on all tables in schema public to service_role;
 set client_min_messages = notice;
@@ -173,6 +181,23 @@ begin
   raise notice 'PASS extend: upward/not_upward/review_open/not_seed/not_found, item swap, released slots';
 end $$;
 
+-- Extending an OLDER seed: n is a count (§1.3 sequence[n mod len]), so the
+-- next common read steps back one piece rather than returning the extended
+-- seed's own piece; that piece comes back when the sequence wraps. This pins
+-- the contract formula; the §1.3 parenthetical only describes the latest seed.
+do $$
+declare v uuid := pg_temp.person(); s1 jsonb; s2 jsonb; s3 jsonb; r jsonb;
+begin
+  s1 := tl_grant_piece(v, pg_temp.ev(v), 'seed');
+  s2 := tl_grant_piece(v, pg_temp.ev(v), 'seed');
+  s3 := tl_grant_piece(v, pg_temp.ev(v), 'seed');
+  assert s3->>'item_id' = 'risk_reef_dual_orbit_antenna', 'three commons';
+  assert (tl_extend_seed(v, (s2->>'inventory_id')::uuid, 72::smallint)->>'ok')::boolean, 'the middle seed goes to 3 days';
+  r := tl_grant_piece(v, pg_temp.ev(v), 'seed');
+  assert r->>'item_id' = 'risk_reef_dual_orbit_antenna' and (r->>'held')::int = 3, 'n = 2 → common #3 again: ' || r::text;
+  raise notice 'PASS extend: an older seed releases a count, not its own piece (contract formula)';
+end $$;
+
 -- ---------- the core moves; the trigger reserves it where the land keeps it ----------
 do $$
 declare c uuid := pg_temp.person(); pl uuid; r jsonb;
@@ -207,7 +232,58 @@ begin
     raise exception 'moving a piece under the core was accepted';
   exception when check_violation then null; end;
   assert tl_move_core(c, 2, 2)->>'error' = 'occupied', 'pieces at 3,3 block the core coming back';
-  raise notice 'PASS core: outside/occupied/not_found/ok, trigger rejects the moved rectangle, old cells freed';
+  -- A target drawn on another island size is refused before anything else.
+  r := tl_move_core(c, 6, 0, 10);
+  assert r->>'error' = 'resized' and (r->>'size')::int = 8, 'a core target drawn on a 10×10 is refused on an 8×8: ' || r::text;
+  assert (tl_move_core(c, 6, 0, 8)->>'ok')::boolean, 'the same target drawn on the 8×8 moves the core';
+  raise notice 'PASS core: outside/occupied/not_found/resized/ok, trigger rejects the moved rectangle, old cells freed';
+end $$;
+
+-- ---------- placement writes: the land row first, stale frames and races refused as data ----------
+do $$
+declare k uuid := pg_temp.person(); other uuid := pg_temp.person(); inv uuid; inv2 uuid; seed uuid; theirs uuid; pl uuid; r jsonb;
+begin
+  insert into tl_inventory(identity_id, item_id, state, source, bloomed_at) values (k, 'crypto_bay_data_dock', 'bloomed', 'route', now()) returning id into inv;
+  insert into tl_inventory(identity_id, item_id, state, source, bloomed_at) values (k, 'crypto_bay_data_dock', 'bloomed', 'route', now()) returning id into inv2;
+  insert into tl_inventory(identity_id, item_id, state, source) values (k, 'crypto_bay_data_dock', 'seed', 'route') returning id into seed;
+  insert into tl_inventory(identity_id, item_id, state, source, bloomed_at) values (other, 'crypto_bay_data_dock', 'bloomed', 'route', now()) returning id into theirs;
+  assert tl_place_piece(k, inv, 0, 0, 0, 8)->>'error' = 'not_found', 'no land, nowhere to place';
+  insert into tl_lands(identity_id) values (k), (other);
+  -- The frame the caller validated on must still be the island's.
+  r := tl_place_piece(k, inv, 0, 0, 0, 10);
+  assert r->>'error' = 'resized' and (r->>'size')::int = 8, 'coordinates drawn on a 10×10 are refused on an 8×8: ' || r::text;
+  assert not exists (select 1 from tl_placements where inventory_id = inv), 'and nothing is placed';
+  r := tl_place_piece(k, inv, 0, 0, 0, 8);
+  assert (r->>'ok')::boolean, 'placed: ' || r::text;
+  pl := (r->>'placement_id')::uuid;
+  assert exists (select 1 from tl_placements where id = pl and identity_id = k and x = 0 and y = 0), 'the row is written';
+  assert (select count(*) from tl_placement_cells where placement_id = pl) = 1, 'and its cell reserved';
+  -- Every database refusal is data ('changed'), never an exception.
+  assert tl_place_piece(k, inv, 1, 0)->>'error' = 'changed', 'a piece placed twice';
+  assert tl_place_piece(k, inv2, 0, 0)->>'error' = 'changed', 'an occupied cell';
+  r := tl_place_piece(k, inv2, 3, 4);
+  assert r->>'error' = 'changed' and r->>'detail' = 'The Aura Core footprint is reserved', 'the core: ' || r::text;
+  assert tl_place_piece(k, inv2, 8, 0)->>'detail' = 'Placement is outside the island', 'outside';
+  assert tl_place_piece(k, seed, 1, 1)->>'detail' = 'Placement requires an owned, bloomed piece', 'a seed';
+  assert tl_place_piece(k, theirs, 1, 1)->>'error' = 'changed', 'someone else''s piece';
+  assert tl_place_piece(k, gen_random_uuid(), 1, 1)->>'error' = 'changed', 'an unknown piece';
+  assert (select count(*) from tl_placements where identity_id = k) = 1 and (select count(*) from tl_placement_cells where identity_id = k) = 1, 'refusals leave the island as it was';
+  -- Move.
+  r := tl_move_piece(k, pl, 7, 7, 90, 8);
+  assert (r->>'ok')::boolean and r->>'placement_id' = pl::text, 'moved: ' || r::text;
+  assert exists (select 1 from tl_placements where id = pl and x = 7 and y = 7 and rotation = 90), 'the row moved';
+  assert (select array_agg(x || ':' || y) from tl_placement_cells where placement_id = pl) = array['7:7'], 'and its cell followed';
+  assert tl_move_piece(k, pl, 3, 3, 0, 8)->>'error' = 'changed', 'onto the core';
+  assert tl_move_piece(k, pl, 0, 0, 0, 10)->>'error' = 'resized', 'drawn on another size';
+  assert exists (select 1 from tl_placements where id = pl and x = 7 and y = 7), 'refused moves leave the piece';
+  assert tl_move_piece(other, pl, 0, 0, 0, 8)->>'error' = 'not_found', 'someone else''s placement is not found';
+  assert tl_move_piece(k, gen_random_uuid(), 0, 0, 0, 8)->>'error' = 'not_found', 'an unknown placement';
+  -- Remove (by id: no frame).
+  assert tl_remove_piece(other, pl)->>'error' = 'not_found', 'someone else cannot store it';
+  assert (tl_remove_piece(k, pl)->>'ok')::boolean, 'stored';
+  assert not exists (select 1 from tl_placements where id = pl) and not exists (select 1 from tl_placement_cells where placement_id = pl), 'row and cells released';
+  assert tl_remove_piece(k, pl)->>'error' = 'not_found', 'storing twice';
+  raise notice 'PASS placement writes: place/move/remove, resized, changed with the database reason, not_found';
 end $$;
 
 -- ---------- growth: wake at 5, no growth below the threshold, 8 → 10 → 12 with the ring shift ----------
@@ -289,6 +365,107 @@ begin
   raise notice 'PASS growth: 12→16 by two rings, 16 is final';
 end $$;
 
+-- ---------- races with a growth step: no deadlock, no piece one ring off ----------
+-- Real sessions (dblink into this cluster), ordered by locks, not by sleeps.
+-- Before the placement RPCs, a plain UPDATE / DELETE / INSERT on
+-- tl_placements took the placement first and the land second (the trigger's
+-- FOR SHARE) while tl_grow_land takes the land first and each placement
+-- second: cases A and B died with "deadlock detected", and in case C the
+-- piece meant for the 8×8 corner (7,7) landed one ring inside the 10×10.
+create function pg_temp.session(name text) returns int language plpgsql as $$
+begin
+  perform dblink_connect(name, format('host=127.0.0.1 port=%s user=%s dbname=%s', current_setting('port'), current_user, current_database()));
+  return (select pid from dblink(name, 'select pg_backend_pid()') as t(pid int));
+end $$;
+-- Wait until a session is parked on a lock (its request is queued behind ours).
+create function pg_temp.parked(pid int) returns void language plpgsql as $$
+begin
+  for i in 1..1000 loop
+    perform pg_stat_clear_snapshot();
+    if exists (select 1 from pg_stat_activity a where a.pid = parked.pid and a.wait_event_type = 'Lock') then return; end if;
+    perform pg_sleep(0.01);
+  end loop;
+  raise exception 'session % never waited on a lock', pid;
+end $$;
+-- The async answer of a session (an error there, e.g. a deadlock, fails the test).
+create function pg_temp.answer(name text) returns jsonb language plpgsql as $$
+declare out jsonb;
+begin
+  select r into out from dblink_get_result(name) as t(r jsonb);
+  perform 1 from dblink_get_result(name) as t(r jsonb);
+  return out;
+end $$;
+-- An 8×8 at the growth threshold: 35 1×1 pieces row-major around the core + 4 core cells = 39.
+create function pg_temp.full_island() returns uuid language plpgsql as $$
+declare p uuid := pg_temp.person();
+begin
+  insert into public.tl_lands(identity_id) values (p);
+  perform pg_temp.fill(p, 35);
+  return p;
+end $$;
+create temp table race(name text primary key, identity_id uuid, placement uuid, inventory uuid);
+insert into race select 'move', pg_temp.full_island();
+insert into race select 'remove', pg_temp.full_island();
+-- (a separate statement: the one that built the island cannot see its rows yet)
+update race r set placement = p.id from tl_placements p where p.identity_id = r.identity_id and p.x = 0 and p.y = 0;
+-- A bloomed piece in hand, not on the island.
+create function pg_temp.in_hand(p uuid) returns uuid language sql as $$
+  insert into public.tl_inventory(identity_id, item_id, state, source, bloomed_at) values (p, 'crypto_bay_data_dock', 'bloomed', 'route', now()) returning id
+$$;
+insert into race select 'place', pg_temp.full_island();
+update race set inventory = pg_temp.in_hand(identity_id) where name = 'place';
+
+do $$
+declare
+  g_pid int := pg_temp.session('grow'); w_pid int := pg_temp.session('writer'); l_pid int := pg_temp.session('pause');
+  v_id uuid; v_pl uuid; v_inv uuid; grew jsonb; out jsonb;
+begin
+  -- A. A move drawn on the 8×8 queues behind a growth that holds the land.
+  select identity_id, placement into v_id, v_pl from race where name = 'move';
+  perform dblink_exec('grow', 'begin');
+  perform * from dblink('grow', format('select 1 from tl_lands where identity_id = %L for update', v_id)) as t(x int);
+  perform dblink_send_query('writer', format('select tl_move_piece(%L, %L, 7, 7, 0, 8)', v_id, v_pl));
+  perform pg_temp.parked(w_pid);
+  select r into grew from dblink('grow', format('select tl_grow_land(%L)', v_id)) as t(r jsonb);
+  perform dblink_exec('grow', 'commit');
+  out := pg_temp.answer('writer');
+  assert (grew->>'grew')::boolean and (grew->>'to')::int = 10, 'A: the growth went through: ' || grew::text;
+  assert out->>'error' = 'resized' and (out->>'size')::int = 10, 'A: the move waited on the land, then was refused as drawn on the 8×8: ' || out::text;
+  assert exists (select 1 from tl_placements where id = v_pl and x = 1 and y = 1), 'A: the piece only took the ring shift';
+
+  -- B. A store lands while the growth is mid-shift (paused on its first row).
+  select identity_id, placement into v_id, v_pl from race where name = 'remove';
+  perform dblink_exec('pause', 'begin');
+  perform * from dblink('pause', format('select 1 from tl_placements where identity_id = %L order by x + y desc, x desc limit 1 for update', v_id)) as t(x int);
+  perform dblink_send_query('grow', format('select tl_grow_land(%L)', v_id));
+  perform pg_temp.parked(g_pid);
+  perform dblink_send_query('writer', format('select tl_remove_piece(%L, %L)', v_id, v_pl));
+  perform pg_temp.parked(w_pid);
+  perform dblink_exec('pause', 'commit');
+  grew := pg_temp.answer('grow');
+  out := pg_temp.answer('writer');
+  assert (grew->>'grew')::boolean, 'B: the growth finished: ' || grew::text;
+  assert (out->>'ok')::boolean, 'B: the store waited for it, then stored the shifted piece: ' || out::text;
+  assert not exists (select 1 from tl_placements where id = v_pl) and not exists (select 1 from tl_placement_cells where placement_id = v_pl), 'B: row and cells gone';
+  assert (select count(*) from tl_placement_cells where identity_id = v_id) = 34, 'B: the other 34 cells re-reserved in the 10×10';
+
+  -- C. A placement at the 8×8 corner (7,7) queues behind a growth.
+  select identity_id, inventory into v_id, v_inv from race where name = 'place';
+  perform dblink_exec('grow', 'begin');
+  perform * from dblink('grow', format('select 1 from tl_lands where identity_id = %L for update', v_id)) as t(x int);
+  perform dblink_send_query('writer', format('select tl_place_piece(%L, %L, 7, 7, 0, 8)', v_id, v_inv));
+  perform pg_temp.parked(w_pid);
+  select r into grew from dblink('grow', format('select tl_grow_land(%L)', v_id)) as t(r jsonb);
+  perform dblink_exec('grow', 'commit');
+  out := pg_temp.answer('writer');
+  assert (grew->>'grew')::boolean, 'C: the growth went through';
+  assert out->>'error' = 'resized', 'C: the placement was refused, not applied one ring inside: ' || out::text;
+  assert not exists (select 1 from tl_placements where inventory_id = v_inv), 'C: the piece stays in hand';
+
+  perform dblink_disconnect('grow'); perform dblink_disconnect('writer'); perform dblink_disconnect('pause');
+  raise notice 'PASS races: move / store / place against a growth step — no deadlock, stale frames refused';
+end $$;
+
 -- ---------- checks on the land ----------
 do $$
 declare f uuid := pg_temp.person();
@@ -329,17 +506,49 @@ begin
   raise notice 'PASS backfill: core_stage = 1 only at ≥ 5 placements';
 end $$;
 
+-- ---------- the identity link keeps progress.route_index ----------
+-- Commons 1..8 carry only 7 legacy route indexes (the Double Gate, legacy
+-- #5, is a building now). The merge used to recompute the counter from the
+-- legacy index alone, turning an 8 into a 7.
+create function pg_temp.wallet() returns uuid language sql as $$
+  insert into public.bobby_identities(wallet_address) values ('0x' || md5(gen_random_uuid()::text)) returning id
+$$;
+do $$
+declare k uuid := pg_temp.person(); m uuid := pg_temp.wallet(); a uuid := pg_temp.person(); b uuid := pg_temp.wallet(); r jsonb;
+begin
+  for i in 1..8 loop perform tl_grant_piece(k, pg_temp.ev(k), 'seed'); end loop;
+  insert into bobby_progress(identity_id, route_index) values (k, 8), (m, 0);
+  assert (select count(distinct t.route_index) from tl_inventory i join tl_items t on t.id = i.item_id where i.identity_id = k and t.route_index is not null) = 7, 'eight commons, seven legacy indexes';
+  r := bobby_link_identities(k, m);
+  assert (r->>'route_index')::int = 8 and (select route_index from bobby_progress where identity_id = k) = 8, 'the link keeps 8: ' || r::text;
+  -- Two partial islands: 3 + 6 commons → 9 held, capped at 8, more than either showed.
+  for i in 1..3 loop perform tl_grant_piece(a, pg_temp.ev(a), 'seed'); end loop;
+  for i in 1..6 loop perform tl_grant_piece(b, pg_temp.ev(b), 'seed'); end loop;
+  insert into bobby_progress(identity_id, route_index) values (a, 3), (b, 6);
+  r := bobby_link_identities(a, b);
+  assert (r->>'route_index')::int = 8 and (select route_index from bobby_progress where identity_id = a) = 8, 'the union of commons counts: ' || r::text;
+  assert not exists (select 1 from bobby_identities where id = b) and (select count(*) from tl_inventory where identity_id = a) = 9, 'the merged identity is folded in';
+  raise notice 'PASS link: route_index never moves back (stored, commons held, legacy count)';
+end $$;
+
 -- ---------- privileges: service_role only ----------
 do $$
 declare fn text;
 begin
-  foreach fn in array array['public.tl_grant_piece(uuid,uuid,text,smallint)', 'public.tl_extend_seed(uuid,uuid,smallint)', 'public.tl_move_core(uuid,integer,integer)', 'public.tl_grow_land(uuid)', 'public.tl_reserve_placement_cells()'] loop
+  assert to_regprocedure('public.tl_move_core(uuid,integer,integer)') is null, 'no 3-argument tl_move_core overload is left behind';
+  foreach fn in array array['public.tl_grant_piece(uuid,uuid,text,smallint)', 'public.tl_extend_seed(uuid,uuid,smallint)', 'public.tl_move_core(uuid,integer,integer,integer)', 'public.tl_grow_land(uuid)',
+      'public.tl_place_piece(uuid,uuid,integer,integer,integer,integer)', 'public.tl_move_piece(uuid,uuid,integer,integer,integer,integer)', 'public.tl_remove_piece(uuid,uuid)', 'public.tl_reserve_placement_cells()'] loop
     assert not has_function_privilege('anon', fn, 'execute'), 'anon cannot execute ' || fn;
     assert not has_function_privilege('authenticated', fn, 'execute'), 'authenticated cannot execute ' || fn;
     assert has_function_privilege('service_role', fn, 'execute'), 'service_role executes ' || fn;
     assert (select not exists (select 1 from aclexplode((select proacl from pg_proc where oid = fn::regprocedure)) a where a.grantee = 0)), 'PUBLIC has no grant on ' || fn;
     assert (select prosecdef = false and proconfig @> array['search_path=public, pg_temp'] from pg_proc where oid = fn::regprocedure), fn || ' is security invoker with a pinned search_path';
   end loop;
+  -- The identity merge stays what 20260903000010 made it: security definer, service_role only.
+  fn := 'public.bobby_link_identities(uuid,uuid)';
+  assert not has_function_privilege('anon', fn, 'execute') and not has_function_privilege('authenticated', fn, 'execute') and has_function_privilege('service_role', fn, 'execute'), fn || ' is service_role only';
+  assert (select not exists (select 1 from aclexplode((select proacl from pg_proc where oid = fn::regprocedure)) a where a.grantee = 0)), 'PUBLIC has no grant on ' || fn;
+  assert (select prosecdef and proconfig @> array['search_path=public, pg_catalog'] from pg_proc where oid = fn::regprocedure), fn || ' keeps security definer and its search_path';
   raise notice 'PASS privileges: EXECUTE revoked from public/anon/authenticated, granted to service_role';
 end $$;
 
@@ -365,11 +574,14 @@ begin
   assert (r->>'ok')::boolean and r->>'tier' = 'landmark', 'service_role extends';
   r := public.tl_grant_piece(s, pg_temp.ev(s), 'bloomed');
   inv := (r->>'inventory_id')::uuid;
-  insert into public.tl_placements(identity_id, inventory_id, x, y) values (s, inv, 0, 0);
-  assert (public.tl_move_core(s, 5, 5)->>'ok')::boolean, 'service_role moves the core';
+  r := public.tl_place_piece(s, inv, 0, 0, 0, 8);
+  assert (r->>'ok')::boolean, 'service_role places: ' || r::text;
+  assert (public.tl_move_piece(s, (r->>'placement_id')::uuid, 1, 0, 0, 8)->>'ok')::boolean, 'service_role moves a piece';
+  assert (public.tl_move_core(s, 5, 5, 8)->>'ok')::boolean, 'service_role moves the core';
   assert (public.tl_grow_land(s)->>'ok')::boolean, 'service_role grows';
+  assert (public.tl_remove_piece(s, (r->>'placement_id')::uuid)->>'ok')::boolean, 'service_role stores a piece';
   raise notice 'PASS service_role path under RLS';
 end $$;
 reset role;
 
-\echo 'PASS: trader land growth — schema, grants, extend, core, growth, checks, backfill, privileges'
+\echo 'PASS: trader land growth — schema, grants, extend, core, placement writes, growth, races, checks, backfill, link, privileges'
