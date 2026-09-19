@@ -6,6 +6,7 @@ import Foundation
 
 @MainActor
 final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
+    static let enabled = false // Text-only App Store release.
     @Published var speaking = false
     @Published var level: CGFloat = 0
 
@@ -38,6 +39,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// greetings, onboarding previews — retry once and then stay silent: a
     /// robotic voice breaking the companion's identity is worse than no voice.
     func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true, playbackRate: Float = 1.0, free: Bool = false) {
+        guard Self.enabled else { return }
         stop()
         generation += 1
         let gen = generation
@@ -90,6 +92,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// /api/bobby-voice-free voice: it starts instantly and needs no network.
     /// A missing clip falls back to the network voice for `fallbackText`.
     func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
+        guard Self.enabled else { return }
         guard let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
               let data = try? Data(contentsOf: url) else {
             speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)

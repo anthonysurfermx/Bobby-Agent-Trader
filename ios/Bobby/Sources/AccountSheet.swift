@@ -12,6 +12,8 @@ struct AccountSheet: View {
     @ObservedObject private var account = AccountSession.shared
     @State private var busy = false
     @State private var showDeleteConfirmation = false
+    @State private var accountDeleted = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -94,7 +96,7 @@ struct AccountSheet: View {
                 Task {
                     let deleted = await account.deleteAccount(store: store)
                     busy = false
-                    if deleted { onClose() }
+                    if deleted { accountDeleted = true }
                 }
             }
             Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
@@ -103,6 +105,19 @@ struct AccountSheet: View {
                 "This deletes your Apple-backed account and synced XP, streak, gear and Trader Land. Public blockchain transactions cannot be erased and limited security or audit records may remain.",
                 "Esto borra tu cuenta vinculada a Apple y tu XP, racha, accesorios y Trader Land sincronizados. Las transacciones públicas de blockchain no se pueden borrar y pueden conservarse registros limitados de seguridad o auditoría."
             ))
+        }
+        .alert(L.t("Account deleted", "Cuenta eliminada"), isPresented: $accountDeleted) {
+            if account.manualAppleRevocationRequired {
+                Button(L.t("Manage Sign in with Apple", "Gestionar acceso con Apple")) {
+                    openURL(URL(string: "https://support.apple.com/en-us/102571")!)
+                    onClose()
+                }
+            }
+            Button("OK", role: .cancel) { onClose() }
+        } message: {
+            Text(account.manualAppleRevocationRequired
+                ? L.t("Your Bobby account and synced progress were deleted. Finish disconnecting Bobby in your Apple Account's Sign in with Apple settings.", "Se borraron tu cuenta de Bobby y su progreso. Para desconectar también el acceso con Apple, elimina Bobby en los ajustes de Iniciar sesión con Apple de tu cuenta de Apple.")
+                : L.t("Your account and synced progress were deleted.", "Se borraron tu cuenta y su progreso sincronizado."))
         }
     }
 

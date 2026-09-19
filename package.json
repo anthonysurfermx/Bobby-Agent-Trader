@@ -44,7 +44,9 @@
     "gen:hardness-abi": "tsx scripts/gen-hardness-abi.mts",
     "test:stock-ticker-routing": "tsx scripts/test-stock-ticker-routing.mts",
     "test:realtime-session": "tsx scripts/test-realtime-session.mts",
-    "test:desk-audit": "tsx scripts/test-desk-audit.mts"
+    "test:desk-audit": "tsx scripts/test-desk-audit.mts",
+    "test:ios-remediation": "tsx scripts/test-ios-remediation.mts",
+    "test:progress-atomic-pg": "tsx scripts/test-progress-atomic-pg.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

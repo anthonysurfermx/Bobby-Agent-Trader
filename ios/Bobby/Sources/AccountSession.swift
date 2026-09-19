@@ -20,6 +20,8 @@ struct StoredSession: Codable {
     var refreshToken: String
     var expiresAt: Date
     var userId: String
+    var appleUserId: String? = nil
+    var provider: String? = nil
 }
 
 @MainActor
@@ -27,26 +29,64 @@ final class AccountSession: ObservableObject {
     static let shared = AccountSession()
     @Published private(set) var session: StoredSession?
     @Published var lastError: String?
+    @Published var manualAppleRevocationRequired = false
     private var currentNonce: String?
+    /// Invalidates every pending request when the account changes or signs out.
+    private(set) var generation = UUID()
+    private var refreshTask: Task<StoredSession, Error>?
+    private var revocationObserver: NSObjectProtocol?
     private let keychainService = "xyz.bobbyprotocol.bobby.session"
 
-    init() { session = Keychain.read(service: keychainService) }
+    init() {
+        session = Keychain.read(service: keychainService)
+        revocationObserver = NotificationCenter.default.addObserver(forName: ASAuthorizationAppleIDProvider.credentialRevokedNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.session?.provider != "twitter" else { return }
+                self.signOut()
+            }
+        }
+    }
+
+    deinit { if let revocationObserver { NotificationCenter.default.removeObserver(revocationObserver) } }
+
+    func checkAppleCredential() async {
+        guard let appleID = session?.appleUserId else { return }
+        let started = generation
+        let state = try? await ASAuthorizationAppleIDProvider().credentialState(forUserID: appleID)
+        guard generation == started else { return }
+        if state == .revoked || state == .notFound { signOut() }
+    }
 
     var isSignedIn: Bool { session != nil }
 
     /// A valid access token, refreshed when it is about to expire. nil = signed out.
     func accessToken() async -> String? {
-        guard var s = session else { return nil }
+        guard let s = session else { return nil }
         if s.expiresAt.timeIntervalSinceNow > 60 { return s.accessToken }
+        let started = generation
+        let task: Task<StoredSession, Error>
+        if let running = refreshTask { task = running }
+        else {
+            task = Task { try await self.exchange(body: ["refresh_token": s.refreshToken], grant: "refresh_token") }
+            refreshTask = task
+        }
+        defer { if generation == started { refreshTask = nil } }
         do {
-            let refreshed = try await exchange(body: ["refresh_token": s.refreshToken], grant: "refresh_token")
-            s = refreshed; session = s; Keychain.write(s, service: keychainService)
-            return s.accessToken
-        } catch let error as NSError where error.domain == Self.authHTTPDomain && (400..<500).contains(error.code) {
+            var refreshed = try await task.value
+            guard generation == started, session?.userId == s.userId,
+                  refreshed.userId == s.userId else { return nil }
+            refreshed.appleUserId = s.appleUserId
+            refreshed.provider = refreshed.provider ?? s.provider
+            session = refreshed; Keychain.write(refreshed, service: keychainService)
+            lastError = nil
+            return refreshed.accessToken
+        } catch let error as NSError where error.domain == Self.authHTTPDomain && [400, 401, 403].contains(error.code) {
+            guard generation == started else { return nil }
             // Supabase rejected the refresh token: the session is really over.
             lastError = L.t("Session expired — sign in again", "La sesión caducó — inicia sesión de nuevo")
             signOut(); return nil
         } catch {
+            guard generation == started else { return nil }
             // Offline or a server hiccup: keep the session and try again later.
             lastError = L.t("You're offline — try again in a moment", "Sin conexión — inténtalo de nuevo en un momento")
             return nil
@@ -54,14 +94,27 @@ final class AccountSession: ObservableObject {
     }
 
     func signOut(store: CompanionStore? = nil) {
+        generation = UUID()
+        refreshTask?.cancel(); refreshTask = nil
         session = nil; Keychain.delete(service: keychainService)
         store?.unbind()
+    }
+
+    private func accept(_ newSession: StoredSession) {
+        generation = UUID()
+        refreshTask?.cancel(); refreshTask = nil
+        session = newSession
+        Keychain.write(newSession, service: keychainService)
+        lastError = nil
     }
 
     /// Permanently remove the Apple-backed account and synced Bobby data.
     /// Confirmed public-chain transactions cannot be erased; the server removes
     /// their Bobby account link before deleting the Auth user.
     func deleteAccount(store: CompanionStore? = nil) async -> Bool {
+        let started = generation
+        let deletingUserId = session?.userId
+        manualAppleRevocationRequired = false
         guard let token = await accessToken() else {
             if session == nil {
                 lastError = L.t("Sign in again before deleting your account", "Inicia sesión de nuevo antes de borrar tu cuenta")
@@ -70,21 +123,38 @@ final class AccountSession: ObservableObject {
         }
         var request = URLRequest(url: URL(string: "https://bobbyprotocol.xyz/api/account")!)
         request.httpMethod = "DELETE"
-        request.timeoutInterval = 20
+        request.timeoutInterval = 45
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
 
         do {
+            var check = request
+            check.httpMethod = "GET"
+            let (requirements, checkResponse) = try await URLSession.shared.data(for: check)
+            guard (checkResponse as? HTTPURLResponse)?.statusCode == 200,
+                  let body = try JSONSerialization.jsonObject(with: requirements) as? [String: Any] else { throw URLError(.badServerResponse) }
+            if body["appleAuthorizationRequired"] as? Bool == true {
+                let code = try await AppleDeletionAuthorization.shared.authorize()
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: ["appleAuthorizationCode": code])
+            }
+            guard generation == started else { return false }
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
                 lastError = L.t(message ?? "Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
                 return false
             }
+            // A late deletion response must never sign out a different account.
+            if let deletingUserId { store?.forgetAccount(deletingUserId) }
+            guard generation == started else { return true }
+            let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            manualAppleRevocationRequired = result?["appleRevocation"] as? String == "manual"
             signOut(store: store)
             lastError = nil
             return true
         } catch {
+            if (error as? ASAuthorizationError)?.code == .canceled { return false }
             lastError = L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
             return false
         }
@@ -99,6 +169,7 @@ final class AccountSession: ObservableObject {
     }
 
     func completeApple(_ result: Result<ASAuthorization, Error>) async {
+        let started = generation
         switch result {
         case .failure(let error):
             if (error as? ASAuthorizationError)?.code != .canceled { lastError = error.localizedDescription }
@@ -107,8 +178,10 @@ final class AccountSession: ObservableObject {
                   let tokenData = cred.identityToken, let idToken = String(data: tokenData, encoding: .utf8),
                   let nonce = currentNonce else { lastError = L.t("Apple returned no identity token", "Apple no devolvió un token de identidad"); return }
             do {
-                let s = try await exchange(body: ["provider": "apple", "id_token": idToken, "nonce": nonce], grant: "id_token")
-                session = s; Keychain.write(s, service: keychainService); lastError = nil
+                var s = try await exchange(body: ["provider": "apple", "id_token": idToken, "nonce": nonce], grant: "id_token")
+                guard generation == started else { return }
+                s.appleUserId = cred.user; s.provider = "apple"
+                accept(s)
             } catch {
                 lastError = L.t("Could not sign in: \(error.localizedDescription)", "No se pudo iniciar sesión — inténtalo de nuevo")
             }
@@ -128,13 +201,16 @@ final class AccountSession: ObservableObject {
     }
 
     func signInWithOAuth(provider: String) async {
+        let started = generation
         var comps = URLComponents(url: SupabaseConfig.url.appendingPathComponent("auth/v1/authorize"), resolvingAgainstBaseURL: false)!
         comps.queryItems = [URLQueryItem(name: "provider", value: provider), URLQueryItem(name: "redirect_to", value: Self.oauthCallback)]
         guard let authURL = comps.url else { lastError = L.t("bad authorize URL", "URL de autorización no válida"); return }
         do {
             let callback = try await WebAuthPresenter.shared.run(url: authURL, scheme: "bobbyprotocol")
-            guard let s = Self.session(fromCallback: callback) else { lastError = L.t("Supabase returned no session", "Supabase no devolvió una sesión"); return }
-            session = s; Keychain.write(s, service: keychainService); lastError = nil
+            guard var s = Self.session(fromCallback: callback) else { lastError = L.t("Supabase returned no session", "Supabase no devolvió una sesión"); return }
+            guard generation == started else { return }
+            s.provider = provider
+            accept(s)
         } catch {
             // The visitor closing the sheet is not an error worth showing.
             if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin { return }

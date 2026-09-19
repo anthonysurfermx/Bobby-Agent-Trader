@@ -30,8 +30,11 @@ enum MarketTimeframe: String, CaseIterable, Identifiable {
         }
     }
 
-    // Mirrors MarketCanvas on bobbyprotocol.xyz. Yahoo does not expose 4H
-    // candles, so the web desk deliberately expands those views to daily data.
+    static func available(isEquity: Bool) -> [MarketTimeframe] {
+        allCases.filter { !isEquity || $0 != .fourHours }
+    }
+
+    // Yahoo does not expose 4H; the selector excludes it for equities.
     var equityQuery: (range: String, interval: String) {
         switch self {
         case .fifteenMinutes: return ("7d", "15m")
@@ -68,6 +71,12 @@ struct BobbyAnswer {
     var rewardRisk: Double?
     var overview: String?
 
+    var alphaArgument: String?
+    var redArgument: String?
+    var cioArgument: String?
+    var agentVerdict: String?
+    var evidenceLabel: String?
+
     /// True when the debate simply never came back — no market data and no
     /// verdict of any kind. A backend failure must NEVER masquerade as a
     /// disciplined NO TRADE (no Halo moment, no XP, no "capital protected").
@@ -84,6 +93,7 @@ struct BobbyAnswer {
     /// Bobby's signature NO TRADE state.
     var isNoTrade: Bool {
         guard !isUnavailable else { return false }
+        if let agentVerdict { return agentVerdict == "wait" }
         let normalizedSignal = signal?.lowercased().replacingOccurrences(of: "-", with: "_") ?? ""
         if normalizedSignal.contains("no_trade") || normalizedSignal.contains("neutral") || normalizedSignal.contains("wait") {
             return true
@@ -95,6 +105,7 @@ struct BobbyAnswer {
 
     var noTradeReason: String {
         guard isNoTrade else { return "" }
+        if let cioArgument { return cioArgument }
         let normalizedSignal = signal?.lowercased() ?? ""
         if normalizedSignal.contains("neutral") || normalizedSignal.contains("wait") {
             return L.t("No clean directional signal passed the desk.",
@@ -114,6 +125,7 @@ struct BobbyAnswer {
 
     /// The spoken/written summary — terminal-honest, never advice-flavored.
     var summary: String {
+        if let cioArgument { return cioArgument }
         var lines: [String] = []
         if let p = price {
             lines.append(L.t("\(symbol) is at \(Self.money(p)).",
@@ -151,7 +163,7 @@ struct BobbyAnswer {
             }
             lines.append(plan + ".")
         }
-        if isNoTrade { lines.append(L.t("No setup yet. Capital protected.", "Sin oportunidad todavía. Capital protegido.")) }
+        if isNoTrade { lines.append(L.t("No clear setup. Waiting is an option.", "Sin oportunidad clara. Esperar es una opción.")) }
         if lines.isEmpty {
             lines.append(L.t("I do not have enough data on \(symbol) right now.",
                              "No tengo datos suficientes de \(symbol) ahora mismo."))
@@ -338,7 +350,8 @@ enum BobbyAPI {
         }
         var req = URLRequest(url: url)
         req.httpMethod = method
-        req.timeoutInterval = 60
+        req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
+        req.timeoutInterval = path == "api/desk-debate" ? 100 : 60
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -437,11 +450,23 @@ enum BobbyAPI {
     }
 
     /// Shared technical evidence: regime, indicators, signal and risk plan.
-    static func debate(_ symbol: String) async -> BobbyAnswer {
-        guard let obj = try? await json("api/voice-tool", method: "POST",
-                                        body: ["tool": "run_debate", "args": ["symbol": symbol]]) as? [String: Any]
+    static func debate(_ symbol: String, question: String, isEquity: Bool = false) async -> BobbyAnswer {
+        guard let obj = try? await json("api/desk-debate", method: "POST",
+                                        body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto"]) as? [String: Any],
+              let agents = obj["agents"] as? [String: String],
+              let alpha = agents["alpha"], !alpha.isEmpty,
+              let red = agents["red"], !red.isEmpty,
+              let cio = agents["cio"], !cio.isEmpty,
+              let verdict = agents["verdict"], ["wait", "review"].contains(verdict)
         else { return BobbyAnswer(symbol: symbol) }
-        return decodeEvidence(obj, symbol: symbol)
+        var answer = decodeEvidence(obj, symbol: symbol)
+        answer.alphaArgument = alpha; answer.redArgument = red; answer.cioArgument = cio
+        answer.agentVerdict = verdict
+        answer.direction = agents["direction"]
+        if let source = obj["provenance"] as? [String: String] {
+            answer.evidenceLabel = [source["provider"], source["instrument"], source["timeframe"], source["asOf"]].compactMap { $0 }.joined(separator: " · ")
+        }
+        return answer
     }
 
     static func decodeEvidence(_ obj: [String: Any], symbol: String) -> BobbyAnswer {
@@ -477,6 +502,7 @@ enum BobbyAPI {
     }
 
     static func candles(symbol: String, isEquity: Bool, timeframe: MarketTimeframe = .oneHour) async -> [Candle] {
+        guard !isEquity || timeframe != .fourHours else { return [] }
         let equity = timeframe.equityQuery
         let path = isEquity
             ? "api/stock-candles?symbol=\(symbol)&range=\(equity.range)&interval=\(equity.interval)"

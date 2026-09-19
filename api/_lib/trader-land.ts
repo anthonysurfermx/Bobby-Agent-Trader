@@ -20,13 +20,13 @@
 // /api/trader-land, which already proved the identity. The land-shaping
 // writes are RPCs that lock the land row (migration 20260919120516).
 // ============================================================
-import { randomInt, randomUUID } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
-import { AWARD_AURA, EXECUTION_BONUS, applyAward, type PlantKind, type ProgressCounters } from './progress-rules.js';
+import { EXECUTION_BONUS, type PlantKind } from './progress-rules.js';
 import { publicLastPrice } from './public-price.js';
 import { horizonAt, horizonHours, resolveThesis, reviewAt, seedHorizon, swapExecutesThesis, thesisFrom, type SeedHorizon, type SwapCandidate, type Thesis, type ThesisOutcome, type Tier } from './thesis-rules.js';
 import { LEGACY_LAND_SIZE, LEGACY_ROUTE_CAP, TIER_ORDER, coreOf, growthOf, heldByTier, nextInTier, tierSequence, type Core, type Growth } from './trader-land-growth.js';
-import { seasonProgress, type SeasonProgress } from './trader-land-season.js';
+import { SEASON, seasonProgress, type SeasonProgress } from './trader-land-season.js';
 
 export { THESIS_REVIEW_HOURS, ThesisSchema, resolveThesis, reviewAt, seedHorizon, thesisFrom, type SeedHorizon, type Thesis, type ThesisOutcome, type Tier } from './thesis-rules.js';
 export { SEASON, seasonProgress, type SeasonProgress } from './trader-land-season.js';
@@ -54,7 +54,6 @@ export interface RouteGrant {
 
 export interface Item { id: string; world: string; attribution: string; kind: string; footprint_w: number; footprint_h: number; name: unknown; route_index: number | null; tier: string | null; tier_index: number | null; art_url: string | null }
 export interface PieceSummary { id: string; world: string; attribution: string; kind: string; name: unknown; footprint: [number, number] }
-const PIECE_COLUMNS = 'id,world,attribution,kind,footprint_w,footprint_h,name';
 export function pieceSummary(item: Item): PieceSummary {
   return { id: item.id, world: item.world, attribution: item.attribution, kind: item.kind, name: item.name, footprint: [item.footprint_w, item.footprint_h] };
 }
@@ -369,20 +368,6 @@ export async function findExecutingSwap(identityId: string, wallet: string, thes
 
 export interface SeasonGrant { piece: PieceSummary | null; progress: SeasonProgress }
 
-/** The next season piece for this identity, tied to the executed review's ledger row (one piece per event). */
-async function grantSeasonPiece(identityId: string, ledgerEventId: string, at: string): Promise<SeasonGrant> {
-  const inv = await fetch(bobbyRest(`tl_inventory?identity_id=eq.${identityId}&source=eq.season&select=item_id,source`), { headers: bobbyServiceHeaders() });
-  const held = (inv.ok ? await inv.json() : []) as Array<{ item_id: string; source: string }>;
-  const progress = seasonProgress(held);
-  if (!progress.next) return { piece: null, progress };
-  const itemR = await fetch(bobbyRest(`tl_items?id=eq.${progress.next}&active=eq.true&select=${PIECE_COLUMNS}&limit=1`), { headers: bobbyServiceHeaders() });
-  const item = ((itemR.ok ? await itemR.json() : []) as Item[])[0];
-  if (!item) { console.error('[trader-land] season piece missing from catalog', progress.next); return { piece: null, progress }; }
-  const ins = await fetch(bobbyRest('tl_inventory?select=id'), { method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ identity_id: identityId, item_id: item.id, state: 'bloomed', source: 'season', event_id: ledgerEventId, bloomed_at: at }) });
-  if (!ins.ok) { console.error('[trader-land] season grant', ins.status, await ins.text().catch(() => '')); return { piece: null, progress }; }
-  return { piece: pieceSummary(item), progress: seasonProgress([...held, { item_id: item.id, source: 'season' }]) };
-}
-
 export interface ClosedThesis {
   inventoryId: string; itemId: string; outcome: ThesisOutcome;
   symbol: string | null; direction: string | null; referencePx: number | null; closePx: number | null; movePct: number | null;
@@ -396,11 +381,8 @@ export type CloseResult = { ok: true; closed: ClosedThesis } | { ok: false; stat
 
 /**
  * Review a seed: after the window, compare its thesis with the public price,
- * bloom the seed and pay the close. The bloom is a compare-and-set on
- * state='seed', so a seed pays exactly once however many requests race; XP
- * is only written by the request that flipped it. Everything that can fail
- * for reasons outside the user (prices, swap history) is read BEFORE the
- * flip, so a retry never finds a bloomed seed that was never paid.
+ * then commit bloom, counters, ledger and season piece in one transaction.
+ * Retries return the stored review; concurrent clients cannot claim it twice.
  */
 export async function closeSeed(identity: { id: string; wallet: string | null }, inventoryId: string, opts: { platform: 'ios' | 'web'; tzOffsetMin: number; now?: Date }): Promise<CloseResult> {
   const now = opts.now ?? new Date();
@@ -408,7 +390,7 @@ export async function closeSeed(identity: { id: string; wallet: string | null },
   if (!r.ok) throw new Error('Seed read failed');
   const seed = ((await r.json()) as SeedRow[])[0];
   if (!seed) return { ok: false, status: 404, error: 'Piece not in your inventory' };
-  if (seed.state !== 'seed') return { ok: false, status: 409, error: 'This piece already bloomed' };
+  if (seed.state !== 'seed') return commitSeedReview(identity.id, seed, opts, {});
   const review = (await seedReviews([seed], now.getTime())).get(seed.id)!;
   if (!review.ready) return { ok: false, status: 409, error: 'The market has not had time to answer yet', reviewAt: review.reviewAt };
 
@@ -423,49 +405,32 @@ export async function closeSeed(identity: { id: string; wallet: string | null },
   const readAt = review.readAt ?? seed.seeded_at;
   const swap = review.thesis && identity.wallet ? await findExecutingSwap(identity.id, identity.wallet, review.thesis, readAt, bloomedAt) : null;
 
-  const prog = await fetch(bobbyRest(`bobby_progress?identity_id=eq.${identity.id}&select=xp,aura,streak,last_day,daily_awards,daily_awards_day&limit=1`), { headers: bobbyServiceHeaders() });
-  const row = ((prog.ok ? await prog.json() : []) as Array<{ xp: number; aura: number; streak: number; last_day: string | null; daily_awards: number; daily_awards_day: string | null }>)[0];
-  if (!row) return { ok: false, status: 502, error: 'Could not load progress' };
-
-  // The horizon that was read is part of the compare-and-set: an extend that
-  // lands between the readiness check and here moved the review later.
-  const cas = await fetch(bobbyRest(`tl_inventory?id=eq.${seed.id}&identity_id=eq.${identity.id}&state=eq.seed&horizon_hours=eq.${horizonHours(seed.horizon_hours)}&select=id`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ state: 'bloomed', bloomed_at: bloomedAt }) });
-  if (!cas.ok) throw new Error('Bloom write failed');
-  if (!((await cas.json()) as unknown[]).length) {
-    const again = await fetch(bobbyRest(`tl_inventory?id=eq.${seed.id}&identity_id=eq.${identity.id}&select=state,seeded_at,horizon_hours&limit=1`), { headers: bobbyServiceHeaders() });
-    const current = again.ok ? ((await again.json()) as Array<Pick<SeedRow, 'state' | 'seeded_at' | 'horizon_hours'>>)[0] : undefined;
-    if (current?.state === 'seed') return { ok: false, status: 409, error: 'The market has not had time to answer yet', reviewAt: reviewAt(current.seeded_at, horizonHours(current.horizon_hours)) };
-    return { ok: false, status: 409, error: 'This piece already bloomed' };
-  }
-
-  const counters: ProgressCounters = { xp: row.xp, streak: row.streak, lastDay: row.last_day, dailyAwards: row.daily_awards, dailyAwardsDay: row.daily_awards_day };
-  const award = applyAward(counters, 'thesis_closed', now, opts.tzOffsetMin);
   const executed: Execution | null = swap ? { receiptId: swap.id, txHash: swap.txHash, tokenIn: swap.tokenIn, tokenOut: swap.tokenOut, at: swap.at, xp: EXECUTION_BONUS.xp, aura: EXECUTION_BONUS.aura } : null;
-  const xp = award.awarded + (executed?.xp ?? 0);
-  const aura = AWARD_AURA.thesis_closed + (executed?.aura ?? 0);
-  const xpAfter = award.xpAfter + (executed?.xp ?? 0);
-  const closed: Omit<ClosedThesis, 'xp' | 'aura' | 'xpAfter' | 'ledgerEventId' | 'season'> = {
+  return commitSeedReview(identity.id, seed, opts, {
     inventoryId: seed.id, itemId: seed.item_id, outcome: verdict.outcome,
     symbol: review.thesis?.symbol ?? null, direction: review.thesis?.direction ?? null,
-    referencePx: verdict.referencePx, closePx, movePct: verdict.movePct,
-    executed,
-  };
-  const ledger = await fetch(bobbyRest('bobby_progress_events?select=id'), {
-    method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }),
-    body: JSON.stringify({
-      identity_id: identity.id, client_event_id: randomUUID(), kind: 'thesis_closed',
-      points: award.points + (executed?.xp ?? 0), awarded: xp, aura, xp_after: xpAfter, platform: opts.platform,
-      occurred_at: bloomedAt, day_key: award.dayKey,
-      meta: { thesis_close: { ...closed, plantEventId: seed.event_id, reviewedAt: bloomedAt } },
-    }),
+    referencePx: verdict.referencePx, closePx, movePct: verdict.movePct, executed,
   });
-  if (!ledger.ok) { console.error('[trader-land] close ledger', ledger.status, await ledger.text().catch(() => '')); throw new Error('Close could not be recorded'); }
-  const ledgerEventId = ((await ledger.json()) as Array<{ id: string }>)[0]?.id ?? null;
-  const season = executed && ledgerEventId ? await grantSeasonPiece(identity.id, ledgerEventId, bloomedAt) : null;
-  const upd = await fetch(bobbyRest(`bobby_progress?identity_id=eq.${identity.id}`), {
-    method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({ xp: xpAfter, aura: (row.aura ?? 0) + aura, streak: award.state.streak, last_day: award.state.lastDay, daily_awards: award.state.dailyAwards, daily_awards_day: award.state.dailyAwardsDay, last_platform: opts.platform, updated_at: bloomedAt }),
+}
+
+async function commitSeedReview(identityId: string, seed: SeedRow, opts: { platform: 'ios' | 'web'; tzOffsetMin: number }, closed: Record<string, unknown>): Promise<CloseResult> {
+  const result = await rpc<{ ok: true; closed: ClosedThesis & { seasonItemId?: string | null } }>('bobby_close_seed', {
+    p_identity: identityId, p_inventory: seed.id, p_hours: horizonHours(seed.horizon_hours),
+    p_platform: opts.platform, p_tz: opts.tzOffsetMin, p_closed: closed, p_season: SEASON.pieces,
   });
-  if (!upd.ok) throw new Error('Progress could not be saved');
-  return { ok: true, closed: { ...closed, xp, aura, xpAfter, ledgerEventId, season } };
+  if (result.ok === false) {
+    const status = result.error === 'not_found' ? 404 : result.error === 'progress_unavailable' ? 503 : 409;
+    return { ok: false, status, error: result.error === 'review_not_ready' ? 'The review window or horizon changed. Reload the island.' : 'The seed could not be reviewed. Reload the island and retry.' };
+  }
+  const value = result.closed;
+  let season: SeasonGrant | null = null;
+  if (value.executed) {
+    const items = await catalog();
+    const inventory = await fetch(bobbyRest(`tl_inventory?identity_id=eq.${identityId}&source=eq.season&select=item_id,source`), { headers: bobbyServiceHeaders() });
+    if (!inventory.ok) throw new Error('Season inventory unavailable');
+    const held = await inventory.json() as Array<{ item_id: string; source: string }>;
+    const item = items.find(item => item.id === value.seasonItemId);
+    season = { piece: item ? pieceSummary(item) : null, progress: seasonProgress(held) };
+  }
+  return { ok: true, closed: { ...value, season } };
 }

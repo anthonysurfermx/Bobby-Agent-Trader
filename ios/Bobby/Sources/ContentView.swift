@@ -18,7 +18,7 @@ enum DeskPhase: Int, CaseIterable {
         // "LIVE" on every device: the owner asked for this exact word.
         case .idle: return "LIVE"
         case .resolving: return L.t("RESOLVING ASSET", "LOCALIZANDO ACTIVO")
-        case .alpha: return L.t("ALPHA HUNTER", "CAZADOR")
+        case .alpha: return L.t("REVIEWING EVIDENCE", "REVISANDO EVIDENCIA")
         case .redTeam: return L.t("RED TEAM", "CRÍTICO")
         case .cio: return L.t("CIO DECIDES", "EL DIRECTOR DECIDE")
         case .complete: return L.t("VERDICT READY", "VEREDICTO LISTO")
@@ -43,9 +43,11 @@ final class BobbyViewModel: ObservableObject {
     private var suggestTask: Task<Void, Never>?
     @Published var thinking = false
     @Published var candles: [Candle] = []
+    @Published var candlesLoading = false
+    private var confirmedQuestion: (symbol: String, question: String)?
     @Published var snapshot: MarketSnapshot?
     @Published var lastAnswer: BobbyAnswer?
-    @Published var speakEnabled = true
+    @Published var speakEnabled = NeuralVoice.enabled
     @Published var phase: DeskPhase = .idle
     @Published var timeframe: MarketTimeframe = .oneHour
     @Published var noTradeMoment: NoTradeMoment? = nil
@@ -190,6 +192,13 @@ final class BobbyViewModel: ObservableObject {
         assetHits = []
         let q = (preset ?? input).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !thinking else { return }
+        guard q.count <= 1200 else {
+            errorHint = L.t("Keep your question under 1200 characters.", "Escribe tu pregunta en menos de 1200 caracteres.")
+            return
+        }
+        let originalQuestion = confirmedQuestion?.symbol == q ? confirmedQuestion!.question : q
+        let accountGeneration = AccountSession.shared.generation
+        confirmedQuestion = nil
         asked = true
         input = ""
         voice.stop()
@@ -224,6 +233,7 @@ final class BobbyViewModel: ObservableObject {
                     text += " " + L.t("Heads up: that listing is \(note).", "Ojo: ese listado es \(note).")
                 }
                 confirmPrompt = text
+                confirmedQuestion = (sym, originalQuestion)
                 text += " " + L.t("Tap it to confirm.", "Tócalo para confirmar.")
                 if speakEnabled { say(text) }
                 assetHits = [BobbyAPI.AssetHit(
@@ -233,7 +243,10 @@ final class BobbyViewModel: ObservableObject {
                 )]
                 return
             }
+            guard AccountSession.shared.generation == accountGeneration else { phase = .idle; return }
             let asset = resolution.snapshot
+            if asset.isEquity && timeframe == .fourHours { timeframe = .oneHour }
+            candlesLoading = true
 
             memory.recordQuery(symbol: asset.symbol, isEquity: asset.isEquity)
             quickAccess = memory.quickAccess(fallback: Self.defaultQuickAccess)
@@ -244,7 +257,7 @@ final class BobbyViewModel: ObservableObject {
                 isEquity: asset.isEquity,
                 timeframe: timeframe
             )
-            async let debateRequest = BobbyAPI.debate(asset.symbol)
+            async let debateRequest = BobbyAPI.debate(asset.symbol, question: originalQuestion, isEquity: asset.isEquity)
 
             var snap = asset
             let market = await marketRequest
@@ -259,10 +272,11 @@ final class BobbyViewModel: ObservableObject {
             let fetchedCandles = await candleRequest
             withAnimation(.easeOut(duration: 0.35)) {
                 candles = fetchedCandles
-                phase = .redTeam
+                candlesLoading = false
             }
 
             var answer = await debateRequest
+            guard AccountSession.shared.generation == accountGeneration else { phase = .idle; return }
             withAnimation(.spring(duration: 0.38)) {
                 lastAnswer = answer
                 phase = .cio
@@ -286,7 +300,6 @@ final class BobbyViewModel: ObservableObject {
                 lastAnswer = answer
             }
 
-            try? await Task.sleep(for: .milliseconds(360))
             phase = .complete
             let text = answer.summary
             UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -422,11 +435,13 @@ final class BobbyViewModel: ObservableObject {
         harvest = moment
     }
 
-    func selectTimeframe(_ next: MarketTimeframe) {
-        guard next != timeframe else { return }
+    func selectTimeframe(_ next: MarketTimeframe, retry: Bool = false) {
+        guard !thinking, retry || next != timeframe else { return }
+        guard snapshot?.isEquity != true || next != .fourHours else { return }
         timeframe = next
         candles = []
         guard let snapshot else { return }
+        candlesLoading = true
 
         Task {
             let rows = await BobbyAPI.candles(
@@ -435,7 +450,7 @@ final class BobbyViewModel: ObservableObject {
                 timeframe: next
             )
             guard self.timeframe == next, self.snapshot?.symbol == snapshot.symbol else { return }
-            withAnimation(.easeOut(duration: 0.28)) { candles = rows }
+            withAnimation(.easeOut(duration: 0.28)) { candles = rows; candlesLoading = false }
         }
     }
 }
@@ -530,18 +545,24 @@ struct ContentView: View {
         // A round that acknowledged awards may have planted pieces; signing in
         // or out changes whose island the chip reads.
         .onChange(of: progressSync.acknowledgedRounds) { Task { await pulse.refresh() } }
-        .onChange(of: account.isSignedIn) { Task { await pulse.refresh() } }
+        .onChange(of: account.isSignedIn) {
+            if !account.isSignedIn { vm.companions.unbind() }
+            Task { await pulse.refresh() }
+        }
         // Signed out, or into another account: the harvest card's seed is not this desk's to extend.
         .onChange(of: account.session?.userId) { _, userID in vm.accountChanged(to: userID) }
         .onChange(of: scenePhase) { _, next in
             if next == .background { vm.voice.stop() }
             // Back from the background: a seed whose review opened meanwhile shows its choice closed.
-            if next == .active { vm.closeExpiredHorizon() }
+            if next == .active { vm.closeExpiredHorizon(); Task { await account.checkAppleCredential() } }
         }
         .onDisappear { vm.voice.stop() }
         // A new companion must not finish the old one's sentence — unless the
         // pick came from SQUAD, which plays the new companion's line itself.
-        .onChange(of: vm.companions.companionId) { _, _ in if !showSquad { vm.voice.stop() } }
+        .onChange(of: vm.companions.companionId) { _, _ in
+            if !showSquad { vm.voice.stop() }
+            if vm.companions.profileNeedsSync { Task { await ProgressSync.shared.sync(store: vm.companions, profile: vm.profile) } }
+        }
         .onChange(of: vm.voice.speaking) { _, speaking in
             guard !speaking, let line = vm.pendingLine else { return }
             vm.pendingLine = nil
@@ -632,10 +653,16 @@ struct ContentView: View {
             Text(accountError ?? "")
         }
         .alert(L.t("Account deleted", "Cuenta eliminada"), isPresented: $accountDeleted) {
+            if account.manualAppleRevocationRequired {
+                Button(L.t("Manage Sign in with Apple", "Gestionar acceso con Apple")) {
+                    UIApplication.shared.open(URL(string: "https://support.apple.com/en-us/102571")!)
+                }
+            }
             Button("OK", role: .cancel) {}
         } message: {
-            Text(L.t("Your account and its synced progress were deleted. Bobby keeps working on this phone without an account.",
-                     "Se borraron tu cuenta y su progreso sincronizado. Bobby sigue funcionando en este teléfono sin cuenta."))
+            Text(account.manualAppleRevocationRequired
+                 ? L.t("Your Bobby account and progress were deleted. Finish disconnecting Bobby in your Apple Account's Sign in with Apple settings.", "Se borraron tu cuenta de Bobby y su progreso. Para desconectar también el acceso con Apple, elimina Bobby en los ajustes de Iniciar sesión con Apple de tu cuenta de Apple.")
+                 : L.t("Your account and its synced progress were deleted. Bobby keeps working on this phone without an account.", "Se borraron tu cuenta y su progreso sincronizado. Bobby sigue funcionando en este teléfono sin cuenta."))
         }
 
         .animation(.easeOut(duration: 0.35), value: vm.profile.onboarded)
@@ -728,6 +755,7 @@ struct ContentView: View {
             LandChip(badge: account.isSignedIn ? pulse.badge : 0, bump: vm.landBump) {
                 openLand(account.isSignedIn ? pulse.focus : nil, haptic: .light)
             }
+            if NeuralVoice.enabled {
             Button {
                 vm.speakEnabled.toggle()
                 if !vm.speakEnabled { vm.voice.stop() }
@@ -739,6 +767,7 @@ struct ContentView: View {
                     .frame(width: 32, height: 32)
                     .background(Circle().fill(Theme.card))
                     .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+            }
             }
             // Progress, account and the custody promise live in the menu.
             Menu {
@@ -930,7 +959,7 @@ struct ContentView: View {
                 .font(.mono(24, .black))
                 .kerning(4)
                 .foregroundStyle(halo.tintSoft)
-            Text(L.t("No setup yet. Capital protected.", "Sin oportunidad todavía. Capital protegido."))
+            Text(L.t("No clear setup. Waiting is an option.", "Sin oportunidad clara. Esperar es una opción."))
                 .font(.rounded(16, .bold))
                 .foregroundStyle(Theme.text)
             Text(moment.reason)
@@ -977,10 +1006,10 @@ struct ContentView: View {
         .transition(.scale(scale: 0.92).combined(with: .opacity))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(moment.disciplineXP > 0
-            ? L.t("No trade for \(moment.symbol). Capital protected. Plus \(moment.disciplineXP) discipline XP.",
-                  "No operar \(moment.symbol). Capital protegido. Más \(moment.disciplineXP) XP de disciplina.")
-            : L.t("No trade for \(moment.symbol). Capital protected. Daily XP complete.",
-                  "No operar \(moment.symbol). Capital protegido. XP diario completo."))
+            ? L.t("No trade for \(moment.symbol). Waiting is an option. Plus \(moment.disciplineXP) discipline XP.",
+                  "No operar \(moment.symbol). Esperar es una opción. Más \(moment.disciplineXP) XP de disciplina.")
+            : L.t("No trade for \(moment.symbol). Waiting is an option. Daily XP complete.",
+                  "No operar \(moment.symbol). Esperar es una opción. XP diario completo."))
     }
 
     private func harvestCard(_ moment: HarvestMoment, showsXP: Bool = true) -> some View {
@@ -1087,7 +1116,7 @@ struct ContentView: View {
                 }
 
                 HStack(spacing: 5) {
-                    ForEach(MarketTimeframe.allCases) { timeframe in
+                    ForEach(MarketTimeframe.available(isEquity: snapshot.isEquity)) { timeframe in
                         Button {
                             vm.selectTimeframe(timeframe)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1111,16 +1140,20 @@ struct ContentView: View {
                         .fill(Theme.panel.opacity(0.84))
                     if vm.candles.isEmpty {
                         VStack(spacing: 9) {
-                            ProgressView().tint(Theme.accentSoft)
-                            Text(L.t("SYNCING CANDLES", "SINCRONIZANDO VELAS"))
+                            if vm.candlesLoading { ProgressView().tint(Theme.accentSoft) }
+                            Text(vm.candlesLoading ? L.t("SYNCING CANDLES", "SINCRONIZANDO VELAS") : L.t("CHART UNAVAILABLE", "GRÁFICO NO DISPONIBLE"))
                                 .font(.mono(9, .bold))
                                 .kerning(1.5)
                                 .foregroundStyle(Theme.muted)
+                            if !vm.candlesLoading {
+                                Button(L.t("Retry", "Reintentar")) { vm.selectTimeframe(vm.timeframe, retry: true) }
+                                    .disabled(vm.thinking)
+                            }
                         }
                     } else {
                         ChartView(
                             candles: vm.candles,
-                            answer: vm.lastAnswer,
+                            answer: vm.timeframe == .oneHour ? vm.lastAnswer : nil,
                             timeframe: vm.timeframe
                         )
                             .padding(.horizontal, 3)
@@ -1132,10 +1165,10 @@ struct ContentView: View {
 
                 HStack {
                     Text(snapshot.isEquity
-                         ? L.t("EQUITIES · LIVE MARKET", "ACCIONES · MERCADO EN VIVO")
-                         : L.t("CRYPTO · LIVE MARKET", "CRIPTO · MERCADO EN VIVO"))
+                         ? L.t("EQUITIES · YAHOO", "ACCIONES · YAHOO")
+                         : "CRYPTO · OKX")
                     Spacer()
-                    Text(L.t("100 OHLCV · LIVE", "100 VELAS · EN VIVO"))
+                    Text("\(vm.candles.count) OHLCV · \(vm.timeframe.rawValue)")
                 }
                 .font(.mono(7.5, .bold))
                 .kerning(0.7)
@@ -1211,14 +1244,25 @@ struct ContentView: View {
                 agentCard(name: L.t("RED TEAM", "CRÍTICO"), role: L.t("attacks", "ataca"), phase: .redTeam, color: Theme.down)
                 agentCard(name: L.t("CIO", "DIRECTOR"), role: L.t("decides", "decide"), phase: .cio, color: Theme.cio)
             }
+            if let answer = vm.lastAnswer, let alpha = answer.alphaArgument, let red = answer.redArgument {
+                Text("ALPHA").font(.mono(10, .bold)).foregroundStyle(Theme.up)
+                Text(alpha).font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
+                Text("RED TEAM").font(.mono(10, .bold)).foregroundStyle(Theme.down)
+                Text(red).font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
+                if let label = answer.evidenceLabel {
+                    Text(label).font(.mono(9, .medium)).foregroundStyle(Theme.muted)
+                    Text(L.t("Analysis uses 1H candles; the chart interval can be changed separately.", "El análisis usa velas de 1H; puedes cambiar por separado el intervalo del gráfico."))
+                        .font(.system(size: 11)).foregroundStyle(Theme.muted)
+                }
+            }
         }
         .padding(13)
         .card()
     }
 
     private func agentCard(name: String, role: String, phase: DeskPhase, color: Color) -> some View {
-        let reached = vm.phase.rawValue >= phase.rawValue && vm.phase != .error
-        let active = vm.phase == phase
+        let reached = vm.lastAnswer?.agentVerdict != nil
+        let active = vm.thinking
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 5) {
                 Circle()
@@ -1254,6 +1298,7 @@ struct ContentView: View {
         guard let answer = vm.lastAnswer else {
             return vm.phase == phase ? L.t("processing…", "procesando…") : fallback
         }
+        if answer.agentVerdict != nil { return L.t("review complete", "revisión completa") }
         switch phase {
         case .alpha:
             return answer.trend.map {

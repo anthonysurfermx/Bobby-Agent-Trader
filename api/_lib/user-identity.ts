@@ -23,6 +23,8 @@ export interface Identity {
 
 interface IdentityRow { id: string; auth_user_id: string | null; wallet_address: string | null }
 
+export class IdentityUnavailableError extends Error {}
+
 function authBase(): { url: string; anon: string } | null {
   try {
     const url = (process.env.BOBBY_AUTH_URL || bobbyDbUrl()).replace(/\/+$/, '');
@@ -35,16 +37,17 @@ function authBase(): { url: string; anon: string } | null {
 
 async function verifySupabaseToken(token: string): Promise<{ id: string; email: string | null; provider: string | null } | null> {
   const base = authBase();
-  if (!base) return null;
+  if (!base) throw new IdentityUnavailableError('Authentication is temporarily unavailable');
   try {
-    const r = await fetch(`${base.url}/auth/v1/user`, { headers: { apikey: base.anon, Authorization: `Bearer ${token}` } });
-    if (!r.ok) return null;
+    const r = await fetch(`${base.url}/auth/v1/user`, { headers: { apikey: base.anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) });
+    if ([400, 401, 403].includes(r.status)) return null;
+    if (!r.ok) throw new IdentityUnavailableError('Authentication is temporarily unavailable');
     const user = (await r.json()) as { id?: string; email?: string; app_metadata?: { provider?: string } };
     if (!user?.id || !/^[0-9a-f-]{36}$/i.test(user.id)) return null;
     return { id: user.id, email: user.email ?? null, provider: user.app_metadata?.provider ?? null };
-  } catch (error) {
-    console.error('[user-identity] auth verify', error);
-    return null;
+  } catch {
+    console.warn('[user-identity] auth service unavailable');
+    throw new IdentityUnavailableError('Authentication is temporarily unavailable');
   }
 }
 
@@ -56,7 +59,7 @@ async function upsertIdentity(conflict: 'wallet_address' | 'auth_user_id', row: 
   });
   if (!r.ok) {
     console.error('[user-identity] upsert', r.status, await r.text().catch(() => ''));
-    return null;
+    throw new IdentityUnavailableError('Account data is temporarily unavailable');
   }
   const rows = (await r.json()) as IdentityRow[];
   return rows[0] ?? null;
@@ -85,7 +88,13 @@ export async function resolveIdentity(req: VercelRequest): Promise<Identity | nu
 }
 
 export async function requireIdentity(req: VercelRequest, res: VercelResponse): Promise<Identity | null> {
-  const identity = await resolveIdentity(req);
+  let identity: Identity | null;
+  try { identity = await resolveIdentity(req); }
+  catch {
+    res.setHeader('Retry-After', '5');
+    res.status(503).json({ error: 'Sign-in service is temporarily unavailable. Try again.' });
+    return null;
+  }
   if (!identity) {
     res.setHeader('WWW-Authenticate', 'Bearer realm="bobby-progress"');
     res.status(401).json({ error: 'Sign in required: wallet session or Supabase access token' });

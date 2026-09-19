@@ -194,9 +194,14 @@ final class ProgressSync: ObservableObject {
     /// One round trip: POST when awards are pending (or never synced), GET otherwise.
     func sync(store: CompanionStore, profile: AgentProfile, platform: String = "ios") async {
         guard !inflight else { return }
-        guard let token = await AccountSession.shared.accessToken() else { status = .unauthenticated; return }
         inflight = true; status = .syncing
         defer { inflight = false }
+        let generation = AccountSession.shared.generation
+        guard let token = await AccountSession.shared.accessToken() else {
+            status = AccountSession.shared.isSignedIn ? .error : .unauthenticated
+            return
+        }
+        guard AccountSession.shared.generation == generation else { return }
         guard let uid = AccountSession.shared.session?.userId else { status = .unauthenticated; return }
         store.bind(to: uid)
         // The server accepts 50 events per request: drain the queue in batches, never drop.
@@ -204,8 +209,8 @@ final class ProgressSync: ObservableObject {
         repeat {
             rounds += 1
             let pending = Array(store.pendingAwards.prefix(50))
-            let mustPost = !pending.isEmpty || store.syncedAt == nil
-            let ok = await round(store: store, profile: profile, platform: platform, token: token, pending: pending, mustPost: mustPost, uid: uid)
+            let mustPost = !pending.isEmpty || store.syncedAt == nil || store.profileNeedsSync
+            let ok = await round(store: store, profile: profile, platform: platform, token: token, pending: pending, mustPost: mustPost, uid: uid, generation: generation)
             if !ok { return }
         } while !store.pendingAwards.isEmpty && rounds < 20
         status = .synced
@@ -223,7 +228,7 @@ final class ProgressSync: ObservableObject {
         return outcomes[eventID]
     }
 
-    private func round(store: CompanionStore, profile: AgentProfile, platform: String, token: String, pending: [PendingAward], mustPost: Bool, uid: String) async -> Bool {
+    private func round(store: CompanionStore, profile: AgentProfile, platform: String, token: String, pending: [PendingAward], mustPost: Bool, uid: String, generation: UUID) async -> Bool {
         do {
             var req = URLRequest(url: BobbyAPI.base.appendingPathComponent("api/progress"))
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -231,8 +236,9 @@ final class ProgressSync: ObservableObject {
             if mustPost {
                 req.httpMethod = "POST"
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                var profileBody: [String: Any] = ["companionId": store.companionId as Any, "onboarded": profile.onboarded, "riskNoticeVersion": profile.riskNoticeVersion]
-                if store.syncedAt == nil, store.disciplineXP > 0 { profileBody["localXpClaim"] = store.disciplineXP }
+                var profileBody: [String: Any] = ["companionId": store.companionId.map { $0 as Any } ?? NSNull(), "onboarded": profile.onboarded, "riskNoticeVersion": profile.riskNoticeVersion,
+                                                  "restore": store.syncedAt == nil, "localXpIncludesPending": false]
+                if store.syncedAt == nil, store.legacyXP > 0 { profileBody["localXpClaim"] = store.legacyXP }
                 let events = pending.map { award -> [String: Any] in
                     var event: [String: Any] = ["id": award.id, "kind": award.kind, "at": award.at, "tzOffsetMin": award.tzOffsetMin]
                     if let thesis = award.thesis { event["thesis"] = thesis.body }
@@ -241,8 +247,10 @@ final class ProgressSync: ObservableObject {
                 req.httpBody = try JSONSerialization.data(withJSONObject: ["platform": platform, "events": events, "profile": profileBody])
             }
             let (data, response) = try await URLSession.shared.data(for: req)
+            guard AccountSession.shared.generation == generation,
+                  AccountSession.shared.session?.userId == uid, store.ownerUserId == uid else { return false }
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if code == 401 { AccountSession.shared.signOut(); status = .unauthenticated; return false }
+            if code == 401 { AccountSession.shared.signOut(store: store); status = .unauthenticated; return false }
             guard (200..<300).contains(code), let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let p = json["progress"] as? [String: Any] else { status = .error; return false }
             let results = (json["results"] as? [[String: Any]]) ?? []

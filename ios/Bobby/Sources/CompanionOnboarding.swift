@@ -269,8 +269,8 @@ struct CompanionOnboarding: View {
                 .font(.rounded(20, .bold))
                 .foregroundStyle(Theme.text)
                 .multilineTextAlignment(.center)
-            Text(L.t("Tap to hear it. The tone changes; the data never does.",
-                     "Toca para escucharlo. Cambia el tono; los datos no cambian."))
+            Text(L.t("Choose your companion’s style.",
+                     "Elige el estilo de tu compañero."))
                 .font(.rounded(12, .medium))
                 .foregroundStyle(Theme.muted)
 

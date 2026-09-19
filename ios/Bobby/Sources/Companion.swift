@@ -93,7 +93,7 @@ let bobbyCompanions: [Companion] = [
     .init(id: "halo", label: "HALO", role: L.t("RISK GATE", "FILTRO DE RIESGO"),
           personality: L.t("celebrates not trading with you", "celebra contigo el no operar"),
           selectLine: L.t("Protecting capital today also counts as winning.", "Hoy proteger capital también cuenta como ganar."),
-          secretPhrase: L.t("No setup yet. Capital protected.", "Todavía no hay entrada. Capital protegido."),
+          secretPhrase: L.t("No clear setup. Waiting is an option.", "Sin oportunidad clara. Esperar es una opción."),
           hue: 0.560, requiredLevel: 4,
           voicePersona: "shimmer",
           evolutionNames: ["HALO", "HALO SHIELD", "HALO WARDEN", "HALO AEGIS", "HALO SANCTUM"]),
@@ -278,6 +278,7 @@ final class CompanionStore: ObservableObject {
         static let aura = "companion.aura"
         static let routeIndex = "companion.routeIndex"
         static let owner = "companion.ownerUserId"
+        static let syncedCompanion = "companion.syncedCompanionId"
     }
 
     @Published var companionId: String? {
@@ -309,6 +310,12 @@ final class CompanionStore: ObservableObject {
     @Published private(set) var aura: Int { didSet { defaults.set(aura, forKey: Key.aura) } }
     @Published private(set) var routeIndex: Int { didSet { defaults.set(routeIndex, forKey: Key.routeIndex) } }
 
+    var profileNeedsSync: Bool { syncedAt != nil && companionId != defaults.string(forKey: Key.syncedCompanion) }
+    /// Pending awards will be replayed by the server; only import older, unrepresented XP.
+    var legacyXP: Int {
+        max(0, disciplineXP - pendingAwards.reduce(0) { $0 + ($1.kind == "no_trade_respected" ? 20 : 10) })
+    }
+
     init() {
         companionId = defaults.string(forKey: Key.companion)
         disciplineXP = defaults.integer(forKey: Key.xp)
@@ -331,7 +338,9 @@ final class CompanionStore: ObservableObject {
         disciplineStreak = server.streak
         aura = server.aura
         routeIndex = server.routeIndex
-        if companionId == nil, let c = server.companionId { companionId = c }
+        if firstReconcile || !profileNeedsSync, let c = server.companionId,
+           bobbyCompanions.contains(where: { $0.id == c }) { companionId = c }
+        defaults.set(server.companionId, forKey: Key.syncedCompanion)
         let iso = ISO8601DateFormatter(); iso.formatOptions = [.withFullDate]
         if let d = server.lastDay.flatMap({ iso.date(from: $0) }) { defaults.set(d, forKey: Key.lastDay) } else { defaults.removeObject(forKey: Key.lastDay) }
         defaults.set(server.dailyAwards, forKey: Key.dailyAwards)
@@ -351,6 +360,7 @@ final class CompanionStore: ObservableObject {
     func bind(to userId: String) {
         if ownerUserId == userId { return }
         let previous = ownerUserId
+        syncedAt = nil
         if previous == nil {
             let local = pendingAwards
             // Signing back in: what this account still owed the server from an
@@ -375,6 +385,11 @@ final class CompanionStore: ObservableObject {
         pendingAwards = defaults.data(forKey: pendingKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
         disciplineXP = 0; disciplineStreak = 0; aura = 0; routeIndex = 0; syncedAt = nil
         defaults.removeObject(forKey: Key.lastDay); defaults.set(0, forKey: Key.dailyAwards); defaults.removeObject(forKey: Key.dailyAwardsDay)
+    }
+
+    func forgetAccount(_ userId: String) {
+        if ownerUserId == userId { unbind() }
+        defaults.removeObject(forKey: Key.pending + "." + userId)
     }
 
     var companion: Companion? { bobbyCompanions.first { $0.id == companionId } }

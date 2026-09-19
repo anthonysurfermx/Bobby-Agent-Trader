@@ -240,6 +240,7 @@ enum TraderLandMutation {
     case move(placementID: String, x: Int, y: Int, rotation: Int)
     case remove(placementID: String)
     case close(inventoryID: String)
+    case renamePrivate(title: String)
     case publish(title: String)
     case unpublish
     /// Give a seed a longer horizon (72 or 168 h): upward only, before its review opens.
@@ -257,6 +258,8 @@ enum TraderLandMutation {
             return ["action": "remove", "placementId": id]
         case let .close(id):
             return ["action": "close", "inventoryId": id, "tzOffsetMin": -TimeZone.current.secondsFromGMT() / 60, "platform": "ios"]
+        case let .renamePrivate(title):
+            return ["action": "rename_private", "title": String(title.prefix(80))]
         case let .publish(title):
             return ["action": "publish", "title": String(title.prefix(80))]
         case .unpublish:
@@ -560,6 +563,8 @@ extension LandHorizon {
             extra["closed"] = ["itemId": rows[index].itemID, "outcome": "expired", "symbol": Self.null(rows[index].thesis?["symbol"]),
                                "direction": Self.null(rows[index].thesis?["direction"]), "movePct": 0.8, "xp": 12, "aura": 3,
                                "executed": NSNull(), "season": ["piece": NSNull()]]
+        case let .renamePrivate(title):
+            isPublic = false; shareTitle = title.isEmpty ? nil : title
         case let .publish(title):
             isPublic = true; shareTitle = title.isEmpty ? nil : title
         case .unpublish:
