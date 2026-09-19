@@ -16,6 +16,8 @@ insert into tl_inventory values
  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2','11111111-1111-4111-8111-111111111111','small','bloomed'),
  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3','11111111-1111-4111-8111-111111111111','small','seed');
 \ir ../supabase/bobby-protocol/supabase/migrations/20260904222250_trader_land_occupied_cells.sql
+-- Growth v1 replaces the trigger: the core rectangle comes from the land (default 3,3).
+\ir ../supabase/bobby-protocol/supabase/migrations/20260919000001_trader_land_growth.sql
 
 do $$
 declare owner uuid := '11111111-1111-4111-8111-111111111111'; placement uuid;
@@ -47,7 +49,14 @@ begin
    update tl_placements set identity_id='22222222-2222-4222-8222-222222222222' where id=placement;
    raise exception 'Mismatched owner was accepted';
  exception when check_violation then null; end;
+ update tl_lands set core_x=5, core_y=5 where identity_id=owner;
+ update tl_placements set x=3,y=3 where id=placement;
+ assert exists(select 1 from tl_placement_cells where placement_id=placement and x=3 and y=4), 'Old core cells free once the core moved';
+ begin
+   update tl_placements set x=5,y=4 where id=placement;
+   raise exception 'Moved core overlap was accepted';
+ exception when check_violation then null; end;
  delete from tl_placements where id=placement;
  assert not exists(select 1 from tl_placement_cells where placement_id=placement), 'Store released reservations';
- raise notice 'PASS: full footprint, collision, rotation, core, bounds, seed, ownership, rollback, removal';
+ raise notice 'PASS: full footprint, collision, rotation, core, bounds, seed, ownership, rollback, moved core, removal';
 end $$;
