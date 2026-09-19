@@ -13,6 +13,9 @@ final class TraderLandGateTests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["How to play"].waitForExistence(timeout: 10))
         app.buttons["How to play"].tap()
+        // The practice island never grows and its core does not move: its help says so.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "This practice island stays 8×8.")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "tap it to move it")).count, 0)
         app.buttons["Restore"].tap()
         let status = app.staticTexts["land-fixed-status"]
         XCTAssertTrue(status.waitForExistence(timeout: 5))
@@ -116,6 +119,12 @@ final class TraderLandGateTests: XCTestCase {
         XCTAssertEqual(notice.label, "Seed extended to 3 days: it will bloom into Candle Tower.")
         XCTAssertEqual(horizon.label, "3 days · building 2×1")
         shot("seed-extended")
+
+        // An account island's help tells how it grows and that its core moves.
+        app.buttons["land-help"].tap()
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "tap it to move it")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "This practice island stays 8×8.")).count, 0)
+        app.buttons["Done"].tap()
     }
 
     private func shot(_ name: String) {

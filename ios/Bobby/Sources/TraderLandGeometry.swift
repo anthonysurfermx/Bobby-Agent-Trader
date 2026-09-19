@@ -49,6 +49,23 @@ struct GateLayout: Equatable {
     /// Centre of the grid, in cells: the fog rings and the practice focus are centred here.
     var middle: CGFloat { CGFloat(size - 1) / 2 }
 
+    /// Closest camera zoom on an 8×8 island.
+    static let baseMaxZoom: CGFloat = 2.6
+    /// Closest camera zoom: scaled by N/8 so a grown island's smaller tiles get as close.
+    var maxZoom: CGFloat { Self.baseMaxZoom * CGFloat(size) / 8 }
+    /// Home zoom: 12×12 and 16×16 islands start closer so their 1×1 tiles stay tappable.
+    var homeZoom: CGFloat { size >= 12 ? 1.25 : 1 }
+
+    /// How far the camera may pan from the island it looks at, in map points, at canvas `scale`
+    /// (map fit × zoom). An 8×8 island keeps ±70 % of the map exactly as before Growth v1 (the
+    /// practice island never changes); a grown island, whose max zoom scales by N/8, also lets its
+    /// far corners (368 × 184 units from the centre, plus the art above the top one) come into view.
+    func panSlack(map: CGSize, scale: CGFloat) -> CGSize {
+        let base = CGSize(width: map.width * 0.7, height: map.height * 0.7)
+        guard size > 8 else { return base }
+        return CGSize(width: max(base.width, 368 * scale), height: max(base.height, (184 + 60) * scale))
+    }
+
     /// Centre of cell (column, row) — fractional values allowed.
     func iso(column: CGFloat, row: CGFloat) -> CGPoint {
         CGPoint(x: origin.x + (column - row) * tileWidth / 2,
@@ -145,6 +162,14 @@ struct LandCore: Equatable {
     static func cells(col: Int, row: Int) -> Set<String> {
         ["\(col):\(row)", "\(col + 1):\(row)", "\(col):\(row + 1)", "\(col + 1):\(row + 1)"]
     }
+}
+
+/// The awake Aura Core's runtime orbit motes. Their diameters and glow are fixed decorations drawn
+/// for the 8×8 core, so a grown island scales them by 8/N (`GateLayout.unit`) with the core's art.
+enum AuraCoreMotes {
+    static let count = 7
+    static func diameter(_ index: Int, unit: CGFloat) -> CGFloat { (index.isMultiple(of: 3) ? 5 : 3) * unit }
+    static func glowRadius(unit: CGFloat) -> CGFloat { 4 * unit }
 }
 
 enum TraderLandGeometry {

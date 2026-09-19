@@ -48,8 +48,15 @@ func expect(_ condition: Bool, _ message: String) { precondition(condition, mess
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
         let sync = TraderLandSync(transport: session)
+        // Before the first world (and after a failed first load) an account island has no core to draw.
+        LandFixtureProtocol.fail = true
+        await sync.load()
+        expect(sync.world == nil && sync.error != nil && LandCore.standing(accountIsland: true, world: sync.world) == nil, "No guessed core without a world")
+        expect(LandCore.standing(accountIsland: false, world: sync.world) == LandCore.practice, "Practice core stays 3,3 awake")
+        LandFixtureProtocol.fail = false
         await sync.load()
         expect(sync.world?.xp == 24 && !sync.busy && sync.error == nil, "Decode authoritative world")
+        expect(LandCore.standing(accountIsland: true, world: sync.world) == sync.world?.core, "Account core comes from its world")
         expect(LandFixtureProtocol.requests.last?.value(forHTTPHeaderField: "Authorization") == "Bearer test-fixture-only", "Use account auth")
         expect(LandFixtureProtocol.requests.last?.value(forHTTPHeaderField: "X-Trader-Land-Client") == "2", "GET declares Growth v1 client")
         expect(sync.world?.placements.first?.rotation == 90, "Preserve rotation")
@@ -93,6 +100,6 @@ func expect(_ condition: Bool, _ message: String) { precondition(condition, mess
         AccountSession.shared.session = nil
         await sync.load()
         expect(sync.world == nil, "Guest is not a server world")
-        print("PASS: decode, auth, client header, rotation, move, extend/move_core bodies, grown sizes, core fallback, conflict, reload, timeout, identity isolation, sign-out")
+        print("PASS: decode, auth, client header, rotation, move, extend/move_core bodies, grown sizes, core fallback, no core before the first world, conflict, reload, timeout, identity isolation, sign-out")
     }
 }

@@ -204,6 +204,80 @@ final class TraderLandGrowthTests: XCTestCase {
                        LandCore(col: 1, row: 5, stage: 0))
     }
 
+    /// An account island draws and reserves no core until its world arrives (and none after a
+    /// failed first load); the practice island always stands with the snapshot's 3,3 awake core.
+    func testAccountIslandHasNoCoreUntilItsWorldArrives() throws {
+        XCTAssertNil(LandCore.standing(accountIsland: true, world: nil))
+        XCTAssertEqual(LandCore.standing(accountIsland: true, world: try decode(fullPayload)), LandCore(col: 6, row: 2, stage: 0))
+        XCTAssertEqual(LandCore.standing(accountIsland: true, world: try decode(build31Payload)), .practice, "An older server's island: 3,3 awake")
+        XCTAssertEqual(LandCore.standing(accountIsland: false, world: nil), .practice)
+        XCTAssertEqual(LandCore.standing(accountIsland: false, world: try decode(fullPayload)), .practice, "The practice island never takes an account's core")
+        XCTAssertEqual(RuntimeBundle.fixture.core.col, LandCore.practice.col)
+        XCTAssertEqual(RuntimeBundle.fixture.core.row, LandCore.practice.row)
+    }
+
+    /// Camera limits (GROWTH-v1 §4): max zoom scales by N/8, 12×12 and 16×16 start closer, and every
+    /// island's home fits the practice island's limits, so a reset to home is always in range.
+    func testCameraLimitsPerSize() {
+        XCTAssertEqual(GateLayout.practice.maxZoom, 2.6, accuracy: 0.0001)
+        XCTAssertEqual(GateLayout.practice.homeZoom, 1)
+        XCTAssertEqual(GateLayout(size: 10).maxZoom, 3.25, accuracy: 0.0001)
+        XCTAssertEqual(GateLayout(size: 10).homeZoom, 1)
+        XCTAssertEqual(GateLayout(size: 12).homeZoom, 1.25)
+        XCTAssertEqual(GateLayout(size: 16).maxZoom, 5.2, accuracy: 0.0001)
+        XCTAssertEqual(GateLayout(size: 16).homeZoom, 1.25)
+        for n in GateLayout.sizes {
+            XCTAssertLessThanOrEqual(GateLayout(size: n).homeZoom, GateLayout(size: n).maxZoom)
+            XCTAssertLessThanOrEqual(GateLayout(size: n).homeZoom, GateLayout.practice.maxZoom)
+        }
+    }
+
+    /// The practice island (and any 8×8) pans exactly as before Growth v1: ±70 % of the map at every
+    /// zoom. Only a grown island loosens the limit, so its far corners can reach the screen.
+    func testPracticeIslandKeepsItsPanLimits() {
+        let map = CGSize(width: 402, height: 500)
+        let fit = min(map.width / 830, map.height / 640)
+        for zoom: CGFloat in [0.22, 0.9, 1, 2, GateLayout.practice.maxZoom] {
+            let slack = GateLayout.practice.panSlack(map: map, scale: fit * zoom)
+            XCTAssertEqual(slack.width, map.width * 0.7, accuracy: 0.0001, "@\(zoom)")
+            XCTAssertEqual(slack.height, map.height * 0.7, accuracy: 0.0001, "@\(zoom)")
+        }
+        let grown = GateLayout(size: 16)
+        let close = fit * grown.maxZoom
+        XCTAssertEqual(grown.panSlack(map: map, scale: close).width, 368 * close, accuracy: 0.0001)
+        XCTAssertEqual(grown.panSlack(map: map, scale: close).height, 244 * close, accuracy: 0.0001)
+        XCTAssertGreaterThan(grown.panSlack(map: map, scale: close).width, map.width * 0.7)
+        // At its home zoom a grown island is held as tightly as an 8×8.
+        XCTAssertEqual(grown.panSlack(map: map, scale: fit * grown.homeZoom).width, map.width * 0.7, accuracy: 0.0001)
+    }
+
+    /// The awake core's orbit motes and their glow keep their 8×8 size (5 / 3 pt, 4 pt glow) and
+    /// shrink with the core's art on a grown island: same proportion to the core at every size.
+    func testCoreMotesScaleWithTheCore() throws {
+        let item = try XCTUnwrap(RuntimeBundle.items[LandCore.itemID])
+        XCTAssertEqual(AuraCoreMotes.diameter(0, unit: 1), 5)
+        XCTAssertEqual(AuraCoreMotes.diameter(1, unit: 1), 3)
+        XCTAssertEqual(AuraCoreMotes.glowRadius(unit: 1), 4)
+        let practice = try XCTUnwrap(LandSpriteGeometry(item: item, col: 3, row: 3, orientation: nil, layout: .practice)).frame.width
+        for n in GateLayout.sizes {
+            let layout = GateLayout(size: n)
+            let side = try XCTUnwrap(LandSpriteGeometry(item: item, col: 0, row: 0, orientation: nil, layout: layout)).frame.width
+            for index in 0..<AuraCoreMotes.count {
+                XCTAssertEqual(AuraCoreMotes.diameter(index, unit: layout.unit) / side, AuraCoreMotes.diameter(index, unit: 1) / practice, accuracy: 1e-9, "\(n)")
+            }
+            XCTAssertEqual(AuraCoreMotes.glowRadius(unit: layout.unit) / side, AuraCoreMotes.glowRadius(unit: 1) / practice, accuracy: 1e-9, "\(n)")
+        }
+    }
+
+    /// Help step 4: only an account island grows and has a core to tap; the practice island says so.
+    @MainActor func testHelpNeverPromisesThePracticeIslandAMovableCore() {
+        let tap = L.t("tap it to move it", "tócalo para moverlo")
+        let practice = TraderLandGateHarnessView.growthHelp(accountIsland: false)
+        XCTAssertFalse(practice.contains(tap))
+        XCTAssertTrue(practice.hasSuffix(L.t("This practice island stays 8×8.", "Esta isla de práctica se queda en 8×8.")))
+        XCTAssertTrue(TraderLandGateHarnessView.growthHelp(accountIsland: true).contains(tap))
+    }
+
     func testPublicIslandDecodesItsCore() throws {
         let json = #"{"ok":true,"worlds":[{"code":"abc","title":null,"size":12,"theme":"default","publishedAt":null,"placements":[],"stats":{"pieces":0,"districts":[]},"core":{"x":4,"y":4,"stage":1}},{"code":"old","title":"Old","size":8,"placements":[]}]}"#
         struct Gallery: Decodable { let worlds: [PublicIsland] }

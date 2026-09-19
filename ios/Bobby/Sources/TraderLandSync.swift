@@ -154,6 +154,15 @@ struct TraderLandWorld: Decodable {
     var seedsGrowing: Int { inventory.filter { $0.state == "seed" && $0.review?.ready != true }.count }
 }
 
+extension LandCore {
+    /// The core an island draws and reserves. The practice island's stands at 3,3, awake. An
+    /// account island's comes from its world only: while the first world loads, or when that load
+    /// fails, there is none, rather than a guessed 3,3 awake core that jumps when the world lands.
+    static func standing(accountIsland: Bool, world: TraderLandWorld?) -> LandCore? {
+        accountIsland ? world?.core : .practice
+    }
+}
+
 /// Where the desk asks Trader Land to open.
 enum TraderLandFocus: Equatable {
     /// A bloomed piece is waiting: open the collection on it, ready to build.

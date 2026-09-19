@@ -59,10 +59,25 @@ func near(_ a: CGFloat, _ b: CGFloat, _ tolerance: CGFloat = 0.0001) -> Bool { a
             precondition(frame.frame.width <= 360 * layout.unit + 0.001, "Sprite cap \(n)")
             let dormant = layout.spriteFrame(footprint: (2, 2), col: c, row: c, flip: false, anchor: anchor, contentBounds: bounds, scale: GateLayout.dormantCoreScale)
             precondition(near(dormant.frame.width, frame.frame.width * 0.72, 0.001) && near(dormant.depth, frame.depth), "Dormant core \(n)")
-            checks += 10
+            // The core's motes keep their proportion to the core; the camera's home fits its limits.
+            let base = GateLayout.practice.spriteFrame(footprint: (2, 2), col: 3, row: 3, flip: false, anchor: anchor, contentBounds: bounds)
+            precondition(near(AuraCoreMotes.diameter(0, unit: layout.unit) / frame.frame.width, 5 / base.frame.width, 0.000001), "Mote size \(n)")
+            precondition(near(AuraCoreMotes.glowRadius(unit: layout.unit) / frame.frame.width, 4 / base.frame.width, 0.000001), "Mote glow \(n)")
+            precondition(layout.homeZoom <= layout.maxZoom && near(layout.maxZoom, 2.6 * CGFloat(n) / 8), "Zoom limits \(n)")
+            checks += 13
         }
+        // An 8×8 island (the practice one) pans ±70 % of the map at every zoom, as before Growth v1.
+        let map = CGSize(width: 402, height: 500), fit: CGFloat = min(402.0 / 830.0, 500.0 / 640.0)
+        for zoom: CGFloat in [0.22, 1, 2.6] {
+            let slack = GateLayout.practice.panSlack(map: map, scale: fit * zoom)
+            precondition(near(slack.width, 281.4) && near(slack.height, 350), "Practice pan @\(zoom)")
+            checks += 1
+        }
+        let grownSlack = GateLayout(size: 16).panSlack(map: map, scale: fit * 5.2)
+        precondition(near(grownSlack.width, 368 * fit * 5.2) && grownSlack.width > 281.4, "Grown pan")
+        checks += 1
         precondition(GateLayout(size: 9).size == 8 && !GateLayout.supports(9), "Unsupported sizes fall back to 8")
         precondition(LandCore.cells(col: 3, row: 3) == ["3:3", "4:3", "3:4", "4:4"], "Core cells")
-        print("PASS: \(checks) geometry cases — drag at five zoom levels, and at N = 8/10/12/16 tiles, slab, iso/cellAt round trips, drag steps, sprite anchoring and the dormant core")
+        print("PASS: \(checks) geometry cases — drag at five zoom levels, and at N = 8/10/12/16 tiles, slab, iso/cellAt round trips, drag steps, sprite anchoring, the dormant core, core motes, zoom and pan limits")
     }
 }
