@@ -269,6 +269,22 @@ enum TraderLandMutation {
     }
 }
 
+extension TraderLandMutation {
+    /// The request body. place / move / move_core coordinates are on the island as this
+    /// client drew it, so they carry that size; the server refuses a stale one with 409
+    /// (the island grew on another device). docs/trader-land/GROWTH-v1.md §3.
+    func payload(drawnOn size: Int?) -> [String: Any] {
+        var body = self.body
+        switch self {
+        case .place, .move, .moveCore:
+            if let size { body["size"] = size }
+        default:
+            break
+        }
+        return body
+    }
+}
+
 @MainActor
 final class TraderLandSync: ObservableObject {
     /// Clients that implement GROWTH-v1 say so on every request; only they may grow an island.
@@ -369,7 +385,7 @@ final class TraderLandSync: ObservableObject {
             if let action {
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                request.httpBody = try JSONSerialization.data(withJSONObject: action.body)
+                request.httpBody = try JSONSerialization.data(withJSONObject: action.payload(drawnOn: world?.land.size))
             }
             let (data, response) = try await transport.data(for: request)
             guard generation == epoch, AccountSession.shared.session?.userId == userID else { return nil }
@@ -515,7 +531,7 @@ extension LandHorizon {
             var taken = Set<String>()
             for spot in spots { taken.formUnion(cells(spot)) }
             guard taken.isDisjoint(with: LandCore.cells(col: x, row: y)) else {
-                return .failure(Refusal(status: 409, error: "The island changed. Reload and try again."))
+                return .failure(Refusal(status: 409, error: "The island changed. Reload before trying again."))
             }
             core.x = x; core.y = y
             extra["coreMoved"] = ["x": x, "y": y]
@@ -524,13 +540,13 @@ extension LandHorizon {
                 return .failure(Refusal(status: 404, error: "Piece not in your inventory"))
             }
             let spot = Spot(id: "fx-p-\(row.id)-\(spots.count)", inventoryID: id, x: x, y: y, rotation: rotation)
-            guard fits(cells(spot), ignoring: nil) else { return .failure(Refusal(status: 409, error: "The island changed. Reload and try again.")) }
+            guard fits(cells(spot), ignoring: nil) else { return .failure(Refusal(status: 409, error: "The island changed. Reload before trying again.")) }
             spots.append(spot)
             extra["grew"] = Self.null(grow())
         case let .move(id, x, y, rotation):
             guard let index = spots.firstIndex(where: { $0.id == id }) else { return .failure(Refusal(status: 404, error: "Placement not found")) }
             var moved = spots[index]; moved.x = x; moved.y = y; moved.rotation = rotation
-            guard fits(cells(moved), ignoring: id) else { return .failure(Refusal(status: 409, error: "The island changed. Reload and try again.")) }
+            guard fits(cells(moved), ignoring: id) else { return .failure(Refusal(status: 409, error: "The island changed. Reload before trying again.")) }
             spots[index] = moved
         case let .remove(id):
             spots.removeAll { $0.id == id }

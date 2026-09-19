@@ -53,7 +53,7 @@ final class DeskHarvestCardTests: XCTestCase {
         XCTAssertTrue(threeDays.isEnabled)
         XCTAssertTrue(week.isEnabled)
         // VoiceOver hears the footprint as words, never "2 multiplied by 1".
-        XCTAssertTrue(threeDays.label.hasPrefix("3 days · building 2 by 1"), threeDays.label)
+        XCTAssertTrue(threeDays.label.hasPrefix("3\u{00A0}days · building 2 by 1"), threeDays.label)
         XCTAssertTrue(threeDays.label.contains("Double Gate"), threeDays.label)
         XCTAssertTrue(week.label.contains("landmark 2 by 2"), week.label)
         XCTAssertFalse(app.buttons["harvest-horizon-confirm"].exists, "nothing is sent without a confirmation")

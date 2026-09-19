@@ -133,7 +133,7 @@ final class TraderLandGrowthTests: XCTestCase {
     func testRefusalsReadAsPlainLanguage() {
         XCTAssertEqual(TraderLandSync.failure(status: 409, serverError: "Its review is already open"),
                        L.t("Its review is already open, so its horizon can no longer grow. Reload to review it.", "Su revisión ya está abierta, así que su horizonte ya no puede crecer. Recarga para revisarla."))
-        XCTAssertEqual(TraderLandSync.failure(status: 409, serverError: "The island changed. Reload and try again."),
+        XCTAssertEqual(TraderLandSync.failure(status: 409, serverError: "The island changed. Reload before trying again."),
                        L.t("The island changed. Reload before trying again.", "La isla cambió. Recarga antes de intentarlo de nuevo."))
         XCTAssertNotEqual(TraderLandSync.failure(status: 400, serverError: "A horizon can only grow"), TraderLandSync.failure(status: 500, serverError: nil))
     }
@@ -287,8 +287,8 @@ final class TraderLandGrowthTests: XCTestCase {
     }
 
     func testHorizonOptionLabels() {
-        XCTAssertEqual(LandHorizon.threeDays.optionLabel, L.t("3 days · building 2×1", "3 días · edificio 2×1"))
-        XCTAssertEqual(LandHorizon.week.optionLabel, L.t("7 days · landmark 2×2", "7 días · monumento 2×2"))
+        XCTAssertEqual(LandHorizon.threeDays.optionLabel, L.t("3\u{00A0}days · building 2×1", "3\u{00A0}días · edificio 2×1"))
+        XCTAssertEqual(LandHorizon.week.optionLabel, L.t("7\u{00A0}days · landmark 2×2", "7\u{00A0}días · monumento 2×2"))
     }
 
 #if DEBUG
@@ -335,4 +335,14 @@ final class TraderLandGrowthTests: XCTestCase {
         XCTAssertNil(placed.grew)
     }
 #endif
+
+    func testIslandWritesCarryTheSizeTheyWereDrawnOn() {
+        let place = TraderLandMutation.place(inventoryID: "inv", x: 1, y: 2, rotation: 0).payload(drawnOn: 10)
+        XCTAssertEqual(place["size"] as? Int, 10)
+        XCTAssertEqual(TraderLandMutation.move(placementID: "p", x: 1, y: 2, rotation: 90).payload(drawnOn: 12)["size"] as? Int, 12)
+        XCTAssertEqual(TraderLandMutation.moveCore(x: 0, y: 5).payload(drawnOn: 8)["size"] as? Int, 8)
+        XCTAssertNil(TraderLandMutation.extend(inventoryID: "inv", hours: 72).payload(drawnOn: 8)["size"], "extend carries no island frame")
+        XCTAssertNil(TraderLandMutation.remove(placementID: "p").payload(drawnOn: 8)["size"])
+        XCTAssertNil(TraderLandMutation.place(inventoryID: "inv", x: 1, y: 2, rotation: 0).payload(drawnOn: nil)["size"], "no world yet: no size")
+    }
 }

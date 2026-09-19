@@ -258,7 +258,7 @@ final class DeskHorizonTests: XCTestCase {
         XCTAssertEqual(answer(400, #"{"error":"A horizon can only grow"}"#), .failure(.notUpward))
         XCTAssertEqual(answer(401, #"{"error":"Unauthorized"}"#), .failure(.signedOut))
         // Anything else changes nothing the desk knows of: retry is safe.
-        XCTAssertEqual(answer(409, #"{"error":"The island changed. Reload and try again."}"#), .failure(.unavailable))
+        XCTAssertEqual(answer(409, #"{"error":"The island changed. Reload before trying again."}"#), .failure(.unavailable))
         XCTAssertEqual(answer(400, #"{"error":"Invalid action"}"#), .failure(.unavailable))
         XCTAssertEqual(answer(500, "oops"), .failure(.unavailable))
         // A 200 without `extended` (an older server) or naming another seed is not a success.
@@ -412,7 +412,7 @@ final class DeskHorizonTests: XCTestCase {
     // MARK: Copy
 
     func testHorizonCopyNeverBreaksAndReadsFootprintsAsWords() {
-        XCTAssertEqual(LandHorizon.day.unbroken, "24\u{00A0}h")
+        XCTAssertEqual(LandHorizon.day.label, "24\u{00A0}h")
         XCTAssertFalse(HarvestCard.horizonLine(.threeDays).hasPrefix("3 "), "no breakable space inside the horizon")
         XCTAssertTrue(HarvestCard.horizonLine(.week).hasSuffix("2×2"))
         XCTAssertFalse(HarvestCard.spokenHorizonLine(.threeDays).contains("×"), "VoiceOver reads × as a multiplication")

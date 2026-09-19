@@ -34,12 +34,13 @@ enum LandHorizon: Int, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// "24 h", "3 days", "7 days".
+    /// "24 h", "3 days", "7 days", glued with a no-break space so a narrow line never
+    /// leaves the unit alone on the next line.
     var label: String {
         switch self {
-        case .day: return L.t("24 h", "24 h")
-        case .threeDays: return L.t("3 days", "3 días")
-        case .week: return L.t("7 days", "7 días")
+        case .day: return L.t("24\u{00A0}h", "24\u{00A0}h")
+        case .threeDays: return L.t("3\u{00A0}days", "3\u{00A0}días")
+        case .week: return L.t("7\u{00A0}days", "7\u{00A0}días")
         }
     }
 

@@ -101,14 +101,14 @@ final class TraderLandGateTests: XCTestCase {
         // A 24 h seed can grow to 3 or 7 days; each option names the piece it would bloom into.
         let horizon = app.staticTexts["land-horizon-fx-seed-growing"]
         XCTAssertTrue(horizon.waitForExistence(timeout: 5))
-        XCTAssertEqual(horizon.label, "24 h · common piece 1×1")
+        XCTAssertEqual(horizon.label, "24\u{00A0}h · common piece 1×1")
         let menu = app.buttons["land-extend-fx-seed-growing"]
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         menu.tap()
-        let threeDays = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "3 days · building 2×1")).firstMatch
+        let threeDays = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "3\u{00A0}days · building 2×1")).firstMatch
         XCTAssertTrue(threeDays.waitForExistence(timeout: 5))
-        XCTAssertEqual(threeDays.label, "3 days · building 2×1 · Candle Tower")
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "7 days · landmark 2×2")).firstMatch.exists)
+        XCTAssertEqual(threeDays.label, "3\u{00A0}days · building 2×1 · Candle Tower")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "7\u{00A0}days · landmark 2×2")).firstMatch.exists)
         shot("extend-menu")
         threeDays.tap()
         let alert = app.alerts.firstMatch
@@ -116,8 +116,8 @@ final class TraderLandGateTests: XCTestCase {
         XCTAssertTrue(alert.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "You can't shorten it later")).firstMatch.exists)
         alert.buttons["Extend"].tap()
         XCTAssertTrue(notice.waitForExistence(timeout: 5))
-        XCTAssertEqual(notice.label, "Seed extended to 3 days: it will bloom into Candle Tower.")
-        XCTAssertEqual(horizon.label, "3 days · building 2×1")
+        XCTAssertEqual(notice.label, "Seed extended to 3\u{00A0}days: it will bloom into Candle Tower.")
+        XCTAssertEqual(horizon.label, "3\u{00A0}days · building 2×1")
         shot("seed-extended")
 
         // An account island's help tells how it grows and that its core moves.

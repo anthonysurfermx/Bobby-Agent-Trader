@@ -450,11 +450,6 @@ struct LandChip: View {
     }
 }
 
-extension LandHorizon {
-    /// "24 h" / "3 days" glued with a no-break space: a narrow card line never leaves the
-    /// unit alone on the next line ("… in 24" / "h: BTC long").
-    var unbroken: String { label.replacingOccurrences(of: " ", with: "\u{00A0}") }
-}
 
 /// A horizon chip draws its own states: the seed's current horizon is not tappable
 /// yet must read at full strength, so no system dimming for disabled.
@@ -680,7 +675,7 @@ struct HarvestCard: View {
                 : L.t("This read becomes a seed on your island.", "Esta lectura se vuelve una semilla en tu isla.")
         case .seed:
             // The seed's own horizon: 24 h as planted, 3 or 7 days once grown.
-            let when = moment.span.unbroken
+            let when = moment.span.label
             if let thesis = moment.thesis {
                 return L.t("It blooms when you review this thesis in \(when): \(thesis.line).",
                            "Florece cuando revises esta tesis en \(when): \(thesis.line).")
@@ -706,8 +701,8 @@ struct HarvestCard: View {
         case .syncing:
             EmptyView()
         case .seed:
-            // The reviews list is where a growing seed waits on the island.
-            primary(L.t("See it on my island", "Verla en mi isla")) { onOpen(.review) }
+            // The island opens on this seed's row in the reviews list (or on the list if the id is unknown).
+            primary(L.t("See it on my island", "Verla en mi isla")) { onOpen(moment.inventoryID.map { .seed(inventoryID: $0) } ?? .review) }
         case let .bloomed(p):
             primary(L.t("Build it", "Constrúyela")) { onOpen(.build(itemID: p.id)) }
         case .capped, .routeComplete, .pending:
@@ -777,7 +772,7 @@ struct HarvestCard: View {
 
     /// "24 h · common 1×1", "3 days · building 2×1", "7 days · landmark 2×2".
     static func horizonLine(_ h: LandHorizon) -> String {
-        "\(h.unbroken) · \(tierWord(h)) \(h.footprintLabel)"
+        "\(h.label) · \(tierWord(h)) \(h.footprintLabel)"
     }
 
     /// The same line for VoiceOver, which reads "×" as a multiplication: "3 days · building 2 by 1".
@@ -903,11 +898,11 @@ struct HarvestCard: View {
         let busy = moment.extending == h
         let bloomLine: String
         if let bloom = bloomPiece(h) {
-            bloomLine = L.t("It blooms into \(bloom.displayName) when you review it in \(h.unbroken).",
-                            "Florece como \(bloom.displayName) cuando la revises en \(h.unbroken).")
+            bloomLine = L.t("It blooms into \(bloom.displayName) when you review it in \(h.label).",
+                            "Florece como \(bloom.displayName) cuando la revises en \(h.label).")
         } else {
-            bloomLine = L.t("It blooms into a bigger piece when you review it in \(h.unbroken).",
-                            "Florece como una pieza más grande cuando la revises en \(h.unbroken).")
+            bloomLine = L.t("It blooms into a bigger piece when you review it in \(h.label).",
+                            "Florece como una pieza más grande cuando la revises en \(h.label).")
         }
         return VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
@@ -927,7 +922,7 @@ struct HarvestCard: View {
                 } label: {
                     HStack(spacing: 6) {
                         if busy { ProgressView().controlSize(.mini).tint(.white) }
-                        Text(busy ? L.t("Extending…", "Extendiendo…") : L.t("Extend to \(h.unbroken)", "Extender a \(h.unbroken)"))
+                        Text(busy ? L.t("Extending…", "Extendiendo…") : L.t("Extend to \(h.label)", "Extender a \(h.label)"))
                             .lineLimit(1)
                             .fixedSize()
                     }
@@ -944,7 +939,7 @@ struct HarvestCard: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     proposed = nil
                 } label: {
-                    Text(L.t("Keep \(moment.span.unbroken)", "Dejar en \(moment.span.unbroken)"))
+                    Text(L.t("Keep \(moment.span.label)", "Dejar en \(moment.span.label)"))
                         .font(.rounded(12.5, .semibold))
                         .foregroundStyle(Theme.accentSoft)
                         .lineLimit(1)
