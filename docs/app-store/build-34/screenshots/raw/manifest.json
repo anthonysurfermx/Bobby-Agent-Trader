@@ -1,0 +1,118 @@
+{
+  "generated_utc": "2026-09-19T22:40:00Z",
+  "spec": "review33/app-store-handoff-33/SCREENSHOTS.md",
+  "build": {
+    "git_commit": "56f500a4430c41c6e151c585be120ab1bc4dfa9d",
+    "git_branch": "claude/build34",
+    "worktree": "/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.claude/worktrees/b34-backend",
+    "worktree_clean": true,
+    "cfbundle_short_version_string": "1.2",
+    "cfbundle_version": "34",
+    "bundle_identifier": "xyz.bobbyprotocol.bobby",
+    "configuration": "Release",
+    "generator": "xcodegen generate + xcodebuild -scheme Bobby -configuration Release",
+    "verified_from": "installed simulator bundle Info.plist"
+  },
+  "device": {
+    "name": "iPhone 17 Pro Max",
+    "udid": "E671B2A2-1913-46DB-8636-C14111AB41D1",
+    "os": "iOS 26.1 (23B86) Simulator",
+    "native_resolution": "1320x2868",
+    "app_store_slot": "6.9 inch",
+    "erased_before_install": true
+  },
+  "locale": {
+    "apple_languages": ["en-US"],
+    "apple_locale": "en_US",
+    "ui_language": "English"
+  },
+  "account_mode": "signed out, practice",
+  "capture": {
+    "method": "xcrun simctl io <udid> screenshot --type png",
+    "launch_arguments": "none (no -qa-harvest, -store-shots, -trader-land-gate, -land-neighbors-fixture or any other QA flag)",
+    "backend": "production (bobbyprotocol.xyz) — live model calls and live OKX market data",
+    "model_calls_used": 1,
+    "color": "RGBA 8-bit PNG (alpha channel present; flatten to RGB on final export)",
+    "post_processing": "none — untouched originals"
+  },
+  "journey": [
+    "cold launch on a freshly erased device",
+    "risk notice v3: acknowledged all four statements by hand, then 'I UNDERSTAND. LET ME IN'",
+    "companion onboarding: picked BYTE (plain speak), waited for the real aura forge scan, 'DROP INTO THE DESK'",
+    "desk: typed one question and waited for the real three-agent answer",
+    "equipped the 'Market Translator' gear the first read legitimately unlocked",
+    "scrolled the completed read to frame each region"
+  ],
+  "frames": [
+    {
+      "id": "01",
+      "file": "01-desk-and-composer.png",
+      "sha256": "bb7af132fc30c92a0a9301cb2c72a8245292ca5c67e52e3c101ea6d703849e84",
+      "route": "desk (mainScreen) — pre-ask state: companion stage + LIVE status + gear row + QUICK ACCESS + text composer",
+      "screen": "ContentView.mainScreen / commandDeck / commandBar",
+      "question_asked": null,
+      "captured_utc": "2026-09-19T22:31:35Z",
+      "account_mode": "signed out, practice",
+      "notes": "First-run desk before any read: composer shows its real 'Type…' placeholder, no XP, no earned gear."
+    },
+    {
+      "id": "02",
+      "file": "02-three-perspective.png",
+      "sha256": "ebed6082227b1efb0aceac540f128f66703d0e7ae6a60bc4ee66c9eebf6a3140",
+      "route": "desk — debateRail (ADVERSARIAL DESK · COMPLETE)",
+      "screen": "ContentView.debateRail",
+      "question_asked": "What supports and weakens the case for Bitcoin?",
+      "captured_utc": "2026-09-19T22:33:52Z",
+      "account_mode": "signed out, practice",
+      "notes": "All three agent cards (ALPHA / RED TEAM / CIO) show 'review complete', with the full Alpha argument, the full Red Team rebuttal and the evidence label 'OKX · BTC-USDT · 1H · 2026-09-19T22:00:00.000Z'."
+    },
+    {
+      "id": "03",
+      "file": "03-wait-verdict.png",
+      "sha256": "cafe7580a5d6e0fd331c15abe61c64572c1b8b502a7452527699fde27660155e",
+      "route": "desk — noTradeSignature (HALO // RISK GATE)",
+      "screen": "ContentView.noTradeSignature",
+      "question_asked": "What supports and weakens the case for Bitcoin?",
+      "captured_utc": "2026-09-19T22:32:48Z",
+      "account_mode": "signed out, practice",
+      "notes": "Genuine NO TRADE returned by the live backend: 'No clear setup. Waiting is an option.' plus the model's own explanation. Not manufactured — BTC really answered wait. Companion and VERDICT READY status are in frame."
+    },
+    {
+      "id": "04",
+      "file": "04-chart.png",
+      "sha256": "d51e09ed7bf0ab31adfb146090ba5dff1d1dc6a4d6e59e3c15285cfdb60bcd67",
+      "route": "desk — marketSurface (chart card)",
+      "screen": "ContentView.marketSurface / ChartView",
+      "question_asked": "What supports and weakens the case for Bitcoin?",
+      "captured_utc": "2026-09-19T22:34:33Z",
+      "account_mode": "signed out, practice",
+      "notes": "Asset 'BTC CRYPTO $81,096', timeframe selector with 1H active, '1H // LIVE', source 'CRYPTO · OKX' and '100 OHLCV · 1H' all readable; EMA20/EMA50, R 81953 / S 80569 levels, SIDEWAYS / RSI 42 and the ENTRY/STOP/TARGET strip are the real analysis output."
+    },
+    {
+      "id": "06",
+      "file": "06-cio-conclusion.png",
+      "sha256": "57b7b493f1d5ccab3e574cbdc6ef1c4354b84afa0d5377ba536598afcb2c399d",
+      "route": "desk — verdictCard (CIO // VERDICT)",
+      "screen": "ContentView.verdictCard",
+      "question_asked": "What supports and weakens the case for Bitcoin?",
+      "captured_utc": "2026-09-19T22:33:28Z",
+      "account_mode": "signed out, practice",
+      "notes": "The CIO's written conclusion in full, with 'REFERENCE ONLY' and the 'General technical context · Bobby never executes trades' footer. Verified legible at 1:1."
+    }
+  ],
+  "missing": [
+    {
+      "id": "05",
+      "reason": "Frame 05 (signed-in personal Trader Land with legitimate learning progress) cannot be captured without a real account. This walkthrough is signed out / practice by design, and the spec forbids substituting the public gallery view, the signed-out practice island or seeded XP. It needs a real Apple or Google sign-in plus genuinely earned progress on that account."
+    }
+  ],
+  "alternates_in_scratchpad": {
+    "directory": "/private/tmp/claude-501/-Users-mrrobot-Documents-GitHub-Bobby-Agent-Trader/adfa090d-a846-413a-8d0e-1d764b355262/scratchpad/shots34/raw",
+    "files": [
+      "01b-desk-composer-typed.png — same pre-ask desk with the full question typed; the single-line field scrolls the '?' out of view",
+      "01c-desk-composer-typed.png — shorter typed question; the simulator hardware keyboard renders '?' as '_'",
+      "02a-three-perspective.png — wider crop with the chart above the agent cards",
+      "03b-wait-verdict.png — NO TRADE card framed at the top of the scroll, without the companion"
+    ]
+  }
+}

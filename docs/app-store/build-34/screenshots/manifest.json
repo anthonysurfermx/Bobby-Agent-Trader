@@ -1,0 +1,203 @@
+{
+  "generated_by": "scripts/build-app-store-shots-34.mjs",
+  "spec": "review33/app-store-handoff-33/SCREENSHOTS.md",
+  "locale": "en-US",
+  "slot": "6.9 inch iPhone (1320x2868)",
+  "build": {
+    "git_commit": "56f500a4430c41c6e151c585be120ab1bc4dfa9d",
+    "git_branch": "claude/build34",
+    "worktree": "/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.claude/worktrees/b34-backend",
+    "worktree_clean": true,
+    "cfbundle_short_version_string": "1.2",
+    "cfbundle_version": "34",
+    "bundle_identifier": "xyz.bobbyprotocol.bobby",
+    "configuration": "Release",
+    "generator": "xcodegen generate + xcodebuild -scheme Bobby -configuration Release",
+    "verified_from": "installed simulator bundle Info.plist"
+  },
+  "device": {
+    "name": "iPhone 17 Pro Max",
+    "udid": "E671B2A2-1913-46DB-8636-C14111AB41D1",
+    "os": "iOS 26.1 (23B86) Simulator",
+    "native_resolution": "1320x2868",
+    "app_store_slot": "6.9 inch",
+    "erased_before_install": true
+  },
+  "capture": {
+    "backend": "production (bobbyprotocol.xyz) — live model calls and live OKX market data",
+    "launch_arguments": "none (no -qa-harvest, -store-shots, -trader-land-gate, -land-neighbors-fixture or any other QA flag)",
+    "account_mode": "signed out, practice"
+  },
+  "compositing": {
+    "background": "lifestyle plate art upscaled 851x1848/1849 -> 1320x2868 with lanczos3",
+    "plate_phone": "the plates' AI-generated phone is removed with a pull/push diffusion fill before the real device is drawn",
+    "plate_caption": "the plates' baked caption is removed the same way; the headline and support line are re-set from the spec table",
+    "ui": "authentic capture, downscaled only, never retouched, nothing drawn over the screen rectangle",
+    "typography": "SF Pro Display 700 headline / 400 support / 600 emerald eyebrow"
+  },
+  "finals": [
+    {
+      "id": "01",
+      "file": "en-US/01.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB 8-bit PNG (no alpha)",
+      "bytes": 2990190,
+      "sha256": "d2958cf5a48e51f2a238caa5596ba69fcfeacb817e7e2ea3d9d0bb6700465924",
+      "headline": "Make sense of the market.",
+      "support": "Ask Bobby by text.",
+      "eyebrow": "01 / MEET BOBBY",
+      "raw_capture": {
+        "file": "raw/01-desk-and-composer.png",
+        "sha256": "bb7af132fc30c92a0a9301cb2c72a8245292ca5c67e52e3c101ea6d703849e84",
+        "sha256_from_raw_manifest": "bb7af132fc30c92a0a9301cb2c72a8245292ca5c67e52e3c101ea6d703849e84",
+        "route": "desk (mainScreen) — pre-ask state: companion stage + LIVE status + gear row + QUICK ACCESS + text composer",
+        "captured_utc": "2026-09-19T22:31:35Z"
+      },
+      "plate": {
+        "file": "plates/01-meet-bobby.png",
+        "sha256": "d3003883d055246839e87791cd7e14e4362e9ac7b4f945762b56f4d48f1ca363"
+      },
+      "screen": {
+        "source_px": "1320x2868 (native capture)",
+        "placed_px": "641x1393",
+        "scale": 0.48561,
+        "resample": "lanczos3, downscale only",
+        "edits": "none — the capture is placed unmodified inside a drawn hardware bezel; nothing is composited on top of it"
+      },
+      "note": "Desk with the real companion, LIVE status, earned gear row, QUICK ACCESS and the text composer."
+    },
+    {
+      "id": "02",
+      "file": "en-US/02.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB 8-bit PNG (no alpha)",
+      "bytes": 3342809,
+      "sha256": "19ccce8556ba0b46cfc04257221430071c56c119c7b2b524de70ffe0e7e09788",
+      "headline": "See both sides before you decide.",
+      "support": "Read the case for and against.",
+      "eyebrow": "02 / GET PERSPECTIVE",
+      "raw_capture": {
+        "file": "raw/02-three-perspective.png",
+        "sha256": "ebed6082227b1efb0aceac540f128f66703d0e7ae6a60bc4ee66c9eebf6a3140",
+        "sha256_from_raw_manifest": "ebed6082227b1efb0aceac540f128f66703d0e7ae6a60bc4ee66c9eebf6a3140",
+        "route": "desk — debateRail (ADVERSARIAL DESK · COMPLETE)",
+        "captured_utc": "2026-09-19T22:33:52Z"
+      },
+      "plate": {
+        "file": "plates/02-perspective.png",
+        "sha256": "7fcd785101923788d03be66449b0738c22bcd49414c103a58b95018e35a75259"
+      },
+      "screen": {
+        "source_px": "1320x2868 (native capture)",
+        "placed_px": "641x1393",
+        "scale": 0.48561,
+        "resample": "lanczos3, downscale only",
+        "edits": "none — the capture is placed unmodified inside a drawn hardware bezel; nothing is composited on top of it"
+      },
+      "note": "Completed ADVERSARIAL DESK: Alpha, Red Team and CIO all \"review complete\", with the full Alpha case, the Red Team rebuttal and the OKX evidence label."
+    },
+    {
+      "id": "03",
+      "file": "en-US/03.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB 8-bit PNG (no alpha)",
+      "bytes": 3924304,
+      "sha256": "035011f40c5fb9626463b7c7120a78ad382fab2b082a12e07384f73afdcc7bf8",
+      "headline": "Know when to wait.",
+      "support": "No clear setup? Bobby says so.",
+      "eyebrow": "03 / STAY PATIENT",
+      "raw_capture": {
+        "file": "raw/03-wait-verdict.png",
+        "sha256": "cafe7580a5d6e0fd331c15abe61c64572c1b8b502a7452527699fde27660155e",
+        "sha256_from_raw_manifest": "cafe7580a5d6e0fd331c15abe61c64572c1b8b502a7452527699fde27660155e",
+        "route": "desk — noTradeSignature (HALO // RISK GATE)",
+        "captured_utc": "2026-09-19T22:32:48Z"
+      },
+      "plate": {
+        "file": "plates/03-patience.png",
+        "sha256": "a5fb84cce66c5c2d09ba1b1cbb62af2d68c8dcfd684d212858999cfab8b9adf5"
+      },
+      "screen": {
+        "source_px": "1320x2868 (native capture)",
+        "placed_px": "641x1393",
+        "scale": 0.48561,
+        "resample": "lanczos3, downscale only",
+        "edits": "none — the capture is placed unmodified inside a drawn hardware bezel; nothing is composited on top of it"
+      },
+      "note": "Genuine NO TRADE returned by the live backend: \"No clear setup. Waiting is an option.\" with the model's own explanation."
+    },
+    {
+      "id": "04",
+      "file": "en-US/04.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB 8-bit PNG (no alpha)",
+      "bytes": 3282225,
+      "sha256": "3ede46c847747381280d5d69a8a0db198abea06ad128f19f6023012668e416e0",
+      "headline": "Build your market understanding.",
+      "support": "Explore the chart behind the analysis.",
+      "eyebrow": "04 / KEEP LEARNING",
+      "raw_capture": {
+        "file": "raw/04-chart.png",
+        "sha256": "d51e09ed7bf0ab31adfb146090ba5dff1d1dc6a4d6e59e3c15285cfdb60bcd67",
+        "sha256_from_raw_manifest": "d51e09ed7bf0ab31adfb146090ba5dff1d1dc6a4d6e59e3c15285cfdb60bcd67",
+        "route": "desk — marketSurface (chart card)",
+        "captured_utc": "2026-09-19T22:34:33Z"
+      },
+      "plate": {
+        "file": "plates/04-learning.png",
+        "sha256": "3529fcc6e7005288a6774e393466768a03d48a835c11afcb77007f7498ba6c23"
+      },
+      "screen": {
+        "source_px": "1320x2868 (native capture)",
+        "placed_px": "641x1393",
+        "scale": 0.48561,
+        "resample": "lanczos3, downscale only",
+        "edits": "none — the capture is placed unmodified inside a drawn hardware bezel; nothing is composited on top of it"
+      },
+      "note": "Real chart card: BTC CRYPTO $81,096, 1H // LIVE, CRYPTO · OKX, 100 OHLCV · 1H, EMA20/EMA50, SIDEWAYS / RSI 42."
+    },
+    {
+      "id": "06",
+      "file": "en-US/06.png",
+      "width": 1320,
+      "height": 2868,
+      "color": "RGB 8-bit PNG (no alpha)",
+      "bytes": 3491504,
+      "sha256": "7c90b61de51bb57b94860b423e229687082fadc57c2000b334ed1e92849fe2a7",
+      "headline": "Understand the why.",
+      "support": "Read the reasons behind the answer.",
+      "eyebrow": "06 / UNDERSTAND BOBBY",
+      "raw_capture": {
+        "file": "raw/06-cio-conclusion.png",
+        "sha256": "57b7b493f1d5ccab3e574cbdc6ef1c4354b84afa0d5377ba536598afcb2c399d",
+        "sha256_from_raw_manifest": "57b7b493f1d5ccab3e574cbdc6ef1c4354b84afa0d5377ba536598afcb2c399d",
+        "route": "desk — verdictCard (CIO // VERDICT)",
+        "captured_utc": "2026-09-19T22:33:28Z"
+      },
+      "plate": {
+        "file": "plates/06-understand-the-why-plate.png",
+        "sha256": "136654a110f790f42b239eafc2ea97c94b42486b41316bea463b534bf34f4596"
+      },
+      "screen": {
+        "source_px": "1320x2868 (native capture)",
+        "placed_px": "641x1393",
+        "scale": 0.48561,
+        "resample": "lanczos3, downscale only",
+        "edits": "none — the capture is placed unmodified inside a drawn hardware bezel; nothing is composited on top of it"
+      },
+      "note": "The CIO // VERDICT written conclusion in full, with REFERENCE ONLY and the \"General technical context · Bobby never executes trades\" footer."
+    }
+  ],
+  "missing": [
+    {
+      "id": "05",
+      "plate": "05-progress.png",
+      "headline": "Make progress you can see. / Build a world of your own.",
+      "reason": "Needs a real signed-in personal Trader Land with legitimately earned progress. The build-34 walkthrough is signed out / practice, and the spec forbids substituting the public gallery, the practice island or seeded XP. No honest frame can be produced from the available raws."
+    }
+  ]
+}
