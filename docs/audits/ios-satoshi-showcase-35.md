@@ -26,4 +26,12 @@ The card identifies it as “Bobby showcase island” / “Isla de muestra de Bo
 
 Combined candidate: `output/satoshi-island-35/Bobby-1.2-35.xcarchive`. Its folder also contains the native test result, test log and summary, archive verification, and named screenshots in `screenshots/`.
 
-The candidate remains **1.2 (35)** and includes the voice and Trader Land fixes from the earlier revisions. This is a local candidate; making the permanent island available to installed apps requires distributing this update. No physical-device installation, push, TestFlight upload or App Store deployment was performed.
+The candidate remains **1.2 (35)** and includes the voice and Trader Land fixes from the earlier revisions. At archive creation, no physical-device installation, push, TestFlight upload or App Store deployment had been performed. Making the permanent island available to all installed apps still requires distributing this update.
+
+## Requested physical-device installation
+
+On September 22, the user requested a fresh build to try on their phone. Release was built successfully from `7d943bbb356ad150812c57eb70dc4c400a0517bb`, its strict signature was verified, and all 108 MP3 hashes matched the audited catalog. The build contains the permanent showcase. Its executable SHA-256 is `fee4de5e24b7c1d2a7e2c08256fd3986ff04aeda2b8b374db85a0ddced41e00c`.
+
+The connected **iPhone 17 Pro** reported Bobby **1.2 (34)** before installation and **1.2 (35)** afterward. `devicectl` confirmed successful installation and launch at 11:30 Lisbon time. The app was updated in place without uninstalling or resetting its data. This verifies installation and launch; the user can now assess physical-device playback and their account state.
+
+Evidence is stored in `output/satoshi-island-35/device/`: `build.log`, `build-verification.json`, `installed-before.json`, `install-result.json`, `launch-result.json`, and `installed-after.json`. No TestFlight or App Store upload was performed.
