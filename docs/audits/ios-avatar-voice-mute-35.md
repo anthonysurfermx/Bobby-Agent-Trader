@@ -2,6 +2,8 @@
 
 Date: 2026-09-22. Follows `9028620`, preserving the restored machine, onboarding order and [complete bilingual catalog](ios-avatar-voice-35.md).
 
+**Subsequent combined candidate:** [Trader Land restoration](ios-traderland-restoration-2026-09-22.md) preserves these voice fixes and restores exploration/sharing. Use `output/traderland-restore-35/Bobby-1.2-35.xcarchive` for that candidate; the archive below records the voice-only revision.
+
 ## Behavior
 
 The speaker control is available in onboarding, the desk and the Squad gallery. All three use the same `NeuralVoice` instance and device preference, `avatar.voiceMuted`. Muting immediately stops playback, resets the mouth meter and invalidates audio responses still in flight. Muted clip and narration calls return before starting playback or making a TTS request. Changing avatar or style does not enable voice again. Enabling or muting remains saved after relaunch.

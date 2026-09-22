@@ -167,87 +167,128 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertEqual(toggle.label, audible, "Enabling voice is remembered too")
     }
 
-    func testOrdinaryIslandDoesNotExposePublicGallery() {
+    /// The ordinary app path exposes exploration without a feature-enabling fixture flag.
+    func testOrdinaryPracticeIslandCanZoomOutToTheArchipelago() {
         let app = XCUIApplication()
         app.launchArguments = ["-trader-land-gate", "-AppleLanguages", "(en)"]
         app.launch()
-        XCTAssertTrue(app.buttons["How to play"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["land-archipelago"].exists)
-        XCTAssertFalse(app.buttons["land-publish-cta"].exists)
+        XCTAssertTrue(app.buttons["land-archipelago"].waitForExistence(timeout: 10))
+        for _ in 0..<4 { app.buttons["Zoom out"].tap() }
+        XCTAssertTrue(app.descendants(matching: .any)["land-archipelago-card"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["land-share"].exists, "A guest cannot publish device-only practice progress")
+        app.buttons["land-home-island"].tap()
+        XCTAssertTrue(app.staticTexts["land-fixed-status"].waitForExistence(timeout: 5))
     }
 
-    // MARK: The account island on the Release path (public worlds off)
+    func testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish() {
+        verifyPracticeExploration(spanish: false)
+    }
 
-    /// The account fixture with `-trader-land-release-island`: the same switches as a Release build,
-    /// on an island published before public worlds were turned off (`-trader-land-fixture-public`).
-    private func launchReleaseIsland() -> XCUIApplication {
+    func testSpanishPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish() {
+        verifyPracticeExploration(spanish: true)
+    }
+
+    private func verifyPracticeExploration(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-trader-land-gate", "-trader-land-account-fixture", "-trader-land-release-island",
-                               "-trader-land-fixture-public", "-AppleLanguages", "(en)"]
+        app.launchArguments = ["-trader-land-gate", "-land-neighbors-fixture", "-AppleLanguages", spanish ? "(es)" : "(en)"]
         app.launch()
-        XCTAssertTrue(app.staticTexts["land-fixed-status"].waitForExistence(timeout: 10))
-        return app
+        let status = app.staticTexts["land-fixed-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        let original = status.label
+        for _ in 0..<4 { app.buttons[spanish ? "Alejar" : "Zoom out"].tap() }
+        XCTAssertTrue(app.descendants(matching: .any)["land-archipelago-card"].waitForExistence(timeout: 5))
+        let focused = app.staticTexts["land-focused-island"]
+        XCTAssertEqual(focused.label, spanish ? "Tu isla de práctica" : "Your practice island")
+        islandShot(app, spanish ? "archipelago-es" : "archipelago-en")
+        app.buttons["land-next-island"].tap()
+        XCTAssertEqual(focused.label, "Harbor of Patience")
+        XCTAssertFalse(app.buttons["land-confirm"].exists)
+        islandShot(app, spanish ? "visit-es" : "visit-en")
+        app.buttons["land-publish-cta"].tap()
+        XCTAssertTrue(app.staticTexts[spanish ? "Inicia sesión en la mesa para publicar. Tu isla de práctica se queda en este dispositivo." : "Sign in on the desk to publish. Your practice island stays on this device."].exists)
+        XCTAssertFalse(app.buttons["land-publish"].exists)
+        app.buttons["land-home-island"].tap()
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertEqual(status.label, original, "Exploring must not replace local progress")
     }
 
-    private func openIslandSettings(_ app: XCUIApplication) {
-        let settings = app.buttons["land-share"]
-        XCTAssertEqual(settings.label, "Island settings", "never \"Share your island\" in Release")
-        settings.tap()
-        XCTAssertTrue(app.staticTexts["Saving keeps this island private."].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["Publish island"].exists)
-        XCTAssertFalse(app.buttons["Update name"].exists)
-        XCTAssertFalse(app.buttons["land-share-archipelago"].exists)
+    func testAccountIslandCanSaveNamePublishShareAndBecomePrivate() {
+        verifyIslandSharing(spanish: false)
     }
 
-    private func waitForLabel(_ element: XCUIElement, _ label: String) {
+    func testSpanishAccountIslandCanSaveNamePublishShareAndBecomePrivate() {
+        verifyIslandSharing(spanish: true)
+    }
+
+    /// Only the data is a fixture. Exploration and sharing use the same UI as Release.
+    private func verifyIslandSharing(spanish: Bool) {
+        let app = XCUIApplication()
+        app.launchArguments = ["-trader-land-gate", "-trader-land-account-fixture", "-AppleLanguages", spanish ? "(es)" : "(en)"]
+        app.launch()
+        let status = app.staticTexts["land-fixed-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        let original = status.label
+        let name = spanish ? "Puerto Calma" : "Quiet Harbor"
+        let updated = spanish ? "Mi Archipiélago" : "My Archipelago"
+        app.buttons["land-share"].tap()
+        let field = app.textFields["land-island-name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["land-share-link"].exists)
+        field.tap(); field.typeText(name + "\n")
+        tapIslandControl(app.buttons["land-save-name"], in: app)
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+        waitForIslandLabel(app.staticTexts["land-title"], name)
+
+        app.buttons["land-share"].tap()
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        XCTAssertEqual(field.value as? String, name)
+        XCTAssertFalse(app.buttons["land-share-link"].exists, "Saving a private name must not publish")
+        tapIslandControl(app.buttons["land-publish"], in: app)
+        let link = app.buttons["land-share-link"]
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        islandShot(app, spanish ? "share-island-es" : "share-island-en")
+        field.tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: name.count) + updated + "\n")
+        tapIslandControl(app.buttons["land-update-name"], in: app)
+        XCTAssertTrue(link.exists, "Renaming a public island must not make it private")
+        app.buttons["land-share-close"].tap()
+        waitForIslandLabel(app.staticTexts["land-title"], updated)
+        XCTAssertEqual(status.label, original, "Naming and publishing must preserve earned pieces")
+
+        for _ in 0..<4 { app.buttons[spanish ? "Alejar" : "Zoom out"].tap() }
+        let focused = app.staticTexts["land-focused-island"]
+        XCTAssertTrue(focused.waitForExistence(timeout: 5))
+        XCTAssertEqual(focused.label, updated)
+        app.buttons["land-next-island"].tap()
+        XCTAssertEqual(focused.label, "Harbor of Patience")
+        app.buttons["land-home-island"].tap()
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertEqual(status.label, original)
+        app.buttons["land-share"].tap()
+        XCTAssertTrue(link.waitForExistence(timeout: 5))
+        tapIslandControl(app.buttons["land-make-private"], in: app)
+        XCTAssertTrue(link.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["land-publish"].exists)
+        XCTAssertEqual(field.value as? String, updated)
+        app.buttons["land-share-close"].tap()
+        XCTAssertEqual(status.label, original)
+        XCTAssertEqual(app.staticTexts["land-title"].label, updated)
+    }
+
+    private func tapIslandControl(_ element: XCUIElement, in app: XCUIApplication) {
+        if !element.isHittable { app.swipeUp() }
+        element.tap()
+    }
+
+    private func waitForIslandLabel(_ element: XCUIElement, _ label: String) {
         let match = expectation(for: NSPredicate(format: "label == %@", label), evaluatedWith: element)
         wait(for: [match], timeout: 5)
     }
 
-    /// No archipelago: zooming out stops at 70 % on your own island, and saving a name
-    /// (`renamePrivate`) keeps a published island private.
-    func testReleaseAccountIslandHasNoSeaAndSavingANameKeepsItPrivate() {
-        let app = launchReleaseIsland()
-        XCTAssertFalse(app.buttons["land-archipelago"].exists)
-        let zoom = app.buttons["land-zoom"]
-        XCTAssertEqual(zoom.value as? String, "100%")
-        for _ in 0..<6 { app.buttons["Zoom out"].tap() }
-        XCTAssertEqual(zoom.value as? String, "70%", "the Release minimum zoom")
-        XCTAssertTrue(app.staticTexts["land-fixed-status"].exists, "still your island, not the sea")
-        XCTAssertFalse(app.descendants(matching: .any)["land-archipelago-card"].exists)
-        XCTAssertFalse(app.staticTexts["land-focused-island"].exists)
-
-        openIslandSettings(app)
-        XCTAssertTrue(app.buttons["Make private"].exists, "a published island can be taken back")
-        let name = app.textFields["Island name"]
-        name.tap()
-        name.typeText("Quiet Harbor\n")
-        app.buttons["Save name"].tap()
-        XCTAssertTrue(app.staticTexts["Saving keeps this island private."].waitForNonExistence(timeout: 5))
-        waitForLabel(app.staticTexts["land-title"], "Quiet Harbor")
-
-        // Saving the name made it private: the sheet keeps the name and no longer offers Make private.
-        openIslandSettings(app)
-        XCTAssertEqual(app.textFields["Island name"].value as? String, "Quiet Harbor")
-        XCTAssertFalse(app.buttons["Make private"].exists)
-    }
-
-    /// "Make private" in Island settings takes back an island published before public worlds were off.
-    func testReleaseIslandSettingsMakeAPublishedIslandPrivate() {
-        let app = launchReleaseIsland()
-        openIslandSettings(app)
-        let makePrivate = app.buttons["Make private"]
-        XCTAssertTrue(makePrivate.exists)
-        makePrivate.tap()
-        XCTAssertTrue(makePrivate.waitForNonExistence(timeout: 5))
-        // Drag the sheet away: the notice waits on the island underneath.
-        let hint = app.staticTexts["Saving keeps this island private."]
-        hint.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.99)))
-        XCTAssertTrue(hint.waitForNonExistence(timeout: 5))
-        let notice = app.staticTexts["land-notice"]
-        XCTAssertTrue(notice.waitForExistence(timeout: 5))
-        XCTAssertEqual(notice.label, "Your island is private again.")
-        XCTAssertEqual(app.staticTexts["land-title"].label, "Trader Land", "no name was given")
+    private func islandShot(_ app: XCUIApplication, _ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

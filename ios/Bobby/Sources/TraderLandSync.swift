@@ -429,10 +429,7 @@ extension LandHorizon {
 /// tests and screenshots.
 @MainActor final class TraderLandAccountFixture {
     static var enabled: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-account-fixture") }
-    /// `-trader-land-release-island`: the fixture on the Release path — public worlds off, so the
-    /// header opens the private "Island settings" sheet, there is no archipelago and zoom stops at 0.7.
-    nonisolated static var releaseIsland: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-release-island") }
-    /// `-trader-land-fixture-public`: the island starts public, as one published before public worlds were switched off.
+    /// `-trader-land-fixture-public`: test an island that was already published.
     nonisolated static var startsPublic: Bool { ProcessInfo.processInfo.arguments.contains("-trader-land-fixture-public") }
 
     struct Refusal: Error { let status: Int; let error: String }

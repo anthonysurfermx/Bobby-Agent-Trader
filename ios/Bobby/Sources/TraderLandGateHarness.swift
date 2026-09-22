@@ -531,18 +531,9 @@ struct TraderLandGateHarnessView: View {
     private var canExtend: Bool { accountIsland && sync.world?.capabilities?.extend == true && !editsDisabled && draft == nil }
     private var editsDisabled: Bool { accountIsland && (sync.busy || sync.world == nil || sync.error != nil) }
     private var canUndo: Bool { accountIsland ? remoteUndo != nil && !editsDisabled : !history.isEmpty }
-    /// The camera is out at sea or on someone else's island: your island is read-only here.
-    // Public UGC stays disabled until reporting, blocking and moderation are available.
-    private var publicWorldsEnabled: Bool {
-#if DEBUG
-        // `-trader-land-release-island` keeps a fixture on the Release path: private settings, no sea.
-        return !TraderLandAccountFixture.releaseIsland && (ArchipelagoFixture.enabled || accountFixture)
-#else
-        return false
-#endif
-    }
-    private var minimumZoom: CGFloat { publicWorldsEnabled ? Self.minZoom : 0.7 }
-    private var archipelagoMode: Bool { publicWorldsEnabled && (zoom < Self.archipelagoZoom || visited != nil) }
+    /// The same archipelago is available in development and distributed builds.
+    /// Visiting another island never grants edit access to it.
+    private var archipelagoMode: Bool { zoom < Self.archipelagoZoom || visited != nil }
     private var seaVisible: Bool { zoom <= Self.seaZoom || visited != nil }
     private var ownCode: String? { accountIsland ? sync.world?.share?.code : nil }
     /// The name its builder gave the island in the share sheet (kept while private too), if any.
@@ -555,7 +546,6 @@ struct TraderLandGateHarnessView: View {
     }
     private var ownPublic: Bool { accountIsland && sync.world?.share?.public == true }
     private var publicNeighbors: [PublicIsland] {
-        guard publicWorldsEnabled else { return [] }
         return Array((fixtureIslands ?? neighbors.islands).filter { $0.code != ownCode }.prefix(24))
     }
     private var neighborsReady: Bool { fixtureIslands != nil || neighbors.loaded }
@@ -704,13 +694,11 @@ struct TraderLandGateHarnessView: View {
             Spacer(minLength: 0)
             icon(sound.enabled ? "speaker.wave.2" : "speaker.slash", label: L.t("Toggle sound", "Activar o silenciar sonido")) { sound.toggle() }
                 .accessibilityIdentifier("land-sound-toggle")
-            if publicWorldsEnabled {
-                icon("circle.hexagongrid", label: L.t("Archipelago", "Archipiélago"), active: archipelagoMode) {
-                    archipelagoMode ? goHome() : openArchipelago()
-                }.accessibilityIdentifier("land-archipelago")
-            }
+            icon("circle.hexagongrid", label: L.t("Archipelago", "Archipiélago"), active: archipelagoMode) {
+                archipelagoMode ? goHome() : openArchipelago()
+            }.accessibilityIdentifier("land-archipelago")
             if accountIsland {
-                icon(ownPublic ? "globe" : "square.and.arrow.up", label: publicWorldsEnabled ? L.t("Share your island", "Compartir tu isla") : L.t("Island settings", "Ajustes de la isla")) { openShare() }
+                icon(ownPublic ? "globe" : "square.and.arrow.up", label: L.t("Share your island", "Compartir tu isla")) { openShare() }
                     .accessibilityIdentifier("land-share")
             }
             icon("questionmark.circle", label: L.t("How to play", "Cómo jugar")) { help = true }.accessibilityIdentifier("land-help")
@@ -760,7 +748,7 @@ struct TraderLandGateHarnessView: View {
                             pinchAnchor = CGPoint(x: (point.x - proxy.size.width / 2 - pan.width) / zoom, y: (point.y - proxy.size.height / 2 - pan.height) / zoom)
                         }
                         if state == .changed || state == .ended {
-                            zoom = min(maxZoom, max(draft == nil ? minimumZoom : 0.7, pinchZoom * value))
+                            zoom = min(maxZoom, max(draft == nil ? Self.minZoom : 0.7, pinchZoom * value))
                             let raw = CGSize(width: point.x - proxy.size.width / 2 - pinchAnchor.x * zoom, height: point.y - proxy.size.height / 2 - pinchAnchor.y * zoom)
                             refocus(pan: raw, size: proxy.size)
                             pan = boundedPan(raw, size: proxy.size)
@@ -1174,8 +1162,8 @@ struct TraderLandGateHarnessView: View {
                 helpStep(2, L.t("Patience decides the piece. A seed reviewed after 24 h blooms into a 1×1 piece; give it 3 days for a 2×1 building or 7 days for a 2×2 landmark. A horizon only grows, and only before its review opens.", "La paciencia decide la pieza. Una semilla revisada a las 24 h florece en una pieza 1×1; dale 3 días para un edificio 2×1 o 7 días para un monumento 2×2. Un horizonte solo crece, y solo antes de que abra su revisión."))
                 helpStep(3, L.t("Whatever the market says, it blooms at its review — or right away when you respect a NO TRADE. Pieces repeat, so there is always a next one.", "Diga lo que diga el mercado, florece en su revisión, o al instante cuando respetas un NO OPERAR. Las piezas se repiten, así que siempre hay una siguiente."))
                 helpStep(4, Self.growthHelp(accountIsland: accountIsland))
-                helpStep(5, L.t("Build and arrange your own island as your collection grows.", "Construye y organiza tu isla mientras crece tu colección."))
-                Text(L.t("Tap a built piece to move or store it. Drag to explore and pinch to zoom.", "Toca una pieza construida para moverla o guardarla. Arrastra para explorar y pellizca para ajustar el zoom."))
+                helpStep(5, L.t("Build here, name your island and publish it when you want to join the archipelago. Visits never give XP.", "Construye aquí, ponle nombre a tu isla y publícala cuando quieras unirte al archipiélago. Las visitas nunca dan XP."))
+                Text(L.t("Tap a built piece to move or store it. Drag to explore, zoom out to see other islands, or open the archipelago from the header.", "Toca una pieza construida para moverla o guardarla. Arrastra para explorar, aleja el zoom para ver otras islas o abre el archipiélago desde la cabecera."))
                     .font(.subheadline).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
                 if !accountIsland { HStack {
                     Button(L.t("Reveal next focus ring", "Revelar el siguiente anillo"), action: reveal).disabled(focusLevel >= 2)
@@ -1264,7 +1252,6 @@ struct TraderLandGateHarnessView: View {
     }
 
     private func openArchipelago() {
-        guard publicWorldsEnabled else { return }
         atSea {
             let zoom = overviewZoom, ring = ArchipelagoLayout.ringOneBounds
             animateCamera(zoom: zoom, pan: panTarget(CGPoint(x: 0, y: ring.midY), zoom: zoom), visit: nil)
@@ -1293,7 +1280,7 @@ struct TraderLandGateHarnessView: View {
     }
 
     private func zoomBy(_ factor: CGFloat) {
-        let target = min(maxZoom, max(draft == nil ? minimumZoom : 0.7, zoom * factor))
+        let target = min(maxZoom, max(draft == nil ? Self.minZoom : 0.7, zoom * factor))
         let ratio = target / zoom
         withAnimation(.easeOut(duration: 0.25)) {
             zoom = target
@@ -1370,7 +1357,6 @@ struct TraderLandGateHarnessView: View {
     // MARK: Archipelago data and card
 
     private func loadNeighbors() async {
-        guard publicWorldsEnabled else { return }
 #if DEBUG
         // The account fixture stays offline: its sea is the neighbours fixture too.
         if ArchipelagoFixture.enabled || accountFixture { fixtureIslands = ArchipelagoFixture.islands(); rebuildScene(); return }
@@ -1702,61 +1688,57 @@ struct TraderLandGateHarnessView: View {
         }
     }
 
-    @ViewBuilder private var shareSheet: some View {
-        if publicWorldsEnabled { publicShareSheet }
-        else {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(L.t("Your island", "Tu isla")).font(.title2.bold())
-                TextField(L.t("Island name", "Nombre de la isla"), text: $shareTitle)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: shareTitle) { _, value in if value.count > 80 { shareTitle = String(value.prefix(80)) } }
-                Text(L.t("Saving keeps this island private.", "Al guardar, esta isla queda privada.")).font(.subheadline).foregroundStyle(Theme.muted)
-                Button(L.t("Save name", "Guardar nombre")) {
-                    Task {
-                        if await sync.mutate(.renamePrivate(title: shareTitle)) != nil { shareOpen = false }
-                    }
-                }.buttonStyle(.borderedProminent).disabled(sync.busy)
-                if ownPublic {
-                    Button(L.t("Make private", "Hacer privada"), role: .destructive) { unpublish() }.disabled(sync.busy)
-                }
-                if let error = sync.error { Text(error).font(.footnote).foregroundStyle(Theme.down) }
-                Spacer()
-            }.padding(22).background(Theme.bg.ignoresSafeArea())
-        }
-    }
-
-    private var publicShareSheet: some View {
+    private var shareSheet: some View {
         let share = sync.world?.share
-        return VStack(alignment: .leading, spacing: 14) {
-            Text(share?.public == true ? L.t("Your island is public.", "Tu isla es pública.") : L.t("Share your island.", "Comparte tu isla.")).font(.title2.bold())
-            Text(L.t("A public island shows your pieces and districts to anyone with the link. Your XP, account and readings stay private.", "Una isla pública muestra tus piezas y distritos a quien tenga el enlace. Tu XP, cuenta y lecturas siguen siendo privadas."))
-                .font(.subheadline).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
-            TextField(L.t("Island name (optional)", "Nombre de la isla (opcional)"), text: $shareTitle)
-                .textFieldStyle(.roundedBorder).submitLabel(.done).onChange(of: shareTitle) { _, value in if value.count > 80 { shareTitle = String(value.prefix(80)) } }
-            if share?.public == true, let code = share?.code {
-                ShareLink(item: Self.shareURL(code)) { Label(L.t("Share link", "Compartir enlace"), systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }
-                    .buttonStyle(.borderedProminent).tint(Theme.accent).foregroundStyle(.white)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Button(L.t("Update name", "Actualizar nombre")) { publish() }.disabled(sync.busy)
+                    Text(share?.public == true ? L.t("Your island is public.", "Tu isla es pública.") : L.t("Your island", "Tu isla")).font(.title2.bold())
                     Spacer()
-                    Button(L.t("Make private", "Hacer privada"), role: .destructive) { unpublish() }.disabled(sync.busy)
-                }.font(.system(size: 14)).frame(minHeight: 44)
-            } else {
-                Button { publish() } label: { Label(L.t("Publish island", "Publicar isla"), systemImage: "globe").frame(maxWidth: .infinity, minHeight: 44) }
-                    .buttonStyle(.borderedProminent).tint(Theme.accent).foregroundStyle(.white).disabled(sync.busy || sync.world == nil)
-            }
-            Button {
-                shareOpen = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { openArchipelago() }
-            } label: { Label(L.t("Explore the archipelago", "Explorar el archipiélago"), systemImage: "circle.hexagongrid").frame(maxWidth: .infinity, minHeight: 44) }
-                .foregroundStyle(Theme.accentSoft).accessibilityIdentifier("land-share-archipelago")
-            if let error = sync.error { Text(error).font(.footnote).foregroundStyle(Theme.down) }
-            Spacer(minLength: 0)
-        }.padding(22).background(Theme.bg.ignoresSafeArea()).foregroundStyle(Theme.text).tint(Theme.accentSoft)
+                    Button { shareOpen = false } label: {
+                        Image(systemName: "xmark").frame(width: 44, height: 44)
+                    }.accessibilityLabel(L.t("Close island settings", "Cerrar ajustes de la isla"))
+                        .accessibilityIdentifier("land-share-close")
+                }
+                Text(L.t("Publishing puts your island's name, pieces and districts in the public archipelago and gives you a link to share. Your XP, account and readings stay private.", "Publicar muestra el nombre, las piezas y los distritos de tu isla en el archipiélago público y te da un enlace para compartir. Tu XP, cuenta y lecturas siguen siendo privadas."))
+                    .font(.subheadline).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                TextField(L.t("Island name (optional)", "Nombre de la isla (opcional)"), text: $shareTitle)
+                    .textFieldStyle(.roundedBorder).submitLabel(.done)
+                    .accessibilityIdentifier("land-island-name")
+                    .onChange(of: shareTitle) { _, value in if value.count > 80 { shareTitle = String(value.prefix(80)) } }
+                if share?.public == true, let code = share?.code {
+                    ShareLink(item: Self.shareURL(code)) { Label(L.t("Share link", "Compartir enlace"), systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }
+                        .buttonStyle(.borderedProminent).tint(Theme.accent).foregroundStyle(.white)
+                        .accessibilityIdentifier("land-share-link")
+                    HStack {
+                        Button(L.t("Update name", "Actualizar nombre")) { publish() }.disabled(sync.busy)
+                            .accessibilityIdentifier("land-update-name")
+                        Spacer()
+                        Button(L.t("Make private", "Hacer privada"), role: .destructive) { unpublish() }.disabled(sync.busy)
+                            .accessibilityIdentifier("land-make-private")
+                    }.font(.system(size: 14)).frame(minHeight: 44)
+                } else {
+                    Button(L.t("Save name privately", "Guardar nombre en privado")) {
+                        Task {
+                            if await sync.mutate(.renamePrivate(title: shareTitle.trimmingCharacters(in: .whitespacesAndNewlines))) != nil { shareOpen = false }
+                        }
+                    }.frame(maxWidth: .infinity, minHeight: 44).disabled(sync.busy || sync.world == nil)
+                        .accessibilityIdentifier("land-save-name")
+                    Button { publish() } label: { Label(L.t("Publish island", "Publicar isla"), systemImage: "globe").frame(maxWidth: .infinity, minHeight: 44) }
+                        .buttonStyle(.borderedProminent).tint(Theme.accent).foregroundStyle(.white).disabled(sync.busy || sync.world == nil)
+                        .accessibilityIdentifier("land-publish")
+                }
+                Button {
+                    shareOpen = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { openArchipelago() }
+                } label: { Label(L.t("Explore the archipelago", "Explorar el archipiélago"), systemImage: "circle.hexagongrid").frame(maxWidth: .infinity, minHeight: 44) }
+                    .foregroundStyle(Theme.accentSoft).accessibilityIdentifier("land-share-archipelago")
+                if let error = sync.error { Text(error).font(.footnote).foregroundStyle(Theme.down) }
+            }.padding(22)
+        }.background(Theme.bg.ignoresSafeArea()).foregroundStyle(Theme.text).tint(Theme.accentSoft)
     }
 
     private func publish() {
-        guard publicWorldsEnabled else { return }
         Task {
             guard let world = await sync.mutate(.publish(title: shareTitle.trimmingCharacters(in: .whitespacesAndNewlines))), world.share?.public == true else { return }
             notice = L.t("Your island is public. Share the link.", "Tu isla es pública. Comparte el enlace.")
