@@ -32,7 +32,7 @@ final class ReleaseReadinessTests: XCTestCase {
 
     private func verifyAvatarOnboarding(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-avatar.voiceMuted", "NO", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
+        app.launchArguments = ["-avatar.voiceMuted", "NO", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "4", "-agent.onboarded", "NO"]
         app.launch()
         let next = app.buttons["onboarding-next"]
         XCTAssertTrue(next.waitForExistence(timeout: 15))
@@ -77,7 +77,7 @@ final class ReleaseReadinessTests: XCTestCase {
 
     private func verifyAvatarMute(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-avatar.voiceMuted", "NO", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES"]
+        app.launchArguments = ["-avatar.voiceMuted", "NO", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "4", "-agent.onboarded", "YES"]
         app.launch()
         let toggle = app.buttons["avatar-voice-toggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 15))
@@ -92,7 +92,7 @@ final class ReleaseReadinessTests: XCTestCase {
 
     func testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice() {
         let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES",
+        app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "4", "-agent.onboarded", "YES",
                                "-companion.id", "byte", "-companion.disciplineXP", "1000", "-avatar.voiceMuted", "NO"]
         app.launch()
         let portrait = app.buttons["squad-portrait"]
@@ -121,7 +121,7 @@ final class ReleaseReadinessTests: XCTestCase {
 
     private func verifyPersistentMute(spanish: Bool) {
         let app = XCUIApplication()
-        let language = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3"]
+        let language = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "4"]
         let muted = spanish ? "Activar voz del avatar" : "Enable avatar voice"
         let audible = spanish ? "Silenciar voz del avatar" : "Mute avatar voice"
         app.launchArguments = language + ["-agent.onboarded", "NO", "-avatar.voiceMuted", "NO"]

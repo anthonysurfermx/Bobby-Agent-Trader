@@ -6,7 +6,7 @@ import SwiftUI
 
 enum RiskNotice {
     /// Bump when the wording changes materially; users re-acknowledge.
-    static let currentVersion = 3
+    static let currentVersion = 4
 }
 
 struct RiskNoticeView: View {
@@ -22,7 +22,7 @@ struct RiskNoticeView: View {
     private var statements: [(title: String, body: String)] {
         [
             (L.t("Allow AI processing of my questions.", "Permito que la IA procese mis preguntas."),
-             L.t("Bobby sends your typed question and public market data to OpenAI to generate the analysis. Avoid including personal or financial account details.", "Bobby envía tu pregunta escrita y datos públicos de mercado a OpenAI para generar el análisis. Evita incluir datos personales o de tus cuentas financieras.")),
+             L.t("Bobby sends your question and market data to OpenAI. When voice is on, reply text goes to OpenAI or Microsoft to create speech. Avoid personal or account details.", "Bobby envía tu pregunta y datos de mercado a OpenAI. Con voz activa, envía el texto de respuesta a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas.")),
             (L.t("Not investment advice.", "No es asesoría de inversión."),
              L.t("Verdicts, levels and stops are educational analysis made by software, not recommendations for you.",
                  "Veredictos, niveles y stops son análisis educativo hecho por un programa, no recomendaciones para ti.")),

@@ -303,6 +303,8 @@ final class TraderLandSync: ObservableObject {
 
     init(transport: URLSession = .shared) { self.transport = transport }
 
+    func clearError() { error = nil }
+
     func reset() {
         generation = UUID(); ownerID = nil; world = nil; error = nil; busy = false
 #if DEBUG
@@ -347,6 +349,12 @@ final class TraderLandSync: ObservableObject {
     /// What the player reads when the server refuses a request. Known refusals match exact server strings.
     nonisolated static func failure(status: Int, serverError: String?) -> String {
         switch (status, serverError ?? "") {
+        case (422, "Choose a respectful island name without links or contact details."):
+            return L.t("Choose a respectful name without links or contact details.", "Elige un nombre respetuoso, sin enlaces ni datos de contacto.")
+        case (503, "Name review is temporarily unavailable. Try again."):
+            return L.t("Name review is unavailable. Try again shortly.", "La revisión del nombre no está disponible. Inténtalo en un momento.")
+        case (403, "Publishing is restricted. Contact Bobby support."):
+            return L.t("Publishing is restricted. Contact Bobby support.", "La publicación está restringida. Contacta a soporte de Bobby.")
         case (409, "This piece already bloomed"):
             return L.t("This piece already bloomed. Reload your island.", "Esta pieza ya floreció. Recarga tu isla.")
         case (409, "The market has not had time to answer yet"):

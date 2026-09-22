@@ -38,7 +38,7 @@ final class StoreShots: XCTestCase {
         // The four-acknowledgement risk/AI notice (v3) is covered by
         // ReleaseReadinessTests; this rig starts right after it.
         app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
-                               "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
+                               "-agent.riskNoticeVersion", "4", "-agent.onboarded", "NO"]
         app.launch()
 
         // 01 — choose your companion (3D stage + roster)

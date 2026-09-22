@@ -38,6 +38,8 @@ import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { ISLAND_CHANGED, THESIS_REVIEW_HOURS, catalog, cleanTitle, closeSeed, drawnSize, ensureLand, extendSeed, growLand, growthClient, landView, moveCore, movePiece, newShareCode, nextPieces, pieceSummary, placePiece, removePiece, seasonProgress, seedHorizon, seedReviews, wakeCore, type Grew } from './_lib/trader-land.js';
 import { CORE_CELLS, LEGACY_LAND_SIZE, TIER_FOOTPRINT, TIER_HOURS, TIER_ORDER, WAKE_PIECES, coreCellKeys, heldByTier, pieceCells, tierSequence } from './_lib/trader-land-growth.js';
 import { requireIdentity, type Identity } from './_lib/user-identity.js';
+import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
+import { publishReviewedIsland, reviewIslandTitle } from './_lib/trader-land-moderation.js';
 import { guardWrite } from './_lib/write-guard.js';
 
 export const config = { maxDuration: 15 };
@@ -123,7 +125,7 @@ async function world(identity: Identity, headers?: VercelRequest['headers']) {
     placements,
     catalog: items,
     capabilities: { move: true, close: true, extend: true, moveCore: true, grow: true },
-    share: { public: land.visibility === 'public', code: land.share_code, title: land.title, publishedAt: land.published_at },
+    share: { public: land.visibility === 'public' && land.moderation_status === 'approved' && !land.community_blocked, code: land.share_code, title: land.title, publishedAt: land.published_at },
   };
 }
 
@@ -161,7 +163,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await ensureLand(identity.id);
       const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identity.id}`), {
         method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }),
-        body: JSON.stringify({ title: cleanTitle(body.title), visibility: 'private' }),
+        body: JSON.stringify({ title: cleanTitle(body.title), visibility: 'private', moderation_status: 'pending' }),
       });
       if (!r.ok || !((await r.json()) as unknown[]).length) return res.status(502).json({ error: 'Could not save the island name' });
       return res.status(200).json({ ok: true, ...(await world(identity, req.headers)) });
@@ -173,15 +175,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (body.action === 'publish') {
       const land = await ensureLand(identity.id);
+      if (land.community_blocked) return res.status(403).json({ error: 'Publishing is restricted. Contact Bobby support.', code: 'community_blocked' });
+      if ((await checkPersistentLimit('trader-land-publish', identity.id, 10, 3600)).limited) return res.status(429).json({ error: 'Too many publication requests. Try later.' });
       const title = body.title === undefined ? land.title : cleanTitle(body.title);
-      // The share code is minted once and survives unpublish/republish, so a
-      // link that was already shared keeps working when the island comes back.
+      const review = await reviewIslandTitle(title);
+      if (review === 'rejected') return res.status(422).json({ error: 'Choose a respectful island name without links or contact details.', code: 'title_rejected' });
+      if (review === 'unavailable') return res.status(503).json({ error: 'Name review is temporarily unavailable. Try again.', code: 'review_unavailable' });
       for (let attempt = 0; attempt < 3; attempt += 1) {
-        const code = land.share_code ?? newShareCode();
-        const r = await fetch(bobbyRest(`tl_lands?identity_id=eq.${identity.id}`), { method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }), body: JSON.stringify({ visibility: 'public', share_code: code, title, published_at: new Date().toISOString() }) });
-        if (r.status === 409 && !land.share_code) continue; // another land drew the same code
-        if (!r.ok || !((await r.json()) as unknown[]).length) return res.status(502).json({ error: 'Could not publish the island' });
-        return res.status(200).json({ ok: true, published: code, ...(await world(identity, req.headers)) });
+        const result = await publishReviewedIsland(identity.id, land.share_code ?? newShareCode(), title);
+        if (result.error === 'code_conflict' && !land.share_code) continue;
+        if (result.error === 'community_blocked') return res.status(403).json({ error: 'Publishing is restricted. Contact Bobby support.', code: 'community_blocked' });
+        if (!result.ok) return res.status(502).json({ error: 'Could not publish the island' });
+        return res.status(200).json({ ok: true, published: result.code, ...(await world(identity, req.headers)) });
       }
       return res.status(502).json({ error: 'Could not publish the island' });
     }

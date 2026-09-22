@@ -81,8 +81,8 @@ export async function heldPieces(identityId: string): Promise<Record<Tier, numbe
   return heldByTier(rows.map((row) => ({ source: row.source, tier: row.tl_items?.tier ?? null })));
 }
 
-export interface Land { size: number; theme: string; visibility: 'private' | 'public'; share_code: string | null; title: string | null; published_at: string | null; core_x: number; core_y: number; core_stage: number }
-const LAND_COLUMNS = 'size,theme,visibility,share_code,title,published_at,core_x,core_y,core_stage';
+export interface Land { size: number; theme: string; visibility: 'private' | 'public'; share_code: string | null; title: string | null; published_at: string | null; core_x: number; core_y: number; core_stage: number; moderation_status?: string; community_blocked?: boolean }
+const LAND_COLUMNS = 'size,theme,visibility,share_code,title,published_at,core_x,core_y,core_stage,moderation_status,community_blocked';
 
 /** The land as clients read it: the stored fields plus the core and how far the island is from growing. */
 export interface LandView { size: number; theme: string; visibility: 'private' | 'public'; share_code: string | null; title: string | null; published_at: string | null; core: Core; growth: Growth }

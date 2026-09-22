@@ -24,6 +24,7 @@ const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExper
 // /app-v1 keeps the previous landing, and direction B stays a candidate at /app-b.
 const BobbyAppLandingA = lazyWithRetry(() => import('@/pages/BobbyAppLandingA'), 'app-landing-a');
 const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'), 'app-landing-b');
+const BobbySupportPage = lazy(() => import('@/pages/BobbySupportPage'));
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
@@ -336,6 +337,10 @@ const router = createBrowserRouter(
               <BobbyAppLandingB />
             </Suspense>
           ),
+        },
+        {
+          path: 'support',
+          element: (<Suspense fallback={<PageLoader />}><BobbySupportPage /></Suspense>),
         },
         {
           path: 'privacy',

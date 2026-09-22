@@ -43,7 +43,7 @@ function artDataUri(url: string): string | null {
 }
 
 async function publicIsland(code: string): Promise<CardIsland | null> {
-  const r = await fetch(bobbyRest(`tl_lands?share_code=eq.${code}&visibility=eq.public&select=${PUBLIC_LAND_COLUMNS}&limit=1`), { headers: bobbyServiceHeaders() });
+  const r = await fetch(bobbyRest(`tl_lands?share_code=eq.${code}&visibility=eq.public&moderation_status=eq.approved&community_blocked=eq.false&select=${PUBLIC_LAND_COLUMNS}&limit=1`), { headers: bobbyServiceHeaders() });
   if (!r.ok) throw new Error(`Land read failed (${r.status})`);
   const row = ((await r.json()) as PublicLandRow[])[0];
   if (!row) return null;
@@ -85,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const png = Buffer.from(await image.arrayBuffer());
       res.setHeader('Content-Type', 'image/png');
       // The URL carries a version of the island, so a changed island is a new URL.
-      res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=604800, stale-while-revalidate=86400');
+      res.setHeader('Cache-Control', 'no-store');
       return res.status(200).send(png);
     } catch (error) {
       console.error('[trader-land-share] image', error);
@@ -108,14 +108,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const island = await publicIsland(code);
     if (!island) {
-      res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=30');
+      res.setHeader('Cache-Control', 'no-store');
       return res.status(200).send(shell);
     }
     const items = manifestItems();
     const copy = cardCopy(island, islandStats(island, items), lang);
     const url = `${SITE}${VISIT_PATH}${code}`;
     const image = `${originOf(req)}/api/trader-land-share?code=${code}&img=1&lang=${lang}&v=${cardVersion(island, sha)}`;
-    res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(withIslandMeta(shell, { title: copy.title, description: copy.description, url, image, alt: copy.alt, locale: lang === 'es' ? 'es_MX' : 'en_US' }));
   } catch (error) {
     // The visitor still gets the app; only the preview falls back to Bobby's.

@@ -1,0 +1,97 @@
+{
+  "capture": "Unretouched XCTest screenshots, iPhone 17 Pro Max / iOS 26.1; final verified UI run",
+  "sourceResultBundle": "output/app-store-ready-35/store-and-community-verified.xcresult",
+  "count": 10,
+  "files": [
+    {
+      "file": "en-US/store35-01-companion.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "39e8286ad0d634b9d960cb9d0bdb5482617915a06daf68874bed69d98a634c26",
+      "test": "Store35Shots/testEnglishScreenshots()",
+      "original": "4E734D8D-261C-4A3A-9A04-CB18404F15B8.png"
+    },
+    {
+      "file": "en-US/store35-02-style.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "687641ae9ded5828e0e272a3d98be25104bc4729b43950038d98117d09cbe9c0",
+      "test": "Store35Shots/testEnglishScreenshots()",
+      "original": "40786013-B991-48A1-A93A-D9AD3E1AC93B.png"
+    },
+    {
+      "file": "en-US/store35-03-squad.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "5f1b40446351f5b9d42107d4cfe07a2f0542460262c728c901849dbb4c3a1993",
+      "test": "Store35Shots/testEnglishScreenshots()",
+      "original": "80C58551-E1C4-44CA-B0BD-847ED5DD0EB6.png"
+    },
+    {
+      "file": "en-US/store35-04-analysis.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "270939c5d089f8bfcf27e48b54893cb7fa807ef4c4d82c30d48b22f43c532398",
+      "test": "Store35Shots/testEnglishScreenshots()",
+      "original": "1D1E8300-3853-4C3D-B8AD-96F0E2F5A72F.png"
+    },
+    {
+      "file": "en-US/store35-05-traderland.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "711ca33f2cd72bc9247886b28841a6b96f8823b3e510a3a1f26b3a8cb6b38c64",
+      "test": "Store35Shots/testEnglishScreenshots()",
+      "original": "3D1CF81E-EE7B-4223-8F78-E496B5825510.png"
+    },
+    {
+      "file": "es-MX/store35-01-companion.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "00922365f9e06eacbc8699298725103f63c249826e04de83712919faf15359ad",
+      "test": "Store35Shots/testSpanishScreenshots()",
+      "original": "E4977099-C17A-4615-85E6-EA37B9ECF2BA.png"
+    },
+    {
+      "file": "es-MX/store35-02-style.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "fce85ebb424b1e4d275e7ac69ddca6f09dcdec4c8287ef0a0948432e28b47c8a",
+      "test": "Store35Shots/testSpanishScreenshots()",
+      "original": "68C08FBC-AC5D-41E0-8CC9-C681F0602ECF.png"
+    },
+    {
+      "file": "es-MX/store35-03-squad.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "504edaf604ade4974017301cfcea512d1c8e41c2d29d8e544373d33ce2a15c99",
+      "test": "Store35Shots/testSpanishScreenshots()",
+      "original": "22A8A4EA-96DA-4E3C-82E7-90BB0D48F54A.png"
+    },
+    {
+      "file": "es-MX/store35-04-analysis.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "8f15f0e619e049209d2641788f20602c61b0b5b4e13a258660102103739e46c7",
+      "test": "Store35Shots/testSpanishScreenshots()",
+      "original": "B77ECDAE-8D57-4183-8CFD-641F19CF68C2.png"
+    },
+    {
+      "file": "es-MX/store35-05-traderland.png",
+      "width": 1320,
+      "height": 2868,
+      "pngColorType": 2,
+      "sha256": "be2c35297ffc191af50314bcc37271da92dce5ac5afc2eff70e4305197ecc9a5",
+      "test": "Store35Shots/testSpanishScreenshots()",
+      "original": "876CCCB4-9A4D-457D-833B-529A193E4ED1.png"
+    }
+  ]
+}

@@ -23,16 +23,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const items = await catalog();
     if (!items.length) throw new Error('Catalog unavailable');
     const byId = new Map(items.map((item) => [item.id, item]));
-    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=300');
+    res.setHeader('Cache-Control', 'no-store');
     if (code) {
-      const r = await fetch(bobbyRest(`tl_lands?share_code=eq.${code}&visibility=eq.public&select=${PUBLIC_LAND_COLUMNS}&limit=1`), { headers: bobbyServiceHeaders() });
+      const r = await fetch(bobbyRest(`tl_lands?share_code=eq.${code}&visibility=eq.public&moderation_status=eq.approved&community_blocked=eq.false&select=${PUBLIC_LAND_COLUMNS}&limit=1`), { headers: bobbyServiceHeaders() });
       if (!r.ok) throw new Error('Land read failed');
       const row = ((await r.json()) as PublicLandRow[])[0];
       if (!row) return res.status(404).json({ error: 'This island is not published' });
       const placements = (await placementsFor([row.identity_id])).get(row.identity_id) ?? [];
       return res.status(200).json({ ok: true, world: publicWorld(row, placements, byId), catalog: items });
     }
-    const r = await fetch(bobbyRest(`tl_lands?visibility=eq.public&share_code=not.is.null&order=published_at.desc.nullslast&limit=${GALLERY_LIMIT}&select=${PUBLIC_LAND_COLUMNS}`), { headers: bobbyServiceHeaders() });
+    const r = await fetch(bobbyRest(`tl_lands?visibility=eq.public&moderation_status=eq.approved&community_blocked=eq.false&share_code=not.is.null&order=published_at.desc.nullslast&limit=${GALLERY_LIMIT}&select=${PUBLIC_LAND_COLUMNS}`), { headers: bobbyServiceHeaders() });
     if (!r.ok) throw new Error('Gallery read failed');
     const rows = (await r.json()) as PublicLandRow[];
     const placements = await placementsFor(rows.map((row) => row.identity_id));

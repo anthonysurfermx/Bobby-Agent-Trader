@@ -24,6 +24,8 @@
     "test:trader-land-thesis": "tsx scripts/test-trader-land-thesis.mts",
     "test:trader-land-web": "node scripts/test-trader-land-gestures.mjs && tsx scripts/test-trader-land-growth.tsx && tsx scripts/test-trader-land-studio.mts",
     "test:trader-land-share": "tsx scripts/test-trader-land-share.mts",
+    "test:trader-land-moderation": "tsx scripts/test-trader-land-moderation.mts",
+    "test:trader-land-moderation-pg": "tsx scripts/test-trader-land-moderation-pg.mts",
     "test:trader-land-api": "tsx scripts/test-trader-land-api.mts",
     "test:trackrecord-v2": "tsx scripts/test-trackrecord-v2-lib.mts",
     "test:e2e:trackrecord-v2": "tsx scripts/e2e-trackrecord-v2.mts",

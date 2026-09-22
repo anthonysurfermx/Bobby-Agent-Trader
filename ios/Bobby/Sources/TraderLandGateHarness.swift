@@ -486,6 +486,8 @@ struct TraderLandGateHarnessView: View {
     @StateObject private var sound = LandSound()
     @StateObject private var sync = TraderLandSync()
     @StateObject private var neighbors = TraderLandNeighbors()
+    @StateObject private var communitySafety = LandCommunitySafety()
+    @State private var communityOpen = false
     @ObservedObject private var account = AccountSession.shared
     @State private var remoteUndo: TraderLandMutation?
     @State private var shareOpen = false
@@ -546,7 +548,7 @@ struct TraderLandGateHarnessView: View {
     }
     private var ownPublic: Bool { accountIsland && sync.world?.share?.public == true }
     private var publicNeighbors: [PublicIsland] {
-        return TraderLandShowcase.neighbors(among: fixtureIslands ?? neighbors.islands, excluding: ownCode)
+        return TraderLandShowcase.neighbors(among: fixtureIslands ?? neighbors.islands, excluding: ownCode).filter(communitySafety.allows)
     }
     private var neighborsReady: Bool { fixtureIslands != nil || neighbors.loaded }
     private func availableInventory(_ itemID: String) -> TraderLandWorld.Inventory? {
@@ -665,6 +667,9 @@ struct TraderLandGateHarnessView: View {
             .onChange(of: neighborsReady) { _, _ in rebuildScene() }
             .onChange(of: archipelagoMode) { _, active in
                 withAnimation(.easeInOut(duration: 0.25)) { archipelagoChrome(active) }
+            }
+            .sheet(isPresented: $communityOpen) {
+                LandCommunitySheet(island: visited.flatMap { scene.islands.indices.contains($0) ? scene.islands[$0].info : nil }, safety: communitySafety)
             }
             .sheet(isPresented: $help) {
                 helpSheet.presentationDetents([.fraction(0.72), .large]).presentationDragIndicator(.visible).presentationBackground(Theme.bg)
@@ -1414,6 +1419,10 @@ struct TraderLandGateHarnessView: View {
                     arrow("chevron.right", label: L.t("Next island", "Siguiente isla"), id: "land-next-island") { step(1) }
                 }
             }
+            Button { communityOpen = true } label: {
+                Label(current != nil && current?.isShowcase != true ? L.t("Report or block creator", "Reportar o bloquear creador") : L.t("Community safety", "Seguridad de la comunidad"), systemImage: "hand.raised")
+                    .font(.system(size: 12)).frame(maxWidth: .infinity, minHeight: 44)
+            }.accessibilityIdentifier("land-community-safety")
             if ownPublic {
                 Label(L.t("Your island is on the map.", "Tu isla está en el mapa."), systemImage: "globe").font(.system(size: 12)).foregroundStyle(Theme.accentSoft)
             } else if publishHint {
@@ -1695,10 +1704,13 @@ struct TraderLandGateHarnessView: View {
                 }
                 Text(L.t("Publishing puts your island's name, pieces and districts in the public archipelago and gives you a link to share. Your XP, account and readings stay private.", "Publicar muestra el nombre, las piezas y los distritos de tu isla en el archipiélago público y te da un enlace para compartir. Tu XP, cuenta y lecturas siguen siendo privadas."))
                     .font(.subheadline).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                Text(L.t("By publishing, you allow OpenAI to check the island name for abusive content. Keep names respectful and omit personal information. Report or block creators from the archipelago.", "Al publicar, autorizas que OpenAI revise el nombre para detectar contenido abusivo. Usa nombres respetuosos y sin datos personales. Puedes reportar o bloquear creadores desde el archipiélago."))
+                    .font(.footnote).foregroundStyle(Theme.muted)
+                Link(L.t("Community rules and support", "Reglas de la comunidad y soporte"), destination: URL(string: "https://bobbyprotocol.xyz/support")!)
                 TextField(L.t("Island name (optional)", "Nombre de la isla (opcional)"), text: $shareTitle)
                     .textFieldStyle(.roundedBorder).submitLabel(.done)
                     .accessibilityIdentifier("land-island-name")
-                    .onChange(of: shareTitle) { _, value in if value.count > 80 { shareTitle = String(value.prefix(80)) } }
+                    .onChange(of: shareTitle) { _, value in sync.clearError(); if value.count > 80 { shareTitle = String(value.prefix(80)) } }
                 if share?.public == true, let code = share?.code {
                     ShareLink(item: Self.shareURL(code)) { Label(L.t("Share link", "Compartir enlace"), systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44) }
                         .buttonStyle(.borderedProminent).tint(Theme.accent).foregroundStyle(.white)

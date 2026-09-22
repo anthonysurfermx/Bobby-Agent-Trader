@@ -1,0 +1,21 @@
+Bobby 1.2 (build 35) is a native SwiftUI app for educational market analysis. Users type questions and receive three AI perspectives, charts and optional avatar narration. It does not execute trades, connect wallets, custody assets, request microphone access or record audio.
+
+Review path without an account:
+1. On first launch, acknowledge the notices explaining OpenAI analysis and optional speech generation by OpenAI or Microsoft, plus the educational scope and market risk.
+2. Complete all three onboarding steps: companion, aura machine and style (Chill, Direct or Pro). The speaker control mutes narration immediately and remembers the preference across relaunches.
+3. Type "What supports and weakens the case for Bitcoin?" or "What supports and weakens the case for NVIDIA?". Alpha Hunter builds the case, Red Team challenges it and CIO weighs both. The chart and analysis show their source, instrument, timeframe and timestamp. A NO TRADE / wait conclusion is valid.
+4. Open the Squad gallery to choose another companion and preview its voice. The same narration mute applies to onboarding, the desk and this gallery.
+5. Open Trader Land from the desk. Zoom out below 60% or tap the archipelago button. Visit islands using the arrows, and choose "Back to my island" to return. "Satoshi Nakamoto" is a permanent, clearly labeled Bobby showcase, available offline; it is not a user account. Visits give no XP.
+
+Account and public islands:
+6. Choose "Save progress" in the desk menu and use Sign in with Apple. It is the only sign-in provider in the iPhone app and requests no name or email. An account is optional for market analysis and practice-island exploration.
+7. Account reads sync progress and grow the account island. In island settings, save a name privately or choose "Publish island". The sheet explains what becomes public and asks the user to authorize OpenAI moderation of the island name by choosing Publish. Rejected names are not published. A failed moderation request does not approve the name. Names can be updated, links shared, and the island made private again.
+8. On a community island, open "Report or block creator". A report with reason and optional details enters a private operator review queue; the app only confirms receipt after a successful server acknowledgement. "Block creator" hides that creator's stable island code on this device, including after renaming or republishing. "Community safety" lists blocks and supports unblocking. The bundled showcase is identified separately.
+9. Help and support is available from the desk and community safety. Community rules prohibit hate, sexual content, threats, harassment, impersonation, scams and spam. Operators can withdraw islands and restrict publishing; the restriction is enforced by the server.
+
+Account deletion:
+10. Desk menu > "Delete account", or account sheet > "Delete account and synced progress", then "Delete account permanently". The app deletes the account, synced progress and Trader Land. When Apple revocation is configured and a fresh authorization is required, it presents Sign in with Apple before deletion. If automatic revocation is unavailable, the confirmation supplies Apple's manual disconnection steps; deployment must configure automatic Apple revocation before submission.
+
+Privacy: https://bobbyprotocol.xyz/privacy?lang=en (Spanish: ?lang=es).
+Support and community rules: https://bobbyprotocol.xyz/support?lang=en (Spanish: ?lang=es).
+No purchases, subscriptions, wallet, swaps, microphone input or voice calls are offered in this iPhone build. Spoken replies are optional output; bundled introductions/style samples require no network. Public content and speech processing are described in the updated privacy policy. App Privacy declares account-linked progress/content and a device-linked installation identifier used only to deduplicate abuse reports, with no advertising tracking.

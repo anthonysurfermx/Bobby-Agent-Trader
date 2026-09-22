@@ -705,7 +705,9 @@ struct ContentView: View {
         VStack(spacing: 0) {
             deskHeader
             ScrollView {
-                LazyVStack(spacing: 12) {
+                // This bounded set of cards needs stable heights while scrolling.
+                // Lazy height estimation can loop on long translated debate text.
+                VStack(spacing: 12) {
                     // Your companion never leaves the stage; a NO TRADE lands under it.
                     liveConsole
                     if let moment = vm.noTradeMoment {
@@ -811,6 +813,9 @@ struct ContentView: View {
                     }
                     Button { showRiskNotice = true } label: {
                         Label(L.t("Risk notice", "Aviso de riesgo"), systemImage: "exclamationmark.triangle")
+                    }
+                    Link(destination: URL(string: "https://bobbyprotocol.xyz/support")!) {
+                        Label(L.t("Help and support", "Ayuda y soporte"), systemImage: "questionmark.circle")
                     }
                     Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
                         Label(L.t("Privacy Policy", "Aviso de privacidad"), systemImage: "hand.raised")
@@ -1418,7 +1423,7 @@ struct ContentView: View {
                 .autocorrectionDisabled(true)
                 .textInputAutocapitalization(.never)
                 .submitLabel(.send)
-                .onSubmit { vm.ask() }
+                .onSubmit { focused = false; vm.ask() }
                 .accessibilityLabel(L.t("Ask your companion", "Pregúntale a tu amigo"))
                 .accessibilityIdentifier("ask-field")
                 .padding(.horizontal, 14)
@@ -1429,6 +1434,7 @@ struct ContentView: View {
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                focused = false
                 vm.ask()
             } label: {
                 Image(systemName: "arrow.up")

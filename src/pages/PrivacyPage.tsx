@@ -1,11 +1,9 @@
 // Privacy policy for the Bobby iPhone app and bobbyprotocol.xyz.
 // Linked from App Store Connect and from the app — every claim here must stay
 // true to the code. The per-data-type mapping lives in
-// docs/app-store/build-34/APP-PRIVACY-ANSWERS.md; keep both in step.
-// Scope rule: the iPhone app (1.2) is text-only analysis with an optional
-// Sign in with Apple account. Anything else (wallets and wallet accounts,
-// swaps, voice, Google sign-in, the website's Apple sign-in with name and
-// email, public islands) is labelled website-only or earlier-iPhone-only.
+// docs/app-store/build-35/APP-PRIVACY-ANSWERS.md; keep both in step.
+// Scope: iOS supports typed analysis, optional avatar narration and public islands.
+// Microphone input, wallet connections and swaps remain website-only.
 // Account deletion copy must hold with or without the APPLE_SIGN_IN_* keys:
 // without them the app skips Apple's sheet and shows the manual steps.
 // Update EFFECTIVE_DATE whenever the substance changes.
@@ -15,7 +13,7 @@ import type { ReactNode } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { lang, type Lang } from '@/lib/companions/i18n';
 
-const EFFECTIVE_DATE: Record<Lang, string> = { en: 'September 19, 2026', es: '19 de septiembre de 2026' };
+const EFFECTIVE_DATE: Record<Lang, string> = { en: 'September 22, 2026', es: '22 de septiembre de 2026' };
 const REPO_URL = 'https://github.com/anthonysurfermx/Bobby-Agent-Trader';
 const APPLE_STOP_USING_URL = 'https://support.apple.com/en-us/102571';
 
@@ -57,8 +55,8 @@ export default function PrivacyPage() {
         <meta
           name="description"
           content={tr(
-            'Privacy policy for the Bobby iPhone app and bobbyprotocol.xyz: text-only analysis on iPhone, an optional Sign in with Apple account that syncs progress and Trader Land, no ads and no tracking.',
-            'Aviso de privacidad de la app Bobby para iPhone y de bobbyprotocol.xyz: análisis solo por texto en iPhone, cuenta opcional con Iniciar sesión con Apple para sincronizar tu progreso y Trader Land, sin anuncios y sin rastreo.',
+            'Privacy policy for the Bobby iPhone app and bobbyprotocol.xyz: market analysis and optional narration on iPhone, an optional Sign in with Apple account that syncs progress and Trader Land, no ads and no tracking.',
+            'Aviso de privacidad de la app Bobby para iPhone y de bobbyprotocol.xyz: análisis de mercado y narración opcional en iPhone, cuenta opcional con Iniciar sesión con Apple para sincronizar tu progreso y Trader Land, sin anuncios y sin rastreo.',
           )}
         />
       </Helmet>
@@ -89,8 +87,8 @@ export default function PrivacyPage() {
           </p>
           <p>
             {tr(
-              'The iPhone app (version 1.2) is text-only market analysis. It does not connect wallets, prepare or execute swaps, request microphone access, record audio, recognize speech, or play spoken replies. An optional account, created with Sign in with Apple, syncs your progress and your Trader Land island.',
-              'La app para iPhone (versión 1.2) ofrece análisis de mercado solo por texto. No conecta wallets, no prepara ni ejecuta swaps, no pide acceso al micrófono, no graba audio, no reconoce voz y no reproduce respuestas habladas. Una cuenta opcional, creada con Iniciar sesión con Apple, sincroniza tu progreso y tu isla de Trader Land.',
+              'The iPhone app (version 1.2, build 35 onward) offers typed market analysis, optional avatar narration and Trader Land exploration. It does not connect wallets, execute swaps, request microphone access or record your voice. An optional Sign in with Apple account syncs progress and lets you publish your island.',
+              'La app para iPhone (versión 1.2, build 35 en adelante) ofrece análisis por escrito, narración opcional y exploración de Trader Land. No conecta wallets, no ejecuta swaps, no pide micrófono ni graba tu voz. Una cuenta opcional con Iniciar sesión con Apple sincroniza el progreso y permite publicar tu isla.',
             )}
           </p>
           <p>
@@ -134,12 +132,12 @@ export default function PrivacyPage() {
                 'Por cada lectura que sembró una pieza en Trader Land: el activo, la dirección del análisis de Bobby (alcista, bajista o ninguna), sus niveles de precio, entrada, stop y objetivo, y el resultado cuando esa lectura se revisa contra el mercado.',
               )}
             </li>
-            <li>{tr('Your island’s layout and its private name.', 'La distribución de tu isla y su nombre privado.')}</li>
+            <li>{tr('Your island’s layout, name and chosen visibility.', 'La distribución, el nombre y la visibilidad elegida de tu isla.')}</li>
           </ul>
           <p>
             {tr(
-              'We use this data only to run the product: to keep your progress through reinstalls and across your devices, including bobbyprotocol.xyz if you sign in there with the same Apple ID. In the iPhone app your island stays private; the app does not publish it.',
-              'Usamos estos datos solo para que el producto funcione: para conservar tu progreso si reinstalas la app y en todos tus dispositivos, incluido bobbyprotocol.xyz si ahí entras con el mismo Apple ID. En la app para iPhone tu isla es privada; la app no la publica.',
+              'We use this data only to run the product: to keep your progress through reinstalls and across your devices, including bobbyprotocol.xyz if you sign in there with the same Apple ID. Your island is private until you explicitly publish it. Publishing shares only its name, layout and districts.',
+              'Usamos estos datos solo para que el producto funcione: para conservar tu progreso si reinstalas la app y en todos tus dispositivos, incluido bobbyprotocol.xyz si ahí entras con el mismo Apple ID. Tu isla es privada hasta que eliges publicarla. Publicar comparte solo su nombre, distribución y distritos.',
             )}
           </p>
         </Section>
@@ -244,16 +242,8 @@ export default function PrivacyPage() {
             <Scope>{tr('Website', 'Sitio web')}</Scope>
             {strong(tr('Live voice. ', 'Voz en vivo. '))}
             {tr(
-              'Bobby for iPhone 1.2 does not request microphone access, record audio, or play spoken replies. On the website, microphone access is optional and requested when you start voice. Live voice streams your audio directly to OpenAI to understand your question and generate spoken replies; the session also receives your selected voice, asset, timeframe, and relevant market context. Spoken replies can also be generated by ElevenLabs or Microsoft speech services. Bobby does not store raw audio recordings on its servers; providers keep data under their own terms. Live voice requires an account: we store account-linked session timing to enforce a 3-minute daily allowance that resets at 00:00 UTC. Time counts while the call is open, including muted time.',
-              'Bobby para iPhone 1.2 no pide acceso al micrófono, no graba audio y no reproduce respuestas habladas. En el sitio web, el acceso al micrófono es opcional y se pide cuando inicias la voz. La voz en vivo envía tu audio directamente a OpenAI para entender tu pregunta y generar respuestas habladas; la sesión también recibe la voz que elegiste, el activo, el plazo y el contexto de mercado relevante. Las respuestas habladas también pueden generarse con los servicios de voz de ElevenLabs o Microsoft. Bobby no guarda grabaciones de audio en sus servidores; los proveedores conservan los datos según sus propios términos. La voz en vivo requiere cuenta: guardamos la duración de las sesiones, vinculada a tu cuenta, para aplicar un límite diario de 3 minutos que se reinicia a las 00:00 UTC. El tiempo cuenta mientras la llamada está abierta, aunque tengas el micrófono silenciado.',
-            )}
-          </p>
-          <p>
-            <Scope>{tr('Website', 'Sitio web')}</Scope>
-            {strong(tr('Public islands. ', 'Islas públicas. '))}
-            {tr(
-              'If you publish your Trader Land island on the website, its name and layout are visible to anyone in the public gallery until you make it private again, which you can also do from the iPhone app.',
-              'Si publicas tu isla de Trader Land en el sitio web, cualquier persona puede ver su nombre y su distribución en la galería pública hasta que la vuelvas privada, algo que también puedes hacer desde la app para iPhone.',
+              'The current iPhone app does not request microphone access or record audio; it can narrate replies as explained below. On the website, microphone access is optional and requested when you start voice. Live voice streams your audio directly to OpenAI to understand your question and generate spoken replies; the session also receives your selected voice, asset, timeframe, and relevant market context. Spoken replies can also be generated by ElevenLabs or Microsoft speech services. Bobby does not store raw audio recordings on its servers; providers keep data under their own terms. Live voice requires an account: we store account-linked session timing to enforce a 3-minute daily allowance that resets at 00:00 UTC. Time counts while the call is open, including muted time.',
+              'La app actual para iPhone no pide micrófono ni graba audio; puede narrar respuestas como se explica abajo. En el sitio web, el acceso al micrófono es opcional y se pide cuando inicias la voz. La voz en vivo envía tu audio directamente a OpenAI para entender tu pregunta y generar respuestas habladas; la sesión también recibe la voz que elegiste, el activo, el plazo y el contexto de mercado relevante. Las respuestas habladas también pueden generarse con los servicios de voz de ElevenLabs o Microsoft. Bobby no guarda grabaciones de audio en sus servidores; los proveedores conservan los datos según sus propios términos. La voz en vivo requiere cuenta: guardamos la duración de las sesiones, vinculada a tu cuenta, para aplicar un límite diario de 3 minutos que se reinicia a las 00:00 UTC. El tiempo cuenta mientras la llamada está abierta, aunque tengas el micrófono silenciado.',
             )}
           </p>
           <p>
@@ -274,11 +264,24 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title={tr('Avatar narration and community safety', 'Narración y seguridad de la comunidad')}>
+          <p>
+            {strong(tr('Public islands. ', 'Islas públicas. '))}
+            {tr(
+              'If you publish from iPhone or the website, its name and layout become visible in the public gallery and shared links until you make it private. Before publishing, the name is sent to OpenAI for content moderation. Your account ID, XP and readings are not published. Third parties may keep copies of previously shared previews.',
+              'Si publicas desde iPhone o el sitio web, su nombre y distribución serán visibles en la galería y enlaces compartidos hasta que la vuelvas privada. Antes de publicar, enviamos el nombre a OpenAI para moderarlo. No publicamos tu identificador de cuenta, XP ni lecturas. Terceros pueden conservar copias de vistas previas ya compartidas.',
+            )}
+          </p>
+          <p>{tr('Avatar introductions and style previews are bundled recordings and play without sending text to a provider. With voice enabled, dynamic reply text, language, avatar voice and style are sent to our speech endpoint and then OpenAI or Microsoft to generate audio. No Bobby account token or microphone audio accompanies that request. Muting stops narration and new speech requests, and is remembered on this device. Providers may retain requests under their own terms.', 'Las presentaciones de avatares y muestras de estilo son grabaciones incluidas en la app; no envían texto a un proveedor. Con la voz activa, enviamos el texto de respuesta, idioma, voz y estilo a nuestro servidor y después a OpenAI o Microsoft para generar audio. Esa solicitud no incluye un token de cuenta de Bobby ni audio del micrófono. Silenciar detiene la narración y nuevas solicitudes de voz; se recuerda en este dispositivo. Los proveedores pueden conservar solicitudes según sus términos.')}</p>
+          <p>{tr('Reports include the island code, a snapshot of its name, reason and optional details. A random installation identifier is sent and stored only as a hash to limit duplicate reports. It is not an advertising identifier and is not linked to your Bobby account. Reports are kept in a private review queue. Resolved reports are eligible for deletion after 90 days; open reports remain until reviewed. Avoid personal information in reports. Creator blocks are stored only on this device and can be removed from Community safety.', 'Los reportes incluyen el código de la isla, una copia de su nombre, el motivo y detalles opcionales. Se envía un identificador aleatorio de instalación, guardado solo como hash para limitar duplicados. No es un identificador publicitario ni se vincula a tu cuenta de Bobby. Los reportes se guardan en una cola privada. Los resueltos pueden eliminarse después de 90 días; los abiertos se conservan hasta su revisión. Evita datos personales. Los bloqueos de creadores se guardan solo en este dispositivo y se quitan desde Seguridad de la comunidad.')}</p>
+          <a className={linkClass} href={`/support?lang=${language}`}>{tr('Community rules and support', 'Reglas de la comunidad y soporte')}</a>
+        </Section>
+
         <Section title={tr('Earlier iPhone versions', 'Versiones anteriores para iPhone')}>
           <p>
             {tr(
-              'iPhone versions 1.1 and earlier offered voice features: live voice as described above, dictation with Apple speech recognition (on the device when supported, otherwise on Apple’s servers), and spoken replies from our speech providers. Version 1.2 removes these features. If you still use an earlier version, the voice terms above also apply to it.',
-              'Las versiones 1.1 y anteriores para iPhone ofrecían funciones de voz: la voz en vivo descrita arriba, dictado con el reconocimiento de voz de Apple (en el dispositivo cuando es posible y, si no, en los servidores de Apple) y respuestas habladas de nuestros proveedores de voz. La versión 1.2 elimina estas funciones. Si todavía usas una versión anterior, los términos de voz de arriba también aplican.',
+              'iPhone versions 1.1 and earlier offered voice features: live voice as described above, dictation with Apple speech recognition (on the device when supported, otherwise on Apple’s servers), and spoken replies from our speech providers. Builds 33–34 removed voice; build 35 restores output-only avatar narration. Live microphone conversations and dictation remain unavailable on iPhone. If you still use an earlier version, the voice terms above also apply to it.',
+              'Las versiones 1.1 y anteriores para iPhone ofrecían funciones de voz: la voz en vivo descrita arriba, dictado con el reconocimiento de voz de Apple (en el dispositivo cuando es posible y, si no, en los servidores de Apple) y respuestas habladas de nuestros proveedores de voz. Los builds 33–34 quitaron la voz; el build 35 recupera la narración de avatares. Las conversaciones con micrófono y el dictado siguen sin estar disponibles en iPhone. Si todavía usas una versión anterior, los términos de voz de arriba también aplican.',
             )}
           </p>
         </Section>
@@ -288,13 +291,14 @@ export default function PrivacyPage() {
           <ul className="list-disc space-y-1 pl-5">
             <li>{strong('Apple')} — {tr('Sign in with Apple (and, in earlier iPhone versions, speech recognition).', 'Iniciar sesión con Apple (y, en versiones anteriores para iPhone, reconocimiento de voz).')}</li>
             <li>{strong('Supabase')} — {tr('authentication, synced progress, Trader Land, and product records.', 'autenticación, progreso sincronizado, Trader Land y registros del producto.')}</li>
-            <li>{strong('OpenAI')} — {tr('the text analysis behind the three perspectives; on the website, also live voice.', 'el análisis de texto detrás de las tres perspectivas; en el sitio web, también la voz en vivo.')}</li>
+            <li>{strong('OpenAI')} — {tr('text analysis, optional speech generation and public-name moderation; on the website, also live voice.', 'análisis de texto, narración opcional y moderación de nombres públicos; en el sitio web, también la voz en vivo.')}</li>
             <li>{strong('Vercel')} — {tr('hosts our backend and website, with standard, short-lived request logs.', 'aloja nuestro backend y el sitio web, con registros de solicitudes estándar y de corta duración.')}</li>
             <li>{strong(tr('Public market data sources', 'Fuentes públicas de datos de mercado'))} — {tr('prices and charts, requested with an asset symbol and timeframe only, without your account or wallet identifiers.', 'precios y gráficas, pedidos solo con el símbolo del activo y un plazo, sin identificadores de tu cuenta ni de tu wallet.')}</li>
             <li><Scope>{tr('Website', 'Sitio web')}</Scope>{strong('Google')} — {tr('optional sign-in.', 'inicio de sesión opcional.')}</li>
             <li><Scope>{tr('Website', 'Sitio web')}</Scope>{strong('Reown')} — {tr('connection to your chosen external wallet. Not included in the iPhone app.', 'conexión con la wallet externa que elijas. No está incluido en la app para iPhone.')}</li>
             <li><Scope>{tr('Website', 'Sitio web')}</Scope>{strong('Base & Uniswap')} — {tr('public blockchain and swap-routing infrastructure.', 'infraestructura pública de blockchain y de enrutamiento de swaps.')}</li>
-            <li><Scope>{tr('Website', 'Sitio web')}</Scope>{strong('ElevenLabs & Microsoft')} — {tr('speech generation for voice replies.', 'generación de voz para las respuestas habladas.')}</li>
+            <li>{strong('Microsoft')} — {tr('optional speech generation, including on iPhone.', 'narración opcional, también en iPhone.')}</li>
+            <li><Scope>{tr('Website', 'Sitio web')}</Scope>{strong('ElevenLabs')} — {tr('speech generation on the website.', 'generación de voz en el sitio web.')}</li>
           </ul>
         </Section>
 

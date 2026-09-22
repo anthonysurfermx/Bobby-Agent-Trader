@@ -1,0 +1,83 @@
+{
+  "passed": true,
+  "fields": [
+    {
+      "file": "metadata/app-review-notes-en.txt",
+      "characters": 3909,
+      "limit": 4000,
+      "pass": true
+    },
+    {
+      "file": "metadata/en-US/description.txt",
+      "characters": 1965,
+      "limit": 4000,
+      "pass": true
+    },
+    {
+      "file": "metadata/en-US/keywords.txt",
+      "characters": 99,
+      "limit": 100,
+      "pass": true
+    },
+    {
+      "file": "metadata/en-US/name.txt",
+      "characters": 29,
+      "limit": 30,
+      "pass": true
+    },
+    {
+      "file": "metadata/en-US/promotional-text.txt",
+      "characters": 144,
+      "limit": 170,
+      "pass": true
+    },
+    {
+      "file": "metadata/en-US/subtitle.txt",
+      "characters": 26,
+      "limit": 30,
+      "pass": true
+    },
+    {
+      "file": "metadata/en-US/whats-new.txt",
+      "characters": 403,
+      "limit": 4000,
+      "pass": true
+    },
+    {
+      "file": "metadata/es-MX/description.txt",
+      "characters": 2135,
+      "limit": 4000,
+      "pass": true
+    },
+    {
+      "file": "metadata/es-MX/keywords.txt",
+      "characters": 93,
+      "limit": 100,
+      "pass": true
+    },
+    {
+      "file": "metadata/es-MX/name.txt",
+      "characters": 22,
+      "limit": 30,
+      "pass": true
+    },
+    {
+      "file": "metadata/es-MX/promotional-text.txt",
+      "characters": 154,
+      "limit": 170,
+      "pass": true
+    },
+    {
+      "file": "metadata/es-MX/subtitle.txt",
+      "characters": 26,
+      "limit": 30,
+      "pass": true
+    },
+    {
+      "file": "metadata/es-MX/whats-new.txt",
+      "characters": 420,
+      "limit": 4000,
+      "pass": true
+    }
+  ]
+}

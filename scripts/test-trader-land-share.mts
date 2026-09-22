@@ -163,7 +163,7 @@ const image = await call({ code: 'np4dl6dyys', img: '1', lang: 'es' });
 const png = image.body as Buffer;
 assert(image.status === 200 && image.headers['content-type'] === 'image/png', `the card renders (${image.status})`);
 assert(Buffer.isBuffer(png) && png.subarray(1, 4).toString() === 'PNG' && png.length > 50_000, 'the card is a real PNG with the art in it');
-assert(/s-maxage=604800/.test(image.headers['cache-control'] ?? ''), 'the versioned card caches long');
+assert(image.headers['cache-control'] === 'no-store', 'moderated cards must not remain in the CDN after withdrawal');
 lands = [{ ...lands[0], size: 12, core_x: 5, core_y: 5, core_stage: 1 }];
 const grownImage = await call({ code: 'np4dl6dyys', img: '1', lang: 'en' });
 assert(grownImage.status === 200 && Buffer.isBuffer(grownImage.body) && (grownImage.body as Buffer).length > 50_000, `a 12×12 island renders its card (${grownImage.status})`);

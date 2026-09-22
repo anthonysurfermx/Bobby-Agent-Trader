@@ -1,0 +1,5 @@
+• Avatar narration in English and Spanish, with a mute preference that stays saved.
+• Three-step onboarding: companion, aura machine and Chill / Direct / Pro style.
+• Trader Land exploration, island names and sharing, plus the permanent Satoshi Nakamoto showcase.
+• Public-name checks and controls to report islands and block creators.
+• Updated privacy information for narration and community features.
