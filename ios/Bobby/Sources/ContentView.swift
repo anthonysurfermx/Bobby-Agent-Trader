@@ -127,13 +127,13 @@ final class BobbyViewModel: ObservableObject {
     var voicePersona: String? { companions.companion?.voicePersona }
 
     func say(_ text: String) {
-        voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue, free: true)
+        voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue)
     }
 
     /// Greetings and flavor lines: the companion's voice or nothing — never
     /// the robotic system voice.
     func sayAmbient(_ text: String) {
-        voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue, essential: false, free: true)
+        voice.speak(text, voiceId: profile.voiceId, persona: voicePersona, vibe: profile.vibe.rawValue, essential: false)
     }
 
     /// The desk opens hyped: the companion names what is actually moving right

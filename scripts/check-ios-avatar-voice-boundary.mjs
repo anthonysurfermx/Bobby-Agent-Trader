@@ -16,4 +16,5 @@ function inspect(directory) {
 }
 inspect(fileURLToPath(new URL('Sources/', root)));
 assert.doesNotMatch(readFileSync(new URL('project.yml', root), 'utf8'), forbidden);
+assert.doesNotMatch(readFileSync(new URL('Sources/ContentView.swift', root), 'utf8'), /free:\s*true/, 'Desk narration must keep the avatar persona instead of forcing generic free TTS.');
 console.log('Native Bobby: no microphone, speech recognition, Live session, or ChatGPT route.');

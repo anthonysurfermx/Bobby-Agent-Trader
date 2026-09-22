@@ -23,34 +23,92 @@ final class ReleaseReadinessTests: XCTestCase {
 
     /// Avatar narration restores the preview step without opening an interactive call.
     func testAvatarVoiceStyleReturnsToOnboarding() {
+        verifyAvatarOnboarding(spanish: false)
+    }
+
+    func testSpanishAvatarVoiceStyleReturnsToOnboarding() {
+        verifyAvatarOnboarding(spanish: true)
+    }
+
+    private func verifyAvatarOnboarding(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
+        app.launchArguments = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
         app.launch()
-        let pick = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'PICK '")).firstMatch
-        XCTAssertTrue(pick.waitForExistence(timeout: 15))
+        let next = app.buttons["onboarding-next"]
+        XCTAssertTrue(next.waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["01 / 03"].exists)
-        pick.tap()
+        next.tap()
         XCTAssertTrue(app.staticTexts["02 / 03"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'talk to you'")).firstMatch.exists)
-        let next = app.staticTexts["NEXT"]
-        XCTAssertTrue(next.exists)
+        XCTAssertTrue(app.staticTexts[spanish ? "BOBBY // PREPARANDO AURA" : "BOBBY // PREPPING AURA"].exists)
+        XCTAssertFalse(app.buttons["avatar-vibe-chill"].exists, "Styles belong after the machine")
+        if app.staticTexts[spanish ? "ESCANEANDO…" : "SCANNING…"].exists { XCTAssertFalse(next.isEnabled) }
+        let forge = XCTAttachment(screenshot: app.screenshot())
+        forge.name = spanish ? "forge-es-2-of-3" : "forge-en-2-of-3"
+        forge.lifetime = .keepAlways
+        add(forge)
+        let ready = expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: next)
+        wait(for: [ready], timeout: 15)
         next.tap()
         XCTAssertTrue(app.staticTexts["03 / 03"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts[spanish ? "BOBBY // SU VIBRA" : "BOBBY // THEIR VIBE"].exists)
+        for vibe in ["chill", "directo", "pro"] {
+            let style = app.buttons["avatar-vibe-\(vibe)"]
+            XCTAssertTrue(style.exists)
+            style.tap()
+            XCTAssertTrue(style.isSelected)
+        }
+        let styles = XCTAttachment(screenshot: app.screenshot())
+        styles.name = spanish ? "styles-es-3-of-3" : "styles-en-3-of-3"
+        styles.lifetime = .keepAlways
+        add(styles)
+        XCTAssertFalse(app.buttons["ChatGPT"].exists)
+        XCTAssertFalse(app.buttons["Live"].exists)
+        next.tap()
+        XCTAssertTrue(app.buttons["avatar-voice-toggle"].waitForExistence(timeout: 10))
     }
 
     func testDeskCanMuteAndRestoreAvatarNarration() {
+        verifyAvatarMute(spanish: false)
+    }
+
+    func testSpanishDeskCanMuteAndRestoreAvatarNarration() {
+        verifyAvatarMute(spanish: true)
+    }
+
+    private func verifyAvatarMute(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES"]
+        app.launchArguments = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES"]
         app.launch()
         let toggle = app.buttons["avatar-voice-toggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 15))
-        XCTAssertEqual(toggle.label, "Mute avatar voice")
+        XCTAssertEqual(toggle.label, spanish ? "Silenciar voz del avatar" : "Mute avatar voice")
         toggle.tap()
-        XCTAssertEqual(toggle.label, "Enable avatar voice")
+        XCTAssertEqual(toggle.label, spanish ? "Activar voz del avatar" : "Enable avatar voice")
         toggle.tap()
-        XCTAssertEqual(toggle.label, "Mute avatar voice")
+        XCTAssertEqual(toggle.label, spanish ? "Silenciar voz del avatar" : "Mute avatar voice")
         XCTAssertFalse(app.buttons["ChatGPT"].exists)
         XCTAssertFalse(app.buttons["Live"].exists)
+    }
+
+    func testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES",
+                               "-companion.id", "byte", "-companion.disciplineXP", "1000"]
+        app.launch()
+        let portrait = app.buttons["squad-portrait"]
+        XCTAssertTrue(portrait.waitForExistence(timeout: 15))
+        portrait.tap()
+        let kora = app.descendants(matching: .any)["squad-rail-kora"]
+        XCTAssertTrue(kora.waitForExistence(timeout: 10))
+        kora.tap()
+        XCTAssertTrue(app.staticTexts["squad-stage-ready"].waitForExistence(timeout: 20))
+        app.buttons["PICK KORA"].tap()
+        let avatar = app.descendants(matching: .any)["squad-avatar"].firstMatch
+        let speaking = expectation(for: NSPredicate(format: "value == 'Speaking'"), evaluatedWith: avatar)
+        wait(for: [speaking], timeout: 5)
+        app.descendants(matching: .any)["squad-rail-byte"].tap()
+        let stopped = expectation(for: NSPredicate(format: "value == 'Ready'"), evaluatedWith: app.descendants(matching: .any)["squad-avatar"].firstMatch)
+        wait(for: [stopped], timeout: 5)
     }
 
     func testOrdinaryIslandDoesNotExposePublicGallery() {

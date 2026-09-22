@@ -92,14 +92,14 @@ final class AvatarVoiceTests: XCTestCase {
             XCTAssertEqual(body?["text"], line)
             XCTAssertEqual(body?["voice"], "ash", "The avatar's identity wins over the profile default")
             XCTAssertEqual(body?["vibe"], "analytical")
-            XCTAssertEqual(body?["mode"], "free", "Preserve the desk's existing free narration policy")
-            XCTAssertNotNil(body?["lang"])
+            XCTAssertNil(body?["mode"], "Keep the persona voice instead of forcing the generic free voice")
+            XCTAssertEqual(body?["lang"], L.ttsLang)
             request.fulfill()
             stub.respond(data)
         }
         let voice = NeuralVoice(session: session)
         defer { voice.stop() }
-        voice.speak(line, voiceId: "coral", persona: "ash", vibe: "pro", free: true)
+        voice.speak(line, voiceId: "coral", persona: "ash", vibe: "pro")
         await fulfillment(of: [request], timeout: 3)
         try await waitUntil { voice.speaking && voice.level > 0.06 }
         voice.stop()
@@ -137,5 +137,66 @@ final class AvatarVoiceTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertFalse(voice.speaking, "Muting must also invalidate pending narration")
         XCTAssertEqual(voice.level, 0)
+    }
+
+    /// Exercise every bundled selection and style through NeuralVoice's actual
+    /// AVAudioPlayer and mouth meter, in both languages, with the network denied.
+    @MainActor func testEveryAvatarAndStyleHasAudibleOfflineSpeechInBothLanguages() async throws {
+        AvatarVoiceProtocol.handler = { _ in XCTFail("Every avatar/style must have bundled speech") }
+        let voice = NeuralVoice(session: session)
+        defer { voice.stop() }
+        var clips: [String: String] = [:]
+        for companion in bobbyCompanions {
+            for lang in ["en", "es"] {
+                clips["select-\(companion.id)-\(lang)"] = companion.voicePersona
+                for vibe in AgentVibe.allCases {
+                    clips["vibe-\(vibe.rawValue)-\(companion.voicePersona)-\(lang)"] = companion.voicePersona
+                }
+            }
+        }
+        XCTAssertEqual(bobbyCompanions.count, 18)
+        XCTAssertEqual(clips.count, 108)
+        for (name, persona) in clips.sorted(by: { $0.key < $1.key }) {
+            XCTAssertNotNil(Bundle.main.url(forResource: name, withExtension: "mp3"), name)
+            voice.speakClip(name, fallbackText: "Missing clip", persona: persona, playbackRate: 1.12)
+            let deadline = Date().addingTimeInterval(3)
+            while voice.level <= 0.06, Date() < deadline { try await Task.sleep(for: .milliseconds(40)) }
+            XCTAssertTrue(voice.speaking && voice.level > 0.06, "Silent clip: \(name)")
+            voice.stop()
+        }
+    }
+
+    @MainActor func testEveryAvatarKeepsItsPersonaAndVibeInNarratedAnswers() async throws {
+        let data = try clip()
+        let voice = NeuralVoice(session: session)
+        defer { voice.stop() }
+        for companion in bobbyCompanions {
+            for vibe in AgentVibe.allCases {
+                let request = expectation(description: "\(companion.id) / \(vibe.rawValue)")
+                AvatarVoiceProtocol.handler = { stub in
+                    let body = try? stub.body()
+                    XCTAssertEqual(body?["voice"], companion.voicePersona)
+                    XCTAssertEqual(body?["vibe"], NeuralVoice.serverVibe(vibe.rawValue))
+                    XCTAssertEqual(body?["lang"], L.ttsLang)
+                    XCTAssertNil(body?["mode"])
+                    request.fulfill()
+                    stub.respond(data)
+                }
+                voice.speak(companion.selectLine, voiceId: "coral", persona: companion.voicePersona, vibe: vibe.rawValue)
+                await fulfillment(of: [request], timeout: 3)
+                try await waitUntil { voice.speaking && voice.level > 0.06 }
+                voice.stop()
+            }
+        }
+    }
+
+    @MainActor func testACompletedOldVoiceCannotStopTheNewAvatarsMouthAnimation() async throws {
+        let voice = NeuralVoice(session: session)
+        defer { voice.stop() }
+        let oldPlayer = try AVAudioPlayer(data: clip())
+        voice.audioPlayerDidFinishPlaying(oldPlayer, successfully: true)
+        voice.speechSynthesizer(AVSpeechSynthesizer(), didCancel: AVSpeechUtterance(string: "Old voice"))
+        voice.speakClip("select-byte-en", fallbackText: "Hello", persona: "ballad")
+        try await waitUntil { voice.speaking && voice.level > 0.06 }
     }
 }

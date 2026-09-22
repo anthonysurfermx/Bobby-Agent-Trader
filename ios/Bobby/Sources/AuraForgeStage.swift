@@ -145,22 +145,64 @@ private struct SpawnBurst: View {
     }
 }
 
-/// The forge's sound: one bright hit when the aura maxes out. Ambient, so it
-/// mixes with the user's music and respects the silent switch — onboarding may
-/// not have spoken yet, so no session is set up. No drone under the scan: the
-/// machine hum read as a spaceship engine and it is gone.
+/// The machine hum, scan milestones and materialization chime share a playback
+/// session with avatar narration, so the silent switch cannot mute the forge.
+/// The onboarding owner stops every player when leaving or backgrounding.
+@MainActor
 final class ForgeAudio {
     static let shared = ForgeAudio()
-    private var oneShot: AVAudioPlayer?
+    private var hum: AVAudioPlayer?
+    private var cues: [AVAudioPlayer] = []
 
-    func auraMax() {
-        guard let data = NSDataAsset(name: "sfx_aura_max")?.data,
-              let player = try? AVAudioPlayer(data: data, fileTypeHint: "wav") else { return }
-        try? AVAudioSession.sharedInstance().setCategory(.ambient)
+    var isHumming: Bool { hum?.isPlaying == true }
+    var isPlayingCue: Bool { cues.contains(where: \.isPlaying) }
+
+    @discardableResult
+    func startHum() -> Bool {
+        if isHumming { return true }
+        guard let player = player("sfx_forge_hum") else { return false }
+        player.numberOfLoops = -1
+        player.volume = 0
+        guard player.play() else { return false }
+        player.setVolume(0.32, fadeDuration: 0.5)
+        hum = player
+        return true
+    }
+
+    @discardableResult
+    func charge(_ quarter: Int) -> Bool {
+        playCue("sfx_forge_charge_\(min(4, max(1, quarter)))", volume: 0.65)
+    }
+
+    @discardableResult
+    func auraMax() -> Bool {
+        hum?.stop()
+        hum = nil
+        return playCue("sfx_aura_max", volume: 0.75)
+    }
+
+    func stop() {
+        hum?.stop()
+        hum = nil
+        cues.forEach { $0.stop() }
+        cues.removeAll()
+    }
+
+    private func player(_ name: String) -> AVAudioPlayer? {
+        guard let data = NSDataAsset(name: name)?.data,
+              let player = try? AVAudioPlayer(data: data, fileTypeHint: "wav") else { return nil }
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
-        player.volume = 0.6
         player.prepareToPlay()
-        player.play()
-        oneShot = player
+        return player
+    }
+
+    private func playCue(_ name: String, volume: Float) -> Bool {
+        guard let player = player(name) else { return false }
+        player.volume = volume
+        guard player.play() else { return false }
+        cues.removeAll { !$0.isPlaying }
+        cues.append(player)
+        return true
     }
 }

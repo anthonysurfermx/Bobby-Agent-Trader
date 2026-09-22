@@ -24,7 +24,8 @@ struct MascotPerformanceMetrics: Equatable {
 
 struct MascotGalleryView: View {
     @ObservedObject var store: CompanionStore
-    var voice: NeuralVoice?
+    @ObservedObject private var voice: NeuralVoice
+    private let voiceEnabled: Bool
     var voiceId: String = AgentVoice.coral.rawValue
 
     @Environment(\.dismiss) private var dismiss
@@ -39,7 +40,8 @@ struct MascotGalleryView: View {
 
     init(store: CompanionStore, voice: NeuralVoice? = nil, voiceId: String = AgentVoice.coral.rawValue, initialId: String? = nil) {
         self.store = store
-        self.voice = voice
+        _voice = ObservedObject(wrappedValue: voice ?? NeuralVoice())
+        self.voiceEnabled = voice != nil
         self.voiceId = voiceId
         // Open on YOUR companion, not on a hardcoded default
         _selectedId = State(initialValue: initialId ?? store.companionId ?? bobbyCompanions[0].id)
@@ -106,6 +108,8 @@ struct MascotGalleryView: View {
         }
         .preferredColorScheme(.dark)
         .animation(.spring(duration: 0.35), value: secretPhrase != nil)
+        .onChange(of: selectedId) { _, _ in voice.stop() }
+        .onDisappear { voice.stop() }
     }
 
     // MARK: header
@@ -137,6 +141,8 @@ struct MascotGalleryView: View {
             MascotSceneView(
                 assetName: selected.id,
                 interactive: true,
+                speaking: voiceEnabled && isActive && voice.speaking,
+                voiceLevel: voiceEnabled && isActive ? voice.level : 0,
                 emoteEvent: emoteEvent,
                 onLoading: { loading, failed in
                     stageLoading = loading
@@ -153,6 +159,9 @@ struct MascotGalleryView: View {
                 statue: !isUnlocked
             )
             .id(selected.id) // portal: fresh scene per companion
+            .accessibilityIdentifier("squad-avatar")
+            .accessibilityLabel(L.t("\(selected.label) avatar", "Avatar \(selected.label)"))
+            .accessibilityValue(voiceEnabled && isActive && voice.speaking ? L.t("Speaking", "Hablando") : L.t("Ready", "Listo"))
             .opacity(stageLoading ? 0 : 1)
             .scaleEffect(stageLoading ? 0.72 : 1)
             .animation(.spring(duration: 0.5, bounce: 0.35), value: stageLoading)
@@ -322,7 +331,9 @@ struct MascotGalleryView: View {
             justChosen = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             // In its OWN voice persona — the whole point of choosing it
-            voice?.speakClip("select-\(selected.id)-\(L.ttsLang)", fallbackText: selected.selectLine, persona: selected.voicePersona, playbackRate: 1.12)
+            if voiceEnabled {
+                voice.speakClip("select-\(selected.id)-\(L.ttsLang)", fallbackText: selected.selectLine, persona: selected.voicePersona, playbackRate: 1.12)
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) { justChosen = false }
         } label: {
             Text(isActive ? (justChosen ? L.t("✓ YOUR FRIEND NOW", "✓ AHORA ESTÁ CONTIGO") : L.t("✓ YOUR FRIEND", "✓ ESTÁ CONTIGO")) :

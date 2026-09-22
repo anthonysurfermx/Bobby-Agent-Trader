@@ -77,7 +77,7 @@ final class Build34Tests: XCTestCase {
         }
         XCTAssertNil(calls.last?.body.flatMap { $0.isEmpty ? nil : $0 }, "no Apple code was asked for")
         XCTAssertTrue(account.manualAppleRevocationRequired)
-        XCTAssertEqual(account.manualRevocationURL.absoluteString, "https://support.apple.com/en-us/102571")
+        XCTAssertEqual(account.manualRevocationURL.absoluteString, L.t("https://support.apple.com/en-us/102571", "https://support.apple.com/es-mx/102571"))
         XCTAssertNil(account.session)
         XCTAssertNil(Keychain.read(service: service))
         XCTAssertTrue(AccountDeletionCopy.deleted(manualAppleSteps: true).contains(AccountSession.manualRevocationSteps))

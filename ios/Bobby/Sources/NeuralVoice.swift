@@ -1,6 +1,5 @@
-// 2026 voice — Microsoft Edge NEURAL voices served by bobby-voice-free
-// (free, no per-minute bill). The robotic AVSpeech stays only as an
-// offline fallback.
+// One-way persona narration served by bobby-voice-free. Bundled previews and
+// generated answers use the same persona; AVSpeech is the offline fallback.
 import Foundation
 @preconcurrency import AVFoundation
 
@@ -14,6 +13,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
 
     private var player: AVAudioPlayer?
     private let fallback = AVSpeechSynthesizer()
+    private var fallbackUtterance: AVSpeechUtterance?
     private var generation = 0
     private var meterTimer: Timer?
     private let session: URLSession
@@ -27,11 +27,21 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.speaking = false }
+        Task { @MainActor in
+            guard self.fallbackUtterance === utterance else { return }
+            self.fallbackUtterance = nil
+            self.level = 0
+            self.speaking = false
+        }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in self.speaking = false }
+        Task { @MainActor in
+            guard self.fallbackUtterance === utterance else { return }
+            self.fallbackUtterance = nil
+            self.level = 0
+            self.speaking = false
+        }
     }
 
     /// `persona` is the companion's own voice (coral/ballad/sage/ash) and wins
@@ -105,7 +115,9 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         stop()
         fallbackPersona = persona
         fallbackPlaybackRate = playbackRate
-        play(data, playbackRate: playbackRate)
+        if !play(data, playbackRate: playbackRate) {
+            speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)
+        }
     }
 
     @discardableResult
@@ -178,13 +190,14 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
 
     private func speakFallback(_ text: String) {
         // The on-device voice needs the same spoken-audio session as play():
-        // the aura forge leaves an ambient one behind, which the silent switch mutes.
+        // restore spoken-audio mode after the forge's mixing session.
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
         try? AVAudioSession.sharedInstance().setActive(true)
         let u = AVSpeechUtterance(string: text)
         u.voice = bestSystemVoice()
         u.rate = min(AVSpeechUtteranceMaximumSpeechRate, max(AVSpeechUtteranceMinimumSpeechRate, 0.5 * fallbackPlaybackRate))
         u.pitchMultiplier = Self.feminineVoices.contains(fallbackPersona) ? 1.05 : 0.95
+        fallbackUtterance = u
         speaking = true
         fallback.speak(u)
     }
@@ -209,6 +222,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         player = nil
         meterTimer?.invalidate()
         meterTimer = nil
+        fallbackUtterance = nil
         fallback.stopSpeaking(at: .immediate)
         speaking = false
         level = 0
@@ -216,6 +230,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor in
+            guard self.player === player else { return }
+            self.player = nil
             self.meterTimer?.invalidate()
             self.meterTimer = nil
             self.level = 0

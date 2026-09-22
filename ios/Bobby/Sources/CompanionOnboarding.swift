@@ -1,7 +1,7 @@
 // Companion-first onboarding. The user lands INSIDE the squad world from
 // second one — same dark stage, same 3D companions, same tokens as the rest
-// of the app. Choose your companion, preview its narrated voice, then watch
-// the aura forge scan it to life. Voice previews do not open a Live call.
+// of the app. Choose your companion, forge its aura, then choose its voice
+// style. Voice previews do not open a Live call.
 import SwiftUI
 
 struct CompanionOnboarding: View {
@@ -10,7 +10,8 @@ struct CompanionOnboarding: View {
     @ObservedObject var voice: NeuralVoice
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var step = 0
+    private enum Step: Int { case choose, forge, vibe }
+    @State private var step = Step.choose
     @State private var selected: Companion = bobbyCompanions.first(where: { $0.id != "orb" }) ?? bobbyCompanions[0]
     /// The carousel page. `selected` follows it once a swipe or tap lands.
     @State private var pageId: String = (bobbyCompanions.first(where: { $0.id != "orb" }) ?? bobbyCompanions[0]).id
@@ -24,9 +25,9 @@ struct CompanionOnboarding: View {
     /// The vibe only changes how the companion sounds: without voice it is a choice with no effect.
     private var showsVibeStep: Bool { Self.showsVibeStep(voiceEnabled: NeuralVoice.avatarNarrationEnabled) }
     static func showsVibeStep(voiceEnabled: Bool) -> Bool { voiceEnabled }
-    /// Beats on screen: 3 with the vibe step, 2 without. Step indices stay 0 / 1 / 2.
+    /// The forge is always second; the voice style is the final beat.
     private var beats: Int { showsVibeStep ? 3 : 2 }
-    private var beat: Int { step == 2 ? beats : step + 1 }
+    private var beat: Int { step.rawValue + 1 }
 
     var body: some View {
         ZStack {
@@ -40,9 +41,9 @@ struct CompanionOnboarding: View {
                 header
 
                 // The companion IS the onboarding — always on stage. On the
-                // last step it stands inside the aura forge.
+                // second step it stands inside the aura forge.
                 Group {
-                    if step == 2 {
+                    if step == .forge {
                         AuraForgeStage(tint: tint, charged: auraCharge, ready: auraReady) { forgeStage }
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
@@ -52,9 +53,9 @@ struct CompanionOnboarding: View {
                 }
                 .frame(maxHeight: .infinity)
 
-                if step < 2 {
+                if step != .forge {
                     Group {
-                        if step == 0 { chooseStep } else if showsVibeStep { vibeStep }
+                        if step == .choose { chooseStep } else if showsVibeStep { vibeStep }
                     }
                     .padding(.horizontal, 18)
                     .padding(.bottom, 6)
@@ -63,26 +64,32 @@ struct CompanionOnboarding: View {
                 cta
             }
         }
-        .task(id: step == 2 && scenePhase == .active) {
+        .task(id: step == .forge && scenePhase == .active) {
             // The scan reports its own finish; this only guarantees the CTA
             // can never stay locked if the model is slow or the render stalls.
             // It counts only while the app is on screen: the scan runs on the
             // render clock, which stops in the background.
-            guard step == 2, scenePhase == .active else { return }
+            guard step == .forge, scenePhase == .active else {
+                ForgeAudio.shared.stop()
+                return
+            }
+            if !auraReady { ForgeAudio.shared.startHum() }
             try? await Task.sleep(for: .seconds(8))
             if !Task.isCancelled { scanned(4) }
         }
-        // Step 1 stays silent: the companion's voice arrives in step 2, when
-        // you choose how it talks.
         .onAppear { MascotAssetCache.preload(starters.map(\.id)) }
-        .onDisappear { MascotAssetCache.purge() }
+        .onDisappear {
+            ForgeAudio.shared.stop()
+            voice.stop()
+            MascotAssetCache.purge()
+        }
     }
 
     // MARK: stage
 
     @ViewBuilder
     private var stage: some View {
-        if step == 0 {
+        if step == .choose {
             carousel
         } else {
             CompanionStagePage(companion: selected, active: true,
@@ -104,7 +111,7 @@ struct CompanionOnboarding: View {
                                    voiceLevel: onStage ? voice.level : 0,
                                    pulseToken: pulses[comp.id, default: 0])
                     .contentShape(Rectangle())
-                    .onTapGesture { pulse(comp.id) }
+                    .onTapGesture { pulse(comp.id); previewSelection(comp) }
                     .tag(comp.id)
             }
         }
@@ -137,6 +144,12 @@ struct CompanionOnboarding: View {
         guard let comp = starters.first(where: { $0.id == id }), comp.id != selected.id else { return }
         selected = comp
         UISelectionFeedbackGenerator().selectionChanged()
+        previewSelection(comp)
+    }
+
+    private func previewSelection(_ companion: Companion) {
+        voice.speakClip("select-\(companion.id)-\(L.ttsLang)", fallbackText: companion.selectLine,
+                        persona: companion.voicePersona, playbackRate: 1.12)
     }
 
     private func pulse(_ id: String) {
@@ -159,9 +172,10 @@ struct CompanionOnboarding: View {
     /// Each quarter of the first X-ray pass charges the platform with a soft
     /// tick; the last one maxes the aura out. Milestones only move forward.
     private func scanned(_ quarter: Int) {
-        guard quarter > auraCharge else { return }
+        guard step == .forge, scenePhase == .active, quarter > auraCharge else { return }
         auraCharge = quarter
         guard quarter >= 4 else {
+            ForgeAudio.shared.charge(quarter)
             UIImpactFeedbackGenerator(style: .soft).impactOccurred(intensity: 0.6)
             return
         }
@@ -178,8 +192,8 @@ struct CompanionOnboarding: View {
             HStack {
                 HStack(spacing: 8) {
                     Circle().fill(tint).frame(width: 7, height: 7).shadow(color: tint, radius: 7)
-                    Text(step == 2 ? L.t("BOBBY // PREPPING AURA", "BOBBY // PREPARANDO AURA")
-                         : step == 1 ? L.t("BOBBY // THEIR VIBE", "BOBBY // SU VIBRA")
+                    Text(step == .forge ? L.t("BOBBY // PREPPING AURA", "BOBBY // PREPARANDO AURA")
+                         : step == .vibe ? L.t("BOBBY // THEIR VIBE", "BOBBY // SU VIBRA")
                          : L.t("BOBBY // PICK YOUR FRIEND", "BOBBY // ELIGE A TU AMIGO"))
                         .font(.mono(11, .bold))
                         .kerning(1.9)
@@ -204,7 +218,7 @@ struct CompanionOnboarding: View {
         .padding(.top, 12)
     }
 
-    // MARK: step 0 — choose the companion
+    // MARK: step 1 — choose the companion
 
     private var chooseStep: some View {
         VStack(spacing: 10) {
@@ -228,7 +242,7 @@ struct CompanionOnboarding: View {
                 HStack(spacing: 10) {
                     ForEach(starters) { comp in
                         Button {
-                            guard comp.id != pageId else { return }
+                            guard comp.id != pageId else { previewSelection(comp); return }
                             withAnimation(.spring(duration: 0.45)) { pageId = comp.id }
                         } label: {
                             VStack(spacing: 5) {
@@ -266,7 +280,12 @@ struct CompanionOnboarding: View {
         }
     }
 
-    // MARK: step 1 — its vibe (heard live, in the companion's own voice)
+    // MARK: step 3 — its vibe, in the companion's own narrated voice
+
+    private func previewVibe(_ vibe: AgentVibe) {
+        voice.speakClip("vibe-\(vibe.rawValue)-\(selected.voicePersona)-\(L.ttsLang)", fallbackText: vibe.sample,
+                        persona: selected.voicePersona, vibe: vibe.rawValue, playbackRate: 1.12)
+    }
 
     private var vibeStep: some View {
         VStack(spacing: 10) {
@@ -284,8 +303,7 @@ struct CompanionOnboarding: View {
                     Button {
                         profile.vibeId = vibe.rawValue
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        voice.speakClip("vibe-\(vibe.rawValue)-\(selected.voicePersona)-\(L.ttsLang)", fallbackText: vibe.sample,
-                                        persona: selected.voicePersona, vibe: vibe.rawValue, playbackRate: 1.12)
+                        previewVibe(vibe)
                     } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
@@ -308,9 +326,12 @@ struct CompanionOnboarding: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(profile.vibeId == vibe.rawValue ? tint.opacity(0.55) : Theme.stroke, lineWidth: 1))
                     }
+                    .accessibilityIdentifier("avatar-vibe-\(vibe.rawValue)")
+                    .accessibilityAddTraits(profile.vibeId == vibe.rawValue ? [.isSelected] : [])
                 }
             }
         }
+        .onAppear { previewVibe(profile.vibe) }
     }
 
     // MARK: CTA
@@ -319,31 +340,35 @@ struct CompanionOnboarding: View {
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             switch step {
-            case 0:
+            case .choose:
                 commitCompanion()
-                withAnimation(.spring(duration: 0.42)) { step = showsVibeStep ? 1 : 2 }
-            case 1:
                 voice.stop()
-                withAnimation(.spring(duration: 0.42)) { step = 2 }
-            default:
+                withAnimation(.spring(duration: 0.42)) { step = .forge }
+            case .forge:
                 guard auraReady else { return }
+                ForgeAudio.shared.stop()
+                if showsVibeStep {
+                    withAnimation(.spring(duration: 0.42)) { step = .vibe }
+                } else {
+                    finish()
+                }
+            case .vibe:
                 // The payoff happens on the desk: one greeting, in the
                 // companion's own voice, with today's real movers. Nothing is
                 // spoken here so the two lines never overlap.
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                voice.stop()
-                withAnimation(.spring(duration: 0.5)) { profile.onboarded = true }
+                finish()
             }
         } label: {
             HStack {
-                Text(step == 0
+                Text(step == .choose
                      ? L.t("PICK \(selected.name(at: 1))", "ELEGIR A \(selected.name(at: 1))")
-                     : step == 1 ? L.t("NEXT", "SIGUE")
-                     : auraReady ? L.t("DROP INTO THE DESK", "ENTRAR A LA MESA") : L.t("SCANNING…", "ESCANEANDO…"))
+                     : step == .forge && !auraReady ? L.t("SCANNING…", "ESCANEANDO…")
+                     : step == .forge && showsVibeStep ? L.t("NEXT", "SIGUE")
+                     : L.t("DROP INTO THE DESK", "ENTRAR A LA MESA"))
                     .font(.mono(12, .bold))
                     .kerning(1.7)
                 Spacer()
-                Image(systemName: step == 2 ? "arrow.right" : "checkmark")
+                Image(systemName: step == .choose ? "checkmark" : "arrow.right")
                     .font(.system(size: 13, weight: .bold))
             }
             .foregroundStyle(.black)
@@ -352,13 +377,21 @@ struct CompanionOnboarding: View {
             .background(tint)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .shadow(color: tint.opacity(0.30), radius: 14, y: 4)
-            .opacity(step == 2 && !auraReady ? 0.45 : 1)
+            .opacity(step == .forge && !auraReady ? 0.45 : 1)
             .animation(.easeOut(duration: 0.3), value: auraReady)
         }
-        .disabled(step == 2 && !auraReady)
+        .disabled(step == .forge && !auraReady)
+        .accessibilityIdentifier("onboarding-next")
         .padding(.horizontal, 18)
         .padding(.top, 8)
         .padding(.bottom, 10)
+    }
+
+    private func finish() {
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        ForgeAudio.shared.stop()
+        voice.stop()
+        withAnimation(.spring(duration: 0.5)) { profile.onboarded = true }
     }
 
     /// Selection is the identity moment: the companion becomes the agent.
