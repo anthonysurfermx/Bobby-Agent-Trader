@@ -161,13 +161,13 @@ final class TraderLandGateTests: XCTestCase {
         shot("archipelago-fixture")
 
         app.buttons["land-next-island"].tap()
-        XCTAssertEqual(focused.label, "Harbor of Patience")
+        XCTAssertEqual(focused.label, "Satoshi Nakamoto")
         app.buttons["land-next-island"].tap()
-        XCTAssertEqual(focused.label, "Quiet Reef")
+        XCTAssertEqual(focused.label, "Harbor of Patience")
         sleep(1)
         shot("visiting-neighbour")
         app.buttons["land-prev-island"].tap()
-        XCTAssertEqual(focused.label, "Harbor of Patience")
+        XCTAssertEqual(focused.label, "Satoshi Nakamoto")
 
         app.buttons["land-home-island"].tap()
         XCTAssertTrue(status.waitForExistence(timeout: 5))

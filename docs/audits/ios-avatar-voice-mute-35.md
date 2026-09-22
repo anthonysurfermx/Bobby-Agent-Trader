@@ -2,7 +2,7 @@
 
 Date: 2026-09-22. Follows `9028620`, preserving the restored machine, onboarding order and [complete bilingual catalog](ios-avatar-voice-35.md).
 
-**Subsequent combined candidate:** [Trader Land restoration](ios-traderland-restoration-2026-09-22.md) preserves these voice fixes and restores exploration/sharing. Use `output/traderland-restore-35/Bobby-1.2-35.xcarchive` for that candidate; the archive below records the voice-only revision.
+**Subsequent combined candidate:** [Trader Land restoration](ios-traderland-restoration-2026-09-22.md) preserves these voice fixes and restores exploration/sharing. The [permanent Satoshi Nakamoto showcase](ios-satoshi-showcase-35.md) is included in the latest combined archive, `output/satoshi-island-35/Bobby-1.2-35.xcarchive`; the archive below records the voice-only revision.
 
 ## Behavior
 

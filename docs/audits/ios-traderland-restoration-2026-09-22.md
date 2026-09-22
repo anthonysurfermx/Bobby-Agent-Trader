@@ -2,6 +2,8 @@
 
 Revisión del 22 de septiembre de 2026. Horas históricas en Lisboa (UTC+1).
 
+**Candidato posterior:** la petición de conservar Quiet Reef se implementa en [Satoshi Nakamoto como isla permanente](ios-satoshi-showcase-35.md). El archivo combinado más reciente está en `output/satoshi-island-35/Bobby-1.2-35.xcarchive`; el resto de este documento registra la revisión anterior.
+
 ## Hallazgo
 
 El código del archipiélago, las visitas, el nombre y los enlaces seguía presente. Un interruptor introducido por **Codex** ocultaba la exploración y el compartir en la versión distribuida. El nombre solo quedaba en los ajustes privados de una isla de cuenta. No fue una pérdida de esos archivos al cambiar de versión.

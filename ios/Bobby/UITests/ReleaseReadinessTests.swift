@@ -167,17 +167,33 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertEqual(toggle.label, audible, "Enabling voice is remembered too")
     }
 
-    /// The ordinary app path exposes exploration without a feature-enabling fixture flag.
+    /// No fixture flag: every installed app includes the permanent island.
     func testOrdinaryPracticeIslandCanZoomOutToTheArchipelago() {
+        verifyPermanentIsland(spanish: false)
+    }
+
+    func testSpanishOrdinaryPracticeIslandIncludesSatoshiNakamoto() {
+        verifyPermanentIsland(spanish: true)
+    }
+
+    private func verifyPermanentIsland(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-trader-land-gate", "-AppleLanguages", "(en)"]
+        app.launchArguments = ["-trader-land-gate", "-AppleLanguages", spanish ? "(es)" : "(en)"]
         app.launch()
         XCTAssertTrue(app.buttons["land-archipelago"].waitForExistence(timeout: 10))
-        for _ in 0..<4 { app.buttons["Zoom out"].tap() }
+        let status = app.staticTexts["land-fixed-status"]
+        let original = status.label
+        for _ in 0..<4 { app.buttons[spanish ? "Alejar" : "Zoom out"].tap() }
         XCTAssertTrue(app.descendants(matching: .any)["land-archipelago-card"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["land-share"].exists, "A guest cannot publish device-only practice progress")
+        app.buttons["land-next-island"].tap()
+        XCTAssertEqual(app.staticTexts["land-focused-island"].label, "Satoshi Nakamoto")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", spanish ? "Isla de muestra de Bobby" : "Bobby showcase island")).firstMatch.exists)
+        XCTAssertFalse(app.buttons["land-confirm"].exists, "The showcase is read-only")
+        islandShot(app, spanish ? "satoshi-nakamoto-es" : "satoshi-nakamoto-en")
         app.buttons["land-home-island"].tap()
-        XCTAssertTrue(app.staticTexts["land-fixed-status"].waitForExistence(timeout: 5))
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertEqual(status.label, original)
     }
 
     func testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish() {
@@ -201,7 +217,7 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertEqual(focused.label, spanish ? "Tu isla de práctica" : "Your practice island")
         islandShot(app, spanish ? "archipelago-es" : "archipelago-en")
         app.buttons["land-next-island"].tap()
-        XCTAssertEqual(focused.label, "Harbor of Patience")
+        XCTAssertEqual(focused.label, "Satoshi Nakamoto")
         XCTAssertFalse(app.buttons["land-confirm"].exists)
         islandShot(app, spanish ? "visit-es" : "visit-en")
         app.buttons["land-publish-cta"].tap()
@@ -260,7 +276,7 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertTrue(focused.waitForExistence(timeout: 5))
         XCTAssertEqual(focused.label, updated)
         app.buttons["land-next-island"].tap()
-        XCTAssertEqual(focused.label, "Harbor of Patience")
+        XCTAssertEqual(focused.label, "Satoshi Nakamoto")
         app.buttons["land-home-island"].tap()
         XCTAssertTrue(status.waitForExistence(timeout: 5))
         XCTAssertEqual(status.label, original)

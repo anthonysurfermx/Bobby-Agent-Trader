@@ -1,6 +1,24 @@
 import XCTest
 @testable import Bobby
 
+/// The community request is either empty or offline; no production transport is used.
+private final class ShowcaseCommunityProtocol: URLProtocol {
+    static var responseBody: Data?
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard let body = Self.responseBody else {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
 /// Island geometry, the archipelago layout and the headline's next action.
 final class TraderLandArchipelagoTests: XCTestCase {
     private func world(_ inventory: String) throws -> TraderLandWorld {
@@ -111,6 +129,55 @@ final class TraderLandArchipelagoTests: XCTestCase {
         let old = ArchipelagoScene(islands: [PublicIsland(code: "old", title: nil, size: 8, publishedAt: nil, placements: [], stats: nil)], showLots: false)
         XCTAssertEqual(old.islands.first?.freeCells.count, 60)
         XCTAssertEqual(old.islands.first?.sprites.first?.state.contentBounds, RuntimeBundle.items["aura_core"]?.artState("stage1")?.contentBounds)
+    }
+
+    func testPermanentShowcaseIsBuiltAndClearlyIdentified() throws {
+        let island = TraderLandShowcase.island
+        XCTAssertEqual(island.title, "Satoshi Nakamoto")
+        XCTAssertTrue(island.isShowcase)
+        XCTAssertEqual(island.coreSpot.stage, 1)
+        XCTAssertNil(island.publishedAt, "The sample must not pretend to be a recent user publication")
+        XCTAssertEqual(LandIslandStatus.published(island), L.t("Bobby showcase island", "Isla de muestra de Bobby"))
+        XCTAssertTrue(island.placements.contains { $0.item_id == "evidence_mines_mother_crystal" })
+        XCTAssertTrue(island.placements.contains { $0.item_id == "thesis_citadel_double_gate" })
+        XCTAssertEqual(island.placements.count, 10)
+        var occupied = island.coreSpot.cells
+        for placement in island.placements {
+            let item = try XCTUnwrap(RuntimeBundle.items[TraderLandCatalog.artID(placement.item_id)])
+            let cells = landCells(item, .init(uid: placement.item_id, itemId: item.id, col: placement.x, row: placement.y, orientation: placement.rotation == 90 ? .nwSE : .neSW))
+            XCTAssertTrue(GateLayout(size: island.size).contains(cells))
+            XCTAssertTrue(occupied.isDisjoint(with: cells), placement.item_id)
+            occupied.formUnion(cells)
+        }
+    }
+
+    func testShowcaseStaysFirstWithEmptyFullOrDuplicateCommunityResults() {
+        let sample = TraderLandShowcase.island
+        let community = (0..<30).map { PublicIsland(code: "user-\($0)", title: "Island \($0)", size: 8, publishedAt: nil, placements: [], stats: nil) }
+        XCTAssertEqual(TraderLandShowcase.neighbors(among: [], excluding: nil), [sample])
+        let merged = TraderLandShowcase.neighbors(among: community + [sample, sample], excluding: "user-0")
+        XCTAssertEqual(merged.count, 24)
+        XCTAssertEqual(merged.first, sample)
+        XCTAssertEqual(merged.filter(\.isShowcase).count, 1)
+        XCTAssertFalse(merged.contains { $0.code == "user-0" })
+        XCTAssertEqual(merged[1].code, "user-1")
+    }
+
+    @MainActor func testOfflineAndEmptyCommunityKeepThePermanentIslandAvailable() async {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [ShowcaseCommunityProtocol.self]
+        let transport = URLSession(configuration: config)
+        defer { transport.invalidateAndCancel(); ShowcaseCommunityProtocol.responseBody = nil }
+        let neighbors = TraderLandNeighbors(transport: transport)
+        ShowcaseCommunityProtocol.responseBody = nil
+        await neighbors.load(excluding: nil)
+        XCTAssertTrue(neighbors.failed)
+        XCTAssertTrue(neighbors.loaded)
+        XCTAssertEqual(TraderLandShowcase.neighbors(among: neighbors.islands, excluding: nil), [TraderLandShowcase.island])
+        ShowcaseCommunityProtocol.responseBody = Data(#"{"ok":true,"worlds":[]}"#.utf8)
+        await neighbors.load(excluding: nil)
+        XCTAssertFalse(neighbors.failed)
+        XCTAssertEqual(TraderLandShowcase.neighbors(among: neighbors.islands, excluding: nil), [TraderLandShowcase.island])
     }
 
 #if DEBUG

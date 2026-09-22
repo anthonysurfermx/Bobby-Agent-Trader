@@ -26,6 +26,7 @@ struct PublicIsland: Decodable, Identifiable, Equatable {
     let stats: Stats?
     var core: Core? = nil
     var id: String { code }
+    var isShowcase: Bool { code == TraderLandShowcase.code }
     /// The core to draw: 3,3 awake when the server sends none.
     var coreSpot: LandCore { core.map { LandCore(col: $0.x, row: $0.y, stage: $0.stage) } ?? .practice }
 }

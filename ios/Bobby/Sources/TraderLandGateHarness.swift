@@ -546,7 +546,7 @@ struct TraderLandGateHarnessView: View {
     }
     private var ownPublic: Bool { accountIsland && sync.world?.share?.public == true }
     private var publicNeighbors: [PublicIsland] {
-        return Array((fixtureIslands ?? neighbors.islands).filter { $0.code != ownCode }.prefix(24))
+        return TraderLandShowcase.neighbors(among: fixtureIslands ?? neighbors.islands, excluding: ownCode)
     }
     private var neighborsReady: Bool { fixtureIslands != nil || neighbors.loaded }
     private func availableInventory(_ itemID: String) -> TraderLandWorld.Inventory? {
@@ -650,7 +650,7 @@ struct TraderLandGateHarnessView: View {
                     placements = saved.placements; focusLevel = saved.focusLevel
                 }
             }
-            .task { await loadNeighbors() }
+            .task { rebuildScene(); await loadNeighbors() }
             .onReceive(sync.$world) { world in
                 guard accountIsland, let world else { return }
                 placements = world.placements.compactMap { placement in
@@ -1377,9 +1377,7 @@ struct TraderLandGateHarnessView: View {
     private var archipelagoCard: some View {
         let islands = scene.islands
         let current = visited.flatMap { islands.indices.contains($0) ? islands[$0].info : nil }
-        let loadFailed = islands.isEmpty && neighbors.failed && fixtureIslands == nil
-        // Loaded, nobody else public: the empty state speaks for your own island too.
-        let emptySea = neighborsReady && islands.isEmpty && !loadFailed
+        let loadFailed = neighbors.failed && fixtureIslands == nil
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text(archipelagoEyebrow).font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(1.4).foregroundStyle(Theme.muted)
@@ -1394,17 +1392,14 @@ struct TraderLandGateHarnessView: View {
                 Text(L.t("Looking for public islands…", "Buscando islas públicas…")).font(.system(size: 14)).foregroundStyle(Theme.muted)
             } else if loadFailed {
                 HStack(spacing: 10) {
-                    Text(L.t("The archipelago could not load. Check your connection.", "No se pudo cargar el archipiélago. Revisa tu conexión."))
+                    Text(L.t("Community islands could not load. You can still visit Satoshi Nakamoto.", "No se pudieron cargar las islas de la comunidad. Puedes visitar Satoshi Nakamoto."))
                         .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                     Button(L.t("Retry", "Reintentar")) { Task { await loadNeighbors() } }
                         .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accentSoft).frame(minHeight: 44)
                 }
-            } else if emptySea {
-                Text(ownPublic ? L.t("Your island is the first on the map. Others appear here as they publish.", "Tu isla es la primera del mapa. Las demás aparecerán aquí cuando se publiquen.")
-                     : L.t("No public islands yet. Publish yours and be the first.", "Todavía no hay islas públicas. Publica la tuya y abre el archipiélago."))
-                    .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
-            } else {
+            }
+            if !islands.isEmpty {
                 HStack(spacing: 6) {
                     arrow("chevron.left", label: L.t("Previous island", "Isla anterior"), id: "land-prev-island") { step(-1) }
                     VStack(alignment: .leading, spacing: 3) {
@@ -1420,9 +1415,7 @@ struct TraderLandGateHarnessView: View {
                 }
             }
             if ownPublic {
-                if !emptySea {
-                    Label(L.t("Your island is on the map.", "Tu isla está en el mapa."), systemImage: "globe").font(.system(size: 12)).foregroundStyle(Theme.accentSoft)
-                }
+                Label(L.t("Your island is on the map.", "Tu isla está en el mapa."), systemImage: "globe").font(.system(size: 12)).foregroundStyle(Theme.accentSoft)
             } else if publishHint {
                 Text(L.t("Sign in on the desk to publish. Your practice island stays on this device.", "Inicia sesión en la mesa para publicar. Tu isla de práctica se queda en este dispositivo."))
                     .font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)

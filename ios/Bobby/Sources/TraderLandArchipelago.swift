@@ -479,6 +479,7 @@ enum LandIslandStatus {
     }
 
     static func published(_ island: PublicIsland, now: Date = Date()) -> String? {
+        if island.isShowcase { return L.t("Bobby showcase island", "Isla de muestra de Bobby") }
         guard let date = date(island.publishedAt) else { return nil }
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = Locale(identifier: L.isSpanish ? "es" : "en")
@@ -509,6 +510,7 @@ enum ArchipelagoFixture {
         ]
         let formatter = ISO8601DateFormatter()
         return titles.indices.map { k in
+            if k == 1 { return TraderLandShowcase.island }
             let layout = GateLayout(size: sizes[k])
             let n = layout.size, shift = (n - 8) / 2
             let core = cores[k] ?? .init(x: 3, y: 3, stage: 1)
