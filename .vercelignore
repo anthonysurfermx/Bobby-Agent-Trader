@@ -1,3 +1,11 @@
 .claude/
 dist/
 docs/
+ios/
+output/
+.env*
+.ai/
+.codex/
+.agents/
+tmp/
+*.log
