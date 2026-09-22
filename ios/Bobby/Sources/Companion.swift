@@ -265,7 +265,7 @@ func levelTone(_ level: Int) -> String {
 // ---- Store ----------------------------------------------------
 
 final class CompanionStore: ObservableObject {
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
     private enum Key {
         static let companion = "companion.id"
         static let xp = "companion.disciplineXP"
@@ -279,6 +279,7 @@ final class CompanionStore: ObservableObject {
         static let routeIndex = "companion.routeIndex"
         static let owner = "companion.ownerUserId"
         static let syncedCompanion = "companion.syncedCompanionId"
+        static let unequipped = "companion.unequippedItems.v1"
     }
 
     @Published var companionId: String? {
@@ -296,6 +297,30 @@ final class CompanionStore: ObservableObject {
     /// Gear that just crossed its XP threshold (first read, then every 100 XP).
     /// The UI plays the unlock moment for each, in order, then clears it.
     @Published var pendingToolUnlocks: [CompanionTool] = []
+    /// Local outfit choices are separate from earned inventory and server XP.
+    private var equipmentKey: String { Key.unequipped + "." + (ownerUserId ?? "local") }
+    @Published private(set) var unequippedItemIDs: Set<String> {
+        didSet { defaults.set(unequippedItemIDs.sorted(), forKey: equipmentKey) }
+    }
+
+    func isEquipped(_ item: CatalogItem) -> Bool {
+        LockerLedger.state(item, ownId: companionId, xp: disciplineXP) == .owned && !unequippedItemIDs.contains(item.id)
+    }
+
+    func setEquipped(_ equipped: Bool, item: CatalogItem) {
+        guard LockerLedger.state(item, ownId: companionId, xp: disciplineXP) == .owned else { return }
+        if equipped { unequippedItemIDs.remove(item.id) } else { unequippedItemIDs.insert(item.id) }
+    }
+
+    func wornGear(for companionId: String) -> [CompanionTool] {
+        CompanionToolkit.wornGear(companionId: companionId, xp: disciplineXP).filter { !unequippedItemIDs.contains($0.id) }
+    }
+
+    func wornPet(for companionId: String) -> CompanionPet? {
+        guard CompanionToolkit.petUnlocked(companionId: companionId, xp: disciplineXP),
+              let pet = CompanionToolkit.pet(for: companionId), !unequippedItemIDs.contains(pet.id) else { return nil }
+        return pet
+    }
     /// Awards not yet acknowledged by the server (offline / signed out). The server re-applies the rules.
     /// Queue key is per account: awards earned under one Apple ID never travel to another.
     private var pendingKey: String { Key.pending + "." + (ownerUserId ?? "local") }
@@ -316,11 +341,13 @@ final class CompanionStore: ObservableObject {
         max(0, disciplineXP - pendingAwards.reduce(0) { $0 + ($1.kind == "no_trade_respected" ? 20 : 10) })
     }
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         companionId = defaults.string(forKey: Key.companion)
         disciplineXP = defaults.integer(forKey: Key.xp)
         disciplineStreak = defaults.integer(forKey: Key.streak)
         ownerUserId = defaults.string(forKey: Key.owner)
+        unequippedItemIDs = Set(defaults.stringArray(forKey: Key.unequipped + "." + (defaults.string(forKey: Key.owner) ?? "local")) ?? [])
         let queueKey = Key.pending + "." + (defaults.string(forKey: Key.owner) ?? "local")
         pendingAwards = defaults.data(forKey: queueKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
         syncedAt = defaults.object(forKey: Key.syncedAt) as? Date
@@ -363,16 +390,20 @@ final class CompanionStore: ObservableObject {
         syncedAt = nil
         if previous == nil {
             let local = pendingAwards
+            let localOutfit = unequippedItemIDs
             // Signing back in: what this account still owed the server from an
             // earlier session stays queued next to anything earned signed out.
             let saved = defaults.data(forKey: Key.pending + "." + userId)
                 .flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
             ownerUserId = userId
+            unequippedItemIDs = defaults.stringArray(forKey: equipmentKey).map { Set($0) } ?? localOutfit
+            defaults.removeObject(forKey: Key.unequipped + ".local")
             pendingAwards = saved + local.filter { award in !saved.contains { $0.id == award.id } }
             defaults.removeObject(forKey: Key.pending + ".local")
             return
         }
         ownerUserId = userId
+        unequippedItemIDs = Set(defaults.stringArray(forKey: equipmentKey) ?? [])
         pendingAwards = defaults.data(forKey: pendingKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
         disciplineXP = 0; disciplineStreak = 0; aura = 0; routeIndex = 0; syncedAt = nil
         defaults.removeObject(forKey: Key.lastDay); defaults.set(0, forKey: Key.dailyAwards); defaults.removeObject(forKey: Key.dailyAwardsDay)
@@ -382,6 +413,7 @@ final class CompanionStore: ObservableObject {
     func unbind() {
         guard ownerUserId != nil else { return }
         ownerUserId = nil
+        unequippedItemIDs = Set(defaults.stringArray(forKey: equipmentKey) ?? [])
         pendingAwards = defaults.data(forKey: pendingKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
         disciplineXP = 0; disciplineStreak = 0; aura = 0; routeIndex = 0; syncedAt = nil
         defaults.removeObject(forKey: Key.lastDay); defaults.set(0, forKey: Key.dailyAwards); defaults.removeObject(forKey: Key.dailyAwardsDay)
@@ -390,6 +422,7 @@ final class CompanionStore: ObservableObject {
     func forgetAccount(_ userId: String) {
         if ownerUserId == userId { unbind() }
         defaults.removeObject(forKey: Key.pending + "." + userId)
+        defaults.removeObject(forKey: Key.unequipped + "." + userId)
     }
 
     var companion: Companion? { bobbyCompanions.first { $0.id == companionId } }

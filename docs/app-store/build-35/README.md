@@ -9,18 +9,20 @@ Prepared September 22, 2026. This replaces the build-34 metadata. **Preparation 
 - `APP-PRIVACY-ANSWERS.md`: seven data categories to enter and verify in App Privacy. No tracking.
 - `screenshots/<locale>`: five reviewed, original, full-resolution iPhone 17 Pro Max screenshots per language (ten total). Do not use old microphone/live-call screenshots.
 - `MODERATION-RUNBOOK.md`: production rollout, report review and withdrawal procedure.
-- `verification/`: archive identity, final four-test English/Spanish UI result, production smoke checks and rollout evidence.
-- Local build and test evidence: `output/app-store-ready-35/` (ignored by Git).
+- `verification/`: current archive identity, equipment test summary, original store UI result, production smoke checks and rollout evidence.
+- Local build and test evidence: `output/app-store-ready-35/` and `output/optional-equipment-35/` (ignored by Git).
 
-The final Release archive is `output/app-store-ready-35/Bobby-1.2-35.xcarchive`. Its executable SHA-256 is `957c9c4879495c96e98146926fb1df285d157a2a15c818ce815d8c57158d95f3`. The executable and dSYM both have UUID `C6D5B488-2F81-3D52-A33E-3AC44B6BFD4D`. Use this identity to distinguish the new candidate from the earlier phone build, which also displays 1.2 (35). Archive verification confirms 108 bundled voice files, seven privacy categories and no microphone permission.
+The final Release archive is `output/optional-equipment-35/Bobby-1.2-35.xcarchive`. Its executable SHA-256 is `7344a0e825fe238417d21c5c7ec64669e92ae43a93f013ed2bf30223786dd5d8`. The executable and dSYM both have UUID `E5690293-5622-3025-A39B-5AA3300CA61A`. Use this identity to distinguish the new candidate from the earlier phone build, which also displays 1.2 (35). Archive verification confirms 108 bundled voice files, seven privacy categories and no microphone permission.
 
-This exact development-signed candidate was installed successfully on the connected iPhone 17 Pro. Automatic launch was refused because the phone was locked; unlock the phone and open Bobby. Installation does not replace the remaining real-account and TestFlight checks.
+This exact development-signed candidate was installed successfully on the connected iPhone 17 Pro. Automatic launch also succeeded. The installation and launch records are retained in `output/optional-equipment-35/`. Installation does not replace the remaining real-account and TestFlight checks.
 
-The native candidate restores the three onboarding steps, machine audio, 18 companions with 108 bundled English/Spanish style clips, persistent narration mute, archipelago navigation, island naming/sharing, and the permanent Satoshi Nakamoto showcase. This preparation adds reports, persistent creator blocks, moderation before publication, consent version 4, support and current privacy disclosures.
+The native candidate restores the three onboarding steps, machine audio, 18 companions with 108 bundled English/Spanish style clips, persistent narration mute, archipelago navigation, island naming/sharing, and the permanent Satoshi Nakamoto showcase. This preparation adds reports, persistent creator blocks, moderation before publication, consent version 4, support and current privacy disclosures. The latest native candidate also lets users equip or store earned accessories and pets without changing ownership or XP. Outfit preferences persist per account on this device; they are not synced to other devices.
 
 Suggested screenshot order in each locale: analysis debate (`04`), companion selection (`01`), style selection (`02`), Squad (`03`), Trader Land (`05`). Keep the same order in both languages. The extra verdict capture repeated the analysis view and is excluded from the store package; the original remains in the local result bundle.
 
-Verification records 157 distinct native tests passing across the unit, release-readiness and final UI runs, plus 557 backend/database checks. The final four-test run passed both languages for community controls and the real analysis-to-Trader-Land flow, including the repaired Spanish scroll freeze. Earlier failures and the interrupted reproduction are retained in the audit; these totals do not imply one clean run or production account-lifecycle coverage.
+The original store preparation records 157 distinct native tests passing across the unit, release-readiness and final UI runs, plus 557 backend/database checks. The final four-test run passed both languages for community controls and the real analysis-to-Trader-Land flow, including the repaired Spanish scroll freeze. Earlier failures and the interrupted reproduction are retained in the audit; these totals do not imply one clean run or production account-lifecycle coverage.
+
+The equipment update passed a separate run of **147 tests** (144 unit tests, English/Spanish equipment flows and the existing locker regression), with no failures. The unit suite includes the previous 139 tests, so these totals must not be added together as distinct tests. See [the equipment audit](../../audits/ios-optional-equipment-35.md). The earlier archive identity is retained in `verification/archive-verification-before-equipment.json`.
 
 ## URLs and store fields
 
@@ -59,14 +61,14 @@ npm run build
 xcodegen generate --spec ios/Bobby/project.yml
 xcodebuild -project ios/Bobby/Bobby.xcodeproj -scheme Bobby \
   -configuration Release -destination 'generic/platform=iOS' \
-  -archivePath output/app-store-ready-35/Bobby-1.2-35.xcarchive archive
+  -archivePath output/rebuilt-35/Bobby-1.2-35.xcarchive archive
 xcodebuild -exportArchive \
-  -archivePath output/app-store-ready-35/Bobby-1.2-35.xcarchive \
+  -archivePath output/optional-equipment-35/Bobby-1.2-35.xcarchive \
   -exportPath output/app-store-ready-35/app-store-export \
   -exportOptionsPlist ios/Bobby/ExportOptions-External.plist \
   -allowProvisioningUpdates
 ```
 
-Use a new archive path for subsequent builds to retain the verified candidate. Export options disable automatic build-number changes and use `app-store-connect`; they do not upload or submit automatically. Distribution signing must be resolved first. Do not upload an older archive merely because it exports successfully.
+The rebuild command writes a separate archive; the export command targets the verified equipment candidate. Use a new archive path for subsequent builds to retain both. Export options disable automatic build-number changes and use `app-store-connect`; they do not upload or submit automatically. Distribution signing must be resolved first. Do not upload an older archive merely because it exports successfully.
 
 Apple references: [user-generated content](https://developer.apple.com/app-store/review/guidelines/#user-generated-content), [privacy disclosures](https://developer.apple.com/app-store/app-privacy-details/), [screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications). The 1320 × 2868 RGB PNG captures meet the 6.9-inch screenshot dimensions and contain no alpha channel.

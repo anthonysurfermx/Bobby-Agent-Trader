@@ -192,7 +192,8 @@ enum CompanionToolkit {
 /// The three gear slots under the companion: locked, unlocked, golden.
 struct ToolBelt: View {
     let companion: Companion
-    let xp: Int
+    @ObservedObject var store: CompanionStore
+    private var xp: Int { store.disciplineXP }
     var onTap: ((CompanionTool) -> Void)? = nil
     var onPet: (() -> Void)? = nil
     var onPlus: (() -> Void)? = nil
@@ -204,6 +205,7 @@ struct ToolBelt: View {
         HStack(spacing: 10) {
             ForEach(CompanionToolkit.tools(for: companion.id)) { tool in
                 let unlocked = CompanionToolkit.unlocked(tool, xp: xp)
+                let equipped = store.isEquipped(.tool(tool, companion))
                 Button { onTap?(tool) } label: {
                     ZStack {
                         Circle()
@@ -223,10 +225,13 @@ struct ToolBelt: View {
                         }
                     }
                     .frame(width: 38, height: 38)
+                    .opacity(unlocked && !equipped ? 0.5 : 1)
                     .shadow(color: unlocked && tool.isGolden ? Color(red: 0.96, green: 0.77, blue: 0.26).opacity(0.35) : .clear, radius: 8)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(unlocked ? tool.name : L.t("\(tool.name), unlocks at \(tool.unlockXP) XP", "\(tool.name), se desbloquea con \(tool.unlockXP) XP"))
+                .accessibilityValue(unlocked ? (equipped ? L.t("Equipped", "Equipado") : L.t("Stored", "Guardado")) : L.t("Locked", "Bloqueado"))
+                .accessibilityIdentifier("belt-tool-\(tool.id)")
             }
             // The pet slot: the companion's own animal, at 500 XP.
             if let pet = CompanionToolkit.pet(for: companion.id) {
@@ -241,9 +246,12 @@ struct ToolBelt: View {
                         }
                     }
                     .frame(width: 38, height: 38)
+                    .opacity(has && store.wornPet(for: companion.id) == nil ? 0.5 : 1)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(has ? pet.name : L.t("Pet, unlocks at \(CompanionPet.unlockXP) XP", "Mascota, se desbloquea con \(CompanionPet.unlockXP) XP"))
+                .accessibilityValue(has ? (store.wornPet(for: companion.id) != nil ? L.t("Equipped", "Equipado") : L.t("Stored", "Guardado")) : L.t("Locked", "Bloqueado"))
+                .accessibilityIdentifier("belt-pet-\(companion.id)")
             }
             // "+": the locker — the whole squad and everything it can earn.
             let fresh = LockerSeen.unseen(ownId: companion.id, xp: xp, raw: lockerSeen).count
@@ -386,7 +394,7 @@ struct WorldMapSheet: View {
 struct ToolUnlockOverlay: View {
     let companion: Companion
     let tool: CompanionTool
-    let onDismiss: () -> Void
+    let onDismiss: (Bool) -> Void
 
     @State private var shown = false
     private var gold: Color { Color(red: 0.96, green: 0.77, blue: 0.26) }
@@ -425,7 +433,7 @@ struct ToolUnlockOverlay: View {
                     .foregroundStyle(Theme.text)
                 HStack(spacing: 8) {
                     CompanionThumb(companion: companion).frame(width: 26, height: 26).clipShape(Circle())
-                    Text(L.t("equipped on \(companion.name(at: 1))", "equipado en \(companion.name(at: 1))"))
+                    Text(L.t("for \(companion.name(at: 1))", "para \(companion.name(at: 1))"))
                         .font(.rounded(13, .medium)).foregroundStyle(Theme.text.opacity(0.8))
                 }
                 Text("\(tool.tierLabel) · \(tool.unlockXP) XP")
@@ -439,7 +447,7 @@ struct ToolUnlockOverlay: View {
                     .padding(.horizontal, 32)
                 Button {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onDismiss()
+                    onDismiss(true)
                 } label: {
                     Text(L.t("EQUIP IT", "EQUIPARLO"))
                         .font(.mono(12, .bold))
@@ -451,6 +459,9 @@ struct ToolUnlockOverlay: View {
                         .clipShape(Capsule())
                 }
                 .padding(.top, 6)
+                Button(L.t("KEEP FOR LATER", "GUARDAR PARA DESPUÉS")) { onDismiss(false) }
+                    .font(.mono(11, .bold)).foregroundStyle(Theme.text.opacity(0.8))
+                    .frame(minHeight: 44).accessibilityIdentifier("gear-unlock-store")
             }
             .opacity(shown ? 1 : 0)
         }
@@ -466,48 +477,83 @@ struct ToolUnlockOverlay: View {
 struct ToolDetailSheet: View {
     let companion: Companion
     let tool: CompanionTool
-    let xp: Int
+    @ObservedObject var store: CompanionStore
+    var onEquip: () -> Void = {}
+    private var xp: Int { store.disciplineXP }
 
     private var gold: Color { Color(red: 0.96, green: 0.77, blue: 0.26) }
     private var unlocked: Bool { CompanionToolkit.unlocked(tool, xp: xp) }
     private var tint: Color { tool.isGolden ? gold : companion.tint }
 
     var body: some View {
-        VStack(spacing: 14) {
-            Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
-            ZStack {
-                Circle().fill(tint.opacity(unlocked ? 0.12 : 0.04)).frame(width: 150, height: 150)
-                Circle().stroke(tint.opacity(unlocked ? 0.6 : 0.2), lineWidth: 1).frame(width: 150, height: 150)
-                if unlocked, tool.hasArt {
-                    Image(tool.assetName).resizable().scaledToFit().frame(width: 134, height: 134).clipShape(Circle())
-                } else {
-                    Image(systemName: unlocked ? tool.symbol : "lock.fill")
-                        .font(.system(size: 44, weight: .bold))
-                        .foregroundStyle(unlocked ? tint : Theme.muted)
+        ScrollView {
+            VStack(spacing: 14) {
+                Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
+                ZStack {
+                    Circle().fill(tint.opacity(unlocked ? 0.12 : 0.04)).frame(width: 150, height: 150)
+                    Circle().stroke(tint.opacity(unlocked ? 0.6 : 0.2), lineWidth: 1).frame(width: 150, height: 150)
+                    if unlocked, tool.hasArt {
+                        Image(tool.assetName).resizable().scaledToFit().frame(width: 134, height: 134).clipShape(Circle())
+                    } else {
+                        Image(systemName: unlocked ? tool.symbol : "lock.fill")
+                            .font(.system(size: 44, weight: .bold))
+                            .foregroundStyle(unlocked ? tint : Theme.muted)
+                    }
+                }
+                .saturation(unlocked ? 1 : 0)
+                Text(unlocked ? tool.name : "???")
+                    .font(.rounded(22, .bold))
+                    .foregroundStyle(Theme.text)
+                Text(unlocked
+                     ? "\(tool.tierLabel) · \(companion.name(at: 1))"
+                     : L.t("\(tool.tierLabel) · UNLOCKS AT \(tool.unlockXP) XP · YOU HAVE \(xp)", "\(tool.tierLabel) · SE DESBLOQUEA A \(tool.unlockXP) XP · LLEVAS \(xp)"))
+                    .font(.mono(10, .bold))
+                    .kerning(1.3)
+                    .foregroundStyle(Theme.muted)
+                Text(unlocked
+                     ? tool.lore
+                     : (tool.tier == 1
+                        ? L.t("Drops after your first full read.", "Cae después de tu primera lectura completa.")
+                        : L.t("Discipline only: reads and coming back. Never volume.", "Solo disciplina: lecturas y volver. Nunca volumen.")))
+                    .font(.rounded(14, .medium))
+                    .foregroundStyle(Theme.text.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+                if unlocked {
+                    EquipmentControl(store: store, item: .tool(tool, companion), onEquip: onEquip)
                 }
             }
-            .saturation(unlocked ? 1 : 0)
-            Text(unlocked ? tool.name : "???")
-                .font(.rounded(22, .bold))
-                .foregroundStyle(Theme.text)
-            Text(unlocked
-                 ? "\(tool.tierLabel) · \(companion.name(at: 1))"
-                 : L.t("\(tool.tierLabel) · UNLOCKS AT \(tool.unlockXP) XP · YOU HAVE \(xp)", "\(tool.tierLabel) · SE DESBLOQUEA A \(tool.unlockXP) XP · LLEVAS \(xp)"))
-                .font(.mono(10, .bold))
-                .kerning(1.3)
-                .foregroundStyle(Theme.muted)
-            Text(unlocked
-                 ? tool.lore
-                 : (tool.tier == 1
-                    ? L.t("Drops after your first full read.", "Cae después de tu primera lectura completa.")
-                    : L.t("Discipline only: reads and coming back. Never volume.", "Solo disciplina: lecturas y volver. Nunca volumen.")))
-                .font(.rounded(14, .medium))
-                .foregroundStyle(Theme.text.opacity(0.8))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 28)
-            Spacer(minLength: 0)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity)
         }
-        .padding(.bottom, 16)
+    }
+}
+
+/// Removing a piece changes the outfit, never its ownership or XP threshold.
+struct EquipmentControl: View {
+    @ObservedObject var store: CompanionStore
+    let item: CatalogItem
+    var onEquip: () -> Void = {}
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let equipped = store.isEquipped(item)
+        VStack(spacing: 8) {
+            Button {
+                store.setEquipped(!equipped, item: item)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                if !equipped { onEquip() }
+                dismiss()
+            } label: {
+                Label(equipped ? L.t("UNEQUIP", "QUITAR") : L.t("EQUIP", "EQUIPAR"), systemImage: equipped ? "minus.circle" : "plus.circle")
+                    .font(.mono(12, .bold)).frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent).tint(item.companion.tint).foregroundStyle(.black)
+            .accessibilityIdentifier("equipment-toggle-\(item.id)")
+            .accessibilityValue(equipped ? L.t("Equipped", "Equipado") : L.t("Stored", "Guardado"))
+            Text(L.t("Stays in your collection. Your XP stays the same.", "Se queda en tu colección. Conservas tu XP."))
+                .font(.rounded(12, .medium)).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
+        }.padding(.horizontal, 24)
     }
 }
 
@@ -601,7 +647,7 @@ enum SkinCard {
             sub.draw(at: CGPoint(x: (size.width - sub.size().width) / 2, y: 1024 + dy))
             var line = gear.map { $0.name }
             if let pet { line.append(pet.name) }
-            let gearText = line.isEmpty ? L.t("No gear yet — first read drops the first tool.", "Aún sin accesorios — tu primera lectura suelta el primero.") : line.joined(separator: " · ")
+            let gearText = line.isEmpty ? L.t("No accessories equipped.", "Sin accesorios equipados.") : line.joined(separator: " · ")
             let gearAttr = NSAttributedString(string: gearText, attributes: [.font: UIFont.systemFont(ofSize: 28, weight: .medium), .foregroundColor: UIColor.white.withAlphaComponent(0.8)])
             let gearRect = CGRect(x: 90, y: 1090 + dy, width: size.width - 180, height: 120)
             gearAttr.draw(with: gearRect, options: [.usesLineFragmentOrigin], context: nil)
@@ -623,23 +669,27 @@ struct ShareSheet: UIViewControllerRepresentable {
 /// The pet slot, tapped: what it is, or what it takes.
 struct PetDetailSheet: View {
     let companion: Companion
-    let xp: Int
+    @ObservedObject var store: CompanionStore
+    private var xp: Int { store.disciplineXP }
     var body: some View {
         let pet = CompanionToolkit.pet(for: companion.id)
         let has = CompanionToolkit.petUnlocked(companionId: companion.id, xp: xp)
-        VStack(spacing: 12) {
-            Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
-            if let pet, pet.hasArt {
-                Image(pet.assetName).resizable().scaledToFit().frame(width: 150, height: 150).saturation(has ? 1 : 0.15)
-            } else {
-                Text(pet?.emoji ?? "🐾").font(.system(size: 96)).saturation(has ? 1 : 0.15)
+        ScrollView {
+            VStack(spacing: 12) {
+                Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
+                if let pet, pet.hasArt {
+                    Image(pet.assetName).resizable().scaledToFit().frame(width: 150, height: 150).saturation(has ? 1 : 0.15)
+                } else {
+                    Text(pet?.emoji ?? "🐾").font(.system(size: 96)).saturation(has ? 1 : 0.15)
+                }
+                Text(pet?.name ?? "").font(.rounded(22, .bold)).foregroundStyle(Theme.text)
+                Text(has
+                     ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en la mesa.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."))
+                     : L.t("Unlocks at \(CompanionPet.unlockXP) XP · you have \(xp). Discipline only.", "Se desbloquea a \(CompanionPet.unlockXP) XP · llevas \(xp). Solo disciplina."))
+                    .font(.rounded(14, .medium)).foregroundStyle(Theme.text.opacity(0.75)).multilineTextAlignment(.center).padding(.horizontal, 28)
+                if has, let pet { EquipmentControl(store: store, item: .pet(pet, companion)) }
             }
-            Text(pet?.name ?? "").font(.rounded(22, .bold)).foregroundStyle(Theme.text)
-            Text(has
-                 ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en la mesa.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."))
-                 : L.t("Unlocks at \(CompanionPet.unlockXP) XP · you have \(xp). Discipline only.", "Se desbloquea a \(CompanionPet.unlockXP) XP · llevas \(xp). Solo disciplina."))
-                .font(.rounded(14, .medium)).foregroundStyle(Theme.text.opacity(0.75)).multilineTextAlignment(.center).padding(.horizontal, 28)
-            Spacer()
+            .frame(maxWidth: .infinity).padding(.bottom, 16)
         }
     }
 }

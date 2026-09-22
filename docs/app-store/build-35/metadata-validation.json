@@ -3,7 +3,7 @@
   "fields": [
     {
       "file": "metadata/app-review-notes-en.txt",
-      "characters": 3909,
+      "characters": 3996,
       "limit": 4000,
       "pass": true
     },
@@ -39,7 +39,7 @@
     },
     {
       "file": "metadata/en-US/whats-new.txt",
-      "characters": 403,
+      "characters": 490,
       "limit": 4000,
       "pass": true
     },
@@ -75,7 +75,7 @@
     },
     {
       "file": "metadata/es-MX/whats-new.txt",
-      "characters": 420,
+      "characters": 490,
       "limit": 4000,
       "pass": true
     }

@@ -545,13 +545,13 @@ struct ContentView: View {
             if vm.companions.pendingEvolution == nil,
                let drop = vm.companions.pendingToolUnlocks.first,
                let comp = vm.companions.companion {
-                ToolUnlockOverlay(companion: comp, tool: drop) {
+                ToolUnlockOverlay(companion: comp, tool: drop) { equipped in
+                    vm.companions.setEquipped(equipped, item: .tool(drop, comp))
                     withAnimation(.easeOut(duration: 0.3)) { _ = vm.companions.pendingToolUnlocks.removeFirst() }
-                    // Now it is worn: play the equip flight on the desk scene.
-                    // Celebrated here, so the locker does not flag it NEW.
+                    // Only the explicit equip choice plays the flight; either
+                    // choice celebrates ownership, so the locker does not flag it NEW.
                     LockerSeen.mark([drop.id])
-                    equipToolId = drop.id
-                    equipToken += 1
+                    if equipped { equipToolId = drop.id; equipToken += 1 }
                 }
                 .transition(.opacity)
                 .zIndex(11)
@@ -604,12 +604,14 @@ struct ContentView: View {
             AssetBoardView(vm: vm)
         }
         .sheet(item: $inspectedTool) { tool in
-            ToolDetailSheet(companion: vm.companions.companion ?? bobbyCompanions[0], tool: tool, xp: vm.companions.disciplineXP)
-                .presentationDetents([.medium])
+            ToolDetailSheet(companion: vm.companions.companion ?? bobbyCompanions[0], tool: tool, store: vm.companions) {
+                equipToolId = tool.id; equipToken += 1
+            }
+                .presentationDetents([.medium, .large])
                 .presentationBackground(Theme.bg)
         }
         .sheet(isPresented: $showCatalog) {
-            // The locker. SEE IT WORN closes it, then the piece flies onto the desk companion.
+            // Equipping closes the locker, then the piece flies onto the desk companion.
             SquadLockerSheet(store: vm.companions) { tool in
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
                     equipToolId = tool.id
@@ -632,15 +634,15 @@ struct ContentView: View {
                 .presentationBackground(Theme.bg)
         }
         .sheet(isPresented: $petDetail) {
-            PetDetailSheet(companion: vm.companions.companion ?? bobbyCompanions[0], xp: vm.companions.disciplineXP)
-                .presentationDetents([.medium])
+            PetDetailSheet(companion: vm.companions.companion ?? bobbyCompanions[0], store: vm.companions)
+                .presentationDetents([.medium, .large])
                 .presentationBackground(Theme.bg)
         }
         .sheet(item: $skinShot) { card in
             if let comp = vm.companions.companion {
                 SkinShareSheet(card: card, companion: comp, level: vm.companions.level,
-                               gear: CompanionToolkit.wornGear(companionId: comp.id, xp: vm.companions.disciplineXP),
-                               pet: CompanionToolkit.petUnlocked(companionId: comp.id, xp: vm.companions.disciplineXP) ? CompanionToolkit.pet(for: comp.id) : nil,
+                               gear: vm.companions.wornGear(for: comp.id),
+                               pet: vm.companions.wornPet(for: comp.id),
                                xp: vm.companions.disciplineXP)
             }
         }
@@ -867,9 +869,9 @@ struct ContentView: View {
                             // Worn gear and the pet ride on the body — the Fortnite effect.
                             // Pieces still waiting in the loot queue are not worn yet: they
                             // fly onto the body when the human taps EQUIP IT.
-                            gear: CompanionToolkit.wornGear(companionId: comp.id, xp: vm.companions.disciplineXP)
+                            gear: vm.companions.wornGear(for: comp.id)
                                 .filter { tool in !vm.companions.pendingToolUnlocks.contains(where: { $0.id == tool.id }) },
-                            pet: CompanionToolkit.petUnlocked(companionId: comp.id, xp: vm.companions.disciplineXP) ? CompanionToolkit.pet(for: comp.id) : nil,
+                            pet: vm.companions.wornPet(for: comp.id),
                             equipToolId: equipToolId,
                             equipToken: equipToken,
                             snapshotToken: skinSnapshotToken,
@@ -932,7 +934,7 @@ struct ContentView: View {
             // The gear belt: three slots that fill with discipline — first
             // read, then every 100 XP, the last one golden.
             if let comp = vm.companions.companion {
-                ToolBelt(companion: comp, xp: vm.companions.disciplineXP, onTap: { tool in
+                ToolBelt(companion: comp, store: vm.companions, onTap: { tool in
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     inspectedTool = tool
                 }, onPet: {

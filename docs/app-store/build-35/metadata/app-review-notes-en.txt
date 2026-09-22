@@ -4,7 +4,7 @@ Review path without an account:
 1. On first launch, acknowledge the notices explaining OpenAI analysis and optional speech generation by OpenAI or Microsoft, plus the educational scope and market risk.
 2. Complete all three onboarding steps: companion, aura machine and style (Chill, Direct or Pro). The speaker control mutes narration immediately and remembers the preference across relaunches.
 3. Type "What supports and weakens the case for Bitcoin?" or "What supports and weakens the case for NVIDIA?". Alpha Hunter builds the case, Red Team challenges it and CIO weighs both. The chart and analysis show their source, instrument, timeframe and timestamp. A NO TRADE / wait conclusion is valid.
-4. Open the Squad gallery to choose another companion and preview its voice. The same narration mute applies to onboarding, the desk and this gallery.
+4. Open the Squad gallery to choose another companion and preview its voice. The same narration mute applies to onboarding, the desk and this gallery. Tap earned items below the avatar to equip or unequip them without losing items or XP.
 5. Open Trader Land from the desk. Zoom out below 60% or tap the archipelago button. Visit islands using the arrows, and choose "Back to my island" to return. "Satoshi Nakamoto" is a permanent, clearly labeled Bobby showcase, available offline; it is not a user account. Visits give no XP.
 
 Account and public islands:

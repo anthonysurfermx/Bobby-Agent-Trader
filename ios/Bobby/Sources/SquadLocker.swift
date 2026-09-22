@@ -196,7 +196,7 @@ private struct ItemArt: View {
 
 struct SquadLockerSheet: View {
     @ObservedObject var store: CompanionStore
-    /// Your own gear, replayed on the desk: the sheet closes, then it flies on.
+    /// Newly equipped gear flies onto the desk after the sheet closes.
     var onSeeItWorn: ((CompanionTool) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
@@ -357,6 +357,7 @@ struct SquadLockerSheet: View {
                     isOwn: c.id == ownId,
                     xp: xp,
                     ownId: ownId,
+                    unequippedIDs: store.unequippedItemIDs,
                     live: abs(i - index) <= (lean ? 0 : 1),
                     active: i == index && scenePhase == .active,
                     focus: i == index ? $focus : .constant(nil),
@@ -366,11 +367,13 @@ struct SquadLockerSheet: View {
                     appeared: appeared,
                     onPulse: { pulses[c.id, default: 0] += 1 },
                     onStep: step,
-                    onSeeItWorn: { tool in
+                    onChangeEquipment: { item in
+                        let equipped = store.isEquipped(item)
+                        store.setEquipped(!equipped, item: item)
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         LockerSeen.mark(ownedIds(on: c))
                         dismiss()
-                        onSeeItWorn?(tool)
+                        if !equipped, let tool = item.tool { onSeeItWorn?(tool) }
                     }
                 )
                 .tag(c.id)
@@ -412,6 +415,7 @@ private struct LockerPage: View {
     let isOwn: Bool
     let xp: Int
     let ownId: String?
+    let unequippedIDs: Set<String>
     let live: Bool
     let active: Bool
     @Binding var focus: String?
@@ -421,7 +425,7 @@ private struct LockerPage: View {
     let appeared: Bool
     let onPulse: () -> Void
     let onStep: (Int) -> Void
-    let onSeeItWorn: (CompanionTool) -> Void
+    let onChangeEquipment: (CatalogItem) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var stageState = "loading"
@@ -524,8 +528,9 @@ private struct LockerPage: View {
                     if let item = focused {
                         LockerShowcase(item: item,
                                        state: LockerLedger.state(item, ownId: ownId, xp: xp),
-                                       canWear: isOwn && item.tool != nil && !pendingIds.contains(item.id),
-                                       onSeeItWorn: { if let t = item.tool { onSeeItWorn(t) } })
+                                       canWear: isOwn && !pendingIds.contains(item.id),
+                                       equipped: !unequippedIDs.contains(item.id),
+                                       onSeeItWorn: { onChangeEquipment(item) })
                             .id(item.id)
                             .transition(reduceMotion ? .opacity : .scale(scale: 0.5, anchor: .bottom).combined(with: .opacity))
                     }
@@ -792,6 +797,7 @@ private struct LockerShowcase: View {
     let item: CatalogItem
     let state: LockerState
     let canWear: Bool
+    let equipped: Bool
     let onSeeItWorn: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -832,7 +838,7 @@ private struct LockerShowcase: View {
                 .frame(width: 150)
             if canWear && owned {
                 Button(action: onSeeItWorn) {
-                    Text(L.t("SEE IT WORN ›", "VERLO PUESTO ›"))
+                    Text(equipped ? L.t("UNEQUIP ›", "QUITAR ›") : L.t("EQUIP ›", "EQUIPAR ›"))
                         .font(.mono(9, .bold)).kerning(1.2)
                         .foregroundStyle(accent)
                         .padding(.horizontal, 12).frame(height: 32)
@@ -842,6 +848,7 @@ private struct LockerShowcase: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("locker-see-worn")
+                .accessibilityValue(equipped ? L.t("Equipped", "Equipado") : L.t("Stored", "Guardado"))
             }
         }
         .frame(width: 150)

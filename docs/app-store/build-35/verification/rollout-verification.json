@@ -31,8 +31,12 @@
     "version": "1.2",
     "build": "35",
     "installedFromFinalArchive": true,
-    "automaticLaunch": "refused: device locked",
-    "realAppleAccountLifecycle": "pending"
+    "automaticLaunch": "succeeded",
+    "realAppleAccountLifecycle": "pending",
+    "nativeBinarySha256": "7344a0e825fe238417d21c5c7ec64669e92ae43a93f013ed2bf30223786dd5d8",
+    "nativeArchive": "output/optional-equipment-35/Bobby-1.2-35.xcarchive",
+    "installationEvidence": "output/optional-equipment-35/phone-install.json",
+    "launchEvidence": "output/optional-equipment-35/phone-launch.json"
   },
   "appIconSource": {
     "width": 1024,

@@ -1,5 +1,7 @@
 # Bobby 1.2 (35): submission preparation, September 22, 2026
 
+Native candidate update: the archive and phone installation described below are historical. The newer [optional-equipment candidate](ios-optional-equipment-35.md) supersedes them; the current identity is in the store handoff. Backend rollout evidence and unresolved release gates below remain applicable.
+
 Status: **native candidate prepared and installed, production schema/backend deployed; distribution signing, account-lifecycle evidence and confirmed support ownership remain release gates.** Nothing was uploaded to App Store Connect or submitted for review by this work.
 
 ## Changes

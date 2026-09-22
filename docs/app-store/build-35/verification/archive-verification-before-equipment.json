@@ -7,8 +7,8 @@
   "deviceFamily": [
     1
   ],
-  "binarySha256": "7344a0e825fe238417d21c5c7ec64669e92ae43a93f013ed2bf30223786dd5d8",
-  "binaryAndDSYMUUID": "E5690293-5622-3025-A39B-5AA3300CA61A",
+  "binarySha256": "957c9c4879495c96e98146926fb1df285d157a2a15c818ce815d8c57158d95f3",
+  "binaryAndDSYMUUID": "C6D5B488-2F81-3D52-A33E-3AC44B6BFD4D",
   "bundledVoiceFiles": 108,
   "privacyTypes": [
     "NSPrivacyCollectedDataTypeOtherUserContent",
@@ -21,7 +21,6 @@
   ],
   "tracking": false,
   "microphonePermission": false,
-  "archive": "output/optional-equipment-35/Bobby-1.2-35.xcarchive",
-  "optionalEquipment": true,
-  "distributionSigningPreflight": "Previously blocked: no Xcode accounts / no distribution certificate; export not retried for this equipment-only update"
+  "archive": "output/app-store-ready-35/Bobby-1.2-35.xcarchive",
+  "distributionSigningPreflight": "blocked: no Xcode accounts / no distribution certificate; same bundle and signing configuration"
 }
