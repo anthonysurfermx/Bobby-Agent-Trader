@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PTS Home señales</title>
+<style>
+:root{
+  --bg:#06080A; --board:#0B0E12; --panel:#10141A;
+  --ink:#FFFFFF; --ink-2:#A9B0BA; --ink-3:#7E8793;
+  --gold:#DBB366; --gold-soft:#FAE0A6; --gold-deep:#70502A;
+  --gold-14:rgba(219,179,102,.14); --gold-45:rgba(219,179,102,.45);
+  --surface:rgba(255,255,255,.04); --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.18);
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--board)}
+body{background:var(--board);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;line-height:1.35}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:left}
+
+/* ---------- board ---------- */
+.board{max-width:1500px;margin:0 auto;padding:40px 32px 72px}
+.board-head{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:34px}
+.board-head h1{font-size:30px;font-weight:500;letter-spacing:-.6px}
+.board-head h1 b{font-weight:900;letter-spacing:3px;margin-right:10px}
+.board-head p{color:var(--ink-2);font-size:14px;max-width:780px;margin-top:6px}
+.notice{font:600 11px var(--mono);letter-spacing:1.1px;color:var(--gold);border:1px solid var(--gold-45);border-radius:999px;padding:7px 12px}
+.frames{display:flex;flex-wrap:wrap;gap:44px 36px;justify-content:center}
+.frame{width:413px}
+.frame > h2{font:600 11px var(--mono);letter-spacing:1.4px;color:var(--gold);margin:0 0 6px 10px}
+.frame > h3{font-size:17px;font-weight:500;margin:0 0 16px 10px}
+.frame > ul{margin:20px 6px 0 26px;color:var(--ink-2);font-size:13px;display:grid;gap:7px}
+.frame > ul > li::marker{color:var(--gold)}
+.section{margin-top:64px;border-top:1px solid var(--line);padding-top:30px}
+.section > h2{font-size:22px;font-weight:500;letter-spacing:-.3px;margin-bottom:6px}
+.section > p{color:var(--ink-2);font-size:14px;max-width:880px;margin-bottom:26px}
+.anatomy{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.anatomy .stage{position:relative;padding:0 44px;width:433px}
+.legend{display:grid;gap:12px;max-width:620px;font-size:14px;color:var(--ink-2)}
+.legend div{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start}
+.legend b{color:var(--ink);font-weight:600}
+.pin{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--gold);color:#06080A;font:700 12px var(--mono)}
+.stage .pin{position:absolute;right:8px}
+.stage .pin.left{right:auto;left:8px}
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.state-box{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px}
+.state-box h4{font:600 11px var(--mono);letter-spacing:1.2px;color:var(--ink-2);margin-bottom:14px}
+.state-box p{font-size:13px;color:var(--ink-2);margin-top:12px}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px}
+.notes article{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}
+.notes h4{font-size:15px;font-weight:600;margin-bottom:10px}
+.notes ul{margin-left:18px;color:var(--ink-2);font-size:13.5px;display:grid;gap:8px}
+.notes li::marker{color:var(--gold)}
+.notes b{color:var(--ink);font-weight:600}
+
+/* wireframe for N >= 2: behaviour only, no content */
+.wire{display:flex;gap:12px;align-items:stretch;width:393px;max-width:100%;height:150px;overflow:hidden;border:1px solid var(--line);border-radius:18px;padding:16px 0 16px 24px;background:var(--bg)}
+.wire div{border:1px solid var(--line-2);border-radius:14px;flex:none;display:grid;place-items:center;text-align:center;font:600 11px var(--mono);letter-spacing:.8px;color:var(--ink-2);padding:8px;width:305px}
+.wirecap{font:600 11px var(--mono);letter-spacing:1px;color:var(--ink-2);margin-top:10px}
+
+/* ---------- phone ---------- */
+.phone{width:393px;height:852px;border-radius:56px;background:var(--bg);position:relative;overflow:hidden;margin:10px;
+  box-shadow:0 0 0 10px #14171C,0 0 0 11px #2B3038,0 34px 80px rgba(0,0,0,.55)}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:124px;height:36px;border-radius:20px;background:#000;z-index:6}
+.statusbar{height:54px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 36px 9px;font-weight:600;font-size:16px}
+.statusbar .sys{display:flex;gap:6px;align-items:center;color:var(--ink)}
+.statusbar .sys svg{height:12px;width:auto;display:block}
+.home-ind{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:138px;height:5px;border-radius:3px;background:rgba(255,255,255,.5);z-index:6}
+.screen{position:absolute;inset:54px 0 0 0;overflow-y:auto;scrollbar-width:none}
+.screen::-webkit-scrollbar,.rail::-webkit-scrollbar{display:none}
+.fade-in{animation:fade .2s ease both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.fade-in{animation:none}}
+:focus-visible{outline:2px solid var(--gold-soft);outline-offset:2px}
+
+/* ---------- home ---------- */
+.strip{display:flex;align-items:baseline;gap:8px;padding:12px 24px 0;min-height:44px}
+.wordmark{font-weight:900;font-size:20px;letter-spacing:3px}
+.strip .where{font-size:14px;color:var(--ink-2)}
+.title{padding:6px 24px 0;font-size:33px;font-weight:500;letter-spacing:-1px;line-height:1.1}
+.filters{margin:16px 24px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.seg{min-height:52px;border-radius:12px;border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.seg b{font-size:14px;font-weight:500;color:var(--ink)}
+.seg small{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.seg.has{background:var(--surface)}
+.seg.on{background:var(--gold-14);border-color:var(--gold-45)}
+.seg.on b{color:var(--gold-soft);font-weight:600}
+.seg.on small{color:var(--gold-soft)}
+.railhead{padding:18px 24px 0;font:600 12px var(--mono);letter-spacing:1.2px;color:var(--gold)}
+.railhead span{color:var(--ink-2);font-weight:500}
+.single{padding:18px 24px 0}
+.rail{margin-top:12px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x mandatory;scroll-padding-left:24px}
+.track{display:inline-flex;gap:12px;padding:0 24px;vertical-align:top}
+.track .card{width:305px;scroll-snap-align:start}
+
+.card{display:block;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:20px;color:var(--ink)}
+.card > span{display:block}
+.type{font:600 13px var(--mono);letter-spacing:1.4px;color:var(--gold)}
+.lockup{margin-top:6px;display:flex !important;align-items:baseline;gap:10px}
+.sym{font-size:44px;font-weight:500;letter-spacing:-1.6px;line-height:1.02}
+.name{font-size:16px;color:var(--ink-2)}
+.meta{margin-top:14px;display:grid !important;grid-template-columns:1fr 1fr;gap:12px}
+.meta span{display:block}
+.k{font:500 12px var(--mono);letter-spacing:1.1px;color:var(--ink-2)}
+.v{margin-top:3px;font-size:16px;color:var(--ink)}
+.rule{height:1px;background:var(--line);margin:16px 0}
+.qual{font-size:13px;color:var(--ink-2)}
+.qual b{color:var(--ink);font-weight:600;white-space:nowrap}
+.verdict{margin-top:5px;font-size:20px;font-weight:400;letter-spacing:-.2px;color:var(--ink)}
+.dstate{display:flex !important;align-items:center;gap:7px;font:500 12px var(--mono);letter-spacing:1.1px;color:var(--ink-2)}
+.dstate b{color:var(--ink);font-weight:600}
+.ring{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--ink);flex:none}
+.ring.half{background:linear-gradient(90deg,var(--ink) 50%,transparent 50%)}
+.ring.full{background:var(--ink)}
+.rows{margin-top:10px;display:grid !important;gap:8px}
+.rows span{display:flex;gap:10px;align-items:center;font-size:15px;color:var(--ink)}
+.mk{width:12px;height:12px;border-radius:50%;flex:none}
+.mk.has{background:var(--ink)}
+.mk.miss{border:1.5px dashed var(--ink)}
+.cta{margin-top:18px;height:48px;border-radius:14px;background:var(--gold-14);border:1px solid var(--gold-45);color:var(--gold-soft);font-size:16px;font-weight:600;display:flex !important;align-items:center;justify-content:space-between;padding:0 16px}
+.cta svg{width:18px;height:18px}
+.pos{padding:12px 24px 0;font-size:13px;color:var(--ink-2)}
+.pos b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.foot{padding:16px 24px 44px;font-size:13px;color:var(--ink-2);line-height:1.5}
+
+.empty{margin:18px 24px 0;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:24px 22px 26px}
+.empty h2{margin-top:10px;font-size:22px;font-weight:500;letter-spacing:-.4px}
+.empty p{margin-top:8px;font-size:15px;color:var(--ink-2);line-height:1.5}
+
+/* ---------- detail ---------- */
+.dstrip{display:flex;align-items:center;justify-content:space-between;padding:6px 14px 0;min-height:50px}
+.back{display:inline-flex;align-items:center;gap:6px;color:var(--gold);font-size:16px;font-weight:600;min-height:44px;min-width:44px;padding:0 10px}
+.back svg{width:19px;height:19px}
+.iconbtn{width:44px;height:44px;display:grid;place-items:center;color:var(--gold)}
+.iconbtn svg{width:20px;height:20px}
+.dhead{padding:6px 24px 0;display:flex;justify-content:space-between;align-items:flex-end}
+.dhead .sym{font-size:38px}
+.orbplay{width:48px;height:48px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:radial-gradient(circle at 30% 28%,var(--gold-soft),var(--gold) 46%,var(--gold-deep));box-shadow:0 0 22px rgba(219,179,102,.28)}
+.orbplay svg{width:15px;height:15px;color:#06080A}
+.dmeta{padding:10px 24px 0;font-size:13px;color:var(--ink-2)}
+.dverdict{padding:12px 24px 0}
+.chartph{margin:14px 0 0;height:226px;position:relative;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.chartph .lvl{position:absolute;left:0;right:0;border-top:1px dashed rgba(219,179,102,.5)}
+.chartph .lvl.sel{border-top:2px solid var(--gold)}
+.chartph .lvl span{position:absolute;right:10px;top:-9px;font:600 11px var(--mono);background:#1A1710;color:var(--gold-soft);border:1px solid rgba(219,179,102,.4);border-radius:5px;padding:1px 6px;line-height:14px}
+.chartph .lvl.sel span{background:var(--gold);color:#06080A;border-color:var(--gold)}
+.chartph em{position:absolute;left:24px;top:12px;font:500 11px var(--mono);letter-spacing:1px;color:var(--ink-2);font-style:normal;max-width:210px;line-height:1.5}
+.chartnote{padding:10px 24px 0;font-size:13px;color:var(--ink-2)}
+.source{margin:12px 24px 0;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px}
+.source .h{display:flex;gap:12px;align-items:center}
+.source .h svg{width:26px;height:26px;color:var(--gold);flex:none}
+.source .h b{display:block;font-size:15px;font-weight:500;margin-top:3px}
+.moments{display:flex;gap:8px;margin-top:14px}
+.moment{flex:1;border:1px solid var(--line-2);border-radius:12px;min-height:44px;padding:8px 12px;display:flex;align-items:center;gap:8px;font:600 13px var(--mono);color:var(--gold-soft)}
+.moment svg{width:12px;height:12px;color:var(--gold)}
+.srcnote{margin-top:10px;font-size:12px;color:var(--ink-2)}
+.ask{margin:12px 24px 40px;display:flex;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:12px 16px}
+.ask .orb{width:40px;height:40px;border-radius:50%;flex:none;background:radial-gradient(circle at 30% 28%,var(--gold-soft),var(--gold) 46%,var(--gold-deep));box-shadow:0 0 18px rgba(219,179,102,.25)}
+.ask b{display:block;font-size:15px;font-weight:500}
+.ask span{font-size:13px;color:var(--ink-2)}
+
+/* ---------- single-screen export mode ---------- */
+body.only{background:var(--bg)}
+body.only .board{padding:0;max-width:none}
+body.only .board-head,body.only .section,body.only .frame > h2,body.only .frame > h3,body.only .frame > ul{display:none}
+body.only .frames{display:block}
+body.only .frame{width:393px}
+body.only .phone{margin:0;border-radius:0;box-shadow:none}
+body.only .fade-in,body.shot .fade-in{animation:none}
+@media (max-width:460px){.board{padding:24px 0 56px}.board-head,.section{padding-left:16px;padding-right:16px}.frame{width:100%;display:grid;justify-items:center}.frame > h2,.frame > h3{justify-self:start;margin-left:16px}.frame > ul{margin-right:16px}.anatomy .stage{width:100%;padding:0 36px}}
+</style>
+</head>
+<body>
+<div class="board">
+  <header class="board-head">
+    <div>
+      <h1><b>PTS</b>Home de señales · propuesta visual v2</h1>
+      <p>Bandeja de señales con cuatro filtros con conteo, una cronología por fecha y estados vacíos en presente. Solo aparece la señal que existe: COIN, publicada el 18 sep 2026 por Daniel Marín, con el contrato sin documentar. La maqueta es interactiva: toca los filtros, la tarjeta y «Señales».</p>
+    </div>
+    <span class="notice">MAQUETA DE DISEÑO · USO INTERNO · NO ES UN PRODUCTO PUBLICADO</span>
+  </header>
+
+  <div class="frames" id="frames"></div>
+
+  <section class="section">
+    <h2>Anatomía de la tarjeta</h2>
+    <p>El orden de lectura es el del brief. El tamaño sigue al nivel de evidencia: lo más grande es el activo, que es un hecho; el veredicto va en blanco y peso regular, y la calificación «sin verificar» se lee antes que él. Lo que falta se declara con el mismo peso que lo que existe.</p>
+    <div class="anatomy">
+      <div class="stage" id="anatomy-card"></div>
+      <div class="legend">
+        <div><span class="pin">1</span><span><b>Tipo.</b> «OPCIONES», 13 pt mono dorado, pegado al símbolo para leerse en una sola fijación. Sin icono: una línea ascendente promete resultado y un rayo sugiere urgencia.</span></div>
+        <div><span class="pin">2</span><span><b>Activo.</b> «COIN» a 44 pt y «Coinbase» a 16 pt sobre la misma línea base. Es el ancla visual.</span></div>
+        <div><span class="pin">3</span><span><b>Fecha, rotulada «PUBLICADA».</b> En una tarjeta de opciones, una fecha suelta se lee como vencimiento del contrato, que es justo el dato que no se puede completar. Siempre absoluta; nunca «hace 3 días».</span></div>
+        <div><span class="pin">4</span><span><b>Autor, rotulado «AUTOR».</b> Sin avatar, sello ni insignia de verificación.</span></div>
+        <div><span class="pin">5</span><span><b>Veredicto reportado.</b> Primero la calificación «Reportado por el autor · <b>sin verificar</b>» a 13 pt, con «sin verificar» en blanco y peso alto; después la frase, a 20 pt regular. Sin comillas ni filete de cita: es el resumen de PTS, no una frase textual de Daniel. Nunca en dorado ni en verde, nunca en píldora.</span></div>
+        <div><span class="pin">6</span><span><b>Estado de datos.</b> «ESTADO DE DATOS · PARCIAL» y dos filas del mismo tamaño y contraste: marcador lleno para lo que existe, marcador hueco punteado para lo que falta. Marcadores blancos, no dorados: el dorado no debe leerse como «bueno».</span></div>
+        <div><span class="pin">7</span><span><b>Acción primaria.</b> «Abrir señal», botón tonal (dorado al 14 %), no dorado sólido: se abre un expediente, no se ejecuta una orden. Toda la tarjeta es un único botón.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Estados de los componentes</h2>
+    <p>Variantes que el Home necesita. Se muestran sueltas, sin señales de ejemplo, para no inventar contenido.</p>
+    <div class="states">
+      <div class="state-box">
+        <h4>ESTADO DE DATOS</h4>
+        <div style="display:grid;gap:12px">
+          <span class="dstate"><i class="ring full"></i><span>ESTADO DE DATOS</span><span>·</span><b>COMPLETO</b></span>
+          <span class="dstate"><i class="ring half"></i><span>ESTADO DE DATOS</span><span>·</span><b>PARCIAL</b></span>
+          <span class="dstate"><i class="ring"></i><span>ESTADO DE DATOS</span><span>·</span><b>FALTANTE</b></span>
+        </div>
+        <p>Forma y palabra, sin color. «Parcial» es una clasificación de PTS sobre el caso COIN y conviene confirmarla; si no se confirma, se conservan las dos filas sin la palabra.</p>
+      </div>
+      <div class="state-box">
+        <h4>FILAS DE EVIDENCIA</h4>
+        <div class="rows" style="margin-top:0"><span><i class="mk has"></i>Fuente original disponible</span><span><i class="mk miss"></i>Contrato sin documentar</span></div>
+        <p>Las palabras son las del brief. Ninguna palomita, sello ni check en el Home.</p>
+      </div>
+      <div class="state-box">
+        <h4>FILTRO</h4>
+        <div class="filters" style="margin:0"><button class="seg on has" tabindex="-1"><b>Opciones</b><small>1 señal</small></button><button class="seg" tabindex="-1"><b>Stocks</b><small>0 señales</small></button><button class="seg" tabindex="-1"><b>Spot</b><small>0 señales</small></button><button class="seg" tabindex="-1"><b>Scalping</b><small>0 señales</small></button></div>
+        <p>Los cuatro nombres van siempre en blanco y caben sin scroll; el conteo lleva unidad y sale de los datos. Con tamaños de accesibilidad pasan a una rejilla de 2 × 2, nunca a una fila desplazable.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Cuando exista una segunda señal</h2>
+    <p>La continuidad es una propiedad de los datos, no del maquetado. Con una señal, la tarjeta ocupa todo el ancho y nada invita a deslizar. Con dos o más, la tarjeta pasa a 305 pt, asoman 52 pt de la siguiente tarjeta real y aparece «CRONOLOGÍA · MÁS RECIENTE PRIMERO». Esquema de comportamiento, sin contenido:</p>
+    <div class="wire" aria-hidden="true"><div>TARJETA 1 · 305 PT<br>LA MÁS RECIENTE</div><div>TARJETA 2<br>ASOMA 52 PT</div></div>
+    <div class="wirecap">1 DE N · LA LEYENDA SE ACTUALIZA AL DESLIZAR; EN LA ÚLTIMA: «N DE N · SIN SEÑALES ANTERIORES AL …»</div>
+  </section>
+
+  <section class="section">
+    <h2>Decisiones y preguntas abiertas</h2>
+    <p>Lo que cambia frente al Home 0.4 y lo que dejo señalado para la crítica. La v2 incorpora la revisión de un panel interno de tres propuestas y tres jueces.</p>
+    <div class="notes">
+      <article>
+        <h4>Continuidad sin inventar nada</h4>
+        <ul>
+          <li>El brief pide que asome «parte de la siguiente» tarjeta, pero solo existe una señal. Cualquier silueta, contorno punteado o nodo hueco se lee como «aquí vendrá algo», que es una promesa.</li>
+          <li>Con una señal: tarjeta a 345 pt, sin scroll horizontal ni rebote, y la verdad escrita y visible en reposo: <b>«1 de 1 · Sin señales anteriores al 18 sep 2026»</b>.</li>
+          <li>Conteos, posición y fechas salen siempre de los datos. La maqueta ya lo hace: si se añade una segunda señal real al arreglo, el carrusel aparece solo.</li>
+        </ul>
+      </article>
+      <article>
+        <h4>Home frente a Detalle</h4>
+        <ul>
+          <li>Misma franja, distinto contenido: «PTS Señales» en el Home, <b>«← Señales»</b> en el Detalle. Control propio de 44 pt; no se depende del botón atrás del sistema, que en iOS 26 puede quedar en solo chevron.</li>
+          <li>Navegación push horizontal, no hoja modal, para que el control, el gesto de borde y la transición digan lo mismo.</li>
+          <li>El Detalle repite la misma calificación y el mismo veredicto en blanco. Hoy lleva un sello con palomita junto a «SIN VERIFICAR» y una línea dorada: conviene corregirlos en la misma entrega.</li>
+        </ul>
+      </article>
+      <article>
+        <h4>Para la crítica de copy</h4>
+        <ul>
+          <li><b>Estado vacío:</b> el texto del brief («Esta categoría aparecerá cuando…») está en futuro y roza su propia regla contra prometer señales. La maqueta usa presente; requiere visto bueno.</li>
+          <li><b>«Todas las señales»</b> titula una vista siempre filtrada por tipo. Alternativa: «Señales».</li>
+          <li><b>«objetivo»</b> sugiere meta cumplida. El literal no se toca, pero nunca debe reformularse como «superado», «alcanzado» o «cumplido».</li>
+          <li><b>«Abrir señal»</b> puede evocar «abrir posición». Alternativa a evaluar: «Ver señal».</li>
+          <li><b>«Pregúntale lo que quieras»</b> contradice el alcance limitado a COIN; en el Detalle se añade «Sobre COIN y esta señal».</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+</div>
+
+<script>
+const ICON = {
+  right:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  left:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+  doc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v6"/><path d="M14 3v4h4"/><path d="M7 3v18h5"/><circle cx="16.5" cy="17.5" r="3"/><path d="M19 20l2 2"/></svg>',
+  video:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm6 3.8v6.4l5.5-3.2z"/></svg>',
+  play:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>'
+};
+const CATEGORIES = [
+  {id:'options', label:'Opciones'},
+  {id:'stocks', label:'Stocks'},
+  {id:'spot', label:'Spot'},
+  {id:'scalping', label:'Scalping'}
+];
+// The only registered signal. Nothing else exists: do not add sample rows.
+// Every count, position and date on screen is computed from this array.
+const SIGNALS = [{
+  id:'coin-daniel-2026-09-18', category:'options', symbol:'COIN', name:'Coinbase',
+  author:'Daniel Marín', published:'18 sep 2026', publishedLong:'18 de septiembre de 2026',
+  verdict:'Segundo objetivo reportado',
+  dataState:'PARCIAL', has:['Fuente original disponible'], missing:['Contrato sin documentar']
+}];
+const LEVELS = [160.07,171.75,180.95,186.22,190.59,204.53];
+const count = id => SIGNALS.filter(s => s.category === id).length;
+const labelOf = id => CATEGORIES.find(c => c.id === id).label;
+const unit = n => n + (n === 1 ? ' señal' : ' señales');
+
+function statusBar(){
+  return '<div class="island"></div><div class="statusbar"><span>9:41</span><span class="sys" aria-hidden="true">' +
+    '<svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>' +
+    '<svg viewBox="0 0 17 12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M1.2 4.4a10.4 10.4 0 0 1 14.6 0"/><path d="M3.9 7.2a6.5 6.5 0 0 1 9.2 0"/><circle cx="8.5" cy="10.3" r="1.1" fill="currentColor" stroke="none"/></svg>' +
+    '<svg viewBox="0 0 28 13" fill="none"><rect x=".6" y=".6" width="23.8" height="11.8" rx="3.6" stroke="currentColor" stroke-opacity=".45" stroke-width="1.2"/><rect x="2.3" y="2.3" width="20.4" height="8.4" rx="2.2" fill="currentColor"/><path d="M26 4.4v4.2c.9-.3 1.5-1.1 1.5-2.1S26.9 4.7 26 4.4z" fill="currentColor" fill-opacity=".5"/></svg>' +
+    '</span></div>';
+}
+function cardHTML(s){
+  const aria = labelOf(s.category)+'. '+s.symbol+', '+s.name+'. Publicada el '+s.publishedLong+'. Autor: '+s.author+'. Reportado por el autor, sin verificar: '+s.verdict+'. Estado de datos '+s.dataState.toLowerCase()+': '+s.has.concat(s.missing).join('; ')+'. Abrir señal.';
+  return '<button class="card" data-open="'+s.id+'" aria-label="'+aria+'">' +
+    '<span class="type">'+labelOf(s.category).toUpperCase()+'</span>' +
+    '<span class="lockup"><span class="sym">'+s.symbol+'</span><span class="name">'+s.name+'</span></span>' +
+    '<span class="meta"><span><span class="k">PUBLICADA</span><span class="v">'+s.published+'</span></span><span><span class="k">AUTOR</span><span class="v">'+s.author+'</span></span></span>' +
+    '<span class="rule"></span>' +
+    '<span class="qual">Reportado por el autor · <b>sin verificar</b></span>' +
+    '<span class="verdict">'+s.verdict+'</span>' +
+    '<span class="rule"></span>' +
+    '<span class="dstate"><i class="ring half"></i><span>ESTADO DE DATOS</span><span>·</span><b>'+s.dataState+'</b></span>' +
+    '<span class="rows">'+s.has.map(t => '<span><i class="mk has"></i>'+t+'</span>').join('')+s.missing.map(t => '<span><i class="mk miss"></i>'+t+'</span>').join('')+'</span>' +
+    '<span class="cta">Abrir señal'+ICON.right+'</span>' +
+  '</button>';
+}
+const FOOT = '<p class="foot">Contenido educativo: no es una recomendación ni una orden de compra o venta. PTS no completa datos que la fuente no documenta.</p>';
+function homeHTML(state){
+  const list = SIGNALS.filter(s => s.category === state.category);
+  let body;
+  if (list.length === 1){
+    body = '<div class="single fade-in">'+cardHTML(list[0])+'</div>' +
+      '<p class="pos"><b>1 de 1</b> · Sin señales anteriores al '+list[0].published+'</p>' + FOOT;
+  } else if (list.length > 1){
+    body = '<div class="railhead">CRONOLOGÍA <span>· MÁS RECIENTE PRIMERO</span></div>' +
+      '<div class="rail fade-in"><div class="track">'+list.map(cardHTML).join('')+'</div></div>' +
+      '<p class="pos"><b>1 de '+list.length+'</b></p>' + FOOT;
+  } else {
+    body = '<div class="empty fade-in"><span class="type" style="color:var(--ink-2)">'+labelOf(state.category).toUpperCase()+'</span><h2>Sin señales registradas</h2>' +
+      '<p>Aquí solo se muestran reportes con fuente y fecha. No hay ninguno registrado en '+labelOf(state.category)+'.</p></div>' + FOOT;
+  }
+  return statusBar() + '<div class="screen">' +
+    '<div class="strip"><span class="wordmark">PTS</span><span class="where">Señales</span></div>' +
+    '<h1 class="title">Todas las señales</h1>' +
+    '<div class="filters" role="tablist" aria-label="Tipo de señal">' +
+      CATEGORIES.map(c => '<button class="seg'+(c.id===state.category?' on':'')+(count(c.id)?' has':'')+'" role="tab" aria-selected="'+(c.id===state.category)+'" aria-label="'+c.label+', '+(count(c.id)?unit(count(c.id)):'sin señales')+'" data-cat="'+c.id+'"><b>'+c.label+'</b><small>'+unit(count(c.id))+'</small></button>').join('') +
+    '</div>' + body + '</div><div class="home-ind"></div>';
+}
+function detailHTML(){
+  const s = SIGNALS[0], lo = 157.5, hi = 207, h = 226;
+  const lvls = LEVELS.map(p => '<div class="lvl'+(p===190.59?' sel':'')+'" style="top:'+(h*(hi-p)/(hi-lo)).toFixed(1)+'px"><span>'+p.toFixed(2)+'</span></div>').join('');
+  return statusBar() + '<div class="screen fade-in">' +
+    '<div class="dstrip"><button class="back" data-back="1" aria-label="Volver a todas las señales">'+ICON.left+'Señales</button><button class="iconbtn" aria-label="Ver publicación original">'+ICON.doc+'</button></div>' +
+    '<div class="dhead"><div><span class="type">OPCIONES</span><div class="lockup" style="margin-top:4px"><span class="sym">'+s.symbol+'</span><span class="name">'+s.name+'</span></div></div><span class="orbplay" role="img" aria-label="Escuchar explicación IA">'+ICON.play+'</span></div>' +
+    '<div class="dmeta">Publicada el '+s.published+' · '+s.author+' · YouTube</div>' +
+    '<div class="dverdict"><span class="qual" style="display:block">Reportado por el autor · <b>sin verificar</b></span><span class="verdict" style="display:block;font-size:18px">'+s.verdict+'</span></div>' +
+    '<div class="chartph"><em>GRÁFICO DE PRECIO DE COIN · VELAS NO REPRESENTADAS EN ESTA MAQUETA</em>'+lvls+'</div>' +
+    '<div class="chartnote">Niveles publicados · función sin confirmar</div>' +
+    '<div class="source"><div class="h">'+ICON.video+'<div><span class="type" style="font-size:12px">FUENTE · VIDEO DE YOUTUBE</span><b>Daniel menciona COIN y el segundo objetivo</b></div></div>' +
+      '<div class="moments"><span class="moment">'+ICON.play+'05:27</span><span class="moment">'+ICON.play+'15:29</span></div><p class="srcnote">Dos momentos del mismo video. Se abren en YouTube.</p></div>' +
+    '<div class="ask"><span class="orb"></span><div><b>Pregúntale lo que quieras</b><span>Sobre COIN y esta señal</span></div></div>' +
+    '</div><div class="home-ind"></div>';
+}
+
+const FRAMES = [
+  {key:'home', n:'01', title:'Home · Opciones', state:{view:'home', category:'options'}, notes:[
+    'Tres capas antes de la tarjeta (marca, título, filtros): la tarjeta empieza en y ≈ 236 y todo cabe en 393 × 852 con holgura.',
+    'En cinco segundos: cuatro tipos con su conteo, COIN, «Publicada 18 sep 2026», y el veredicto ya calificado como «sin verificar».',
+    'Una señal, una tarjeta a todo el ancho. Nada invita a deslizar; «1 de 1» lo dice con palabras.']},
+  {key:'empty', n:'02', title:'Home · categoría sin señales', state:{view:'home', category:'stocks'}, notes:[
+    'En presente y sin promesa. Sin icono, sin contorno punteado, sin tarjetas de ejemplo.',
+    'El «0 señales» del filtro avisa antes de tocar: la categoría vacía no parece rota.',
+    'Spot y Scalping usan el mismo estado con su propio nombre.']},
+  {key:'detail', n:'03', title:'Detalle · regreso a Señales', state:{view:'detail', category:'options'}, notes:[
+    '«← Señales» textual, con área táctil de 44 pt, en la misma franja que «PTS Señales».',
+    'Misma calificación y mismo veredicto que en el Home, en blanco y sin sello.',
+    'Fuente de YouTube visible con 05:27 y 15:29. Niveles neutrales, sin función asignada.']}
+];
+
+function mount(frame){
+  const wrap = document.createElement('div');
+  wrap.className = 'frame'; wrap.dataset.key = frame.key;
+  wrap.innerHTML = '<h2>'+frame.n+'</h2><h3>'+frame.title+'</h3><div class="phone"></div><ul>'+frame.notes.map(n => '<li>'+n+'</li>').join('')+'</ul>';
+  const phone = wrap.querySelector('.phone');
+  const state = Object.assign({}, frame.state);
+  const render = () => { phone.innerHTML = state.view === 'detail' ? detailHTML() : homeHTML(state); };
+  phone.addEventListener('click', e => {
+    const t = e.target.closest('[data-cat],[data-open],[data-back]'); if (!t) return;
+    if (t.dataset.cat){ state.view='home'; state.category=t.dataset.cat; }
+    else if (t.dataset.open){ state.view='detail'; }
+    else if (t.dataset.back){ state.view='home'; }
+    render();
+  });
+  render();
+  return wrap;
+}
+const params = new URLSearchParams(location.search);
+const only = params.get('only');
+if (params.has('shot')) document.body.classList.add('shot');
+if (only) document.body.classList.add('only');
+const host = document.getElementById('frames');
+FRAMES.filter(f => !only || f.key === only).forEach(f => host.appendChild(mount(f)));
+
+const PINS = [[1,'left',18],[2,'right',50],[3,'left',118],[4,'right',118],[5,'right',190],[6,'right',268],[7,'right',358]];
+document.getElementById('anatomy-card').innerHTML = PINS.map(p => '<span class="pin'+(p[1]==='left'?' left':'')+'" style="top:'+p[2]+'px">'+p[0]+'</span>').join('') + cardHTML(SIGNALS[0]);
+</script>
+</body>
+</html>

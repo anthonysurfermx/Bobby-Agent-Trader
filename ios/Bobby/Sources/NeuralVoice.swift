@@ -6,7 +6,11 @@ import Foundation
 
 @MainActor
 final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
+    #if PTS_DEMO
+    static let enabled = true
+    #else
     static let enabled = false // Text-only App Store release.
+    #endif
     @Published var speaking = false
     @Published var level: CGFloat = 0
 

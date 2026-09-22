@@ -1,0 +1,215 @@
+import Foundation
+
+/// A published price. `role` is set only when the author documented it.
+struct SignalLevel: Hashable {
+    let price: Double
+    let role: String?
+    var chipTitle: String { role.map { "\($0) \(String(format: "%.2f", price))" } ?? String(format: "%.2f", price) }
+}
+
+struct SignalMoment: Hashable {
+    let label: String
+    let url: URL
+    let identifier: String
+}
+
+/// Everything the detail screen and Copiloto need for one curated signal.
+struct SignalCase {
+    let marketResource: String
+    let chartCaption: String
+    let levels: [SignalLevel]
+    let focusLevel: Double
+    /// Shaded reference zones: (from, to, rgba color).
+    let bands: [(Double, Double, String)]
+    let priceRange: ClosedRange<Double>
+    let hasGuidedNarration: Bool
+    let moments: [SignalMoment]
+    let sourceNote: String
+    let voice: PTSVoiceCase
+    let suggestions: [String]
+    let levelQuestion: (SignalLevel) -> String
+    /// Prices tracked live after publication; roles only where documented.
+    let milestones: [SignalMilestone]
+    /// ASTS was published with the entry already active.
+    let entryAtPublication: Bool
+    /// Reviewed offline answers; nil uses the COIN answers in SignalTutor.
+    let reviewedAnswer: ((String) -> String)?
+    // Details sheet
+    let evidenceLabel: String
+    let contractTitle: String
+    let contractDetail: String
+    let originalImage: String
+    let levelsNote: String
+    let chartNote: String
+
+    static func forSignal(_ signal: SignalListItem) -> SignalCase {
+        switch signal.id {
+        case SignalListItem.xly.id: return .xly
+        case SignalListItem.dram.id: return .dram
+        case SignalListItem.asts.id: return .asts
+        default: return .coin
+        }
+    }
+
+    static let coin = SignalCase(
+        marketResource: "coin-market",
+        chartCaption: "Acción · USD · histórico",
+        levels: [160.07, 171.75, 180.95, 186.22, 190.59, 204.53].map { SignalLevel(price: $0, role: nil) },
+        focusLevel: 190.59,
+        bands: [(160.07, 171.75, "rgba(169, 176, 186, 0.06)"), (171.75, 180.95, "rgba(169, 176, 186, 0.04)"), (180.95, 204.53, "rgba(169, 176, 186, 0.06)")],
+        priceRange: 156...207,
+        hasGuidedNarration: true,
+        moments: [
+            SignalMoment(label: "05:27", url: SignalSource.firstMoment, identifier: "source-327"),
+            SignalMoment(label: "15:29", url: SignalSource.secondMoment, identifier: "source-929"),
+        ],
+        sourceNote: "Solo COIN y el análisis de Daniel · Máximo 3 minutos · No es recomendación",
+        voice: .coin,
+        suggestions: ["¿Qué crees que pase con COIN?", "¿Qué niveles menciona Daniel?", "¿Cuál es el escenario alcista?"],
+        levelQuestion: { "¿Cómo debo interpretar el nivel publicado \(String(format: "%.2f", $0.price)) sin asumir que es una entrada o un stop?" },
+        milestones: [SignalMilestone(title: "Nivel 6", price: 204.53, up: true), SignalMilestone(title: "Nivel 1", price: 160.07, up: false)],
+        entryAtPublication: false,
+        reviewedAnswer: nil,
+        evidenceLabel: "Reportado por el autor · ",
+        contractTitle: "Contrato sin documentar",
+        contractDetail: "Faltan tipo de opción, strike, vencimiento, primas, cantidad, multiplicador, comisiones y ejecución.",
+        originalImage: "coin",
+        levelsNote: "Los seis niveles se transcribieron de la publicación. Su función no está confirmada: no se les asigna entrada, stop ni objetivo.",
+        chartNote: "El gráfico interactivo muestra el precio histórico de la acción, no el resultado de la opción. Usa velas diarias; la publicación original usa velas de dos horas."
+    )
+
+    // Levels use the exact values drawn on Daniel's chart; his text rounds
+    // the targets to 116-118-123 and break-even to 115.
+    static let xly = SignalCase(
+        marketResource: "xly-market",
+        chartCaption: "ETF · USD · histórico",
+        levels: [
+            SignalLevel(price: 109.26, role: "Stop"),
+            SignalLevel(price: 112.99, role: "Entrada"),
+            SignalLevel(price: 115.05, role: "BE"),
+            SignalLevel(price: 116.66, role: "Obj. 1"),
+            SignalLevel(price: 118.64, role: "Obj. 2"),
+            SignalLevel(price: 123.73, role: "Obj. 3"),
+        ],
+        focusLevel: 112.99,
+        bands: [(109.26, 112.99, "rgba(248, 113, 113, 0.07)"), (112.99, 123.73, "rgba(74, 222, 128, 0.05)")],
+        priceRange: 107...125,
+        hasGuidedNarration: false,
+        moments: [],
+        sourceNote: "Solo XLY y el plan de Daniel · Máximo 3 minutos · No es recomendación",
+        voice: .xly,
+        suggestions: ["¿Qué crees que pase con XLY?", "¿Cuál es la entrada y el stop?", "¿Qué contrato de opciones propone Daniel?"],
+        levelQuestion: { level in
+            "¿Qué papel tiene el nivel \(String(format: "%.2f", level.price))\(level.role.map { " (\($0))" } ?? "") en el plan de Daniel para XLY?"
+        },
+        milestones: [
+            SignalMilestone(title: "Entrada", price: 112.99, up: true),
+            SignalMilestone(title: "BE", price: 115.05, up: true, afterEntry: true),
+            SignalMilestone(title: "Obj. 1", price: 116.66, up: true, afterEntry: true),
+            SignalMilestone(title: "Obj. 2", price: 118.64, up: true, afterEntry: true),
+            SignalMilestone(title: "Obj. 3", price: 123.73, up: true, afterEntry: true),
+            SignalMilestone(title: "Stop", price: 109.26, up: false, afterEntry: true),
+        ],
+        entryAtPublication: false,
+        reviewedAnswer: PTSVoicePolicyXLY.reviewedAnswer,
+        evidenceLabel: "Plan publicado por el autor · ",
+        contractTitle: "Contrato documentado",
+        contractDetail: "Compra de call, strike 115, vence el 19 de marzo de 2027. Daniel estima un riesgo de unos 150 dólares por contrato y un potencial de 230 a 500 dólares. Son estimaciones del autor, no resultados.",
+        originalImage: "xly",
+        levelsNote: "Entrada 112.99, stop 109.26, stop a break-even al llegar a 115 y objetivos 116, 118 y 123, según el texto. Las líneas usan los valores exactos de su gráfico (115.05, 116.66, 118.64 y 123.73). Riesgo indicado: -0.7 % de la cuenta.",
+        chartNote: "El gráfico interactivo muestra el precio histórico diario del ETF hasta el cierre del 21 sep 2026 (112.23, debajo de la entrada). No indica si la entrada se activó ni el resultado de la opción."
+    )
+
+    // Levels use the values drawn on Daniel's chart; his text says entry zone
+    // 64.00-65.85, break-even 73 and targets 83-102.
+    static let asts = SignalCase(
+        marketResource: "asts-market",
+        chartCaption: "Acción · USD · histórico",
+        levels: [
+            SignalLevel(price: 58.39, role: "Stop"),
+            SignalLevel(price: 65.00, role: "Entrada"),
+            SignalLevel(price: 73.52, role: "BE"),
+            SignalLevel(price: 83.77, role: "Obj. 1"),
+            SignalLevel(price: 102.85, role: "Obj. 2"),
+        ],
+        focusLevel: 65.00,
+        bands: [(58.39, 65.00, "rgba(248, 113, 113, 0.07)"), (65.00, 102.85, "rgba(74, 222, 128, 0.05)")],
+        priceRange: 55...106,
+        hasGuidedNarration: false,
+        moments: [],
+        sourceNote: "Solo ASTS y el plan de Daniel · Máximo 3 minutos · No es recomendación",
+        voice: .asts,
+        suggestions: ["¿Qué crees que pase con ASTS?", "¿Cuál es la entrada y el stop?", "¿Por qué es de alto riesgo?"],
+        levelQuestion: { level in
+            "¿Qué papel tiene el nivel \(String(format: "%.2f", level.price))\(level.role.map { " (\($0))" } ?? "") en el plan de Daniel para ASTS?"
+        },
+        milestones: [
+            SignalMilestone(title: "Entrada", price: 65.00, up: true),
+            SignalMilestone(title: "BE", price: 73.52, up: true, afterEntry: true),
+            SignalMilestone(title: "Obj. 1", price: 83.77, up: true, afterEntry: true),
+            SignalMilestone(title: "Obj. 2", price: 102.85, up: true, afterEntry: true),
+            SignalMilestone(title: "Stop", price: 58.39, up: false, afterEntry: true),
+        ],
+        entryAtPublication: true,
+        reviewedAnswer: PTSVoicePolicyASTS.reviewedAnswer,
+        evidenceLabel: "Plan publicado por el autor · ",
+        contractTitle: "Contrato documentado",
+        contractDetail: "Compra de call, strike 75, vence el 20 de noviembre de 2026, no más de 1 contrato. Daniel estima un riesgo de unos 250 dólares por contrato y un potencial de 950 a 2,000 dólares. Son estimaciones del autor, no resultados.",
+        originalImage: "asts",
+        levelsNote: "Entrada activa en 64.00–65.85, stop 58.39, stop a break-even al llegar a 73 y objetivos 83 y 102, según el texto. Las líneas usan los valores de su gráfico (65.00, 73.52, 83.77 y 102.85). Riesgo indicado: -0.7 % de la cuenta, 1 acción por cada 1,000. Daniel la califica de alto riesgo por su volatilidad.",
+        chartNote: "El gráfico interactivo muestra el precio histórico diario hasta el cierre del 21 sep 2026 (61.89). La publicación es del 22 sep durante la sesión, con el precio en la zona de entrada según su gráfico. No hay datos posteriores."
+    )
+
+    // The Sep 18 and Sep 21 posts do not state which level is the entry, stop
+    // or target (the entry went out on Sep 17), so levels stay neutral.
+    static let dram = SignalCase(
+        marketResource: "dram-market",
+        chartCaption: "ETF · USD · histórico",
+        levels: [52.07, 59.02, 64.96, 67.80, 73.74].map { SignalLevel(price: $0, role: nil) },
+        focusLevel: 59.02,
+        bands: [(52.07, 59.02, "rgba(169, 176, 186, 0.05)"), (59.02, 73.74, "rgba(169, 176, 186, 0.06)")],
+        priceRange: 50...76,
+        hasGuidedNarration: false,
+        moments: [],
+        sourceNote: "Solo DRAM y el análisis de Daniel · Máximo 3 minutos · No es recomendación",
+        voice: .dram,
+        suggestions: ["¿Qué crees que pase con DRAM?", "¿Qué niveles marca Daniel?", "¿Por qué le gusta el sector de memorias?"],
+        levelQuestion: { "¿Cómo debo interpretar el nivel \(String(format: "%.2f", $0.price)) del gráfico de Daniel para DRAM sin asumir que es una entrada o un stop?" },
+        milestones: [
+            SignalMilestone(title: "Nivel 3", price: 64.96, up: true),
+            SignalMilestone(title: "Nivel 4", price: 67.80, up: true),
+            SignalMilestone(title: "Nivel 5", price: 73.74, up: true),
+            SignalMilestone(title: "Nivel 1", price: 52.07, up: false),
+        ],
+        entryAtPublication: false,
+        reviewedAnswer: PTSVoicePolicyDRAM.reviewedAnswer,
+        evidenceLabel: "Reportado por el autor · ",
+        contractTitle: "Sin contrato de opciones",
+        contractDetail: "Daniel la plantea como swing trading con gestión de riesgo. En estos mensajes no publica contrato de opciones, tamaño ni cifras de ganancia.",
+        originalImage: "dram",
+        levelsNote: "Los cinco niveles se transcribieron de su gráfico. Los mensajes del 18 y 21 sep no indican cuál es la entrada, el stop o los objetivos (la entrada se envió el 17 sep), así que no se les asigna función.",
+        chartNote: "El gráfico interactivo muestra el precio histórico diario del ETF hasta el cierre del 21 sep 2026 (61.58). El 18 sep su máximo fue 59.70. La publicación original usa velas de 4 horas."
+    )
+}
+
+extension SignalCase {
+    /// One-line live status for cards: newest milestone reached, a touched
+    /// stop, or what the price is waiting for.
+    func trackingHeadline(_ statuses: [MilestoneStatus]) -> String? {
+        guard !statuses.isEmpty else { return nil }
+        let price: (Double) -> String = { String(format: "%.2f", $0) }
+        if let stop = statuses.first(where: { $0.milestone.title == "Stop" }), let day = stop.reachedOn {
+            return "Tocó el stop \(price(stop.milestone.price)) · \(SignalTracking.dayLabel(day))"
+        }
+        let reachedUp = statuses.filter { $0.milestone.up && $0.reachedOn != nil }
+        if let top = reachedUp.max(by: { $0.milestone.price < $1.milestone.price }) {
+            if top.milestone.title == "Entrada" && entryAtPublication { return "Entrada activa desde la publicación" }
+            let verb = top.milestone.title.hasPrefix("Nivel") ? "Superó el" : "Alcanzó"
+            return "\(verb) \(top.milestone.title) \(price(top.milestone.price)) · \(SignalTracking.dayLabel(top.reachedOn!))"
+        }
+        if let next = statuses.filter({ $0.milestone.up }).min(by: { $0.milestone.price < $1.milestone.price }) {
+            return "Esperando \(next.milestone.title) \(price(next.milestone.price))"
+        }
+        return nil
+    }
+}

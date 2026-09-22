@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <style>
+    html, body { margin: 0; background: #06080a; height: 100%; overflow: hidden; }
+    #chart { height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="chart"></div>
+  <script src="lightweight-charts.standalone.production.js"></script>
+  <script>
+    // PTS 0.4: published levels stay neutral until their roles are confirmed.
+    const { createChart, ColorType, CandlestickSeries, BaselineSeries, LineStyle } = LightweightCharts;
+    const chart = createChart(document.getElementById('chart'), {
+      autoSize: true,
+      layout: { background: { type: ColorType.Solid, color: '#06080a' }, textColor: '#79818e', fontSize: 10, attributionLogo: true },
+      grid: { vertLines: { color: '#ffffff06' }, horzLines: { color: '#ffffff0b' } },
+      rightPriceScale: { borderVisible: false, scaleMargins: { top: .1, bottom: .12 } },
+      timeScale: { borderVisible: false, timeVisible: false },
+      crosshair: { mode: 0 },
+      handleScroll: { vertTouchDrag: false }
+    });
+    const series = chart.addSeries(CandlestickSeries, {
+      upColor: '#4ade80', downColor: '#f87171', wickUpColor: '#86efac', wickDownColor: '#fca5a5',
+      borderVisible: false, priceLineVisible: false
+    });
+    // Defaults are the COIN case; window.setCase replaces them per signal.
+    let levels = [160.07, 171.75, 180.95, 186.22, 190.59, 204.53];
+    let titles = levels.map((_, index) => `Nivel ${index + 1}`);
+    let colors = levels.map(() => '#A9B0BA');
+    let bandSpecs = [[160.07, 171.75, 'rgba(169, 176, 186, 0.06)'], [171.75, 180.95, 'rgba(169, 176, 186, 0.04)'], [180.95, 204.53, 'rgba(169, 176, 186, 0.06)']];
+    let floor = 156, ceiling = 207;
+    // Only levels whose role the author documented carry a title and color.
+    window.setCase = config => {
+      levels = config.levels.map(level => level.price);
+      titles = config.levels.map((level, index) => level.role || `Nivel ${index + 1}`);
+      colors = config.levels.map(level => level.color || '#A9B0BA');
+      bandSpecs = config.bands;
+      floor = config.floor;
+      ceiling = config.ceiling;
+    };
+    let lines = [];
+    let bands = [];
+
+    function band(bottom, top, color) {
+      const zone = chart.addSeries(BaselineSeries, {
+        baseValue: { type: 'price', price: bottom },
+        topFillColor1: color,
+        topFillColor2: color,
+        topLineColor: 'transparent',
+        bottomFillColor1: 'transparent',
+        bottomFillColor2: 'transparent',
+        bottomLineColor: 'transparent',
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+        autoscaleInfoProvider: () => null
+      });
+      bands.push(zone);
+      return zone;
+    }
+
+    window.setCandles = rows => {
+      const data = rows.map(c => ({ time: Math.floor(c.ts / 1000), open: c.open, high: c.high, low: c.low, close: c.close }));
+      series.setData(data);
+      bands.forEach(zone => chart.removeSeries(zone));
+      bands = [];
+      const from = data[Math.max(0, data.length - 38)].time;
+      const to = data[data.length - 1].time;
+      // Reference bands carry order semantics only where the author documented them.
+      bandSpecs.forEach(([bottom, top, color]) => band(bottom, top, color).setData([{ time: from, value: top }, { time: to, value: top }]));
+      series.applyOptions({ autoscaleInfoProvider: original => {
+        const info = original();
+        if (info) {
+          info.priceRange.minValue = Math.min(info.priceRange.minValue, floor);
+          info.priceRange.maxValue = Math.max(info.priceRange.maxValue, ceiling);
+        }
+        return info;
+      }});
+      chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, data.length - 38), to: data.length + 7 });
+    };
+
+    // Live updates move only the newest bar, so panning is not reset.
+    window.updateLast = c => series.update({ time: Math.floor(c.ts / 1000), open: c.open, high: c.high, low: c.low, close: c.close });
+    window.focusLevel = price => {
+      lines.forEach(line => series.removePriceLine(line));
+      lines = levels.map((level, index) => series.createPriceLine({
+        price: level,
+        color: level === price ? '#DBB366' : colors[index],
+        lineWidth: level === price ? 3 : 1,
+        lineStyle: level === price ? LineStyle.Solid : LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: titles[index]
+      }));
+    };
+
+    chart.subscribeClick(param => {
+      if (!param.point) return;
+      const price = series.coordinateToPrice(param.point.y);
+      if (price === null) return;
+      const nearest = levels.reduce((a, b) => Math.abs(b - price) < Math.abs(a - price) ? b : a);
+      window.webkit?.messageHandlers.level.postMessage(nearest);
+    });
+    focusLevel(190.59);
+    window.webkit?.messageHandlers.ready.postMessage(true);
+  </script>
+</body>
+</html>
