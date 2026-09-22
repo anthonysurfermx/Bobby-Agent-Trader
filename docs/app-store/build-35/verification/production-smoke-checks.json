@@ -1,0 +1,104 @@
+{
+  "checkedAt": "2026-09-22T11:52:52.383332+00:00",
+  "deployment": {
+    "id": "dpl_7x4f49omCCK6KaY76LhszV2AEFFC",
+    "url": "bobby-agent-trader-86xadzlvs-anthonysurfermxs-projects.vercel.app",
+    "readyState": "READY",
+    "target": "production",
+    "alias": [
+      "bobbyprotocol.xyz",
+      "bobby-agent-trader.vercel.app",
+      "www.bobbyprotocol.xyz",
+      "bobby-agent-trader-anthonysurfermxs-projects.vercel.app"
+    ]
+  },
+  "gitCommit": "9c68c635f6a874a3e64ee2f71e106e6f3ca3beb2",
+  "checks": [
+    {
+      "name": "gallery",
+      "status": 200,
+      "expected": 200,
+      "pass": true,
+      "cacheControl": "no-store",
+      "body": {
+        "ok": true,
+        "islandCount": 0
+      }
+    },
+    {
+      "name": "missing_island",
+      "status": 404,
+      "expected": 404,
+      "pass": true,
+      "cacheControl": "no-store",
+      "body": {
+        "error": "This island is not published"
+      }
+    },
+    {
+      "name": "report_method",
+      "status": 405,
+      "expected": 405,
+      "pass": true,
+      "cacheControl": "no-store",
+      "body": {
+        "error": "Method not allowed"
+      }
+    },
+    {
+      "name": "report_invalid",
+      "status": 400,
+      "expected": 400,
+      "pass": true,
+      "cacheControl": "no-store",
+      "body": {
+        "error": "Invalid payload",
+        "issues": [
+          {
+            "path": "code",
+            "message": "Required"
+          },
+          {
+            "path": "installation",
+            "message": "Required"
+          },
+          {
+            "path": "reason",
+            "message": "Required"
+          }
+        ]
+      }
+    },
+    {
+      "name": "report_missing_target",
+      "status": 404,
+      "expected": 404,
+      "pass": true,
+      "cacheControl": "no-store",
+      "body": {
+        "error": "Island unavailable"
+      }
+    },
+    {
+      "name": "publish_requires_account",
+      "status": 401,
+      "expected": 401,
+      "pass": true,
+      "cacheControl": "public, max-age=0, must-revalidate",
+      "body": {
+        "error": "Sign in required: wallet session or Supabase access token"
+      }
+    },
+    {
+      "name": "pts_relay_preserved",
+      "status": 405,
+      "expected": 405,
+      "pass": true,
+      "cacheControl": "public, max-age=0, must-revalidate",
+      "body": {
+        "error": "Method not allowed"
+      }
+    }
+  ],
+  "passed": true
+}

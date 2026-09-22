@@ -9,10 +9,12 @@ Prepared September 22, 2026. This replaces the build-34 metadata. **Preparation 
 - `APP-PRIVACY-ANSWERS.md`: seven data categories to enter and verify in App Privacy. No tracking.
 - `screenshots/<locale>`: five reviewed, original, full-resolution iPhone 17 Pro Max screenshots per language (ten total). Do not use old microphone/live-call screenshots.
 - `MODERATION-RUNBOOK.md`: production rollout, report review and withdrawal procedure.
-- `verification/`: archive identity and the final four-test English/Spanish UI result summary.
+- `verification/`: archive identity, final four-test English/Spanish UI result, production smoke checks and rollout evidence.
 - Local build and test evidence: `output/app-store-ready-35/` (ignored by Git).
 
 The final Release archive is `output/app-store-ready-35/Bobby-1.2-35.xcarchive`. Its executable SHA-256 is `957c9c4879495c96e98146926fb1df285d157a2a15c818ce815d8c57158d95f3`. The executable and dSYM both have UUID `C6D5B488-2F81-3D52-A33E-3AC44B6BFD4D`. Use this identity to distinguish the new candidate from the earlier phone build, which also displays 1.2 (35). Archive verification confirms 108 bundled voice files, seven privacy categories and no microphone permission.
+
+This exact development-signed candidate was installed successfully on the connected iPhone 17 Pro. Automatic launch was refused because the phone was locked; unlock the phone and open Bobby. Installation does not replace the remaining real-account and TestFlight checks.
 
 The native candidate restores the three onboarding steps, machine audio, 18 companions with 108 bundled English/Spanish style clips, persistent narration mute, archipelago navigation, island naming/sharing, and the permanent Satoshi Nakamoto showcase. This preparation adds reports, persistent creator blocks, moderation before publication, consent version 4, support and current privacy disclosures.
 
@@ -33,16 +35,16 @@ Verification records 157 distinct native tests passing across the unit, release-
 | Marketing URL | Leave empty until its older promotional screenshots are replaced. |
 | Review sign-in | Optional Apple sign-in; core analysis and practice exploration require no account or reviewer password. |
 
-URLs above describe the deployment target. The new support page and September 22 privacy text must be deployed and verified before submission. The existing public GitHub issue tracker is enabled and supplies the current support link; a monitored private support contact still needs the owner's confirmation.
+Both support/privacy pages are deployed and verified in English and Spanish at the URLs above. The existing public GitHub issue tracker is enabled and supplies the current support link; a monitored private support contact still needs the owner's confirmation.
 
 Retain the existing category, price, territories and legal seller details unless the owner changes them. Complete the current age-rating questionnaire using the actual features: AI-generated educational market analysis, public user-generated island names/layouts, reporting and blocking, no messaging, no gambling, no purchases in this build. Do not invent legal contact, copyright owner, rights attestations or EU trader status. Verify the existing account's answers in App Store Connect.
 
 ## Release gates
 
 - [x] **Production database:** applied `20260922120000_trader_land_moderation.sql` through Supabase MCP to `qbvdqkknnuweatptjohi`, after confirming the deployed `BOBBY_SUPABASE_URL`. Recorded remotely as `20260922114536_trader_land_moderation`. Verified report-table RLS, no anonymous/authenticated reads, and service-role-only publication.
-- [ ] **Production backend and website:** deploy this candidate after the migration. Check `/support`, `/privacy`, moderation, reports and share withdrawal. Do not deploy the new handlers before the schema exists.
+- [x] **Production backend and website:** deployed commit `9c68c635f6a874a3e64ee2f71e106e6f3ca3beb2` as `dpl_7x4f49omCCK6KaY76LhszV2AEFFC` to `bobbyprotocol.xyz` after the migration. The previously deployed PTS relay commit `89464bc` was merged first to preserve it. Seven production API smoke checks passed; the real moderation provider returned a valid HTTP 200 result. Support/privacy rendered correctly in both languages. The authenticated publication/report/withdrawal walkthrough still belongs to the real-account gate below.
 - [ ] **Apple revocation:** production currently does not list `APPLE_SIGN_IN_TEAM_ID`, `APPLE_SIGN_IN_KEY_ID`, `APPLE_SIGN_IN_CLIENT_ID` or `APPLE_SIGN_IN_PRIVATE_KEY`. Use team `QZRTV6CMTT`, client `xyz.bobbyprotocol.bobby`, and a verified Sign in with Apple key. Do not assume any downloaded `.p8` is the correct key. Keep all values in the server's secret environment, never Git or the app.
-- [ ] **Account lifecycle on a real iPhone:** use an explicitly designated test Apple account, sign in, complete a read, relaunch, confirm saved progress, then delete. Verify database deletion and `appleRevocation: "revoked"`; Bobby should disappear from Apple's connected-app list. Never delete the owner's everyday account for QA. Network-failure and cancellation paths must remain retryable.
+- [ ] **Account lifecycle on a real iPhone:** use an explicitly designated test Apple account, sign in, complete a read, relaunch, confirm saved progress, publish/report/withdraw its test island following the moderation runbook, then delete. Verify database deletion and `appleRevocation: "revoked"`; Bobby should disappear from Apple's connected-app list. Never delete the owner's everyday account for QA. Network-failure and cancellation paths must remain retryable.
 - [ ] **Moderation ownership/support:** assign a person to review the queue daily and respond to urgent reports promptly. Confirm a monitored public support contact and private privacy channel. The prepared software does not mean an operator has been assigned.
 - [ ] **Distribution signing:** add the authorized Apple Developer account in Xcode Settings → Accounts and obtain the correct distribution certificate/profile. The export preflight failed with `No Accounts` and missing `iOS Distribution` certificate. A development-signed archive is not an App Store IPA.
 - [ ] **App Store Connect:** confirm build 35 is unused, upload the distribution export, wait for processing, verify privacy/age-rating/contact/rights fields, attach both screenshot sets and review notes, and select this exact build. No online fields have been saved by this task.

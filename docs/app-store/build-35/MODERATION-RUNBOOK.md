@@ -2,6 +2,8 @@
 
 ## Rollout
 
+September 22 rollout status: the migration is applied to `qbvdqkknnuweatptjohi`, recorded as `20260922114536_trader_land_moderation`, and the matching backend is deployed as `dpl_7x4f49omCCK6KaY76LhszV2AEFFC`. Schema permissions, provider access and unauthenticated API smoke checks passed. Steps 5–6 below still require the owner's designated test account and assigned operator.
+
 1. Confirm the Bobby database project from the deployed `BOBBY_SUPABASE_URL`. The current native account client uses `qbvdqkknnuweatptjohi`; verify that production points there too. Do not apply the migration to the unrelated DeFi Mexico database. Use Supabase MCP for production queries and migrations, following AGENTS.md.
 2. Review and apply `supabase/bobby-protocol/supabase/migrations/20260922120000_trader_land_moderation.sql`. It adds fields, a private report table and a service-role-only publication function. Existing islands retain all pieces and names. Previously public names start pending and will disappear from the gallery after the new API is deployed until their owners publish again and pass review.
 3. Confirm the production `OPENAI_API_KEY` can access moderation. Publish rejects flagged names and returns an actionable temporary failure when review is unavailable. The built-in default name does not need external review.

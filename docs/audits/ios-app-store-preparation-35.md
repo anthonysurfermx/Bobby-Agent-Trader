@@ -1,6 +1,6 @@
 # Bobby 1.2 (35): submission preparation, September 22, 2026
 
-Status: **local candidate prepared and production schema migrated; backend rollout, distribution signing and account-lifecycle evidence remain release gates.** Nothing was uploaded to App Store Connect or submitted for review by this work.
+Status: **native candidate prepared and installed, production schema/backend deployed; distribution signing, account-lifecycle evidence and confirmed support ownership remain release gates.** Nothing was uploaded to App Store Connect or submitted for review by this work.
 
 ## Changes
 
@@ -29,15 +29,19 @@ Evidence is retained under `output/app-store-ready-35/` (local, ignored by Git).
 | Existing iOS backend/account/debate checks | 322 passed (32 + 124 + 166) |
 | Actual local PostgreSQL migration/permissions/concurrency | 15 passed |
 | Production database migration | Applied via Supabase MCP to the verified Bobby project; report RLS and restricted grants confirmed |
+| Production moderation provider access | Real OpenAI moderation request returned HTTP 200 and an unflagged result for the non-personal test text “Calm Harbor” |
+| Production rollout | READY, commit `9c68c63`, deployment `dpl_7x4f49omCCK6KaY76LhszV2AEFFC`; seven API smoke checks passed |
 | Native unit tests | 139 passed on iPhone 17 Pro simulator |
 | Existing consent, voices, mute, onboarding and island UI regressions | 14 passed, English and Spanish |
 | New block, return-home and unblock UI tests | 2 passed on iPhone 17 Pro Max simulator |
 | Real analysis, scrolling, onboarding, Squad and showcase capture flows | 2 passed, English and Spanish, on the same final UI run |
 | Store screenshots | 5 reviewed images per language; 10 original 1320 × 2868 RGB PNGs with SHA-256 manifest |
 | Store metadata | All 13 text fields within their App Store Connect limits |
-| Web support/privacy | Rendered and checked in English/Spanish using the local production build |
+| Web support/privacy | Rendered and checked in English/Spanish locally and on the deployed production domain |
 | Reviewer example questions | Bitcoin → BTC and NVIDIA → NVDA, both exact, no confirmation needed |
 | Final Release archive | Succeeded; codesign verification passed; executable/dSYM UUIDs match |
+| App icon | 1024 × 1024 source PNG, no alpha channel |
+| Physical iPhone installation | Final archived app installed successfully; launch was refused by iOS because the phone was locked |
 
 Final executable SHA-256: `957c9c4879495c96e98146926fb1df285d157a2a15c818ce815d8c57158d95f3`. Archive: `output/app-store-ready-35/Bobby-1.2-35.xcarchive`. This is a development-signed local candidate; distribution export is blocked by the missing account/certificate.
 
@@ -47,14 +51,15 @@ Screenshot capture uses the real app UI and actual public market/debate response
 
 The intermediate `store-final.xcresult` run was deliberately interrupted after reproducing the Spanish scroll freeze; it is not a successful test result. The replacement run, `store-and-community-verified.xcresult`, passed all four tests with zero failures: two community flows and two store capture flows. Final store captures enter Trader Land through the ordinary `desk-land` control, without a preview route. The extra verdict images duplicated the analysis composition and were excluded from the store folder, while their originals remain in the result bundle.
 
-Across the successful runs, 157 distinct native tests and 557 backend/database checks passed. These totals combine the documented runs; they are not a claim that the first run passed or that production signing/account deletion has been tested. The final native candidate has not replaced the earlier build 35 on the physical phone.
+Across the successful runs, 157 distinct native tests and 557 backend/database checks passed. These totals combine the documented runs; they are not a claim that the first run passed or that production signing/account deletion has been tested. The final native candidate replaced the earlier build 35 on the physical iPhone 17 Pro. `phone-install-final.json` records the successful installation; `phone-launch-final.log` records the locked-device launch refusal. No real account was deleted for testing.
+
+Production had the separate PTS relay commit `89464bc`; it was merged before deployment, followed by a successful build/API typecheck. `.vercelignore` now excludes native archives, local output and environment files from web deployment. Supabase MCP recorded the migration as `20260922114536_trader_land_moderation` in `qbvdqkknnuweatptjohi`, matching the deployed environment URL. Production contained seven private islands and no public islands, so the pending-review default did not remove existing public content. The production smoke checks include gallery reads, missing-island handling, invalid/missing-target reports, authentication for publication and the preserved PTS endpoint. They did not create or delete a user account or publish a test island.
 
 ## Remaining external work
 
-1. Deploy the matching API and support/privacy pages. The Supabase connection became available during final preparation: the migration was applied to `qbvdqkknnuweatptjohi`, matching the deployed `BOBBY_SUPABASE_URL`, and recorded as `20260922114536_trader_land_moderation`. Read-only verification confirmed the columns, report RLS, denied anonymous/authenticated reads and denied anonymous RPC execution. The current production deployment includes `89464bc` (PTS realtime relay), which must be preserved during rollout.
-2. Configure the four `APPLE_SIGN_IN_*` server variables using a verified Sign in with Apple key. A read-only Vercel Production environment-name check found all four absent. Do not infer the key's purpose from its downloaded filename.
-3. Sign in and delete an explicitly designated test Apple account on the physical phone. The owner's real account has not been deleted or altered for this preparation. Mock tests do not replace proof of actual Apple token revocation.
-4. Resolve Xcode's `No Accounts` / missing `iOS Distribution` signing error. The successful development archive is not a distribution IPA. App Store Connect also opened at its sign-in screen, so online build-number availability, metadata, privacy and legal fields have not been verified or saved.
-5. Confirm who handles reports/support and the private privacy contact, verify the processed build in TestFlight, then submit only after the owner authorizes the actual submission.
+1. Configure the four `APPLE_SIGN_IN_*` server variables using a verified Sign in with Apple key. A read-only Vercel Production environment-name check found all four absent. Do not infer the key's purpose from its downloaded filename.
+2. Sign in with an explicitly designated test Apple account on the physical phone, verify the authenticated island publication/report/withdrawal flow, then delete that test account. The owner's real account has not been deleted or altered for this preparation. Mock tests do not replace proof of actual Apple token revocation.
+3. Resolve Xcode's `No Accounts` / missing `iOS Distribution` signing error. The successful development archive is not a distribution IPA. App Store Connect also opened at its sign-in screen, so online build-number availability, metadata, privacy and legal fields have not been verified or saved.
+4. Confirm who handles reports/support and the private privacy contact, verify the processed build in TestFlight, then submit only after the owner authorizes the actual submission.
 
 See [the complete handoff](../app-store/build-35/README.md), [privacy answers](../app-store/build-35/APP-PRIVACY-ANSWERS.md) and [moderation runbook](../app-store/build-35/MODERATION-RUNBOOK.md).

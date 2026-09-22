@@ -1,0 +1,43 @@
+{
+  "database": {
+    "project": "qbvdqkknnuweatptjohi",
+    "matchesDeployedBobbySupabaseURL": true,
+    "migration": "20260922114536_trader_land_moderation",
+    "reportsRLS": true,
+    "anonymousAndAuthenticatedReportReads": false,
+    "anonymousPublishRPC": false,
+    "serviceRolePublishRPC": true,
+    "publicIslandsAtRollout": 0
+  },
+  "moderationProvider": {
+    "status": 200,
+    "input": "Calm Harbor",
+    "flagged": false
+  },
+  "webPages": {
+    "productionDomain": "https://bobbyprotocol.xyz",
+    "supportVerified": [
+      "en",
+      "es"
+    ],
+    "privacyVerified": [
+      "en",
+      "es"
+    ],
+    "policyEffectiveDate": "2026-09-22"
+  },
+  "phone": {
+    "model": "iPhone 17 Pro",
+    "version": "1.2",
+    "build": "35",
+    "installedFromFinalArchive": true,
+    "automaticLaunch": "refused: device locked",
+    "realAppleAccountLifecycle": "pending"
+  },
+  "appIconSource": {
+    "width": 1024,
+    "height": 1024,
+    "hasAlpha": false
+  },
+  "appStoreSubmission": "not uploaded or submitted"
+}
