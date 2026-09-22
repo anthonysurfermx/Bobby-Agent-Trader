@@ -1,0 +1,92 @@
+{
+  "version": "1.0",
+  "chainId": "8453",
+  "createdAt": 1788900142582,
+  "meta": {
+    "name": "Bobby Protocol accept (8453)",
+    "description": "7 reviewed accept calls generated from contracts/deployments/8453.json",
+    "txBuilderVersion": "1.18.0",
+    "createdFromSafeAddress": "0x8BE60853F27b944e11486285d95c3e06596553b4",
+    "createdFromOwnerAddress": "",
+    "checksum": ""
+  },
+  "transactions": [
+    {
+      "to": "0x953181F1E7179BAA5659f0b8bbd13e901fa2DeBd",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    },
+    {
+      "to": "0x9b47C1d80F60eF7eA1e4C25Fa6187E1B8fe741D4",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    },
+    {
+      "to": "0x0b90Ac939EBB2fC6032938806FA51DE0B5512e00",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    },
+    {
+      "to": "0x946aB6cC26ff974cB56c0e98357104c042E3e131",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    },
+    {
+      "to": "0xE10ed31E08d0f6B1DB257420D4352C72D146F7b0",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    },
+    {
+      "to": "0x07A6B6A2272bB1f458A3bB3a7276c42C0e1861bD",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    },
+    {
+      "to": "0x5F72C9Ea3929FAbE1ddBa9fFd1d1ACFbC37D8F65",
+      "value": "0",
+      "data": null,
+      "contractMethod": {
+        "inputs": [],
+        "name": "acceptOwnership",
+        "payable": false
+      },
+      "contractInputsValues": {}
+    }
+  ]
+}
