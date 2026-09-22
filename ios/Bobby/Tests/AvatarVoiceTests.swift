@@ -43,9 +43,13 @@ private final class AvatarVoiceProtocol: URLProtocol {
 /// transport is stubbed: tests cannot create a paid session or reach production.
 final class AvatarVoiceTests: XCTestCase {
     private var session: URLSession!
+    private var defaults: UserDefaults!
+    private var defaultsSuite: String!
 
     override func setUp() {
         super.setUp()
+        defaultsSuite = "avatar-voice-tests-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: defaultsSuite)!
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [AvatarVoiceProtocol.self]
         session = URLSession(configuration: config)
@@ -53,6 +57,7 @@ final class AvatarVoiceTests: XCTestCase {
 
     override func tearDown() {
         session.invalidateAndCancel()
+        defaults.removePersistentDomain(forName: defaultsSuite)
         AvatarVoiceProtocol.handler = nil
         super.tearDown()
     }
@@ -70,7 +75,7 @@ final class AvatarVoiceTests: XCTestCase {
 
     @MainActor func testBundledAvatarClipPlaysAudibleSamplesAndFinishesWithoutNetwork() async throws {
         AvatarVoiceProtocol.handler = { _ in XCTFail("A bundled avatar clip must not make a network request") }
-        let voice = NeuralVoice(session: session)
+        let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
         voice.speakClip("select-orb-es", fallbackText: "Hola", persona: "ash")
         try await waitUntil { voice.speaking && voice.level > 0.06 }
@@ -97,7 +102,7 @@ final class AvatarVoiceTests: XCTestCase {
             request.fulfill()
             stub.respond(data)
         }
-        let voice = NeuralVoice(session: session)
+        let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
         voice.speak(line, voiceId: "coral", persona: "ash", vibe: "pro")
         await fulfillment(of: [request], timeout: 3)
@@ -116,7 +121,7 @@ final class AvatarVoiceTests: XCTestCase {
             request.fulfill()
             stub.respond(data)
         }
-        let voice = NeuralVoice(session: session)
+        let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
         voice.speakClip("missing-avatar-clip", fallbackText: "Hola", persona: "ash")
         await fulfillment(of: [request], timeout: 3)
@@ -128,11 +133,11 @@ final class AvatarVoiceTests: XCTestCase {
         let request = expectation(description: "request before mute")
         var pending: AvatarVoiceProtocol?
         AvatarVoiceProtocol.handler = { stub in pending = stub; request.fulfill() }
-        let voice = NeuralVoice(session: session)
+        let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
         voice.speak("Hola", voiceId: "ash", essential: false)
         await fulfillment(of: [request], timeout: 3)
-        voice.stop()
+        voice.isMuted = true
         try XCTUnwrap(pending).respond(data)
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertFalse(voice.speaking, "Muting must also invalidate pending narration")
@@ -143,7 +148,7 @@ final class AvatarVoiceTests: XCTestCase {
     /// AVAudioPlayer and mouth meter, in both languages, with the network denied.
     @MainActor func testEveryAvatarAndStyleHasAudibleOfflineSpeechInBothLanguages() async throws {
         AvatarVoiceProtocol.handler = { _ in XCTFail("Every avatar/style must have bundled speech") }
-        let voice = NeuralVoice(session: session)
+        let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
         var clips: [String: String] = [:]
         for companion in bobbyCompanions {
@@ -168,7 +173,7 @@ final class AvatarVoiceTests: XCTestCase {
 
     @MainActor func testEveryAvatarKeepsItsPersonaAndVibeInNarratedAnswers() async throws {
         let data = try clip()
-        let voice = NeuralVoice(session: session)
+        let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
         for companion in bobbyCompanions {
             for vibe in AgentVibe.allCases {
@@ -191,7 +196,7 @@ final class AvatarVoiceTests: XCTestCase {
     }
 
     @MainActor func testACompletedOldVoiceCannotStopTheNewAvatarsMouthAnimation() async throws {
-        let voice = NeuralVoice(session: session)
+        let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
         let oldPlayer = try AVAudioPlayer(data: clip())
         voice.audioPlayerDidFinishPlaying(oldPlayer, successfully: true)
@@ -199,4 +204,28 @@ final class AvatarVoiceTests: XCTestCase {
         voice.speakClip("select-byte-en", fallbackText: "Hello", persona: "ballad")
         try await waitUntil { voice.speaking && voice.level > 0.06 }
     }
+    @MainActor func testMutePersistsAndBlocksClipsAndNetworkUntilExplicitlyEnabled() async throws {
+        AvatarVoiceProtocol.handler = { _ in XCTFail("Muted narration must not call TTS") }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        voice.speakClip("select-byte-es", fallbackText: "Hola", persona: "ballad")
+        try await waitUntil { voice.speaking && voice.level > 0.06 }
+        voice.isMuted = true
+        XCTAssertFalse(voice.speaking)
+        XCTAssertEqual(voice.level, 0)
+        XCTAssertTrue(defaults.bool(forKey: NeuralVoice.mutePreferenceKey))
+
+        let relaunched = NeuralVoice(session: session, defaults: defaults)
+        defer { relaunched.stop() }
+        XCTAssertTrue(relaunched.isMuted)
+        relaunched.speakClip("select-byte-en", fallbackText: "Hello", persona: "ballad")
+        relaunched.speak("Hello", voiceId: "ballad")
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertFalse(relaunched.speaking)
+        relaunched.isMuted = false
+        relaunched.speakClip("select-byte-en", fallbackText: "Hello", persona: "ballad")
+        try await waitUntil { relaunched.speaking && relaunched.level > 0.06 }
+        XCTAssertFalse(defaults.bool(forKey: NeuralVoice.mutePreferenceKey))
+    }
+
 }

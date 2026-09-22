@@ -2,6 +2,8 @@
 
 Date: 2026-09-22. Base: verified `origin/main` at `6f117bf7ec78cb5c479ecde8a2ec8de1f3a604bc`. This revision supersedes the first build-35 candidate from `540f8bd`.
 
+**Latest candidate:** the subsequent [persistent-mute revision](ios-avatar-voice-mute-35.md) retains these fixes and adds the remembered voice control. Its archive is `output/avatar-voice-mute-35/Bobby-1.2-35-final.xcarchive`. The evidence below describes the earlier voice-consistency revision.
+
 ## Changes
 
 The requested onboarding order is **choose a companion (1/3) → aura machine (2/3) → Chill / Direct / Pro (3/3)**. The scan still gates its Next button, including the existing eight-second render timeout. Selecting or tapping a companion previews its introduction; the last step previews its current style and lets the user compare all three.

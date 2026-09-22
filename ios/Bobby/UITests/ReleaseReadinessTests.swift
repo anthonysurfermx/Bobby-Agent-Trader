@@ -32,7 +32,7 @@ final class ReleaseReadinessTests: XCTestCase {
 
     private func verifyAvatarOnboarding(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
+        app.launchArguments = ["-avatar.voiceMuted", "NO", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
         app.launch()
         let next = app.buttons["onboarding-next"]
         XCTAssertTrue(next.waitForExistence(timeout: 15))
@@ -77,7 +77,7 @@ final class ReleaseReadinessTests: XCTestCase {
 
     private func verifyAvatarMute(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES"]
+        app.launchArguments = ["-avatar.voiceMuted", "NO", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES"]
         app.launch()
         let toggle = app.buttons["avatar-voice-toggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 15))
@@ -93,7 +93,7 @@ final class ReleaseReadinessTests: XCTestCase {
     func testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES",
-                               "-companion.id", "byte", "-companion.disciplineXP", "1000"]
+                               "-companion.id", "byte", "-companion.disciplineXP", "1000", "-avatar.voiceMuted", "NO"]
         app.launch()
         let portrait = app.buttons["squad-portrait"]
         XCTAssertTrue(portrait.waitForExistence(timeout: 15))
@@ -109,6 +109,62 @@ final class ReleaseReadinessTests: XCTestCase {
         app.descendants(matching: .any)["squad-rail-byte"].tap()
         let stopped = expectation(for: NSPredicate(format: "value == 'Ready'"), evaluatedWith: app.descendants(matching: .any)["squad-avatar"].firstMatch)
         wait(for: [stopped], timeout: 5)
+    }
+
+    func testMuteChoiceSurvivesOnboardingGalleryAndRelaunch() {
+        verifyPersistentMute(spanish: false)
+    }
+
+    func testSpanishMuteChoiceSurvivesOnboardingGalleryAndRelaunch() {
+        verifyPersistentMute(spanish: true)
+    }
+
+    private func verifyPersistentMute(spanish: Bool) {
+        let app = XCUIApplication()
+        let language = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "3"]
+        let muted = spanish ? "Activar voz del avatar" : "Enable avatar voice"
+        let audible = spanish ? "Silenciar voz del avatar" : "Mute avatar voice"
+        app.launchArguments = language + ["-agent.onboarded", "NO", "-avatar.voiceMuted", "NO"]
+        app.launch()
+        let toggle = app.buttons["avatar-voice-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 15))
+        toggle.tap()
+        XCTAssertEqual(toggle.label, muted)
+        let next = app.buttons["onboarding-next"]
+        next.tap()
+        XCTAssertTrue(app.staticTexts["02 / 03"].waitForExistence(timeout: 5))
+        let ready = expectation(for: NSPredicate(format: "isEnabled == true"), evaluatedWith: next)
+        wait(for: [ready], timeout: 15)
+        next.tap()
+        XCTAssertTrue(app.staticTexts["03 / 03"].waitForExistence(timeout: 5))
+        app.buttons["avatar-vibe-pro"].tap()
+        XCTAssertEqual(toggle.label, muted, "Changing style cannot turn the voice back on")
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = spanish ? "onboarding-muted-es" : "onboarding-muted-en"
+        shot.lifetime = .keepAlways
+        add(shot)
+        next.tap()
+        XCTAssertTrue(app.buttons["squad-portrait"].waitForExistence(timeout: 10))
+        XCTAssertEqual(toggle.label, muted)
+        app.terminate()
+
+        // Remove the launch override: this must read the saved preference.
+        app.launchArguments = language + ["-agent.onboarded", "YES"]
+        app.launch()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 15))
+        XCTAssertEqual(toggle.label, muted)
+        app.buttons["squad-portrait"].tap()
+        XCTAssertTrue(app.buttons["squad-close"].waitForExistence(timeout: 10))
+        let galleryToggle = app.buttons["squad-voice-toggle"]
+        XCTAssertEqual(galleryToggle.label, muted)
+        galleryToggle.tap()
+        XCTAssertEqual(galleryToggle.label, audible)
+        app.buttons["squad-close"].tap()
+        XCTAssertEqual(toggle.label, audible)
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(toggle.waitForExistence(timeout: 15))
+        XCTAssertEqual(toggle.label, audible, "Enabling voice is remembered too")
     }
 
     func testOrdinaryIslandDoesNotExposePublicGallery() {

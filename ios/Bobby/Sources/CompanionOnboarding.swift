@@ -203,6 +203,7 @@ struct CompanionOnboarding: View {
                 Text("0\(beat) / 0\(beats)")
                     .font(.mono(10, .bold))
                     .foregroundStyle(selected.tintSoft)
+                AvatarVoiceToggle(voice: voice)
             }
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {

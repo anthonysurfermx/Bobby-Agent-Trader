@@ -10,6 +10,16 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     static let avatarNarrationEnabled = true
     @Published var speaking = false
     @Published var level: CGFloat = 0
+    /// One device preference shared by onboarding, the desk and the gallery.
+    /// Muting also invalidates requests that have not returned audio yet.
+    @Published var isMuted: Bool {
+        didSet {
+            defaults.set(isMuted, forKey: Self.mutePreferenceKey)
+            if isMuted { stop() }
+        }
+    }
+    static let mutePreferenceKey = "avatar.voiceMuted"
+    private let defaults: UserDefaults
 
     private var player: AVAudioPlayer?
     private let fallback = AVSpeechSynthesizer()
@@ -18,8 +28,10 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     private var meterTimer: Timer?
     private let session: URLSession
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = .shared, defaults: UserDefaults = .standard) {
         self.session = session
+        self.defaults = defaults
+        self.isMuted = defaults.bool(forKey: Self.mutePreferenceKey)
         super.init()
         // Without the delegate the AVSpeech fallback never flips `speaking`
         // back to false — the companion would mouth silence forever.
@@ -53,7 +65,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// greetings, onboarding previews — retry once and then stay silent: a
     /// robotic voice breaking the companion's identity is worse than no voice.
     func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true, playbackRate: Float = 1.0, free: Bool = false) {
-        guard Self.avatarNarrationEnabled else { return }
+        guard Self.avatarNarrationEnabled, !isMuted else { return }
         stop()
         generation += 1
         let gen = generation
@@ -106,7 +118,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// /api/bobby-voice-free voice: it starts instantly and needs no network.
     /// A missing clip falls back to the network voice for `fallbackText`.
     func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
-        guard Self.avatarNarrationEnabled else { return }
+        guard Self.avatarNarrationEnabled, !isMuted else { return }
         guard let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
               let data = try? Data(contentsOf: url) else {
             speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)

@@ -121,6 +121,7 @@ struct MascotGalleryView: View {
                 .kerning(2.0)
                 .foregroundStyle(Theme.text.opacity(0.75))
             Spacer()
+            if voiceEnabled { AvatarVoiceToggle(voice: voice, accessibilityID: "squad-voice-toggle") }
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))

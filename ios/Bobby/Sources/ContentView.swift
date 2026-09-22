@@ -59,7 +59,10 @@ final class BobbyViewModel: ObservableObject {
     private var confirmedQuestion: (symbol: String, question: String)?
     @Published var snapshot: MarketSnapshot?
     @Published var lastAnswer: BobbyAnswer?
-    @Published var speakEnabled = NeuralVoice.avatarNarrationEnabled
+    var speakEnabled: Bool {
+        get { NeuralVoice.avatarNarrationEnabled && !voice.isMuted }
+        set { voice.isMuted = !newValue }
+    }
     @Published var phase: DeskPhase = .idle
     @Published var timeframe: MarketTimeframe = .oneHour
     @Published var noTradeMoment: NoTradeMoment? = nil
@@ -649,7 +652,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSquad) {
             // Muted means muted: the gallery's pick line stays silent too.
-            MascotGalleryView(store: vm.companions, voice: vm.speakEnabled ? vm.voice : nil, voiceId: vm.profile.voiceId)
+            MascotGalleryView(store: vm.companions, voice: vm.voice, voiceId: vm.profile.voiceId)
         }
         .onChange(of: vm.profile.onboarded) { _, onboarded in
             if onboarded { vm.bootGreetingIfNeeded() }
@@ -785,20 +788,7 @@ struct ContentView: View {
                 openLand(account.isSignedIn ? pulse.focus : nil, haptic: .light)
             }
             if NeuralVoice.avatarNarrationEnabled {
-            Button {
-                vm.speakEnabled.toggle()
-                if !vm.speakEnabled { vm.voice.stop() }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            } label: {
-                Image(systemName: vm.speakEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(vm.speakEnabled ? Theme.accentSoft : Theme.muted)
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(Theme.card))
-                    .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
-            }
-            .accessibilityIdentifier("avatar-voice-toggle")
-            .accessibilityLabel(vm.speakEnabled ? L.t("Mute avatar voice", "Silenciar voz del avatar") : L.t("Enable avatar voice", "Activar voz del avatar"))
+                AvatarVoiceToggle(voice: vm.voice)
             }
             // Progress, account and the custody promise live in the menu.
             Menu {
