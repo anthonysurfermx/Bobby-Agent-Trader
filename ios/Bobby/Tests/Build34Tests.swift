@@ -51,10 +51,9 @@ final class Build34Tests: XCTestCase {
         XCTAssertEqual(SignInMethods.offersX, SignInMethods.isDebugBuild)
     }
 
-    @MainActor func testTextOnlyOnboardingSkipsTheVibeStep() {
-        XCTAssertFalse(NeuralVoice.enabled)
-        XCTAssertFalse(CompanionOnboarding.showsVibeStep(voiceEnabled: NeuralVoice.enabled))
-        XCTAssertTrue(CompanionOnboarding.showsVibeStep(voiceEnabled: true))
+    @MainActor func testAvatarNarrationRestoresVoiceStyleOnboarding() {
+        XCTAssertTrue(CompanionOnboarding.showsVibeStep(voiceEnabled: NeuralVoice.avatarNarrationEnabled))
+        XCTAssertFalse(CompanionOnboarding.showsVibeStep(voiceEnabled: false))
     }
 
     // MARK: Account deletion — client 2 contract

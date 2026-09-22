@@ -1,10 +1,7 @@
 // Companion-first onboarding. The user lands INSIDE the squad world from
 // second one — same dark stage, same 3D companions, same tokens as the rest
-// of the app. Choose your companion, choose its vibe (heard live — only in a
-// build with voice), then watch the aura forge scan it to life — pure
-// animation, no cards. No orb, no separate "blue app". The text-only release
-// has no voice, so the vibe step (a choice that only changes how it sounds)
-// is skipped there: two beats.
+// of the app. Choose your companion, preview its narrated voice, then watch
+// the aura forge scan it to life. Voice previews do not open a Live call.
 import SwiftUI
 
 struct CompanionOnboarding: View {
@@ -25,7 +22,7 @@ struct CompanionOnboarding: View {
     private var starters: [Companion] { bobbyCompanions.filter { $0.requiredLevel == 1 } }
     private var tint: Color { selected.tint }
     /// The vibe only changes how the companion sounds: without voice it is a choice with no effect.
-    private var showsVibeStep: Bool { Self.showsVibeStep(voiceEnabled: NeuralVoice.enabled) }
+    private var showsVibeStep: Bool { Self.showsVibeStep(voiceEnabled: NeuralVoice.avatarNarrationEnabled) }
     static func showsVibeStep(voiceEnabled: Bool) -> Bool { voiceEnabled }
     /// Beats on screen: 3 with the vibe step, 2 without. Step indices stay 0 / 1 / 2.
     private var beats: Int { showsVibeStep ? 3 : 2 }

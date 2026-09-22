@@ -59,7 +59,7 @@ final class BobbyViewModel: ObservableObject {
     private var confirmedQuestion: (symbol: String, question: String)?
     @Published var snapshot: MarketSnapshot?
     @Published var lastAnswer: BobbyAnswer?
-    @Published var speakEnabled = NeuralVoice.enabled
+    @Published var speakEnabled = NeuralVoice.avatarNarrationEnabled
     @Published var phase: DeskPhase = .idle
     @Published var timeframe: MarketTimeframe = .oneHour
     @Published var noTradeMoment: NoTradeMoment? = nil
@@ -784,7 +784,7 @@ struct ContentView: View {
             LandChip(badge: account.isSignedIn ? pulse.badge : 0, bump: vm.landBump) {
                 openLand(account.isSignedIn ? pulse.focus : nil, haptic: .light)
             }
-            if NeuralVoice.enabled {
+            if NeuralVoice.avatarNarrationEnabled {
             Button {
                 vm.speakEnabled.toggle()
                 if !vm.speakEnabled { vm.voice.stop() }
@@ -797,6 +797,8 @@ struct ContentView: View {
                     .background(Circle().fill(Theme.card))
                     .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
             }
+            .accessibilityIdentifier("avatar-voice-toggle")
+            .accessibilityLabel(vm.speakEnabled ? L.t("Mute avatar voice", "Silenciar voz del avatar") : L.t("Enable avatar voice", "Activar voz del avatar"))
             }
             // Progress, account and the custody promise live in the menu.
             Menu {

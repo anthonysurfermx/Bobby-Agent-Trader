@@ -21,18 +21,36 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertTrue(consent.waitForNonExistence(timeout: 5))
     }
 
-    /// The text-only release has no voice: onboarding never asks how the companion should talk.
-    func testTextOnlyOnboardingHasNoVoiceStyleStep() {
+    /// Avatar narration restores the preview step without opening an interactive call.
+    func testAvatarVoiceStyleReturnsToOnboarding() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "NO"]
         app.launch()
         let pick = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'PICK '")).firstMatch
         XCTAssertTrue(pick.waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["01 / 02"].exists, "two beats: choose, then the aura forge")
+        XCTAssertTrue(app.staticTexts["01 / 03"].exists)
         pick.tap()
-        XCTAssertTrue(app.staticTexts["02 / 02"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["NEXT"].exists)
-        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'talk to you'")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["02 / 03"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'talk to you'")).firstMatch.exists)
+        let next = app.staticTexts["NEXT"]
+        XCTAssertTrue(next.exists)
+        next.tap()
+        XCTAssertTrue(app.staticTexts["03 / 03"].waitForExistence(timeout: 5))
+    }
+
+    func testDeskCanMuteAndRestoreAvatarNarration() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "3", "-agent.onboarded", "YES"]
+        app.launch()
+        let toggle = app.buttons["avatar-voice-toggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 15))
+        XCTAssertEqual(toggle.label, "Mute avatar voice")
+        toggle.tap()
+        XCTAssertEqual(toggle.label, "Enable avatar voice")
+        toggle.tap()
+        XCTAssertEqual(toggle.label, "Mute avatar voice")
+        XCTAssertFalse(app.buttons["ChatGPT"].exists)
+        XCTAssertFalse(app.buttons["Live"].exists)
     }
 
     func testOrdinaryIslandDoesNotExposePublicGallery() {

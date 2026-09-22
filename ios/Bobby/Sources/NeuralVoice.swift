@@ -6,7 +6,9 @@ import Foundation
 
 @MainActor
 final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
-    static let enabled = false // Text-only App Store release.
+    // One-way avatar narration (clips and TTS), independent of conversational
+    // Live/ChatGPT. This client has no microphone or Realtime session flow.
+    static let avatarNarrationEnabled = true
     @Published var speaking = false
     @Published var level: CGFloat = 0
 
@@ -14,8 +16,10 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     private let fallback = AVSpeechSynthesizer()
     private var generation = 0
     private var meterTimer: Timer?
+    private let session: URLSession
 
-    override init() {
+    init(session: URLSession = .shared) {
+        self.session = session
         super.init()
         // Without the delegate the AVSpeech fallback never flips `speaking`
         // back to false — the companion would mouth silence forever.
@@ -39,7 +43,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// greetings, onboarding previews — retry once and then stay silent: a
     /// robotic voice breaking the companion's identity is worse than no voice.
     func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true, playbackRate: Float = 1.0, free: Bool = false) {
-        guard Self.enabled else { return }
+        guard Self.avatarNarrationEnabled else { return }
         stop()
         generation += 1
         let gen = generation
@@ -68,7 +72,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 if free { body["mode"] = "free" }
                 if let serverVibe = Self.serverVibe(vibe) { body["vibe"] = serverVibe }
                 req.httpBody = try JSONSerialization.data(withJSONObject: body)
-                    let result = try await URLSession.shared.data(for: req)
+                    let result = try await session.data(for: req)
                     guard gen == self.generation else { return }
                     let status = (result.1 as? HTTPURLResponse)?.statusCode ?? 0
                     if status == 200 && result.0.count > 500 { payload = result; break }
@@ -92,7 +96,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// /api/bobby-voice-free voice: it starts instantly and needs no network.
     /// A missing clip falls back to the network voice for `fallbackText`.
     func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
-        guard Self.enabled else { return }
+        guard Self.avatarNarrationEnabled else { return }
         guard let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
               let data = try? Data(contentsOf: url) else {
             speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)

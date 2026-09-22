@@ -93,11 +93,8 @@ final class ReleaseAuditTests: XCTestCase {
         XCTAssertFalse(incomplete.isNoTrade)
     }
 
-    @MainActor func testTextReleaseNeverStartsSpeech() {
-        XCTAssertFalse(NeuralVoice.enabled)
-        let voice = NeuralVoice()
-        voice.speak("Private question", voiceId: "coral")
-        voice.speakClip("nonexistent", fallbackText: "Private question", persona: "coral")
-        XCTAssertFalse(voice.speaking)
+    func testAvatarNarrationDoesNotRequestMicrophoneOrSpeechRecognition() {
+        XCTAssertNil(Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription"))
+        XCTAssertNil(Bundle.main.object(forInfoDictionaryKey: "NSSpeechRecognitionUsageDescription"))
     }
 }
