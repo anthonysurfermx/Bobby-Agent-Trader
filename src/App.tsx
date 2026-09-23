@@ -20,10 +20,12 @@ import UserLayout from '@/pages/user/UserLayout';
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
-// Direction A is now /app itself; /app-a stays as an alias for links already shared,
-// /app-v1 keeps the previous landing, and direction B stays a candidate at /app-b.
+// Direction A (lifestyle) was /app until 2026-09-24 and stays at /app-a, so a rollback is a route change;
+// /app-v1 keeps the landing before it, and direction B stays a candidate at /app-b.
 const BobbyAppLandingA = lazyWithRetry(() => import('@/pages/BobbyAppLandingA'), 'app-landing-a');
 const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'), 'app-landing-b');
+// Direction A3 (sticker poster stack + Bobby's world) is /app since 2026-09-24; /app-world stays as an alias.
+const BobbyAppLandingWorld = lazyWithRetry(() => import('@/pages/BobbyAppLandingWorld'), 'app-landing-world');
 const BobbySupportPage = lazy(() => import('@/pages/BobbySupportPage'));
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
@@ -309,7 +311,15 @@ const router = createBrowserRouter(
           path: 'app',
           element: (
             <Suspense fallback={<PageLoader />}>
-              <BobbyAppLandingA />
+              <BobbyAppLandingWorld />
+            </Suspense>
+          ),
+        },
+        {
+          path: 'app-world',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAppLandingWorld />
             </Suspense>
           ),
         },
