@@ -81,3 +81,13 @@
 }
 .a3-typing { animation: a3-typing 1s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .a3-typing { animation: none; } }
+
+/* Creases that show up as the receipt gets crushed. */
+.a3-crease {
+  background:
+    linear-gradient(115deg, transparent 0 18%, rgba(5, 7, 6, 0.1) 18.6%, transparent 22% 40%, rgba(5, 7, 6, 0.08) 40.6%, transparent 45%),
+    linear-gradient(35deg, transparent 0 30%, rgba(5, 7, 6, 0.09) 30.6%, transparent 34% 62%, rgba(255, 255, 255, 0.7) 62.6%, transparent 66%),
+    linear-gradient(-60deg, transparent 0 50%, rgba(5, 7, 6, 0.08) 50.6%, transparent 55%),
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0), rgba(5, 7, 6, 0.14));
+  mix-blend-mode: multiply;
+}

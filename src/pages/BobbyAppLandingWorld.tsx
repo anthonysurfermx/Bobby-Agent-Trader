@@ -1,20 +1,23 @@
-// PROPOSAL A3 — "Fun to ask. Hard to fool." Sticker poster stack for /app.
+// /app — "Fun to ask. Hard to fool." (direction A3, sticker poster stack).
 //
 // The App Store campaign turned into a scroll: every section is one poster —
 // one colour, one headline, one object — and on desktop each poster slides over
-// the one before it. The playfulness lives in the craft (photo cards with white
-// borders, tape, die-cut stickers of the squad's pets, never more than three
-// per poster); the argument stays serious: chatbots forget, Bobby keeps
-// receipts, and the record on the receipt is live. It closes by walking into
-// Bobby's world — the islands you can drag through.
+// the one before it. The fun lives in the motion, not in the copy: Byte hangs on
+// to the next poster rather than be covered, the two chatbot answers drop in
+// like marbles, the receipt crumples into a ball as you move on, the squad
+// breathes, and the page ends by sailing through Trader Land. The argument
+// stays serious — chatbots forget, Bobby keeps receipts, and the record on the
+// receipt is live.
 //
 // Routed at /app (since 2026-09-24) and /app-world. The previous lifestyle landing stays at /app-a for rollback.
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { motion, useInView, useReducedMotion } from 'framer-motion';
+import { motion, useInView, useReducedMotion, useScroll, useTransform, type Easing, type MotionValue } from 'framer-motion';
 import { isSpanish, t } from '@/lib/companions/i18n';
 import { APP_STORE_URL } from '@/lib/app-store';
 import BobbyWorld from '@/components/app-landing/BobbyWorld';
+import LedgeByte from '@/components/app-landing/LedgeByte';
+import SquadLineup from '@/components/app-landing/SquadLineup';
 import '@/components/app-landing/app-landing-a3.css';
 
 const DESK_URL = '/desk';
@@ -76,9 +79,9 @@ function StoreButton({ className = '' }: { className?: string }) {
 }
 
 /** One poster in the stack. The first one sits flat; every later one overlaps the previous with a rounded top. */
-function Poster({ id, z, className, children, first = false }: { id?: string; z: number; className: string; children: React.ReactNode; first?: boolean }) {
+function Poster({ id, z, className, children, first = false, sectionRef }: { id?: string; z: number; className: string; children: React.ReactNode; first?: boolean; sectionRef?: React.Ref<HTMLElement> }) {
   return (
-    <section id={id} className={`a3-poster relative overflow-hidden ${first ? '' : 'a3-poster-card'} ${className}`} style={{ zIndex: z }}>
+    <section ref={sectionRef} id={id} className={`a3-poster relative overflow-hidden ${first ? '' : 'a3-poster-card'} ${className}`} style={{ zIndex: z }}>
       {children}
     </section>
   );
@@ -105,17 +108,6 @@ function PetSticker({ src, className, rotate = 0 }: { src: string; className: st
   return <img src={src} alt="" loading="lazy" draggable={false} className={`a3-diecut pointer-events-none absolute h-auto ${className}`} style={{ transform: `rotate(${rotate}deg)` }} />;
 }
 
-function PhotoCard({ src, alt, bg, rotate, className, focus = '50% 0%' }: { src: string; alt: string; bg: string; rotate: number; className: string; focus?: string }) {
-  return (
-    <div
-      className={`absolute overflow-hidden rounded-[16px] border-[7px] border-white shadow-[0_24px_50px_rgba(5,7,6,.2)] lg:rounded-[22px] lg:border-[10px] ${className}`}
-      style={{ background: bg, transform: `rotate(${rotate}deg)` }}
-    >
-      <img src={src} alt={alt} loading="lazy" draggable={false} className="h-full w-full object-cover" style={{ objectPosition: focus }} />
-    </div>
-  );
-}
-
 function Tape({ className, rotate }: { className: string; rotate: number }) {
   return <span aria-hidden="true" className={`absolute h-[26px] w-[96px] bg-white/70 lg:h-[32px] lg:w-[110px] ${className}`} style={{ transform: `rotate(${rotate}deg)` }} />;
 }
@@ -133,6 +125,32 @@ function PosterCopy({ kicker, title, body, dark = false, size = 'lg', children }
     </motion.div>
   );
 }
+
+/* ------------------------------------------------------------------ hero */
+
+/** Byte standing on the studio floor, pointing at his pet. `byteRef` wraps his image so LedgeByte can take his place. */
+function HeroBobby({ className, byteRef }: { className: string; byteRef?: React.Ref<HTMLDivElement> }) {
+  const reduceMotion = useReducedMotion();
+  const rise = reduceMotion ? {} : { initial: { opacity: 0, y: 30 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.8, ease: EASE } };
+  const pop = reduceMotion ? {} : { initial: { opacity: 0, scale: 0.6, y: 20 }, animate: { opacity: 1, scale: 1, y: 0 }, transition: { delay: 0.55, type: 'spring' as const, stiffness: 260, damping: 16 } };
+  return (
+    <div className={`relative ${className}`}>
+      <div className="absolute bottom-[1.5%] left-[8%] h-[8%] w-[84%] rounded-[50%] bg-[radial-gradient(closest-side,rgba(5,7,6,.2),rgba(5,7,6,0))]" />
+      <div ref={byteRef} className="absolute bottom-[3%] left-[4%] aspect-[571/960] h-[94%]">
+        <motion.img
+          {...rise}
+          src={`${P}/byte-standing.webp`}
+          alt={t('Byte, Bobby’s hoodie robot, standing and pointing at his pet', 'Byte, el robot con sudadera de Bobby, de pie señalando a su mascota')}
+          draggable={false}
+          className="block h-full w-full"
+        />
+      </div>
+      <motion.img {...pop} src={`${PET}/pet-byte.webp`} alt="" draggable={false} className="absolute bottom-[2.5%] right-[1%] h-[35%] w-auto origin-bottom" />
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- receipts */
 
 function Receipt({ record }: { record: StatsState }) {
   const rowNum = 'font-black tracking-[-0.04em] [font-family:Archivo,system-ui,sans-serif] text-[34px] lg:text-[44px]';
@@ -170,25 +188,128 @@ function Receipt({ record }: { record: StatsState }) {
   );
 }
 
-/** Byte standing on the studio floor, pointing at his pet. No frames, no photos: the characters are the hero. */
-function HeroBobby({ className }: { className: string }) {
-  const reduceMotion = useReducedMotion();
-  const rise = reduceMotion ? {} : { initial: { opacity: 0, y: 30 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.8, ease: EASE } };
-  const pop = reduceMotion ? {} : { initial: { opacity: 0, scale: 0.6, y: 20 }, animate: { opacity: 1, scale: 1, y: 0 }, transition: { delay: 0.55, type: 'spring' as const, stiffness: 260, damping: 16 } };
+// a faceted paper ball, lit from the top left
+const BALL: [string, string][] = [
+  ['90.5,48.3 84.5,69.7 53.9,46.4', '#d7d7d9'],
+  ['84.5,69.7 73.9,85.3 44.6,58.9', '#d7d7d9'],
+  ['73.9,85.3 59.9,92.9 44.6,58.9', '#dfdfe1'],
+  ['59.9,92.9 39.2,92.0 44.6,58.9', '#dcdcde'],
+  ['39.2,92.0 23.0,79.4 44.6,58.9', '#dedee0'],
+  ['23.0,79.4 4.3,62.1 41.1,52.3', '#e9e9eb'],
+  ['4.3,62.1 9.2,43.8 41.1,52.3', '#ededef'],
+  ['9.2,43.8 14.7,16.8 41.1,52.3', '#f3f3f5'],
+  ['14.7,16.8 35.5,9.6 51.3,37.8', '#fefeff'],
+  ['35.5,9.6 59.2,11.6 51.3,37.8', '#f5f5f7'],
+  ['59.2,11.6 76.7,17.7 51.3,37.8', '#e6e6e8'],
+  ['76.7,17.7 83.9,28.4 51.3,37.8', '#e7e7e9'],
+  ['83.9,28.4 90.5,48.3 53.9,46.4', '#e2e2e4'],
+  ['44.6,58.9 41.1,52.3 50.0,50.0', '#f3f3f5'],
+  ['41.1,52.3 53.9,46.4 50.0,50.0', '#f1f1f3'],
+  ['53.9,46.4 51.3,37.8 50.0,50.0', '#eaeaec'],
+  ['51.3,37.8 44.6,58.9 50.0,50.0', '#f6f6f8'],
+];
+const BALL_OUTLINE = '90.5,48.3 84.5,69.7 73.9,85.3 59.9,92.9 39.2,92.0 23.0,79.4 4.3,62.1 9.2,43.8 14.7,16.8 35.5,9.6 59.2,11.6 76.7,17.7 83.9,28.4';
+
+function PaperBall() {
   return (
-    <div className={`relative ${className}`}>
-      <div className="absolute bottom-[1.5%] left-[8%] h-[8%] w-[84%] rounded-[50%] bg-[radial-gradient(closest-side,rgba(5,7,6,.2),rgba(5,7,6,0))]" />
-      <motion.img
-        {...rise}
-        src={`${P}/byte-standing.webp`}
-        alt={t('Byte, Bobby’s hoodie robot, standing and pointing at his pet', 'Byte, el robot con sudadera de Bobby, de pie señalando a su mascota')}
-        draggable={false}
-        className="absolute bottom-[3%] left-[4%] h-[94%] w-auto"
-      />
-      <motion.img {...pop} src={`${PET}/pet-byte.webp`} alt="" draggable={false} className="absolute bottom-[2.5%] right-[1%] h-[35%] w-auto origin-bottom" />
+    <svg viewBox="0 0 100 100" className="h-full w-full drop-shadow-[0_18px_22px_rgba(5,7,6,.28)]" aria-hidden="true">
+      <polygon points={BALL_OUTLINE} fill="#e4e4e6" />
+      {BALL.map(([pts, fill]) => <polygon key={pts} points={pts} fill={fill} stroke="#c9c9cc" strokeWidth="0.6" strokeLinejoin="round" />)}
+      <path d="M20 40 L38 48 L30 64 M60 22 L56 40 L72 50 M48 74 L58 62" stroke="#b9b9bd" strokeWidth="0.9" fill="none" strokeLinecap="round" />
+      <path d="M26 30 L44 26" stroke="#050706" strokeOpacity=".25" strokeWidth="1.4" strokeDasharray="2 2" />
+      <polygon points={BALL_OUTLINE} fill="none" stroke="#bfbfc3" strokeWidth="1" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** As the next poster rises, the receipt is crushed into a ball and dropped. Scroll back up and it smooths out again. */
+function CrumpleReceipt({ record, progress }: { record: StatsState; progress: MotionValue<number> }) {
+  const reduceMotion = useReducedMotion();
+  const sx = useTransform(progress, [0, 0.16, 0.34], [1, 0.84, 0.3]);
+  const sy = useTransform(progress, [0, 0.16, 0.34], [1, 0.6, 0.3]);
+  const rotate = useTransform(progress, [0, 0.34], [0, -24]);
+  const skewX = useTransform(progress, [0, 0.16, 0.34], [0, 7, -5]);
+  const crease = useTransform(progress, [0.03, 0.2], [0, 1]);
+  const paperOpacity = useTransform(progress, [0.28, 0.36], [1, 0]);
+  const ballOpacity = useTransform(progress, [0.28, 0.35], [0, 1]);
+  const ballScale = useTransform(progress, [0.28, 0.38], [0.75, 1]);
+  const ballY = useTransform(progress, [0.4, 0.8], [0, 380]);
+  const ballX = useTransform(progress, [0.4, 0.8], [0, -80]);
+  const ballRotate = useTransform(progress, [0.28, 0.8], [0, 320]);
+  if (reduceMotion) return <Receipt record={record} />;
+  return (
+    <div className="relative">
+      <motion.div className="relative origin-center" style={{ scaleX: sx, scaleY: sy, rotate, skewX, opacity: paperOpacity }}>
+        <Receipt record={record} />
+        <motion.div className="a3-crease pointer-events-none absolute inset-0" style={{ opacity: crease }} />
+      </motion.div>
+      <motion.div
+        className="pointer-events-none absolute left-1/2 top-1/2 -ml-[60px] -mt-[60px] h-[120px] w-[120px] lg:-ml-[80px] lg:-mt-[80px] lg:h-[160px] lg:w-[160px]"
+        style={{ opacity: ballOpacity, scale: ballScale, y: ballY, x: ballX, rotate: ballRotate }}
+      >
+        <PaperBall />
+      </motion.div>
     </div>
   );
 }
+
+function ChatBubble({ day, text }: { day: string; text: string }) {
+  return (
+    <div className="flex w-[196px] flex-col gap-1 rounded-[20px_20px_20px_6px] border-2 border-[#050706] bg-white px-4 py-3 shadow-[0_14px_26px_rgba(5,7,6,.12)] lg:w-[330px] lg:rounded-[26px_26px_26px_8px] lg:border-[2.5px] lg:px-5 lg:py-4">
+      <span className={`${MONO} text-[10px] font-semibold tracking-[0.1em] text-[#4A524D] lg:text-xs`}>{day}</span>
+      <span className="text-[19px] font-extrabold tracking-[-0.02em] lg:text-[30px]">{text}</span>
+    </div>
+  );
+}
+
+/** The two answers drop in like marbles — one left, one right — bounce, squash and settle. Then the sticker slaps on. */
+function MarbleBubbles() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.6 });
+  const reduceMotion = useReducedMotion();
+  const drop = (delay: number, rot: number) => {
+    if (reduceMotion) return { style: { rotate: rot } };
+    return {
+      initial: { opacity: 0, y: -420, rotate: rot * 4, scaleX: 1, scaleY: 1 },
+      animate: inView
+        ? {
+            opacity: 1,
+            y: [-420, 0, -110, 0, -36, 0, -10, 0],
+            rotate: [rot * 4, rot + 3, rot - 4, rot + 1.5, rot - 1, rot, rot, rot],
+            scaleY: [1.08, 0.82, 1.05, 0.91, 1.02, 0.97, 1, 1],
+            scaleX: [0.94, 1.14, 0.97, 1.07, 0.99, 1.02, 1, 1],
+          }
+        : { opacity: 0, y: -420 },
+      transition: {
+        delay,
+        duration: 1.65,
+        times: [0, 0.38, 0.55, 0.7, 0.8, 0.88, 0.94, 1],
+        ease: ['easeIn', 'easeOut', 'easeIn', 'easeOut', 'easeIn', 'easeOut', 'easeIn'] as Easing[],
+        opacity: { delay, duration: 0.15 },
+      },
+    };
+  };
+  return (
+    <div ref={ref} className="relative mt-8 h-[190px] w-full max-w-[640px] lg:mt-9 lg:h-[200px]">
+      <motion.div {...drop(0, -4)} className="absolute left-0 top-[18px] origin-bottom lg:bottom-[16px] lg:top-auto">
+        <ChatBubble day={t('MON · NEW CHAT', 'LUN · CHAT NUEVO')} text={t('NVDA? Buy it.', '¿NVDA? Cómprala.')} />
+      </motion.div>
+      <motion.div {...drop(0.28, 3)} className="absolute bottom-0 right-0 origin-bottom lg:left-[350px] lg:right-auto">
+        <ChatBubble day={t('TUE · NEW CHAT', 'MAR · CHAT NUEVO')} text={t('NVDA? I’d sell.', '¿NVDA? Yo vendería.')} />
+      </motion.div>
+      <motion.div
+        className="absolute left-[150px] top-[96px] lg:left-[262px] lg:top-[20px]"
+        initial={reduceMotion ? false : { opacity: 0, scale: 1.9, rotate: -24 }}
+        animate={inView || reduceMotion ? { opacity: 1, scale: 1, rotate: -8 } : { opacity: 0, scale: 1.9, rotate: -24 }}
+        transition={{ delay: reduceMotion ? 0 : 1.95, type: 'spring', stiffness: 520, damping: 17 }}
+      >
+        <TextSticker tone="gold" className="!static">{t('SAME QUESTION.', 'MISMA PREGUNTA.')}</TextSticker>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ argue back */
 
 const QUESTIONS: [string, string][] = [
   ['What’s your exit if it drops?', '¿Cuál es tu salida si baja?'],
@@ -196,64 +317,116 @@ const QUESTIONS: [string, string][] = [
   ['How much can you afford to lose?', '¿Cuánto puedes permitirte perder?'],
 ];
 
+/** Parallax depth + a soft idle float around each message, so the thread feels alive without shouting. */
+function Drift({ progress, depth, visible, children, className = '', float = 5 }: { progress: MotionValue<number>; depth: number; visible: boolean; children: React.ReactNode; className?: string; float?: number }) {
+  const reduceMotion = useReducedMotion();
+  const y = useTransform(progress, [0, 1], [depth * 36, -depth * 36]);
+  return (
+    <motion.div className={className} style={reduceMotion ? undefined : { y }}>
+      <motion.div
+        initial={false}
+        animate={visible ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 20, scale: 0.94 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+      >
+        <motion.div animate={visible && !reduceMotion ? { y: [0, -4, 0] } : { y: 0 }} transition={{ duration: float, repeat: Infinity, ease: 'easeInOut' }}>
+          {children}
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 /** The conversation plays out when it scrolls into view: your idea, Bobby typing, the pushback, then you. */
 function ArgueBack() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.4 });
   const reduceMotion = useReducedMotion();
   const [step, setStep] = useState(0);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ['start end', 'end start'] });
   useEffect(() => {
     if (!inView) return;
     if (reduceMotion) { setStep(5); return; }
-    const ids = [150, 950, 2100, 3000, 4100].map((ms, i) => window.setTimeout(() => setStep(i + 1), ms));
+    const ids = [150, 950, 2100, 3000, 4300].map((ms, i) => window.setTimeout(() => setStep(i + 1), ms));
     return () => ids.forEach((id) => window.clearTimeout(id));
   }, [inView, reduceMotion]);
-  const enter = (visible: boolean) => ({
-    initial: false as const,
-    animate: visible ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 18, scale: 0.96 },
-    transition: { duration: 0.45, ease: EASE },
-  });
   return (
     <div ref={ref} className="a3-visual relative mx-auto flex min-h-[560px] w-full max-w-[400px] flex-col justify-center gap-3.5 lg:min-h-[660px] lg:max-w-[620px] lg:gap-6">
-      <motion.div {...enter(step >= 1)} className="self-end rounded-[24px_24px_6px_24px] bg-[#FBFAF1] px-5 py-3.5 text-[19px] font-extrabold tracking-[-0.02em] text-[#050706] shadow-[0_16px_36px_rgba(6,26,77,.35)] lg:rounded-[32px_32px_8px_32px] lg:px-8 lg:py-5 lg:text-[31px]">
-        {t('I think NVDA could go up.', 'Creo que NVDA puede subir.')}
-      </motion.div>
+      <Drift progress={scrollYProgress} depth={1.2} visible={step >= 1} className="self-end" float={5.2}>
+        <div className="rounded-[24px_24px_6px_24px] bg-[#FBFAF1] px-5 py-3.5 text-[19px] font-extrabold tracking-[-0.02em] text-[#050706] shadow-[0_16px_36px_rgba(6,26,77,.35)] lg:rounded-[32px_32px_8px_32px] lg:px-8 lg:py-5 lg:text-[31px]">
+          {t('I think NVDA could go up.', 'Creo que NVDA puede subir.')}
+        </div>
+      </Drift>
 
-      <div className="flex items-end gap-3">
-        <img src="/mascots/byte.webp" alt="" className="h-10 w-10 shrink-0 rounded-full border-2 border-white/80 object-cover lg:h-14 lg:w-14" />
-        {step === 2 ? (
-          <motion.div {...enter(true)} className="flex items-center gap-1.5 rounded-[24px_24px_24px_6px] bg-[#050706] px-5 py-4" aria-hidden="true">
-            <span className="a3-typing h-2.5 w-2.5 rounded-full bg-[#7FFABD]" />
-            <span className="a3-typing h-2.5 w-2.5 rounded-full bg-[#7FFABD] [animation-delay:.15s]" />
-            <span className="a3-typing h-2.5 w-2.5 rounded-full bg-[#7FFABD] [animation-delay:.3s]" />
-          </motion.div>
-        ) : (
-          <motion.div {...enter(step >= 3)} className="flex flex-col gap-2 rounded-[26px_26px_26px_6px] bg-[#050706] px-5 py-4 text-[#FBFAF1] shadow-[0_22px_50px_rgba(6,26,77,.45)] lg:rounded-[38px_38px_38px_8px] lg:px-8 lg:py-7">
-            <span className="text-[27px] font-black leading-[1.02] tracking-[-0.035em] lg:text-[52px]">{t('Maybe. What could prove you wrong?', 'Puede ser. ¿Qué te probaría equivocado?')}</span>
-            <span className={`${MONO} text-[10px] font-semibold tracking-[0.12em] text-[#7FFABD] lg:text-xs`}>BOBBY</span>
-          </motion.div>
-        )}
-      </div>
+      <Drift progress={scrollYProgress} depth={0.6} visible={step >= 2} float={6.4}>
+        <div className="flex items-end gap-3">
+          <motion.img
+            src="/mascots/byte.webp" alt="" className="h-10 w-10 shrink-0 rounded-full border-2 border-white/80 object-cover lg:h-14 lg:w-14"
+            animate={step === 2 && !reduceMotion ? { rotate: [0, -8, 8, 0], y: [0, -3, 0] } : { rotate: 0, y: 0 }}
+            transition={{ duration: 0.9, repeat: step === 2 ? Infinity : 0 }}
+          />
+          {step === 2 ? (
+            <div className="flex items-center gap-1.5 rounded-[24px_24px_24px_6px] bg-[#050706] px-5 py-4" aria-hidden="true">
+              <span className="a3-typing h-2.5 w-2.5 rounded-full bg-[#7FFABD]" />
+              <span className="a3-typing h-2.5 w-2.5 rounded-full bg-[#7FFABD] [animation-delay:.15s]" />
+              <span className="a3-typing h-2.5 w-2.5 rounded-full bg-[#7FFABD] [animation-delay:.3s]" />
+            </div>
+          ) : (
+            <motion.div
+              initial={false}
+              animate={step >= 3 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              className="flex origin-bottom-left flex-col gap-2 rounded-[26px_26px_26px_6px] bg-[#050706] px-5 py-4 text-[#FBFAF1] shadow-[0_22px_50px_rgba(6,26,77,.45)] lg:rounded-[38px_38px_38px_8px] lg:px-8 lg:py-7"
+            >
+              <span className="text-[27px] font-black leading-[1.02] tracking-[-0.035em] lg:text-[52px]">{t('Maybe. What could prove you wrong?', 'Puede ser. ¿Qué te probaría equivocado?')}</span>
+              <span className={`${MONO} text-[10px] font-semibold tracking-[0.12em] text-[#7FFABD] lg:text-xs`}>BOBBY</span>
+            </motion.div>
+          )}
+        </div>
+      </Drift>
 
-      <motion.div {...enter(step >= 4)} className="relative ml-[52px] rounded-[22px] border border-white/15 bg-[#0B1330]/90 p-4 text-[#FBFAF1] lg:ml-[68px] lg:rounded-[30px] lg:p-7">
-        <div className={`${MONO} mb-3 text-[10px] font-semibold tracking-[0.12em] text-[#7FFABD] lg:mb-4 lg:text-xs`}>{t('BEFORE YOU DECIDE', 'ANTES DE DECIDIR')}</div>
-        <ol className="flex flex-col gap-2.5 lg:gap-3.5">
-          {QUESTIONS.map(([en, es], i) => (
-            <li key={en} className="flex items-center gap-3 text-[15px] font-bold lg:text-[21px]">
-              <span className={`${MONO} grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#7FFABD] text-[11px] font-semibold text-[#050706] lg:h-8 lg:w-8 lg:text-xs`}>{i + 1}</span>
-              {t(en, es)}
-            </li>
-          ))}
-        </ol>
-        <TextSticker tone="gold" rotate={6} className="-right-2 -top-5 lg:-right-8 lg:-top-6">{t('SECOND OPINION', 'SEGUNDA OPINIÓN')}</TextSticker>
-      </motion.div>
+      <Drift progress={scrollYProgress} depth={0.2} visible={step >= 4} className="ml-[52px] lg:ml-[68px]" float={7}>
+        <div className="relative rounded-[22px] border border-white/15 bg-[#0B1330]/90 p-4 text-[#FBFAF1] lg:rounded-[30px] lg:p-7">
+          <div className={`${MONO} mb-3 text-[10px] font-semibold tracking-[0.12em] text-[#7FFABD] lg:mb-4 lg:text-xs`}>{t('BEFORE YOU DECIDE', 'ANTES DE DECIDIR')}</div>
+          <ol className="flex flex-col gap-2.5 lg:gap-3.5">
+            {QUESTIONS.map(([en, es], i) => (
+              <motion.li
+                key={en}
+                className="flex items-center gap-3 text-[15px] font-bold lg:text-[21px]"
+                initial={false}
+                animate={step >= 4 ? { opacity: 1, x: 0 } : { opacity: 0, x: -14 }}
+                transition={{ delay: step >= 4 ? 0.2 + i * 0.22 : 0, duration: 0.4, ease: EASE }}
+              >
+                <motion.span
+                  className={`${MONO} grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#7FFABD] text-[11px] font-semibold text-[#050706] lg:h-8 lg:w-8 lg:text-xs`}
+                  initial={false}
+                  animate={step >= 4 ? { scale: [0.4, 1.25, 1] } : { scale: 0.4 }}
+                  transition={{ delay: step >= 4 ? 0.2 + i * 0.22 : 0, duration: 0.45 }}
+                >
+                  {i + 1}
+                </motion.span>
+                {t(en, es)}
+              </motion.li>
+            ))}
+          </ol>
+          <TextSticker tone="gold" rotate={6} className="-right-2 -top-5 lg:-right-8 lg:-top-6">{t('SECOND OPINION', 'SEGUNDA OPINIÓN')}</TextSticker>
+        </div>
+      </Drift>
 
-      <motion.div {...enter(step >= 5)} className="self-end rounded-[24px_24px_6px_24px] bg-[#FBFAF1] px-5 py-3 text-[17px] font-extrabold text-[#050706] shadow-[0_16px_36px_rgba(6,26,77,.35)] lg:px-7 lg:py-4 lg:text-[25px]">
-        {t('…ok, fair.', '…ok, tiene sentido.')}
-      </motion.div>
+      <Drift progress={scrollYProgress} depth={1} visible={step >= 5} className="self-end" float={4.6}>
+        <motion.div
+          className="rounded-[24px_24px_6px_24px] bg-[#FBFAF1] px-5 py-3 text-[17px] font-extrabold text-[#050706] shadow-[0_16px_36px_rgba(6,26,77,.35)] lg:px-7 lg:py-4 lg:text-[25px]"
+          initial={false}
+          animate={step >= 5 && !reduceMotion ? { rotate: [0, -4, 3, 0] } : { rotate: 0 }}
+          transition={{ duration: 0.7, delay: 0.15 }}
+        >
+          {t('…ok, fair.', '…ok, tiene sentido.')}
+        </motion.div>
+      </Drift>
     </div>
   );
 }
+
+/* --------------------------------------------------------- floating phone */
 
 /** A real Live Desk screen, lifted off the store plate so it floats on the poster's colour instead of sitting in a frame. */
 function FloatingPhone({ src, alt, className, rotate, fadeBottom = false, glow }: { src: string; alt: string; className: string; rotate: number; fadeBottom?: boolean; glow: string }) {
@@ -281,18 +454,16 @@ function FloatingPhone({ src, alt, className, rotate, fadeBottom = false, glow }
   );
 }
 
-function ChatBubble({ day, text, className, rotate }: { day: string; text: string; className: string; rotate: number }) {
-  return (
-    <div className={`absolute flex w-[230px] flex-col gap-1 rounded-[20px_20px_20px_6px] border-2 border-[#050706] bg-white px-4 py-3 lg:w-[330px] lg:rounded-[26px_26px_26px_8px] lg:border-[2.5px] lg:px-5 lg:py-4 ${className}`} style={{ transform: `rotate(${rotate}deg)` }}>
-      <span className={`${MONO} text-[10px] font-semibold tracking-[0.1em] text-[#4A524D] lg:text-xs`}>{day}</span>
-      <span className="text-[21px] font-extrabold tracking-[-0.02em] lg:text-[30px]">{text}</span>
-    </div>
-  );
-}
+/* ------------------------------------------------------------------ page */
 
 export default function BobbyAppLandingWorld() {
   const record = useRecord();
   const reduceMotion = useReducedMotion();
+  const byteRef = useRef<HTMLDivElement>(null);
+  const receiptsRef = useRef<HTMLElement>(null);
+  const argueRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: leaveReceipts } = useScroll({ target: argueRef, offset: ['start end', 'start start'] });
+
   const pageTitle = t('Bobby — Fun to ask. Hard to fool.', 'Bobby — Divertido de usar. Difícil de engañar.');
   const pageDescription = t(
     'Ask Bobby about Bitcoin, Nvidia, gold and 600 more. It argues back before your money is in, writes every call down before the market answers, and your discipline builds a world you can walk through.',
@@ -371,12 +542,15 @@ export default function BobbyAppLandingWorld() {
           </div>
 
           {/* Byte and his pet — desktop */}
-          <HeroBobby className="a3-visual hidden h-[575px] w-[460px] lg:block xl:h-[700px] xl:w-[560px]" />
+          <HeroBobby byteRef={byteRef} className="a3-visual hidden h-[575px] w-[460px] lg:block xl:h-[700px] xl:w-[560px]" />
         </div>
       </Poster>
 
+      {/* Byte grabs the next poster instead of being covered by it */}
+      <LedgeByte standingRef={byteRef} edgeRef={receiptsRef} />
+
       {/* ============ 02 · CHATBOTS FORGET ============ */}
-      <Poster id="receipts" z={20} className="bg-[#75F8C0]">
+      <Poster id="receipts" z={20} sectionRef={receiptsRef} className="bg-[#75F8C0]">
         <div className="mx-auto grid max-w-[1440px] gap-12 a3-poster-inner px-5 py-16 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center lg:gap-16 lg:px-16">
           <div>
             <PosterCopy
@@ -387,11 +561,7 @@ export default function BobbyAppLandingWorld() {
                 'No recuerda lo que te dijo. Bobby escribe cada llamada antes de que el mercado responda — fallos incluidos.',
               )}
             />
-            <div className="relative mt-8 h-[190px] lg:mt-9 lg:h-[200px]">
-              <ChatBubble day={t('MON · NEW CHAT', 'LUN · CHAT NUEVO')} text={t('NVDA? Buy it.', '¿NVDA? Cómprala.')} rotate={-3} className="left-0 top-0" />
-              <ChatBubble day={t('TUE · NEW CHAT', 'MAR · CHAT NUEVO')} text={t('NVDA? I’d sell.', '¿NVDA? Yo vendería.')} rotate={2} className="left-[110px] top-[92px] lg:left-[190px] lg:top-[96px]" />
-              <TextSticker tone="gold" rotate={-8} className="left-[186px] top-[58px] lg:left-[300px] lg:top-[60px]">{t('SAME QUESTION.', 'MISMA PREGUNTA.')}</TextSticker>
-            </div>
+            <MarbleBubbles />
             <p className="mt-6 max-w-[620px] text-[15px] font-medium leading-[1.45] lg:mt-6 lg:text-lg">
               {t(
                 'Bobby runs on the same models everyone else uses. The difference is not the model — it is the procedure around it.',
@@ -400,13 +570,13 @@ export default function BobbyAppLandingWorld() {
             </p>
           </div>
           <div className="a3-visual flex justify-center pb-6 lg:pb-0">
-            <Receipt record={record} />
+            <CrumpleReceipt record={record} progress={leaveReceipts} />
           </div>
         </div>
       </Poster>
 
       {/* ============ 03 · IT WON'T JUST AGREE ============ */}
-      <Poster z={30} className="bg-[#2170FD] text-white">
+      <Poster z={30} sectionRef={argueRef} className="bg-[#2170FD] text-white">
         <div className="mx-auto grid max-w-[1440px] gap-10 a3-poster-inner px-5 py-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:px-16">
           <PosterCopy
             title={<>{t('It won’t just', 'No nomás')}<br />{t('agree with you.', 'te da la razón.')}</>}
@@ -423,11 +593,9 @@ export default function BobbyAppLandingWorld() {
             title={<>{t('Never face', 'Nunca enfrentes')}<br />{t('the market alone.', 'el mercado solo.')}</>}
             body={t('Pick who talks to you. Calm, blunt or full trading desk — same numbers underneath.', 'Elige quién te habla. Tranquilo, directo o de mesa de trading — los mismos números abajo.')}
           />
-          <div className="a3-visual relative mx-auto h-[380px] w-[350px] lg:h-[620px] lg:w-[600px]">
-            <PhotoCard src={`${P}/c02-squad.webp`} alt={t('The Bobby squad: Iris, Sol and Glitch with three small companions', 'El squad de Bobby: Iris, Sol y Glitch con tres compañeros pequeños')} bg="#FBFAF1" rotate={2} className="left-[10px] top-[10px] h-[330px] w-[326px] lg:left-[20px] lg:top-[20px] lg:h-[560px] lg:w-[554px]" focus="50% 50%" />
-            <PetSticker src={`${PET}/pet-byte.webp`} className="-left-3 bottom-0 w-[80px] lg:-left-10 lg:bottom-0 lg:w-[130px]" rotate={-9} />
-            <PetSticker src={`${PET}/pet-halo.webp`} className="-right-2 -top-4 w-[72px] lg:-right-6 lg:-top-6 lg:w-[116px]" rotate={8} />
-            <TextSticker tone="mint" rotate={-3} className="right-4 bottom-[-6px] lg:right-10 lg:bottom-[-10px]">{t('PICK YOUR BOBBY', 'ELIGE A TU BOBBY')}</TextSticker>
+          <div className="relative">
+            <SquadLineup />
+            <TextSticker tone="mint" rotate={-3} className="bottom-0 right-6 lg:bottom-2 lg:right-16">{t('PICK YOUR BOBBY', 'ELIGE A TU BOBBY')}</TextSticker>
           </div>
         </div>
       </Poster>
@@ -483,7 +651,33 @@ export default function BobbyAppLandingWorld() {
       {/* ============ 07 · BOBBY'S WORLD ============ */}
       <BobbyWorld />
 
-      <footer className="relative z-[80] bg-[#08130E] px-5 py-8 text-[#FBFAF1] lg:px-16">
+      {/* ============ 08 · GET IT ============ */}
+      <section className="a3-poster-card relative overflow-hidden bg-[#FBFAF1]" style={{ zIndex: 80 }}>
+        <div className="mx-auto grid max-w-[1440px] items-center gap-8 px-5 pb-14 pt-16 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-10 lg:px-16 lg:py-24">
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.6, ease: EASE }}
+          >
+            <h2 className="text-[clamp(2.8rem,12vw,3.6rem)] font-black leading-[0.9] tracking-[-0.055em] lg:text-[clamp(4.5rem,6.6vw,6.5rem)]">
+              {t('Don’t guess.', 'No adivines.')}<br />{t('Ask Bobby.', 'Pregúntale a Bobby.')}
+            </h2>
+            <p className="mt-4 max-w-[460px] text-[17px] font-medium leading-[1.4] lg:mt-6 lg:text-[22px]">
+              {t('Free on iPhone. The desk is open on the web too.', 'Gratis en iPhone. El desk también está abierto en la web.')}
+            </p>
+            <div className="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center lg:mt-10 lg:gap-7">
+              <StoreButton />
+              <a href={DESK_URL} className="flex min-h-11 items-center justify-center whitespace-nowrap text-[15px] font-bold underline underline-offset-4 sm:justify-start lg:text-lg">
+                {t('Try it in your browser', 'Pruébala en tu navegador')}
+              </a>
+            </div>
+          </motion.div>
+          <HeroBobby className="a3-visual mx-auto h-[320px] w-[290px] lg:h-[520px] lg:w-[440px]" />
+        </div>
+      </section>
+
+      <footer className="relative bg-[#08130E] px-5 py-8 text-[#FBFAF1] lg:px-16" style={{ zIndex: 90 }}>
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-7 gap-y-3 text-sm">
           <span className="text-xl font-black tracking-[-0.06em]">bobby</span>
           <a href={DESK_URL} className="font-semibold opacity-75 transition hover:opacity-100">{t('Open the desk on the web', 'Abre el desk en la web')}</a>
