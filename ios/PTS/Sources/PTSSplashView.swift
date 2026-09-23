@@ -1,40 +1,60 @@
 import SwiftUI
+import UIKit
 
+/// Hosts the opening motion and hands off to the signal home. The home is
+/// mounted during the splash's hold (so its first layout never lands on the
+/// busy part of the motion) and zooms in underneath as the splash clears.
 struct PTSLaunchView: View {
-    @State private var showSplash = true
+    @State private var homeMounted = false
+    @State private var homeRevealed = false
+    @State private var splashDone = false
 
     var body: some View {
-        Group {
-            if showSplash {
-                PTSSplashView {
-                    withAnimation(.easeOut(duration: 0.20)) {
-                        showSplash = false
-                    }
-                }
-            } else {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if homeMounted {
                 SignalHome()
+                    .scaleEffect(homeRevealed ? 1 : 1.06)
+                    .opacity(homeRevealed ? 1 : 0)
+                    .accessibilityHidden(!splashDone)
+            }
+            if !splashDone {
+                PTSSplashView(
+                    onHold: { homeMounted = true },
+                    onExit: { withAnimation(.smooth(duration: 0.55)) { homeRevealed = true } },
+                    onFinished: { splashDone = true }
+                )
+                .transition(.identity)
             }
         }
     }
 }
 
-/// The PTS identity motion shown before the signal home (≈2.75 s with the
-/// fade). One timeline drives every layer: the bull runs in with motion blur
-/// and light streaks, lands with a pulse and a ring, a glint crosses it, and
-/// the title reveals behind it before a gold rule draws underneath. The final
-/// frame keeps the approved composition: title left, bull landing at right.
+/// The PTS opening (≈2.9 s). One deterministic timeline drives every layer:
+/// the gold icon springs in with a haptic and a glint, the logos of the
+/// signals Daniel is covering fly in from the edges and keep floating, the
+/// wordmark and tagline reveal word by word, and the whole scene pushes
+/// through into the home.
 struct PTSSplashView: View {
+    var onHold: () -> Void = {}
+    var onExit: () -> Void = {}
     let onFinished: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start: Date?
 
-    private let title = Array("Pro trading Skills")
-    private static let duration: TimeInterval = 2.55
-    // Geometry of the bull inside the original 942×1670 artwork.
-    private static let art = CGSize(width: 942, height: 1670)
-    private static let bullCenter = CGPoint(x: 0.1561, y: 0.494)
-    private static let bullWidth: CGFloat = 0.2484
+    private static let holdAt: TimeInterval = 2.0
+    private static let exitAt: TimeInterval = 2.35
+    private static let exitLength: TimeInterval = 0.5
+
+    private let titleWords = ["Pro", "Trading", "Skills"]
+    private let taglineLines = [["Las", "señales", "de", "Daniel,"], ["explicadas", "paso", "a", "paso."]]
+
+    /// Resting spot, tilt and depth for each orbiting logo, in order of the
+    /// curated signals (the logos themselves come from the catalog).
+    private static let orbit: [(x: CGFloat, y: CGFloat, tilt: Double, size: CGFloat)] = [
+        (0.21, 0.165, -10, 70), (0.81, 0.225, 9, 58), (0.19, 0.745, 8, 58), (0.79, 0.80, -8, 72),
+    ]
 
     var body: some View {
         GeometryReader { proxy in
@@ -50,133 +70,210 @@ struct PTSSplashView: View {
         .onAppear {
             guard start == nil else { return }
             start = Date()
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.duration) { onFinished() }
+            let haptic = UIImpactFeedbackGenerator(style: .soft)
+            haptic.prepare()
+            DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0.3 : 0.4)) { haptic.impactOccurred(intensity: 0.8) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.holdAt) { onHold() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.exitAt) { onExit() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.exitAt + Self.exitLength) { onFinished() }
         }
     }
 
     // MARK: - Timeline
 
     private func frame(t: TimeInterval, size: CGSize) -> some View {
-        let scale = min(size.width / Self.art.width, size.height / Self.art.height)
-        let shown = CGSize(width: Self.art.width * scale, height: Self.art.height * scale)
-        let origin = CGPoint(x: (size.width - shown.width) / 2, y: (size.height - shown.height) / 2)
-        let bullW = Self.bullWidth * shown.width
-        let bullH = bullW * 186 / 234
-        // Same landing spot as the approved splash (artwork offset by 70 % of the width).
-        let end = CGPoint(x: origin.x + Self.bullCenter.x * shown.width + size.width * 0.70,
-                          y: origin.y + Self.bullCenter.y * shown.height)
-        let startX = -bullW
-        let run = reduceMotion ? 1 : ease(progress(t, 0.10, 1.30))
-        let bullX = startX + (end.x - startX) * run
-        let landing = progress(t, 1.18, 1.62)
-        let bump = reduceMotion ? 0 : sin(landing * .pi) * 0.05
-        let titleCenter = CGPoint(x: size.width * 0.39, y: size.height * 0.52)
+        let center = CGPoint(x: size.width / 2, y: size.height * 0.415)
+        let iconSize = min(136, size.width * 0.33)
+        let exit = easeIn(progress(t, Self.exitAt, Self.exitAt + Self.exitLength))
+        // Slow camera push across the whole opening.
+        let push = reduceMotion ? 1 : 1.04 - 0.04 * easeOut(progress(t, 0, Self.exitAt))
 
         return ZStack {
             Color.black
 
-            // Warm halo that settles behind the landed bull.
-            RadialGradient(colors: [Theme.accent.opacity(0.28), .clear], center: .center, startRadius: 0, endRadius: bullW * 1.6)
-                .frame(width: bullW * 3.2, height: bullW * 3.2)
-                .position(end)
-                .opacity(progress(t, 1.15, 1.7) * (0.85 + 0.15 * sin(t * 3)))
+            levels(t: t, size: size)
+                .opacity(1 - exit)
 
-            if !reduceMotion {
-                streaks(bullX: bullX, y: end.y, bullW: bullW, bullH: bullH, speed: 1 - run)
-                // Impact ring on landing.
-                Circle()
-                    .stroke(Theme.accentSoft, lineWidth: 1.2)
-                    .frame(width: bullW * (0.6 + 1.4 * landing), height: bullW * (0.6 + 1.4 * landing))
-                    .position(end)
-                    .opacity(landing > 0 ? (1 - landing) * 0.6 : 0)
+            bloom(iconSize: iconSize, t: t, exit: exit)
+                .position(center)
+
+            ForEach(Array(SignalListItem.curated.prefix(Self.orbit.count).enumerated()), id: \.element.id) { index, signal in
+                tile(signal.symbol, index: index, t: t, center: center, size: size, exit: exit)
             }
 
-            titleView(t: t, bullX: bullX, center: titleCenter)
+            icon(size: iconSize, t: t, exit: exit)
+                .position(center)
 
-            // Gold rule drawing under the title once the bull lands.
-            Capsule()
-                .fill(LinearGradient(colors: [Theme.accent.opacity(0), Theme.accent, Theme.accentSoft], startPoint: .leading, endPoint: .trailing))
-                .frame(width: 190 * ease(progress(t, 1.35, 1.9)), height: 1.5)
-                .frame(width: 190, alignment: .leading)
-                .position(x: titleCenter.x, y: titleCenter.y + 22)
-                .opacity(progress(t, 1.3, 1.5))
-
-            bull(width: bullW, height: bullH, t: t, run: run)
-                .scaleEffect(x: 1 + bump + (reduceMotion ? 0 : 0.16 * (1 - run)), y: 1 + bump, anchor: .center)
-                .blur(radius: reduceMotion ? 0 : 11 * pow(1 - run, 1.6))
-                .opacity(reduceMotion ? progress(t, 0.1, 0.7) : min(1, progress(t, 0.1, 0.35) * 1.2))
-                .position(x: bullX, y: end.y)
-                .accessibilityIdentifier("pts-login-splash-bull")
+            copy(t: t, exit: exit)
+                .frame(width: size.width - 48)
+                .position(x: center.x, y: center.y + iconSize / 2 + 92)
         }
+        .scaleEffect(push)
     }
 
-    private func bull(width: CGFloat, height: CGFloat, t: TimeInterval, run: Double) -> some View {
-        let glint = progress(t, 1.35, 1.85)
-        return Image("pts-bull-mark")
+    // MARK: - Layers
+
+    /// Gold bloom that grows behind the icon and breathes while it holds.
+    private func bloom(iconSize: CGFloat, t: TimeInterval, exit: Double) -> some View {
+        let grow: Double = reduceMotion ? 1 : 0.55 + 0.45 * easeOut(progress(t, 0.05, 0.9))
+        let scale = grow + 0.03 * sin(t * 2.2) + 0.35 * exit
+        let colors = [Theme.accent.opacity(0.34), Theme.accent.opacity(0.08), Color.clear]
+        return RadialGradient(colors: colors, center: .center, startRadius: 0, endRadius: iconSize * 2.1)
+            .frame(width: iconSize * 4.2, height: iconSize * 4.2)
+            .scaleEffect(scale)
+            .opacity(progress(t, 0.05, 0.6) * (1 - exit))
+    }
+
+    private func icon(size: CGFloat, t: TimeInterval, exit: Double) -> some View {
+        let s = reduceMotion ? progress(t, 0.05, 0.45) : spring(t, delay: 0.12, response: 0.62, damping: 0.62)
+        let focus = reduceMotion ? 1 : easeOut(progress(t, 0.12, 0.5))
+        let glint = progress(t, 1.1, 1.65)
+        let shape = RoundedRectangle(cornerRadius: size * 0.215, style: .continuous)
+        return Image("pts-bull")
             .resizable()
+            .interpolation(.high)
             .scaledToFit()
-            .frame(width: width, height: height)
+            .frame(width: size, height: size)
             .overlay {
-                // A diagonal light band sweeps across the gold, clipped to the bull.
-                LinearGradient(colors: [.clear, .white.opacity(0.85), .clear], startPoint: .leading, endPoint: .trailing)
-                    .frame(width: width * 0.35, height: height * 1.8)
-                    .rotationEffect(.degrees(22))
-                    .offset(x: -width + glint * width * 2)
-                    .blendMode(.plusLighter)
+                // A diagonal light band sweeps across the gold. Overlay blending
+                // leaves the black untouched, so only the bull and rim catch it.
+                LinearGradient(colors: [.clear, .white.opacity(0.9), .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: size * 0.32, height: size * 1.9)
+                    .rotationEffect(.degrees(24))
+                    .offset(x: -size * 0.95 + glint * size * 1.9)
+                    .blendMode(.overlay)
                     .opacity(reduceMotion || glint == 0 || glint == 1 ? 0 : 1)
-                    .mask(Image("pts-bull-mark").resizable().scaledToFit().frame(width: width, height: height))
             }
-            .shadow(color: Theme.accent.opacity(0.35 * progress(t, 1.2, 1.7)), radius: 14)
+            .mask(shape.padding(size * 0.035))
+            .shadow(color: Theme.accent.opacity(0.45 * progress(t, 0.3, 0.8)), radius: 24)
+            .scaleEffect((reduceMotion ? 1 : 0.45 + 0.55 * s) + 0.22 * exit)
+            .blur(radius: 14 * (1 - focus) + 10 * exit)
+            .opacity(min(1, progress(t, 0.12, 0.32)) * (1 - exit))
+            .accessibilityHidden(true)
+            .accessibilityIdentifier("pts-login-splash-bull")
     }
 
-    private func streaks(bullX: CGFloat, y: CGFloat, bullW: CGFloat, bullH: CGFloat, speed: Double) -> some View {
-        let specs: [(dy: CGFloat, length: CGFloat, weight: CGFloat)] = [(-bullH * 0.22, 1.0, 1.6), (0, 1.35, 1.1), (bullH * 0.24, 0.8, 1.2)]
-        return ZStack {
-            ForEach(Array(specs.enumerated()), id: \.offset) { _, spec in
-                let length = bullW * 2.2 * spec.length * speed
-                Capsule()
-                    .fill(LinearGradient(colors: [Theme.accent.opacity(0), Theme.accentSoft.opacity(0.9)], startPoint: .leading, endPoint: .trailing))
-                    .frame(width: max(0, length), height: spec.weight)
-                    .position(x: bullX - bullW * 0.35 - length / 2, y: y + spec.dy)
+    /// One orbiting signal logo: flies in from beyond its edge on a bouncy
+    /// spring, then floats; on exit it keeps going outward, like a camera
+    /// pushing through the scene.
+    private func tile(_ symbol: String, index: Int, t: TimeInterval, center: CGPoint, size: CGSize, exit: Double) -> some View {
+        let spec = Self.orbit[index]
+        let rest = CGPoint(x: size.width * spec.x, y: size.height * spec.y)
+        let dx = rest.x - center.x, dy = rest.y - center.y
+        let length = max(1, sqrt(dx * dx + dy * dy))
+        let out = CGPoint(x: dx / length, y: dy / length)
+        let delay = 0.42 + Double(index) * 0.075
+        let s = reduceMotion ? 1 : spring(t, delay: delay, response: 0.72, damping: 0.6)
+        let travel = (1 - s) * 280 + exit * exit * 360
+        let phase = Double(index) * 1.7
+        let float = reduceMotion ? 0 : sin(t * 2.3 + phase) * 4 * progress(t, delay + 0.4, delay + 0.9)
+        let appear = reduceMotion ? progress(t, 0.35, 0.8) : min(1, progress(t, delay, delay + 0.18))
+        // Smaller tiles read as farther away: a touch softer and dimmer.
+        let far = spec.size < 64
+        // Tilts in 3D along its flight path, then keeps a gentle wobble.
+        let flip = reduceMotion ? 0 : (1 - s) * 55 + sin(t * 1.9 + phase) * 7
+        return SignalLogo(symbol: symbol, size: spec.size)
+            .rotation3DEffect(.degrees(flip), axis: (x: -out.y, y: out.x, z: 0), perspective: 0.6)
+            .shadow(color: .black.opacity(0.6), radius: 14, y: 8)
+            .shadow(color: SignalBrand.chart(symbol).opacity(0.3), radius: 20)
+            .rotationEffect(.degrees(spec.tilt + (reduceMotion ? 0 : (1 - s) * spec.tilt * 3.5)))
+            .scaleEffect(reduceMotion ? 1 : 0.55 + 0.45 * s)
+            .blur(radius: (far ? 0.6 : 0) + 6 * exit)
+            .brightness(far ? -0.06 : 0)
+            .opacity(appear * (1 - exit))
+            .position(x: rest.x + out.x * travel, y: rest.y + out.y * travel + float)
+    }
+
+    private func copy(t: TimeInterval, exit: Double) -> some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 9) {
+                ForEach(Array(titleWords.enumerated()), id: \.offset) { index, word in
+                    reveal(Text(word), t: t, delay: 0.72 + Double(index) * 0.08, rise: 16)
+                }
+            }
+            .font(.system(size: 34, weight: .bold))
+            .tracking(-0.8)
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Pro Trading Skills")
+            .accessibilityIdentifier("pts-login-splash-title")
+
+            VStack(spacing: 2) {
+                ForEach(Array(taglineLines.enumerated()), id: \.offset) { line, words in
+                    HStack(spacing: 5) {
+                        ForEach(Array(words.enumerated()), id: \.offset) { index, word in
+                            let order = taglineLines.prefix(line).reduce(0) { $0 + $1.count } + index
+                            reveal(Text(word), t: t, delay: 1.0 + Double(order) * 0.035, rise: 10)
+                        }
+                    }
+                }
+            }
+            .font(.system(size: 17, weight: .regular))
+            .foregroundStyle(Theme.secondary)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Las señales de Daniel, explicadas paso a paso.")
+        }
+        .offset(y: -14 * exit)
+        .blur(radius: 6 * exit)
+        .opacity(1 - min(1, exit * 1.6))
+    }
+
+    /// Word reveal: rises out of a blur on a soft spring.
+    private func reveal(_ text: Text, t: TimeInterval, delay: TimeInterval, rise: CGFloat) -> some View {
+        let s = reduceMotion ? progress(t, delay, delay + 0.4) : spring(t, delay: delay, response: 0.5, damping: 0.82)
+        let fade = progress(t, delay, delay + 0.28)
+        return text
+            .opacity(fade)
+            .blur(radius: 8 * (1 - fade))
+            .offset(y: reduceMotion ? 0 : rise * (1 - s))
+    }
+
+    /// Thin horizontal levels that draw across the screen, echoing the
+    /// entry / stop / target lines on Daniel's charts. Purely decorative.
+    private func levels(t: TimeInterval, size: CGSize) -> some View {
+        let rows: [(y: CGFloat, alpha: Double)] = [(0.105, 0.16), (0.30, 0.24), (0.675, 0.22), (0.885, 0.14)]
+        return ZStack(alignment: .topLeading) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                let draw = reduceMotion ? 1 : easeOut(progress(t, 0.08 + Double(index) * 0.07, 0.9 + Double(index) * 0.07))
+                let y = size.height * row.y
+                Path { path in
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: size.width, y: y))
+                }
+                .trim(from: 0, to: draw)
+                .stroke(LinearGradient(colors: [.clear, Theme.accentSoft.opacity(row.alpha), Theme.accentSoft.opacity(row.alpha), .clear],
+                                       startPoint: .leading, endPoint: .trailing), lineWidth: 0.5)
+                // Glowing head that rides the line while it draws.
+                Circle()
+                    .fill(Theme.accentSoft)
+                    .frame(width: 3, height: 3)
+                    .shadow(color: Theme.accent, radius: 5)
+                    .position(x: size.width * draw, y: y)
+                    .opacity(reduceMotion || draw == 0 ? 0 : 1 - draw)
             }
         }
-        .opacity(min(1, speed * 1.4))
+        .frame(width: size.width, height: size.height)
+        .accessibilityHidden(true)
     }
 
-    private func titleView(t: TimeInterval, bullX: CGFloat, center: CGPoint) -> some View {
-        let letterWidth: CGFloat = 11.6
-        let startX = center.x - CGFloat(title.count) * letterWidth / 2
-        return HStack(spacing: 0) {
-            ForEach(Array(title.enumerated()), id: \.offset) { index, character in
-                // Each letter appears as the bull passes it (or on a gentle
-                // stagger with Reduce Motion).
-                let letterX = startX + (CGFloat(index) + 0.5) * letterWidth
-                let reveal = reduceMotion
-                    ? progress(t, 0.4 + Double(index) * 0.03, 0.9 + Double(index) * 0.03)
-                    : min(1, max(0, Double((bullX - letterX) / 46)))
-                Text(String(character))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .opacity(reveal)
-                    .blur(radius: 5 * (1 - reveal))
-                    .offset(y: 8 * (1 - reveal))
-            }
-        }
-        .shadow(color: Theme.accent.opacity(0.35), radius: 12)
-        .position(center)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Pro trading Skills")
-        .accessibilityIdentifier("pts-login-splash-title")
-    }
-
-    // MARK: - Easing
+    // MARK: - Curves
 
     private func progress(_ t: TimeInterval, _ from: TimeInterval, _ to: TimeInterval) -> Double {
         min(1, max(0, (t - from) / (to - from)))
     }
 
-    /// Cubic ease-out: a readable run that decelerates into a soft landing.
-    private func ease(_ x: Double) -> Double {
-        1 - pow(1 - min(1, max(0, x)), 3)
+    private func easeOut(_ x: Double) -> Double { 1 - pow(1 - min(1, max(0, x)), 3) }
+    private func easeIn(_ x: Double) -> Double { pow(min(1, max(0, x)), 2) }
+
+    /// Closed-form damped spring from 0 to 1 (overshoots when damping < 1),
+    /// so the motion stays deterministic frame by frame.
+    private func spring(_ t: TimeInterval, delay: TimeInterval, response: Double, damping: Double) -> Double {
+        let x = t - delay
+        guard x > 0 else { return 0 }
+        let omega = 2 * Double.pi / response
+        let damped = omega * sqrt(1 - damping * damping)
+        return 1 - exp(-damping * omega * x) * (cos(damped * x) + damping * omega / damped * sin(damped * x))
     }
 }
