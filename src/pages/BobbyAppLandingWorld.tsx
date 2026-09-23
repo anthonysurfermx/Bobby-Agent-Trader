@@ -454,6 +454,87 @@ function FloatingPhone({ src, alt, className, rotate, fadeBottom = false, glow }
   );
 }
 
+/* ------------------------------------------------------------ no trade */
+
+/** A FOMO order walks up to the risk gate and gets stamped. The ticket shakes, submit is struck out, your money stays put. */
+function StampedOrder() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.5 });
+  const reduceMotion = useReducedMotion();
+  const [stamped, setStamped] = useState(false);
+  useEffect(() => {
+    if (!inView) return;
+    if (reduceMotion) { setStamped(true); return; }
+    const id = window.setTimeout(() => setStamped(true), 1100);
+    return () => window.clearTimeout(id);
+  }, [inView, reduceMotion]);
+  const rows: [string, string, string, string][] = [
+    ['SIDE', 'LADO', 'BUY', 'COMPRA'],
+    ['ASSET', 'ACTIVO', 'BTC', 'BTC'],
+    ['TYPE', 'TIPO', 'MARKET', 'A MERCADO'],
+    ['WHY', 'POR QUÉ', 'EVERYONE’S BUYING', 'TODOS ESTÁN COMPRANDO'],
+  ];
+  return (
+    <div ref={ref} className="a3-visual relative mx-auto flex h-[470px] w-[330px] items-center justify-center lg:h-[680px] lg:w-[520px]">
+      <motion.div
+        className="relative w-[300px] lg:w-[470px]"
+        initial={reduceMotion ? false : { opacity: 0, y: 80, rotate: 6 }}
+        animate={inView || reduceMotion ? (stamped && !reduceMotion ? { opacity: 1, y: 0, rotate: [-3, 1.5, -4, -2.5], x: [0, -6, 5, 0] } : { opacity: 1, y: 0, rotate: -3 }) : { opacity: 0, y: 80, rotate: 6 }}
+        transition={stamped ? { duration: 0.35, ease: 'easeOut' } : { type: 'spring', stiffness: 150, damping: 18 }}
+      >
+        <div className={`a3-receipt ${MONO} flex flex-col gap-3 bg-white px-6 pb-12 pt-6 text-[#050706] shadow-[0_28px_50px_rgba(5,7,6,.18)] lg:gap-4 lg:px-8 lg:pb-14 lg:pt-8`}>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold tracking-[0.1em] lg:text-lg">{t('ORDER TICKET', 'ORDEN')}</span>
+            <span className="rounded-full border-2 border-[#050706] px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.1em] lg:text-[11px]">{t('DRAFT', 'BORRADOR')}</span>
+          </div>
+          <div className="border-t-2 border-dashed border-[#050706]" />
+          {rows.map(([k, kes, v, ves]) => (
+            <div key={k} className="flex items-baseline justify-between gap-4 text-[12px] lg:text-[17px]">
+              <span className="opacity-60">{t(k, kes)}</span>
+              <span className="text-right font-semibold">{t(v, ves)}</span>
+            </div>
+          ))}
+          <div className="border-t-2 border-dashed border-[#050706]" />
+          <div className="relative mt-1 flex items-center justify-center rounded-full bg-[#050706] py-3 text-[12px] font-semibold tracking-[0.12em] text-[#FBFAF1] lg:py-3.5 lg:text-sm">
+            {t('SUBMIT', 'ENVIAR')}
+            <motion.span
+              className="absolute left-[12%] right-[12%] top-1/2 h-[3px] origin-left rounded bg-[#E0443E]"
+              initial={false}
+              animate={{ scaleX: stamped ? 1 : 0 }}
+              transition={{ delay: stamped ? 0.35 : 0, duration: 0.35, ease: EASE }}
+            />
+          </div>
+        </div>
+
+        {/* Halo's stamp */}
+        <motion.div
+          className="pointer-events-none absolute left-1/2 top-[44%] -ml-[125px] -mt-[52px] w-[250px] lg:-ml-[190px] lg:-mt-[74px] lg:w-[380px]"
+          initial={false}
+          animate={stamped ? { opacity: 1, scale: 1, rotate: -12 } : { opacity: 0, scale: 2.2, rotate: -4 }}
+          transition={stamped ? { type: 'spring', stiffness: 700, damping: 26, mass: 0.8 } : { duration: 0.2 }}
+        >
+          <div className="a3-stamp rounded-[18px] border-[5px] border-[#E0443E] px-4 py-3 text-center text-[#E0443E] lg:rounded-[22px] lg:border-[7px] lg:px-6 lg:py-4">
+            <div className="text-[44px] font-black leading-none tracking-[-0.04em] lg:text-[62px]">{t('NOT TODAY.', 'HOY NO.')}</div>
+            <div className={`${MONO} mt-2 whitespace-nowrap text-[10px] font-semibold tracking-[0.18em] lg:text-[13px]`}>HALO // RISK GATE</div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="absolute -bottom-6 left-1/2 -translate-x-1/2"
+          initial={false}
+          animate={stamped ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 14, scale: 0.8 }}
+          transition={{ delay: stamped ? 0.75 : 0, type: 'spring', stiffness: 380, damping: 20 }}
+        >
+          <TextSticker tone="ink" rotate={-3} className="!static">{t('YOUR MONEY STAYS PUT', 'TU DINERO SE QUEDA DONDE ESTÁ')}</TextSticker>
+        </motion.div>
+      </motion.div>
+
+      <PetSticker src={`${PET}/pet-sol.webp`} className="bottom-4 left-0 w-[78px] lg:bottom-10 lg:left-2 lg:w-[118px]" rotate={-7} />
+      <TextSticker tone="gold" rotate={5} className="right-0 top-4 lg:-right-2 lg:top-10">{t('WAITING COUNTS TOO', 'ESPERAR TAMBIÉN CUENTA')}</TextSticker>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ page */
 
 export default function BobbyAppLandingWorld() {
@@ -634,17 +715,7 @@ export default function BobbyAppLandingWorld() {
             title={<>{t('No edge?', '¿Sin ventaja?')}<br />{t('No trade.', 'No se opera.')}</>}
             body={t('Bobby can tell you to wait. Not today is a real answer.', 'Bobby te puede decir que esperes. «Hoy no» también es una respuesta.')}
           />
-          <div className="a3-visual relative mx-auto h-[520px] w-[330px] lg:h-[780px] lg:w-[520px]">
-            <FloatingPhone
-              src={`${P}/phone-notrade.webp`}
-              alt={t('Bobby Live Desk showing the Halo risk gate: NO TRADE, no clear setup', 'El Live Desk de Bobby con el filtro de riesgo de Halo: NO TRADE, sin setup claro')}
-              className="mt-2.5 h-[500px] w-auto lg:h-[740px]"
-              rotate={4}
-              glow="rgba(255,255,255,.55)"
-            />
-            <PetSticker src={`${PET}/pet-sol.webp`} className="bottom-3 left-2 w-[82px] lg:bottom-8 lg:left-6 lg:w-[124px]" rotate={-7} />
-            <TextSticker tone="ink" rotate={-5} className="right-0 top-[330px] lg:-right-6 lg:top-[470px]">{t('WAITING COUNTS TOO', 'ESPERAR TAMBIÉN CUENTA')}</TextSticker>
-          </div>
+          <StampedOrder />
         </div>
       </Poster>
 

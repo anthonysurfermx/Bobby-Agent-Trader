@@ -91,3 +91,15 @@
     radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0), rgba(5, 7, 6, 0.14));
   mix-blend-mode: multiply;
 }
+
+/* Rubber-stamp ink: a little uneven, pressed into the paper. */
+.a3-stamp {
+  background: rgba(224, 68, 62, 0.06);
+  mix-blend-mode: multiply;
+  -webkit-mask-image: radial-gradient(circle at 20% 30%, #000 0 60%, rgba(0, 0, 0, 0.82) 61% 100%),
+    repeating-linear-gradient(115deg, #000 0 7px, rgba(0, 0, 0, 0.72) 7px 9px);
+  -webkit-mask-composite: source-in;
+  mask-image: radial-gradient(circle at 20% 30%, #000 0 60%, rgba(0, 0, 0, 0.82) 61% 100%),
+    repeating-linear-gradient(115deg, #000 0 7px, rgba(0, 0, 0, 0.72) 7px 9px);
+  mask-composite: intersect;
+}
