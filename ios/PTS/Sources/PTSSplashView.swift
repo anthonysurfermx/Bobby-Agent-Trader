@@ -30,11 +30,10 @@ struct PTSLaunchView: View {
     }
 }
 
-/// The PTS opening (≈2.9 s). One deterministic timeline drives every layer:
-/// the gold icon springs in with a haptic and a glint, the logos of the
-/// signals Daniel is covering fly in from the edges and keep floating, the
-/// wordmark and tagline reveal word by word, and the whole scene pushes
-/// through into the home.
+/// The PTS opening (≈2.55 s), icons only — no copy. One deterministic
+/// timeline drives every layer: the gold icon springs in with a haptic and a
+/// glint, the logos of the signals Daniel is covering fly in from the edges
+/// and keep floating, and the whole scene pushes through into the home.
 struct PTSSplashView: View {
     var onHold: () -> Void = {}
     var onExit: () -> Void = {}
@@ -43,12 +42,9 @@ struct PTSSplashView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start: Date?
 
-    private static let holdAt: TimeInterval = 2.0
-    private static let exitAt: TimeInterval = 2.35
+    private static let holdAt: TimeInterval = 1.7
+    private static let exitAt: TimeInterval = 2.05
     private static let exitLength: TimeInterval = 0.5
-
-    private let titleWords = ["Pro", "Trading", "Skills"]
-    private let taglineLines = [["Las", "señales", "de", "Daniel,"], ["explicadas", "paso", "a", "paso."]]
 
     /// Resting spot, tilt and depth for each orbiting logo, in order of the
     /// curated signals (the logos themselves come from the catalog).
@@ -82,8 +78,8 @@ struct PTSSplashView: View {
     // MARK: - Timeline
 
     private func frame(t: TimeInterval, size: CGSize) -> some View {
-        let center = CGPoint(x: size.width / 2, y: size.height * 0.415)
-        let iconSize = min(136, size.width * 0.33)
+        let center = CGPoint(x: size.width / 2, y: size.height * 0.47)
+        let iconSize = min(150, size.width * 0.37)
         let exit = easeIn(progress(t, Self.exitAt, Self.exitAt + Self.exitLength))
         // Slow camera push across the whole opening.
         let push = reduceMotion ? 1 : 1.04 - 0.04 * easeOut(progress(t, 0, Self.exitAt))
@@ -103,10 +99,6 @@ struct PTSSplashView: View {
 
             icon(size: iconSize, t: t, exit: exit)
                 .position(center)
-
-            copy(t: t, exit: exit)
-                .frame(width: size.width - 48)
-                .position(x: center.x, y: center.y + iconSize / 2 + 92)
         }
         .scaleEffect(push)
     }
@@ -149,7 +141,7 @@ struct PTSSplashView: View {
             .scaleEffect((reduceMotion ? 1 : 0.45 + 0.55 * s) + 0.22 * exit)
             .blur(radius: 14 * (1 - focus) + 10 * exit)
             .opacity(min(1, progress(t, 0.12, 0.32)) * (1 - exit))
-            .accessibilityHidden(true)
+            .accessibilityLabel("Pro Trading Skills")
             .accessibilityIdentifier("pts-login-splash-bull")
     }
 
@@ -182,52 +174,6 @@ struct PTSSplashView: View {
             .brightness(far ? -0.06 : 0)
             .opacity(appear * (1 - exit))
             .position(x: rest.x + out.x * travel, y: rest.y + out.y * travel + float)
-    }
-
-    private func copy(t: TimeInterval, exit: Double) -> some View {
-        VStack(spacing: 14) {
-            HStack(spacing: 9) {
-                ForEach(Array(titleWords.enumerated()), id: \.offset) { index, word in
-                    reveal(Text(word), t: t, delay: 0.72 + Double(index) * 0.08, rise: 16)
-                }
-            }
-            .font(.system(size: 34, weight: .bold))
-            .tracking(-0.8)
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Pro Trading Skills")
-            .accessibilityIdentifier("pts-login-splash-title")
-
-            VStack(spacing: 2) {
-                ForEach(Array(taglineLines.enumerated()), id: \.offset) { line, words in
-                    HStack(spacing: 5) {
-                        ForEach(Array(words.enumerated()), id: \.offset) { index, word in
-                            let order = taglineLines.prefix(line).reduce(0) { $0 + $1.count } + index
-                            reveal(Text(word), t: t, delay: 1.0 + Double(order) * 0.035, rise: 10)
-                        }
-                    }
-                }
-            }
-            .font(.system(size: 17, weight: .regular))
-            .foregroundStyle(Theme.secondary)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Las señales de Daniel, explicadas paso a paso.")
-        }
-        .offset(y: -14 * exit)
-        .blur(radius: 6 * exit)
-        .opacity(1 - min(1, exit * 1.6))
-    }
-
-    /// Word reveal: rises out of a blur on a soft spring.
-    private func reveal(_ text: Text, t: TimeInterval, delay: TimeInterval, rise: CGFloat) -> some View {
-        let s = reduceMotion ? progress(t, delay, delay + 0.4) : spring(t, delay: delay, response: 0.5, damping: 0.82)
-        let fade = progress(t, delay, delay + 0.28)
-        return text
-            .opacity(fade)
-            .blur(radius: 8 * (1 - fade))
-            .offset(y: reduceMotion ? 0 : rise * (1 - s))
     }
 
     /// Thin horizontal levels that draw across the screen, echoing the
