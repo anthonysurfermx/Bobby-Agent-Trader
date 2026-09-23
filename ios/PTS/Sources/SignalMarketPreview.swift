@@ -34,7 +34,7 @@ struct SignalMarketSnapshot: Decodable {
 
     var accessibilitySummary: String {
         guard let last = candles.last else { return "" }
-        return "Gráfico histórico de la acción. Cierre del \(Self.dateLabel(last.date, year: true)): \(String(format: "%.2f", last.close)) dólares. No es precio en vivo."
+        return "Gráfico histórico del precio. Cierre del \(Self.dateLabel(last.date, year: true)): \(String(format: "%.2f", last.close)) dólares. No es precio en vivo."
     }
 }
 

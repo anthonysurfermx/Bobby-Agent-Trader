@@ -40,6 +40,9 @@
       bandSpecs = config.bands;
       floor = config.floor;
       ceiling = config.ceiling;
+      // Five-digit prices (BTC) get separators; round axis ticks drop ".00".
+      if (config.groupPrices) chart.applyOptions({ localization: { priceFormatter: price =>
+        price.toLocaleString('en-US', { minimumFractionDigits: Math.abs(price - Math.round(price)) < 0.005 ? 0 : 2, maximumFractionDigits: 2 }) } });
     };
     let lines = [];
     let bands = [];

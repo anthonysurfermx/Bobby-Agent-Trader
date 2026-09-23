@@ -1,7 +1,8 @@
 import Foundation
 
 /// Live market data for the curated signals, read from Bobby's public
-/// `stock-candles` endpoint (Yahoo chart data, CDN-cached up to 5 minutes).
+/// `stock-candles` endpoint (Yahoo chart data, CDN-cached up to 5 minutes);
+/// crypto reads Binance's public market data for the author's own pair.
 /// The bundled snapshots remain the offline fallback.
 struct LiveCandle: Decodable, Equatable {
     let ts: Double
@@ -103,7 +104,15 @@ enum SignalTracking {
         }
     }
 
+    /// Crypto signals and the Binance pair their author charts. The crypto
+    /// market never closes, so these quotes are always live.
+    nonisolated static let binancePairs = ["BTC": "BTCUSDT"]
+
     nonisolated private static func fetch(_ symbol: String) async -> SignalQuote? {
+        if let pair = binancePairs[symbol] {
+            guard let days = await binanceDaily(pair), days.count >= 2, let last = days.last else { return nil }
+            return SignalQuote(price: last.close, asOf: Date(), changePct: last.close / days[days.count - 2].close - 1, isLive: true, daily: days)
+        }
         async let daily = candles(symbol, range: "90d", interval: "1d")
         async let intraday = candles(symbol, range: "7d", interval: "15m")
         guard let days = await daily, !days.isEmpty else { return nil }
@@ -135,6 +144,29 @@ enum SignalTracking {
         return valid.isEmpty ? nil : valid.sorted { $0.ts < $1.ts }
     }
 
+    /// Binance daily bars open at 00:00 UTC and the newest one is still
+    /// forming, so its close is the current price. Bars are re-stamped at New
+    /// York midnight of the same date: tracking and labels count New York days
+    /// (as for stocks) and must name the UTC day each bar covers.
+    nonisolated static func binanceDaily(_ pair: String) async -> [LiveCandle]? {
+        guard let url = URL(string: "https://data-api.binance.vision/api/v3/klines?symbol=\(pair)&interval=1d&limit=90") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let rows = try? JSONSerialization.jsonObject(with: data) as? [[Any]] else { return nil }
+        var utc = Calendar(identifier: .gregorian); utc.timeZone = TimeZone(identifier: "UTC")!
+        var ny = Calendar(identifier: .gregorian); ny.timeZone = SignalTracking.newYork
+        let candles = rows.compactMap { row -> LiveCandle? in
+            guard row.count > 4, let openTime = (row[0] as? NSNumber)?.doubleValue else { return nil }
+            let prices = row[1...4].compactMap { ($0 as? String).flatMap(Double.init) }
+            guard prices.count == 4, prices.allSatisfy({ $0.isFinite && $0 > 0 }),
+                  let day = ny.date(from: utc.dateComponents([.year, .month, .day], from: Date(timeIntervalSince1970: openTime / 1_000))) else { return nil }
+            return LiveCandle(ts: day.timeIntervalSince1970 * 1_000, open: prices[0], high: prices[1], low: prices[2], close: prices[3])
+        }
+        return candles.isEmpty ? nil : candles.sorted { $0.ts < $1.ts }
+    }
+
     /// Live facts handed to the Copiloto; nil when no live data arrived.
     func copilotContext(for signal: SignalListItem) -> String? {
         guard let quote = quotes[signal.symbol] else { return nil }
@@ -142,18 +174,19 @@ enum SignalTracking {
         let when = quote.isLive
             ? "en vivo a las \(SignalTracking.timeLabel(quote.asOf)) de Nueva York, con hasta unos minutos de retraso"
             : "último precio disponible, del \(SignalTracking.dayLabel(quote.asOf)) a las \(SignalTracking.timeLabel(quote.asOf)) de Nueva York; el mercado está cerrado"
-        var lines = ["DATOS DE MERCADO ACTUALES (esto reemplaza lo dicho arriba sobre la falta de precio en vivo y sobre el último cierre de la instantánea): \(signal.symbol) cotiza en \(String(format: "%.2f", quote.price)) USD, \(when)."]
+        let unit = Self.binancePairs[signal.symbol].map { "USDT (\($0) en Binance)" } ?? "USD"
+        var lines = ["DATOS DE MERCADO ACTUALES (esto reemplaza lo dicho arriba sobre la falta de precio en vivo y sobre el último cierre de la instantánea): \(signal.symbol) cotiza en \(quote.price.priceText) \(unit), \(when)."]
         if let change = quote.changePct { lines.append("Cambio frente al cierre anterior: \(String(format: "%+.2f", change * 100)) %.") }
         let since = quote.daily.filter { $0.date >= SignalTracking.tradingDayStart(signal.publishedAt) }
         if let high = since.map(\.high).max(), let low = since.map(\.low).min() {
-            lines.append("Desde la publicación (velas diarias): máximo \(String(format: "%.2f", high)), mínimo \(String(format: "%.2f", low)).")
+            lines.append("Desde la publicación (velas diarias): máximo \(high.priceText), mínimo \(low.priceText).")
         }
         let statuses = SignalTracking.statuses(signalCase.milestones, candles: quote.daily, since: signal.publishedAt, entryAtPublication: signalCase.entryAtPublication)
-        let reached = statuses.filter { $0.reachedOn != nil }.map { "\($0.milestone.title) \(String(format: "%.2f", $0.milestone.price)) el \(SignalTracking.dayLabel($0.reachedOn!))" }
-        let pending = statuses.filter { $0.reachedOn == nil }.map { "\($0.milestone.title) \(String(format: "%.2f", $0.milestone.price))" }
+        let reached = statuses.filter { $0.reachedOn != nil }.map { "\($0.milestone.title) \($0.milestone.price.priceText) el \(SignalTracking.dayLabel($0.reachedOn!))" }
+        let pending = statuses.filter { $0.reachedOn == nil }.map { "\($0.milestone.title) \($0.milestone.price.priceText)" }
         if !reached.isEmpty { lines.append("Niveles que el precio ya alcanzó según los datos de mercado: \(reached.joined(separator: "; ")).") }
         if !pending.isEmpty { lines.append("Aún no alcanzados: \(pending.joined(separator: "; ")).") }
-        lines.append("Esto es seguimiento de PTS con precios de mercado, no la ejecución ni la cuenta de Daniel; dentro de un mismo día no se sabe el orden de los movimientos. Si preguntan cómo va, usa estos datos y dilo así.")
+        lines.append("Esto es seguimiento de PTS con precios de mercado, no la ejecución ni la cuenta de \(signal.authorFirstName); dentro de un mismo día no se sabe el orden de los movimientos. Si preguntan cómo va, usa estos datos y dilo así.")
         return lines.joined(separator: " ")
     }
 }

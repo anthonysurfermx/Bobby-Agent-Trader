@@ -71,7 +71,19 @@ struct SignalListItem: Identifiable, Hashable {
         reportedVerdict: "Plan: entrada 64.00–65.85 · alto riesgo", publicationCount: 1,
         sourceAvailable: true, contractDocumented: true
     )
-    static let curated: [SignalListItem] = [coin, xly, dram, asts]
+    // Jasiel's market read in the members updates of Sep 23, 2026: a possible
+    // correction toward 80,550-76,900 as a buying zone; no trade was sent.
+    static let btc = SignalListItem(
+        id: "btc-jasiel-2026-09-23", category: .spot,
+        symbol: "BTC", name: "Bitcoin", author: "Jasiel Sánchez",
+        publishedAt: ISO8601DateFormatter().date(from: "2026-09-23T00:00:00Z")!,
+        reportedVerdict: "Escenario: retroceso a 80,550–76,900", publicationCount: 1,
+        sourceAvailable: true, contractDocumented: false
+    )
+    // The splash orbits the first four; BTC stays last so it keeps its layout.
+    static let curated: [SignalListItem] = [coin, xly, dram, asts, btc]
+
+    var authorFirstName: String { author.split(separator: " ").first.map(String.init) ?? author }
 }
 
 enum SignalSource {

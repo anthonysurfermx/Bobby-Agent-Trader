@@ -166,7 +166,7 @@ struct SignalHome: View {
             .buttonStyle(.plain)
             .accessibilityAddTraits(.isButton)
             .accessibilityLabel("\(signal.category.title). \(signal.symbol), \(signal.name), subyacente. Publicada el \(signal.publicationDate). Autor: \(signal.author). Reportado por el autor, sin verificar: \(signal.reportedVerdict). \(signal.sourceAvailable ? "Fuente original disponible" : "Fuente original no disponible"). \(signal.contractDocumented ? "Contrato documentado" : "Contrato sin documentar"). Publicaciones: \(signal.publicationCount). \(summary.counts[signal.id]?.likes ?? 0) me gusta, \(summary.counts[signal.id]?.comments ?? 0) comentarios\(saved.contains(signal.id) ? ", guardada" : ""). Abrir señal.")
-            .accessibilityValue(market.quotes[signal.symbol].map { "\($0.isLive ? "Precio en vivo" : "Último precio"): \(String(format: "%.2f", $0.price)) dólares." } ?? SignalMarketSnapshot.forSymbol(signal.symbol)?.accessibilitySummary ?? "")
+            .accessibilityValue(market.quotes[signal.symbol].map { "\($0.isLive ? "Precio en vivo" : "Último precio"): \($0.price.priceText) dólares." } ?? SignalMarketSnapshot.forSymbol(signal.symbol)?.accessibilitySummary ?? "")
             .accessibilityIdentifier("signal-card-\(signal.id)")
     }
 
@@ -342,6 +342,11 @@ struct SignalLogo: View {
                 // AST SpaceMobile wordmark, white on its orange.
                 Image("logo-asts").resizable().scaledToFit().frame(width: size * 0.74)
                     .frame(width: size, height: size).background(SignalBrand.tile("ASTS"), in: shape)
+            case "BTC":
+                // Bitcoin's public-domain mark: white ₿ tilted on its orange.
+                Image(systemName: "bitcoinsign").font(.system(size: size * 0.46, weight: .bold)).foregroundStyle(.white)
+                    .rotationEffect(.degrees(14))
+                    .frame(width: size, height: size).background(SignalBrand.tile("BTC"), in: shape)
             case "XLY", "DRAM":
                 // Full official tiles: SPDR sector badge and Roundhill mark.
                 Image(symbol == "XLY" ? "logo-xly" : "logo-dram").resizable().interpolation(.high).scaledToFill()
@@ -365,6 +370,7 @@ enum SignalBrand {
         case "ASTS": return Color(red: 248 / 255, green: 168 / 255, blue: 40 / 255)
         case "XLY": return Color(red: 72 / 255, green: 184 / 255, blue: 56 / 255)
         case "DRAM": return Color(red: 88 / 255, green: 88 / 255, blue: 248 / 255)
+        case "BTC": return Color(red: 247 / 255, green: 147 / 255, blue: 26 / 255)
         default: return Theme.accent
         }
     }
@@ -375,6 +381,7 @@ enum SignalBrand {
         case "ASTS": return Color(red: 0.98, green: 0.69, blue: 0.24)
         case "XLY": return Color(red: 0.38, green: 0.80, blue: 0.33)
         case "DRAM": return Color(red: 0.48, green: 0.49, blue: 1)
+        case "BTC": return Color(red: 0.98, green: 0.65, blue: 0.25)
         default: return Theme.accent
         }
     }

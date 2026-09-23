@@ -76,13 +76,20 @@ struct PTSVoiceCase {
     let answerInstruction: String
     let judgeInstruction: String
     let route: (String) -> PTSVoicePolicy.Route
+    /// Asset named in the idle status and the "repeat" prompt.
+    var subject = "COIN"
+    /// Vocabulary hint for speech-to-text.
+    var transcriptionHint = "COIN, Coinbase, Daniel Marín, rango lateral, ruptura, opciones."
 
     static let coin = PTSVoiceCase(greeting: PTSVoicePolicy.greeting, redirect: PTSVoicePolicy.redirect, instructions: PTSVoicePolicy.instructions,
                                    answerInstruction: PTSVoicePolicy.answerInstruction, judgeInstruction: PTSVoicePolicy.judgeInstruction, route: PTSVoicePolicy.route)
     static let xly = PTSVoiceCase(greeting: PTSVoicePolicyXLY.greeting, redirect: PTSVoicePolicyXLY.redirect, instructions: PTSVoicePolicyXLY.instructions,
-                                  answerInstruction: PTSVoicePolicyXLY.answerInstruction, judgeInstruction: PTSVoicePolicyXLY.judgeInstruction, route: PTSVoicePolicyXLY.route)
+                                  answerInstruction: PTSVoicePolicyXLY.answerInstruction, judgeInstruction: PTSVoicePolicyXLY.judgeInstruction, route: PTSVoicePolicyXLY.route, subject: "XLY")
     static let asts = PTSVoiceCase(greeting: PTSVoicePolicyASTS.greeting, redirect: PTSVoicePolicyASTS.redirect, instructions: PTSVoicePolicyASTS.instructions,
-                                   answerInstruction: PTSVoicePolicyASTS.answerInstruction, judgeInstruction: PTSVoicePolicyASTS.judgeInstruction, route: PTSVoicePolicyASTS.route)
+                                   answerInstruction: PTSVoicePolicyASTS.answerInstruction, judgeInstruction: PTSVoicePolicyASTS.judgeInstruction, route: PTSVoicePolicyASTS.route, subject: "ASTS")
     static let dram = PTSVoiceCase(greeting: PTSVoicePolicyDRAM.greeting, redirect: PTSVoicePolicyDRAM.redirect, instructions: PTSVoicePolicyDRAM.instructions,
-                                   answerInstruction: PTSVoicePolicyDRAM.answerInstruction, judgeInstruction: PTSVoicePolicyDRAM.judgeInstruction, route: PTSVoicePolicyDRAM.route)
+                                   answerInstruction: PTSVoicePolicyDRAM.answerInstruction, judgeInstruction: PTSVoicePolicyDRAM.judgeInstruction, route: PTSVoicePolicyDRAM.route, subject: "DRAM")
+    static let btc = PTSVoiceCase(greeting: PTSVoicePolicyBTC.greeting, redirect: PTSVoicePolicyBTC.redirect, instructions: PTSVoicePolicyBTC.instructions,
+                                  answerInstruction: PTSVoicePolicyBTC.answerInstruction, judgeInstruction: PTSVoicePolicyBTC.judgeInstruction, route: PTSVoicePolicyBTC.route,
+                                  subject: "Bitcoin", transcriptionHint: "Bitcoin, BTC, Jasiel Sánchez, retroceso, corrección, divergencias, bulltrap, futuros, spot, Binance.")
 }

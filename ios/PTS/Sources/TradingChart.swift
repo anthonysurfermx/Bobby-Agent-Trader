@@ -48,11 +48,13 @@ struct TradingChart: UIViewRepresentable {
             return (try? JSONSerialization.data(withJSONObject: rows)).flatMap { String(data: $0, encoding: .utf8) }
         }
 
-        // Daniel's chart colors, used only for roles he documented.
+        // The authors' chart colors, used only for roles they documented
+        // (Jasiel draws the correction zone in blue).
         static func chartConfig(_ signalCase: SignalCase) -> [String: Any] {
             func color(_ role: String?) -> String? {
                 guard let role else { return nil }
                 if role == "Stop" { return "#F87171" }
+                if role == "Corrección" { return "#60A5FA" }
                 if role == "Entrada" { return "#C4B5FD" }
                 if role == "BE" { return "#FACC15" }
                 return role.hasPrefix("Obj") ? "#4ADE80" : nil
@@ -67,6 +69,7 @@ struct TradingChart: UIViewRepresentable {
                 "bands": signalCase.bands.map { [$0.0, $0.1, $0.2] as [Any] },
                 "floor": signalCase.priceRange.lowerBound,
                 "ceiling": signalCase.priceRange.upperBound,
+                "groupPrices": signalCase.priceRange.upperBound >= 10_000,
             ]
         }
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {

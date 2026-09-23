@@ -1,10 +1,17 @@
 import Foundation
 
+extension Double {
+    /// Two decimals, with thousands separators once prices reach BTC's scale.
+    var priceText: String {
+        formatted(.number.precision(.fractionLength(2)).grouping(.automatic).locale(Locale(identifier: "en_US")))
+    }
+}
+
 /// A published price. `role` is set only when the author documented it.
 struct SignalLevel: Hashable {
     let price: Double
     let role: String?
-    var chipTitle: String { role.map { "\($0) \(String(format: "%.2f", price))" } ?? String(format: "%.2f", price) }
+    var chipTitle: String { role.map { "\($0) \(price.priceText)" } ?? price.priceText }
 }
 
 struct SignalMoment: Hashable {
@@ -47,6 +54,7 @@ struct SignalCase {
         case SignalListItem.xly.id: return .xly
         case SignalListItem.dram.id: return .dram
         case SignalListItem.asts.id: return .asts
+        case SignalListItem.btc.id: return .btc
         default: return .coin
         }
     }
@@ -190,6 +198,45 @@ struct SignalCase {
         levelsNote: "Los cinco niveles se transcribieron de su gráfico. Los mensajes del 18 y 21 sep no indican cuál es la entrada, el stop o los objetivos (la entrada se envió el 17 sep), así que no se les asigna función.",
         chartNote: "El gráfico interactivo muestra el precio histórico diario del ETF hasta el cierre del 21 sep 2026 (61.58). El 18 sep su máximo fue 59.70. La publicación original usa velas de 4 horas."
     )
+
+    // A market read, not a trade: Jasiel projects a correction to the two
+    // blue lines of his chart (possible buying zone) and names 97k and 102k
+    // as future exit levels. No entry, stop or size was published.
+    static let btc = SignalCase(
+        marketResource: "btc-market",
+        chartCaption: "Cripto · USDT · histórico",
+        levels: [
+            SignalLevel(price: 76_869.85, role: "Corrección"),
+            SignalLevel(price: 80_550.99, role: "Corrección"),
+            SignalLevel(price: 97_014.43, role: "Obj. 1"),
+            SignalLevel(price: 102_000, role: "Obj. 2"),
+        ],
+        focusLevel: 80_550.99,
+        bands: [(76_869.85, 80_550.99, "rgba(96, 165, 250, 0.08)"), (97_014.43, 102_000, "rgba(74, 222, 128, 0.05)")],
+        priceRange: 74_000...104_000,
+        hasGuidedNarration: false,
+        moments: [],
+        sourceNote: "Solo BTC y el análisis de Jasiel · Máximo 3 minutos · No es recomendación",
+        voice: .btc,
+        suggestions: ["¿Qué crees que pase con Bitcoin?", "¿Por qué ve un posible retroceso?", "¿Qué es la bulltrap que menciona?"],
+        levelQuestion: { level in
+            "¿Qué papel tiene el nivel \(level.price.priceText)\(level.role.map { " (\($0))" } ?? "") en el análisis de Jasiel para Bitcoin?"
+        },
+        milestones: [
+            SignalMilestone(title: "Corrección", price: 80_550.99, up: false),
+            SignalMilestone(title: "Corrección", price: 76_869.85, up: false),
+            SignalMilestone(title: "Obj. 1", price: 97_014.43, up: true),
+            SignalMilestone(title: "Obj. 2", price: 102_000, up: true),
+        ],
+        entryAtPublication: false,
+        reviewedAnswer: PTSVoicePolicyBTC.reviewedAnswer,
+        evidenceLabel: "Análisis publicado por el autor · ",
+        contractTitle: "Sin operación publicada",
+        contractDetail: "Jasiel no publica entrada, stop ni tamaño, y aclara que no invita a operar en corto: si llega la corrección, la ve como posible oportunidad de compra. Dice que él opera solo futuros y no tiene nada en spot.",
+        originalImage: "btc",
+        levelsNote: "Corrección hacia 80,550 y 76,900 aprox., según el texto; su gráfico los marca en 80,550.99 y 76,869.85 (este junto al retroceso de Fibonacci 0.382). 97k y 102k son objetivos futuros para salir: 97,014.43 está en su gráfico y 102,000 solo en el texto. No publica entrada ni stop.",
+        chartNote: "El gráfico interactivo muestra velas diarias de BTCUSDT en Binance, el mismo par que usa Jasiel; su gráfico original es de 8 horas y marcaba 85,399.02 al hacerlo, el 23 sep 2026. Muestra el precio de Bitcoin, no el resultado de una operación."
+    )
 }
 
 extension SignalCase {
@@ -197,7 +244,7 @@ extension SignalCase {
     /// stop, or what the price is waiting for.
     func trackingHeadline(_ statuses: [MilestoneStatus]) -> String? {
         guard !statuses.isEmpty else { return nil }
-        let price: (Double) -> String = { String(format: "%.2f", $0) }
+        let price: (Double) -> String = { $0.priceText }
         if let stop = statuses.first(where: { $0.milestone.title == "Stop" }), let day = stop.reachedOn {
             return "Tocó el stop \(price(stop.milestone.price)) · \(SignalTracking.dayLabel(day))"
         }
@@ -207,7 +254,12 @@ extension SignalCase {
             let verb = top.milestone.title.hasPrefix("Nivel") ? "Superó el" : "Alcanzó"
             return "\(verb) \(top.milestone.title) \(price(top.milestone.price)) · \(SignalTracking.dayLabel(top.reachedOn!))"
         }
-        if let next = statuses.filter({ $0.milestone.up }).min(by: { $0.milestone.price < $1.milestone.price }) {
+        // Downside references other than a stop (BTC's correction zone).
+        if let deepest = statuses.filter({ !$0.milestone.up && $0.reachedOn != nil }).min(by: { $0.milestone.price < $1.milestone.price }) {
+            return "Bajó a \(deepest.milestone.title) \(price(deepest.milestone.price)) · \(SignalTracking.dayLabel(deepest.reachedOn!))"
+        }
+        // Milestones are listed in the order the author expects them.
+        if let next = statuses.first(where: { $0.reachedOn == nil && ($0.milestone.up || !$0.milestone.afterEntry) }) {
             return "Esperando \(next.milestone.title) \(price(next.milestone.price))"
         }
         return nil

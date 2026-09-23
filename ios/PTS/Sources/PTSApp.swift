@@ -199,7 +199,7 @@ struct SignalDesk: View {
                 pendingQuestion = signalCase.levelQuestion(selectedLevel)
                 learn = true
             } label: {
-                HStack { Image(systemName: "sparkles"); Text(selectedLevel.role == nil ? "Entender el nivel \(String(format: "%.2f", selected))" : "Entender \(selectedLevel.chipTitle)"); Spacer(); Image(systemName: "arrow.up.right") }.font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent).padding(.vertical, 10)
+                HStack { Image(systemName: "sparkles"); Text(selectedLevel.role == nil ? "Entender el nivel \(selected.priceText)" : "Entender \(selectedLevel.chipTitle)"); Spacer(); Image(systemName: "arrow.up.right") }.font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.accent).padding(.vertical, 10)
             }.accessibilityIdentifier("ask-ai")
         }
     }
@@ -418,7 +418,7 @@ struct SignalDesk: View {
                     VStack(alignment: .leading, spacing: 8) {
                         if signalCase.moments.isEmpty {
                             Text("Fuente original").font(.headline)
-                            Text("Publicación de Daniel en el área de miembros de Pro Trading Skills, \(signal.publicationDate). No tiene enlace público; abajo está su gráfico original.")
+                            Text("Publicación de \(signal.authorFirstName) en el área de miembros de Pro Trading Skills, \(signal.publicationDate). No tiene enlace público; abajo está su gráfico original.")
                                 .font(.subheadline).foregroundStyle(Theme.secondary)
                         } else {
                             Text("Fuente original disponible").font(.headline)

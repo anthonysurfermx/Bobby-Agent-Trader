@@ -72,7 +72,7 @@ final class PTSRealtimeClient: ObservableObject {
     var countdown: String { String(format: "%d:%02d", remainingSeconds / 60, remainingSeconds % 60) }
     var statusText: String {
         switch state {
-        case .idle: return "Conversar sobre COIN"
+        case .idle: return "Conversar sobre \(policy.subject)"
         case .connecting: return "Conectando voz…"
         case .listening: return "Te escucho"
         case .thinking: return "Revisando el análisis…"
@@ -199,7 +199,7 @@ final class PTSRealtimeClient: ObservableObject {
             "audio": [
                 "input": [
                     "format": ["type": "audio/pcm", "rate": 24000],
-                    "transcription": ["model": "gpt-4o-mini-transcribe", "language": "es", "prompt": "COIN, Coinbase, Daniel Marín, rango lateral, ruptura, opciones."],
+                    "transcription": ["model": "gpt-4o-mini-transcribe", "language": "es", "prompt": policy.transcriptionHint],
                     "turn_detection": ["type": "server_vad", "threshold": 0.5, "prefix_padding_ms": 300, "silence_duration_ms": 600, "create_response": false, "interrupt_response": true]
                 ],
                 "output": ["format": ["type": "audio/pcm", "rate": 24000], "voice": "marin"]
@@ -236,7 +236,7 @@ final class PTSRealtimeClient: ObservableObject {
             transcript.append(Line(role: "user", text: question))
             try await answer(question)
         case "conversation.item.input_audio_transcription.failed":
-            try await requestResponse("Di solamente: No te entendí bien. ¿Puedes repetir tu pregunta sobre COIN?")
+            try await requestResponse("Di solamente: No te entendí bien. ¿Puedes repetir tu pregunta sobre \(policy.subject)?")
         case "response.created":
             responseActive = true; state = .thinking
             currentResponseID = (event["response"] as? [String: Any])?["id"] as? String

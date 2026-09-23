@@ -32,13 +32,13 @@ struct SignalTrackingView: View {
                 HStack(spacing: 10) {
                     Image(systemName: status.reachedOn == nil ? "circle" : (status.milestone.title == "Stop" ? "xmark.circle.fill" : "checkmark.circle.fill"))
                         .foregroundStyle(status.reachedOn == nil ? Theme.secondary : (status.milestone.title == "Stop" ? Color.red : Color.green))
-                    Text("\(status.milestone.title) \(String(format: "%.2f", status.milestone.price))").font(.subheadline.monospacedDigit())
+                    Text("\(status.milestone.title) \(status.milestone.price.priceText)").font(.subheadline.monospacedDigit())
                     Spacer()
                     Text(detail(status)).font(.caption.monospacedDigit()).foregroundStyle(Theme.secondary)
                 }
                 .accessibilityElement(children: .combine)
             }
-            Text("Calculado por PTS con precios de mercado desde la publicación, no con la cuenta de Daniel. Con velas diarias no se conoce el orden dentro de un mismo día.")
+            Text("Calculado por PTS con precios de mercado desde la publicación, no con la cuenta de \(signal.authorFirstName). Con velas diarias no se conoce el orden dentro de un mismo día.")
                 .font(.caption2).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .padding(18)
