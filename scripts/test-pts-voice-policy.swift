@@ -26,6 +26,18 @@ import Foundation
             for q in blocked { precondition(route(q) == .redirect, "\(name) not redirected: \(q)") }
             precondition(route("Sí") == .judge, "\(name) follow-up not judged")
         }
+        // Noise transcripts: the transcriber echoing its vocabulary prompt (seen
+        // on device on Sep 24) and stock hallucinations are dropped; real
+        // questions that name a few of those words are kept.
+        let tltHint = PTSVoiceCase.tlt.transcriptionHint
+        for q in ["TLT, bonos del Tesoro, bono a 10 años, rendimiento, rentabilidad, Jasiel Sánchez, falso escape, DXY, dólar, oro, plata, Trump, Xi Jinping.", "Jasiel Sánchez, falso escape, DXY, dólar, oro, plata.", "Gracias.", "Subtítulos realizados por la comunidad de Amara.org", "  "] {
+            precondition(PTSVoicePolicy.isNoiseTranscript(q, hint: tltHint), "Noise kept: \(q)")
+        }
+        for q in ["¿Qué pasa con el dólar, el oro y la plata?", "¿Qué dice Jasiel del bono a 10 años?", "¿Y el bono a 10 años?", "¿Qué crees que pase con TLT?", "¿Por qué habla de Trump y Xi Jinping?", "Sí"] {
+            precondition(!PTSVoicePolicy.isNoiseTranscript(q, hint: tltHint), "Question dropped: \(q)")
+        }
+        precondition(PTSVoicePolicy.isNoiseTranscript(PTSVoiceCase.coin.transcriptionHint, hint: PTSVoiceCase.coin.transcriptionHint))
+        precondition(!PTSVoicePolicy.isNoiseTranscript("¿Qué dice Daniel de la ruptura del rango lateral de COIN?", hint: PTSVoiceCase.coin.transcriptionHint))
         let start = Date(timeIntervalSince1970: 1000)
         let end = start.addingTimeInterval(PTSVoicePolicy.maximumDuration)
         precondition(PTSVoicePolicy.remaining(until: end, now: start) == 180)

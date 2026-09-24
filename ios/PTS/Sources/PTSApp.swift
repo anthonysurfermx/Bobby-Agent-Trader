@@ -241,6 +241,13 @@ struct SignalDesk: View {
                 VStack(alignment: .leading, spacing: 20) {
                     VStack(spacing: 10) {
                         PTSOrbit(speaking: live.state == .speaking || backup.speaking, level: backup.speaking ? 0.5 : live.level, active: live.isActive || live.state == .connecting || backupActive)
+                            .contentShape(Rectangle())
+                            // The mic is closed while the Copiloto speaks, so a tap interrupts.
+                            .onTapGesture {
+                                if backupActive { backup.stop() } else { Task { await live.interruptSpeaking() } }
+                            }
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityHint("Toca para interrumpir al Copiloto")
                             .accessibilityIdentifier("pts-orbit")
                         Text("Hablemos de \(signal.symbol)").font(.title2.weight(.medium))
                         HStack(spacing: 7) {
@@ -255,6 +262,10 @@ struct SignalDesk: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(live.state == .error && !backupActive ? .orange : Theme.accent)
                         .animation(.easeInOut(duration: 0.2), value: live.state)
+                        if (live.state == .speaking && !backupActive) || backup.speaking {
+                            Text("Toca la esfera para interrumpir").font(.caption).foregroundStyle(Theme.secondary)
+                                .accessibilityIdentifier("live-interrupt-hint")
+                        }
                         if live.state == .error, !backupActive, let message = live.error {
                             Text(message).font(.footnote).foregroundStyle(Theme.secondary)
                                 .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)

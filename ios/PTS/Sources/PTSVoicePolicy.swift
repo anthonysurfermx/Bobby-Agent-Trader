@@ -63,6 +63,32 @@ enum PTSVoicePolicy {
 
     static func allows(_ question: String) -> Bool { route(question) != .redirect }
 
+    /// With noise, the transcriber tends to return its own vocabulary prompt
+    /// ("TLT, bonos del Tesoro, …") or stock phrases. Those are not questions.
+    static func isNoiseTranscript(_ text: String, hint: String) -> Bool {
+        func words(_ s: String) -> [String] {
+            s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "es_MX"))
+                .split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        }
+        let said = words(text)
+        guard !said.isEmpty else { return true }
+        let folded = said.joined(separator: " ")
+        if ["amara org", "subtitulos realizados", "suscribete", "gracias por ver"].contains(where: folded.contains) { return true }
+        if ["gracias", "muchas gracias", "adios", "chau"].contains(folded) { return true }
+        // An echo repeats several whole prompt terms and little else; a real
+        // question names one or two of them inside its own words.
+        var covered = Set<Int>()
+        var matchedTerms = 0
+        for term in hint.split(whereSeparator: { ",.".contains($0) }).map({ words(String($0)) }) where !term.isEmpty && term.count <= said.count {
+            var matched = false
+            for start in 0...(said.count - term.count) where Array(said[start..<start + term.count]) == term {
+                covered.formUnion(start..<start + term.count); matched = true
+            }
+            if matched { matchedTerms += 1 }
+        }
+        return matchedTerms >= 3 && Double(covered.count) / Double(said.count) >= 0.7
+    }
+
     static func remaining(until deadline: Date, now: Date = Date()) -> Int {
         max(0, min(Int(maximumDuration), Int(ceil(deadline.timeIntervalSince(now)))))
     }

@@ -178,6 +178,16 @@ final class PTSRealtimeClient: ObservableObject {
     func stop() { generation = UUID(); cleanup(); state = .idle }
     func end() { generation = UUID(); cleanup(); state = .ended }
 
+    /// Voice can no longer interrupt (half duplex), so a tap on the orb does.
+    func interruptSpeaking() async {
+        guard isActive, responseActive || scheduledBuffers > 0 else { return }
+        queuedQuestion = nil
+        do { try await interrupt() } catch { return }
+        responseActive = false
+        state = .listening
+    }
+
+
     func sendText(_ text: String) async {
         let question = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(800))
         guard !question.isEmpty, canSend, checkDeadline() else { return }
@@ -200,7 +210,11 @@ final class PTSRealtimeClient: ObservableObject {
                 "input": [
                     "format": ["type": "audio/pcm", "rate": 24000],
                     "transcription": ["model": "gpt-4o-mini-transcribe", "language": "es", "prompt": policy.transcriptionHint],
-                    "turn_detection": ["type": "server_vad", "threshold": 0.5, "prefix_padding_ms": 300, "silence_duration_ms": 600, "create_response": false, "interrupt_response": true]
+                    // Half duplex: the mic is not streamed while the Copiloto speaks
+                    // (see appendAudio), so room noise can never cut an answer.
+                    // Interrupting is a tap on the orb or a suggestion.
+                    "turn_detection": ["type": "server_vad", "threshold": 0.5, "prefix_padding_ms": 300, "silence_duration_ms": 600, "create_response": false, "interrupt_response": false],
+                    "noise_reduction": ["type": "near_field"]
                 ],
                 "output": ["format": ["type": "audio/pcm", "rate": 24000], "voice": "marin"]
             ]
@@ -222,13 +236,13 @@ final class PTSRealtimeClient: ObservableObject {
             state = .thinking
             try await requestResponse("Di exactamente: \(policy.greeting)")
         case "input_audio_buffer.speech_started":
-            if responseActive, let id = currentResponseID { ignoredResponseIDs.insert(id) }
-            try await truncatePlayback()
-            stopPlayback()
+            // Audio sent just before an answer began must not cut it off.
+            guard !responseActive, scheduledBuffers == 0 else { return }
             state = .listening
         case "input_audio_buffer.speech_stopped": state = .thinking
         case "conversation.item.input_audio_transcription.completed":
-            guard let question = event["transcript"] as? String, !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, checkDeadline() else {
+            guard let question = event["transcript"] as? String, !question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  !PTSVoicePolicy.isNoiseTranscript(question, hint: policy.transcriptionHint), checkDeadline() else {
                 // A cough or noise yields no words; go back to listening.
                 if !responseActive, scheduledBuffers == 0, isActive { state = .listening }
                 return
@@ -288,6 +302,7 @@ final class PTSRealtimeClient: ObservableObject {
 
     private func requestResponse(_ instruction: String) async throws {
         responseText = ""; responseActive = true; state = .thinking
+        try await send(["type": "input_audio_buffer.clear", "event_id": cleanupEventID()])
         try await send(["type": "response.create", "response": ["output_modalities": ["audio"], "instructions": sessionInstructions + "\nPARA ESTA RESPUESTA: " + instruction]])
     }
 
@@ -464,11 +479,10 @@ final class PTSRealtimeClient: ObservableObject {
         // Keep ambient Mac speech out of that deterministic test conversation.
         if ProcessInfo.processInfo.arguments.contains("-PTSVoiceUITest") || ProcessInfo.processInfo.arguments.contains("-PTSLocalAudioQA") { return }
         #endif
-        #if targetEnvironment(simulator)
-        // Simulator audio lacks the device VoiceProcessingIO echo canceller.
-        // Avoid feeding the Mac speaker output back into the simulated mic.
+        // Half duplex, as in Bobby's Live Desk: while an answer is generated or
+        // playing, the mic is not streamed. Room noise, a cough or the speaker
+        // itself would otherwise trigger the VAD and cut the answer mid-sentence.
         guard !responseActive, scheduledBuffers == 0, Date() > outputSilenceUntil else { return }
-        #endif
         let capacity = AVAudioFrameCount(ceil(Double(buffer.frameLength) * audioFormat.sampleRate / buffer.format.sampleRate)) + 1
         guard let converted = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: capacity) else { return }
         var supplied = false
