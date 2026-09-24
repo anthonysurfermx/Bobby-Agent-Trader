@@ -23,7 +23,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>PTS usa el micrófono para conversar sobre las señales de Daniel.</string>
+	<string>PTS usa el micrófono para que converses con el Copiloto sobre las señales.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

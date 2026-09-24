@@ -30,8 +30,9 @@ struct SignalTrackingView: View {
             }
             ForEach(statuses, id: \.self) { status in
                 HStack(spacing: 10) {
-                    Image(systemName: status.reachedOn == nil ? "circle" : (status.milestone.title == "Stop" ? "xmark.circle.fill" : "checkmark.circle.fill"))
-                        .foregroundStyle(status.reachedOn == nil ? Theme.secondary : (status.milestone.title == "Stop" ? Color.red : Color.green))
+                    let against = status.milestone.title == "Stop" || status.milestone.adverse
+                    Image(systemName: status.reachedOn == nil ? "circle" : (against ? "xmark.circle.fill" : "checkmark.circle.fill"))
+                        .foregroundStyle(status.reachedOn == nil ? Theme.secondary : (against ? Color.red : Color.green))
                     Text("\(status.milestone.title) \(status.milestone.price.priceText)").font(.subheadline.monospacedDigit())
                     Spacer()
                     Text(detail(status)).font(.caption.monospacedDigit()).foregroundStyle(Theme.secondary)
@@ -50,7 +51,7 @@ struct SignalTrackingView: View {
     private func detail(_ status: MilestoneStatus) -> String {
         if let day = status.reachedOn {
             if status.milestone.title == "Entrada" && signalCase.entryAtPublication { return "activa al publicar" }
-            return "alcanzado · \(SignalTracking.dayLabel(day))"
+            return "\(status.milestone.adverse ? "perforado" : "alcanzado") · \(SignalTracking.dayLabel(day))"
         }
         if status.milestone.afterEntry, statuses.first(where: { $0.milestone.title == "Entrada" })?.reachedOn == nil { return "tras la entrada" }
         let distance = (status.milestone.price / quote.price - 1) * 100

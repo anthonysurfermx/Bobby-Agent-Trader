@@ -92,4 +92,7 @@ struct PTSVoiceCase {
     static let btc = PTSVoiceCase(greeting: PTSVoicePolicyBTC.greeting, redirect: PTSVoicePolicyBTC.redirect, instructions: PTSVoicePolicyBTC.instructions,
                                   answerInstruction: PTSVoicePolicyBTC.answerInstruction, judgeInstruction: PTSVoicePolicyBTC.judgeInstruction, route: PTSVoicePolicyBTC.route,
                                   subject: "Bitcoin", transcriptionHint: "Bitcoin, BTC, Jasiel Sánchez, retroceso, corrección, divergencias, bulltrap, futuros, spot, Binance.")
+    static let tlt = PTSVoiceCase(greeting: PTSVoicePolicyTLT.greeting, redirect: PTSVoicePolicyTLT.redirect, instructions: PTSVoicePolicyTLT.instructions,
+                                  answerInstruction: PTSVoicePolicyTLT.answerInstruction, judgeInstruction: PTSVoicePolicyTLT.judgeInstruction, route: PTSVoicePolicyTLT.route,
+                                  subject: "TLT", transcriptionHint: "TLT, bonos del Tesoro, bono a 10 años, rendimiento, rentabilidad, Jasiel Sánchez, falso escape, DXY, dólar, oro, plata, Trump, Xi Jinping.")
 }

@@ -193,7 +193,7 @@ struct SignalHome: View {
                 .padding(.bottom, 4).accessibilityHidden(true)
             Text(showSaved ? "Aún no guardas señales" : "Sin señales registradas").font(.title2.weight(.medium))
                 .accessibilityAddTraits(.isHeader)
-            Text(showSaved ? "Toca Guardar dentro de una señal para tenerla aquí." : "Cuando Daniel publique un reporte de \(category.title), aparecerá aquí.")
+            Text(showSaved ? "Toca Guardar dentro de una señal para tenerla aquí." : "Cuando Pro Trading Skills publique un reporte de \(category.title), aparecerá aquí.")
                 .font(.subheadline).foregroundStyle(Theme.secondary).lineSpacing(4)
             if let latest = SignalListItem.curated.max(by: { $0.publishedAt < $1.publishedAt }) {
                 Button {
@@ -347,6 +347,11 @@ struct SignalLogo: View {
                 Image(systemName: "bitcoinsign").font(.system(size: size * 0.46, weight: .bold)).foregroundStyle(.white)
                     .rotationEffect(.degrees(14))
                     .frame(width: size, height: size).background(SignalBrand.tile("BTC"), in: shape)
+            case "TLT":
+                // Treasury bonds: a generic columns glyph on a navy tile
+                // (no issuer artwork is bundled for iShares).
+                Image(systemName: "building.columns.fill").font(.system(size: size * 0.42, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: size, height: size).background(SignalBrand.tile("TLT"), in: shape)
             case "XLY", "DRAM":
                 // Full official tiles: SPDR sector badge and Roundhill mark.
                 Image(symbol == "XLY" ? "logo-xly" : "logo-dram").resizable().interpolation(.high).scaledToFill()
@@ -371,6 +376,7 @@ enum SignalBrand {
         case "XLY": return Color(red: 72 / 255, green: 184 / 255, blue: 56 / 255)
         case "DRAM": return Color(red: 88 / 255, green: 88 / 255, blue: 248 / 255)
         case "BTC": return Color(red: 247 / 255, green: 147 / 255, blue: 26 / 255)
+        case "TLT": return Color(red: 30 / 255, green: 64 / 255, blue: 124 / 255)
         default: return Theme.accent
         }
     }
@@ -382,6 +388,7 @@ enum SignalBrand {
         case "XLY": return Color(red: 0.38, green: 0.80, blue: 0.33)
         case "DRAM": return Color(red: 0.48, green: 0.49, blue: 1)
         case "BTC": return Color(red: 0.98, green: 0.65, blue: 0.25)
+        case "TLT": return Color(red: 0.45, green: 0.64, blue: 1)
         default: return Theme.accent
         }
     }

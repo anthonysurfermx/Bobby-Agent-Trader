@@ -55,6 +55,7 @@ struct SignalCase {
         case SignalListItem.dram.id: return .dram
         case SignalListItem.asts.id: return .asts
         case SignalListItem.btc.id: return .btc
+        case SignalListItem.tlt.id: return .tlt
         default: return .coin
         }
     }
@@ -237,6 +238,43 @@ struct SignalCase {
         levelsNote: "Corrección hacia 80,550 y 76,900 aprox., según el texto; su gráfico los marca en 80,550.99 y 76,869.85 (este junto al retroceso de Fibonacci 0.382). 97k y 102k son objetivos futuros para salir: 97,014.43 está en su gráfico y 102,000 solo en el texto. No publica entrada ni stop.",
         chartNote: "El gráfico interactivo muestra velas diarias de BTCUSDT en Binance, el mismo par que usa Jasiel; su gráfico original es de 8 horas y marcaba 85,399.02 al hacerlo, el 23 sep 2026. Muestra el precio de Bitcoin, no el resultado de una operación."
     )
+
+    // A macro read, not a trade: if TLT holds 80.40, Jasiel sees rebounds to
+    // 84.27-85.34 (Fibonacci 0.618 and 0.786 on his chart, blue labels). His
+    // chart labels the support 80.47 in green; the text says 80.40.
+    static let tlt = SignalCase(
+        marketResource: "tlt-market",
+        chartCaption: "ETF · USD · histórico",
+        levels: [
+            SignalLevel(price: 80.40, role: "Soporte"),
+            SignalLevel(price: 84.27, role: "Rebote 1"),
+            SignalLevel(price: 85.34, role: "Rebote 2"),
+        ],
+        focusLevel: 80.40,
+        bands: [(84.27, 85.34, "rgba(96, 165, 250, 0.08)")],
+        priceRange: 78...88.5,
+        hasGuidedNarration: false,
+        moments: [],
+        sourceNote: "Solo TLT, bonos y el análisis de Jasiel · Máximo 3 minutos · No es recomendación",
+        voice: .tlt,
+        suggestions: ["¿Qué crees que pase con TLT?", "¿Qué dice Jasiel del bono a 10 años?", "¿Qué pasa si TLT pierde 80.40?"],
+        levelQuestion: { level in
+            "¿Qué papel tiene el nivel \(level.price.priceText)\(level.role.map { " (\($0))" } ?? "") en el análisis de Jasiel para TLT?"
+        },
+        milestones: [
+            SignalMilestone(title: "Rebote 1", price: 84.27, up: true),
+            SignalMilestone(title: "Rebote 2", price: 85.34, up: true),
+            SignalMilestone(title: "Soporte", price: 80.40, up: false, adverse: true),
+        ],
+        entryAtPublication: false,
+        reviewedAnswer: PTSVoicePolicyTLT.reviewedAnswer,
+        evidenceLabel: "Análisis publicado por el autor · ",
+        contractTitle: "Sin operación publicada",
+        contractDetail: "Jasiel no publica entrada, stop ni tamaño. Es su lectura de los bonos: si TLT mantiene 80.40 ve posibles rebotes hacia 84.27–85.34, y lo considera un alivio temporal.",
+        originalImage: "tlt",
+        levelsNote: "Según el texto: si TLT mantiene 80.40, podría rebotar a 84.27–85.34. Su gráfico de 8 horas marca 80.47 abajo y 84.27 y 85.34 como zona de rebote (retrocesos de Fibonacci 0.618 y 0.786). En el rendimiento del bono a 10 años vigila 5.025 %: volver abajo confirmaría un techo, con retroceso posible a 4.697 %. No publica entrada ni stop.",
+        chartNote: "El gráfico interactivo muestra velas diarias del ETF TLT; sin conexión, hasta el cierre del 23 sep 2026 (80.46), el mismo precio que marcaba el gráfico de Jasiel, hecho el 24 sep antes de la apertura con velas de 8 horas. Muestra el precio del ETF, no el resultado de una operación."
+    )
 }
 
 extension SignalCase {
@@ -253,6 +291,10 @@ extension SignalCase {
             if top.milestone.title == "Entrada" && entryAtPublication { return "Entrada activa desde la publicación" }
             let verb = top.milestone.title.hasPrefix("Nivel") ? "Superó el" : "Alcanzó"
             return "\(verb) \(top.milestone.title) \(price(top.milestone.price)) · \(SignalTracking.dayLabel(top.reachedOn!))"
+        }
+        // A support the author wants held (TLT's 80.40).
+        if let support = statuses.first(where: { $0.milestone.adverse && $0.reachedOn != nil }) {
+            return "Perforó el soporte \(price(support.milestone.price)) · \(SignalTracking.dayLabel(support.reachedOn!))"
         }
         // Downside references other than a stop (BTC's correction zone).
         if let deepest = statuses.filter({ !$0.milestone.up && $0.reachedOn != nil }).min(by: { $0.milestone.price < $1.milestone.price }) {

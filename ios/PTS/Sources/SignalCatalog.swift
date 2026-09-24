@@ -80,8 +80,18 @@ struct SignalListItem: Identifiable, Hashable {
         reportedVerdict: "Escenario: retroceso a 80,550–76,900", publicationCount: 1,
         sourceAvailable: true, contractDocumented: false
     )
-    // The splash orbits the first four; BTC stays last so it keeps its layout.
-    static let curated: [SignalListItem] = [coin, xly, dram, asts, btc]
+    // Jasiel's macro read of Sep 24, 2026 ("¿Se viene la siguiente OLA
+    // ALCISTA?"): if TLT holds 80.40 it could rebound to 84.27-85.34; the
+    // 10-year yield and the dollar are context. No trade was sent.
+    static let tlt = SignalListItem(
+        id: "tlt-jasiel-2026-09-24", category: .stocks,
+        symbol: "TLT", name: "Bonos del Tesoro 20+ años", author: "Jasiel Sánchez",
+        publishedAt: ISO8601DateFormatter().date(from: "2026-09-24T00:00:00Z")!,
+        reportedVerdict: "Escenario: rebote a 84.27–85.34 si sostiene 80.40", publicationCount: 1,
+        sourceAvailable: true, contractDocumented: false
+    )
+    // The splash orbits the first four; later signals go last so it keeps its layout.
+    static let curated: [SignalListItem] = [coin, xly, dram, asts, btc, tlt]
 
     var authorFirstName: String { author.split(separator: " ").first.map(String.init) ?? author }
 }

@@ -29,6 +29,9 @@ struct SignalMilestone: Hashable {
     let up: Bool
     /// Stops only count once the entry was reached.
     var afterEntry = false
+    /// A support the author wants held (TLT's 80.40): reaching it weakens
+    /// the scenario, so it reads like a stop, not like a target.
+    var adverse = false
 }
 
 struct MilestoneStatus: Hashable {

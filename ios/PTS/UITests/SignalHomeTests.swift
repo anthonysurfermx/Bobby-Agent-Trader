@@ -25,19 +25,21 @@ final class SignalHomeTests: XCTestCase {
         XCTAssertTrue(card.label.contains("Contrato sin documentar"))
         XCTAssertTrue(card.label.contains("2026"))
         XCTAssertTrue(app.buttons["home-signals"].isSelected)
-        XCTAssertTrue(app.buttons["home-copilot"].isHittable)
+        // The opening motion still covers the Home for a moment after mount.
+        XCTAssertTrue(app.buttons["home-copilot"].waitForHittable(timeout: 5))
         XCTAssertGreaterThanOrEqual(app.buttons["home-copilot"].frame.height, 44)
         capture("01-home-options")
 
-        // Stocks holds the two ETF signals; Spot and Scalping stay empty.
+        // Stocks holds the three ETF signals, Spot holds BTC; Scalping stays empty.
         app.buttons["signal-category-stocks"].tap()
         let xly = app.buttons["signal-card-xly-daniel-2026-09-21"]
         XCTAssertTrue(xly.waitForExistence(timeout: 3))
         XCTAssertTrue(xly.label.contains("Contrato documentado"))
         XCTAssertTrue(app.buttons["signal-card-dram-daniel-2026-09-18"].exists)
+        XCTAssertTrue(app.buttons["signal-card-tlt-jasiel-2026-09-24"].exists)
         XCTAssertFalse(card.exists)
         capture("02-stocks-carousel")
-        for category in ["spot", "scalping"] {
+        for category in ["scalping"] {
             let filter = app.buttons["signal-category-\(category)"]
             XCTAssertTrue(filter.label.contains("0 señales"))
             filter.tap()
@@ -288,6 +290,44 @@ final class SignalHomeTests: XCTestCase {
         let answer = answers.matching(NSPredicate(format: "label CONTAINS %@", "73")).firstMatch
         XCTAssertTrue(answer.waitForExistence(timeout: 5), app.debugDescription)
         capture("20-backup-voice")
+    }
+
+    // Jasiel's Sep 24 bonds read: TLT leads Stocks, shows his levels, the
+    // original chart, live tracking and a Copiloto scoped to TLT (backup
+    // voice here, so the live voice quota is not spent).
+    func testTLTSignalFromJasiel() {
+        app.launchArguments += ["-PTSForceLiveFailure"]
+        app.launch()
+        XCTAssertTrue(app.buttons["signal-category-stocks"].waitForExistence(timeout: 10))
+        app.buttons["signal-category-stocks"].tap()
+        let tlt = app.buttons["signal-card-tlt-jasiel-2026-09-24"]
+        XCTAssertTrue(tlt.waitForExistence(timeout: 5))
+        XCTAssertTrue(tlt.label.contains("Jasiel Sánchez"), tlt.label)
+        XCTAssertTrue(tlt.label.contains("84.27–85.34"), tlt.label)
+        capture("21-tlt-card")
+        if !tlt.isHittable { app.swipeRight() }
+        tlt.tap()
+        XCTAssertTrue(app.buttons["signal-back"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Soporte 80.40")).firstMatch.exists)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Rebote 1 84.27")).firstMatch.exists)
+        let followUp = app.descendants(matching: .any).matching(identifier: "signal-live-tracking").firstMatch
+        XCTAssertTrue(followUp.waitForExistence(timeout: 20), "Live TLT data never arrived")
+        capture("22-tlt-detail")
+        app.buttons["signal-details"].tap()
+        XCTAssertTrue(app.staticTexts["Sin operación publicada"].waitForExistence(timeout: 3))
+        capture("23-tlt-details")
+        app.buttons["Listo"].tap()
+
+        app.buttons["signal-learn"].tap()
+        XCTAssertTrue(app.staticTexts["Hablemos de TLT"].waitForExistence(timeout: 5))
+        let answers = app.staticTexts.matching(identifier: "live-answer")
+        let greeting = answers.matching(NSPredicate(format: "label CONTAINS %@", "Hola, ¿qué quieres saber sobre TLT")).firstMatch
+        XCTAssertTrue(greeting.waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["¿Qué pasa si TLT pierde 80.40?"].tap()
+        let answer = answers.matching(NSPredicate(format: "label CONTAINS %@", "84.27")).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 5), app.debugDescription)
+        capture("24-tlt-copilot-backup")
     }
 
     // The floating navigation bar covers the bottom of the scroll view; keep
