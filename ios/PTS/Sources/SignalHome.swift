@@ -266,7 +266,8 @@ private struct SignalCard: View {
                 Label {
                     Text(trackingHeadline).fixedSize(horizontal: false, vertical: true)
                 } icon: {
-                    Circle().fill(Color.green).frame(width: 7, height: 7)
+                    // Red when the price went against the plan (stop or held support).
+                    Circle().fill(trackingHeadline.hasPrefix("Tocó el stop") || trackingHeadline.hasPrefix("Perforó") ? Color.red : Color.green).frame(width: 7, height: 7)
                 }
                 .font(.caption.weight(.semibold)).foregroundStyle(Theme.accentSoft)
                 .accessibilityIdentifier("signal-tracking")

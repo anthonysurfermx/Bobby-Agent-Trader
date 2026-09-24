@@ -24,7 +24,7 @@ struct SignalTrackingView: View {
                 Text(quote.price, format: .currency(code: "USD").locale(Locale(identifier: "en_US")))
                     .font(.title3.weight(.semibold)).monospacedDigit()
                 if let change = quote.changePct {
-                    Text(String(format: "%+.2f %% hoy", change * 100)).font(.caption.weight(.semibold)).monospacedDigit()
+                    Text(String(format: quote.isLive ? "%+.2f %% hoy" : "%+.2f %% al cierre", change * 100)).font(.caption.weight(.semibold)).monospacedDigit()
                         .foregroundStyle(change >= 0 ? Color.green : Color.red)
                 }
             }

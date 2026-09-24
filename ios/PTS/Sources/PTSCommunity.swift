@@ -4,6 +4,12 @@ import Security
 // Shared likes and comments live in the bobby-protocol Supabase project behind
 // the pts_* RPCs (migration 20260922_pts_signal_social). The publishable key is
 // public by design; tables are closed and every write goes through an RPC.
+extension String {
+    /// The database limits count code points, not visible characters, so
+    /// emoji and flags are capped the same way before sending.
+    func cappedScalars(_ limit: Int) -> String { String(String.UnicodeScalarView(unicodeScalars.prefix(limit))) }
+}
+
 enum PTSCommunityConfig {
     static let rpcBase = URL(string: "https://qbvdqkknnuweatptjohi.supabase.co/rest/v1/rpc/")!
     static let publishableKey = "sb_publishable_OmdOOoZmg6tqd_8NTCJ5Bw_wSLp6-OB"
@@ -29,7 +35,7 @@ enum PTSMember {
             let stored = UserDefaults.standard.string(forKey: nameKey)?.trimmingCharacters(in: .whitespacesAndNewlines)
             return stored?.isEmpty == false ? stored : nil
         }
-        set { UserDefaults.standard.set(newValue.map { String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(40)) }, forKey: nameKey) }
+        set { UserDefaults.standard.set(newValue.map { $0.trimmingCharacters(in: .whitespacesAndNewlines).cappedScalars(40) }, forKey: nameKey) }
     }
 }
 
@@ -112,7 +118,7 @@ enum PTSCommunityAPI {
     }
 
     func comment(_ text: String, as name: String) async -> Bool {
-        let body = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(500))
+        let body = text.trimmingCharacters(in: .whitespacesAndNewlines).cappedScalars(500)
         guard !body.isEmpty else { return false }
         return await mutate("pts_add_comment", ["p_signal_id": signalID, "p_secret": PTSMember.secret, "p_name": name, "p_body": body])
     }

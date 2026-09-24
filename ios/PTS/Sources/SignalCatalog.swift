@@ -59,7 +59,7 @@ struct SignalListItem: Identifiable, Hashable {
         id: "dram-daniel-2026-09-18", category: .stocks,
         symbol: "DRAM", name: "ETF de memorias", author: "Daniel Marín",
         publishedAt: ISO8601DateFormatter().date(from: "2026-09-18T00:00:00Z")!,
-        reportedVerdict: "Entrada activada · en ganancias", publicationCount: 2,
+        reportedVerdict: "Entrada activada · en ganancias al 21 sep", publicationCount: 2,
         sourceAvailable: true, contractDocumented: false
     )
     // Aggressive high-beta trade sent during the Sep 22 session, entry active

@@ -331,9 +331,10 @@ struct SignalDesk: View {
                 .toolbar { Button("Listo") { learn = false } }
                 .task { await live.connect() }
                 .onChange(of: live.state) { _, state in
-                    // Provider trouble (credits, outage, timeout, network) hands the
-                    // conversation to the pre-rendered backup voice.
-                    if state == .error, !backupActive, let failure = live.failure, [.busy, .server, .timeout, .offline].contains(failure) {
+                    // Provider trouble (credits, outage, timeout, network) or a denied
+                    // microphone hands the conversation to the pre-rendered backup
+                    // voice, which needs no mic.
+                    if state == .error, !backupActive, let failure = live.failure, [.busy, .server, .timeout, .offline, .microphone].contains(failure) {
                         backupActive = true
                         backupLines = [PTSRealtimeClient.Line(role: "assistant", text: signalCase.voice.greeting)]
                         backup.speak(signalCase.voice.greeting)
