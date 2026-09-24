@@ -56,6 +56,7 @@ struct SignalCase {
         case SignalListItem.asts.id: return .asts
         case SignalListItem.btc.id: return .btc
         case SignalListItem.tlt.id: return .tlt
+        case SignalListItem.spx.id: return .spx
         default: return .coin
         }
     }
@@ -274,6 +275,41 @@ struct SignalCase {
         originalImage: "tlt",
         levelsNote: "Según el texto: si TLT mantiene 80.40, podría rebotar a 84.27–85.34. Su gráfico de 8 horas marca 80.47 abajo y 84.27 y 85.34 como zona de rebote (retrocesos de Fibonacci 0.618 y 0.786). En el rendimiento del bono a 10 años vigila 5.025 %: volver abajo confirmaría un techo, con retroceso posible a 4.697 %. No publica entrada ni stop.",
         chartNote: "El gráfico interactivo muestra velas diarias del ETF TLT; sin conexión, hasta el cierre del 23 sep 2026 (80.46), el mismo precio que marcaba el gráfico de Jasiel, hecho el 24 sep antes de la apertura con velas de 8 horas. Muestra el precio del ETF, no el resultado de una operación."
+    )
+
+    // A market instruction, not a trade: Daniel stays out of short-term
+    // positions while the bearish "phy" (the scorpion) develops. The index
+    // bounced over the 7660 zone; 7613 would be interesting to start buying.
+    // His green box and the "0.23" level have no published price.
+    static let spx = SignalCase(
+        marketResource: "spx-market",
+        chartCaption: "Índice · USD · histórico",
+        levels: [
+            SignalLevel(price: 7_613, role: "Retroceso"),
+            SignalLevel(price: 7_660, role: "Soporte"),
+        ],
+        focusLevel: 7_613,
+        bands: [(7_613, 7_660, "rgba(96, 165, 250, 0.08)")],
+        priceRange: 7_250...7_850,
+        hasGuidedNarration: false,
+        moments: [],
+        sourceNote: "Solo el S&P 500 y el análisis de Daniel · Máximo 3 minutos · No es recomendación",
+        voice: .spx,
+        suggestions: ["¿Qué crees que pase con el S&P 500?", "¿Qué es el phy bajista o alacrán?", "¿Por qué Daniel prefiere esperar fuera?"],
+        levelQuestion: { level in
+            "¿Qué papel tiene el nivel \(level.price.priceText)\(level.role.map { " (\($0))" } ?? "") en el análisis de Daniel para el S&P 500?"
+        },
+        milestones: [
+            SignalMilestone(title: "Retroceso", price: 7_613, up: false),
+        ],
+        entryAtPublication: false,
+        reviewedAnswer: PTSVoicePolicySPX.reviewedAnswer,
+        evidenceLabel: "Instrucción publicada por el autor · ",
+        contractTitle: "Sin operación publicada",
+        contractDetail: "Daniel pide seguir pacientes y fuera de posiciones de trading a corto plazo mientras se desarrolla el phy bajista, sin miedo y buscando entradas después de la barrida. Un retroceso a 7613 le parecería un punto muy interesante para empezar a tomar posiciones. No publica entrada, stop ni contrato.",
+        originalImage: "spx",
+        levelsNote: "Según el texto: el índice rebotó con un phy pequeño sobre la zona de 7660, no puede avanzar por encima del 0.23 y no descarta un retroceso a 7613. Su gráfico diario marca en verde la zona del phy bajista justo arriba del precio; el texto no da cifras de esa zona ni del 0.23. En petróleo, superar los 100 dólares podría causar más retrocesos en bolsa.",
+        chartNote: "El gráfico interactivo muestra velas diarias del índice S&P 500; sin conexión, hasta el cierre del 24 sep 2026 (7,707.02). El gráfico original de Daniel es diario, del 24 sep a las 15:29 de Nueva York, junto al petróleo WTI (95.32). Muestra el precio del índice, no el resultado de una operación."
     )
 }
 

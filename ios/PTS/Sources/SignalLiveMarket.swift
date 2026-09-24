@@ -135,7 +135,12 @@ enum SignalTracking {
         return SignalQuote(price: last.close, asOf: last.date, changePct: change, isLive: fresh, daily: merged)
     }
 
+    /// Indices and the Yahoo symbol their author charts. Bobby's stock-candles
+    /// only accepts plain tickers, so these read Yahoo's chart data directly.
+    nonisolated static let yahooIndices = ["SPX": "^GSPC"]
+
     nonisolated private static func candles(_ symbol: String, range: String, interval: String) async -> [LiveCandle]? {
+        if let index = yahooIndices[symbol] { return await yahooChart(index, range: range == "90d" ? "3mo" : "5d", interval: interval) }
         guard let url = URL(string: "https://bobbyprotocol.xyz/api/stock-candles?symbol=\(symbol)&range=\(range)&interval=\(interval)") else { return nil }
         var request = URLRequest(url: url)
         request.timeoutInterval = 10
@@ -145,6 +150,32 @@ enum SignalTracking {
               let payload = try? JSONDecoder().decode(Payload.self, from: data) else { return nil }
         let valid = payload.candles.filter { [$0.open, $0.high, $0.low, $0.close].allSatisfy { $0.isFinite && $0 > 0 } }
         return valid.isEmpty ? nil : valid.sorted { $0.ts < $1.ts }
+    }
+
+    nonisolated private static func yahooChart(_ symbol: String, range: String, interval: String) async -> [LiveCandle]? {
+        guard let encoded = symbol.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+              let url = URL(string: "https://query1.finance.yahoo.com/v8/finance/chart/\(encoded)?range=\(range)&interval=\(interval)") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
+        struct Chart: Decodable {
+            struct Result: Decodable {
+                struct Indicators: Decodable { struct Quote: Decodable { let open, high, low, close: [Double?] }; let quote: [Quote] }
+                let timestamp: [Double]?; let indicators: Indicators
+            }
+            struct Body: Decodable { let result: [Result]? }
+            let chart: Body
+        }
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let result = (try? JSONDecoder().decode(Chart.self, from: data))?.chart.result?.first,
+              let times = result.timestamp, let quote = result.indicators.quote.first else { return nil }
+        let rows = times.indices.compactMap { i -> LiveCandle? in
+            guard i < quote.close.count, let o = quote.open[i], let h = quote.high[i], let l = quote.low[i], let c = quote.close[i],
+                  [o, h, l, c].allSatisfy({ $0.isFinite && $0 > 0 }) else { return nil }
+            return LiveCandle(ts: times[i] * 1_000, open: o, high: h, low: l, close: c)
+        }
+        return rows.isEmpty ? nil : rows.sorted { $0.ts < $1.ts }
     }
 
     /// Binance daily bars open at 00:00 UTC and the newest one is still

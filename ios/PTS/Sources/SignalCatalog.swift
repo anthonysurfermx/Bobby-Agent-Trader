@@ -90,8 +90,18 @@ struct SignalListItem: Identifiable, Hashable {
         reportedVerdict: "Escenario: rebote a 84.27–85.34 si sostiene 80.40", publicationCount: 1,
         sourceAvailable: true, contractDocumented: false
     )
+    // Daniel's market update of Sep 24, 2026, 16:40 ("¿EL ALACRÁN SIGUE
+    // AHÍ?"): stay out of short-term trades while the S&P 500's bearish
+    // "phy" plays out; a pullback to 7613 would be a point to start buying.
+    static let spx = SignalListItem(
+        id: "spx-daniel-2026-09-24", category: .stocks,
+        symbol: "SPX", name: "S&P 500", author: "Daniel Marín",
+        publishedAt: ISO8601DateFormatter().date(from: "2026-09-24T20:40:00Z")!,
+        reportedVerdict: "Instrucción: esperar fuera · retroceso a 7613 interesante", publicationCount: 1,
+        sourceAvailable: true, contractDocumented: false
+    )
     // The splash orbits the first four; later signals go last so it keeps its layout.
-    static let curated: [SignalListItem] = [coin, xly, dram, asts, btc, tlt]
+    static let curated: [SignalListItem] = [coin, xly, dram, asts, btc, tlt, spx]
 
     var authorFirstName: String { author.split(separator: " ").first.map(String.init) ?? author }
 }

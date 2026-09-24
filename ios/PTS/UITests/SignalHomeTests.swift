@@ -305,7 +305,7 @@ final class SignalHomeTests: XCTestCase {
         XCTAssertTrue(tlt.label.contains("Jasiel Sánchez"), tlt.label)
         XCTAssertTrue(tlt.label.contains("84.27–85.34"), tlt.label)
         capture("21-tlt-card")
-        if !tlt.isHittable { app.swipeRight() }
+        if !tlt.isHittable { app.swipeLeft() }
         tlt.tap()
         XCTAssertTrue(app.buttons["signal-back"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 5))
@@ -328,6 +328,43 @@ final class SignalHomeTests: XCTestCase {
         let answer = answers.matching(NSPredicate(format: "label CONTAINS %@", "84.27")).firstMatch
         XCTAssertTrue(answer.waitForExistence(timeout: 5), app.debugDescription)
         capture("24-tlt-copilot-backup")
+    }
+
+    // Daniel's Sep 24 S&P 500 update leads Stocks: his two levels, the
+    // original chart, live index data and a Copiloto scoped to the case
+    // (backup voice here, so the live voice quota is not spent).
+    func testSPXSignalFromDaniel() {
+        app.launchArguments += ["-PTSForceLiveFailure"]
+        app.launch()
+        XCTAssertTrue(app.buttons["signal-category-stocks"].waitForExistence(timeout: 10))
+        app.buttons["signal-category-stocks"].tap()
+        let spx = app.buttons["signal-card-spx-daniel-2026-09-24"]
+        XCTAssertTrue(spx.waitForExistence(timeout: 5))
+        XCTAssertTrue(spx.label.contains("Daniel Marín"), spx.label)
+        XCTAssertTrue(spx.label.contains("7613"), spx.label)
+        XCTAssertTrue(spx.isHittable, "SPX is the newest signal and must lead the carousel")
+        capture("25-spx-card")
+        spx.tap()
+        XCTAssertTrue(app.buttons["signal-back"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Retroceso 7,613.00")).firstMatch.exists)
+        let followUp = app.descendants(matching: .any).matching(identifier: "signal-live-tracking").firstMatch
+        XCTAssertTrue(followUp.waitForExistence(timeout: 20), "Live S&P 500 data never arrived")
+        capture("26-spx-detail")
+        app.buttons["signal-details"].tap()
+        XCTAssertTrue(app.staticTexts["Sin operación publicada"].waitForExistence(timeout: 3))
+        capture("27-spx-details")
+        app.buttons["Listo"].tap()
+
+        app.buttons["signal-learn"].tap()
+        XCTAssertTrue(app.staticTexts["Hablemos de SPX"].waitForExistence(timeout: 5))
+        let answers = app.staticTexts.matching(identifier: "live-answer")
+        let greeting = answers.matching(NSPredicate(format: "label CONTAINS %@", "S&P 500 y el análisis de Daniel")).firstMatch
+        XCTAssertTrue(greeting.waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["¿Qué es el phy bajista o alacrán?"].tap()
+        let answer = answers.matching(NSPredicate(format: "label CONTAINS %@", "barrida")).firstMatch
+        XCTAssertTrue(answer.waitForExistence(timeout: 5), app.debugDescription)
+        capture("28-spx-copilot-backup")
     }
 
     // The floating navigation bar covers the bottom of the scroll view; keep

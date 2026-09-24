@@ -54,7 +54,7 @@ struct TradingChart: UIViewRepresentable {
             func color(_ role: String?) -> String? {
                 guard let role else { return nil }
                 if role == "Stop" { return "#F87171" }
-                if role == "Corrección" || role.hasPrefix("Rebote") { return "#60A5FA" }
+                if role == "Corrección" || role == "Retroceso" || role.hasPrefix("Rebote") { return "#60A5FA" }
                 if role == "Soporte" { return "#4ADE80" }
                 if role == "Entrada" { return "#C4B5FD" }
                 if role == "BE" { return "#FACC15" }

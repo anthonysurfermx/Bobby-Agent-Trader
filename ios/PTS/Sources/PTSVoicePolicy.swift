@@ -121,4 +121,7 @@ struct PTSVoiceCase {
     static let tlt = PTSVoiceCase(greeting: PTSVoicePolicyTLT.greeting, redirect: PTSVoicePolicyTLT.redirect, instructions: PTSVoicePolicyTLT.instructions,
                                   answerInstruction: PTSVoicePolicyTLT.answerInstruction, judgeInstruction: PTSVoicePolicyTLT.judgeInstruction, route: PTSVoicePolicyTLT.route,
                                   subject: "TLT", transcriptionHint: "TLT, bonos del Tesoro, bono a 10 años, rendimiento, rentabilidad, Jasiel Sánchez, falso escape, DXY, dólar, oro, plata, Trump, Xi Jinping.")
+    static let spx = PTSVoiceCase(greeting: PTSVoicePolicySPX.greeting, redirect: PTSVoicePolicySPX.redirect, instructions: PTSVoicePolicySPX.instructions,
+                                  answerInstruction: PTSVoicePolicySPX.answerInstruction, judgeInstruction: PTSVoicePolicySPX.judgeInstruction, route: PTSVoicePolicySPX.route,
+                                  subject: "el S&P 500", transcriptionHint: "S&P 500, SP500, Daniel Marín, phy bajista, alacrán, barrida, petróleo, hiperescaladores, AVGO, DRAM, neocloud.")
 }

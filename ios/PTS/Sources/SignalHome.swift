@@ -353,6 +353,10 @@ struct SignalLogo: View {
                 // (no issuer artwork is bundled for iShares).
                 Image(systemName: "building.columns.fill").font(.system(size: size * 0.42, weight: .semibold)).foregroundStyle(.white)
                     .frame(width: size, height: size).background(SignalBrand.tile("TLT"), in: shape)
+            case "SPX":
+                // The index has no issuer mark: a generic trend glyph.
+                Image(systemName: "chart.line.uptrend.xyaxis").font(.system(size: size * 0.40, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: size, height: size).background(SignalBrand.tile("SPX"), in: shape)
             case "XLY", "DRAM":
                 // Full official tiles: SPDR sector badge and Roundhill mark.
                 Image(symbol == "XLY" ? "logo-xly" : "logo-dram").resizable().interpolation(.high).scaledToFill()
@@ -378,6 +382,7 @@ enum SignalBrand {
         case "DRAM": return Color(red: 88 / 255, green: 88 / 255, blue: 248 / 255)
         case "BTC": return Color(red: 247 / 255, green: 147 / 255, blue: 26 / 255)
         case "TLT": return Color(red: 30 / 255, green: 64 / 255, blue: 124 / 255)
+        case "SPX": return Color(red: 44 / 255, green: 48 / 255, blue: 62 / 255)
         default: return Theme.accent
         }
     }
@@ -390,6 +395,7 @@ enum SignalBrand {
         case "DRAM": return Color(red: 0.48, green: 0.49, blue: 1)
         case "BTC": return Color(red: 0.98, green: 0.65, blue: 0.25)
         case "TLT": return Color(red: 0.45, green: 0.64, blue: 1)
+        case "SPX": return Color(red: 0.72, green: 0.78, blue: 0.92)
         default: return Theme.accent
         }
     }
