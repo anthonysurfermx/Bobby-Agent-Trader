@@ -44,11 +44,14 @@ function OnChainStat({ label, selector }: { label: string; selector: string }) {
 }
 
 interface PnlData {
+  scope: string;
   summary: {
     startingCapital: number;
     currentEquity: number;
     totalReturn: number;
     totalTrades: number;
+    closedTrades: number;
+    valuationComplete: boolean;
     wins: number;
     losses: number;
     winRate: number;
@@ -245,7 +248,7 @@ export default function BobbyChallengePage() {
 
   // Equity chart data (memoized)
   const chartData = useMemo(() => {
-    if (!pnl || !s) return [];
+    if (!pnl || !s || s.totalTrades === 0 || pnl.closedPositions.length === 0) return [];
     let cumPnl = 0;
     const points = [
       { trade: 0, equity: s.startingCapital, label: 'START', result: 'START', symbol: '', pnl: undefined as number | undefined },
@@ -254,10 +257,6 @@ export default function BobbyChallengePage() {
         return { trade: i + 1, equity: s.startingCapital + cumPnl, label: `#${i + 1}`, result: t.result, symbol: t.symbol, pnl: t.realizedPnl };
       }),
     ];
-    // If no trades yet, show current equity as "NOW" point so chart renders
-    if (pnl.closedPositions.length === 0) {
-      points.push({ trade: 1, equity: s.currentEquity, label: 'NOW', result: 'START', symbol: '', pnl: undefined });
-    }
     return points;
   }, [pnl, s]);
 
@@ -278,16 +277,16 @@ export default function BobbyChallengePage() {
   return (
     <KineticShell activeTab="challenge">
       <Helmet>
-        <title>$100 Challenge | Bobby Agent Trader</title>
-        <meta name="description" content="Can an AI trading room survive with $100? Three agents debate every trade. On-chain proof on X Layer. Track Bobby's live performance." />
+        <title>Public Protocol Activity | Bobby Agent Trader</title>
+        <meta name="description" content="Inspect Bobby's public protocol activity and confirmed Base trade receipts when available." />
         <link rel="canonical" href="https://bobbyprotocol.xyz/challenge" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://bobbyprotocol.xyz/challenge" />
-        <meta property="og:title" content="Bobby Live Challenge | AI Trading Dashboard" />
-        <meta property="og:description" content="Witness Bobby's autonomous trading. Zero human intervention. Multi-agent debate. On-chain accountability." />
+        <meta property="og:title" content="Bobby Public Protocol Activity" />
+        <meta property="og:description" content="Public decision activity and attributable trade performance when available." />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Bobby Live Challenge | AI Trading Dashboard" />
-        <meta name="twitter:description" content="Track Bobby's live trading on OKX. Balance, win rate, every trade verified on X Layer." />
+        <meta name="twitter:title" content="Bobby Public Protocol Activity" />
+        <meta name="twitter:description" content="Track public decisions and confirmed Base trade receipts when available." />
       </Helmet>
 
       <div className="max-w-7xl mx-auto p-6 md:p-10 pb-20">
@@ -298,11 +297,10 @@ export default function BobbyChallengePage() {
             <div className="max-w-2xl">
               <div className="font-mono text-[8px] text-green-500 mb-4 tracking-widest uppercase">system_status: active</div>
               <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-none mb-4">
-                BOBBY <span className="text-white/20">$100</span> CHALLENGE
+                BOBBY <span className="text-white/20">PUBLIC</span> RECORD
               </h1>
               <p className="text-white/40 max-w-lg font-mono text-sm leading-relaxed">
-                Autonomous trading agent on OKX X Layer. Multi-agent debate before every decision.
-                Every trade committed on-chain before the outcome is known.
+                Agent decisions and public trade receipts are separate records. The trade figures below include only confirmed Base receipts attributable to public protocol cycles.
               </p>
             </div>
             {/* Next Scan Countdown — Stitch amber card */}
@@ -439,6 +437,11 @@ export default function BobbyChallengePage() {
             </div>
           ) : s ? (
             <>
+              {s.totalTrades === 0 && (
+                <div className="mb-6 rounded border border-white/[0.06] bg-white/[0.02] p-5 font-mono text-xs text-white/50">
+                  No publicly attributable protocol trades have been recorded. The decision calls and debate activity below are separate from realized trade performance.
+                </div>
+              )}
               {/* === Bento Grid Metrics — Stitch style === */}
               <motion.section initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
                 className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
@@ -447,16 +450,16 @@ export default function BobbyChallengePage() {
                   <div className="absolute top-0 right-0 p-4">
                     <div className="w-1 h-1 bg-green-500" style={{ boxShadow: '0 0 5px #22C55E' }} />
                   </div>
-                  <div className="font-mono text-xs text-white/40 mb-8 tracking-widest">NET_BALANCE_AVAILABLE</div>
+                  <div className="font-mono text-xs text-white/40 mb-8 tracking-widest">PUBLIC_PORTFOLIO_EQUITY</div>
                   <div>
                     <div className="text-6xl md:text-7xl font-mono font-black text-green-400 tracking-tighter mb-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      ${s.totalTrades === 0 ? s.startingCapital.toFixed(2) : s.currentEquity.toFixed(2)}
+                      {s.totalTrades > 0 && s.valuationComplete ? `$${s.currentEquity.toFixed(2)}` : '—'}
                     </div>
                     <div className="flex items-center gap-2 text-xs font-mono text-white/30">
                       <span className={s.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}>
-                        {s.totalTrades === 0 ? '0.00' : `${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}`}%
+                        {s.totalTrades > 0 && s.startingCapital > 0 && s.valuationComplete ? `${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%` : 'No measured return'}
                       </span>
-                      <span>from ${s.startingCapital} initial</span>
+                      <span>{s.totalTrades > 0 ? `from $${s.startingCapital} capital required` : 'No public protocol trades yet'}</span>
                     </div>
                   </div>
                 </div>
@@ -464,17 +467,17 @@ export default function BobbyChallengePage() {
                 <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-8 rounded hover:bg-white/[0.04] transition-all duration-300">
                   <div className="font-mono text-xs text-white/40 mb-8 tracking-widest">TOTAL_RETURN</div>
                   <div className={`text-4xl md:text-5xl font-mono font-bold tracking-tighter ${s.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {s.totalReturn >= 0 ? '+' : ''}{s.totalReturn}%
+                    {s.totalTrades > 0 && s.startingCapital > 0 && s.valuationComplete ? `${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%` : '—'}
                   </div>
                   <div className="mt-4 text-[10px] font-mono text-white/20 uppercase">
-                    {s.totalReturn >= 0 ? 'Gain' : 'Loss'} relative to start
+                    {s.totalTrades > 0 ? 'Relative to capital required' : 'No public trade capital recorded'}
                   </div>
                 </div>
                 {/* Win Rate */}
                 <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-8 rounded hover:bg-white/[0.04] transition-all duration-300">
                   <div className="font-mono text-xs text-white/40 mb-8 tracking-widest">WIN_RATE</div>
-                  <div className="text-4xl md:text-5xl font-mono font-bold tracking-tighter" style={{ fontVariantNumeric: 'tabular-nums' }}>{s.winRate.toFixed(1)}%</div>
-                  <div className="mt-4 text-[10px] font-mono text-white/20 uppercase">{s.wins}/{s.totalTrades} Successful cycles</div>
+                  <div className="text-4xl md:text-5xl font-mono font-bold tracking-tighter" style={{ fontVariantNumeric: 'tabular-nums' }}>{s.closedTrades > 0 ? `${s.winRate.toFixed(1)}%` : '—'}</div>
+                  <div className="mt-4 text-[10px] font-mono text-white/20 uppercase">{s.closedTrades > 0 ? `${s.wins}/${s.closedTrades} winning closed trades` : 'No closed public trades yet'}</div>
                 </div>
               </motion.section>
 
@@ -534,13 +537,12 @@ export default function BobbyChallengePage() {
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="font-mono text-sm font-black tracking-[0.3em] uppercase flex items-center gap-3">
                         <span className="w-2 h-2 bg-green-500 rounded-full" />
-                        Live_Execution_Log
+                        Public_Trade_Receipts
                       </h2>
-                      <a href="https://www.oklink.com/xlayer/address/0xf841b428e6d743187d7be2242eccc1078fde2395"
-                        target="_blank" rel="noopener noreferrer"
+                      <Link to="/record"
                         className="font-mono text-[10px] text-white/30 hover:text-green-400 transition-colors flex items-center gap-1">
-                        VIEW_ON_CHAIN →
-                      </a>
+                        VIEW_PUBLIC_RECORD →
+                      </Link>
                     </div>
                     <div className="space-y-3">
                       {/* Pending scan indicator */}
@@ -559,6 +561,9 @@ export default function BobbyChallengePage() {
                       </div>
 
                       {/* Real trades */}
+                      {pnl?.scope === 'public-aggregate' && s.totalTrades > 0 && (
+                        <div className="font-mono text-[10px] text-white/35">Individual receipts are not published in the public aggregate.</div>
+                      )}
                       {pnl?.closedPositions.slice(0, 5).map((trade, i) => {
                         const isWin = trade.result === 'WIN';
                         return (
@@ -734,7 +739,8 @@ export default function BobbyChallengePage() {
 
                   {/* Operational Params — Stitch style */}
                   <div className="bg-[#1c1b1b] p-6 rounded">
-                    <h3 className="font-mono text-xs text-white/40 uppercase mb-6 tracking-widest border-b border-white/5 pb-2">Operational_Params</h3>
+                    <h3 className="font-mono text-xs text-white/40 uppercase mb-3 tracking-widest border-b border-white/5 pb-2">Legacy_Prototype_Params</h3>
+                    <p className="mb-5 font-mono text-[9px] text-white/25">Historical X Layer configuration; separate from Base trade receipts.</p>
                     <div className="space-y-4 font-mono">
                       {[
                         { label: 'CHAIN:', value: 'OKX X LAYER (196)', color: '' },
@@ -747,7 +753,7 @@ export default function BobbyChallengePage() {
                         { label: 'MAX_LEVERAGE:', value: '5x', color: '' },
                         { label: 'CIRCUIT_BREAKER:', value: '-20%', color: 'text-amber-400' },
                         { label: 'STOP_LOSS:', value: 'MANDATORY', color: 'text-green-400' },
-                        { label: 'PROFIT_FACTOR:', value: profitFactor.toFixed(2), color: profitFactor >= 1 ? 'text-green-400' : 'text-red-400' },
+                        { label: 'PROFIT_FACTOR:', value: pnl?.closedPositions.length ? profitFactor.toFixed(2) : '—', color: pnl?.closedPositions.length && profitFactor >= 1 ? 'text-green-400' : 'text-white/40' },
                       ].map(p => (
                         <div key={p.label} className="flex justify-between items-center">
                           <span className="text-[10px] text-white/30">{p.label}</span>
@@ -760,7 +766,7 @@ export default function BobbyChallengePage() {
                   {/* Proof of Custody — Stitch style */}
                   <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-6 rounded relative overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent" />
-                    <h3 className="font-mono text-xs text-white/40 uppercase mb-4 relative z-10">Proof_of_Custody</h3>
+                    <h3 className="font-mono text-xs text-white/40 uppercase mb-4 relative z-10">Legacy_X_Layer_Canary</h3>
                     <div className="relative z-10 space-y-3">
                       <div className="p-3 bg-black/40 rounded flex items-center justify-between border border-white/5">
                         <span className="font-mono text-[10px] text-white/30">CONTRACT</span>
@@ -775,7 +781,7 @@ export default function BobbyChallengePage() {
                         <OnChainStat label="PENDING" selector="0xea70b4af" />
                       </div>
                       <p className="text-[10px] text-white/20 italic leading-relaxed font-mono">
-                        Every debate committed on X Layer before the outcome. Verified via OKX Agent Trade Kit.
+                        Historical X Layer contract statistics. These are separate from the public Base trade record above.
                       </p>
                       <a href="https://www.oklink.com/xlayer/address/0xf841b428e6d743187d7be2242eccc1078fde2395"
                         target="_blank" rel="noopener noreferrer"
@@ -804,7 +810,7 @@ export default function BobbyChallengePage() {
                       ))}
                     </div>
                     <div className="mt-3 text-[8px] font-mono text-white/15">
-                      {s.totalTrades} debates · {recentDecisions.length} loaded
+                      {recentDecisions.length} recent debates loaded
                     </div>
                   </div>
 
@@ -843,7 +849,7 @@ export default function BobbyChallengePage() {
               </div>
             </>
           ) : (
-            <div className="text-center py-20 text-white/20 text-sm font-mono">No challenge data available</div>
+            <div className="text-center py-20 text-white/40 text-sm font-mono">Public trade record unavailable. Performance cannot be verified right now.</div>
           )}
         </div>
     </KineticShell>

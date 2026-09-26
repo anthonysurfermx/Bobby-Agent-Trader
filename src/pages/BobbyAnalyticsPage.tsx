@@ -12,7 +12,7 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContai
 import KineticShell from '@/components/kinetic/KineticShell';
 
 interface PnlData {
-  summary: { startingCapital: number; currentEquity: number; totalReturn: number; totalTrades: number; wins: number; losses: number; winRate: number };
+  summary: { startingCapital: number; currentEquity: number; totalReturn: number; totalTrades: number; closedTrades: number; wins: number; losses: number; winRate: number };
   closedPositions: Array<{ symbol: string; direction: string; entryPrice: number; exitPrice: number; realizedPnl: number; pnlPct: number; leverage: string; closeTime: string; result: string }>;
 }
 
@@ -90,10 +90,10 @@ export default function BobbyAnalyticsPage() {
           <div className="min-w-0">
             <h1 className="break-all text-2xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl">PERFORMANCE_ANALYTICS</h1>
             <p className="font-mono text-xs text-white/30 mt-1">
-              Bobby's public track record · Confirmed Base receipts · <span className="text-green-400">LIVE</span>
+              Bobby's public track record · Confirmed Base receipts · <span className="text-green-400">LATEST SNAPSHOT</span>
             </p>
           </div>
-          <div className="hidden sm:flex gap-4">
+          {pnl?.closedPositions.length ? <div className="hidden sm:flex gap-4">
             <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] px-4 py-2 flex flex-col items-end rounded">
               <span className="text-[8px] font-mono text-white/25 mb-1">PROFIT_FACTOR</span>
               <span className={`font-mono text-sm ${profitFactor >= 1 ? 'text-green-400' : 'text-red-400'}`}>{profitFactor.toFixed(2)}</span>
@@ -102,11 +102,15 @@ export default function BobbyAnalyticsPage() {
               <span className="text-[8px] font-mono text-white/25 mb-1">MAX_DRAWDOWN</span>
               <span className="font-mono text-sm text-red-400">-{maxDrawdown.toFixed(1)}%</span>
             </div>
-          </div>
+          </div> : null}
         </motion.div>
 
         {loading ? (
           <div className="text-center py-20"><span className="text-[10px] font-mono text-white/20 animate-pulse">LOADING ANALYTICS...</span></div>
+        ) : s && s.totalTrades === 0 ? (
+          <div className="border border-white/[0.04] bg-white/[0.02] rounded p-8 font-mono text-sm text-white/50">
+            No publicly attributable protocol trades have been recorded yet. Performance metrics need confirmed public receipts.
+          </div>
         ) : s ? (
           <>
             {/* KPI Row — 4 cards */}
@@ -114,7 +118,7 @@ export default function BobbyAnalyticsPage() {
               className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[
                 { label: 'TOTAL_RETURN', value: `${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%`, color: s.totalReturn >= 0 ? 'text-green-400' : 'text-red-400' },
-                { label: 'WIN_RATE', value: `${s.winRate.toFixed(1)}%`, color: 'text-white' },
+                { label: 'WIN_RATE', value: s.closedTrades > 0 ? `${s.winRate.toFixed(1)}%` : '—', color: 'text-white' },
                 { label: 'CURRENT_EQUITY', value: `$${s.currentEquity.toFixed(2)}`, color: 'text-green-400' },
                 { label: 'TOTAL_TRADES', value: String(s.totalTrades), color: 'text-white' },
               ].map(kpi => (
@@ -126,6 +130,7 @@ export default function BobbyAnalyticsPage() {
               ))}
             </motion.div>
 
+            {pnl?.closedPositions.length ? <>
             {/* Charts Row: Equity (8/12) + Daily Alpha (4/12) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
               {/* Cumulative Growth */}
@@ -205,7 +210,6 @@ export default function BobbyAnalyticsPage() {
                 </div>
               </motion.div>
             </div>
-
             {/* Bottom Row: Council Efficiency + Execution Ledger */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               {/* Council Efficiency */}
@@ -270,6 +274,9 @@ export default function BobbyAnalyticsPage() {
                 </div>
               </motion.div>
             </div>
+            </> : <div className="border border-white/[0.04] bg-white/[0.02] rounded p-6 font-mono text-xs text-white/40">
+              The public endpoint provides aggregate totals only. Individual receipts and trade-level charts are not published here.
+            </div>}
           </>
         ) : (
           <div className="text-center py-20 text-white/20 text-sm font-mono">No analytics data available</div>

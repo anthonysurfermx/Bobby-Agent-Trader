@@ -40,6 +40,8 @@ interface CallRow {
   exitPublishTime: number | null;
   reclassified: boolean;
   challengeTx: string | null;
+  challengeDeadline: number | null;
+  challengeable: boolean;
 }
 
 interface CallsPayload {
@@ -64,6 +66,11 @@ const RESULT_STYLE: Record<string, string> = {
 
 function short(hash: string | null): string {
   return hash ? `${hash.slice(0, 10)}…${hash.slice(-6)}` : '—';
+}
+
+function canChallenge(call: CallRow): boolean {
+  return call.challengeable && call.challengeDeadline !== null
+    && Math.floor(Date.now() / 1000) <= call.challengeDeadline;
 }
 
 interface ScanResult {
@@ -96,6 +103,7 @@ export default function BobbyCallsPage() {
   const receipt = useWaitForTransactionReceipt({ hash: challengeTxHash, chainId: BASE_SEPOLIA_ID });
 
   const openChallenge = (call: CallRow) => {
+    if (!canChallenge(call)) return;
     setChallenging(call);
     setAnchorTs(call.entryPublishTime || Math.floor(Date.now() / 1000) - 600);
     setScan(null);
@@ -105,7 +113,7 @@ export default function BobbyCallsPage() {
 
   /** Submit the REAL challenge from the visitor's wallet — permissionless. */
   const submitChallenge = async () => {
-    if (!challenging || !scan?.updateData || !data) return;
+    if (!challenging || !canChallenge(challenging) || scan?.verdict !== 'BREACH' || !scan.updateData || !data) return;
     setSubmitError(null);
     try {
       if (!isConnected) {
@@ -148,6 +156,7 @@ export default function BobbyCallsPage() {
       setData((await res.json()) as CallsPayload);
       setError(false);
     } catch {
+      setData(null);
       setError(true);
     } finally {
       setLoading(false);
@@ -166,6 +175,7 @@ export default function BobbyCallsPage() {
   }, [receipt.isSuccess, refresh]);
 
   const sc = data?.scorecard;
+  const activeChallenges = data?.calls.some(canChallenge) ?? false;
   const txUrl = (tx: string | null) => (tx && data ? `${data.explorer}/tx/${tx}` : undefined);
 
   return (
@@ -271,13 +281,15 @@ export default function BobbyCallsPage() {
                         </a>
                       ) : null,
                     )}
-                    {c.mode === 'VERIFIED' && !c.reclassified && (
+                    {canChallenge(c) ? (
                       <button
                         onClick={() => openChallenge(c)}
                         className="mt-1 inline-flex items-center gap-1 rounded border border-red-400/30 bg-red-400/10 px-2 py-1 font-bold text-red-300 transition hover:bg-red-400/20"
                       >
                         <Swords className="h-3 w-3" /> retar
                       </button>
+                    ) : c.mode === 'VERIFIED' && !c.challengeTx && (
+                      <div className="mt-1 text-[10px] text-white/35">ventana de reto cerrada</div>
                     )}
                   </td>
                 </tr>
@@ -302,10 +314,11 @@ export default function BobbyCallsPage() {
               <Swords className="h-4 w-4" /> Challenge a call
             </div>
             <p className="text-sm leading-6 text-white/60">
-              Think a WIN crossed its stop? <b className="text-white/80">Anyone</b> can call{' '}
+              {activeChallenges ? 'Think a WIN crossed its stop? ' : 'The Sepolia canary challenge windows have closed. For a future eligible call, '}
+              <b className="text-white/80">anyone</b> can call{' '}
               <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-white/80">challengeStopBreach(debateHash, anchorTs, breachUpdate)</code>{' '}
               on the contract with a signed Pyth tick that crossed the committed stop. If the breach is
-              real, the trade reclassifies to LOSS on-chain — no permission, no committee. A non-breaching
+              real, a pending call resolves as LOSS or a WIN is reclassified as LOSS on-chain — no permission, no committee. A non-breaching
               tick simply reverts <code className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-white/80">NoBreach()</code>.
             </p>
             <a
@@ -316,7 +329,7 @@ export default function BobbyCallsPage() {
             >
               Open contract on Basescan <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
-            <p className="mt-3 text-xs text-white/35">This challenge interface targets the completed Base Sepolia canary. Mainnet challenges unlock with production writes.</p>
+            <p className="mt-3 text-xs text-white/35">This ledger preserves the completed Base Sepolia canary and its proof transactions. Mainnet challenges unlock with production writes.</p>
           </div>
         </div>
 

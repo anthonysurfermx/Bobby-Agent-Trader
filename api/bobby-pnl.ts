@@ -1,17 +1,14 @@
 // ============================================================
 // GET /api/bobby-pnl
-// PnL from agent_trades on Base (swaps the receipt verifier confirmed
-// on-chain). Two shapes:
-//   · anonymous  → aggregates only (counts, totals, win rate). No rows: a
-//                  symbol + amount + timestamp can be correlated on-chain.
-//   · signed in  → that identity's own rows (wallet session or Supabase
-//                  bearer, see user-identity), positions net of sells.
+// PnL from confirmed Base receipts. Public figures include only unowned
+// trades from explicitly public protocol cycles; a user's swaps must never
+// become Bobby's public performance. Personal receipts require identity.
 // Marks: the rail's own pool quote (what a wallet could sell for now).
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
-import { bobbyDbConfigured, bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
+import { bobbyDbConfigured, bobbyRest, bobbyServiceHeaders, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
 import { quoteBaseSwap } from './_lib/base-swap.js';
 import { findBaseToken } from '../src/lib/base-swap/tokens.js';
 import { resolveIdentity } from './_lib/user-identity.js';
@@ -33,21 +30,33 @@ interface TradeRow {
   block_number: number | null;
   tx_index: number | null;
   owner_address: string | null;
+  user_id: string | null;
+  cycle_id: string | null;
+  agent_cycles?: { visibility: string } | null;
 }
 
-const SELECT = 'token_symbol,direction,amount_usd,entry_price,exit_price,realized_pnl_pct,outcome,created_at,settled_at,units,units_remaining,block_number,tx_index,owner_address';
+const SELECT = 'token_symbol,direction,amount_usd,entry_price,exit_price,realized_pnl_pct,outcome,created_at,settled_at,units,units_remaining,block_number,tx_index,owner_address,user_id,cycle_id';
 const PAGE = 1000;
 const MAX_PAGES = 50;
 
 /** The whole ledger, page by page: an accounting that stops at row 500 is not an accounting. */
-async function readLedger(scope: string): Promise<{ rows: TradeRow[]; truncated: boolean }> {
+async function readLedger(scope: 'public' | 'identity', identity?: { id: string; wallet: string | null }): Promise<{ rows: TradeRow[]; truncated: boolean }> {
+  // The inner join makes provenance and ownership part of the database query,
+  // before any rows are aggregated. A missing/private cycle cannot match.
+  const query = scope === 'public'
+    ? `&owner_address=is.null&user_id=is.null&agent_cycles.visibility=eq.public&select=${SELECT},agent_cycles!inner(visibility)`
+    : `&or=(user_id.eq.${identity!.id}${identity!.wallet ? `,owner_address.eq.${identity!.wallet.toLowerCase()}` : ''})&select=${SELECT}`;
   const rows: TradeRow[] = [];
   for (let page = 0; page < MAX_PAGES; page++) {
     const from = page * PAGE;
-    const r = await fetch(bobbyRest(`agent_trades?chain=eq.base&status=eq.confirmed${scope}&select=${SELECT}&order=block_number.asc,tx_index.asc,created_at.asc`), { headers: bobbyServiceHeaders({ Range: `${from}-${from + PAGE - 1}`, 'Range-Unit': 'items' }) });
+    const r = await fetch(bobbyRest(`agent_trades?chain=eq.base&status=eq.confirmed${query}&order=block_number.asc,tx_index.asc,created_at.asc`), { headers: bobbyServiceHeaders({ Range: `${from}-${from + PAGE - 1}`, 'Range-Unit': 'items' }) });
     if (!r.ok && r.status !== 206) throw new Error(`ledger read ${r.status}`);
     const batch = (await r.json()) as TradeRow[];
-    rows.push(...batch);
+    // Keep the same positive provenance rule in the application as a second
+    // guard against a future query edit or an unexpected API response.
+    rows.push(...(scope === 'public'
+      ? batch.filter((trade) => trade.owner_address === null && trade.user_id === null && Boolean(trade.cycle_id) && trade.agent_cycles?.visibility === 'public')
+      : batch));
     if (batch.length < PAGE) return { rows, truncated: false };
   }
   return { rows, truncated: true };
@@ -110,18 +119,26 @@ function aggregates(rows: TradeRow[]) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
   if (!await enforcePublicRateLimit(req, res, 'bobby-pnl', 30, 600)) return;
-  if (!bobbyDbConfigured()) {
-    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=30');
-    return res.status(200).json({ ok: false, message: 'Database not configured' });
-  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Vary', 'Authorization, x-bobby-session');
+  if (!bobbyDbConfigured() || !bobbyServiceKeyOptional()) return res.status(503).json({ ok: false, error: 'Database not configured' });
+
+  const requestedScope = typeof req.query.scope === 'string' ? req.query.scope : '';
+  if (requestedScope && !['public', 'mine'].includes(requestedScope)) return res.status(400).json({ ok: false, error: 'Invalid scope' });
 
   try {
-    const identity = await resolveIdentity(req).catch(() => null);
-    const scope = identity
-      ? `&or=(user_id.eq.${identity.id}${identity.wallet ? `,owner_address.eq.${identity.wallet.toLowerCase()}` : ''})`
-      : '';
+    const suppliedCredential = Boolean(req.headers['x-bobby-session'] || req.headers.authorization);
+    const identity = requestedScope === 'public' || (!suppliedCredential && requestedScope !== 'mine')
+      ? null
+      : await resolveIdentity(req);
+    if (requestedScope === 'mine' && !identity) return res.status(401).json({ ok: false, error: 'Sign in to view your receipts' });
+    if (suppliedCredential && requestedScope !== 'public' && !identity) return res.status(401).json({ ok: false, error: 'Invalid session' });
+    const scope = identity ? 'identity' : 'public';
     let rows: TradeRow[]; let truncated = false;
-    try { ({ rows, truncated } = await readLedger(scope)); } catch { return res.status(502).json({ ok: false, error: 'Could not read trades' }); }
+    try { ({ rows, truncated } = await readLedger(scope, identity ?? undefined)); } catch (error) {
+      console.error('[bobby-pnl] ledger read', error);
+      return res.status(502).json({ ok: false, error: 'Could not read trades' });
+    }
     const { realizations, wins, losses, realizedPnl, capitalDeployed, realizedCash, capitalRequired, netInvested } = aggregates(rows);
     const lots = openLots(rows);
 
@@ -168,10 +185,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalEquity: Number(portfolioEquity.toFixed(2)),
       totalReturn: Number(totalReturn.toFixed(2)),
       totalTrades: realizations.length + openPositions.length,
+      closedTrades: realizations.length,
       wins,
       losses,
       winRate: realizations.length ? Number(((wins / realizations.length) * 100).toFixed(1)) : 0,
       openPositions: openPositions.length,
+      valuationComplete: lots.every((lot) => marks.get(lot.symbol) != null),
       /** true only if the ledger exceeded 50,000 rows; figures would then be partial. */
       truncated,
     };
@@ -179,7 +198,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', identity ? 'no-store' : 's-maxage=15, stale-while-revalidate=60');
     if (!identity) {
       // Anonymous: totals only. No per-trade rows leave the server.
-      return res.status(200).json({ ok: true, timestamp: new Date().toISOString(), agent: 'Bobby Agent Trader', scope: 'public-aggregate', source: 'agent_trades (Base · verified receipts)', summary, openPositions: [], closedPositions: [] });
+      return res.status(200).json({ ok: true, timestamp: new Date().toISOString(), agent: 'Bobby Agent Trader', scope: 'public-aggregate', source: 'public protocol cycles · confirmed Base receipts', summary, openPositions: [], closedPositions: [] });
     }
     const closedPositions = [...realizations].reverse().map((t) => ({
       symbol: t.token_symbol,
@@ -195,9 +214,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       openTime: t.created_at,
       closeTime: t.settled_at,
     }));
-    return res.status(200).json({ ok: true, timestamp: new Date().toISOString(), agent: 'Bobby Agent Trader', scope: 'identity', source: 'agent_trades (Base · verified receipts)', summary, openPositions, closedPositions: closedPositions.slice(0, 50) });
+    return res.status(200).json({ ok: true, timestamp: new Date().toISOString(), agent: 'Bobby Agent Trader', scope: 'identity', source: 'your confirmed Base receipts', summary, openPositions, closedPositions: closedPositions.slice(0, 50) });
   } catch (error) {
     console.error('[bobby-pnl]', error);
-    return res.status(500).json({ ok: false, error: 'PnL unavailable' });
+    return res.status(503).json({ ok: false, error: 'PnL or sign-in service unavailable' });
   }
 }
