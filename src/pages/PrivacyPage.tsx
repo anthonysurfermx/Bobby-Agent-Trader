@@ -172,6 +172,12 @@ export default function PrivacyPage() {
           </p>
           <p>
             {tr(
+              'To count free reads, the app and the website send a random install identifier and, when you are signed in, your account. We store a salted hash of that identifier (never the identifier itself), a salted hash of your network, the asset you asked about and the time. These rows are deleted after 35 days. If you subscribe to Bobby Pro, we store the subscription status and renewal date from Stripe or Apple; we never see or store your card.',
+              'Para contar las lecturas gratis, la app y el sitio envían un identificador aleatorio de instalación y, si iniciaste sesión, tu cuenta. Guardamos un hash con sal de ese identificador (nunca el identificador), un hash con sal de tu red, el activo que preguntaste y la hora. Esos registros se borran a los 35 días. Si te suscribes a Bobby Pro, guardamos el estado de la suscripción y la fecha de renovación que nos da Stripe o Apple; nunca vemos ni guardamos tu tarjeta.',
+            )}
+          </p>
+          <p>
+            {tr(
               'Our hosting and authentication providers keep short-lived request, error, and sign-in security logs, which can include IP addresses and device information. The iPhone app contains no analytics, advertising, or tracking SDKs.',
               'Nuestros proveedores de hosting y autenticación conservan por poco tiempo registros de solicitudes, errores y seguridad de inicio de sesión, que pueden incluir direcciones IP y datos del dispositivo. La app para iPhone no incluye SDKs de analítica, publicidad ni rastreo.',
             )}
