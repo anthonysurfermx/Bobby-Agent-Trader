@@ -59,7 +59,7 @@ function wire(){
 var FONTS_P = (function(){
   try {
     if (!D.fonts || !D.fonts.load) return Promise.resolve();
-    var loads = ['400 26px "Instrument Serif"', '400 40px "Instrument Serif"', '400 16px "Geist"', '500 16px "Geist"', '600 16px "Geist"', '500 11px "Geist Mono"', '400 10px "Geist Mono"']
+    var loads = ['300 26px "Sora"', '300 40px "Sora"', '400 16px "Geist"', '500 16px "Geist"', '600 16px "Geist"', '500 11px "Geist Mono"', '400 10px "Geist Mono"']
       .map(function(f){ return D.fonts.load(f).catch(noop); });
     return Promise.race([Promise.all(loads), new Promise(function(r){ setTimeout(r, 3000); })]);
   } catch (e) { return Promise.resolve(); }

@@ -8,14 +8,14 @@
 <title>Bobby</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@300;400&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0B0A09; --ink:#F2EDE4; --ink-b:#FFF8EC; --ink2:#A39C91; --ink3:#8A8378; --ink4:rgba(242,237,228,.28);
   --hair:rgba(242,237,228,.08); --line:rgba(242,237,228,.12);
   --alpha:#3FE0B5; --red:#FF5A5F; --cio:#F6B94E; --pearl:#E8DFD0; --listen:#5CE1FF;
   --vc:#F6B94E; --glass:rgba(22,19,17,.86);
-  --serif:'Instrument Serif','Iowan Old Style','Times New Roman',Georgia,serif;
+  --serif:'Sora',-apple-system,'SF Pro Display',system-ui,sans-serif;  /* display face, shared with bobbyprotocol.xyz */
   --sans:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   --mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
 }
@@ -55,12 +55,12 @@ button:focus-visible{outline:2px solid var(--ink-b);outline-offset:3px}
 #fx,#chart{width:390px;height:844px;overflow:visible;opacity:1}
 #fx path,#fx circle,#fx ellipse,#fx line{fill:none}
 #orbitE{stroke:var(--line);stroke-width:.5;stroke-dasharray:1 6;stroke-linecap:round}
-.serif{font-family:var(--serif);font-weight:400}
+.serif{font-family:var(--serif);font-weight:300}
 .lbl{font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase}
 .w{display:inline-block;white-space:pre}
-#wmBig{left:0;width:390px;top:512px;text-align:center;font:400 44px/48px var(--serif);letter-spacing:-.015em;color:var(--ink)}
+#wmBig{left:0;width:390px;top:512px;text-align:center;font:300 38px/41px var(--serif);letter-spacing:-.035em;color:var(--ink)}
 header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;pointer-events:none}
-#wm{position:absolute;left:20px;top:8px;font:400 24px/28px var(--serif);letter-spacing:-.01em;color:var(--ink);opacity:0;transform-origin:50% 50%}
+#wm{position:absolute;left:20px;top:8px;font:300 21px/24px var(--serif);letter-spacing:-.035em;color:var(--ink);opacity:0;transform-origin:50% 50%}
 #close{position:absolute;left:8px;top:0;width:44px;height:44px;display:grid;place-items:center;opacity:0;color:var(--ink2);pointer-events:none}
 #close.on{pointer-events:auto}
 #dq{position:absolute;left:75px;width:240px;top:12px;text-align:center;font:400 15px/20px var(--sans);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0}
@@ -68,18 +68,18 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #avatar .face,.bead{border-radius:50%;background-color:#2A2A2A;background-size:118% 118%;background-position:50% 42%;box-shadow:0 0 0 .5px rgba(242,237,228,.2)}
 #avatar .face{position:absolute;inset:3px}
 #avatar svg{position:absolute;inset:0;overflow:visible}
-.mono-ava{display:grid;place-items:center;font:400 15px/1 var(--serif);color:var(--ink)}
+.mono-ava{display:grid;place-items:center;font:300 13px/1 var(--serif);letter-spacing:-.03em;color:var(--ink)}
 #belt{width:390px;height:844px;opacity:1}
 .bead{position:absolute;left:0;top:0;width:20px;height:20px;margin:-10px 0 0 -10px;opacity:0}
-#prompt{left:0;width:390px;top:110px;text-align:center;font:400 28px/31px var(--serif);letter-spacing:-.01em}
+#prompt{left:0;width:390px;top:110px;text-align:center;font:300 24px/27px var(--serif);letter-spacing:-.035em}
 #pava{left:163px;top:466px;width:64px;height:64px;border-radius:50%;background-color:#2A2A2A;background-size:118% 118%;background-position:50% 42%;box-shadow:0 0 0 .5px rgba(242,237,228,.22),0 10px 28px rgba(0,0,0,.55);opacity:0}
-#pname{left:0;width:390px;top:544px;text-align:center;font:400 36px/40px var(--serif);letter-spacing:-.01em;height:40px;overflow:visible}
+#pname{left:0;width:390px;top:544px;text-align:center;font:300 31px/34px var(--serif);letter-spacing:-.035em;height:40px;overflow:visible}
 #pcount{left:0;width:390px;top:590px;text-align:center;color:var(--ink3)}
 .roll{position:relative;display:block}
 .roll>span{position:absolute;left:0;right:0;top:0;white-space:nowrap}
-#title{left:20px;width:350px;top:512px;text-align:center;font:400 40px/42px var(--serif);letter-spacing:-.015em;white-space:nowrap}
+#title{left:20px;width:350px;top:512px;text-align:center;font:300 34px/36px var(--serif);letter-spacing:-.035em;white-space:nowrap}
 #sub{left:20px;width:350px;top:566px;text-align:center;font:400 16px/23px var(--sans);color:var(--ink2);text-wrap:balance}
-.cap{left:20px;width:350px;top:512px;text-align:center;font:400 26px/31px var(--serif);letter-spacing:-.005em;text-wrap:balance}
+.cap{left:20px;width:350px;top:512px;text-align:center;font:300 22px/27px var(--serif);letter-spacing:-.035em;text-wrap:balance}
 .cap .w{will-change:transform,opacity,filter}
 #capM{visibility:hidden;opacity:0}
 #cap2{left:20px;width:350px;top:553px;text-align:center;font:400 15px/21px var(--sans);color:var(--ink2)}
@@ -96,7 +96,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #agC{width:220px;text-align:center}#agC .nm{justify-content:center}#agC .st{max-width:none;height:42px;position:relative}
 #agC .st .roll{height:42px}#agC .st .roll>span{white-space:normal}
 #lines{left:20px;width:350px;top:0;opacity:1}
-#lines .ln{position:absolute;left:0;width:350px;text-align:center;font:400 22px/26px var(--serif);letter-spacing:-.01em;text-wrap:balance}
+#lines .ln{position:absolute;left:0;width:350px;text-align:center;font:300 19px/22px var(--serif);letter-spacing:-.035em;text-wrap:balance}
 #lines .rb{position:absolute;left:10px;width:330px;text-align:center;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance}
 #notice.tap{pointer-events:auto}
 #notice{left:95px;width:200px;top:640px;height:44px;font:400 13px/16px var(--sans);color:var(--ink2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(163,156,145,.5)}
@@ -113,7 +113,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 .od{display:inline-block;height:22px;overflow:hidden;vertical-align:top}
 .od>span{display:block}.od>span>b{display:block;height:22px;font-weight:500}
 #verdict{width:240px;text-align:center}
-#verdict .vw{font-family:var(--serif);font-weight:400;line-height:1;color:var(--ink-b);white-space:nowrap}
+#verdict .vw{font-family:var(--serif);font-weight:300;line-height:1;color:var(--ink-b);white-space:nowrap}
 #verdict .vc{margin-top:8px;color:rgba(255,248,236,.78);display:flex;justify-content:center;gap:6px;height:14px}
 #pct{width:120px;text-align:center;font:600 13px/16px var(--sans);color:var(--vc);height:16px;overflow:hidden}
 #isla{width:120px;height:120px}
@@ -151,7 +151,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 .card::after{content:'';position:absolute;inset:0;border-radius:28px;background:linear-gradient(180deg,#221E1B,#171513);opacity:var(--veil,0);pointer-events:none}
 .ch{display:flex;justify-content:space-between;gap:12px;color:var(--ink2)}
 .ch span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card h3{font:400 28px/31px var(--serif);letter-spacing:-.01em;margin-top:18px;color:var(--ink)}
+.card h3{font:300 24px/27px var(--serif);letter-spacing:-.035em;margin-top:18px;color:var(--ink)}
 .dsc{position:absolute;left:24px;right:24px;top:50px;bottom:46px;overflow:hidden}
 .dsc.more{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent)}
 .row{display:flex;gap:12px;margin-top:14px}
@@ -176,7 +176,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #perm{left:45px;top:486px;width:300px;border-radius:24px;padding:20px 16px 16px;background:var(--glass);border:.5px solid var(--hair);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 60px -24px rgba(0,0,0,.9);z-index:6;opacity:1;visibility:hidden}
 #perm.set{background:rgba(22,19,17,.72);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
-#perm h4{font:400 24px/28px var(--serif);letter-spacing:-.01em;text-align:center;text-wrap:balance}
+#perm h4{font:300 21px/24px var(--serif);letter-spacing:-.035em;text-align:center;text-wrap:balance}
 #perm p{font:400 15px/21px var(--sans);letter-spacing:-.01em;color:var(--ink2);text-align:center;margin-top:6px;text-wrap:balance}
 #perm button{display:block;margin:16px auto 0;width:252px;height:44px;border-radius:22px;background:var(--ink);color:#141210;font:600 16px/44px var(--sans);pointer-events:auto}
 #sheet{left:0;top:0;width:390px;height:844px;opacity:1;z-index:7}
@@ -184,7 +184,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   border-top:.5px solid rgba(242,237,228,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 -20px 60px -20px rgba(0,0,0,.8);visibility:hidden}
 #sheet .si{position:absolute;opacity:0}
 #grab{left:177px;top:478px;width:36px;height:5px;border-radius:3px;background:var(--ink4)}
-#shT{left:20px;width:350px;top:500px;text-align:center;font:400 28px/32px var(--serif);letter-spacing:-.01em}
+#shT{left:20px;width:350px;top:500px;text-align:center;font:300 24px/28px var(--serif);letter-spacing:-.035em}
 #shB{left:40px;width:310px;top:540px;height:42px;text-align:center;font:400 15px/21px var(--sans);color:var(--ink2);overflow:visible}
 #shB .roll>span{white-space:normal;text-wrap:balance}
 .sbtn{left:20px;width:350px;height:50px;border-radius:25px;display:flex;align-items:center;justify-content:center;gap:6px;font:500 17px/20px -apple-system,BlinkMacSystemFont,'SF Pro Text',var(--sans);pointer-events:none}

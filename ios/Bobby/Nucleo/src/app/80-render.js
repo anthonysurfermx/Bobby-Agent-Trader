@@ -493,12 +493,12 @@ function renderCap(c, cy, r){
 }
 /* ---------- verdict word + ring (conviction only when R5 agrees; otherwise a completion ring, no digits) ---------- */
 function renderVerdict(L0, rNow){
-  var cyV = L0.cy, r = L0.r, cond = A.vCond.x, fs = Math.round(0.62 * r);
+  var cyV = L0.cy, r = L0.r, cond = A.vCond.x, fs = Math.round(0.54 * r);   /* Sora: .54 r keeps "Ready" inside the glass */
   var u = clamp(cond, 0, 1), f = RM ? u : E.focus(u), vo = RM ? u : sstep(0, 0.6, u);
   op(el.vWord, vo);
   if (vo > 0.002){
     stU(el.vWord, 'fontSize', fs, 'px', 1);
-    var track = RM ? -0.01 : lerp(0.30, -0.01, f), blur = RM ? 0 : 14 * (1 - f), sc = RM ? 1 : lerp(1.25, 1, f);
+    var track = RM ? -0.04 : lerp(0.30, -0.04, f), blur = RM ? 0 : 14 * (1 - f), sc = RM ? 1 : lerp(1.25, 1, f);
     stU(el.vWord, 'letterSpacing', track, 'em', 1000);
     tf(el.vWord, 195 - 120, cyV - fs / 2, sc); if (el.vWord._fo !== fs){ el.vWord._fo = fs; el.vWord.style.transformOrigin = '120px ' + f2(fs / 2) + 'px'; }
     bl(el.vWord, blur);

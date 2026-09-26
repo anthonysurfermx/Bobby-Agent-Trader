@@ -227,10 +227,10 @@ var vEl = $('verdict'), vWord = $('vword'), vc = vEl.querySelector('.vc'), pctEl
 function renderVerdict(){
   var b = tmB('verdict'), g = tmG('verdict');
   if (T < b || T > g + 0.4){ st(vEl, null, 0); st(pctEl, null, 0); return; }
-  var r = SPH.dr, fs = Math.round(0.62 * r), u = c01((T - b) / 0.9), k = FOC(u), o = RM ? c01((T - b) / 0.3) : c01(u * 1.6);
-  var trk = lerp(0.30, -0.01, k), blur = lerp(14, 0, k), s = lerp(1.25, 1, k);
-  if (RM){ trk = -0.01; blur = 0; s = 1; }
-  if (T > g){ var e = c01((T - g) / 0.28); trk = lerp(-0.01, 0.30, FOC(e)); blur = 14 * FOC(e); s = lerp(1, 1.25, FOC(e)); o *= 1 - e; }
+  var r = SPH.dr, fs = Math.round(0.54 * r), u = c01((T - b) / 0.9), k = FOC(u), o = RM ? c01((T - b) / 0.3) : c01(u * 1.6);
+  var trk = lerp(0.30, -0.04, k), blur = lerp(14, 0, k), s = lerp(1.25, 1, k);
+  if (RM){ trk = -0.04; blur = 0; s = 1; }
+  if (T > g){ var e = c01((T - g) / 0.28); trk = lerp(-0.04, 0.30, FOC(e)); blur = 14 * FOC(e); s = lerp(1, 1.25, FOC(e)); o *= 1 - e; }
   sc(vWord, 'fontSize', fs + 'px'); sc(vWord, 'letterSpacing', trk.toFixed(3) + 'em');
   var conv = W.ringMode === 'conviction', inner = conv ? sstep(58, 66, r) : 0;
   sc(vc, 'opacity', f3(inner * c01((T - (b + 0.25)) / 0.3)));

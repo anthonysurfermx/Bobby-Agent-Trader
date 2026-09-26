@@ -15,13 +15,27 @@ function sa(el, k, v){ if (el['_a' + k] !== v){ el['_a' + k] = v; el.setAttribut
 function sc(el, k, v){ if (el['_c' + k] !== v){ el['_c' + k] = v; el.style[k] = v; } }
 function txt(el, s){ if (el._x !== s){ el._x = s; el.textContent = s; } }
 function cls(el, k, on){ on = !!on; if (el['_k' + k] !== on){ el['_k' + k] = on; el.classList.toggle(k, on); } }
+/* Sora is wider than the serif these lines were first sized for: a nowrap display line that no longer
+   fits its column steps its font size down (never below 70%) instead of running off the screen. */
+var FIT_LINES = [];
+function fitLine(el){
+  if (!el) return;
+  if (FIT_LINES.indexOf(el) < 0) FIT_LINES.push(el);
+  el.style.fontSize = '';
+  var cs = getComputedStyle(el); if (cs.whiteSpace !== 'nowrap') return;
+  var cw = el.clientWidth, sw = el.scrollWidth; if (!cw || sw <= cw + 1) return;
+  var fs = parseFloat(cs.fontSize); el.style.fontSize = Math.max(fs * 0.7, Math.floor(fs * cw / sw * 10) / 10) + 'px';
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ FIT_LINES.forEach(fitLine); });
 function spans(el, text, klass){
   el.innerHTML = '';
   var ws = String(text || '').split(' ').filter(function(w){ return w !== ''; });
-  return ws.map(function(w, i){
+  var out = ws.map(function(w, i){
     var s = document.createElement('span'); s.className = 'w' + (klass ? ' ' + klass : '');
     s.textContent = w + (i < ws.length - 1 ? ' ' : ''); el.appendChild(s); return s;
   });
+  fitLine(el);
+  return out;
 }
 /* text width (layout-free): pill labels size themselves from their own copy */
 var MEAS = document.createElement('canvas').getContext('2d');

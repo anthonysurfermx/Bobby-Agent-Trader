@@ -103,7 +103,7 @@ function togglePause(){ paused = !paused; st($('pauseTag'), null, paused ? 1 : 0
 function harnessPrepare(){
   H.name = Q.script || ''; H.script = SCRIPTS[H.name] || null;
   var fonts = [];
-  try { ['400 26px "Instrument Serif"', '400 40px "Instrument Serif"', '400 15px Geist', '500 15px Geist', '600 16px Geist', '500 11px "Geist Mono"', '400 10px "Geist Mono"'].forEach(function(f){ fonts.push(document.fonts.load(f)); }); } catch(e){}
+  try { ['300 26px "Sora"', '300 40px "Sora"', '400 15px Geist', '500 15px Geist', '600 16px Geist', '500 11px "Geist Mono"', '400 10px "Geist Mono"'].forEach(function(f){ fonts.push(document.fonts.load(f)); }); } catch(e){}
   var timeout = new Promise(function(res){ setTimeout(res, 4000); });
   var mattes = loadRoster().then(function(){
     return new Promise(function(res){ var t0 = Date.now(); (function poll(){ if (MATTE_PENDING <= 0 || Date.now() - t0 > 4000) res(); else setTimeout(poll, 30); })(); });

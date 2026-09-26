@@ -57,6 +57,18 @@ function geoKey(o, a, b, c, d, e, f){
   o._g0 = a; o._g1 = b; o._g2 = c; o._g3 = d; o._g4 = e; o._g5 = f; return true;
 }
 /* word spans (DOM text only: never innerHTML with data) */
+/* Sora is wider than the serif these lines were first sized for: a nowrap display line that no longer
+   fits its column steps its font size down (never below 70%) instead of running off the screen. */
+var FIT_LINES = [];
+function fitLine(el){
+  if (!el) return;
+  if (FIT_LINES.indexOf(el) < 0) FIT_LINES.push(el);
+  el.style.fontSize = '';
+  var cs = getComputedStyle(el); if (cs.whiteSpace !== 'nowrap') return;
+  var cw = el.clientWidth, sw = el.scrollWidth; if (!cw || sw <= cw + 1) return;
+  var fs = parseFloat(cs.fontSize); el.style.fontSize = Math.max(fs * 0.7, Math.floor(fs * cw / sw * 10) / 10) + 'px';
+}
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ FIT_LINES.forEach(fitLine); });
 function words(el, text){
   el.textContent = '';
   var out = [], ws = String(text || '').split(/\s+/).filter(Boolean);
@@ -64,6 +76,7 @@ function words(el, text){
     var s = D.createElement('span'); s.className = 'w'; s.textContent = w; el.appendChild(s); out.push(s);
     if (i < ws.length - 1) el.appendChild(D.createTextNode(' '));
   });
+  fitLine(el);
   return out;
 }
 function mk(tag, cls, text){ var e = D.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }

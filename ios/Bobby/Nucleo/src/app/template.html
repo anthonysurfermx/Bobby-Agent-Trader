@@ -6,14 +6,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0B0A09">
 <title>Bobby</title>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@300;400&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0B0A09; --ink:#F2EDE4; --inkb:#FFF8EC; --ink2:#A39C91; --ink3:#8A8378; --ink4:rgba(242,237,228,.28);
   --hair:rgba(242,237,228,.08); --line:rgba(242,237,228,.12);
   --alpha:#3FE0B5; --red:#FF5A5F; --cio:#F6B94E; --pearl:#E8DFD0; --listen:#5CE1FF;
   --glass:rgba(22,19,17,.86);
-  --serif:'Instrument Serif','Iowan Old Style','Palatino Linotype',Georgia,serif;
+  --serif:'Sora',-apple-system,'SF Pro Display',system-ui,sans-serif;  /* display face, shared with bobbyprotocol.xyz */
   --sans:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   --mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
 }
@@ -59,7 +59,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #vec,#chart{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 
 /* header */
-#wm{left:12px;top:54px;height:44px;padding:0 8px;font:400 24px/44px var(--serif);letter-spacing:-.01em;white-space:nowrap;cursor:default}
+#wm{left:12px;top:54px;height:44px;padding:0 8px;font:300 21px/44px var(--serif);letter-spacing:-.035em;white-space:nowrap;cursor:default}
 #close{position:absolute;left:10px;top:54px;width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink2);cursor:pointer}
 #dockQ{left:75px;top:62px;width:240px;height:21px;font:400 15px/21px var(--sans);color:var(--ink2);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 #dockA{left:75px;top:84px;width:240px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);text-align:center;white-space:nowrap;overflow:hidden;pointer-events:none}
@@ -67,18 +67,18 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #avatar::before{content:'';position:absolute;left:-8px;top:-8px;width:48px;height:48px;border-radius:50%}   /* 48 px target around the 32 px face */
 #avatar .ph{position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;overflow:hidden;background:#232120;box-shadow:0 0 0 .5px rgba(242,237,228,.2)}
 #avatar img{position:absolute;left:-9%;top:-4%;width:118%;height:118%;display:block}
-#avatar .mg{position:absolute;inset:0;display:grid;place-items:center;font:400 17px/1 var(--serif);color:var(--ink)}
+#avatar .mg{position:absolute;inset:0;display:grid;place-items:center;font:300 15px/1 var(--serif);letter-spacing:-.03em;color:var(--ink)}
 #avatar svg{position:absolute;left:-4px;top:-4px;width:40px;height:40px;overflow:visible}
 
 /* greeting, notes, face text */
 #greet,#note{left:20px;top:512px;width:350px;text-align:center;pointer-events:none}
-#greet .t{font:400 40px/42px var(--serif);letter-spacing:-.015em;white-space:nowrap}
+#greet .t{font:300 34px/36px var(--serif);letter-spacing:-.035em;white-space:nowrap}
 #greet .s{display:block;margin-top:12px;font:400 16px/23px var(--sans);color:var(--ink2);white-space:nowrap}
-#note .t{font:400 26px/31px var(--serif);letter-spacing:-.005em;text-wrap:balance}
+#note .t{font:300 22px/27px var(--serif);letter-spacing:-.035em;text-wrap:balance}
 #note .s{display:block;margin-top:8px;font:400 15px/21px var(--sans);color:var(--ink2);text-wrap:balance}
 .w{display:inline-block}
 .ftx{left:20px;top:512px;width:350px;text-align:center;pointer-events:none}
-.ftx .t{font:400 36px/40px var(--serif);letter-spacing:-.01em;white-space:nowrap}
+.ftx .t{font:300 31px/34px var(--serif);letter-spacing:-.035em;white-space:nowrap}
 .ftx .s{display:block;margin-top:6px;font:400 15px/21px var(--sans);color:var(--ink2);text-wrap:balance}
 .ftx .cw{position:absolute;left:0;width:350px;top:94px;text-align:center}
 .fchip{display:inline-block;height:40px;padding:0 16px;border-radius:20px;border:.5px solid var(--line);background:rgba(242,237,228,.04);font:500 15px/39px var(--sans);color:var(--ink);cursor:pointer;white-space:nowrap;pointer-events:auto}
@@ -139,7 +139,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .dg b span{display:block;height:22px}
 
 /* verdict */
-#vWord{width:240px;text-align:center;font-family:var(--serif);font-weight:400;line-height:1;color:var(--inkb);white-space:nowrap;pointer-events:none}
+#vWord{width:240px;text-align:center;font-family:var(--serif);font-weight:300;line-height:1;color:var(--inkb);white-space:nowrap;pointer-events:none}
 #convL{font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:rgba(255,248,236,.74);white-space:nowrap;pointer-events:none}
 #pct{width:48px;height:16px;text-align:right;font:600 13px/16px var(--sans);white-space:nowrap;pointer-events:none}
 .col{display:inline-block;height:16px;overflow:hidden;vertical-align:top}
@@ -147,7 +147,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .col b span{display:block;height:16px}
 
 /* captions */
-.say,.sayM{left:20px;width:350px;text-align:center;font:400 26px/31px var(--serif);letter-spacing:-.005em;text-wrap:balance;transform-origin:175px 31px;pointer-events:none}
+.say,.sayM{left:20px;width:350px;text-align:center;font:300 22px/27px var(--serif);letter-spacing:-.035em;text-wrap:balance;transform-origin:175px 27px;pointer-events:none}
 .sayM{visibility:hidden}
 #meta{left:20px;width:350px;text-align:center;font:400 12px/16px var(--sans);color:var(--ink3);pointer-events:none}
 
@@ -157,7 +157,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .card .ch{top:24px;display:flex;justify-content:space-between;align-items:baseline}
 .card .ch .lb{font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
 .card .ch .mt{font:400 13px/16px var(--sans);color:var(--ink2)}
-.card .ct{top:48px;font:400 28px/31px var(--serif);letter-spacing:-.01em;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .ct{top:48px;font:300 24px/27px var(--serif);letter-spacing:-.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .rows{top:91px}
 .card .rows div{display:flex;justify-content:space-between;align-items:center;height:36px;border-bottom:.5px solid rgba(242,237,228,.06)}
 .card .rows div:last-child{border-bottom:0}
@@ -195,7 +195,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #perm{left:45px;top:488px;width:300px;border-radius:24px;padding:20px 20px 16px;background:var(--glass);border:.5px solid var(--hair);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 60px -24px rgba(0,0,0,.9);z-index:6;text-align:center}
 #perm.set{background:rgba(22,19,17,.72);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
-#perm h4{font:400 24px/28px var(--serif);letter-spacing:-.01em;font-weight:400}
+#perm h4{font:300 21px/24px var(--serif);letter-spacing:-.035em}
 #perm p{font:400 15px/21px var(--sans);color:var(--ink2);margin-top:6px;text-wrap:balance}
 #perm button{display:block;margin:14px auto 0;width:252px;height:44px;border-radius:22px;background:var(--ink);color:#141210;font:600 16px/44px var(--sans);cursor:pointer}
 
