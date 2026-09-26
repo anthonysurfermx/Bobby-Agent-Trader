@@ -18,7 +18,7 @@ import { voiceScreenState } from '@/lib/realtime-context';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import RiskNotice from './RiskNotice';
 import ProgressSync from './ProgressSync';
-import LangSelect from './LangSelect';
+import NucleoSphere, { GLASS_TINT, type AgentFocus, type SphereMode, type SphereVerdict } from './NucleoSphere';
 import SignInPrompt, { recordAsk, shouldPromptAfterAsk, shouldPromptNow } from './SignInPrompt';
 import { getSyncStatus } from '@/lib/companions/sync';
 import { MarketCanvas, type ChartLevel, type Timeframe } from '@/components/adams/MarketCanvas';
@@ -138,7 +138,7 @@ function localizedMomentum(raw: string) {
 type AgentKey = 'alpha' | 'red' | 'cio';
 interface Stance { key: AgentKey; name: string; line: string; score: number | null; level: { kind: ChartLevel['kind']; price: number; label: string; to?: number } | null }
 interface Debate { stances: [Stance, Stance, Stance]; headline: string; spoken: string; noTrade: boolean; direction: 'long' | 'short' | 'none' }
-const AGENT_TONE: Record<AgentKey, string> = { alpha: '#4ade80', red: '#ff716a', cio: '#facc15' };
+const AGENT_TONE: Record<AgentKey, string> = { alpha: '#3FE0B5', red: '#FF5A5F', cio: '#F6B94E' };
 
 function debateFor(a: Answer): Debate {
   const noTrade = isNoTrade(a);
@@ -198,18 +198,18 @@ function DeskReadSource() {
 
 /** The three stances as three rows — the simplest honest picture of the desk. */
 function StanceRows({ debate }: { debate: Debate }) {
-  const verdictTone = debate.direction === 'none' ? '#7dd3fc' : debate.direction === 'short' ? '#ff716a' : '#4ade80';
+  const verdictTone = debate.direction === 'none' ? '#F6B94E' : debate.direction === 'short' ? '#FF5A5F' : '#3FE0B5';
   return (
-    <div className="space-y-2">
-      {debate.stances.map((s) => (
-        <div key={s.key} className="flex items-start gap-3 rounded-lg border px-3 py-2" style={{ borderColor: `${AGENT_TONE[s.key]}40`, background: `${AGENT_TONE[s.key]}0a` }}>
-          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: AGENT_TONE[s.key], boxShadow: `0 0 8px ${AGENT_TONE[s.key]}` }} />
+    <div>
+      {debate.stances.map((s, i) => (
+        <div key={s.key} className="flex items-start gap-3 py-3" style={{ borderTop: i ? '1px solid rgba(242,237,228,.08)' : 'none' }}>
+          <span className="mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: AGENT_TONE[s.key], boxShadow: `0 0 10px ${AGENT_TONE[s.key]}` }} />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-mono text-[10px] tracking-[0.18em]" style={{ color: AGENT_TONE[s.key] }}>{s.name}</span>
-              {s.key === 'cio' ? <span className="font-mono text-xs font-bold tracking-[0.12em]" style={{ color: verdictTone }}>{debate.headline}</span> : s.score !== null && <span className="font-mono text-[10px] text-white/40">{s.score}%</span>}
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: AGENT_TONE[s.key] }}>{s.name}</span>
+              {s.key === 'cio' ? <span className="font-mono text-[12px] tracking-[0.12em]" style={{ color: verdictTone }}>{debate.headline}</span> : s.score !== null && <span className="font-mono text-[11px]" style={{ color: '#8A8378' }}>{s.score}%</span>}
             </div>
-            <div className="mt-0.5 text-sm leading-snug text-white/85">{s.line}</div>
+            <div className="mt-1 text-[15px] leading-snug" style={{ color: '#F2EDE4' }}>{s.line}</div>
           </div>
         </div>
       ))}
@@ -288,7 +288,7 @@ export default function CompanionDesk() {
   const [drops, setDrops] = useState<CompanionTool[]>([]);
   const [inspected, setInspected] = useState<CompanionTool | null>(null);
   const [menu, setMenu] = useState(false);
-  const [sheet, setSheet] = useState<'none' | 'board' | 'squad' | 'risk' | 'catalog' | 'pet' | 'world' | 'swap'>('none');
+  const [sheet, setSheet] = useState<'none' | 'board' | 'squad' | 'risk' | 'catalog' | 'pet' | 'world' | 'swap' | 'companion'>('none');
   const [signInPrompt, setSignInPrompt] = useState(false);
   // A prompt owed from a previous visit (reached the threshold behind an
   // evolution or a drop, then reloaded) is raised here; the render guard
@@ -518,7 +518,6 @@ export default function CompanionDesk() {
   // Worn gear (pieces still in the loot queue are not worn yet — they fly on
   // when the human taps EQUIP IT) plus the pet at the feet.
   const desktop = useMediaQuery('(min-width: 1024px)');
-  const mascotSize = desktop ? 340 : 260;
   const [chartSymbol, setChartSymbol] = useState(initialScreen.symbol);
   // 1H: the verdict is computed on 1H candles, so the chart's indicator strip
   // must open on the same bars or the two contradict each other at first paint.
@@ -541,294 +540,252 @@ export default function CompanionDesk() {
     return items;
   }, [companion.id, progress.xp, drops]);
 
-  // The pieces of the desk, composed twice: the phone layout (one column,
-  // composer pinned to the bottom) and the production desktop layout (companion
-  // centered, mic below, the live chart on the right).
+  // ---- The Núcleo composition: the iPhone app on the web ----
+  // The glass holds the centre and the companion lives in the avatar, as on iOS. Everything the old
+  // desk did is still here, restyled: wallet, swaps, sign-in, squad, gear, Trader Land, the chart.
+  const glassTint = GLASS_TINT[companion.palette] ?? null;
+  const verdictKind: SphereVerdict = !debate ? 'wait' : debate.direction === 'long' ? 'ready' : debate.direction === 'short' ? 'pass' : 'wait';
+  const verdictWord = !debate ? null : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : 'No trade';
+  const verdictSub = !debate ? null : debate.direction !== 'none' && answer?.convictionPct != null
+    ? t(`${Math.round(answer.convictionPct)}% conviction`, `${Math.round(answer.convictionPct)}% de convicción`)
+    : t('Capital protected', 'Capital protegido');
+  const sphereMode: SphereMode = isWorking ? 'debate' : phase === 'complete' && debate ? 'verdict' : listening ? 'listen' : 'idle';
+  const agentFocus: AgentFocus | 'all' | null = phase === 'alpha' ? 'alpha' : phase === 'redTeam' ? 'red' : phase === 'cio' ? 'cio' : phase === 'resolving' ? 'all' : null;
+  const lastBobby = [...messages].reverse().find((m) => m.from === 'bobby')?.text ?? '';
+  const lastYou = [...messages].reverse().find((m) => m.from === 'you')?.text ?? '';
+  const statusColor = listening ? '#5CE1FF' : phase === 'error' ? '#FF5A5F' : phase === 'complete' && debate ? (debate.direction === 'long' ? '#3FE0B5' : debate.direction === 'short' ? '#FF5A5F' : '#F6B94E') : '#A39C91';
+  const sphereSize = desktop ? 300 : 216;
+  const closeRecognition = () => { const recognition = recognitionRef.current as BrowserRecognition | null; if (recognition) { recognition.onend = null; recognition.abort(); recognitionRef.current = null; setListening(false); } };
+
+  const menuItems = [
+    { icon: <Grid2x2 size={14} />, label: t('Explore markets', 'Explorar mercados'), act: () => setSheet('board') },
+    { icon: <Grid2x2 size={14} />, label: t('Tools', 'Herramientas'), act: () => setSheet('catalog') },
+    { icon: <ArrowLeftRight size={14} />, label: t('Swap on Base', 'Swap en Base'), act: () => setSheet('swap') },
+    { icon: <Users size={14} />, label: t('My squad', 'Mi squad'), act: () => setSheet('squad') },
+    { icon: <MapIcon size={14} />, label: 'Trader Land', act: openTraderLand },
+    { icon: <Share2 size={14} />, label: t('Share my skin', 'Compartir mi skin'), act: () => setSheet('companion') },
+    { icon: <ShieldAlert size={14} />, label: t('Risk notice', 'Aviso de riesgo'), act: () => setSheet('risk') },
+    { icon: <Globe size={14} />, label: isSpanish() ? 'English' : 'Español', act: () => { try { localStorage.setItem('bobby_lang', isSpanish() ? 'en' : 'es'); } catch { /* private mode */ } window.location.reload(); } },
+    { icon: muted ? <VolumeX size={14} /> : <Volume2 size={14} />, label: muted ? t('Sounds off', 'Sonidos apagados') : t('Sounds on', 'Sonidos encendidos'), act: () => { setSfxMuted(!muted); setMuted(!muted); } },
+    { icon: <RotateCcw size={14} />, label: t('Reset companion', 'Reiniciar companion'), act: () => { if (window.confirm(t('Reset XP, gear and companion on this browser?', '¿Reiniciar XP, equipo y companion en este navegador?'))) progressStore.reset(); } },
+  ];
+
   const headerNode = (
-    <>
-      {/* header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="hidden items-center gap-3 lg:flex">
-          <div className="relative">
-            <img src={`/mascots/${companion.id}.webp`} alt="" className="h-11 w-11 rounded-full object-cover border" style={{ borderColor: tintFor(companion, 0.6) }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
-            <span className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-green-400 text-black text-[10px] font-bold flex items-center justify-center">{level.number}</span>
-          </div>
-          <div>
-            <div className="text-white font-mono tracking-[0.2em] text-sm">LIVE DESK</div>
-            <div className="text-[10px] font-mono tracking-[0.15em]" style={{ color: tint }}>{displayName}</div>
-          </div>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <button type="button" aria-label={t('Voice mode', 'Modo de voz')} onClick={() => { voice.stop(); const recognition = recognitionRef.current as BrowserRecognition | null; if (recognition) { recognition.onend = null; recognition.abort(); recognitionRef.current = null; setListening(false); } setFreeVoice(v => !v); setVoiceNotice(''); }} className="h-10 rounded-full border border-white/[0.06] px-3 font-mono text-[10px] text-sky-300">{freeVoice ? t('Free', 'Gratis') : 'Live'}</button>
-          <div className="hidden lg:block"><LangSelect /></div>
-          {/* Trader Land lives here as a compact control: the chart stays the co-star of the desk. */}
-          <button type="button" onClick={openTraderLand} aria-label="Trader Land" title="Trader Land" className="hidden h-10 shrink-0 items-center gap-2 rounded-full border border-emerald-200/20 bg-emerald-200/[0.06] pl-1 pr-1 text-emerald-100 transition hover:border-emerald-200/40 hover:bg-emerald-200/[0.12] lg:flex">
-            <img src="/land/v1/gate-A/aura_core/ne/stage1_thumb_256.png" alt="" width="32" height="32" className="h-8 w-8 object-contain" />
-          </button>
-          <WalletBalancePill onClick={() => { sfxTock(); setSheet('swap'); }} />
-          <div className="hidden lg:block"><ProgressSync onChoose={() => { sfxTock(); setSignInPrompt(true); }} /></div>
-          <button aria-label={speakEnabled ? t('Mute voice', 'Silenciar voz') : t('Enable voice', 'Activar voz')} onClick={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })} className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.04] text-sky-300 lg:flex">{speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
-          <div className="relative">
-            <button aria-label={t('More options', 'Más opciones')} onClick={() => setMenu((m) => !m)} className="h-10 w-10 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/70"><MoreHorizontal size={16} /></button>
-            <AnimatePresence>
-              {menu && (
-                <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="absolute right-0 mt-2 w-60 rounded-xl bg-[#0b0b0e] border border-white/[0.08] p-1 z-30 text-sm">
-                  {[
-                    { icon: <Grid2x2 size={14} />, label: t('Explore markets', 'Explorar mercados'), act: () => setSheet('board') },
-                    { icon: <Grid2x2 size={14} />, label: t('Tools', 'Herramientas'), act: () => setSheet('catalog') },
-                    { icon: <ArrowLeftRight size={14} />, label: t('Swap on Base', 'Swap en Base'), act: () => setSheet('swap') },
-                    { icon: <Users size={14} />, label: t('My squad', 'Mi squad'), act: () => setSheet('squad') },
-                    { icon: <MapIcon size={14} />, label: 'Trader Land', act: openTraderLand },
-                    { icon: <Share2 size={14} />, label: t('Share my skin', 'Compartir mi skin'), act: () => void shareSkin() },
-                    { icon: <ShieldAlert size={14} />, label: t('Risk notice', 'Aviso de riesgo'), act: () => setSheet('risk') },
-                    { icon: <Globe size={14} />, label: isSpanish() ? 'English' : 'Español', act: () => { try { localStorage.setItem('bobby_lang', isSpanish() ? 'en' : 'es'); } catch { /* private mode */ } window.location.reload(); } },
-                    { icon: muted ? <VolumeX size={14} /> : <Volume2 size={14} />, label: muted ? t('Sounds off', 'Sonidos apagados') : t('Sounds on', 'Sonidos encendidos'), act: () => { setSfxMuted(!muted); setMuted(!muted); } },
-                    { icon: <RotateCcw size={14} />, label: t('Reset companion', 'Reiniciar companion'), act: () => { if (window.confirm(t('Reset XP, gear and companion on this browser?', '¿Reiniciar XP, equipo y companion en este navegador?'))) progressStore.reset(); } },
-                  ].map((item) => (
-                    <button key={item.label} onClick={() => { setMenu(false); item.act(); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/80 hover:bg-white/[0.05] text-left">{item.icon}{item.label}</button>
-                  ))}
-                  <div className="px-3 py-2 text-[10px] font-mono text-white/35">{t('Your wallet signs every swap', 'Tu wallet firma cada swap')}</div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+    <header className="n-topbar">
+      <a href="/" className="n-wordmark" aria-label={t('Bobby, home', 'Bobby, inicio')}>Bobby</a>
+      <div className="flex items-center gap-2">
+        <button type="button" aria-label={t('Voice mode', 'Modo de voz')} title={freeVoice ? t('Free voice: dictation in the browser', 'Voz gratis: dictado en el navegador') : t('Live voice room', 'Sala de voz en vivo')} onClick={() => { voice.stop(); closeRecognition(); setFreeVoice(v => !v); setVoiceNotice(''); }} className="n-iconbtn px-3 font-mono text-[10px] uppercase tracking-[0.12em]">{freeVoice ? t('Free', 'Gratis') : 'Live'}</button>
+        {/* Trader Land stays a compact control: the chart is the desk's co-star. */}
+        <button type="button" onClick={openTraderLand} aria-label="Trader Land" title="Trader Land" className="n-iconbtn hidden lg:inline-grid">
+          <img src="/land/v1/gate-A/aura_core/ne/stage1_thumb_256.png" alt="" width="28" height="28" className="h-7 w-7 object-contain" />
+        </button>
+        <WalletBalancePill onClick={() => { sfxTock(); setSheet('swap'); }} />
+        <div className="hidden lg:block"><ProgressSync onChoose={() => { sfxTock(); setSignInPrompt(true); }} /></div>
+        <button type="button" aria-label={speakEnabled ? t('Mute voice', 'Silenciar voz') : t('Enable voice', 'Activar voz')} onClick={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })} className="n-iconbtn hidden lg:inline-grid">{speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
+        <button type="button" className="n-avatar" onClick={() => { sfxTock(); setSheet('companion'); }} aria-label={t(`${displayName}, your companion`, `${displayName}, tu companion`)} title={displayName}>
+          <img src={`/mascots/${companion.id}.webp`} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+          <span className="lv">{level.number}</span>
+        </button>
+        <div className="relative">
+          <button type="button" aria-label={t('More options', 'Más opciones')} aria-expanded={menu} onClick={() => setMenu((m) => !m)} className="n-iconbtn"><MoreHorizontal size={16} /></button>
+          <AnimatePresence>
+            {menu && (
+              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="n-menu absolute right-0 z-30 mt-2 w-64 p-1.5 text-sm">
+                {menuItems.map((item) => (
+                  <button key={item.label} type="button" onClick={() => { setMenu(false); item.act(); }} className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left hover:bg-white/[0.05]" style={{ color: '#F2EDE4' }}>{item.icon}{item.label}</button>
+                ))}
+                <div className="px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]" style={{ color: '#8A8378' }}>{t('Your wallet signs every swap', 'Tu wallet firma cada swap')}</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
+    </header>
+  );
 
+  const stageNode = (
+    <div className="flex w-full flex-col items-center">
+      <div className="mb-6 flex min-h-[22px] items-end justify-center">
+        {lastYou && (isWorking || phase === 'complete' || phase === 'confirm') && <p className="n-question">{lastYou}</p>}
+      </div>
+      <NucleoSphere
+        size={sphereSize}
+        mode={sphereMode}
+        verdict={verdictKind}
+        word={verdictWord}
+        sub={verdictSub}
+        tint={glassTint}
+        agents={isWorking ? agentFocus : null}
+        agentsLayout={desktop ? 'around' : 'row'}
+        agentNames={{ alpha: 'Alpha Hunter', red: 'Red Team', cio: 'CIO' }}
+      />
+      <div className={desktop ? 'mt-10' : 'mt-14'} />
+      <span className="n-status" style={{ color: statusColor }}><i />{statusLabel}</span>
+      {statusHint && <span className="mt-2 text-[13px]" style={{ color: '#A39C91' }}>{statusHint}</span>}
+      {lastBobby && !isWorking && <p className={`mt-4 n-caption ${lastBobby.length > 150 ? 'long' : ''}`}>{lastBobby}</p>}
+    </div>
+  );
+
+  const chipsNode = !snapshot && phase !== 'confirm' ? (
+    <div className="flex justify-center gap-2 overflow-x-auto pb-1">
+      <button type="button" onClick={() => setSheet('board')} className="n-chip ghost">{t('Explore', 'Explorar')}</button>
+      {progress.quickAccess.slice(0, 2).map((s) => (
+        <button key={s} type="button" onClick={() => void ask(s)} className="n-chip">{t(`How does ${s} look?`, `¿Cómo se ve ${s}?`)}</button>
+      ))}
+    </div>
+  ) : null;
+
+  const askNode = (
+    <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="n-ask">
+      <input ref={inputRef} data-desk-input autoFocus={desktop} value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Asset to analyze', 'Activo a analizar')} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about any asset…', 'Pregunta por cualquier activo…')} />
+      <button type="submit" disabled={!input.trim() || isWorking} className="n-send">{isWorking ? t('Analyzing', 'Analizando') : t('Ask', 'Preguntar')}</button>
+      <button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Talk to Bobby', 'Hablar con Bobby')} className={`n-mic ${listening ? 'on' : ''}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>
+    </form>
+  );
+
+  const logNode = (
+    <details className="n-card p-4">
+      <summary className="n-label cursor-pointer">{t('Conversation', 'Conversación')}</summary>
+      <div className="mt-3 space-y-3">
+        {messages.slice(-6).map((m, i) => (
+          <div key={i} className="flex gap-3 pb-2 text-sm" style={{ borderBottom: '1px solid rgba(242,237,228,.06)' }}>
+            <span className="w-12 shrink-0 pt-0.5 font-mono text-[10px] uppercase tracking-[0.14em]" style={{ color: m.from === 'bobby' ? '#F2EDE4' : '#8A8378' }}>{m.from === 'bobby' ? 'Bobby' : t('You', 'Tú')}</span>
+            <span style={{ color: '#D9D2C7' }}>{m.text}</span>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+
+  const cardsNode = (
+    <>
+      {deskError && <div role="alert" className="rounded-2xl border border-red-400/30 bg-red-400/[0.06] p-4 text-sm text-red-200">{deskError}</div>}
+      {phase === 'confirm' && pending && (
+        <div className="n-card p-5">
+          <div className="n-label" style={{ color: '#F6B94E' }}>{t('Did you mean', '¿Quisiste decir')}</div>
+          <div className="n-display mt-1.5 text-[24px]">{pending.confirmName} <span style={{ color: '#A39C91' }}>({pending.snapshot.symbol})</span></div>
+          {pending.proxyNote && <div className="mt-1 text-xs" style={{ color: '#A39C91' }}>{pending.proxyNote}</div>}
+          <div className="mt-4 flex gap-2">
+            <button type="button" onClick={() => { const r = pending; setPending(null); void analyze(r.snapshot); }} className="n-send">{t('Yes, analyze', 'Sí, analiza')}</button>
+            <button type="button" onClick={() => { setPending(null); setPhase('idle'); }} className="n-chip ghost">{t('No', 'No')}</button>
+          </div>
+        </div>
+      )}
+      {/* NO TRADE halo */}
+      {noTrade && <NoTradeCard compact={!desktop} symbol={noTrade.symbol} reason={noTrade.reason} xp={noTrade.xp} onClose={() => setNoTrade(null)} />}
+      {/* Trader Land: the seed a read planted (with its horizon choice) or the piece a NO TRADE bloomed. */}
+      {landEvent && <LandSeedCard key={landEvent} compact={!desktop} eventId={landEvent} onClose={() => setLandEvent(null)} />}
+      {snapshot && answer && debate && (
+        <div className="n-card p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="n-label">{t('The desk', 'El desk')} · {snapshot.symbol}</span>
+            <span className="n-label">{t('Reference only', 'Solo referencia')}</span>
+          </div>
+          {answer.price !== null && (
+            <div className="mt-2 flex items-baseline gap-3">
+              <span className="n-display text-[34px] leading-none">{money(answer.price)}</span>
+              <span className="n-label">{snapshot.isEquity ? t('Equity', 'Acción') : 'Crypto'}</span>
+            </div>
+          )}
+          <div className="mt-3"><StanceRows debate={debate} /></div>
+          <DeskReadSource />
+        </div>
+      )}
+      {snapshot && answer && debate && debate.direction === 'long' && <DeskSwapCard symbol={snapshot.symbol} conviction={answer.convictionPct} />}
+      {messages.length > 0 && logNode}
     </>
   );
-  const stageNode = (
-    <>
-      {/* stage */}
-      <div className="flex flex-col items-center py-2" style={{ background: `radial-gradient(circle at 50% 40%, ${tintFor(companion, 0.16)}, transparent 60%)` }}>
-        <div ref={stageRef} className="relative" style={{ width: mascotSize, height: mascotSize }}>
+
+  const companionSheet = sheet === 'companion' ? (
+    <motion.div key="companion-sheet" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end justify-center bg-black/75 backdrop-blur-sm md:items-center" onClick={() => setSheet('none')}>
+      <motion.div initial={{ y: 24 }} animate={{ y: 0 }} className="n-card relative w-full max-w-md rounded-b-none p-6 pb-[max(24px,env(safe-area-inset-bottom))] md:rounded-[28px]" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={() => setSheet('none')} className="n-iconbtn absolute right-4 top-4" aria-label={t('Close', 'Cerrar')}><X size={16} /></button>
+        <div className="n-label">{t('Your companion', 'Tu companion')}</div>
+        <div className="n-display mt-1 text-[28px] leading-tight">{displayName}</div>
+        <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: tint }}>{t('Level', 'Nivel')} {level.number} · {level.name} · {progress.xp} XP</div>
+        <div ref={stageRef} className="relative mx-auto mt-2" style={{ width: 260, height: 260 }}>
           <BobbyMascot3D
             look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }}
             state={mascotState}
             level={voice.speaking ? voice.level : null}
-            size={mascotSize}
+            size={260}
             attachments={attachments}
             equipUrl={equip.url}
             equipToken={equip.token}
           />
         </div>
-      </div>
-    </>
-  );
-  const confirmNode = (
-    <>
-      {deskError && <div role="alert" className="rounded-xl border border-red-400/30 bg-red-400/[0.06] p-4 text-sm text-red-200">{deskError}</div>}
-      {/* confirm */}
-      {phase === 'confirm' && pending && (
-        <div className="rounded-xl p-4 bg-white/[0.02] border border-amber-400/30 text-sm text-white/80">
-          <div className="text-[10px] font-mono tracking-[0.2em] text-amber-300">{t('DID YOU MEAN', '¿QUISISTE DECIR')}</div>
-          <div className="mt-1 text-white text-lg">{pending.confirmName} ({pending.snapshot.symbol})</div>
-          {pending.proxyNote && <div className="text-xs text-white/50 mt-1">{pending.proxyNote}</div>}
-          <div className="mt-3 flex gap-2">
-            <button onClick={() => { const r = pending; setPending(null); void analyze(r.snapshot); }} className="px-4 py-2 rounded-lg bg-green-400 text-black text-xs font-mono tracking-[0.15em]">{t('YES, ANALYZE', 'SÍ, ANALIZA')}</button>
-            <button onClick={() => { setPending(null); setPhase('idle'); }} className="px-4 py-2 rounded-lg border border-white/10 text-white/70 text-xs font-mono tracking-[0.15em]">{t('NO', 'NO')}</button>
+        <div className="mt-1 flex justify-center"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={openTraderLand} /></div>
+        <div className="mt-5 grid grid-cols-3 gap-2">
+          <button type="button" onClick={() => setSheet('squad')} className="n-chip">{t('My squad', 'Mi squad')}</button>
+          <button type="button" onClick={() => setSheet('catalog')} className="n-chip">{t('Gear', 'Equipo')}</button>
+          <button type="button" onClick={() => void shareSkin()} className="n-chip">{t('Share', 'Compartir')}</button>
+        </div>
+      </motion.div>
+    </motion.div>
+  ) : null;
+
+  const overlaysNode = (
+    <AnimatePresence>
+      {companionSheet}
+      {sheet === 'board' && <BoardSheet onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
+      {sheet === 'squad' && <SquadSheet current={companion} level={level.number} onPick={(c) => { progressStore.setCompanion(c.id); setSheet('none'); void voice.speak(pick(c.selectLine), { voice: c.voicePersona, essential: false }); }} onClose={() => setSheet('none')} />}
+      {signInPrompt && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} onClose={() => setSignInPrompt(false)} />}
+      {sheet === 'catalog' && <GearCatalog current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
+      {sheet === 'world' && <WorldMapTeaser xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
+      {sheet === 'swap' && <SwapSheet initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
+      {sheet === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 md:items-center" onClick={() => setSheet('none')}>
+          <div className="n-card w-full max-w-md space-y-3 rounded-b-none p-6 text-center md:rounded-[28px]" onClick={(e) => e.stopPropagation()}>
+            <div className="text-7xl" style={{ filter: has ? 'none' : 'grayscale(1)' }}>{pet.emoji}</div>
+            <div className="n-display text-2xl">{pick(pet.name)}</div>
+            <div className="text-sm" style={{ color: '#A39C91' }}>{has ? (pet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.')) : t(`Unlocks at ${PET_UNLOCK_XP} XP · you have ${progress.xp}. Discipline only.`, `Se desbloquea a ${PET_UNLOCK_XP} XP · llevas ${progress.xp}. Solo disciplina.`)}</div>
           </div>
-        </div>
+        </motion.div>) : null; })()}
+      {sheet === 'risk' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 overflow-y-auto" style={{ background: 'rgba(11,10,9,.96)' }}><RiskNotice readOnly onClose={() => setSheet('none')} /></motion.div>
       )}
-
-    </>
-  );
-  const noTradeNode = (compact = false) => (
-    <>
-      {/* NO TRADE halo */}
-      {noTrade && <NoTradeCard compact={compact} symbol={noTrade.symbol} reason={noTrade.reason} xp={noTrade.xp} onClose={() => setNoTrade(null)} />}
-      {/* Trader Land: the seed a read planted (with its horizon choice) or the piece a NO TRADE bloomed. */}
-      {landEvent && <LandSeedCard key={landEvent} compact={compact} eventId={landEvent} onClose={() => setLandEvent(null)} />}
-
-    </>
-  );
-  const marketNode = (
-    <>
-      {/* market card */}
-      {snapshot && answer && (
-        <div className="rounded-2xl border border-white/[0.05] bg-white/[0.02] p-4 space-y-4">
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-semibold text-white">{snapshot.symbol}</span>
-            <span className="text-[10px] font-mono tracking-[0.15em] text-white/40">{snapshot.isEquity ? 'EQUITY' : 'CRYPTO'}</span>
-          </div>
-          {answer.price !== null && <div className="text-4xl font-mono text-white">{money(answer.price)}</div>}
-          {debate && <><StanceRows debate={debate} /><DeskReadSource /></>}
-        </div>
-      )}
-      {snapshot && answer && debate && debate.direction === 'long' && <DeskSwapCard symbol={snapshot.symbol} conviction={answer.convictionPct} />}
-
-    </>
-  );
-  const quickNode = (
-    <>
-      {/* quick access */}
-      {!snapshot && phase !== 'confirm' && (
-        <div className="flex items-center justify-center gap-2">
-            <button onClick={() => setSheet('board')} className="rounded-xl border border-sky-400/40 bg-sky-400/[0.06] px-4 py-2 text-sm font-medium text-sky-300">{t('Explore', 'Explorar')}</button>
-            {progress.quickAccess.slice(0, 2).map((s) => (
-              <button key={s} onClick={() => void ask(s)} className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-2 text-sm font-medium text-white">{s}</button>
-            ))}
-        </div>
-      )}
-
-    </>
-  );
-  const logNode = (
-    <>
-      {/* desk log */}
-      <details className="rounded-2xl p-4 bg-white/[0.02] border border-white/[0.05]">
-        <summary className="cursor-pointer text-[10px] font-mono tracking-[0.15em] text-white/50">{t('Conversation', 'Conversación')}</summary>
-        <div className="mt-2 space-y-3">
-          {messages.slice(-6).map((m, i) => (
-            <div key={i} className="flex gap-3 text-sm border-b border-white/[0.04] pb-2"><span className="w-12 shrink-0 text-[10px] font-mono tracking-[0.15em] pt-1" style={{ color: m.from === 'bobby' ? '#7ea6ff' : 'rgba(255,255,255,0.4)' }}>{m.from === 'bobby' ? 'BOBBY' : t('YOU', 'TÚ')}</span><span className="text-white/85">{m.text}</span></div>
-          ))}
-        </div>
-      </details>
-    </>
-  );
-  const composerNode = (
-    <>
-      {/* composer */}
-      <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="fixed bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black/95 to-transparent p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <div className="mx-auto max-w-2xl flex gap-2">
-          <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Asset to analyze', 'Activo a analizar')} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about BTC, NVDA, gold…', 'Pregunta por BTC, NVDA, oro…')} className="min-w-0 flex-1 rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-white outline-none focus:border-sky-400/50" />
-          {canDictate && <button type="button" onClick={toggleDictation} aria-label={t('Talk to Bobby', 'Hablar con Bobby')} className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center ${listening ? 'bg-red-400 text-black' : 'bg-sky-500 text-white'}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>}
-          <button type="submit" disabled={!input.trim() || isWorking} className="h-12 px-4 rounded-xl bg-green-400 text-black font-mono text-xs tracking-[0.15em] disabled:cursor-not-allowed disabled:opacity-40">{isWorking ? t('ANALYZING', 'ANALIZANDO') : t('ASK', 'PREGUNTA')}</button>
-        </div>
-      </form>
-    </>
+      {inspected && <ToolDetail companion={companion} tool={inspected} xp={progress.xp} onClose={() => setInspected(null)} />}
+      {evolution && <EvolutionOverlay companion={companion} level={evolution} onDone={() => { const name = companionName(companion, evolution.number); say(t(`I evolved. Call me ${name} now.`, `Evolucioné. Ahora dime ${name}.`), false); setEvolution(null); }} />}
+      {/* A new tool flies onto the companion: open its sheet so the equip is actually seen. */}
+      {!evolution && drops[0] && <ToolUnlockOverlay companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) { setSheet('companion'); setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 420); } }} />}
+    </AnimatePresence>
   );
 
   if (desktop) {
     return (
-      <div className="flex min-h-[calc(100vh-56px)] flex-col text-white">
-        <div className="border-b border-white/10 px-6 py-3">{headerNode}</div>
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(340px,0.78fr)_minmax(0,1.22fr)]">
-          {/* companion side */}
-          <section className="relative flex min-h-0 flex-col items-center justify-center overflow-hidden px-5 py-6" style={{ background: `radial-gradient(circle at 50% 45%, ${tintFor(companion, 0.12)}, transparent 62%)` }}>
-            <div className="relative flex flex-col items-center">
-        <div ref={stageRef} className="relative" style={{ width: mascotSize, height: mascotSize }}>
-          <BobbyMascot3D
-            look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }}
-            state={mascotState}
-            level={voice.speaking ? voice.level : null}
-            size={mascotSize}
-            attachments={attachments}
-            equipUrl={equip.url}
-            equipToken={equip.token}
-          />
-        </div>
-        <div className="mt-2 flex items-center gap-2 text-[11px] font-mono tracking-[0.25em]" style={{ color: listening ? '#34D399' : voice.speaking ? '#7ea6ff' : phase === 'error' ? '#f87171' : phase === 'complete' ? '#34D399' : '#7ea6ff' }}>
-          <span className="h-1.5 w-1.5 rounded-full bg-current shadow-[0_0_6px_currentColor]" />{statusLabel}
-        </div>
-        {statusHint && <div className="text-[10px] font-mono text-white/45 mt-1">{statusHint}</div>}
-            </div>
-            <div className="relative mt-5 flex shrink-0 flex-col items-center gap-2">
-              <button type="button" onClick={canDictate ? toggleDictation : () => inputRef.current?.focus()} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Tap to talk', 'Toca para hablar')} className={`relative grid h-14 w-14 place-items-center rounded-full transition ${listening ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)]' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff]'}`}>
-                {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-              </button>
-              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">{listening ? t('Listening…', 'Escuchando…') : t('Tap to talk', 'Toca para hablar')}</p>
-            </div>
-            <div className="relative mt-5">
-        <div className="mt-3"><ToolBelt companion={companion} xp={progress.xp} onTap={(tool) => { sfxTock(); setInspected(tool); }} onPet={() => { sfxTock(); setSheet('pet'); }} onPlus={() => { sfxTock(); setSheet('catalog'); }} onWorld={openTraderLand} /></div>
-            </div>
+      <div className="flex min-h-screen flex-col" style={{ color: '#F2EDE4' }}>
+        {headerNode}
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(460px,1fr)_minmax(0,1fr)]">
+          {/* the glass side */}
+          <section className="relative flex min-h-[calc(100vh-64px)] flex-col items-center justify-between px-8 pb-8 pt-4" style={{ background: 'radial-gradient(60% 46% at 50% 40%, #15121C, transparent 72%)' }}>
+            <div className="flex w-full flex-1 items-center justify-center">{stageNode}</div>
+            <div className="w-full max-w-[560px] space-y-3">{chipsNode}{askNode}</div>
           </section>
-
-          {/* market side */}
-          <section className="flex min-h-0 flex-col gap-3 border-l border-white/10 p-4">
-            <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="rounded-2xl border border-green-400/25 bg-green-400/[0.045] p-3 shadow-[0_0_36px_rgba(74,222,128,.05)]">
-              <div className="flex gap-2">
-                <input ref={inputRef} data-desk-input autoFocus value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Asset to analyze', 'Activo a analizar')} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about an asset…', 'Pregunta por un activo…')} className="min-w-0 flex-1 rounded-xl border border-white/[0.10] bg-black/35 px-4 py-3 text-white outline-none placeholder:text-white/30 focus:border-green-400/60" />
-                {canDictate && <button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Name an asset by voice', 'Di un activo por voz')} className={`h-12 w-12 shrink-0 rounded-xl grid place-items-center ${listening ? 'bg-red-400 text-black' : 'border border-sky-400/30 bg-sky-500/15 text-sky-300'}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>}
-                <button type="submit" disabled={!input.trim() || isWorking} className="h-12 shrink-0 rounded-xl bg-green-400 px-5 font-mono text-xs font-bold tracking-[0.13em] text-black transition hover:bg-green-300 disabled:cursor-not-allowed disabled:opacity-40">{isWorking ? t('ANALYZING', 'ANALIZANDO') : t('ANALYZE', 'ANALIZAR')}</button>
-              </div>
-            </form>
-            {!snapshot && phase !== 'confirm' && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button onClick={() => setSheet('board')} className="rounded-lg border border-sky-400/40 bg-sky-400/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-sky-300">{t('Explore', 'Explorar')}</button>
-                {progress.quickAccess.slice(0, 2).map((sym) => (
-                  <button key={sym} onClick={() => void ask(sym)} className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/80">{sym}</button>
-                ))}
-              </div>
-            )}
-            <div className="min-h-[360px] flex-1">
+          {/* the market side: the chart stays the co-star */}
+          <section className="flex min-h-0 flex-col gap-3 px-5 pb-6 pt-2" style={{ borderLeft: '1px solid rgba(242,237,228,.08)' }}>
+            <div className="n-card min-h-[380px] flex-1 overflow-hidden p-2">
               <MarketCanvas compact showAgents showSymbolSelector={false} symbol={chartSymbol} timeframe={chartTimeframe} levels={chartLevels} debate={chartDebate} language={isSpanish() ? 'es' : 'en'} onSymbolChange={(sym) => setChartSymbol(sym)} onTimeframeChange={(tf) => setChartTimeframe(tf)} />
             </div>
-            <div className="max-h-[38vh] space-y-3 overflow-y-auto pr-1">
-              {confirmNode}
-              {noTradeNode()}
-              {snapshot && answer && debate && (
-                <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] p-4">
-                  <div className="flex justify-between text-[10px] font-mono tracking-[0.2em]"><span className="text-amber-300">{t('TECHNICAL DESK', 'DESK TÉCNICO')} · {snapshot.symbol}</span><span className="text-white/40">{t('REFERENCE ONLY', 'SOLO REFERENCIA')}</span></div>
-                  <div className="mt-3"><StanceRows debate={debate} /></div>
-                  <DeskReadSource />
-                </div>
-              )}
-              {snapshot && answer && debate && debate.direction === 'long' && <DeskSwapCard symbol={snapshot.symbol} conviction={answer.convictionPct} />}
-              {logNode}
-            </div>
+            <div className="max-h-[42vh] space-y-3 overflow-y-auto pr-1">{cardsNode}</div>
           </section>
         </div>
-      {/* sheets & overlays */}
-      <AnimatePresence>
-        {sheet === 'board' && <BoardSheet onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
-        {sheet === 'squad' && <SquadSheet current={companion} level={level.number} onPick={(c) => { progressStore.setCompanion(c.id); setSheet('none'); void voice.speak(pick(c.selectLine), { voice: c.voicePersona, essential: false }); }} onClose={() => setSheet('none')} />}
-        {signInPrompt && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} onClose={() => setSignInPrompt(false)} />}
-        {sheet === 'catalog' && <GearCatalog current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
-        {sheet === 'world' && <WorldMapTeaser xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
-        {sheet === 'swap' && <SwapSheet initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
-        {sheet === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end md:items-center justify-center bg-black/70" onClick={() => setSheet('none')}>
-            <div className="w-full max-w-md bg-[#0a0a0c] border border-white/[0.06] rounded-t-2xl md:rounded-2xl p-6 text-center space-y-3" onClick={(e) => e.stopPropagation()}>
-              <div className="text-7xl" style={{ filter: has ? 'none' : 'grayscale(1)' }}>{pet.emoji}</div>
-              <div className="text-2xl font-semibold text-white">{pick(pet.name)}</div>
-              <div className="text-sm text-white/75">{has ? (pet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.')) : t(`Unlocks at ${PET_UNLOCK_XP} XP · you have ${progress.xp}. Discipline only.`, `Se desbloquea a ${PET_UNLOCK_XP} XP · llevas ${progress.xp}. Solo disciplina.`)}</div>
-            </div>
-          </motion.div>) : null; })()}
-        {sheet === 'risk' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/90 overflow-y-auto"><RiskNotice readOnly onClose={() => setSheet('none')} /></motion.div>
-        )}
-        {inspected && <ToolDetail companion={companion} tool={inspected} xp={progress.xp} onClose={() => setInspected(null)} />}
-        {evolution && <EvolutionOverlay companion={companion} level={evolution} onDone={() => { const name = companionName(companion, evolution.number); say(t(`I evolved. Call me ${name} now.`, `Evolucioné. Ahora dime ${name}.`), false); setEvolution(null); }} />}
-        {!evolution && drops[0] && <ToolUnlockOverlay companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 80); }} />}
-      </AnimatePresence>
+        {overlaysNode}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pt-2 pb-28 space-y-4">
+    <div className="min-h-screen pb-44" style={{ color: '#F2EDE4' }}>
       {headerNode}
-      {stageNode}
-      {confirmNode}
-      {noTradeNode(true)}
-      {marketNode}
-      {quickNode}
-      {logNode}
-      {composerNode}
-      {/* sheets & overlays */}
-      <AnimatePresence>
-        {sheet === 'board' && <BoardSheet onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
-        {sheet === 'squad' && <SquadSheet current={companion} level={level.number} onPick={(c) => { progressStore.setCompanion(c.id); setSheet('none'); void voice.speak(pick(c.selectLine), { voice: c.voicePersona, essential: false }); }} onClose={() => setSheet('none')} />}
-        {signInPrompt && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} onClose={() => setSignInPrompt(false)} />}
-        {sheet === 'catalog' && <GearCatalog current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
-        {sheet === 'world' && <WorldMapTeaser xp={progress.xp} level={level.number} onClose={() => setSheet('none')} />}
-        {sheet === 'swap' && <SwapSheet initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
-        {sheet === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 flex items-end md:items-center justify-center bg-black/70" onClick={() => setSheet('none')}>
-            <div className="w-full max-w-md bg-[#0a0a0c] border border-white/[0.06] rounded-t-2xl md:rounded-2xl p-6 text-center space-y-3" onClick={(e) => e.stopPropagation()}>
-              <div className="text-7xl" style={{ filter: has ? 'none' : 'grayscale(1)' }}>{pet.emoji}</div>
-              <div className="text-2xl font-semibold text-white">{pick(pet.name)}</div>
-              <div className="text-sm text-white/75">{has ? (pet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.')) : t(`Unlocks at ${PET_UNLOCK_XP} XP · you have ${progress.xp}. Discipline only.`, `Se desbloquea a ${PET_UNLOCK_XP} XP · llevas ${progress.xp}. Solo disciplina.`)}</div>
-            </div>
-          </motion.div>) : null; })()}
-        {sheet === 'risk' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/90 overflow-y-auto"><RiskNotice readOnly onClose={() => setSheet('none')} /></motion.div>
-        )}
-        {inspected && <ToolDetail companion={companion} tool={inspected} xp={progress.xp} onClose={() => setInspected(null)} />}
-        {evolution && <EvolutionOverlay companion={companion} level={evolution} onDone={() => { const name = companionName(companion, evolution.number); say(t(`I evolved. Call me ${name} now.`, `Evolucioné. Ahora dime ${name}.`), false); setEvolution(null); }} />}
-        {!evolution && drops[0] && <ToolUnlockOverlay companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 80); }} />}
-      </AnimatePresence>
+      <div className="mx-auto max-w-2xl space-y-6 px-4 pt-2">
+        <div className="py-2" style={{ background: 'radial-gradient(70% 40% at 50% 30%, #15121C, transparent 72%)' }}>{stageNode}</div>
+        <div className="space-y-3">{cardsNode}</div>
+      </div>
+      {/* the dock: suggestions, the ask field and the black mic pill, like the iPhone */}
+      <div className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-8" style={{ background: 'linear-gradient(180deg, transparent, rgba(11,10,9,.95) 34%)' }}>
+        <div className="mx-auto max-w-2xl space-y-3">{chipsNode}{askNode}</div>
+      </div>
+      {overlaysNode}
     </div>
   );
 }

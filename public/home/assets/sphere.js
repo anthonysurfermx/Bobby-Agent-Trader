@@ -248,15 +248,17 @@ function mount(cv, opts){
   /* layout size, not the transformed box: a page may scale/move the canvas with CSS without reallocating the buffer */
   function size(){ var w = Math.max(1, Math.round((cv.clientWidth || 1) * dpr)), h = Math.max(1, Math.round((cv.clientHeight || 1) * dpr)); if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; } }
   window.addEventListener('resize', size); size();
-  window.addEventListener('pointermove', function(e){ var r = cv.getBoundingClientRect(); light.tx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width/2)) / (r.width))); light.ty = Math.max(-1, Math.min(1, -(e.clientY - (r.top + r.height/2)) / (r.height))); }, { passive: true });
+  function onPtr(e){ var r = cv.getBoundingClientRect(); light.tx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width/2)) / (r.width))); light.ty = Math.max(-1, Math.min(1, -(e.clientY - (r.top + r.height/2)) / (r.height))); }
+  window.addEventListener('pointermove', onPtr, { passive: true });
+  var dead = false, io = null;
   var visible = true;
-  if ('IntersectionObserver' in window) new IntersectionObserver(function(es){ visible = es[0].isIntersecting; if (visible) req(); }, { rootMargin: '120px' }).observe(cv);
+  if ('IntersectionObserver' in window){ io = new IntersectionObserver(function(es){ visible = es[0].isIntersecting; if (visible) req(); }, { rootMargin: '120px' }); io.observe(cv); }
   var last = performance.now(), raf = 0, t0 = last;
-  function req(){ if (!raf) raf = requestAnimationFrame(frame); }
+  function req(){ if (!raf && !dead) raf = requestAnimationFrame(frame); }
   var emit = new Float32Array(12), nodes = new Float32Array(9), neigh = new Float32Array(4), cxf = new Float32Array(4);
   var TETHER = [-140 * Math.PI/180, -40 * Math.PI/180, 90 * Math.PI/180];
   function frame(now){
-    raf = 0; if (!visible) return;
+    raf = 0; if (!visible || dead) return;
     var h = Math.min(0.05, (now - last) / 1000); last = now; var clk = (now - t0) / 1000;
     var k = 1 - Math.exp(-h / 0.45); for (var n in T) X[n] += (T[n] - X[n]) * k;
     var sh = RM ? 0 : 1;
@@ -296,6 +298,14 @@ function mount(cv, opts){
   }
   req();
   var api = {
+    /* stop the loop and let go of the GPU: for pages that mount and unmount the glass (the web desk) */
+    destroy: function(){
+      if (dead) return; dead = true;
+      if (raf) cancelAnimationFrame(raf); raf = 0;
+      window.removeEventListener('resize', size); window.removeEventListener('pointermove', onPtr);
+      if (io) io.disconnect();
+      try { var ext = gl.getExtension('WEBGL_lose_context'); if (ext) ext.loseContext(); } catch (e) {}
+    },
     set: function(mode, verdict){
       var base = { energy: .35, swirl: 0, glow: .35, irid: 1, listen: 0, wflow: .18, braid: 0, flood: 0, scrim: 0, nodes: 0, filA: 0 };
       if (mode === 'listen'){ base.listen = 1; base.energy = .55; base.glow = .5; }
