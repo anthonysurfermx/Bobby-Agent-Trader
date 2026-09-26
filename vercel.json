@@ -21,6 +21,14 @@
       "destination": "/api/trader-land-share?code=:code"
     },
     {
+      "source": "/nucleo",
+      "destination": "/nucleo/index.html"
+    },
+    {
+      "source": "/nucleo/",
+      "destination": "/nucleo/index.html"
+    },
+    {
       "source": "/((?!api/|assets/|ai-judge-manifest\\.json$).*)",
       "destination": "/"
     }

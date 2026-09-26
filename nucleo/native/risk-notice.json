@@ -1,0 +1,43 @@
+{
+ "v": 1,
+ "source": "Sources/RiskNoticeView.swift statements (must move to enum RiskNotice; never retyped)",
+ "version": 4,
+ "statements": {
+  "en": [
+   {
+    "title": "Allow AI processing of my questions.",
+    "body": "Bobby sends your question and market data to OpenAI. When voice is on, reply text goes to OpenAI or Microsoft to create speech. Avoid personal or account details."
+   },
+   {
+    "title": "Not investment advice.",
+    "body": "Verdicts, levels and stops are educational analysis made by software, not recommendations for you."
+   },
+   {
+    "title": "Bobby never touches your money.",
+    "body": "It doesn't connect wallets, move funds, execute trades or hold your keys."
+   },
+   {
+    "title": "You can lose money. You decide.",
+    "body": "Data can be late or wrong. If you need advice, talk to a licensed professional."
+   }
+  ],
+  "es": [
+   {
+    "title": "Permito que la IA procese mis preguntas.",
+    "body": "Bobby envía tu pregunta y datos de mercado a OpenAI. Con voz activa, envía el texto de respuesta a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas."
+   },
+   {
+    "title": "No es asesoría de inversión.",
+    "body": "Veredictos, niveles y stops son análisis educativo hecho por un programa, no recomendaciones para ti."
+   },
+   {
+    "title": "Bobby nunca toca tu dinero.",
+    "body": "No conecta wallets, no mueve fondos, no ejecuta operaciones y no guarda tus llaves."
+   },
+   {
+    "title": "Puedes perder dinero. Tú decides.",
+    "body": "Los datos pueden llegar tarde o mal. Si necesitas asesoría, acude a un profesional autorizado."
+   }
+  ]
+ }
+}

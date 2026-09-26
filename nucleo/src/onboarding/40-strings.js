@@ -1,0 +1,152 @@
+
+/* ============================================================
+   Strings (en / es), selected by session.language. Read-derived
+   copy (verdicts, satellites, thesis rows, failures, XP) comes
+   from NucleoReadModel; everything the onboarding itself says
+   lives here. No advice or outcome language (lint: nucleo.lint()).
+   '|' in a spoken line is a caption page break (never spoken).
+   ============================================================ */
+var STR = {
+  en: {
+    'hello': 'I’m Bobby. Before you trade anything,|three of me argue about it. Then you decide.',
+    'pick.prompt': 'Who lives in here?',
+    'pick.count': '{i} of {n}',
+    'pick.choose': 'Choose {name}',
+    'pick.hint': 'Swipe the sphere · Tap to choose',
+    'pick.chosen': '{name} it is.',
+    'pick.failed': 'That didn’t stick · Tap to choose again',
+    'ask.title': 'Ask before you trade.',
+    'ask.sub': 'Hold the button and talk, or tap a question.',
+    'chip.look': 'How is {sym} looking?',
+    'chip.move': 'Why is {sym} moving today?',
+    'chip.again': 'Try another question',
+    'perm.title': 'I only listen while you hold.',
+    'perm.body': 'iOS will ask for the microphone and speech recognition once.',
+    'perm.go': 'Continue',
+    'ask.gotIt': 'Got it. Hold and ask.',
+    'hint.hold': 'Hold to ask',
+    'hint.release': 'Release to send',
+    'hint.type': 'Type your question',
+    'hint.sttEmpty': 'I didn’t catch that · Hold and try again',
+    'hint.sttError': 'The mic stopped · Hold to try again',
+    'type.placeholder': 'Ask about a stock or a crypto',
+    'type.send': 'Send',
+    'risk.intro': 'Before I answer, one thing.',
+    'risk.introOnly': 'One thing before we go on.',
+    'risk.hold': 'Hold to agree',
+    'risk.notice': 'Read the full notice',
+    'risk.failed': 'That didn’t go through · Hold again',
+    'think.elapsed': '{s} s',
+    'think.still': 'Still weighing · deep reads take up to a minute',
+    'think.long': 'Taking longer than usual · tap to cancel',
+    'think.forming': 'Verdict forming',
+    'hint.conviction': 'Conviction = how sure Bobby is in this read',
+    'hint.pull': 'Pull down for the full read',
+    'pill.fullRead': 'See the full read',
+    'save.failed': 'Couldn’t save · Try again',
+    'evolution': 'Level {n} · {name}',
+    'unlocked': 'Unlocked · {names}',
+    'sheet.title': 'Keep your theses.',
+    'sheet.body': 'Back up your theses and XP so they survive a new phone.',
+    'sheet.apple': 'Sign in with Apple',
+    'sheet.notnow': 'Not now',
+    'sheet.unavailable': 'Sign-in isn’t available right now. Your thesis stays on this device.',
+    'sheet.failed': 'Sign-in didn’t finish. You can try again later.',
+    'isla.seed': 'Your island got its first seed.',
+    'isla.seedSub': 'It grows when this read closes.',
+    'isla.bloom': 'Your island grew its first piece.',
+    'isla.card.title': 'Island · size {size}',
+    'isla.card.body': '{pieces} pieces · {seeds} growing',
+    'home.morning': 'Good morning.', 'home.afternoon': 'Good afternoon.', 'home.evening': 'Good evening.',
+    'home.saved': 'Your {sym} thesis is saved.',
+    'home.none': 'Ask me about any stock or crypto.',
+    'home.hint': 'Hold to ask · Swipe the sphere',
+    'gsat': '{sym} · {word}',
+    'chart.now': 'NOW',
+    'asof': 'as of {time}',
+    'aria.listening': 'Bobby is listening',
+    'aria.debate': 'Three agents debating',
+    'aria.bobby': 'Bobby',
+    'aria.pill': 'Ask Bobby, hold to talk',
+    'aria.close': 'Close read',
+    'pause': 'Paused'
+  },
+  es: {
+    'hello': 'Soy Bobby. Antes de que operes,|tres de mí lo discuten. Luego tú decides.',
+    'pick.prompt': '¿Quién vive aquí?',
+    'pick.count': '{i} de {n}',
+    'pick.choose': 'Elegir a {name}',
+    'pick.hint': 'Desliza la esfera · Toca para elegir',
+    'pick.chosen': 'Elegiste a {name}.',
+    'pick.failed': 'No se guardó · Toca para elegir otra vez',
+    'ask.title': 'Pregunta antes de operar.',
+    'ask.sub': 'Mantén el botón y habla, o toca una pregunta.',
+    'chip.look': '¿Cómo se ve {sym}?',
+    'chip.move': '¿Por qué se mueve {sym} hoy?',
+    'chip.again': 'Prueba otra pregunta',
+    'perm.title': 'Solo escucho mientras mantienes.',
+    'perm.body': 'iOS te pedirá una vez el micrófono y el reconocimiento de voz.',
+    'perm.go': 'Continuar',
+    'ask.gotIt': 'Listo. Mantén y pregunta.',
+    'hint.hold': 'Mantén para preguntar',
+    'hint.release': 'Suelta para enviar',
+    'hint.type': 'Escribe tu pregunta',
+    'hint.sttEmpty': 'No te escuché · Mantén e intenta de nuevo',
+    'hint.sttError': 'El micrófono se detuvo · Mantén para intentar',
+    'type.placeholder': 'Pregunta por una acción o una cripto',
+    'type.send': 'Enviar',
+    'risk.intro': 'Antes de responder, una cosa.',
+    'risk.introOnly': 'Una cosa antes de seguir.',
+    'risk.hold': 'Mantén para aceptar',
+    'risk.notice': 'Leer el aviso completo',
+    'risk.failed': 'No se registró · Mantén otra vez',
+    'think.elapsed': '{s} s',
+    'think.still': 'Sigue deliberando · una lectura a fondo tarda hasta un minuto',
+    'think.long': 'Tarda más de lo normal · toca para cancelar',
+    'think.forming': 'Veredicto en camino',
+    'hint.conviction': 'Convicción = qué tan seguro está Bobby de esta lectura',
+    'hint.pull': 'Desliza hacia abajo para la lectura completa',
+    'pill.fullRead': 'Ver la lectura',
+    'save.failed': 'No se pudo guardar · Intenta de nuevo',
+    'evolution': 'Nivel {n} · {name}',
+    'unlocked': 'Desbloqueado · {names}',
+    'sheet.title': 'Conserva tus tesis.',
+    'sheet.body': 'Respalda tus tesis y tu XP para no perderlos al cambiar de teléfono.',
+    'sheet.apple': 'Iniciar sesión con Apple',
+    'sheet.notnow': 'Ahora no',
+    'sheet.unavailable': 'Ahora no se puede iniciar sesión. Tu tesis se queda en este dispositivo.',
+    'sheet.failed': 'No se completó el inicio de sesión. Puedes intentarlo más tarde.',
+    'isla.seed': 'Tu isla recibió su primera semilla.',
+    'isla.seedSub': 'Crece cuando esta lectura se cierre.',
+    'isla.bloom': 'Tu isla creció su primera pieza.',
+    'isla.card.title': 'Isla · tamaño {size}',
+    'isla.card.body': '{pieces} piezas · {seeds} creciendo',
+    'home.morning': 'Buenos días.', 'home.afternoon': 'Buenas tardes.', 'home.evening': 'Buenas noches.',
+    'home.saved': 'Tu tesis de {sym} está guardada.',
+    'home.none': 'Pregúntame por cualquier acción o cripto.',
+    'home.hint': 'Mantén para preguntar · Desliza la esfera',
+    'gsat': '{sym} · {word}',
+    'chart.now': 'AHORA',
+    'asof': 'a las {time}',
+    'aria.listening': 'Bobby está escuchando',
+    'aria.debate': 'Tres agentes debatiendo',
+    'aria.bobby': 'Bobby',
+    'aria.pill': 'Pregunta a Bobby, mantén para hablar',
+    'aria.close': 'Cerrar lectura',
+    'pause': 'Pausa'
+  }
+};
+var LANG = 'en';
+function Ls(key, vars){
+  var s = STR[LANG][key]; if (s == null) s = STR.en[key]; if (s == null) return key;
+  return s.replace(/\{(\w+)\}/g, function(_, k){ return vars && vars[k] != null ? String(vars[k]) : ''; });
+}
+/* same rule as tests/read-model.test.mjs: no advice or outcome words in any table this page ships */
+var LINT_RE = /\b(buy|sell|compra|vende|profit|ganancias?|win|wins|winning|returns|guarantee\w*|garantiz\w*)\b/i;
+function lintStrings(){
+  var bad = [];
+  ['en', 'es'].forEach(function(l){ Object.keys(STR[l]).forEach(function(k){ if (LINT_RE.test(STR[l][k])) bad.push(l + '.' + k + ': ' + STR[l][k]); }); });
+  if (Object.keys(STR.en).length !== Object.keys(STR.es).length) bad.push('en/es key count differs');
+  Object.keys(STR.en).forEach(function(k){ if (STR.es[k] == null) bad.push('es missing ' + k); });
+  return bad;
+}
