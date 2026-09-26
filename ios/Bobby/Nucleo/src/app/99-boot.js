@@ -105,7 +105,7 @@ W.nucleo = {
   /* dev/harness only: drive the real input entry points in stage coordinates */
   input: MOCK ? { down: function(x, y){ inDown(x, y, hitAt(x, y)); }, move: function(x, y){ inMove(x, y); }, up: function(x, y){ inUp(x, y); }, hold: function(sel){ return targetXY(sel || '#pill'); } } : null,
   type: MOCK ? function(text){ if (ST.name !== 'TYPING') openTyping({}); el.ta.value = text; taAutosize(); STATES.TYPING.send(); } : null,
-  restore: MOCK ? function(name){ var f = W.NUCLEO_FIXTURES && W.NUCLEO_FIXTURES.ask[name || 'nvda']; if (f && S) go('RESTORE', { read: JSON.parse(JSON.stringify(f)) }); } : null,
+  restore: MOCK && typeof harnessRestore === 'function' ? harnessRestore : null,
   step: MOCK ? function(sec){ return runSteps(Math.round((sec == null ? 1 / 60 : sec) / H)).then(function(){ render(); return { t: clk, state: ST.name }; }); } : null,
   pause: function(){ paused = true; }, play: function(){ paused = false; }
 };

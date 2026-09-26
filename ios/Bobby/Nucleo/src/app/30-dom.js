@@ -19,6 +19,13 @@ function op(el, o){
   var q = o < 0.002 ? 0 : (o > 0.998 ? 1 : Math.round(o * 1000) / 1000);
   if (el._o === q) return; el._o = q;
   el.style.opacity = q; el.style.visibility = q === 0 ? 'hidden' : 'visible';
+  /* A visible child can override visibility:hidden on an animated parent.
+     Keep the whole inactive group out of accessibility and keyboard focus. */
+  if (el.classList && el.classList.contains('a')){
+    if (el._ariaFixed == null) el._ariaFixed = el.getAttribute('aria-hidden') === 'true';
+    if (!el._ariaFixed) att(el, 'aria-hidden', q === 0 ? 'true' : 'false');
+    if (el._inert !== (q === 0)){ el._inert = q === 0; el.inert = el._inert; }
+  }
 }
 function bl(el, b){ var q = b > 0.05 ? Math.round(b * 100) / 100 : 0; if (el._b === q) return; el._b = q; el.style.filter = q ? 'blur(' + q + 'px)' : 'none'; }
 function stc(el, k, c, a){

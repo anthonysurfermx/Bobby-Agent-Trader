@@ -27,7 +27,13 @@ export interface PersistentLimitResult {
   limited: boolean;
   remaining: number;
   resetAt: number; // epoch ms
+  /** False when the backing store could not confirm this hit. */
+  available: boolean;
 }
+
+// A voice request checks this store twice before synthesis. Keep both checks
+// inside the mobile client's deadline, even when Supabase stalls.
+const STORE_TIMEOUT_MS = 900;
 
 /**
  * Count a hit against `scope:id` and report whether the caller is over
@@ -42,18 +48,19 @@ export async function checkPersistentLimit(
   limit: number,
   windowSec: number,
 ): Promise<PersistentLimitResult> {
-  const openResult = { limited: false, remaining: limit, resetAt: Date.now() + windowSec * 1000 };
+  const openResult = { limited: false, remaining: limit, resetAt: Date.now() + windowSec * 1000, available: false };
   if (!SB_URL || !SB_KEY) return openResult;
 
   const key = `rl:${scope}:${id}`;
   try {
+    const signal = AbortSignal.timeout(STORE_TIMEOUT_MS);
     const nowIso = new Date().toISOString();
     const getUrl =
       `${SB_URL}/rest/v1/api_cache` +
       `?cache_key=eq.${encodeURIComponent(key)}` +
       `&expires_at=gt.${encodeURIComponent(nowIso)}` +
       `&select=payload,expires_at&limit=1`;
-    const getRes = await fetch(getUrl, { headers: headers() });
+    const getRes = await fetch(getUrl, { headers: headers(), signal });
     if (!getRes.ok) return openResult;
     const rows = (await getRes.json()) as Array<{ payload: { count?: number }; expires_at: string }>;
 
@@ -61,9 +68,10 @@ export async function checkPersistentLimit(
     const count = (row?.payload?.count ?? 0) + 1;
     const expiresAt = row?.expires_at ?? new Date(Date.now() + windowSec * 1000).toISOString();
 
-    await fetch(`${SB_URL}/rest/v1/api_cache?on_conflict=cache_key`, {
+    const saveRes = await fetch(`${SB_URL}/rest/v1/api_cache?on_conflict=cache_key`, {
       method: 'POST',
       headers: { ...headers(), Prefer: 'resolution=merge-duplicates,return=minimal' },
+      signal,
       body: JSON.stringify({
         cache_key: key,
         payload: { count },
@@ -71,11 +79,13 @@ export async function checkPersistentLimit(
         updated_at: new Date().toISOString(),
       }),
     });
+    if (!saveRes.ok) return openResult;
 
     return {
       limited: count > limit,
       remaining: Math.max(0, limit - count),
       resetAt: new Date(expiresAt).getTime(),
+      available: true,
     };
   } catch {
     return openResult;

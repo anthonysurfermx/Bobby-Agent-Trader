@@ -7,7 +7,7 @@
    contain a spoken question only; every value on screen still comes from
    the bridge replies.
    ===================================================================== */
-var MOCK_CLOCKED = false, SCRIPT = null, G = { x: 195, y: 790, vis: 0, press: 0 };
+var DEV_BUILD = true, MOCK_CLOCKED = false, SCRIPT = null, G = { x: 195, y: 790, vis: 0, press: 0 };
 var SCRIPTS = {
   'read-nvda': { mic: 'granted', steps: [
     { wait: 'IDLE', after: 1.0 },
@@ -99,6 +99,10 @@ function hashFrame(){
   var g = 0;
   if (gl && !glLost){ var w = cv.width, h = cv.height, buf = new Uint8Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf); g = fnvBytes(2166136261, buf); }
   return { gl: hx8(g), dom: hx8(fnv(2166136261, stage.innerHTML)), t: Math.round(clk * 1000) / 1000, state: ST.name };
+}
+function harnessRestore(name){
+  var f = W.NUCLEO_FIXTURES && W.NUCLEO_FIXTURES.ask[name || 'nvda'];
+  if (f && S) go('RESTORE', { read: JSON.parse(JSON.stringify(f)) });
 }
 function harnessStart(){
   var sc = SCRIPTS[QS.script];

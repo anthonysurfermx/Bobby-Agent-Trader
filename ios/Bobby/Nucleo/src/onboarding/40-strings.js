@@ -68,6 +68,9 @@ var STR = {
     'aria.debate': 'Three agents debating',
     'aria.bobby': 'Bobby',
     'aria.pill': 'Ask Bobby, hold to talk',
+    'aria.skip': 'Skip narration',
+    'aria.cancel': 'Cancel read',
+    'aria.riskAgree': 'Agree to the risk notice',
     'aria.close': 'Close read',
     'pause': 'Paused'
   },
@@ -132,6 +135,9 @@ var STR = {
     'aria.debate': 'Tres agentes debatiendo',
     'aria.bobby': 'Bobby',
     'aria.pill': 'Pregunta a Bobby, mantén para hablar',
+    'aria.skip': 'Saltar narración',
+    'aria.cancel': 'Cancelar lectura',
+    'aria.riskAgree': 'Aceptar el aviso de riesgo',
     'aria.close': 'Cerrar lectura',
     'pause': 'Pausa'
   }

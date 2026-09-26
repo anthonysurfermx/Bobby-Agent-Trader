@@ -202,8 +202,19 @@ final class NucleoSpeech {
         return .stopped
     }
 
-    /// Background, teardown: the mic closes now, no final.
-    func cancel() { stop(cancel: true) }
+    /// Background, interruption, teardown: close the mic and suppress a late final
+    /// even when the user had already released the pill and recognition was settling.
+    func cancel() {
+        if listening {
+            _ = stop(cancel: true)
+        } else if awaitingFinal {
+            finalTimeout?.cancel()
+            task?.cancel()
+            finishRecognition()
+        }
+        session += 1  // Ignore callbacks already queued by the old recognizer.
+        latestText = ""
+    }
 
     private func closeMicrophone() {
         if let engine {

@@ -146,6 +146,17 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         }
     }
 
+    /// Take over a stalled network narration immediately with the device voice.
+    /// `stop()` invalidates the pending response, so it cannot start playing later.
+    @discardableResult
+    func speakOnDevice(_ text: String) -> Bool {
+        guard Self.avatarNarrationEnabled, !isMuted,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        stop()
+        speakFallback(text)
+        return true
+    }
+
     @discardableResult
     private func play(_ data: Data, playbackRate: Float) -> Bool {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)

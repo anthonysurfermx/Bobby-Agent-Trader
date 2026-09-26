@@ -80,7 +80,7 @@ function pillDown(){
 }
 function pillUp(cancelled){
   var s = W.state;
-  if (W.press){ askRelease(); return; }            /* the mic is live only between speech.start and speech.stop */
+  if (W.press){ askRelease(cancelled); return; }      /* the mic is live only between speech.start and speech.stop */
   if (s === 'RISK'){ agreeRelease(); return; }
   if (cancelled) return;
   if (s === 'PICK') choose();
@@ -123,7 +123,12 @@ window.addEventListener('pointercancel', function(e){ if (HARNESS){ HP = null; r
 document.addEventListener('click', function(e){
   if (e.detail !== 0 || HARNESS || inTypeBox(e.target)) return;
   var h = hitOf(e.target); if (!h[0]) return;
-  if (h[0] === 'pill'){ W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false); }
+  if (h[0] === 'pill'){
+    /* VoiceOver and keyboard activation cannot sustain a pointer hold. Let the
+       same consent ring complete on the simulation clock after activation. */
+    if (W.state === 'RISK'){ agreePress(); return; }
+    W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false);
+  }
   else action(h[0], h[1]);
 });
 ['gesturestart', 'gesturechange', 'dblclick'].forEach(function(k){ document.addEventListener(k, function(e){ e.preventDefault(); }, { passive:false }); });

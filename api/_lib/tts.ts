@@ -39,6 +39,8 @@ export interface SpeechOptions {
   /** Per-call provider override (e.g. degrade to free Edge when a global
    *  spend budget is exhausted). Beats TTS_PROVIDER and the key-based default. */
   provider?: 'openai' | 'edge';
+  /** Whole provider chain deadline; a stalled provider must leave time for fallback. */
+  timeoutMs?: number;
 }
 
 // ---- Voice persona mapping ----
@@ -214,7 +216,7 @@ async function edgeTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' |
 
 // ---- OpenAI TTS (warm default) ----
 
-async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' | 'format'>> & Pick<SpeechOptions, 'voice' | 'vibe'>): Promise<SpeechResult> {
+async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' | 'format'>> & Pick<SpeechOptions, 'voice' | 'vibe'>, signal: AbortSignal): Promise<SpeechResult> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('openai-tts: OPENAI_API_KEY missing');
   const model = process.env.TTS_OPENAI_MODEL || 'gpt-4o-mini-tts';
@@ -235,6 +237,7 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify(body),
+    signal,
   });
   if (!res.ok) throw new Error(`openai-tts ${res.status}: ${(await res.text()).slice(0, 180)}`);
   const audio = Buffer.from(await res.arrayBuffer());
@@ -273,9 +276,9 @@ export async function generateSpeech(
   };
 
   const provider = (opts.provider || process.env.TTS_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'edge')).toLowerCase();
-  const makers: Record<TtsProvider, () => Promise<SpeechResult>> = {
+  const makers: Record<TtsProvider, (signal: AbortSignal) => Promise<SpeechResult>> = {
     edge: () => edgeTTS(clean, resolved),
-    openai: () => openaiTTS(clean, resolved),
+    openai: (signal) => openaiTTS(clean, resolved, signal),
   };
   // An explicit 'edge' override is a spend cap — never fall back to paid.
   // Otherwise a valid per-user Edge voice flips the order to edge-first.
@@ -283,11 +286,29 @@ export async function generateSpeech(
     ? [makers.edge]
     : ttsProviderOrder(provider, resolved.edgeVoice).map((name) => makers[name]);
 
-  for (const fn of chain) {
+  const deadline = Date.now() + (opts.timeoutMs ?? 20_000);
+  for (const [index, fn] of chain.entries()) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    // Split the remaining time so a hung first provider cannot consume the
+    // fallback's entire budget. OpenAI's fetch is also aborted on timeout.
+    const providerMs = Math.max(1, Math.floor(remaining / (chain.length - index)));
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await fn();
+      return await Promise.race([
+        fn(controller.signal),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error(`tts provider timed out after ${providerMs}ms`));
+          }, providerMs);
+        }),
+      ]);
     } catch (err) {
       console.error('[tts]', err instanceof Error ? err.message : err);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
   return null;

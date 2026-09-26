@@ -51,19 +51,22 @@ async function publicIsland(code: string): Promise<CardIsland | null> {
   return { code, title: row.title, size: row.size, core: coreOf(row, placements.length), placements };
 }
 
-/** This deployment's public origin (production: bobbyprotocol.xyz). */
-function originOf(req: VercelRequest): string {
-  const host = req.headers['x-forwarded-host'] ?? req.headers.host;
-  const value = Array.isArray(host) ? host[0] : host;
-  return value && /^[a-z0-9.-]+(:\d+)?$/i.test(value) ? `${value.startsWith('localhost') ? 'http' : 'https'}://${value}` : SITE;
+/** Only deployment configuration may select the shell fetched server-side. */
+function deploymentOrigin(): { url: string; protectedPreview: boolean } {
+  const host = process.env.VERCEL_URL;
+  if (process.env.VERCEL_ENV === 'preview' && host && /^[a-z0-9][a-z0-9-]*\.vercel\.app$/i.test(host)) {
+    return { url: `https://${host}`, protectedPreview: true };
+  }
+  return { url: SITE, protectedPreview: false };
 }
 
 /** The deployed app shell, read from this same deployment. */
-async function appShell(origin: string): Promise<string> {
+async function appShell(origin: ReturnType<typeof deploymentOrigin>): Promise<string> {
   const headers: Record<string, string> = { Accept: 'text/html' };
   // Protected preview deployments answer 401 without the automation bypass.
-  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  const r = await fetch(`${origin}/`, { headers });
+  if (origin.protectedPreview && process.env.VERCEL_AUTOMATION_BYPASS_SECRET) headers['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  // A redirect must not forward the preview bypass header to another host.
+  const r = await fetch(`${origin.url}/`, { headers, redirect: 'manual' });
   if (!r.ok) throw new Error(`App shell ${r.status}`);
   return r.text();
 }
@@ -95,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let shell: string;
   try {
-    shell = await appShell(originOf(req));
+    shell = await appShell(deploymentOrigin());
   } catch (error) {
     // Never strand a visitor: the same page is served, without the card, outside this rewrite.
     console.error('[trader-land-share] shell', error);
@@ -114,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const items = manifestItems();
     const copy = cardCopy(island, islandStats(island, items), lang);
     const url = `${SITE}${VISIT_PATH}${code}`;
-    const image = `${originOf(req)}/api/trader-land-share?code=${code}&img=1&lang=${lang}&v=${cardVersion(island, sha)}`;
+    const image = `${deploymentOrigin().url}/api/trader-land-share?code=${code}&img=1&lang=${lang}&v=${cardVersion(island, sha)}`;
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(withIslandMeta(shell, { title: copy.title, description: copy.description, url, image, alt: copy.alt, locale: lang === 'es' ? 'es_MX' : 'en_US' }));
   } catch (error) {

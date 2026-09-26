@@ -8,7 +8,18 @@ function tf(x, y, s){ return 'translate3d(' + f1(x) + 'px,' + f1(y) + 'px,0)' + 
 function bl(b){ return b > 0.06 ? 'blur(' + f1(b) + 'px)' : 'none'; }
 function st(el, t, o, f){
   if (t != null && t !== el._t){ el._t = t; el.style.transform = t; }
-  if (o != null){ o = o < 0.003 ? 0 : (o > 0.997 ? 1 : Math.round(o * 1000) / 1000); if (o !== el._o){ el._o = o; el.style.opacity = o; } }
+  if (o != null){
+    o = o < 0.003 ? 0 : (o > 0.997 ? 1 : Math.round(o * 1000) / 1000);
+    if (o !== el._o){
+      el._o = o; el.style.opacity = o;
+      /* Opacity alone leaves inactive text in the screen reader tree. */
+      if (el.classList && el.classList.contains('a')){
+        if (el._ariaFixed == null) el._ariaFixed = el.getAttribute('aria-hidden') === 'true';
+        if (!el._ariaFixed) sa(el, 'aria-hidden', o === 0 ? 'true' : 'false');
+        if (el._inert !== (o === 0)){ el._inert = o === 0; el.inert = el._inert; }
+      }
+    }
+  }
   if (f != null && f !== el._f){ el._f = f; el.style.filter = f; }
 }
 function sa(el, k, v){ if (el['_a' + k] !== v){ el['_a' + k] = v; el.setAttribute(k, v); } }

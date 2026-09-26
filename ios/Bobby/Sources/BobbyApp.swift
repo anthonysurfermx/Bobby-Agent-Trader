@@ -60,7 +60,10 @@ struct BobbyApp: App {
 #if targetEnvironment(simulator)
         if args.contains("-nucleo-reset-onboarding") {
             let defaults = UserDefaults.standard
-            ["agent.onboarded", "agent.riskNoticeVersion", "companion.id"].forEach { defaults.removeObject(forKey: $0) }
+            // Write explicit reset values: removing a key can expose a stale fallback value.
+            defaults.set(false, forKey: "agent.onboarded")
+            defaults.set(0, forKey: "agent.riskNoticeVersion")
+            defaults.removeObject(forKey: "companion.id")
         }
 #endif
         if let scenario = nucleoOptions.fixtures {

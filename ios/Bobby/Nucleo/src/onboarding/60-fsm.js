@@ -234,6 +234,7 @@ ENTER.ASK_TEACH = function(a){
   signal(a.granted ? 'ASK_GRANTED' : 'ASK_READY');
 };
 function askCapable(){ return W.state === 'ASK_TEACH' || W.state === 'ERROR' || W.state === 'TYPING'; }
+var PILL_HOLD_SEC = 0.35;
 function askPress(){
   var mic = SESSION && SESSION.mic ? SESSION.mic.state : 'unavailable';
   var p = W.press = { t:T, mic:mic, released:false, cancelled:false };
@@ -242,14 +243,22 @@ function askPress(){
   if (W.errLine){ capGone(W.errLine); W.errLine = null; } if (isOn('cap2')) tg('cap2');
   if (W.gotLine){ capGone(W.gotLine); }
   to(W.lean, 1); W.micBreath = false;
-  if (mic === 'granted') startListening(p);
+  if (mic === 'granted') at(PILL_HOLD_SEC, function(){ if (W.press === p && !p.released) startListening(p); });
 }
-function askRelease(){
+function askRelease(cancelled){
   var p = W.press; if (!p) return; W.press = null; p.released = true;
   var dt = T - p.t;
+  if (cancelled){
+    p.cancelled = true; W.listenSeq++;
+    if (p.started) fire('speech.stop', { cancel:true });
+    endListenVisual(); go('ASK_TEACH', { quiet:true }); return;
+  }
   if (p.mic === 'granted'){
-    if (dt < 0.25){ p.cancelled = true; fire('speech.stop', { cancel:true }); endListenVisual(); go('TYPING'); return; }
-    if (W.state === 'LISTENING') stopListening();
+    if (dt < PILL_HOLD_SEC || !p.started){ go('TYPING'); return; }
+    if (W.state === 'LISTENING'){
+      if (p.listening) stopListening();
+      else { stopListenVisual(); W.awaitStart = T + 3; }
+    }
     return;
   }
   to(W.lean, 0);
@@ -258,19 +267,20 @@ function askRelease(){
 }
 function startListening(p){
   var req = ++W.listenSeq;
+  p.started = true;
   go('LISTENING');
   call('speech.start', {}).then(function(r){
     var s = r && r.status;
     if (req !== W.listenSeq || p.cancelled){ if (s === 'listening') fire('speech.stop', { cancel:true }); return; }
-    if (s === 'listening'){ p.listening = true; if (p.released && W.state === 'LISTENING') fire('speech.stop', {}); return; }
+    if (W.state !== 'LISTENING'){ if (s === 'listening') fire('speech.stop', { cancel:true }); return; }
+    if (s === 'listening'){ p.listening = true; if (p.released) stopListening(); return; }
     endListenVisual();
     if (s === 'busy'){ go('ASK_TEACH', { quiet:true }); return; }
     var mic = s === 'needs_permission' ? 'undetermined' : (s === 'unavailable' ? 'unavailable' : 'denied');
     if (SESSION) SESSION.mic = { state:mic, onDevice:mic !== 'unavailable' };
     p.mic = mic;
-    if (p.released){ if (mic === 'undetermined') go('PRE_PERMISSION'); else go('TYPING', { reason:'denied' }); }
-    else { W.press = p; W.state = 'ASK_TEACH'; }   /* the release decides (card or typing) */
-  }, function(){ if (req !== W.listenSeq) return; endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); });
+    if (mic === 'undetermined') go('PRE_PERMISSION'); else go('TYPING', { reason:'denied' });
+  }, function(){ if (req !== W.listenSeq || W.state !== 'LISTENING') return; endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); });
 }
 ENTER.PRE_PERMISSION = function(){ tb('perm'); W.micBreath = false; setHint(''); W.permBusy = false; };
 function permContinue(){
@@ -285,17 +295,21 @@ function permContinue(){
 }
 ENTER.LISTENING = function(){
   setPill('listen', '', 236); tb('listen'); moveSphere(340, 132); to(W.lean, 1); setHint(Ls('hint.release'));
-  clearWords(); W.qFinal = false; W.awaitFinal = 0; W.micLevel = 0; W.txShift.x = W.txShift.t = 0; W.txShift.v = 0; tb('words');
+  clearWords(); W.qFinal = false; W.awaitFinal = 0; W.awaitStart = 0; W.micLevel = 0; W.txShift.x = W.txShift.t = 0; W.txShift.v = 0; tb('words');
 };
 function stopListening(){
   fire('speech.stop', {});
-  tg('listen'); setPill('mic', '', 96); setHint(''); to(W.lean, 0);
+  stopListenVisual();
+  W.awaitStart = 0;
   W.awaitFinal = T + 2.5;
 }
-function endListenVisual(){ if (isOn('listen')) tg('listen'); setPill('mic', '', 96); setHint(''); to(W.lean, 0); moveSphere(340, 120); tg('words'); W.awaitFinal = 0; }
+function stopListenVisual(){
+  tg('listen'); setPill('mic', '', 96); setHint(''); to(W.lean, 0);
+}
+function endListenVisual(){ if (isOn('listen')) tg('listen'); setPill('mic', '', 96); setHint(''); to(W.lean, 0); moveSphere(340, 120); tg('words'); W.awaitFinal = 0; W.awaitStart = 0; }
 function onSpeechFinal(text){
   if (W.state !== 'LISTENING') return;
-  W.awaitFinal = 0;
+  W.press = null; W.awaitFinal = 0; W.awaitStart = 0;
   var q = String(text || '').trim();
   if (!q){ endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttEmpty') }); return; }
   updateWords(q); commitQuestion(q, 'voice');
@@ -572,7 +586,7 @@ function saveFailed(){ W.saving = false; if (W.state !== 'SAVING') return; tg('s
 ENTER.RETURNING = function(a){
   tg('cards'); tg('verdict'); tg('ring'); tg('present'); tg('dock'); tg('pillHide'); tg('sats');
   if (!isOn('commit') && tmB('commit') > T) tb('commit');       /* an un-pulled chart is inhaled too */
-  if (W.readLine){ capGone(W.readLine); if (W.readLine.src === 'voice' && !W.readLine.done) fire('stopSpeaking', {}); }
+  if (W.readLine){ capGone(W.readLine); if (!W.readLine.done) fire('stopSpeaking', {}); }
   tg('meta'); setPill('mic', '', 96); W.verdictShown = false; W.talking = false; W.compShow = false; to(W.compAmt, 0);
   if (!W.saved) setHint('');
   at(0.28, function(){ moveSphere(340, 120); });
@@ -635,6 +649,7 @@ ENTER.ISLA_PEEK = function(a){
 
 /* ---------- O9 home, then native takes over (finishOnboarding cross-fades to app.html) ---------- */
 ENTER.HOME = function(a){
+  txt(live, '');
   setMer(); if (!W.tm.mer) at(0.3, function(){ tb('mer'); });
   if (!W.saved && !a.quick) at(0.35, nudge);
   var h = SESSION && fin(SESSION.localHour) ? SESSION.localHour : 20;
@@ -661,7 +676,7 @@ function teardownRead(){
   nodesOff(); W.duel = null; W.conv = null; W.nodeOn = [false, false, false]; W.filCollapse = null;
   to(W.swirl, 0); to(W.irid, 1); to(W.energy, 0.35); to(W.braid, 0); to(W.filA, 0); to(W.flood, 0); to(W.scrim, 0); W.vflag = false;
   ['agA', 'agR', 'agC', 'tethers', 'qwait', 'dock', 'sats', 'verdict', 'ring', 'meta'].forEach(function(k){ if (isOn(k)) tg(k); });
-  if (W.readLine){ capGone(W.readLine); if (!W.readLine.done && W.readLine.src === 'voice') fire('stopSpeaking', {}); W.readLine.done = true; }
+  if (W.readLine){ capGone(W.readLine); if (!W.readLine.done) fire('stopSpeaking', {}); W.readLine.done = true; }
   W.talking = false; W.compShow = false; to(W.compAmt, 0);
   moveSphere(340, 120); crit(W.tintAmt, 0.8); tintTo(companionTint(), 0.35);
   setPill('mic', '', 96); setHint(''); W.micBreath = true;
@@ -695,12 +710,12 @@ function closeActive(){ var s = W.state; return isOn('dock') && (s === 'RESOLVIN
 function wireEvents(){
   if (!BR) return;
   BR.on('session.changed', function(s){ applySession(s); });
-  BR.on('app.state', function(p){ W.bg = p && p.state === 'background'; if (W.bg && W.state === 'LISTENING'){ endListenVisual(); go('ASK_TEACH', { quiet:true }); } });
+  BR.on('app.state', function(p){ W.bg = p && p.state === 'background'; if (W.bg && W.state === 'LISTENING'){ if (W.press) W.press.cancelled = true; W.press = null; W.listenSeq++; fire('speech.stop', { cancel:true }); endListenVisual(); go('ASK_TEACH', { quiet:true }); } });
   BR.on('ask.stage', function(p){ if (p && p.stage === 'accepted' && W.state === 'RESOLVING') go('THINK_WAIT'); });
   BR.on('speech.level', function(p){ W.micLevel = p && fin(p.level) ? p.level : 0; W.micLevelT = T; });
   BR.on('speech.partial', function(p){ if (W.state === 'LISTENING' && p) updateWords(p.text); });
   BR.on('speech.final', function(p){ onSpeechFinal(p && p.text); });
-  BR.on('speech.error', function(p){ if (W.state === 'LISTENING'){ endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); } });
+  BR.on('speech.error', function(p){ if (W.state === 'LISTENING'){ W.press = null; W.listenSeq++; endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); } });
   ['voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end'].forEach(function(n){
     BR.on(n, function(p){ if (p && typeof p.id === 'string' && p.id.indexOf('preview-') === 0){ if (n === 'voice.level'){ W.pvLevel = fin(p.level) ? p.level : 0; W.pvLevelT = T; } return; } onVoice(n, p); });
   });

@@ -1,6 +1,8 @@
-# Núcleo v2 — Art Direction (single source of truth)
+# Núcleo v2 — Art Direction (prototype reference)
 
 Files to build: `nucleo-v2.html` (daily core loop, returning user) and `nucleo-onboarding.html` (first run). Frame: 390×844 CSS px, iPhone 15/16 class. Every number here is a target the reviewers will measure; where a critic disagreed, the ruling is in Appendix A.
+
+**Shipping 1.5 (40) rulings.** The implementation in `../src/` and `../ARCHITECTURE.md` supersedes the prototype storyboards below. Anthony chose the Deep core glass in `GLASS.md` variant C: the idle interior re-saturates ×1.45 over `irid()` while the halo and rim remain restrained. The companion is a round avatar outside the glass (below it in the onboarding picker, in the header afterward, with the XP arc); the talking and Squad sphere contain glass and light only. XP is awarded on saving a thesis. Sign-in is offered after that value, with Apple as the available provider. Verdicts are Wait and Review. Historical references below to an in-glass companion, Ready/Pass, a fixed 64% conviction, Google sign-in, earnings, notifications, and scripted fixture copy are prototype targets, not shipped requirements.
 
 ---
 
@@ -64,7 +66,7 @@ Files to build: `nucleo-v2.html` (daily core loop, returning user) and `nucleo-o
 | `cio` | `#F6B94E` | CIO, verdict **Wait**, and what the CIO owns: calm zone, thesis, discipline XP, conviction ring |
 | `pearl` | `#E8DFD0` | Braid colour after the debate converges and before the verdict (neutral, never amber) |
 | `listen` | `#5CE1FF` | Listening accent (pill glow, bottom iridescence) |
-| iridescence | `#4D6BFF` `#9A5CFF` `#FF6EC7` `#5CE1FF` | Idle interior and halo. Saturation ×0.8 relative to v1. |
+| iridescence | `#4D6BFF` `#9A5CFF` `#FF6EC7` `#5CE1FF` | Deep core idle interior: saturation ×1.45 over `irid()` (approximately ×1.16 relative to v1). Halo and rim stay restrained. The core hue is gated off while thinking. |
 | `core-wait` / `core-ready` / `core-pass` | `#2A1C08` / `#082A20` / `#2A0C0E` | Scrim target behind the verdict word. `ink-bright` on these = 15.7 / 14.6 / 17.2 :1 |
 | `card-top` → `card-bot` | `#221E1B` → `#171513` @96% | Card fill, with an inner top highlight `rgba(255,255,255,.05)` |
 | `glass-fill` | `rgba(22,19,17,.86)` | Satellites in flight, sheets, and the pre-permission card (blur added after settle) |

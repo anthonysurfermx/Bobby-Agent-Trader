@@ -97,15 +97,26 @@ const GUARANTEE: RegExp[] = [
 ];
 // "short-term caution" or "a short while" is not a short trade.
 const ADVICE: RegExp[] = [
-  /\byou\s+(?:should|must|need\s+to|ought\s+to|have\s+to)\s+(?:definitely\s+|now\s+)?(?:buy|sell|short(?![- ](?:term|run|while|lived))|go\s+long|go\s+short|open\s+a\s+(?:long|short)|load\s+up|go\s+all[- ]in)\b/giu,
-  /\bI\s+(?:recommend|advise|suggest)\s+(?:that\s+)?(?:you\s+)?(?:to\s+)?(?:buy|buying|sell|selling|short(?![- ](?:term|run|while|lived))|shorting|go\s+long|going\s+long|go\s+short|going\s+short)\b/giu,
+  /\byou\s+(?:should|must|need\s+to|ought\s+to|have\s+to)\s+(?:definitely\s+|now\s+)?(?:buy|sell|purchase|invest(?:\s+in)?|trad(?:e|ing)|allocat(?:e|ing)|short(?![- ](?:term|run|while|lived))|go\s+long|go\s+short|open\s+a\s+(?:long|short)|load\s+up|go\s+all[- ]in)\b/giu,
+  /\bI\s+(?:recommend|advise|suggest)\s+(?:that\s+)?(?:you\s+)?(?:to\s+)?(?:buy|buying|sell|selling|purchas(?:e|ing)|invest(?:ing)?(?:\s+in)?|trad(?:e|ing)|allocat(?:e|ing)|short(?![- ](?:term|run|while|lived))|shorting|go\s+long|going\s+long|go\s+short|going\s+short)\b/giu,
+  // A direct command needs no "now" or "today". Keep the object narrow so
+  // market observations such as "Buy volume today exceeded sell volume" pass.
+  /(?:(?<=^)|(?<=[.!?]\s+))(?:[Bb]uy|[Ss]ell|[Ss]hort|[Ii]nvest(?:\s+in)?)\s+(?:it|this|that|these|those|them|more|everything|all\s+(?:your\s+)?(?:money|savings|capital)|the\s+(?:dip|rip|bounce|breakout|rally)|[Bb]itcoin|[Ee]ther(?:eum)?|[Ss]olana|[A-Z][A-Z0-9.-]{1,9})\b/gu,
+  // "Buy some BTC" and "Sell your NVDA" are still commands. Keep the
+  // object asset-specific so "Buy volume" and "Sell orders" remain data.
+  /(?:(?<=^)|(?<=[.!?]\s+))(?:[Bb]uy|[Ss]ell|[Pp]urchase)\s+(?:(?:some|more|your|a\s+(?:bit|little)\s+of)\s+)(?:[Bb]itcoin|[Ee]ther(?:eum)?|[Ss]olana|\$?[A-Z][A-Z0-9.-]{1,9})\b/gu,
+  /(?:(?<=^)|(?<=[.!?]\s+))(?:[Cc]onsider|[Tt]ry)\s+(?:buying|selling|purchasing|investing\s+in)\s+(?:(?:some|more|your)\s+)?(?:[Bb]itcoin|[Ee]ther(?:eum)?|[Ss]olana|\$?[A-Z][A-Z0-9.-]{1,9})\b/gu,
+  /\b[Yy]ou\s+(?:might|may|could|should)\s+consider\s+(?:buying|selling|purchasing|investing\s+in)\s+(?:(?:some|more|your)\s+)?(?:[Bb]itcoin|[Ee]thereum|[Ss]olana|\$?[A-Z][A-Z0-9.-]{1,9})\b/gu,
   // A sentence-initial imperative. Case-sensitive on purpose: the optional
   // object is a pronoun, a ticker or "the dip", so "Sell volume today
   // exceeded buy volume" reads as data, not an order.
   /(?:(?<=^)|(?<=[.!?]\s+))(?:[Bb]uy|[Ss]ell|[Ss]hort|BUY|SELL|SHORT)\s+(?:(?:it|this|that|these|those|them|here|more|everything|the\s+(?:dip|rip|bounce|breakout|rally)|[Bb]itcoin|[Ee]ther(?:eum)?|[Ss]olana|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:now|immediately|right\s+(?:now|away)|today|NOW|TODAY)\b/gu,
-  /(?<![\p{L}])(?:deber[ií]as|debes|tienes\s+que|te\s+conviene|necesitas)\s+(?:ya\s+|ahora\s+)?(?:comprar|vender|shortear|abrir\s+(?:un\s+)?(?:largo|corto|long|short)|ponerte\s+(?:largo|corto))\b/giu,
+  /(?<![\p{L}])(?:deber[ií]as|debes|tienes\s+que|te\s+conviene|necesitas)\s+(?:ya\s+|ahora\s+)?(?:comprar|vender|adquirir|invertir(?:\s+en)?|operar|shortear|abrir\s+(?:un\s+)?(?:largo|corto|long|short)|ponerte\s+(?:largo|corto))\b/giu,
   // Trade verbs only: "sugiero comprobar…", "te recomiendo comprender…" pass.
-  /(?<![\p{L}])(?:te\s+)?(?:recomiendo|aconsejo|sugiero)\s+(?:que\s+)?(?:comprar|compres|compre|compren|vender|vendas|venda|vendan|shortear|shortees|abrir\s+(?:un\s+)?(?:largo|corto)|abras\s+(?:un\s+)?(?:largo|corto))(?![\p{L}])/giu,
+  /(?<![\p{L}])(?:te\s+)?(?:recomiendo|aconsejo|sugiero)\s+(?:que\s+)?(?:comprar|compres|compre|compren|vender|vendas|venda|vendan|invertir|inviertas|invierta|inviertan|operar|shortear|shortees|abrir\s+(?:un\s+)?(?:largo|corto)|abras\s+(?:un\s+)?(?:largo|corto))(?![\p{L}])/giu,
+  /(?:(?<=^)|(?<=[.!?¡]\s*))(?:[Cc]ompra|[Vv]ende|[Cc]ompre|[Vv]enda|[Cc]ompren|[Vv]endan|[Ii]nvierte|[Ii]nvierta|[Ii]nviertan)\s+(?:en\s+)?(?:lo|la|los|las|esto|eso|todo|más|[A-Z][A-Z0-9.-]{1,9})\b/gu,
+  /(?:(?<=^)|(?<=[.!?¡]\s*))(?:[Cc]ompra|[Vv]ende|[Aa]dquiere)\s+(?:un\s+poco\s+de|algo\s+de|m[aá]s\s+de|tus?|unas?)\s+(?:[Bb]itcoin|[Ee]thereum|[Ss]olana|\$?[A-Z][A-Z0-9.-]{1,9})\b/gu,
+  /(?:(?<=^)|(?<=[.!?¡]\s*))(?:[Cc]onsidera|[Ii]ntenta)\s+(?:comprar|vender|adquirir|invertir\s+en)\s+(?:[Bb]itcoin|[Ee]thereum|[Ss]olana|\$?[A-Z][A-Z0-9.-]{1,9})\b/gu,
   // Same shape as the English imperative: "Compra neta hoy…" is data.
   /(?:(?<=^)|(?<=[.!?¡]\s*))(?:[Cc]ompra|[Vv]ende|[Cc]ompre|[Vv]enda|[Cc]ompren|[Vv]endan)\s+(?:(?:lo|la|los|las|esto|eso|todo|más|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:ya|ahora|hoy|de\s+inmediato|inmediatamente)(?![\p{L}])/gu,
 ];
@@ -151,6 +162,17 @@ function negatedAfter(text: string, end: number): boolean {
   return words(rest).slice(0, 4).some(word => NEGATED_AFTER.has(word));
 }
 
+/** A quoted example expressly rejected by the agent is not its instruction. */
+function deniedQuotedAdvice(text: string, at: number, end: number): boolean {
+  const before = text.slice(0, at);
+  const straightOpen = (before.match(/"/gu)?.length ?? 0) % 2 === 1;
+  const curlyOpen = before.lastIndexOf('“') > before.lastIndexOf('”');
+  const close = straightOpen ? text.indexOf('"', end) : curlyOpen ? text.indexOf('”', end) : -1;
+  if (close < 0) return false;
+  const after = text.slice(close + 1, close + 130).split(/[.!?]/u)[0];
+  return /\b(?:not\s+(?:our\s+|a\s+)?(?:advice|recommendation)|(?:unsafe|prohibited|misleading)\s+(?:advice|wording)|advice\s+we\s+(?:reject|avoid)|should\s+not\s+be\s+(?:said|used|followed))\b|\bno\s+es\s+(?:un\s+)?(?:consejo|una\s+recomendaci[oó]n)\b/iu.test(after);
+}
+
 /** The matches of `pattern` that `text` actually asserts. */
 function affirmedMatches(text: string, pattern: RegExp, checkAfter: boolean): RegExpMatchArray[] {
   return [...text.matchAll(pattern)].filter(match => {
@@ -158,7 +180,8 @@ function affirmedMatches(text: string, pattern: RegExp, checkAfter: boolean): Re
     // A negation inside the match itself: "guarantees no gains", "guarantees nothing".
     // Its first word is the pattern's own ("sin riesgo" is the claim, not a negation).
     if (checkAfter && words(match[0]).slice(1).some(word => NEGATIONS.has(word))) return false;
-    return !negatedBefore(text, at) && !(checkAfter && negatedAfter(text, at + match[0].length));
+    return !negatedBefore(text, at) && !(checkAfter && negatedAfter(text, at + match[0].length))
+      && !(!checkAfter && deniedQuotedAdvice(text, at, at + match[0].length));
   });
 }
 

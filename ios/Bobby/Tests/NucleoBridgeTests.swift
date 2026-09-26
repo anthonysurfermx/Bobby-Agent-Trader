@@ -253,11 +253,41 @@ final class NucleoBridgeTests: XCTestCase {
         let (session, bridge, _) = make()
         let read = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
         generation = UUID()
+        XCTAssertNil(session.desk.pendingRead(), "another account must not restore this question")
         let saved = await result(bridge, "saveThesis", ["requestId": try XCTUnwrap(read["requestId"] as? String)])
         XCTAssertEqual(saved["status"] as? String, "stale")
         let theses = await result(bridge, "theses")
         XCTAssertEqual((theses["items"] as? [Any])?.count, 0, "no ledger entry")
         XCTAssertTrue(session.companions.pendingAwards.isEmpty, "no award")
+    }
+
+    func testSavedReadAndConfirmationTokenDoNotCrossAccounts() async throws {
+        let (_, bridge, _) = make()
+        let read = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        let requestId = try XCTUnwrap(read["requestId"] as? String)
+        _ = await result(bridge, "saveThesis", ["requestId": requestId])
+        let fuzzy = await result(bridge, "ask", ["question": "how is nvidea doing"])
+        let token = try XCTUnwrap(fuzzy["token"] as? String)
+        generation = UUID()
+        let stale = await result(bridge, "saveThesis", ["requestId": requestId])
+        let oldToken = await fault(bridge, "ask", ["token": token])
+        let oldFollowUp = await fault(bridge, "ask", ["followUpOf": requestId, "question": "What changed?"])
+        XCTAssertEqual(stale["status"] as? String, "stale",
+                       "a cached save must not disclose the previous account's thesis")
+        XCTAssertEqual(oldToken, "invalid_params")
+        XCTAssertEqual(oldFollowUp, "invalid_params")
+    }
+
+    func testAccountChangeCancelsAnInFlightRead() async throws {
+        NucleoFixtures.setScenario("slow")
+        let (session, bridge, _) = make()
+        let pending = Task { await self.result(bridge, "ask", ["question": "Is now a good time for Bitcoin?"]) }
+        for _ in 0..<200 where !session.desk.isBusy { await Task.yield() }
+        XCTAssertTrue(session.desk.isBusy)
+        generation = UUID()
+        let response = await pending.value
+        XCTAssertEqual(response["status"] as? String, "cancelled")
+        XCTAssertNil(session.desk.pendingRead())
     }
 
     func testSaveThesisAtTheDailyCapStillKeepsTheThesis() async throws {
@@ -464,16 +494,45 @@ final class NucleoBridgeTests: XCTestCase {
             return (0..<count).map { NucleoDeskIO.Bar(t: last - (count - 1 - $0) * 3_600_000, o: 1, h: 1, l: 1, c: 1, v: 0) }
         }
         XCTAssertEqual(NucleoDeskIO.gate([], isEquity: true, now: now), "thin_data")
-        XCTAssertNil(NucleoDeskIO.gate(bars(1, lastAge: 4 * 86_400), isEquity: true, now: now))
-        XCTAssertEqual(NucleoDeskIO.gate(bars(50, lastAge: 6 * 86_400), isEquity: true, now: now), "stale_data")
+        XCTAssertEqual(NucleoDeskIO.gate(bars(1, lastAge: 4 * 86_400), isEquity: true, now: now), "thin_data")
+        XCTAssertEqual(NucleoDeskIO.gate(bars(58, lastAge: 60), isEquity: true, now: now), "thin_data")
+        XCTAssertNil(NucleoDeskIO.gate(bars(59, lastAge: 4 * 86_400), isEquity: true, now: now))
+        XCTAssertEqual(NucleoDeskIO.gate(bars(59, lastAge: 6 * 86_400), isEquity: true, now: now), "stale_data")
         XCTAssertEqual(NucleoDeskIO.gate(bars(58, lastAge: 60), isEquity: false, now: now), "thin_data")
         XCTAssertNil(NucleoDeskIO.gate(bars(59, lastAge: 2 * 3_600), isEquity: false, now: now))
         XCTAssertEqual(NucleoDeskIO.gate(bars(100, lastAge: 4 * 3_600), isEquity: false, now: now), "stale_data")
+        XCTAssertEqual(NucleoDeskIO.gate(bars(59, lastAge: -61), isEquity: true, now: now), "stale_data")
+        XCTAssertEqual(NucleoDeskIO.candlePath(symbol: "NVDA", isEquity: true),
+                       "api/stock-candles?symbol=NVDA&range=30d&interval=1h")
+        let recordedMinimum = NucleoDesk.minimumBars(symbol: "NVDA", isEquity: true, fixtures: true)
+        XCTAssertEqual(recordedMinimum, 50)
+        XCTAssertEqual(NucleoDeskIO.gate(bars(1, lastAge: 60), isEquity: true, now: now,
+                                        minimumBars: recordedMinimum), "thin_data")
+        XCTAssertNil(NucleoDeskIO.gate(bars(50, lastAge: 60), isEquity: true, now: now,
+                                      minimumBars: recordedMinimum))
+        XCTAssertEqual(NucleoDesk.minimumBars(symbol: "TSLA", isEquity: true, fixtures: true), 59)
+        XCTAssertEqual(NucleoDesk.minimumBars(symbol: "NVDA", isEquity: true, fixtures: false), 59)
+    }
+
+    func testMalformedSearchSymbolsAndCandlesCannotPassPreflight() {
+        let search: [String: Any] = ["resolution": [:], "resolved": ["baseSymbol": "BTC&bar=1W", "assetClass": "crypto"]]
+        if case .failed = NucleoDeskIO.parseSearch(search) {} else { XCTFail("the search symbol could alter a candle query") }
+        XCTAssertFalse(NucleoDeskIO.validSymbol("BTC&bar=1W"))
+        XCTAssertFalse(NucleoDeskIO.validSymbol("BTC\n"))
+        XCTAssertTrue(NucleoDeskIO.validSymbol("BTC"))
+        let row: [String: Any] = ["ts": 1_790_000_000_000, "open": 2, "high": 3, "low": 1, "close": 2, "volume": 1]
+        var invalidPrice = row; invalidPrice["close"] = -1
+        var invalidVolume = row; invalidVolume["volume"] = "not-a-number"
+        let bars = NucleoDeskIO.decodeCandles(["candles": [row, invalidPrice, invalidVolume]])
+        XCTAssertEqual(bars.count, 1, "the app and debate service must count the same valid evidence")
     }
 
     func testDebateMapping() {
         XCTAssertEqual(Self.label(NucleoDeskIO.parseDebate(status: 429, json: ["error": "limit"], headers: ["retry-after": "60"])), "quota:60:limit")
         XCTAssertEqual(Self.label(NucleoDeskIO.parseDebate(status: 429, json: nil, headers: [:])), "quota:-:-")
+        XCTAssertEqual(Self.label(NucleoDeskIO.parseDebate(status: 429, json: nil, headers: ["retry-after": "1e300"])), "quota:-:-",
+                       "an untrusted header must never trap when converted to Int")
+        XCTAssertEqual(Self.label(NucleoDeskIO.parseDebate(status: 429, json: nil, headers: ["retry-after": "1.2"])), "quota:2:-")
         XCTAssertEqual(Self.label(NucleoDeskIO.parseDebate(status: 504, json: nil, headers: [:])), "bad_response")
         XCTAssertEqual(Self.label(NucleoDeskIO.parseDebate(status: 503, json: ["code": "other"], headers: [:])), "bad_response")
         XCTAssertEqual(Self.label(NucleoDeskIO.parseDebate(status: 200, json: ["agents": ["alpha": "a", "red": "r", "cio": "c", "verdict": "buy"]], headers: [:])),
@@ -505,6 +564,28 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(NucleoVoice.wordIndex(starts, location: ns.range(of: "wait").location), 2)
         XCTAssertEqual(NucleoVoice.wordIndex(starts, location: ns.range(of: "ok").location), 5)
         XCTAssertEqual(NucleoVoice.wordIndex(starts, location: 0), 0)
+    }
+
+    func testStalledNetworkVoiceFallsBackToTheDeviceVoice() async throws {
+        // Fixture TTS refuses instantly and NeuralVoice waits 1.2 s before retrying.
+        // A short injected startup deadline must transfer the line to AVSpeech now.
+        let voice = NeuralVoice(defaults: defaults)
+        let narrator = NucleoVoice(voice: voice, startupTimeoutSeconds: 0.05)
+        var events: [(String, [String: Any])] = []
+        narrator.emit = { events.append(($0, $1)) }
+        XCTAssertEqual(narrator.speak(id: "fallback-1", text: "A patient answer.", voiceId: "alloy", persona: nil, vibe: nil).rawValue,
+                       "queued")
+        for _ in 0..<50 where !events.contains(where: { $0.0 == "voice.start" }) {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(voice.engine, .device)
+        XCTAssertTrue(events.contains { $0.0 == "voice.start" && $0.1["engine"] as? String == "device" },
+                      "the startup deadline should speak locally rather than end in silence")
+        narrator.stop()
+        try await Task.sleep(for: .milliseconds(1_300))
+        XCTAssertEqual(events.filter { $0.0 == "voice.start" }.count, 1,
+                       "a late network retry must not restart a finished line")
+        XCTAssertEqual(events.filter { $0.0 == "voice.end" }.count, 1)
     }
 
     func testSpeechPermissionStates() {

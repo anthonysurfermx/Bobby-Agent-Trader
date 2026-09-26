@@ -2,13 +2,12 @@
 
 This document is the single source of truth for building the real Núcleo app. The sphere is the app.
 
-- **Worktree:** `.claude/worktrees/ios-nucleo`
-- **Branch:** `ios/nucleo-preview`
-- **Base:** iOS 1.4 (37), building 1.5 (40)
+- **Shipping baseline:** `ios/nucleo-preview` at `3f34a91`, iOS 1.5 (40).
+- **Audit branch:** `codex/nucleo-audit`, branched from that committed baseline. The six build-40 screenshots and App Store Connect upload predate audit fixes.
 
 The approved design is kept inside the repo:
 
-- `design/DIRECTION.md` holds the tokens, springs, stage map, storyboards and acceptance criteria.
+- `design/DIRECTION.md` holds the prototype tokens, springs, stage map, storyboards and acceptance criteria; its shipping-1.5 rulings at the top supersede outdated prototype details.
 - `design/GLASS.md` holds the idle glass.
 - `design/prototype-src/` holds the approved engine sources. The scratchpad copies are temporary; always read the repo copies.
 
@@ -549,7 +548,7 @@ Hooks:
 - **Consent before processing.** No `ask` reaches the network before `riskAccepted`; native enforces this (§2.4 step 2).
 - **Sign in with Apple only;** "Not now" loses nothing. The account deletion path stays in `AccountSheet` (`openNative("account")`).
 - **Bundled code only.** The pages come from the app bundle, and there is no remote JS. `connect-src 'none'`; the only external requests are Google Fonts CSS and fonts (R15).
-- **Before any App Store submission** (not in this workflow): run `build.py --park-legacy` once, then `build.py --release`; remove the hidden long-press to the classic app, or make it a visible setting (guideline 2.3.1 on hidden features); and confirm that `showNucleo` in Release is intended.
+- **Build-40 status:** the legacy preview pages were parked, release pages were generated, the classic exit is DEBUG-only, and Release routes to Núcleo. Recheck these gates for each later archive.
 
 ---
 
@@ -672,6 +671,6 @@ The three builders work in parallel, and no file is owned by two of them. None m
 3. The **Review** verdict colour is mint (R6).
 4. **Saved thesis levels are null** in v1, as in today's app, so a Review seed always reviews as `expired`. Saving the engine levels when R5 agrees is a 5-line change once approved.
 5. These are dropped until they have a data source: Google sign-in, price pings/notifications, the Record face, the earnings marker, and LLM follow-ups (R9).
-6. **The hidden classic exit** must go before App Store submission (§5).
+6. **Classic exit:** verify it remains DEBUG-only before each later App Store submission (§5).
 7. **Fonts** load from Google Fonts over the network. Bundling them (OFL) means downloading them, which needs Anthony's OK.
 8. **What Anthony sees on his phone.** This workflow ends with a simulator-verified build. Installing it on his iPhone (Xcode run or TestFlight) is his step, because this workflow may not install to devices or upload.

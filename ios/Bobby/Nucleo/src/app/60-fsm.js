@@ -113,6 +113,7 @@ function dissolveThink(){
 /* everything a read put on screen goes back where it came from (cards before the sphere moves) */
 function clearRead(){
   chipsHide();
+  el.live.textContent = '';
   var hadCards = A.cardsOn || A.rev.some(function(v){ return v.x > 0.01; });
   if (hadCards){ [2, 0, 1].forEach(function(i, k){ A.rev[i].to(0, 'ret', null, 0.15 + k * 0.04); }); }
   A.cardsOn = false; A.pullOn = false; A.commit = false; A.viewOnly = false; A.tp.on = false;
@@ -123,7 +124,7 @@ function clearRead(){
   A.sat.forEach(function(s, i){ satRetract(i, 0); }); A.orbO.tween(0, 0.24, E.fade); U.compOn.to(0);
   dissolveThink();
   if (A.note.o.t > 0) noteOut();
-  if (VOICE.started && !VOICE.ended) bcall('stopSpeaking').catch(noop);
+  if (VOICE.id && !VOICE.ended) bcall('stopSpeaking').catch(noop);
   VOICE.id = null; K.on = false; PREV.on = false; PREV.imp = false;
   hint('');
   return hadCards;
@@ -226,12 +227,16 @@ function wordmarkPress(){
 var LP_SEQ = 0;
 
 /* the pill: press → listen (granted), pre-permission card (undetermined), or typing (denied / unavailable) */
+var PILL_HOLD_SEC = 0.35;
+var LISTEN_SEQ = 0;
 function pillDown(p, fromRead){
   A.press.to(0.94, 'snap'); tick('light');
   var ms = SES && SES.mic ? SES.mic.state : 'undetermined', t0 = nowT();
   if (ms === 'granted'){
     go('LISTENING', { fromRead: !!fromRead });
-    return { move: noop, up: function(){ STATES.LISTENING.release(nowT() - t0 < 0.25, false); }, cancel: function(){ STATES.LISTENING.release(false, true); } };
+    return { move: function(p){ if (p.moved) STATES.LISTENING.release(false, true); },
+      up: function(){ STATES.LISTENING.release(nowT() - t0 < PILL_HOLD_SEC, false); },
+      cancel: function(){ STATES.LISTENING.release(false, true); } };
   }
   if (ms === 'undetermined'){
     if (fromRead) go('RETURNING');
@@ -270,23 +275,36 @@ STATES.PRE_PERMISSION = {
 /* ---------- LISTENING: B2 (3.00–5.90). The mic is live only between speech.start and speech.stop ---------- */
 STATES.LISTENING = {
   enter: function(prev, d){
-    this.released = false; this.finalWait = 0; this.live = false;
+    this.released = false; this.finalWait = 0; this.live = false; this.requested = false; this.awaitStart = false; this.startWait = 0;
+    var seq = this.seq = ++LISTEN_SEQ;
     chromeUp();
     if (d.fromRead || readShowing()){ clearRead(); glassHome(); moveSphere(340, 120); tintHome(); A.satG.o.tween(0, 0.2, E.fade); }
     if (A.note.o.t > 0) noteOut();
     txReset(); SPEECH.lvl = 0; SPEECH.at = -9;
     U.faceOn.to(0);
     var self = this;
-    bcall('speech.start').then(function(r){
-      if (ST.name !== 'LISTENING' || self.released && !self.live){ if (r && r.status === 'listening') bcall('speech.stop', { cancel: true }).catch(noop); return; }
-      self.onStart(r && r.status);
-    }, function(){ if (ST.name === 'LISTENING') self.onStart('failed'); });
+    /* A tap opens typing without ever activating the microphone. */
+    cue(PILL_HOLD_SEC, function(){
+      if (ST.name !== 'LISTENING' || self.seq !== seq || self.released) return;
+      self.requested = true;
+      bcall('speech.start').then(function(r){
+        if (ST.name !== 'LISTENING' || self.seq !== seq){
+          if (r && r.status === 'listening' && self.seq === seq) bcall('speech.stop', { cancel: true }).catch(noop);
+          return;
+        }
+        self.onStart(r && r.status);
+      }, function(){ if (ST.name === 'LISTENING' && self.seq === seq) self.onStart('failed'); });
+    });
     cue(0.09, function(){ if (self.released) return; A.pillW.to(236, 'pill'); pillMode('bars'); A.barsT0 = clk; A.barsOutT0 = 1e9; A.glow.tween(0.8, 0.24, E.fade); A.goo.tween(1, 0.3, E.fade); });
     cue(0.10, function(){ if (self.released) return; if (lineShown(A.greet)) greetOut(); meriOut(); A.satG.o.tween(0, 0.2, E.fade); hint(tt('hint.release')); });
     cue(0.15, function(){ if (self.released) return; S.r.to(132, 'soft'); S.lean.to(6, BODY.gaze); S.bulge.to(0.02, BODY.gaze); U.listenIr.to(1); });
   },
   onStart: function(status){
-    if (status === 'listening'){ this.live = true; if (this.released && !this.finalWait) bcall('speech.stop', { cancel: true }).catch(noop); return; }
+    if (status === 'listening'){
+      this.live = true;
+      if (this.released){ if (this.awaitStart) this.stopCapture(); else bcall('speech.stop', { cancel: true }).catch(noop); }
+      return;
+    }
     this.collapse();
     if (status === 'needs_permission'){ SES.mic.state = 'undetermined'; go('PRE_PERMISSION'); return; }
     if (status === 'denied' || status === 'unavailable' || status === 'restricted'){ SES.mic.state = status; go('IDLE', { hint: 'hint.micOff', restoreGreet: true }); return; }
@@ -297,19 +315,23 @@ STATES.LISTENING = {
     at(0.16, function(){ if (ST.name === 'LISTENING' || ST.name === 'SENDING' || ST.name === 'IDLE') pillMode(ST.name === 'SENDING' ? 'mic' : idleMode()); });
     S.lean.to(0, BODY.gaze); S.bulge.to(0, BODY.gaze); U.listenIr.to(0); S.r.to(120, 'soft');
   },
+  stopCapture: function(){
+    this.awaitStart = false; this.startWait = 0; this.finalWait = clk || 1e-6;
+    bcall('speech.stop', {}).catch(noop);
+  },
   release: function(isTap, cancelled){
     if (ST.name !== 'LISTENING' || this.released) return;
     this.released = true;
     if (isTap || cancelled){
-      if (this.live) bcall('speech.stop', { cancel: true }).catch(noop);
+      if (this.requested) bcall('speech.stop', { cancel: true }).catch(noop);
       this.collapse(); txReset();
       if (isTap) openTyping({}); else go('IDLE', { restoreGreet: true });
       return;
     }
     this.collapse();
-    this.finalWait = clk;
-    if (this.live) bcall('speech.stop', {}).then(function(r){ if (r && r.status === 'idle' && ST.name === 'LISTENING') STATES.LISTENING.gotFinal(txText()); }).catch(noop);
-    else this.gotFinal('');
+    if (!this.requested){ openTyping({}); return; }
+    if (this.live) this.stopCapture();
+    else { this.awaitStart = true; this.startWait = clk || 1e-6; }
   },
   gotFinal: function(text){
     if (ST.name !== 'LISTENING') return;
@@ -322,11 +344,18 @@ STATES.LISTENING = {
   on: function(name, p){
     if (name === 'speech.partial'){ if (!this.released || this.finalWait) txSet(p && p.text, false); }
     else if (name === 'speech.final'){ if (this.released) this.gotFinal(p && p.text); }
-    else if (name === 'speech.error'){ this.released = true; this.collapse(); txReset(); go('IDLE', { hint: 'hint.micStopped', restoreGreet: true }); }
+    else if (name === 'speech.error'){ this.released = true; this.awaitStart = false; this.collapse(); txReset(); go('IDLE', { hint: 'hint.micStopped', restoreGreet: true }); }
     else if (name === 'speech.state' && p && p.state === 'stopped' && !this.released){ this.released = true; this.collapse(); this.finalWait = clk; }
-    else if (name === 'app.state' && p && p.state === 'background' && !this.released){ this.released = true; this.collapse(); txReset(); go('IDLE', { restoreGreet: true }); }
+    else if (name === 'app.state' && p && p.state === 'background'){
+      this.released = true; this.awaitStart = false;
+      if (this.requested) bcall('speech.stop', { cancel: true }).catch(noop);
+      this.collapse(); txReset(); go('IDLE', { restoreGreet: true });
+    }
   },
-  tick: function(){ if (this.finalWait && clk - this.finalWait > 2.0) this.gotFinal(txText()); },
+  tick: function(){
+    if (this.awaitStart && clk - this.startWait > 3.0){ this.awaitStart = false; this.gotFinal(txText()); }
+    else if (this.finalWait && clk - this.finalWait > 2.0) this.gotFinal(txText());
+  },
   down: function(h){ return null; }
 };
 
@@ -617,7 +646,7 @@ function pullRelease(vy){
 }
 function cardsDown(h, p, hitEl){
   if (h === 'close') return tapG(function(){ go('RETURNING'); });
-  if (h === 'save') return A.saved.t > 0.5 ? null : tapG(function(){ go('SAVING'); }, A.savePress);
+  if (h === 'save') return ST.name === 'SAVING' || A.saved.t > 0.5 ? null : tapG(function(){ go('SAVING'); }, A.savePress);
   if (h === 'hz') return tapG(function(){ setHorizon(+hitEl.getAttribute('data-h')); tick('selection'); });
   if (h === 'islaGo') return tapG(function(){ openNative('isla'); });
   if (h === 'pill') return pillDown(p, true);

@@ -2,7 +2,8 @@
 // over the app's NeuralVoice: the page queues a line by id and gets voice.start /
 // voice.level / voice.progress / voice.word / voice.end back. NeuralVoice keeps
 // `speaking` false while the TTS request is in flight, so start and end are found on
-// the edges of `speaking`, and a 10 s watchdog guarantees exactly one voice.end per id.
+// the edges of `speaking`. A 10 s startup watchdog switches a stalled network voice
+// to the on-device voice so the answer still speaks and every line eventually ends.
 import Combine
 import Foundation
 import QuartzCore
@@ -11,9 +12,10 @@ import QuartzCore
 final class NucleoVoice {
     static let maxLength = 800
     static let idPattern = #"^[A-Za-z0-9_.:-]{1,64}$"#
-    static let watchdogSeconds: Double = 10
+    nonisolated static let watchdogSeconds: Double = 10
 
     let voice: NeuralVoice
+    private let startupTimeoutSeconds: Double
     var emit: (String, [String: Any]) -> Void = { _, _ in }
 
     private struct Line {
@@ -32,8 +34,9 @@ final class NucleoVoice {
     private var wordOnset: (at: CFTimeInterval, length: Int)?
     private var envelopeTimer: Timer?
 
-    init(voice: NeuralVoice) {
+    init(voice: NeuralVoice, startupTimeoutSeconds: Double = watchdogSeconds) {
         self.voice = voice
+        self.startupTimeoutSeconds = startupTimeoutSeconds
         voice.$speaking.sink { [weak self] speaking in
             // @Published delivers in willSet: read the new value from the argument, and let
             // NeuralVoice finish its own bookkeeping before reacting.
@@ -84,12 +87,13 @@ final class NucleoVoice {
         if current != nil { finish(reason: "stopped") }
         current = Line(id: id, text: text, wordStarts: Self.wordStarts(text))
         watchdog?.cancel()
+        let timeout = startupTimeoutSeconds
         watchdog = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(Self.watchdogSeconds * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
             guard !Task.isCancelled, let self, let line = self.current, line.id == id, !line.started else { return }
-            // Playback never started (network voice and fallback both failed): end it honestly.
-            self.voice.stop()
-            self.finish(reason: "failed")
+            // The network response becomes stale; the same text and companion persona
+            // move immediately to the on-device voice.
+            if !self.voice.speakOnDevice(line.text) { self.finish(reason: "failed") }
         }
     }
 
@@ -105,6 +109,9 @@ final class NucleoVoice {
     }
 
     private func speakingChanged(_ speaking: Bool) {
+        // Combine publishes in willSet; an older edge can arrive after a newer
+        // stop/start. React only when it still matches NeuralVoice's current state.
+        guard voice.speaking == speaking else { return }
         guard var line = current else { return }
         if speaking, !line.started {
             line.started = true

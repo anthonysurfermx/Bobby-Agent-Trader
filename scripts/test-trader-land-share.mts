@@ -104,14 +104,21 @@ assert(escapeHtml(`&<>"'`) === '&amp;&lt;&gt;&quot;&#39;', 'escapeHtml covers th
 // ---------- handler ----------
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-key';
+delete process.env.VERCEL_ENV;
+delete process.env.VERCEL_URL;
+process.env.VERCEL_AUTOMATION_BYPASS_SECRET = 'test-bypass-secret';
 type Row = { identity_id: string; size: number; theme: string; title: string | null; published_at: string | null; share_code: string | null; core_x: number; core_y: number; core_stage: number };
 let lands: Row[] = [{ identity_id: '11111111-1111-1111-1111-111111111111', size: 8, theme: 'default', title: 'Anthony Land', published_at: '2026-09-18T00:00:00Z', share_code: 'np4dl6dyys', core_x: 0, core_y: 5, core_stage: 0 }];
 let shellStatus = 200;
 const requested: string[] = [];
-globalThis.fetch = (async (input: string | URL) => {
+const shellRequests: Array<{ url: string; headers: Record<string, string>; redirect?: RequestRedirect }> = [];
+globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const url = String(input);
   requested.push(url);
-  if (url === 'https://bobbyprotocol.xyz/') return new Response(shell, { status: shellStatus, headers: { 'content-type': 'text/html' } });
+  if (url === 'https://bobbyprotocol.xyz/' || url === 'https://bobby-preview.vercel.app/') {
+    shellRequests.push({ url, headers: init?.headers as Record<string, string> ?? {}, redirect: init?.redirect });
+    return new Response(shell, { status: shellStatus, headers: { 'content-type': 'text/html' } });
+  }
   if (url.startsWith('https://db.test/rest/v1/tl_lands')) {
     const code = url.match(/share_code=eq\.([a-z0-9]+)/)?.[1];
     return Response.json(lands.filter((l) => l.share_code === code && url.includes('visibility=eq.public')));
@@ -150,6 +157,23 @@ assert(html.includes(`v=${withCore}"`), 'the served version carries the land\'s 
 assert(requested.some((u) => u.includes('tl_lands') && u.includes('core_x,core_y,core_stage')), 'the public land read selects the core');
 assert(html.includes('2 piezas · 1 distrito'), 'served description counts the real placements');
 assert(visit.headers['vary'] === 'Accept-Language', 'language varies the cache');
+assert(!shellRequests[0].headers['x-vercel-protection-bypass'], 'production shell never receives the preview bypass secret');
+
+const poisoned = await call({ code: 'np4dl6dyys' }, { host: 'attacker.example', 'x-forwarded-host': 'attacker.example' });
+assert(poisoned.status === 200 && !requested.some((url) => url.includes('attacker.example')), 'host headers cannot redirect the server-side shell fetch');
+assert(!String(poisoned.body).includes('attacker.example'), 'host headers cannot poison the shared image URL');
+
+process.env.VERCEL_ENV = 'preview';
+process.env.VERCEL_URL = 'bobby-preview.vercel.app';
+const preview = await call({ code: 'np4dl6dyys' }, { 'x-forwarded-host': 'attacker.example' });
+assert(preview.status === 200 && shellRequests.at(-1)?.url === 'https://bobby-preview.vercel.app/', 'preview shell uses the configured Vercel deployment');
+assert(shellRequests.at(-1)?.headers['x-vercel-protection-bypass'] === 'test-bypass-secret', 'validated preview receives the bypass secret');
+assert(shellRequests.at(-1)?.redirect === 'manual', 'preview bypass cannot follow a cross-origin redirect');
+process.env.VERCEL_URL = 'attacker.example';
+const invalidPreview = await call({ code: 'np4dl6dyys' });
+assert(invalidPreview.status === 200 && shellRequests.at(-1)?.url === 'https://bobbyprotocol.xyz/' && !shellRequests.at(-1)?.headers['x-vercel-protection-bypass'], 'invalid preview configuration falls back without the secret');
+delete process.env.VERCEL_ENV;
+delete process.env.VERCEL_URL;
 
 const english = await call({ code: 'np4dl6dyys' }, { 'accept-language': 'en-US' });
 assert(String(english.body).includes('2 pieces · 1 district'), 'English visitors get English copy');

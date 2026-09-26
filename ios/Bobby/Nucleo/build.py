@@ -7,7 +7,7 @@
 
 For every page P in PAGES with a src/P/template.html:
   src/shared/*.js (sorted; 9*-dev-*.js skipped in --release) -> <!--NUCLEO:SHARED-->
-  src/P/*.js (sorted)                                         -> <!--NUCLEO:JS-->
+  src/P/*.js (sorted; harness only in dev, release stubs only in release) -> <!--NUCLEO:JS-->
   companions.json (with dataUri)                              -> __COMPANIONS_JSON__ (exactly once)
   fixtures (dev only)                                         -> <!--NUCLEO:FIXTURES-->
   the shared CSP                                              -> <!--NUCLEO:CSP-->
@@ -85,7 +85,12 @@ def build_page(page, release, companions_payload, fixtures_payload):
         if tpl.count(token) != 1:
             sys.exit(f"{page}/template.html must contain {token} exactly once")
     shared = shared_scripts(release)
-    parts = sorted(n for n in os.listdir(os.path.join(SRC, page)) if n.endswith(".js"))
+    parts = sorted(
+        n for n in os.listdir(os.path.join(SRC, page))
+        if n.endswith(".js")
+        and (not release or not n.endswith("-harness.js"))
+        and (release or not n.endswith("-release.js"))
+    )
     page_js = "\n".join(f"/* ---- {page}/{n} ---- */\n" + read(os.path.join(SRC, page, n)) for n in parts)
     shared_js = "\n".join(f"/* ---- shared/{n} ---- */\n" + body for n, body in shared)
     fixtures_tag = "" if release else f"<script>window.NUCLEO_FIXTURES={fixtures_payload};</script>"

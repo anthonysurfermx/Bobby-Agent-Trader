@@ -9,6 +9,7 @@ function renderAll(){
   renderCaptions(); renderTexts(); renderPicker(); renderLines(); renderHint();
   renderPill(); renderChips(); renderPerm(); renderCards(); renderSheet(); renderGsat();
   renderGhost(); renderTyping();
+  renderA11y();
 }
 var STEP = 1 / 120, last = 0, BOOTED = false;
 function advance(dt){ var acc = dt; while (acc > 1e-9){ var h = Math.min(STEP, acc); sim(h); acc -= h; } }

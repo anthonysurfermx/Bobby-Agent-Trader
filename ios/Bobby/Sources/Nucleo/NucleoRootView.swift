@@ -83,8 +83,8 @@ private struct NucleoStage: View {
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
                 case .active: session.appBecameActive()
-                case .background: session.appWentBackground()
-                default: break
+                case .inactive, .background: session.appWentBackground()
+                @unknown default: session.appWentBackground()
                 }
             }
     }

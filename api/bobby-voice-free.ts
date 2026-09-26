@@ -58,7 +58,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const speech = await generateSpeech(text, {
       lang, voice, vibe, edgeVoice, format: 'mp3',
       // Free mode never retries a paid provider, even when Edge is unavailable.
-      provider: body.mode === 'free' || budget.limited ? 'edge' : undefined,
+      provider: body.mode === 'free' || budget.limited || !budget.available ? 'edge' : undefined,
+      timeoutMs: 5000,
     });
     if (!speech) {
       return res.status(502).json({ error: 'TTS synthesis failed' });

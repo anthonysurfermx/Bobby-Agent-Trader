@@ -95,6 +95,9 @@ function sim(h){
     W.awaitFinal = 0; var last = W.qw.map(function(w){ return w.text; }).join(' ');
     onSpeechFinal(last);                                           /* no final within 1.5 s (+1 s grace): the last partial */
   }
+  if (W.state === 'LISTENING' && W.awaitStart && T > W.awaitStart){
+    W.awaitStart = 0; W.listenSeq++; endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') });
+  }
   verdictStep();
   W.closeK.t = closeActive() ? 1 : 0;   /* the × shows only while it does something */
 

@@ -19,6 +19,15 @@ struct NucleoAsset: Equatable, Sendable {
 /// Network reads for a desk question, parsed off the main actor into plain values.
 /// `fixtures/normalize.py` is the normative spec of every mapping here.
 enum NucleoDeskIO {
+    /// Same symbol alphabet and length as /api/desk-debate. Search results still need
+    /// validation before they are interpolated into a candle URL.
+    static let symbolPattern = #"^[A-Z0-9.^=-]{1,20}$"#
+
+    static func validSymbol(_ symbol: String) -> Bool {
+        guard let match = symbol.range(of: symbolPattern, options: .regularExpression) else { return false }
+        return match == symbol.startIndex..<symbol.endIndex
+    }
+
     enum Search: Sendable {
         case resolved(NucleoAsset, needsConfirmation: Bool, matchKind: String?, proxyNote: String?)
         case unresolved
@@ -122,6 +131,7 @@ enum NucleoDeskIO {
               let resolved = obj["resolved"] as? [String: Any],
               let symbol = (resolved["baseSymbol"] as? String) ?? (resolved["symbol"] as? String), !symbol.isEmpty
         else { return .unresolved }
+        guard validSymbol(symbol) else { return .failed }
         let assetClass = (resolved["assetClass"] as? String) ?? "crypto"
         let aliases = (resolved["aliases"] as? [String]) ?? []
         let name = BobbyAPI.prettyName(aliases.first(where: { $0 != symbol }) ?? symbol, symbol: symbol)
@@ -136,7 +146,9 @@ enum NucleoDeskIO {
     static func candlePath(symbol: String, isEquity: Bool) -> String {
         let tf = MarketTimeframe.oneHour
         return isEquity
-            ? "api/stock-candles?symbol=\(symbol)&range=\(tf.equityQuery.range)&interval=\(tf.equityQuery.interval)"
+            // Match loadDeskEvidence: seven trading days cannot yield the 59 hourly bars
+            // the debate requires, even though a shorter chart would look plausible.
+            ? "api/stock-candles?symbol=\(symbol)&range=30d&interval=\(tf.equityQuery.interval)"
             : "api/okx-candles?instId=\(symbol)-USDT&bar=\(tf.cryptoBar)&limit=100"
     }
 
@@ -160,19 +172,27 @@ enum NucleoDeskIO {
         var out: [Bar] = []
         for r in rows {
             guard let t = num(r["ts"]), let o = num(r["open"]), let h = num(r["high"]),
-                  let l = num(r["low"]), let c = num(r["close"]), abs(t) < 1e15 else { continue }
-            out.append(Bar(t: Int(t), o: o, h: h, l: l, c: c, v: num(r["volume"]) ?? 0))
+                  let l = num(r["low"]), let c = num(r["close"]), abs(t) < 1e15,
+                  c > 0, l > 0, h >= l else { continue }
+            let volume: Double
+            if let rawVolume = r["volume"], !(rawVolume is NSNull) {
+                guard let parsed = num(rawVolume) else { continue }
+                volume = parsed
+            } else {
+                volume = 0
+            }
+            out.append(Bar(t: Int(t), o: o, h: h, l: l, c: c, v: volume))
         }
         return out.sorted { $0.t < $1.t }
     }
 
-    /// R14: crypto ≥59 bars and the last one ≤3 h old; equity's last bar ≤5 days old.
-    static func gate(_ bars: [Bar], isEquity: Bool, now: Date) -> String? {
+    /// Mirror loadDeskEvidence: both classes need 59 valid bars; reject stale or future data.
+    static func gate(_ bars: [Bar], isEquity: Bool, now: Date, minimumBars: Int = 59) -> String? {
+        if bars.count < minimumBars { return "thin_data" }
         guard let last = bars.last else { return "thin_data" }
         let age = now.timeIntervalSince1970 - Double(last.t) / 1000
-        if isEquity { return age > 5 * 86_400 ? "stale_data" : nil }
-        if bars.count < 59 { return "thin_data" }
-        return age > 3 * 3_600 ? "stale_data" : nil
+        if age < -60 { return "stale_data" }
+        return age > (isEquity ? 5 * 86_400 : 3 * 3_600) ? "stale_data" : nil
     }
 
     // MARK: Market, pulse (quota-free)
@@ -232,8 +252,13 @@ enum NucleoDeskIO {
         let code = body?["code"] as? String
         let message = body?["error"] as? String
         if status == 429 {
-            let seconds = num(headers["retry-after"]).map { Int($0) }
-            return .quota(retryAfter: seconds == 0 ? nil : seconds, message: message)
+            // A response header is untrusted. Int(Double.greatestFiniteMagnitude)
+            // traps; a malformed or out-of-window value is simply unknown.
+            let seconds = num(headers["retry-after"]).flatMap { value -> Int? in
+                guard value >= 1, value <= 86_400 else { return nil }
+                return Int(value.rounded(.up))
+            }
+            return .quota(retryAfter: seconds, message: message)
         }
         if status == 400, code == "question_too_long" { return .tooLong(message: message) }
         if status == 503, let code, code == "analysis_failed" || code == "desk_unavailable" { return .failed(code: code, message: message) }
@@ -301,6 +326,15 @@ final class NucleoDesk {
     static let pulseGraceSeconds: Double = 5
     static let islandCacheSeconds: TimeInterval = 60
 
+    /// One legacy capture predates the 30d equity query. Keep its 50 recorded
+    /// bars usable in Debug fixture mode without weakening any other preflight.
+    static func minimumBars(symbol: String, isEquity: Bool, fixtures: Bool) -> Int {
+#if DEBUG
+        if fixtures && isEquity && symbol == "NVDA" { return 50 }
+#endif
+        return 59
+    }
+
     let profile: AgentProfile
     let companions: CompanionStore
     let ledger: NucleoLedger
@@ -313,7 +347,7 @@ final class NucleoDesk {
     var sessionChanged: () -> Void = {}
     var recordQuery: (_ symbol: String, _ isEquity: Bool) -> Void = { DeskMemory().recordQuery(symbol: $0, isEquity: $1) }
 
-    private struct TokenEntry { let asset: NucleoAsset; let question: String; let expires: Date }
+    private struct TokenEntry { let asset: NucleoAsset; let question: String; let expires: Date; let generation: UUID }
     private final class Read {
         let requestId: String
         let result: [String: Any]
@@ -346,6 +380,7 @@ final class NucleoDesk {
     }
     private struct Inflight {
         let requestId: String
+        let generation: UUID
         let task: Task<Void, Never>
         let continuation: CheckedContinuation<[String: Any], Never>
     }
@@ -423,10 +458,12 @@ final class NucleoDesk {
         switch source {
         case let .token(token):
             purgeTokens()
-            guard let entry = tokens.removeValue(forKey: token), entry.expires > Date() else { throw NucleoFault.invalid("unknown or expired token") }
+            guard let entry = tokens.removeValue(forKey: token), entry.expires > Date(), entry.generation == generation
+            else { throw NucleoFault.invalid("unknown or expired token") }
             job = Job(requestId: requestId, question: entry.question, asset: entry.asset, generation: generation, startedAt: Date())
         case let .followUp(previous, q):
-            guard let read = reads.first(where: { $0.requestId == previous }) else { throw NucleoFault.invalid("unknown followUpOf") }
+            guard let read = reads.first(where: { $0.requestId == previous && $0.generation == generation })
+            else { throw NucleoFault.invalid("unknown followUpOf") }
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: read.asset,
                       generation: generation, startedAt: Date())
         case let .question(q):
@@ -441,7 +478,7 @@ final class NucleoDesk {
                 let result = await self.run(job)
                 self.complete(requestId, result)
             }
-            inflight = Inflight(requestId: requestId, task: task, continuation: continuation)
+            inflight = Inflight(requestId: requestId, generation: generation, task: task, continuation: continuation)
         }
     }
 
@@ -457,13 +494,13 @@ final class NucleoDesk {
     private func complete(_ requestId: String, _ result: [String: Any]) {
         guard let current = inflight, current.requestId == requestId else { return }
         inflight = nil
-        current.continuation.resume(returning: result)
+        current.continuation.resume(returning: current.generation == generation() ? result : Self.cancelledResult)
     }
 
     private func issueToken(_ asset: NucleoAsset, question: String) -> String {
         purgeTokens()
         let token = UUID().uuidString.lowercased()
-        tokens[token] = TokenEntry(asset: asset, question: question, expires: Date().addingTimeInterval(Self.tokenLifetime))
+        tokens[token] = TokenEntry(asset: asset, question: question, expires: Date().addingTimeInterval(Self.tokenLifetime), generation: generation())
         return token
     }
 
@@ -472,20 +509,21 @@ final class NucleoDesk {
     }
 
     private func run(_ job: Job) async -> [String: Any] {
+        guard generation() == job.generation else { return Self.cancelledResult }
         // 5. Resolve.
         var asset: NucleoAsset
         if let known = job.asset {
             asset = known
         } else {
             let search = await NucleoDeskIO.search(job.question)
-            if Task.isCancelled { return Self.cancelledResult }
+            if Task.isCancelled || generation() != job.generation { return Self.cancelledResult }
             switch search {
             case .failed:
                 return Self.errorResult("network")
             case .unresolved:
                 let hits = await BobbyAPI.searchAssets(job.question, limit: 3)
-                if Task.isCancelled { return Self.cancelledResult }
-                let suggestions: [[String: Any]] = hits.map { hit in
+                if Task.isCancelled || generation() != job.generation { return Self.cancelledResult }
+                let suggestions: [[String: Any]] = hits.filter { NucleoDeskIO.validSymbol($0.symbol) }.map { hit in
                     let a = NucleoAsset(symbol: hit.symbol, name: hit.name, isEquity: hit.assetClass == "equity", assetClass: hit.assetClass)
                     return ["symbol": hit.symbol, "name": hit.name, "assetClass": hit.assetClass, "token": issueToken(a, question: job.question)]
                 }
@@ -503,6 +541,7 @@ final class NucleoDesk {
 
         // 6. Preflight: nothing the desk cannot chart ever spends quota.
         guard asset.assetClass == "equity" || asset.assetClass == "crypto" else { return Self.unsupported(asset, "asset_class") }
+        guard NucleoDeskIO.validSymbol(asset.symbol) else { return Self.unsupported(asset, "symbol_format") }
         if asset.isEquity, asset.symbol.range(of: Self.equitySymbolPattern, options: .regularExpression) == nil {
             return Self.unsupported(asset, "symbol_format")
         }
@@ -513,7 +552,7 @@ final class NucleoDesk {
         // The market read (quota-free) starts with the candles; its stage always lands first.
         async let marketRead = NucleoAsync.withTimeout(Self.marketCapSeconds) { await NucleoDeskIO.market(symbol) }
         let candleRead = await NucleoDeskIO.candles(symbol: symbol, isEquity: isEquity)
-        if Task.isCancelled { return Self.cancelledResult }
+        if Task.isCancelled || generation() != job.generation { return Self.cancelledResult }
         let bars: [NucleoDeskIO.Bar]
         switch candleRead {
         case let .failed(code):
@@ -522,7 +561,8 @@ final class NucleoDesk {
         case let .bars(rows):
             bars = rows
         }
-        if let reason = NucleoDeskIO.gate(bars, isEquity: isEquity, now: clock.now(symbol)) {
+        let minimum = Self.minimumBars(symbol: symbol, isEquity: isEquity, fixtures: fixtures)
+        if let reason = NucleoDeskIO.gate(bars, isEquity: isEquity, now: clock.now(symbol), minimumBars: minimum) {
             return Self.unsupported(asset, reason)
         }
 
@@ -531,14 +571,15 @@ final class NucleoDesk {
         let question = job.question
         async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity)
         let market = await marketRead ?? NucleoDeskIO.Market(price: nil, changePct: nil)
-        if Task.isCancelled { pulseTask.cancel(); return Self.cancelledResult }
+        if Task.isCancelled || generation() != job.generation { pulseTask.cancel(); return Self.cancelledResult }
         emit("ask.stage", ["requestId": job.requestId, "stage": "market", "market": market.json])
         let candles = bars.map(\.json)
         emit("ask.stage", ["requestId": job.requestId, "stage": "candles", "candles": candles, "provenance": NSNull()])
         let desk = await deskRead
-        if Task.isCancelled { pulseTask.cancel(); return Self.cancelledResult }
+        if Task.isCancelled || generation() != job.generation { pulseTask.cancel(); return Self.cancelledResult }
         let pulse: NucleoDeskIO.Pulse? = await NucleoAsync.withTimeout(Self.pulseGraceSeconds) { await pulseTask.value } ?? nil
         pulseTask.cancel()
+        if Task.isCancelled || generation() != job.generation { return Self.cancelledResult }
 
         // 8. Map. Never a verdict on a failure.
         switch desk {
@@ -553,7 +594,7 @@ final class NucleoDesk {
         case let .failed(code, message):
             return Self.errorResult(code, message)
         case let .ok(debate):
-            if Task.isCancelled { return Self.cancelledResult }
+            if Task.isCancelled || generation() != job.generation { return Self.cancelledResult }
             let receivedAt = clock.receivedAt(symbol)
             let result: [String: Any] = [
                 "v": 1, "status": "ok", "requestId": job.requestId, "question": job.question, "language": L.ttsLang,
@@ -579,7 +620,8 @@ final class NucleoDesk {
 
     /// The latest ok read not saved yet and under 30 min old (restore after a web content crash).
     func pendingRead(now: Date = Date()) -> [String: Any]? {
-        reads.last { $0.saved == nil && now.timeIntervalSince($0.storedAt) < Self.pendingReadWindow }?.result
+        let current = generation()
+        return reads.last { $0.generation == current && $0.saved == nil && now.timeIntervalSince($0.storedAt) < Self.pendingReadWindow }?.result
     }
 
     // MARK: - saveThesis (the only XP)
@@ -588,9 +630,9 @@ final class NucleoDesk {
         let requestId = try p.string("requestId", maxLength: 64)!
         let horizon = try p.int("horizonHours", required: false, oneOf: [24, 72, 168])
         guard let read = reads.first(where: { $0.requestId == requestId }) else { throw NucleoFault.invalid("unknown requestId") }
-        if let saved = read.saved { return saved }
         // Signed in or out while it ran: the read belongs to an account that is gone.
         guard generation() == read.generation else { return ["status": "stale"] }
+        if let saved = read.saved { return saved }
 
         let wait = read.verdict == "wait"
         let kind = wait ? "no_trade_respected" : "read_complete"
@@ -624,15 +666,18 @@ final class NucleoDesk {
         islandCache = nil
         sessionChanged()
         if planting == "pending", let eventID = award.eventID {
-            Task { [weak self] in await self?.plant(requestId: requestId, eventID: eventID, horizon: horizon, owner: owner) }
+            Task { [weak self] in
+                await self?.plant(requestId: requestId, eventID: eventID, horizon: horizon, owner: owner, generation: read.generation)
+            }
         }
         return result
     }
 
     /// Signed in: sync, wait for the server's word on this award, and tell the page what it planted.
-    private func plant(requestId: String, eventID: String, horizon: Int?, owner: String?) async {
+    private func plant(requestId: String, eventID: String, horizon: Int?, owner: String?, generation savedGeneration: UUID) async {
         let outcome = await ProgressSync.shared.outcome(for: eventID, store: companions, profile: profile)
-        var stage = isSignedIn() ? "failed" : "signed_out"
+        guard generation() == savedGeneration, isSignedIn(), userID() == owner else { return }
+        var stage = "failed"
         var piece: Any = NSNull()
         var horizonJSON: Any = NSNull()
         if let outcome {
@@ -649,6 +694,7 @@ final class NucleoDesk {
                 if stage == "seed", let hours = horizon, hours > 24, let target = LandHorizon(rawValue: hours),
                    let inventoryID = grant.inventoryId, seedHorizon?.options().contains(target) == true {
                     if case let .success(extended) = await DeskSeedExtender().extend(inventoryID: inventoryID, to: target) {
+                        guard generation() == savedGeneration, isSignedIn(), userID() == owner else { return }
                         piece = ["id": extended.item.id, "name": extended.item.displayName]
                         seedHorizon = extended.horizon
                     }
@@ -664,6 +710,7 @@ final class NucleoDesk {
                 stage = "failed"
             }
         }
+        guard generation() == savedGeneration, isSignedIn(), userID() == owner else { return }
         islandCache = nil
         emit("thesis.planted", ["requestId": requestId, "stage": stage, "piece": piece, "horizon": horizonJSON])
         sessionChanged()

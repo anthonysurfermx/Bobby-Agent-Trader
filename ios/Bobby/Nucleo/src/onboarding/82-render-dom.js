@@ -412,3 +412,31 @@ function renderGsat(){
   if (T > tg3){ var q = c01((T - tg3) / 0.16); yy = -8 * FOC(q); oo = 1 - q; }
   st(savedTag, tf(sx + gsat._w / 2 - 200, sy - gsat._h / 2 - 8 - 14), 1); st(savedRoll, 'translateY(' + f1(yy * TR) + 'px)', oo);
 }
+
+/* The animated surface keeps its buttons in the DOM. Only actions available
+   in the current beat may enter keyboard or VoiceOver navigation. */
+var A11Y_BUTTONS = document.getElementsByTagName('button');
+var PILL_ACTION_STATES = { PICK:1, ASK_TEACH:1, ERROR:1, LISTENING:1, RISK:1, RESOLVING:1,
+  THINK_WAIT:1, TALK_EVIDENCE:1, TALK_CHART:1, VERDICT:1, HANDBACK:1 };
+function renderA11y(){
+  var label = W.state === 'RISK' ? Ls('aria.riskAgree') :
+    W.pillMode === 'label' && W.pillLabel ? W.pillLabel :
+    W.pillMode === 'agree' && W.pillLabel ? W.pillLabel :
+    W.pillMode === 'stop' ? Ls('aria.skip') :
+    W.pillMode === 'think' ? Ls('aria.cancel') :
+    W.state === 'LISTENING' ? Ls('hint.release') : Ls('aria.pill');
+  sa(pill, 'aria-label', label);
+  for (var i = 0; i < A11Y_BUTTONS.length; i++){
+    var b = A11Y_BUTTONS[i], id = b.id, active = false;
+    if (id === 'pill') active = !!PILL_ACTION_STATES[W.state] && (W.state !== 'RISK' || W.agreeReady) && b._o > 0.5 && b.style.pointerEvents !== 'none';
+    else if (id === 'close') active = b.classList.contains('on') && b._o > 0.5;
+    else if (id === 'permGo') active = W.state === 'PRE_PERMISSION' && !!permEl._set && !W.permBusy;
+    else if (id === 'typeSend') active = typeBox.classList.contains('on') && !b.disabled;
+    else active = (b.classList.contains('tap') || b.classList.contains('on')) && b._o > 0.5;
+    if (b._a11yActive === active) continue;
+    b._a11yActive = active;
+    if (!active && document.activeElement === b) b.blur();
+    b.tabIndex = active ? 0 : -1;
+    sa(b, 'aria-hidden', active ? 'false' : 'true');
+  }
+}
