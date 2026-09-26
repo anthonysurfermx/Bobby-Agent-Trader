@@ -89,7 +89,7 @@ export function shouldPromptNow(alreadySignedIn: boolean): boolean {
   return shouldPromptAfterAsk(readAskCount(), alreadySignedIn);
 }
 
-type Busy = 'apple' | 'google' | 'wallet' | null;
+type Busy = 'apple' | 'google' | 'twitter' | 'wallet' | null;
 
 export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp: number; onClose: () => void; voiceAccess?: boolean }) {
   // Seen once it is on screen; the scheduling side must not count as seeing it.
@@ -102,7 +102,7 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp:
 
   const close = () => { if (!voiceAccess) dismissForever(); onClose(); };
 
-  const oauth = async (provider: 'apple' | 'google') => {
+  const oauth = async (provider: 'apple' | 'google' | 'twitter') => {
     setBusy(provider);
     setError('');
     setProviderUrl(null);
@@ -146,6 +146,7 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp:
   const options: Array<{ id: Busy; label: string; icon: React.ReactNode; run: () => void }> = [
     { id: 'apple', label: t('Continue with Apple', 'Continuar con Apple'), icon: <Apple size={17} />, run: () => void oauth('apple') },
     { id: 'google', label: t('Continue with Google', 'Continuar con Google'), icon: <GoogleMark />, run: () => void oauth('google') },
+    { id: 'twitter', label: t('Continue with X', 'Continuar con X'), icon: <XMark />, run: () => void oauth('twitter') },
     { id: 'wallet', label: t('Continue with a wallet', 'Continuar con una wallet'), icon: <Wallet size={17} />, run: () => void connectWallet() },
   ];
 
@@ -212,6 +213,14 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp:
         </button>
       </motion.div>
     </motion.div>
+  );
+}
+
+function XMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
   );
 }
 
