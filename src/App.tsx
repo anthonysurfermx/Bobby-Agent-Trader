@@ -1,5 +1,5 @@
 // src/App.tsx - CON VERCEL ANALYTICS
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
@@ -19,6 +19,23 @@ import UserLayout from '@/pages/user/UserLayout';
 // Lazy load todas las páginas para mejor performance
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
+const BobbySignInPage = lazyWithRetry(() => import('@/pages/BobbySignInPage'), 'bobby-signin');
+
+// "/" is the Bobby app home: middleware.ts serves the static page in public/home before the SPA is involved.
+// The SPA only reaches the index route on a client-side navigation (a <Link to="/">), which needs a real page
+// load to get that page, or where the middleware does not run (local vite dev). The path the SPA booted on
+// tells the two apart, so the fallback renders the protocol landing instead of reloading forever.
+const SPA_BOOT_PATH = typeof window !== 'undefined' ? window.location.pathname : '/';
+function HomeGate() {
+  const bootedHere = SPA_BOOT_PATH === '/';
+  useEffect(() => { if (!bootedHere) window.location.assign('/'); }, [bootedHere]);
+  if (!bootedHere) return <PageLoader />;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <BobbyProtocolLanding />
+    </Suspense>
+  );
+}
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
 // Direction A (lifestyle) was /app until 2026-09-24 and stays at /app-a, so a rollback is a route change;
 // /app-v1 keeps the landing before it, and direction B stays a candidate at /app-b.
@@ -293,11 +310,7 @@ const router = createBrowserRouter(
         // ==========================================
         {
           index: true,
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyProtocolLanding />
-            </Suspense>
-          ),
+          element: <HomeGate />,
         },
         {
           path: 'protocol',
@@ -468,6 +481,15 @@ const router = createBrowserRouter(
           ),
         },
         // The iPhone experience on the web: risk notice → squad → live desk.
+        // Apple / Google sign-in, started from the static home: /signin?provider=apple|google
+        {
+          path: 'signin',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <BobbySignInPage />
+            </Suspense>
+          ),
+        },
         {
           path: 'desk',
           element: (

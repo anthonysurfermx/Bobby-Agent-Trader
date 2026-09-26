@@ -1,0 +1,580 @@
+<meta charset="utf-8">
+<script>
+/* an auth link that lands on "/" (magic link, OAuth code, error) belongs to the SPA's callback, not to this page */
+(function(){ var h = location.hash, q = location.search;
+  if (/(^|[#&])(access_token|error_description)=/.test(h) || /[?&](code|error_description)=/.test(q)) location.replace('/auth/callback' + q + h); })();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bobby — Asking an AI about your asset is no longer an edge</title>
+<meta name="description" content="Ask Bobby about any asset. Three voices argue it out before you hear an answer, and Bobby replies in one word: Ready, Wait or Pass. Every read is written down before the outcome and scored after.">
+<link rel="canonical" href="https://bobbyprotocol.xyz/">
+<meta name="theme-color" content="#0B0A09">
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="64x64">
+<link rel="icon" href="/favicon-bobby-v3.png" type="image/png" sizes="512x512">
+<link rel="apple-touch-icon" href="/apple-touch-icon-bobby-v3.png" sizes="180x180">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Bobby">
+<meta property="og:url" content="https://bobbyprotocol.xyz/">
+<meta property="og:title" content="Bobby — Asking an AI about your asset is no longer an edge">
+<meta property="og:description" content="Three voices argue it out. One word: Ready, Wait or Pass. Every read on the record.">
+<meta property="og:image" content="https://bobbyprotocol.xyz/bobby-social-base-v1.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@bobbyprotocol">
+<meta name="twitter:title" content="Bobby — Asking an AI about your asset is no longer an edge">
+<meta name="twitter:description" content="Three voices argue it out. One word: Ready, Wait or Pass. Every read on the record.">
+<meta name="twitter:image" content="https://bobbyprotocol.xyz/bobby-social-base-v1.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&family=Sora:wght@200;300;400&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#0B0A09; --ambient:#15121C; --ink:#F2EDE4; --inkb:#FFF8EC; --ink2:#A39C91; --ink3:#8A8378;
+  --hair:rgba(242,237,228,.08); --line:rgba(242,237,228,.12);
+  --card-a:#221E1B; --card-b:#171513;
+  --alpha:#3FE0B5; --red:#FF5A5F; --cio:#F6B94E; --rim:#A7BFE8; --listen:#5CE1FF;
+  --sans:"Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono:"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  /* canvas side: the sphere radius is 0.226 of it (see sphere scale below) */
+  --S: min(150vmin, 1500px, 128vw);
+  /* display face: Sora Light, tight; the emphasised half of a line drops to ExtraLight in ink2 */
+  --display:"Sora", ui-sans-serif, system-ui, -apple-system, sans-serif; --dw:300; --dtrack:-.05em; --dscale:.92; --emstyle:normal; --emw:200;
+}
+@media (max-aspect-ratio: 4/5){ :root{ --S: 176vw; } }
+html,body{height:100%}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); overflow-x:hidden}
+
+/* ---------- the pinned stage: one sphere tells the whole story ---------- */
+.story{position:relative; height:780svh}
+.stage{position:sticky; top:0; height:100svh; min-height:600px; overflow:hidden; isolation:isolate}
+.stage::before{content:""; position:absolute; inset:0; z-index:-2;
+  background:
+    radial-gradient(42% 38% at 50% 50%, rgba(77,107,255,.10), transparent 70%),
+    radial-gradient(70% 60% at 50% 45%, var(--ambient), transparent 72%)}
+/* rim light pooled under the glass; closest-side keeps every edge of the box fully transparent */
+.beam{position:absolute; left:50%; top:calc(50% + var(--S) * .21); width:calc(var(--S) * .72); height:calc(var(--S) * .34);
+  transform:translate(-50%, -50%); z-index:-1; pointer-events:none;
+  background:radial-gradient(closest-side, rgba(167,191,232,.24), rgba(92,225,255,.06) 55%, transparent)}
+#glass{position:absolute; left:50%; top:50%; width:var(--S); height:var(--S); transform:translate(-50%,-50%); transform-origin:50% 50%; display:block}
+
+/* ---------- orbiting assets ---------- */
+.orbit{position:absolute; inset:0; pointer-events:none}
+.sat{position:absolute; left:0; top:0; display:grid; justify-items:center; gap:8px;
+  --chip: clamp(40px, 4.4vmin, 58px); width:var(--chip); margin-left:calc(var(--chip) / -2); margin-top:calc(var(--chip) / -2);
+  will-change:transform, opacity, filter}
+.chip{position:relative; width:var(--chip); height:var(--chip); border-radius:50%; display:grid; place-items:center}
+.chip::before{content:""; position:absolute; inset:0; border-radius:50%; opacity:var(--bgA, 1);
+  background:linear-gradient(180deg, rgba(34,30,27,.78), rgba(18,16,14,.78));
+  border:1px solid rgba(242,237,228,.14);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 14px 34px -14px rgba(0,0,0,.8), 0 0 24px -8px rgba(167,191,232,.25);
+  -webkit-backdrop-filter:blur(8px) saturate(140%); backdrop-filter:blur(8px) saturate(140%)}
+.glyph{position:relative; width:46%; height:46%; background:var(--ink);
+  -webkit-mask:var(--logo) center / contain no-repeat; mask:var(--logo) center / contain no-repeat}
+.glyph.wide{width:66%; height:30%}
+.tick{font:500 10px/1 var(--mono); letter-spacing:.14em; color:var(--ink2); opacity:var(--lbA, 1); white-space:nowrap}
+
+/* ---------- scene overlays ---------- */
+.scene{position:absolute; inset:0; pointer-events:none; opacity:0}
+.scene.s0{opacity:1}
+.eyebrow{font:500 11px/1.2 var(--mono); letter-spacing:.16em; text-transform:uppercase; color:var(--ink3)}
+.disp{font-family:var(--display); font-weight:var(--dw); letter-spacing:var(--dtrack)}
+.disp em, .h2 em{font-style:var(--emstyle); font-weight:var(--emw); color:var(--ink2)}
+.h2{font-family:var(--display); font-weight:var(--dw); letter-spacing:var(--dtrack); font-size:calc(clamp(28px, 3.3vw, 48px) * var(--dscale)); line-height:1.06; margin:0; text-wrap:balance; color:var(--ink)}
+
+/* s0 — hero line */
+.s0 .line{position:absolute; left:50%; bottom:max(5svh, 28px); transform:translateX(-50%); width:min(92vw, 820px); text-align:center; display:grid; gap:18px; justify-items:center}
+.s0 h1{margin:0; font-family:var(--display); font-weight:var(--dw); letter-spacing:var(--dtrack); font-size:calc(clamp(28px, 3.7vw, 54px) * var(--dscale)); line-height:1.06; text-wrap:balance;
+  text-shadow:0 2px 30px rgba(11,10,9,.9)}
+.s0 h1 em{font-style:var(--emstyle); font-weight:var(--emw); color:var(--ink2)}
+.cue{display:flex; align-items:center; gap:10px; font:500 10px/1 var(--mono); letter-spacing:.2em; color:var(--ink3); text-transform:uppercase}
+.cue i{display:block; width:1px; height:26px; background:linear-gradient(var(--ink3), transparent); animation:cue 2.4s ease-in-out infinite; transform-origin:top}
+@keyframes cue{0%{transform:scaleY(0); opacity:0} 40%{transform:scaleY(1); opacity:1} 100%{transform:scaleY(1); opacity:0}}
+
+/* s1 — the problem */
+.s1 .col{position:absolute; left:max(6vw, 24px); top:50%; transform:translateY(-50%); width:min(500px, 44vw); display:grid; gap:18px}
+.chat{background:linear-gradient(180deg, var(--card-a), var(--card-b)); border:1px solid var(--hair); border-radius:22px; padding:14px 16px 16px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.8); display:grid; gap:10px}
+.chat .meta{display:flex; justify-content:space-between; align-items:center; font:500 10px/1 var(--mono); letter-spacing:.14em; color:var(--ink3); text-transform:uppercase}
+.chat .meta b{font-weight:500; color:var(--ink2); display:flex; align-items:center; gap:8px}
+.chat .meta b::before{content:""; width:14px; height:14px; border-radius:50%; background:#3A3531}
+.q{justify-self:end; max-width:85%; background:#000; border:1px solid rgba(242,237,228,.10); border-radius:16px 16px 4px 16px; padding:9px 13px; font-size:14px; color:var(--ink)}
+.a{font-size:14.5px; line-height:1.5; color:var(--ink2); margin:0}
+.a mark{background:none; color:var(--inkb); border-bottom:1px solid rgba(255,248,236,.35)}
+.chat.two{margin-left:clamp(0px, 3vw, 36px)}
+.fail{font-family:var(--display); font-weight:var(--dw); letter-spacing:var(--dtrack); font-size:calc(clamp(20px, 2vw, 28px) * var(--dscale)); line-height:1.2; margin:6px 0 0; text-wrap:balance}
+.fail span{color:var(--ink2); font-style:var(--emstyle); font-weight:var(--emw)}
+.qrow{display:flex; justify-content:flex-end; align-items:center; gap:10px}
+.qrow .q{justify-self:auto}
+.slot{flex:none; width:44px; height:44px}
+
+/* s2 — three voices */
+.s2 .head{position:absolute; left:50%; top:max(6svh, 36px); transform:translateX(-50%); width:min(92vw, 1080px); text-align:center; display:grid; gap:12px; justify-items:center}
+.voice{position:absolute; width:min(280px, 26vw); display:grid; gap:8px; opacity:0}
+.voice .who{display:flex; align-items:center; gap:9px; font:500 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase}
+.voice .who::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--c); box-shadow:0 0 12px var(--c)}
+.voice .who small{font:400 11px/1 var(--mono); letter-spacing:.06em; text-transform:none; color:var(--ink3)}
+.voice p{margin:0; font-size:15px; line-height:1.5; color:var(--ink)}
+.v-a{--c:var(--alpha); right:calc(50% + var(--S) * .235 + 28px); top:44%}
+.v-r{--c:var(--red); left:calc(50% + var(--S) * .235 + 28px); top:36%}
+.v-c{--c:var(--cio); left:50%; bottom:max(6svh, 32px); margin-left:min(-140px, -13vw)}
+.v-a .who{color:var(--alpha)} .v-r .who{color:var(--red)} .v-c .who{color:var(--cio)}
+
+/* s3 — one word */
+.word{position:absolute; left:0; top:0; pointer-events:none; opacity:0; will-change:transform}
+.word .ring{position:absolute; left:0; top:0; border-radius:50%; border:1.5px solid var(--cio);
+  box-shadow:0 0 40px -6px rgba(246,185,78,.45), inset 0 0 40px -12px rgba(246,185,78,.35); transform:translate(-50%,-50%)}
+.word b{position:absolute; left:0; top:0; transform:translate(-50%,-54%); font-family:var(--display); font-weight:var(--dw); letter-spacing:var(--dtrack); font-size:calc(var(--wfs, 60px) * var(--dscale)); line-height:1; color:var(--inkb); white-space:nowrap;
+  text-shadow:0 2px 24px rgba(42,28,8,.8)}
+.s3 .foot{position:absolute; left:50%; bottom:max(4svh, 24px); transform:translateX(-50%); width:min(92vw, 680px); display:grid; gap:14px; justify-items:center; text-align:center}
+.chart{width:100%; height:auto; display:block; overflow:visible}
+.chart text{font:500 10px var(--mono); letter-spacing:.12em; fill:var(--ink3)}
+.call{margin:0; font-family:var(--display); font-weight:var(--dw); letter-spacing:var(--dtrack); font-size:calc(clamp(22px, 2.4vw, 32px) * var(--dscale)); line-height:1.15; text-wrap:balance}
+.call em{font-style:normal; color:var(--cio)}
+.rule{margin:0; font-size:14px; color:var(--ink2); max-width:56ch}
+.fine{font:500 10px/1.4 var(--mono); letter-spacing:.12em; color:var(--ink3); text-transform:uppercase}
+
+/* s5 — the record */
+.s4 .col{position:absolute; right:max(6vw, 24px); top:50%; transform:translateY(-50%); width:min(560px, 46vw); display:grid; gap:18px}
+.ledger{list-style:none; margin:0; padding:0; border-top:1px solid var(--hair)}
+.row{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, .8fr) minmax(0, .6fr) auto; align-items:center; gap:12px; padding:13px 2px; border-bottom:1px solid var(--hair)}
+.as{display:flex; align-items:center; gap:10px; font:500 12px/1 var(--mono); letter-spacing:.1em; color:var(--ink)}
+.lg{flex:none; width:16px; height:16px; background:var(--ink); -webkit-mask:var(--logo) center / contain no-repeat; mask:var(--logo) center / contain no-repeat}
+.vd{font-family:var(--display); font-weight:var(--dw); letter-spacing:-.03em; font-size:calc(21px * var(--dscale)); line-height:1; color:var(--c)}
+.dt{font:500 11px/1 var(--mono); letter-spacing:.08em; color:var(--ink3); font-variant-numeric:tabular-nums}
+.stt{justify-self:end; display:flex; align-items:center; gap:8px; white-space:nowrap; font:500 11px/1 var(--mono); letter-spacing:.04em; color:var(--ink2)}
+.stt::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--ink3)}
+.stt.open::before{background:transparent; box-shadow:inset 0 0 0 1px var(--cio)}
+.stt.ok::before{background:var(--alpha)}
+.stt.miss::before{background:var(--red)}
+.note{margin:0; color:var(--ink2); font-size:14.5px; line-height:1.55; max-width:52ch}
+.note a{color:var(--ink); text-decoration:none; border-bottom:1px solid rgba(242,237,228,.3); white-space:nowrap}
+.note a:focus-visible{outline:2px solid var(--listen); outline-offset:2px}
+.same{margin:2px 0 0; font-family:var(--display); font-weight:var(--dw); letter-spacing:-.03em; font-size:calc(clamp(18px, 1.6vw, 22px) * var(--dscale)); line-height:1.32; color:var(--ink); text-wrap:balance}
+.same em{font-style:normal; font-weight:var(--emw); color:var(--ink2)}
+
+/* ---------- portrait / phone ---------- */
+@media (max-aspect-ratio: 1/1){
+  .s1 .col{left:16px; right:16px; width:auto; top:auto; bottom:max(4svh, 20px); transform:none; gap:12px}
+  .chat{padding:12px 14px 14px; gap:8px}
+  .a{font-size:13.5px}
+  .chat.two{margin-left:0}
+  .s2 .head{top:max(5svh, 28px)}
+  .voice{left:16px; right:16px; width:auto; margin:0}
+  .v-a{top:auto; bottom:calc(max(4svh, 20px) + 196px)}
+  .v-r{top:auto; bottom:calc(max(4svh, 20px) + 98px)}
+  .v-c{top:auto; bottom:max(4svh, 20px)}
+  .s4 .col{left:16px; right:16px; width:auto; top:auto; bottom:max(4svh, 20px); transform:none; gap:12px}
+  .row{grid-template-columns:minmax(0, 1fr) auto auto; padding:10px 2px}
+  .dt{display:none}
+  .vd{font-size:calc(18px * var(--dscale))}
+  .note{font-size:13.5px}
+  .same{font-size:calc(17px * var(--dscale))}
+}
+@media (max-width: 420px){ .s0 h1{font-size:calc(28px * var(--dscale))} .fail{font-size:calc(20px * var(--dscale))} .voice p{font-size:14px} }
+
+/* ---------- join (after the story) ---------- */
+.join{padding-block:14svh 12svh; padding-inline:16px}
+.panel{max-width:1180px; margin:0 auto; display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(0, .85fr); min-height:min(720px, 84svh);
+  border-radius:32px; overflow:hidden; border:1px solid var(--hair); background:#0D0C0B;
+  box-shadow:0 80px 140px -70px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.04)}
+.vis{position:relative; overflow:hidden; min-height:420px;
+  background:radial-gradient(55% 55% at 46% 52%, #171420, #0B0A09 72%)}
+.vis canvas{position:absolute; left:48%; top:50%; height:150%; width:auto; aspect-ratio:1 / 1; transform:translate(-50%,-50%)}
+.beam2{position:absolute; left:48%; top:72%; width:80%; height:44%; transform:translate(-50%,-50%); pointer-events:none;
+  background:radial-gradient(closest-side, rgba(167,191,232,.22), rgba(92,225,255,.05) 55%, transparent)}
+.brand{position:absolute; left:28px; top:26px; z-index:2; font-size:calc(22px * var(--dscale)); color:var(--ink)}
+.motto{position:absolute; left:28px; right:28px; bottom:24px; z-index:2; margin:0; font:500 10px/1.5 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--ink3)}
+.form{position:relative; display:flex; flex-direction:column; justify-content:center; gap:14px; padding:clamp(28px, 5vw, 64px);
+  background:linear-gradient(180deg, rgba(34,30,27,.5), rgba(18,16,14,.6)); border-left:1px solid var(--hair)}
+.jt{margin:0; font-size:calc(clamp(30px, 3vw, 42px) * var(--dscale)); line-height:1.05; color:var(--ink)}
+.sub{margin:0 0 10px; color:var(--ink2); font-size:15px; line-height:1.5; max-width:36ch}
+.btns{display:grid; gap:10px}
+.btn{appearance:none; display:flex; align-items:center; justify-content:center; gap:10px; width:100%; height:50px; border-radius:12px;
+  font:500 15px/1 var(--sans); text-decoration:none; cursor:pointer; transition:transform .15s ease, background .2s ease, border-color .2s ease}
+.btn:active{transform:scale(.985)}
+.btn:focus-visible, .have a:focus-visible{outline:2px solid var(--listen); outline-offset:2px}
+.b-apple{background:var(--ink); color:#0B0A09; border:1px solid var(--ink)}
+.b-apple:hover{background:var(--inkb)}
+.b-google, .b-ios{background:#000; color:var(--ink); border:1px solid rgba(242,237,228,.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+.b-google:hover, .b-ios:hover{border-color:rgba(242,237,228,.3)}
+.ico{width:18px; height:18px; background:currentColor; -webkit-mask:var(--logo) center / contain no-repeat; mask:var(--logo) center / contain no-repeat}
+.or{display:flex; align-items:center; gap:12px; color:var(--ink3); font:500 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase}
+.or::before, .or::after{content:""; flex:1; height:1px; background:var(--hair)}
+.have{margin:4px 0 0; font-size:14px; color:var(--ink2)}
+.have a{color:var(--ink); text-decoration:none; border-bottom:1px solid rgba(242,237,228,.3)}
+.legal{margin:10px 0 0; font-size:12px; line-height:1.5; color:var(--ink3); max-width:44ch}
+.legal a{color:var(--ink2)}
+/* ---------- site footer: the protocol gateway ---------- */
+.site-foot{padding-block:4svh 40px; padding-inline:16px}
+.site-foot .wrap{max-width:1180px; margin:0 auto; display:grid; gap:28px}
+.proto{position:relative; overflow:hidden; display:grid; gap:14px; padding:clamp(28px, 5vw, 56px); border-radius:28px; text-decoration:none; color:var(--ink);
+  border:1px solid var(--hair); background:linear-gradient(135deg, #14121A, #0D0C0B 60%); box-shadow:inset 0 1px 0 rgba(255,255,255,.04); transition:border-color .25s ease}
+.proto:hover{border-color:rgba(242,237,228,.2)}
+.proto:focus-visible{outline:2px solid var(--listen); outline-offset:3px}
+.proto-title{font-size:calc(clamp(40px, 6.4vw, 92px) * var(--dscale)); line-height:.95; letter-spacing:-.055em}
+.proto-copy{max-width:56ch; color:var(--ink2); font-size:16px; line-height:1.55}
+.proto-cta{display:inline-flex; align-items:center; gap:10px; font:500 12px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--ink); margin-top:6px}
+.proto-cta i{font-style:normal; transition:transform .25s ease}
+.proto:hover .proto-cta i{transform:translateX(4px)}
+/* a quiet echo of the glass: two hairline rings off the right edge */
+.halo{position:absolute; right:-14%; top:50%; width:min(46vw, 560px); aspect-ratio:1; transform:translateY(-50%); border-radius:50%; pointer-events:none;
+  border:1px solid rgba(167,191,232,.16); box-shadow:0 0 0 38px rgba(167,191,232,.025), 0 0 120px -20px rgba(154,92,255,.25)}
+.proto-links{display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:0 24px; border-top:1px solid var(--hair)}
+.proto-links a{padding-block:16px; border-bottom:1px solid var(--hair); color:var(--ink2); text-decoration:none; font-size:14px; display:flex; justify-content:space-between}
+.proto-links a::after{content:"↗"; color:var(--ink3)}
+.proto-links a:hover{color:var(--ink)}
+.proto-links a:focus-visible, .social a:focus-visible{outline:2px solid var(--listen); outline-offset:2px}
+.base{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px 24px; color:var(--ink3); font-size:13px}
+.base .mark{font-size:calc(20px * var(--dscale)); color:var(--ink)}
+.social{display:flex; gap:18px}
+.social a{color:var(--ink2); text-decoration:none}
+.social a:hover{color:var(--ink)}
+@media (max-width: 720px){ .proto-links{grid-template-columns:1fr 1fr} .halo{right:-40%; width:90vw} }
+
+@media (max-width: 860px){
+  .panel{grid-template-columns:1fr; min-height:0}
+  .vis{min-height:0; height:clamp(340px, 62vw, 460px)}
+  .vis canvas{left:50%; height:150%}
+  .form{border-left:0; border-top:1px solid var(--hair)}
+}
+
+
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+@media (prefers-reduced-motion: reduce){ .cue i{animation:none} }
+</style>
+
+<main class="story" id="story">
+  <div class="stage" id="stage">
+    <div class="beam" aria-hidden="true"></div>
+    <canvas id="glass" aria-hidden="true"></canvas>
+    <div class="orbit" id="orbit" aria-hidden="true"></div>
+
+    <!-- 1 · hero -->
+    <section class="scene s0" id="s0" aria-label="Bobby">
+      <div class="line">
+        <h1>Asking an AI about your asset is <em>no longer an edge.</em></h1>
+        <div class="cue" aria-hidden="true"><i></i>Scroll</div>
+      </div>
+    </section>
+
+    <!-- 2 · the problem -->
+    <section class="scene s1" id="s1" aria-label="The problem">
+      <div class="col">
+        <span class="eyebrow">Any AI chat · Example</span>
+        <div class="chat one" id="c1">
+          <div class="meta"><b>Assistant</b><span>Mon 09:12</span></div>
+          <div class="qrow"><span class="slot" id="slot"></span><div class="q">Is now a good time for NVIDIA?</div></div>
+          <p class="a">Yes. Demand for AI chips keeps growing and the momentum is strong. <mark>It looks like a good entry.</mark></p>
+        </div>
+        <div class="chat two" id="c2">
+          <div class="meta"><b>Assistant</b><span>Thu 16:40</span></div>
+          <div class="q">Is now a good time for NVIDIA?</div>
+          <p class="a">The stock looks stretched after its run. <mark>It may be wise to wait</mark> for a pullback.</p>
+        </div>
+        <p class="fail" id="fail">Two confident answers. <span>Nobody checked either one, and it won't remember Monday.</span></p>
+      </div>
+    </section>
+
+    <!-- 3 · three voices -->
+    <section class="scene s2" id="s2" aria-label="How Bobby answers">
+      <div class="head">
+        <span class="eyebrow">Same question, asked to Bobby</span>
+        <h2 class="h2">Before you hear an answer, <em>it has to survive an attack.</em></h2>
+      </div>
+      <div class="voice v-a" id="va"><span class="who">Alpha Hunter <small>makes the case</small></span><p>Demand for AI chips still outruns supply, and buyers defended the last dip.</p></div>
+      <div class="voice v-r" id="vr"><span class="who">Red Team <small>tries to break it</small></span><p>The price already assumes perfect quarters. One miss and that floor gives way.</p></div>
+      <div class="voice v-c" id="vc"><span class="who">CIO <small>decides</small></span><p>The case is real. The entry is not. Wait for a better level.</p></div>
+    </section>
+
+    <!-- 4 · one word -->
+    <div class="word" id="word" aria-hidden="true"><span class="ring" id="ring"></span><b id="wordtxt">Wait</b></div>
+    <section class="scene s3" id="s3" aria-label="The verdict">
+      <div class="foot">
+        <svg class="chart" id="chart" viewBox="0 0 680 150" role="img" aria-label="Example one-hour chart with resistance and support"></svg>
+        <p class="call">The case is real, the entry is not. My call: <em>wait.</em></p>
+        <p class="rule">Bobby answers in one of three words: Ready, Wait or Pass. It never tells you to buy or sell.</p>
+        <span class="fine">Example read · NVDA · Educational, not financial advice</span>
+      </div>
+    </section>
+
+    <!-- 5 · the record -->
+    <section class="scene s4" id="s4" aria-label="The record">
+      <div class="col">
+        <span class="eyebrow">The record · Example</span>
+        <h2 class="h2">Bobby remembers what it told you. <em>Then it keeps score.</em></h2>
+        <ol class="ledger">
+          <li class="row" id="r1"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/nvidia.svg)"></span>NVDA</span><span class="vd" id="r1v" style="--c:var(--cio)">Wait</span><span class="dt">Sep 26</span><span class="stt open">Open · scored in 7 days</span></li>
+          <li class="row" id="r2"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/bitcoin.svg)"></span>BTC</span><span class="vd" style="--c:var(--alpha)">Ready</span><span class="dt">Sep 19</span><span class="stt ok">Resolved · right</span></li>
+          <li class="row" id="r3"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/tesla.svg)"></span>TSLA</span><span class="vd" style="--c:var(--red)">Pass</span><span class="dt">Sep 12</span><span class="stt ok">Resolved · right</span></li>
+          <li class="row" id="r4"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/ethereum.svg)"></span>ETH</span><span class="vd" style="--c:var(--alpha)">Ready</span><span class="dt">Sep 05</span><span class="stt miss">Resolved · missed</span></li>
+        </ol>
+        <p class="note" id="note">Every read is written down before the outcome and scored after it. The misses stay next to the wins. <a href="/record">See the public record</a></p>
+        <p class="same" id="same">Bobby runs on the same models everyone else uses. <em>The difference is not the model — it is the procedure around it.</em></p>
+      </div>
+    </section>
+  </div>
+</main>
+
+<section class="join" id="join" aria-labelledby="join-title">
+  <div class="panel">
+    <div class="vis" aria-hidden="true">
+      <span class="brand disp">Bobby</span>
+      <div class="beam2"></div>
+      <canvas id="glass2"></canvas>
+      <p class="motto">Refuted before execution · Published before the outcome</p>
+    </div>
+    <div class="form">
+      <span class="eyebrow">Start free</span>
+      <h2 class="jt disp" id="join-title">Join Bobby</h2>
+      <p class="sub">Your reads, your companion and your record, on the web and on iPhone.</p>
+      <div class="btns">
+        <a class="btn b-apple" id="b-apple" href="/signin?provider=apple"><span class="ico" style="--logo:url(/home/assets/logos/apple.svg)"></span>Continue with Apple</a>
+        <a class="btn b-google" id="b-google" href="/signin?provider=google"><span class="ico" style="--logo:url(/home/assets/logos/google.svg)"></span>Continue with Google</a>
+      </div>
+      <div class="or"><span>or</span></div>
+      <!-- APP_STORE_URL in src/lib/app-store.ts -->
+      <a class="btn b-ios" href="https://apps.apple.com/app/bobby-the-market-argues-back/id6804460489">Get the iPhone app</a>
+      <p class="have">Already have an account? <a href="/signin">Log in</a> · <a href="/desk">Try it on the web</a></p>
+      <p class="legal">By continuing you agree to the <a href="/privacy">Privacy Policy</a>. Educational reads, not financial advice.</p>
+    </div>
+  </div>
+</section>
+
+<!-- the protocol gateway: /protocol keeps the protocol landing that used to live at "/"; it moves to /docs later. -->
+<footer class="site-foot">
+  <div class="wrap">
+    <a class="proto" href="/protocol">
+      <span class="eyebrow">For builders, agents and the curious</span>
+      <span class="proto-title disp">Bobby Protocol</span>
+      <span class="proto-copy">The rules behind every read: how an answer is attacked before you see it, how it is scored after, and how any agent can run the same procedure.</span>
+      <span class="proto-cta">Read the protocol <i aria-hidden="true">→</i></span>
+      <span class="halo" aria-hidden="true"></span>
+    </a>
+    <nav class="proto-links" aria-label="Protocol">
+      <a href="/protocol#rules">The rules</a>
+      <a href="/protocol/calls">Verified calls</a>
+      <a href="/record">Track record</a>
+      <a href="/protocol/docs">Docs &amp; MCP</a>
+      <a href="/protocol/architecture">Architecture</a>
+      <a href="/protocol/heartbeat">Contract heartbeat</a>
+    </nav>
+    <div class="base">
+      <span class="disp mark">Bobby</span>
+      <span>Educational reads, not financial advice.</span>
+      <span class="social"><a href="/support">Support</a><a href="/privacy">Privacy</a><a href="https://twitter.com/bobbyprotocol">X</a><a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader">GitHub</a></span>
+    </div>
+  </div>
+</footer>
+
+
+<script src="/home/assets/sphere.js"></script>
+<script>
+(function(){
+  'use strict';
+  var RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var SCALE = 0.86;                               /* R = S / 2 / 1.9 * .86 ≈ .226 S */
+  var cv = document.getElementById('glass');
+  var sphere = BobbySphere.mount(cv, { mode: 'debate', scale: SCALE, dpr: 1.35 });
+
+  /* fifteen assets at the centre of the AI trade, on five shells like electrons.
+     r is in sphere radii: < 1 lives inside the glass, > 1 passes in front and slips behind. */
+  var RINGS = [
+    { r: 1.30, inc: 0.30, roll: -0.26, w:  0.100 },   /* main shell, passes across the lower face */
+    { r: 1.60, inc: 0.44, roll:  0.34, w: -0.075 },   /* outer shell, counter-rotating */
+    { r: 0.80, inc: 0.62, roll:  1.05, w:  0.135 },   /* inside the glass */
+    { r: 1.14, inc: 1.22, roll: -0.52, w: -0.115 },   /* steep loop: rises over the face and dives behind */
+    { r: 1.88, inc: 0.20, roll:  0.10, w:  0.055 }    /* wide, slow halo */
+  ];
+  var ASSETS = [
+    { t: 'NVDA',  logo: 'nvidia',     ring: 0, hero: true },
+    { t: 'BTC',   logo: 'bitcoin',    ring: 0 },
+    { t: 'AAPL',  logo: 'apple',      ring: 0 },
+    { t: 'TSLA',  logo: 'tesla',      ring: 0 },
+    { t: 'TSM',   logo: 'tsmc', ring: 1, wide: true },
+    { t: 'ETH',   logo: 'ethereum',   ring: 1 },
+    { t: 'META',  logo: 'meta',       ring: 1 },
+    { t: 'AMZN',  logo: 'amazon',     ring: 1 },
+    { t: 'GOOGL', logo: 'google',     ring: 2 },
+    { t: 'MSFT',  logo: 'microsoft',  ring: 2 },
+    { t: 'SOL',   logo: 'solana',     ring: 2 },
+    { t: 'PLTR',  logo: 'palantir',   ring: 3 },
+    { t: 'AMD',   logo: 'amd',        ring: 3 },
+    { t: 'AVGO',  logo: 'broadcom',   ring: 4 },
+    { t: 'ORCL',  logo: 'oracle',     ring: 4 }
+  ];
+  var counts = RINGS.map(function(){ return 0; }), idx = RINGS.map(function(){ return 0; });
+  ASSETS.forEach(function(a){ counts[a.ring]++; });
+
+  var host = document.getElementById('orbit');
+  var items = ASSETS.map(function(a, i){
+    var el = document.createElement('div'); el.className = 'sat';
+    el.innerHTML = '<div class="chip"><span class="glyph' + (a.wide ? ' wide' : '') + '" style="--logo:url(/home/assets/logos/' + a.logo + '.svg)"></span></div><span class="tick">' + a.t + '</span>';
+    host.appendChild(el);
+    var k = idx[a.ring]++;
+    return { el: el, hero: !!a.hero, ring: RINGS[a.ring], ph: (k / counts[a.ring]) * Math.PI * 2 + a.ring * 0.7, born: 0.2 + i * 0.08 };
+  });
+
+  /* ---------- helpers ---------- */
+  function clamp(x, a, b){ return Math.min(b, Math.max(a, x)); }
+  function ss(a, b, x){ var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+  function lerp(a, b, t){ return a + (b - a) * t; }
+  function band(p, a, b, c, d){ return ss(a, b, p) * (1 - ss(c, d, p)); }   /* in over a..b, out over c..d */
+
+  var $ = function(id){ return document.getElementById(id); };
+  var story = $('story'), stage = $('stage');
+  var S0 = $('s0'), S1 = $('s1'), S2 = $('s2'), S3 = $('s3');
+  var C1 = $('c1'), C2 = $('c2'), FAIL = $('fail'), SLOT = $('slot');
+  var VA = $('va'), VR = $('vr'), VC = $('vc');
+  var WORD = $('word'), RING = $('ring'), WTXT = $('wordtxt');
+  var S4 = $('s4'), R1V = $('r1v'), ROWS = [$('r1'), $('r2'), $('r3'), $('r4')], NOTE = $('note'), SAME = $('same');
+
+  /* ---------- example chart (seeded, clearly labelled as an example) ---------- */
+  (function drawChart(){
+    var svg = $('chart'), W = 680, H = 150, N = 72, seed = 7, pts = [], v = 50;
+    function rnd(){ seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    for (var i = 0; i < N; i++){ v += (rnd() - 0.5) * 7 + (i < 26 ? 0.55 : (i < 44 ? -0.35 : 0.12)); pts.push(v); }
+    var mx = Math.max.apply(null, pts), mn = Math.min.apply(null, pts);
+    function y(val){ return 24 + (1 - (val - mn) / (mx - mn)) * (H - 52); }
+    var d = pts.map(function(val, i){ return (i ? 'L' : 'M') + (i / (N - 1) * (W - 70)).toFixed(1) + ' ' + y(val).toFixed(1); }).join(' ');
+    var lx = (W - 70), ly = y(pts[N - 1]), res = y(mx) - 4, sup = y(mn) + 4;
+    svg.innerHTML =
+      '<line x1="0" x2="' + W + '" y1="' + res + '" y2="' + res + '" stroke="rgba(242,237,228,.28)" stroke-dasharray="2 5"/>' +
+      '<line x1="0" x2="' + W + '" y1="' + sup + '" y2="' + sup + '" stroke="rgba(242,237,228,.28)" stroke-dasharray="2 5"/>' +
+      '<text x="' + W + '" y="' + (res - 8) + '" text-anchor="end">RESISTANCE</text>' +
+      '<text x="0" y="' + (sup + 18) + '">SUPPORT</text>' +
+      '<path d="' + d + '" fill="none" stroke="#F2EDE4" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + lx + '" cy="' + ly + '" r="4" fill="#FFF8EC"/>' +
+      '<circle cx="' + lx + '" cy="' + ly + '" r="10" fill="none" stroke="rgba(246,185,78,.5)"/>' +
+      '<text x="' + (W - 52) + '" y="' + (ly + 4) + '" style="fill:#F6B94E">NOW</text>' +
+      '<text x="0" y="10">EXAMPLE · NVDA · 1H</text>';
+  })();
+
+  /* ---------- pointer parallax ---------- */
+  var ptr = { x: 0, y: 0, tx: 0, ty: 0 };
+  window.addEventListener('pointermove', function(e){ ptr.tx = e.clientX / innerWidth * 2 - 1; ptr.ty = e.clientY / innerHeight * 2 - 1; }, { passive: true });
+
+  var mode = 'debate';
+  function setMode(m){
+    if (m === mode) return; mode = m;
+    if (m === 'record'){ sphere.set('idle'); sphere.tint('#D6DAE2', 0.32); return; }   /* the Record face: silver */
+    sphere.tint('#D6DAE2', 0);
+    if (m === 'wait') sphere.set('verdict', 'wait'); else sphere.set(m);
+  }
+  function rise(el, k){ el.style.opacity = k.toFixed(3); el.style.translate = '0 ' + ((1 - k) * 14).toFixed(1) + 'px'; }
+
+  var t0 = performance.now(), F = 5, ps = -1;          /* F: perspective focal length, in sphere radii */
+  function frame(now){
+    var t = RM ? 14 : (now - t0) / 1000;
+    var W = innerWidth, H = stage.clientHeight, land = W / H > 1;
+    /* scroll progress through the pinned track, eased so wheel steps glide */
+    var sr = story.getBoundingClientRect(), pRaw = clamp(-sr.top / Math.max(1, sr.height - H), 0, 1);
+    ps = ps < 0 || RM ? pRaw : ps + (pRaw - ps) * 0.14;
+    /* p runs scenes 1–4 (they finish at 81% of the track); pr runs the record scene on the raw track */
+    var pr = ps, p = ps * 1.24;
+    ptr.x += (ptr.tx - ptr.x) * 0.04; ptr.y += (ptr.ty - ptr.y) * 0.04;
+
+    /* ----- scene weights ----- */
+    var kHero = 1 - ss(0.04, 0.10, p);
+    var kProb = ss(0.10, 0.20, p) * (1 - ss(0.40, 0.49, p));
+    var kDeb  = ss(0.44, 0.52, p) * (1 - ss(0.70, 0.78, p));
+    var kVer  = ss(0.72, 0.82, p);
+    var disperse = ss(0.07, 0.17, p);
+
+    var kRec = ss(0.83, 0.90, pr);
+    setMode(p < 0.09 ? 'debate' : p < 0.45 ? 'idle' : p < 0.76 ? 'debate' : pr < 0.845 ? 'wait' : 'record');
+
+    /* ----- sphere placement: steps aside for the problem, rises for the verdict ----- */
+    var tx, ty, sc, op = 1 - kProb * 0.55;
+    if (land){ tx = kProb * 0.25 * W - kRec * 0.26 * W; ty = -kVer * 0.19 * H * (1 - kRec); sc = 1 - kProb * 0.42 - kDeb * 0.16 - kVer * 0.4 - kRec * 0.06; ty += kDeb * 0.035 * H; }
+    else     { tx = 0; ty = -kProb * 0.27 * H - kDeb * 0.17 * H - kVer * 0.2 * H - kRec * 0.1 * H; sc = 1 - kProb * 0.5 - kDeb * 0.3 - kVer * 0.42 - kRec * 0.16; }
+    cv.style.transform = 'translate(-50%,-50%) translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px) scale(' + sc.toFixed(4) + ')';
+    cv.style.opacity = op.toFixed(3);
+
+    var cr = cv.getBoundingClientRect(), st = stage.getBoundingClientRect();
+    var cx = cr.left - st.left + cr.width / 2, cy = cr.top - st.top + cr.height / 2, R = sphere.radius();
+    var fit = Math.max(0.72, Math.min(1, (W / 2 - 30) / (1.9 * R / Math.max(sc, 0.01))));   /* keep the outer shell on screen */
+
+    /* ----- orbits ----- */
+    var slot = SLOT.getBoundingClientRect(), sx = slot.left - st.left + slot.width / 2, sy = slot.top - st.top + slot.height / 2;
+    items.forEach(function(it){
+      var g = it.ring, th = it.ph + g.w * t;
+      var inc = g.inc + ptr.y * 0.07, roll = g.roll + ptr.x * 0.06;
+      var gr = g.r < 1 ? g.r : 1 + (g.r - 1) * fit + (fit - 1) * 0.1;
+      gr *= 1 + (it.hero ? 0 : disperse * 1.1);                    /* the others drift outward and leave */
+      var x = gr * Math.cos(th), s = gr * Math.sin(th);
+      var y1 = -s * Math.sin(inc), z = s * Math.cos(inc);
+      var c = Math.cos(roll), sn = Math.sin(roll);
+      var X = x * c - y1 * sn, Y = x * sn + y1 * c;
+      var pp = F / (F - z);
+      var d2 = Math.sqrt(X * X + Y * Y) * pp;
+      var behind = ss(0.12, -0.12, z), inDisc = 1 - ss(0.94, 1.08, d2);
+      var inside = 1 - ss(0.95, 1.05, Math.sqrt(X * X + Y * Y + z * z));
+      var glassy = Math.max(inside, behind * inDisc);
+      var born = RM ? 1 : ss(it.born, it.born + 1.1, t);
+      var alpha = born * (1 - glassy * (0.42 + 0.34 * behind)) * (1 - 0.3 * behind * (1 - inDisc));
+      var blur = glassy * (0.7 + 1.3 * behind);
+      var scl = pp * (1 - 0.18 * behind) * (0.94 + 0.06 * born);
+      var px = cx + X * R * pp, py = cy - Y * R * pp, zi = Math.round((z + 3) * 100);
+
+      if (it.hero){
+        /* NVIDIA: from its orbit into the chat (the question), then into the glass (Bobby's turn) */
+        var a = ss(0.08, 0.18, p), b = ss(0.41, 0.50, p);
+        px = lerp(lerp(px, sx, a), cx, b); py = lerp(lerp(py, sy, a), cy, b);
+        scl = lerp(lerp(scl, 1.1, a), 0.2, b);
+        alpha = lerp(alpha, 1, a) * (1 - ss(0.46, 0.50, p));
+        blur = lerp(blur, 0, a); glassy *= (1 - a); behind *= (1 - a);
+        it.parked = a;
+        if (a > 0.02) zi = 900;
+      } else {
+        alpha *= 1 - disperse;
+      }
+      var el = it.el;
+      el.style.transform = 'translate3d(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px,0) scale(' + scl.toFixed(3) + ')';
+      el.style.opacity = alpha.toFixed(3);
+      el.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(2) + 'px)' : 'none';
+      el.style.zIndex = String(zi);
+      el.style.setProperty('--bgA', (1 - glassy).toFixed(3));
+      el.style.setProperty('--lbA', ((1 - glassy) * (1 - 0.55 * behind) * (1 - (it.parked || 0))).toFixed(3));
+      el.style.visibility = alpha < 0.005 ? 'hidden' : 'visible';
+    });
+
+    /* ----- overlays ----- */
+    S0.style.opacity = kHero.toFixed(3);
+    S1.style.opacity = band(p, 0.12, 0.18, 0.40, 0.46).toFixed(3);
+    rise(C1, ss(0.15, 0.21, p)); rise(C2, ss(0.23, 0.29, p)); rise(FAIL, ss(0.31, 0.36, p));
+    S2.style.opacity = band(p, 0.47, 0.52, 0.70, 0.75).toFixed(3);
+    rise(VA, ss(0.52, 0.56, p)); rise(VR, ss(0.57, 0.61, p)); rise(VC, ss(0.62, 0.66, p));
+    S3.style.opacity = (ss(0.80, 0.86, p) * (1 - ss(0.83, 0.87, pr))).toFixed(3);
+    var k4 = ss(0.86, 0.90, pr);
+    S4.style.opacity = k4.toFixed(3); S4.style.pointerEvents = k4 > 0.6 ? 'auto' : 'none';
+    ROWS.forEach(function(r, i){ rise(r, ss(0.86 + i * 0.025, 0.89 + i * 0.025, pr)); });
+    rise(NOTE, ss(0.93, 0.955, pr)); rise(SAME, ss(0.945, 0.97, pr));
+
+    /* the word and its ring sit on the glass, wherever the glass is */
+    /* …then the word leaves the glass and becomes the first line of the record */
+    var wk = ss(0.77, 0.83, p), fly = ss(0.85, 0.91, pr), land2 = ss(0.905, 0.93, pr);
+    var vr = R1V.getBoundingClientRect(), vx = vr.left - st.left + vr.width / 2, vy = vr.top - st.top + vr.height / 2;
+    WORD.style.opacity = (wk * (1 - land2)).toFixed(3);
+    WORD.style.transform = 'translate(' + lerp(cx, vx, fly).toFixed(1) + 'px,' + lerp(cy, vy, fly).toFixed(1) + 'px)';
+    var rd = R * 2 * (1.14 + (1 - wk) * 0.12);
+    RING.style.width = RING.style.height = rd.toFixed(1) + 'px';
+    RING.style.opacity = (1 - ss(0.84, 0.87, pr)).toFixed(3);
+    var small = parseFloat(getComputedStyle(R1V).fontSize) / 0.92;
+    WTXT.style.setProperty('--wfs', lerp(R * 0.62, small, fly).toFixed(1) + 'px');
+    WTXT.style.color = fly > 0.5 ? 'var(--cio)' : '';
+    R1V.style.opacity = land2.toFixed(3);
+
+    if (!RM) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  /* ----- join panel: a second glass, listening ----- */
+  BobbySphere.mount(document.getElementById('glass2'), { mode: 'listen', scale: 0.8, dpr: 1.5 });
+
+
+  if (RM){ window.addEventListener('scroll', function(){ requestAnimationFrame(frame); }, { passive: true }); window.addEventListener('resize', function(){ requestAnimationFrame(frame); }); }
+})();
+</script>
