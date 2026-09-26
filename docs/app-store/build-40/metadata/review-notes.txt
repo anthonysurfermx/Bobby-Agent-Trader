@@ -1,0 +1,29 @@
+Bobby 1.5 (build 40) is an educational market-analysis app for stocks and crypto. This version replaces the previous screens with one interactive glass sphere. Bobby gives analysis, not advice: every answer ends with "Wait" or "Review" and is labeled "Educational read · not financial advice". The app does not execute trades, offer swaps, connect wallets, hold funds or keys, or offer in-app purchases.
+
+No account is needed: asking, the full read, saving theses, the Squad and the risk notice all work signed out.
+
+First launch:
+1. Bobby introduces itself. Swipe the sphere to browse companions and tap "Choose <name>".
+2. "Ask before you trade." Hold the round button at the bottom and speak, or tap it to type. Before the first hold, an in-app card explains that Bobby only listens while you hold; "Continue" then shows the two iOS prompts (microphone, then speech recognition). Declining either one keeps everything working: the button opens the keyboard instead.
+3. The risk notice shows four statements (AI processing of questions, not investment advice, Bobby never touches your money, you can lose money). "Read the full notice" opens the complete text. Hold "Hold to agree" to accept. No question, speech request or account request leaves the device before this step.
+4. The question is analyzed: Alpha Hunter builds the case, Red Team challenges it and the CIO weighs both, inside the sphere. Price, RSI, volume and the recent range appear around it, with a one-hour chart. Replies usually take a few seconds and can take up to about a minute. A "Wait" answer is a valid, common result.
+5. Pull down for the full debate and the thesis card, then tap "Save thesis". Bobby then offers Sign in with Apple once; "Not now" keeps the thesis on the device.
+
+Suggested questions: "Is now a good time for Bitcoin?" or "How is NVIDIA looking?". Assets Bobby cannot read (for example commodities) get a plain explanation instead of an answer.
+
+Microphone and speech recognition:
+- The microphone is active only while the user holds the button, and stops on release, when the app goes to the background or after 60 seconds.
+- Recognition runs on the device (requiresOnDeviceRecognition). The iOS speech prompt shows Apple's standard wording, but Bobby does not use server recognition; if on-device recognition is not available for the device language, Bobby does not offer the microphone and uses typing. No audio is recorded or uploaded. Only the resulting text is sent, as the question, like a typed one.
+- Questions go to OpenAI for the analysis. When voice is on, the reply text goes to OpenAI or Microsoft to create speech, as the risk notice says. While Bobby speaks, the button stops the voice. The voice can be muted in the Squad gallery (swipe the sphere to "Squad", then "Change companion", then the speaker button), and the setting is remembered.
+
+Daily use:
+- Swipe the sphere to reach Squad (companions, level and streak) and Saved theses. When signed in, the Isla face opens Trader Land with the same island, publishing, report and block controls as version 1.2.
+
+Account, sign in and deletion:
+- Tap the companion avatar in the top-right corner of the main screen. The account sheet offers Sign in with Apple (the only sign-in method; it requests no name or email), and links to the Privacy Policy and Help and support.
+- Signed in, the same sheet shows "Sign out on this phone" and "Delete account and synced progress". Deletion asks for confirmation ("Delete account permanently"), then deletes the account, synced progress and Trader Land.
+
+Privacy: https://bobbyprotocol.xyz/privacy?lang=en (Spanish: ?lang=es)
+Support: https://bobbyprotocol.xyz/support?lang=en (Spanish: ?lang=es)
+
+The app follows the device language (English or Spanish).

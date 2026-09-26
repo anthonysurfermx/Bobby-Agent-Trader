@@ -21,6 +21,8 @@ function inState(){ return clk - ST.t0; }
 function fsmEvent(name, p){ var s = STATES[ST.name]; if (s && s.on){ try { s.on(name, p); } catch (e) { logErr('on ' + name, e); } } }
 function markHint(key){ bcall('markHint', { key: key }).then(function(r){ if (SES && r && fin(r.count)){ SES.hints = SES.hints || {}; SES.hints[key] = r.count; } }).catch(noop); }
 function openNative(route){ bcall('openNative', { route: route }).catch(noop); }
+/* the header avatar is the account's door: sign in, sign out, delete the account, privacy (App Review 5.1.1(v)) */
+function avatarG(){ return tapG(function(){ tick('light'); openNative('account'); }, A.avPress); }
 
 /* ---------- shared choreography ---------- */
 function chromeUp(){
@@ -138,7 +140,10 @@ function routeReply(r){
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'cancelled'){ go('RETURNING', { cancelled: true }); return; }
-  go('ERROR', { f: RMOD.failure(r.reply, LANG) });
+  var f = RMOD.failure(r.reply, LANG);
+  /* consent is missing (a stale or reset notice): not a failed read — the way to the risk beat */
+  if (f.kind === 'risk'){ if (SES) SES.riskAccepted = false; go('RISK_GATE', { f: f }); return; }
+  go('ERROR', { f: f });
 }
 function cancelRead(){
   var r = READ; if (!r || r.reply || r.cancelling) return;
@@ -205,7 +210,8 @@ STATES.IDLE = {
   tick: function(){ if (A.th.x !== 0 && !A.th.moving() && Math.abs(A.th.x - Math.round(A.th.x / TAU) * TAU) < 1e-3) A.th.set(0); },
   down: function(h, p){
     if (h === 'pill') return pillDown(p);
-    if (h === 'wm') return wordmarkPress();
+    if (h === 'avatar') return avatarG();
+    if (h === 'wm' && DEV_BUILD) return wordmarkPress();
     if (h === 'satG') return tapG(function(){ if (SAVED && SAVED.thesis) go('THESIS_VIEW', { thesis: SAVED.thesis, back: 'IDLE' }); });
     if (h === 'meri') return tapG(function(){ if (FACES.length > 1){ go('FACES'); faceSwing(1, 0); } });
     if (h === 'surface') return faceDragG();
@@ -566,6 +572,7 @@ STATES.HANDBACK = {
     this.idleT = clk;
     if (h === 'close') return tapG(function(){ go('RETURNING'); });
     if (h === 'pill') return pillDown(p, true);
+    if (h === 'avatar') return avatarG();
     return pullG();
   }
 };
@@ -700,6 +707,7 @@ function chipRowG(){
 function chipAct(c){
   var a = c.action || {}, cx = c.x + c.w / 2 + A.chipX.x, cy = 660;
   tick('light');
+  if (a.risk){ openNative('riskNotice'); return; }   /* native replaces this page with the risk beat (onboarding#risk) */
   if (a.retype){ openTyping({ fromRead: false }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
@@ -759,6 +767,8 @@ function askAgainDown(h, p, hitEl){
 }
 STATES.CONFIRM_ASSET = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
 STATES.UNKNOWN_ASSET = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
+/* RISK_GATE: the read was refused for consent; the chip opens the risk beat, never a generic failure */
+STATES.RISK_GATE = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
 
 /* ---------- FACES: B11 physics under the real finger ---------- */
 function faceDragG(){
@@ -829,6 +839,7 @@ STATES.FACES = {
     if (h === 'fchip') return tapG(function(){ faceAction(hitEl.getAttribute('data-face')); }, A.fchipPress);
     if (h === 'satT0' || h === 'satT1'){ var s = A.satT[h === 'satT0' ? 0 : 1]; return tapG(function(){ if (s.th) go('THESIS_VIEW', { thesis: s.th, back: 'FACES' }); }); }
     if (h === 'meri') return tapG(function(){ faceSwing(1, 0); });
+    if (h === 'avatar') return avatarG();
     if (h === 'pill'){ A.th.to(Math.round(A.th.x / TAU) * TAU, 'glide'); A.fDrag = false; A.fRel = false; if (A.fIdx !== 0){ faceText(0, -1); A.fIdx = 0; } return pillDown(p); }
     return faceDragG();
   }
@@ -885,5 +896,5 @@ STATES.RESTORE = {
 /* ---------- aria per state ---------- */
 var ARIA = { BOOT: 'aria.waking', WAKE: 'aria.waking', IDLE: 'aria.idle', PRE_PERMISSION: 'aria.idle', LISTENING: 'aria.listening', TYPING: 'aria.idle',
   SENDING: 'aria.sending', RESOLVING: 'aria.thinking', THINK_WAIT: 'aria.thinking', THINK_RESOLVE: 'aria.thinking', TALK_EVIDENCE: 'aria.speaking', TALK_CHART: 'aria.speaking',
-  RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
+  RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', RISK_GATE: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
 function ariaState(){ var k = ARIA[ST.name]; if (k) att(el.sphereA, 'aria-label', tt(k)); }

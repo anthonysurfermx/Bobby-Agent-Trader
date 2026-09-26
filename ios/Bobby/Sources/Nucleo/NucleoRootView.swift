@@ -1,8 +1,10 @@
 // The Núcleo is the app (Nucleo/ARCHITECTURE.md §1.3). One session and one web view:
 // onboarding until a companion is chosen and the risk notice accepted, then the daily
 // app, cross-faded. Native sheets (squad, locker, island, account, risk notice) open
-// over the glass. A long press on the page's wordmark (`openClassic`) tears all of this
-// down before the classic desk appears, for the rest of this launch.
+// over the glass; the header avatar opens the account sheet (sign in, sign out, delete
+// the account, privacy). DEBUG builds only: a long press on the page's wordmark
+// (`openClassic`) tears all of this down before the classic desk appears, for the rest
+// of this launch. Release has no way out of the Núcleo.
 import SwiftUI
 
 /// DEBUG launch options, parsed by BobbyApp (Release always uses the defaults).
@@ -102,7 +104,8 @@ private struct NucleoStage: View {
                 .presentationDetents([.large])
                 .presentationBackground(Theme.bg)
         case .account:
-            AccountSheet(store: session.companions, profile: session.profile) { session.sheet = nil }
+            // Full height: deletion must never hide below a half-height detent (App Review 5.1.1(v)).
+            AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true) { session.sheet = nil }
         case .riskNotice:
             RiskNoticeView(profile: session.profile, readOnly: true) { session.sheet = nil }
         }

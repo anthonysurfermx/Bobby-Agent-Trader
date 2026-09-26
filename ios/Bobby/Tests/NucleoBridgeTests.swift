@@ -400,6 +400,51 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(session.page, .app)
     }
 
+    func testTheAvatarOpensTheAccountSheet() async throws {
+        let (session, bridge, recorder) = make()
+        _ = await result(bridge, "session", ["page": "app"])
+        let opened = await result(bridge, "openNative", ["route": "account"])
+        XCTAssertEqual(opened["opened"] as? Bool, true)
+        XCTAssertEqual(session.sheet, .account, "sign in, sign out, delete the account and privacy live there")
+        let second = await result(bridge, "openNative", ["route": "squad"])
+        XCTAssertEqual(second["opened"] as? Bool, false, "one sheet at a time")
+        session.sheetDismissed()
+        XCTAssertNil(session.sheet)
+        let sheets = recorder.events.filter { $0.name == "native.sheet" }.map { "\($0.payload["route"] ?? "")/\($0.payload["state"] ?? "")" }
+        XCTAssertEqual(sheets, ["account/open", "account/closed"])
+    }
+
+    func testARiskRefusalOnTheAppPageRoutesToTheRiskBeat() async throws {
+        let (session, bridge, _) = make(riskAccepted: false)
+        session.profile.onboarded = true
+        session.companions.companionId = "byte"
+        var routed: [NucleoPage] = []
+        session.onRoute = { routed.append($0) }
+        _ = await result(bridge, "session", ["page": "app"])
+        try assertGolden(await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"]), "risk")
+        let opened = await result(bridge, "openNative", ["route": "riskNotice"])
+        XCTAssertEqual(opened["opened"] as? Bool, true)
+        XCTAssertNil(session.sheet, "the read-only notice cannot be accepted: no sheet")
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(routed, [.onboardingRisk], "the risk beat replaces the app page")
+
+        // On the onboarding page the same route is the read-only notice ("Read the full notice").
+        _ = await result(bridge, "session", ["page": "onboarding"])
+        let sheet = await result(bridge, "openNative", ["route": "riskNotice"])
+        XCTAssertEqual(sheet["opened"] as? Bool, true)
+        XCTAssertEqual(session.sheet, .riskNotice)
+        session.sheetDismissed()
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(routed, [.onboardingRisk])
+
+        // Once accepted, the app page gets the read-only notice again.
+        _ = await result(bridge, "acceptRisk", ["version": RiskNotice.currentVersion])
+        _ = await result(bridge, "session", ["page": "app"])
+        _ = await result(bridge, "openNative", ["route": "riskNotice"])
+        XCTAssertEqual(session.sheet, .riskNotice)
+        session.sheetDismissed()
+    }
+
     func testRouting() {
         XCTAssertEqual(NucleoPage.route(onboarded: false, companionId: nil, riskAccepted: false), .onboarding)
         XCTAssertEqual(NucleoPage.route(onboarded: false, companionId: "kora", riskAccepted: true), .onboarding)

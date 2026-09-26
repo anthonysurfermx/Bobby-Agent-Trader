@@ -4,8 +4,9 @@ import SwiftUI
 
 @main
 struct BobbyApp: App {
-    /// The Núcleo is the app. The classic desk sits behind a long press on the page's
-    /// wordmark (`openClassic`) for the rest of this launch; the next launch returns here.
+    /// The Núcleo is the app. DEBUG builds only: the classic desk sits behind a long press
+    /// on the page's wordmark (`openClassic`) for the rest of this launch; the next launch
+    /// returns here. Release always shows the Núcleo and never routes to ContentView.
     @State private var showNucleo = true
 
     init() {
@@ -105,11 +106,8 @@ struct BobbyApp: App {
                     ContentView()
                 }
 #else
-                if showNucleo {
-                    NucleoRootView(options: Self.nucleoLaunchOptions) { showNucleo = false }
-                } else {
-                    ContentView()
-                }
+                // No hidden exit in Release (App Review 2.3.1): openClassic is refused natively.
+                NucleoRootView(options: Self.nucleoLaunchOptions) {}
 #endif
             }
             .preferredColorScheme(.dark)

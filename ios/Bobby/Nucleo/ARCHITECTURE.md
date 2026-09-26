@@ -4,7 +4,7 @@ This document is the single source of truth for building the real Núcleo app. T
 
 - **Worktree:** `.claude/worktrees/ios-nucleo`
 - **Branch:** `ios/nucleo-preview`
-- **Base:** iOS 1.4 (37), building 1.5 (39)
+- **Base:** iOS 1.4 (37), building 1.5 (40)
 
 The approved design is kept inside the repo:
 
@@ -34,7 +34,7 @@ The goal is the app Anthony asked for. He asks his own question by voice or text
 | R10 | The horizon control (24h/3d/7d) is shown only when the user is **signed in and the verdict is Review**. | Only a `read_complete` seed has a horizon, and extending one needs sign-in plus an `inventoryId`. |
 | R11 | Onboarding's risk beat shows the **4 real `RiskNotice` statements**, fetched from native, as a hold-to-agree. It never shows the prototype's 3 paraphrased lines. No bridge call can reach the network before acceptance. | Statement 1 is the consent to AI processing. |
 | R12 | Native keeps a **local thesis ledger** (`nucleo.theses.<owner>`, 20 newest). It feeds the Theses face, the ghost satellite and `theses()`, and it saves even at the daily XP cap. | Signed out, pending awards vanish after sync, and a capped award queues nothing. |
-| R13 | A single `NucleoSession` owns `AgentProfile`, `CompanionStore` and `NeuralVoice`. `openClassic` tears the Núcleo down before `ContentView` appears. The classic app sits behind a **long press (0.8 s) on the header wordmark**. | Two live stores clobber `pendingAwards`. |
+| R13 | A single `NucleoSession` owns `AgentProfile`, `CompanionStore` and `NeuralVoice`. `openClassic` tears the Núcleo down before `ContentView` appears. The classic app sits behind a **long press (0.8 s) on the header wordmark**, in **DEBUG builds only** (dev pages and DEBUG native); Release refuses `openClassic` (`unknown_method`) and never shows `ContentView` (1.5 (40), App Review 2.3.1). | Two live stores clobber `pendingAwards`. |
 | R14 | Before any desk call, native runs a **preflight**: asset class must be equity or crypto, the equity symbol must match `^[A-Z]{1,5}$`, and candles must be fresh (crypto ≥59 bars with the last bar ≤3 h old; equity last bar ≤5 days old). A failure answers `unsupported` without spending quota. | The desk spends quota before it loads evidence. Every failure after that is a paid 503. |
 | R15 | Fonts keep loading from Google Fonts (the CSP allows only those two hosts). Bundling Geist and Instrument Serif needs Anthony's OK to download them; see §7. | No local copies exist. |
 
@@ -109,7 +109,8 @@ Browser checks run against the dev server (`http://localhost:4614` serves `ios/B
 | `!profile.onboarded` or `companions.companionId == nil` | `onboarding.html` (resumes at the ask-teach beat if a companion is already chosen) |
 | onboarded but `!profile.acceptedRiskNotice` (stale version) | `onboarding.html#risk` (risk beat only) |
 | otherwise | `app.html` |
-| `openClassic()` (long press on the wordmark) | tear down Núcleo, then `ContentView()` for the rest of this launch; the next launch returns to Núcleo |
+| `openClassic()` (long press on the wordmark; DEBUG only) | tear down Núcleo, then `ContentView()` for the rest of this launch; the next launch returns to Núcleo. Release has no exit |
+| `openNative("riskNotice")` from the app page while the notice is not accepted | the risk beat (`onboarding.html#risk`, or full onboarding if the companion is missing) replaces the page; its `finishOnboarding` cross-fades back |
 
 `finishOnboarding()` sets `profile.onboarded = true`, but only if a companion is chosen and the risk notice is accepted. It then cross-fades to `app.html`: overlay `snapshotView(afterScreenUpdates:false)`, load the page, and remove the overlay on the page's first `session` call. Returning users never see the birth.
 
@@ -192,8 +193,8 @@ Types: `S` string, `B` bool, `N` finite number, `I` integer, `?` nullable. "Sess
 | `riskNotice` | `{}` | `{version I, statements:[{title S, body S}]×4}`. This is the RiskNoticeView copy, moved into `enum RiskNotice` unchanged (§6.2). Snapshot: `fixtures/native/risk-notice.json`. |
 | `acceptRisk` | `{version I}` | `{accepted B, version I}`. `version` must equal `RiskNotice.currentVersion`; if it does, set `profile.riskNoticeVersion`, and when signed in also run `ProgressSync.sync`. |
 | `signIn` | `{}` | `{status:"signedIn"\|"cancelled"\|"failed"\|"unavailable"}`. Native runs an `ASAuthorizationController` with `AccountSession.shared.prepareAppleRequest` then `completeApple`, and on success `ProgressSync.shared.sync(store:profile:)`. Apple only. Fixture mode returns `unavailable`. |
-| `openNative` | `{route: "squad"\|"locker"\|"isla"\|"account"\|"riskNotice"}` | `{opened B}`. The routes present, as sheets over the web view: `MascotGalleryView`, `SquadLockerSheet`, `TraderLandGateHarnessView(focus:nil)` (sync on dismiss, as ContentView does), `AccountSheet`, and `RiskNoticeView(readOnly:true)`. Emits `native.sheet`. |
-| `openClassic` | `{}` | `{}`, then routes (§1.3) |
+| `openNative` | `{route: "squad"\|"locker"\|"isla"\|"account"\|"riskNotice"}` | `{opened B}`. The routes present, as sheets over the web view: `MascotGalleryView`, `SquadLockerSheet`, `TraderLandGateHarnessView(focus:nil)` (sync on dismiss, as ContentView does), `AccountSheet` (full height, with Privacy Policy and Help links; the header avatar opens it), and `RiskNoticeView(readOnly:true)`. Emits `native.sheet`. Exception: `riskNotice` from the **app** page while the notice is not accepted opens no sheet; the risk beat replaces the page (§1.3). |
+| `openClassic` | `{}` | DEBUG only: `{}`, then routes (§1.3). Release: `unknown_method`. |
 | `finishOnboarding` | `{}` | `{next:"app"}` or `{status:"incomplete", missing:["companion"\|"risk"]}` |
 | `markHint` | `{key S(^[a-z][A-Za-z0-9_.-]{0,31}$)}` | `{count I}`. Stored in the UserDefaults dict `nucleo.hints` and echoed in `session.hints`. |
 | `log` | `{level:"info"\|"warn"\|"error", message S(≤300)}` | `{}` (DEBUG print only) |
@@ -207,7 +208,7 @@ There is intentionally **no `award` method**. Awards are minted only by `saveThe
   "xp":120, "level":{"number":2,"name":"LOCKED IN","progress":0.7,"nextMinXP":150}, "streak":3,
   "signedIn":false, "riskAccepted":true, "riskVersion":4, "muted":false, "reducedMotion":false,
   "mic":{"state":"granted","onDevice":true}, "hints":{"verdictPull":1},
-  "pendingRead":null, "fixtures":false, "platform":"ios", "appVersion":"1.5 (39)" }
+  "pendingRead":null, "fixtures":false, "platform":"ios", "appVersion":"1.5 (40)" }
 ```
 - `language` is `L.ttsLang`.
 - `companion` is null before the pick.
@@ -386,7 +387,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 |---|---|---|---|
 | BOOT | page load | none (black `#0B0A09`) | `session()` → WAKE. If `pendingRead` → RESTORE |
 | WAKE | session | B0 0.00–0.90. The greeting comes from `localHour` plus the strings table; the sub line is the latest ledger thesis ("NVDA is saved.") or the default prompt. The XP arc is `level.progress`. The avatar is the `COMPANIONS` art for `companion.webId`. | → IDLE |
-| IDLE | | B1 breath; pill glow in antiphase. The hint "HOLD TO ASK · SWIPE THE SPHERE" shows while `hints.idle < 3`. | pill pointerdown: `mic.state` granted → LISTENING, undetermined → PRE_PERMISSION, else TYPING. Pill tap <250 ms → TYPING. Horizontal drag on the sphere → FACE_DRAG. Chip → SENDING. Long press on the wordmark → `openClassic` |
+| IDLE | | B1 breath; pill glow in antiphase. The hint "HOLD TO ASK · SWIPE THE SPHERE" shows while `hints.idle < 3`. | pill pointerdown: `mic.state` granted → LISTENING, undetermined → PRE_PERMISSION, else TYPING. Pill tap <250 ms → TYPING. Horizontal drag on the sphere → FACE_DRAG. Chip → SENDING. Tap on the header avatar → `openNative("account")` (also from FACES and HANDBACK). Long press on the wordmark → `openClassic` (dev builds only) |
 | PRE_PERMISSION | first hold with mic undetermined | onboarding O3 card (bloom from the bottom rim): "I only listen while you hold." / "iOS will ask for the microphone and speech recognition once." / **Continue** | Continue → `speech.requestPermission` → granted: IDLE with hint "Hold to ask"; otherwise TYPING |
 | LISTENING | `speech.start` → listening | B2 3.00–3.15 on press. Words are born from the `speech.partial` diff: the stable prefix keeps its spans, new words rise, revised tail words re-roll, and the tail stays ink2. | pointerup → `speech.stop` → wait for `speech.final` → SENDING, or STT_EMPTY if `""`. `speech.error` → IDLE with a hint |
 | TYPING | | textarea rises from the pill | send → SENDING; blur or empty → IDLE |
@@ -406,6 +407,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | RETURNING | | B10 33.20–35.00: cards retract before the sphere moves, the verdict evaporates, the ring unwinds, the flood recedes, the tint returns. The ghost satellite comes from `theses().items[0]` if it was saved this session. | → IDLE |
 | FACE_DRAG / FACE(k) | drag in IDLE | B11 physics with the real pointer. Isla: `island()` summary and a chip that calls `openNative("isla")`. Squad: `roster()` belt plus `level`/`streak`, chip `openNative("squad")`. Theses: 2 satellites from `theses()`; tapping one opens its card read-only. | detent at Desk → IDLE |
 | ERROR(kind) / CANCELLED | | caption from `NucleoReadModel.failure()`. **No verdict, no ring, no XP.** The pill returns to mic. | 6 s or a tap → RETURNING |
+| RISK_GATE | reply `error/risk_not_accepted` (`failure().kind == "risk"`) | caption "First, the risk notice." plus one chip | chip → `openNative("riskNotice")` (native swaps in the risk beat); tap elsewhere or 30 s → RETURNING |
 | RESTORE | `pendingRead` at boot | builds the model and jumps to the settled HANDBACK frame (reduced choreography) | as HANDBACK |
 
 ### 3.3 Onboarding state machine (`onboarding.html`, Builder C)

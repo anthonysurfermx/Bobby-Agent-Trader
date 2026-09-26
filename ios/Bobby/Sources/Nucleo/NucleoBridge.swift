@@ -69,14 +69,21 @@ struct NucleoParams {
 final class NucleoBridge: NSObject, WKScriptMessageHandlerWithReply {
     static let version = 1
     static let maxEnvelopeBytes = 64 * 1024
-    static let methods: Set<String> = [
-        "session", "roster", "suggestions", "ask", "cancel",
-        "speech.permission", "speech.requestPermission", "speech.start", "speech.stop",
-        "speak", "previewVoice", "stopSpeaking", "setMuted", "haptic",
-        "saveThesis", "island", "theses", "record",
-        "setCompanion", "riskNotice", "acceptRisk", "signIn",
-        "openNative", "openClassic", "finishOnboarding", "markHint", "log",
-    ]
+    static let methods: Set<String> = {
+        var methods: Set<String> = [
+            "session", "roster", "suggestions", "ask", "cancel",
+            "speech.permission", "speech.requestPermission", "speech.start", "speech.stop",
+            "speak", "previewVoice", "stopSpeaking", "setMuted", "haptic",
+            "saveThesis", "island", "theses", "record",
+            "setCompanion", "riskNotice", "acceptRisk", "signIn",
+            "openNative", "finishOnboarding", "markHint", "log",
+        ]
+#if DEBUG
+        // The hidden exit to the classic desk exists in DEBUG builds only (App Review 2.3.1).
+        methods.insert("openClassic")
+#endif
+        return methods
+    }()
 
     /// Strong: the session never holds the bridge (WebKit does, until teardown removes the handler).
     private let session: NucleoSession

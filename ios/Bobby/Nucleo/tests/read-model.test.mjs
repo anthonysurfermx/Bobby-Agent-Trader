@@ -91,6 +91,20 @@ test('every non-ok golden maps to a caption and never to a verdict', () => {
   }
   assert.throws(() => RM.build(load('quota'), {}));
 });
+test('a read refused for consent routes to the risk beat, never the generic failure copy', () => {
+  for (const lang of ['en', 'es']) {
+    const f = RM.failure(load('risk'), lang);
+    assert.equal(f.kind, 'risk');
+    assert.equal(f.code, 'risk_not_accepted');
+    assert.notEqual(f.caption, RM.t(lang, 'err.bad'));
+    assert.equal(f.caption, RM.t(lang, 'err.risk'));
+    assert.ok(f.sub);
+    assert.equal(f.chips.length, 1);
+    assert.deepEqual(f.chips[0].action, { risk: true });
+    assert.equal(f.chips[0].label, RM.t(lang, 'err.riskCta'));
+    assert.ok(!('verdict' in f));
+  }
+});
 test('xp chip shows real points and the cap honestly', () => {
   assert.equal(RM.xpChip(20, 'wait', 'en'), '+20 discipline XP for waiting');
   assert.equal(RM.xpChip(10, 'review', 'es'), '+10 XP de disciplina');

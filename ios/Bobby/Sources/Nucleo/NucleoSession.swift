@@ -190,8 +190,13 @@ final class NucleoSession: ObservableObject {
             let route = try p.string("route", oneOf: Set(NucleoRoute.allCases.map(\.rawValue)))!
             return ["opened": openNative(NucleoRoute(rawValue: route)!)]
         case "openClassic":
+#if DEBUG
             DispatchQueue.main.async { [weak self] in self?.requestClassic() }
             return [String: Any]()
+#else
+            // Release has no way out of the Núcleo (App Review 2.3.1: no hidden features).
+            throw NucleoFault.unknownMethod(method)
+#endif
         case "finishOnboarding":
             return finishOnboarding()
         case "markHint":
@@ -429,6 +434,14 @@ final class NucleoSession: ObservableObject {
         guard sheet == nil, openSheet == nil else { return false }
         nucleoVoice.stop()
         speech.cancel()
+        // A read refused for consent (§2.4 step 2) sends the app page here. The read-only notice
+        // cannot be accepted, so the risk beat (onboarding#risk, R11) replaces the page instead;
+        // its finishOnboarding cross-fades back to the app (§1.3).
+        if route == .riskNotice, currentPage == NucleoPage.app.name, !profile.acceptedRiskNotice {
+            let next = page
+            DispatchQueue.main.async { [weak self] in self?.onRoute?(next) }
+            return true
+        }
         openSheet = route
         sheet = route
         emit("native.sheet", ["route": route.rawValue, "state": "open"])
@@ -471,10 +484,13 @@ final class NucleoSession: ObservableObject {
         emit("app.state", ["state": "background"])
     }
 
+#if DEBUG
+    /// DEBUG only: the hidden long press on the wordmark. Release never leaves the Núcleo.
     private func requestClassic() {
         guard !classicRequested else { return }
         classicRequested = true
     }
+#endif
 
     /// Before the classic app appears: nothing of this session may keep writing.
     func teardown() {

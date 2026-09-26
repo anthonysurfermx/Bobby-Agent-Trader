@@ -159,7 +159,7 @@ el.d100P = el.d100.parentNode; el.d10P = el.d10.parentNode;
 function buildAvatar(){
   var ph = el.avatar.querySelector('.ph'); ph.textContent = '';
   if (ME.art && ME.art.dataUri){ var im = D.createElement('img'); im.alt = ''; im.src = ME.art.dataUri; ph.appendChild(im); }
-  else if (ME.label){ ph.appendChild(mk('div', 'mg', ME.label.charAt(0))); }
+  else if (ME.label){ ph.appendChild(mk('span', 'mg', ME.label.charAt(0))); }
 }
 function setXpArc(progress){
   var C18 = TAU * 18, p = clamp(fin(progress) ? progress : 0, 0, 1);

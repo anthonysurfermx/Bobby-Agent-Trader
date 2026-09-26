@@ -63,7 +63,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #close{position:absolute;left:10px;top:54px;width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink2);cursor:pointer}
 #dockQ{left:75px;top:62px;width:240px;height:21px;font:400 15px/21px var(--sans);color:var(--ink2);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 #dockA{left:75px;top:84px;width:240px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);text-align:center;white-space:nowrap;overflow:hidden;pointer-events:none}
-#avatar{left:338px;top:60px;width:32px;height:32px}
+#avatar{left:338px;top:60px;width:32px;height:32px;padding:0;cursor:pointer}
+#avatar::before{content:'';position:absolute;left:-8px;top:-8px;width:48px;height:48px;border-radius:50%}   /* 48 px target around the 32 px face */
 #avatar .ph{position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;overflow:hidden;background:#232120;box-shadow:0 0 0 .5px rgba(242,237,228,.2)}
 #avatar img{position:absolute;left:-9%;top:-4%;width:118%;height:118%;display:block}
 #avatar .mg{position:absolute;inset:0;display:grid;place-items:center;font:400 17px/1 var(--serif);color:var(--ink)}
@@ -389,7 +390,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     <button id="close" type="button" data-hit="close"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
     <div id="dockQ" class="a"></div>
     <div id="dockA" class="a"></div>
-    <div id="avatar" class="a" role="img"><div class="ph"></div><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="none" stroke="rgba(242,237,228,.14)" stroke-width="2"/><circle id="xpArc" cx="20" cy="20" r="18" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" transform="rotate(-90 20 20)" stroke-dasharray="0 200"/></svg></div>
+    <button id="avatar" class="a" type="button" data-hit="avatar"><span class="ph"></span><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="rgba(242,237,228,.14)" stroke-width="2"/><circle id="xpArc" cx="20" cy="20" r="18" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" transform="rotate(-90 20 20)" stroke-dasharray="0 200"/></svg></button>
 
     <div id="hint" class="a" aria-hidden="true"></div>
     <div id="micGlow" class="a"><i></i></div>
@@ -557,6 +558,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'err.network': 'No connection. Nothing was analyzed.',
       'err.timeout': 'The desk took too long. No verdict was issued.',
       'err.bad': 'The analysis did not come back. No verdict was issued.',
+      'err.risk': 'First, the risk notice.', 'err.riskSub': 'Bobby reads nothing until you agree to it. Your question was not sent.',
+      'err.riskCta': 'Open the risk notice',
       'follow.another': 'Another question about {symbol}', 'follow.how': 'How is {symbol} looking?', 'follow.why': 'Why is {symbol} moving today?',
       'aria.verdict': 'Verdict: {word}', 'aria.conviction': ', {pct}% conviction'
     },
@@ -592,6 +595,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'err.network': 'Sin conexión. No se analizó nada.',
       'err.timeout': 'La mesa tardó demasiado. No se emitió ningún veredicto.',
       'err.bad': 'El análisis no regresó. No se emitió ningún veredicto.',
+      'err.risk': 'Primero, el aviso de riesgo.', 'err.riskSub': 'Bobby no analiza nada hasta que lo aceptes. Tu pregunta no se envió.',
+      'err.riskCta': 'Abrir el aviso de riesgo',
       'follow.another': 'Otra pregunta sobre {symbol}', 'follow.how': '¿Cómo se ve {symbol}?', 'follow.why': '¿Por qué se mueve {symbol} hoy?',
       'aria.verdict': 'Veredicto: {word}', 'aria.conviction': ', {pct}% de convicción'
     }
@@ -898,6 +903,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       case 'quota': return { kind: 'quota', caption: r.message || t(lang, 'err.quota'), sub: null, chips: [], retryAfterSec: r.retryAfterSec };
       case 'cancelled': return { kind: 'cancelled', caption: null, sub: null, chips: [] };
       case 'error':
+        // Consent first (§2.4 step 2): the page routes to the risk beat instead of a generic failure.
+        if (r.code === 'risk_not_accepted') {
+          return { kind: 'risk', code: r.code, caption: t(lang, 'err.risk'), sub: t(lang, 'err.riskSub'),
+            chips: [{ label: t(lang, 'err.riskCta'), action: { risk: true }, primary: true }] };
+        }
         var key = r.code === 'network' ? 'err.network' : r.code === 'timeout' ? 'err.timeout' : 'err.bad';
         return { kind: 'error', code: r.code, caption: r.message || t(lang, key), sub: null, chips: [] };
       default:
@@ -989,6 +999,9 @@ try { (location.search || '').replace(/^\?/, '').split('&').forEach(function(kv)
 /* the dev mock exists only in dev builds in a browser; harness code does nothing without it (native, release) */
 var MOCK = BR && BR.mock ? BR.mock : null;
 var HARNESS = QS.harness === '1' && !!MOCK;
+/* dev builds only (build.py inlines fixtures only without --release): the hidden long press to the classic desk.
+   Release pages have no way out of the Núcleo, and native Release refuses openClassic too (App Review 2.3.1). */
+var DEV_BUILD = !!W.NUCLEO_FIXTURES;
 var FREEZE = HARNESS && QS.freeze === '1';
 var RM = QS.rm === '1';
 try { if (!RM && W.matchMedia && W.matchMedia('(prefers-reduced-motion: reduce)').matches) RM = true; } catch (e) {}
@@ -1665,7 +1678,7 @@ el.d100P = el.d100.parentNode; el.d10P = el.d10.parentNode;
 function buildAvatar(){
   var ph = el.avatar.querySelector('.ph'); ph.textContent = '';
   if (ME.art && ME.art.dataUri){ var im = D.createElement('img'); im.alt = ''; im.src = ME.art.dataUri; ph.appendChild(im); }
-  else if (ME.label){ ph.appendChild(mk('div', 'mg', ME.label.charAt(0))); }
+  else if (ME.label){ ph.appendChild(mk('span', 'mg', ME.label.charAt(0))); }
 }
 function setXpArc(progress){
   var C18 = TAU * 18, p = clamp(fin(progress) ? progress : 0, 0, 1);
@@ -1727,7 +1740,8 @@ var STR = /*STRINGS-BEGIN*/{
     'aria.thinking': 'Three agents debating', 'aria.speaking': 'Bobby is speaking', 'aria.cards': 'Full read: debate and thesis cards',
     'aria.faces': 'Sphere faces', 'aria.noVerdict': 'No verdict was issued',
     'aria.pill': 'Ask Bobby, hold to talk', 'aria.pillType': 'Type a question', 'aria.pillCancel': 'Cancel the read', 'aria.pillStop': 'Stop the voice',
-    'aria.close': 'Close read', 'aria.companion': 'Your companion, {name}', 'aria.faceDots': 'Sphere faces: {list}', 'aria.wm': 'Bobby'
+    'aria.close': 'Close read', 'aria.companion': 'Your companion, {name}', 'aria.faceDots': 'Sphere faces: {list}', 'aria.wm': 'Bobby',
+    'aria.account': '{name}. Account and progress', 'aria.accountPlain': 'Account and progress'
   },
   es: {
     'greet.morning': 'Buenos días.', 'greet.afternoon': 'Buenas tardes.', 'greet.evening': 'Buenas noches.',
@@ -1755,7 +1769,8 @@ var STR = /*STRINGS-BEGIN*/{
     'aria.thinking': 'Tres agentes debatiendo', 'aria.speaking': 'Bobby está hablando', 'aria.cards': 'Lectura completa: debate y tesis',
     'aria.faces': 'Caras de la esfera', 'aria.noVerdict': 'No se emitió veredicto',
     'aria.pill': 'Pregúntale a Bobby, mantén para hablar', 'aria.pillType': 'Escribe una pregunta', 'aria.pillCancel': 'Cancelar la lectura', 'aria.pillStop': 'Detener la voz',
-    'aria.close': 'Cerrar lectura', 'aria.companion': 'Tu compañero, {name}', 'aria.faceDots': 'Caras de la esfera: {list}', 'aria.wm': 'Bobby'
+    'aria.close': 'Cerrar lectura', 'aria.companion': 'Tu compañero, {name}', 'aria.faceDots': 'Caras de la esfera: {list}', 'aria.wm': 'Bobby',
+    'aria.account': '{name}. Cuenta y progreso', 'aria.accountPlain': 'Cuenta y progreso'
   }
 }/*STRINGS-END*/;
 var LANG = 'en';
@@ -1824,7 +1839,7 @@ function buildState(){
     dim: new V(0, 'soft'),
     perm: { p: new V(0, 'emit'), b: 1e9, g: 1e9, press: new V(1, 'snap') },
     type: { p: new V(0, 'emit'), o: new V(0, 'soft') },
-    fchipPress: new V(1, 'snap')
+    fchipPress: new V(1, 'snap'), avPress: new V(1, 'snap')
   };
 }
 /* ambient uniforms follow the temperament in idle, listening and faces; from the send until the return they run
@@ -2303,6 +2318,8 @@ function inState(){ return clk - ST.t0; }
 function fsmEvent(name, p){ var s = STATES[ST.name]; if (s && s.on){ try { s.on(name, p); } catch (e) { logErr('on ' + name, e); } } }
 function markHint(key){ bcall('markHint', { key: key }).then(function(r){ if (SES && r && fin(r.count)){ SES.hints = SES.hints || {}; SES.hints[key] = r.count; } }).catch(noop); }
 function openNative(route){ bcall('openNative', { route: route }).catch(noop); }
+/* the header avatar is the account's door: sign in, sign out, delete the account, privacy (App Review 5.1.1(v)) */
+function avatarG(){ return tapG(function(){ tick('light'); openNative('account'); }, A.avPress); }
 
 /* ---------- shared choreography ---------- */
 function chromeUp(){
@@ -2420,7 +2437,10 @@ function routeReply(r){
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'cancelled'){ go('RETURNING', { cancelled: true }); return; }
-  go('ERROR', { f: RMOD.failure(r.reply, LANG) });
+  var f = RMOD.failure(r.reply, LANG);
+  /* consent is missing (a stale or reset notice): not a failed read — the way to the risk beat */
+  if (f.kind === 'risk'){ if (SES) SES.riskAccepted = false; go('RISK_GATE', { f: f }); return; }
+  go('ERROR', { f: f });
 }
 function cancelRead(){
   var r = READ; if (!r || r.reply || r.cancelling) return;
@@ -2487,7 +2507,8 @@ STATES.IDLE = {
   tick: function(){ if (A.th.x !== 0 && !A.th.moving() && Math.abs(A.th.x - Math.round(A.th.x / TAU) * TAU) < 1e-3) A.th.set(0); },
   down: function(h, p){
     if (h === 'pill') return pillDown(p);
-    if (h === 'wm') return wordmarkPress();
+    if (h === 'avatar') return avatarG();
+    if (h === 'wm' && DEV_BUILD) return wordmarkPress();
     if (h === 'satG') return tapG(function(){ if (SAVED && SAVED.thesis) go('THESIS_VIEW', { thesis: SAVED.thesis, back: 'IDLE' }); });
     if (h === 'meri') return tapG(function(){ if (FACES.length > 1){ go('FACES'); faceSwing(1, 0); } });
     if (h === 'surface') return faceDragG();
@@ -2848,6 +2869,7 @@ STATES.HANDBACK = {
     this.idleT = clk;
     if (h === 'close') return tapG(function(){ go('RETURNING'); });
     if (h === 'pill') return pillDown(p, true);
+    if (h === 'avatar') return avatarG();
     return pullG();
   }
 };
@@ -2982,6 +3004,7 @@ function chipRowG(){
 function chipAct(c){
   var a = c.action || {}, cx = c.x + c.w / 2 + A.chipX.x, cy = 660;
   tick('light');
+  if (a.risk){ openNative('riskNotice'); return; }   /* native replaces this page with the risk beat (onboarding#risk) */
   if (a.retype){ openTyping({ fromRead: false }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
@@ -3041,6 +3064,8 @@ function askAgainDown(h, p, hitEl){
 }
 STATES.CONFIRM_ASSET = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
 STATES.UNKNOWN_ASSET = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
+/* RISK_GATE: the read was refused for consent; the chip opens the risk beat, never a generic failure */
+STATES.RISK_GATE = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
 
 /* ---------- FACES: B11 physics under the real finger ---------- */
 function faceDragG(){
@@ -3111,6 +3136,7 @@ STATES.FACES = {
     if (h === 'fchip') return tapG(function(){ faceAction(hitEl.getAttribute('data-face')); }, A.fchipPress);
     if (h === 'satT0' || h === 'satT1'){ var s = A.satT[h === 'satT0' ? 0 : 1]; return tapG(function(){ if (s.th) go('THESIS_VIEW', { thesis: s.th, back: 'FACES' }); }); }
     if (h === 'meri') return tapG(function(){ faceSwing(1, 0); });
+    if (h === 'avatar') return avatarG();
     if (h === 'pill'){ A.th.to(Math.round(A.th.x / TAU) * TAU, 'glide'); A.fDrag = false; A.fRel = false; if (A.fIdx !== 0){ faceText(0, -1); A.fIdx = 0; } return pillDown(p); }
     return faceDragG();
   }
@@ -3167,7 +3193,7 @@ STATES.RESTORE = {
 /* ---------- aria per state ---------- */
 var ARIA = { BOOT: 'aria.waking', WAKE: 'aria.waking', IDLE: 'aria.idle', PRE_PERMISSION: 'aria.idle', LISTENING: 'aria.listening', TYPING: 'aria.idle',
   SENDING: 'aria.sending', RESOLVING: 'aria.thinking', THINK_WAIT: 'aria.thinking', THINK_RESOLVE: 'aria.thinking', TALK_EVIDENCE: 'aria.speaking', TALK_CHART: 'aria.speaking',
-  RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
+  RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', RISK_GATE: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
 function ariaState(){ var k = ARIA[ST.name]; if (k) att(el.sphereA, 'aria-label', tt(k)); }
 
 /* ---- app/70-input.js ---- */
@@ -3482,7 +3508,7 @@ function render(){
 function renderHeader(){
   var h = A.hdr.x;
   tf(el.wm, 0, A.wmY.x, null); op(el.wm, h * A.wmO.x);
-  op(el.avatar, h); op(el.close, A.closeO.x);
+  op(el.avatar, h); tf(el.avatar, 0, 0, A.avPress.x); op(el.close, A.closeO.x);
   if (A.qT0 < 1e8){
     if (A._qk !== A.qText){ A._qk = A.qText; A._qc = Array.from(A.qText || ''); }
     var n = clamp(Math.floor((clk - A.qT0) / 0.010), 0, A._qc.length);
@@ -3630,7 +3656,9 @@ function placeSat(node, x, y, sc, o, cy, r, inFlight, settled, hw){
     var m = 'radial-gradient(circle at ' + f2(mx) + 'px ' + f2(my) + 'px, transparent ' + f2(mr) + 'px, #000 ' + f2(mr + 1.5) + 'px)';
     st(node, 'webkitMaskImage', m); st(node, 'maskImage', m);
   } else { st(node, 'webkitMaskImage', 'none'); st(node, 'maskImage', 'none'); }
-  st(node, 'backdropFilter', settled ? 'blur(14px)' : 'none'); st(node, 'webkitBackdropFilter', settled ? 'blur(14px)' : 'none');
+  /* no backdrop blur on satellites: WebKit (WKWebView, iOS Safari) stops painting the pill's background and text once
+     backdrop-filter is switched on as the mask is dropped, so a settled satellite showed as an empty blur on iPhone.
+     The .86 glass fill carries the look. */
 }
 function renderSats(cy, r){
   var i, orbO = 0, FT = TM.follow * 1000, nOn = 0;
@@ -4228,7 +4256,7 @@ function applySession(s, first){
     if (ROSTER) buildBelt(ROSTER.companions);
     if (!first){ buildFaces(); if (ST.name === 'IDLE' || ST.name === 'FACES') tintHome(); }
   }
-  att(el.avatar, 'aria-label', ME.label ? tt('aria.companion', { name: ME.label }) : tt('aria.wm'));
+  att(el.avatar, 'aria-label', ME.label ? tt('aria.account', { name: ME.label }) : tt('aria.accountPlain'));
   att(el.close, 'aria-label', tt('aria.close'));
   setXpArc(s.level && s.level.progress);
 }

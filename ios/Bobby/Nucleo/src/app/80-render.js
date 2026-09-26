@@ -189,7 +189,7 @@ function render(){
 function renderHeader(){
   var h = A.hdr.x;
   tf(el.wm, 0, A.wmY.x, null); op(el.wm, h * A.wmO.x);
-  op(el.avatar, h); op(el.close, A.closeO.x);
+  op(el.avatar, h); tf(el.avatar, 0, 0, A.avPress.x); op(el.close, A.closeO.x);
   if (A.qT0 < 1e8){
     if (A._qk !== A.qText){ A._qk = A.qText; A._qc = Array.from(A.qText || ''); }
     var n = clamp(Math.floor((clk - A.qT0) / 0.010), 0, A._qc.length);
@@ -337,7 +337,9 @@ function placeSat(node, x, y, sc, o, cy, r, inFlight, settled, hw){
     var m = 'radial-gradient(circle at ' + f2(mx) + 'px ' + f2(my) + 'px, transparent ' + f2(mr) + 'px, #000 ' + f2(mr + 1.5) + 'px)';
     st(node, 'webkitMaskImage', m); st(node, 'maskImage', m);
   } else { st(node, 'webkitMaskImage', 'none'); st(node, 'maskImage', 'none'); }
-  st(node, 'backdropFilter', settled ? 'blur(14px)' : 'none'); st(node, 'webkitBackdropFilter', settled ? 'blur(14px)' : 'none');
+  /* no backdrop blur on satellites: WebKit (WKWebView, iOS Safari) stops painting the pill's background and text once
+     backdrop-filter is switched on as the mask is dropped, so a settled satellite showed as an empty blur on iPhone.
+     The .86 glass fill carries the look. */
 }
 function renderSats(cy, r){
   var i, orbO = 0, FT = TM.follow * 1000, nOn = 0;

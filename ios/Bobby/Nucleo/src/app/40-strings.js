@@ -30,7 +30,8 @@ var STR = /*STRINGS-BEGIN*/{
     'aria.thinking': 'Three agents debating', 'aria.speaking': 'Bobby is speaking', 'aria.cards': 'Full read: debate and thesis cards',
     'aria.faces': 'Sphere faces', 'aria.noVerdict': 'No verdict was issued',
     'aria.pill': 'Ask Bobby, hold to talk', 'aria.pillType': 'Type a question', 'aria.pillCancel': 'Cancel the read', 'aria.pillStop': 'Stop the voice',
-    'aria.close': 'Close read', 'aria.companion': 'Your companion, {name}', 'aria.faceDots': 'Sphere faces: {list}', 'aria.wm': 'Bobby'
+    'aria.close': 'Close read', 'aria.companion': 'Your companion, {name}', 'aria.faceDots': 'Sphere faces: {list}', 'aria.wm': 'Bobby',
+    'aria.account': '{name}. Account and progress', 'aria.accountPlain': 'Account and progress'
   },
   es: {
     'greet.morning': 'Buenos días.', 'greet.afternoon': 'Buenas tardes.', 'greet.evening': 'Buenas noches.',
@@ -58,7 +59,8 @@ var STR = /*STRINGS-BEGIN*/{
     'aria.thinking': 'Tres agentes debatiendo', 'aria.speaking': 'Bobby está hablando', 'aria.cards': 'Lectura completa: debate y tesis',
     'aria.faces': 'Caras de la esfera', 'aria.noVerdict': 'No se emitió veredicto',
     'aria.pill': 'Pregúntale a Bobby, mantén para hablar', 'aria.pillType': 'Escribe una pregunta', 'aria.pillCancel': 'Cancelar la lectura', 'aria.pillStop': 'Detener la voz',
-    'aria.close': 'Cerrar lectura', 'aria.companion': 'Tu compañero, {name}', 'aria.faceDots': 'Caras de la esfera: {list}', 'aria.wm': 'Bobby'
+    'aria.close': 'Cerrar lectura', 'aria.companion': 'Tu compañero, {name}', 'aria.faceDots': 'Caras de la esfera: {list}', 'aria.wm': 'Bobby',
+    'aria.account': '{name}. Cuenta y progreso', 'aria.accountPlain': 'Cuenta y progreso'
   }
 }/*STRINGS-END*/;
 var LANG = 'en';

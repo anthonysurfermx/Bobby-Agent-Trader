@@ -46,7 +46,7 @@ function buildState(){
     dim: new V(0, 'soft'),
     perm: { p: new V(0, 'emit'), b: 1e9, g: 1e9, press: new V(1, 'snap') },
     type: { p: new V(0, 'emit'), o: new V(0, 'soft') },
-    fchipPress: new V(1, 'snap')
+    fchipPress: new V(1, 'snap'), avPress: new V(1, 'snap')
   };
 }
 /* ambient uniforms follow the temperament in idle, listening and faces; from the send until the return they run

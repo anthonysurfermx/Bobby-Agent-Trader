@@ -20,6 +20,9 @@ try { (location.search || '').replace(/^\?/, '').split('&').forEach(function(kv)
 /* the dev mock exists only in dev builds in a browser; harness code does nothing without it (native, release) */
 var MOCK = BR && BR.mock ? BR.mock : null;
 var HARNESS = QS.harness === '1' && !!MOCK;
+/* dev builds only (build.py inlines fixtures only without --release): the hidden long press to the classic desk.
+   Release pages have no way out of the Núcleo, and native Release refuses openClassic too (App Review 2.3.1). */
+var DEV_BUILD = !!W.NUCLEO_FIXTURES;
 var FREEZE = HARNESS && QS.freeze === '1';
 var RM = QS.rm === '1';
 try { if (!RM && W.matchMedia && W.matchMedia('(prefers-reduced-motion: reduce)').matches) RM = true; } catch (e) {}

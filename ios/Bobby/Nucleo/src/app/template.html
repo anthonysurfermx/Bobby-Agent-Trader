@@ -63,7 +63,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #close{position:absolute;left:10px;top:54px;width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink2);cursor:pointer}
 #dockQ{left:75px;top:62px;width:240px;height:21px;font:400 15px/21px var(--sans);color:var(--ink2);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 #dockA{left:75px;top:84px;width:240px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);text-align:center;white-space:nowrap;overflow:hidden;pointer-events:none}
-#avatar{left:338px;top:60px;width:32px;height:32px}
+#avatar{left:338px;top:60px;width:32px;height:32px;padding:0;cursor:pointer}
+#avatar::before{content:'';position:absolute;left:-8px;top:-8px;width:48px;height:48px;border-radius:50%}   /* 48 px target around the 32 px face */
 #avatar .ph{position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;overflow:hidden;background:#232120;box-shadow:0 0 0 .5px rgba(242,237,228,.2)}
 #avatar img{position:absolute;left:-9%;top:-4%;width:118%;height:118%;display:block}
 #avatar .mg{position:absolute;inset:0;display:grid;place-items:center;font:400 17px/1 var(--serif);color:var(--ink)}
@@ -389,7 +390,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     <button id="close" type="button" data-hit="close"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
     <div id="dockQ" class="a"></div>
     <div id="dockA" class="a"></div>
-    <div id="avatar" class="a" role="img"><div class="ph"></div><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="none" stroke="rgba(242,237,228,.14)" stroke-width="2"/><circle id="xpArc" cx="20" cy="20" r="18" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" transform="rotate(-90 20 20)" stroke-dasharray="0 200"/></svg></div>
+    <button id="avatar" class="a" type="button" data-hit="avatar"><span class="ph"></span><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="rgba(242,237,228,.14)" stroke-width="2"/><circle id="xpArc" cx="20" cy="20" r="18" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" transform="rotate(-90 20 20)" stroke-dasharray="0 200"/></svg></button>
 
     <div id="hint" class="a" aria-hidden="true"></div>
     <div id="micGlow" class="a"><i></i></div>

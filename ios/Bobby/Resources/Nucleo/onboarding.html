@@ -500,6 +500,8 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
       'err.network': 'No connection. Nothing was analyzed.',
       'err.timeout': 'The desk took too long. No verdict was issued.',
       'err.bad': 'The analysis did not come back. No verdict was issued.',
+      'err.risk': 'First, the risk notice.', 'err.riskSub': 'Bobby reads nothing until you agree to it. Your question was not sent.',
+      'err.riskCta': 'Open the risk notice',
       'follow.another': 'Another question about {symbol}', 'follow.how': 'How is {symbol} looking?', 'follow.why': 'Why is {symbol} moving today?',
       'aria.verdict': 'Verdict: {word}', 'aria.conviction': ', {pct}% conviction'
     },
@@ -535,6 +537,8 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
       'err.network': 'Sin conexión. No se analizó nada.',
       'err.timeout': 'La mesa tardó demasiado. No se emitió ningún veredicto.',
       'err.bad': 'El análisis no regresó. No se emitió ningún veredicto.',
+      'err.risk': 'Primero, el aviso de riesgo.', 'err.riskSub': 'Bobby no analiza nada hasta que lo aceptes. Tu pregunta no se envió.',
+      'err.riskCta': 'Abrir el aviso de riesgo',
       'follow.another': 'Otra pregunta sobre {symbol}', 'follow.how': '¿Cómo se ve {symbol}?', 'follow.why': '¿Por qué se mueve {symbol} hoy?',
       'aria.verdict': 'Veredicto: {word}', 'aria.conviction': ', {pct}% de convicción'
     }
@@ -841,6 +845,11 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
       case 'quota': return { kind: 'quota', caption: r.message || t(lang, 'err.quota'), sub: null, chips: [], retryAfterSec: r.retryAfterSec };
       case 'cancelled': return { kind: 'cancelled', caption: null, sub: null, chips: [] };
       case 'error':
+        // Consent first (§2.4 step 2): the page routes to the risk beat instead of a generic failure.
+        if (r.code === 'risk_not_accepted') {
+          return { kind: 'risk', code: r.code, caption: t(lang, 'err.risk'), sub: t(lang, 'err.riskSub'),
+            chips: [{ label: t(lang, 'err.riskCta'), action: { risk: true }, primary: true }] };
+        }
         var key = r.code === 'network' ? 'err.network' : r.code === 'timeout' ? 'err.timeout' : 'err.bad';
         return { kind: 'error', code: r.code, caption: r.message || t(lang, key), sub: null, chips: [] };
       default:

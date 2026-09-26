@@ -17,7 +17,7 @@ function applySession(s, first){
     if (ROSTER) buildBelt(ROSTER.companions);
     if (!first){ buildFaces(); if (ST.name === 'IDLE' || ST.name === 'FACES') tintHome(); }
   }
-  att(el.avatar, 'aria-label', ME.label ? tt('aria.companion', { name: ME.label }) : tt('aria.wm'));
+  att(el.avatar, 'aria-label', ME.label ? tt('aria.account', { name: ME.label }) : tt('aria.accountPlain'));
   att(el.close, 'aria-label', tt('aria.close'));
   setXpArc(s.level && s.level.progress);
 }
