@@ -1,0 +1,19 @@
+{
+ "synthetic": true,
+ "note": "api/desk-debate.ts daily_limit refusal",
+ "request": {
+  "method": "POST",
+  "path": "api/desk-debate"
+ },
+ "status": 429,
+ "headers": {
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store",
+  "retry-after": "3600"
+ },
+ "elapsedMs": 900,
+ "body": {
+  "error": "Bobby reached today's analysis limit. Try again tomorrow.",
+  "code": "daily_limit"
+ }
+}

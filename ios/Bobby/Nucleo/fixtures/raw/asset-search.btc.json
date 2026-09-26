@@ -1,0 +1,315 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/bobby-asset-search",
+  "body": {
+   "q": "Is now a good time for Bitcoin?"
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:35:48 GMT"
+ },
+ "elapsedMs": 599,
+ "recordedAt": "2026-09-26T11:35:47Z",
+ "body": {
+  "ok": true,
+  "query": "Is now a good time for Bitcoin?",
+  "instTypes": [
+   "SPOT",
+   "SWAP",
+   "FUTURES"
+  ],
+  "results": [
+   {
+    "instId": "BTC-USDT",
+    "instType": "SPOT",
+    "symbol": "BTC",
+    "baseSymbol": "BTC",
+    "quoteSymbol": "USDT",
+    "settleSymbol": null,
+    "family": null,
+    "underlying": null,
+    "assetClass": "crypto",
+    "displaySymbol": "BTC",
+    "displayName": "BTC/USDT",
+    "aliases": [
+     "BTC",
+     "BITCOIN",
+     "VITCOIN",
+     "BITCON",
+     "BITCOM"
+    ],
+    "priority": 68,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "1",
+     "lever": "10",
+     "listTime": "1611907686000",
+     "lotSz": "0.00000001",
+     "tickSz": "0.1"
+    },
+    "searchText": "BTC-USDT BTC USDT BTC/USDT BTC BITCOIN VITCOIN BITCON BITCOM"
+   },
+   {
+    "instId": "BTC-USDT-SWAP",
+    "instType": "SWAP",
+    "symbol": "BTC",
+    "baseSymbol": "BTC",
+    "quoteSymbol": "USDT",
+    "settleSymbol": "USDT",
+    "family": "BTC-USDT",
+    "underlying": "BTC-USDT",
+    "assetClass": "crypto",
+    "displaySymbol": "BTC",
+    "displayName": "BTC/USDT PERP",
+    "aliases": [
+     "BTC",
+     "BITCOIN",
+     "VITCOIN",
+     "BITCON",
+     "BITCOM"
+    ],
+    "priority": 64,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "1",
+     "lever": "100",
+     "listTime": "1573557408000",
+     "lotSz": "0.01",
+     "tickSz": "0.1"
+    },
+    "searchText": "BTC-USDT-SWAP BTC USDT USDT BTC-USDT BTC-USDT BTC/USDT PERP BTC BITCOIN VITCOIN BITCON BITCOM"
+   },
+   {
+    "instId": "BTC-USD",
+    "instType": "SPOT",
+    "symbol": "BTC",
+    "baseSymbol": "BTC",
+    "quoteSymbol": "USD",
+    "settleSymbol": null,
+    "family": null,
+    "underlying": null,
+    "assetClass": "crypto",
+    "displaySymbol": "BTC",
+    "displayName": "BTC/USD",
+    "aliases": [
+     "BTC",
+     "BITCOIN",
+     "VITCOIN",
+     "BITCON",
+     "BITCOM"
+    ],
+    "priority": 53,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "1",
+     "lever": null,
+     "listTime": "1733454000000",
+     "lotSz": "0.00000001",
+     "tickSz": "0.1"
+    },
+    "searchText": "BTC-USD BTC USD BTC/USD BTC BITCOIN VITCOIN BITCON BITCOM"
+   },
+   {
+    "instId": "BTC-USD_UM_XPERP-310404",
+    "instType": "FUTURES",
+    "symbol": "BTC",
+    "baseSymbol": "BTC",
+    "quoteSymbol": "USD",
+    "settleSymbol": "USD",
+    "family": "BTC-USD_UM_XPERP",
+    "underlying": "BTC-USD",
+    "assetClass": "crypto",
+    "displaySymbol": "BTC",
+    "displayName": "BTC/USD 310404",
+    "aliases": [
+     "BTC",
+     "BITCOIN",
+     "VITCOIN",
+     "BITCON",
+     "BITCOM"
+    ],
+    "priority": 31,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": "1933056000000",
+     "instCategory": "1",
+     "lever": "50",
+     "listTime": "1774845000428",
+     "lotSz": "1",
+     "tickSz": "0.1"
+    },
+    "searchText": "BTC-USD_UM_XPERP-310404 BTC USD USD BTC-USD_UM_XPERP BTC-USD BTC/USD 310404 BTC BITCOIN VITCOIN BITCON BITCOM"
+   },
+   {
+    "instId": "BTC-USD_UM-261030",
+    "instType": "FUTURES",
+    "symbol": "BTC",
+    "baseSymbol": "BTC",
+    "quoteSymbol": "USD",
+    "settleSymbol": "USD",
+    "family": "BTC-USD_UM",
+    "underlying": "BTC-USD",
+    "assetClass": "crypto",
+    "displaySymbol": "BTC",
+    "displayName": "BTC/USD 261030",
+    "aliases": [
+     "BTC",
+     "BITCOIN",
+     "VITCOIN",
+     "BITCON",
+     "BITCOM"
+    ],
+    "priority": 31,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": "1793347200000",
+     "instCategory": "1",
+     "lever": "20",
+     "listTime": "1787904600714",
+     "lotSz": "0.01",
+     "tickSz": "0.1"
+    },
+    "searchText": "BTC-USD_UM-261030 BTC USD USD BTC-USD_UM BTC-USD BTC/USD 261030 BTC BITCOIN VITCOIN BITCON BITCOM"
+   },
+   {
+    "instId": "BTC-USD_UM-261127",
+    "instType": "FUTURES",
+    "symbol": "BTC",
+    "baseSymbol": "BTC",
+    "quoteSymbol": "USD",
+    "settleSymbol": "USD",
+    "family": "BTC-USD_UM",
+    "underlying": "BTC-USD",
+    "assetClass": "crypto",
+    "displaySymbol": "BTC",
+    "displayName": "BTC/USD 261127",
+    "aliases": [
+     "BTC",
+     "BITCOIN",
+     "VITCOIN",
+     "BITCON",
+     "BITCOM"
+    ],
+    "priority": 31,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": "1795766400000",
+     "instCategory": "1",
+     "lever": "20",
+     "listTime": "1790323800603",
+     "lotSz": "0.01",
+     "tickSz": "0.1"
+    },
+    "searchText": "BTC-USD_UM-261127 BTC USD USD BTC-USD_UM BTC-USD BTC/USD 261127 BTC BITCOIN VITCOIN BITCON BITCOM"
+   },
+   {
+    "instId": "BTC-USD_UM-261225",
+    "instType": "FUTURES",
+    "symbol": "BTC",
+    "baseSymbol": "BTC",
+    "quoteSymbol": "USD",
+    "settleSymbol": "USD",
+    "family": "BTC-USD_UM",
+    "underlying": "BTC-USD",
+    "assetClass": "crypto",
+    "displaySymbol": "BTC",
+    "displayName": "BTC/USD 261225",
+    "aliases": [
+     "BTC",
+     "BITCOIN",
+     "VITCOIN",
+     "BITCON",
+     "BITCOM"
+    ],
+    "priority": 31,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": "1798185600000",
+     "instCategory": "1",
+     "lever": "20",
+     "listTime": "1781251800815",
+     "lotSz": "0.01",
+     "tickSz": "0.1"
+    },
+    "searchText": "BTC-USD_UM-261225 BTC USD USD BTC-USD_UM BTC-USD BTC/USD 261225 BTC BITCOIN VITCOIN BITCON BITCOM"
+   },
+   {
+    "instId": "BTC-USD_UM-270326",
+    "instType": "FUTURES",
+    "symbol": "BTC",
+    "baseSymbol": "BTC",
+    "quoteSymbol": "USD",
+    "settleSymbol": "USD",
+    "family": "BTC-USD_UM",
+    "underlying": "BTC-USD",
+    "assetClass": "crypto",
+    "displaySymbol": "BTC",
+    "displayName": "BTC/USD 270326",
+    "aliases": [
+     "BTC",
+     "BITCOIN",
+     "VITCOIN",
+     "BITCON",
+     "BITCOM"
+    ],
+    "priority": 31,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": "1806048000000",
+     "instCategory": "1",
+     "lever": "20",
+     "listTime": "1784710800000",
+     "lotSz": "0.01",
+     "tickSz": "0.1"
+    },
+    "searchText": "BTC-USD_UM-270326 BTC USD USD BTC-USD_UM BTC-USD BTC/USD 270326 BTC BITCOIN VITCOIN BITCON BITCOM"
+   }
+  ],
+  "resolved": {
+   "instId": "BTC-USDT",
+   "instType": "SPOT",
+   "symbol": "BTC",
+   "baseSymbol": "BTC",
+   "quoteSymbol": "USDT",
+   "settleSymbol": null,
+   "family": null,
+   "underlying": null,
+   "assetClass": "crypto",
+   "displaySymbol": "BTC",
+   "displayName": "BTC/USDT",
+   "aliases": [
+    "BTC",
+    "BITCOIN",
+    "VITCOIN",
+    "BITCON",
+    "BITCOM"
+   ],
+   "priority": 68,
+   "state": "LIVE",
+   "instrumentMeta": {
+    "expTime": null,
+    "instCategory": "1",
+    "lever": "10",
+    "listTime": "1611907686000",
+    "lotSz": "0.00000001",
+    "tickSz": "0.1"
+   },
+   "searchText": "BTC-USDT BTC USDT BTC/USDT BTC BITCOIN VITCOIN BITCON BITCOM"
+  },
+  "resolution": {
+   "matchKind": "exact",
+   "matchedTerm": "BITCOIN",
+   "needsConfirmation": false,
+   "proxyNote": null
+  },
+  "source": "OKX public instruments",
+  "catalogAgeMs": 5548
+ }
+}

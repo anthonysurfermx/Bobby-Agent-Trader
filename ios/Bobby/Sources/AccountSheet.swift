@@ -1,5 +1,7 @@
 // Account sheet — why to sign in (progress follows you to the web and back)
 // and the Apple button. 1.2 offers Sign in with Apple only; the X button is Debug-only.
+// The Núcleo opens it from the header avatar, full height and with the privacy and
+// support links (the classic desk keeps those in its menu).
 import AuthenticationServices
 import SwiftUI
 
@@ -8,6 +10,10 @@ struct AccountSheet: View {
     @ObservedObject var profile: AgentProfile
     /// Pieces the account holds on Trader Land (the desk's island read); nil = unknown.
     var pieces: Int? = nil
+    /// Sheet heights; the Núcleo asks for `.large` only so deletion is always on screen.
+    var detents: Set<PresentationDetent> = [.medium, .large]
+    /// Privacy Policy and Help links under the buttons (the Núcleo has no other menu).
+    var showsLinks = false
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
     @State private var busy = false
@@ -91,10 +97,26 @@ struct AccountSheet: View {
                 Text(err).font(.footnote).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("account-error")
             }
+            if showsLinks {
+                HStack(spacing: 18) {
+                    Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
+                        Label(L.t("Privacy Policy", "Aviso de privacidad"), systemImage: "hand.raised")
+                    }
+                    .accessibilityIdentifier("account-privacy")
+                    Link(destination: URL(string: "https://bobbyprotocol.xyz/support")!) {
+                        Label(L.t("Help and support", "Ayuda y soporte"), systemImage: "questionmark.circle")
+                    }
+                    .accessibilityIdentifier("account-support")
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
+            }
         }
         .padding(22)
         .background(Theme.bg.ignoresSafeArea())
-        .presentationDetents([.medium, .large])
+        .presentationDetents(detents)
         .confirmationDialog(
             L.t("Delete your Bobby account?", "¿Borrar tu cuenta de Bobby?"),
             isPresented: $showDeleteConfirmation,

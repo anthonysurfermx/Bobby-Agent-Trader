@@ -1,0 +1,19 @@
+{
+ "synthetic": true,
+ "note": "api/desk-debate.ts question_too_long",
+ "request": {
+  "method": "POST",
+  "path": "api/desk-debate"
+ },
+ "status": 400,
+ "headers": {
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store"
+ },
+ "elapsedMs": 900,
+ "body": {
+  "error": "Your question is too long. Keep it to 1,200 characters or fewer.",
+  "code": "question_too_long",
+  "maxLength": 1200
+ }
+}

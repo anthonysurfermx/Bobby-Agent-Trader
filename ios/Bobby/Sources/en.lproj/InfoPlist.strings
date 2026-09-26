@@ -1,2 +1,4 @@
 "CFBundleDisplayName" = "Bobby";
 "NSPhotoLibraryAddUsageDescription" = "Bobby saves your skin card to Photos only when you tap Save Image.";
+"NSMicrophoneUsageDescription" = "Bobby listens only while you hold the button, to hear your question.";
+"NSSpeechRecognitionUsageDescription" = "Bobby turns your spoken question into text on this iPhone. The audio never leaves your device.";

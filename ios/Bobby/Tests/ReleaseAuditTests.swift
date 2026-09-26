@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import Speech
 @testable import Bobby
 
 private final class AuditAuthProtocol: URLProtocol {
@@ -93,8 +94,18 @@ final class ReleaseAuditTests: XCTestCase {
         XCTAssertFalse(incomplete.isNoTrade)
     }
 
-    func testAvatarNarrationDoesNotRequestMicrophoneOrSpeechRecognition() {
-        XCTAssertNil(Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription"))
-        XCTAssertNil(Bundle.main.object(forInfoDictionaryKey: "NSSpeechRecognitionUsageDescription"))
+    /// Deliberately changed for the Núcleo (Nucleo/ARCHITECTURE.md §5, R8): the user may now ASK by
+    /// voice (hold the pill). Both purpose strings must exist, and recognition is on-device only, so
+    /// no audio ever leaves the phone and the risk notice copy stays true.
+    func testSpokenQuestionsDeclareMicrophoneAndSpeechAndRecognizeOnDeviceOnly() {
+        let mic = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
+        let speech = Bundle.main.object(forInfoDictionaryKey: "NSSpeechRecognitionUsageDescription") as? String
+        XCTAssertFalse((mic ?? "").trimmingCharacters(in: .whitespaces).isEmpty, "NSMicrophoneUsageDescription must explain hold-to-ask")
+        XCTAssertFalse((speech ?? "").trimmingCharacters(in: .whitespaces).isEmpty, "NSSpeechRecognitionUsageDescription must explain on-device dictation")
+        let request = NucleoSpeech.makeRequest(contextualStrings: ["NVDA", "Bitcoin"])
+        XCTAssertTrue(request.requiresOnDeviceRecognition, "Audio must never leave the device (R8)")
+        XCTAssertTrue(request.shouldReportPartialResults)
+        XCTAssertTrue(request.addsPunctuation)
+        XCTAssertEqual(request.contextualStrings, ["NVDA", "Bitcoin"])
     }
 }

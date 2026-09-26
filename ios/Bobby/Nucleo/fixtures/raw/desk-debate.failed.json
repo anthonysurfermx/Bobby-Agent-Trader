@@ -1,0 +1,18 @@
+{
+ "synthetic": true,
+ "note": "api/desk-debate.ts analysis_failed (quota already spent server-side)",
+ "request": {
+  "method": "POST",
+  "path": "api/desk-debate"
+ },
+ "status": 503,
+ "headers": {
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store"
+ },
+ "elapsedMs": 900,
+ "body": {
+  "error": "The analysis could not finish. Please retry. No verdict was issued.",
+  "code": "analysis_failed"
+ }
+}

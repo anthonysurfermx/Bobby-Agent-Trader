@@ -10,6 +10,13 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     static let avatarNarrationEnabled = true
     @Published var speaking = false
     @Published var level: CGFloat = 0
+    /// Which voice is (or was last) playing: the network persona or the on-device fallback.
+    enum Engine: Equatable { case neural, device }
+    @Published private(set) var engine: Engine = .neural
+    /// Position and length of the network voice's audio; nil for the device voice and when idle.
+    @Published private(set) var playback: (time: TimeInterval, duration: TimeInterval)?
+    /// Word boundaries of the device voice (`willSpeakRangeOfSpeechString`), in the spoken text.
+    var onDeviceWord: ((NSRange) -> Void)?
     /// One device preference shared by onboarding, the desk and the gallery.
     /// Muting also invalidates requests that have not returned audio yet.
     @Published var isMuted: Bool {
@@ -44,6 +51,13 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
             self.fallbackUtterance = nil
             self.level = 0
             self.speaking = false
+        }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, willSpeakRangeOfSpeechString characterRange: NSRange, utterance: AVSpeechUtterance) {
+        Task { @MainActor in
+            guard self.fallbackUtterance === utterance else { return }
+            self.onDeviceWord?(characterRange)
         }
     }
 
@@ -145,9 +159,12 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         p.enableRate = playbackRate != 1.0
         p.rate = min(1.25, max(0.85, playbackRate))
         player = p
+        engine = .neural
+        playback = (0, p.duration)
         speaking = true
         guard p.play() else {
             player = nil
+            playback = nil
             speaking = false
             return false
         }
@@ -210,6 +227,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         u.rate = min(AVSpeechUtteranceMaximumSpeechRate, max(AVSpeechUtteranceMinimumSpeechRate, 0.5 * fallbackPlaybackRate))
         u.pitchMultiplier = Self.feminineVoices.contains(fallbackPersona) ? 1.05 : 0.95
         fallbackUtterance = u
+        engine = .device
+        playback = nil
         speaking = true
         fallback.speak(u)
     }
@@ -224,6 +243,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 player.updateMeters()
                 let power = player.averagePower(forChannel: 0)
                 self.level = min(1, max(0.04, CGFloat(pow(10, power / 20)) * 2.5))
+                self.playback = (player.currentTime, player.duration)
             }
         }
     }
@@ -236,6 +256,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         meterTimer = nil
         fallbackUtterance = nil
         fallback.stopSpeaking(at: .immediate)
+        playback = nil
         speaking = false
         level = 0
     }
@@ -247,6 +268,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
             self.meterTimer?.invalidate()
             self.meterTimer = nil
             self.level = 0
+            self.playback = nil
             self.speaking = false
         }
     }

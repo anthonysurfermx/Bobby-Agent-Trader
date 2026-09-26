@@ -1,0 +1,92 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/voice-tool",
+  "body": {
+   "tool": "run_debate",
+   "args": {
+    "symbol": "BTC",
+    "lang": "en"
+   }
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "public, max-age=0, must-revalidate",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:35:50 GMT"
+ },
+ "elapsedMs": 558,
+ "recordedAt": "2026-09-26T11:35:50Z",
+ "body": {
+  "symbol": "BTC",
+  "context": null,
+  "market": {
+   "symbol": "BTC",
+   "assetType": "crypto",
+   "available": true,
+   "price": 84181.3,
+   "change_24h_pct": -0.89,
+   "high_24h": 84948,
+   "low_24h": 83174.7,
+   "funding_rate": 1.19002591243e-05
+  },
+  "regime": "LOW VOLATILITY (BTC -0.9%)",
+  "technicals": {
+   "price": 84181.3,
+   "rsi14": 62.1,
+   "ema20": 84071.3,
+   "ema50": 84275.1,
+   "support": 83174.7,
+   "resistance": 85258.8,
+   "atrPct": 0.23,
+   "trend": "lateral",
+   "momentum": "neutral"
+  },
+  "technical_pulse": {
+   "signal": "strong_long",
+   "direction": "long",
+   "conviction_pct": 59,
+   "agreement_pct": 94,
+   "overview": "Bollinger: Price is 85.8% through the Bollinger channel with 0.62% band width. MA 50/200: MA50 is above MA200, keeping the higher-timeframe trend constructive. MACD: MACD is above signal by 26.6 with bullish histogram 53.4.",
+   "trade_plan": {
+    "stop": 83659.2,
+    "basis": [
+     "Breakout mode: entry defaults to current price.",
+     "Stop uses 1.4x ATR with structure overlay.",
+     "Target uses 1.6R or Bollinger expansion, whichever is wider."
+    ],
+    "entry": 84181.2,
+    "target": 85016.4,
+    "direction": "long",
+    "rewardRisk": 1.6,
+    "invalidation": "Lose 83659.2 or a bearish SuperTrend flip."
+   },
+   "source": "intel",
+   "instrument": null
+  },
+  "quick_brief": {
+   "symbol": "BTC",
+   "assetType": "crypto",
+   "timeframe": "1H",
+   "price": 84181.3,
+   "change24hPct": -0.89,
+   "bias": "neutral",
+   "trend": "lateral",
+   "momentum": "neutral",
+   "rsi14": 62.1,
+   "ema20": 84071.3,
+   "ema50": 84275.1,
+   "support": 83174.7,
+   "resistance": 85258.8,
+   "atrPct": 0.23,
+   "summary": "BTC is at 84,181.3 and remains range-bound on 1H, between 83,174.7 support and 85,258.8 resistance. RSI: 62.1.",
+   "risk": "Inside the range there is more noise than edge; wait for confirmation beyond either boundary.",
+   "source": "live-candles",
+   "generatedAt": "2026-09-26T11:35:50.599Z",
+   "latencyMs": 229
+  },
+  "how_to_use": "Anchor Alpha on the support/demand side, Red Team on the level that breaks the thesis, and the CIO on where you would actually act. Size each zone with atrPct. Never state a level that is not derived from these numbers.",
+  "note": "Analysis only. Bobby does not execute trades."
+ }
+}

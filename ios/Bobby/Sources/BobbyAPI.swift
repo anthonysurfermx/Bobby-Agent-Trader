@@ -292,7 +292,8 @@ enum BobbyAPI {
         var id: String { symbol }
     }
 
-    private static func prettyName(_ raw: String, symbol: String) -> String {
+    /// Internal (not private) so the Núcleo bridge names assets exactly as the desk does.
+    static func prettyName(_ raw: String, symbol: String) -> String {
         guard raw != symbol, !raw.isEmpty else { return symbol }
         if raw.rangeOfCharacter(from: CharacterSet(charactersIn: "&0123456789")) != nil { return raw }
         return raw.lowercased().split(separator: " ").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
@@ -421,6 +422,30 @@ enum BobbyAPI {
         }
         let (data, response) = try await URLSession.shared.data(for: req)
         return (try? JSONSerialization.jsonObject(with: data), (response as? HTTPURLResponse)?.statusCode ?? 0)
+    }
+
+    /// `response`, plus the reply's headers with lowercased names (the Núcleo bridge reads
+    /// `retry-after` on a 429). Same URL, Origin header, timeouts and body as `response`.
+    static func responseWithHeaders(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+        guard let url = URL(string: base.absoluteString + "/" + path) else {
+            throw URLError(.badURL)
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
+        req.timeoutInterval = path == "api/desk-debate" ? 100 : 60
+        if let body {
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+        let (data, response) = try await URLSession.shared.data(for: req)
+        let http = response as? HTTPURLResponse
+        var headers: [String: String] = [:]
+        for (key, value) in http?.allHeaderFields ?? [:] {
+            guard let name = key as? String else { continue }
+            headers[name.lowercased()] = value as? String ?? "\(value)"
+        }
+        return (try? JSONSerialization.jsonObject(with: data), http?.statusCode ?? 0, headers)
     }
 
     /// Words that carry no asset meaning in a natural question, es/en.

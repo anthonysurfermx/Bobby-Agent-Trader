@@ -1,0 +1,64 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/bobby-asset-search",
+  "body": {
+   "q": "Should I buy gold?"
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:35:51 GMT"
+ },
+ "elapsedMs": 463,
+ "recordedAt": "2026-09-26T11:35:51Z",
+ "body": {
+  "ok": true,
+  "query": "Should I buy gold?",
+  "instTypes": [
+   "SPOT",
+   "SWAP",
+   "FUTURES"
+  ],
+  "results": [],
+  "resolved": {
+   "instId": "XAUT-USDT",
+   "instType": "SPOT",
+   "symbol": "XAUT",
+   "baseSymbol": "XAUT",
+   "quoteSymbol": "USDT",
+   "settleSymbol": null,
+   "family": null,
+   "underlying": null,
+   "assetClass": "commodity",
+   "displaySymbol": "XAUT",
+   "displayName": "XAUT/USDT",
+   "aliases": [
+    "XAUT",
+    "XAU",
+    "TETHER GOLD"
+   ],
+   "priority": 68,
+   "state": "LIVE",
+   "instrumentMeta": {
+    "expTime": null,
+    "instCategory": "4",
+    "lever": "10",
+    "listTime": "1658200770000",
+    "lotSz": "0.000001",
+    "tickSz": "0.1"
+   },
+   "searchText": "XAUT-USDT XAUT USDT XAUT/USDT XAUT XAU TETHER GOLD"
+  },
+  "resolution": {
+   "matchKind": "proxy",
+   "matchedTerm": "GOLD",
+   "needsConfirmation": true,
+   "proxyNote": "Tether Gold (XAUT), a tokenized gold product"
+  },
+  "source": "OKX public instruments",
+  "catalogAgeMs": 9067
+ }
+}

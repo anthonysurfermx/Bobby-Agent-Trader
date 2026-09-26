@@ -1,0 +1,119 @@
+{
+ "name": "Núcleo",
+ "tagline": "La esfera es la app: todo nace de ella y todo regresa a ella.",
+ "big_idea": "Quitamos la pantalla de \"personaje arriba, texto y gráfica abajo\" y dejamos una sola cosa viva al centro: una esfera de vidrio. Todo sale de ella cuando hace falta: los datos, la gráfica, el debate, el veredicto y la tesis. Al terminar, cada pieza vuelve a entrar en la esfera. El resto de Bobby (Isla, Squad, Record, tesis) vive en las caras de esa misma esfera, así que no hay tab bar ni menú.",
+ "orb_and_companion": "El compañero elegido de los 18 vive dentro del vidrio. Solo se ve como una silueta suave y cálida (opacidad 0.3 a 0.85 según la amplitud de la voz) mientras Bobby habla, y desaparece cuando se forma el veredicto para dejarle el centro a la palabra. El resto del tiempo es luz: la esfera es su cuerpo y el compañero es su alma. En la cara Squad el compañero sí se ve completo, con los demás del roster como puntos debajo; ahí se cambia de compañero y se ve su gear, XP y racha. El compañero también le pone su tinte al vidrio (el zorro, rosa; el robot, azul frío), así cada usuario reconoce \"su\" esfera sin necesitar el modelo 3D completo en pantalla.",
+ "flow": [
+  {
+   "step": "Reposo",
+   "user": "Abre la app y ve una esfera iridiscente de 244 px, centrada en y=388, que respira. Debajo: 'Good evening.' y la pastilla negra del micrófono.",
+   "bobby": "Ciclo de respiración de ~4.8 s. Rim light frío, corrientes azul, violeta, rosa y cian. Etiqueta pequeña: 'Hold to ask · swipe to turn'."
+  },
+  {
+   "step": "Escucha",
+   "user": "Mantiene presionada la pastilla (estilo Monogram), que se ensancha de 96 a 236 px con 22 barras de voz y un halo cónico difuminado. Dice 'Should I buy NVIDIA right now?'.",
+   "bobby": "La transcripción aparece palabra por palabra bajo la esfera (serif de 28 px, cada palabra pasa de desenfoque a nítida). El borde de la esfera ondula con el nivel de voz y el halo crece."
+  },
+  {
+   "step": "Debate",
+   "user": "Suelta. La pregunta sube y se encoge al header ('You asked').",
+   "bobby": "Dentro del vidrio aparecen tres corrientes que se cruzan y giran: menta (Alpha Hunter), coral (Red Team) y ámbar (CIO). Afuera, tres etiquetas del mismo color con su postura en una línea. En los últimos 1.4 s las corrientes convergen en una sola de color ámbar y la del CIO cambia a 'Verdict forming'."
+  },
+  {
+   "step": "Satélites",
+   "user": "Solo mira y escucha.",
+   "bobby": "La esfera sube a y=226 y baja a 168 px. De su centro salen, con resorte y 200 ms de desfase entre sí, 4 satélites (precio 178.40 +1.8%, RSI 71, volumen 1.4×, earnings en 6 días) que se quedan en una órbita elíptica punteada. La silueta del compañero se enciende mientras habla, con subtítulos tipo karaoke."
+  },
+  {
+   "step": "Gráfica exhalada",
+   "user": "Solo mira.",
+   "bobby": "Un cometa de luz sale de la parte baja de la esfera, baja en curva y dibuja 30 días de NVDA a escala, de izquierda a derecha, en 1.7 s. Al final aparecen la banda 'Calm entry 168–172', el punto 'NOW 178.40' con un pulso y la línea punteada de earnings en 6 días."
+  },
+  {
+   "step": "Veredicto",
+   "user": "Escucha 'So my call is wait. Not a no. A not yet.'",
+   "bobby": "La palabra 'Wait' se condensa en el centro de la esfera: pasa de desenfocada y grande a nítida. Alrededor se dibuja un anillo ámbar de convicción al 64%. Aparece la pista 'Pull down for the full read'."
+  },
+  {
+   "step": "Jalar las tarjetas",
+   "user": "Arrastra hacia abajo desde la esfera, desliza a la izquierda y toca 'Save thesis'.",
+   "bobby": "De la esfera (ya de 128 px) salen tarjetas estilo Monogram de 318×286 px con el borde de la siguiente asomando: Debate, Tesis (entrada 168–172, stop 161.50, objetivos 186/195, se muere si cierra bajo 158) e Isla. Al guardar: 'Saved · Bobby is watching' y '+20 discipline XP for waiting'."
+  },
+  {
+   "step": "Seguimiento",
+   "user": "Ve 'You might want to ask'.",
+   "bobby": "Tres chips entran escalonados (120 ms): 'What would make it a buy?', 'Compare with AMD', 'What if earnings miss?'."
+  },
+  {
+   "step": "Caras de la esfera",
+   "user": "Hace swipe horizontal sobre la esfera.",
+   "bobby": "Las tarjetas y los satélites vuelven a meterse en la esfera. La esfera regresa al centro y gira: cada swipe rota el ruido interno 1.8 rad, cambia el tinte y trae un glifo nuevo desde la derecha. Orden: Isla (verde agua), Squad (rosa), Track Record (azul, 41 marcas y 63%) y Saved theses (ámbar), y luego vuelve a Desk. Los puntos del header marcan en qué cara estás."
+  },
+  {
+   "step": "Regreso",
+   "user": "No hace nada.",
+   "bobby": "Vuelve al reposo con el tinte neutro y el saludo. El loop dura unos 35 s."
+  }
+ ],
+ "metrics": "Las métricas no van en tabla. Son satélites: pastillas de vidrio de unos 100×46 px (blur 14, borde de 1 px), con la etiqueta en mono de 9 px en mayúsculas y el valor en Geist de 16 px con números tabulares. El cambio va en color: menta si sube, coral si está caliente, ámbar si hay un evento. Salen del centro de la esfera con un resorte (k=130, amortiguación 15, un pequeño rebote) y se acomodan en ángulos de -160°, -20°, 160° y 20° de una órbita elíptica (rx = r+52, ry = r+22), con una deriva de ±3° para que se sientan vivos. Máximo 4 por respuesta: Bobby decide cuáles importan. Cuando la respuesta pasa a tarjetas, regresan a la esfera en orden inverso.",
+ "chart": "La gráfica es una estela de luz que la esfera exhala. Primero un cometa baja en curva desde la base de la esfera hasta el primer punto. Luego la línea se dibuja de izquierda a derecha con un degradado de cian tenue (pasado) a marfil y a ámbar (hoy), más un halo desenfocado de 7 px. Está a escala: 30 cierres, eje de 145 a 185, solo dos líneas de guía (155 y 175) y 8 días de futuro a la derecha. El punto focal es uno solo: el punto 'NOW 178.40' con pulso, sobre la banda 'Calm entry 168–172', que hace visible sin palabras que el precio está a $6.40 del lugar tranquilo. La línea punteada de earnings (a 6 días) explica el riesgo. El relleno bajo la línea y las marcas aparecen 2 s después, cuando la línea ya terminó.",
+ "debate": "El debate sucede dentro del vidrio. Cada agente es una corriente: una isolínea de ruido fbm con su propio desfase. Menta = Alpha Hunter, coral = Red Team, ámbar = CIO. Mientras piensan, el shader gira (twist por radio) y las tres corrientes se cruzan y chocan. Afuera hay tres etiquetas mínimas del mismo color con una sola postura cada una ('Demand is still beating estimates' contra 'Stretched, with earnings in 6 days'). La convergencia no es una animación decorativa: los desfases de las corrientes se reducen a cero, así que se enciman físicamente en una sola línea y el vidrio se tiñe del color del veredicto. El texto completo del debate solo se lee si el usuario jala la tarjeta 'The debate'.",
+ "verdict": "El veredicto se condensa como una sola palabra en el centro de la esfera: 'Wait', en Instrument Serif de 46 px. Entra desenfocada 14 px y al 150% y queda nítida en 1.2 s. Debajo, '64% conviction' en mono. Un anillo ámbar alrededor de la esfera se llena hasta 64% en 1.5 s. El color del vidrio es el color del veredicto (ámbar = esperar, menta = comprar, coral = no). Esperar se trata como una respuesta completa y se premia: guardar esa tesis da '+20 discipline XP for waiting'.",
+ "discovery": "No hay tab bar. La esfera tiene 5 caras que se recorren con swipe horizontal sobre ella: Desk (preguntar), Isla, Squad, Track Record y Saved theses. Cada swipe rota el interior del vidrio (1.8 rad con resorte), cambia su tinte (verde agua, rosa, azul, ámbar) y trae un glifo nuevo desde el lado del gesto: la isla, el compañero, el anillo de 41 llamadas o las tesis apiladas. Debajo aparece el nombre en serif de 32 px con una línea de estado. Arriba a la derecha, 5 puntos (el activo es una pastilla de 16 px) más el nombre de la cara en mono dicen dónde estás. Configuración y cuenta: long-press sobre la esfera abre una hoja (en el prototipo no se muestra). Las tesis guardadas también se ven como satélites fantasma en la cara Desk cuando tienen una alerta.",
+ "motion_states": {
+  "idle": "Respira en un ciclo de ~4.8 s (amp 0.10 ± 0.07). Corrientes iridiscentes azul, violeta, rosa y cian que se mueven lento. Halo tenue de 0.2. El ruido rota 0.05 rad/s. Tamaño 244 px al centro.",
+  "listening": "Crece a 264 px. El borde ondula con dos armónicos (5 y 3 lóbulos) al ritmo del nivel de voz. El halo sube hasta +0.22 y el interior se aclara con la voz. La pastilla se ensancha a 236 px con barras de voz y un halo cónico que gira 120°/s.",
+  "thinking": "Twist: el interior gira según el radio (sin(t·0.8)·2.4) y las iridiscencias bajan 70%. Aparecen tres isolíneas brillantes (menta, coral, ámbar) que se cruzan más rápido (velocidad ×3.8). Al final los desfases llegan a cero y se funden en una sola corriente ámbar.",
+  "talking": "La esfera se encoge a 168 px arriba. Pulsa con una envolvente de sílabas (|sin(7.2t)|^0.7 modulada por frase, con pausas). El radio crece hasta +3% con cada pico. Se ve la silueta del compañero y el vidrio queda tintado del color del veredicto.",
+  "presenting": "Se encoge a 128 px, anclada arriba con el anillo de convicción y la palabra del veredicto. Casi no se mueve (amp 0.1) para no competir con las tarjetas. Da un pulso cuando el usuario guarda la tesis."
+ },
+ "removed": [
+  "El compañero parado arriba de la pantalla como avatar permanente",
+  "La columna de texto largo bajo el personaje (ahora son subtítulos de una línea y tarjetas solo si las jalas)",
+  "La gráfica fija en una tarjeta con ejes completos, que se vuelve una estela de luz a escala con un solo punto focal",
+  "La tab bar y la navegación por pestañas (Isla, Squad, Record y tesis pasan a ser caras de la esfera)",
+  "El panel de métricas en tabla o grid (se vuelven 4 satélites en órbita)",
+  "El bloque del debate siempre visible (ahora se ve como corrientes en el vidrio y el texto solo en la tarjeta)",
+  "Botones y chips permanentes: los chips de seguimiento solo aparecen al final de cada respuesta"
+ ],
+ "strengths": [
+  "Es la más memorable de las tres: se reconoce en una captura, un video de 3 s o un ícono, y tiene fuerza de marca para App Store y TikTok",
+  "Hace visible el valor único de Bobby: el debate de tres agentes se ve pelear y converger, no solo se lee",
+  "Pone 'no operar' como protagonista: el vidrio ámbar y la palabra 'Wait' tienen el mismo peso visual que un 'Buy'",
+  "La carga cognitiva es mínima para Gen Z: una cosa en pantalla, un gesto (mantener presionado) para preguntar y otro (swipe) para explorar",
+  "Todo sale y regresa a la esfera, así que cada transición tiene origen y destino y el usuario nunca se pierde",
+  "Aprovecha a los 18 compañeros sin saturar: el compañero da color y alma a la esfera y aparece cuando habla",
+  "Encaja con la voz: los estados de ElevenLabs (idle, listening, thinking, talking) se mapean directo a parámetros del shader"
+ ],
+ "risks": [
+  "Descubribilidad: el swipe sobre la esfera para Isla, Squad y Record no es obvio. Hace falta una pista la primera vez, los puntos del header y quizá mostrar un pedazo de la cara vecina en el borde",
+  "Performance: un shader fbm a pantalla completa en Android de gama media o en la TWA puede calentar el teléfono y gastar batería. Hay que bajar DPR, pausar cuando no está visible y tener un fallback en CSS o video",
+  "Densidad: los usuarios avanzados que quieren ver más datos pueden sentirlo lento. Hay que ofrecer 'jalar para ver todo' y un modo de lectura directa",
+  "Accesibilidad: el color no puede ser el único canal del debate y el veredicto. Hay que mantener la palabra, el porcentaje y las etiquetas, más VoiceOver y reduced-motion (el prototipo ya reduce la velocidad a 40%)",
+  "Perder el vínculo emocional con el compañero 3D actual. A quien le gusta ver a su zorro todo el tiempo le puede parecer que se esconde",
+  "Riesgo de que la estética le gane a la claridad: si las corrientes compiten con los números, el producto se ve como un salvapantallas. Los satélites y el veredicto siempre tienen que ganar el contraste"
+ ],
+ "build_path": "Web (React): la esfera es un solo componente <NucleusOrb> con un canvas WebGL crudo (el mismo fragment shader del prototipo, unas 80 líneas GLSL) o three.js con ShaderMaterial en un plano. Recibe props de estado: amp, listen, swirl, conv, rot y tint, que salen del estado del agente (voz real con AnalyserNode del TTS y el micrófono). Los satélites, las tarjetas, el anillo y los glifos son DOM encima, posicionados con Framer Motion (useSpring) a partir del centro y radio de la esfera. La gráfica es un SVG propio (path con dashoffset) en vez de Recharts para poder hacer el 'exhale'. Con los datos reales de bobby-cycle/intel y la tesis existente: unas 2 semanas para una persona senior. iOS (SwiftUI): la esfera en Metal con el mismo shader portado a MSL, en un MTKView o como .colorEffect/.layerEffect de SwiftUI (iOS 17+); los satélites y las tarjetas en SwiftUI con matchedGeometryEffect desde el centro de la esfera; el swipe de caras con un DragGesture que controla la rotación del shader. Unas 2 a 3 semanas. Hay que agregar un fallback de video loop para dispositivos viejos y para la TWA de Android.",
+ "palette": [
+  "#0B0A09 fondo carbón cálido",
+  "#18141C centro del degradado radial del fondo",
+  "#F2EDE4 texto marfil",
+  "#A39C91 texto secundario",
+  "#6B645B texto terciario",
+  "#3FE0B5 Alpha Hunter (menta)",
+  "#FF5A5F Red Team (coral)",
+  "#F6B94E CIO / veredicto Wait (ámbar)",
+  "#5CE1FF cian iridiscente / escucha",
+  "#4D6BFF azul iridiscente",
+  "#9A5CFF violeta iridiscente",
+  "#FF6EC7 rosa iridiscente",
+  "#000000 pastilla del micrófono"
+ ],
+ "fonts": [
+  "Instrument Serif (display: pregunta, subtítulos hablados, veredicto 'Wait', títulos de caras y tarjetas)",
+  "Geist (UI y cuerpo: métricas, tarjetas, chips)",
+  "Geist Mono (etiquetas en mayúsculas, ejes de la gráfica, estados)"
+ ],
+ "prototype_file": "/private/tmp/claude-501/-Users-mrrobot-Documents-GitHub-Bobby-Agent-Trader/3d68fb89-e361-455a-8960-70905d672c37/scratchpad/bobby-reinvent/p1-nucleo.html",
+ "file": "p1-nucleo.html"
+}

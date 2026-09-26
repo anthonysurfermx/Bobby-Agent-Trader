@@ -39,8 +39,12 @@
 	<array>
 		<string>instagram-stories</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Bobby listens only while you hold the button, to hear your question.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Bobby saves your skin card to Photos only when you tap Save Image.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Bobby turns your spoken question into text on this iPhone. The audio never leaves your device.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

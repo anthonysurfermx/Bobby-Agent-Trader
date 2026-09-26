@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--NUCLEO:CSP-->
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0B0A09">
+<title>Bobby</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B0A09; --ink:#F2EDE4; --ink-b:#FFF8EC; --ink2:#A39C91; --ink3:#8A8378; --ink4:rgba(242,237,228,.28);
+  --hair:rgba(242,237,228,.08); --line:rgba(242,237,228,.12);
+  --alpha:#3FE0B5; --red:#FF5A5F; --cio:#F6B94E; --pearl:#E8DFD0; --listen:#5CE1FF;
+  --vc:#F6B94E; --glass:rgba(22,19,17,.86);
+  --serif:'Sora',-apple-system,'SF Pro Display',system-ui,sans-serif;  /* display face, shared with bobbyprotocol.xyz */
+  --sans:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+/* A fixed, non-scrolling, non-zooming app surface: touch-action:none keeps pan, pinch and double-tap zoom away so every
+   touch reaches the pointer handlers; no tap flash, no selection, no long-press callout. The typing box opts back in. */
+html,body{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;background:#0B0A09;
+  touch-action:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--ink-b);outline-offset:3px}
+#stage{position:absolute;left:0;top:0;width:390px;height:844px;transform-origin:0 0;overflow:hidden;
+  background:radial-gradient(90% 55% at 50% var(--sy,340px),var(--amb,#15121C) 0%,#0B0A09 70%);
+  color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  font-variant-numeric:tabular-nums lining-nums;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+#fpsM{position:absolute;right:8px;top:8px;z-index:12;pointer-events:none;padding:3px 6px;border-radius:6px;background:rgba(11,10,9,.72);
+  border:.5px solid var(--line);color:var(--ink2);font:500 11px/14px var(--mono);white-space:pre;text-align:right}
+.a{position:absolute;left:0;top:0;pointer-events:none;opacity:0;z-index:2}
+.tap{pointer-events:auto}
+#pool{width:100px;height:100px;border-radius:50%;filter:blur(18px);z-index:0}
+#gl{position:absolute;left:0;top:0;width:390px;height:844px;z-index:0}
+#snow{width:390px;height:844px;z-index:0;opacity:1}
+#fb{width:100px;height:100px;border-radius:50%;overflow:hidden;z-index:0;display:none}
+#fb .orb{position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 32% 26%,rgba(255,255,255,.85) 0 3%,rgba(255,255,255,0) 12%),radial-gradient(circle at 28% 72%,#C95FA0 0,rgba(201,95,160,0) 46%),radial-gradient(circle at 74% 36%,#56B8D0 0,rgba(86,184,208,0) 46%),radial-gradient(circle at 56% 60%,#7E55C8 0,rgba(126,85,200,0) 62%),#0d0c16;
+  box-shadow:inset 0 0 22px rgba(255,255,255,.28)}
+#fb img{position:absolute;left:12%;top:14%;width:76%;height:76%;opacity:0;mix-blend-mode:screen;
+  -webkit-mask-image:radial-gradient(circle at 50% 50%,#000 40%,transparent 68%);mask-image:radial-gradient(circle at 50% 50%,#000 40%,transparent 68%)}
+.nogl #fb{display:block}.nogl #gl{display:none}
+#grain{position:absolute;inset:0;pointer-events:none;opacity:.035;mix-blend-mode:overlay;z-index:1;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+#lbx{position:absolute;left:0;top:0;width:390px;height:844px;z-index:1;pointer-events:none;display:none;
+  --fx:linear-gradient(90deg,#0B0A09 0,rgba(11,10,9,.56) 8px,rgba(11,10,9,.25) 16px,rgba(11,10,9,.06) 24px,rgba(11,10,9,0) 32px,rgba(11,10,9,0) 358px,rgba(11,10,9,.06) 366px,rgba(11,10,9,.25) 374px,rgba(11,10,9,.56) 382px,#0B0A09 390px);
+  --fy:linear-gradient(180deg,#0B0A09 0,rgba(11,10,9,.56) 8px,rgba(11,10,9,.25) 16px,rgba(11,10,9,.06) 24px,rgba(11,10,9,0) 32px,rgba(11,10,9,0) 812px,rgba(11,10,9,.06) 820px,rgba(11,10,9,.25) 828px,rgba(11,10,9,.56) 836px,#0B0A09 844px)}
+.lbx-x #lbx,.lbx-y #lbx{display:block}
+.lbx-x #lbx{background-image:var(--fx)}.lbx-y #lbx{background-image:var(--fy)}.lbx-x.lbx-y #lbx{background-image:var(--fx),var(--fy)}
+#seed{width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#FFF8EC;box-shadow:0 0 12px 2px rgba(255,248,236,.55)}
+#fx,#chart{width:390px;height:844px;overflow:visible;opacity:1}
+#fx path,#fx circle,#fx ellipse,#fx line{fill:none}
+#orbitE{stroke:var(--line);stroke-width:.5;stroke-dasharray:1 6;stroke-linecap:round}
+.serif{font-family:var(--serif);font-weight:300}
+.lbl{font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.w{display:inline-block;white-space:pre}
+#wmBig{left:0;width:390px;top:512px;text-align:center;font:300 38px/41px var(--serif);letter-spacing:-.035em;color:var(--ink)}
+header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;pointer-events:none}
+#wm{position:absolute;left:20px;top:8px;font:300 21px/24px var(--serif);letter-spacing:-.035em;color:var(--ink);opacity:0;transform-origin:50% 50%}
+#close{position:absolute;left:8px;top:0;width:44px;height:44px;display:grid;place-items:center;opacity:0;color:var(--ink2);pointer-events:none}
+#close.on{pointer-events:auto}
+#dq{position:absolute;left:75px;width:240px;top:12px;text-align:center;font:400 15px/20px var(--sans);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0}
+#avatar{position:absolute;left:338px;top:6px;width:32px;height:32px;opacity:0}
+#avatar .face,.bead{border-radius:50%;background-color:#2A2A2A;background-size:118% 118%;background-position:50% 42%;box-shadow:0 0 0 .5px rgba(242,237,228,.2)}
+#avatar .face{position:absolute;inset:3px}
+#avatar svg{position:absolute;inset:0;overflow:visible}
+.mono-ava{display:grid;place-items:center;font:300 13px/1 var(--serif);letter-spacing:-.03em;color:var(--ink)}
+#belt{width:390px;height:844px;opacity:1}
+.bead{position:absolute;left:0;top:0;width:20px;height:20px;margin:-10px 0 0 -10px;opacity:0}
+#prompt{left:0;width:390px;top:110px;text-align:center;font:300 24px/27px var(--serif);letter-spacing:-.035em}
+#pava{left:163px;top:466px;width:64px;height:64px;border-radius:50%;background-color:#2A2A2A;background-size:118% 118%;background-position:50% 42%;box-shadow:0 0 0 .5px rgba(242,237,228,.22),0 10px 28px rgba(0,0,0,.55);opacity:0}
+#pname{left:0;width:390px;top:544px;text-align:center;font:300 31px/34px var(--serif);letter-spacing:-.035em;height:40px;overflow:visible}
+#pcount{left:0;width:390px;top:590px;text-align:center;color:var(--ink3)}
+.roll{position:relative;display:block}
+.roll>span{position:absolute;left:0;right:0;top:0;white-space:nowrap}
+#title{left:20px;width:350px;top:512px;text-align:center;font:300 34px/36px var(--serif);letter-spacing:-.035em;white-space:nowrap}
+#sub{left:20px;width:350px;top:566px;text-align:center;font:400 16px/23px var(--sans);color:var(--ink2);text-wrap:balance}
+.cap{left:20px;width:350px;top:512px;text-align:center;font:300 22px/27px var(--serif);letter-spacing:-.035em;text-wrap:balance}
+.cap .w{will-change:transform,opacity,filter}
+#capM{visibility:hidden;opacity:0}
+#cap2{left:20px;width:350px;top:553px;text-align:center;font:400 15px/21px var(--sans);color:var(--ink2)}
+/* the transcript: one line, eased left as words arrive; the head fades when the question is longer than the line */
+#tx{left:20px;width:350px;top:528px;height:34px;overflow:visible;font:400 24px/30px var(--sans);letter-spacing:-.012em;white-space:nowrap}
+#tx.long{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 28px);mask-image:linear-gradient(90deg,transparent 0,#000 28px)}
+#txIn{position:absolute;left:0;top:0;white-space:nowrap}
+#qbead,#tbead{width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--ink-b);box-shadow:0 0 10px rgba(255,248,236,.5)}
+.ag{width:156px}
+.ag .nm{display:flex;align-items:center;gap:6px;color:var(--c);white-space:nowrap}
+.ag .nm i{width:5px;height:5px;border-radius:50%;background:var(--c);flex:none}
+.ag .st{font:400 15px/21px var(--sans);color:var(--ink);margin-top:4px;max-width:156px;max-height:42px;overflow:hidden}
+#agR{text-align:right}#agR .nm{justify-content:flex-end}
+#agC{width:220px;text-align:center}#agC .nm{justify-content:center}#agC .st{max-width:none;height:42px;position:relative}
+#agC .st .roll{height:42px}#agC .st .roll>span{white-space:normal}
+#lines{left:20px;width:350px;top:0;opacity:1}
+#lines .ln{position:absolute;left:0;width:350px;text-align:center;font:300 19px/22px var(--serif);letter-spacing:-.035em;text-wrap:balance}
+#lines .rb{position:absolute;left:10px;width:330px;text-align:center;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance}
+#notice.tap{pointer-events:auto}
+#notice{left:95px;width:200px;top:640px;height:44px;font:400 13px/16px var(--sans);color:var(--ink2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(163,156,145,.5)}
+.sat{min-width:100px;height:52px;border-radius:16px;padding:7px 12px;background:var(--glass);border:.5px solid var(--hair);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px -12px rgba(0,0,0,.7);white-space:nowrap}
+.sat.set{background:rgba(22,19,17,.64);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.sat .k{display:flex;align-items:center;gap:5px;color:var(--ink2);white-space:nowrap}
+.sat .k i{width:5px;height:5px;border-radius:50%;background:var(--c);flex:none}
+.sat .v{display:flex;align-items:baseline;gap:4px;font:500 18px/22px var(--sans);letter-spacing:-.01em;margin-top:2px;white-space:nowrap;color:var(--ink)}
+.sat .v em{font:400 13px/16px var(--sans);font-style:normal;color:var(--ink2)}
+#gsat{min-width:0;height:auto;padding:8px 12px 9px;opacity:0}
+#gsat .v{font-size:15px;line-height:20px}
+#savedTag{width:200px;text-align:right;color:var(--ink2);white-space:nowrap;height:14px;overflow:hidden}
+#capLine{width:200px;height:2px;margin:-1px 0 0 -100px;border-radius:1px;background:rgba(242,237,228,.55)}
+.od{display:inline-block;height:22px;overflow:hidden;vertical-align:top}
+.od>span{display:block}.od>span>b{display:block;height:22px;font-weight:500}
+#verdict{width:240px;text-align:center}
+#verdict .vw{font-family:var(--serif);font-weight:300;line-height:1;color:var(--ink-b);white-space:nowrap}
+#verdict .vc{margin-top:8px;color:rgba(255,248,236,.78);display:flex;justify-content:center;gap:6px;height:14px}
+#pct{width:120px;text-align:center;font:600 13px/16px var(--sans);color:var(--vc);height:16px;overflow:hidden}
+#isla{width:120px;height:120px}
+#isla svg{width:120px;height:120px;overflow:visible}
+#meta{left:20px;width:350px;text-align:center;font:400 12px/16px var(--sans);color:var(--ink3)}
+#hint{left:20px;width:350px;top:713px;text-align:center;color:var(--ink2);height:14px;opacity:1}
+#hint .roll>span{display:flex;justify-content:center;align-items:center;gap:6px}
+#mer{width:390px;height:844px;opacity:1}
+#mer i{position:absolute;left:0;top:0;height:6px;width:6px;margin:-3px 0 0 -3px;border-radius:3px;background:var(--ink4);opacity:0}
+#pglow{width:270px;height:78px;border-radius:40px;background:conic-gradient(from var(--ga,0deg),#4D6BFF,#9A5CFF,#FF6EC7,#5CE1FF,#4D6BFF);filter:blur(22px);z-index:3}
+#pill{position:absolute;left:0;top:742px;height:56px;width:96px;border-radius:28px;background:#000;border:1px solid rgba(242,237,228,.10);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -12px rgba(0,0,0,.9);overflow:hidden;z-index:4;opacity:0;pointer-events:auto}
+#pill .ic{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px}
+#pill .bars{position:absolute;left:50%;top:50%;width:131px;height:32px;margin:-16px 0 0 -65.5px;display:flex;gap:3px;align-items:center}
+#pill .bars i{display:block;width:3px;height:28px;border-radius:2px;background:var(--ink);transform:scaleY(.14)}
+#pill .goo{position:absolute;inset:0;width:100%;height:100%}
+#pill .lab{position:absolute;left:0;right:0;top:18px;height:20px;text-align:center;font:600 16px/20px var(--sans);color:var(--ink);white-space:nowrap}
+#pill .fill{position:absolute;left:0;top:0;bottom:0;width:100%;background:rgba(242,237,228,.12);transform-origin:0 50%;transform:scaleX(0)}
+#pill .dots{position:absolute;left:50%;top:50%;width:0;height:0}
+#pill .dots i{position:absolute;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%}
+#pill .stop{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:3px;background:var(--ink);opacity:0}
+#pill .chk{position:absolute;left:50%;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;opacity:0}
+#chipsBox{left:0;top:0;width:390px;height:844px;opacity:1}
+#eyebrow{position:absolute;left:20px;top:613px;color:var(--ink3);opacity:0}
+#chips{position:absolute;left:0;top:640px;width:390px;height:40px;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent)}
+.chip{position:absolute;left:0;top:0;height:40px;padding:0 16px;border-radius:20px;background:rgba(242,237,228,.04);border:.5px solid var(--line);
+  font:500 15px/39px var(--sans);color:var(--ink2);white-space:nowrap;opacity:0;pointer-events:none}
+.chip.on{pointer-events:auto}
+.chip.first{color:var(--ink)}
+#cards{width:390px;height:844px;opacity:1;z-index:3}
+.card{position:absolute;left:0;top:236px;width:330px;height:420px;border-radius:28px;padding:24px;overflow:hidden;
+  background:linear-gradient(180deg,rgba(34,30,27,.96),rgba(23,21,19,.96));border:1px solid var(--hair);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 26px 60px -22px rgba(0,0,0,.85)}
+.card::after{content:'';position:absolute;inset:0;border-radius:28px;background:linear-gradient(180deg,#221E1B,#171513);opacity:var(--veil,0);pointer-events:none}
+.ch{display:flex;justify-content:space-between;gap:12px;color:var(--ink2)}
+.ch span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card h3{font:300 24px/27px var(--serif);letter-spacing:-.035em;margin-top:18px;color:var(--ink)}
+.dsc{position:absolute;left:24px;right:24px;top:50px;bottom:46px;overflow:hidden}
+.dsc.more{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent)}
+.row{display:flex;gap:12px;margin-top:14px}
+.row i{flex:0 0 5px;height:5px;border-radius:50%;background:var(--c);margin-top:5px}
+.row b{display:block;color:var(--c);font-weight:500}
+.row p{font:400 15px/21px var(--sans);margin-top:2px;color:var(--ink);text-transform:none;letter-spacing:0}
+.card dl{margin-top:12px}
+.card dl div{display:flex;justify-content:space-between;align-items:center;height:32px;border-bottom:1px solid rgba(242,237,228,.06)}
+.card dt{color:var(--ink2)}
+.card dd{font:500 17px/22px var(--sans);letter-spacing:-.005em;text-transform:none;color:var(--ink);text-align:right}
+.hz{position:absolute;left:24px;right:24px;top:275px;font:400 13px/18px var(--sans);color:var(--ink2)}
+.xp{position:absolute;left:24px;top:271px;height:26px;padding:0 10px;border-radius:13px;background:rgba(246,185,78,.12);color:var(--vc);font:500 13px/26px var(--sans);white-space:nowrap;opacity:0}
+.btn{position:absolute;left:24px;right:24px;top:304px;height:52px;border-radius:26px;background:var(--ink);color:#141210;font:600 16px/20px var(--sans);overflow:hidden;pointer-events:none}
+.btn.tap{pointer-events:auto}
+.btn .roll{position:absolute;left:0;right:0;top:16px;height:20px}
+.btn .sweep{position:absolute;inset:-1px;border-radius:26px;padding:1px;background:conic-gradient(from var(--sw,0deg),transparent 0 70%,var(--vc) 88%,transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0}
+.card .foot{position:absolute;left:24px;right:24px;bottom:22px;font:400 12px/16px var(--sans);color:var(--ink2)}
+.card .isl{font:400 16px/23px var(--sans);color:var(--ink2);margin-top:12px}
+#tpill{height:24px;margin:-12px 0 0 0;padding:0 12px;border-radius:12px;background:rgba(246,185,78,.16);border:.5px solid rgba(246,185,78,.45);
+  color:var(--vc);text-align:center;font:500 11px/23px var(--mono);letter-spacing:.06em;white-space:nowrap;z-index:4}
+#perm{left:45px;top:486px;width:300px;border-radius:24px;padding:20px 16px 16px;background:var(--glass);border:.5px solid var(--hair);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 60px -24px rgba(0,0,0,.9);z-index:6;opacity:1;visibility:hidden}
+#perm.set{background:rgba(22,19,17,.72);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+#perm h4{font:300 21px/24px var(--serif);letter-spacing:-.035em;text-align:center;text-wrap:balance}
+#perm p{font:400 15px/21px var(--sans);letter-spacing:-.01em;color:var(--ink2);text-align:center;margin-top:6px;text-wrap:balance}
+#perm button{display:block;margin:16px auto 0;width:252px;height:44px;border-radius:22px;background:var(--ink);color:#141210;font:600 16px/44px var(--sans);pointer-events:auto}
+#sheet{left:0;top:0;width:390px;height:844px;opacity:1;z-index:7}
+#sheetBody{position:absolute;left:0;top:0;width:96px;height:8px;border-radius:32px 32px 0 0;background:var(--glass);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+  border-top:.5px solid rgba(242,237,228,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 -20px 60px -20px rgba(0,0,0,.8);visibility:hidden}
+#sheet .si{position:absolute;opacity:0}
+#grab{left:177px;top:478px;width:36px;height:5px;border-radius:3px;background:var(--ink4)}
+#shT{left:20px;width:350px;top:500px;text-align:center;font:300 24px/28px var(--serif);letter-spacing:-.035em}
+#shB{left:40px;width:310px;top:540px;height:42px;text-align:center;font:400 15px/21px var(--sans);color:var(--ink2);overflow:visible}
+#shB .roll>span{white-space:normal;text-wrap:balance}
+.sbtn{left:20px;width:350px;height:50px;border-radius:25px;display:flex;align-items:center;justify-content:center;gap:6px;font:500 17px/20px -apple-system,BlinkMacSystemFont,'SF Pro Text',var(--sans);pointer-events:none}
+.sbtn.tap{pointer-events:auto}
+#apple{top:610px;background:#FFFFFF;color:#000}
+#apple .lg{font:500 19px/20px -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;margin-top:-2px}
+#notnow{left:120px;width:150px;top:672px;height:44px;font:400 15px/44px var(--sans);color:var(--ink2);text-align:center;pointer-events:none}
+#notnow.tap{pointer-events:auto}
+#ghost{width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;border:1px solid rgba(242,237,228,.6);z-index:9}
+#ghost::after{content:'';position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(242,237,228,.8)}
+#pauseTag{left:159px;top:806px;width:72px;height:24px;border-radius:12px;background:rgba(242,237,228,.10);border:.5px solid var(--line);
+  color:var(--ink);text-align:center;font:500 11px/23px var(--mono);letter-spacing:.06em;text-transform:uppercase;z-index:11}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* typing: a real textarea OUTSIDE the scaled stage (the keyboard lifts it with visualViewport) */
+#typeBox{position:fixed;left:16px;right:16px;top:0;z-index:20;display:none;align-items:flex-end;gap:8px;padding:8px 8px 8px 16px;border-radius:26px;
+  background:rgba(22,19,17,.94);border:.5px solid rgba(242,237,228,.16);box-shadow:0 20px 50px -18px rgba(0,0,0,.9);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);touch-action:auto;opacity:0;transform:translateY(20px)}
+#typeBox.on{display:flex}
+#typeIn{flex:1;min-height:36px;max-height:120px;resize:none;border:0;outline:0;background:transparent;color:#F2EDE4;font:400 17px/22px 'Geist',-apple-system,system-ui,sans-serif;
+  padding:7px 0;-webkit-user-select:text;user-select:text;touch-action:auto;caret-color:#FFF8EC}
+#typeIn::placeholder{color:#8A8378}
+#typeSend{flex:none;width:40px;height:40px;border-radius:20px;background:#F2EDE4;color:#141210;display:grid;place-items:center;touch-action:manipulation}
+#typeSend[disabled]{opacity:.35}
+</style>
+</head>
+<body data-page="onboarding">
+<div id="stage" aria-label="Bobby">
+  <div id="pool" class="a"></div>
+  <canvas id="gl" role="img" aria-label="Bobby"></canvas>
+  <div id="fb" class="a"><div class="orb"></div><img id="fbImg" alt=""></div>
+  <canvas id="snow" class="a" width="390" height="844"></canvas>
+  <div id="grain"></div>
+  <div id="lbx" aria-hidden="true"></div>
+
+  <div id="seed" class="a"></div>
+  <svg id="fx" class="a" viewBox="0 0 390 844" aria-hidden="true">
+    <path id="thA" stroke="rgba(63,224,181,.35)" stroke-width=".5"/>
+    <path id="thR" stroke="rgba(255,90,95,.35)" stroke-width=".5"/>
+    <path id="thC" stroke="rgba(246,185,78,.35)" stroke-width=".5"/>
+    <ellipse id="orbitE" cx="195" cy="330" rx="180" ry="141" opacity="0"/>
+    <g id="isRing" opacity="0"></g>
+    <g id="ringG" opacity="0">
+      <circle id="ringTrk" stroke="rgba(242,237,228,.10)" stroke-width="1"/>
+      <circle id="ringArc" stroke="#F2EDE4" stroke-width="1" stroke-linecap="round"/>
+      <circle id="ringHead" r="2.5" fill="#F2EDE4" stroke="none"/>
+    </g>
+  </svg>
+
+  <div id="isla" class="a" aria-hidden="true">
+    <svg viewBox="0 0 100 100">
+      <defs>
+        <radialGradient id="glowP"><stop offset="0" stop-color="#FFF8EC" stop-opacity=".9"/><stop offset="1" stop-color="#FFF8EC" stop-opacity="0"/></radialGradient>
+        <radialGradient id="seaG"><stop offset="0" stop-color="#7BC8F0" stop-opacity=".30"/><stop offset=".7" stop-color="#7BC8F0" stop-opacity=".10"/><stop offset="1" stop-color="#7BC8F0" stop-opacity="0"/></radialGradient>
+        <linearGradient id="sandG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3EAD6" stop-opacity=".92"/><stop offset="1" stop-color="#E8D9BC" stop-opacity=".62"/></linearGradient>
+      </defs>
+      <ellipse cx="50" cy="69.5" rx="47" ry="11" fill="url(#seaG)"/>
+      <path d="M17 67.6 C23 66.2 26.6 61 33.6 58.8 C40 56.9 44.4 53.2 51 53 C58.6 52.8 62.8 56.4 68.6 58.6 C74.6 60.9 78.4 65.4 84 67.6 C66 70.8 35 70.9 17 67.6 Z" fill="url(#sandG)" stroke="rgba(242,237,228,.85)" stroke-width=".9" stroke-linejoin="round"/>
+      <path d="M11 72 Q21 70.4 30 71.8 M39 73.6 Q50 72.2 61 73.6 M70 71.8 Q79 70.4 89 72" fill="none" stroke="rgba(123,200,240,.6)" stroke-width=".85" stroke-linecap="round"/>
+      <circle id="newPiece" cx="52" cy="50.6" r="7" fill="url(#glowP)" opacity="0"/>
+      <g id="seedDrop" opacity="0"><path d="M52 44 C49.4 47.6 48.8 49.5 48.8 50.6 A3.2 3.2 0 0 0 55.2 50.6 C55.2 49.5 54.6 47.6 52 44 Z" fill="#FFF8EC" stroke="#7BC8F0" stroke-width=".9"/></g>
+    </svg>
+  </div>
+
+  <div id="qbead" class="a"></div>
+  <div id="verdict" class="a"><div class="vw" id="vword"></div><div class="vc lbl"><span id="vpct"></span><span id="vlab"></span></div></div>
+  <div id="pct" class="a"></div>
+
+  <div class="sat a" id="s0"><span class="k lbl"></span><span class="v"></span></div>
+  <div class="sat a" id="s1"><span class="k lbl"></span><span class="v"></span></div>
+  <div class="sat a" id="s2"><span class="k lbl"></span><span class="v"></span></div>
+  <div class="sat a" id="gsat"><span class="k lbl"><i></i><span id="gsK"></span></span><span class="v" id="gsV"></span></div>
+  <div id="savedTag" class="a lbl"><span class="roll"><span id="savedTx"></span></span></div>
+
+  <svg id="chart" class="a" viewBox="0 0 390 844" aria-hidden="true"></svg>
+
+  <div id="belt" class="a"></div>
+  <div id="prompt" class="a"></div>
+  <div id="pname" class="a"><span class="roll"><span></span><span></span></span></div>
+  <div id="pcount" class="a lbl"><span class="roll"><span></span><span></span></span></div>
+  <div id="pava" class="a" aria-hidden="true"></div>
+
+  <div id="agA" class="ag a" style="--c:#3FE0B5;left:20px;top:188px"><div class="nm lbl"><i></i><span class="n"></span></div><div class="st"></div></div>
+  <div id="agR" class="ag a" style="--c:#FF5A5F;left:214px;top:188px"><div class="nm lbl"><span class="n"></span><i></i></div><div class="st"></div></div>
+  <div id="agC" class="ag a" style="--c:#F6B94E;left:85px;top:528px"><div class="nm lbl"><i></i><span class="n"></span></div><div class="st"><span class="roll"><span></span><span></span></span></div></div>
+
+  <div id="lines" class="a"></div>
+  <button id="notice" class="a" data-hit="notice" tabindex="0"></button>
+  <div id="tx" class="a" aria-hidden="true"><div id="txIn"></div></div>
+  <div id="tbead" class="a"></div>
+  <div id="cap" class="a cap" aria-hidden="true"></div>
+  <div id="capM" class="a cap" aria-hidden="true"></div>
+  <div id="capLine" class="a" aria-hidden="true"></div>
+  <div id="cap2" class="a"></div>
+  <div id="title" class="a"></div>
+  <div id="sub" class="a"></div>
+  <div id="wmBig" class="a">Bobby</div>
+  <div id="meta" class="a"></div>
+
+  <div id="cards" class="a">
+    <article class="card" id="cD">
+      <div class="ch lbl"><span id="dH"></span><span id="dT"></span></div>
+      <div class="dsc" id="dScroll"><div id="dRows"></div></div>
+      <div class="foot" id="dFoot"></div>
+    </article>
+    <article class="card" id="cT">
+      <div class="ch lbl"><span id="tH"></span><span id="tAsof"></span></div>
+      <h3 id="tTitle"></h3>
+      <dl class="lbl" id="tRows"></dl>
+      <div class="hz" id="hz"></div>
+      <div class="xp" id="xp"></div>
+      <button class="btn" id="save" data-hit="save" tabindex="0"><span class="sweep" id="sweep"></span><span class="roll"><span id="saveA"></span><span id="saveB"></span></span></button>
+      <div class="foot" id="tFoot"></div>
+    </article>
+    <article class="card" id="cI">
+      <div class="ch lbl"><span id="iH">Isla</span><span id="iT"></span></div>
+      <h3 id="iTitle"></h3>
+      <p class="isl" id="iBody"></p>
+    </article>
+  </div>
+  <div id="tpill" class="a"></div>
+
+  <div id="chipsBox" class="a">
+    <div id="eyebrow" class="lbl"></div>
+    <div id="chips"></div>
+  </div>
+  <div id="hint" class="a lbl"><span class="roll"><span></span><span></span></span></div>
+  <div id="mer" class="a"></div>
+
+  <div id="pglow" class="a"></div>
+  <button id="pill" data-hit="pill" aria-label="Ask Bobby, hold to talk" tabindex="0">
+    <span class="fill"></span>
+    <svg class="goo" viewBox="0 0 236 56" preserveAspectRatio="none" aria-hidden="true">
+      <defs><filter id="gooF"><feGaussianBlur in="SourceGraphic" stdDeviation="6"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"/></filter></defs>
+      <g filter="url(#gooF)" id="gooG" opacity=".55"><circle r="14" fill="#5CE1FF"/><circle r="12" fill="#9A5CFF"/><circle r="11" fill="#FF6EC7"/></g>
+    </svg>
+    <svg class="ic" viewBox="0 0 22 22" fill="none" stroke="#F2EDE4" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="7.5" y="2.5" width="7" height="11" rx="3.5"/><path d="M4.5 10.5a6.5 6.5 0 0 0 13 0M11 17v2.5"/></svg>
+    <span class="bars" aria-hidden="true"></span>
+    <span class="dots" aria-hidden="true"><i style="background:#3FE0B5"></i><i style="background:#FF5A5F"></i><i style="background:#F6B94E"></i></span>
+    <span class="stop" aria-hidden="true"></span>
+    <svg class="chk" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 10.5 L8.5 14.2 L15.5 6" fill="none" stroke="#F2EDE4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="lab roll"><span></span><span></span></span>
+  </button>
+
+  <div id="perm" class="a" role="dialog">
+    <h4 id="permT"></h4>
+    <p id="permB"></p>
+    <button id="permGo" data-hit="perm" tabindex="0"></button>
+  </div>
+
+  <div id="sheet" class="a" role="dialog">
+    <div id="sheetBody"></div>
+    <div id="grab" class="si"></div>
+    <div id="shT" class="si"></div>
+    <div id="shB" class="si"><span class="roll"><span id="shBa"></span><span id="shBb"></span></span></div>
+    <button id="apple" class="si sbtn" data-hit="apple" tabindex="0"><span class="lg" aria-hidden="true">&#xF8FF;</span><span id="appleL"></span></button>
+    <button id="notnow" class="si" data-hit="notnow" tabindex="0"></button>
+  </div>
+
+  <header>
+    <div id="wm">Bobby</div>
+    <button id="close" data-hit="close" tabindex="0"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+    <div id="dq"></div>
+    <div id="avatar"><div class="face" id="avaFace"></div><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="none" stroke="rgba(242,237,228,.14)" stroke-width="2"/><circle id="xpArc" cx="16" cy="16" r="15" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" transform="rotate(-90 16 16)" stroke-dasharray="0 94.25"/></svg></div>
+  </header>
+
+  <div id="ghost" class="a"></div>
+  <div id="pauseTag" class="a"></div>
+  <div id="live" class="sr" aria-live="polite"></div>
+</div>
+<div id="typeBox" role="group"><textarea id="typeIn" rows="1" enterkeyhint="send" autocomplete="off" autocorrect="on" spellcheck="true" maxlength="1400"></textarea><button id="typeSend" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13 V3 M3.5 7.5 L8 3 L12.5 7.5" fill="none" stroke="#141210" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+<script id="companions" type="application/json">__COMPANIONS_JSON__</script>
+<!--NUCLEO:FIXTURES-->
+<!--NUCLEO:SHARED-->
+<!--NUCLEO:JS-->
+</body>
+</html>

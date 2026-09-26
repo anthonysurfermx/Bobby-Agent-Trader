@@ -1,0 +1,11 @@
+{
+ "v": 1,
+ "status": "unsupported",
+ "asset": {
+  "symbol": "XAUT",
+  "name": "Xau",
+  "isEquity": false,
+  "assetClass": "commodity"
+ },
+ "reason": "asset_class"
+}

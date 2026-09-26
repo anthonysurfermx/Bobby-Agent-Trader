@@ -1,0 +1,6 @@
+{
+ "v": 1,
+ "status": "quota",
+ "retryAfterSec": 3600,
+ "message": "Bobby reached today's analysis limit. Try again tomorrow."
+}

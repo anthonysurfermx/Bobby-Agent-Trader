@@ -1,0 +1,36 @@
+{
+ "v": 1,
+ "source": "Sources/Companion.swift companionLevels",
+ "levels": [
+  {
+   "number": 1,
+   "en": "SPAWNED",
+   "es": "EN ESCENA",
+   "minXP": 0
+  },
+  {
+   "number": 2,
+   "en": "LOCKED IN",
+   "es": "EN LA ZONA",
+   "minXP": 50
+  },
+  {
+   "number": 3,
+   "en": "MARKET READER",
+   "es": "LEE EL MERCADO",
+   "minXP": 150
+  },
+  {
+   "number": 4,
+   "en": "RISK GUARDIAN",
+   "es": "CUIDA EL RIESGO",
+   "minXP": 400
+  },
+  {
+   "number": 5,
+   "en": "ON-CHAIN LEGEND",
+   "es": "LEYENDA ON-CHAIN",
+   "minXP": 1000
+  }
+ ]
+}

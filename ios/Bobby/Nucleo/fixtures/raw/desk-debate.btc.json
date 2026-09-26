@@ -1,0 +1,51 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/desk-debate",
+  "body": {
+   "symbol": "BTC",
+   "question": "Is now a good time for Bitcoin?",
+   "language": "en",
+   "assetType": "crypto"
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:36:14 GMT"
+ },
+ "elapsedMs": 4393,
+ "recordedAt": "2026-09-26T11:36:14Z",
+ "body": {
+  "symbol": "BTC",
+  "technicals": {
+   "price": 84181.3,
+   "rsi14": 62.1,
+   "ema20": 84071.3,
+   "ema50": 84275.1,
+   "support": 83174.7,
+   "resistance": 85258.8,
+   "atrPct": 0.23,
+   "trend": "lateral",
+   "momentum": "neutral"
+  },
+  "provenance": {
+   "provider": "OKX",
+   "instrument": "BTC-USDT",
+   "assetType": "crypto",
+   "timeframe": "1H",
+   "asOf": "2026-09-26T11:00:00.000Z"
+  },
+  "market": {
+   "price": 84181.3
+  },
+  "agents": {
+   "alpha": "Currently, Bitcoin (BTC) is trading at 84181.3, with a neutral momentum and a lateral trend. The RSI is at 62.1, suggesting it is approaching overbought conditions, while the price is near the support level of 83174.7 and resistance at 85258.8. This indicates potential volatility, but the lack of a clear upward or downward trend adds uncertainty to the timing for investment.",
+   "red": "Alpha's argument relies on the interpretation of technical indicators, but it assumes that RSI alone can dictate market conditions without considering broader market sentiment or external factors influencing Bitcoin's price. The mention of a neutral momentum and lateral trend suggests indecision, yet it does not address potential catalysts that could drive price movement. Additionally, the analysis lacks context on historical performance or market events that could impact Bitcoin's future trajectory.",
+   "cio": "Bitcoin is currently trading at 84181.3 with a neutral momentum and a lateral trend. The RSI at 62.1 indicates it is nearing overbought conditions, while the proximity to support and resistance levels suggests potential volatility. However, the lack of a clear trend and the uncertainty surrounding broader market factors make it difficult to determine if now is a good time for investment.",
+   "verdict": "wait",
+   "direction": "none"
+  }
+ }
+}
