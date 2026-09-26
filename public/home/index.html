@@ -47,6 +47,17 @@
 html,body{height:100%}
 body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); overflow-x:hidden}
 
+/* ---------- top bar: the smallest possible wordmark, one way into the app ---------- */
+.topbar{position:fixed; top:0; left:0; right:0; z-index:60; display:flex; justify-content:space-between; align-items:center;
+  padding-top:calc(env(safe-area-inset-top, 0px) + 16px); padding-inline:clamp(16px, 3vw, 32px); pointer-events:none}
+.topbar a{pointer-events:auto; text-decoration:none; color:var(--ink)}
+.tb-mark{font-family:var(--display); font-weight:400; letter-spacing:-.04em; font-size:15px}
+.tb-app{font:500 12px/1 var(--sans); letter-spacing:.01em; padding:8px 15px; border-radius:999px; background:rgba(0,0,0,.5);
+  border:1px solid rgba(242,237,228,.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); transition:border-color .2s ease}
+.tb-app:hover{border-color:rgba(242,237,228,.32)}
+.tb-mark:focus-visible, .tb-app:focus-visible{outline:2px solid var(--listen); outline-offset:3px}
+
 /* ---------- the pinned stage: one sphere tells the whole story ---------- */
 .story{position:relative; height:780svh}
 .stage{position:sticky; top:0; height:100svh; min-height:600px; overflow:hidden; isolation:isolate}
@@ -111,7 +122,7 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 .slot{flex:none; width:44px; height:44px}
 
 /* s2 — three voices */
-.s2 .head{position:absolute; left:50%; top:max(6svh, 36px); transform:translateX(-50%); width:min(92vw, 1080px); text-align:center; display:grid; gap:12px; justify-items:center}
+.s2 .head{position:absolute; left:50%; top:max(9svh, 68px); transform:translateX(-50%); width:min(92vw, 1080px); text-align:center; display:grid; gap:12px; justify-items:center}
 .voice{position:absolute; width:min(280px, 26vw); display:grid; gap:8px; opacity:0}
 .voice .who{display:flex; align-items:center; gap:9px; font:500 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase}
 .voice .who::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--c); box-shadow:0 0 12px var(--c)}
@@ -161,7 +172,7 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   .chat{padding:12px 14px 14px; gap:8px}
   .a{font-size:13.5px}
   .chat.two{margin-left:0}
-  .s2 .head{top:max(5svh, 28px)}
+  .s2 .head{top:max(8svh, 60px)}
   .voice{left:16px; right:16px; width:auto; margin:0}
   .v-a{top:auto; bottom:calc(max(4svh, 20px) + 196px)}
   .v-r{top:auto; bottom:calc(max(4svh, 20px) + 98px)}
@@ -245,6 +256,11 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
 @media (prefers-reduced-motion: reduce){ .cue i{animation:none} }
 </style>
+
+<header class="topbar">
+  <a class="tb-mark" href="/" aria-label="Bobby, home">Bobby</a>
+  <a class="tb-app" href="/desk">App</a>
+</header>
 
 <main class="story" id="story">
   <div class="stage" id="stage">
