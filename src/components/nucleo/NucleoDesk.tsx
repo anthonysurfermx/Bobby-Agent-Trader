@@ -21,6 +21,9 @@ import { EvolutionOverlay, GearCatalog, ToolDetail, ToolUnlockOverlay } from '@/
 import LandSeedCard from '@/components/companion/LandSeedCard';
 import { DeskSwapCard, SwapSheet } from '@/components/companion/DeskSwap';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
+import ProgressSync from '@/components/companion/ProgressSync';
+import { bobbySupabase } from '@/lib/bobby-db-client';
+import { fetchAccess, startBilling, type Access, type AccessState } from '@/lib/access-client';
 import NucleoChart from './NucleoChart';
 import NucleoProfile from './NucleoProfile';
 import NucleoRisk from './NucleoRisk';
@@ -36,7 +39,8 @@ interface BrowserRecognition {
   onend: (() => void) | null; onerror: (() => void) | null;
 }
 
-type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'cio' | 'reveal' | 'complete' | 'error' | 'confirm';
+type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'cio' | 'reveal' | 'complete' | 'error' | 'confirm' | 'gate';
+const PENDING_ASK = 'bobby:pending-ask';
 type Sheet = 'none' | 'profile' | 'board' | 'risk' | 'catalog' | 'pet' | 'swap';
 interface Msg { from: 'bobby' | 'you'; text: string }
 
@@ -131,6 +135,12 @@ export default function NucleoDesk() {
   const [inspected, setInspected] = useState<CompanionTool | null>(null);
   const [sheet, setSheet] = useState<Sheet>('none');
   const [signInPrompt, setSignInPrompt] = useState(false);
+  // Metered access (api/_lib/access.ts): 3 reads without an account, 10 a week with one, Bobby Pro unlimited.
+  const [accessState, setAccessState] = useState<AccessState | null>(null);
+  const [gate, setGate] = useState<'signin' | 'paywall' | null>(null);
+  const [billing, setBilling] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
+  const [proNotice, setProNotice] = useState<'welcome' | 'cancelled' | null>(() => (params.get('pro') === 'welcome' ? 'welcome' : params.get('pro') === 'cancelled' ? 'cancelled' : null));
+  const meter: Access | null = accessState?.access ?? null;
   const [movers, setMovers] = useState<Mover[]>([]);
   const [readSeq, setReadSeq] = useState(0);
   useEffect(() => { if (shouldPromptNow(getSyncStatus() === 'synced')) setSignInPrompt(true); }, []);
@@ -179,6 +189,17 @@ export default function NucleoDesk() {
     const a = await runDebate(snap.symbol, signal);
     clearTimeout(stage); clearTimeout(stage2);
     if (signal.aborted) return;
+    if (a.access) setAccessState((prev) => (prev ? { ...prev, access: a.access! } : { access: a.access!, signedIn: a.access!.tier !== 'anon', subscription: null, payments: { stripe: false, apple: true } }));
+    if (a.gate) {
+      // The server stopped this read: sign in first, or Bobby Pro. The question waits and runs after.
+      try { sessionStorage.setItem(PENDING_ASK, snap.symbol); } catch { /* private mode */ }
+      setSnapshot(null);
+      setPhase('gate');
+      setGate(a.gate === 'signin_required' ? 'signin' : 'paywall');
+      if (a.gate === 'signin_required') setSignInPrompt(true);
+      void fetchAccess().then((st) => { if (st) setAccessState(st); });
+      return;
+    }
     if (isUnavailable(a)) {
       setPhase('error');
       const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`);
@@ -244,12 +265,43 @@ export default function NucleoDesk() {
     await analyze(r.snapshot, controller);
   }, [analyze, voice]);
 
+  // The meter: on load, whenever the account changes, and after a Stripe checkout (the webhook can
+  // lag a few seconds, so a welcome polls until the subscription shows up). A question the gate held
+  // runs by itself once the reader is signed in.
+  const retried = useRef(false);
+  useEffect(() => {
+    let alive = true;
+    const load = async (attempt = 0) => {
+      const st = await fetchAccess();
+      if (!alive || !st) return;
+      setAccessState(st);
+      if (proNotice === 'welcome' && st.access.tier !== 'pro' && attempt < 6) { window.setTimeout(() => void load(attempt + 1), 2500); return; }
+      let pending: string | null = null;
+      try { pending = sessionStorage.getItem(PENDING_ASK); } catch { pending = null; }
+      const canRead = st.access.tier === 'pro' || (st.signedIn && !(st.access.paywall && (st.access.remaining ?? 1) <= 0));
+      if (pending && canRead && !retried.current) {
+        retried.current = true;
+        try { sessionStorage.removeItem(PENDING_ASK); } catch { /* private mode */ }
+        setGate(null); setSignInPrompt(false);
+        void ask(pending);
+      }
+    };
+    void load();
+    let unsub: (() => void) | null = null;
+    try {
+      const { data } = bobbySupabase().auth.onAuthStateChange((event) => { if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { retried.current = false; void load(); } });
+      unsub = () => data.subscription.unsubscribe();
+    } catch { unsub = null; }
+    return () => { alive = false; unsub?.(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const reset = () => {
     requestRef.current?.abort();
     if (revealRef.current) clearTimeout(revealRef.current);
     voice.stop();
     sfxTock();
-    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]);
+    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]); setGate(null);
   };
 
   const chartSymbol = snapshot?.symbol ?? initialScreen.symbol;
@@ -352,6 +404,7 @@ export default function NucleoDesk() {
   // ---- derived view state ----
   const working = WORKING.includes(phase);
   const reading = working || phase === 'reveal';
+  const gated = phase === 'gate' && gate !== null;
   const done = phase === 'complete' && !!debate && !!answer && !!snapshot;
   const verdictKind: SphereVerdict = !debate ? 'wait' : debate.direction === 'long' ? 'ready' : debate.direction === 'short' ? 'pass' : 'wait';
   const verdictWord = !debate ? null : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade');
@@ -532,6 +585,46 @@ export default function NucleoDesk() {
     </div>
   ) : null;
 
+  const subscribe = async () => {
+    setBilling({ busy: true, error: null });
+    const err = await startBilling('checkout');
+    if (err) setBilling({ busy: false, error: err });
+  };
+  const resetDate = meter?.resetsAt ? new Date(meter.resetsAt).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) : null;
+  const gateStage = gated ? (
+    <div className="flex flex-col items-center text-center">
+      <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
+      {gate === 'signin' ? (
+        <>
+          <div className="n-label mt-12">{t('Free account', 'Cuenta gratis')}</div>
+          <h2 className="n-display mt-3 max-w-[20ch] text-[32px] leading-[1.12] sm:text-[38px]">{t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.')}</h2>
+          <p className="mt-3 max-w-[44ch] text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{t('10 free reads every week, and your XP and gear saved on the web and the iPhone app. Your question runs as soon as you are in.', '10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone. Tu pregunta corre en cuanto entres.')}</p>
+          <button type="button" className="n-cta on mt-7 max-w-[320px]" onClick={() => { sfxTock(); setSignInPrompt(true); }}>{t('Continue with Apple or Google', 'Continuar con Apple o Google')}</button>
+        </>
+      ) : (
+        <>
+          <div className="n-label mt-12">Bobby Pro</div>
+          <h2 className="n-display mt-3 max-w-[20ch] text-[32px] leading-[1.12] sm:text-[38px]">{t('Your 10 free reads this week are used.', 'Ya usaste tus 10 lecturas gratis de esta semana.')}</h2>
+          <p className="mt-3 max-w-[46ch] text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>
+            {t('Bobby Pro reads without limits for $5 a month. Cancel anytime.', 'Bobby Pro lee sin límites por $5 al mes. Cancela cuando quieras.')}
+            {resetDate ? t(` Or wait: your free reads come back ${resetDate}.`, ` O espera: tus lecturas gratis vuelven el ${resetDate}.`) : ''}
+          </p>
+          <button type="button" className="n-cta on mt-7 max-w-[320px]" disabled={billing.busy || !accessState?.payments.stripe} onClick={() => void subscribe()}>
+            {accessState?.payments.stripe ? (billing.busy ? t('Opening checkout…', 'Abriendo el pago…') : t('Get Bobby Pro · $5/month', 'Obtener Bobby Pro · $5/mes')) : t('Card payments open very soon', 'Los pagos con tarjeta abren muy pronto')}
+          </button>
+          {billing.error && <p role="alert" className="mt-3 text-[13px]" style={{ color: '#FFB3B5' }}>{billing.error}</p>}
+          <p className="mt-4 text-[12px]" style={{ color: '#8A8378' }}>{t('On iPhone, Bobby Pro is sold through the App Store.', 'En iPhone, Bobby Pro se compra en la App Store.')}</p>
+        </>
+      )}
+    </div>
+  ) : null;
+
+  const meterLine = meter && meter.paywall && meter.tier !== 'pro' && meter.remaining !== null && meter.limit !== null
+    ? meter.tier === 'anon'
+      ? t(`${meter.remaining} of ${meter.limit} reads left without an account`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas sin cuenta`)
+      : t(`${meter.remaining} of ${meter.limit} free reads left this week`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas gratis esta semana`)
+    : null;
+
   const errorStage = phase === 'error' ? (
     <div className="flex flex-col items-center">
       <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
@@ -542,8 +635,9 @@ export default function NucleoDesk() {
   const suggestions = done && snapshot
     ? [t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`), ...progress.quickAccess.filter((s) => s !== snapshot.symbol).slice(0, 2).map((s) => t(`How does ${s} look?`, `¿Cómo se ve ${s}?`))]
     : progress.quickAccess.slice(0, 3).map((s) => t(`How does ${s} look?`, `¿Cómo se ve ${s}?`));
-  const chips = !reading && phase !== 'confirm' ? (
+  const chips = !reading && !gated && phase !== 'confirm' ? (
     <div className="w-full">
+      {meterLine && <div className="mb-4 text-center text-[13px]" style={{ color: '#8A8378' }}>{meterLine}</div>}
       <div className="n-label mb-3 text-center">{t('You might want to ask', 'Quizá quieras preguntar')}</div>
       <div className="n-chips">
         {suggestions.map((s, i) => (
@@ -571,11 +665,21 @@ export default function NucleoDesk() {
   return (
     <div className="n-desk">
       {header}
+      {/* keeps progress sync (and the wallet credential) configured even while the profile is closed */}
+      <div hidden><ProgressSync /></div>
       <main className="n-stage">
+        {proNotice && (
+          <div className="n-notice" role="status">
+            <span>{proNotice === 'welcome'
+              ? (meter?.tier === 'pro' ? t('Welcome to Bobby Pro. Unlimited reads.', 'Bienvenido a Bobby Pro. Lecturas sin límite.') : t('Payment received. Activating Bobby Pro…', 'Pago recibido. Activando Bobby Pro…'))
+              : t('Checkout cancelled. Nothing was charged.', 'Pago cancelado. No se cobró nada.')}</span>
+            <button type="button" aria-label={t('Close', 'Cerrar')} onClick={() => setProNotice(null)}><X size={14} /></button>
+          </div>
+        )}
         <AnimatePresence mode="wait">
-          <motion.section key={reading ? 'think' : done ? 'result' : phase === 'confirm' ? 'confirm' : phase === 'error' ? 'error' : 'idle'}
+          <motion.section key={reading ? 'think' : done ? 'result' : gated ? 'gate' : phase === 'confirm' ? 'confirm' : phase === 'error' ? 'error' : 'idle'}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }} className="w-full">
-            {reading ? thinkStage : done ? resultStage : phase === 'confirm' ? confirmCard : phase === 'error' ? errorStage : idleStage}
+            {reading ? thinkStage : done ? resultStage : gated ? gateStage : phase === 'confirm' ? confirmCard : phase === 'error' ? errorStage : idleStage}
           </motion.section>
         </AnimatePresence>
         {cards}
@@ -598,11 +702,22 @@ export default function NucleoDesk() {
             onToggleVoiceMode={() => { voice.stop(); closeRecognition(); setFreeVoice((v) => !v); setVoiceNotice(''); }}
             onToggleSpeak={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })}
             onToggleSounds={() => { setSfxMuted(!muted); setMuted(!muted); }}
+            pro={{
+              label: meter?.tier === 'pro' ? t('Bobby Pro · active', 'Bobby Pro · activo') : 'Bobby Pro',
+              detail: meter?.tier === 'pro'
+                ? (accessState?.subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone') : t('Manage or cancel', 'Administrar o cancelar'))
+                : meterLine ?? t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes'),
+              action: () => {
+                if (meter?.tier === 'pro') { if (accessState?.subscription?.provider === 'stripe') void startBilling('portal'); return; }
+                if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
+                void subscribe();
+              },
+            }}
             onReset={() => { if (window.confirm(t('Reset XP, gear and avatar on this browser?', '¿Reiniciar XP, equipo y avatar en este navegador?'))) progressStore.reset(); }}
           />
         )}
         {sheet === 'board' && <BoardSheet key="board" onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
-        {signInPrompt && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} onClose={() => setSignInPrompt(false)} />}
+        {signInPrompt && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} required={gate === 'signin'} onClose={() => setSignInPrompt(false)} />}
         {sheet === 'catalog' && <GearCatalog key="catalog" current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('profile')} />}
         {sheet === 'swap' && <SwapSheet key="swap" initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
         {sheet === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (

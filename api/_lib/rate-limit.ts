@@ -84,7 +84,7 @@ export function getClientIpKey(req: VercelRequest): string {
   return saltedKey(ip);
 }
 
-function saltedKey(value: string): string {
+export function saltedKey(value: string): string {
   return createHash('sha256').update(`${rateLimitSalt()}:${value}`).digest('hex').slice(0, 24);
 }
 

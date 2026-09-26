@@ -5,6 +5,7 @@ import { deskJson } from '@/lib/desk-request';
 import { deskPrice as money } from '@/lib/desk-price';
 import { t } from '@/lib/companions/i18n';
 import type { ChartLevel } from '@/components/adams/MarketCanvas';
+import { accessHeaders, type Access } from '@/lib/access-client';
 
 export interface Snapshot { symbol: string; name?: string; isEquity: boolean }
 export interface Resolution { snapshot: Snapshot; needsConfirmation: boolean; confirmName: string; proxyNote: string | null }
@@ -48,15 +49,19 @@ export async function resolveAsset(query: string, signal?: AbortSignal): Promise
 export interface Answer {
   symbol: string; price: number | null; trend: string | null; momentum: string | null; rsi: number | null; support: number | null; resistance: number | null; atrPct: number | null;
   regime: string | null; signal: string | null; direction: string | null; convictionPct: number | null; entry: number | null; stop: number | null; target: number | null; rewardRisk: number | null; overview: string | null; error: boolean;
+  /** Metered access: set when the server stopped the read (sign in first, or Bobby Pro), and the meter after a read. */
+  gate: 'signin_required' | 'subscription_required' | null; access: Access | null;
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 
 export async function runDebate(symbol: string, signal: AbortSignal): Promise<Answer> {
-  const a: Answer = { symbol, price: null, trend: null, momentum: null, rsi: null, support: null, resistance: null, atrPct: null, regime: null, signal: null, direction: null, convictionPct: null, entry: null, stop: null, target: null, rewardRisk: null, overview: null, error: false };
+  const a: Answer = { symbol, price: null, trend: null, momentum: null, rsi: null, support: null, resistance: null, atrPct: null, regime: null, signal: null, direction: null, convictionPct: null, entry: null, stop: null, target: null, rewardRisk: null, overview: null, error: false, gate: null, access: null };
   try {
-    const { ok, data: obj } = await deskJson<Record<string, unknown>>('/api/voice-tool', { signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: 'run_debate', args: { symbol } }) }, 45_000);
+    const { ok, data: obj } = await deskJson<Record<string, unknown>>('/api/voice-tool', { signal, method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ tool: 'run_debate', args: { symbol } }) }, 45_000);
+    if (obj && typeof obj === 'object' && obj.access) a.access = obj.access as Access;
+    if (!ok && (obj.code === 'signin_required' || obj.code === 'subscription_required')) { a.gate = obj.code; return a; }
     if (!ok || obj.error) { a.error = true; return a; }
     a.regime = str(obj.regime);
     const m = obj.market as Record<string, unknown> | undefined;

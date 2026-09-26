@@ -90,7 +90,7 @@ export function shouldPromptNow(alreadySignedIn: boolean): boolean {
 
 type Busy = 'apple' | 'google' | 'wallet' | null;
 
-export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp: number; onClose: () => void; voiceAccess?: boolean }) {
+export default function SignInPrompt({ xp, onClose, voiceAccess = false, required = false }: { xp: number; onClose: () => void; voiceAccess?: boolean; /** The free reads without an account are used: no "keep going" option. */ required?: boolean }) {
   // Seen once it is on screen; the scheduling side must not count as seeing it.
   useEffect(() => { if (!voiceAccess) markPromptShown(); }, [voiceAccess]);
   const { open } = useAppKit();
@@ -99,7 +99,7 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp:
   /** The provider URL Supabase built, kept so a blocked redirect can still be opened by a plain tap. */
   const [providerUrl, setProviderUrl] = useState<string | null>(null);
 
-  const close = () => { if (!voiceAccess) dismissForever(); onClose(); };
+  const close = () => { if (!voiceAccess && !required) dismissForever(); onClose(); };
 
   const oauth = async (provider: 'apple' | 'google') => {
     setBusy(provider);
@@ -171,12 +171,12 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp:
           <X size={15} />
         </button>
 
-        <div className="n-label">{voiceAccess ? 'BOBBY VOICE' : t('YOUR PROGRESS', 'TU PROGRESO')}</div>
+        <div className="n-label">{voiceAccess ? 'BOBBY VOICE' : required ? t('Free account', 'Cuenta gratis') : t('YOUR PROGRESS', 'TU PROGRESO')}</div>
         <h2 id="signin-prompt-title" className="n-display mt-3 text-[28px] leading-tight text-white">
-          {voiceAccess ? t('3 voice minutes a day', '3 min de voz al día') : t('Want to keep your points?', '¿Quieres conservar tus puntos?')}
+          {voiceAccess ? t('3 voice minutes a day', '3 min de voz al día') : required ? t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.') : t('Want to keep your points?', '¿Quieres conservar tus puntos?')}
         </h2>
         <p className="mt-3 text-sm leading-6 text-white/60">
-          {voiceAccess ? t('Sign in. Your time is shared across web and iPhone.', 'Inicia sesión. Tu tiempo se comparte entre web y iPhone.') : t(
+          {voiceAccess ? t('Sign in. Your time is shared across web and iPhone.', 'Inicia sesión. Tu tiempo se comparte entre web y iPhone.') : required ? t('You used your 3 reads without an account. With one: 10 free reads every week, and your XP and gear saved on the web and the iPhone app.', 'Ya usaste tus 3 lecturas sin cuenta. Con una: 10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone.') : t(
             `You have ${xp} XP on this device. Sign in and it follows you to the iPhone app and any other browser. Keep reading without an account if you prefer — nothing is locked.`,
             `Llevas ${xp} XP en este dispositivo. Entra y te siguen a la app de iPhone y a cualquier otro navegador. Si prefieres, sigue sin cuenta: aquí no se bloquea nada.`,
           )}
@@ -206,9 +206,11 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp:
           </a>
         )}
 
-        <button onClick={close} className="mt-5 w-full py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/45 transition hover:text-white/75">
-          {voiceAccess ? t('Continue with free voice', 'Seguir con voz gratis') : t('Keep going without an account', 'Seguir sin cuenta')}
-        </button>
+        {!required && (
+          <button onClick={close} className="mt-5 w-full py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/45 transition hover:text-white/75">
+            {voiceAccess ? t('Continue with free voice', 'Seguir con voz gratis') : t('Keep going without an account', 'Seguir sin cuenta')}
+          </button>
+        )}
       </motion.div>
     </motion.div>
   );

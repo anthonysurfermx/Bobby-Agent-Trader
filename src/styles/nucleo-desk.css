@@ -230,3 +230,7 @@ button.n-row:hover { background: rgba(242, 237, 228, .025); }
   .n-claim { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 12px; }
   .n-claim-t { font-size: 13px; text-align: right; }
 }
+.n-notice { width: 100%; max-width: 620px; margin: 0 auto 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px;
+  border-radius: 16px; background: rgba(63, 224, 181, .08); border: 1px solid rgba(63, 224, 181, .25); color: var(--n-ink); font: 400 14px/1.35 var(--n-sans); }
+.n-notice button { color: var(--n-ink2); }
+.n-cta:disabled { cursor: not-allowed; }

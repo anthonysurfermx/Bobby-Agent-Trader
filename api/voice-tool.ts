@@ -15,6 +15,7 @@ import { buildTechnicalMarketSummary, type TechnicalRegime } from '../src/lib/bo
 import { getBaseVenues, resolveOkxInstrument } from '../src/lib/okx-asset-search.js';
 import { fetchOkxIndicatorBundle } from './_lib/okx-indicators.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { consumeRead, refundRead } from './_lib/access.js';
 
 export const config = { maxDuration: 60 };
 
@@ -299,14 +300,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'get_market':
         return res.status(200).json(await getMarket(String(args?.symbol ?? '')));
 
-      case 'run_debate':
-        return res.status(200).json(
-          await runDebate(
+      case 'run_debate': {
+        // The metered read: 3 without an account, 10 a week with one, unlimited with Bobby Pro.
+        const gate = await consumeRead(req, String(args?.symbol ?? ''));
+        if (!gate.allowed) {
+          const signin = gate.code === 'signin_required';
+          return res.status(signin ? 401 : 402).json({
+            error: signin ? 'Create a free account to keep reading.' : 'Your free reads for this week are used. Bobby Pro reads without limits.',
+            code: gate.code,
+            access: gate.access,
+          });
+        }
+        try {
+          const result = await runDebate(
             String(args?.symbol ?? ''),
             args?.context ? String(args.context) : undefined,
             args?.lang === 'en' ? 'en' : 'es',
-          ),
-        );
+          );
+          if (result && typeof result === 'object' && 'error' in (result as Record<string, unknown>) && (result as Record<string, unknown>).error) await refundRead(gate.readId);
+          return res.status(200).json({ ...(result as Record<string, unknown>), access: gate.access });
+        } catch (error) {
+          await refundRead(gate.readId);
+          throw error;
+        }
+      }
 
       case 'get_protocol_stats':
         return res.status(200).json(await getProtocolStats());
