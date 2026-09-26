@@ -53,7 +53,7 @@ if (HARNESS){
   });
 }
 /* hero frames of the current scripted run (state/signal + dwell), for ArrowRight/Left and the report */
-var HERO_DEF = [['born', 'BIRTH', 2.6], ['picker', 'PICK_READY', 1.0], ['mic card', 'PRE_PERMISSION', 0.9], ['listening', 'LISTENING', 1.8],
+var HERO_DEF = [['born', 'BIRTH', 2.6], ['ask', 'ASK_READY', 1.0], ['mic card', 'PRE_PERMISSION', 0.9], ['listening', 'LISTENING', 1.8],
   ['risk ring filling', 'AGREE_READY', 2.9], ['debate', 'THINK_WAIT', 3.0], ['stances', 'THINK_RESOLVE', 1.9], ['satellites', 'TALK_EVIDENCE', 1.6],
   ['chart', 'TALK_CHART', 2.4], ['verdict', 'VERDICT', 2.0], ['thesis card', 'CARDS', 1.2], ['saved + XP', 'SAVING', 0.8], ['sign-in sheet', 'SIGN_IN', 1.4], ['home', 'HOME', 1.8]];
 var HERO = [];

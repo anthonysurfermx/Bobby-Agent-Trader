@@ -308,7 +308,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | `voice.level` | `{id, level N 0…1}` (≤30 Hz; from `NeuralVoice.level`) |
 | `voice.progress` | `{id, t N, duration N}` (≤10 Hz; neural engine only) |
 | `voice.word` | `{id, index I}` (device engine only, from `willSpeakRangeOfSpeechString`; the word index is counted on whitespace splits of the spoken text) |
-| `voice.end` | `{id, reason:"finished"\|"stopped"\|"failed"}`. Always sent exactly once per queued id, within 10 s if playback never starts (watchdog). |
+| `voice.end` | `{id, reason:"finished"\|"stopped"\|"failed"}`. Always sent exactly once per queued id, within 22 s if playback never starts (watchdog). |
 | `thesis.planted` | `{requestId, stage:"seed"\|"bloomed"\|"capped"\|"signed_out"\|"failed", piece:{id,name}?, horizon:{hours,reviewAt,extendable}?}` (signed in only; after `ProgressSync.outcome`) |
 | `native.sheet` | `{route, state:"open"\|"closed"}`. While a sheet is open, JS pauses rendering. |
 
@@ -325,7 +325,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 - **The mic is live only between `speech.start` and `speech.stop`.** JS starts on pill pointerdown and stops on pointerup or pointercancel. Native also stops on background.
 - **Voice.** `speak` calls `NeuralVoice.speak(text, voiceId: profile.voiceId, persona: companion?.voicePersona, vibe: profile.vibeId, essential: true)`.
   - Muted gives `{status:"muted"}`, and JS then runs its silent reading clock.
-  - Watch `$speaking` to find start and end. `speaking` stays false while the TTS request is in flight, so start/end detection is edge-based, with the 10 s watchdog.
+  - Watch `$speaking` to find start and end. `speaking` stays false while the TTS request is in flight, so start/end detection is edge-based, with the 22 s watchdog.
   - Add these to `NeuralVoice.swift`, additively:
     - a published `playback: (time: TimeInterval, duration: TimeInterval)?`, updated in the existing metering timer;
     - a word-boundary callback from the fallback synthesizer's `willSpeakRangeOfSpeechString`;
@@ -395,7 +395,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | RESOLVING | | the pill shows the think dots after 1.2 s | `ask.stage accepted` → THINK_WAIT. An early reply: `confirm` → CONFIRM_ASSET, `unknown_asset` → UNKNOWN_ASSET, any other non-ok → ERROR |
 | CONFIRM_ASSET / UNKNOWN_ASSET | | caption exhaled from the rim (`failure()` copy + `sub`), with chips born from the pill | chip `{token}` → SENDING (`ask({token})`); "Something else" → TYPING |
 | THINK_WAIT | accepted | B3 6.70–10.40 as a **loop**: agent labels show **names only**, tethers, duel. ω ramps 1.6→2.6 over 0.8 s, then holds with ±12% modulation on 2B. After 15 s exposure drops to .06; after 30 s sparks fire on every other crossing. The header shows the price from `ask.stage market`. Hint row: elapsed seconds from 8 s; "Still weighing · deep reads take up to a minute" at 30 s; "Taking longer than usual · tap to cancel" at 75 s. | reply `ok` and `clk − tThink ≥ floor` (4.5 s on the first read of the session, else 1.5 s) → THINK_RESOLVE. Non-ok → ERROR. Pill tap → `cancel()` → CANCELLED |
-| THINK_RESOLVE | | Stances (`model.agents[i].stance`, the first sentence) reveal word by word at 45 ms/word: Alpha at +0, Red at +0.55, CIO at +1.10; 2-line clamp with ellipsis. Hold 1.6 s, then B3 10.40–12.60: "Verdict forming", converge, IMPACT 1, hush, filament. **On entry, call `speak({id: requestId, text: model.spoken.text})`** so the TTS fetch overlaps the choreography. | choreography done **and** (`voice.start`, `muted`, or 6 s without start → call `stopSpeaking` and go silent) → TALK_EVIDENCE |
+| THINK_RESOLVE | | Stances (`model.agents[i].stance`, the first sentence) reveal word by word at 45 ms/word: Alpha at +0, Red at +0.55, CIO at +1.10; 2-line clamp with ellipsis. Hold 1.6 s, then B3 10.40–12.60: "Verdict forming", converge, IMPACT 1, hush, filament. **On entry, call `speak({id: requestId, text: model.spoken.text})`** so the TTS fetch overlaps the choreography. | choreography done **and** (`voice.start`, `muted`, or 14 s without start → call `stopSpeaking` and go silent; 6 s cancelled most persona-voice reads) → TALK_EVIDENCE |
 | TALK_EVIDENCE | | B4: satellites from `model.satellites` (4 slots, clockwise UL→UR→LR→LL; odometer `from`→`value`). Caption pages are the spoken sentences packed into ≤2-line pages; the karaoke timeline comes from `voice.word` (device), else `wordTimes(text, durationSec)` driven by `voice.progress`, else the reading clock. | the karaoke reaches sentence `spoken.stageAt.chart` (or sentence 0 ends plus 0.3 s when null) → TALK_CHART; skip if `model.chart == null` |
 | TALK_CHART | | B5: the chart is built from `model.chart` (48 closes, domain, 2 gridlines, NOW = last close, support **band** `band.lo…band.hi` labelled `band.label`, resistance line, plan lines only when present, bracket NOW→support at +0.30 s after the band, x-label `1H · provider · instrument · as of <local time>`). There is no earnings marker. | the karaoke reaches `spoken.verdictWordIndex − 0.03 s` → VERDICT |
 | VERDICT | | B6: satellites retract, filament collapse, IMPACT 2 in `verdict.color`; `uV`/scrim core = `verdict.core`. `verdict.word` condenses 30 ms before the spoken word, and that caption word takes the verdict colour. Ring: in `conviction` mode it fills to `pct` with odometer digits and `label`; in `complete` mode it draws 0→100% in 1100 ms with no digits and no label. Meta line = `model.meta` + `asOf`. | `voice.end` (or the reading clock ends) → HANDBACK |
@@ -415,8 +415,8 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | State | Reuses | Data |
 |---|---|---|
 | BIRTH (O0) | O0 0.00–2.80, plays once | only when `session.firstRun && companion == null` |
-| HELLO (O1) | O1 2.80–7.60: trailer duel, ivory soft impact | Onboarding copy from the strings table, spoken with `speak()` (default voice before a pick), karaoke per §3.2 |
-| PICK (O2) | O2 identity mode, belt, snow, swipe physics | Starters are `roster()` entries with `requiredLevel == 1 && unlocked`, in roster order; the default is the first that is not `orb`. `previewVoice` runs 350 ms after each detent. The pill "Choose {Label}" calls `setCompanion({id})` then celebrates. The avatar and temperament follow the choice (no fixed `CHOSEN`). |
+| HELLO (O1) | O1 2.80–7.60: trailer duel, ivory soft impact | Onboarding copy from the strings table, spoken with `speak()` (default voice, before the companion is assigned), karaoke per §3.2; then ASK_TEACH |
+| ~~PICK (O2)~~ | removed 2026-09-26 (owner's decision): the glass leads the first run | There is no picker. When HELLO ends, `ensureCompanion()` silently assigns the default starter with the old picker rule (the first `roster()` entry with `requiredLevel == 1 && unlocked` whose id is not `orb`) through `setCompanion({id})`, and goes straight to ASK_TEACH. The header avatar fades in and the rim glides to the companion tint; the companion never surfaces as the hero. The avatar is part of the profile: `AccountSheet` (header avatar → `openNative("account")`) has a "Your avatar / Tu avatar" row that opens `MascotGalleryView`. If `finishOnboarding` still reports `missing: ["companion"]`, the page assigns the default and finishes again. |
 | ASK_TEACH (O3) | O3 title/sub/chips, pre-permission card | Chips come from `suggestions()` via the strings template ("How is {SYM} looking?" / "Why is {SYM} moving today?" only for `movers`). The pre-permission card uses **Continue**, then `speech.requestPermission()`, which triggers the **real** OS prompts; the fake alerts are deleted. Denied or unavailable → typing. LISTENING/TYPING as in §3.2; the question becomes the bead, which is **not sent yet** |
 | RISK (O4) | O4 ring + hold-to-agree, the same geometry as the conviction ring | `riskNotice()`: the 4 `title`s are the pulse-swept lines, with statement 1's `body` below them (Geist 13 ink2). "Read the full notice" calls `openNative("riskNotice")`. Completing the 1200 ms hold calls `acceptRisk({version})`; an early release unwinds with no copy |
 | READ (O5) | O5, as the daily THINK→VERDICT states | `ask({question})`. First-read options: `build(r, {firstRead:true})` (3 satellites), a 4.5 s floor. The conviction explainer hint appears only when `ring.mode == "conviction"`. Non-ok replies use the daily ERROR/CONFIRM patterns; after an error the chip "Try another question" returns to ASK_TEACH |
@@ -641,7 +641,7 @@ The three builders work in parallel, and no file is owned by two of them. None m
 **Acceptance** (browser mock at `.../onboarding.html?first=1`, your own tab):
 - **C1.** A full first run with real input:
   1. Birth, then hello (mock voice karaoke).
-  2. The picker shows the **10 starters from `roster()`**, defaulting to `byte`. `previewVoice` fires on each detent. Choosing calls `setCompanion`, and the avatar and tint follow the choice.
+  2. No picker (since 2026-09-26): after hello, `setCompanion` is called once with the default starter (`byte` in the fixtures) and the run goes straight to ask-teach; the avatar and tint follow it quietly.
   3. Ask-teach chips come from `suggestions()`. With `mic=undetermined`: Continue, then `requestPermission`, then hold-to-ask. The question waits as the bead.
   4. The risk beat shows the **4 real statements** (and the Spanish ones under `lang=es`). An early release unwinds; the full hold calls `acceptRisk`.
   5. The read has 3 satellites and honours the 4.5 s floor.
@@ -650,10 +650,10 @@ The three builders work in parallel, and no file is owned by two of them. None m
   8. The sign-in sheet has Apple and "Not now" only; "Not now" leads to "Saved on this device".
   9. No Isla peek (signed out).
   10. Home, then `finishOnboarding` is called.
-- **C2.** A grep of `src/onboarding` for `ALERTS`, `Would Like to`, `PICK_IDS`, `CHOSEN =`, `Watch & ping`, `Continue with Google`, `CALM ENTRY`, `178.40`, `Mira it is.` returns 0. The celebration line is built from the chosen label via the strings table.
+- **C2.** A grep of `src/onboarding` for `ALERTS`, `Would Like to`, `PICK_IDS`, `CHOSEN =`, `Watch & ping`, `Continue with Google`, `CALM ENTRY`, `178.40`, `Mira it is.` returns 0. (The picker and its celebration line are gone since 2026-09-26.)
 - **C3.** With `mic=denied`, the typing path completes the whole run. `#risk&risk=0` runs only the risk beat and then `finishOnboarding`. `first=1&companion=kora` resumes at ASK_TEACH.
 - **C4.** Errors during the first read (`scenario=quota|failed|offline`) give an honest caption and "Try another question", with no XP and no sign-in sheet.
-- **C5.** Determinism: `?harness=1&script=first-run&t=<s>&freeze=1` gives identical hashes for the hero frames (born, picker, mic card, risk ring filling, debate, verdict, saved + XP, sign-in sheet, home).
+- **C5.** Determinism: `?harness=1&script=first-run&t=<s>&freeze=1` gives identical hashes for the hero frames (born, ask, mic card, risk ring filling, debate, verdict, saved + XP, sign-in sheet, home).
 - **C6.** Spanish and reduced motion, as in B6.
 
 ### 6.5 Integration (after A, B and C report)

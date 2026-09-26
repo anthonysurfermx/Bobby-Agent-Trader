@@ -11,13 +11,10 @@ var SEEKING = false, paused = false, frozen = HARNESS && Q.freeze === '1', beatI
 var H = { script:null, name:'', hits:{}, queue:[], g:null };
 var GHOST = { x:195, y:900, p:0, v:0 };
 /* [signal or state, nth time it fires, delay (s), action, args…]. Actions: tap <target> · hold <target> <s> ·
-   swipe <-1 next | 1 previous> · pull <dy> · type <text> (typing path) · chip <i> */
+   swipe <-1 next | 1 previous> (unused since the picker left) · pull <dy> · type <text> (typing path) · chip <i> */
 var SCRIPTS = {
+  /* no picker: HELLO hands straight to ASK_TEACH (the default companion is assigned silently) */
   'first-run': [
-    ['PICK_READY', 1, 1.3, 'swipe', -1],
-    ['PICK_READY', 1, 2.5, 'swipe', -1],
-    ['PICK_READY', 1, 3.7, 'swipe', -1],
-    ['PICK_READY', 1, 5.6, 'tap', 'pill'],
     ['ASK_READY', 1, 1.8, 'hold', 'pill', 0.3],
     ['PRE_PERMISSION', 1, 1.2, 'tap', 'perm'],
     ['ASK_GRANTED', 1, 2.2, 'hold', 'pill', 3.4],
@@ -29,7 +26,6 @@ var SCRIPTS = {
   ],
   /* mic=denied: the typing path completes the whole run */
   'typed-run': [
-    ['PICK_READY', 1, 1.6, 'tap', 'pill'],
     ['ASK_READY', 1, 1.8, 'hold', 'pill', 0.3],
     ['TYPING', 1, 1.0, 'type', 'How is Bitcoin doing today?'],
     ['AGREE_READY', 1, 1.0, 'hold', 'pill', 1.5],

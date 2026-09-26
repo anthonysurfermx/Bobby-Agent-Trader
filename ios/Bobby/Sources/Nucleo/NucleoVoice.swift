@@ -2,7 +2,7 @@
 // over the app's NeuralVoice: the page queues a line by id and gets voice.start /
 // voice.level / voice.progress / voice.word / voice.end back. NeuralVoice keeps
 // `speaking` false while the TTS request is in flight, so start and end are found on
-// the edges of `speaking`, and a 10 s watchdog guarantees exactly one voice.end per id.
+// the edges of `speaking`, and a 22 s watchdog guarantees exactly one voice.end per id.
 import Combine
 import Foundation
 import QuartzCore
@@ -11,7 +11,9 @@ import QuartzCore
 final class NucleoVoice {
     static let maxLength = 800
     static let idPattern = #"^[A-Za-z0-9_.:-]{1,64}$"#
-    static let watchdogSeconds: Double = 10
+    /// Long enough for NeuralVoice's worst legitimate path (8 s request timeout, a 1.2 s pause and
+    /// one retry, then the device fallback): a slow network voice must not be cancelled before it plays.
+    static let watchdogSeconds: Double = 22
 
     let voice: NeuralVoice
     var emit: (String, [String: Any]) -> Void = { _, _ in }
@@ -21,6 +23,7 @@ final class NucleoVoice {
         let text: String
         /// UTF-16 offset of each whitespace-separated word, in order (voice.word index).
         let wordStarts: [Int]
+        let queuedAt = CACurrentMediaTime()
         var started = false
     }
 
@@ -102,6 +105,9 @@ final class NucleoVoice {
         guard let line = current else { return }
         current = nil
         emit("voice.end", ["id": line.id, "reason": reason])
+#if DEBUG
+        print("[NucleoVoice] voice.end \(line.id) · \(reason)")
+#endif
     }
 
     private func speakingChanged(_ speaking: Bool) {
@@ -114,6 +120,9 @@ final class NucleoVoice {
             let neural = voice.engine == .neural
             let duration: Any = neural ? (voice.playback.map { $0.duration as Any } ?? NSNull()) : NSNull()
             emit("voice.start", ["id": line.id, "durationSec": duration, "engine": neural ? "neural" : "device"])
+#if DEBUG
+            print("[NucleoVoice] voice.start \(line.id) · \(neural ? "neural" : "device") · \(String(format: "%.1f", CACurrentMediaTime() - line.queuedAt)) s after speak")
+#endif
             if !neural { startEnvelope() }
         } else if !speaking, line.started {
             finish(reason: "finished")

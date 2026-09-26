@@ -39,7 +39,7 @@ function wire(){
   BR.on('voice.start', function(p){
     if (!p || p.id !== VOICE.id) return;
     VOICE.started = true; VOICE.engine = p.engine || null;
-    VOICE.lat = clamp(lerp(VOICE.lat, clk - VOICE.reqT, 0.6), 0.15, 3.5);
+    VOICE.lat = clamp(lerp(VOICE.lat, clk - VOICE.reqT, 0.6), 0.15, 5);   /* a slow voice is requested earlier, under the choreography */
     K.on = true; K.t = 0; K.mode = 'read';
     if (fin(p.durationSec) && p.durationSec > 0) kRetime(p.durationSec);
   });

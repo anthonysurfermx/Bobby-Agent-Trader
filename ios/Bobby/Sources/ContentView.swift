@@ -650,7 +650,7 @@ struct ContentView: View {
             RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
         }
         .sheet(isPresented: $showAccount) {
-            AccountSheet(store: vm.companions, profile: vm.profile, pieces: account.isSignedIn ? pulse.pieces : nil) { showAccount = false }
+            AccountSheet(store: vm.companions, profile: vm.profile, pieces: account.isSignedIn ? pulse.pieces : nil, voice: vm.voice) { showAccount = false }
         }
         .sheet(isPresented: $showSquad) {
             // Muted means muted: the gallery's pick line stays silent too.

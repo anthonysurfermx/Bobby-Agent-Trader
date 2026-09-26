@@ -2,8 +2,7 @@
 /* ============================================================
    Input is real. Pointer events (and, under ?harness=1 only, the
    scripted ghost finger) call the same handlers: the pill hold,
-   the picker swipe (θ = θ0 − dx/(0.9R), ±1 detent, commit at
-   40 px or 300 px/s), the pull (rubber band, commit at 72 px or
+   the pull (rubber band, commit at 72 px or
    500 px/s), the card track and chips. Velocity comes from a
    ~100 ms pointer history.
    ============================================================ */
@@ -23,8 +22,7 @@ function inDown(hit, idx, x, y){
   var s = W.state;
   if (hit === 'pill'){ W.pr.pill = [T, 1e9]; pillDown(); return; }
   if (hit){ W.pr[hit === 'chip' ? 'chip' + idx : hit] = [T, 1e9]; return; }
-  if (s === 'PICK' && W.pickReady && y > 98 && y < 720) PTR.kind = 'pick?';
-  else if (s === 'HANDBACK' && y > 98 && y < 736) PTR.kind = 'pull?';
+  if (s === 'HANDBACK' && y > 98 && y < 736) PTR.kind = 'pull?';
   else if (s === 'CARDS') PTR.kind = inDebate(x, y) ? 'card?' : 'track?';
 }
 function inMove(x, y){
@@ -32,16 +30,14 @@ function inMove(x, y){
   P.x = x; P.y = y; P.hist.push([nowS(), x, y]); if (P.hist.length > 16) P.hist.shift();
   var dx = x - P.x0, dy = y - P.y0, ad = Math.max(Math.abs(dx), Math.abs(dy));
   if (ad > 8) P.moved = true;
-  if (P.kind === 'pick?' && ad > 6){
-    if (Math.abs(dx) >= Math.abs(dy) && W.state === 'PICK'){ P.kind = 'pick'; W.drag = { kind:'pick', x0:P.x0, x:x, th0:W.theta.x }; } else P.kind = null;
-  } else if (P.kind === 'pull?' && ad > 6){
+  if (P.kind === 'pull?' && ad > 6){
     if (dy > Math.abs(dx) && pullStart(P.y0)) P.kind = 'pull'; else P.kind = null;
   } else if ((P.kind === 'card?' || P.kind === 'track?') && ad > 6){
     if (Math.abs(dx) >= Math.abs(dy)){ P.kind = 'track'; W.drag = { kind:'track', x0:P.x0, x:x, tr0:W.track.x }; }
     else if (P.kind === 'card?'){ P.kind = 'scroll'; W.drag = { kind:'scroll', y0:P.y0, y:y, s0:DSCROLL.y }; }
     else P.kind = null;
   }
-  if ((P.kind === 'pick' || P.kind === 'track') && W.drag) W.drag.x = x;
+  if (P.kind === 'track' && W.drag) W.drag.x = x;
   else if (P.kind === 'scroll' && W.drag) W.drag.y = y;
   else if (P.kind === 'pull') W.pullY = y;
 }
@@ -55,13 +51,6 @@ function inUp(x, y, upHit, cancelled){
     if (!cancelled && (upHit == null || upHit === P.hit)) action(P.hit, P.idx);
     return;
   }
-  if (P.kind === 'pick'){
-    var d = W.drag; W.drag = null; if (!d) return;
-    var dx = P.x - P.x0, commit = !cancelled && (Math.abs(dx) > 40 || Math.abs(v[0]) > 300), k0 = Math.round(d.th0 / DET);
-    W.theta.v = clamp(-v[0] / (0.9 * Math.max(40, W.r.x)), -12, 12);   /* hand the finger's velocity to the glide spring */
-    pickTo(commit ? k0 + (dx < 0 ? 1 : -1) : k0, dx < 0 ? 1 : -1);
-    return;
-  }
   if (P.kind === 'pull'){ pullEnd(cancelled ? 0 : v[1]); return; }
   if (P.kind === 'track'){
     var d2 = W.drag; W.drag = null; if (!d2) return;
@@ -72,7 +61,7 @@ function inUp(x, y, upHit, cancelled){
   }
   if (P.kind === 'scroll'){ W.drag = null; }
 }
-/* the pill: hold to ask, hold to agree, tap to choose / cancel / skip / open the read */
+/* the pill: hold to ask, hold to agree, tap to cancel / skip / open the read */
 function pillDown(){
   var s = W.state;
   if (askCapable()) askPress();
@@ -83,8 +72,7 @@ function pillUp(cancelled){
   if (W.press){ askRelease(); return; }            /* the mic is live only between speech.start and speech.stop */
   if (s === 'RISK'){ agreeRelease(); return; }
   if (cancelled) return;
-  if (s === 'PICK') choose();
-  else if (s === 'RESOLVING' || s === 'THINK_WAIT'){ fire('cancel', {}); buzz('light', 0.4); }
+  if (s === 'RESOLVING' || s === 'THINK_WAIT'){ fire('cancel', {}); buzz('light', 0.4); }
   else if (s === 'TALK_EVIDENCE' || s === 'TALK_CHART' || s === 'VERDICT') skipTalk();
   else if (s === 'HANDBACK'){ pullCommit(); go('CARDS'); }
 }
