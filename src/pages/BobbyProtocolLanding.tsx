@@ -193,6 +193,14 @@ export default function BobbyProtocolLanding() {
   const { activity, isLoading: isActivityLoading, error: activityError, refresh: refreshActivity } = useActivity();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'recorded'>('all');
+  // Deep links such as /protocol#rules arrive before this lazy page has rendered its sections,
+  // so the browser's own jump finds nothing. Scroll once the section exists.
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    if (!id) return;
+    const t = window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }), 120);
+    return () => window.clearTimeout(t);
+  }, []);
   const btc = price(stats, 'BTC');
   // Debates, decisions and win rate come from the public resolution ledger.
   // MCP calls and interactions come from AgentEconomy on Base mainnet. Each
