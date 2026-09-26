@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1320, initial-scale=1">
+  <title>Bobby Núcleo — App Store screenshot concepts</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 1320px; height: 2868px; margin: 0; overflow: hidden; }
+    body { background: #050406; }
+    .poster { position: relative; width: 1320px; height: 2868px; overflow: hidden; color: #f8f6f3; isolation: isolate; }
+    .poster:not(.cover) { background: #050406; }
+    .poster:not(.cover)::before { content: ""; position: absolute; inset: 740px -400px -350px; z-index: -1; opacity: .58; background: radial-gradient(ellipse at 50% 58%, var(--glow, rgba(122,86,176,.28)), transparent 58%); }
+    .masthead { position: absolute; z-index: 5; top: 99px; left: 108px; font-size: 28px; font-weight: 500; letter-spacing: .3em; line-height: 1; }
+    .slide-count { position: absolute; z-index: 5; top: 98px; right: 108px; color: #9a9697; font-size: 25px; font-weight: 400; letter-spacing: .14em; }
+    .eyebrow { position: absolute; z-index: 5; top: 290px; left: 108px; color: var(--accent, #bda7c5); font-size: 28px; font-weight: 500; letter-spacing: .24em; text-transform: uppercase; }
+    h1 { position: absolute; z-index: 5; top: 353px; left: 103px; width: 1114px; margin: 0; font-size: 117px; font-weight: 400; line-height: 1.04; letter-spacing: -.065em; text-wrap: balance; }
+    .screen { position: absolute; z-index: 2; top: 890px; left: 107px; width: 1106px; border: 2px solid rgba(255,255,255,.095); border-radius: 72px; overflow: hidden; background: #050406; box-shadow: 0 40px 130px rgba(0,0,0,.7), 0 0 90px var(--halo, rgba(162,113,184,.11)); }
+    .screen img { display: block; width: 100%; height: auto; }
+    .screen-close { top: 820px; }
+    .screen-wide { left: 49px; width: 1222px; top: 845px; }
+    .poster .bottom-fade { position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; height: 220px; pointer-events: none; background: linear-gradient(transparent, #050406); }
+    .cover { background: #08070b; text-align: center; }
+    .cover-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: saturate(.8) brightness(.75); }
+    .cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.1) 0%, rgba(3,2,7,.16) 35%, rgba(4,3,8,.62) 68%, rgba(3,3,7,.86) 100%); }
+    .cover-orb { position: absolute; z-index: 2; top: 500px; left: 157px; width: 1006px; height: 1006px; overflow: hidden; border-radius: 50%; -webkit-mask-image: radial-gradient(circle at center, #000 395px, transparent 500px); mask-image: radial-gradient(circle at center, #000 395px, transparent 500px); filter: drop-shadow(0 30px 100px rgba(68,35,100,.6)); }
+    .cover-orb img { position: absolute; width: 1320px; max-width: none; height: 2868px; left: -157px; top: -622px; }
+    .cover-wordmark { position: absolute; z-index: 3; top: 1735px; left: 0; width: 100%; font-family: Georgia, "Times New Roman", serif; font-size: 174px; font-weight: 400; line-height: 1; letter-spacing: -.065em; }
+    .cover-line { position: absolute; z-index: 3; top: 1995px; left: 130px; width: 1060px; font-size: 65px; font-weight: 400; line-height: 1.17; letter-spacing: -.05em; }
+    .cover-bottom { position: absolute; z-index: 3; bottom: 165px; left: 0; width: 100%; color: rgba(255,255,255,.82); font-size: 28px; letter-spacing: .28em; }
+    .duo .screen { width: 742px; border-radius: 55px; }
+    .duo .screen.primary { left: -51px; top: 857px; transform: rotate(-4deg); }
+    .duo .screen.secondary { left: 662px; top: 1080px; transform: rotate(5deg); }
+    .duo .screen.secondary img { filter: brightness(.86); }
+    .duo .bottom-fade { height: 330px; }
+  </style>
+</head>
+<body>
+  <main id="poster" class="poster"></main>
+  <script>
+    const root = document.getElementById('poster');
+    const source = '../build-40/screenshots/en-US/';
+    const slides = {
+      '01': { cover: true },
+      '02': { label: 'THE QUESTION', title: 'Ask what matters.', image: '01-home-greeting.png', accent: '#c7b0d3', glow: 'rgba(165,112,197,.34)' },
+      '03': { label: 'THE DEBATE', title: 'Three minds. One read.', image: '02-three-agent-debate.png', accent: '#78d9cb', glow: 'rgba(51,192,179,.29)' },
+      '04': { label: 'THE EVIDENCE', title: 'See the evidence.', image: '03-evidence-satellites-chart.png', accent: '#b4b3d2', glow: 'rgba(123,122,183,.27)', screenClass: 'screen-wide' },
+      '05': { label: 'THE VERDICT', title: 'Clarity can mean wait.', image: '04-verdict-wait.png', accent: '#e7b454', glow: 'rgba(213,148,46,.28)', screenClass: 'screen-close' },
+      '06': { label: 'THE COMPANION', title: 'Save. Reflect. Grow.', images: ['05-thesis-saved.png', '06-squad-face.png'], accent: '#c7aadc', glow: 'rgba(125,102,176,.29)' },
+    };
+    const id = new URLSearchParams(location.search).get('slide') || '01';
+    const slide = slides[id];
+    if (!slide) throw new Error('Unknown slide');
+    if (slide.cover) {
+      root.classList.add('cover');
+      root.innerHTML = `<img class="cover-bg" src="assets/cover-atmosphere.png" alt=""><div class="cover-orb"><img src="${source}01-home-greeting.png" alt=""></div><div class="cover-wordmark">Bobby</div><div class="cover-line">Think before you trade.</div><div class="cover-bottom">ASK &nbsp;·&nbsp; DEBATE &nbsp;·&nbsp; REFLECT</div>`;
+    } else {
+      root.style.setProperty('--accent', slide.accent);
+      root.style.setProperty('--glow', slide.glow);
+      if (slide.images) root.classList.add('duo');
+      const screens = slide.images
+        ? `<div class="screen primary"><img src="${source}${slide.images[0]}" alt=""></div><div class="screen secondary"><img src="${source}${slide.images[1]}" alt=""></div>`
+        : `<div class="screen ${slide.screenClass || ''}"><img src="${source}${slide.image}" alt=""></div>`;
+      root.innerHTML = `<div class="masthead">BOBBY</div><div class="slide-count">${id} / 06</div><div class="eyebrow">${slide.label}</div><h1>${slide.title}</h1>${screens}<div class="bottom-fade"></div>`;
+    }
+  </script>
+</body>
+</html>
