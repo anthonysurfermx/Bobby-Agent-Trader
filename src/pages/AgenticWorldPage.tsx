@@ -15,6 +15,7 @@ import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 export default function AgenticWorldPage() {
   // Fetch real stats
   const [stats, setStats] = useState({ trades: 0, equity: 0, return: 0, debates: 0 });
+  const [recordState, setRecordState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
 
   useEffect(() => {
     fetch('/api/bobby-pnl')
@@ -27,9 +28,12 @@ export default function AgenticWorldPage() {
             equity: d.summary.currentEquity,
             return: d.summary.totalReturn,
           }));
+          setRecordState('ready');
+        } else {
+          setRecordState('unavailable');
         }
       })
-      .catch(() => {});
+      .catch(() => setRecordState('unavailable'));
 
     // Fetch debate count
     const SB = BOBBY_DB_URL;
@@ -66,7 +70,7 @@ export default function AgenticWorldPage() {
       iconBg: 'bg-green-500/10 border-green-500/20',
       iconColor: 'text-green-400',
       description: 'Name your agent. Pick your markets. Set your frequency. Your CIO thinks while you sleep — scanning BTC, NVDA, Gold, whatever you choose. Not alerts. Not a bot. A system that debates itself before it speaks.',
-      metric: stats.return !== 0 ? `${stats.return >= 0 ? '+' : ''}${stats.return}% Return` : 'LIVE',
+      metric: 'CREATE YOUR AGENT',
       metricColor: 'text-green-400',
       cta: 'CREATE MY AGENT',
       ctaBg: 'bg-green-500/5 hover:bg-green-500 text-green-400 hover:text-black border-green-500/20',
@@ -91,20 +95,20 @@ export default function AgenticWorldPage() {
     },
     {
       icon: BarChart3,
-      name: 'THE $100 CHALLENGE',
-      tag: 'PROOF OF INTELLIGENCE',
+      name: 'THE PUBLIC RECORD',
+      tag: 'PROTOCOL TRADE RECEIPTS',
       tagColor: 'text-amber-400',
       borderHover: 'hover:border-amber-500/30',
       dotColor: 'bg-amber-500',
       dotGlow: 'shadow-[0_0_10px_#f59e0b]',
       iconBg: 'bg-amber-500/10 border-amber-500/20',
       iconColor: 'text-amber-400',
-      description: 'Bobby started with $100 of real money. Every decision is committed before the outcome. No cherry-picking. No hindsight. Inspect the process on-chain.',
-      metric: `$${stats.equity.toFixed(2)} EQUITY`,
+      description: 'Confirmed Base trades appear here only when they can be attributed to a public protocol cycle. Inspect the record and its source before judging performance.',
+      metric: recordState === 'loading' ? 'LOADING PUBLIC RECORD' : recordState === 'unavailable' ? 'PUBLIC RECORD UNAVAILABLE' : stats.trades > 0 ? `$${stats.equity.toFixed(2)} PUBLIC EQUITY` : 'NO PUBLIC TRADES YET',
       metricColor: stats.return >= 0 ? 'text-green-400' : 'text-red-400',
-      cta: 'SEE THE PROOF',
+      cta: 'SEE THE RECORD',
       ctaBg: 'bg-amber-500/5 hover:bg-amber-500 text-amber-400 hover:text-black border-amber-500/20',
-      link: '/challenge',
+      link: '/record',
     },
     {
       icon: Swords,
@@ -189,9 +193,9 @@ export default function AgenticWorldPage() {
             </Link>
           </div>
           <div className="flex gap-4 mt-3">
-            <Link to="/challenge"
+            <Link to="/record"
               className="text-white/30 text-[10px] font-mono tracking-wider hover:text-white/60 transition-colors">
-              See Bobby's $100 Challenge →
+              See Bobby's public record →
             </Link>
           </div>
         </motion.div>
@@ -202,7 +206,7 @@ export default function AgenticWorldPage() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-6">
           {[
             { value: '50+', label: 'REAL TRADERS' },
-            { value: `${stats.trades}`, label: 'TRADES EXECUTED' },
+            { value: recordState === 'ready' ? `${stats.trades}` : '—', label: 'PUBLIC TRADES' },
             { value: 'BASE · 8453', label: 'DECISION RECORDS' },
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-3">

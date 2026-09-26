@@ -54,12 +54,16 @@ export default function BobbyPortfolioPage() {
       <div className="max-w-md mx-auto px-5 pt-6 pb-20 space-y-6">
         {loading ? (
           <div className="text-center py-20"><span className="text-[10px] font-mono text-white/20 animate-pulse">CARGANDO...</span></div>
+        ) : s && s.totalTrades === 0 ? (
+          <div className="bg-white/[0.02] border border-white/[0.04] rounded p-6 font-mono text-sm text-white/50">
+            No public protocol trades have been recorded yet. <Link to="/record" className="text-green-400">View the public record →</Link>
+          </div>
         ) : s ? (
           <>
             {/* Total Equity — Hero */}
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] rounded p-6 text-center">
-              <span className="text-[8px] font-mono text-white/25 tracking-widest">BOBBY'S EQUITY · $100 CHALLENGE</span>
+              <span className="text-[8px] font-mono text-white/25 tracking-widest">PUBLIC PROTOCOL EQUITY · CONFIRMED BASE RECEIPTS</span>
               <div className="text-4xl font-mono font-black text-green-400 mt-2" style={{ textShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
                 ${s.currentEquity.toFixed(2)}
               </div>
@@ -67,9 +71,15 @@ export default function BobbyPortfolioPage() {
                 <span className={s.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}>
                   {s.totalReturn >= 0 ? '+' : ''}{s.totalReturn}%
                 </span>
-                <span className="text-white/20">from ${s.startingCapital}</span>
+                <span className="text-white/20">from ${s.startingCapital} capital required</span>
               </div>
             </motion.div>
+
+            {pnl?.closedPositions.length === 0 && (
+              <div className="bg-white/[0.02] border border-white/[0.04] rounded p-4 font-mono text-[10px] text-white/40">
+                This public endpoint reports aggregates; individual trade receipts are not published here.
+              </div>
+            )}
 
             {/* Holdings — horizontal scroll */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
@@ -124,12 +134,12 @@ export default function BobbyPortfolioPage() {
 
             {/* The Council */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-              <span className="text-[9px] font-mono text-white/30 tracking-widest block mb-3">THE_COUNCIL</span>
+              <span className="text-[9px] font-mono text-white/30 tracking-widest block mb-3">TRADE_OUTCOMES</span>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { name: 'CIO', color: 'text-yellow-400', stat: `${s.winRate.toFixed(0)}% WR` },
-                  { name: 'ALPHA', color: 'text-green-400', stat: `${s.wins} signals` },
-                  { name: 'RED', color: 'text-red-400', stat: `${s.losses} vetoes` },
+                  { name: 'WIN RATE', color: 'text-yellow-400', stat: s.closedTrades > 0 ? `${s.winRate.toFixed(0)}%` : '—' },
+                  { name: 'WINS', color: 'text-green-400', stat: String(s.wins) },
+                  { name: 'LOSSES', color: 'text-red-400', stat: String(s.losses) },
                 ].map(a => (
                   <div key={a.name} className="bg-white/[0.02] border border-white/[0.04] rounded p-3 text-center">
                     <span className={`text-[8px] font-mono font-bold ${a.color} tracking-widest`}>{a.name}</span>

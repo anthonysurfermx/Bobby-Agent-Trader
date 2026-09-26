@@ -49,17 +49,16 @@ export default function SkinInTheGameBadge() {
     return () => { alive = false; clearInterval(poll); };
   }, []);
 
-  // Fallback (new user, zero trades, or transient error):
-  // expectation copy — signals the track record starts with the first trade.
+  // A failed request is not evidence of an empty ledger.
   if (error || !summary || summary.totalTrades === 0) {
     return (
       <Link
         to="/record"
         className="hidden lg:flex items-center gap-1.5 text-[9px] font-mono text-white/30 hover:text-white/50 transition-colors"
-        title="Track record begins with the first trade"
+        title={error || !summary ? 'Public record is temporarily unavailable' : 'No publicly attributable protocol trades yet'}
       >
         <Shield className="w-3 h-3" />
-        <span>0 TRADES · AWAITING FIRST SETUP</span>
+        <span>{error || !summary ? 'PUBLIC RECORD UNAVAILABLE' : 'NO PUBLIC TRADES YET'}</span>
       </Link>
     );
   }
