@@ -1,0 +1,13 @@
+{
+ "v": 1,
+ "status": "confirm",
+ "token": "fixture-confirm-fuzzy",
+ "asset": {
+  "symbol": "NVDA",
+  "name": "Nvidia",
+  "isEquity": true,
+  "assetClass": "equity"
+ },
+ "matchKind": "fuzzy",
+ "proxyNote": null
+}

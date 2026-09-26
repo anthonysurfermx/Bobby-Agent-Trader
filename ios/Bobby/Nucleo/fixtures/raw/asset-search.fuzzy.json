@@ -1,0 +1,126 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/bobby-asset-search",
+  "body": {
+   "q": "how is nvidea doing"
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:35:51 GMT"
+ },
+ "elapsedMs": 457,
+ "recordedAt": "2026-09-26T11:35:51Z",
+ "body": {
+  "ok": true,
+  "query": "how is nvidea doing",
+  "instTypes": [
+   "SPOT",
+   "SWAP",
+   "FUTURES"
+  ],
+  "results": [
+   {
+    "instId": "NVDA-USDT-SWAP",
+    "instType": "SWAP",
+    "symbol": "NVDA",
+    "baseSymbol": "NVDA",
+    "quoteSymbol": "USDT",
+    "settleSymbol": "USDT",
+    "family": "NVDA-USDT",
+    "underlying": "NVDA-USDT",
+    "assetClass": "equity",
+    "displaySymbol": "NVDA",
+    "displayName": "NVDA/USDT PERP",
+    "aliases": [
+     "NVDA",
+     "NVIDIA",
+     "ENVIDIA",
+     "INVIDIA"
+    ],
+    "priority": 64,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "3",
+     "lever": "50",
+     "listTime": "1772607600000",
+     "lotSz": "0.01",
+     "tickSz": "0.01"
+    },
+    "searchText": "NVDA-USDT-SWAP NVDA USDT USDT NVDA-USDT NVDA-USDT NVDA/USDT PERP NVDA NVIDIA ENVIDIA INVIDIA"
+   },
+   {
+    "instId": "NVDA-USD_UM_XPERP-310613",
+    "instType": "FUTURES",
+    "symbol": "NVDA",
+    "baseSymbol": "NVDA",
+    "quoteSymbol": "USD",
+    "settleSymbol": "USD",
+    "family": "NVDA-USD_UM_XPERP",
+    "underlying": "NVDA-USD",
+    "assetClass": "equity",
+    "displaySymbol": "NVDA",
+    "displayName": "NVDA/USD 310613",
+    "aliases": [
+     "NVDA",
+     "NVIDIA",
+     "ENVIDIA",
+     "INVIDIA"
+    ],
+    "priority": 31,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": "1939104000000",
+     "instCategory": "3",
+     "lever": "20",
+     "listTime": "1780993800110",
+     "lotSz": "0.01",
+     "tickSz": "0.01"
+    },
+    "searchText": "NVDA-USD_UM_XPERP-310613 NVDA USD USD NVDA-USD_UM_XPERP NVDA-USD NVDA/USD 310613 NVDA NVIDIA ENVIDIA INVIDIA"
+   }
+  ],
+  "resolved": {
+   "instId": "NVDA-USDT-SWAP",
+   "instType": "SWAP",
+   "symbol": "NVDA",
+   "baseSymbol": "NVDA",
+   "quoteSymbol": "USDT",
+   "settleSymbol": "USDT",
+   "family": "NVDA-USDT",
+   "underlying": "NVDA-USDT",
+   "assetClass": "equity",
+   "displaySymbol": "NVDA",
+   "displayName": "NVDA/USDT PERP",
+   "aliases": [
+    "NVDA",
+    "NVIDIA",
+    "ENVIDIA",
+    "INVIDIA"
+   ],
+   "priority": 64,
+   "state": "LIVE",
+   "instrumentMeta": {
+    "expTime": null,
+    "instCategory": "3",
+    "lever": "50",
+    "listTime": "1772607600000",
+    "lotSz": "0.01",
+    "tickSz": "0.01"
+   },
+   "searchText": "NVDA-USDT-SWAP NVDA USDT USDT NVDA-USDT NVDA-USDT NVDA/USDT PERP NVDA NVIDIA ENVIDIA INVIDIA"
+  },
+  "resolution": {
+   "matchKind": "fuzzy",
+   "matchedTerm": "HOW IS NVIDEA DOING",
+   "needsConfirmation": true,
+   "proxyNote": null
+  },
+  "source": "OKX public instruments",
+  "catalogAgeMs": 8607
+ }
+}

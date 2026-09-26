@@ -1,0 +1,18 @@
+{
+ "synthetic": true,
+ "note": "api/desk-debate.ts desk_unavailable (no quota spent)",
+ "request": {
+  "method": "POST",
+  "path": "api/desk-debate"
+ },
+ "status": 503,
+ "headers": {
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store"
+ },
+ "elapsedMs": 900,
+ "body": {
+  "error": "The analysis desk is temporarily unavailable.",
+  "code": "desk_unavailable"
+ }
+}

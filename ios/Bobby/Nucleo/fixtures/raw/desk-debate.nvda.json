@@ -1,0 +1,51 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/desk-debate",
+  "body": {
+   "symbol": "NVDA",
+   "question": "Should I buy NVIDIA right now?",
+   "language": "en",
+   "assetType": "equity"
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:36:10 GMT"
+ },
+ "elapsedMs": 5378,
+ "recordedAt": "2026-09-26T11:36:10Z",
+ "body": {
+  "symbol": "NVDA",
+  "technicals": {
+   "price": 225.1,
+   "rsi14": 63.8,
+   "ema20": 224.5,
+   "ema50": 223.5,
+   "support": 221.1,
+   "resistance": 230,
+   "atrPct": 0.67,
+   "trend": "alcista",
+   "momentum": "neutral"
+  },
+  "provenance": {
+   "provider": "Yahoo Finance",
+   "instrument": "NVDA",
+   "assetType": "equity",
+   "timeframe": "1H",
+   "asOf": "2026-09-25T20:00:00.000Z"
+  },
+  "market": {
+   "price": 225.1
+  },
+  "agents": {
+   "alpha": "NVIDIA (NVDA) is currently priced at 225.1, with a neutral momentum and an upward trend. The support level is at 221.1 and resistance at 230, indicating potential for movement within this range. However, the RSI of 63.8 suggests that it is nearing overbought conditions, which could imply caution in buying at this moment.",
+   "red": "Alpha's argument relies on the current price and technical indicators, but it overlooks the broader market context and potential volatility. The neutral momentum and high RSI suggest that while there may be upward movement, the risk of a pullback is significant, especially if external factors influence market sentiment. Additionally, the analysis does not consider fundamental aspects of NVIDIA's business or market conditions that could impact its performance.",
+   "cio": "The analysis of NVIDIA (NVDA) shows a current price of 225.1 with a neutral momentum and an upward trend. However, the RSI of 63.8 indicates it is approaching overbought territory, suggesting caution. Additionally, the broader market context and potential volatility are not fully addressed, which adds uncertainty to the decision to buy now.",
+   "verdict": "wait",
+   "direction": "none"
+  }
+ }
+}

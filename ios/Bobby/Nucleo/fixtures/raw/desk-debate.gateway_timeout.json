@@ -1,0 +1,15 @@
+{
+ "synthetic": true,
+ "note": "Vercel 95 s maxDuration page (non-JSON)",
+ "request": {
+  "method": "POST",
+  "path": "api/desk-debate"
+ },
+ "status": 504,
+ "headers": {
+  "content-type": "text/plain; charset=utf-8"
+ },
+ "elapsedMs": 900,
+ "body": null,
+ "bodyText": "An error occurred with your deployment\n\nFUNCTION_INVOCATION_TIMEOUT"
+}

@@ -1,0 +1,288 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/bobby-asset-search",
+  "body": {
+   "q": "Should I buy NVIDIA right now?"
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:35:42 GMT"
+ },
+ "elapsedMs": 1415,
+ "recordedAt": "2026-09-26T11:35:42Z",
+ "body": {
+  "ok": true,
+  "query": "Should I buy NVIDIA right now?",
+  "instTypes": [
+   "SPOT",
+   "SWAP",
+   "FUTURES"
+  ],
+  "results": [
+   {
+    "instId": "NVDA-USDT-SWAP",
+    "instType": "SWAP",
+    "symbol": "NVDA",
+    "baseSymbol": "NVDA",
+    "quoteSymbol": "USDT",
+    "settleSymbol": "USDT",
+    "family": "NVDA-USDT",
+    "underlying": "NVDA-USDT",
+    "assetClass": "equity",
+    "displaySymbol": "NVDA",
+    "displayName": "NVDA/USDT PERP",
+    "aliases": [
+     "NVDA",
+     "NVIDIA",
+     "ENVIDIA",
+     "INVIDIA"
+    ],
+    "priority": 64,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "3",
+     "lever": "50",
+     "listTime": "1772607600000",
+     "lotSz": "0.01",
+     "tickSz": "0.01"
+    },
+    "searchText": "NVDA-USDT-SWAP NVDA USDT USDT NVDA-USDT NVDA-USDT NVDA/USDT PERP NVDA NVIDIA ENVIDIA INVIDIA"
+   },
+   {
+    "instId": "NVDA-USD_UM_XPERP-310613",
+    "instType": "FUTURES",
+    "symbol": "NVDA",
+    "baseSymbol": "NVDA",
+    "quoteSymbol": "USD",
+    "settleSymbol": "USD",
+    "family": "NVDA-USD_UM_XPERP",
+    "underlying": "NVDA-USD",
+    "assetClass": "equity",
+    "displaySymbol": "NVDA",
+    "displayName": "NVDA/USD 310613",
+    "aliases": [
+     "NVDA",
+     "NVIDIA",
+     "ENVIDIA",
+     "INVIDIA"
+    ],
+    "priority": 31,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": "1939104000000",
+     "instCategory": "3",
+     "lever": "20",
+     "listTime": "1780993800110",
+     "lotSz": "0.01",
+     "tickSz": "0.01"
+    },
+    "searchText": "NVDA-USD_UM_XPERP-310613 NVDA USD USD NVDA-USD_UM_XPERP NVDA-USD NVDA/USD 310613 NVDA NVIDIA ENVIDIA INVIDIA"
+   },
+   {
+    "instId": "NIGHT-USDT",
+    "instType": "SPOT",
+    "symbol": "NIGHT",
+    "baseSymbol": "NIGHT",
+    "quoteSymbol": "USDT",
+    "settleSymbol": null,
+    "family": null,
+    "underlying": null,
+    "assetClass": "crypto",
+    "displaySymbol": "NIGHT",
+    "displayName": "NIGHT/USDT",
+    "aliases": [
+     "NIGHT"
+    ],
+    "priority": 68,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "1",
+     "lever": "10",
+     "listTime": "1765270800000",
+     "lotSz": "0.1",
+     "tickSz": "0.000001"
+    },
+    "searchText": "NIGHT-USDT NIGHT USDT NIGHT/USDT NIGHT"
+   },
+   {
+    "instId": "LIGHT-USDT-SWAP",
+    "instType": "SWAP",
+    "symbol": "LIGHT",
+    "baseSymbol": "LIGHT",
+    "quoteSymbol": "USDT",
+    "settleSymbol": "USDT",
+    "family": "LIGHT-USDT",
+    "underlying": "LIGHT-USDT",
+    "assetClass": "crypto",
+    "displaySymbol": "LIGHT",
+    "displayName": "LIGHT/USDT PERP",
+    "aliases": [
+     "LIGHT"
+    ],
+    "priority": 64,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "1",
+     "lever": "10",
+     "listTime": "1765872000000",
+     "lotSz": "1",
+     "tickSz": "0.0001"
+    },
+    "searchText": "LIGHT-USDT-SWAP LIGHT USDT USDT LIGHT-USDT LIGHT-USDT LIGHT/USDT PERP LIGHT"
+   },
+   {
+    "instId": "NIGHT-USDT-SWAP",
+    "instType": "SWAP",
+    "symbol": "NIGHT",
+    "baseSymbol": "NIGHT",
+    "quoteSymbol": "USDT",
+    "settleSymbol": "USDT",
+    "family": "NIGHT-USDT",
+    "underlying": "NIGHT-USDT",
+    "assetClass": "crypto",
+    "displaySymbol": "NIGHT",
+    "displayName": "NIGHT/USDT PERP",
+    "aliases": [
+     "NIGHT"
+    ],
+    "priority": 64,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "1",
+     "lever": "20",
+     "listTime": "1765279800000",
+     "lotSz": "1",
+     "tickSz": "0.000001"
+    },
+    "searchText": "NIGHT-USDT-SWAP NIGHT USDT USDT NIGHT-USDT NIGHT-USDT NIGHT/USDT PERP NIGHT"
+   },
+   {
+    "instId": "NIGHT-USD",
+    "instType": "SPOT",
+    "symbol": "NIGHT",
+    "baseSymbol": "NIGHT",
+    "quoteSymbol": "USD",
+    "settleSymbol": null,
+    "family": null,
+    "underlying": null,
+    "assetClass": "crypto",
+    "displaySymbol": "NIGHT",
+    "displayName": "NIGHT/USD",
+    "aliases": [
+     "NIGHT"
+    ],
+    "priority": 53,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "1",
+     "lever": null,
+     "listTime": "1765278000000",
+     "lotSz": "0.1",
+     "tickSz": "0.000001"
+    },
+    "searchText": "NIGHT-USD NIGHT USD NIGHT/USD NIGHT"
+   },
+   {
+    "instId": "NIGHT-USD_UM_XPERP-310718",
+    "instType": "FUTURES",
+    "symbol": "NIGHT",
+    "baseSymbol": "NIGHT",
+    "quoteSymbol": "USD",
+    "settleSymbol": "USD",
+    "family": "NIGHT-USD_UM_XPERP",
+    "underlying": "NIGHT-USD",
+    "assetClass": "crypto",
+    "displaySymbol": "NIGHT",
+    "displayName": "NIGHT/USD 310718",
+    "aliases": [
+     "NIGHT"
+    ],
+    "priority": 31,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": "1942128000000",
+     "instCategory": "1",
+     "lever": "20",
+     "listTime": "1784284500174",
+     "lotSz": "1",
+     "tickSz": "0.000001"
+    },
+    "searchText": "NIGHT-USD_UM_XPERP-310718 NIGHT USD USD NIGHT-USD_UM_XPERP NIGHT-USD NIGHT/USD 310718 NIGHT"
+   },
+   {
+    "instId": "NIGHT-EUR",
+    "instType": "SPOT",
+    "symbol": "NIGHT",
+    "baseSymbol": "NIGHT",
+    "quoteSymbol": "EUR",
+    "settleSymbol": null,
+    "family": null,
+    "underlying": null,
+    "assetClass": "crypto",
+    "displaySymbol": "NIGHT",
+    "displayName": "NIGHT/EUR",
+    "aliases": [
+     "NIGHT"
+    ],
+    "priority": 18,
+    "state": "LIVE",
+    "instrumentMeta": {
+     "expTime": null,
+     "instCategory": "1",
+     "lever": null,
+     "listTime": "1772085600000",
+     "lotSz": "0.1",
+     "tickSz": "0.000001"
+    },
+    "searchText": "NIGHT-EUR NIGHT EUR NIGHT/EUR NIGHT"
+   }
+  ],
+  "resolved": {
+   "instId": "NVDA-USDT-SWAP",
+   "instType": "SWAP",
+   "symbol": "NVDA",
+   "baseSymbol": "NVDA",
+   "quoteSymbol": "USDT",
+   "settleSymbol": "USDT",
+   "family": "NVDA-USDT",
+   "underlying": "NVDA-USDT",
+   "assetClass": "equity",
+   "displaySymbol": "NVDA",
+   "displayName": "NVDA/USDT PERP",
+   "aliases": [
+    "NVDA",
+    "NVIDIA",
+    "ENVIDIA",
+    "INVIDIA"
+   ],
+   "priority": 64,
+   "state": "LIVE",
+   "instrumentMeta": {
+    "expTime": null,
+    "instCategory": "3",
+    "lever": "50",
+    "listTime": "1772607600000",
+    "lotSz": "0.01",
+    "tickSz": "0.01"
+   },
+   "searchText": "NVDA-USDT-SWAP NVDA USDT USDT NVDA-USDT NVDA-USDT NVDA/USDT PERP NVDA NVIDIA ENVIDIA INVIDIA"
+  },
+  "resolution": {
+   "matchKind": "exact",
+   "matchedTerm": "NVIDIA",
+   "needsConfirmation": false,
+   "proxyNote": null
+  },
+  "source": "OKX public instruments",
+  "catalogAgeMs": 217
+ }
+}

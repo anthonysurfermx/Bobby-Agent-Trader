@@ -1,0 +1,204 @@
+{
+ "v": 1,
+ "source": "Sources/Companion.swift bobbyCompanions (en), order preserved; unlocked = level 1 user",
+ "companions": [
+  {
+   "id": "orb",
+   "webId": "bobby",
+   "label": "BOBBY",
+   "role": "ORB \u00b7 CORE",
+   "selectLine": "Ready. We read the market together, calmly.",
+   "requiredLevel": 1,
+   "voicePersona": "ash",
+   "palette": "matrix",
+   "unlocked": true
+  },
+  {
+   "id": "byte",
+   "webId": "byte",
+   "label": "BYTE",
+   "role": "PLAIN SPEAK",
+   "selectLine": "Hey. I keep it simple, no jargon.",
+   "requiredLevel": 1,
+   "voicePersona": "ballad",
+   "palette": "matrix",
+   "unlocked": true
+  },
+  {
+   "id": "kora",
+   "webId": "kora",
+   "label": "KORA",
+   "role": "CONVERSATION",
+   "selectLine": "I am here. Tell me what is on your mind.",
+   "requiredLevel": 1,
+   "voicePersona": "coral",
+   "palette": "matrix",
+   "unlocked": true
+  },
+  {
+   "id": "zip",
+   "webId": "zip",
+   "label": "ZIP",
+   "role": "ALERTS",
+   "selectLine": "On it. If something moves, I will tell you.",
+   "requiredLevel": 1,
+   "voicePersona": "sage",
+   "palette": "matrix",
+   "unlocked": true
+  },
+  {
+   "id": "glitch",
+   "webId": "glitch",
+   "label": "GLITCH",
+   "role": "RED TEAM",
+   "selectLine": "Sure about that? Let me break your thesis first.",
+   "requiredLevel": 2,
+   "voicePersona": "cedar",
+   "palette": "plasma",
+   "unlocked": false
+  },
+  {
+   "id": "momo",
+   "webId": "momo",
+   "label": "MOMO",
+   "role": "EXPLORATION",
+   "selectLine": "What if we explore something new today?",
+   "requiredLevel": 2,
+   "voicePersona": "marin",
+   "palette": "plasma",
+   "unlocked": false
+  },
+  {
+   "id": "flux",
+   "webId": "flux",
+   "label": "FLUX",
+   "role": "SIGNALS",
+   "selectLine": "Signal detected. Context first, noise later.",
+   "requiredLevel": 3,
+   "voicePersona": "alloy",
+   "palette": "ice",
+   "unlocked": false
+  },
+  {
+   "id": "rook",
+   "webId": "rook",
+   "label": "ROOK",
+   "role": "THESIS",
+   "selectLine": "Thesis in progress. Entry, stop, invalidation.",
+   "requiredLevel": 3,
+   "voicePersona": "onyx",
+   "palette": "matrix",
+   "unlocked": false
+  },
+  {
+   "id": "halo",
+   "webId": "halo",
+   "label": "HALO",
+   "role": "RISK GATE",
+   "selectLine": "Protecting capital today also counts as winning.",
+   "requiredLevel": 4,
+   "voicePersona": "shimmer",
+   "palette": "ghost",
+   "unlocked": false
+  },
+  {
+   "id": "axiom",
+   "webId": "axiom",
+   "label": "AXIOM",
+   "role": "TRACK RECORD",
+   "selectLine": "Everything gets recorded. Verifying is the edge.",
+   "requiredLevel": 5,
+   "voicePersona": "fable",
+   "palette": "gold",
+   "unlocked": false
+  },
+  {
+   "id": "iris",
+   "webId": "iris",
+   "label": "IRIS",
+   "role": "MARKET REGIME",
+   "selectLine": "Let me read the weather first. Today there is wind.",
+   "requiredLevel": 1,
+   "voicePersona": "sage",
+   "palette": "ice",
+   "unlocked": true
+  },
+  {
+   "id": "sol",
+   "webId": "sol",
+   "label": "SOL",
+   "role": "GROWTH",
+   "selectLine": "Let us build your world, one earned piece at a time.",
+   "requiredLevel": 1,
+   "voicePersona": "coral",
+   "palette": "gold",
+   "unlocked": true
+  },
+  {
+   "id": "zuri",
+   "webId": "zuri",
+   "label": "ZURI",
+   "role": "ON-CHAIN FLOWS",
+   "selectLine": "Give me a minute. I am following the thread.",
+   "requiredLevel": 1,
+   "voicePersona": "nova",
+   "palette": "lava",
+   "unlocked": true
+  },
+  {
+   "id": "mira",
+   "webId": "mira",
+   "label": "MIRA",
+   "role": "PRACTICE",
+   "selectLine": "No money on the line yet. Let us just look.",
+   "requiredLevel": 1,
+   "voicePersona": "alloy",
+   "palette": "ghost",
+   "unlocked": true
+  },
+  {
+   "id": "nalu",
+   "webId": "nalu",
+   "label": "NALU",
+   "role": "LIQUIDITY",
+   "selectLine": "Not every wave is yours. Let us wait for the good one.",
+   "requiredLevel": 1,
+   "voicePersona": "marin",
+   "palette": "lava",
+   "unlocked": true
+  },
+  {
+   "id": "vega",
+   "webId": "vega",
+   "label": "VEGA",
+   "role": "PROBABILITY",
+   "selectLine": "I can give you the probability. Not the promise.",
+   "requiredLevel": 3,
+   "voicePersona": "shimmer",
+   "palette": "gold",
+   "unlocked": false
+  },
+  {
+   "id": "noor",
+   "webId": "noor",
+   "label": "NOOR",
+   "role": "MENTORSHIP",
+   "selectLine": "Sit down. Let us review the week before the next trade.",
+   "requiredLevel": 4,
+   "voicePersona": "fable",
+   "palette": "matrix",
+   "unlocked": false
+  },
+  {
+   "id": "keo",
+   "webId": "keo",
+   "label": "KEO",
+   "role": "PATIENCE",
+   "selectLine": "Sit with me a minute. The good one always comes.",
+   "requiredLevel": 1,
+   "voicePersona": "mellow",
+   "palette": "lava",
+   "unlocked": true
+  }
+ ]
+}

@@ -7,6 +7,26 @@ import SwiftUI
 enum RiskNotice {
     /// Bump when the wording changes materially; users re-acknowledge.
     static let currentVersion = 4
+
+    // Copy rule: every title fits one line and every body at most three,
+    // down to a 375 pt screen. Same three commitments, fewer words.
+    // Shared by RiskNoticeView and the Núcleo risk beat (`riskNotice()`), so the
+    // words the human agrees to are the same on both screens.
+    static func statements(spanish: Bool) -> [(title: String, body: String)] {
+        [
+            (L.t("Allow AI processing of my questions.", "Permito que la IA procese mis preguntas.", spanish: spanish),
+             L.t("Bobby sends your question and market data to OpenAI. When voice is on, reply text goes to OpenAI or Microsoft to create speech. Avoid personal or account details.", "Bobby envía tu pregunta y datos de mercado a OpenAI. Con voz activa, envía el texto de respuesta a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas.", spanish: spanish)),
+            (L.t("Not investment advice.", "No es asesoría de inversión.", spanish: spanish),
+             L.t("Verdicts, levels and stops are educational analysis made by software, not recommendations for you.",
+                 "Veredictos, niveles y stops son análisis educativo hecho por un programa, no recomendaciones para ti.", spanish: spanish)),
+            (L.t("Bobby never touches your money.", "Bobby nunca toca tu dinero.", spanish: spanish),
+             L.t("It doesn't connect wallets, move funds, execute trades or hold your keys.",
+                 "No conecta wallets, no mueve fondos, no ejecuta operaciones y no guarda tus llaves.", spanish: spanish)),
+            (L.t("You can lose money. You decide.", "Puedes perder dinero. Tú decides.", spanish: spanish),
+             L.t("Data can be late or wrong. If you need advice, talk to a licensed professional.",
+                 "Los datos pueden llegar tarde o mal. Si necesitas asesoría, acude a un profesional autorizado.", spanish: spanish)),
+        ]
+    }
 }
 
 struct RiskNoticeView: View {
@@ -17,23 +37,7 @@ struct RiskNoticeView: View {
 
     @State private var checks: [Bool] = [false, false, false, false]
 
-    // Copy rule: every title fits one line and every body at most three,
-    // down to a 375 pt screen. Same three commitments, fewer words.
-    private var statements: [(title: String, body: String)] {
-        [
-            (L.t("Allow AI processing of my questions.", "Permito que la IA procese mis preguntas."),
-             L.t("Bobby sends your question and market data to OpenAI. When voice is on, reply text goes to OpenAI or Microsoft to create speech. Avoid personal or account details.", "Bobby envía tu pregunta y datos de mercado a OpenAI. Con voz activa, envía el texto de respuesta a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas.")),
-            (L.t("Not investment advice.", "No es asesoría de inversión."),
-             L.t("Verdicts, levels and stops are educational analysis made by software, not recommendations for you.",
-                 "Veredictos, niveles y stops son análisis educativo hecho por un programa, no recomendaciones para ti.")),
-            (L.t("Bobby never touches your money.", "Bobby nunca toca tu dinero."),
-             L.t("It doesn't connect wallets, move funds, execute trades or hold your keys.",
-                 "No conecta wallets, no mueve fondos, no ejecuta operaciones y no guarda tus llaves.")),
-            (L.t("You can lose money. You decide.", "Puedes perder dinero. Tú decides."),
-             L.t("Data can be late or wrong. If you need advice, talk to a licensed professional.",
-                 "Los datos pueden llegar tarde o mal. Si necesitas asesoría, acude a un profesional autorizado.")),
-        ]
-    }
+    private var statements: [(title: String, body: String)] { RiskNotice.statements(spanish: L.isSpanish) }
 
     private var allChecked: Bool { checks.allSatisfy { $0 } }
 

@@ -1,0 +1,120 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Núcleo">
+<meta name="theme-color" content="#0B0A09">
+<title>Núcleo en tu iPhone</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --ground:#0B0A09; --card:#171412; --card-2:#1E1A17; --rule:#2A2426;
+  --ivory:#F2EDE4; --soft:#BDB5AA; --muted:#8A8378;
+  --mint:#3FE0B5; --coral:#FF5A5F; --amber:#F6B94E;
+  --serif:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --sans:"Geist", -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --mono:"Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+html,body{height:100%;background:var(--ground);color:var(--ivory)}
+body{font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;touch-action:manipulation}
+#home{min-height:100%;padding-inline:20px;padding-block:calc(env(safe-area-inset-top, 0px) + 28px) calc(env(safe-area-inset-bottom, 0px) + 36px);display:flex;flex-direction:column;gap:28px;max-width:520px;margin:0 auto;background:radial-gradient(520px 420px at 50% 0%,#1d1519 0%,transparent 70%)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--serif);font-weight:400;font-size:64px;line-height:.95;margin:6px 0 0}
+h1 em{color:var(--amber)}
+.intro{margin:0;color:var(--soft);font-size:15px;max-width:34ch}
+.choices{display:grid;gap:12px}
+.choice{appearance:none;width:100%;text-align:left;border:1px solid var(--rule);background:linear-gradient(180deg,var(--card-2),var(--card));color:var(--ivory);border-radius:22px;padding:18px 18px 16px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;cursor:pointer;font:inherit}
+.choice:active{transform:scale(.98)}
+.choice:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.choice b{font-family:var(--serif);font-weight:400;font-size:30px;line-height:1.05}
+.choice span{grid-column:1;color:var(--soft);font-size:14px}
+.choice i{grid-row:1 / span 2;grid-column:2;font-style:normal;font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--rule);border-radius:999px;padding:6px 10px}
+.squad{display:grid;gap:12px}
+.squad-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.squad-head h2{font-family:var(--serif);font-weight:400;font-size:26px;margin:0}
+.squad-head small{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em}
+.belt{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 10px;margin-inline:-20px;padding-inline:20px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.belt::-webkit-scrollbar{display:none}
+.bead{appearance:none;border:0;background:none;color:var(--soft);font:500 12px var(--sans);display:grid;justify-items:center;gap:6px;scroll-snap-align:start;cursor:pointer;padding:0;flex:0 0 auto}
+.bead .ring{width:58px;height:58px;border-radius:50%;padding:2px;background:var(--rule);transition:background .2s}
+.bead .ring img,.bead .ring div{width:100%;height:100%;border-radius:50%;object-fit:cover;transform:scale(1.2);display:block;background:#2A2A2A}
+.bead .ring{overflow:hidden}
+.bead[aria-pressed="true"] .ring{background:linear-gradient(135deg,var(--amber),#fff3d6)}
+.bead[aria-pressed="true"]{color:var(--ivory)}
+.bead:focus-visible .ring{outline:2px solid var(--amber);outline-offset:2px}
+.note{margin:0;color:var(--muted);font-size:13px}
+.note b{color:var(--soft);font-weight:500}
+.exit{appearance:none;justify-self:start;border:1px solid var(--rule);background:transparent;color:var(--soft);font:500 14px var(--sans);border-radius:999px;padding:12px 18px;cursor:pointer}
+.exit:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+#player{position:fixed;inset:0;background:#000;z-index:10}
+#player iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.hud{position:absolute;left:0;right:0;top:0;padding-top:calc(env(safe-area-inset-top, 0px) + 6px);padding-inline:12px;display:flex;justify-content:space-between;pointer-events:none;z-index:2}
+.hud button{pointer-events:auto;appearance:none;border:1px solid #ffffff1f;background:#0b0a09b3;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);color:var(--ivory);font:500 13px var(--sans);border-radius:999px;height:34px;padding:0 14px;cursor:pointer}
+.hud button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.hud .step{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top, 0px) + 14px);font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:#f2ede499;white-space:nowrap}
+body.app .hud{padding-top:11px;padding-inline:14px;align-items:center}
+body.app .hud button{height:32px;font-size:12px;padding:0 12px;background:#0b0a0999}
+body.app .hud .step{position:static;transform:none;margin-left:auto;margin-right:8px;top:auto}
+@media (prefers-reduced-motion:reduce){.choice:active{transform:none}.bead .ring{transition:none}}
+</style>
+
+<main id="home">
+  <div>
+    <div class="eyebrow">Bobby · prototipo</div>
+    <h1>Núcleo<em>.</em></h1>
+  </div>
+  <p class="intro">La esfera es la app. Elige qué quieres ver; se reproduce a pantalla completa y en bucle.</p>
+  <div class="choices">
+    <button class="choice" type="button" data-src="nucleo-onboarding.html" data-name="Primera vez"><b>Primera vez</b><span>Nace la esfera, eliges compañero, primera lectura.</span><i>66 s</i></button>
+    <button class="choice" type="button" data-src="nucleo-v2.html" data-name="Todos los días" data-companion="1"><b>Todos los días</b><span>Preguntas, debate, veredicto, tesis y caras.</span><i>43 s</i></button>
+  </div>
+  <section class="squad" aria-labelledby="squad-h">
+    <div class="squad-head"><h2 id="squad-h">Tu compañero</h2><small id="picked">MIRA</small></div>
+    <div class="belt" id="belt" role="group" aria-label="Compañero para «Todos los días»"></div>
+  </section>
+  <p class="note"><b>Toca la pantalla</b> para ir en cámara lenta. <b>Siguiente</b> salta de momento y <b>‹</b> vuelve aquí. Datos de ejemplo, no son pantallas de producción.</p>
+  <button class="exit" type="button" id="exit" hidden>Abrir Bobby actual</button>
+</main>
+
+<div id="player" hidden>
+  <iframe id="frame" title="Prototipo de Núcleo" allow="autoplay"></iframe>
+  <div class="hud"><button type="button" id="back" aria-label="Volver al menú">‹</button><span class="step" id="step"></span><button type="button" id="next">Siguiente</button></div>
+</div>
+
+<script id="companions" type="application/json">__COMPANIONS_JSON__</script>
+<script>
+(function(){
+  var CO=[];try{CO=JSON.parse(document.getElementById('companions').textContent)}catch(e){CO=[]}
+  if(!Array.isArray(CO)||!CO.length){CO=[{id:'mira',label:'Mira'},{id:'kora',label:'Kora'},{id:'byte',label:'Byte'},{id:'zip',label:'Zip'},{id:'glitch',label:'Glitch'}]}
+  var picked='mira';
+  try{var s=localStorage.getItem('nucleo.companion');if(s&&CO.some(function(c){return c.id===s}))picked=s}catch(e){}
+  var belt=document.getElementById('belt'),pickedEl=document.getElementById('picked');
+  function label(id){for(var i=0;i<CO.length;i++)if(CO[i].id===id)return CO[i].label||id;return id}
+  CO.forEach(function(c){
+    var b=document.createElement('button');b.type='button';b.className='bead';b.setAttribute('aria-pressed',c.id===picked?'true':'false');b.dataset.id=c.id;
+    var ring=document.createElement('span');ring.className='ring';
+    if(c.dataUri){var im=document.createElement('img');im.alt='';im.src=c.dataUri;im.decoding='async';ring.appendChild(im)}else{ring.appendChild(document.createElement('div'))}
+    b.appendChild(ring);b.appendChild(document.createTextNode(c.label||c.id));
+    b.addEventListener('click',function(){picked=c.id;try{localStorage.setItem('nucleo.companion',picked)}catch(e){}
+      [].forEach.call(belt.children,function(x){x.setAttribute('aria-pressed',x.dataset.id===picked?'true':'false')});pickedEl.textContent=label(picked).toUpperCase()});
+    belt.appendChild(b);
+  });
+  pickedEl.textContent=label(picked).toUpperCase();
+  var bridge=window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.nucleo,exit=document.getElementById('exit');
+  if(bridge){document.body.classList.add('app');exit.hidden=false;exit.addEventListener('click',function(){try{bridge.postMessage('exit')}catch(e){}})}
+  var home=document.getElementById('home'),player=document.getElementById('player'),frame=document.getElementById('frame'),step=document.getElementById('step');
+  [].forEach.call(document.querySelectorAll('.choice'),function(btn){
+    btn.addEventListener('click',function(){
+      var src=btn.dataset.src+(btn.dataset.companion?('?companion='+encodeURIComponent(picked)):'');
+      frame.src=src;step.textContent='';home.hidden=true;player.hidden=false;
+      try{window.scrollTo(0,0)}catch(e){}
+    });
+  });
+  document.getElementById('back').addEventListener('click',function(){frame.src='about:blank';player.hidden=true;home.hidden=false});
+  document.getElementById('next').addEventListener('click',function(){try{frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight'}))}catch(e){}});
+  window.addEventListener('message',function(ev){var m=ev.data;if(!m||m.type!=='bobby-step'||ev.source!==frame.contentWindow)return;step.textContent=(m.index+1)+'/'+m.total})
+})();
+</script>

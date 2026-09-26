@@ -1,0 +1,91 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/voice-tool",
+  "body": {
+   "tool": "run_debate",
+   "args": {
+    "symbol": "NVDA",
+    "lang": "en"
+   }
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "public, max-age=0, must-revalidate",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:35:47 GMT"
+ },
+ "elapsedMs": 2998,
+ "recordedAt": "2026-09-26T11:35:47Z",
+ "body": {
+  "symbol": "NVDA",
+  "context": null,
+  "market": {
+   "symbol": "NVDA",
+   "assetType": "equity",
+   "currency": "USD",
+   "marketStatus": "market-data",
+   "available": true,
+   "price": 225.07,
+   "change_24h_pct": 0.22,
+   "high_24h": 226.94,
+   "low_24h": 223.133
+  },
+  "regime": "LOW VOLATILITY (BTC -0.9%)",
+  "technicals": {
+   "price": 225.1,
+   "rsi14": 63.8,
+   "ema20": 224.5,
+   "ema50": 223.5,
+   "support": 221.1,
+   "resistance": 230,
+   "atrPct": 0.67,
+   "trend": "alcista",
+   "momentum": "neutral"
+  },
+  "technical_pulse": {
+   "signal": "neutral",
+   "direction": "none",
+   "conviction_pct": 10,
+   "agreement_pct": 52,
+   "overview": "MA 50/200: MA50 is above MA200, keeping the higher-timeframe trend constructive. Bollinger: Price is 71.8% through the Bollinger channel with 0.52% band width. EMA 12/26: Fast EMA is below slow EMA, signaling short-term downside control.",
+   "trade_plan": {
+    "direction": "none",
+    "entry": null,
+    "stop": null,
+    "target": null,
+    "rewardRisk": null,
+    "invalidation": "No edge: composite score is inside the neutral band.",
+    "basis": [
+     "Wait for the technical composite to clear +/-0.20."
+    ]
+   },
+   "source": "okx-indicators",
+   "instrument": "NVDA-USDT-SWAP"
+  },
+  "quick_brief": {
+   "symbol": "NVDA",
+   "assetType": "equity",
+   "timeframe": "1H",
+   "price": 225.1,
+   "change24hPct": 0.22,
+   "bias": "bullish",
+   "trend": "alcista",
+   "momentum": "neutral",
+   "rsi14": 63.8,
+   "ema20": 224.5,
+   "ema50": 223.5,
+   "support": 221.1,
+   "resistance": 230,
+   "atrPct": 0.67,
+   "summary": "NVDA is at 225.1 with a bullish 1H structure. Visible support is 221.1 and RSI reads 63.8.",
+   "risk": "The thesis weakens below 221.1; immediate resistance is 230.",
+   "source": "live-candles",
+   "generatedAt": "2026-09-26T11:35:47.397Z",
+   "latencyMs": 2609
+  },
+  "how_to_use": "Anchor Alpha on the support/demand side, Red Team on the level that breaks the thesis, and the CIO on where you would actually act. Size each zone with atrPct. Never state a level that is not derived from these numbers.",
+  "note": "Analysis only. Bobby does not execute trades."
+ }
+}

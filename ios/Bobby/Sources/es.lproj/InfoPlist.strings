@@ -1,2 +1,4 @@
 "CFBundleDisplayName" = "Bobby";
 "NSPhotoLibraryAddUsageDescription" = "Bobby guarda tu tarjeta de estilo en Fotos solo cuando tocas Guardar imagen.";
+"NSMicrophoneUsageDescription" = "Bobby solo escucha mientras mantienes presionado el botón, para oír tu pregunta.";
+"NSSpeechRecognitionUsageDescription" = "Bobby convierte tu pregunta hablada en texto en este iPhone. El audio nunca sale de tu dispositivo.";

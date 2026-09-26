@@ -26,6 +26,10 @@ targets:
     platform: iOS
     sources:
       - Tests
+      # Núcleo golden bridge replies (ARCHITECTURE.md §4.2), read by NucleoBridgeTests.
+      - path: Nucleo/fixtures/ask
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: Bobby
     settings:
@@ -60,6 +64,9 @@ targets:
         buildPhase: resources
       - path: Resources/Voice
         buildPhase: resources
+      - path: Resources/Nucleo
+        type: folder
+        buildPhase: resources
       - path: ../../public/land/v1/gate-A
         type: folder
         buildPhase: resources
@@ -84,7 +91,9 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSApplicationQueriesSchemes:
           - instagram-stories
+        NSMicrophoneUsageDescription: "Bobby listens only while you hold the button, to hear your question."
         NSPhotoLibraryAddUsageDescription: "Bobby saves your skin card to Photos only when you tap Save Image."
+        NSSpeechRecognitionUsageDescription: "Bobby turns your spoken question into text on this iPhone. The audio never leaves your device."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -102,5 +111,5 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
-        MARKETING_VERSION: "1.4"
-        CURRENT_PROJECT_VERSION: "37"
+        MARKETING_VERSION: "1.5"
+        CURRENT_PROJECT_VERSION: "39"

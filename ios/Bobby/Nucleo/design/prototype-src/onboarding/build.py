@@ -1,0 +1,10 @@
+import os
+here = os.path.dirname(os.path.abspath(__file__))
+root = os.path.dirname(here)
+tpl = open(os.path.join(here, 'template.html')).read()
+parts = sorted(f for f in os.listdir(here) if f.startswith('p') and f.endswith('.js'))
+js = '\n'.join(open(os.path.join(here, f)).read() for f in parts)
+open(os.path.join(here, 'all.js'), 'w').write(js)
+out = tpl.replace('<!--JS-->', '<script>\n' + js + '\n</script>')
+open(os.path.join(root, 'nucleo-onboarding.html'), 'w').write(out)
+print('parts:', parts, 'bytes:', len(out), 'tokens:', out.count('__COMPANIONS_JSON__'))

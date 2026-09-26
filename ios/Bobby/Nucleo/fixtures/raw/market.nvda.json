@@ -1,0 +1,31 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/voice-tool",
+  "body": {
+   "tool": "get_market",
+   "args": {
+    "symbol": "NVDA"
+   }
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "public, max-age=0, must-revalidate",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:35:44 GMT"
+ },
+ "elapsedMs": 1261,
+ "recordedAt": "2026-09-26T11:35:44Z",
+ "body": {
+  "symbol": "NVDA",
+  "assetType": "equity",
+  "currency": "USD",
+  "marketStatus": "market-data",
+  "available": true,
+  "price": 225.07,
+  "change_24h_pct": 0.22,
+  "high_24h": 226.94,
+  "low_24h": 223.133
+ }
+}

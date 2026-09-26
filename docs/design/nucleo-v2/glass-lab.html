@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Glass Lab</title>
+<style>
+:root{--bg:#0B0A09;--ink:#F2EDE4;--ink2:#A39C91;--ink3:#8A8378;--hair:rgba(242,237,228,.08);--line:rgba(242,237,228,.12)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font:500 12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+#bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 16px;background:rgba(11,10,9,.92);border-bottom:1px solid var(--hair)}
+#bar b{color:var(--ink2);font-weight:500;margin-right:4px}
+#bar button{background:transparent;border:1px solid var(--line);color:var(--ink2);border-radius:14px;padding:3px 10px;font:inherit;cursor:pointer}
+#bar button.on{color:var(--ink);border-color:rgba(242,237,228,.4);background:rgba(242,237,228,.06)}
+#bar .sep{width:1px;height:18px;background:var(--hair);margin:0 4px}
+#msg{color:var(--ink3);padding:6px 16px;min-height:22px}
+#wrap{position:relative;margin:0 auto}
+.cell{position:absolute;overflow:hidden}
+.lab{position:absolute;left:0;right:0;text-align:center;color:var(--ink2);letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lab i{font-style:normal;color:var(--ink3)}
+#gl{position:absolute;left:0;top:0;pointer-events:none}
+#bench{padding:8px 16px 24px;color:var(--ink2);white-space:pre-wrap}
+iframe{position:absolute;left:-2000px;top:0;width:390px;height:844px;border:0;visibility:hidden}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="msg">Loading states from the prototype…</div>
+<div id="wrap"><canvas id="gl"></canvas></div>
+<div id="bench"></div>
+<script>
+(function(){
+'use strict';
+var D = document, W = window;
+function $(id){ return D.getElementById(id); }
+var QS = {};
+(location.search || '').replace(/^\?/, '').split('&').forEach(function(kv){ if (!kv) return; var i = kv.indexOf('='); QS[decodeURIComponent(i < 0 ? kv : kv.slice(0, i))] = i < 0 ? '1' : decodeURIComponent(kv.slice(i + 1)); });
+
+/* ---- sources, injected by .glass/build.mjs ---- */
+var BASE_FS = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\nuniform vec2 uC; uniform float uR;\nuniform float uBreath; uniform float uGlobal; uniform vec2 uLean; uniform vec3 uRipple; uniform vec3 uEmit[4]; uniform vec2 uPull;\nuniform float uEnergy; uniform float uVoice; uniform float uGlow; uniform float uIrid; uniform float uListenIr;\nuniform float uTwist; uniform float uTwistOsc; uniform float uFlow; uniform float uDrift; uniform float uRot; uniform float uIridPh; uniform float uCioRot;\nuniform float uSwirlAmt; uniform vec3 uNodes[3]; uniform vec3 uNodeDir; uniform float uSep; uniform float uBraid; uniform vec3 uFil;\nuniform float uFlood; uniform vec3 uV; uniform float uScrim; uniform vec3 uVCore; uniform vec2 uShock; uniform vec3 uShockC; uniform float uExposure;\nuniform vec3 uTint; uniform float uTintAmt; uniform float uTintWash; uniform vec4 uNeighL; uniform vec4 uNeighR;\nuniform sampler2D uComp; uniform float uCompMode; uniform float uCompDepth; uniform float uCompAmt; uniform vec3 uCompBg; uniform vec4 uCompXf;\nuniform vec2 uLight; uniform vec3 uAmb; uniform vec2 uSpark; uniform float uRimBoost; uniform float uSeed; uniform float uStatic;\nfloat hash(vec3 p){ p = fract(p*0.3183099 + vec3(0.1,0.2,0.3)); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }\nfloat hash2(vec2 p){ vec3 p3 = fract(vec3(p.xyx)*0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y)*p3.z); }\nfloat noise(vec3 x){ vec3 i = floor(x); vec3 f = fract(x); f = f*f*(3.0-2.0*f);\n  return mix(mix(mix(hash(i),hash(i+vec3(1.0,0.0,0.0)),f.x), mix(hash(i+vec3(0.0,1.0,0.0)),hash(i+vec3(1.0,1.0,0.0)),f.x),f.y),\n             mix(mix(hash(i+vec3(0.0,0.0,1.0)),hash(i+vec3(1.0,0.0,1.0)),f.x), mix(hash(i+vec3(0.0,1.0,1.0)),hash(i+vec3(1.0,1.0,1.0)),f.x),f.y), f.z); }\nfloat fbm(vec3 p){ float s = 0.0; float a = 0.5; for (int i = 0; i < 4; i++){ s += a*noise(p); p = p*2.03 + vec3(1.7,9.2,3.1); a *= 0.5; } return s; }\nvec3 irid(float x){ x = fract(x);\n  vec3 c1 = vec3(0.30,0.42,1.00); vec3 c2 = vec3(0.60,0.36,1.00); vec3 c3 = vec3(1.00,0.43,0.78); vec3 c4 = vec3(0.36,0.88,1.00);\n  vec3 c = mix(c1, c2, smoothstep(0.0,0.25,x)); c = mix(c, c3, smoothstep(0.25,0.5,x)); c = mix(c, c4, smoothstep(0.5,0.75,x)); c = mix(c, c1, smoothstep(0.75,1.0,x));\n  return mix(vec3(dot(c, vec3(0.299,0.587,0.114))), c, 0.8); }\nmat2 rot(float a){ float c = cos(a); float s = sin(a); return mat2(c,-s,s,c); }\nfloat iso(float v, float w){ return 1.0 - smoothstep(0.0, w, abs(v-0.5)); }\nfloat adiff(float a, float b){ float d = a - b; return atan(sin(d), cos(d)); }\nfloat sq(float x){ return x*x; }\nvoid main(){\n  vec2 p = (gl_FragCoord.xy - uC)/uR;\n  float rho = length(p);\n  if (rho > 1.95){ gl_FragColor = vec4(0.0); return; }\n  float ang = atan(p.y, p.x + 1e-6);\n  float sa = p.y/max(rho, 1e-4);\n  float loc = uLean.y*pow(max(0.0,-sa),3.0);\n  float dR = adiff(ang, uRipple.x);\n  loc += uRipple.y*exp(-abs(dR)*0.44)*sin(8.0*abs(dR) - uRipple.z);\n  for (int i = 0; i < 4; i++){ float de = adiff(ang, uEmit[i].x)/max(uEmit[i].z, 0.01); loc += uEmit[i].y*exp(-de*de); }\n  loc += uPull.y*pow(max(0.0,-sa),4.0);\n  float edge = 1.0 + 0.009*uBreath + uGlobal + loc;\n  float d = rho/edge;\n  float aa = 1.5/uR;\n  float dith = (hash2(gl_FragCoord.xy + fract(uSeed)*61.0) - 0.5)/255.0;\n  vec3 hc = mix(irid(ang*0.159 + uIridPh), uV, uFlood);\n  hc = mix(hc, uTint, uTintAmt);\n  float hk = min(0.35, 0.20 + 0.05*uBreath + 0.25*uVoice)*uGlow;\n  float halo = exp(-max(d-1.0,0.0)*4.0)*hk*(1.0 - smoothstep(1.5, 1.8, d));\n  halo = max(0.0, halo + dith*2.0);\n  vec4 outside = vec4(hc*halo, halo);\n  if (d > 1.0 + aa){ gl_FragColor = outside; return; }\n  vec2 pp = p/edge;\n  float r2 = min(dot(pp,pp), 1.0);\n  float z = sqrt(1.0 - r2);\n  float rr = sqrt(r2);\n  float tw = (1.0 - uStatic)*(uSwirlAmt*(1.3 - rr)*2.4*sin(uTwistOsc) + uTwist);\n  vec2 q = rot(tw)*pp;\n  vec3 n = vec3(q*(1.0 + 0.45*(1.0 - z)), z*0.9);\n  n.xz = rot(uRot)*n.xz;\n  float f1 = fbm(n*1.3 + vec3(0.0, 0.0, uDrift));\n  float f2 = fbm(n*2.2 + vec3(f1*2.4, f1*1.2, uDrift*0.64));\n  vec3 ir = irid(f2*1.4 + 0.08*sin(ang) + uIridPh);\n  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2));\n  vec3 col = vec3(0.012) + ir*dens*(0.62 + 0.55*uEnergy)*uIrid + ir*0.12*(0.6 + 0.4*z);\n  col += vec3(0.36,0.88,1.0)*uListenIr*0.35*dens*smoothstep(0.15,-0.85,pp.y);\n  col = mix(col, uTint*(0.10 + 0.55*dens), uTintWash);\n  if (uSwirlAmt > 0.002 || uBraid > 0.002){\n    vec3 m = n*1.7;\n    vec3 cm = vec3(uFlow*0.30, uFlow*0.10, 0.0);\n    float sp = uSep;\n    float sA = fbm(m*mix(0.66,0.78,sp) + cm + sp*(vec3(3.1,1.7,0.4) + vec3(0.0,-0.8,0.25)*uFlow));\n    float sR = fbm(m*mix(0.66,1.35,sp) + cm + sp*(vec3(-2.3,4.1,1.9) + vec3(1.1,0.45,-0.9)*uFlow));\n    float sC = fbm(m*mix(0.66,0.9,sp) + cm + sp*(vec3(0.7,-3.3,2.6) + vec3(uCioRot,0.0,0.0)));\n    vec3 cA = vec3(0.247,0.878,0.710); vec3 cR = vec3(1.0,0.353,0.373); vec3 cC = vec3(0.965,0.725,0.306);\n    vec2 hA0 = pp - vec2(-0.45,0.40); vec2 hR0 = pp - vec2(0.45,0.40);\n    float hA = mix(1.0, exp(-dot(hA0,hA0)*2.4), sp);\n    float hR = mix(1.0, exp(-dot(hR0,hR0)*2.4), sp);\n    float yC = pp.y + 0.35 + 0.16*(sC - 0.5);\n    float bandC = 1.0 - smoothstep(0.0, 0.07, abs(yC));\n    float glowC = 1.0 - smoothstep(0.0, 0.22, abs(yC));\n    float wA = mix(0.04, 0.045, sp); float wR = mix(0.04, 0.028, sp);\n    vec3 cur = cA*(iso(sA,wA) + 0.28*iso(sA,0.16))*hA\n             + cR*(iso(sR,wR) + 0.28*iso(sR,0.13))*hR\n             + cC*mix(iso(sC,0.04) + 0.28*iso(sC,0.16), bandC*0.72 + glowC*0.16, sp);\n    if (uStatic > 0.5){\n      float a0 = adiff(ang, 2.44); float a1 = adiff(ang, 0.70); float a2 = adiff(ang, -1.57);\n      cur = (cA*exp(-a0*a0*4.0) + cR*exp(-a1*a1*4.0) + cC*exp(-a2*a2*4.0))*0.9*smoothstep(0.15,0.9,rr);\n    }\n    float bm = uBraid > 0.002 ? 1.0 - smoothstep(uBraid - 0.10, uBraid, rr) : 0.0;\n    col += cur*uSwirlAmt*(0.85 + 0.6*uEnergy)*(1.0 - bm)*mix(0.5, 1.0, sp);\n    for (int i = 0; i < 3; i++){\n      float g = uNodes[i].z;\n      if (g > 0.002){\n        vec2 np = uNodes[i].y*vec2(cos(uNodes[i].x), sin(uNodes[i].x));\n        vec2 dd = pp - np;\n        float head = exp(-dot(dd,dd)*520.0) + 0.8*exp(-dot(dd,dd)*2600.0);\n        float drn = rr - uNodes[i].y;\n        float beh = adiff(ang, uNodes[i].x)*uNodeDir[i];\n        float trail = exp(-drn*drn*400.0)*exp(-max(beh,0.0)*6.0)*step(0.0,beh)*(1.0 - smoothstep(0.45,0.6,beh))*smoothstep(0.03,0.14,uNodes[i].y);\n        vec3 nc = i == 0 ? cA : (i == 1 ? cR : cC);\n        col += (nc*(head*1.9 + trail*0.75) + vec3(1.0)*exp(-dot(dd,dd)*5200.0)*0.9)*g;\n      }\n    }\n    if (uBraid > 0.002){\n      vec3 pr = vec3(0.910,0.875,0.816);\n      vec3 bc = pr*(iso(sA,0.020) + 0.55*iso(sA + 0.085,0.012) + 0.55*iso(sA - 0.085,0.012)) + pr*0.10*iso(sA,0.14);\n      col = mix(col, col*0.5 + bc*(0.65 + 0.5*uEnergy) + pr*0.035*dens, bm);\n      col += pr*exp(-sq((rr - uBraid)/0.035))*0.55*(1.0 - smoothstep(0.95, 1.1, uBraid));\n    }\n  }\n  if (uFil.y > 0.002){\n    float fr0 = exp(-sq((rr - uFil.x)/0.012));\n    float beh = mod(uFil.z - ang, 6.2831853);\n    col += vec3(0.965,0.725,0.306)*fr0*(0.30 + 0.70*exp(-beh*1.1))*uFil.y*1.4;\n  }\n  if (uFlood > 0.002){\n    float fm = 1.0 - smoothstep(uFlood - 0.12, uFlood, rr);\n    vec3 vIn = uV*(0.05 + 0.42*dens*(0.7 + 0.3*z)) + uV*iso(f2, 0.035)*0.30 + col*0.18;\n    col = mix(col, vIn, fm);\n    col += uV*exp(-sq((rr - uFlood)/0.04))*0.5*(1.0 - smoothstep(0.95, 1.1, uFlood));\n  }\n  col = mix(col, uVCore, uScrim*(1.0 - smoothstep(0.52, 0.93, rr)));\n  float fr = pow(1.0 - z, 2.4);\n  if (uCompMode > 0.5 && uCompXf.w > 0.002){\n    float side = uCompXf.z;\n    vec2 cp = pp - vec2(uCompXf.x, uCompXf.y);\n    float lens = 1.0/(1.0 + 0.35*(1.0 - z));\n    float sc = mix(1.0, 0.92, uCompDepth);\n    vec2 uv = vec2(0.5 + cp.x/side*lens/sc, 0.5 - cp.y/side*lens/sc) + n.xy*0.03*uCompDepth;\n    float bias = 3.0*uCompDepth;\n    vec4 tx = texture2D(uComp, uv, bias);\n    float inb = step(0.0,uv.x)*step(uv.x,1.0)*step(0.0,uv.y)*step(uv.y,1.0);\n    float amt = uCompAmt*uCompXf.w;\n    if (uCompMode < 1.5){\n      float l = dot(tx.rgb, vec3(0.299,0.587,0.114));\n      col *= 1.0 - min(0.7, 0.95*tx.a*inb*amt*(1.0 - fr));\n      col += vec3(1.0,0.953,0.886)*tx.a*inb*(0.25 + 0.75*smoothstep(0.05,0.6,l))*amt*(1.0 - fr);\n    } else {\n      float pr = length(cp)/(side*0.62);\n      col = mix(col, uCompBg, 0.9*amt*(1.0 - smoothstep(0.55, 0.85, pr)));\n      float cs = 0.006*(1.0 - z);\n      vec4 tr = texture2D(uComp, uv + vec2(cs, 0.0), bias); vec4 tb = texture2D(uComp, uv - vec2(cs, 0.0), bias);\n      vec3 tc = vec3(tr.r, tx.g, tb.b);\n      tc = -log(max(vec3(0.001), 1.0 - min(tc, vec3(0.97))))/1.3;\n      col = mix(col, tc, tx.a*inb*amt*(1.0 - fr));\n      vec2 fc = cp - vec2(0.0, -0.43*side/1.5);\n      col += vec3(1.0,0.97,0.9)*0.12*amt*exp(-(fc.x*fc.x*14.0 + fc.y*fc.y*160.0));\n    }\n  }\n  vec3 rimC = mix(vec3(0.80,0.85,1.0), mix(uV, vec3(1.0), 0.3), uFlood*0.7);\n  rimC = mix(rimC, uTint, uTintAmt);\n  col += rimC*fr*0.75*(1.0 + uRimBoost);\n  col += rimC*0.18*exp(-sq((rr - 0.9)*14.0));\n  float ia = ang*0.159 + uIridPh;\n  col.r += fr*0.10*irid(ia + 0.02).r; col.b += fr*0.10*irid(ia - 0.02).b;\n  col += irid(ia)*pow(1.0 - z, 7.0)*0.7*(1.0 - 0.6*uFlood);\n  float wl = 1.0 - smoothstep(0.30, 0.55, abs(adiff(ang, 3.14159265)));\n  float wr = 1.0 - smoothstep(0.30, 0.55, abs(adiff(ang, 0.0)));\n  col += uNeighL.rgb*fr*0.45*uNeighL.a*wl + uNeighR.rgb*fr*0.45*uNeighR.a*wr;\n  col += vec3(1.0,0.97,0.92)*uSpark.y*exp(-sq(adiff(ang, uSpark.x)/0.035))*smoothstep(0.93, 1.0, rr);\n  col += uAmb*0.08*(0.5 + 0.5*smoothstep(0.3, 1.0, rr));\n  vec2 L = vec2(-0.36, 0.46) + uLight;\n  vec2 h1 = pp - L; float d1 = dot(h1, h1);\n  col += vec3(1.0)*exp(-d1*420.0)*0.9*(1.0 + 0.4*uVoice);\n  col += vec3(1.0)*exp(-d1*28.0)*0.25;\n  vec2 h2 = pp + 0.85*L; col += vec3(1.0)*exp(-dot(h2,h2)*900.0)*0.25;\n  float cr = (rr - 0.82)*9.0;\n  float cau = exp(-cr*cr)*(1.0 - smoothstep(-0.95, -0.15, pp.y));\n  col += mix(ir, uV, uFlood)*cau*0.5;\n  col += uShockC*uShock.y*exp(-sq((rr - uShock.x)/0.035));\n  col = 1.0 - exp(-col*1.3*(1.0 + uExposure));\n  col *= 0.70 + 0.30*z;\n  col += dith;\n  float e = 1.0 - smoothstep(1.0 - aa, 1.0 + aa, d);\n  gl_FragColor = mix(outside, vec4(col, 1.0), e);\n}";
+var ONB_FS = "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\nuniform vec4 uG;   /* cx, cy, r (px), breath */\nuniform vec4 uL;   /* energy, voice, glow, irid */\nuniform vec4 uB;   /* birth, rim hardness, specular, haptic */\nuniform vec4 uPh;  /* twist, twistOsc, flow, drift */\nuniform vec4 uPh2; /* rot, iridPh, dither seed, listen iridescence */\nuniform vec4 uD;   /* swirl, sep, braid front, exposure */\nuniform vec4 uNA; uniform vec4 uNR; uniform vec4 uNC; /* node: angle, radius, glow, direction */\nuniform vec4 uCur; /* flowA, flowR, cio rotation, reduced-motion bands */\nuniform vec4 uFl;  /* filament radius, alpha, angle, flood front */\nuniform vec4 uV;   /* verdict rgb, flood amount */\nuniform vec4 uVC;  /* core rgb, scrim */\nuniform vec4 uSh;  /* shock radius, alpha, bottom bulge, pull */\nuniform vec4 uShC; /* shock rgb, ripple amp */\nuniform vec4 uRp;  /* ripple angle, ripple phase, emit angle, emit extrusion */\nuniform vec4 uTi;  /* tint rgb, tint amount (rim/halo) */\nuniform vec4 uNb;  /* neighbour tint rgb, amount (right sector) */\nuniform vec4 uXA; uniform vec4 uXB; /* companion: offset x, offset y, side, alpha */\nuniform vec4 uCo;  /* silhouette, depth, amount, emit width */\nuniform vec4 uCb;  /* companion backdrop rgb, tint wash */\nuniform vec4 uLt;  /* light parallax x, y, spark angle, spark amount */\nuniform vec4 uAm;  /* ambient rgb, pearl merge */\nuniform sampler2D uTA; uniform sampler2D uTB;\nfloat hash(vec3 p){ p = fract(p*0.3183099 + vec3(0.1,0.2,0.3)); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }\nfloat noise(vec3 x){ vec3 i = floor(x); vec3 f = fract(x); f = f*f*(3.0-2.0*f);\n  return mix(mix(mix(hash(i),hash(i+vec3(1.0,0.0,0.0)),f.x), mix(hash(i+vec3(0.0,1.0,0.0)),hash(i+vec3(1.0,1.0,0.0)),f.x),f.y),\n             mix(mix(hash(i+vec3(0.0,0.0,1.0)),hash(i+vec3(1.0,0.0,1.0)),f.x), mix(hash(i+vec3(0.0,1.0,1.0)),hash(i+vec3(1.0,1.0,1.0)),f.x),f.y), f.z); }\nfloat fbm(vec3 p){ float s = 0.0; float a = 0.5; for(int i=0;i<4;i++){ s += a*noise(p); p = p*2.03 + vec3(1.7,9.2,3.1); a *= 0.5; } return s; }\nfloat fbm2(vec3 p){ return 0.5*noise(p) + 0.25*noise(p*2.03 + vec3(1.7,9.2,3.1)) + 0.125; }\nvec3 irid(float x){ x = fract(x);\n  vec3 c1 = vec3(0.30,0.42,1.00); vec3 c2 = vec3(0.60,0.36,1.00); vec3 c3 = vec3(1.00,0.43,0.78); vec3 c4 = vec3(0.36,0.88,1.00);\n  vec3 c = mix(c1, c2, smoothstep(0.0,0.25,x)); c = mix(c, c3, smoothstep(0.25,0.5,x)); c = mix(c, c4, smoothstep(0.5,0.75,x)); c = mix(c, c1, smoothstep(0.75,1.0,x));\n  return mix(c, vec3(dot(c, vec3(0.299,0.587,0.114))), 0.2); }\nmat2 rot(float a){ float c = cos(a); float s = sin(a); return mat2(c,-s,s,c); }\nfloat iso(float v, float w){ return 1.0 - smoothstep(0.0, w, abs(v-0.5)); }\nfloat adiff(float a, float b){ float d = a - b; return atan(sin(d), cos(d)); }\nfloat gs(float x){ return exp(-x*x); }\nfloat h2(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }\nvec3 node(vec4 N, vec2 pp, float rr, float ang, vec3 c){\n  vec2 pos = N.y*vec2(cos(N.x), sin(N.x)); vec2 dv = pp - pos;\n  float head = exp(-dot(dv,dv)*900.0);\n  float dr = rr - N.y; float db = adiff(N.x, ang)*N.w;\n  float tr = step(0.0, db)*(1.0 - smoothstep(0.45, 0.6, db))*exp(-dr*dr*400.0)*exp(-db*6.0);\n  return c*(head*1.5 + tr*0.65)*N.z; }\nvec4 comp(sampler2D T, vec4 X, vec2 q, float z, float bias){\n  vec2 uv = (q - X.xy)/max(X.z, 0.01); uv = vec2(0.5 + uv.x, 0.5 - uv.y);\n  float inb = step(0.0, uv.x)*step(uv.x, 1.0)*step(0.0, uv.y)*step(uv.y, 1.0);\n  vec2 cd = normalize(q + vec2(1e-4))*0.006*(1.0 - z);\n  vec4 c = texture2D(T, clamp(uv, 0.0, 1.0), bias);\n  c.r = texture2D(T, clamp(uv + cd, 0.0, 1.0), bias).r;\n  c.b = texture2D(T, clamp(uv - cd, 0.0, 1.0), bias).b;\n  c.a *= inb*X.w; return c; }\nvec3 unTone(vec3 c){ return -log(1.0 - min(c, vec3(0.955)))/1.3; }\nvoid main(){\n  vec2 p = (gl_FragCoord.xy - uG.xy)/uG.z;\n  float rho = length(p); float ang = atan(p.y, p.x);\n  float sb = max(0.0, -sin(ang));\n  float e = 1.0 + 0.009*uG.w + 0.015*uB.w;\n  e += uSh.z*sb*sb*sb;\n  float da = adiff(ang, uRp.x);\n  e += uShC.w*exp(-abs(da)*0.44)*sin(8.0*da - uRp.y);\n  float de = adiff(ang, uRp.z)/max(uCo.w, 0.05);\n  e += uRp.w*exp(-de*de);\n  e += uSh.w*sb*sb*sb*sb;\n  float d = rho/e;\n  if (d > 1.8){ gl_FragColor = vec4(0.0); return; }\n  float aa = 1.4/uG.z;\n  float dith = (h2(gl_FragCoord.xy + fract(uPh2.z)*61.0) - 0.5)/255.0;\n  float fl = uV.w*smoothstep(0.0, 1.0, uFl.w);\n  vec3 hc = mix(irid(ang*0.159 + uPh2.y*3.0), uV.rgb, fl);\n  hc = mix(hc, uTi.rgb, uTi.w);\n  float hal = exp(-max(d - 1.0, 0.0)*4.0)*min(0.35, 0.20 + 0.05*uG.w + 0.25*uL.y)*uL.z;\n  hal *= 1.0 - smoothstep(1.45, 1.8, d);\n  hal = max(hal + dith, 0.0);\n  vec4 outside = vec4(hc*hal, hal);\n  if (d > 1.0 + aa){ gl_FragColor = outside; return; }\n  vec2 pp = p/e; float r2 = min(dot(pp,pp), 1.0); float rr = sqrt(r2); float z = sqrt(1.0 - r2);\n  float tw = uD.x*((1.3 - rr)*0.8*sin(uPh.y) + uPh.x);\n  vec2 q = rot(tw)*pp;\n  vec3 n = vec3(q*(1.0 + 0.45*(1.0 - z)), z*0.9);\n  n.xz = rot(uPh2.x)*n.xz;\n  float f1 = fbm(n*1.3 + vec3(0.0, 0.0, uPh.w));\n  float f2 = fbm(n*2.2 + vec3(f1*2.4, f1*1.2, uPh.w*0.64));\n  vec3 ir = irid(f2*1.4 + 0.08*sin(ang)*smoothstep(0.0, 0.35, rr) + uPh2.y);\n  ir = mix(ir, uTi.rgb, uCb.w);\n  float bf = uB.x*1.4;\n  float bm = 1.0 - smoothstep(bf - 0.35, bf - 0.05, rr);\n  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2))*bm;\n  vec3 col = vec3(0.012) + ir*dens*(0.62 + 0.55*uL.x)*uL.w + ir*0.12*(0.6 + 0.4*z)*bm*mix(0.5, 1.0, uL.w);\n  col += vec3(0.36,0.88,1.0)*uPh2.w*0.35*dens*(1.0 - smoothstep(-0.9, 0.15, pp.y));\n  col += vec3(1.0,0.97,0.92)*0.6*(1.0 - uB.x)*step(0.001, uB.x)*gs((rr - uB.x*1.1)/0.05);\n  vec3 m = n*1.7;\n  if (uD.x > 0.002){\n    float sep = uD.y;\n    float sA = fbm2(m*0.9 + vec3(0.0, -uCur.x, 0.0) + vec3(3.1,1.7,0.4)*sep);\n    float sR = fbm(m*1.25 + vec3(uCur.y, uCur.y*0.4, 0.0) + vec3(-2.3,4.1,1.9)*sep);\n    vec2 dir = normalize(pp + vec2(1e-4));\n    float hA = mix(1.0, smoothstep(-0.55, 0.85, dot(dir, vec2(-0.7, 0.7))), sep);\n    float hR = mix(1.0, smoothstep(-0.55, 0.85, dot(dir, vec2(0.7, 0.7))), sep);\n    vec3 nc = n; nc.xz = rot(uCur.z)*nc.xz;\n    float by = -0.35*sep + 0.07*sin(nc.x*3.0 + nc.z*2.0);\n    float sC = fbm2(nc*1.6 + vec3(0.0, 0.0, uCur.z*0.5));\n    float bC = gs((pp.y - by - (sC - 0.5)*0.22)/0.06)*(0.35 + 0.65*smoothstep(0.35, 0.7, sC));\n    float hC = mix(1.0, 1.0 - smoothstep(0.2, 0.9, pp.y), sep);\n    float vis = smoothstep(0.0, 0.35, sep);\n    vec3 cc = vec3(0.247,0.878,0.710)*(iso(sA, 0.045) + 0.28*iso(sA, 0.16))*hA*vis\n            + vec3(1.0,0.353,0.373)*(iso(sR, 0.028) + 0.30*iso(sR, 0.12))*hR*vis\n            + vec3(0.965,0.725,0.306)*(bC*0.6 + 0.12*gs((pp.y - by)/0.22))*hC*vis;\n    vec3 bands = vec3(0.247,0.878,0.710)*smoothstep(0.3,0.9,dot(dir,vec2(-0.87,0.5))) + vec3(1.0,0.353,0.373)*smoothstep(0.3,0.9,dot(dir,vec2(0.87,0.5))) + vec3(0.965,0.725,0.306)*smoothstep(0.3,0.9,-dir.y);\n    cc = mix(cc, bands*0.35*bm, uCur.w);\n    float sM = fbm2(m + vec3(uCur.x*0.5, 0.0, uCur.y*0.2));\n    cc += vec3(0.91,0.87,0.82)*(iso(sM, 0.05) + 0.25*iso(sM, 0.18))*uAm.w;\n    col = mix(col, col*0.45, uD.x*0.5);\n    col += cc*uD.x*(0.85 + 0.8*uL.x);\n    col += node(uNA, pp, rr, ang, vec3(0.247,0.878,0.710)) + node(uNR, pp, rr, ang, vec3(1.0,0.353,0.373)) + node(uNC, pp, rr, ang, vec3(0.965,0.725,0.306));\n  }\n  float fm = (1.0 - smoothstep(uFl.w - 0.12, uFl.w, rr))*uV.w;\n  if (uD.z > 0.002){\n    float sB = fbm2(m*1.1 + vec3(uPh.z*0.5, -uPh.z*0.3, 0.0));\n    float br = iso(sB, 0.05) + 0.3*iso(sB, 0.18);\n    float bk = (1.0 - smoothstep(uD.z - 0.12, uD.z, rr))*(1.0 - fm);\n    col = mix(col, col*0.5, bk*0.6);\n    col += vec3(0.91,0.87,0.82)*br*bk*0.42*(0.8 + 0.6*uL.x);\n    col += vec3(0.91,0.87,0.82)*0.5*gs((rr - uD.z)/0.03)*smoothstep(0.03, 0.15, uD.z)*(1.0 - smoothstep(0.9, 1.1, uD.z));\n  }\n  if (uFl.y > 0.002){\n    float fil = gs((rr - uFl.x)/0.012);\n    float fa = 0.35 + 0.65*pow(0.5 + 0.5*cos(adiff(ang, uFl.z)), 6.0);\n    col += vec3(0.965,0.725,0.306)*fil*fa*uFl.y*1.3;\n  }\n  col = mix(col, uV.rgb*(0.16 + dens*0.72) + col*0.22, 0.62*fm);\n  col += uV.rgb*0.45*gs((rr - uFl.w)/0.035)*uV.w*smoothstep(0.03, 0.15, uFl.w)*(1.0 - smoothstep(0.85, 1.1, uFl.w));\n  col = mix(col, uVC.rgb, 0.62*uVC.w*(1.0 - smoothstep(0.28, 0.72, rr)));\n  float fr = pow(1.0 - z, 2.4);\n  if (uCo.z > 0.002){\n    float dep = uCo.y; float sil = uCo.x;\n    float lens = 1.0/(1.0 + 0.35*(1.0 - z));\n    vec2 qq = pp*lens + n.xy*0.03*dep;\n    float bias = 3.0*dep;\n    col = mix(col, uCb.rgb*0.9, 0.9*uCo.z*(1.0 - sil)*(1.0 - smoothstep(0.55, 0.85, rr))*max(uXA.w, uXB.w));\n    vec4 ta = comp(uTA, uXA, qq, z, bias); vec4 tb = comp(uTB, uXB, qq, z, bias);\n    float k = uCo.z*(1.0 - fr);\n    vec2 fa2 = (qq - uXA.xy - vec2(0.0, -uXA.z*0.40))/(uXA.z*vec2(0.30, 0.05));\n    col += vec3(1.0,0.97,0.92)*0.12*exp(-dot(fa2,fa2))*uXA.w*(1.0 - sil)*uCo.z;\n    col = mix(col, unTone(ta.rgb), ta.a*k*(1.0 - sil));\n    col = mix(col, unTone(tb.rgb), tb.a*k*(1.0 - sil));\n    float la = dot(ta.rgb, vec3(0.299,0.587,0.114)); float lb = dot(tb.rgb, vec3(0.299,0.587,0.114));\n    col += vec3(1.0,0.953,0.886)*(ta.a*(0.25 + 0.75*smoothstep(0.05, 0.6, la)) + tb.a*(0.25 + 0.75*smoothstep(0.05, 0.6, lb)))*k*sil;\n  }\n  vec3 rimC = mix(vec3(0.80,0.85,1.0), mix(uV.rgb, vec3(1.0), 0.3), fl*0.7);\n  rimC = mix(rimC, uTi.rgb, uTi.w);\n  float rh = uB.y*(1.0 + 0.08*uB.w);\n  col += rimC*fr*0.75*rh;\n  col += rimC*0.18*gs((rr - 0.9)*14.0)*rh;\n  float ia = ang*0.159 + uPh2.y*3.0;\n  col.r += fr*0.10*irid(ia + 0.02).r*rh; col.b += fr*0.10*irid(ia - 0.02).b*rh;\n  col += irid(ia)*pow(1.0 - z, 7.0)*0.7*(1.0 - 0.6*fl)*rh;\n  col += uNb.rgb*fr*0.45*uNb.w*(1.0 - smoothstep(0.35, 0.55, abs(adiff(ang, 0.0))));\n  vec2 ruv = pp + n.xy*0.06;\n  col += uAm.rgb*0.08*(1.0 - smoothstep(0.2, 1.3, length(ruv - vec2(0.0, 0.1))));\n  col += vec3(1.0)*uLt.w*gs(adiff(ang, uLt.z)/0.03)*smoothstep(0.93, 1.0, rr);\n  vec2 L = vec2(-0.36, 0.46) + uLt.xy; vec2 hp = pp - L; float hd = dot(hp,hp);\n  vec2 hq = pp + 0.85*L;\n  float spc = exp(-hd*420.0)*0.9*(1.0 + 0.4*uL.y) + exp(-hd*28.0)*0.25 + exp(-dot(hq,hq)*900.0)*0.25;\n  col += vec3(1.0)*spc*uB.z;\n  float cr = (rr - 0.82)*9.0;\n  col += mix(ir, uV.rgb, fl)*exp(-cr*cr)*(1.0 - smoothstep(-0.95, -0.15, pp.y))*0.5*bm;\n  col += uShC.rgb*uSh.y*gs((rr - uSh.x)/0.025);\n  col = 1.0 - exp(-col*1.3*(1.0 + uD.w));\n  col *= 0.70 + 0.30*z;\n  col += dith;\n  float edge = 1.0 - smoothstep(1.0 - aa, 1.0 + aa, d);\n  gl_FragColor = mix(outside, vec4(col, 1.0), edge);\n}";
+var VARIANTS = [{"id":"v0","name":"Current","v2":[],"onb":[]},{"id":"A","name":"Clear shell","v2":[["  vec3 ir = irid(f2*1.4 + 0.08*sin(ang) + uIridPh);\n  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2));\n  vec3 col = vec3(0.012) + ir*dens*(0.62 + 0.55*uEnergy)*uIrid + ir*0.12*(0.6 + 0.4*z);","  vec3 ir = irid(f2*1.4 + 0.08*sin(ang) + uIridPh);\n  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2));\n  float body = 1.0 - smoothstep(0.50, 0.97, rr);\n  vec3 col = (ir*dens*(0.62 + 0.55*uEnergy)*uIrid + ir*0.12*(0.6 + 0.4*z))*mix(0.10, 1.0, body) + uAmb*(1.0 - body) + vec3(0.012);"],["  col = mix(col, uTint*(0.10 + 0.55*dens), uTintWash);","  col = mix(col, uTint*(0.10 + 0.55*dens), uTintWash*body);"],["  col += rimC*fr*0.75*(1.0 + uRimBoost);\n  col += rimC*0.18*exp(-sq((rr - 0.9)*14.0));","  float frT = pow(1.0 - z, 8.0);\n  col += rimC*(frT*1.8 + fr*0.06)*(1.0 + uRimBoost);\n  col += rimC*0.14*exp(-sq((rr - 0.93)*40.0));"],["  col *= 0.70 + 0.30*z;","  col *= mix(0.70 + 0.30*z, 1.0, frT);"]],"onb":[]},{"id":"B","name":"Clean nebula","v2":[["  vec3 ir = irid(f2*1.4 + 0.08*sin(ang) + uIridPh);\n  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2));\n  vec3 col = vec3(0.012) + ir*dens*(0.62 + 0.55*uEnergy)*uIrid + ir*0.12*(0.6 + 0.4*z);","  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2));\n  float calm = smoothstep(0.4, 1.0, uIrid);\n  float lit = smoothstep(0.30, 0.78, f2);\n  vec3 cq = vec3(pp, z) - vec3(-0.30, 0.18, 0.80);\n  float cw = exp(-dot(cq, cq)*2.0);\n  float body = 1.0 - smoothstep(0.48, 0.97, rr);\n  vec3 ir = irid(0.02 + (0.30*lit + 0.20*cw)*calm + 0.04*sin(ang) + 0.05*sin(6.2831853*uIridPh));\n  ir = max(mix(vec3(dot(ir, vec3(0.299,0.587,0.114))), ir, 1.45), 0.0);\n  vec3 col = ir*(0.30 + 0.60*lit + 0.45*cw)*(0.62 + 0.55*uEnergy)*uIrid*mix(0.06, 1.0, body) + uAmb*(1.0 - body) + vec3(0.012);"],["  col = mix(col, uTint*(0.10 + 0.55*dens), uTintWash);","  col = mix(col, uTint*(0.10 + 0.55*dens), uTintWash*body);"],["  col += rimC*fr*0.75*(1.0 + uRimBoost);\n  col += rimC*0.18*exp(-sq((rr - 0.9)*14.0));","  float frT = pow(1.0 - z, 8.0);\n  col += rimC*(frT*1.8 + fr*0.06)*(1.0 + uRimBoost);\n  col += rimC*0.14*exp(-sq((rr - 0.93)*40.0));"],["  col *= 0.70 + 0.30*z;","  col *= mix(0.70 + 0.30*z, 1.0, frT);"]],"onb":[]},{"id":"C","name":"Deep core","v2":[["  vec3 ir = irid(f2*1.4 + 0.08*sin(ang) + uIridPh);\n  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2));\n  vec3 col = vec3(0.012) + ir*dens*(0.62 + 0.55*uEnergy)*uIrid + ir*0.12*(0.6 + 0.4*z);","  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2));\n  float calm = smoothstep(0.4, 1.0, uIrid);\n  float body = 1.0 - smoothstep(0.50, 0.98, rr);\n  vec3 cq = vec3(pp, z) - vec3(-0.30, 0.18, 0.80) - 0.20*vec3(f1 - 0.5, f2 - 0.5, 0.0);\n  float core = exp(-dot(cq, cq)*2.0);\n  vec3 sn = vec3(q, z); sn.xz = rot(uRot)*sn.xz;\n  float w1 = dot(sn, normalize(vec3(0.95, 0.18 + 0.25*sin(uDrift*0.37), 0.30))) + 0.08*(f1 - 0.5);\n  float w2 = dot(sn, normalize(vec3(0.45, -0.55, 0.70))) - 0.52 + 0.10*(f1 - 0.5);\n  float cur = (exp(-sq(w1/0.011)) + 0.20*exp(-sq(w1/0.06)) + 0.55*exp(-sq(w2/0.022)) + 0.25*exp(-sq(w2/0.08)))*(0.30 + 0.90*smoothstep(0.38, 0.62, f1))*body*calm;\n  float fold = smoothstep(0.0, 0.20, w1)*exp(-max(w1, 0.0)*5.0);\n  vec3 ir = irid((0.50*core - 0.24*smoothstep(0.0, 0.9, -sn.y)*(1.0 - core))*calm + 0.13*(f2 - 0.5) + 0.04*sin(6.2831853*uIridPh));\n  ir = max(mix(vec3(dot(ir, vec3(0.299,0.587,0.114))), ir, 1.45), 0.0);\n  vec3 col = ir*(0.60 + 1.05*core + 0.35*fold + 0.45*(smoothstep(0.2, 0.8, f2) - 0.5))*(0.62 + 0.55*uEnergy)*uIrid*mix(0.05, 1.0, body)\n           + irid(0.62 + 0.4*core)*cur*0.55 + uAmb*(1.0 - body) + vec3(0.012);"],["  col = mix(col, uTint*(0.10 + 0.55*dens), uTintWash);","  col = mix(col, uTint*(0.10 + 0.55*dens), uTintWash*body);"],["  col += rimC*fr*0.75*(1.0 + uRimBoost);\n  col += rimC*0.18*exp(-sq((rr - 0.9)*14.0));","  float frT = pow(1.0 - z, 8.0);\n  col += rimC*(frT*1.8 + fr*0.06)*(1.0 + uRimBoost);\n  col += rimC*0.14*exp(-sq((rr - 0.93)*40.0));"],["  col *= 0.70 + 0.30*z;","  col *= mix(0.70 + 0.30*z, 1.0, frT);"]],"onb":[["  vec3 ir = irid(f2*1.4 + 0.08*sin(ang)*smoothstep(0.0, 0.35, rr) + uPh2.y);\n  ir = mix(ir, uTi.rgb, uCb.w);\n  float bf = uB.x*1.4;\n  float bm = 1.0 - smoothstep(bf - 0.35, bf - 0.05, rr);\n  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2))*bm;\n  vec3 col = vec3(0.012) + ir*dens*(0.62 + 0.55*uL.x)*uL.w + ir*0.12*(0.6 + 0.4*z)*bm*mix(0.5, 1.0, uL.w);","  float bf = uB.x*1.4;\n  float bm = 1.0 - smoothstep(bf - 0.35, bf - 0.05, rr);\n  float dens = mix(0.18, 1.0, smoothstep(0.22, 0.78, f2))*bm;\n  float calm = smoothstep(0.4, 1.0, uL.w);\n  float body = mix(1.0, 1.0 - smoothstep(0.50, 0.98, rr), clamp(uB.y, 0.0, 1.0));\n  vec3 cq = vec3(pp, z) - vec3(-0.30, 0.18, 0.80) - 0.20*vec3(f1 - 0.5, f2 - 0.5, 0.0);\n  float core = exp(-dot(cq, cq)*2.0);\n  vec3 sn = vec3(q, z); sn.xz = rot(uPh2.x)*sn.xz;\n  float w1 = dot(sn, normalize(vec3(0.95, 0.18 + 0.25*sin(uPh.w*0.37), 0.30))) + 0.08*(f1 - 0.5);\n  float w2 = dot(sn, normalize(vec3(0.45, -0.55, 0.70))) - 0.52 + 0.10*(f1 - 0.5);\n  float cur = (gs(w1/0.011) + 0.20*gs(w1/0.06) + 0.55*gs(w2/0.022) + 0.25*gs(w2/0.08))*(0.30 + 0.90*smoothstep(0.38, 0.62, f1))*body*calm*bm;\n  float fold = smoothstep(0.0, 0.20, w1)*exp(-max(w1, 0.0)*5.0);\n  vec3 ir = irid((0.50*core - 0.24*smoothstep(0.0, 0.9, -sn.y)*(1.0 - core))*calm + 0.13*(f2 - 0.5) + 0.04*sin(6.2831853*uPh2.y));\n  ir = max(mix(vec3(dot(ir, vec3(0.299,0.587,0.114))), ir, 1.45), 0.0);\n  ir = mix(ir, uTi.rgb, uCb.w*body);\n  vec3 col = ir*(0.60 + 1.05*core + 0.35*fold + 0.45*(smoothstep(0.2, 0.8, f2) - 0.5))*(0.62 + 0.55*uL.x)*uL.w*mix(0.05, 1.0, body)*bm\n           + irid(0.62 + 0.4*core)*cur*0.55 + uAm.rgb*(1.0 - body*bm) + vec3(0.012);"],["  col += rimC*fr*0.75*rh;\n  col += rimC*0.18*gs((rr - 0.9)*14.0)*rh;","  float frT = pow(1.0 - z, 8.0);\n  col += rimC*(frT*1.8 + fr*0.06)*rh;\n  col += rimC*0.14*gs((rr - 0.93)*40.0)*rh;"],["  col *= 0.70 + 0.30*z;","  col *= mix(0.70 + 0.30*z, 1.0, frT*clamp(rh, 0.0, 1.0));"]]}];
+/* idle fallback (t = 2.0 in nucleo-v2) when the prototype cannot be loaded */
+var FALLBACK = {"uR":210.1538,"uBreath":1,"uGlobal":0,"uLean":[0,0],"uRipple":[-1.5708,0,113.0973],"uEmit":[[0,0,0.2],[0,0,0.2],[0,0,0.2],[0,0,0.2]],"uPull":[0,0],"uEnergy":0.35,"uVoice":0,"uGlow":1,"uIrid":1,"uListenIr":0,"uTwist":0,"uTwistOsc":1.6,"uFlow":0.36,"uDrift":0.308,"uRot":0.1,"uIridPh":0.024,"uCioRot":0.4,"uSwirlAmt":0,"uNodes":[[2.4435,0.98,0],[0.6981,0.98,0],[-1.5708,0.98,0]],"uNodeDir":[1,-1,1],"uSep":1,"uBraid":0,"uFil":[0.8,0,1],"uFlood":0,"uV":[0.9647,0.7255,0.3059],"uScrim":0,"uVCore":[0.1384,0.0895,0.0245],"uShock":[0,0],"uShockC":[0.9098,0.8745,0.8157],"uExposure":0,"uTint":[0.7216,0.7608,0.8275],"uTintAmt":0.35,"uTintWash":0.12,"uNeighL":[0,0,0,0],"uNeighR":[0,0,0,0],"uCompMode":0,"uCompDepth":0,"uCompAmt":0,"uCompBg":[0.1275,0.135,0.1426],"uCompXf":[0,0,1.25,0],"uLight":[0,0],"uAmb":[0.0824,0.0706,0.1098],"uSpark":[0,0],"uRimBoost":0,"uSeed":0.62,"uStatic":0,"__rk":1};
+
+var STATES = [
+  { id: 'idle', t: 2.0, name: 'Idle 2.0' },
+  { id: 'listen', t: 4.6, name: 'Listening 4.6' },
+  { id: 'duel', t: 9.6, name: 'Duel 9.6' },
+  { id: 'pearl', t: 12.4, name: 'Pearl + filament 12.4' },
+  { id: 'talk', t: 20.2, name: 'Talking (silhouette) 20.2' },
+  { id: 'verdict', t: 23.9, name: 'Verdict flood 23.9' },
+  { id: 'isla', t: 35.95, name: 'Isla 35.95' },
+  { id: 'squad', t: 37.15, name: 'Squad (identity) 37.15' },
+  { id: 'record', t: 38.35, name: 'Record 38.35' },
+  { id: 'theses', t: 39.55, name: 'Theses 39.55' }
+];
+var SNAP = {};
+
+function applyPatches(src, patches){
+  var s = src, errs = [];
+  (patches || []).forEach(function(p, i){
+    var k = s.indexOf(p[0]);
+    if (k < 0){ errs.push('patch ' + i + ' not found'); return; }
+    if (s.indexOf(p[0], k + 1) >= 0){ errs.push('patch ' + i + ' ambiguous'); return; }
+    s = s.slice(0, k) + p[1] + s.slice(k + p[0].length);
+  });
+  return { src: s, errs: errs };
+}
+
+/* ---- ui state ---- */
+var selV = (QS.v ? QS.v.split(',') : VARIANTS.map(function(v){ return v.id; }));
+var selS = (QS.s ? QS.s.split(',') : ['idle']);
+var R = +(QS.r || 90);          /* sphere radius in CSS px (idle is 120 in the app) */
+var ANIM = QS.anim === '1';
+var AT = +(QS.at || 0);          /* extra seconds of drift/breath on top of the captured state */
+
+function btn(label, on, fn){ var b = D.createElement('button'); b.textContent = label; if (on) b.className = 'on'; b.onclick = fn; $('bar').appendChild(b); return b; }
+function sep(){ var s = D.createElement('span'); s.className = 'sep'; $('bar').appendChild(s); }
+function lbl(t){ var s = D.createElement('b'); s.textContent = t; $('bar').appendChild(s); }
+function go(){ var q = ['v=' + selV.join(','), 's=' + selS.join(','), 'r=' + R]; if (ANIM) q.push('anim=1'); if (AT) q.push('at=' + AT); if (QS.dpr) q.push('dpr=' + QS.dpr); location.search = '?' + q.join('&'); }
+function buildBar(){
+  lbl('variants');
+  VARIANTS.forEach(function(v){ btn(v.id, selV.indexOf(v.id) >= 0, function(){ var i = selV.indexOf(v.id); if (i >= 0) selV.splice(i, 1); else selV.push(v.id); selV.sort(function(a, b){ return idxV(a) - idxV(b); }); go(); }); });
+  sep(); lbl('states');
+  btn('all', selS.length === STATES.length, function(){ selS = STATES.map(function(s){ return s.id; }); go(); });
+  STATES.forEach(function(s){ btn(s.id, selS.indexOf(s.id) >= 0, function(){ var i = selS.indexOf(s.id); if (i >= 0){ if (selS.length > 1) selS.splice(i, 1); } else selS.push(s.id); selS.sort(function(a, b){ return idxS(a) - idxS(b); }); go(); }); });
+  sep();
+  btn(ANIM ? 'breathing on' : 'breathing off', ANIM, function(){ ANIM = !ANIM; go(); });
+  btn('r ' + R, false, function(){ R = R >= 120 ? 70 : (R >= 110 ? 120 : (R >= 90 ? 110 : 90)); go(); });
+  btn('bench', false, function(){ bench(2400); });
+}
+function idxV(id){ for (var i = 0; i < VARIANTS.length; i++) if (VARIANTS[i].id === id) return i; return 99; }
+function idxS(id){ for (var i = 0; i < STATES.length; i++) if (STATES[i].id === id) return i; return 99; }
+
+/* ---- layout: rows = states, columns = variants ---- */
+var dpr = QS.dpr ? +QS.dpr : Math.min(W.devicePixelRatio || 1, 2);
+var cells = [], CW, CH, LABH = 34;
+function layout(){
+  var vs = selV.map(function(id){ return VARIANTS[idxV(id)]; }).filter(Boolean);
+  var ss = selS.map(function(id){ var m = id.split('+'), st = STATES[idxS(m[0])]; if (!st) return null; return m[1] ? { id: st.id, t: st.t, name: st.name + ' +' + m[1] + 's', at: +m[1] } : st; }).filter(Boolean);
+  CW = Math.round(R * 2.9); CH = Math.round(R * 2.75) + LABH;
+  var wrap = $('wrap'); wrap.style.width = (CW * vs.length) + 'px'; wrap.style.height = (CH * ss.length) + 'px';
+  cells = [];
+  ss.forEach(function(s, j){
+    vs.forEach(function(v, i){
+      var c = { v: v, s: s, x: i * CW, y: j * CH, cx: i * CW + CW / 2, cy: j * CH + LABH + R * 1.35 };
+      var el = D.createElement('div'); el.className = 'cell';
+      el.style.left = c.x + 'px'; el.style.top = c.y + 'px'; el.style.width = CW + 'px'; el.style.height = CH + 'px';
+      c.el = el;
+      var l = D.createElement('div'); l.className = 'lab'; l.style.top = '8px';
+      l.innerHTML = v.id + ' · ' + v.name + '<br><i>' + s.name + '</i>';
+      el.appendChild(l);
+      wrap.insertBefore(el, $('gl'));
+      cells.push(c);
+    });
+  });
+  var cv = $('gl'); cv.style.width = (CW * vs.length) + 'px'; cv.style.height = (CH * ss.length) + 'px';
+  cv.width = Math.round(CW * vs.length * dpr); cv.height = Math.round(CH * ss.length * dpr);
+}
+function ambCss(c, snap){
+  var a = snap.uAmb || [0.0824, 0.0706, 0.1098];
+  var col = 'rgb(' + Math.round(a[0] * 255) + ',' + Math.round(a[1] * 255) + ',' + Math.round(a[2] * 255) + ')';
+  /* the stage gradient: 90% x 55% of the 390 x 844 stage, centred on the sphere */
+  var cy = c.cy - c.y;
+  c.el.style.background = 'radial-gradient(' + (351 * R / 120) + 'px ' + (464 * R / 120) + 'px at 50% ' + cy + 'px,' + col + ' 0%,#0B0A09 70%)';
+}
+
+/* ---- GL ---- */
+var gl, progs = {}, locs = {}, tex = null;
+var VS = 'attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }';
+function mkProg(g, fs, tag){
+  function sh(type, src){ var s = g.createShader(type); g.shaderSource(s, src); g.compileShader(s); if (!g.getShaderParameter(s, g.COMPILE_STATUS)){ throw new Error(tag + ': ' + g.getShaderInfoLog(s)); } return s; }
+  var p = g.createProgram(); g.attachShader(p, sh(g.VERTEX_SHADER, VS)); g.attachShader(p, sh(g.FRAGMENT_SHADER, fs)); g.linkProgram(p);
+  if (!g.getProgramParameter(p, g.LINK_STATUS)) throw new Error(tag + ': link ' + g.getProgramInfoLog(p));
+  return p;
+}
+function initGL(){
+  var cv = $('gl');
+  gl = cv.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false });
+  if (!gl) { msg('WebGL unavailable'); return false; }
+  var buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  var errs = [];
+  VARIANTS.forEach(function(v){
+    var r = applyPatches(BASE_FS, v.v2);
+    if (r.errs.length) errs.push(v.id + ' v2: ' + r.errs.join(', '));
+    try { progs[v.id] = mkProg(gl, r.src, v.id); } catch (e) { errs.push(String(e.message || e)); }
+    var o = applyPatches(ONB_FS, v.onb);
+    if (o.errs.length) errs.push(v.id + ' onboarding: ' + o.errs.join(', '));
+    try { var po = mkProg(gl, o.src, v.id + ' onboarding'); gl.deleteProgram(po); } catch (e) { errs.push(String(e.message || e)); }
+  });
+  tex = gl.createTexture(); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.clearColor(0, 0, 0, 0);
+  W.__labErrors = errs;
+  if (errs.length) msg('Shader errors: ' + errs.join(' | '));
+  return true;
+}
+function setU(p, name, v){
+  var L = gl.getUniformLocation(p, name);
+  if (L === null && Array.isArray(v) && Array.isArray(v[0])) L = gl.getUniformLocation(p, name + '[0]');
+  if (L === null) return;
+  if (typeof v === 'number') gl.uniform1f(L, v);
+  else if (Array.isArray(v[0])){ var f = []; v.forEach(function(a){ f.push.apply(f, a); }); gl.uniform3fv(L, new Float32Array(f)); }
+  else if (v.length === 2) gl.uniform2f(L, v[0], v[1]);
+  else if (v.length === 3) gl.uniform3f(L, v[0], v[1], v[2]);
+  else if (v.length === 4) gl.uniform4f(L, v[0], v[1], v[2], v[3]);
+}
+function breathAt(ph){
+  var t = ph * 4.8;
+  if (t < 1.9) return -Math.cos(Math.PI * t / 1.9);
+  if (t < 2.15) return 1;
+  if (t < 4.5){ var u = (t - 2.15) / 2.35, c = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; return 1 - 2 * c; }
+  return -1;
+}
+var t0 = performance.now();
+function draw(){
+  var el = ANIM ? (performance.now() - t0) / 1000 : 0;
+  gl.disable(gl.SCISSOR_TEST); gl.viewport(0, 0, gl.canvas.width, gl.canvas.height); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.SCISSOR_TEST);
+  cells.forEach(function(c){
+    var snap = SNAP[c.s.id]; if (!snap) return;
+    var ex = AT + el + (c.s.at || 0);
+    var p = progs[c.v.id]; if (!p) return;
+    gl.useProgram(p);
+    var al = gl.getAttribLocation(p, 'a'); gl.enableVertexAttribArray(al); gl.vertexAttribPointer(al, 2, gl.FLOAT, false, 0, 0);
+    Object.keys(snap).forEach(function(k){ setU(p, k, snap[k]); });
+    var cx = c.cx * dpr, cy = gl.canvas.height - c.cy * dpr, rp = R * dpr * (snap.__rk || 1);
+    setU(p, 'uC', [cx, cy]); setU(p, 'uR', rp);
+    if (ex){
+      setU(p, 'uDrift', snap.uDrift + ex * 0.154); setU(p, 'uRot', snap.uRot + ex * 0.05);
+      setU(p, 'uIridPh', (snap.uIridPh + ex * 0.012) % 1); setU(p, 'uSeed', (ex * 7.31) % 1);
+      if (c.s.id === 'idle' || c.s.id === 'isla' || c.s.id === 'squad' || c.s.id === 'record' || c.s.id === 'theses') setU(p, 'uBreath', breathAt(((ex + 2.0) / 4.8) % 1));
+    }
+    gl.uniform1i(gl.getUniformLocation(p, 'uComp'), 0);
+    var sx = Math.floor(c.x * dpr), sy = Math.floor(gl.canvas.height - (c.y + CH) * dpr);
+    gl.scissor(sx, sy, Math.ceil(CW * dpr), Math.ceil(CH * dpr));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  });
+  if (ANIM) requestAnimationFrame(draw);
+}
+function msg(t){ $('msg').textContent = t; }
+
+/* ---- companion matte (same recipe as nucleo-v2 §4.3: border flood fill, not a luminance key) ---- */
+function clamp(x, a, b){ return x < a ? a : (x > b ? b : x); }
+function sstep(a, b, x){ x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); }
+function buildMatte(img){
+  var N = 256, c = D.createElement('canvas'); c.width = N; c.height = N;
+  var x = c.getContext('2d'); x.drawImage(img, 0, 0, N, N);
+  var id = x.getImageData(0, 0, N, N), d = id.data, i, j, k;
+  var mr = 0, mg = 0, mb = 0, cnt = 0;
+  for (i = 0; i < N; i++){ [[i, 0], [i, N - 1], [0, i], [N - 1, i]].forEach(function(q){ var o = (q[1] * N + q[0]) * 4; mr += d[o]; mg += d[o + 1]; mb += d[o + 2]; cnt++; }); }
+  mr /= cnt; mg /= cnt; mb /= cnt;
+  var flood = new Uint8Array(N * N), qx = new Int32Array(N * N), qh = 0, qt = 0;
+  function nearBg(o){ return Math.max(Math.abs(d[o] - mr), Math.abs(d[o + 1] - mg), Math.abs(d[o + 2] - mb)) <= 22; }
+  for (i = 0; i < N; i++){ [i, (N - 1) * N + i, i * N, i * N + N - 1].forEach(function(p){ if (!flood[p] && nearBg(p * 4)){ flood[p] = 1; qx[qt++] = p; } }); }
+  while (qh < qt){
+    var p = qx[qh++], px = p % N, py = (p / N) | 0, o = p * 4;
+    var nb = [px > 0 ? p - 1 : -1, px < N - 1 ? p + 1 : -1, py > 0 ? p - N : -1, py < N - 1 ? p + N : -1];
+    for (k = 0; k < 4; k++){ var q = nb[k]; if (q < 0 || flood[q]) continue; var oq = q * 4;
+      if (Math.max(Math.abs(d[oq] - d[o]), Math.abs(d[oq + 1] - d[o + 1]), Math.abs(d[oq + 2] - d[o + 2])) <= 5 && nearBg(oq)){ flood[q] = 1; qx[qt++] = q; } }
+  }
+  var A = new Float32Array(N * N), B = new Float32Array(N * N);
+  for (i = 0; i < N * N; i++) A[i] = flood[i] ? 0 : 1;
+  for (j = 0; j < N; j++) for (i = 0; i < N; i++){ var mn = 1; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++){ var xx = clamp(i + dx, 0, N - 1), yy = clamp(j + dy, 0, N - 1); mn = Math.min(mn, A[yy * N + xx]); } B[j * N + i] = mn; }
+  for (var pass = 0; pass < 2; pass++){
+    for (j = 0; j < N; j++) for (i = 0; i < N; i++){ var s = 0; for (var ey = -1; ey <= 1; ey++) for (var ex = -1; ex <= 1; ex++){ s += B[clamp(j + ey, 0, N - 1) * N + clamp(i + ex, 0, N - 1)]; } A[j * N + i] = s / 9; }
+    var t = A; A = B; B = t;
+  }
+  for (j = 0; j < N; j++) for (i = 0; i < N; i++){
+    var rx = (i + 0.5) / N * 2 - 1, ry = (j + 0.5) / N * 2 - 1, rt = Math.sqrt(rx * rx + ry * ry);
+    var a = B[j * N + i] * (1 - sstep(0.70, 0.96, rt)), o2 = (j * N + i) * 4;
+    if (a < 0.02){ d[o2] = mr; d[o2 + 1] = mg; d[o2 + 2] = mb; }
+    d[o2 + 3] = Math.round(clamp(a, 0, 1) * 255);
+  }
+  x.putImageData(id, 0, 0);
+  return c;
+}
+function loadCompanion(done){
+  fetch('companions.json').then(function(r){ return r.json(); }).then(function(list){
+    var me = null; for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === 'mira') me = list[i];
+    if (!me || !me.dataUri) { done(); return; }
+    var img = new Image();
+    img.onload = function(){
+      var mc = buildMatte(img);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, mc);
+      gl.generateMipmap(gl.TEXTURE_2D); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      done();
+    };
+    img.onerror = function(){ done(); };
+    img.src = me.dataUri;
+  }).catch(function(){ done(); });
+}
+
+/* ---- capture real uniform states from the prototype (same origin), so the lab never drifts from nucleo-v2 ---- */
+function capture(done){
+  var fr = D.createElement('iframe'); fr.src = 'dist/nucleo-v2.html?t=2&freeze=1'; D.body.appendChild(fr);
+  var tries = 0;
+  function poll(){
+    tries++;
+    var w = fr.contentWindow, ok = false;
+    try { ok = !!(w && w.nucleo && w.document.getElementById('gl')); } catch (e) { ok = false; }
+    if (!ok){ if (tries > 80){ done(false); return; } setTimeout(poll, 100); return; }
+    setTimeout(function(){
+      try {
+        var g = w.document.getElementById('gl').getContext('webgl'), p = g.getParameter(g.CURRENT_PROGRAM);
+        var n = g.getProgramParameter(p, g.ACTIVE_UNIFORMS), names = [];
+        for (var i = 0; i < n; i++){ var u = g.getActiveUniform(p, i); names.push([u.name.replace('[0]', ''), u.size]); }
+        STATES.forEach(function(s){
+          w.nucleo.seek(s.t); w.nucleo.render();
+          var o = {};
+          names.forEach(function(nm){
+            if (nm[0] === 'uComp' || nm[0] === 'uC') return;
+            if (nm[1] > 1){ var arr = []; for (var k = 0; k < nm[1]; k++) arr.push(Array.from(g.getUniform(p, g.getUniformLocation(p, nm[0] + '[' + k + ']')))); o[nm[0]] = arr; }
+            else { var v = g.getUniform(p, g.getUniformLocation(p, nm[0])); o[nm[0]] = typeof v === 'number' ? v : Array.from(v); }
+          });
+          /* keep the relative size between states (idle r120 maps to R) */
+          o.__rk = o.uR / (120 * g.canvas.width / 390);
+          SNAP[s.id] = o;
+        });
+        done(true);
+      } catch (e) { console.error('[GlassLab] capture', e); done(false); }
+    }, 1200);
+  }
+  poll();
+}
+
+/* ---- bench: one sphere at the app's idle size on an iPhone-like backing store (r 120 x DPR 1.75) ---- */
+function bench(size){
+  size = size || 800; var c = D.createElement('canvas'); c.width = size; c.height = size;
+  var g = c.getContext('webgl', { alpha: true, premultipliedAlpha: true, antialias: false });
+  var out = ['bench: r = ' + Math.round(size * 0.2625) + ' px backing (800 = 120 CSS x DPR 1.75), ' + size + ' x ' + size + ' px, 200 draws each, readPixels sync every 20, best of 3 (lower is better)'];
+  var buf = g.createBuffer(); g.bindBuffer(g.ARRAY_BUFFER, buf); g.bufferData(g.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), g.STATIC_DRAW);
+  var snap = SNAP.idle || FALLBACK;
+  var saveGl = gl; gl = g;
+  var res = [];
+  for (var rep = 0; rep < 3; rep++){
+    VARIANTS.forEach(function(v, vi){
+      var r = applyPatches(BASE_FS, v.v2), p;
+      try { p = mkProg(g, r.src, v.id); } catch (e) { out.push(v.id + ' compile fail'); return; }
+      g.useProgram(p); var al = g.getAttribLocation(p, 'a'); g.enableVertexAttribArray(al); g.vertexAttribPointer(al, 2, g.FLOAT, false, 0, 0);
+      Object.keys(snap).forEach(function(k){ setU(p, k, snap[k]); });
+      setU(p, 'uC', [size / 2, size / 2]); setU(p, 'uR', size * 0.2625);
+      g.viewport(0, 0, size, size); g.enable(g.SCISSOR_TEST); g.scissor(0, 0, size, size);
+      var px1 = new Uint8Array(4);
+      for (var w = 0; w < 10; w++) g.drawArrays(g.TRIANGLES, 0, 3);
+      g.readPixels(size >> 1, size >> 1, 1, 1, g.RGBA, g.UNSIGNED_BYTE, px1);
+      var t = performance.now();
+      for (var i = 0; i < 200; i++){ g.drawArrays(g.TRIANGLES, 0, 3); if (i % 20 === 19) g.readPixels(size >> 1, size >> 1, 1, 1, g.RGBA, g.UNSIGNED_BYTE, px1); }
+      g.readPixels(size >> 1, size >> 1, 1, 1, g.RGBA, g.UNSIGNED_BYTE, px1);
+      var ms = (performance.now() - t) / 200;
+      res[vi] = Math.min(res[vi] || 1e9, ms);
+      g.deleteProgram(p);
+    });
+  }
+  VARIANTS.forEach(function(v, vi){ out.push(v.id + '  ' + (res[vi] != null ? res[vi].toFixed(3) + ' ms/draw' : 'n/a') + (vi ? '  (' + (res[vi] / res[0] * 100 - 100).toFixed(0) + '% vs current)' : '')); });
+  gl = saveGl;
+  $('bench').textContent = out.join('\n');
+  W.__bench = res;
+  return res;
+}
+
+buildBar();
+layout();
+if (initGL()){
+  var pending = 2;
+  function ready(){
+    if (--pending) return;
+    cells.forEach(function(c){ ambCss(c, SNAP[c.s.id] || FALLBACK); });
+    draw();
+    /* live colour metrics inside the glass (0.9r disc): OKLab chroma and the share of low-chroma mid-tones ("mud") */
+    try { var m = chroma(0.9); cells.forEach(function(c, i){ var l = D.createElement('div'); l.className = 'lab'; l.style.bottom = '6px'; l.innerHTML = '<i>chroma ' + m[i].meanChroma.toFixed(3) + ' · mud ' + Math.round(m[i].mudShare * 100) + '%</i>'; c.el.appendChild(l); }); } catch (e) {}
+    if (!ANIM) draw();
+    W.__labReady = true;
+  }
+  capture(function(ok){
+    if (!ok){ SNAP.idle = FALLBACK; msg('Prototype not reachable: showing the embedded idle state only.'); }
+    else if (!(W.__labErrors || []).length) msg('States captured live from dist/nucleo-v2.html. Onboarding patches compile: ' + (VARIANTS.length) + '/' + VARIANTS.length + '.');
+    ready();
+  });
+  loadCompanion(ready);
+}
+function relL(r, g, b){ function li(c){ c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); } return 0.2126 * li(r) + 0.7152 * li(g) + 0.0722 * li(b); }
+/* composite over the cell backdrop is approximated by the ambient centre colour (the glass interior is opaque, alpha 1) */
+function probe(k, ox, oy){
+  draw();
+  return cells.map(function(c){
+    var cx = Math.round((c.cx + (ox || 0) * R) * dpr), cy = Math.round(gl.canvas.height - (c.cy - (oy || 0) * R) * dpr), rad = Math.round((k || 0.3) * R * dpr);
+    var w = rad * 2 + 1, px = new Uint8Array(w * w * 4);
+    gl.readPixels(cx - rad, cy - rad, w, w, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    var sum = 0, n = 0, mx = 0, sr = 0, sg = 0, sb = 0;
+    for (var j = 0; j < w; j++) for (var i = 0; i < w; i++){ var dx = i - rad, dy = j - rad; if (dx * dx + dy * dy > rad * rad) continue; var o = (j * w + i) * 4; var L = relL(px[o], px[o + 1], px[o + 2]); sum += L; n++; if (L > mx) mx = L; sr += px[o]; sg += px[o + 1]; sb += px[o + 2]; }
+    return { v: c.v.id, s: c.s.name, meanL: +(sum / n).toFixed(4), maxL: +mx.toFixed(4), rgb: [Math.round(sr / n), Math.round(sg / n), Math.round(sb / n)] };
+  });
+}
+function chroma(k){
+  /* mean OKLab chroma and share of low-chroma mid-grey pixels ("mud") inside the glass */
+  draw();
+  function lin(c){ c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  return cells.map(function(c){
+    var cx = Math.round(c.cx * dpr), cy = Math.round(gl.canvas.height - c.cy * dpr), rad = Math.round((k || 0.9) * R * dpr);
+    var w = rad * 2 + 1, px = new Uint8Array(w * w * 4);
+    gl.readPixels(cx - rad, cy - rad, w, w, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    var n = 0, cs = 0, mud = 0, Ls = 0;
+    for (var j = 0; j < w; j += 2) for (var i = 0; i < w; i += 2){ var dx = i - rad, dy = j - rad; if (dx * dx + dy * dy > rad * rad) continue; var o = (j * w + i) * 4;
+      var r = lin(px[o]), g = lin(px[o + 1]), b = lin(px[o + 2]);
+      var l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), s2 = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+      var L = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s2, A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s2, B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s2;
+      var C = Math.sqrt(A * A + B * B); cs += C; Ls += L; n++; if (L > 0.30 && L < 0.75 && C < 0.06) mud++; }
+    return { v: c.v.id, s: c.s.name, meanChroma: +(cs / n).toFixed(4), meanL: +(Ls / n).toFixed(3), mudShare: +(mud / n).toFixed(3) };
+  });
+}
+W.lab = { draw: function(){ draw(); }, bench: bench, snaps: function(){ return SNAP; }, probe: probe, chroma: chroma };
+})();
+</script>
+</body>
+</html>

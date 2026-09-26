@@ -1,0 +1,6 @@
+{
+ "v": 1,
+ "status": "too_long",
+ "maxLength": 1200,
+ "message": "Your question is too long. Keep it to 1,200 characters or fewer."
+}

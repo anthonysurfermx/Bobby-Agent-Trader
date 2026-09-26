@@ -1,0 +1,77 @@
+{
+ "v": 1,
+ "volatileKeys": [
+  "requestId",
+  "elapsedMs",
+  "fixture"
+ ],
+ "recorded": {
+  "deskDebateCalls": 2,
+  "at": "2026-09-26T11:36:10Z",
+  "language": "en",
+  "note": "Both real reads returned verdict 'wait'. No real 'review' capture exists yet."
+ },
+ "assetSearch": [
+  {
+   "contains": [
+    "nvidea"
+   ],
+   "raw": "asset-search.fuzzy.json",
+   "ask": "confirm-fuzzy"
+  },
+  {
+   "contains": [
+    "gold",
+    " oro"
+   ],
+   "raw": "asset-search.proxy.json",
+   "ask": "confirm-proxy"
+  },
+  {
+   "contains": [
+    "nvidia",
+    "nvda"
+   ],
+   "raw": "asset-search.nvda.json",
+   "ask": "nvda"
+  },
+  {
+   "contains": [
+    "bitcoin",
+    "btc"
+   ],
+   "raw": "asset-search.btc.json",
+   "ask": "btc"
+  },
+  {
+   "contains": [],
+   "raw": "asset-search.none.json",
+   "ask": "unknown"
+  }
+ ],
+ "bySymbol": {
+  "NVDA": {
+   "candles": "candles.nvda.json",
+   "market": "market.nvda.json",
+   "pulse": "pulse.nvda.json",
+   "debate": "desk-debate.nvda.json"
+  },
+  "BTC": {
+   "candles": "candles.btc.json",
+   "market": "market.btc.json",
+   "pulse": "pulse.btc.json",
+   "debate": "desk-debate.btc.json"
+  }
+ },
+ "scenarios": {
+  "default": "replay the recorded read (desk latency = min(recorded, 6000 ms))",
+  "slow": "replay with a 45 s desk latency (THINK_WAIT long-wait copy)",
+  "hang": "desk request never answers; ends as error.timeout after 20 s (client timeout stand-in)",
+  "quota": "desk-debate.quota.json",
+  "too_long": "desk-debate.too_long.json",
+  "failed": "desk-debate.failed.json",
+  "unavailable": "desk-debate.unavailable.json",
+  "gateway_timeout": "desk-debate.gateway_timeout.json",
+  "offline": "every request fails with URLError.notConnectedToInternet (error.network)"
+ }
+}

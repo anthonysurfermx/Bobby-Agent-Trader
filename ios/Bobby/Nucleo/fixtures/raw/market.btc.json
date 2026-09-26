@@ -1,0 +1,30 @@
+{
+ "request": {
+  "method": "POST",
+  "path": "api/voice-tool",
+  "body": {
+   "tool": "get_market",
+   "args": {
+    "symbol": "BTC"
+   }
+  }
+ },
+ "status": 200,
+ "headers": {
+  "Cache-Control": "public, max-age=0, must-revalidate",
+  "Content-Type": "application/json; charset=utf-8",
+  "Date": "Sat, 26 Sep 2026 11:35:50 GMT"
+ },
+ "elapsedMs": 1297,
+ "recordedAt": "2026-09-26T11:35:49Z",
+ "body": {
+  "symbol": "BTC",
+  "assetType": "crypto",
+  "available": true,
+  "price": 84181.3,
+  "change_24h_pct": -0.89,
+  "high_24h": 84948,
+  "low_24h": 83174.7,
+  "funding_rate": 1.19002591243e-05
+ }
+}

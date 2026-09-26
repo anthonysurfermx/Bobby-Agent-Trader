@@ -1,0 +1,13 @@
+{
+ "v": 1,
+ "status": "confirm",
+ "token": "fixture-confirm-proxy",
+ "asset": {
+  "symbol": "XAUT",
+  "name": "Xau",
+  "isEquity": false,
+  "assetClass": "commodity"
+ },
+ "matchKind": "proxy",
+ "proxyNote": "Tether Gold (XAUT), a tokenized gold product"
+}
