@@ -14,7 +14,6 @@ import { useAppKit } from '@reown/appkit/react';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { t } from '@/lib/companions/i18n';
 
-const GOLD = '#F5C542';
 
 /** Asset questions before the prompt appears. */
 export const ASK_THRESHOLD = 3;
@@ -164,16 +163,16 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp:
         initial={{ scale: 0.92, y: 18 }}
         animate={{ scale: 1, y: 0 }}
         transition={{ type: 'spring', bounce: 0.35, duration: 0.6 }}
-        className="relative my-auto w-full max-w-sm overflow-hidden rounded-3xl bg-[#07090c] p-6"
-        style={{ border: `1px solid ${GOLD}40`, boxShadow: `0 0 60px ${GOLD}22` }}
+        className="n-card relative my-auto w-full max-w-sm overflow-hidden rounded-[28px] p-6"
+        style={{ boxShadow: '0 40px 80px -30px rgba(0,0,0,.9)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={close} aria-label={t('Close', 'Cerrar')} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/[0.06] text-white/70 transition hover:text-white">
           <X size={15} />
         </button>
 
-        <div className="font-mono text-[10px] tracking-[0.24em]" style={{ color: GOLD }}>{voiceAccess ? 'BOBBY VOICE' : t('YOUR PROGRESS', 'TU PROGRESO')}</div>
-        <h2 id="signin-prompt-title" className="mt-3 text-2xl font-semibold leading-tight text-white">
+        <div className="n-label">{voiceAccess ? 'BOBBY VOICE' : t('YOUR PROGRESS', 'TU PROGRESO')}</div>
+        <h2 id="signin-prompt-title" className="n-display mt-3 text-[28px] leading-tight text-white">
           {voiceAccess ? t('3 voice minutes a day', '3 min de voz al día') : t('Want to keep your points?', '¿Quieres conservar tus puntos?')}
         </h2>
         <p className="mt-3 text-sm leading-6 text-white/60">
@@ -190,7 +189,7 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false }: { xp:
               type="button"
               onClick={option.run}
               disabled={busy !== null}
-              className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 text-sm font-medium text-white transition hover:border-white/25 hover:bg-white/[0.08] disabled:opacity-50"
+              className="flex min-h-[52px] w-full items-center justify-center gap-3 rounded-full border border-white/[0.12] bg-black px-5 text-[15px] font-medium text-white transition hover:border-white/30 disabled:opacity-50"
             >
               <span className="grid h-6 w-6 place-items-center text-white/85">
                 {busy === option.id ? <Loader2 size={16} className="animate-spin" /> : option.icon}

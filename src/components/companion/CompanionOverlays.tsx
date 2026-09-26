@@ -17,16 +17,16 @@ const WORLD_REGIONS = ['CRYPTO BAY', 'GOLD MINES', 'WALL STREET CITADEL', 'RISK 
 
 export function EvolutionOverlay({ companion, level, onDone }: { companion: Companion; level: CompanionLevel; onDone: () => void }) {
   useEffect(() => { sfxLevelUp(); }, []);
-  const tint = tintFor(companion);
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85">
-      <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 50% 45%, ${tintFor(companion, 0.25)}, transparent 55%)` }} />
-      <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', bounce: 0.4, duration: 0.6 }} className="relative text-center space-y-3 px-8">
-        <div className="text-[11px] font-mono tracking-[0.3em]" style={{ color: tint }}>{t('EVOLVED', 'EVOLUCIONÓ')}</div>
-        <div className="text-4xl font-semibold text-white">{companionName(companion, level.number)}</div>
-        <div className="text-[11px] font-mono tracking-[0.2em] text-white/60">{t('LEVEL', 'NIVEL')} {level.number} · {level.name}</div>
-        <div className="text-sm text-white/70">{t('Earned with discipline, never with volume.', 'Ganado con disciplina, nunca con volumen.')}{pick(LEVEL_TONE[level.number] ?? { en: '', es: '' })}</div>
-        <button onClick={onDone} className="mt-4 px-8 py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: tint }}>{t('CONTINUE', 'CONTINUAR')}</button>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(11,10,9,.97)' }}>
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(50% 40% at 50% 42%, #15121C, transparent 72%)' }} />
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', bounce: 0.3, duration: 0.6 }} className="relative flex max-w-md flex-col items-center px-8 text-center">
+        <img src={`/mascots/${companion.id}.webp`} alt="" className="h-28 w-28 rounded-full object-cover" style={{ boxShadow: '0 0 0 1px rgba(242,237,228,.14), 0 0 60px -10px rgba(242,237,228,.35)' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+        <div className="n-label mt-7">{t('Your avatar evolved', 'Tu avatar evolucionó')}</div>
+        <div className="n-display mt-3 text-[44px] leading-none" style={{ color: '#FFF8EC' }}>{companionName(companion, level.number)}</div>
+        <div className="n-label mt-4" style={{ color: '#A39C91' }}>{t('Level', 'Nivel')} {level.number} · {level.name}</div>
+        <div className="mt-4 text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{t('Earned with discipline, never with volume.', 'Ganado con disciplina, nunca con volumen.')}{pick(LEVEL_TONE[level.number] ?? { en: '', es: '' })}</div>
+        <button onClick={onDone} className="n-cta on mt-8 max-w-[260px]">{t('Continue', 'Continuar')}</button>
       </motion.div>
     </motion.div>
   );
@@ -34,21 +34,20 @@ export function EvolutionOverlay({ companion, level, onDone }: { companion: Comp
 
 export function ToolUnlockOverlay({ companion, tool, onDone }: { companion: Companion; tool: CompanionTool; onDone: () => void }) {
   const golden = tool.tier === 3;
-  const tint = golden ? GOLD : tintFor(companion);
+  const tint = golden ? GOLD : '#F2EDE4';
   useEffect(() => { sfxLoot(golden); }, [golden]);
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85">
-      <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 50% 45%, ${golden ? 'rgba(245,197,66,0.28)' : tintFor(companion, 0.28)}, transparent 55%)` }} />
-      <motion.div initial={{ scale: 0.6, rotate: -12, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }} transition={{ type: 'spring', bounce: 0.45, duration: 0.65 }} className="relative text-center space-y-3 px-8">
-        <div className="text-[11px] font-mono tracking-[0.3em]" style={{ color: tint }}>{golden ? t('GOLDEN GEAR UNLOCKED', 'EQUIPO DORADO DESBLOQUEADO') : t('NEW GEAR UNLOCKED', 'NUEVO EQUIPO DESBLOQUEADO')}</div>
-        <div className="mx-auto h-56 w-56 rounded-full flex items-center justify-center overflow-hidden" style={{ background: `${tint}1a`, boxShadow: `0 0 40px ${tint}66`, border: `1px solid ${tint}80` }}>
-          {toolHasArt(tool) ? <img src={toolArt(tool)} alt="" className="h-52 w-52 object-contain" /> : <span className="text-7xl" style={{ color: tint }}>{tool.glyph}</span>}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(11,10,9,.97)' }}>
+      <div className="absolute inset-0" style={{ background: golden ? 'radial-gradient(45% 36% at 50% 40%, rgba(246,185,78,.16), transparent 72%)' : 'radial-gradient(50% 40% at 50% 40%, #15121C, transparent 72%)' }} />
+      <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', bounce: 0.35, duration: 0.6 }} className="relative flex max-w-md flex-col items-center px-8 text-center">
+        <div className="n-label" style={{ color: golden ? GOLD : undefined }}>{golden ? t('Golden gear unlocked', 'Equipo dorado desbloqueado') : t('New gear unlocked', 'Nuevo equipo desbloqueado')}</div>
+        <div className="mt-6 grid h-52 w-52 place-items-center overflow-hidden rounded-full" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(242,237,228,.07), rgba(242,237,228,.015) 70%)', boxShadow: `0 0 0 1px ${tint}33, 0 0 60px -12px ${tint}66` }}>
+          {toolHasArt(tool) ? <img src={toolArt(tool)} alt="" className="h-48 w-48 object-contain" /> : <span className="text-7xl" style={{ color: tint }}>{tool.glyph}</span>}
         </div>
-        <div className="text-3xl font-semibold text-white">{pick(tool.name)}</div>
-        <div className="flex items-center justify-center gap-2 text-sm text-white/80"><img src={`/mascots/${companion.id}.webp`} alt="" className="h-6 w-6 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />{t(`equipped on ${companionName(companion, 1)}`, `equipado en ${companionName(companion, 1)}`)}</div>
-        <div className="text-[11px] font-mono tracking-[0.2em] text-white/60">{pick(toolTierLabel(tool.tier))} · {toolUnlockXP(tool.tier)} XP</div>
-        <div className="text-sm text-white/75 max-w-sm mx-auto">{pick(tool.lore)}</div>
-        <button onClick={onDone} className="mt-3 px-8 py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: tint }}>{t('EQUIP IT', 'EQUIPARLO')}</button>
+        <div className="n-display mt-6 text-[32px] leading-tight" style={{ color: '#FFF8EC' }}>{pick(tool.name)}</div>
+        <div className="mt-2 flex items-center justify-center gap-2 text-[14px]" style={{ color: '#A39C91' }}><img src={`/mascots/${companion.id}.webp`} alt="" className="h-6 w-6 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />{t(`for ${companionName(companion, 1)}`, `para ${companionName(companion, 1)}`)} · {pick(toolTierLabel(tool.tier))} · {toolUnlockXP(tool.tier)} XP</div>
+        <div className="mt-4 max-w-sm text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{pick(tool.lore)}</div>
+        <button onClick={onDone} className="n-cta on mt-8 max-w-[260px]">{t('Equip it', 'Equiparlo')}</button>
       </motion.div>
     </motion.div>
   );
