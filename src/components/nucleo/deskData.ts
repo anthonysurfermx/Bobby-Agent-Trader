@@ -184,13 +184,14 @@ export async function topMovers(limit = 2): Promise<Mover[]> {
   return out.slice(0, limit);
 }
 
-export interface Candle { ts: number; close: number }
+export interface Candle { ts: number; close: number; high: number | null; low: number | null; volume: number | null }
 export async function candles(symbol: string, isEquity: boolean): Promise<Candle[]> {
   try {
     const url = isEquity ? `/api/stock-candles?symbol=${symbol}&range=7d&interval=1h` : `/api/okx-candles?instId=${symbol}-USDT&bar=1H&limit=100`;
     const res = await fetch(url);
     const obj = (await res.json()) as { candles?: Array<Record<string, unknown>> };
-    return (obj.candles ?? []).map((r) => ({ ts: Number(r.ts), close: Number(r.close) })).filter((c) => Number.isFinite(c.close));
+    const opt = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+    return (obj.candles ?? []).map((r) => ({ ts: Number(r.ts), close: Number(r.close), high: opt(r.high), low: opt(r.low), volume: opt(r.volume) })).filter((c) => Number.isFinite(c.close));
   } catch { return []; }
 }
 

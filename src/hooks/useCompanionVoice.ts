@@ -40,7 +40,10 @@ export function useCompanionVoice() {
       audioRef.current = new Audio();
       audioRef.current.crossOrigin = 'anonymous';
     }
-    if (!ctxRef.current) {
+    // On an iPhone, sound routed through Web Audio obeys the ring/silent switch, so a phone on silent
+    // plays the voice to nobody. There the <audio> element plays on its own (no mouth level).
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (!ctxRef.current && !ios) {
       try {
         const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (Ctor) {
@@ -55,6 +58,32 @@ export function useCompanionVoice() {
     }
     return audioRef.current;
   };
+
+  // Safari (macOS and iPhone) only lets a page make sound from inside a tap or a key press, and the
+  // read's voice arrives seconds after the tap that asked for it. So the first gesture on the page
+  // creates and resumes the audio graph and primes the one <audio> element with a silent clip; every
+  // later play() on that element, even without a gesture, is then allowed.
+  useEffect(() => {
+    const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+    let done = false;
+    const unlock = () => {
+      if (done) return;
+      done = true;
+      try {
+        const audio = ensureAudio();
+        void ctxRef.current?.resume?.();
+        if (!audio.src || audio.paused) {
+          const prev = audio.src;
+          audio.src = SILENT;
+          void audio.play().then(() => { if (audio.src === SILENT) { audio.pause(); if (prev) audio.src = prev; } }).catch(() => { done = false; });
+        }
+      } catch { done = false; }
+      if (done) off();
+    };
+    const off = () => { ['pointerdown', 'keydown', 'touchend'].forEach((e) => window.removeEventListener(e, unlock, true)); };
+    ['pointerdown', 'keydown', 'touchend'].forEach((e) => window.addEventListener(e, unlock, true));
+    return off;
+  }, []);
 
   const meter = () => {
     const analyser = analyserRef.current;

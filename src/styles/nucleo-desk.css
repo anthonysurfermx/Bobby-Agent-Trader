@@ -184,7 +184,7 @@ body.nucleo-ui .n-ask input:focus-visible { outline: none; }
 .n-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(0, 0, 0, .5); border: 1px solid var(--n-line); }
 .n-seg button { height: 30px; padding: 0 12px; border-radius: 999px; font: 500 11px/1 var(--n-mono); letter-spacing: .12em; color: var(--n-ink3); }
 .n-seg button[aria-pressed="true"] { background: var(--n-ink); color: #0B0A09; }
-.n-ack { width: 100%; display: flex; gap: 14px; align-items: flex-start; text-align: left; padding: 16px 4px; border-top: 1px solid var(--n-hair); transition: opacity .2s ease; }
+.n-ack { width: 100%; display: flex; gap: 14px; align-items: flex-start; text-align: left; padding: 13px 4px; border-top: 1px solid var(--n-hair); transition: opacity .2s ease; }
 .n-ack:last-child { border-bottom: 1px solid var(--n-hair); }
 .n-ack-box { flex: none; margin-top: 2px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid rgba(242, 237, 228, .3); color: #0B0A09; transition: all .25s ease; }
 .n-ack.on .n-ack-box { background: var(--n-alpha); border-color: var(--n-alpha); box-shadow: 0 0 14px rgba(63, 224, 181, .45); }
@@ -220,4 +220,13 @@ button.n-row:hover { background: rgba(242, 237, 228, .025); }
   .n-sats { gap: 10px; }
   .n-sats.left, .n-sats.right { align-items: stretch; }
   .n-sat { max-width: none; }
+}
+/* what each voice says, in chart terms, above the chart */
+.n-claims { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.n-claim { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; background: rgba(242, 237, 228, .03); border: 1px solid var(--n-hair); min-width: 0; }
+.n-claim-t { font: 400 14px/1.3 var(--n-sans); color: var(--n-ink); }
+@media (max-width: 640px) {
+  .n-claims { grid-template-columns: 1fr; gap: 6px; }
+  .n-claim { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 10px; padding: 8px 12px; }
+  .n-claim-t { font-size: 13px; text-align: right; }
 }
