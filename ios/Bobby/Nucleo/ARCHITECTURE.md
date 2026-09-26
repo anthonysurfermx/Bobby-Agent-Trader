@@ -415,8 +415,8 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | State | Reuses | Data |
 |---|---|---|
 | BIRTH (O0) | O0 0.00–2.80, plays once | only when `session.firstRun && companion == null` |
-| HELLO (O1) | O1 2.80–7.60: trailer duel, ivory soft impact | Onboarding copy from the strings table, spoken with `speak()` (default voice before a pick), karaoke per §3.2 |
-| PICK (O2) | O2 identity mode, belt, snow, swipe physics | Starters are `roster()` entries with `requiredLevel == 1 && unlocked`, in roster order; the default is the first that is not `orb`. `previewVoice` runs 350 ms after each detent. The pill "Choose {Label}" calls `setCompanion({id})` then celebrates. The avatar and temperament follow the choice (no fixed `CHOSEN`). |
+| HELLO (O1) | O1 2.80–7.60: trailer duel, ivory soft impact | Onboarding copy from the strings table, spoken with `speak()` (default voice, before the companion is assigned), karaoke per §3.2; then ASK_TEACH |
+| ~~PICK (O2)~~ | removed 2026-09-26 (owner's decision): the glass leads the first run | There is no picker. When HELLO ends, `ensureCompanion()` silently assigns the default starter with the old picker rule (the first `roster()` entry with `requiredLevel == 1 && unlocked` whose id is not `orb`) through `setCompanion({id})`, and goes straight to ASK_TEACH. The header avatar fades in and the rim glides to the companion tint; the companion never surfaces as the hero. The avatar is part of the profile: `AccountSheet` (header avatar → `openNative("account")`) has a "Your avatar / Tu avatar" row that opens `MascotGalleryView`. If `finishOnboarding` still reports `missing: ["companion"]`, the page assigns the default and finishes again. |
 | ASK_TEACH (O3) | O3 title/sub/chips, pre-permission card | Chips come from `suggestions()` via the strings template ("How is {SYM} looking?" / "Why is {SYM} moving today?" only for `movers`). The pre-permission card uses **Continue**, then `speech.requestPermission()`, which triggers the **real** OS prompts; the fake alerts are deleted. Denied or unavailable → typing. LISTENING/TYPING as in §3.2; the question becomes the bead, which is **not sent yet** |
 | RISK (O4) | O4 ring + hold-to-agree, the same geometry as the conviction ring | `riskNotice()`: the 4 `title`s are the pulse-swept lines, with statement 1's `body` below them (Geist 13 ink2). "Read the full notice" calls `openNative("riskNotice")`. Completing the 1200 ms hold calls `acceptRisk({version})`; an early release unwinds with no copy |
 | READ (O5) | O5, as the daily THINK→VERDICT states | `ask({question})`. First-read options: `build(r, {firstRead:true})` (3 satellites), a 4.5 s floor. The conviction explainer hint appears only when `ring.mode == "conviction"`. Non-ok replies use the daily ERROR/CONFIRM patterns; after an error the chip "Try another question" returns to ASK_TEACH |
@@ -641,7 +641,7 @@ The three builders work in parallel, and no file is owned by two of them. None m
 **Acceptance** (browser mock at `.../onboarding.html?first=1`, your own tab):
 - **C1.** A full first run with real input:
   1. Birth, then hello (mock voice karaoke).
-  2. The picker shows the **10 starters from `roster()`**, defaulting to `byte`. `previewVoice` fires on each detent. Choosing calls `setCompanion`, and the avatar and tint follow the choice.
+  2. No picker (since 2026-09-26): after hello, `setCompanion` is called once with the default starter (`byte` in the fixtures) and the run goes straight to ask-teach; the avatar and tint follow it quietly.
   3. Ask-teach chips come from `suggestions()`. With `mic=undetermined`: Continue, then `requestPermission`, then hold-to-ask. The question waits as the bead.
   4. The risk beat shows the **4 real statements** (and the Spanish ones under `lang=es`). An early release unwinds; the full hold calls `acceptRisk`.
   5. The read has 3 satellites and honours the 4.5 s floor.
@@ -650,10 +650,10 @@ The three builders work in parallel, and no file is owned by two of them. None m
   8. The sign-in sheet has Apple and "Not now" only; "Not now" leads to "Saved on this device".
   9. No Isla peek (signed out).
   10. Home, then `finishOnboarding` is called.
-- **C2.** A grep of `src/onboarding` for `ALERTS`, `Would Like to`, `PICK_IDS`, `CHOSEN =`, `Watch & ping`, `Continue with Google`, `CALM ENTRY`, `178.40`, `Mira it is.` returns 0. The celebration line is built from the chosen label via the strings table.
+- **C2.** A grep of `src/onboarding` for `ALERTS`, `Would Like to`, `PICK_IDS`, `CHOSEN =`, `Watch & ping`, `Continue with Google`, `CALM ENTRY`, `178.40`, `Mira it is.` returns 0. (The picker and its celebration line are gone since 2026-09-26.)
 - **C3.** With `mic=denied`, the typing path completes the whole run. `#risk&risk=0` runs only the risk beat and then `finishOnboarding`. `first=1&companion=kora` resumes at ASK_TEACH.
 - **C4.** Errors during the first read (`scenario=quota|failed|offline`) give an honest caption and "Try another question", with no XP and no sign-in sheet.
-- **C5.** Determinism: `?harness=1&script=first-run&t=<s>&freeze=1` gives identical hashes for the hero frames (born, picker, mic card, risk ring filling, debate, verdict, saved + XP, sign-in sheet, home).
+- **C5.** Determinism: `?harness=1&script=first-run&t=<s>&freeze=1` gives identical hashes for the hero frames (born, ask, mic card, risk ring filling, debate, verdict, saved + XP, sign-in sheet, home).
 - **C6.** Spanish and reduced motion, as in B6.
 
 ### 6.5 Integration (after A, B and C report)

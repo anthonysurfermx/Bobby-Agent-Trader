@@ -1,22 +1,24 @@
 
 /* ============================================================
    The first run as a state machine (ARCHITECTURE.md §3.3).
-   BIRTH → HELLO → PICK → PICKED → ASK_TEACH (⇄ PRE_PERMISSION,
+   BIRTH → HELLO → ASK_TEACH (⇄ PRE_PERMISSION,
    LISTENING, TYPING) → COMMIT → RISK → RESOLVING → THINK_WAIT →
    THINK_RESOLVE → TALK_EVIDENCE → TALK_CHART → VERDICT →
    HANDBACK → PULLING → CARDS → SAVING → RETURNING → SIGN_IN →
    SHEET_OUT → (ISLA_PEEK) → HOME → finishOnboarding() → DONE.
-   Entries: #risk (risk only), resume (companion chosen), firstRun.
+   There is no companion picker: HELLO assigns the default starter
+   silently (ensureCompanion) and the avatar lives in the profile.
+   Entries: #risk (risk only), resume (companion set), firstRun.
    ============================================================ */
 var CALLS = [];   /* dev mock only: which methods were called, when (never the text) */
 function call(method, params){
   if (!BR) return Promise.reject(new Error('no bridge'));
-  if (MOCK){ CALLS.push([method, +T.toFixed(2), method === 'previewVoice' ? params.companionId : method === 'setCompanion' ? params.id : method === 'haptic' ? params.kind : '']); if (CALLS.length > 400) CALLS.shift(); }
+  if (MOCK){ CALLS.push([method, +T.toFixed(2), method === 'setCompanion' ? params.id : method === 'haptic' ? params.kind : '']); if (CALLS.length > 400) CALLS.shift(); }
   try { return BR.call(method, params || {}); } catch(e){ return Promise.reject(e); }
 }
 function fire(method, params){ call(method, params).catch(noop); }
 
-var BEAT_OF = { BOOT:0, BIRTH:0, HELLO:1, PICK:2, PICKED:2, ASK_TEACH:3, PRE_PERMISSION:3, LISTENING:3, TYPING:3, COMMIT:3, RISK:4,
+var BEAT_OF = { BOOT:0, BIRTH:0, HELLO:1, ASK_TEACH:3, PRE_PERMISSION:3, LISTENING:3, TYPING:3, COMMIT:3, RISK:4,
   RESOLVING:5, THINK_WAIT:5, THINK_RESOLVE:5, TALK_EVIDENCE:5, TALK_CHART:5, VERDICT:5, ERROR:5, HANDBACK:5, PULLING:6, CARDS:6, SAVING:6,
   RETURNING:6, SIGN_IN:7, SHEET_OUT:7, ISLA_PEEK:8, HOME:9, DONE:9 };
 var BEAT_TITLES = ['O0 · First light', 'O1 · Hello', 'O2 · Choose your companion', 'O3 · Hold to ask', 'O4 · Hold to agree', 'O5 · First read',
@@ -67,7 +69,7 @@ function loadRoster(){
     });
     NPICK = PICKS.length;
     PICK_DEFAULT = 0; for (var i = 0; i < PICKS.length; i++){ if (PICKS[i].id !== 'orb'){ PICK_DEFAULT = i; break; } }
-    PICKS.forEach(function(p){ buildMatte(p.art, onMatte); });
+    if (PICKS[PICK_DEFAULT]) buildMatte(PICKS[PICK_DEFAULT].art, onMatte);   /* only the one the first run assigns */
     return PICKS;
   }, function(e){ ROSTER_P = null; throw e; });
   return ROSTER_P;
@@ -141,79 +143,44 @@ ENTER.HELLO = function(){
       at(dt, helloImpact);
     } });
   });
-  at(25, function(){ go('PICK'); });   /* never strands the first run */
+  at(25, helloDone);   /* never strands the first run */
 };
 function helloImpact(){
   expo(0.15); shock(0.8, 0.3, C_IVORY, 0.16); W.vcol = C_IVORY; W.floodAmt = 0.5; crit(W.flood, 0.48); to(W.flood, 1.1); buzz('soft', 0.8); nodesOff();
   at(0.20, function(){ crit(W.swirl, 0.8); to(W.swirl, 0); crit(W.flood, 0.7); to(W.flood, 0); to(W.irid, 1); to(W.energy, 0.35); W.duel = null; });
-  at(0.55, function(){ go('PICK'); });
+  at(0.55, helloDone);
 }
 function nodeIn(i){ W.nodeOn[i] = true; W.nodeAng[i] = [A_ALPHA, A_RED, A_CIO][i]; W.nodeR[i].x = 0.95; to(W.nodeR[i], W.sepR0[i], 'emit'); to(W.nodeGlow[i], 1); }
 function nodesOff(){ for (var i = 0; i < 3; i++){ to(W.nodeGlow[i], 0); } }
 function converge(d){ W.conv = { t0:T, d:d, r0:[W.nodeR[0].x, W.nodeR[1].x, W.nodeR[2].x] }; }
 
-/* ---------- O2 choose your companion (starters from roster(); previewVoice on each detent) ---------- */
-ENTER.PICK = function(a){
-  W.agMode = 'trailer'; W.duel = null; W.conv = null; W.nodeOn = [false, false, false];
-  loadSugg();
-  loadRoster().then(function(){ if (W.state === 'PICK') pickReady(a); }, function(){ if (W.state === 'PICK'){ setHint(''); at(1.5, function(){ go('PICK', a); }); } });
-};
-function pickReady(a){
-  if (!NPICK) return;
-  var again = !!a.again, d = again ? clamp(W.pick, 0, NPICK - 1) : PICK_DEFAULT;
-  W.pick = d; W.picker = true; W.chosen = false; W.chosenIdx = -1;
-  moveSphere(330, 124);
-  W.theta.x = W.theta.t = d * DET; W.theta.v = 0; W.belt.x = W.belt.t = d;
-  W.compSil.x = W.compSil.t = 0; W.compDepth.x = 1; to(W.compDepth, 0); to(W.compAmt, 1);
-  tintTo(PICKS[d].art.tintLab, 0.35); W.snowOn = true; W.snowT = T; W.snowOff = null; initSnow();
-  delete W.tm.beadsOut; delete W.tm.avaFly;
-  buildBelt();
-  at(0.10, function(){ tb('prompt'); });
-  at(0.20, function(){ tb('belt'); });
-  at(0.40, function(){
-    tb('pname'); W.pickRoll = [{ i:d, t:T, dir:0 }];
-    var lab0 = Ls('pick.choose', { name:PICKS[d].label });
-    setPill('label', lab0, pillFor(lab0, 180)); if (tmB('pillIn') > T) tb('pillIn');
-    setHint(again ? Ls('pick.failed') : Ls('pick.hint'));
-    W.pickReady = true; signal('PICK_READY');
-  });
-  at(0.90, function(){ preview(d); });
+/* ---------- no picker (owner's decision, 2026-09-26): the glass leads the first run ----------
+   The companion is part of the profile now (account sheet → "Your avatar" → the squad gallery).
+   The first run still needs one so the tint, the header avatar and the voice work downstream, so
+   the default starter is assigned silently with the picker's own rule: the first roster() entry
+   with requiredLevel 1 && unlocked whose id is not 'orb'. It never surfaces inside the glass. */
+var COMP_P = null;
+function ensureCompanion(){
+  if (SESSION && SESSION.companion) return Promise.resolve(true);
+  if (COMP_P) return COMP_P;
+  COMP_P = loadRoster().then(function(){
+    var p = PICKS[PICK_DEFAULT]; if (!p) throw new Error('no starter');
+    return call('setCompanion', { id:p.id });
+  }).then(function(s){ applySession(s); quietAvatar(); return true; }, function(e){ COMP_P = null; throw e; });
+  return COMP_P;
 }
-function preview(k){ var p = PICKS[k]; if (!p) return; var seq = ++W.pvSeq; after(0, function(){ if (seq === W.pvSeq) fire('previewVoice', { companionId:p.id }); }); }
-function pickTo(k, dir){
-  k = clamp(k, 0, NPICK - 1);
-  to(W.theta, k * DET, 'glide');
-  if (k === W.pick) return;
-  W.pick = k; W.pickRoll.push({ i:k, t:T, dir:dir }); if (W.pickRoll.length > 8) W.pickRoll.shift();
-  to(W.belt, k, 'glide');
-  var lab1 = Ls('pick.choose', { name:PICKS[k].label });
-  setPill(null, lab1, pillFor(lab1, 180));
-  after(0.32, function(){ gulpK(0.02); buzz('selection', 0.35); });
-  var seq = ++W.pvSeq; after(0.35, function(){ if (seq === W.pvSeq && W.state === 'PICK') fire('previewVoice', { companionId:PICKS[k].id }); });
+/* the avatar lands in the header and the rim takes the companion tint: a glide, not a reveal */
+function quietAvatar(){
+  if (!CHOSEN_ART || W.chosen) return;
+  W.chosen = true; tintTo(companionTint(), 0.35);
+  if (tmB('avaFly') > T) tb('avaFly');
 }
-function choose(){
-  if (W.state !== 'PICK' || !W.picker || !W.pickReady || !PICKS[W.pick]) return;
-  go('PICKED', { p:PICKS[W.pick] });
+function helloDone(){
+  if (W.state !== 'HELLO') return;
+  W.duel = null; W.conv = null; W.nodeOn = [false, false, false];
+  ensureCompanion().catch(function(){ at(1.5, function(){ ensureCompanion().catch(noop); }); });
+  go('ASK_TEACH');
 }
-ENTER.PICKED = function(a){
-  var p = a.p, ok = null;
-  W.pickReady = false; W.pvSeq++; fire('stopSpeaking', {});
-  gulpK(0.04); bodyKick(W.hop, -245); buzz('success', 1); W.burst = T; setPill('check', null, null); W.chosen = true; W.chosenIdx = W.pick;
-  CHOSEN_ART = p.art; setAvatar(p.art);
-  call('setCompanion', { id:p.id }).then(function(s){ applySession(s); ok = true; }, function(){ ok = false; });
-  at(0.20, function(){ tb('beadsOut'); tb('avaFly'); setHint(''); });
-  at(0.32, function(){ tg('pname'); });
-  at(0.50, function(){ to(W.compSil, 1); to(W.compAmt, 0.3); tintTo(companionTint(), 0.35); W.snowOff = T; });
-  at(0.60, function(){ to(W.pillW, 96, 'pill'); });
-  at(0.65, function(){ W.chosenLine = sayLine({ id:'chosen', text:Ls('pick.chosen', { name:p.label }), top:512, watchdog:3 }); });
-  at(1.20, function(){ to(W.compAmt, 0); });
-  at(1.70, function(){ tg('prompt'); });
-  at(1.90, function(){ moveSphere(340, 120); W.picker = false; W.thBase = W.theta.t; });
-  at(2.50, function(){ waitThen(function(){ return ok !== null && (!W.chosenLine || W.chosenLine.done); }, function(){
-    if (ok) go('ASK_TEACH');
-    else { W.chosen = false; W.chosenIdx = -1; CHOSEN_ART = null; if (W.chosenLine) capGone(W.chosenLine); go('PICK', { again:true }); }
-  }); });
-};
 
 /* ---------- O3 hold to ask (the pre-permission card, then the REAL system prompts) ---------- */
 ENTER.ASK_TEACH = function(a){
@@ -651,7 +618,7 @@ function finish(){
     W.finishing = false;
     if (r && r.next === 'app'){ go('DONE'); return; }
     var miss = (r && r.missing) || [];
-    if (miss.indexOf('companion') >= 0) go('PICK'); else if (miss.indexOf('risk') >= 0) go('RISK', { only:true }); else go('DONE');
+    if (miss.indexOf('companion') >= 0){ ensureCompanion().then(function(){ at(0.3, finish); }, function(){ at(2, finish); }); } else if (miss.indexOf('risk') >= 0) go('RISK', { only:true }); else go('DONE');
   }, function(){ W.finishing = false; if (W.state !== 'DONE') at(2, finish); });
 }
 ENTER.DONE = function(){ W.micBreath = true; signal('FINISHED'); };

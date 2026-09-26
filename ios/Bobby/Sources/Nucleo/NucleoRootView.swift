@@ -105,7 +105,7 @@ private struct NucleoStage: View {
                 .presentationBackground(Theme.bg)
         case .account:
             // Full height: deletion must never hide below a half-height detent (App Review 5.1.1(v)).
-            AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true) { session.sheet = nil }
+            AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice) { session.sheet = nil }
         case .riskNotice:
             RiskNoticeView(profile: session.profile, readOnly: true) { session.sheet = nil }
         }

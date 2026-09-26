@@ -2,6 +2,8 @@
 // and the Apple button. 1.2 offers Sign in with Apple only; the X button is Debug-only.
 // The Núcleo opens it from the header avatar, full height and with the privacy and
 // support links (the classic desk keeps those in its menu).
+// The avatar lives here too: the first run no longer asks who lives in the glass
+// (a default starter is assigned), so "Your avatar" opens the squad gallery to change it.
 import AuthenticationServices
 import SwiftUI
 
@@ -14,11 +16,14 @@ struct AccountSheet: View {
     var detents: Set<PresentationDetent> = [.medium, .large]
     /// Privacy Policy and Help links under the buttons (the Núcleo has no other menu).
     var showsLinks = false
+    /// The voice the squad gallery speaks with when a companion is chosen; nil keeps it silent.
+    var voice: NeuralVoice? = nil
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
     @State private var busy = false
     @State private var showDeleteConfirmation = false
     @State private var accountDeleted = false
+    @State private var showAvatar = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -41,6 +46,7 @@ struct AccountSheet: View {
                 // Pieces repeat and the island grows: no fixed route to count against.
                 stat(L.t("Pieces", "Piezas"), pieces.map { "\($0)" } ?? "—")
             }
+            avatarRow
             if !store.pendingAwards.isEmpty {
                 Text(L.t("\(store.pendingAwards.count) award(s) waiting to sync", "\(store.pendingAwards.count) premio(s) por sincronizar")).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.muted)
             }
@@ -117,6 +123,9 @@ struct AccountSheet: View {
         .padding(22)
         .background(Theme.bg.ignoresSafeArea())
         .presentationDetents(detents)
+        .sheet(isPresented: $showAvatar) {
+            MascotGalleryView(store: store, voice: voice, voiceId: profile.voiceId)
+        }
         .confirmationDialog(
             L.t("Delete your Bobby account?", "¿Borrar tu cuenta de Bobby?"),
             isPresented: $showDeleteConfirmation,
@@ -146,6 +155,39 @@ struct AccountSheet: View {
         } message: {
             Text(AccountDeletionCopy.deleted(manualAppleSteps: account.manualAppleRevocationRequired))
         }
+    }
+
+    /// The profile's avatar: the current companion and the way to change it (the squad gallery).
+    private var avatarRow: some View {
+        Button { showAvatar = true } label: {
+            HStack(spacing: 12) {
+                Group {
+                    if let c = store.companion {
+                        CompanionThumb(companion: c)
+                    } else {
+                        Image(systemName: "person.crop.circle").font(.system(size: 22)).foregroundStyle(Theme.muted)
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L.t("Your avatar", "Tu avatar")).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                    Text(store.companion.map { $0.label.capitalized } ?? L.t("Choose who lives in your Bobby", "Elige quién vive en tu Bobby"))
+                        .font(.system(size: 12)).foregroundStyle(Theme.muted)
+                }
+                Spacer()
+                Text(L.t("Change", "Cambiar")).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.accent)
+                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.muted)
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L.t("Your avatar. Change it", "Tu avatar. Cambiarlo"))
+        .accessibilityIdentifier("account-avatar")
     }
 
     private func stat(_ label: String, _ value: String) -> some View {
