@@ -21,7 +21,7 @@ function expoNow(){ var e = 0; for (var i = 0; i < W.expo.length; i++){ var x = 
 function aria(s){ if (cv._al !== s){ cv._al = s; cv.setAttribute('aria-label', s); } }
 
 var SPH = { cy:340, r:120, dcy:340, dr:120 };
-var seedEl = $('seed'), poolEl = $('pool'), POOL_C = [0.55, 0.45, 0.95];
+var seedEl = $('seed'), poolEl = $('pool'), introWashEl = $('introWash'), POOL_C = [0.55, 0.45, 0.95];
 var AMB_LAB = [0, 0, 0], AMB_RGB = [0, 0, 0], TINT_RGB = [0, 0, 0], XA = [0, 0, 0, 0], XB = [0, 0, 0, 0], BG0 = [0.16, 0.16, 0.16], AMB_V0 = lab('#19140D');
 var SAT_A = [Math.atan2(-100, -127), Math.atan2(-100, 127), Math.atan2(100, 127), Math.atan2(100, -127)];   /* screen angles: UL, UR, LR, LL */
 function renderSphere(){
@@ -41,6 +41,7 @@ function renderSphere(){
 
   /* launch point: 4 px, 12 px bloom, two heartbeats, then it ignites (birth-relative) */
   var bt = T - W.birthT, hb = 0, hu = (bt - 0.40) / 0.3; if (hu > 0 && hu < 1) hb = Math.sin(Math.PI * hu);
+  st(introWashEl, null, 0.86 * sstep(0.4, 1.4, bt) * (1 - sstep(2.5, 4.3, bt)));
   hu = (bt - 0.70) / 0.3; if (hu > 0 && hu < 1) hb = Math.max(hb, Math.sin(Math.PI * hu));
   var seedO = bt >= 0 && bt < 1.3 ? c01(bt / 0.4) * (1 - sstep(1.0, 1.22, bt)) : 0;
   st(seedEl, seedO > 0 ? tf(195, 340, 1 + 0.6 * hb * TR) : null, seedO);

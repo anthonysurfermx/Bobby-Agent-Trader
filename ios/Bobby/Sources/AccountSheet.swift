@@ -31,8 +31,8 @@ struct AccountSheet: View {
             Text(account.isSignedIn ? L.t("Your progress is saved", "Tu progreso está guardado") : L.t("Keep your XP everywhere", "Conserva tu XP en todas partes"))
                 .font(.system(size: 22, weight: .heavy)).foregroundStyle(.white)
             Text(account.isSignedIn
-                 ? L.t("XP, streak, gear and your Trader Land follow this account on the phone and on bobbyprotocol.xyz. Bobby never holds your money or keys.", "XP, racha, accesorios y tu Trader Land quedan guardados en esta cuenta, en el teléfono y en bobbyprotocol.xyz. Bobby nunca guarda tu dinero ni tus llaves.")
-                 : L.t("Sign in with Apple so XP, streak, gear and Trader Land survive a reinstall and follow you across your devices. No keys or email are required.", "Inicia sesión con Apple para que XP, racha, accesorios y Trader Land no se pierdan si reinstalas Bobby y te acompañen en tus dispositivos. No requiere llaves ni correo."))
+                 ? L.t("XP, streak, gear and your Trader Land follow this account on the phone and on bobbyprotocol.xyz. bObby never holds your money or keys.", "XP, racha, accesorios y tu Trader Land quedan guardados en esta cuenta, en el teléfono y en bobbyprotocol.xyz. bObby nunca guarda tu dinero ni tus llaves.")
+                 : L.t("Sign in with Apple so XP, streak, gear and Trader Land survive a reinstall and follow you across your devices. No keys or email are required.", "Inicia sesión con Apple para que XP, racha, accesorios y Trader Land no se pierdan si reinstalas bObby y te acompañen en tus dispositivos. No requiere llaves ni correo."))
                 .font(.system(size: 14)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 14) {
                 stat(L.t("XP", "XP"), "\(store.disciplineXP)")
@@ -118,7 +118,7 @@ struct AccountSheet: View {
         .background(Theme.bg.ignoresSafeArea())
         .presentationDetents(detents)
         .confirmationDialog(
-            L.t("Delete your Bobby account?", "¿Borrar tu cuenta de Bobby?"),
+            L.t("Delete your bObby account?", "¿Borrar tu cuenta de bObby?"),
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
@@ -163,8 +163,8 @@ struct AccountSheet: View {
 /// The deletion copy both entry points (this sheet and the desk menu) show.
 enum AccountDeletionCopy {
     static var confirmation: String {
-        L.t("This deletes your Bobby account and synced XP, streak, gear and Trader Land. Limited security or audit records may remain.",
-            "Esto borra tu cuenta de Bobby y tu XP, racha, accesorios y Trader Land sincronizados. Pueden conservarse registros limitados de seguridad o auditoría.")
+        L.t("This deletes your bObby account and synced XP, streak, gear and Trader Land. Limited security or audit records may remain.",
+            "Esto borra tu cuenta de bObby y tu XP, racha, accesorios y Trader Land sincronizados. Pueden conservarse registros limitados de seguridad o auditoría.")
     }
 
     static var manageAppleButton: String { L.t("Open Apple's steps", "Ver los pasos de Apple") }
@@ -172,9 +172,9 @@ enum AccountDeletionCopy {
     /// With `manualAppleSteps`, the server could not revoke Apple access itself: say how to finish.
     @MainActor static func deleted(manualAppleSteps: Bool) -> String {
         manualAppleSteps
-            ? L.t("Your Bobby account and synced progress were deleted.", "Se borraron tu cuenta de Bobby y su progreso sincronizado.")
+            ? L.t("Your bObby account and synced progress were deleted.", "Se borraron tu cuenta de bObby y su progreso sincronizado.")
                 + " " + AccountSession.manualRevocationSteps
-            : L.t("Your account and synced progress were deleted. Bobby keeps working on this phone without an account.",
-                  "Se borraron tu cuenta y su progreso sincronizado. Bobby sigue funcionando en este teléfono sin cuenta.")
+            : L.t("Your account and synced progress were deleted. bObby keeps working on this phone without an account.",
+                  "Se borraron tu cuenta y su progreso sincronizado. bObby sigue funcionando en este teléfono sin cuenta.")
     }
 }

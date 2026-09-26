@@ -47,7 +47,7 @@ enum CompanionToolkit {
             return [
                 t(1, "clock", "Patience Chronometer", "Cronómetro de paciencia", "Counts the candles you did not chase.", "Cuenta las velas que no perseguiste."),
                 t(2, "safari", "4H Trend Compass", "Brújula de tendencia 4H", "Points where the structure goes, not where the noise does.", "Apunta hacia donde va la estructura, no el ruido."),
-                t(3, "circle.hexagongrid.fill", "Omega Core", "Núcleo Omega", "Bobby's own heart. You earned it by waiting better.", "El corazón del propio Bobby. Te lo ganaste esperando mejor."),
+                t(3, "circle.hexagongrid.fill", "Omega Core", "Núcleo Omega", "bObby's own heart. You earned it by waiting better.", "El corazón del propio bObby. Te lo ganaste esperando mejor."),
             ]
         case "byte":
             return [

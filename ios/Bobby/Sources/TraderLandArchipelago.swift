@@ -479,7 +479,7 @@ enum LandIslandStatus {
     }
 
     static func published(_ island: PublicIsland, now: Date = Date()) -> String? {
-        if island.isShowcase { return L.t("Bobby showcase island", "Isla de muestra de Bobby") }
+        if island.isShowcase { return L.t("bObby showcase island", "Isla de muestra de bObby") }
         guard let date = date(island.publishedAt) else { return nil }
         let formatter = RelativeDateTimeFormatter()
         formatter.locale = Locale(identifier: L.isSpanish ? "es" : "en")

@@ -80,7 +80,7 @@ targets:
     info:
       path: Sources/Info.plist
       properties:
-        CFBundleDisplayName: Bobby
+        CFBundleDisplayName: bObby
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:
@@ -91,9 +91,9 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSApplicationQueriesSchemes:
           - instagram-stories
-        NSMicrophoneUsageDescription: "Bobby listens only while you hold the button, to hear your question."
-        NSPhotoLibraryAddUsageDescription: "Bobby saves your skin card to Photos only when you tap Save Image."
-        NSSpeechRecognitionUsageDescription: "Bobby turns your spoken question into text on this iPhone. The audio never leaves your device."
+        NSMicrophoneUsageDescription: "bObby listens only while you hold the button, to hear your question."
+        NSPhotoLibraryAddUsageDescription: "bObby saves your skin card to Photos only when you tap Save Image."
+        NSSpeechRecognitionUsageDescription: "bObby turns your spoken question into text on this iPhone. The audio never leaves your device."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

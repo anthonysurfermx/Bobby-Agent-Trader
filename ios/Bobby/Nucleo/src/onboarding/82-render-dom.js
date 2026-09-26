@@ -147,14 +147,14 @@ function renderTexts(){
   if (!wmEl._w) wmEl._w = wmEl.offsetWidth || 62;
   if (T >= wb && T < wf + 0.8){
     var k = FOC(c01((T - wb) / 0.6)), o = c01((T - wb) / 0.3), bb = 8 * (1 - k), x = 0, y = 0, s = 1;
-    if (T >= wf){ var p = sp('soft', T - wf); var hx = 20 + wmEl._w / 2, dx = hx - 195, dy = 76 - 536; x = dx * p; y = dy * p; s = lerp(1, 24 / 44, p); o *= 1 - sstep(0.1, 0.6, c01((T - wf) / 0.7)); bb = 0; }
+    if (T >= wf){ var p = sp('soft', T - wf); var hx = 20 + wmEl._w / 2, dx = hx - 195, dy = 76 - 534; x = dx * p; y = dy * p; s = lerp(1, 24 / 48, p); o *= 1 - sstep(0.1, 0.6, c01((T - wf) / 0.7)); bb = 0; }
     if (RM){ x = 0; y = 0; s = 1; bb = 0; }
     st(wmBig, tf(x, y, s), o, bl(bb));
   } else st(wmBig, null, 0);
   /* header: wordmark / docked question + × / avatar with its XP arc */
   var dk = tmB('dock'), dg = tmG('dock'), wo = 0, wx = 0, wy = 0, ws = 1;
   if (T >= wf){
-    var fp = sp('soft', T - wf); wo = sstep(0.3, 0.8, c01((T - wf) / 0.7)); wx = -(20 + wmEl._w / 2 - 195) * (1 - fp); wy = (536 - 76) * (1 - fp); ws = lerp(44 / 24, 1, fp);
+    var fp = sp('soft', T - wf); wo = sstep(0.3, 0.8, c01((T - wf) / 0.7)); wx = -(20 + wmEl._w / 2 - 195) * (1 - fp); wy = (534 - 76) * (1 - fp); ws = lerp(48 / 24, 1, fp);
     if (RM){ wx = 0; wy = 0; ws = 1; wo = c01((T - wf) / 0.2); }
     if (T >= dk && T < dg){ var du = c01((T - dk) / 0.16); wy = -8 * du; wo *= 1 - du; }
     if (T >= dg){ var ru = T - dg - 0.14; wy = ru > 0 ? 8 * (1 - sp('snap', ru)) * TR : 8; wo *= ru > 0 ? c01(ru / 0.16) : 0; }

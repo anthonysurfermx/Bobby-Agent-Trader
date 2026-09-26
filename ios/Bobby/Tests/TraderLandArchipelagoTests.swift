@@ -137,7 +137,7 @@ final class TraderLandArchipelagoTests: XCTestCase {
         XCTAssertTrue(island.isShowcase)
         XCTAssertEqual(island.coreSpot.stage, 1)
         XCTAssertNil(island.publishedAt, "The sample must not pretend to be a recent user publication")
-        XCTAssertEqual(LandIslandStatus.published(island), L.t("Bobby showcase island", "Isla de muestra de Bobby"))
+        XCTAssertEqual(LandIslandStatus.published(island), L.t("bObby showcase island", "Isla de muestra de bObby"))
         XCTAssertTrue(island.placements.contains { $0.item_id == "evidence_mines_mother_crystal" })
         XCTAssertTrue(island.placements.contains { $0.item_id == "thesis_citadel_double_gate" })
         XCTAssertEqual(island.placements.count, 10)

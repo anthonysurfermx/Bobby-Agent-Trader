@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data: blob:; media-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0B0A09">
-<title>Bobby</title>
+<title>bObby</title>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -59,7 +59,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #vec,#chart{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
 
 /* header */
-#wm{left:12px;top:54px;height:44px;padding:0 8px;font:400 24px/44px var(--serif);letter-spacing:-.01em;white-space:nowrap;cursor:default}
+#wm{left:12px;top:54px;height:44px;padding:0 8px;font:600 24px/44px var(--sans);letter-spacing:-.055em;white-space:nowrap;cursor:default}
 #close{position:absolute;left:10px;top:54px;width:44px;height:44px;border-radius:22px;display:grid;place-items:center;color:var(--ink2);cursor:pointer}
 #dockQ{left:75px;top:62px;width:240px;height:21px;font:400 15px/21px var(--sans);color:var(--ink2);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 #dockA{left:75px;top:84px;width:240px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);text-align:center;white-space:nowrap;overflow:hidden;pointer-events:none}
@@ -72,13 +72,13 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 
 /* greeting, notes, face text */
 #greet,#note{left:20px;top:512px;width:350px;text-align:center;pointer-events:none}
-#greet .t{font:400 40px/42px var(--serif);letter-spacing:-.015em;white-space:nowrap}
+#greet .t{font:500 40px/42px var(--sans);letter-spacing:-.055em;white-space:nowrap}
 #greet .s{display:block;margin-top:12px;font:400 16px/23px var(--sans);color:var(--ink2);white-space:nowrap}
 #note .t{font:400 26px/31px var(--serif);letter-spacing:-.005em;text-wrap:balance}
 #note .s{display:block;margin-top:8px;font:400 15px/21px var(--sans);color:var(--ink2);text-wrap:balance}
 .w{display:inline-block}
 .ftx{left:20px;top:512px;width:350px;text-align:center;pointer-events:none}
-.ftx .t{font:400 36px/40px var(--serif);letter-spacing:-.01em;white-space:nowrap}
+.ftx .t{font:500 39px/42px var(--sans);letter-spacing:-.055em;white-space:nowrap}
 .ftx .s{display:block;margin-top:6px;font:400 15px/21px var(--sans);color:var(--ink2);text-wrap:balance}
 .ftx .cw{position:absolute;left:0;width:350px;top:94px;text-align:center}
 .fchip{display:inline-block;height:40px;padding:0 16px;border-radius:20px;border:.5px solid var(--line);background:rgba(242,237,228,.04);font:500 15px/39px var(--sans);color:var(--ink);cursor:pointer;white-space:nowrap;pointer-events:auto}
@@ -386,7 +386,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       <button type="button" data-hit="perm"></button>
     </div>
 
-    <div id="wm" class="a" data-hit="wm">Bobby</div>
+    <div id="wm" class="a" data-hit="wm">bObby</div>
     <button id="close" type="button" data-hit="close"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
     <div id="dockQ" class="a"></div>
     <div id="dockA" class="a"></div>
@@ -551,14 +551,14 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'meta': 'Educational read · not financial advice',
       'confirm.prompt': 'Did you mean {name} ({symbol})?', 'confirm.yes': 'Yes, {symbol}', 'confirm.no': 'Something else',
       'err.unknown': 'I couldn’t find an asset in that. Try the name or the ticker.',
-      'err.unsupported': 'Bobby can’t read {name} yet. Try a stock or a crypto.',
+      'err.unsupported': 'bObby can’t read {name} yet. Try a stock or a crypto.',
       'err.unsupportedStale': 'The market data for {symbol} is too old to read right now.',
-      'err.quota': 'Bobby reached today’s analysis limit. Try again tomorrow.',
+      'err.quota': 'bObby reached today’s analysis limit. Try again tomorrow.',
       'err.tooLong': 'Your question is too long. Keep it to 1,200 characters or fewer.',
       'err.network': 'No connection. Nothing was analyzed.',
       'err.timeout': 'The desk took too long. No verdict was issued.',
       'err.bad': 'The analysis did not come back. No verdict was issued.',
-      'err.risk': 'First, the risk notice.', 'err.riskSub': 'Bobby reads nothing until you agree to it. Your question was not sent.',
+      'err.risk': 'First, the risk notice.', 'err.riskSub': 'bObby reads nothing until you agree to it. Your question was not sent.',
       'err.riskCta': 'Open the risk notice',
       'follow.another': 'Another question about {symbol}', 'follow.how': 'How is {symbol} looking?', 'follow.why': 'Why is {symbol} moving today?',
       'aria.verdict': 'Verdict: {word}', 'aria.conviction': ', {pct}% conviction'
@@ -588,14 +588,14 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'meta': 'Lectura educativa · no es asesoría financiera',
       'confirm.prompt': '¿Te refieres a {name} ({symbol})?', 'confirm.yes': 'Sí, {symbol}', 'confirm.no': 'Otro activo',
       'err.unknown': 'No encontré un activo en eso. Prueba con el nombre o el ticker.',
-      'err.unsupported': 'Bobby aún no puede leer {name}. Prueba una acción o una cripto.',
+      'err.unsupported': 'bObby aún no puede leer {name}. Prueba una acción o una cripto.',
       'err.unsupportedStale': 'Los datos de {symbol} son demasiado viejos para leerlos ahora.',
-      'err.quota': 'Bobby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.',
+      'err.quota': 'bObby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.',
       'err.tooLong': 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.',
       'err.network': 'Sin conexión. No se analizó nada.',
       'err.timeout': 'La mesa tardó demasiado. No se emitió ningún veredicto.',
       'err.bad': 'El análisis no regresó. No se emitió ningún veredicto.',
-      'err.risk': 'Primero, el aviso de riesgo.', 'err.riskSub': 'Bobby no analiza nada hasta que lo aceptes. Tu pregunta no se envió.',
+      'err.risk': 'Primero, el aviso de riesgo.', 'err.riskSub': 'bObby no analiza nada hasta que lo aceptes. Tu pregunta no se envió.',
       'err.riskCta': 'Abrir el aviso de riesgo',
       'follow.another': 'Otra pregunta sobre {symbol}', 'follow.how': '¿Cómo se ve {symbol}?', 'follow.why': '¿Por qué se mueve {symbol} hoy?',
       'aria.verdict': 'Veredicto: {word}', 'aria.conviction': ', {pct}% de convicción'
@@ -1741,11 +1741,11 @@ var STR = /*STRINGS-BEGIN*/{
     'save.stale': 'Account changed · this read was not saved', 'save.failed': 'Could not save this read',
     'isla.title': 'Your island', 'isla.pieces': 'Pieces', 'isla.seeds': 'Seeds growing', 'isla.ready': 'Ready to review', 'isla.cta': 'Visit Isla',
     'meta.asOf': 'as of {when}', 'chart.x': '{tf} · {provider} · {inst} · as of {when}',
-    'aria.waking': 'Bobby is waking up', 'aria.idle': 'Bobby is idle', 'aria.listening': 'Bobby is listening', 'aria.sending': 'Sending your question',
-    'aria.thinking': 'Three agents debating', 'aria.speaking': 'Bobby is speaking', 'aria.cards': 'Full read: debate and thesis cards',
+    'aria.waking': 'bObby is waking up', 'aria.idle': 'bObby is idle', 'aria.listening': 'bObby is listening', 'aria.sending': 'Sending your question',
+    'aria.thinking': 'Three agents debating', 'aria.speaking': 'bObby is speaking', 'aria.cards': 'Full read: debate and thesis cards',
     'aria.faces': 'Sphere faces', 'aria.noVerdict': 'No verdict was issued',
-    'aria.pill': 'Ask Bobby, hold to talk', 'aria.pillType': 'Type a question', 'aria.pillCancel': 'Cancel the read', 'aria.pillStop': 'Stop the voice',
-    'aria.close': 'Close read', 'aria.companion': 'Your companion, {name}', 'aria.faceDots': 'Sphere faces: {list}', 'aria.wm': 'Bobby',
+    'aria.pill': 'Ask bObby, hold to talk', 'aria.pillType': 'Type a question', 'aria.pillCancel': 'Cancel the read', 'aria.pillStop': 'Stop the voice',
+    'aria.close': 'Close read', 'aria.companion': 'Your companion, {name}', 'aria.faceDots': 'Sphere faces: {list}', 'aria.wm': 'bObby',
     'aria.account': '{name}. Account and progress', 'aria.accountPlain': 'Account and progress'
   },
   es: {
@@ -1770,11 +1770,11 @@ var STR = /*STRINGS-BEGIN*/{
     'save.stale': 'Cambió la cuenta · esta lectura no se guardó', 'save.failed': 'No se pudo guardar esta lectura',
     'isla.title': 'Tu isla', 'isla.pieces': 'Piezas', 'isla.seeds': 'Semillas creciendo', 'isla.ready': 'Listas para revisar', 'isla.cta': 'Visitar Isla',
     'meta.asOf': 'al {when}', 'chart.x': '{tf} · {provider} · {inst} · al {when}',
-    'aria.waking': 'Bobby está despertando', 'aria.idle': 'Bobby está en reposo', 'aria.listening': 'Bobby está escuchando', 'aria.sending': 'Enviando tu pregunta',
-    'aria.thinking': 'Tres agentes debatiendo', 'aria.speaking': 'Bobby está hablando', 'aria.cards': 'Lectura completa: debate y tesis',
+    'aria.waking': 'bObby está despertando', 'aria.idle': 'bObby está en reposo', 'aria.listening': 'bObby está escuchando', 'aria.sending': 'Enviando tu pregunta',
+    'aria.thinking': 'Tres agentes debatiendo', 'aria.speaking': 'bObby está hablando', 'aria.cards': 'Lectura completa: debate y tesis',
     'aria.faces': 'Caras de la esfera', 'aria.noVerdict': 'No se emitió veredicto',
-    'aria.pill': 'Pregúntale a Bobby, mantén para hablar', 'aria.pillType': 'Escribe una pregunta', 'aria.pillCancel': 'Cancelar la lectura', 'aria.pillStop': 'Detener la voz',
-    'aria.close': 'Cerrar lectura', 'aria.companion': 'Tu compañero, {name}', 'aria.faceDots': 'Caras de la esfera: {list}', 'aria.wm': 'Bobby',
+    'aria.pill': 'Pregúntale a bObby, mantén para hablar', 'aria.pillType': 'Escribe una pregunta', 'aria.pillCancel': 'Cancelar la lectura', 'aria.pillStop': 'Detener la voz',
+    'aria.close': 'Cerrar lectura', 'aria.companion': 'Tu compañero, {name}', 'aria.faceDots': 'Caras de la esfera: {list}', 'aria.wm': 'bObby',
     'aria.account': '{name}. Cuenta y progreso', 'aria.accountPlain': 'Cuenta y progreso'
   }
 }/*STRINGS-END*/;

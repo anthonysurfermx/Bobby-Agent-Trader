@@ -354,7 +354,7 @@ final class TraderLandSync: ObservableObject {
         case (503, "Name review is temporarily unavailable. Try again."):
             return L.t("Name review is unavailable. Try again shortly.", "La revisión del nombre no está disponible. Inténtalo en un momento.")
         case (403, "Publishing is restricted. Contact Bobby support."):
-            return L.t("Publishing is restricted. Contact Bobby support.", "La publicación está restringida. Contacta a soporte de Bobby.")
+            return L.t("Publishing is restricted. Contact bObby support.", "La publicación está restringida. Contacta a soporte de bObby.")
         case (409, "This piece already bloomed"):
             return L.t("This piece already bloomed. Reload your island.", "Esta pieza ya floreció. Recarga tu isla.")
         case (409, "The market has not had time to answer yet"):

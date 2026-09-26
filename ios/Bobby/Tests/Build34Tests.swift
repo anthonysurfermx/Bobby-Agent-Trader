@@ -144,8 +144,8 @@ final class Build34Tests: XCTestCase {
     func testManualAppleStepsMatchApplesIPhoneStepsInBothLanguages() {
         let en = AccountSession.manualRevocationSteps(spanish: false)
         let es = AccountSession.manualRevocationSteps(spanish: true)
-        XCTAssertEqual(en, "To finish, open Settings, tap your name, tap Sign in with Apple, choose Bobby and tap Delete.")
-        XCTAssertEqual(es, "Para terminar, abre Configuración, toca tu nombre, toca Iniciar sesión con Apple, elige Bobby y toca Eliminar.")
+        XCTAssertEqual(en, "To finish, open Settings, tap your name, tap Sign in with Apple, choose bObby and tap Delete.")
+        XCTAssertEqual(es, "Para terminar, abre Configuración, toca tu nombre, toca Iniciar sesión con Apple, elige bObby y toca Eliminar.")
         // Not the web path (Sign-In & Security), not the old button, not Spain's "Ajustes".
         for stale in ["Sign-In & Security", "Stop Using", "Inicio de sesión y seguridad", "Dejar de usar", "Ajustes"] {
             XCTAssertFalse(en.contains(stale) || es.contains(stale), stale)

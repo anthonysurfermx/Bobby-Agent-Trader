@@ -74,7 +74,7 @@ struct LandCommunitySheet: View {
                         } label: {
                             Text(sending ? L.t("Sending…", "Enviando…") : sent ? L.t("Report received", "Reporte recibido") : L.t("Send report", "Enviar reporte"))
                         }.disabled(sending || sent).accessibilityIdentifier("land-send-report")
-                        if sent { Text(L.t("The report is in Bobby's review queue. You can also block this creator now.", "El reporte está en la cola de revisión de Bobby. También puedes bloquear al creador ahora.")).font(.footnote) }
+                        if sent { Text(L.t("The report is in bObby's review queue. You can also block this creator now.", "El reporte está en la cola de revisión de bObby. También puedes bloquear al creador ahora.")).font(.footnote) }
                         if failed { Text(L.t("Your report was not sent. Try again or contact support.", "No se envió el reporte. Inténtalo de nuevo o contacta a soporte.")).foregroundStyle(.red) }
                         Button(L.t("Block creator", "Bloquear creador"), role: .destructive) { confirmBlock = true }
                             .accessibilityIdentifier("land-block-creator")

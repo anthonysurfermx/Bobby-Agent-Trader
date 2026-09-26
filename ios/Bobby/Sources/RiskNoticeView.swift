@@ -15,11 +15,11 @@ enum RiskNotice {
     static func statements(spanish: Bool) -> [(title: String, body: String)] {
         [
             (L.t("Allow AI processing of my questions.", "Permito que la IA procese mis preguntas.", spanish: spanish),
-             L.t("Bobby sends your question and market data to OpenAI. When voice is on, reply text goes to OpenAI or Microsoft to create speech. Avoid personal or account details.", "Bobby envía tu pregunta y datos de mercado a OpenAI. Con voz activa, envía el texto de respuesta a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas.", spanish: spanish)),
+             L.t("bObby sends your question and market data to OpenAI. When voice is on, reply text goes to OpenAI or Microsoft to create speech. Avoid personal or account details.", "bObby envía tu pregunta y datos de mercado a OpenAI. Con voz activa, envía el texto de respuesta a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas.", spanish: spanish)),
             (L.t("Not investment advice.", "No es asesoría de inversión.", spanish: spanish),
              L.t("Verdicts, levels and stops are educational analysis made by software, not recommendations for you.",
                  "Veredictos, niveles y stops son análisis educativo hecho por un programa, no recomendaciones para ti.", spanish: spanish)),
-            (L.t("Bobby never touches your money.", "Bobby nunca toca tu dinero.", spanish: spanish),
+            (L.t("bObby never touches your money.", "bObby nunca toca tu dinero.", spanish: spanish),
              L.t("It doesn't connect wallets, move funds, execute trades or hold your keys.",
                  "No conecta wallets, no mueve fondos, no ejecuta operaciones y no guarda tus llaves.", spanish: spanish)),
             (L.t("You can lose money. You decide.", "Puedes perder dinero. Tú decides.", spanish: spanish),
@@ -48,7 +48,7 @@ struct RiskNoticeView: View {
                 HStack {
                     HStack(spacing: 8) {
                         Circle().fill(Theme.up).frame(width: 7, height: 7).shadow(color: Theme.up, radius: 7)
-                        Text(L.t("BOBBY // BEFORE WE START", "BOBBY // ANTES DE EMPEZAR"))
+                        Text(L.t("bObby // BEFORE WE START", "bObby // ANTES DE EMPEZAR"))
                             .font(.mono(11, .bold))
                             .kerning(1.9)
                             .foregroundStyle(Theme.text.opacity(0.78))
@@ -73,8 +73,8 @@ struct RiskNoticeView: View {
                         Text(L.t("Read this once. It matters.", "Léelo una vez. Importa."))
                             .font(.rounded(26, .bold))
                             .foregroundStyle(Theme.text)
-                        Text(L.t("Bobby is here to make you think, not to tell you what to do with your money.",
-                                 "Bobby está para hacerte pensar, no para decirte qué hacer con tu dinero."))
+                        Text(L.t("bObby is here to make you think, not to tell you what to do with your money.",
+                                 "bObby está para hacerte pensar, no para decirte qué hacer con tu dinero."))
                             .font(.rounded(15, .medium))
                             .foregroundStyle(Theme.text.opacity(0.75))
 
@@ -111,8 +111,8 @@ struct RiskNoticeView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(L.t("Bobby does not publish your questions.",
-                                     "Bobby no publica tus preguntas."))
+                            Text(L.t("bObby does not publish your questions.",
+                                     "bObby no publica tus preguntas."))
                                 .font(.mono(10, .medium))
                                 .foregroundStyle(Theme.muted)
                             Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {

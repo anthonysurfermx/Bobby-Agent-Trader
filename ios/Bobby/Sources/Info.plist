@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bobby</string>
+	<string>bObby</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -40,11 +40,11 @@
 		<string>instagram-stories</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Bobby listens only while you hold the button, to hear your question.</string>
+	<string>bObby listens only while you hold the button, to hear your question.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Bobby saves your skin card to Photos only when you tap Save Image.</string>
+	<string>bObby saves your skin card to Photos only when you tap Save Image.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Bobby turns your spoken question into text on this iPhone. The audio never leaves your device.</string>
+	<string>bObby turns your spoken question into text on this iPhone. The audio never leaves your device.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

@@ -10,7 +10,7 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertFalse(app.buttons["ACKNOWLEDGE ALL FOUR"].isEnabled)
         consent.tap()
         app.buttons["Not investment advice."].tap()
-        app.buttons["Bobby never touches your money."].tap()
+        app.buttons["bObby never touches your money."].tap()
         XCTAssertFalse(app.buttons["ACKNOWLEDGE ALL FOUR"].isEnabled)
         let risk = app.buttons["You can lose money. You decide."]
         if !risk.isHittable { app.swipeUp() }
@@ -188,7 +188,7 @@ final class ReleaseReadinessTests: XCTestCase {
         XCTAssertFalse(app.buttons["land-share"].exists, "A guest cannot publish device-only practice progress")
         app.buttons["land-next-island"].tap()
         XCTAssertEqual(app.staticTexts["land-focused-island"].label, "Satoshi Nakamoto")
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", spanish ? "Isla de muestra de Bobby" : "Bobby showcase island")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", spanish ? "Isla de muestra de bObby" : "bObby showcase island")).firstMatch.exists)
         XCTAssertFalse(app.buttons["land-confirm"].exists, "The showcase is read-only")
         islandShot(app, spanish ? "satoshi-nakamoto-es" : "satoshi-nakamoto-en")
         app.buttons["land-home-island"].tap()

@@ -259,8 +259,8 @@ final class AccountSession: ObservableObject {
     /// words the Settings app uses: "Configuración", not "Ajustes", on an es-MX phone.
     nonisolated static var manualRevocationSteps: String { manualRevocationSteps(spanish: L.isSpanish) }
     nonisolated static func manualRevocationSteps(spanish: Bool) -> String {
-        L.t("To finish, open Settings, tap your name, tap Sign in with Apple, choose Bobby and tap Delete.",
-            "Para terminar, abre Configuración, toca tu nombre, toca Iniciar sesión con Apple, elige Bobby y toca Eliminar.",
+        L.t("To finish, open Settings, tap your name, tap Sign in with Apple, choose bObby and tap Delete.",
+            "Para terminar, abre Configuración, toca tu nombre, toca Iniciar sesión con Apple, elige bObby y toca Eliminar.",
             spanish: spanish)
     }
 
