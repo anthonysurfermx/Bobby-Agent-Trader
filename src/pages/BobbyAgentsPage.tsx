@@ -49,6 +49,7 @@ export default function BobbyAgentsPage() {
   }, [roomMode, profileId]);
 
   const s = summary;
+  const hasPublicPerformance = roomMode !== 'personal' && (s?.totalTrades ?? 0) > 0;
   const agentName = profile?.agent_name || (() => { try { return localStorage.getItem('bobby_agent_name') || 'Bobby'; } catch { return 'Bobby'; } })();
   const personality = profile?.personality || 'analytical';
   const cioColor = personality === 'direct'
@@ -60,8 +61,9 @@ export default function BobbyAgentsPage() {
   const agents = [
     {
       rank: '01', name: `${agentName} CIO`, role: 'Final Decision Maker',
-      winRate: s ? s.winRate : 0, totalReturn: s ? s.totalReturn : 0,
-      trades: s ? s.totalTrades : 0, status: agentStatus,
+      winRate: hasPublicPerformance && s.closedTrades > 0 ? s.winRate : null,
+      totalReturn: hasPublicPerformance ? s.totalReturn : '--',
+      trades: hasPublicPerformance ? s.totalTrades : '--', status: agentStatus,
       ...cioColor,
     },
     {
@@ -178,12 +180,12 @@ export default function BobbyAgentsPage() {
             )}
 
             {/* System equity */}
-            {s && (
+            {hasPublicPerformance && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
                 className="mt-8 bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] rounded p-6 hover:bg-white/[0.04] transition-all duration-300">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] font-mono text-white/30 tracking-widest">SYSTEM_EQUITY</span>
+                    <span className="text-[9px] font-mono text-white/30 tracking-widest">PUBLIC_PROTOCOL_EQUITY</span>
                     <div className="text-3xl font-mono font-black text-green-400 mt-1">${s.currentEquity.toFixed(2)}</div>
                   </div>
                   <div className="text-right">
@@ -195,6 +197,9 @@ export default function BobbyAgentsPage() {
                 </div>
               </motion.div>
             )}
+            {!hasPublicPerformance && <div className="mt-8 font-mono text-[10px] text-white/30">
+              {roomMode === 'personal' ? 'Your private trade receipts are available in the Record page after wallet sign-in.' : 'No publicly attributable protocol trades have been recorded yet.'}
+            </div>}
           </>
         )}
       </div>

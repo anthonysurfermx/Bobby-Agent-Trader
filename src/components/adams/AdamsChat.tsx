@@ -1707,44 +1707,70 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     if (intent === 'portfolio') {
       setIsProcessing(true);
       try {
-        const pnlRes = await fetch('/api/bobby-pnl');
+        // A connected wallet's portfolio is private. Never substitute Bobby's
+        // anonymous protocol aggregate for the user's balance or positions.
+        const personal = Boolean(address);
+        if (personal && !sessionReady) await ensureSession();
+        const pnlRes = personal
+          ? await sessionFetch(address, '/api/bobby-pnl?scope=mine')
+          : await fetch('/api/bobby-pnl?scope=public');
+        if (!pnlRes) {
+          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es'
+            ? 'Firma la sesión de tu wallet para consultar tus operaciones. Tu saldo privado no aparece en el registro público.'
+            : 'Sign your wallet session to view your trades. Your private balance is not in the public record.', timestamp: Date.now() }]);
+          setIsProcessing(false);
+          return;
+        }
         const pnl = await pnlRes.json();
         if (pnl.ok) {
           const s = pnl.summary;
           const positions = pnl.openPositions || [];
           const closed = (pnl.closedPositions || []).slice(0, 5);
 
-          let text = `**PERFORMANCE_ANALYTICS**\n\n`;
-          text += `TOTAL_RETURN: ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n`;
-          text += `EQUITY: $${Number(s.currentEquity || 0).toFixed(2)} USDC (Base)\n`;
-          text += `WIN_RATE: ${s.winRate.toFixed(0)}% (${s.wins}W / ${s.losses}L)\n`;
-          text += `TRADES: ${s.totalTrades}\n`;
-
-          if (positions.length > 0) {
-            text += `\n**ACTIVE_SIGNALS:**\n`;
-            for (const p of positions) {
-              text += `${p.direction.toUpperCase()} ${p.symbol} ${p.leverage} — PnL: ${p.unrealizedPnl >= 0 ? '+' : ''}$${p.unrealizedPnl.toFixed(2)} (${p.unrealizedPnlPct.toFixed(1)}%)\n`;
-            }
+          let text = personal ? '**YOUR_CONFIRMED_BASE_RECEIPTS**\n\n' : '**BOBBY_PUBLIC_PROTOCOL_RECORD**\n\n';
+          if (s.totalTrades === 0) {
+            text += personal
+              ? 'No confirmed Base trades are linked to your wallet yet.'
+              : 'No publicly attributable protocol trades have been recorded yet. This is not a personal wallet balance.';
           } else {
-            text += `\nNo open positions. Bobby is fully cash.`;
-          }
+            text += `TRADES: ${s.totalTrades}\n`;
+            text += `CAPITAL_REQUIRED: $${Number(s.startingCapital).toFixed(2)} USDC (Base)\n`;
+            if (s.valuationComplete) {
+              text += `TOTAL_RETURN: ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n`;
+              text += `EQUITY: $${Number(s.currentEquity).toFixed(2)} USDC (Base)\n`;
+            }
+            text += s.closedTrades > 0
+              ? `WIN_RATE: ${s.winRate.toFixed(0)}% (${s.wins}W / ${s.losses}L)\n`
+              : 'WIN_RATE: unavailable until a trade closes\n';
 
-          if (closed.length > 0) {
-            text += `\n\n**EXECUTION_LEDGER (last ${closed.length}):**\n`;
-            for (const c of closed) {
-              const time = new Date(c.closeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              text += `${time} ${c.symbol} ${c.direction.toUpperCase()} → ${c.result} (${c.pnlPct >= 0 ? '+' : ''}${c.pnlPct.toFixed(1)}%)\n`;
+            if (positions.length > 0) {
+              text += `\n**OPEN_POSITIONS:**\n`;
+              for (const p of positions) {
+                text += `${p.direction.toUpperCase()} ${p.symbol} ${p.leverage} — PnL: ${p.unrealizedPnl >= 0 ? '+' : ''}$${p.unrealizedPnl.toFixed(2)} (${p.unrealizedPnlPct.toFixed(1)}%)\n`;
+              }
+            } else if (personal) {
+              text += '\nNo open positions are linked to this wallet.';
+            } else {
+              text += '\nIndividual positions are not published in this aggregate.';
+            }
+
+            if (closed.length > 0) {
+              text += `\n\n**EXECUTION_LEDGER (last ${closed.length}):**\n`;
+              for (const c of closed) {
+                const time = new Date(c.closeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                text += `${time} ${c.symbol} ${c.direction.toUpperCase()} → ${c.result} (${c.pnlPct >= 0 ? '+' : ''}${c.pnlPct.toFixed(1)}%)\n`;
+              }
             }
           }
 
-          if (address) {
+          if (personal && address) {
             text += `\n_Wallet: ${address.slice(0, 6)}...${address.slice(-4)}_`;
           }
 
           setMessages(prev => [...prev, { id: uid(), role: 'advisor', text, timestamp: Date.now(), isLive: true }]);
-          speakIfEnabled(lang === 'es'
-            ? `Tu equity es ${s.currentEquity.toFixed(2)} dólares. Win rate ${s.winRate.toFixed(0)} por ciento. ${positions.length} posiciones abiertas.`
-            : `Your equity is ${s.currentEquity.toFixed(2)} dollars. Win rate ${s.winRate.toFixed(0)} percent. ${positions.length} open positions.`);
+          speakIfEnabled(s.totalTrades === 0
+            ? (lang === 'es' ? 'Todavía no hay operaciones confirmadas en este registro.' : 'There are no confirmed trades in this record yet.')
+            : (lang === 'es' ? `${s.totalTrades} operaciones confirmadas en ${personal ? 'tu wallet' : 'el protocolo público'}.` : `${s.totalTrades} confirmed trades in ${personal ? 'your wallet' : 'the public protocol'}.`));
         } else {
           setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude cargar el rendimiento.' : 'Could not load performance.', timestamp: Date.now() }]);
         }
@@ -2593,25 +2619,40 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
   // Fetch positions + equity for HUD (every 30s when idle)
   useEffect(() => {
     const fetchHud = async () => {
+      if (!address || !sessionReady) {
+        setHudEquity(null);
+        setHudPositions([]);
+        return;
+      }
       try {
-        const res = await fetch('/api/bobby-pnl');
-        if (!res.ok) return;
+        const res = await sessionFetch(address, '/api/bobby-pnl?scope=mine');
+        if (!res?.ok) {
+          setHudEquity(null);
+          setHudPositions([]);
+          return;
+        }
         const data = await res.json();
-        if (data.ok) {
-          setHudEquity(data.summary?.totalEquity || null);
+        if (data.ok && data.scope === 'identity') {
+          setHudEquity(data.summary?.totalTrades > 0 && data.summary?.valuationComplete ? data.summary.totalEquity : null);
           setHudPositions((data.openPositions || []).map((p: any) => ({
             symbol: p.symbol || '?',
             direction: 'LONG',
             pnl: Number(p.unrealizedPnl || 0),
             pnlPct: Number(p.unrealizedPnlPct || 0),
           })));
+        } else {
+          setHudEquity(null);
+          setHudPositions([]);
         }
-      } catch { }
+      } catch {
+        setHudEquity(null);
+        setHudPositions([]);
+      }
     };
     fetchHud();
     const iv = setInterval(fetchHud, 30000);
     return () => clearInterval(iv);
-  }, []);
+  }, [address, sessionReady]);
 
   // Get the latest advisor message for the "stage" display
   const latestAdvisor = [...messages].reverse().find(m => m.role === 'advisor');

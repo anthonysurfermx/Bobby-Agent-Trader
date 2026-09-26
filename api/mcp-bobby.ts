@@ -41,7 +41,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           { name: 'bobby_ta', description: 'Technical analysis: SMA, RSI, MACD, Bollinger, support/resistance', inputSchema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
           { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time sources', inputSchema: { type: 'object', properties: {} } },
           { name: 'bobby_uniswap_quote', description: 'Exact-input quote on Uniswap V3, Base (read-only)', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'ETH' }, tokenOut: { type: 'string', default: 'USDC' }, amount: { type: 'string', default: '1' }, amountIn: { type: 'string' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
-          { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades)', inputSchema: { type: 'object', properties: {} } },
+          { name: 'bobby_stats', description: 'Public protocol Base receipt aggregates (trade count, win rate, PnL when available)', inputSchema: { type: 'object', properties: {} } },
           { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance on any chain', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'base' } } } },
           { name: 'bobby_wallet_portfolio', description: 'Get portfolio of any wallet address (multi-chain)', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '8453' } }, required: ['address'] } },
           { name: 'bobby_security_scan', description: 'Scan a token contract for honeypot, rug pull, and safety risks', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '1' } }, required: ['address'] } },
@@ -110,9 +110,10 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
       }
 
       if (toolName === 'bobby_stats') {
-        const res = await fetch(`${BASE_URL}/api/bobby-pnl`);
+        const res = await fetch(`${BASE_URL}/api/bobby-pnl?scope=public`);
         const data = await res.json();
-        return { content: [{ type: 'text', text: JSON.stringify(data.summary, null, 2) }] };
+        if (!res.ok || !data.ok || !data.summary) throw new Error(`Public record unavailable: ${res.status}`);
+        return { content: [{ type: 'text', text: JSON.stringify({ scope: data.scope, source: data.source, summary: data.summary }, null, 2) }] };
       }
 
       // Agentic Wallet tools (via droplet onchainos service)
