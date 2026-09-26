@@ -3,6 +3,8 @@
 //   GET                                   → { access, signedIn, subscription, payments }
 //   POST { action: 'checkout' }           → { url }  Stripe Checkout, $5/month (web)
 //   POST { action: 'portal' }             → { url }  Stripe billing portal (manage / cancel)
+//   POST { action: 'revenuecat-sync' }   → { ok, access, subscription }  re-read the `pro` entitlement
+//        from RevenueCat for this account (after a purchase or restore in the app).
 //   POST { action: 'apple', signedTransaction } → { ok, access, subscription }
 //        a StoreKit 2 transaction (JWS) verified against Apple Root CA G3, then stored.
 // Headers: x-bobby-device, x-bobby-platform, and the account credential (see user-identity.ts).
@@ -14,6 +16,7 @@ import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity, resolveIdentity } from './_lib/user-identity.js';
 import { getSubscription, publicSubscription, readAccess, upsertSubscription } from './_lib/access.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
+import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
 
 export const config = { maxDuration: 20 };
 
@@ -78,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       access: await readAccess(req, identity),
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),
-      payments: { stripe: stripeReady(), apple: true },
+      payments: { stripe: stripeReady(), apple: true, revenuecat: revenueCatReady() },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -114,6 +117,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!existing?.stripe_customer_id) return res.status(404).json({ error: 'No card subscription on this account.' });
       const portal = await stripe('billing_portal/sessions', { customer: existing.stripe_customer_id, return_url: `${siteOrigin(req)}/desk` });
       return res.status(200).json({ url: portal.url });
+    }
+
+    if (action === 'revenuecat-sync') {
+      if (!revenueCatReady()) return res.status(503).json({ error: 'Subscriptions are not switched on yet.' });
+      if (!identity.authUserId) return res.status(400).json({ error: 'Sign in with Apple or Google to use Bobby Pro.' });
+      await syncRevenueCat(identity.authUserId, identity.id);
+      const subscription = await getSubscription(identity.id);
+      return res.status(200).json({ ok: true, access: await readAccess(req, identity), subscription: publicSubscription(subscription) });
     }
 
     if (action === 'apple') {
