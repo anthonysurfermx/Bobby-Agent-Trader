@@ -442,7 +442,9 @@ STATES.THINK_RESOLVE = {
   tick: function(){
     if (!this.done) return;
     if (VOICE.started || VOICE.silent) go('TALK_EVIDENCE');
-    else if (clk - VOICE.reqT > 6){ bcall('stopSpeaking').catch(noop); goSilent(); go('TALK_EVIDENCE'); }
+    /* a full read is ~600 chars: the persona voice can take 6–9 s to arrive (and the device fallback only starts after
+       NeuralVoice's 8 s timeout), so 6 s cancelled almost every read and Bobby was never heard. Native's own watchdog is 22 s. */
+    else if (clk - VOICE.reqT > VOICE_WAIT){ bcall('stopSpeaking').catch(noop); goSilent(); go('TALK_EVIDENCE'); }
   },
   down: function(h){ if (h === 'close') return tapG(function(){ go('RETURNING'); }); return null; }
 };
@@ -473,6 +475,7 @@ function speakRead(){
   }, function(){ if (READ === r) goSilent(); });
 }
 function goSilent(){ VOICE.silent = true; VOICE.ended = true; }
+var VOICE_WAIT = 14;   /* s from speak() to voice.start before the read goes on silently */
 function sentStartT(si){ return kWordT(SENT0[si]).t0; }
 
 /* ---------- TALK_EVIDENCE: B4 satellites + karaoke ---------- */

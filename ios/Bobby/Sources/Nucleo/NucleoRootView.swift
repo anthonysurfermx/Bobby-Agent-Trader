@@ -21,8 +21,18 @@ final class NucleoHost: ObservableObject {
     let controller: NucleoWebController
     let bridge: NucleoBridge
 
+    /// One-time reset of the classic desk's mute (1.1–1.4 persisted it under `avatar.voiceMuted`):
+    /// the Núcleo had no way to unmute, so a user who ever muted there never heard Bobby again.
+    /// From here on the account sheet's "Bobby's voice" switch owns the preference.
+    static let voiceMuteResetKey = "nucleo.voiceMuteReset.v1"
+
     init(options: NucleoLaunchOptions) {
         session = NucleoSession(fixtures: options.fixtures != nil)
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: Self.voiceMuteResetKey) {
+            defaults.set(true, forKey: Self.voiceMuteResetKey)
+            session.voice.isMuted = false
+        }
         bridge = NucleoBridge(session: session)
         controller = NucleoWebController(handler: bridge)
         session.emitter = controller
@@ -105,7 +115,8 @@ private struct NucleoStage: View {
                 .presentationBackground(Theme.bg)
         case .account:
             // Full height: deletion must never hide below a half-height detent (App Review 5.1.1(v)).
-            AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice) { session.sheet = nil }
+            AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice,
+                         onVoiceMutedChange: { session.sessionChanged() }) { session.sheet = nil }
         case .riskNotice:
             RiskNoticeView(profile: session.profile, readOnly: true) { session.sheet = nil }
         }

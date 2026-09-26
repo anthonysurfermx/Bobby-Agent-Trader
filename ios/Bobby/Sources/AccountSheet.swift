@@ -16,8 +16,11 @@ struct AccountSheet: View {
     var detents: Set<PresentationDetent> = [.medium, .large]
     /// Privacy Policy and Help links under the buttons (the Núcleo has no other menu).
     var showsLinks = false
-    /// The voice the squad gallery speaks with when a companion is chosen; nil keeps it silent.
+    /// The voice the squad gallery speaks with when a companion is chosen, and the one the
+    /// "Bobby's voice" switch mutes; nil keeps the gallery silent and hides the switch.
     var voice: NeuralVoice? = nil
+    /// Called after the voice switch flips (the Núcleo refreshes the page's `session.muted`).
+    var onVoiceMutedChange: (() -> Void)? = nil
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
     @State private var busy = false
@@ -47,6 +50,9 @@ struct AccountSheet: View {
                 stat(L.t("Pieces", "Piezas"), pieces.map { "\($0)" } ?? "—")
             }
             avatarRow
+            if let voice {
+                VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
+            }
             if !store.pendingAwards.isEmpty {
                 Text(L.t("\(store.pendingAwards.count) award(s) waiting to sync", "\(store.pendingAwards.count) premio(s) por sincronizar")).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.muted)
             }
@@ -199,6 +205,41 @@ struct AccountSheet: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke, lineWidth: 1))
+    }
+}
+
+/// "Bobby's voice": the one device mute (`NeuralVoice.isMuted`) the desk, the gallery and the Núcleo share.
+private struct VoiceSwitchRow: View {
+    @ObservedObject var voice: NeuralVoice
+    let onChange: (() -> Void)?
+
+    var body: some View {
+        Toggle(isOn: Binding(
+            get: { !voice.isMuted },
+            set: { on in
+                voice.isMuted = !on
+                onChange?()
+            })) {
+            HStack(spacing: 12) {
+                Image(systemName: voice.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(voice.isMuted ? Theme.muted : Theme.accent)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Theme.card))
+                    .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L.t("Bobby's voice", "Voz de Bobby")).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                    Text(voice.isMuted ? L.t("Off · Bobby reads in silence", "Apagada · Bobby lee en silencio")
+                                       : L.t("On · Bobby speaks his reads", "Encendida · Bobby dice sus lecturas"))
+                        .font(.system(size: 12)).foregroundStyle(Theme.muted)
+                }
+            }
+        }
+        .tint(Theme.accent)
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke, lineWidth: 1))
+        .accessibilityIdentifier("account-voice")
     }
 }
 
