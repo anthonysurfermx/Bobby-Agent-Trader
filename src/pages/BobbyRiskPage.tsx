@@ -2,6 +2,8 @@
 // Content red-teamed by Kimi K3 (2026-08-19); mechanism numbers match the
 // frozen BobbyTrackRecordV2. Scoped claims only — see "What we will never claim".
 import { Helmet } from 'react-helmet-async';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 import { ArrowLeft } from 'lucide-react';
 
 const TRUST_ROWS: Array<[string, string, string]> = [
@@ -47,8 +49,10 @@ function H2({ children }: { children: React.ReactNode }) {
 }
 
 export default function BobbyRiskPage() {
+  useNucleoPages();
   return (
     <div className="min-h-screen bg-[#050505] text-white">
+      <NucleoTopBar />
       <Helmet>
         <title>Risk & Claims — Bobby Protocol</title>
         <meta name="description" content="Exactly what VERIFIED proves, what ATTESTED is, our trust assumptions, and what we will never claim." />

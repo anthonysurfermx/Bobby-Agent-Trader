@@ -3,6 +3,8 @@ import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { useProtocolTxHistory, type OnChainTx } from '@/hooks/useProtocolTxHistory';
 import { DEFAULT_CHAIN } from '@/config/chains';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 
 interface HeartbeatData {
   ok: boolean;
@@ -116,13 +118,15 @@ function MetricCard({ label, value, sub }: { label: string; value: string | numb
   );
 }
 
+// Contract names read in ink: a hue per contract carried no meaning, and amber / mint / coral are
+// reserved for the CIO / Alpha / Red meanings.
 const CONTRACT_COLORS: Record<string, string> = {
-  HardnessRegistry: 'text-[#7da6ff]',
-  AdversarialBounties: 'text-amber-400',
-  TrackRecord: 'text-cyan-400',
-  AgentEconomy: 'text-purple-400',
-  ConvictionOracle: 'text-blue-400',
-  AgentRegistry: 'text-pink-400',
+  HardnessRegistry: 'text-white/80',
+  AdversarialBounties: 'text-white/80',
+  TrackRecord: 'text-white/80',
+  AgentEconomy: 'text-white/80',
+  ConvictionOracle: 'text-white/80',
+  AgentRegistry: 'text-white/80',
 };
 
 function formatTimestamp(ts: number | null): string {
@@ -135,6 +139,7 @@ function formatTimestamp(ts: number | null): string {
 }
 
 export default function BobbyHeartbeatPage() {
+  useNucleoPages();
   const [data, setData] = useState<HeartbeatData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,14 +185,15 @@ export default function BobbyHeartbeatPage() {
   return (
     <div className="min-h-screen bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet><title>Protocol Heartbeat | Bobby Agent Trader</title></Helmet>
+      <NucleoTopBar />
 
       {/* Header */}
-      <div className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
+      <div className="np-subhead">
         <div className="flex items-center gap-4">
           <a href="/protocol" className="text-white/45 hover:text-[#7da6ff] transition text-[10px] font-mono uppercase tracking-[0.15em]">
             &larr; Protocol
           </a>
-          <h1 className="text-lg font-extrabold tracking-[-0.07em] text-white">Protocol heartbeat</h1>
+          <h1 className="text-2xl text-white md:text-3xl">Protocol heartbeat</h1>
           {data?.health && <StatusDot status={data.health.overall} />}
         </div>
         <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-white/30">
@@ -300,7 +306,7 @@ export default function BobbyHeartbeatPage() {
               {data.recentCommerce.length > 0 ? (
                 <div className="space-y-2">
                   {data.recentCommerce.map((event, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs font-mono">
+                    <div key={i} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs font-mono">
                       <div className="flex items-center gap-2">
                         <span className={commerceBadge(event.status)}>
                           [{commerceLabel(event.status)}]
@@ -368,7 +374,7 @@ export default function BobbyHeartbeatPage() {
                         <span className={`text-xs font-mono flex-shrink-0 ${CONTRACT_COLORS[tx.contractName] || 'text-white/60'}`}>
                           {tx.contractName}
                         </span>
-                        <span className="text-xs font-mono text-white/50 flex-shrink-0">{tx.method}</span>
+                        <span className="min-w-0 truncate text-xs font-mono text-white/50">{tx.method}</span>
                         {parseFloat(tx.valueNative) > 0 && (
                           <span className="text-xs font-mono text-amber-400/60 flex-shrink-0 hidden sm:inline">
                             {parseFloat(tx.valueNative).toFixed(4)} {sym}
@@ -459,7 +465,7 @@ export default function BobbyHeartbeatPage() {
                             <span className={`text-xs font-mono flex-shrink-0 ${CONTRACT_COLORS[tx.contractName] || 'text-white/60'}`}>
                               {tx.contractName}
                             </span>
-                            <span className="text-xs font-mono text-white/50 flex-shrink-0">{tx.method}</span>
+                            <span className="min-w-0 truncate text-xs font-mono text-white/50">{tx.method}</span>
                             <span className="text-xs font-mono text-white/20 hidden md:inline">
                               block #{tx.blockNumber.toLocaleString()}
                             </span>

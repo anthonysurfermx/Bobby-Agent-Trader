@@ -185,7 +185,7 @@ export default function BobbyDocsPage() {
   let sectionIndex = 0;
 
   return (
-    <KineticShell activeTab="docs" minimalNav>
+    <KineticShell activeTab="docs" minimalNav nucleo>
       <Helmet><title>AI Docs | Bobby Agent Trader</title></Helmet>
 
       <div className="min-h-screen bg-[#050505] pb-20 md:pb-8">

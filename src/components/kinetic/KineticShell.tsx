@@ -9,6 +9,8 @@ import { ReactNode, useEffect, useState } from 'react';
 import { TradingRoomProvider, useTradingRoom } from '@/hooks/useTradingRoom';
 import { Lock } from 'lucide-react';
 import SkinInTheGameBadge from './SkinInTheGameBadge';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 
 // V3 IA: 4 páginas core (Gemini). Rutas legacy quedan alcanzables por deep-link.
 const NAV_ITEMS = [
@@ -28,6 +30,8 @@ interface KineticShellProps {
   minimalNav?: boolean;
   showTicker?: boolean;
   showStatus?: boolean;
+  /** Protocol and documentation pages: the Núcleo frame (the home's top bar, no ticker, no bottom nav). */
+  nucleo?: boolean;
 }
 
 // Shared ticker tape data — fetched on mount, then refreshed while mounted.
@@ -88,13 +92,28 @@ function TickerTape() {
   );
 }
 
-export default function KineticShell({ children, activeTab, showSidebar = false, minimalNav = false, showTicker = true, showStatus = true }: KineticShellProps) {
+export default function KineticShell({ children, activeTab, showSidebar = false, minimalNav = false, showTicker = true, showStatus = true, nucleo = false }: KineticShellProps) {
   return (
     <TradingRoomProvider>
-      <KineticShellInner activeTab={activeTab} showSidebar={showSidebar} minimalNav={minimalNav} showTicker={showTicker} showStatus={showStatus}>
-        {children}
-      </KineticShellInner>
+      {nucleo ? (
+        <NucleoShell>{children}</NucleoShell>
+      ) : (
+        <KineticShellInner activeTab={activeTab} showSidebar={showSidebar} minimalNav={minimalNav} showTicker={showTicker} showStatus={showStatus}>
+          {children}
+        </KineticShellInner>
+      )}
     </TradingRoomProvider>
+  );
+}
+
+// The Núcleo frame: styles come from body.nucleo-pages (src/styles/nucleo-pages.css).
+function NucleoShell({ children }: { children: ReactNode }) {
+  useNucleoPages();
+  return (
+    <div className="min-h-screen">
+      <NucleoTopBar />
+      <main className="min-w-0">{children}</main>
+    </div>
   );
 }
 

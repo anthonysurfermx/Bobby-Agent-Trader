@@ -67,7 +67,7 @@ export default function PlaybookCard({ playbook }: PlaybookCardProps) {
       {/* ── Metrics row ── */}
       <div className="mt-4 flex flex-wrap items-center gap-5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/50">
         <div className="flex items-center gap-2">
-          <span className="text-green-400">{playbook.blockRatePct}%</span>
+          <span className="text-white">{playbook.blockRatePct}%</span>
           <span className="text-white/40">block rate</span>
         </div>
         <div className="flex items-center gap-2">
@@ -98,7 +98,7 @@ export default function PlaybookCard({ playbook }: PlaybookCardProps) {
             {sandboxReady && (
               <a
                 href={`/protocol/sandbox?playbook=${encodeURIComponent(playbook.slug)}`}
-                className="inline-flex items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/15 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-green-400 transition-colors hover:bg-green-500/25"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-white/15"
               >
                 Run in Sandbox →
               </a>
@@ -120,7 +120,7 @@ export default function PlaybookCard({ playbook }: PlaybookCardProps) {
             <div className="mt-5 space-y-5 border-t border-white/[0.04] pt-5">
               {/* 1. What it is */}
               <section>
-                <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-green-400/70">
+                <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
                   What it is
                 </div>
                 <p className="text-sm leading-6 text-white/70">{playbook.whatItIs}</p>
@@ -146,7 +146,7 @@ export default function PlaybookCard({ playbook }: PlaybookCardProps) {
                       className="inline-flex flex-col rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2"
                     >
                       <div className="flex items-center gap-2">
-                        <code className="font-mono text-xs text-green-400">{tool.name}</code>
+                        <code className="font-mono text-xs text-white/85">{tool.name}</code>
                         {tool.paid && (
                           <span className="rounded-sm border border-amber-300/20 bg-amber-300/10 px-1.5 py-[1px] font-mono text-[8px] uppercase tracking-[0.14em] text-amber-200">
                             Optional deeper audit

@@ -31,10 +31,10 @@ interface HarnessEvent {
 }
 
 const DECISION_COLORS: Record<string, string> = {
-  allow: '#6dfe9c',
-  reduce: '#fcc025',
-  deny: '#ff716a',
-  stable: '#7da6ff',
+  allow: '#3FE0B5',
+  reduce: '#F6B94E',
+  deny: '#FF5A5F',
+  stable: '#A39C91',
 };
 
 const EVENT_ICONS: Record<string, string> = {
@@ -120,7 +120,7 @@ export default function BobbyHarnessConsolePage() {
   }, [events, filter]);
 
   return (
-    <KineticShell activeTab="harness" minimalNav>
+    <KineticShell activeTab="harness" minimalNav nucleo>
       <Helmet>
         <title>Finance Harness Console | Bobby Protocol</title>
       </Helmet>
@@ -151,14 +151,14 @@ export default function BobbyHarnessConsolePage() {
           className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3"
         >
           {[
-            { label: 'Events', value: stats.total, color: '#7da6ff' },
-            { label: 'Executed', value: stats.executions, color: '#6dfe9c' },
-            { label: 'Blocked', value: stats.skips, color: '#ff716a' },
-            { label: 'Parked', value: stats.parks, color: '#7da6ff' },
-            { label: 'MCP calls', value: stats.mcpCalls, color: '#fcc025' },
-            { label: 'Block rate', value: `${stats.blockRate}%`, color: '#ff716a' },
-            { label: 'Avg conv', value: `${(stats.avgConv * 10).toFixed(1)}`, color: '#7da6ff' },
-            { label: 'W/L', value: `${stats.wins}/${stats.losses}`, color: '#6dfe9c' },
+            { label: 'Events', value: stats.total, color: '#F2EDE4' },
+            { label: 'Executed', value: stats.executions, color: '#3FE0B5' },
+            { label: 'Blocked', value: stats.skips, color: '#FF5A5F' },
+            { label: 'Parked', value: stats.parks, color: '#F2EDE4' },
+            { label: 'MCP calls', value: stats.mcpCalls, color: '#F2EDE4' },
+            { label: 'Block rate', value: `${stats.blockRate}%`, color: '#FF5A5F' },
+            { label: 'Avg conv', value: `${(stats.avgConv * 10).toFixed(1)}`, color: '#F2EDE4' },
+            { label: 'W/L', value: `${stats.wins}/${stats.losses}`, color: '#3FE0B5' },
           ].map(s => (
             <div key={s.label} className="bg-white/[0.04] border border-white/10 rounded-xl p-3 text-center">
               <div className="font-mono text-[9px] text-white/40 uppercase tracking-[0.15em]">{s.label}</div>
@@ -239,7 +239,7 @@ export default function BobbyHarnessConsolePage() {
               ) : (
                 <div className="divide-y divide-white/[0.06]">
                   {memories.map((m) => {
-                    const outcomeColor = m.outcome === 'executed' ? '#6dfe9c' : m.outcome === 'park' ? '#7da6ff' : '#ff716a';
+                    const outcomeColor = m.outcome === 'executed' ? '#3FE0B5' : m.outcome === 'park' ? '#A39C91' : '#FF5A5F';
                     return (
                       <div key={m.id} className="px-4 py-3 font-mono text-[11px]">
                         <div className="flex items-center gap-3">
@@ -251,7 +251,7 @@ export default function BobbyHarnessConsolePage() {
                           </span>
                           {m.symbol && <span className="text-white font-bold">{m.symbol} {m.direction?.toUpperCase()}</span>}
                           {m.conviction != null && (
-                            <span style={{ color: m.conviction >= 0.35 ? '#6dfe9c' : '#ff716a' }}>
+                            <span style={{ color: m.conviction >= 0.35 ? '#3FE0B5' : '#FF5A5F' }}>
                               {(m.conviction * 10).toFixed(1)}/10
                             </span>
                           )}
@@ -379,7 +379,7 @@ export default function BobbyHarnessConsolePage() {
 
 function EventRow({ event }: { event: HarnessEvent }) {
   const [expanded, setExpanded] = useState(false);
-  const decisionColor = DECISION_COLORS[event.decision || ''] || '#7da6ff';
+  const decisionColor = DECISION_COLORS[event.decision || ''] || '#F2EDE4';
   const icon = EVENT_ICONS[event.event_type] || '··';
   const convStr = event.conviction != null ? `${(event.conviction * 10).toFixed(1)}/10` : '—';
 
@@ -427,7 +427,7 @@ function EventRow({ event }: { event: HarnessEvent }) {
 
         {/* Conviction */}
         {event.conviction != null && (
-          <span style={{ color: event.conviction >= 0.35 ? '#6dfe9c' : '#ff716a' }}>
+          <span style={{ color: event.conviction >= 0.35 ? '#3FE0B5' : '#FF5A5F' }}>
             {convStr}
           </span>
         )}

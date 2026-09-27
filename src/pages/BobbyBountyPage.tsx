@@ -2,6 +2,8 @@
 // Amounts approved 2026-08-19. Funding goes live after the mainnet Safe handoff;
 // the terms are published now so hunters can start reading the code today.
 import { Helmet } from 'react-helmet-async';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 import { ArrowLeft, ArrowUpRight, Bug, Swords, Trophy } from 'lucide-react';
 
 const GH = 'https://github.com/anthonysurfermx/Bobby-Agent-Trader';
@@ -30,8 +32,10 @@ const TIERS: Array<[string, string, string]> = [
 ];
 
 export default function BobbyBountyPage() {
+  useNucleoPages();
   return (
     <div className="min-h-screen bg-[#050505] text-white">
+      <NucleoTopBar />
       <Helmet>
         <title>Bug Bounty — Bobby Protocol</title>
         <meta name="description" content="Real rewards for breaking Bobby's track record, contracts or challenge mechanism. $5,000 initial pool." />

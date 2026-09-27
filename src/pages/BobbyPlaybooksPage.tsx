@@ -49,7 +49,7 @@ export default function BobbyPlaybooksPage() {
       <Helmet>
         <title>Pressure-Test Playbooks | Bobby Agent Trader</title>
       </Helmet>
-      <KineticShell activeTab="playbooks" minimalNav>
+      <KineticShell activeTab="playbooks" minimalNav nucleo>
         <div className="mx-auto max-w-6xl px-4 py-10 md:px-8">
           {/* ── Header ── */}
           <header className="mb-8">

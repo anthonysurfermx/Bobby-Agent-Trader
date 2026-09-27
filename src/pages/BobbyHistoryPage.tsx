@@ -53,7 +53,7 @@ type View = 'public' | 'mine';
 const PER_PAGE = 10;
 
 export default function BobbyHistoryPage() {
-  return <KineticShell activeTab="history" showSidebar><HistoryContent /></KineticShell>;
+  return <KineticShell activeTab="history" showSidebar nucleo><HistoryContent /></KineticShell>;
 }
 
 function HistoryContent() {
@@ -136,10 +136,10 @@ function HistoryContent() {
   const returnText = hasCapital && hasValuation ? `${summary!.totalReturn >= 0 ? '+' : ''}${summary!.totalReturn.toFixed(2)}%` : '—';
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto pb-20">
+    <div className="px-4 pt-10 sm:px-6 md:px-8 md:pt-14 max-w-7xl mx-auto pb-20">
       <Helmet><title>Verified Record | Bobby Protocol</title></Helmet>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="text-3xl md:text-5xl font-black tracking-tight">Verified <span className="text-white/20">/</span> Record</h1>
+        <h1 className="text-4xl md:text-6xl font-black tracking-tight">Verified <span className="text-white/20">/</span> Record</h1>
         <p className="text-[10px] font-mono text-white/40 mt-2">
           {view === 'public'
             ? 'Bobby protocol trades from confirmed, explicitly public cycles on Base.'
@@ -147,11 +147,11 @@ function HistoryContent() {
         </p>
         <div className="flex flex-wrap gap-2 mt-5 font-mono text-[10px]">
           <button type="button" onClick={() => chooseView('public')}
-            className={`px-4 py-2 rounded border ${view === 'public' ? 'border-green-400/40 bg-green-400/10 text-green-400' : 'border-white/[0.06] text-white/40 hover:text-white'}`}>
+            className={`px-4 py-2 rounded-full border ${view === 'public' ? 'border-white bg-white text-black' : 'border-white/15 text-white/40 hover:text-white'}`}>
             PUBLIC BOBBY RECORD
           </button>
           <button type="button" onClick={() => chooseView('mine')}
-            className={`px-4 py-2 rounded border ${view === 'mine' ? 'border-green-400/40 bg-green-400/10 text-green-400' : 'border-white/[0.06] text-white/40 hover:text-white'}`}>
+            className={`px-4 py-2 rounded-full border ${view === 'mine' ? 'border-white bg-white text-black' : 'border-white/15 text-white/40 hover:text-white'}`}>
             MY RECEIPTS
           </button>
         </div>
@@ -163,8 +163,8 @@ function HistoryContent() {
         <div className="bg-white/[0.02] border border-white/[0.06] rounded p-8 text-center font-mono text-sm text-white/60">
           {wallet ? 'Sign with your connected wallet to see your private receipts.' : 'Connect a wallet or sign in to see your private receipts.'}
           {wallet && <button type="button" onClick={() => void ensureSession()}
-            className="block mx-auto mt-5 px-4 py-2 rounded bg-green-400 text-black text-[10px] font-bold">SIGN TO VIEW</button>}
-          {!wallet && <Link to="/signin" className="block mx-auto mt-5 w-fit px-4 py-2 rounded bg-green-400 text-black text-[10px] font-bold">SIGN IN</Link>}
+            className="block mx-auto mt-5 px-4 py-2 rounded bg-white text-black text-[10px] font-bold">SIGN TO VIEW</button>}
+          {!wallet && <Link to="/signin" className="block mx-auto mt-5 w-fit px-4 py-2 rounded bg-white text-black text-[10px] font-bold">SIGN IN</Link>}
         </div>
       ) : error ? (
         <div role="alert" className="bg-red-500/5 border border-red-500/20 rounded p-8 text-center font-mono text-sm text-red-300">{error}</div>
