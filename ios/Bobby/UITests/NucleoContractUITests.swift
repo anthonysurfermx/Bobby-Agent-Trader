@@ -8,7 +8,7 @@ final class NucleoContractUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// The contract page's summary line once every row ran ("PASS · 13 passed · 0 failed · 1 skipped").
+    /// The contract page's summary line once every row ran ("PASS · 13 passed · 0 failed · 3 skipped").
     private func runContract(_ extra: [String], name: String) -> String {
         let app = XCUIApplication()
         app.launchArguments = ["-nucleo-fixtures", "-nucleo-page", "contract", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + extra
@@ -35,9 +35,13 @@ final class NucleoContractUITests: XCTestCase {
     }
 
     /// A fresh onboarding: the risk gate row runs (ask before acceptance never reaches the network).
+    /// Natively two rows always skip: the metered refusal (fixture scenario `default`; the gates are
+    /// covered by NucleoBridgeTests) and `paywall()` (it presents a real sheet). Nothing else may.
+    /// Note: `-nucleo-reset-onboarding` clears the app's own domain only; a value written with
+    /// `simctl spawn … defaults write xyz.bobbyprotocol.bobby` lives outside the container and survives it.
     func testContractPassesAfterAnOnboardingReset() {
         let label = runContract(["-nucleo-reset-onboarding"], name: "nucleo-contract-native-reset")
         XCTAssertTrue(label.hasPrefix("PASS"), label)
-        XCTAssertTrue(label.contains("0 skipped"), "the risk gate row must run after a reset: \(label)")
+        XCTAssertTrue(label.contains("· 2 skipped"), "the risk gate row must run after a reset: \(label)")
     }
 }

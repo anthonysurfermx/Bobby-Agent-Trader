@@ -72,6 +72,12 @@
   "failed": "desk-debate.failed.json",
   "unavailable": "desk-debate.unavailable.json",
   "gateway_timeout": "desk-debate.gateway_timeout.json",
-  "offline": "every request fails with URLError.notConnectedToInternet (error.network)"
+  "offline": "every request fails with URLError.notConnectedToInternet (error.network)",
+  "signin_required": "voice-tool.signin_required.json: run_debate answers 401 until the user signs in (the desk is never called)",
+  "subscription_required": "voice-tool.subscription_required.json: run_debate answers 402 until the user subscribes (the desk is never called)"
+ },
+ "gates": {
+  "signin_required": "signin-required",
+  "subscription_required": "subscription-required"
  }
 }

@@ -1,7 +1,7 @@
 // The Núcleo is the app (Nucleo/ARCHITECTURE.md §1.3). One session and one web view:
 // onboarding until a companion is chosen and the risk notice accepted, then the daily
-// app, cross-faded. Native sheets (squad, locker, island, account, risk notice) open
-// over the glass; the header avatar opens the account sheet (sign in, sign out, delete
+// app, cross-faded. Native sheets (squad, locker, island, account, risk notice, Bobby Pro)
+// open over the glass; the header avatar opens the account sheet (sign in, sign out, delete
 // the account, privacy). DEBUG builds only: a long press on the page's wordmark
 // (`openClassic`) tears all of this down before the classic desk appears, for the rest
 // of this launch. Release has no way out of the Núcleo.
@@ -45,6 +45,11 @@ final class NucleoHost: ObservableObject {
         }
 #endif
         controller.load(options.page ?? session.page)
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-nucleo-paywall") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.session.presentPaywallForReview() }
+        }
+#endif
     }
 
     func teardown() {
@@ -119,6 +124,10 @@ private struct NucleoStage: View {
                          onVoiceMutedChange: { session.sessionChanged() }) { session.sheet = nil }
         case .riskNotice:
             RiskNoticeView(profile: session.profile, readOnly: true) { session.sheet = nil }
+        case .paywall:
+            NucleoPaywallSheet(store: BobbyStore.shared, center: BobbyAccessCenter.shared,
+                               afterSignIn: { await session.signedInFromSheet() },
+                               onOutcome: { session.paywallOutcome($0) }) { session.sheet = nil }
         }
     }
 }

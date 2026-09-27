@@ -1,0 +1,57 @@
+{
+  "identifier" : "B0BB7A01",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "B0BB7A02",
+      "localizations" : [
+
+      ],
+      "name" : "Bobby Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "B0BB7A03",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlimited reads",
+              "displayName" : "Bobby Pro",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "xyz.bobbyprotocol.bobby.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Bobby Pro Monthly",
+          "subscriptionGroupID" : "B0BB7A02",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

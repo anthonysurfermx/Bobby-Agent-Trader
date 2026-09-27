@@ -190,6 +190,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #chipRow{left:0;top:0;width:390px;height:844px;pointer-events:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 24px),transparent)}
 .chip{position:absolute;left:0;top:0;height:40px;padding:0 16px;border-radius:20px;border:.5px solid var(--line);background:rgba(242,237,228,.04);font:500 15px/39px var(--sans);color:var(--ink2);white-space:nowrap;cursor:pointer;pointer-events:auto;transform-origin:50% 50%}
 .chip.first{color:var(--ink)}
+.chip.apple{background:#FFFFFF;color:#000;border-color:transparent;font:500 15px/39px -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif}
+.chip.apple .lg{font:500 17px/39px -apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;margin-right:5px}
+.chip.pro{background:var(--ink);color:var(--bg);border-color:transparent;font-weight:600}
 
 /* pre-permission card: blooms from the bottom rim */
 #perm{left:45px;top:488px;width:300px;border-radius:24px;padding:20px 20px 16px;background:var(--glass);border:.5px solid var(--hair);
@@ -427,8 +430,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
  *
  * Replies: native answers every envelope with {v:1, ok:true, result} or
  * {v:1, ok:false, error:{code, message}}. Domain outcomes (quota, unknown
- * asset, cancelled...) are ok:true results with a `status`; ok:false is only
- * for protocol faults (unknown_method, invalid_params, forbidden, busy, internal).
+ * asset, cancelled, signin_required, subscription_required...) are ok:true
+ * results with a `status`; ok:false is only for protocol faults
+ * (unknown_method, invalid_params, forbidden, busy, internal).
  */
 (function () {
   'use strict';
@@ -438,7 +442,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',
-    'setCompanion', 'riskNotice', 'acceptRisk', 'signIn',
+    'setCompanion', 'riskNotice', 'acceptRisk', 'signIn', 'paywall',
     'openNative', 'openClassic', 'finishOnboarding', 'markHint', 'log'
   ];
   var EVENTS = [
@@ -560,6 +564,13 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'err.bad': 'The analysis did not come back. No verdict was issued.',
       'err.risk': 'First, the risk notice.', 'err.riskSub': 'Bobby reads nothing until you agree to it. Your question was not sent.',
       'err.riskCta': 'Open the risk notice',
+      'gate.signin': 'Create your free account to keep reading — 10 free reads a week.',
+      'gate.signinCta': 'Sign in with Apple', 'gate.notNow': 'Not now',
+      'gate.signinUnavailable': 'Sign-in isn’t available right now. Your question was not sent.',
+      'gate.signinFailed': 'Sign-in didn’t finish. Your question was not sent.',
+      'gate.pro': 'You’ve used this week’s free reads.', 'gate.proResets': 'They reset {date}. Bobby Pro has unlimited reads.',
+      'gate.proNoDate': 'Bobby Pro has unlimited reads.', 'gate.proCta': 'See Bobby Pro',
+      'gate.proPending': 'Waiting for the App Store to confirm Bobby Pro.', 'gate.proFailed': 'Bobby Pro isn’t confirmed yet. Your question was not sent.',
       'follow.another': 'Another question about {symbol}', 'follow.how': 'How is {symbol} looking?', 'follow.why': 'Why is {symbol} moving today?',
       'aria.verdict': 'Verdict: {word}', 'aria.conviction': ', {pct}% conviction'
     },
@@ -597,6 +608,13 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'err.bad': 'El análisis no regresó. No se emitió ningún veredicto.',
       'err.risk': 'Primero, el aviso de riesgo.', 'err.riskSub': 'Bobby no analiza nada hasta que lo aceptes. Tu pregunta no se envió.',
       'err.riskCta': 'Abrir el aviso de riesgo',
+      'gate.signin': 'Crea tu cuenta gratis para seguir leyendo: 10 lecturas gratis a la semana.',
+      'gate.signinCta': 'Iniciar sesión con Apple', 'gate.notNow': 'Ahora no',
+      'gate.signinUnavailable': 'Ahora no se puede iniciar sesión. Tu pregunta no se envió.',
+      'gate.signinFailed': 'No se completó el inicio de sesión. Tu pregunta no se envió.',
+      'gate.pro': 'Ya usaste tus lecturas gratis de esta semana.', 'gate.proResets': 'Se renuevan el {date}. Bobby Pro tiene lecturas ilimitadas.',
+      'gate.proNoDate': 'Bobby Pro tiene lecturas ilimitadas.', 'gate.proCta': 'Ver Bobby Pro',
+      'gate.proPending': 'Esperando a que la App Store confirme Bobby Pro.', 'gate.proFailed': 'Bobby Pro aún no está confirmado. Tu pregunta no se envió.',
       'follow.another': 'Otra pregunta sobre {symbol}', 'follow.how': '¿Cómo se ve {symbol}?', 'follow.why': '¿Por qué se mueve {symbol} hoy?',
       'aria.verdict': 'Veredicto: {word}', 'aria.conviction': ', {pct}% de convicción'
     }
@@ -883,10 +901,30 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     return t(lang, verdictKey === 'wait' ? 'xp.pointsWait' : 'xp.points', { points: points });
   }
 
-  /** Non-ok replies -> caption + chips. Never a verdict, never XP. */
+  /** An ISO reset time -> "October 3" / "3 de octubre" in the reader's time zone (null when unreadable). */
+  function resetDay(iso, lang) {
+    if (typeof iso !== 'string' || !iso) return null;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    try { return d.toLocaleDateString(lang2(lang) === 'es' ? 'es-MX' : 'en-US', { month: 'long', day: 'numeric' }); } catch (e) { return null; }
+  }
+
+  /** Non-ok replies -> caption + chips. Never a verdict, never XP.
+   *  Metered-read refusals (ARCHITECTURE.md §8.3) carry a native `token` that re-asks the same question:
+   *  it rides in `retry` (never `token`), so a chip can only re-ask AFTER the sign-in or the purchase. */
   function failure(r, lang) {
     lang = lang2(lang);
     switch (r && r.status) {
+      case 'signin_required':
+        return { kind: 'signin', caption: t(lang, 'gate.signin'), sub: null, access: r.access || null,
+          chips: [{ label: t(lang, 'gate.signinCta'), action: { signIn: true, retry: r.token || null }, primary: true, style: 'apple' },
+            { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
+      case 'subscription_required':
+        var day = resetDay(r.access && r.access.resetsAt, lang);
+        return { kind: 'subscription', caption: t(lang, 'gate.pro'), sub: day ? t(lang, 'gate.proResets', { date: day }) : t(lang, 'gate.proNoDate'),
+          access: r.access || null,
+          chips: [{ label: t(lang, 'gate.proCta'), action: { paywall: true, retry: r.token || null }, primary: true, style: 'pro' },
+            { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
       case 'confirm':
         return { kind: 'confirm', caption: t(lang, 'confirm.prompt', { name: r.asset.name, symbol: r.asset.symbol }), sub: r.proxyNote || null,
           chips: [{ label: t(lang, 'confirm.yes', { symbol: r.asset.symbol }), action: { token: r.token }, primary: true },
@@ -969,7 +1007,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     t: t, money: money, signedPct: signedPct,
     sentences: sentences, firstSentence: firstSentence, clipWords: clipWords,
     syllables: syllables, wordTimes: wordTimes,
-    build: build, failure: failure, xpChip: xpChip, followUps: followUps, thesisView: thesisView,
+    build: build, failure: failure, resetDay: resetDay, xpChip: xpChip, followUps: followUps, thesisView: thesisView,
     _internal: { pulseAgrees: pulseAgrees, planOf: planOf, closedVolumeRatio: closedVolumeRatio, niceStep: niceStep }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -2247,7 +2285,10 @@ function chipsShow(list, eyebrow){
   A.chipX.set(0);
   var x = 20;
   list.forEach(function(c, i){
-    var b = mk('button', 'chip' + (i === 0 ? ' first' : ''), c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
+    /* `apple`: the Sign in with Apple chip (white, the Apple logo in the system font); `pro`: the Bobby Pro chip */
+    var style = c.style === 'apple' || c.style === 'pro' ? ' ' + c.style : '';
+    var b = mk('button', 'chip' + (i === 0 ? ' first' : '') + style, c.style === 'apple' ? null : c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
+    if (c.style === 'apple'){ var lg = mk('span', 'lg', '\uF8FF'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
     el.chipRow.appendChild(b);
     var w = b.offsetWidth || 160, ch = { el: b, x: x, w: w, p: new V(0, 'emit'), o: new V(0, 'soft'), press: new V(1, 'snap'), action: c.action, label: c.label };
     x += w + 8; A.chips.push(ch);
@@ -2453,6 +2494,9 @@ function routeReply(r){
   var f = RMOD.failure(r.reply, LANG);
   /* consent is missing (a stale or reset notice): not a failed read — the way to the risk beat */
   if (f.kind === 'risk'){ if (SES) SES.riskAccepted = false; go('RISK_GATE', { f: f }); return; }
+  /* the server metered this read (§8.3): an account, or Bobby Pro, first. The question waits natively. */
+  if (f.kind === 'signin'){ go('SIGNIN_GATE', { f: f }); return; }
+  if (f.kind === 'subscription'){ go('PRO_GATE', { f: f, auto: r.retryOf !== 'paywall' }); return; }
   go('ERROR', { f: f });
 }
 function cancelRead(){
@@ -2675,7 +2719,7 @@ STATES.SENDING = {
     if (A.note.o.t > 0) noteOut();
     var q = d.question || (READ && READ.question) || '';
     var params = d.params || (d.token ? { token: d.token } : { question: q });
-    startRead(params, q);
+    startRead(params, q).retryOf = d.retryOf || null;
     A.qText = q; A.aText = ''; el.dockA.textContent = ''; A.dockAO.set(0);
     var pre = 0;
     if (d.origin === 'type'){ txReset(); txSet(q, true, 0.045); pre = Math.min(0.6, A.tx.words.length * 0.045) + 0.35; }
@@ -3021,6 +3065,9 @@ function chipAct(c){
   var a = c.action || {}, cx = c.x + c.w / 2 + A.chipX.x, cy = 660;
   tick('light');
   if (a.risk){ openNative('riskNotice'); return; }   /* native replaces this page with the risk beat (onboarding#risk) */
+  if (a.signIn){ gateSignIn(a.retry); return; }
+  if (a.paywall){ gatePaywall(a.retry); return; }
+  if (a.dismiss){ go('RETURNING'); return; }
   if (a.retype){ openTyping({ fromRead: false }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
@@ -3082,6 +3129,50 @@ STATES.CONFIRM_ASSET = { enter: askAgainEnter, tick: function(){ if (inState() >
 STATES.UNKNOWN_ASSET = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
 /* RISK_GATE: the read was refused for consent; the chip opens the risk beat, never a generic failure */
 STATES.RISK_GATE = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
+
+/* ---------- SIGNIN_GATE / PRO_GATE: the server metered this read (§8.3). Glass first: one line from the rim and
+   the Apple chip (or the Bobby Pro chip). The question waits natively in the chip's `retry` token and is asked
+   again only after a real sign in, or after Bobby's server verified the subscription. No verdict, no XP. ---------- */
+var GATE_BUSY = false;
+function gateRetry(token, why){
+  if (!token){ go('RETURNING'); return; }
+  go('SENDING', { params: { token: token }, question: READ ? READ.question : '', origin: 'chip', cx: 195, cy: 660, retryOf: why });
+}
+function gateSignIn(token){
+  if (GATE_BUSY) return;
+  GATE_BUSY = true;
+  bcall('signIn').then(function(r){
+    GATE_BUSY = false;
+    if (ST.name !== 'SIGNIN_GATE') return;
+    var st = r && r.status;
+    if (st === 'signedIn'){ if (SES) SES.signedIn = true; tick('success'); gateRetry(token, 'signin'); return; }
+    if (st !== 'cancelled') hint(RMOD.t(LANG, st === 'unavailable' ? 'gate.signinUnavailable' : 'gate.signinFailed'));
+  }, function(){ GATE_BUSY = false; if (ST.name === 'SIGNIN_GATE') hint(RMOD.t(LANG, 'gate.signinFailed')); });
+}
+function gatePaywall(token){
+  if (GATE_BUSY) return;
+  GATE_BUSY = true;
+  bcall('paywall').then(function(r){
+    GATE_BUSY = false;
+    if (ST.name !== 'PRO_GATE') return;
+    var st = r && r.status;
+    if (st === 'subscribed'){ tick('success'); gateRetry(token, 'paywall'); return; }
+    if (st === 'pending') hint(RMOD.t(LANG, 'gate.proPending'));
+    else if (st === 'failed') hint(RMOD.t(LANG, 'gate.proFailed'));
+  }, function(){ GATE_BUSY = false; });
+}
+function gateTimeout(){ if (inState() > 45 && !GATE_BUSY) go('RETURNING'); }
+STATES.SIGNIN_GATE = { enter: askAgainEnter, tick: gateTimeout, down: askAgainDown };
+STATES.PRO_GATE = {
+  enter: function(prev, d){
+    askAgainEnter(prev, d);
+    /* the Bobby Pro sheet opens on its own once, after the line lands; never again right after a purchase */
+    var chip = (d.f && d.f.chips || [])[0], tok = chip && chip.action ? chip.action.retry : null;
+    if (d.auto) cue(1.2, function(){ gatePaywall(tok); });
+  },
+  tick: gateTimeout,
+  down: askAgainDown
+};
 
 /* ---------- FACES: B11 physics under the real finger ---------- */
 function faceDragG(){
@@ -3209,7 +3300,8 @@ STATES.RESTORE = {
 /* ---------- aria per state ---------- */
 var ARIA = { BOOT: 'aria.waking', WAKE: 'aria.waking', IDLE: 'aria.idle', PRE_PERMISSION: 'aria.idle', LISTENING: 'aria.listening', TYPING: 'aria.idle',
   SENDING: 'aria.sending', RESOLVING: 'aria.thinking', THINK_WAIT: 'aria.thinking', THINK_RESOLVE: 'aria.thinking', TALK_EVIDENCE: 'aria.speaking', TALK_CHART: 'aria.speaking',
-  RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', RISK_GATE: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
+  RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', RISK_GATE: 'aria.noVerdict',
+  SIGNIN_GATE: 'aria.noVerdict', PRO_GATE: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
 function ariaState(){ var k = ARIA[ST.name]; if (k) att(el.sphereA, 'aria-label', tt(k)); }
 
 /* ---- app/70-input.js ---- */
@@ -4147,6 +4239,22 @@ var SCRIPTS = {
     { after: 1.6 },
     { drag: [252, 350, 150, 340], dur: 0.3, ease: 'swipe' },
     { wait: 'IDLE', after: 2.0 }
+  ] },
+  /* the metered-read beats (§8.3): ?scenario=signin_required&signin=ok · ?scenario=subscription_required&purchase=ok */
+  'gate-signin': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 },
+    { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 },
+    { wait: 'SIGNIN_GATE', after: 1.6 },
+    { tap: '.chip.apple' },
+    { wait: 'HANDBACK', after: 1.2 }
+  ] },
+  'gate-pro': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 },
+    { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 },
+    { wait: 'PRO_GATE', after: 0.5 },
+    { wait: 'HANDBACK', after: 1.2 }
   ] },
   'read-btc': { mic: 'granted', steps: [
     { wait: 'IDLE', after: 1.0 },

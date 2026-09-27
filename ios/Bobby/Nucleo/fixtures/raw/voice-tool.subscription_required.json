@@ -1,0 +1,20 @@
+{
+ "synthetic": true,
+ "note": "Server contract (web/desk-nucleo, 2026-09-27): a signed-in free account used this week's reads; run_debate answers 402 subscription_required",
+ "request": {
+  "method": "POST",
+  "path": "api/voice-tool",
+  "body": {"tool": "run_debate", "args": {"symbol": "NVDA", "lang": "en"}}
+ },
+ "status": 402,
+ "headers": {
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store"
+ },
+ "elapsedMs": 300,
+ "body": {
+  "error": "You used this week's free reads.",
+  "code": "subscription_required",
+  "access": {"tier": "free", "used": 10, "limit": 10, "remaining": 0, "resetsAt": "2026-10-03T12:00:00.000Z", "paywall": true}
+ }
+}

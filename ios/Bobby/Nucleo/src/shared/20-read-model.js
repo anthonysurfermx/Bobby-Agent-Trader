@@ -43,6 +43,13 @@
       'err.bad': 'The analysis did not come back. No verdict was issued.',
       'err.risk': 'First, the risk notice.', 'err.riskSub': 'Bobby reads nothing until you agree to it. Your question was not sent.',
       'err.riskCta': 'Open the risk notice',
+      'gate.signin': 'Create your free account to keep reading — 10 free reads a week.',
+      'gate.signinCta': 'Sign in with Apple', 'gate.notNow': 'Not now',
+      'gate.signinUnavailable': 'Sign-in isn’t available right now. Your question was not sent.',
+      'gate.signinFailed': 'Sign-in didn’t finish. Your question was not sent.',
+      'gate.pro': 'You’ve used this week’s free reads.', 'gate.proResets': 'They reset {date}. Bobby Pro has unlimited reads.',
+      'gate.proNoDate': 'Bobby Pro has unlimited reads.', 'gate.proCta': 'See Bobby Pro',
+      'gate.proPending': 'Waiting for the App Store to confirm Bobby Pro.', 'gate.proFailed': 'Bobby Pro isn’t confirmed yet. Your question was not sent.',
       'follow.another': 'Another question about {symbol}', 'follow.how': 'How is {symbol} looking?', 'follow.why': 'Why is {symbol} moving today?',
       'aria.verdict': 'Verdict: {word}', 'aria.conviction': ', {pct}% conviction'
     },
@@ -80,6 +87,13 @@
       'err.bad': 'El análisis no regresó. No se emitió ningún veredicto.',
       'err.risk': 'Primero, el aviso de riesgo.', 'err.riskSub': 'Bobby no analiza nada hasta que lo aceptes. Tu pregunta no se envió.',
       'err.riskCta': 'Abrir el aviso de riesgo',
+      'gate.signin': 'Crea tu cuenta gratis para seguir leyendo: 10 lecturas gratis a la semana.',
+      'gate.signinCta': 'Iniciar sesión con Apple', 'gate.notNow': 'Ahora no',
+      'gate.signinUnavailable': 'Ahora no se puede iniciar sesión. Tu pregunta no se envió.',
+      'gate.signinFailed': 'No se completó el inicio de sesión. Tu pregunta no se envió.',
+      'gate.pro': 'Ya usaste tus lecturas gratis de esta semana.', 'gate.proResets': 'Se renuevan el {date}. Bobby Pro tiene lecturas ilimitadas.',
+      'gate.proNoDate': 'Bobby Pro tiene lecturas ilimitadas.', 'gate.proCta': 'Ver Bobby Pro',
+      'gate.proPending': 'Esperando a que la App Store confirme Bobby Pro.', 'gate.proFailed': 'Bobby Pro aún no está confirmado. Tu pregunta no se envió.',
       'follow.another': 'Otra pregunta sobre {symbol}', 'follow.how': '¿Cómo se ve {symbol}?', 'follow.why': '¿Por qué se mueve {symbol} hoy?',
       'aria.verdict': 'Veredicto: {word}', 'aria.conviction': ', {pct}% de convicción'
     }
@@ -366,10 +380,30 @@
     return t(lang, verdictKey === 'wait' ? 'xp.pointsWait' : 'xp.points', { points: points });
   }
 
-  /** Non-ok replies -> caption + chips. Never a verdict, never XP. */
+  /** An ISO reset time -> "October 3" / "3 de octubre" in the reader's time zone (null when unreadable). */
+  function resetDay(iso, lang) {
+    if (typeof iso !== 'string' || !iso) return null;
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    try { return d.toLocaleDateString(lang2(lang) === 'es' ? 'es-MX' : 'en-US', { month: 'long', day: 'numeric' }); } catch (e) { return null; }
+  }
+
+  /** Non-ok replies -> caption + chips. Never a verdict, never XP.
+   *  Metered-read refusals (ARCHITECTURE.md §8.3) carry a native `token` that re-asks the same question:
+   *  it rides in `retry` (never `token`), so a chip can only re-ask AFTER the sign-in or the purchase. */
   function failure(r, lang) {
     lang = lang2(lang);
     switch (r && r.status) {
+      case 'signin_required':
+        return { kind: 'signin', caption: t(lang, 'gate.signin'), sub: null, access: r.access || null,
+          chips: [{ label: t(lang, 'gate.signinCta'), action: { signIn: true, retry: r.token || null }, primary: true, style: 'apple' },
+            { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
+      case 'subscription_required':
+        var day = resetDay(r.access && r.access.resetsAt, lang);
+        return { kind: 'subscription', caption: t(lang, 'gate.pro'), sub: day ? t(lang, 'gate.proResets', { date: day }) : t(lang, 'gate.proNoDate'),
+          access: r.access || null,
+          chips: [{ label: t(lang, 'gate.proCta'), action: { paywall: true, retry: r.token || null }, primary: true, style: 'pro' },
+            { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
       case 'confirm':
         return { kind: 'confirm', caption: t(lang, 'confirm.prompt', { name: r.asset.name, symbol: r.asset.symbol }), sub: r.proxyNote || null,
           chips: [{ label: t(lang, 'confirm.yes', { symbol: r.asset.symbol }), action: { token: r.token }, primary: true },
@@ -452,7 +486,7 @@
     t: t, money: money, signedPct: signedPct,
     sentences: sentences, firstSentence: firstSentence, clipWords: clipWords,
     syllables: syllables, wordTimes: wordTimes,
-    build: build, failure: failure, xpChip: xpChip, followUps: followUps, thesisView: thesisView,
+    build: build, failure: failure, resetDay: resetDay, xpChip: xpChip, followUps: followUps, thesisView: thesisView,
     _internal: { pulseAgrees: pulseAgrees, planOf: planOf, closedVolumeRatio: closedVolumeRatio, niceStep: niceStep }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

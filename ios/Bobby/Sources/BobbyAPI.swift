@@ -426,7 +426,9 @@ enum BobbyAPI {
 
     /// `response`, plus the reply's headers with lowercased names (the Núcleo bridge reads
     /// `retry-after` on a 429). Same URL, Origin header, timeouts and body as `response`.
-    static func responseWithHeaders(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+    /// `extraHeaders` carries the metered-read identity (`BobbyAccessAPI.headers`).
+    static func responseWithHeaders(_ path: String, method: String = "GET", body: [String: Any]? = nil,
+                                    extraHeaders: [String: String] = [:]) async throws -> (json: Any?, status: Int, headers: [String: String]) {
         guard let url = URL(string: base.absoluteString + "/" + path) else {
             throw URLError(.badURL)
         }
@@ -434,6 +436,7 @@ enum BobbyAPI {
         req.httpMethod = method
         req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
         req.timeoutInterval = path == "api/desk-debate" ? 100 : 60
+        for (name, value) in extraHeaders { req.setValue(value, forHTTPHeaderField: name) }
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)

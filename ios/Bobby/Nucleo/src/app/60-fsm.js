@@ -143,6 +143,9 @@ function routeReply(r){
   var f = RMOD.failure(r.reply, LANG);
   /* consent is missing (a stale or reset notice): not a failed read — the way to the risk beat */
   if (f.kind === 'risk'){ if (SES) SES.riskAccepted = false; go('RISK_GATE', { f: f }); return; }
+  /* the server metered this read (§8.3): an account, or Bobby Pro, first. The question waits natively. */
+  if (f.kind === 'signin'){ go('SIGNIN_GATE', { f: f }); return; }
+  if (f.kind === 'subscription'){ go('PRO_GATE', { f: f, auto: r.retryOf !== 'paywall' }); return; }
   go('ERROR', { f: f });
 }
 function cancelRead(){
@@ -365,7 +368,7 @@ STATES.SENDING = {
     if (A.note.o.t > 0) noteOut();
     var q = d.question || (READ && READ.question) || '';
     var params = d.params || (d.token ? { token: d.token } : { question: q });
-    startRead(params, q);
+    startRead(params, q).retryOf = d.retryOf || null;
     A.qText = q; A.aText = ''; el.dockA.textContent = ''; A.dockAO.set(0);
     var pre = 0;
     if (d.origin === 'type'){ txReset(); txSet(q, true, 0.045); pre = Math.min(0.6, A.tx.words.length * 0.045) + 0.35; }
@@ -711,6 +714,9 @@ function chipAct(c){
   var a = c.action || {}, cx = c.x + c.w / 2 + A.chipX.x, cy = 660;
   tick('light');
   if (a.risk){ openNative('riskNotice'); return; }   /* native replaces this page with the risk beat (onboarding#risk) */
+  if (a.signIn){ gateSignIn(a.retry); return; }
+  if (a.paywall){ gatePaywall(a.retry); return; }
+  if (a.dismiss){ go('RETURNING'); return; }
   if (a.retype){ openTyping({ fromRead: false }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
@@ -772,6 +778,50 @@ STATES.CONFIRM_ASSET = { enter: askAgainEnter, tick: function(){ if (inState() >
 STATES.UNKNOWN_ASSET = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
 /* RISK_GATE: the read was refused for consent; the chip opens the risk beat, never a generic failure */
 STATES.RISK_GATE = { enter: askAgainEnter, tick: function(){ if (inState() > 30) go('RETURNING'); }, down: askAgainDown };
+
+/* ---------- SIGNIN_GATE / PRO_GATE: the server metered this read (§8.3). Glass first: one line from the rim and
+   the Apple chip (or the Bobby Pro chip). The question waits natively in the chip's `retry` token and is asked
+   again only after a real sign in, or after Bobby's server verified the subscription. No verdict, no XP. ---------- */
+var GATE_BUSY = false;
+function gateRetry(token, why){
+  if (!token){ go('RETURNING'); return; }
+  go('SENDING', { params: { token: token }, question: READ ? READ.question : '', origin: 'chip', cx: 195, cy: 660, retryOf: why });
+}
+function gateSignIn(token){
+  if (GATE_BUSY) return;
+  GATE_BUSY = true;
+  bcall('signIn').then(function(r){
+    GATE_BUSY = false;
+    if (ST.name !== 'SIGNIN_GATE') return;
+    var st = r && r.status;
+    if (st === 'signedIn'){ if (SES) SES.signedIn = true; tick('success'); gateRetry(token, 'signin'); return; }
+    if (st !== 'cancelled') hint(RMOD.t(LANG, st === 'unavailable' ? 'gate.signinUnavailable' : 'gate.signinFailed'));
+  }, function(){ GATE_BUSY = false; if (ST.name === 'SIGNIN_GATE') hint(RMOD.t(LANG, 'gate.signinFailed')); });
+}
+function gatePaywall(token){
+  if (GATE_BUSY) return;
+  GATE_BUSY = true;
+  bcall('paywall').then(function(r){
+    GATE_BUSY = false;
+    if (ST.name !== 'PRO_GATE') return;
+    var st = r && r.status;
+    if (st === 'subscribed'){ tick('success'); gateRetry(token, 'paywall'); return; }
+    if (st === 'pending') hint(RMOD.t(LANG, 'gate.proPending'));
+    else if (st === 'failed') hint(RMOD.t(LANG, 'gate.proFailed'));
+  }, function(){ GATE_BUSY = false; });
+}
+function gateTimeout(){ if (inState() > 45 && !GATE_BUSY) go('RETURNING'); }
+STATES.SIGNIN_GATE = { enter: askAgainEnter, tick: gateTimeout, down: askAgainDown };
+STATES.PRO_GATE = {
+  enter: function(prev, d){
+    askAgainEnter(prev, d);
+    /* the Bobby Pro sheet opens on its own once, after the line lands; never again right after a purchase */
+    var chip = (d.f && d.f.chips || [])[0], tok = chip && chip.action ? chip.action.retry : null;
+    if (d.auto) cue(1.2, function(){ gatePaywall(tok); });
+  },
+  tick: gateTimeout,
+  down: askAgainDown
+};
 
 /* ---------- FACES: B11 physics under the real finger ---------- */
 function faceDragG(){
@@ -899,5 +949,6 @@ STATES.RESTORE = {
 /* ---------- aria per state ---------- */
 var ARIA = { BOOT: 'aria.waking', WAKE: 'aria.waking', IDLE: 'aria.idle', PRE_PERMISSION: 'aria.idle', LISTENING: 'aria.listening', TYPING: 'aria.idle',
   SENDING: 'aria.sending', RESOLVING: 'aria.thinking', THINK_WAIT: 'aria.thinking', THINK_RESOLVE: 'aria.thinking', TALK_EVIDENCE: 'aria.speaking', TALK_CHART: 'aria.speaking',
-  RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', RISK_GATE: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
+  RETURNING: 'aria.idle', CONFIRM_ASSET: 'aria.noVerdict', UNKNOWN_ASSET: 'aria.noVerdict', RISK_GATE: 'aria.noVerdict',
+  SIGNIN_GATE: 'aria.noVerdict', PRO_GATE: 'aria.noVerdict', FACES: 'aria.faces', THESIS_VIEW: 'aria.cards', SAVING: 'aria.cards', FOLLOWUPS: 'aria.cards' };
 function ariaState(){ var k = ARIA[ST.name]; if (k) att(el.sphereA, 'aria-label', tt(k)); }

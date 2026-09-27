@@ -1,0 +1,14 @@
+{
+ "v": 1,
+ "status": "subscription_required",
+ "token": "fixture-gate-subscription_required",
+ "message": "You used this week's free reads.",
+ "access": {
+  "tier": "free",
+  "used": 10,
+  "limit": 10,
+  "remaining": 0,
+  "resetsAt": "2026-10-03T12:00:00.000Z",
+  "paywall": true
+ }
+}

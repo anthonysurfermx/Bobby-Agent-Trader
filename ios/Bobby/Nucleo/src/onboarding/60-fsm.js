@@ -637,7 +637,9 @@ ENTER.ERROR = function(r){
   if (r && r.code === 'risk_not_accepted'){ if (SESSION) SESSION.riskAccepted = false; teardownRead(); go('RISK'); return; }
   var f = RMOD ? RMOD.failure(r, LANG) : { kind:'error', caption:null, chips:[] };
   teardownRead(); buzz('warning', 0.4);
-  var chips = (f.chips || []).map(function(c){ return { label:c.label, action:c.action }; });
+  /* a metered read (§8.3) keeps its question natively: the Apple / Bobby Pro chip, then "Try another question" */
+  var chips = (f.chips || []).filter(function(c){ return !(c.action && c.action.dismiss); })
+    .map(function(c){ return { label:c.label, action:c.action, style:c.style || null }; });
   if (f.kind !== 'confirm') chips = chips.slice(0, 2).concat([{ label:Ls('chip.again'), action:{ again:true } }]);
   at(0.40, function(){ if (f.caption) W.errLine = sayLine({ id:'err', text:f.caption, silent:true, noSplit:true, hold:true, top:512 }); if (f.sub){ W.cap2 = f.sub; tb('cap2'); } });
   at(0.70, function(){ setChips(chips.slice(0, 3)); signal('ERROR_READY'); });
@@ -647,9 +649,39 @@ function chipTap(i){
   W.pr['chip' + i] = [T, T + 0.1]; buzz('light', 0.5);
   var a = c.action || {};
   if (a.ask){ commitQuestion(a.ask, 'chip'); return; }
+  if (a.signIn){ gateSignIn(a.retry); return; }
+  if (a.paywall){ gatePaywall(a.retry); return; }
   if (a.token){ if (W.errLine){ capGone(W.errLine); W.errLine = null; } tg('chips'); tg('cap2'); tb('dock'); startAsk({ token:a.token }); return; }
   if (a.retype){ if (W.errLine){ capGone(W.errLine); W.errLine = null; } tg('cap2'); go('TYPING'); return; }
   if (a.again){ go('ASK_TEACH', { again:true }); }
+}
+/* the metered-read gates (§8.3): sign in, or Bobby Pro, then the same question again (its native token) */
+function gateAgain(token){
+  if (W.errLine){ capGone(W.errLine); W.errLine = null; }
+  tg('chips'); tg('cap2');
+  if (!token){ go('ASK_TEACH', { again:true }); return; }
+  tb('dock'); startAsk({ token:token });
+}
+function gateSignIn(token){
+  if (W.gateBusy || W.state !== 'ERROR') return;
+  W.gateBusy = true;
+  call('signIn', {}).then(function(r){
+    W.gateBusy = false; if (W.state !== 'ERROR') return;
+    var s = r && r.status;
+    if (s === 'signedIn'){ if (SESSION) SESSION.signedIn = true; buzz('success', 0.6); gateAgain(token); return; }
+    if (s !== 'cancelled') setHint(RMOD.t(LANG, s === 'unavailable' ? 'gate.signinUnavailable' : 'gate.signinFailed'));
+  }, function(){ W.gateBusy = false; if (W.state === 'ERROR') setHint(RMOD.t(LANG, 'gate.signinFailed')); });
+}
+function gatePaywall(token){
+  if (W.gateBusy || W.state !== 'ERROR') return;
+  W.gateBusy = true;
+  call('paywall', {}).then(function(r){
+    W.gateBusy = false; if (W.state !== 'ERROR') return;
+    var s = r && r.status;
+    if (s === 'subscribed'){ buzz('success', 0.6); gateAgain(token); return; }
+    if (s === 'pending') setHint(RMOD.t(LANG, 'gate.proPending'));
+    else if (s === 'failed') setHint(RMOD.t(LANG, 'gate.proFailed'));
+  }, function(){ W.gateBusy = false; });
 }
 function closeTap(){
   var s = W.state;

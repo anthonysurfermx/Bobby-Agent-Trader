@@ -290,7 +290,14 @@ var eyebrow = $('eyebrow');
 function renderChips(){
   var b = tmB('chips'), g = tmG('chips'), set = W.chips;
   if (T < b || T > g + 0.5 || !set.length){ for (var ci2 = 0; ci2 < 3; ci2++){ st(chipEls[ci2], null, 0); cls(chipEls[ci2], 'on', false); } st(eyebrow, null, 0); return; }
-  if (chipsEl._set !== W.chipsKey){ chipsEl._set = W.chipsKey; chipEls.forEach(function(c, i){ c.textContent = set[i] ? set[i].label : ''; c._w = 0; c.style.display = set[i] ? '' : 'none'; }); }
+  if (chipsEl._set !== W.chipsKey){ chipsEl._set = W.chipsKey; chipEls.forEach(function(c, i){
+    var ch = set[i], sty = ch && ch.style;
+    c.textContent = ch ? ch.label : ''; c._w = 0; c.style.display = ch ? '' : 'none';
+    /* the Sign in with Apple chip: white, the Apple logo in the system font; the Bobby Pro chip: ink */
+    cls(c, 'apple', sty === 'apple'); cls(c, 'pro', sty === 'pro');
+    if (sty === 'apple'){ var lg = document.createElement('span'); lg.className = 'lg'; lg.setAttribute('aria-hidden', 'true'); lg.textContent = '\uF8FF'; c.insertBefore(lg, c.firstChild); c.setAttribute('aria-label', ch.label); }
+    else c.removeAttribute('aria-label');
+  }); }
   var x = 20;
   for (var i = 0; i < 3; i++){
     var c = chipEls[i]; if (!set[i]){ cls(c, 'on', false); continue; }

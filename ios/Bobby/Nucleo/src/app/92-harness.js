@@ -29,6 +29,22 @@ var SCRIPTS = {
     { drag: [252, 350, 150, 340], dur: 0.3, ease: 'swipe' },
     { wait: 'IDLE', after: 2.0 }
   ] },
+  /* the metered-read beats (§8.3): ?scenario=signin_required&signin=ok · ?scenario=subscription_required&purchase=ok */
+  'gate-signin': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 },
+    { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 },
+    { wait: 'SIGNIN_GATE', after: 1.6 },
+    { tap: '.chip.apple' },
+    { wait: 'HANDBACK', after: 1.2 }
+  ] },
+  'gate-pro': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 },
+    { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 },
+    { wait: 'PRO_GATE', after: 0.5 },
+    { wait: 'HANDBACK', after: 1.2 }
+  ] },
   'read-btc': { mic: 'granted', steps: [
     { wait: 'IDLE', after: 1.0 },
     { say: 'Is now a good time for Bitcoin?' },

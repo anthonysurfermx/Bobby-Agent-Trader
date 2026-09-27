@@ -99,7 +99,7 @@ def ok_result(slug, question, language="en"):
     asset = asset_from_search(search["body"])
     t = body["technicals"]
     agents = body["agents"]
-    return {
+    out = {
         "v": V, "status": "ok", "requestId": "00000000-0000-4000-8000-000000000000",
         "question": question, "language": language,
         "asset": {k: asset[k] for k in ("symbol", "name", "isEquity")},
@@ -118,6 +118,11 @@ def ok_result(slug, question, language="en"):
         "elapsedMs": debate["elapsedMs"],
         "fixture": True,
     }
+    # A metering server sends the caller's access with the pulse; a legacy capture has none (no key at all).
+    acc = access((pul["body"] or {}).get("access"))
+    if acc is not None:
+        out["access"] = acc
+    return out
 
 
 def refusal(name):
@@ -133,6 +138,27 @@ def refusal(name):
         return {"v": V, "status": "error", "code": code, "message": b.get("error")}
     # Non-JSON 504 page (Vercel timeout) or anything unexpected: honest error, never NO TRADE.
     return {"v": V, "status": "error", "code": "bad_response", "message": None}
+
+
+def access(a):
+    """BobbyReadAccess: {tier, used, limit, remaining, resetsAt, paywall}; an unknown tier is no access at all."""
+    if not isinstance(a, dict) or a.get("tier") not in ("anon", "free", "pro"):
+        return None
+    def count(v):
+        n = num(v)
+        return int(round(n)) if n is not None and 0 <= n < 1e9 else None
+    return {"tier": a["tier"], "used": count(a.get("used")) or 0, "limit": count(a.get("limit")),
+            "remaining": count(a.get("remaining")), "resetsAt": a.get("resetsAt") or None,
+            "paywall": a.get("paywall") is True}
+
+
+def gate(name):
+    """voice-tool run_debate refused the metered read (ARCHITECTURE.md §8.3): 401 -> signin_required, 402 -> subscription_required.
+    The token re-asks the same question once the user signed in or subscribed (volatile, like a confirm token)."""
+    rec = load(f"voice-tool.{name}.json")
+    b = rec.get("body") or {}
+    status = {401: "signin_required", 402: "subscription_required"}[rec["status"]]
+    return {"v": V, "status": status, "token": "fixture-gate-" + name, "message": b.get("error"), "access": access(b.get("access"))}
 
 
 def confirm(slug):
@@ -164,6 +190,8 @@ def main():
         "timeout": {"v": V, "status": "error", "code": "timeout", "message": None},
         "network": {"v": V, "status": "error", "code": "network", "message": None},
         "risk": {"v": V, "status": "error", "code": "risk_not_accepted", "message": None},
+        "signin-required": gate("signin_required"),
+        "subscription-required": gate("subscription_required"),
     }
     for k, v in out.items():
         with open(os.path.join(ASK, f"{k}.json"), "w") as f:
@@ -194,7 +222,11 @@ def main():
             "failed": "desk-debate.failed.json", "unavailable": "desk-debate.unavailable.json",
             "gateway_timeout": "desk-debate.gateway_timeout.json",
             "offline": "every request fails with URLError.notConnectedToInternet (error.network)",
+            "signin_required": "voice-tool.signin_required.json: run_debate answers 401 until the user signs in (the desk is never called)",
+            "subscription_required": "voice-tool.subscription_required.json: run_debate answers 402 until the user subscribes (the desk is never called)",
         },
+        # The metered-read refusals (§8): scenario -> golden reply.
+        "gates": {"signin_required": "signin-required", "subscription_required": "subscription-required"},
     }
     with open(os.path.join(HERE, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=1)

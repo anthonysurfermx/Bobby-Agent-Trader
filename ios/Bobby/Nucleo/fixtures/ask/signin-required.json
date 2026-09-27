@@ -1,0 +1,14 @@
+{
+ "v": 1,
+ "status": "signin_required",
+ "token": "fixture-gate-signin_required",
+ "message": "Create a free account to keep reading.",
+ "access": {
+  "tier": "anon",
+  "used": 3,
+  "limit": 3,
+  "remaining": 0,
+  "resetsAt": null,
+  "paywall": false
+ }
+}

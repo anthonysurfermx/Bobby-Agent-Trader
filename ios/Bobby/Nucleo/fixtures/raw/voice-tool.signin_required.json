@@ -1,0 +1,20 @@
+{
+ "synthetic": true,
+ "note": "Server contract (web/desk-nucleo, 2026-09-27): an anonymous device used its free reads; run_debate answers 401 signin_required",
+ "request": {
+  "method": "POST",
+  "path": "api/voice-tool",
+  "body": {"tool": "run_debate", "args": {"symbol": "NVDA", "lang": "en"}}
+ },
+ "status": 401,
+ "headers": {
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store"
+ },
+ "elapsedMs": 300,
+ "body": {
+  "error": "Create a free account to keep reading.",
+  "code": "signin_required",
+  "access": {"tier": "anon", "used": 3, "limit": 3, "remaining": 0, "resetsAt": null, "paywall": false}
+ }
+}

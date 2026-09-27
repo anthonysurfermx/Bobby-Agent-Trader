@@ -58,8 +58,17 @@
       </array>
     </dict>
     <dict>
-      <!-- Random installation identifier, hashed for anonymous report deduplication. -->
+      <!-- Random installation identifiers: hashed for anonymous report deduplication, and the
+           per-install UUID the server meters reads by (x-bobby-device, Nucleo/ARCHITECTURE.md §8.1). -->
       <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeDeviceID</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key><true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+    </dict>
+    <dict>
+      <!-- Bobby Pro: the App Store subscription (through RevenueCat) is linked to the Bobby account. -->
+      <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypePurchaseHistory</string>
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
       <key>NSPrivacyCollectedDataTypeTracking</key><false/>
       <key>NSPrivacyCollectedDataTypePurposes</key>
