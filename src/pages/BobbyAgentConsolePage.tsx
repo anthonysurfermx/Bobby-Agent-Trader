@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 
 interface HeartbeatData {
   ok: boolean;
@@ -35,6 +38,10 @@ const CURL_EXAMPLE = `curl -X POST https://bobbyprotocol.xyz/api/orchestrate \\
   }'`;
 
 export default function BobbyAgentConsolePage() {
+  // /protocol/console wears the Núcleo design; the legacy /agentic-world/bobby/console route renders
+  // inside the DeFi México layout and keeps its terminal header.
+  const nucleo = useLocation().pathname.startsWith('/protocol');
+  useNucleoPages(nucleo);
   const [heartbeat, setHeartbeat] = useState<HeartbeatData | null>(null);
 
   useEffect(() => {
@@ -48,8 +55,10 @@ export default function BobbyAgentConsolePage() {
     <div className="min-h-screen bg-[#050505] text-white">
       <Helmet><title>Agent Console | Bobby Protocol — Hardness Finance</title></Helmet>
 
+      {nucleo && <NucleoTopBar />}
+
       {/* Header */}
-      <div className="sticky top-0 z-40 border-b border-white/10 bg-[#050505]/80 px-6 py-4 backdrop-blur-xl flex items-center justify-between">
+      <div className={nucleo ? 'np-subhead' : 'sticky top-0 z-40 border-b border-white/10 bg-[#050505]/80 px-6 py-4 backdrop-blur-xl flex items-center justify-between'}>
         <div className="flex items-center gap-4">
           <a href="/protocol" className="font-mono text-xs uppercase tracking-[0.15em] text-white/45 transition hover:text-white">&larr; Protocol</a>
           <h1 className="font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Agent operating console</h1>
@@ -149,7 +158,7 @@ export default function BobbyAgentConsolePage() {
               { name: 'IntentEscrow', addr: '0x5D9d534419421B7Edfe9Bb509E4c48512256BC97' },
             ].map(c => (
               <a key={c.addr} href={`https://basescan.org/address/${c.addr}`} target="_blank" rel="noopener noreferrer"
-                className="group flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 transition hover:border-[#0052ff]/50 hover:bg-white/[0.05]">
+                className="group flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 transition hover:border-[#0052ff]/50 hover:bg-white/[0.05]">
                 <div className="flex items-center gap-2.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#0052ff] shadow-[0_0_10px_rgba(0,82,255,.8)]" />
                   <span className="text-white/70">{c.name}</span>

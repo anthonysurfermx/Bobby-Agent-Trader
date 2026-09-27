@@ -3,6 +3,8 @@
 // and its Pyth evidence. Clearly labeled CANARY while it points at Sepolia.
 import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 import { ArrowLeft, ArrowUpRight, ShieldCheck, Swords } from 'lucide-react';
 import { useAccount, useSwitchChain, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
@@ -86,6 +88,7 @@ interface ScanResult {
 }
 
 export default function BobbyCallsPage() {
+  useNucleoPages();
   const [data, setData] = useState<CallsPayload | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -180,6 +183,7 @@ export default function BobbyCallsPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">
+      <NucleoTopBar />
       <Helmet>
         <title>Verifiable calls — Bobby Protocol</title>
         <meta name="description" content="Every Bobby call anchored on-chain with signed Pyth evidence. Verify each one yourself — and challenge it." />

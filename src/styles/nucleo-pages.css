@@ -1,0 +1,217 @@
+/* The protocol and documentation pages in the Núcleo design language: the same tokens, type and
+   surfaces as the home ("/") and the desk ("/desk").
+   Scoped to body.nucleo-pages, which useNucleoPages() sets while a page is mounted, so nothing leaks
+   into the pages that still wear the terminal look. The pages keep their Tailwind classes and their
+   logic; this layer remaps the old terminal palette (Base blue, green on #050505, mono everywhere)
+   onto Núcleo: Sora headings, Geist body, Geist Mono labels, warm charcoal surfaces, ink text.
+   Selectors use [class~="…"] (an exact class token) so arbitrary Tailwind values need no escaping and
+   a hover: variant is never mistaken for its base class.
+   Semantic colour lock: mint / coral / amber only carry the Alpha / Red / CIO meanings
+   (right or positive / missed or blocked / open or caution); every decorative hue becomes ink. */
+
+body.nucleo-pages {
+  --n-bg: #0B0A09; --n-amb: #15121C;
+  --n-ink: #F2EDE4; --n-inkb: #FFF8EC; --n-ink2: #A39C91; --n-ink3: #8A8378; --n-faint: rgba(242, 237, 228, .3);
+  --n-hair: rgba(242, 237, 228, .08); --n-line: rgba(242, 237, 228, .12); --n-line2: rgba(242, 237, 228, .2);
+  --n-card-a: #221E1B; --n-card-b: #171513;
+  --n-alpha: #3FE0B5; --n-red: #FF5A5F; --n-red2: #FF8C8F; --n-cio: #F6B94E; --n-listen: #5CE1FF;
+  --n-display: 'Sora', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --n-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --n-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  background: var(--n-bg);
+  color: var(--n-ink);
+  font-family: var(--n-sans);
+  -webkit-font-smoothing: antialiased;
+}
+body.nucleo-pages ::selection { background: rgba(92, 225, 255, .28); color: var(--n-inkb); }
+body.nucleo-pages :is(a, button, input, select, textarea, [role="button"]):focus-visible { outline: 2px solid var(--n-listen); outline-offset: 2px; }
+
+/* ================= top bar (the home's: a small wordmark, quiet mono links, one way into the app) ================= */
+.np-topbar {
+  position: sticky; top: 0; z-index: 50;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 24px;
+  min-height: 64px; padding: env(safe-area-inset-top, 0px) clamp(16px, 3vw, 32px) 0;
+  background: rgba(11, 10, 9, .84); border-bottom: 1px solid var(--n-hair);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+}
+.np-wordmark { font-family: var(--n-display); font-weight: 400; letter-spacing: -.04em; font-size: 17px; line-height: 1; color: var(--n-ink); text-decoration: none; }
+.np-nav { display: flex; justify-content: center; align-items: center; gap: clamp(14px, 2.2vw, 30px); min-width: 0; }
+.np-navlink { font: 500 11px/1 var(--n-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--n-ink3); text-decoration: none;
+  white-space: nowrap; padding-block: 10px; transition: color .2s ease; }
+.np-navlink:hover, .np-navlink.on { color: var(--n-ink); }
+.np-navlink.on { box-shadow: inset 0 -1px 0 var(--n-ink2); }
+.np-app { font: 500 12px/1 var(--n-sans); letter-spacing: .01em; padding: 9px 16px; border-radius: 999px; color: var(--n-ink); text-decoration: none;
+  background: rgba(0, 0, 0, .5); border: 1px solid rgba(242, 237, 228, .14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); transition: border-color .2s ease; }
+.np-app:hover { border-color: rgba(242, 237, 228, .32); }
+@media (max-width: 860px) {
+  .np-topbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "mark app" "nav nav"; row-gap: 2px; padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
+  .np-wordmark { grid-area: mark; }
+  .np-app { grid-area: app; }
+  .np-nav { grid-area: nav; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+    margin-inline: calc(-1 * clamp(16px, 3vw, 32px)); padding-inline: clamp(16px, 3vw, 32px);
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+  .np-nav::-webkit-scrollbar { display: none; }
+  .np-nav > :last-child { padding-right: 24px; }
+}
+/* page anchors land below the bar */
+body.nucleo-pages :is(section, div, article)[id] { scroll-margin-top: 84px; }
+@media (max-width: 860px) { body.nucleo-pages :is(section, div, article)[id] { scroll-margin-top: 112px; } }
+
+/* a quiet sub-header row under the bar (heartbeat, console) */
+.np-subhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px;
+  max-width: 72rem; margin: 0 auto; padding: 28px clamp(16px, 3vw, 24px) 4px; }
+
+/* ================= type ================= */
+body.nucleo-pages .font-mono, body.nucleo-pages :is(code, pre, kbd, samp) { font-family: var(--n-mono); }
+body.nucleo-pages :is(h1, h2, h3, h4):not(.font-mono) { font-family: var(--n-display); font-weight: 300; letter-spacing: -.035em; line-height: 1.06; }
+body.nucleo-pages :is(h3, h4):not(.font-mono) { font-weight: 400; letter-spacing: -.025em; line-height: 1.15; }
+body.nucleo-pages h1:not(.font-mono) { letter-spacing: -.045em; }
+/* the emphasised half of a headline drops to ExtraLight in ink2, like the home */
+body.nucleo-pages :is(h1, h2) :is([class~="text-[#0052ff]"], [class~="text-white/72"], [class~="text-white/20"]) { color: var(--n-ink2); font-weight: 200; }
+body.nucleo-pages .np-display { font-family: var(--n-display); font-weight: 300; letter-spacing: -.045em; }
+/* big figures: Sora Light, not bold mono */
+body.nucleo-pages .font-mono:is([class~="text-xl"], [class~="text-2xl"], [class~="text-3xl"], [class~="text-4xl"], [class~="text-5xl"]) {
+  font-family: var(--n-display); font-weight: 300; letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+}
+/* no heavy weights: Geist 500 carries emphasis */
+body.nucleo-pages :is(.font-bold, .font-extrabold, .font-black, .font-semibold) { font-weight: 500; }
+body.nucleo-pages :is(b, strong) { font-weight: 500; }
+body.nucleo-pages li::marker { color: var(--n-ink3); }
+/* mono labels are tracked, never cramped */
+body.nucleo-pages .font-mono[class~="text-[9px]"] { font-size: 10px; }
+
+/* ================= text colour ================= */
+body.nucleo-pages :is([class~="text-white"], [class~="text-white/95"], [class~="text-white/90"], [class~="text-white/85"], [class~="text-white/80"],
+  [class~="text-white/75"], [class~="text-white/70"], [class~="text-[#e5e2e1]"]) { color: var(--n-ink); }
+body.nucleo-pages :is([class~="text-white/65"], [class~="text-white/60"], [class~="text-white/55"], [class~="text-white/50"]) { color: var(--n-ink2); }
+body.nucleo-pages :is([class~="text-white/45"], [class~="text-white/40"], [class~="text-white/38"], [class~="text-white/35"], [class~="text-white/30"]) { color: var(--n-ink3); }
+body.nucleo-pages :is([class~="text-white/25"], [class~="text-white/20"], [class~="text-white/15"], [class~="text-white/10"]) { color: var(--n-faint); }
+body.nucleo-pages :is([class~="text-gray-500"], [class~="text-gray-400"]) { color: var(--n-ink3); }
+body.nucleo-pages [class~="text-black"] { color: #0B0A09; }
+
+/* the old Base-blue accent: labels go quiet, figures and links go to ink */
+body.nucleo-pages :is([class~="text-[#7da6ff]"], [class~="text-[#7da6ff]/80"], [class~="text-[#7da6ff]/70"], [class~="text-[#7da6ff]/60"], [class~="text-[#0052ff]"], [class~="text-[#7ea6ff]"]) { color: var(--n-ink2); }
+body.nucleo-pages :is(a[class~="text-[#7da6ff]"], a[class~="text-[#7da6ff]/70"], a[class~="text-[#7da6ff]/60"]) { color: var(--n-ink); }
+body.nucleo-pages :is([class~="text-xl"], [class~="text-2xl"], [class~="text-3xl"], [class~="text-4xl"], [class~="text-5xl"], pre)[class~="text-[#7da6ff]"] { color: var(--n-ink); }
+body.nucleo-pages a.uppercase:is([class~="text-[#7da6ff]"], [class~="text-[#7da6ff]/70"]) { color: var(--n-ink2); }
+body.nucleo-pages a.uppercase:is([class~="text-[#7da6ff]"], [class~="text-[#7da6ff]/70"]):hover { color: var(--n-ink); }
+body.nucleo-pages :is(pre, [class~="whitespace-pre"])[class~="text-[#7da6ff]"], body.nucleo-pages [class~="bg-black/60"] [class~="text-[#7da6ff]"] { color: var(--n-ink); }
+
+/* hovers that used to turn blue or white */
+body.nucleo-pages :is([class~="hover:text-white"], [class~="hover:text-[#7da6ff]"], [class~="hover:text-gray-300"], [class~="hover:text-white/40"], [class~="hover:text-white/50"], [class~="hover:text-white/80"]):hover { color: var(--n-inkb); }
+body.nucleo-pages .group:hover :is([class~="group-hover:text-[#7da6ff]"], [class~="group-hover:text-white/80"]) { color: var(--n-ink); }
+
+/* semantic colours only */
+body.nucleo-pages :is([class~="text-green-400"], [class~="text-green-300"], [class~="text-emerald-400"], [class~="text-emerald-300"], [class~="text-[#6dfe9c]"]) { color: var(--n-alpha); }
+body.nucleo-pages [class~="text-emerald-300/80"] { color: rgba(63, 224, 181, .8); }
+body.nucleo-pages :is([class~="text-red-400"], [class~="text-[#ff716a]"], [class~="text-[#ff7a63]"]) { color: var(--n-red); }
+body.nucleo-pages [class~="text-red-400/80"] { color: rgba(255, 90, 95, .85); }
+body.nucleo-pages :is([class~="text-red-300"], [class~="text-red-200"]) { color: var(--n-red2); }
+body.nucleo-pages :is([class~="text-amber-400"], [class~="text-amber-300"], [class~="text-amber-200"], [class~="text-[#fcc025]"], [class~="text-[#ffb95f]"]) { color: var(--n-cio); }
+body.nucleo-pages :is([class~="text-amber-400/70"], [class~="text-amber-400/60"]) { color: rgba(246, 185, 78, .72); }
+/* decorative hues carry no meaning here */
+body.nucleo-pages :is([class~="text-cyan-400"], [class~="text-purple-400"], [class~="text-pink-400"], [class~="text-blue-400"], [class~="text-[#c084fc]"], [class~="text-indigo-400"]) { color: var(--n-ink2); }
+
+/* inline links in running text: ink with an underline, like the home's notes */
+body.nucleo-pages :is(p, li):not(footer *) a:not([class~="bg-white"]):not([class~="rounded-lg"]):not([class~="rounded-full"]) {
+  color: var(--n-ink); text-decoration: underline; text-decoration-color: rgba(242, 237, 228, .3); text-underline-offset: 3px;
+}
+body.nucleo-pages :is(p, li):not(footer *) a:not([class~="bg-white"]):hover { text-decoration-color: var(--n-ink); }
+body.nucleo-pages :is([class~="decoration-[#0052ff]/50"], [class~="decoration-green-400/40"]) { text-decoration-color: rgba(242, 237, 228, .3); }
+
+/* ================= surfaces ================= */
+/* page and section grounds: one warm charcoal */
+body.nucleo-pages :is([class~="bg-[#050505]"], [class~="bg-[#08080a]"], [class~="bg-[#0a0a0a]"], [class~="bg-[#0a0a14]"]) { background-color: var(--n-bg); }
+body.nucleo-pages [class~="bg-[#050505]/80"] { background-color: rgba(11, 10, 9, .84); }
+body.nucleo-pages [class~="bg-gradient-to-b"][class~="from-[#050505]"] { background-image: linear-gradient(to bottom, #0B0A09, rgba(11, 10, 9, .6), #0B0A09); }
+/* the terminal grid and scanlines are gone */
+body.nucleo-pages [class~="[background-size:52px_52px]"] { display: none; }
+/* blue glows become the ambient night of the home */
+body.nucleo-pages [class*="bg-[radial-gradient"][class*="0,82,255"] { background-image: radial-gradient(60% 55% at 50% 0%, rgba(21, 18, 28, .9), transparent 72%); }
+body.nucleo-pages [class*="rgba(0,82,255"] { box-shadow: none; }
+/* React writes inline styles back normalised ("rgba(0, 82, 255, …)"), so match both spellings */
+body.nucleo-pages :is([style*="rgba(0,82,255"], [style*="rgba(0, 82, 255"]) { box-shadow: none !important; }
+body.nucleo-pages :is([class~="ring-[#0052ff]/70"]) { --tw-ring-color: rgba(242, 237, 228, .28); }
+
+/* cards: the Núcleo card (warm gradient, hairline, soft radius) */
+body.nucleo-pages :is([class~="bg-[#0b0b12]"], [class~="bg-[#0b0b12]/80"], [class~="bg-[#101014]/80"], [class~="bg-[#0b0b0f]"], [class~="bg-[#08080b]"], [class~="bg-[#0a0a0f]"]),
+body.nucleo-pages [class~="border"]:is([class~="bg-white/[0.02]"], [class~="bg-white/[0.03]"], [class~="bg-white/[0.035]"], [class~="bg-white/[0.04]"]):is([class~="rounded"], [class~="rounded-xl"], [class~="rounded-2xl"], [class~="rounded-3xl"]) {
+  background: linear-gradient(180deg, var(--n-card-a), var(--n-card-b));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+body.nucleo-pages :is([class~="bg-white/[0.02]"], [class~="bg-white/[0.03]"], [class~="bg-white/[0.035]"]) { background-color: rgba(242, 237, 228, .03); }
+body.nucleo-pages :is([class~="bg-white/[0.04]"], [class~="bg-white/[0.05]"], [class~="bg-white/5"]) { background-color: rgba(242, 237, 228, .045); }
+body.nucleo-pages :is([class~="bg-white/[0.06]"], [class~="bg-white/[0.07]"], [class~="bg-white/10"]) { background-color: rgba(242, 237, 228, .07); }
+body.nucleo-pages [class~="bg-[#1c1b1b]"] { background-color: rgba(242, 237, 228, .035); }
+body.nucleo-pages :is([class~="bg-[#0052ff]/10"], [class~="bg-[#0052ff]/20"], [class~="bg-[#0052ff]/[0.07]"], [class~="bg-[#0052ff]/[0.08]"]) { background-color: rgba(242, 237, 228, .05); }
+body.nucleo-pages :is([class~="hover:bg-white/[0.05]"], [class~="hover:bg-white/[0.07]"], [class~="hover:bg-white/10"], [class~="hover:bg-white/15"], [class~="hover:bg-white/20"], [class~="hover:bg-[#0052ff]/[0.08]"], [class~="hover:bg-[#111726]/90"]):hover { background-color: rgba(242, 237, 228, .08); }
+/* dots and small marks that were blue */
+body.nucleo-pages [class~="bg-[#0052ff]"] { background-color: var(--n-ink); }
+body.nucleo-pages :is(a, button)[class~="hover:bg-[#0052ff]"]:hover { background-color: rgba(242, 237, 228, .1); color: var(--n-inkb); }
+
+/* semantic fills */
+body.nucleo-pages :is(span, div, i)[class~="bg-green-400"] { background-color: var(--n-alpha); }
+body.nucleo-pages :is(span, div, i)[class~="bg-red-400"] { background-color: var(--n-red); }
+body.nucleo-pages :is([class~="bg-amber-400"], [class~="bg-[#fcc025]"]) { background-color: var(--n-cio); }
+body.nucleo-pages [class~="bg-[#ff716a]"] { background-color: var(--n-red); }
+body.nucleo-pages :is([class~="bg-emerald-400/10"], [class~="bg-green-400/10"]) { background-color: rgba(63, 224, 181, .07); }
+body.nucleo-pages :is([class~="bg-red-400/10"], [class~="bg-red-500/5"], [class~="bg-[#ff716a]/10"]) { background-color: rgba(255, 90, 95, .07); }
+body.nucleo-pages [class~="hover:bg-red-400/20"]:hover { background-color: rgba(255, 90, 95, .14); }
+body.nucleo-pages :is([class~="bg-amber-400/10"], [class~="bg-amber-400/[0.06]"], [class~="bg-[#fcc025]/10"]) { background-color: rgba(246, 185, 78, .07); }
+
+/* ================= borders ================= */
+body.nucleo-pages :is([class~="border-white/5"], [class~="border-white/[0.04]"], [class~="border-white/[0.06]"]) { border-color: rgba(242, 237, 228, .06); }
+body.nucleo-pages :is([class~="border-white/10"], [class~="border-white/[0.08]"]) { border-color: var(--n-hair); }
+body.nucleo-pages :is([class~="border-white/15"], [class~="border-white/20"]) { border-color: var(--n-line); }
+body.nucleo-pages :is([class~="divide-white/[0.03]"], [class~="divide-white/[0.06]"]) > :not([hidden]) ~ :not([hidden]) { border-color: rgba(242, 237, 228, .06); }
+body.nucleo-pages :is([class~="border-[#0052ff]/25"], [class~="border-[#0052ff]/30"], [class~="border-[#0052ff]/40"], [class~="border-[#0052ff]/50"]) { border-color: var(--n-line); }
+body.nucleo-pages [class~="border-[#0052ff]"] { border-color: rgba(242, 237, 228, .35); }
+body.nucleo-pages :is([class~="hover:border-[#0052ff]"], [class~="hover:border-[#0052ff]/40"], [class~="hover:border-[#0052ff]/50"], [class~="hover:border-[#0052ff]/60"],
+  [class~="hover:border-[#0052ff]/70"], [class~="hover:border-[#7da6ff]"]):hover { border-color: rgba(242, 237, 228, .28); }
+body.nucleo-pages :is([class~="focus:border-[#0052ff]"], [class~="focus:border-[#0052ff]/60"]):focus { border-color: rgba(242, 237, 228, .35); }
+body.nucleo-pages :is([class~="border-green-400/30"], [class~="border-green-400/40"], [class~="border-emerald-400/30"], [class~="border-[#6dfe9c]/20"]) { border-color: rgba(63, 224, 181, .3); }
+body.nucleo-pages :is([class~="border-red-400/30"], [class~="border-red-400/40"], [class~="border-red-500/20"], [class~="border-[#ff716a]/20"], [class~="border-[#ff716a]/40"]) { border-color: rgba(255, 90, 95, .3); }
+body.nucleo-pages :is([class~="border-amber-400/25"], [class~="border-amber-400/30"], [class~="border-amber-400/40"], [class~="border-[#fcc025]/30"], [class~="border-[#fcc025]/40"]) { border-color: rgba(246, 185, 78, .3); }
+body.nucleo-pages [class~="border-[#fcc025]"] { border-color: var(--n-cio); }
+
+/* ================= radii: softer, like the Núcleo cards ================= */
+body.nucleo-pages [class~="rounded"] { border-radius: 12px; }
+body.nucleo-pages [class~="rounded-md"] { border-radius: 10px; }
+body.nucleo-pages [class~="rounded-lg"] { border-radius: 12px; }
+body.nucleo-pages [class~="rounded-xl"] { border-radius: 16px; }
+body.nucleo-pages [class~="rounded-2xl"] { border-radius: 22px; }
+body.nucleo-pages [class~="rounded-3xl"] { border-radius: 26px; }
+
+/* ================= actions ================= */
+/* every button is a pill, like the desk's chips; cards and inputs keep their radius */
+body.nucleo-pages button:is([class~="rounded"], [class~="rounded-md"], [class~="rounded-lg"]),
+body.nucleo-pages a:is([class~="rounded"], [class~="rounded-md"], [class~="rounded-lg"]):is([class~="bg-white"], [class~="bg-green-400"], [class~="bg-white/10"], [class~="bg-white/5"]) { border-radius: 999px; }
+/* primary: the ink pill */
+body.nucleo-pages :is(a, button):is([class~="bg-white"], [class~="bg-green-400"]) { background: var(--n-ink); color: #0B0A09; border-color: transparent; border-radius: 999px; }
+body.nucleo-pages :is(a, button):is([class~="bg-white"], [class~="bg-green-400"]):hover { background: var(--n-inkb); color: #0B0A09; }
+/* a selected chip (was Base blue) is ink too */
+body.nucleo-pages button:is([class~="bg-[#0052ff]"], [class~="bg-[#0052ff]/20"], [class~="bg-[#0052ff]/10"]) { background: var(--n-ink); color: #0B0A09; border-color: var(--n-ink); }
+/* secondary: a black pill with a hairline */
+body.nucleo-pages :is(a, button)[class~="border"]:is([class~="bg-white/10"], [class~="bg-white/5"]) {
+  background: #000; color: var(--n-ink); border-color: rgba(242, 237, 228, .14); border-radius: 999px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+body.nucleo-pages :is(a, button)[class~="border"]:is([class~="bg-white/10"], [class~="bg-white/5"]):hover { border-color: rgba(242, 237, 228, .32); background: #000; }
+/* calls to action (the big ones) read in Geist, like the home's buttons; small chips stay mono labels */
+body.nucleo-pages :is(a, button):is([class~="bg-white"], [class~="bg-green-400"], [class~="bg-red-400"], [class~="border"]):is([class~="py-3"], [class~="py-4"], [class~="py-2.5"]) {
+  font-family: var(--n-sans); font-weight: 500; font-size: 14px; text-transform: none; letter-spacing: .01em;
+}
+/* the adversarial action keeps the Red Team colour */
+body.nucleo-pages button[class~="bg-red-400"] { background: var(--n-red); color: #0B0A09; border-radius: 999px; }
+body.nucleo-pages button[class~="bg-red-400"]:hover { background: var(--n-red2); }
+
+/* ================= media: the cobalt imagery, warmed into the Núcleo night ================= */
+body.nucleo-pages :is(video, img[src^="/images/protocol/"], img[src^="/posters/"]) { filter: grayscale(1) sepia(.14) brightness(.88) contrast(1.06); }
+body.nucleo-pages :is(video, img)[class~="blur-[2px]"] { filter: blur(2px) grayscale(1) sepia(.14) brightness(.88); }
+
+/* ================= phones: a 16px gutter, nothing wider than the screen ================= */
+@media (max-width: 640px) {
+  body.nucleo-pages [class~="mx-auto"]:is([class~="px-4"], [class~="px-5"], [class~="px-6"], [class~="p-6"]) { padding-left: 16px; padding-right: 16px; }
+  body.nucleo-pages .np-subhead { padding-inline: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) { .np-navlink, .np-app { transition: none; } }

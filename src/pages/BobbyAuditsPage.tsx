@@ -3,6 +3,8 @@
 // in the public repo. The chain is the point: every round tried to break the
 // previous fix, verdicts were NO-GO until fixed, and each fix was re-audited.
 import { Helmet } from 'react-helmet-async';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 import { ArrowLeft, ArrowUpRight, ShieldAlert } from 'lucide-react';
 
 const GH = 'https://github.com/anthonysurfermx/Bobby-Agent-Trader/blob';
@@ -60,8 +62,10 @@ const ROUNDS: Round[] = [
 ];
 
 export default function BobbyAuditsPage() {
+  useNucleoPages();
   return (
     <div className="min-h-screen bg-[#050505] text-white">
+      <NucleoTopBar />
       <Helmet>
         <title>Audit Trail — Bobby Protocol</title>
         <meta name="description" content="Five adversarial audit rounds on BobbyTrackRecordV2 — findings, severities and fixes, published in full." />

@@ -90,11 +90,11 @@ interface Verdict {
 }
 
 const AGENT_META: Record<AgentPhase, { label: string; accent: string; glyph: string; tagline: string }> = {
-  alpha_hunter: { label: 'Alpha Hunter', accent: '#7da6ff', glyph: '>>>', tagline: 'Bull thesis' },
-  red_team:     { label: 'Red Team',     accent: '#ff716a', glyph: ':::', tagline: 'Adversarial rebuttal' },
-  cio:          { label: 'CIO',          accent: '#fcc025', glyph: '[!]', tagline: 'Capital decision' },
-  judge:        { label: 'Judge',        accent: '#60a5fa', glyph: '(6)', tagline: '6-dimension audit' },
-  guardrails:   { label: 'Guardrails',   accent: '#c084fc', glyph: '###', tagline: 'Fail-closed checks' },
+  alpha_hunter: { label: 'Alpha Hunter', accent: '#3FE0B5', glyph: '>>>', tagline: 'Bull thesis' },
+  red_team:     { label: 'Red Team',     accent: '#FF5A5F', glyph: ':::', tagline: 'Adversarial rebuttal' },
+  cio:          { label: 'CIO',          accent: '#F6B94E', glyph: '[!]', tagline: 'Capital decision' },
+  judge:        { label: 'Judge',        accent: '#F2EDE4', glyph: '(6)', tagline: '6-dimension audit' },
+  guardrails:   { label: 'Guardrails',   accent: '#A39C91', glyph: '###', tagline: 'Fail-closed checks' },
 };
 
 const ACTION_STYLE: Record<VerdictAction, { bg: string; border: string; text: string; label: string }> = {
@@ -343,7 +343,7 @@ export default function BobbySandboxPage() {
           content="Pressure-test a playbook in a live adversarial simulation. Watch Alpha Hunter, Red Team, CIO, Judge, and 11 guardrails run in real time."
         />
       </Helmet>
-      <KineticShell activeTab="sandbox" minimalNav>
+      <KineticShell activeTab="sandbox" minimalNav nucleo>
         <div className="mx-auto max-w-7xl px-4 py-10 md:px-8">
           {/* ── Header ── */}
           <header className="mb-8">
@@ -753,9 +753,9 @@ function JudgeCard({ state, scores }: { state: AgentState; scores: Record<string
 
 function GuardrailDot({ cell }: { cell: GuardrailCell }) {
   const color =
-    cell.status === 'pass' ? '#6dfe9c' :
-    cell.status === 'fail' ? '#ff716a' :
-    cell.status === 'skip' ? '#64748b' : '#2a2a2a';
+    cell.status === 'pass' ? '#3FE0B5' :
+    cell.status === 'fail' ? '#FF5A5F' :
+    cell.status === 'skip' ? '#8A8378' : '#2A2521';
   const isActive = cell.status !== 'pending';
   return (
     <motion.div
@@ -782,9 +782,9 @@ function GuardrailDot({ cell }: { cell: GuardrailCell }) {
 
 function GuardrailRow({ cell }: { cell: GuardrailCell }) {
   const color =
-    cell.status === 'pass' ? '#6dfe9c' :
-    cell.status === 'fail' ? '#ff716a' :
-    cell.status === 'skip' ? '#64748b' : '#555';
+    cell.status === 'pass' ? '#3FE0B5' :
+    cell.status === 'fail' ? '#FF5A5F' :
+    cell.status === 'skip' ? '#8A8378' : '#5E5850';
   const symbol =
     cell.status === 'pass' ? '✓' :
     cell.status === 'fail' ? '✕' :
@@ -810,7 +810,7 @@ function GuardrailRow({ cell }: { cell: GuardrailCell }) {
 
 function StatusPill({ status, accent }: { status: AgentState['status']; accent: string }) {
   const label = status === 'thinking' ? 'THINKING' : status === 'done' ? 'DONE' : 'IDLE';
-  const color = status === 'done' ? accent : status === 'thinking' ? accent : '#555';
+  const color = status === 'done' ? accent : status === 'thinking' ? accent : '#5E5850';
   return (
     <span
       className="flex items-center gap-2 rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.2em]"
@@ -831,7 +831,7 @@ function StatusPill({ status, accent }: { status: AgentState['status']; accent: 
 
 function ConvictionBar({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, (value / 10) * 100));
-  const color = value >= 3.5 ? '#0052ff' : value >= 1.5 ? '#fcc025' : '#ff716a';
+  const color = value >= 3.5 ? '#F2EDE4' : value >= 1.5 ? '#F6B94E' : '#FF5A5F';
   return (
     <div className="flex-1">
       <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
@@ -878,7 +878,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 function MarketContextCard({ ctx }: { ctx: MarketContext }) {
   const change = ctx.change24hPct;
   const changeColor =
-    change === null ? '#888' : change > 0 ? '#6dfe9c' : change < 0 ? '#ff716a' : '#888';
+    change === null ? '#8A8378' : change > 0 ? '#3FE0B5' : change < 0 ? '#FF5A5F' : '#8A8378';
   const regime =
     change === null ? 'unknown'
     : change > 3 ? 'risk-on expansion'
@@ -980,9 +980,9 @@ function FeedList({ runs }: { runs: FeedRun[] }) {
   }
 
   const verdictStyle: Record<string, { color: string; label: string }> = {
-    EXECUTE:    { color: '#7da6ff', label: 'EXECUTE' },
-    YIELD_PARK: { color: '#fcc025', label: 'YIELD PARK' },
-    BLOCKED:    { color: '#ff716a', label: 'BLOCKED' },
+    EXECUTE:    { color: '#3FE0B5', label: 'EXECUTE' },
+    YIELD_PARK: { color: '#F6B94E', label: 'YIELD PARK' },
+    BLOCKED:    { color: '#FF5A5F', label: 'BLOCKED' },
   };
 
   async function toggleExpand(id: string) {
@@ -1094,13 +1094,13 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
   return (
     <div className="space-y-4">
       {run.alpha_text && (
-        <TranscriptBlock label="Alpha Hunter" color="#7da6ff" text={run.alpha_text} />
+        <TranscriptBlock label="Alpha Hunter" color="#3FE0B5" text={run.alpha_text} />
       )}
       {run.red_text && (
-        <TranscriptBlock label="Red Team" color="#ff716a" text={run.red_text} />
+        <TranscriptBlock label="Red Team" color="#FF5A5F" text={run.red_text} />
       )}
       {run.cio_text && (
-        <TranscriptBlock label="CIO" color="#fcc025" text={run.cio_text} />
+        <TranscriptBlock label="CIO" color="#F6B94E" text={run.cio_text} />
       )}
       {run.judge_scores && Object.keys(run.judge_scores).length > 0 && (
         <div>
@@ -1125,9 +1125,9 @@ function FeedRunExpanded({ run }: { run: FeedRunFull }) {
           <div className="grid grid-cols-2 gap-1.5 md:grid-cols-3">
             {run.guardrail_results.map((g) => {
               const color =
-                g.status === 'pass' ? '#6dfe9c' :
-                g.status === 'fail' ? '#ff716a' :
-                '#64748b';
+                g.status === 'pass' ? '#3FE0B5' :
+                g.status === 'fail' ? '#FF5A5F' :
+                '#8A8378';
               const sym = g.status === 'pass' ? '✓' : g.status === 'fail' ? '✕' : '–';
               return (
                 <div

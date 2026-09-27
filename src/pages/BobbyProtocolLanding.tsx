@@ -9,14 +9,14 @@ import {
   CircleDollarSign,
   Database,
   Github,
-  Menu,
   RefreshCw,
   ShieldCheck,
   Sparkles,
   Twitter,
-  X,
 } from 'lucide-react';
 import { BOBBY_BASE_MAINNET } from '@/config/chains';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 
 type Price = { symbol: string; price: number; change24h: number };
 
@@ -139,15 +139,11 @@ function useActivity() {
   return { activity, isLoading, error, refresh };
 }
 
+// The Núcleo wordmark (Sora, like the home's footer): no badge, no glow.
 function BrandMark() {
   return (
-    <a href="/protocol" className="flex items-center gap-3 text-white" aria-label="Bobby Protocol home">
-      <span className="relative grid h-10 w-10 place-items-center rounded-[14px] border border-[#8fb6ff]/45 bg-[radial-gradient(circle_at_30%_20%,#8eb6ff_0%,#2670ff_28%,#0052ff_62%,#0035b8_100%)] text-white shadow-[0_0_30px_rgba(0,82,255,.38)]">
-        <span className="pointer-events-none absolute -inset-1 rounded-[17px] border border-[#0052ff]/30 rotate-[-18deg]" />
-        <span className="pointer-events-none absolute -right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#d9e6ff] shadow-[0_0_8px_#d9e6ff]" />
-        <span className="relative text-[21px] font-black leading-none tracking-[-0.12em]">B</span>
-      </span>
-      <span className="text-[15px] font-extrabold tracking-[-0.045em]">Bobby Protocol</span>
+    <a href="/protocol" className="np-display text-[26px] leading-none text-white" aria-label="Bobby Protocol home">
+      Bobby Protocol
     </a>
   );
 }
@@ -191,7 +187,7 @@ export default function BobbyProtocolLanding() {
   const stats = useProtocolStats();
   const mcp = useMcpMeta();
   const { activity, isLoading: isActivityLoading, error: activityError, refresh: refreshActivity } = useActivity();
-  const [menuOpen, setMenuOpen] = useState(false);
+  useNucleoPages();
   const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'recorded'>('all');
   // Deep links such as /protocol#rules arrive before this lazy page has rendered its sections,
   // so the browser's own jump finds nothing. Scroll once the section exists.
@@ -283,7 +279,8 @@ export default function BobbyProtocolLanding() {
     ['Integration', '#for-agents'],
     ['The record', '#contracts'],
     ['The app', APP_LANDING_URL],
-  ];
+    ['Docs', '/protocol/docs'],
+  ] as const;
 
   const filteredActivity = useMemo(() => {
     const list = activityFilter === 'all'
@@ -311,23 +308,7 @@ export default function BobbyProtocolLanding() {
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
 
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-5 lg:px-8">
-          <BrandMark />
-          <nav className="hidden items-center gap-9 md:flex">
-            {navItems.map(([label, href]) => <a key={href} href={href} className="font-mono text-xs uppercase tracking-[0.15em] text-white/55 transition hover:text-white">{label}</a>)}
-            <a href="/protocol/docs" className="font-mono text-xs uppercase tracking-[0.15em] text-white/55 transition hover:text-white">Docs</a>
-          </nav>
-          <div className="hidden items-center gap-3 md:flex">
-            <a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader" target="_blank" rel="noreferrer" className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"><Github className="h-4 w-4" /></a>
-            <a href="/desk" className="rounded-lg bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Try Bobby</a>
-          </div>
-          <button onClick={() => setMenuOpen((open) => !open)} className="rounded-full p-2 md:hidden" aria-label="Toggle navigation">
-            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
-        </div>
-        {menuOpen && <nav className="border-t border-white/10 bg-[#0a0a0a] px-5 py-4 md:hidden">{navItems.map(([label, href]) => <a key={href} href={href} onClick={() => setMenuOpen(false)} className="block py-3 font-mono text-xs uppercase tracking-[0.15em] text-white/70">{label}</a>)}<a href="/desk" className="mt-2 block rounded-lg bg-white px-5 py-3 text-center font-mono text-xs font-bold uppercase tracking-[0.15em] text-black">Try Bobby</a></nav>}
-      </header>
+      <NucleoTopBar links={navItems} />
 
       <main className="relative">
         <section className="relative isolate min-h-[calc(100vh-72px)] overflow-hidden bg-[#050505] text-white">

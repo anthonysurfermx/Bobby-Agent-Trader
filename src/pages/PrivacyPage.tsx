@@ -11,6 +11,8 @@
 // then the web's stored choice, then a Spanish browser, then English.
 import type { ReactNode } from 'react';
 import { Helmet } from 'react-helmet-async';
+import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import { useNucleoPages } from '@/hooks/useNucleoPages';
 import { lang, type Lang } from '@/lib/companions/i18n';
 
 const EFFECTIVE_DATE: Record<Lang, string> = { en: 'September 22, 2026', es: '22 de septiembre de 2026' };
@@ -30,25 +32,27 @@ function policyLang(): Lang {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mb-10">
-      <h2 className="mb-3 font-mono text-sm font-bold uppercase tracking-[0.18em] text-green-400">{title}</h2>
+      <h2 className="mb-3 text-[22px] text-white">{title}</h2>
       <div className="space-y-3 text-[15px] leading-7 text-white/75">{children}</div>
     </section>
   );
 }
 
 function Scope({ children }: { children: ReactNode }) {
-  return <span className="mr-2 rounded border border-amber-400/30 bg-amber-400/[0.06] px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-amber-300">{children}</span>;
+  return <span className="mr-2 rounded-full border border-white/15 bg-white/[0.06] px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-white/60">{children}</span>;
 }
 
-const linkClass = 'text-green-400 underline decoration-green-400/40 underline-offset-4 hover:decoration-green-400';
+const linkClass = 'text-white underline decoration-white/30 underline-offset-4 hover:decoration-white';
 
 export default function PrivacyPage() {
+  useNucleoPages();
   const language = policyLang();
   const tr = (en: string, es: string) => (language === 'es' ? es : en);
   const strong = (text: string) => <span className="text-white">{text}</span>;
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">
+      <NucleoTopBar />
       <Helmet>
         <html lang={language} />
         <title>{tr('Privacy Policy | Bobby', 'Aviso de privacidad | Bobby')}</title>
