@@ -309,7 +309,10 @@ function chipsShow(list, eyebrow){
   A.chipX.set(0);
   var x = 20;
   list.forEach(function(c, i){
-    var b = mk('button', 'chip' + (i === 0 ? ' first' : ''), c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
+    /* `apple`: the Sign in with Apple chip (white, the Apple logo in the system font); `pro`: the Bobby Pro chip */
+    var style = c.style === 'apple' || c.style === 'pro' ? ' ' + c.style : '';
+    var b = mk('button', 'chip' + (i === 0 ? ' first' : '') + style, c.style === 'apple' ? null : c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
+    if (c.style === 'apple'){ var lg = mk('span', 'lg', '\uF8FF'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
     el.chipRow.appendChild(b);
     var w = b.offsetWidth || 160, ch = { el: b, x: x, w: w, p: new V(0, 'emit'), o: new V(0, 'soft'), press: new V(1, 'snap'), action: c.action, label: c.label };
     x += w + 8; A.chips.push(ch);

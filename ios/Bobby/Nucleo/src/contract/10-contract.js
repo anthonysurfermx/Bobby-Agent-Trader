@@ -62,6 +62,8 @@
     provenance: { provider: T.str, instrument: T.str, assetType: oneOf('equity', 'crypto'), timeframe: T.str, asOf: T.str },
     candles: arrayOf(CANDLE), receivedAt: T.int, elapsedMs: T.int, fixture: T.bool
   };
+  /* the server's word on the caller's reads (§8): anon / free / pro */
+  var ACCESS = { tier: oneOf('anon', 'free', 'pro'), used: T.int, limit: nullOr(T.int), remaining: nullOr(T.int), resetsAt: nullOr(T.str), paywall: T.bool };
   var SAVE = {
     status: eq('saved'), awardedXP: T.int, capped: T.bool, kind: oneOf('read_complete', 'no_trade_respected'),
     xp: T.int, level: T.obj, streak: T.int, evolution: nullOr(T.obj), unlocks: arrayOf(T.obj),
@@ -148,6 +150,9 @@
   });
 
   function fixturesOnly() { if (!ctx.session || !ctx.session.fixtures) return 'skip: not in fixture mode (never spend desk quota from the contract page)'; }
+  /* mock only: under ?scenario=signin_required|subscription_required every metered read is refused */
+  function gateScenario() { return B.mock && FX && FX.manifest.gates ? FX.manifest.gates[B.mock.scenario] || null : null; }
+  function okReads() { var s = fixturesOnly(); if (s) return s; if (gateScenario()) return 'skip: gate scenario (metered reads are refused)'; }
 
   test('risk gate: ask before acceptance never reaches the network', function () {
     var s = fixturesOnly(); if (s) return Promise.resolve(s);
@@ -180,7 +185,7 @@
     });
   });
   test('NVDA read == golden (minus volatile) and ask.stage order', function () {
-    var s = fixturesOnly(); if (s) return Promise.resolve(s);
+    var s = okReads(); if (s) return Promise.resolve(s);
     var stages = [];
     var off = B.on('ask.stage', function (p) { stages.push(p.stage); });
     return B.api.ask({ question: 'Should I buy NVIDIA right now?' }).then(function (r) {
@@ -196,14 +201,14 @@
     });
   });
   test('BTC read == golden (minus volatile)', function () {
-    var s = fixturesOnly(); if (s) return Promise.resolve(s);
+    var s = okReads(); if (s) return Promise.resolve(s);
     return B.api.ask({ question: 'Is now a good time for Bitcoin?' }).then(function (r) {
       var vol = FX.manifest.volatileKeys;
       var d = diff(strip(r, vol), strip(FX.ask.btc, vol)); if (d.length) throw new Error('golden drift:\n' + d.join('\n'));
     });
   });
   test('one read at a time (busy) and cancel -> cancelled', function () {
-    var s = fixturesOnly(); if (s) return Promise.resolve(s);
+    var s = okReads(); if (s) return Promise.resolve(s);
     var first = B.api.ask({ question: 'Is now a good time for Bitcoin?' });
     return faultCode(B.api.ask({ question: 'Should I buy NVIDIA right now?' })).then(function (code) {
       if (code !== 'busy') throw new Error('second ask: ' + code);
@@ -213,8 +218,29 @@
       return first;
     }).then(function (r) { if (r.status !== 'cancelled') throw new Error(JSON.stringify(r)); });
   });
-  test('saveThesis awards once per read (idempotent) and lists it', function () {
+  test('metered read refused (401/402) == golden: retry token, access, no verdict', function () {
     var s = fixturesOnly(); if (s) return Promise.resolve(s);
+    var g = gateScenario(); if (!g) return Promise.resolve('skip: not a gate scenario (?scenario=signin_required|subscription_required)');
+    return B.api.ask({ question: 'Should I buy NVIDIA right now?' }).then(function (r) {
+      var d = diff(strip(r, ['token']), strip(FX.ask[g], ['token'])); if (d.length) throw new Error('golden drift:\n' + d.join('\n'));
+      if (!r.token) throw new Error('no retry token');
+      var e = check(r.access, ACCESS); if (e.length) throw new Error(e.join('\n'));
+      if ('agents' in r) throw new Error('a refused read carries no verdict');
+      return B.api.ask({ token: r.token });
+    }).then(function (again) {
+      /* nothing changed (no sign in, no purchase): the same refusal, with a fresh token */
+      if (again.status !== FX.ask[g].status || !again.token) throw new Error(JSON.stringify(again));
+    });
+  });
+  test('paywall() answers how the Bobby Pro sheet ended (mock; native presents a real sheet)', function () {
+    if (B.native) return Promise.resolve('skip: native presents the real sheet');
+    return B.api.paywall().then(function (r) {
+      if (['subscribed', 'cancelled', 'pending', 'failed', 'unavailable'].indexOf(r.status) < 0) throw new Error(JSON.stringify(r));
+      if (r.access !== null && check(r.access, ACCESS).length) throw new Error('access shape ' + JSON.stringify(r.access));
+    });
+  });
+  test('saveThesis awards once per read (idempotent) and lists it', function () {
+    var s = okReads(); if (s) return Promise.resolve(s);
     if (!ctx.nvda) throw new Error('needs the NVDA read');
     var first;
     return B.api.saveThesis({ requestId: ctx.nvda.requestId }).then(function (r) {

@@ -24,7 +24,7 @@ The goal is the app Anthony asked for. He asks his own question by voice or text
 |---|---|---|
 | R1 | The engine stays web tech (HTML/CSS/raw WebGL, the approved code) inside a `WKWebView`. Native Swift owns network, auth, speech-to-text, TTS, haptics and persistence. JS owns rendering and choreography. | Decided upstream. |
 | R2 | **Page JS never touches the network.** The CSP sets `connect-src 'none'`. Every byte of data comes through the bridge. | `/api/desk-debate` rejects the `file://` origin, and the app's `Origin` header is set natively. |
-| R3 | **JS never names an asset.** `ask` accepts a question, a native-issued `token` (from a confirmation or suggestion), or `followUpOf` (a previous read). | The "never analyze an unconfirmed guess" rule is enforced where the network lives. |
+| R3 | **JS never names an asset.** `ask` accepts a question, a native-issued `token` (from a confirmation, a suggestion, or a metered-read refusal, §8.3), or `followUpOf` (a previous read). | The "never analyze an unconfirmed guess" rule is enforced where the network lives. |
 | R4 | **XP is awarded on *Save thesis*, not when a read completes.** Saving is the award event (`read_complete` for Review, `no_trade_respected` for Wait) with the thesis attached. It happens once per read, is capped by `CompanionStore` (3/day), and is guarded by account generation. | This is the only place a thesis exists server-side (`events[].thesis`). The design says the reward comes on save. |
 | R5 | Conviction and plan levels come only from `voice-tool run_debate` (`pulse`, quota-free). They are **shown only when the engine agrees with the desk**: verdict `review`, the same direction, and the same instrument. Otherwise the ring is a **completion ring with no number**, and the thesis shows real support/resistance instead of plan rows. | `/api/desk-debate` returns no conviction or levels. Both real captures are `wait`, while BTC's engine says `strong_long 59%`. Showing that number under "Wait" would contradict the desk. |
 | R6 | Verdict words: `wait` becomes **Wait** (amber `#F6B94E`, scrim `#2A1C08`). `review` becomes **Review** (mint `#3FE0B5`, scrim `#082A20`). "Buy" and "Sell" never appear. Spanish: Espera / Revisa. | Colour lock (DIRECTION §2.1) and compliance. |
@@ -192,8 +192,9 @@ Types: `S` string, `B` bool, `N` finite number, `I` integer, `?` nullable. "Sess
 | `setCompanion` | `{id S}` (iOS id; unlocked) | Session. Commits exactly like `CompanionOnboarding.commitCompanion`: `companionId`, `profile.voiceId = voicePersona`, `profile.auraText = AuraForge.keyword(nearest: hue)`. |
 | `riskNotice` | `{}` | `{version I, statements:[{title S, body S}]×4}`. This is the RiskNoticeView copy, moved into `enum RiskNotice` unchanged (§6.2). Snapshot: `fixtures/native/risk-notice.json`. |
 | `acceptRisk` | `{version I}` | `{accepted B, version I}`. `version` must equal `RiskNotice.currentVersion`; if it does, set `profile.riskNoticeVersion`, and when signed in also run `ProgressSync.sync`. |
+| `paywall` | `{}` | `{status:"subscribed"\|"cancelled"\|"pending"\|"failed"\|"unavailable", access: Access\|null}` (§8.4). Presents the native Bobby Pro sheet and answers **when it closes**. Only `subscribed` (Bobby's server confirmed the account is Pro) lets the page re-ask. `unavailable`: risk notice not accepted, or another sheet is open. Emits `native.sheet{route:"paywall"}`. `openNative` never opens it. |
 | `signIn` | `{}` | `{status:"signedIn"\|"cancelled"\|"failed"\|"unavailable"}`. Native runs an `ASAuthorizationController` with `AccountSession.shared.prepareAppleRequest` then `completeApple`, and on success `ProgressSync.shared.sync(store:profile:)`. Apple only. Fixture mode returns `unavailable`. |
-| `openNative` | `{route: "squad"\|"locker"\|"isla"\|"account"\|"riskNotice"}` | `{opened B}`. The routes present, as sheets over the web view: `MascotGalleryView`, `SquadLockerSheet`, `TraderLandGateHarnessView(focus:nil)` (sync on dismiss, as ContentView does), `AccountSheet` (full height, with Privacy Policy and Help links; the header avatar opens it), and `RiskNoticeView(readOnly:true)`. Emits `native.sheet`. Exception: `riskNotice` from the **app** page while the notice is not accepted opens no sheet; the risk beat replaces the page (§1.3). |
+| `openNative` | `{route: "squad"\|"locker"\|"isla"\|"account"\|"riskNotice"}` (never `paywall`: that route is the awaited `paywall` method) | `{opened B}`. The routes present, as sheets over the web view: `MascotGalleryView`, `SquadLockerSheet`, `TraderLandGateHarnessView(focus:nil)` (sync on dismiss, as ContentView does), `AccountSheet` (full height, with Privacy Policy and Help links; the header avatar opens it), and `RiskNoticeView(readOnly:true)`. Emits `native.sheet`. Exception: `riskNotice` from the **app** page while the notice is not accepted opens no sheet; the risk beat replaces the page (§1.3). |
 | `openClassic` | `{}` | DEBUG only: `{}`, then routes (§1.3). Release: `unknown_method`. |
 | `finishOnboarding` | `{}` | `{next:"app"}` or `{status:"incomplete", missing:["companion"\|"risk"]}` |
 | `markHint` | `{key S(^[a-z][A-Za-z0-9_.-]{0,31}$)}` | `{count I}`. Stored in the UserDefaults dict `nucleo.hints` and echoed in `session.hints`. |
@@ -239,11 +240,13 @@ Order is normative. The mock follows it too.
    - Fetch candles exactly as `BobbyAPI.candles(symbol:isEquity:timeframe:.oneHour)`, but through `BobbyAPI.response`, so that a transport error (`error.network`) is told apart from an empty or non-2xx reply.
    - Gate: crypto needs ≥59 bars and a last bar ≤3 h old; equity needs a last bar ≤5 days old. A failure gives `unsupported/thin_data` or `unsupported/stale_data`.
    - Emit `ask.stage{stage:"candles", candles, provenance:null}`.
-7. **In parallel**, run the market read (`BobbyAPI.market`), the pulse (`POST api/voice-tool {tool:"run_debate", args:{symbol, lang: L.ttsLang}}`, 20 s cap, any failure or `error` key gives `null`), and the **debate**.
-   - The debate is sent exactly as `BobbyAPI.debate` does it: `POST api/desk-debate`, body `{symbol, question, language: L.ttsLang, assetType: "equity"|"crypto"}`, header `Origin: https://bobbyprotocol.xyz`, timeout 100 s.
+7. **Metered gate, then market ‖ desk** (§8.2).
+   - 7a. The pulse (`POST api/voice-tool {tool:"run_debate", args:{symbol, lang: L.ttsLang}}`, 20 s cap) is **the metered read**. It carries the access headers (§8.1) and runs **before** the desk: 401 → `signin_required`, 402 → `subscription_required`, returned at once with a retry `token`; the desk is never called. The desk waits at most 10 s for this answer, then starts anyway (fail open); a refusal that arrives later still wins. Any other failure, or an `error` key, gives `pulse: null` as before.
+   - 7b. The market read (`BobbyAPI.market`, started with the candles) and the **debate** run in parallel.
+   - The debate is sent exactly as `BobbyAPI.debate` does it: `POST api/desk-debate`, body `{symbol, question, language: L.ttsLang, assetType: "equity"|"crypto"}`, header `Origin: https://bobbyprotocol.xyz`, timeout 100 s. It also carries the access headers (§8.1), so the server may meter the desk itself later without an app update.
    - Emit `ask.stage{stage:"market", market}` as soon as the market read returns or fails.
    - **The reply never precedes its `market` and `candles` stages.**
-   - After the debate returns, wait at most 5 s more for the pulse.
+   - After the debate returns, wait at most 5 s more for the pulse (only if 7a had no answer yet).
 8. **Map the debate response:**
 
    | Debate response | Result |
@@ -260,7 +263,7 @@ Order is normative. The mock follows it too.
    Never produce a verdict on failure.
 9. **On `ok`:** call `DeskMemory.recordQuery`, then keep the read in memory (the last 5, keyed by `requestId`) together with its generation. It becomes `pendingRead`. **Nothing is awarded here** (R4).
 
-**AskResult**, where `status` is one of `ok|confirm|unknown_asset|unsupported|too_long|quota|cancelled|error`. The golden examples are in `fixtures/ask/*.json`.
+**AskResult**, where `status` is one of `ok|confirm|unknown_asset|unsupported|too_long|quota|signin_required|subscription_required|cancelled|error`. The golden examples are in `fixtures/ask/*.json`.
 
 ```json
 { "v":1, "status":"ok", "requestId":"<uuid>", "question":"Should I buy NVIDIA right now?", "language":"en",
@@ -274,12 +277,16 @@ Order is normative. The mock follows it too.
   "agents":{"alpha":S,"red":S,"cio":S,"verdict":"wait|review","direction":"long|short|none"},
   "provenance":{"provider":"Yahoo Finance","instrument":"NVDA","assetType":"equity","timeframe":"1H","asOf":"2026-09-25T20:00:00.000Z"},
   "candles":[{"t":1790366400000,"o":N,"h":N,"l":N,"c":N,"v":N}],
-  "receivedAt":1790422570000, "elapsedMs":5378, "fixture":false }
+  "receivedAt":1790422570000, "elapsedMs":5378, "fixture":false,
+  "access": Access }            // only when the server sent one (§8.2); a legacy server: no key at all
 { "v":1, "status":"confirm", "token":S, "asset":{"symbol":"XAUT","name":"Xau","isEquity":false,"assetClass":"commodity"}, "matchKind":"proxy|fuzzy|…", "proxyNote":S? }
 { "v":1, "status":"unknown_asset", "query":S, "suggestions":[{"symbol":S,"name":S,"assetClass":S,"token":S}] }
 { "v":1, "status":"unsupported", "asset":{symbol,name,isEquity,assetClass}, "reason":"asset_class|symbol_format|thin_data|stale_data" }
 { "v":1, "status":"too_long", "maxLength":1200, "message":S? }
 { "v":1, "status":"quota", "retryAfterSec":I?, "message":S? }
+{ "v":1, "status":"signin_required", "token":S, "message":S?, "access":Access? }         // 401 from the metered read
+{ "v":1, "status":"subscription_required", "token":S, "message":S?, "access":Access? }   // 402 from the metered read
+// Access = {tier:"anon"|"free"|"pro", used I, limit I?, remaining I?, resetsAt S(ISO)?, paywall B}
 { "v":1, "status":"cancelled" }
 { "v":1, "status":"error", "code":"analysis_failed|desk_unavailable|network|timeout|bad_response|risk_not_accepted", "message":S? }
 ```
@@ -310,7 +317,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | `voice.word` | `{id, index I}` (device engine only, from `willSpeakRangeOfSpeechString`; the word index is counted on whitespace splits of the spoken text) |
 | `voice.end` | `{id, reason:"finished"\|"stopped"\|"failed"}`. Always sent exactly once per queued id, within 22 s if playback never starts (watchdog). |
 | `thesis.planted` | `{requestId, stage:"seed"\|"bloomed"\|"capped"\|"signed_out"\|"failed", piece:{id,name}?, horizon:{hours,reviewAt,extendable}?}` (signed in only; after `ProgressSync.outcome`) |
-| `native.sheet` | `{route, state:"open"\|"closed"}`. While a sheet is open, JS pauses rendering. |
+| `native.sheet` | `{route, state:"open"\|"closed"}`, `route` includes `paywall`. While a sheet is open, JS pauses rendering. |
 
 ### 2.6 Speech-to-text and voice (native details)
 
@@ -408,6 +415,8 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | FACE_DRAG / FACE(k) | drag in IDLE | B11 physics with the real pointer. Isla: `island()` summary and a chip that calls `openNative("isla")`. Squad: `roster()` belt plus `level`/`streak`, chip `openNative("squad")`. Theses: 2 satellites from `theses()`; tapping one opens its card read-only. | detent at Desk → IDLE |
 | ERROR(kind) / CANCELLED | | caption from `NucleoReadModel.failure()`. **No verdict, no ring, no XP.** The pill returns to mic. | 6 s or a tap → RETURNING |
 | RISK_GATE | reply `error/risk_not_accepted` (`failure().kind == "risk"`) | caption "First, the risk notice." plus one chip | chip → `openNative("riskNotice")` (native swaps in the risk beat); tap elsewhere or 30 s → RETURNING |
+| SIGNIN_GATE | reply `signin_required` (`failure().kind == "signin"`) | glass first: one line from the rim, "Create your free account to keep reading — 10 free reads a week.", the white **Sign in with Apple** chip (Apple logo U+F8FF, system font) and "Not now" | Apple chip → `signIn()`; `signedIn` → SENDING with `{token: retry}` (the same question, asked again automatically); `cancelled` stays; other → hint. "Not now", a tap elsewhere or 45 s (not while signing in) → RETURNING |
+| PRO_GATE | reply `subscription_required` (`failure().kind == "subscription"`) | one line "You’ve used this week’s free reads.", sub "They reset {date}. Bobby Pro has unlimited reads." (date from `access.resetsAt`), chips "See Bobby Pro" and "Not now". The Bobby Pro sheet opens **by itself once** (+1.2 s), never right after a purchase-retry | "See Bobby Pro" → `paywall()`; `subscribed` → SENDING with `{token: retry}`; `pending`/`failed` → hint; "Not now", a tap elsewhere or 45 s → RETURNING |
 | RESTORE | `pendingRead` at boot | builds the model and jumps to the settled HANDBACK frame (reduced choreography) | as HANDBACK |
 
 ### 3.3 Onboarding state machine (`onboarding.html`, Builder C)
@@ -419,7 +428,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | ~~PICK (O2)~~ | removed 2026-09-26 (owner's decision): the glass leads the first run | There is no picker. When HELLO ends, `ensureCompanion()` silently assigns the default starter with the old picker rule (the first `roster()` entry with `requiredLevel == 1 && unlocked` whose id is not `orb`) through `setCompanion({id})`, and goes straight to ASK_TEACH. The header avatar fades in and the rim glides to the companion tint; the companion never surfaces as the hero. The avatar is part of the profile: `AccountSheet` (header avatar → `openNative("account")`) has a "Your avatar / Tu avatar" row that opens `MascotGalleryView`. If `finishOnboarding` still reports `missing: ["companion"]`, the page assigns the default and finishes again. |
 | ASK_TEACH (O3) | O3 title/sub/chips, pre-permission card | Chips come from `suggestions()` via the strings template ("How is {SYM} looking?" / "Why is {SYM} moving today?" only for `movers`). The pre-permission card uses **Continue**, then `speech.requestPermission()`, which triggers the **real** OS prompts; the fake alerts are deleted. Denied or unavailable → typing. LISTENING/TYPING as in §3.2; the question becomes the bead, which is **not sent yet** |
 | RISK (O4) | O4 ring + hold-to-agree, the same geometry as the conviction ring | `riskNotice()`: the 4 `title`s are the pulse-swept lines, with statement 1's `body` below them (Geist 13 ink2). "Read the full notice" calls `openNative("riskNotice")`. Completing the 1200 ms hold calls `acceptRisk({version})`; an early release unwinds with no copy |
-| READ (O5) | O5, as the daily THINK→VERDICT states | `ask({question})`. First-read options: `build(r, {firstRead:true})` (3 satellites), a 4.5 s floor. The conviction explainer hint appears only when `ring.mode == "conviction"`. Non-ok replies use the daily ERROR/CONFIRM patterns; after an error the chip "Try another question" returns to ASK_TEACH |
+| READ (O5) | O5, as the daily THINK→VERDICT states | `ask({question})`. First-read options: `build(r, {firstRead:true})` (3 satellites), a 4.5 s floor. The conviction explainer hint appears only when `ring.mode == "conviction"`. Non-ok replies use the daily ERROR/CONFIRM patterns; after an error the chip "Try another question" returns to ASK_TEACH. A metered refusal (§8.3) shows the same ERROR caption with the Apple (or Bobby Pro) chip first: `signIn()` / `paywall()`, then `ask({token: retry})` |
 | SAVE (O6) | O6 cards opening on **Thesis** | Button "Save thesis" (there is no "Watch & ping me" and no notifications alert). The horizon row shows only if `thesis.horizon.show`. The XP chip uses the real `awardedXP`; this is the only reward |
 | SIGN_IN (O7) | O7 sheet poured from the sphere base | Only if `!signedIn` after the first save. **Sign in with Apple** (HIG white button, 50 tall; the Apple logo is U+F8FF in the system font) calls `signIn()`. **Not now** leads to "Saved on this device". There is no Google button |
 | ISLA_PEEK (O8) | O8 | Only if `thesis.planted` arrives with `seed`/`bloomed` (signed in). Otherwise skip it; the meridian dots are still born for the faces that have content |
@@ -482,6 +491,7 @@ Running `python3 ios/Bobby/Nucleo/fixtures/normalize.py` writes `fixtures/ask/*.
   - `confirm-fuzzy`, `confirm-proxy`
   - `unknown`, `unsupported-proxy`
   - `cancelled`, `timeout`, `network`, `risk`
+  - `signin-required`, `subscription-required` (from the synthetic `raw/voice-tool.{signin_required,subscription_required}.json`, §8.3; `token` is volatile like a confirm token)
 - Volatile keys: `requestId`, `elapsedMs`, `fixture`. **Native fixture mode must reproduce every golden reply JSON-equal, apart from those keys.** The contract page checks this in the app.
 - `fixtures/native/{roster,levels,risk-notice}.json` are snapshots of `Companion.swift` and `RiskNoticeView.swift` for the mock. If native copy changes, re-snapshot them; the contract page catches drift.
 
@@ -490,7 +500,8 @@ Running `python3 ios/Bobby/Nucleo/fixtures/normalize.py` writes `fixtures/ask/*.
 It installs itself only when `window.webkit.messageHandlers.nucleo` is absent. It answers every method from the inlined `NUCLEO_FIXTURES`, matches questions through `manifest.assetSearch` (the same rules native uses), follows the §2.4 order, and fakes STT (seeded irregular word timing plus a level envelope) and TTS (syllable envelope, `voice.word`, `voice.progress`).
 
 URL parameters:
-- `scenario=default|slow|hang|quota|too_long|failed|unavailable|gateway_timeout|offline`
+- `scenario=default|slow|hang|quota|too_long|failed|unavailable|gateway_timeout|offline|signin_required|subscription_required` (the last two refuse every metered read until `signIn` / `paywall` succeed; `subscription_required` starts signed in)
+- `signin=ok` (`signIn` succeeds), `purchase=ok` (the Bobby Pro sheet ends `subscribed`; it resolves on wall time, since a native sheet is not on the page clock)
 - `lang=en|es`
 - `first=1` (first run: no companion, risk not accepted)
 - `signedIn=1`, `signin=ok`
@@ -519,14 +530,16 @@ Hooks:
 | `api/bobby-asset-search?browse=1` | `{"ok":true,"browse":{},"movers":[]}` |
 | `api/okx-tickers` | `{"tickers":[]}` |
 | `api/stock-candles?symbol=S…`, `api/okx-candles?instId=S-USDT…` | `bySymbol[S].candles`, else 502 `{"error":"No chart data"}` |
-| `api/voice-tool` | `get_market` → `bySymbol.market`; `run_debate` → `bySymbol.pulse`; otherwise `{"symbol":S,"available":false,"price":null}` |
+| `api/voice-tool` | `get_market` → `bySymbol.market`; `run_debate` → `voice-tool.<scenario>.json` (401/402) under `signin_required`/`subscription_required`, else `bySymbol.pulse`; otherwise `{"symbol":S,"available":false,"price":null}` |
+| `api/bobby-access` | GET → `{access (the gate capture's, else null), signedIn:false, subscription:null, payments:{stripe:false, apple:true}}`; POST → 401 (fixture mode is signed out) |
 | `api/desk-debate` | the scenario file if the scenario is a refusal, else `bySymbol[S].debate` |
 | `api/bobby-voice-free` | 503 `{"error":"TTS failed"}`, which puts NeuralVoice on the free device voice; not intercepted under `-nucleo-fixtures-live-voice` |
 | `qbvdqkknnuweatptjohi.supabase.co` | `URLError(.notConnectedToInternet)` |
 | any other bobbyprotocol.xyz path | 404 `{"error":"not in fixtures"}` |
 
 - **Latency.** `desk-debate` takes `min(elapsedMs, 6000)` ms by default, 45 s under `slow`; `hang` waits 20 s and then fails with `URLError(.timedOut)`. All other requests take 150 ms. Under `offline`, every request fails with `.notConnectedToInternet`.
-- The mode forces signed-out behaviour: `signedIn:false`, `signIn → unavailable`, and `ProgressSync` is never called.
+- The mode forces signed-out behaviour: `signedIn:false`, `signIn → unavailable`, no bearer on metered reads, RevenueCat never configured, and `ProgressSync` is never called.
+- `NucleoFixtures.accessHeaders` records, per request to voice-tool / bobby-access / desk-debate, the path (`#tool` for voice-tool), `x-bobby-device`, `x-bobby-platform` and whether a bearer was present (never the token).
 - Set `session.fixtures = true`.
 - Set `receivedAt` to the capture's `recordedAt`.
 - The fixture code is compiled only in DEBUG.
@@ -548,6 +561,7 @@ Hooks:
 - **No advice language.** The verdicts are Wait and Review only. Every read carries "Educational read · not financial advice". The app has no Buy, Sell, profit, win or returns strings; `tests/read-model.test.mjs` lints the read-model tables, and Builders B and C lint their own tables the same way. The conviction number appears only when it is real and agrees with the desk (R5).
 - **Consent before processing.** No `ask` reaches the network before `riskAccepted`; native enforces this (§2.4 step 2).
 - **Sign in with Apple only;** "Not now" loses nothing. The account deletion path stays in `AccountSheet` (`openNative("account")`).
+- **Metered reads and Bobby Pro (§8).** A random per-install UUID (Keychain) goes with every metered read: `PrivacyInfo.xcprivacy` already declares Device ID (linked, App Functionality); Purchase History (linked, App Functionality) is added for the subscription. The only purchase is an App Store auto-renewable subscription for analysis (RevenueCat SDK, StoreKit underneath). **No swap, buy/sell, trade or wallet feature exists on iOS**, and the paywall never points to a web checkout (guideline 3.1.1). The sheet shows the price from the App Store, the period, the auto-renewal terms, Restore Purchases, the Terms of Use (Apple's standard EULA; bobbyprotocol.xyz has no /terms route) and the Privacy Policy (guideline 3.1.2).
 - **Bundled code only.** The pages come from the app bundle, and there is no remote JS. `connect-src 'none'`; the only external requests are Google Fonts CSS and fonts (R15).
 - **Before any App Store submission** (not in this workflow): run `build.py --park-legacy` once, then `build.py --release`; remove the hidden long-press to the classic app, or make it a visible setting (guideline 2.3.1 on hidden features); and confirm that `showNucleo` in Release is intended.
 
@@ -560,8 +574,8 @@ The three builders work in parallel, and no file is owned by two of them. None m
 ### 6.1 Shared gates (every builder runs these before reporting)
 
 1. `python3 ios/Bobby/Nucleo/build.py` prints `NUCLEO_BUILD_OK`, and so does `--release`, whose pages contain neither `NUCLEO_FIXTURES=` nor `90-dev-mock-bridge` (grep the built pages). Rebuild in dev mode afterwards.
-2. `node ios/Bobby/Nucleo/tests/read-model.test.mjs` passes. Its baseline is 24 tests.
-3. `contract.html` in the browser shows `PASS` for `?latency=300` (baseline 13 passed + 1 skipped, the risk gate) and for `?latency=300&first=1&lang=es` (baseline 14/14).
+2. `node ios/Bobby/Nucleo/tests/read-model.test.mjs` passes. Its baseline is 36 tests (2026-09-27).
+3. `contract.html` in the browser shows `PASS` for `?latency=300` (baseline 14 passed + 2 skipped: the risk gate and the metered refusal), for `?latency=300&first=1&lang=es` (15 passed + 1 skipped) and for `?latency=300&scenario=signin_required` / `subscription_required` (11 passed + 5 skipped each: the ok reads are refused there).
 
 ### 6.2 Builder A — native bridge (Swift)
 
@@ -675,3 +689,46 @@ The three builders work in parallel, and no file is owned by two of them. None m
 6. **The hidden classic exit** must go before App Store submission (§5).
 7. **Fonts** load from Google Fonts over the network. Bundling them (OFL) means downloading them, which needs Anthony's OK.
 8. **What Anthony sees on his phone.** This workflow ends with a simulator-verified build. Installing it on his iPhone (Xcode run or TestFlight) is his step, because this workflow may not install to devices or upload.
+
+---
+
+## 8. Metered reads and Bobby Pro (iOS 1.5 (43), 2026-09-27)
+
+Owner's decisions (Anthony): anyone can try Bobby without an account for **3 reads**; from the 4th read, **Sign in with Apple** is required; a signed-in account gets **10 free reads per rolling 7 days**; after that, **Bobby Pro** at $4.99/month, which on iOS is an App Store auto-renewable subscription (subscription group "Bobby Pro", product `xyz.bobbyprotocol.bobby.pro.monthly`), sold through **RevenueCat**. The server counts and decides; the app never keeps its own count.
+
+### 8.1 Who is asking (headers)
+
+Every `POST api/voice-tool {tool:"run_debate"}` (the metered read), every `api/bobby-access` call, and the desk call itself carry:
+
+| Header | Value |
+|---|---|
+| `x-bobby-device` | `BobbyDevice.id`: a lowercase random UUID v4 created once per install, kept in the Keychain (`xyz.bobbyprotocol.bobby.device`, AfterFirstUnlockThisDeviceOnly; UserDefaults only if the Keychain refuses), so a reinstall does not reset the anonymous reads |
+| `x-bobby-platform` | `ios` |
+| `Authorization` | `Bearer <Supabase access token>`, only when signed in (`AccountSession.accessToken()`, refreshed when about to expire). A 401 on a signed-in request forces one refresh and one retry (`BobbyAccessAPI.send`) |
+
+The quota-free `get_market` read carries none of them. Fixture mode never sends a bearer.
+
+### 8.2 Where the gate sits in `ask` (§2.4 step 7a)
+
+After the preflight (so nothing unreadable is ever metered) and **before the desk** (so a refused read never spends desk quota): the pulse is the metered read. `NucleoDeskIO.parsePulseReply` maps 401 → `signin_required`, 402 → `subscription_required` (the HTTP status is the contract; the body's `code` only confirms it), 2xx → today's pulse plus `access` when present, anything else → `pulse: null`. The desk waits ≤10 s for the meter, then fails open; a late refusal still wins. Each `access` object the server sends lands in `BobbyAccessCenter.shared` (the account sheet reads it) and, on `ok`, in `AskResult.access`. **A server that predates metering sends no `access`: the reply is byte-for-byte today's.**
+
+### 8.3 The two refusals
+
+`{status:"signin_required"|"subscription_required", token, message, access}`. `token` is a native retry token (single use, 10 min, like a confirm token) for the same question about the same asset. `NucleoReadModel.failure()` puts it in the chip's `retry` (never `token`), so the page can only re-ask **after** a real sign in or a confirmed subscription:
+
+- **Sign-in beat** (app: SIGNIN_GATE; onboarding: its ERROR caption): "Create your free account to keep reading — 10 free reads a week." / "Crea tu cuenta gratis para seguir leyendo: 10 lecturas gratis a la semana." + the white Apple chip → `signIn()` → `ask({token})` automatically. (The "10" is the owner's copy; the 401 carries only the anonymous access, so the free allowance is not in the reply.)
+- **Bobby Pro beat** (app: PRO_GATE): "You’ve used this week’s free reads." + "They reset {date}." from `access.resetsAt`; the native sheet opens by itself once → `paywall()` → `subscribed` → `ask({token})`.
+
+### 8.4 Bobby Pro (native, RevenueCat)
+
+- `BobbyStore` (Sources/BobbyStore.swift). The RevenueCat **public** SDK key comes from the `REVENUECAT_IOS_API_KEY` build setting through Info.plist (project.yml: Debug = the dashboard's Test Store key `test_…`, Release = empty until the production `appl_…` key exists). No key, or a `test_` key in a non-DEBUG build → RevenueCat is never configured and the sheet says "Bobby Pro opens very soon." Configured once, **after the risk notice is accepted** (launch, `acceptRisk`, or the sheet opening), never in unit-test hosts or fixture mode.
+- **Identity:** RevenueCat's app user id **is the Supabase auth user id** (the server maps it to `bobby_identities.auth_user_id`): `configure(appUserID:)` with the signed-in id at launch, `logIn(id)` on every sign in (and again right before a purchase if it ever drifted), `logOut()` on sign out. A purchase needs a signed-in account (the sheet offers Sign in with Apple otherwise).
+- **Offering:** the current offering's monthly package (else any package selling `xyz.bobbyprotocol.bobby.pro.monthly`); price = `package.localizedPriceString` + the product's period. Entitlement id **`pro`**.
+- **Purchase / Restore:** `Purchases.shared.purchase(package:)` / `restorePurchases()`. When `pro` is active, `POST api/bobby-access {action:"revenuecat-sync"}` (headers of §8.1): the server asks RevenueCat for this user's entitlements and answers `{ok, access, subscription}`. Only an answer whose `access.tier` is `pro` (or no access at all) counts as `subscribed`. RevenueCat's own `receivedUpdated` (renewals, Ask to Buy approvals, another device, launch) re-asks the server once per new expiry. The JWS route (`action:"apple"`) is not used by the app.
+- **The sheet** (`NucleoPaywallSheet`, #0B0A09 / ink #F2EDE4, system font — Sora is not bundled): "Bobby Pro", "Unlimited reads", three real feature lines, the price, Subscribe, "Your free reads reset {date}.", Restore Purchases, the auto-renewal terms, Terms of Use (Apple's standard EULA) and Privacy Policy. DEBUG builds add one coral line naming what is missing (key, offering or package).
+- **`-nucleo-paywall`** (DEBUG) opens the sheet at launch for design review; **`-revenuecat-probe [appUserId]`** (DEBUG) configures anonymously, `logIn`s the test id, fetches the offerings once and prints them.
+
+### 8.5 The account sheet
+
+One subtle line from the server's access: "7 of 10 free reads left this week · Resets October 3", or for anonymous reads "2 of 3 free reads left", or "Bobby Pro · Unlimited reads · renews {date}" with **Manage** (Apple's `manageSubscriptionsSheet`, only for an App Store subscription). It refreshes with `GET api/bobby-access` when it opens (after consent only).
+

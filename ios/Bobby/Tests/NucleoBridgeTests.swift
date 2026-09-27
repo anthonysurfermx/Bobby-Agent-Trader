@@ -134,6 +134,92 @@ final class NucleoBridgeTests: XCTestCase {
         }
     }
 
+    // MARK: - Metered reads (§8)
+
+    func testMeteredReadRefusalsMapToTheGoldenAndNeverReachTheDesk() async throws {
+        for (scenario, golden) in [("signin_required", "signin-required"), ("subscription_required", "subscription-required")] {
+            NucleoFixtures.setScenario(scenario)
+            NucleoFixtures.clearLog()
+            let (_, bridge, recorder) = make()
+            let r = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+            try assertGolden(r, golden, ignoring: ["token"])
+            XCTAssertNil(r["agents"], "\(scenario): never a verdict on a refusal")
+            XCTAssertFalse(NucleoFixtures.log.contains { $0.contains("desk-debate") }, "\(scenario): a refused read never spends desk quota")
+            XCTAssertTrue(NucleoFixtures.log.contains { $0.contains("candles") }, "\(scenario): the preflight runs first (nothing unreadable is metered)")
+            XCTAssertEqual(recorder.stages(), ["resolving", "accepted"], "no market or candles stage for a refused read")
+            // The token re-asks the same question; nothing changed, so the same refusal with a new token.
+            let token = try XCTUnwrap(r["token"] as? String)
+            let again = await result(bridge, "ask", ["token": token])
+            XCTAssertEqual(again["status"] as? String, r["status"] as? String)
+            XCTAssertNotEqual(again["token"] as? String, token)
+            let reuse = await fault(bridge, "ask", ["token": token])
+            XCTAssertEqual(reuse, "invalid_params", "a gate token is single use")
+        }
+    }
+
+    func testTheRetryTokenReadsTheSameQuestionOnceTheGateClears() async throws {
+        NucleoFixtures.setScenario("signin_required")
+        let (_, bridge, _) = make()
+        let gate = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        XCTAssertEqual(gate["status"] as? String, "signin_required")
+        NucleoFixtures.setScenario("default")   // the user signed in: the server meters the read and answers
+        let read = await result(bridge, "ask", ["token": try XCTUnwrap(gate["token"] as? String)])
+        try assertGolden(read, "nvda")
+        XCTAssertNil(read["access"], "a server that sends no access: today's exact reply")
+    }
+
+    func testMeteredReadsCarryTheDeviceAndPlatformAndNoBearerSignedOut() async throws {
+        NucleoFixtures.clearLog()
+        let (_, bridge, _) = make()
+        _ = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        let entries = NucleoFixtures.accessHeaders
+        let meter = try XCTUnwrap(entries.first { $0["path"] == "/api/voice-tool#run_debate" }, "\(entries)")
+        XCTAssertEqual(meter["x-bobby-device"], BobbyDevice.id)
+        XCTAssertTrue(BobbyDevice.isUUIDv4(meter["x-bobby-device"] ?? ""))
+        XCTAssertEqual(meter["x-bobby-platform"], "ios")
+        XCTAssertEqual(meter["authorization"], "none", "fixture mode is signed out: no bearer")
+        let desk = try XCTUnwrap(entries.first { $0["path"] == "/api/desk-debate" })
+        XCTAssertEqual(desk["x-bobby-device"], BobbyDevice.id, "the desk gets the same identity (server-side metering may use it)")
+        let market = try XCTUnwrap(entries.first { $0["path"] == "/api/voice-tool#get_market" })
+        XCTAssertEqual(market["x-bobby-device"], "", "the quota-free market read is not metered")
+        let order = NucleoFixtures.log.filter { $0.contains("voice-tool") || $0.contains("desk-debate") }
+        XCTAssertTrue(order.contains { $0.contains("desk-debate") })
+    }
+
+    func testThePaywallOpensAsASheetAndAnswersWhenItCloses() async throws {
+        let (session, bridge, recorder) = make()
+        _ = await result(bridge, "session", ["page": "app"])
+        let pending = Task { await self.result(bridge, "paywall") }
+        for _ in 0..<200 where session.sheet != .paywall { await Task.yield() }
+        XCTAssertEqual(session.sheet, .paywall)
+        let second = await result(bridge, "paywall")
+        XCTAssertEqual(second["status"] as? String, "unavailable", "one sheet at a time")
+        session.paywallOutcome("bogus")
+        session.paywallOutcome("subscribed")
+        session.sheetDismissed()
+        let outcome = await pending.value
+        XCTAssertEqual(outcome["status"] as? String, "subscribed")
+        XCTAssertNotNil(outcome["access"])
+        let sheets = recorder.events.filter { $0.name == "native.sheet" }.map { "\($0.payload["route"] ?? "")/\($0.payload["state"] ?? "")" }
+        XCTAssertEqual(sheets, ["paywall/open", "paywall/closed"])
+
+        // A swipe with no purchase is `cancelled`; openNative never opens the paywall.
+        let swiped = Task { await self.result(bridge, "paywall") }
+        for _ in 0..<200 where session.sheet != .paywall { await Task.yield() }
+        session.sheetDismissed()
+        let cancelled = await swiped.value
+        XCTAssertEqual(cancelled["status"] as? String, "cancelled")
+        let viaOpenNative = await fault(bridge, "openNative", ["route": "paywall"])
+        XCTAssertEqual(viaOpenNative, "invalid_params")
+    }
+
+    func testThePaywallNeedsTheRiskNotice() async throws {
+        let (session, bridge, _) = make(riskAccepted: false)
+        let r = await result(bridge, "paywall")
+        XCTAssertEqual(r["status"] as? String, "unavailable")
+        XCTAssertNil(session.sheet)
+    }
+
     func testHangTimesOutAndOfflineIsANetworkError() async throws {
         NucleoFixtures.setScenario("hang")
         let (_, bridge, _) = make()

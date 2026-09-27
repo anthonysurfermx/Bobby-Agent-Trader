@@ -4,7 +4,10 @@
 // support links (the classic desk keeps those in its menu).
 // The avatar lives here too: the first run no longer asks who lives in the glass
 // (a default starter is assigned), so "Your avatar" opens the squad gallery to change it.
+// So do the reads the server meters (Nucleo/ARCHITECTURE.md §8.5): what is left this week,
+// or Bobby Pro with Manage subscription (Apple's own sheet).
 import AuthenticationServices
+import StoreKit
 import SwiftUI
 
 struct AccountSheet: View {
@@ -23,6 +26,8 @@ struct AccountSheet: View {
     var onVoiceMutedChange: (() -> Void)? = nil
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
+    @ObservedObject private var reads = BobbyAccessCenter.shared
+    @State private var manageSubscription = false
     @State private var busy = false
     @State private var showDeleteConfirmation = false
     @State private var accountDeleted = false
@@ -50,6 +55,9 @@ struct AccountSheet: View {
                 stat(L.t("Pieces", "Piezas"), pieces.map { "\($0)" } ?? "—")
             }
             avatarRow
+            if let row = ReadsRow.content(access: reads.access, subscription: reads.subscription, signedIn: account.isSignedIn) {
+                readsRow(row)
+            }
             if let voice {
                 VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
             }
@@ -129,6 +137,11 @@ struct AccountSheet: View {
         .padding(22)
         .background(Theme.bg.ignoresSafeArea())
         .presentationDetents(detents)
+        .manageSubscriptionsSheet(isPresented: $manageSubscription)
+        .task {
+            // R11: nothing reaches the network before the risk notice is accepted.
+            if profile.acceptedRiskNotice { await reads.refresh() }
+        }
         .sheet(isPresented: $showAvatar) {
             MascotGalleryView(store: store, voice: voice, voiceId: profile.voiceId)
         }
@@ -196,6 +209,37 @@ struct AccountSheet: View {
         .accessibilityIdentifier("account-avatar")
     }
 
+    /// "7 of 10 free reads left this week", or Bobby Pro and Manage subscription. Subtle on purpose.
+    private func readsRow(_ row: ReadsRow) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: row.pro ? "infinity" : "text.bubble")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(row.pro ? Theme.accent : Theme.muted)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Theme.card))
+                .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white)
+                if let detail = row.detail {
+                    Text(detail).font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer()
+            if row.manage {
+                Button(L.t("Manage", "Administrar")) { manageSubscription = true }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.accent)
+                    .accessibilityLabel(L.t("Manage subscription", "Administrar suscripción"))
+                    .accessibilityIdentifier("account-manage-subscription")
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke, lineWidth: 1))
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("account-reads")
+    }
+
     private func stat(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).font(.system(size: 10, weight: .bold, design: .monospaced)).foregroundStyle(Theme.muted)
@@ -205,6 +249,37 @@ struct AccountSheet: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.stroke, lineWidth: 1))
+    }
+}
+
+/// The account sheet's reads line, from the server's access object (never a number of the app's own).
+struct ReadsRow: Equatable {
+    let title: String
+    let detail: String?
+    let pro: Bool
+    /// Manage subscription (Apple's sheet): only for an App Store subscription.
+    let manage: Bool
+
+    static func content(access: BobbyReadAccess?, subscription: BobbySubscription?, signedIn: Bool, spanish: Bool = L.isSpanish) -> ReadsRow? {
+        guard let access else { return nil }
+        if access.isPro {
+            let end = subscription?.periodEnd.map { BobbyAccessAPI.day($0, spanish: spanish) }
+            let canceled = ["canceled", "cancelled", "expired"].contains(subscription?.status ?? "")
+            let detail = end.map { canceled ? L.t("Unlimited reads · ends \($0)", "Lecturas ilimitadas · termina el \($0)", spanish: spanish)
+                                            : L.t("Unlimited reads · renews \($0)", "Lecturas ilimitadas · se renueva el \($0)", spanish: spanish) }
+                ?? L.t("Unlimited reads", "Lecturas ilimitadas", spanish: spanish)
+            return ReadsRow(title: "Bobby Pro", detail: detail, pro: true, manage: subscription?.managedByApple ?? true)
+        }
+        guard let limit = access.limit else { return nil }
+        let left = access.remaining ?? max(0, limit - access.used)
+        if access.tier == "anon" {
+            return ReadsRow(title: L.t("\(left) of \(limit) free reads left", "Te quedan \(left) de \(limit) lecturas gratis", spanish: spanish),
+                            detail: signedIn ? nil : L.t("Sign in to keep reading after that.", "Inicia sesión para seguir leyendo después.", spanish: spanish),
+                            pro: false, manage: false)
+        }
+        let reset = access.resetsDate.map { L.t("Resets \(BobbyAccessAPI.day($0, spanish: spanish))", "Se renuevan el \(BobbyAccessAPI.day($0, spanish: spanish))", spanish: spanish) }
+        return ReadsRow(title: L.t("\(left) of \(limit) free reads left this week", "Te quedan \(left) de \(limit) lecturas gratis esta semana", spanish: spanish),
+                        detail: reset, pro: false, manage: false)
     }
 }
 

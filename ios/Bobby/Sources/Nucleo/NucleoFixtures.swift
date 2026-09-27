@@ -7,8 +7,11 @@
 import Foundation
 
 enum NucleoFixtures {
-    static let scenarios: Set<String> = ["default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline"]
+    static let scenarios: Set<String> = ["default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
+                                         "signin_required", "subscription_required"]
     static let refusals: Set<String> = ["quota", "too_long", "failed", "unavailable", "gateway_timeout"]
+    /// Metered-read refusals (§8): voice-tool run_debate answers 401 / 402 from these captures.
+    static let gates: Set<String> = ["signin_required", "subscription_required"]
 
     private static let lock = NSLock()
     private static var _scenario: String?
@@ -16,6 +19,7 @@ enum NucleoFixtures {
     private static var _timeScale = 1.0
     private static var _registered = false
     private static var _log: [String] = []
+    private static var _accessHeaders: [[String: String]] = []
 
     /// nil = fixture mode off.
     static var scenario: String? { lock.lock(); defer { lock.unlock() }; return _scenario }
@@ -25,6 +29,10 @@ enum NucleoFixtures {
     static var timeScale: Double { lock.lock(); defer { lock.unlock() }; return _timeScale }
     /// "METHOD /path -> status" for every request served (never bodies, never question text).
     static var log: [String] { lock.lock(); defer { lock.unlock() }; return _log }
+    /// The access headers of every request to voice-tool, bobby-access and desk-debate: `path`
+    /// (`/api/voice-tool#run_debate` names the tool), `x-bobby-device`, `x-bobby-platform`, and
+    /// `authorization` = "bearer" | "none" (never the token itself).
+    static var accessHeaders: [[String: String]] { lock.lock(); defer { lock.unlock() }; return _accessHeaders }
 
     /// Registers the protocol (once) before any request is made.
     static func activate(scenario: String, liveVoice: Bool = false, timeScale: Double = 1) {
@@ -53,7 +61,14 @@ enum NucleoFixtures {
         print("[NucleoFixture]", line)
     }
 
-    static func clearLog() { lock.lock(); _log = []; lock.unlock() }
+    static func clearLog() { lock.lock(); _log = []; _accessHeaders = []; lock.unlock() }
+
+    static func recordAccessHeaders(path: String, headers: [String: String]) {
+        let lower = Dictionary(headers.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { a, _ in a })
+        var entry = ["path": path, "authorization": lower["authorization"] == nil ? "none" : "bearer"]
+        for name in [BobbyAccessAPI.deviceHeader, BobbyAccessAPI.platformHeader] { entry[name] = lower[name] ?? "" }
+        lock.lock(); _accessHeaders.append(entry); lock.unlock()
+    }
 
     // MARK: - Captures
 
@@ -152,6 +167,7 @@ enum NucleoFixtures {
             let symbol = ((json["args"] as? [String: Any])?["symbol"] as? String ?? "").uppercased()
             let files = files(symbol: symbol)
             if tool == "get_market", let name = files?["market"] { return (serve(name), quick) }
+            if tool == "run_debate", gates.contains(scenario) { return (serve("voice-tool.\(scenario).json"), quick) }
             if tool == "run_debate", let name = files?["pulse"] { return (serve(name), quick) }
             return (Self.json(200, ["symbol": symbol, "available": false, "price": NSNull()]), quick)
         case "/api/desk-debate":
@@ -162,6 +178,12 @@ enum NucleoFixtures {
             // The recorded desk time, capped at 6 s (45 s under `slow`).
             let elapsed = (raw(served)?["elapsedMs"] as? Double ?? 900) / 1000
             return (serve(served), scenario == "slow" ? 45 : min(elapsed, 6))
+        case "/api/bobby-access":
+            // Fixture mode is signed out: the read of access answers from the scenario, a purchase needs an account.
+            if method != "GET" { return (Self.json(401, ["error": "Sign in first.", "code": "signin_required"]), quick) }
+            let gateBody = gates.contains(scenario) ? (raw("voice-tool.\(scenario).json")?["body"] as? [String: Any]) : nil
+            return (Self.json(200, ["access": gateBody?["access"] ?? NSNull(), "signedIn": false, "subscription": NSNull(),
+                                    "payments": ["stripe": false, "apple": true]]), quick)
         case "/api/bobby-voice-free":
             // Puts NeuralVoice on the free on-device voice (no TTS spend in fixture mode).
             return (Self.json(503, ["error": "TTS failed"]), quick)
@@ -193,6 +215,10 @@ final class NucleoFixtureProtocol: URLProtocol {
         }
         let method = request.httpMethod ?? "GET"
         let body = request.httpBody ?? request.httpBodyStream.map(Self.read)
+        if ["/api/voice-tool", "/api/bobby-access", "/api/desk-debate"].contains(url.path) {
+            let tool = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["tool"] as? String
+            NucleoFixtures.recordAccessHeaders(path: url.path + (tool.map { "#" + $0 } ?? ""), headers: request.allHTTPHeaderFields ?? [:])
+        }
         let (reply, delay) = NucleoFixtures.route(method: method, url: url, body: body, scenario: scenario)
         let label = "\(method) \(url.host ?? "-")\(url.path)"
         let item = DispatchWorkItem { [weak self] in

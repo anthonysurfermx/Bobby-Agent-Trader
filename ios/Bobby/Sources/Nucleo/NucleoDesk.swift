@@ -1,8 +1,9 @@
 // The Núcleo desk (Nucleo/ARCHITECTURE.md §2.4, §2.7). One read at a time, in the
 // normative order: validate → busy → risk gate → length → resolve → preflight →
-// (market ‖ pulse ‖ desk) → map. Native resolves the asset (the page never names one,
-// R3), refuses unsupported or stale instruments BEFORE the desk spends quota (R14),
-// and never produces a verdict on a failure. XP exists only on Save (R4).
+// metered gate (pulse) → (market ‖ desk) → map. Native resolves the asset (the page never
+// names one, R3), refuses unsupported or stale instruments BEFORE anything is metered or the
+// desk spends quota (R14), asks for an account or Bobby Pro only when the server says so
+// (§8), and never produces a verdict on a failure. XP exists only on Save (R4).
 import Foundation
 
 /// An asset as the bridge names it (symbol, pretty name, class).
@@ -184,11 +185,36 @@ enum NucleoDeskIO {
         return Market(price: num(obj["price"]), changePct: num(obj["change_24h_pct"]))
     }
 
-    static func pulse(_ symbol: String) async -> Pulse? {
-        guard let reply = try? await BobbyAPI.response("api/voice-tool", method: "POST",
-                                                       body: ["tool": "run_debate", "args": ["symbol": symbol, "lang": L.ttsLang]]),
-              let obj = reply.json as? [String: Any] else { return nil }
-        return parsePulse(obj)
+    /// What the metered read (`voice-tool run_debate`) came to (§8.2).
+    enum PulseOutcome: Sendable {
+        /// 2xx (or any other non-gate reply): the pulse, if any, and the caller's access, if the server sent it.
+        case answered(Pulse?, access: BobbyReadAccess?)
+        /// 401 `signin_required` or 402 `subscription_required`: this read is refused until the user acts.
+        case gated(status: String, message: String?, access: BobbyReadAccess?)
+        /// No answer (offline, timeout): the meter fails open, as a legacy server would.
+        case unreachable
+    }
+
+    /// The metered read. It carries the access headers (device, platform, bearer when signed in).
+    static func pulse(_ symbol: String, auth: BobbyMeterAuth) async -> PulseOutcome {
+        guard let reply = try? await BobbyAccessAPI.send("api/voice-tool", method: "POST",
+                                                         body: ["tool": "run_debate", "args": ["symbol": symbol, "lang": L.ttsLang]],
+                                                         auth: auth)
+        else { return .unreachable }
+        return parsePulseReply(status: reply.status, json: reply.json)
+    }
+
+    /// 401 → `signin_required`, 402 → `subscription_required` (the HTTP status is the contract; the body's
+    /// `code` only confirms it). Anything else is today's reply: a pulse or null, plus `access` when present.
+    static func parsePulseReply(status: Int, json: Any?) -> PulseOutcome {
+        let body = json as? [String: Any]
+        let access = BobbyReadAccess(json: body?["access"])
+        switch status {
+        case 401: return .gated(status: "signin_required", message: body?["error"] as? String, access: access)
+        case 402: return .gated(status: "subscription_required", message: body?["error"] as? String, access: access)
+        case 200..<300: return .answered(body.flatMap(parsePulse), access: access)
+        default: return .answered(nil, access: access)
+        }
     }
 
     /// null when the tool failed or sent no technical_pulse; `plan` only with a numeric level.
@@ -208,11 +234,13 @@ enum NucleoDeskIO {
     // MARK: Desk (quota)
 
     /// Exactly `BobbyAPI.debate`'s request: POST api/desk-debate, Origin header, 100 s timeout.
-    static func debate(symbol: String, question: String, isEquity: Bool) async -> DebateOutcome {
+    /// `headers`: the metered-read identity, sent along so the server may meter the desk itself too.
+    static func debate(symbol: String, question: String, isEquity: Bool, headers: [String: String] = [:]) async -> DebateOutcome {
         do {
             let reply = try await BobbyAPI.responseWithHeaders("api/desk-debate", method: "POST",
                                                                body: ["symbol": symbol, "question": question, "language": L.ttsLang,
-                                                                      "assetType": isEquity ? "equity" : "crypto"])
+                                                                      "assetType": isEquity ? "equity" : "crypto"],
+                                                               extraHeaders: headers)
             return parseDebate(status: reply.status, json: reply.json, headers: reply.headers)
         } catch let error as URLError {
             switch error.code {
@@ -299,6 +327,8 @@ final class NucleoDesk {
     static let marketCapSeconds: Double = 20
     static let pulseCapSeconds: Double = 20
     static let pulseGraceSeconds: Double = 5
+    /// How long the desk waits for the meter's word before it starts anyway (fail open, §8.2).
+    static let meterWaitSeconds: Double = 10
     static let islandCacheSeconds: TimeInterval = 60
 
     let profile: AgentProfile
@@ -312,6 +342,10 @@ final class NucleoDesk {
     var emit: (String, [String: Any]) -> Void = { _, _ in }
     var sessionChanged: () -> Void = {}
     var recordQuery: (_ symbol: String, _ isEquity: Bool) -> Void = { DeskMemory().recordQuery(symbol: $0, isEquity: $1) }
+    /// Whose bearer the metered read carries (fixture mode: nobody).
+    var meterAuth: BobbyMeterAuth = .account
+    /// Every access object the server sends lands here (the account sheet reads it).
+    var accessChanged: (BobbyReadAccess) -> Void = { BobbyAccessCenter.shared.record($0) }
 
     private struct TokenEntry { let asset: NucleoAsset; let question: String; let expires: Date }
     private final class Read {
@@ -381,6 +415,14 @@ final class NucleoDesk {
 
     static func unsupported(_ asset: NucleoAsset, _ reason: String) -> [String: Any] {
         ["v": 1, "status": "unsupported", "asset": asset.jsonWithClass, "reason": reason]
+    }
+
+    /// `signin_required` / `subscription_required` (§8.3). The token re-asks the same question about
+    /// the same asset once the user has signed in or subscribed (single use, 10 min, like a confirm token).
+    private func gated(_ status: String, message: String?, access: BobbyReadAccess?, job: Job, asset: NucleoAsset) -> [String: Any] {
+        if let access { accessChanged(access) }
+        return ["v": 1, "status": status, "token": issueToken(asset, question: job.question),
+                "message": NucleoDeskIO.orNull(message), "access": access.map { $0.json as Any } ?? NSNull()]
     }
 
     // MARK: - ask
@@ -526,10 +568,22 @@ final class NucleoDesk {
             return Self.unsupported(asset, reason)
         }
 
-        // 7. Market ‖ pulse ‖ desk. The reply never precedes its market and candles stages.
-        let pulseTask = Task { await NucleoAsync.withTimeout(Self.pulseCapSeconds) { await NucleoDeskIO.pulse(symbol) } ?? nil }
+        // 7a. The metered read (§8.2): voice-tool run_debate is the read the server counts, and it may
+        //     answer 401 (an account is needed) or 402 (Bobby Pro is needed). It goes BEFORE the desk, so a
+        //     refused read never spends desk quota. A meter that is slow or unreachable fails open.
+        let auth = meterAuth
+        let pulseTask = Task { await NucleoAsync.withTimeout(Self.pulseCapSeconds) { await NucleoDeskIO.pulse(symbol, auth: auth) } ?? .unreachable }
+        let early = await NucleoAsync.withTimeout(Self.meterWaitSeconds) { await pulseTask.value }
+        if Task.isCancelled { pulseTask.cancel(); return Self.cancelledResult }
+        if case let .gated(status, message, access)? = early {
+            return gated(status, message: message, access: access, job: job, asset: asset)
+        }
+
+        // 7b. Market ‖ desk (the pulse is in hand, or still on its way). The reply never precedes its
+        //     market and candles stages.
         let question = job.question
-        async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity)
+        let identity = BobbyAccessAPI.headers(bearer: await auth.bearer())
+        async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, headers: identity)
         let market = await marketRead ?? NucleoDeskIO.Market(price: nil, changePct: nil)
         if Task.isCancelled { pulseTask.cancel(); return Self.cancelledResult }
         emit("ask.stage", ["requestId": job.requestId, "stage": "market", "market": market.json])
@@ -537,8 +591,24 @@ final class NucleoDesk {
         emit("ask.stage", ["requestId": job.requestId, "stage": "candles", "candles": candles, "provenance": NSNull()])
         let desk = await deskRead
         if Task.isCancelled { pulseTask.cancel(); return Self.cancelledResult }
-        let pulse: NucleoDeskIO.Pulse? = await NucleoAsync.withTimeout(Self.pulseGraceSeconds) { await pulseTask.value } ?? nil
+        let meter: NucleoDeskIO.PulseOutcome
+        if let early { meter = early } else {
+            meter = await NucleoAsync.withTimeout(Self.pulseGraceSeconds) { await pulseTask.value } ?? .unreachable
+        }
         pulseTask.cancel()
+        var pulse: NucleoDeskIO.Pulse?
+        var access: BobbyReadAccess?
+        switch meter {
+        case let .gated(status, message, gateAccess):
+            // A meter that answered late still has the last word: no read it refused is shown.
+            return gated(status, message: message, access: gateAccess, job: job, asset: asset)
+        case let .answered(p, a):
+            pulse = p
+            access = a
+        case .unreachable:
+            break
+        }
+        if let access { accessChanged(access) }
 
         // 8. Map. Never a verdict on a failure.
         switch desk {
@@ -555,7 +625,7 @@ final class NucleoDesk {
         case let .ok(debate):
             if Task.isCancelled { return Self.cancelledResult }
             let receivedAt = clock.receivedAt(symbol)
-            let result: [String: Any] = [
+            var result: [String: Any] = [
                 "v": 1, "status": "ok", "requestId": job.requestId, "question": job.question, "language": L.ttsLang,
                 "asset": asset.json,
                 "market": market.json,
@@ -568,6 +638,8 @@ final class NucleoDesk {
                 "elapsedMs": Int((Date().timeIntervalSince(job.startedAt) * 1000).rounded()),
                 "fixture": fixtures,
             ]
+            // A metering server says how many reads are left; a legacy server says nothing (no key).
+            if let access { result["access"] = access.json }
             // 9. Remember it (the last 5); it becomes `pendingRead` until saved. No XP here (R4).
             recordQuery(symbol, isEquity)
             reads.append(Read(requestId: job.requestId, result: result, asset: asset, generation: job.generation,

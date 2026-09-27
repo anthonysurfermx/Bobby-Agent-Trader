@@ -105,6 +105,58 @@ test('a read refused for consent routes to the risk beat, never the generic fail
     assert.ok(!('verdict' in f));
   }
 });
+// ---- metered reads (ARCHITECTURE.md §8.3): the sign-in beat and the Bobby Pro beat ----
+test('signin_required -> the sign-in beat: the exact line, the Apple chip holding the retry token, never a verdict', () => {
+  const r = load('signin-required');
+  const en = RM.failure(r, 'en'), es = RM.failure(r, 'es');
+  assert.equal(en.kind, 'signin');
+  assert.equal(en.caption, 'Create your free account to keep reading — 10 free reads a week.');
+  assert.equal(es.caption, 'Crea tu cuenta gratis para seguir leyendo: 10 lecturas gratis a la semana.');
+  assert.deepEqual(en.chips[0].action, { signIn: true, retry: r.token });
+  assert.equal(en.chips[0].style, 'apple');
+  assert.equal(en.chips[0].label, 'Sign in with Apple');
+  assert.equal(es.chips[0].label, 'Iniciar sesión con Apple');
+  assert.deepEqual(en.chips[1].action, { dismiss: true });
+  assert.ok(!('token' in en.chips[0].action), 'the retry never rides in `token` (no read before the sign in)');
+  assert.deepEqual(en.access, r.access);
+  assert.ok(!('verdict' in en));
+});
+test('subscription_required -> the Bobby Pro beat: reset day from access.resetsAt, the Pro chip holding the retry token', () => {
+  const r = load('subscription-required');
+  const en = RM.failure(r, 'en'), es = RM.failure(r, 'es');
+  assert.equal(en.kind, 'subscription');
+  assert.equal(en.caption, RM.t('en', 'gate.pro'));
+  assert.equal(en.sub, 'They reset October 3. Bobby Pro has unlimited reads.');   // 2026-10-03T12:00Z is Oct 3 in every zone within ±11 h
+  assert.equal(es.sub, 'Se renuevan el 3 de octubre. Bobby Pro tiene lecturas ilimitadas.');
+  assert.deepEqual(en.chips[0].action, { paywall: true, retry: r.token });
+  assert.equal(en.chips[0].style, 'pro');
+  assert.deepEqual(en.chips[1].action, { dismiss: true });
+  const noDate = RM.failure({ ...r, access: { ...r.access, resetsAt: null } }, 'en');
+  assert.equal(noDate.sub, RM.t('en', 'gate.proNoDate'));
+  assert.equal(RM.failure({ ...r, access: null }, 'en').sub, RM.t('en', 'gate.proNoDate'));
+  assert.equal(RM.resetDay('not a date', 'en'), null);
+});
+test('gate goldens: a retry token, the access shape, and no read in them', () => {
+  for (const [name, status, tier] of [['signin-required', 'signin_required', 'anon'], ['subscription-required', 'subscription_required', 'free']]) {
+    const r = load(name);
+    assert.equal(r.status, status);
+    assert.equal(typeof r.token, 'string');
+    assert.deepEqual(Object.keys(r.access).sort(), ['limit', 'paywall', 'remaining', 'resetsAt', 'tier', 'used']);
+    assert.equal(r.access.tier, tier);
+    assert.equal(r.access.remaining, 0);
+    for (const k of ['agents', 'pulse', 'candles', 'technicals']) assert.ok(!(k in r), `${name} has ${k}`);
+  }
+});
+test('bridge methods: the page and native list the same ones (paywall included)', () => {
+  const js = readFileSync(here + 'src/shared/10-bridge.js', 'utf8');
+  const jsMethods = new Function('return ' + js.split('var METHODS = ')[1].split(';')[0])();
+  const swift = readFileSync(here + '../Sources/Nucleo/NucleoBridge.swift', 'utf8');
+  const block = swift.split('var methods: Set<String> = [')[1].split(']')[0];
+  const native = [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]).concat(['openClassic']);   // openClassic: DEBUG builds
+  assert.deepEqual([...jsMethods].sort(), [...new Set(native)].sort());
+  assert.ok(jsMethods.includes('paywall'));
+});
+
 test('xp chip shows real points and the cap honestly', () => {
   assert.equal(RM.xpChip(20, 'wait', 'en'), '+20 discipline XP for waiting');
   assert.equal(RM.xpChip(10, 'review', 'es'), '+10 XP de disciplina');

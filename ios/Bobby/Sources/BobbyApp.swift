@@ -13,6 +13,16 @@ struct BobbyApp: App {
 #if DEBUG
         Self.prepareNucleoLaunch()
 #endif
+#if DEBUG
+        // `-revenuecat-probe [appUserId]`: configure, log in a test id, fetch the offerings once, print them.
+        if let probe = Self.argument(after: "-revenuecat-probe") {
+            Task { await BobbyStore.shared.probe(appUserID: probe == "all" ? "bobby-ios-simulator-probe" : probe) }
+            return
+        }
+#endif
+        // RevenueCat (§8.4): configured at launch with the signed-in account, once the risk notice is
+        // accepted; never in unit-test hosts or fixture mode, never without a key.
+        BobbyStore.shared.start()
     }
 
     private static var isUnitTestHost: Bool {

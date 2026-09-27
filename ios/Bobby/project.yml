@@ -1,4 +1,6 @@
 name: Bobby
+fileGroups:
+  - Bobby.storekit
 options:
   bundleIdPrefix: xyz.bobbyprotocol
   developmentLanguage: en
@@ -8,6 +10,10 @@ packages:
   GLTFKit2:
     url: https://github.com/warrenm/GLTFKit2
     from: "0.5.0"
+  # Bobby Pro purchases on iOS (Nucleo/ARCHITECTURE.md §8.4): the App Store subscription through RevenueCat.
+  RevenueCat:
+    url: https://github.com/RevenueCat/purchases-ios-spm
+    from: "5.91.0"
 schemes:
   Bobby:
     build:
@@ -15,6 +21,8 @@ schemes:
         Bobby: all
     run:
       config: Debug
+      # Simulator purchases without App Store Connect (the local "Bobby Pro" group, $4.99 monthly).
+      storeKitConfiguration: Bobby.storekit
     test:
       config: Debug
       targets:
@@ -77,6 +85,8 @@ targets:
         buildPhase: resources
     dependencies:
       - package: GLTFKit2
+      - package: RevenueCat
+        product: RevenueCat
     info:
       path: Sources/Info.plist
       properties:
@@ -94,6 +104,9 @@ targets:
         NSMicrophoneUsageDescription: "Bobby listens only while you hold the button, to hear your question."
         NSPhotoLibraryAddUsageDescription: "Bobby saves your skin card to Photos only when you tap Save Image."
         NSSpeechRecognitionUsageDescription: "Bobby turns your spoken question into text on this iPhone. The audio never leaves your device."
+        # RevenueCat's PUBLIC iOS SDK key (appl_…), from the build setting below. Empty = purchases are off
+        # and the Bobby Pro sheet says it opens soon (§8.4).
+        REVENUECAT_IOS_API_KEY: $(REVENUECAT_IOS_API_KEY)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -112,4 +125,12 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.5"
-        CURRENT_PROJECT_VERSION: "42"
+        CURRENT_PROJECT_VERSION: "43"
+      configs:
+        # RevenueCat PUBLIC SDK keys (meant to ship in the app; not secret keys). Debug uses the dashboard's
+        # Test Store key; Release stays empty until the production appl_… key exists (BobbyStore also refuses
+        # any test_ key outside DEBUG). Empty = no purchases, the Bobby Pro sheet says it opens soon.
+        Debug:
+          REVENUECAT_IOS_API_KEY: test_VxgXjDaVEnBXXAGIqrfZqfAzNod
+        Release:
+          REVENUECAT_IOS_API_KEY: ""

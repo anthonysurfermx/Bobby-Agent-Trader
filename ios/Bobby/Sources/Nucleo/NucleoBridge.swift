@@ -75,7 +75,7 @@ final class NucleoBridge: NSObject, WKScriptMessageHandlerWithReply {
             "speech.permission", "speech.requestPermission", "speech.start", "speech.stop",
             "speak", "previewVoice", "stopSpeaking", "setMuted", "haptic",
             "saveThesis", "island", "theses", "record",
-            "setCompanion", "riskNotice", "acceptRisk", "signIn",
+            "setCompanion", "riskNotice", "acceptRisk", "signIn", "paywall",
             "openNative", "finishOnboarding", "markHint", "log",
         ]
 #if DEBUG

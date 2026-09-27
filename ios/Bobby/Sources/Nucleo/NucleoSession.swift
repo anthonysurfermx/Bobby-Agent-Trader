@@ -39,10 +39,13 @@ enum NucleoPage: Equatable {
     }
 }
 
-/// Native screens the page may open as sheets (`openNative`).
+/// Native screens shown as sheets over the page. `openNative` opens every route but `paywall`,
+/// which only the awaited `paywall` method presents (§8.4).
 enum NucleoRoute: String, Identifiable, CaseIterable {
-    case squad, locker, isla, account, riskNotice
+    case squad, locker, isla, account, riskNotice, paywall
     var id: String { rawValue }
+
+    static let openable: Set<String> = Set(allCases.filter { $0 != .paywall }.map(\.rawValue))
 }
 
 /// Native → page events (the web controller in the app, a recorder in tests).
@@ -98,9 +101,10 @@ final class NucleoSession: ObservableObject {
         desk = NucleoDesk(profile: profile, companions: companions, ledger: ledger, fixtures: fixtures)
         nucleoVoice = NucleoVoice(voice: voice)
         if fixtures {
-            // Fixture mode is always the signed-out path: no ProgressSync, no island, no Apple.
+            // Fixture mode is always the signed-out path: no ProgressSync, no island, no Apple, no bearer.
             desk.isSignedIn = { false }
             desk.userID = { nil }
+            desk.meterAuth = .none
         }
         let emit: (String, [String: Any]) -> Void = { [weak self] name, payload in self?.emit(name, payload) }
         desk.emit = emit
@@ -187,8 +191,10 @@ final class NucleoSession: ObservableObject {
         case "signIn":
             return ["status": await signIn()]
         case "openNative":
-            let route = try p.string("route", oneOf: Set(NucleoRoute.allCases.map(\.rawValue)))!
+            let route = try p.string("route", oneOf: NucleoRoute.openable)!
             return ["opened": openNative(NucleoRoute(rawValue: route)!)]
+        case "paywall":
+            return await paywall()
         case "openClassic":
 #if DEBUG
             DispatchQueue.main.async { [weak self] in self?.requestClassic() }
@@ -363,6 +369,8 @@ final class NucleoSession: ObservableObject {
     func acceptRisk(_ version: Int) -> [String: Any] {
         guard version == RiskNotice.currentVersion else { return ["accepted": false, "version": RiskNotice.currentVersion] }
         profile.riskNoticeVersion = RiskNotice.currentVersion
+        // Consent given: purchases may now reach RevenueCat (§8.4).
+        BobbyStore.shared.start()
         if signedIn {
             Task { [weak self] in
                 guard let self else { return }
@@ -426,6 +434,59 @@ final class NucleoSession: ObservableObject {
         return "failed"
     }
 
+    // MARK: - Bobby Pro (§8.4)
+
+    private var paywallContinuation: CheckedContinuation<[String: Any], Never>?
+    /// What the open paywall came to so far; the sheet sets it, closing the sheet reports it.
+    private(set) var paywallStatus = "cancelled"
+    static let paywallStatuses: Set<String> = ["subscribed", "cancelled", "pending", "failed"]
+
+    /// Presents the paywall and answers when it closes: `{status, access}`. Only `subscribed` (the
+    /// server verified the App Store transaction) means the page may re-ask its question.
+    func paywall() async -> [String: Any] {
+        guard profile.acceptedRiskNotice, sheet == nil, openSheet == nil, paywallContinuation == nil else {
+            return ["status": "unavailable", "access": NSNull()]
+        }
+        nucleoVoice.stop()
+        speech.cancel()
+        paywallStatus = "cancelled"
+        return await withCheckedContinuation { continuation in
+            paywallContinuation = continuation
+            openSheet = .paywall
+            sheet = .paywall
+            emit("native.sheet", ["route": NucleoRoute.paywall.rawValue, "state": "open"])
+        }
+    }
+
+#if DEBUG
+    /// `-nucleo-paywall` (DEBUG): the Bobby Pro sheet over the page for design review; nothing awaits it.
+    func presentPaywallForReview() {
+        guard sheet == nil, openSheet == nil else { return }
+        openSheet = .paywall
+        sheet = .paywall
+    }
+#endif
+
+    /// The sheet's own outcome (it closes itself after a purchase; a swipe keeps the last one).
+    func paywallOutcome(_ status: String) {
+        guard Self.paywallStatuses.contains(status) else { return }
+        paywallStatus = status
+    }
+
+    private func finishPaywall() {
+        guard let continuation = paywallContinuation else { return }
+        paywallContinuation = nil
+        let access: Any = BobbyAccessCenter.shared.access.map { $0.json as Any } ?? NSNull()
+        continuation.resume(returning: ["status": paywallStatus, "access": access])
+    }
+
+    /// A Sign in with Apple finished inside a native sheet (the paywall): bind the progress, tell the page.
+    func signedInFromSheet() async {
+        guard signedIn else { return }
+        await ProgressSync.shared.sync(store: companions, profile: profile)
+        sessionChanged()
+    }
+
     // MARK: - Native sheets
 
     private var openSheet: NucleoRoute?
@@ -458,6 +519,7 @@ final class NucleoSession: ObservableObject {
 
     private func sheetClosed(_ route: NucleoRoute) {
         emit("native.sheet", ["route": route.rawValue, "state": "closed"])
+        if route == .paywall { finishPaywall() }
         if route == .isla, signedIn {
             // A thesis closed on the island earns XP: bring the page up to date (as the classic desk does).
             Task { [weak self] in
@@ -495,6 +557,7 @@ final class NucleoSession: ObservableObject {
     /// Before the classic app appears: nothing of this session may keep writing.
     func teardown() {
         guard !tornDown else { return }
+        finishPaywall()
         speech.cancel()
         nucleoVoice.teardown()
         desk.teardown()

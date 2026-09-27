@@ -7,8 +7,10 @@
  * and voice with syllable envelopes. It never touches the network.
  *
  * URL params: scenario=default|slow|hang|quota|too_long|failed|unavailable|gateway_timeout|offline
+ *                      |signin_required|subscription_required   (metered-read gates, ARCHITECTURE.md §8)
  *             lang=en|es  first=1  signedIn=1  risk=0  muted=1  companion=<iOS id>  mic=granted|denied|undetermined|unavailable
  *             say=<text for the fake STT>  latency=<desk ms>  xp=<int>  streak=<int>  rm=1
+ *             signin=ok (signIn succeeds)  purchase=ok (the Bobby Pro sheet ends `subscribed`)
  * Determinism: engines that own a sim clock call nucleoBridge.mock.useClock(fn) and then
  * nucleoBridge.mock.pump() once per sim step; otherwise a real-time pump runs at 60 Hz.
  */
@@ -43,9 +45,13 @@
 
   var roster = FX.native.roster.companions;
   var levels = FX.native.levels.levels;
+  /* metered-read gates: scenario -> golden reply (manifest.gates) */
+  var GATES = (FX.manifest && FX.manifest.gates) || {};
   var state = {
     firstRun: q.get('first') === '1',
-    signedIn: q.get('signedIn') === '1',
+    /* a 402 comes to a signed-in free account: that scenario starts signed in */
+    signedIn: q.get('signedIn') === '1' || scenario === 'subscription_required',
+    pro: false,
     riskVersion: q.get('risk') === '0' || q.get('first') === '1' ? 0 : 4,
     muted: q.get('muted') === '1',
     companionId: q.get('first') === '1' ? null : (q.get('companion') || 'mira'),
@@ -167,6 +173,18 @@
       B.emit('ask.stage', { requestId: requestId, stage: 'resolving' });
       if (scenario === 'offline') { ids.push(at(600, function () { finish(clone(FX.ask.network)); })); return; }
       ids.push(emitLater(350, 'ask.stage', { requestId: requestId, stage: 'accepted', asset: clone(base.asset), startedAt: startedAt }));
+      /* native order (§2.4 step 7a): candles gate, then the metered read BEFORE the desk; a refusal
+         ends the read here, with no market/candles stages and no desk call. The token re-asks it. */
+      var gate = gateNow();
+      if (gate) {
+        ids.push(at(1300, function () {
+          var g = clone(FX.ask[gate]);
+          g.token = 'mock-' + uuid();
+          state.tokens[g.token] = { question: question, next: key };
+          finish(g);
+        }));
+        return;
+      }
       ids.push(emitLater(700, 'ask.stage', { requestId: requestId, stage: 'market', market: clone(base.market) }));
       ids.push(emitLater(900, 'ask.stage', { requestId: requestId, stage: 'candles', candles: clone(base.candles), provenance: null }));
       var refusal = { quota: 'quota', too_long: 'too_long', failed: 'failed', unavailable: 'unavailable', gateway_timeout: 'gateway_timeout' }[scenario];
@@ -183,6 +201,12 @@
       }));
       function finish(result) { if (state.inflight && state.inflight.requestId === requestId) { state.inflight = null; resolve(ok(result)); } }
     });
+  }
+  /** Which gate the "server" answers right now: none once signed in (401) or Pro (402). */
+  function gateNow() {
+    if (scenario === 'signin_required' && !state.signedIn) return GATES.signin_required;
+    if (scenario === 'subscription_required' && !state.pro) return GATES.subscription_required;
+    return null;
   }
   function cancel() {
     var f = state.inflight;
@@ -367,6 +391,21 @@
       return delay(800, ok({ status: signedIn ? 'signedIn' : 'cancelled' })).then(function (r) {
         if (signedIn) { state.signedIn = true; sessionChanged(); }
         return r;
+      });
+    },
+    /* the native Bobby Pro sheet (§8.4): opens, then answers how it ended when it closes */
+    'paywall': function () {
+      if (state.riskVersion < 4 || state.paywallOpen) return Promise.resolve(ok({ status: 'unavailable', access: null }));
+      state.paywallOpen = true;
+      B.emit('native.sheet', { route: 'paywall', state: 'open' });
+      var subscribe = q.get('purchase') === 'ok' && state.signedIn;
+      /* a native sheet lives on wall time, not on the page's (possibly paused) sim clock */
+      return new Promise(function (res) { setTimeout(res, 1200); }).then(function () {
+        state.paywallOpen = false;
+        if (subscribe) state.pro = true;
+        B.emit('native.sheet', { route: 'paywall', state: 'closed' });
+        return ok({ status: subscribe ? 'subscribed' : 'cancelled',
+          access: subscribe ? { tier: 'pro', used: 0, limit: null, remaining: null, resetsAt: null, paywall: false } : null });
       });
     },
     'openNative': function (p) {

@@ -45,6 +45,8 @@
 	<string>Bobby saves your skin card to Photos only when you tap Save Image.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Bobby turns your spoken question into text on this iPhone. The audio never leaves your device.</string>
+	<key>REVENUECAT_IOS_API_KEY</key>
+	<string>$(REVENUECAT_IOS_API_KEY)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

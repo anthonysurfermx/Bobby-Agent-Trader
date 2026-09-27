@@ -8,8 +8,9 @@
  *
  * Replies: native answers every envelope with {v:1, ok:true, result} or
  * {v:1, ok:false, error:{code, message}}. Domain outcomes (quota, unknown
- * asset, cancelled...) are ok:true results with a `status`; ok:false is only
- * for protocol faults (unknown_method, invalid_params, forbidden, busy, internal).
+ * asset, cancelled, signin_required, subscription_required...) are ok:true
+ * results with a `status`; ok:false is only for protocol faults
+ * (unknown_method, invalid_params, forbidden, busy, internal).
  */
 (function () {
   'use strict';
@@ -19,7 +20,7 @@
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',
-    'setCompanion', 'riskNotice', 'acceptRisk', 'signIn',
+    'setCompanion', 'riskNotice', 'acceptRisk', 'signIn', 'paywall',
     'openNative', 'openClassic', 'finishOnboarding', 'markHint', 'log'
   ];
   var EVENTS = [
