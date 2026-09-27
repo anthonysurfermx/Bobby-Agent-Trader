@@ -1,3 +1,4 @@
+<html lang="en">
 <meta charset="utf-8">
 <script>
 /* an auth link that lands on "/" (magic link, OAuth code, error) belongs to the SPA's callback, not to this page */
@@ -57,6 +58,40 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); transition:border-color .2s ease}
 .tb-app:hover{border-color:rgba(242,237,228,.32)}
 .tb-mark:focus-visible, .tb-app:focus-visible{outline:2px solid var(--listen); outline-offset:3px}
+.tb-right{display:flex; align-items:center; gap:8px}
+
+/* ---------- language: a small globe that unfolds into a glass capsule ---------- */
+.lang{position:relative; pointer-events:auto}
+.lang-btn{appearance:none; -webkit-appearance:none; margin:0; padding:0; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; cursor:pointer;
+  color:var(--ink); background:rgba(0,0,0,.5); border:1px solid rgba(242,237,228,.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); transition:border-color .2s ease, background-color .2s ease}
+.lang-btn:hover, .lang-btn[aria-expanded="true"]{border-color:rgba(242,237,228,.32); background:rgba(20,18,16,.72)}
+.lang-btn:focus-visible{outline:2px solid var(--listen); outline-offset:3px}
+.lang-btn svg{display:block; width:16px; height:16px}
+/* the meridian narrows as the capsule opens: the globe turns a quarter */
+.lang-btn .mer{transform-box:fill-box; transform-origin:center; transition:transform .55s cubic-bezier(.2,.8,.2,1)}
+.lang-btn[aria-expanded="true"] .mer{transform:scaleX(.3)}
+.lang-menu{box-sizing:border-box; position:absolute; top:calc(100% + 10px); right:0; min-width:184px; margin:0; padding:6px; display:grid; gap:2px; border-radius:24px;
+  background:linear-gradient(180deg, rgba(38,33,30,.80), rgba(19,17,15,.88)); border:1px solid rgba(242,237,228,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), 0 28px 60px -22px rgba(0,0,0,.92), 0 0 40px -18px rgba(167,191,232,.28);
+  -webkit-backdrop-filter:blur(18px) saturate(140%); backdrop-filter:blur(18px) saturate(140%);
+  /* closed: a globe-sized bead in the top-right corner, invisible */
+  clip-path:inset(0 0 calc(100% - 30px) calc(100% - 30px) round 15px); opacity:0; visibility:hidden;
+  transition:clip-path .3s cubic-bezier(.4,0,.2,1), opacity .22s ease .06s, visibility 0s linear .3s}
+.lang-menu.open{clip-path:inset(0 0 0 0 round 24px); opacity:1; visibility:visible;
+  transition:clip-path .46s cubic-bezier(.2,.85,.25,1), opacity .16s ease, visibility 0s}
+.lang-opt{box-sizing:border-box; appearance:none; -webkit-appearance:none; margin:0; display:flex; align-items:center; justify-content:space-between; gap:22px; width:100%; height:40px; padding:0 14px 0 16px;
+  border:0; border-radius:999px; background:transparent; color:var(--ink2); font:400 14px/1 var(--sans); letter-spacing:.005em; text-align:left; cursor:pointer;
+  opacity:0; transform:translateY(-5px); transition:background-color .2s ease, color .2s ease, opacity .18s ease, transform .3s cubic-bezier(.2,.8,.2,1)}
+.lang-menu.open .lang-opt{opacity:1; transform:none}
+.lang-menu.open .lang-opt:nth-child(2){transition-delay:0s, 0s, .04s, .04s}
+.lang-menu.open .lang-opt:nth-child(3){transition-delay:0s, 0s, .08s, .08s}
+.lang-opt:hover{background:rgba(242,237,228,.06); color:var(--ink)}
+.lang-opt:focus{outline:none}
+.lang-opt:focus-visible{background:rgba(242,237,228,.08); color:var(--ink); box-shadow:inset 0 0 0 1px rgba(92,225,255,.55)}
+.lang-opt[aria-checked="true"]{color:var(--inkb); background:rgba(242,237,228,.05)}
+.lang-opt i{flex:none; width:6px; height:6px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(242,237,228,.22); transition:background-color .2s ease, box-shadow .2s ease}
+.lang-opt[aria-checked="true"] i{background:var(--listen); box-shadow:0 0 10px rgba(92,225,255,.65)}
 
 /* ---------- the pinned stage: one sphere tells the whole story ---------- */
 .story{position:relative; height:780svh}
@@ -178,7 +213,10 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   .v-r{top:auto; bottom:calc(max(4svh, 20px) + 98px)}
   .v-c{top:auto; bottom:max(4svh, 20px)}
   .s4 .col{left:16px; right:16px; width:auto; top:auto; bottom:max(4svh, 20px); transform:none; gap:12px}
-  .row{grid-template-columns:minmax(0, 1fr) auto auto; padding:10px 2px}
+  /* the ticker never gives up its width; a long status (es / pt) wraps instead of running over it */
+  .row{grid-template-columns:minmax(max-content, 1fr) auto minmax(0, auto); padding:10px 2px}
+  .stt{display:block; white-space:normal; text-align:right; line-height:1.35}
+  .stt::before{display:inline-block; margin-right:8px; vertical-align:1px}
   .dt{display:none}
   .vd{font-size:calc(18px * var(--dscale))}
   .note{font-size:13.5px}
@@ -186,38 +224,24 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 }
 @media (max-width: 420px){ .s0 h1{font-size:calc(28px * var(--dscale))} .fail{font-size:calc(20px * var(--dscale))} .voice p{font-size:14px} }
 
-/* ---------- join (after the story) ---------- */
-.join{padding-block:14svh 12svh; padding-inline:16px}
-.panel{max-width:1180px; margin:0 auto; display:grid; grid-template-columns:minmax(0, 1.15fr) minmax(0, .85fr); min-height:min(720px, 84svh);
-  border-radius:32px; overflow:hidden; border:1px solid var(--hair); background:#0D0C0B;
-  box-shadow:0 80px 140px -70px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.04)}
-.vis{position:relative; overflow:hidden; min-height:420px;
-  background:radial-gradient(55% 55% at 46% 52%, #171420, #0B0A09 72%)}
-.vis canvas{position:absolute; left:48%; top:50%; height:150%; width:auto; aspect-ratio:1 / 1; transform:translate(-50%,-50%)}
-.beam2{position:absolute; left:48%; top:72%; width:80%; height:44%; transform:translate(-50%,-50%); pointer-events:none;
-  background:radial-gradient(closest-side, rgba(167,191,232,.22), rgba(92,225,255,.05) 55%, transparent)}
-.brand{position:absolute; left:28px; top:26px; z-index:2; font-size:calc(22px * var(--dscale)); color:var(--ink)}
-.motto{position:absolute; left:28px; right:28px; bottom:24px; z-index:2; margin:0; font:500 10px/1.5 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--ink3)}
-.form{position:relative; display:flex; flex-direction:column; justify-content:center; gap:14px; padding:clamp(28px, 5vw, 64px);
-  background:linear-gradient(180deg, rgba(34,30,27,.5), rgba(18,16,14,.6)); border-left:1px solid var(--hair)}
-.jt{margin:0; font-size:calc(clamp(30px, 3vw, 42px) * var(--dscale)); line-height:1.05; color:var(--ink)}
-.sub{margin:0 0 10px; color:var(--ink2); font-size:15px; line-height:1.5; max-width:36ch}
-.btns{display:grid; gap:10px}
-.btn{appearance:none; display:flex; align-items:center; justify-content:center; gap:10px; width:100%; height:50px; border-radius:12px;
-  font:500 15px/1 var(--sans); text-decoration:none; cursor:pointer; transition:transform .15s ease, background .2s ease, border-color .2s ease}
+/* ---------- try (after the story): no account to start, the app asks later ---------- */
+.try{position:relative; isolation:isolate; padding-block:16svh 11svh; padding-inline:16px; text-align:center}
+.try::before{content:""; position:absolute; left:50%; top:54%; width:min(980px, 100%); height:min(560px, 90vw); transform:translate(-50%,-50%); z-index:-1; pointer-events:none;
+  background:radial-gradient(closest-side, rgba(167,191,232,.10), rgba(92,225,255,.03) 55%, transparent)}
+.try .in{max-width:780px; margin:0 auto; display:grid; gap:18px; justify-items:center}
+.try .h2{font-size:calc(clamp(30px, 3.6vw, 52px) * var(--dscale)); line-height:1.08}
+.try-btns{display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-top:14px}
+.btn{box-sizing:border-box; appearance:none; display:inline-flex; align-items:center; justify-content:center; gap:10px; height:52px; padding:0 28px; border-radius:999px; white-space:nowrap;
+  font:500 15px/1 var(--sans); text-decoration:none; cursor:pointer; transition:transform .15s ease, background-color .2s ease, border-color .2s ease}
 .btn:active{transform:scale(.985)}
-.btn:focus-visible, .have a:focus-visible{outline:2px solid var(--listen); outline-offset:2px}
-.b-apple{background:var(--ink); color:#0B0A09; border:1px solid var(--ink)}
-.b-apple:hover{background:var(--inkb)}
-.b-google, .b-ios{background:#000; color:var(--ink); border:1px solid rgba(242,237,228,.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
-.b-google:hover, .b-ios:hover{border-color:rgba(242,237,228,.3)}
-.ico{width:18px; height:18px; background:currentColor; -webkit-mask:var(--logo) center / contain no-repeat; mask:var(--logo) center / contain no-repeat}
-.or{display:flex; align-items:center; gap:12px; color:var(--ink3); font:500 11px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase}
-.or::before, .or::after{content:""; flex:1; height:1px; background:var(--hair)}
-.have{margin:4px 0 0; font-size:14px; color:var(--ink2)}
-.have a{color:var(--ink); text-decoration:none; border-bottom:1px solid rgba(242,237,228,.3)}
-.legal{margin:10px 0 0; font-size:12px; line-height:1.5; color:var(--ink3); max-width:44ch}
-.legal a{color:var(--ink2)}
+.btn:focus-visible{outline:2px solid var(--listen); outline-offset:3px}
+.b-try{background:var(--ink); color:#0B0A09; border:1px solid var(--ink)}
+.b-try:hover{background:var(--inkb)}
+.b-ios{background:rgba(0,0,0,.6); color:var(--ink); border:1px solid rgba(242,237,228,.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px)}
+.b-ios:hover{border-color:rgba(242,237,228,.32)}
+.ico{flex:none; width:17px; height:17px; margin-top:-2px; background:currentColor; -webkit-mask:var(--logo) center / contain no-repeat; mask:var(--logo) center / contain no-repeat}
+@media (max-width: 520px){ .try-btns{flex-direction:column; align-self:stretch; width:100%; max-width:360px; justify-self:center} .btn{width:100%} }
 /* ---------- site footer: the protocol gateway ---------- */
 .site-foot{padding-block:4svh 40px; padding-inline:16px}
 .site-foot .wrap{max-width:1180px; margin:0 auto; display:grid; gap:28px}
@@ -245,21 +269,31 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 .social a:hover{color:var(--ink)}
 @media (max-width: 720px){ .proto-links{grid-template-columns:1fr 1fr} .halo{right:-40%; width:90vw} }
 
-@media (max-width: 860px){
-  .panel{grid-template-columns:1fr; min-height:0}
-  .vis{min-height:0; height:clamp(340px, 62vw, 460px)}
-  .vis canvas{left:50%; height:150%}
-  .form{border-left:0; border-top:1px solid var(--hair)}
-}
-
-
 .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
-@media (prefers-reduced-motion: reduce){ .cue i{animation:none} }
+@media (prefers-reduced-motion: reduce){
+  .cue i{animation:none}
+  .lang-btn .mer{transition:none}
+  .lang-menu, .lang-menu.open{clip-path:none; transition:opacity .12s linear, visibility 0s linear .12s}
+  .lang-menu.open{transition:opacity .12s linear, visibility 0s}
+  .lang-opt, .lang-menu.open .lang-opt{transform:none; transition:background-color .2s ease, color .2s ease, opacity .12s linear; transition-delay:0s}
+}
 </style>
 
 <header class="topbar">
-  <a class="tb-mark" href="/" aria-label="Bobby, home">Bobby</a>
-  <a class="tb-app" href="/desk">App</a>
+  <a class="tb-mark" href="/" aria-label="Bobby, home" data-i18n-aria="tb.home">Bobby</a>
+  <div class="tb-right">
+    <div class="lang" id="lang">
+      <button class="lang-btn" id="lang-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-menu" aria-label="Language" data-i18n-aria="tb.lang">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><ellipse class="mer" cx="12" cy="12" rx="3.7" ry="8.6"/><path d="M3.9 9.2h16.2M3.9 14.8h16.2"/></svg>
+      </button>
+      <div class="lang-menu" id="lang-menu" role="menu" aria-label="Language" data-i18n-aria="tb.lang">
+        <button class="lang-opt" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-lang="es" lang="es">Español<i aria-hidden="true"></i></button>
+        <button class="lang-opt" type="button" role="menuitemradio" aria-checked="true" tabindex="-1" data-lang="en" lang="en">English<i aria-hidden="true"></i></button>
+        <button class="lang-opt" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-lang="pt" lang="pt">Português<i aria-hidden="true"></i></button>
+      </div>
+    </div>
+    <a class="tb-app" href="/desk">App</a>
+  </div>
 </header>
 
 <main class="story" id="story">
@@ -271,90 +305,78 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     <!-- 1 · hero -->
     <section class="scene s0" id="s0" aria-label="Bobby">
       <div class="line">
-        <h1>Asking an AI about your asset is <em>no longer an edge.</em></h1>
-        <div class="cue" aria-hidden="true"><i></i>Scroll</div>
+        <h1 data-i18n="hero.h1">Asking an AI about your asset is <em>no longer an edge.</em></h1>
+        <div class="cue" aria-hidden="true"><i></i><span data-i18n="hero.cue">Scroll</span></div>
       </div>
     </section>
 
     <!-- 2 · the problem -->
-    <section class="scene s1" id="s1" aria-label="The problem">
+    <section class="scene s1" id="s1" aria-label="The problem" data-i18n-aria="p.aria">
       <div class="col">
-        <span class="eyebrow">Any AI chat · Example</span>
+        <span class="eyebrow" data-i18n="p.eyebrow">Any AI chat · Example</span>
         <div class="chat one" id="c1">
-          <div class="meta"><b>Assistant</b><span>Mon 09:12</span></div>
-          <div class="qrow"><span class="slot" id="slot"></span><div class="q">Is now a good time for NVIDIA?</div></div>
-          <p class="a">Yes. Demand for AI chips keeps growing and the momentum is strong. <mark>It looks like a good entry.</mark></p>
+          <div class="meta"><b data-i18n="p.asst">Assistant</b><span data-i18n="p.day1">Mon 09:12</span></div>
+          <div class="qrow"><span class="slot" id="slot"></span><div class="q" data-i18n="p.q">Is now a good time for NVIDIA?</div></div>
+          <p class="a" data-i18n="p.a1">Yes. Demand for AI chips keeps growing and the momentum is strong. <mark>It looks like a good entry.</mark></p>
         </div>
         <div class="chat two" id="c2">
-          <div class="meta"><b>Assistant</b><span>Thu 16:40</span></div>
-          <div class="q">Is now a good time for NVIDIA?</div>
-          <p class="a">The stock looks stretched after its run. <mark>It may be wise to wait</mark> for a pullback.</p>
+          <div class="meta"><b data-i18n="p.asst">Assistant</b><span data-i18n="p.day2">Thu 16:40</span></div>
+          <div class="q" data-i18n="p.q">Is now a good time for NVIDIA?</div>
+          <p class="a" data-i18n="p.a2">The stock looks stretched after its run. <mark>It may be wise to wait</mark> for a pullback.</p>
         </div>
-        <p class="fail" id="fail">Two confident answers. <span>Nobody checked either one, and it won't remember Monday.</span></p>
+        <p class="fail" id="fail" data-i18n="p.fail">Two confident answers. <span>Nobody checked either one, and it won't remember Monday.</span></p>
       </div>
     </section>
 
     <!-- 3 · three voices -->
-    <section class="scene s2" id="s2" aria-label="How Bobby answers">
+    <section class="scene s2" id="s2" aria-label="How Bobby answers" data-i18n-aria="d.aria">
       <div class="head">
-        <span class="eyebrow">Same question, asked to Bobby</span>
-        <h2 class="h2">Before you hear an answer, <em>it has to survive an attack.</em></h2>
+        <span class="eyebrow" data-i18n="d.eyebrow">Same question, asked to Bobby</span>
+        <h2 class="h2" data-i18n="d.h2">Before you hear an answer, <em>it has to survive an attack.</em></h2>
       </div>
-      <div class="voice v-a" id="va"><span class="who">Alpha Hunter <small>makes the case</small></span><p>Demand for AI chips still outruns supply, and buyers defended the last dip.</p></div>
-      <div class="voice v-r" id="vr"><span class="who">Red Team <small>tries to break it</small></span><p>The price already assumes perfect quarters. One miss and that floor gives way.</p></div>
-      <div class="voice v-c" id="vc"><span class="who">CIO <small>decides</small></span><p>The case is real. The entry is not. Wait for a better level.</p></div>
+      <div class="voice v-a" id="va"><span class="who">Alpha Hunter <small data-i18n="d.alpha.role">makes the case</small></span><p data-i18n="d.alpha">Demand for AI chips still outruns supply, and buyers defended the last dip.</p></div>
+      <div class="voice v-r" id="vr"><span class="who">Red Team <small data-i18n="d.red.role">tries to break it</small></span><p data-i18n="d.red">The price already assumes perfect quarters. One miss and that floor gives way.</p></div>
+      <div class="voice v-c" id="vc"><span class="who">CIO <small data-i18n="d.cio.role">decides</small></span><p data-i18n="d.cio">The case is real. The entry is not. Wait for a better level.</p></div>
     </section>
 
     <!-- 4 · one word -->
-    <div class="word" id="word" aria-hidden="true"><span class="ring" id="ring"></span><b id="wordtxt">Wait</b></div>
-    <section class="scene s3" id="s3" aria-label="The verdict">
+    <div class="word" id="word" aria-hidden="true"><span class="ring" id="ring"></span><b id="wordtxt" data-i18n="v.wait">Wait</b></div>
+    <section class="scene s3" id="s3" aria-label="The verdict" data-i18n-aria="w.aria">
       <div class="foot">
-        <svg class="chart" id="chart" viewBox="0 0 680 150" role="img" aria-label="Example one-hour chart with resistance and support"></svg>
-        <p class="call">The case is real, the entry is not. My call: <em>wait.</em></p>
-        <p class="rule">Bobby answers in one of three words: Ready, Wait or Pass. It never tells you to buy or sell.</p>
-        <span class="fine">Example read · NVDA · Educational, not financial advice</span>
+        <svg class="chart" id="chart" viewBox="0 0 680 150" role="img" aria-label="Example one-hour chart with resistance and support" data-i18n-aria="w.chart"></svg>
+        <p class="call" data-i18n="w.call">The case is real, the entry is not. My call: <em>wait.</em></p>
+        <p class="rule" data-i18n="w.rule">Bobby answers in one of three words: Ready, Wait or Pass. It never tells you to buy or sell.</p>
+        <span class="fine" data-i18n="w.fine">Example read · NVDA · Educational, not financial advice</span>
       </div>
     </section>
 
     <!-- 5 · the record -->
-    <section class="scene s4" id="s4" aria-label="The record">
+    <section class="scene s4" id="s4" aria-label="The record" data-i18n-aria="r.aria">
       <div class="col">
-        <span class="eyebrow">The record · Example</span>
-        <h2 class="h2">Bobby remembers what it told you. <em>Then it keeps score.</em></h2>
+        <span class="eyebrow" data-i18n="r.eyebrow">The record · Example</span>
+        <h2 class="h2" data-i18n="r.h2">Bobby remembers what it told you. <em>Then it keeps score.</em></h2>
         <ol class="ledger">
-          <li class="row" id="r1"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/nvidia.svg)"></span>NVDA</span><span class="vd" id="r1v" style="--c:var(--cio)">Wait</span><span class="dt">Sep 26</span><span class="stt open">Open · scored in 7 days</span></li>
-          <li class="row" id="r2"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/bitcoin.svg)"></span>BTC</span><span class="vd" style="--c:var(--alpha)">Ready</span><span class="dt">Sep 19</span><span class="stt ok">Resolved · right</span></li>
-          <li class="row" id="r3"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/tesla.svg)"></span>TSLA</span><span class="vd" style="--c:var(--red)">Pass</span><span class="dt">Sep 12</span><span class="stt ok">Resolved · right</span></li>
-          <li class="row" id="r4"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/ethereum.svg)"></span>ETH</span><span class="vd" style="--c:var(--alpha)">Ready</span><span class="dt">Sep 05</span><span class="stt miss">Resolved · missed</span></li>
+          <li class="row" id="r1"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/nvidia.svg)"></span>NVDA</span><span class="vd" id="r1v" style="--c:var(--cio)" data-i18n="v.wait">Wait</span><span class="dt" data-i18n="r.d1">Sep 26</span><span class="stt open" data-i18n="r.open">Open · scored in 7 days</span></li>
+          <li class="row" id="r2"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/bitcoin.svg)"></span>BTC</span><span class="vd" style="--c:var(--alpha)" data-i18n="v.ready">Ready</span><span class="dt" data-i18n="r.d2">Sep 19</span><span class="stt ok" data-i18n="r.right">Resolved · right</span></li>
+          <li class="row" id="r3"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/tesla.svg)"></span>TSLA</span><span class="vd" style="--c:var(--red)" data-i18n="v.pass">Pass</span><span class="dt" data-i18n="r.d3">Sep 12</span><span class="stt ok" data-i18n="r.right">Resolved · right</span></li>
+          <li class="row" id="r4"><span class="as"><span class="lg" style="--logo:url(/home/assets/logos/ethereum.svg)"></span>ETH</span><span class="vd" style="--c:var(--alpha)" data-i18n="v.ready">Ready</span><span class="dt" data-i18n="r.d4">Sep 05</span><span class="stt miss" data-i18n="r.missed">Resolved · missed</span></li>
         </ol>
-        <p class="note" id="note">Every read is written down before the outcome and scored after it. The misses stay next to the wins. <a href="/record">See the public record</a></p>
-        <p class="same" id="same">Bobby runs on the same models everyone else uses. <em>The difference is not the model — it is the procedure around it.</em></p>
+        <p class="note" id="note" data-i18n="r.note">Every read is written down before the outcome and scored after it. The misses stay next to the wins. <a href="/record">See the public record</a></p>
+        <p class="same" id="same" data-i18n="r.same">Bobby runs on the same models everyone else uses. <em>The difference is not the model — it is the procedure around it.</em></p>
       </div>
     </section>
   </div>
 </main>
 
-<section class="join" id="join" aria-labelledby="join-title">
-  <div class="panel">
-    <div class="vis" aria-hidden="true">
-      <span class="brand disp">Bobby</span>
-      <div class="beam2"></div>
-      <canvas id="glass2"></canvas>
-      <p class="motto">Refuted before execution · Published before the outcome</p>
-    </div>
-    <div class="form">
-      <span class="eyebrow">Start free</span>
-      <h2 class="jt disp" id="join-title">Join Bobby</h2>
-      <p class="sub">Your reads, your companion and your record, on the web and on iPhone.</p>
-      <div class="btns">
-        <a class="btn b-apple" id="b-apple" href="/signin?provider=apple"><span class="ico" style="--logo:url(/home/assets/logos/apple.svg)"></span>Continue with Apple</a>
-        <a class="btn b-google" id="b-google" href="/signin?provider=google"><span class="ico" style="--logo:url(/home/assets/logos/google.svg)"></span>Continue with Google</a>
-      </div>
-      <div class="or"><span>or</span></div>
+<!-- try first: no sign-in on the way in; the app asks for an account at the third read -->
+<section class="try" id="try" aria-labelledby="try-title">
+  <div class="in">
+    <span class="eyebrow" data-i18n="t.eyebrow">Start free</span>
+    <h2 class="h2" id="try-title" data-i18n="t.h2">Your reads, your companion and your record, <em>on the web and on iPhone.</em></h2>
+    <div class="try-btns">
+      <a class="btn b-try" href="/desk" data-i18n="t.try">Try Bobby</a>
       <!-- APP_STORE_URL in src/lib/app-store.ts -->
-      <a class="btn b-ios" href="https://apps.apple.com/app/bobby-the-market-argues-back/id6804460489">Get the iPhone app</a>
-      <p class="have">Already have an account? <a href="/signin">Log in</a> · <a href="/desk">Try it on the web</a></p>
-      <p class="legal">By continuing you agree to the <a href="/privacy">Privacy Policy</a>. Educational reads, not financial advice.</p>
+      <a class="btn b-ios" href="https://apps.apple.com/app/bobby-the-market-argues-back/id6804460489"><span class="ico" style="--logo:url(/home/assets/logos/apple.svg)"></span><span data-i18n="t.ios">Get the iPhone app</span></a>
     </div>
   </div>
 </section>
@@ -363,28 +385,239 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 <footer class="site-foot">
   <div class="wrap">
     <a class="proto" href="/protocol">
-      <span class="eyebrow">For builders, agents and the curious</span>
+      <span class="eyebrow" data-i18n="f.eyebrow">For builders, agents and the curious</span>
       <span class="proto-title disp">Bobby Protocol</span>
-      <span class="proto-copy">The rules behind every read: how an answer is attacked before you see it, how it is scored after, and how any agent can run the same procedure.</span>
-      <span class="proto-cta">Read the protocol <i aria-hidden="true">→</i></span>
+      <span class="proto-copy" data-i18n="f.copy">The rules behind every read: how an answer is attacked before you see it, how it is scored after, and how any agent can run the same procedure.</span>
+      <span class="proto-cta"><span data-i18n="f.cta">Read the protocol</span> <i aria-hidden="true">→</i></span>
       <span class="halo" aria-hidden="true"></span>
     </a>
-    <nav class="proto-links" aria-label="Protocol">
-      <a href="/protocol#rules">The rules</a>
-      <a href="/protocol/calls">Verified calls</a>
-      <a href="/record">Track record</a>
-      <a href="/protocol/docs">Docs &amp; MCP</a>
-      <a href="/protocol/audits">Audits</a>
-      <a href="/protocol/heartbeat">Contract heartbeat</a>
+    <nav class="proto-links" aria-label="Protocol" data-i18n-aria="f.nav">
+      <a href="/protocol#rules" data-i18n="f.rules">The rules</a>
+      <a href="/protocol/calls" data-i18n="f.calls">Verified calls</a>
+      <a href="/record" data-i18n="f.record">Track record</a>
+      <a href="/protocol/docs" data-i18n="f.docs">Docs &amp; MCP</a>
+      <a href="/protocol/audits" data-i18n="f.audits">Audits</a>
+      <a href="/protocol/heartbeat" data-i18n="f.heartbeat">Contract heartbeat</a>
     </nav>
     <div class="base">
       <span class="disp mark">Bobby</span>
-      <span>Educational reads, not financial advice.</span>
-      <span class="social"><a href="/support">Support</a><a href="/privacy">Privacy</a><a href="https://twitter.com/bobbyprotocol">X</a><a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader">GitHub</a></span>
+      <span data-i18n="f.disc">Educational reads, not financial advice.</span>
+      <span class="social"><a href="/support" data-i18n="f.support">Support</a><a href="/privacy" data-i18n="f.privacy">Privacy</a><a href="https://twitter.com/bobbyprotocol">X</a><a href="https://github.com/anthonysurfermx/Bobby-Agent-Trader">GitHub</a></span>
     </div>
   </div>
 </footer>
 
+<script>
+/* ---------- language: English is the copy in the markup; es / pt swap it in place.
+   The choice lives in localStorage `bobby_lang` (en | es | pt), the key the React app reads, so /desk follows. ---------- */
+(function(){
+  'use strict';
+  var KEY = 'bobby_lang', HTML_LANG = { en: 'en', es: 'es-MX', pt: 'pt-BR' };
+  var DICT = {
+    en: {
+      'c.res': 'RESISTANCE', 'c.sup': 'SUPPORT', 'c.now': 'NOW', 'c.tag': 'EXAMPLE · NVDA · 1H'
+    },
+    es: {
+      'meta.title': 'Bobby — Preguntarle a una IA por tu activo ya no es ventaja',
+      'meta.desc': 'Pregúntale a Bobby por cualquier activo. Tres voces lo debaten antes de que escuches una respuesta, y Bobby contesta en una palabra: Listo, Espera o Paso. Cada lectura queda escrita antes del resultado y se califica después.',
+      'tb.home': 'Bobby, inicio',
+      'tb.lang': 'Idioma',
+      'hero.h1': 'Preguntarle a una IA por tu activo <em>ya no es ventaja.</em>',
+      'hero.cue': 'Desliza',
+      'p.aria': 'El problema',
+      'p.eyebrow': 'Cualquier chat de IA · Ejemplo',
+      'p.asst': 'Asistente',
+      'p.day1': 'Lun 09:12',
+      'p.day2': 'Jue 16:40',
+      'p.q': '¿Ahora es buen momento para NVIDIA?',
+      'p.a1': 'Sí. La demanda de chips de IA sigue creciendo y el impulso es fuerte. <mark>Parece una buena entrada.</mark>',
+      'p.a2': 'La acción se ve estirada después de su subida. <mark>Tal vez convenga esperar</mark> un retroceso.',
+      'p.fail': 'Dos respuestas muy seguras. <span>Nadie verificó ninguna, y no va a recordar lo del lunes.</span>',
+      'd.aria': 'Cómo responde Bobby',
+      'd.eyebrow': 'La misma pregunta, ahora a Bobby',
+      'd.h2': 'Antes de que escuches una respuesta, <em>tiene que sobrevivir a un ataque.</em>',
+      'd.alpha.role': 'defiende la tesis',
+      'd.alpha': 'La demanda de chips de IA sigue superando a la oferta, y los compradores defendieron la última caída.',
+      'd.red.role': 'intenta tumbarla',
+      'd.red': 'El precio ya descuenta trimestres perfectos. Un solo tropiezo y ese piso se cae.',
+      'd.cio.role': 'decide',
+      'd.cio': 'La tesis es real. La entrada, no. Espera un mejor nivel.',
+      'v.ready': 'Listo', 'v.wait': 'Espera', 'v.pass': 'Paso',
+      'w.aria': 'El veredicto',
+      'w.chart': 'Gráfica de ejemplo de una hora con resistencia y soporte',
+      'w.call': 'La tesis es real, la entrada no. Mi veredicto: <em>espera.</em>',
+      'w.rule': 'Bobby responde con una de tres palabras: Listo, Espera o Paso. Nunca te dice que compres o vendas.',
+      'w.fine': 'Lectura de ejemplo · NVDA · Educativo, no es asesoría financiera',
+      'c.res': 'RESISTENCIA', 'c.sup': 'SOPORTE', 'c.now': 'AHORA', 'c.tag': 'EJEMPLO · NVDA · 1H',
+      'r.aria': 'El historial',
+      'r.eyebrow': 'El historial · Ejemplo',
+      'r.h2': 'Bobby recuerda lo que te dijo. <em>Y luego lleva el marcador.</em>',
+      'r.d1': '26 sep', 'r.d2': '19 sep', 'r.d3': '12 sep', 'r.d4': '05 sep',
+      'r.open': 'Abierta · faltan 7 días',
+      'r.right': 'Resuelta · acertó',
+      'r.missed': 'Resuelta · falló',
+      'r.note': 'Cada lectura se escribe antes del resultado y se califica después. Los errores se quedan junto a los aciertos. <a href="/record">Ver el historial público</a>',
+      'r.same': 'Bobby funciona con los mismos modelos que usa todo el mundo. <em>La diferencia no es el modelo — es el procedimiento que lo rodea.</em>',
+      't.eyebrow': 'Empieza gratis',
+      't.h2': 'Tus lecturas, tu compañero y tu historial, <em>en la web y en iPhone.</em>',
+      't.try': 'Prueba Bobby',
+      't.ios': 'Descarga la app para iPhone',
+      'f.eyebrow': 'Para desarrolladores, agentes y curiosos',
+      'f.copy': 'Las reglas detrás de cada lectura: cómo se ataca una respuesta antes de que la veas, cómo se califica después y cómo cualquier agente puede correr el mismo procedimiento.',
+      'f.cta': 'Lee el protocolo',
+      'f.nav': 'Protocolo',
+      'f.rules': 'Las reglas',
+      'f.calls': 'Veredictos verificados',
+      'f.record': 'Historial',
+      'f.docs': 'Docs y MCP',
+      'f.audits': 'Auditorías',
+      'f.heartbeat': 'Latido del contrato',
+      'f.disc': 'Lecturas educativas, no asesoría financiera.',
+      'f.support': 'Soporte',
+      'f.privacy': 'Privacidad'
+    },
+    pt: {
+      'meta.title': 'Bobby — Perguntar a uma IA sobre o seu ativo não é mais vantagem',
+      'meta.desc': 'Pergunte ao Bobby sobre qualquer ativo. Três vozes debatem antes de você ouvir uma resposta, e o Bobby responde em uma palavra: Pronto, Espera ou Passo. Cada leitura é registrada antes do resultado e avaliada depois.',
+      'tb.home': 'Bobby, início',
+      'tb.lang': 'Idioma',
+      'hero.h1': 'Perguntar a uma IA sobre o seu ativo <em>não é mais vantagem.</em>',
+      'hero.cue': 'Role',
+      'p.aria': 'O problema',
+      'p.eyebrow': 'Qualquer chat de IA · Exemplo',
+      'p.asst': 'Assistente',
+      'p.day1': 'Seg 09:12',
+      'p.day2': 'Qui 16:40',
+      'p.q': 'Agora é um bom momento para a NVIDIA?',
+      'p.a1': 'Sim. A demanda por chips de IA continua crescendo e o movimento está forte. <mark>Parece uma boa entrada.</mark>',
+      'p.a2': 'A ação parece esticada depois da alta. <mark>Talvez seja melhor esperar</mark> uma correção.',
+      'p.fail': 'Duas respostas cheias de certeza. <span>Ninguém conferiu nenhuma, e ela não vai lembrar de segunda-feira.</span>',
+      'd.aria': 'Como o Bobby responde',
+      'd.eyebrow': 'A mesma pergunta, agora para o Bobby',
+      'd.h2': 'Antes de você ouvir uma resposta, <em>ela precisa sobreviver a um ataque.</em>',
+      'd.alpha.role': 'defende a tese',
+      'd.alpha': 'A demanda por chips de IA ainda supera a oferta, e os compradores defenderam a última queda.',
+      'd.red.role': 'tenta derrubá-la',
+      'd.red': 'O preço já embute trimestres perfeitos. Um tropeço e esse piso cede.',
+      'd.cio.role': 'decide',
+      'd.cio': 'A tese é real. A entrada, não. Espere um nível melhor.',
+      'v.ready': 'Pronto', 'v.wait': 'Espera', 'v.pass': 'Passo',
+      'w.aria': 'O veredito',
+      'w.chart': 'Gráfico de exemplo de uma hora com resistência e suporte',
+      'w.call': 'A tese é real, a entrada não. Meu veredito: <em>espera.</em>',
+      'w.rule': 'O Bobby responde com uma de três palavras: Pronto, Espera ou Passo. Ele nunca diz para você comprar ou vender.',
+      'w.fine': 'Leitura de exemplo · NVDA · Educativo, não é recomendação de investimento',
+      'c.res': 'RESISTÊNCIA', 'c.sup': 'SUPORTE', 'c.now': 'AGORA', 'c.tag': 'EXEMPLO · NVDA · 1H',
+      'r.aria': 'O histórico',
+      'r.eyebrow': 'O histórico · Exemplo',
+      'r.h2': 'O Bobby lembra o que te disse. <em>E depois marca o placar.</em>',
+      'r.d1': '26 set', 'r.d2': '19 set', 'r.d3': '12 set', 'r.d4': '05 set',
+      'r.open': 'Aberta · faltam 7 dias',
+      'r.right': 'Resolvida · acertou',
+      'r.missed': 'Resolvida · errou',
+      'r.note': 'Cada leitura é registrada antes do resultado e avaliada depois. Os erros ficam ao lado dos acertos. <a href="/record">Ver o histórico público</a>',
+      'r.same': 'O Bobby roda nos mesmos modelos que todo mundo usa. <em>A diferença não é o modelo — é o procedimento em torno dele.</em>',
+      't.eyebrow': 'Comece grátis',
+      't.h2': 'Suas leituras, seu companheiro e seu histórico, <em>na web e no iPhone.</em>',
+      't.try': 'Experimente o Bobby',
+      't.ios': 'Baixe o app para iPhone',
+      'f.eyebrow': 'Para desenvolvedores, agentes e curiosos',
+      'f.copy': 'As regras por trás de cada leitura: como uma resposta é atacada antes de você vê-la, como é avaliada depois e como qualquer agente pode rodar o mesmo procedimento.',
+      'f.cta': 'Leia o protocolo',
+      'f.nav': 'Protocolo',
+      'f.rules': 'As regras',
+      'f.calls': 'Vereditos verificados',
+      'f.record': 'Histórico',
+      'f.docs': 'Docs e MCP',
+      'f.audits': 'Auditorias',
+      'f.heartbeat': 'Pulso do contrato',
+      'f.disc': 'Leituras educativas, não recomendação de investimento.',
+      'f.support': 'Suporte',
+      'f.privacy': 'Privacidade'
+    }
+  };
+
+  var metaDesc = document.querySelector('meta[name="description"]');
+  var textEls = [].slice.call(document.querySelectorAll('[data-i18n]'));
+  var ariaEls = [].slice.call(document.querySelectorAll('[data-i18n-aria]'));
+  /* the English in the markup is canonical: read it once so switching back restores it exactly */
+  var EN = DICT.en;
+  EN['meta.title'] = document.title;
+  EN['meta.desc'] = metaDesc ? metaDesc.getAttribute('content') : '';
+  textEls.forEach(function(el){ var k = el.getAttribute('data-i18n'); if (!(k in EN)) EN[k] = el.innerHTML; });
+  ariaEls.forEach(function(el){ var k = el.getAttribute('data-i18n-aria'); if (!(k in EN)) EN[k] = el.getAttribute('aria-label'); });
+
+  function valid(l){ return l === 'en' || l === 'es' || l === 'pt'; }
+  function detect(){
+    try { var s = localStorage.getItem(KEY); if (valid(s)) return s; } catch (e) { /* private mode */ }
+    var n = String(navigator.language || '').toLowerCase();
+    return n.indexOf('es') === 0 ? 'es' : n.indexOf('pt') === 0 ? 'pt' : 'en';
+  }
+
+  var current = 'en', listeners = [];
+  function t(k){ var d = DICT[current]; return d && k in d ? d[k] : EN[k]; }
+  function apply(l){
+    if (!valid(l)) l = 'en';
+    current = l;
+    document.documentElement.lang = HTML_LANG[l];
+    document.title = t('meta.title');
+    if (metaDesc) metaDesc.setAttribute('content', t('meta.desc'));
+    textEls.forEach(function(el){ var v = t(el.getAttribute('data-i18n')); if (el.innerHTML !== v) el.innerHTML = v; });
+    ariaEls.forEach(function(el){ el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
+    opts.forEach(function(o){ o.setAttribute('aria-checked', String(o.getAttribute('data-lang') === l)); });
+    listeners.forEach(function(fn){ try { fn(l); } catch (e) { console.error('[home-i18n]', e); } });
+  }
+
+  /* ---------- the globe menu ---------- */
+  var wrap = document.getElementById('lang'), btn = document.getElementById('lang-btn'), menu = document.getElementById('lang-menu');
+  var opts = [].slice.call(menu.querySelectorAll('[role="menuitemradio"]'));
+  function isOpen(){ return btn.getAttribute('aria-expanded') === 'true'; }
+  function focusOpt(i){ var n = opts.length; opts[(i + n) % n].focus(); }
+  function openMenu(at){
+    btn.setAttribute('aria-expanded', 'true'); menu.classList.add('open');
+    var i = at === 'last' ? opts.length - 1 : at === 'first' ? 0 : Math.max(0, opts.findIndex(function(o){ return o.getAttribute('aria-checked') === 'true'; }));
+    /* visibility flips on the same frame; focus once it is focusable */
+    requestAnimationFrame(function(){ focusOpt(i); });
+  }
+  function closeMenu(returnFocus){
+    if (!isOpen()) return;
+    btn.setAttribute('aria-expanded', 'false'); menu.classList.remove('open');
+    if (returnFocus) btn.focus();
+  }
+  function choose(l){
+    try { localStorage.setItem(KEY, l); } catch (e) { /* private mode: the page still switches */ }
+    if (l !== current) apply(l);
+    closeMenu(true);
+  }
+
+  btn.addEventListener('click', function(){ if (isOpen()) closeMenu(false); else openMenu(); });
+  btn.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp'){ e.preventDefault(); openMenu(e.key === 'ArrowUp' ? 'last' : null); }
+    else if (e.key === 'Escape' && isOpen()){ e.preventDefault(); closeMenu(true); }
+  });
+  menu.addEventListener('keydown', function(e){
+    var i = opts.indexOf(document.activeElement);
+    switch (e.key){
+      case 'ArrowDown': e.preventDefault(); focusOpt(i + 1); break;
+      case 'ArrowUp':   e.preventDefault(); focusOpt(i - 1); break;
+      case 'Home':      e.preventDefault(); focusOpt(0); break;
+      case 'End':       e.preventDefault(); focusOpt(opts.length - 1); break;
+      case 'Escape':    e.preventDefault(); closeMenu(true); break;
+      case 'Tab':       closeMenu(false); break;
+    }
+  });
+  opts.forEach(function(o){ o.addEventListener('click', function(){ choose(o.getAttribute('data-lang')); }); });
+  document.addEventListener('pointerdown', function(e){ if (isOpen() && !wrap.contains(e.target)) closeMenu(false); }, true);
+  menu.addEventListener('focusout', function(e){ if (isOpen() && e.relatedTarget && !wrap.contains(e.relatedTarget)) closeMenu(false); });
+
+  window.BobbyI18n = {
+    t: t,
+    lang: function(){ return current; },
+    onChange: function(fn){ listeners.push(fn); }
+  };
+  apply(detect());
+})();
+</script>
 
 <script src="/home/assets/sphere.js"></script>
 <script>
@@ -441,14 +674,15 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 
   var $ = function(id){ return document.getElementById(id); };
   var story = $('story'), stage = $('stage');
-  var S0 = $('s0'), S1 = $('s1'), S2 = $('s2'), S3 = $('s3');
+  var S0 = $('s0'), S1 = $('s1'), S2 = $('s2'), S3 = $('s3'), HEAD2 = S2.querySelector('.head');
   var C1 = $('c1'), C2 = $('c2'), FAIL = $('fail'), SLOT = $('slot');
   var VA = $('va'), VR = $('vr'), VC = $('vc');
   var WORD = $('word'), RING = $('ring'), WTXT = $('wordtxt');
   var S4 = $('s4'), R1V = $('r1v'), ROWS = [$('r1'), $('r2'), $('r3'), $('r4')], NOTE = $('note'), SAME = $('same');
 
-  /* ---------- example chart (seeded, clearly labelled as an example) ---------- */
-  (function drawChart(){
+  /* ---------- example chart (seeded, clearly labelled as an example; labels follow the page language) ---------- */
+  var T = window.BobbyI18n ? BobbyI18n.t : function(k){ return { 'c.res': 'RESISTANCE', 'c.sup': 'SUPPORT', 'c.now': 'NOW', 'c.tag': 'EXAMPLE · NVDA · 1H' }[k]; };
+  function drawChart(){
     var svg = $('chart'), W = 680, H = 150, N = 72, seed = 7, pts = [], v = 50;
     function rnd(){ seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
     for (var i = 0; i < N; i++){ v += (rnd() - 0.5) * 7 + (i < 26 ? 0.55 : (i < 44 ? -0.35 : 0.12)); pts.push(v); }
@@ -459,14 +693,15 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     svg.innerHTML =
       '<line x1="0" x2="' + W + '" y1="' + res + '" y2="' + res + '" stroke="rgba(242,237,228,.28)" stroke-dasharray="2 5"/>' +
       '<line x1="0" x2="' + W + '" y1="' + sup + '" y2="' + sup + '" stroke="rgba(242,237,228,.28)" stroke-dasharray="2 5"/>' +
-      '<text x="' + W + '" y="' + (res - 8) + '" text-anchor="end">RESISTANCE</text>' +
-      '<text x="0" y="' + (sup + 18) + '">SUPPORT</text>' +
+      '<text x="' + W + '" y="' + (res - 8) + '" text-anchor="end">' + T('c.res') + '</text>' +
+      '<text x="0" y="' + (sup + 18) + '">' + T('c.sup') + '</text>' +
       '<path d="' + d + '" fill="none" stroke="#F2EDE4" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>' +
       '<circle cx="' + lx + '" cy="' + ly + '" r="4" fill="#FFF8EC"/>' +
       '<circle cx="' + lx + '" cy="' + ly + '" r="10" fill="none" stroke="rgba(246,185,78,.5)"/>' +
-      '<text x="' + (W - 52) + '" y="' + (ly + 4) + '" style="fill:#F6B94E">NOW</text>' +
-      '<text x="0" y="10">EXAMPLE · NVDA · 1H</text>';
-  })();
+      '<text x="' + (W - 52) + '" y="' + (ly + 4) + '" style="fill:#F6B94E">' + T('c.now') + '</text>' +
+      '<text x="0" y="10">' + T('c.tag') + '</text>';
+  }
+  drawChart();
 
   /* ---------- pointer parallax ---------- */
   var ptr = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -505,7 +740,10 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     /* ----- sphere placement: steps aside for the problem, rises for the verdict ----- */
     var tx, ty, sc, op = 1 - kProb * 0.55;
     if (land){ tx = kProb * 0.25 * W - kRec * 0.26 * W; ty = -kVer * 0.19 * H * (1 - kRec); sc = 1 - kProb * 0.42 - kDeb * 0.16 - kVer * 0.4 - kRec * 0.06; ty += kDeb * 0.035 * H; }
-    else     { tx = 0; ty = -kProb * 0.27 * H - kDeb * 0.17 * H - kVer * 0.2 * H - kRec * 0.1 * H; sc = 1 - kProb * 0.5 - kDeb * 0.3 - kVer * 0.42 - kRec * 0.16; }
+    else     { tx = 0; ty = -kProb * 0.27 * H - kDeb * 0.17 * H - kVer * 0.2 * H - kRec * 0.1 * H; sc = 1 - kProb * 0.5 - kDeb * 0.3 - kVer * 0.42 - kRec * 0.16;
+      /* a longer debate headline (es / pt run to three lines) would sit on the glass: drop the glass just enough to clear it.
+         At rest in that scene the centre is at .33 H and the radius .7 × .226 of the canvas side. */
+      if (kDeb > 0){ var hb = HEAD2.offsetTop + HEAD2.offsetHeight + 12, gt = 0.33 * H - 0.7 * 0.226 * cv.offsetWidth; ty += kDeb * clamp(hb - gt, 0, 0.08 * H); } }
     cv.style.transform = 'translate(-50%,-50%) translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px) scale(' + sc.toFixed(4) + ')';
     cv.style.opacity = op.toFixed(3);
 
@@ -587,8 +825,8 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   }
   requestAnimationFrame(frame);
 
-  /* ----- join panel: a second glass, listening ----- */
-  BobbySphere.mount(document.getElementById('glass2'), { mode: 'listen', scale: 0.8, dpr: 1.5 });
+  /* ----- a language switch redraws the chart labels; the loop picks up the new layout on its next frame ----- */
+  if (window.BobbyI18n) BobbyI18n.onChange(function(){ drawChart(); if (RM) requestAnimationFrame(frame); });
 
 
   if (RM){ window.addEventListener('scroll', function(){ requestAnimationFrame(frame); }, { passive: true }); window.addEventListener('resize', function(){ requestAnimationFrame(frame); }); }
