@@ -234,3 +234,42 @@ button.n-row:hover { background: rgba(242, 237, 228, .025); }
   border-radius: 16px; background: rgba(63, 224, 181, .08); border: 1px solid rgba(63, 224, 181, .25); color: var(--n-ink); font: 400 14px/1.35 var(--n-sans); }
 .n-notice button { color: var(--n-ink2); }
 .n-cta:disabled { cursor: not-allowed; }
+/* ---- the language menu: a small globe that unfolds into a glass capsule (the home's, public/home/index.html) ---- */
+.n-lang { position: relative; flex: none; }
+.n-lang-btn { appearance: none; -webkit-appearance: none; margin: 0; padding: 0; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; flex: none;
+  color: var(--n-ink); background: rgba(0, 0, 0, .55); border: 1px solid var(--n-line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: border-color .2s ease, background-color .2s ease; }
+.n-lang-btn:hover, .n-lang-btn[aria-expanded="true"] { border-color: rgba(242, 237, 228, .32); background: rgba(20, 18, 16, .72); }
+.n-lang-btn svg { display: block; width: 18px; height: 18px; }
+/* the meridian narrows as the capsule opens: the globe turns a quarter */
+.n-lang-btn .n-lang-mer { transform-box: fill-box; transform-origin: center; transition: transform .55s cubic-bezier(.2, .8, .2, 1); }
+.n-lang-btn[aria-expanded="true"] .n-lang-mer { transform: scaleX(.3); }
+.n-lang-menu { box-sizing: border-box; position: absolute; top: calc(100% + 10px); right: 0; z-index: 40; min-width: 184px; margin: 0; padding: 6px; display: grid; gap: 2px; border-radius: 24px;
+  background: linear-gradient(180deg, rgba(38, 33, 30, .80), rgba(19, 17, 15, .88)); border: 1px solid rgba(242, 237, 228, .12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 28px 60px -22px rgba(0, 0, 0, .92), 0 0 40px -18px rgba(167, 191, 232, .28);
+  -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%);
+  /* closed: a globe-sized bead in the top-right corner, invisible */
+  clip-path: inset(0 0 calc(100% - 40px) calc(100% - 40px) round 20px); opacity: 0; visibility: hidden;
+  transition: clip-path .3s cubic-bezier(.4, 0, .2, 1), opacity .22s ease .06s, visibility 0s linear .3s; }
+.n-lang-menu.open { clip-path: inset(0 0 0 0 round 24px); opacity: 1; visibility: visible;
+  transition: clip-path .46s cubic-bezier(.2, .85, .25, 1), opacity .16s ease, visibility 0s; }
+.n-lang-opt { box-sizing: border-box; appearance: none; -webkit-appearance: none; margin: 0; display: flex; align-items: center; justify-content: space-between; gap: 22px; width: 100%; height: 40px; padding: 0 14px 0 16px;
+  border: 0; border-radius: 999px; background: transparent; color: var(--n-ink2); font: 400 14px/1 var(--n-sans); letter-spacing: .005em; text-align: left; cursor: pointer;
+  opacity: 0; transform: translateY(-5px); transition: background-color .2s ease, color .2s ease, opacity .18s ease, transform .3s cubic-bezier(.2, .8, .2, 1); }
+.n-lang-menu.open .n-lang-opt { opacity: 1; transform: none; }
+.n-lang-menu.open .n-lang-opt:nth-child(2) { transition-delay: 0s, 0s, .04s, .04s; }
+.n-lang-menu.open .n-lang-opt:nth-child(3) { transition-delay: 0s, 0s, .08s, .08s; }
+.n-lang-opt:hover { background: rgba(242, 237, 228, .06); color: var(--n-ink); }
+body.nucleo-ui .n-lang-opt:focus { outline: none; }
+body.nucleo-ui .n-lang-opt:focus-visible { outline: none; background: rgba(242, 237, 228, .08); color: var(--n-ink); box-shadow: inset 0 0 0 1px rgba(92, 225, 255, .55); }
+.n-lang-opt[aria-checked="true"] { color: var(--n-inkb); background: rgba(242, 237, 228, .05); }
+.n-lang-opt i { flex: none; width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(242, 237, 228, .22); transition: background-color .2s ease, box-shadow .2s ease; }
+.n-lang-opt[aria-checked="true"] i { background: var(--n-listen); box-shadow: 0 0 10px rgba(92, 225, 255, .65); }
+.n-lang-seg { flex: none; }
+.n-lang-seg button { padding: 0 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .n-lang-btn .n-lang-mer { transition: none; }
+  .n-lang-menu, .n-lang-menu.open { clip-path: none; transition: opacity .12s linear, visibility 0s linear .12s; }
+  .n-lang-menu.open { transition: opacity .12s linear, visibility 0s; }
+  .n-lang-opt, .n-lang-menu.open .n-lang-opt { transform: none; transition: background-color .2s ease, color .2s ease, opacity .12s linear; transition-delay: 0s; }
+}

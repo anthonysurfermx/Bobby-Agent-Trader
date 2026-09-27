@@ -95,8 +95,10 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
       return stored === 'es' || stored === 'en' ? stored : 'auto';
     } catch { return 'auto'; }
   });
-  const voiceLang = languageMode === 'auto'
-    ? interfaceLanguage() : languageMode;
+  // The voice room speaks Spanish or English; a Portuguese interface falls back to English here
+  // (the web's rule for strings that have no Portuguese yet) and auto-language still hears Portuguese.
+  const voiceLang: 'es' | 'en' = languageMode === 'auto'
+    ? (interfaceLanguage() === 'es' ? 'es' : 'en') : languageMode;
   const initialScreen = voiceScreenState(params.get('symbol'), params.get('timeframe'));
   const mascotLook = { ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id };
   const attachments = useMemo(() => {

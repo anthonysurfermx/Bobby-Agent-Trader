@@ -13,20 +13,22 @@ import type { ReactNode } from 'react';
 import { Helmet } from 'react-helmet-async';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
-import { lang, type Lang } from '@/lib/companions/i18n';
+import { lang } from '@/lib/companions/i18n';
 
-const EFFECTIVE_DATE: Record<Lang, string> = { en: 'September 22, 2026', es: '22 de septiembre de 2026' };
+/** The policy exists in English and Spanish; a Portuguese reader gets the English text. */
+type PolicyLang = 'en' | 'es';
+const EFFECTIVE_DATE: Record<PolicyLang, string> = { en: 'September 22, 2026', es: '22 de septiembre de 2026' };
 const REPO_URL = 'https://github.com/anthonysurfermx/Bobby-Agent-Trader';
 const APPLE_STOP_USING_URL = 'https://support.apple.com/en-us/102571';
 
-function policyLang(): Lang {
+function policyLang(): PolicyLang {
   try {
     const requested = new URLSearchParams(window.location.search).get('lang');
     if (requested === 'es' || requested === 'en') return requested;
     const stored = localStorage.getItem('bobby_lang');
     if (!stored && navigator.language?.toLowerCase().startsWith('es')) return 'es';
   } catch { /* private mode or no window */ }
-  return lang();
+  return lang() === 'es' ? 'es' : 'en';
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {

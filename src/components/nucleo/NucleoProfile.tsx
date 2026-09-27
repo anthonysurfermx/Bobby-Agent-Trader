@@ -8,11 +8,12 @@ import { ArrowLeftRight, ChevronRight, Globe, Grid2x2, Lock, Map as MapIcon, Mic
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, nextLevelFor, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
-import { isSpanish, pick, t } from '@/lib/companions/i18n';
+import { LANG_NAME, lang, pick, t } from '@/lib/companions/i18n';
 import { sfxTock } from '@/lib/companions/sfx';
 import { ToolBelt } from '@/components/companion/CompanionOverlays';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
+import { LangSegment } from './LangMenu';
 
 interface Props {
   companion: Companion;
@@ -70,11 +71,11 @@ export default function NucleoProfile(p: Props) {
     <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]" onClick={p.onClose}>
       <motion.aside
         initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 40, opacity: 0 }} transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-        className="n-drawer" onClick={(e) => e.stopPropagation()} aria-label={t('Your profile', 'Tu perfil')}
+        className="n-drawer" onClick={(e) => e.stopPropagation()} aria-label={t('Your profile', 'Tu perfil', 'Seu perfil')}
       >
         <div className="flex items-center justify-between">
-          <span className="n-label">{t('Profile', 'Perfil')}</span>
-          <button type="button" onClick={p.onClose} className="n-iconbtn" aria-label={t('Close', 'Cerrar')}><X size={16} /></button>
+          <span className="n-label">{t('Profile', 'Perfil', 'Perfil')}</span>
+          <button type="button" onClick={p.onClose} className="n-iconbtn" aria-label={t('Close', 'Cerrar', 'Fechar')}><X size={16} /></button>
         </div>
 
         {/* your avatar */}
@@ -87,19 +88,19 @@ export default function NucleoProfile(p: Props) {
         </div>
         <div className="mt-4">
           <div className="flex items-baseline justify-between">
-            <span className="n-label">{t('Level', 'Nivel')} {p.level.number} · {p.level.name}</span>
+            <span className="n-label">{t('Level', 'Nivel', 'Nível')} {p.level.number} · {p.level.name}</span>
             <span className="n-label">{p.xp} XP{next ? ` / ${next.minXP}` : ''}</span>
           </div>
           <div className="mt-2 h-[3px] overflow-hidden rounded-full" style={{ background: 'rgba(242,237,228,.08)' }}>
             <div className="h-full rounded-full" style={{ width: `${progress * 100}%`, background: '#F2EDE4', transition: 'width .6s ease' }} />
           </div>
-          <div className="mt-2 text-[12px]" style={{ color: '#8A8378' }}>{t('Earned with discipline, never volume.', 'Se gana con disciplina, nunca con volumen.')}</div>
+          <div className="mt-2 text-[12px]" style={{ color: '#8A8378' }}>{t('Earned with discipline, never volume.', 'Se gana con disciplina, nunca con volumen.', 'Conquistado com disciplina, nunca com volume.')}</div>
         </div>
         <div className="mt-4 flex justify-center"><ToolBelt companion={p.companion} xp={p.xp} onTap={p.onTool} onPet={p.onPet} onPlus={p.onCatalog} onWorld={p.onTraderLand} /></div>
 
         {/* the squad: pick your avatar */}
         <div className="mt-6">
-          <div className="n-label">{t('Your avatar', 'Tu avatar')}</div>
+          <div className="n-label">{t('Your avatar', 'Tu avatar', 'Seu avatar')}</div>
           <div className="n-squad mt-3">
             {COMPANIONS.map((c) => {
               const unlocked = p.level.number >= c.requiredLevel;
@@ -117,38 +118,38 @@ export default function NucleoProfile(p: Props) {
           </div>
           {locked && (
             <div className="mt-2 text-[13px]" style={{ color: '#A39C91' }}>
-              {t(`${locked.label} unlocks at level ${locked.requiredLevel}. You are level ${p.level.number}.`, `${locked.label} se desbloquea en nivel ${locked.requiredLevel}. Vas en nivel ${p.level.number}.`)}
+              {t(`${locked.label} unlocks at level ${locked.requiredLevel}. You are level ${p.level.number}.`, `${locked.label} se desbloquea en nivel ${locked.requiredLevel}. Vas en nivel ${p.level.number}.`, `${locked.label} desbloqueia no nível ${locked.requiredLevel}. Você está no nível ${p.level.number}.`)}
             </div>
           )}
         </div>
 
         <div className="mt-6 space-y-1">
-          <div className="n-label mb-2">{t('Account', 'Cuenta')}</div>
-          <div className="n-row"><span className="n-row-ico"><Globe size={16} /></span><span className="flex-1 text-[15px]">{t('Save your progress', 'Guarda tu progreso')}</span><ProgressSync onChoose={p.onSignIn} /></div>
+          <div className="n-label mb-2">{t('Account', 'Cuenta', 'Conta')}</div>
+          <div className="n-row"><span className="n-row-ico"><Globe size={16} /></span><span className="flex-1 text-[15px]">{t('Save your progress', 'Guarda tu progreso', 'Salve seu progresso')}</span><ProgressSync onChoose={p.onSignIn} /></div>
           <Row icon={<Sparkles size={16} />} label={p.pro.label} detail={p.pro.detail} onClick={p.pro.action} />
-          <Row icon={<ArrowLeftRight size={16} />} label={t('Swap on Base', 'Swap en Base')} detail={t('Your wallet signs every swap', 'Tu wallet firma cada swap')} onClick={p.onSwap}>
+          <Row icon={<ArrowLeftRight size={16} />} label={t('Swap on Base', 'Swap en Base', 'Swap na Base')} detail={t('Your wallet signs every swap', 'Tu wallet firma cada swap', 'Sua carteira assina cada swap')} onClick={p.onSwap}>
             <span className="flex items-center gap-2"><WalletBalancePill onClick={p.onSwap} /><ChevronRight size={16} style={{ color: '#8A8378' }} /></span>
           </Row>
-          <Row icon={<MapIcon size={16} />} label="Trader Land" detail={t('Every read plants something', 'Cada lectura planta algo')} onClick={p.onTraderLand} />
-          <Row icon={<Grid2x2 size={16} />} label={t('Gear', 'Equipo')} onClick={p.onCatalog} />
-          <Row icon={<Grid2x2 size={16} />} label={t('Explore markets', 'Explorar mercados')} onClick={p.onExplore} />
-          <Row icon={<Share2 size={16} />} label={t('Share my avatar', 'Compartir mi avatar')} onClick={p.onShare} />
+          <Row icon={<MapIcon size={16} />} label="Trader Land" detail={t('Every read plants something', 'Cada lectura planta algo', 'Cada leitura planta algo')} onClick={p.onTraderLand} />
+          <Row icon={<Grid2x2 size={16} />} label={t('Gear', 'Equipo', 'Equipamento')} onClick={p.onCatalog} />
+          <Row icon={<Grid2x2 size={16} />} label={t('Explore markets', 'Explorar mercados', 'Explorar mercados')} onClick={p.onExplore} />
+          <Row icon={<Share2 size={16} />} label={t('Share my avatar', 'Compartir mi avatar', 'Compartilhar meu avatar')} onClick={p.onShare} />
         </div>
 
         <div className="mt-6 space-y-1">
-          <div className="n-label mb-2">{t('Preferences', 'Preferencias')}</div>
-          <Row icon={<Mic size={16} />} label={t('Voice', 'Voz')} detail={p.freeVoice ? t('Free: dictation in the browser', 'Gratis: dictado en el navegador') : t('Live voice room', 'Sala de voz en vivo')} onClick={p.onToggleVoiceMode}>
-            <span className="n-pill-sm">{p.freeVoice ? t('Free', 'Gratis') : 'Live'}</span>
+          <div className="n-label mb-2">{t('Preferences', 'Preferencias', 'Preferências')}</div>
+          <Row icon={<Mic size={16} />} label={t('Voice', 'Voz', 'Voz')} detail={p.freeVoice ? t('Free: dictation in the browser', 'Gratis: dictado en el navegador', 'Grátis: ditado no navegador') : t('Live voice room', 'Sala de voz en vivo', 'Sala de voz ao vivo')} onClick={p.onToggleVoiceMode}>
+            <span className="n-pill-sm">{p.freeVoice ? t('Free', 'Gratis', 'Grátis') : 'Live'}</span>
           </Row>
-          <Row icon={p.speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />} label={t('Bobby speaks', 'Bobby habla')} onClick={p.onToggleSpeak}>
-            <span className="n-pill-sm">{p.speakEnabled ? t('On', 'Sí') : t('Off', 'No')}</span>
+          <Row icon={p.speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />} label={t('Bobby speaks', 'Bobby habla', 'Bobby fala')} onClick={p.onToggleSpeak}>
+            <span className="n-pill-sm">{p.speakEnabled ? t('On', 'Sí', 'Ligado') : t('Off', 'No', 'Desligado')}</span>
           </Row>
-          <Row icon={p.muted ? <VolumeX size={16} /> : <Volume2 size={16} />} label={t('Sounds', 'Sonidos')} onClick={p.onToggleSounds}>
-            <span className="n-pill-sm">{p.muted ? t('Off', 'No') : t('On', 'Sí')}</span>
+          <Row icon={p.muted ? <VolumeX size={16} /> : <Volume2 size={16} />} label={t('Sounds', 'Sonidos', 'Sons')} onClick={p.onToggleSounds}>
+            <span className="n-pill-sm">{p.muted ? t('Off', 'No', 'Desligado') : t('On', 'Sí', 'Ligado')}</span>
           </Row>
-          <Row icon={<Globe size={16} />} label={isSpanish() ? 'English' : 'Español'} onClick={() => { try { localStorage.setItem('bobby_lang', isSpanish() ? 'en' : 'es'); } catch { /* private mode */ } window.location.reload(); }} />
-          <Row icon={<ShieldAlert size={16} />} label={t('Risk notice', 'Aviso de riesgo')} onClick={p.onRisk} />
-          <Row icon={<RotateCcw size={16} />} label={t('Reset progress on this browser', 'Reiniciar progreso en este navegador')} onClick={p.onReset} />
+          <Row icon={<Globe size={16} />} label={t('Language', 'Idioma', 'Idioma')} detail={LANG_NAME[lang()]}><LangSegment /></Row>
+          <Row icon={<ShieldAlert size={16} />} label={t('Risk notice', 'Aviso de riesgo', 'Aviso de risco')} onClick={p.onRisk} />
+          <Row icon={<RotateCcw size={16} />} label={t('Reset progress on this browser', 'Reiniciar progreso en este navegador', 'Zerar o progresso neste navegador')} onClick={p.onReset} />
         </div>
       </motion.aside>
     </motion.div>

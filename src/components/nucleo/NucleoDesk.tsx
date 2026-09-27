@@ -9,7 +9,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowRight, Mic, MicOff, X } from 'lucide-react';
 import { COMPANIONS, companionName, getCompanion, getVibe, levelFor, nextLevelFor, petArt, petFor, petUnlocked, PET_UNLOCK_XP, toolArt, toolHasArt, toolSlot, wornGear, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
-import { isSpanish, pick, t } from '@/lib/companions/i18n';
+import { isPortuguese, pick, speechLocale, t } from '@/lib/companions/i18n';
 import { progressStore, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { voiceScreenState } from '@/lib/realtime-context';
@@ -27,6 +27,7 @@ import { fetchAccess, startBilling, type Access, type AccessState } from '@/lib/
 import NucleoChart from './NucleoChart';
 import NucleoProfile from './NucleoProfile';
 import NucleoRisk from './NucleoRisk';
+import LangMenu from './LangMenu';
 import {
   AGENT_TONE, assetSearch, candles, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money, noTradeReason, prettyName, resolveAsset, runDebate, topMovers,
   type AgentKey, type Answer, type Candle, type Mover, type Resolution, type Snapshot,
@@ -50,9 +51,9 @@ const AGENT_NAME: Record<AgentKey, string> = { alpha: 'Alpha Hunter', red: 'Red 
 
 function greeting(): string {
   const h = new Date().getHours();
-  if (h < 5 || h >= 19) return t('Good evening.', 'Buenas noches.');
-  if (h < 12) return t('Good morning.', 'Buenos días.');
-  return t('Good afternoon.', 'Buenas tardes.');
+  if (h < 5 || h >= 19) return t('Good evening.', 'Buenas noches.', 'Boa noite.');
+  if (h < 12) return t('Good morning.', 'Buenos días.', 'Bom dia.');
+  return t('Good afternoon.', 'Buenas tardes.', 'Boa tarde.');
 }
 const signedPct = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(v >= 10 || v <= -10 ? 1 : 2)}%`;
 
@@ -113,7 +114,7 @@ export default function NucleoDesk() {
   const [freeVoice, setFreeVoice] = useState(params.get('voice') === 'free');
   const initialScreen = voiceScreenState(params.get('symbol'), params.get('timeframe'));
   const returned = location.state as { voiceFallback?: boolean; transcript?: Array<{ role: string; text: string }> } | null;
-  const [voiceNotice, setVoiceNotice] = useState(returned?.voiceFallback ? t('Live paused · free voice ready', 'Live en pausa · voz gratis lista') : '');
+  const [voiceNotice, setVoiceNotice] = useState(returned?.voiceFallback ? t('Live paused · free voice ready', 'Live en pausa · voz gratis lista', 'Live pausado · voz grátis pronta') : '');
   const progress = useProgress();
   const voice = useCompanionVoice();
   const companion = getCompanion(progress.companionId) ?? COMPANIONS[1];
@@ -202,7 +203,7 @@ export default function NucleoDesk() {
     }
     if (isUnavailable(a)) {
       setPhase('error');
-      const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`);
+      const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`, `O desk não respondeu sobre ${snap.symbol}. Tente de novo em instantes.`);
       setDeskError(msg);
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       say(msg);
@@ -256,7 +257,7 @@ export default function NucleoDesk() {
     if (controller.signal.aborted) return;
     if (!r) {
       setPhase('error');
-      const msg = t('I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.', 'No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro.');
+      const msg = t('I could not resolve that asset. Try a name or ticker: bitcoin, NVDA, gold.', 'No pude resolver ese activo. Prueba con el nombre o ticker: bitcoin, NVDA, oro.', 'Não consegui identificar esse ativo. Tente um nome ou ticker: bitcoin, NVDA, ouro.');
       setDeskError(msg);
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       return;
@@ -316,11 +317,11 @@ export default function NucleoDesk() {
     const Speech = (window as unknown as { SpeechRecognition?: new () => BrowserRecognition; webkitSpeechRecognition?: new () => BrowserRecognition });
     const Recognition = Speech.SpeechRecognition ?? Speech.webkitSpeechRecognition;
     if (!Recognition) {
-      setVoiceNotice(t('Use keyboard dictation · Bobby replies aloud', 'Dicta con el teclado · Bobby responde con voz'));
+      setVoiceNotice(t('Use keyboard dictation · Bobby replies aloud', 'Dicta con el teclado · Bobby responde con voz', 'Use o ditado do teclado · o Bobby responde em voz alta'));
       inputRef.current?.focus(); return;
     }
     const recognition = new Recognition();
-    recognition.lang = isSpanish() ? 'es-MX' : 'en-US';
+    recognition.lang = speechLocale();
     recognition.continuous = false;
     recognition.interimResults = true;
     let finalText = '';
@@ -333,7 +334,7 @@ export default function NucleoDesk() {
       }
       setInput(draft);
     };
-    recognition.onerror = () => { setListening(false); setVoiceNotice(t('Check microphone access or type below', 'Revisa el micrófono o escribe abajo')); };
+    recognition.onerror = () => { setListening(false); setVoiceNotice(t('Check microphone access or type below', 'Revisa el micrófono o escribe abajo', 'Confira o acesso ao microfone ou digite abaixo')); };
     recognition.onend = () => {
       setListening(false); recognitionRef.current = null;
       if (finalText.trim()) void ask(finalText.trim());
@@ -361,7 +362,7 @@ export default function NucleoDesk() {
       const grad = ctx.createRadialGradient(540, 560, 0, 540, 560, 620);
       grad.addColorStop(0, 'rgba(92,72,140,0.35)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = grad; ctx.fillRect(0, 0, 1080, 1350);
-      ctx.fillStyle = 'rgba(242,237,228,0.7)'; ctx.font = '500 28px ui-monospace, monospace'; ctx.fillText(`BOBBY · ${t('MY AVATAR', 'MI AVATAR')}`, 72, 100);
+      ctx.fillStyle = 'rgba(242,237,228,0.7)'; ctx.font = '500 28px ui-monospace, monospace'; ctx.fillText(`BOBBY · ${t('MY AVATAR', 'MI AVATAR', 'MEU AVATAR')}`, 72, 100);
       if (canvas) ctx.drawImage(canvas, 160, 150, 760, 760);
       const worn = wornGear(companion.id, progress.xp);
       const pet = petUnlocked(progress.xp) ? petFor(companion.id) : null;
@@ -372,16 +373,16 @@ export default function NucleoDesk() {
       })));
       if (pet) { ctx.font = '150px serif'; ctx.fillText(pet.emoji, 180, 900); }
       ctx.fillStyle = '#F2EDE4'; ctx.font = '300 76px Sora, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(displayName, 540, 1000);
-      ctx.fillStyle = '#A39C91'; ctx.font = '500 26px ui-monospace, monospace'; ctx.fillText(`${t('LEVEL', 'NIVEL')} ${level.number} · ${level.name} · ${progress.xp} XP`, 540, 1050);
+      ctx.fillStyle = '#A39C91'; ctx.font = '500 26px ui-monospace, monospace'; ctx.fillText(`${t('LEVEL', 'NIVEL', 'NÍVEL')} ${level.number} · ${level.name} · ${progress.xp} XP`, 540, 1050);
       ctx.fillStyle = 'rgba(242,237,228,0.8)'; ctx.font = '28px system-ui, sans-serif';
-      const line = [...worn.map((w) => pick(w.name)), ...(pet ? [pick(pet.name)] : [])].join(' · ') || t('No gear yet — first read drops the first tool.', 'Sin equipo aún — la primera lectura suelta la primera herramienta.');
+      const line = [...worn.map((w) => pick(w.name)), ...(pet ? [pick(pet.name)] : [])].join(' · ') || t('No gear yet — first read drops the first tool.', 'Sin equipo aún — la primera lectura suelta la primera herramienta.', 'Sem equipamento ainda — a primeira leitura libera a primeira ferramenta.');
       ctx.fillText(line.slice(0, 70), 540, 1120);
-      ctx.fillStyle = 'rgba(242,237,228,0.4)'; ctx.font = '22px ui-monospace, monospace'; ctx.fillText(`bobbyprotocol.xyz · ${t('earned with discipline, never volume', 'ganado con disciplina, nunca volumen')}`, 540, 1280);
+      ctx.fillStyle = 'rgba(242,237,228,0.4)'; ctx.font = '22px ui-monospace, monospace'; ctx.fillText(`bobbyprotocol.xyz · ${t('earned with discipline, never volume', 'ganado con disciplina, nunca volumen', 'conquistado com disciplina, nunca com volume')}`, 540, 1280);
       const blob = await new Promise<Blob | null>((r) => card.toBlob(r, 'image/png'));
       if (!blob) return;
       const file = new File([blob], 'bobby-avatar.png', { type: 'image/png' });
       const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-      if (nav.share && nav.canShare?.({ files: [file] })) { await nav.share({ files: [file], title: 'Bobby', text: t('My Bobby avatar — earned with discipline, never volume.', 'Mi avatar de Bobby — ganado con disciplina, nunca volumen.') }); return; }
+      if (nav.share && nav.canShare?.({ files: [file] })) { await nav.share({ files: [file], title: 'Bobby', text: t('My Bobby avatar — earned with discipline, never volume.', 'Mi avatar de Bobby — ganado con disciplina, nunca volumen.', 'Meu avatar do Bobby — conquistado com disciplina, nunca com volume.') }); return; }
       const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'bobby-avatar.png'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch { /* user cancelled or canvas tainted */ }
   };
@@ -407,10 +408,10 @@ export default function NucleoDesk() {
   const gated = phase === 'gate' && gate !== null;
   const done = phase === 'complete' && !!debate && !!answer && !!snapshot;
   const verdictKind: SphereVerdict = !debate ? 'wait' : debate.direction === 'long' ? 'ready' : debate.direction === 'short' ? 'pass' : 'wait';
-  const verdictWord = !debate ? null : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade');
+  const verdictWord = !debate ? null : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade', 'No trade');
   const verdictSub = !debate ? null : debate.direction !== 'none' && answer?.convictionPct != null
-    ? t(`${Math.round(answer.convictionPct)}% conviction`, `${Math.round(answer.convictionPct)}% convicción`)
-    : t('Capital protected', 'Capital protegido');
+    ? t(`${Math.round(answer.convictionPct)}% conviction`, `${Math.round(answer.convictionPct)}% convicción`, `${Math.round(answer.convictionPct)}% convicção`)
+    : t('Capital protected', 'Capital protegido', 'Capital protegido');
   const lastYou = [...messages].reverse().find((m) => m.from === 'you')?.text ?? '';
   const lastBobby = [...messages].reverse().find((m) => m.from === 'bobby')?.text ?? '';
   const change = useMemo(() => {
@@ -427,10 +428,10 @@ export default function NucleoDesk() {
   // ---- pieces ----
   const header = (
     <header className="n-topbar n-topbar-desk">
-      <div className="flex min-w-[44px] items-center sm:min-w-[88px]">
+      <div className="flex min-w-[44px] items-center sm:min-w-[92px]">
         {snapshot || phase === 'confirm' || phase === 'error'
-          ? <button type="button" onClick={reset} className="n-iconbtn" aria-label={t('Close this read', 'Cerrar esta lectura')}><X size={16} /></button>
-          : <a href="/" className="n-wordmark" aria-label={t('Bobby, home', 'Bobby, inicio')}>Bobby</a>}
+          ? <button type="button" onClick={reset} className="n-iconbtn" aria-label={t('Close this read', 'Cerrar esta lectura', 'Fechar esta leitura')}><X size={16} /></button>
+          : <a href="/" className="n-wordmark" aria-label={t('Bobby, home', 'Bobby, inicio', 'Bobby, início')}>Bobby</a>}
       </div>
       <div className="min-w-0 flex-1 text-center">
         {lastYou && (reading || done || phase === 'confirm') && (
@@ -440,9 +441,10 @@ export default function NucleoDesk() {
           </>
         )}
       </div>
-      <div className="flex min-w-[44px] items-center justify-end gap-2 sm:min-w-[88px]">
+      <div className="flex min-w-[44px] items-center justify-end gap-2 sm:min-w-[92px]">
         {desktop && <WalletBalancePill onClick={() => { sfxTock(); setSheet('swap'); }} />}
-        <button type="button" className="n-face-btn" onClick={() => { sfxTock(); setSheet('profile'); }} aria-label={t(`Your profile · ${displayName}, level ${level.number}`, `Tu perfil · ${displayName}, nivel ${level.number}`)} title={displayName}>
+        <LangMenu />
+        <button type="button" className="n-face-btn" onClick={() => { sfxTock(); setSheet('profile'); }} aria-label={t(`Your profile · ${displayName}, level ${level.number}`, `Tu perfil · ${displayName}, nivel ${level.number}`, `Seu perfil · ${displayName}, nível ${level.number}`)} title={displayName}>
           <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20" fill="none" stroke="rgba(242,237,228,.12)" strokeWidth="2" /><circle cx="22" cy="22" r="20" fill="none" stroke="#FFF8EC" strokeWidth="2" strokeLinecap="round" strokeDasharray={2 * Math.PI * 20} strokeDashoffset={2 * Math.PI * 20 * (1 - xpArc)} transform="rotate(-90 22 22)" /></svg>
           <img src={`/mascots/${companion.id}.webp`} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
         </button>
@@ -458,8 +460,8 @@ export default function NucleoDesk() {
       <p className="mt-3 text-center text-[15px]" style={{ color: '#A39C91' }}>
         {movers.length
           ? movers.map((m, i) => <span key={m.symbol}>{i > 0 && <span style={{ color: '#5c564e' }}> · </span>}{m.symbol} <span style={{ color: m.changePct >= 0 ? '#3FE0B5' : '#FF5A5F' }}>{signedPct(m.changePct)}</span></span>)
-          : t('Ask me about any stock or crypto.', 'Pregúntame por cualquier acción o cripto.')}
-        {movers.length > 0 && <span style={{ color: '#8A8378' }}> {t('in 24h', 'en 24h')}</span>}
+          : t('Ask me about any stock or crypto.', 'Pregúntame por cualquier acción o cripto.', 'Me pergunte sobre qualquer ação ou cripto.')}
+        {movers.length > 0 && <span style={{ color: '#8A8378' }}> {t('in 24h', 'en 24h', 'em 24h')}</span>}
       </p>
       {voiceNotice && <p className="mt-2 text-[13px]" style={{ color: '#8A8378' }}>{voiceNotice}</p>}
     </div>
@@ -474,7 +476,7 @@ export default function NucleoDesk() {
       <div className="n-think-s"><NucleoSphere size={desktop ? 280 : 196} mode="debate" /></div>
       <div className="n-think-r"><Voice k="red" line={redLine} active={activeAgent === 'red'} align={desktop ? 'left' : 'right'} /></div>
       <div className="n-think-c"><Voice k="cio" line={cioLine} active={activeAgent === 'cio'} align="center" /></div>
-      <div className="n-think-st n-label">{phase === 'resolving' ? t('Finding the asset', 'Buscando el activo') : phase === 'reveal' ? t('Verdict forming', 'Se forma el veredicto') : t('Three agents debating', 'Tres agentes debatiendo')}</div>
+      <div className="n-think-st n-label">{phase === 'resolving' ? t('Finding the asset', 'Buscando el activo', 'Buscando o ativo') : phase === 'reveal' ? t('Verdict forming', 'Se forma el veredicto', 'Formando o veredicto') : t('Three agents debating', 'Tres agentes debatiendo', 'Três agentes debatendo')}</div>
     </div>
   );
 
@@ -483,8 +485,8 @@ export default function NucleoDesk() {
     const out: Array<{ k: string; v: string; q?: string | null; dot: string }> = [];
     if (answer.price != null) out.push({ k: snapshot.symbol, v: money(answer.price), q: change !== null ? signedPct(change) : null, dot: change !== null && change < 0 ? AGENT_TONE.red : AGENT_TONE.alpha });
     if (answer.rsi != null) { const mom = answer.momentum ? localizedMomentum(answer.momentum) : null; out.push({ k: 'RSI 14', v: String(Math.round(answer.rsi)), q: mom, dot: answer.rsi >= 70 ? AGENT_TONE.red : answer.rsi <= 30 ? AGENT_TONE.alpha : '#A39C91' }); }
-    if (answer.support != null && answer.resistance != null) out.push({ k: t('Range', 'Rango'), v: `${money(answer.support)}–${money(answer.resistance)}`, dot: '#A39C91' });
-    if (answer.trend) { const trend = localizedTrend(answer.trend); out.push({ k: t('Trend', 'Tendencia'), v: trend.charAt(0).toUpperCase() + trend.slice(1), q: answer.atrPct != null ? `ATR ${answer.atrPct.toFixed(1)}%` : null, dot: '#A39C91' }); }
+    if (answer.support != null && answer.resistance != null) out.push({ k: t('Range', 'Rango', 'Faixa'), v: `${money(answer.support)}–${money(answer.resistance)}`, dot: '#A39C91' });
+    if (answer.trend) { const trend = localizedTrend(answer.trend); out.push({ k: t('Trend', 'Tendencia', 'Tendência'), v: trend.charAt(0).toUpperCase() + trend.slice(1), q: answer.atrPct != null ? `ATR ${answer.atrPct.toFixed(1)}%` : null, dot: '#A39C91' }); }
     return out;
   }, [answer, snapshot, change]);
 
@@ -506,24 +508,24 @@ export default function NucleoDesk() {
 
   const thesisCard = done && debate && answer && snapshot ? (() => {
     const trade = debate.direction !== 'none';
-    const title = debate.direction === 'long' ? t(`Long on ${snapshot.symbol}.`, `Long en ${snapshot.symbol}.`) : debate.direction === 'short' ? t(`Short on ${snapshot.symbol}.`, `Short en ${snapshot.symbol}.`) : t(`No trade on ${snapshot.symbol}.`, `No trade en ${snapshot.symbol}.`);
+    const title = debate.direction === 'long' ? t(`Long on ${snapshot.symbol}.`, `Long en ${snapshot.symbol}.`, `Long em ${snapshot.symbol}.`) : debate.direction === 'short' ? t(`Short on ${snapshot.symbol}.`, `Short en ${snapshot.symbol}.`, `Short em ${snapshot.symbol}.`) : t(`No trade on ${snapshot.symbol}.`, `No trade en ${snapshot.symbol}.`, `No trade em ${snapshot.symbol}.`);
     const rows: Array<{ k: string; v: string; dot?: string }> = [];
-    if (answer.price != null) rows.push({ k: t('Price at read', 'Precio al leer'), v: money(answer.price) });
+    if (answer.price != null) rows.push({ k: t('Price at read', 'Precio al leer', 'Preço na leitura'), v: money(answer.price) });
     if (trade) {
-      if (answer.entry != null) rows.push({ k: t('Entry', 'Entrada'), v: money(answer.entry), dot: AGENT_TONE.alpha });
-      if (answer.target != null) rows.push({ k: t('Target', 'Objetivo'), v: money(answer.target), dot: AGENT_TONE.cio });
-      if (answer.stop != null) rows.push({ k: t('Stop · invalidation', 'Stop · invalidación'), v: money(answer.stop), dot: AGENT_TONE.red });
-      if (answer.rewardRisk != null) rows.push({ k: t('Reward : risk', 'Beneficio : riesgo'), v: `${answer.rewardRisk.toFixed(1)} : 1` });
+      if (answer.entry != null) rows.push({ k: t('Entry', 'Entrada', 'Entrada'), v: money(answer.entry), dot: AGENT_TONE.alpha });
+      if (answer.target != null) rows.push({ k: t('Target', 'Objetivo', 'Alvo'), v: money(answer.target), dot: AGENT_TONE.cio });
+      if (answer.stop != null) rows.push({ k: t('Stop · invalidation', 'Stop · invalidación', 'Stop · invalidação'), v: money(answer.stop), dot: AGENT_TONE.red });
+      if (answer.rewardRisk != null) rows.push({ k: t('Reward : risk', 'Beneficio : riesgo', 'Retorno : risco'), v: `${answer.rewardRisk.toFixed(1)} : 1` });
     } else {
-      if (answer.support != null) rows.push({ k: t('Support', 'Soporte'), v: money(answer.support) });
-      if (answer.resistance != null) rows.push({ k: t('Resistance', 'Resistencia'), v: money(answer.resistance) });
+      if (answer.support != null) rows.push({ k: t('Support', 'Soporte', 'Suporte'), v: money(answer.support) });
+      if (answer.resistance != null) rows.push({ k: t('Resistance', 'Resistencia', 'Resistência'), v: money(answer.resistance) });
     }
     const trendRsi = [answer.trend ? localizedTrend(answer.trend) : null, answer.rsi != null ? `RSI ${Math.round(answer.rsi)}` : null].filter(Boolean).join(' · ');
-    if (trendRsi) rows.push({ k: t('Trend · RSI', 'Tendencia · RSI'), v: trendRsi.charAt(0).toUpperCase() + trendRsi.slice(1) });
+    if (trendRsi) rows.push({ k: t('Trend · RSI', 'Tendencia · RSI', 'Tendência · RSI'), v: trendRsi.charAt(0).toUpperCase() + trendRsi.slice(1) });
     const tone = debate.direction === 'long' ? AGENT_TONE.alpha : debate.direction === 'short' ? AGENT_TONE.red : AGENT_TONE.cio;
     return (
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="n-card n-plan">
-        <div className="flex items-baseline justify-between"><span className="n-label">{t('Thesis', 'Tesis')} · {snapshot.symbol}</span><span className="n-label" style={{ color: tone }}>{verdictSub}</span></div>
+        <div className="flex items-baseline justify-between"><span className="n-label">{t('Thesis', 'Tesis', 'Tese')} · {snapshot.symbol}</span><span className="n-label" style={{ color: tone }}>{verdictSub}</span></div>
         <div className="n-display mt-3 text-[28px] leading-tight">{title}</div>
         {!trade && <p className="mt-2 text-[14px]" style={{ color: '#A39C91' }}>{noTradeReason(answer)}</p>}
         <div className="mt-4">
@@ -531,10 +533,10 @@ export default function NucleoDesk() {
             <div key={r.k} className="n-kv"><span className="n-kv-k">{r.dot && <i style={{ background: r.dot }} />}{r.k}</span><span className="n-kv-v">{r.v}</span></div>
           ))}
         </div>
-        {award && award.xp > 0 && <div className="n-xp mt-4">+{award.xp} {award.noTrade ? t('discipline XP for waiting', 'XP de disciplina por esperar') : t('discipline XP', 'XP de disciplina')}</div>}
+        {award && award.xp > 0 && <div className="n-xp mt-4">+{award.xp} {award.noTrade ? t('discipline XP for waiting', 'XP de disciplina por esperar', 'XP de disciplina por esperar') : t('discipline XP', 'XP de disciplina', 'XP de disciplina')}</div>}
         <p className="mt-4 text-[12px] leading-relaxed" style={{ color: '#8A8378' }}>
-          {t('Based on 1H market indicators. Reference only, not financial advice. ', 'Basado en indicadores de 1H. Solo referencia, no es asesoría financiera. ')}
-          <a href="/protocol" className="underline" style={{ color: '#A39C91' }}>{t('Public agent activity', 'Actividad pública de los agentes')}</a>
+          {t('Based on 1H market indicators. Reference only, not financial advice. ', 'Basado en indicadores de 1H. Solo referencia, no es asesoría financiera. ', 'Baseado em indicadores de 1H. Apenas referência, não é recomendação financeira. ')}
+          <a href="/protocol" className="underline" style={{ color: '#A39C91' }}>{t('Public agent activity', 'Actividad pública de los agentes', 'Atividade pública dos agentes')}</a>
         </p>
       </motion.div>
     );
@@ -542,13 +544,13 @@ export default function NucleoDesk() {
 
   const debateCard = done && debate ? (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="n-card n-plan">
-      <div className="flex items-baseline justify-between"><span className="n-label">{t('The debate', 'El debate')}</span><span className="n-label">{t('3 agents', '3 agentes')}</span></div>
+      <div className="flex items-baseline justify-between"><span className="n-label">{t('The debate', 'El debate', 'O debate')}</span><span className="n-label">{t('3 agents', '3 agentes', '3 agentes')}</span></div>
       <div className="mt-2">
         {debate.stances.map((s, i) => (
           <div key={s.key} className="py-3.5" style={{ borderTop: i ? '1px solid rgba(242,237,228,.07)' : 'none' }}>
             <div className="flex items-center justify-between gap-2">
               <span className="n-voice-name" style={{ color: AGENT_TONE[s.key] }}><i />{AGENT_NAME[s.key]}</span>
-              {s.score !== null && <span className="n-label">{s.key === 'red' ? t(`risk ${s.score}%`, `riesgo ${s.score}%`) : `${s.score}%`}</span>}
+              {s.score !== null && <span className="n-label">{s.key === 'red' ? t(`risk ${s.score}%`, `riesgo ${s.score}%`, `risco ${s.score}%`) : `${s.score}%`}</span>}
             </div>
             <div className="mt-1.5 text-[15px] leading-snug" style={{ color: '#F2EDE4' }}>{s.line}</div>
           </div>
@@ -575,12 +577,12 @@ export default function NucleoDesk() {
   const confirmCard = phase === 'confirm' && pending ? (
     <div className="flex flex-col items-center">
       <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
-      <div className="n-label mt-12" style={{ color: '#F6B94E' }}>{t('Did you mean', '¿Quisiste decir')}</div>
+      <div className="n-label mt-12" style={{ color: '#F6B94E' }}>{t('Did you mean', '¿Quisiste decir', 'Você quis dizer')}</div>
       <div className="n-display mt-2 text-center text-[34px] leading-tight">{pending.confirmName} <span style={{ color: '#8A8378' }}>{pending.snapshot.symbol}</span></div>
       {pending.proxyNote && <div className="mt-2 max-w-[40ch] text-center text-[13px]" style={{ color: '#A39C91' }}>{pending.proxyNote}</div>}
       <div className="mt-6 flex gap-2">
-        <button type="button" onClick={() => { const r = pending; setPending(null); void analyze(r.snapshot); }} className="n-send">{t('Yes, read it', 'Sí, léelo')}</button>
-        <button type="button" onClick={reset} className="n-chip ghost">{t('No', 'No')}</button>
+        <button type="button" onClick={() => { const r = pending; setPending(null); void analyze(r.snapshot); }} className="n-send">{t('Yes, read it', 'Sí, léelo', 'Sim, pode ler')}</button>
+        <button type="button" onClick={reset} className="n-chip ghost">{t('No', 'No', 'Não')}</button>
       </div>
     </div>
   ) : null;
@@ -590,30 +592,30 @@ export default function NucleoDesk() {
     const err = await startBilling('checkout');
     if (err) setBilling({ busy: false, error: err });
   };
-  const resetDate = meter?.resetsAt ? new Date(meter.resetsAt).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }) : null;
+  const resetDate = meter?.resetsAt ? new Date(meter.resetsAt).toLocaleDateString(isPortuguese() ? 'pt-BR' : undefined, { weekday: 'long', month: 'short', day: 'numeric' }) : null;
   const gateStage = gated ? (
     <div className="flex flex-col items-center text-center">
       <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
       {gate === 'signin' ? (
         <>
-          <div className="n-label mt-12">{t('Free account', 'Cuenta gratis')}</div>
-          <h2 className="n-display mt-3 max-w-[20ch] text-[32px] leading-[1.12] sm:text-[38px]">{t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.')}</h2>
-          <p className="mt-3 max-w-[44ch] text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{t('10 free reads every week, and your XP and gear saved on the web and the iPhone app. Your question runs as soon as you are in.', '10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone. Tu pregunta corre en cuanto entres.')}</p>
-          <button type="button" className="n-cta on mt-7 max-w-[320px]" onClick={() => { sfxTock(); setSignInPrompt(true); }}>{t('Continue with Apple or Google', 'Continuar con Apple o Google')}</button>
+          <div className="n-label mt-12">{t('Free account', 'Cuenta gratis', 'Conta grátis')}</div>
+          <h2 className="n-display mt-3 max-w-[20ch] text-[32px] leading-[1.12] sm:text-[38px]">{t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.', 'Crie sua conta grátis para continuar lendo.')}</h2>
+          <p className="mt-3 max-w-[44ch] text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{t('10 free reads every week, and your XP and gear saved on the web and the iPhone app. Your question runs as soon as you are in.', '10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone. Tu pregunta corre en cuanto entres.', '10 leituras grátis por semana, com seu XP e seu equipamento salvos na web e no app de iPhone. Sua pergunta roda assim que você entrar.')}</p>
+          <button type="button" className="n-cta on mt-7 max-w-[320px]" onClick={() => { sfxTock(); setSignInPrompt(true); }}>{t('Continue with Apple or Google', 'Continuar con Apple o Google', 'Continuar com Apple ou Google')}</button>
         </>
       ) : (
         <>
           <div className="n-label mt-12">Bobby Pro</div>
-          <h2 className="n-display mt-3 max-w-[20ch] text-[32px] leading-[1.12] sm:text-[38px]">{t('Your 10 free reads this week are used.', 'Ya usaste tus 10 lecturas gratis de esta semana.')}</h2>
+          <h2 className="n-display mt-3 max-w-[20ch] text-[32px] leading-[1.12] sm:text-[38px]">{t('Your 10 free reads this week are used.', 'Ya usaste tus 10 lecturas gratis de esta semana.', 'Você já usou suas 10 leituras grátis desta semana.')}</h2>
           <p className="mt-3 max-w-[46ch] text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>
-            {t('Bobby Pro reads without limits for $5 a month. Cancel anytime.', 'Bobby Pro lee sin límites por $5 al mes. Cancela cuando quieras.')}
-            {resetDate ? t(` Or wait: your free reads come back ${resetDate}.`, ` O espera: tus lecturas gratis vuelven el ${resetDate}.`) : ''}
+            {t('Bobby Pro reads without limits for $5 a month. Cancel anytime.', 'Bobby Pro lee sin límites por $5 al mes. Cancela cuando quieras.', 'O Bobby Pro lê sem limites por $5 ao mês. Cancele quando quiser.')}
+            {resetDate ? t(` Or wait: your free reads come back ${resetDate}.`, ` O espera: tus lecturas gratis vuelven el ${resetDate}.`, ` Ou espere: suas leituras grátis voltam em ${resetDate}.`) : ''}
           </p>
           <button type="button" className="n-cta on mt-7 max-w-[320px]" disabled={billing.busy || !accessState?.payments.stripe} onClick={() => void subscribe()}>
-            {accessState?.payments.stripe ? (billing.busy ? t('Opening checkout…', 'Abriendo el pago…') : t('Get Bobby Pro · $5/month', 'Obtener Bobby Pro · $5/mes')) : t('Card payments open very soon', 'Los pagos con tarjeta abren muy pronto')}
+            {accessState?.payments.stripe ? (billing.busy ? t('Opening checkout…', 'Abriendo el pago…', 'Abrindo o pagamento…') : t('Get Bobby Pro · $5/month', 'Obtener Bobby Pro · $5/mes', 'Assinar o Bobby Pro · $5/mês')) : t('Card payments open very soon', 'Los pagos con tarjeta abren muy pronto', 'Os pagamentos com cartão abrem em breve')}
           </button>
           {billing.error && <p role="alert" className="mt-3 text-[13px]" style={{ color: '#FFB3B5' }}>{billing.error}</p>}
-          <p className="mt-4 text-[12px]" style={{ color: '#8A8378' }}>{t('On iPhone, Bobby Pro is sold through the App Store.', 'En iPhone, Bobby Pro se compra en la App Store.')}</p>
+          <p className="mt-4 text-[12px]" style={{ color: '#8A8378' }}>{t('On iPhone, Bobby Pro is sold through the App Store.', 'En iPhone, Bobby Pro se compra en la App Store.', 'No iPhone, o Bobby Pro é vendido pela App Store.')}</p>
         </>
       )}
     </div>
@@ -621,8 +623,8 @@ export default function NucleoDesk() {
 
   const meterLine = meter && meter.paywall && meter.tier !== 'pro' && meter.remaining !== null && meter.limit !== null
     ? meter.tier === 'anon'
-      ? t(`${meter.remaining} of ${meter.limit} reads left without an account`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas sin cuenta`)
-      : t(`${meter.remaining} of ${meter.limit} free reads left this week`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas gratis esta semana`)
+      ? t(`${meter.remaining} of ${meter.limit} reads left without an account`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas sin cuenta`, `${meter.remaining === 1 ? 'Resta' : 'Restam'} ${meter.remaining} de ${meter.limit} leituras sem conta`)
+      : t(`${meter.remaining} of ${meter.limit} free reads left this week`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas gratis esta semana`, `${meter.remaining === 1 ? 'Resta' : 'Restam'} ${meter.remaining} de ${meter.limit} leituras grátis nesta semana`)
     : null;
 
   const errorStage = phase === 'error' ? (
@@ -633,12 +635,12 @@ export default function NucleoDesk() {
   ) : null;
 
   const suggestions = done && snapshot
-    ? [t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`), ...progress.quickAccess.filter((s) => s !== snapshot.symbol).slice(0, 2).map((s) => t(`How does ${s} look?`, `¿Cómo se ve ${s}?`))]
-    : progress.quickAccess.slice(0, 3).map((s) => t(`How does ${s} look?`, `¿Cómo se ve ${s}?`));
+    ? [t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`, `Outra pergunta sobre ${snapshot.symbol}`), ...progress.quickAccess.filter((s) => s !== snapshot.symbol).slice(0, 2).map((s) => t(`How does ${s} look?`, `¿Cómo se ve ${s}?`, `Como está ${s}?`))]
+    : progress.quickAccess.slice(0, 3).map((s) => t(`How does ${s} look?`, `¿Cómo se ve ${s}?`, `Como está ${s}?`));
   const chips = !reading && !gated && phase !== 'confirm' ? (
     <div className="w-full">
       {meterLine && <div className="mb-4 text-center text-[13px]" style={{ color: '#8A8378' }}>{meterLine}</div>}
-      <div className="n-label mb-3 text-center">{t('You might want to ask', 'Quizá quieras preguntar')}</div>
+      <div className="n-label mb-3 text-center">{t('You might want to ask', 'Quizá quieras preguntar', 'Talvez você queira perguntar')}</div>
       <div className="n-chips">
         {suggestions.map((s, i) => (
           <button key={s} type="button" className={`n-chip ${i === 0 ? '' : 'dim'}`} onClick={() => {
@@ -647,7 +649,7 @@ export default function NucleoDesk() {
             if (sym) void ask(sym, s);
           }}>{s}</button>
         ))}
-        <button type="button" className="n-chip ghost" onClick={() => { sfxTock(); setSheet('board'); }}>{t('Explore markets', 'Explorar mercados')}</button>
+        <button type="button" className="n-chip ghost" onClick={() => { sfxTock(); setSheet('board'); }}>{t('Explore markets', 'Explorar mercados', 'Explorar mercados')}</button>
       </div>
     </div>
   ) : null;
@@ -655,9 +657,9 @@ export default function NucleoDesk() {
   const dock = (
     <div className="n-dock">
       <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="n-ask mx-auto w-full max-w-[620px]">
-        <input ref={inputRef} data-desk-input value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Ask about an asset', 'Pregunta por un activo')} placeholder={listening ? t('Listening…', 'Escuchando…') : t('Ask about any stock or crypto…', 'Pregunta por cualquier acción o cripto…')} />
-        {input.trim() && !working && <button type="submit" className="n-send" aria-label={t('Ask', 'Preguntar')}><ArrowRight size={16} /></button>}
-        <button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar') : t('Talk to Bobby', 'Hablar con Bobby')} className={`n-mic ${listening ? 'on' : ''}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>
+        <input ref={inputRef} data-desk-input value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Ask about an asset', 'Pregunta por un activo', 'Pergunte sobre um ativo')} placeholder={listening ? t('Listening…', 'Escuchando…', 'Ouvindo…') : t('Ask about any stock or crypto…', 'Pregunta por una acción o cripto…', 'Pergunte sobre ação ou cripto…')} />
+        {input.trim() && !working && <button type="submit" className="n-send" aria-label={t('Ask', 'Preguntar', 'Perguntar')}><ArrowRight size={16} /></button>}
+        <button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar', 'Parar de ouvir') : t('Talk to Bobby', 'Hablar con Bobby', 'Falar com o Bobby')} className={`n-mic ${listening ? 'on' : ''}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button>
       </form>
     </div>
   );
@@ -671,9 +673,9 @@ export default function NucleoDesk() {
         {proNotice && (
           <div className="n-notice" role="status">
             <span>{proNotice === 'welcome'
-              ? (meter?.tier === 'pro' ? t('Welcome to Bobby Pro. Unlimited reads.', 'Bienvenido a Bobby Pro. Lecturas sin límite.') : t('Payment received. Activating Bobby Pro…', 'Pago recibido. Activando Bobby Pro…'))
-              : t('Checkout cancelled. Nothing was charged.', 'Pago cancelado. No se cobró nada.')}</span>
-            <button type="button" aria-label={t('Close', 'Cerrar')} onClick={() => setProNotice(null)}><X size={14} /></button>
+              ? (meter?.tier === 'pro' ? t('Welcome to Bobby Pro. Unlimited reads.', 'Bienvenido a Bobby Pro. Lecturas sin límite.', 'Boas-vindas ao Bobby Pro. Leituras ilimitadas.') : t('Payment received. Activating Bobby Pro…', 'Pago recibido. Activando Bobby Pro…', 'Pagamento recebido. Ativando o Bobby Pro…'))
+              : t('Checkout cancelled. Nothing was charged.', 'Pago cancelado. No se cobró nada.', 'Pagamento cancelado. Nada foi cobrado.')}</span>
+            <button type="button" aria-label={t('Close', 'Cerrar', 'Fechar')} onClick={() => setProNotice(null)}><X size={14} /></button>
           </div>
         )}
         <AnimatePresence mode="wait">
@@ -703,17 +705,17 @@ export default function NucleoDesk() {
             onToggleSpeak={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })}
             onToggleSounds={() => { setSfxMuted(!muted); setMuted(!muted); }}
             pro={{
-              label: meter?.tier === 'pro' ? t('Bobby Pro · active', 'Bobby Pro · activo') : 'Bobby Pro',
+              label: meter?.tier === 'pro' ? t('Bobby Pro · active', 'Bobby Pro · activo', 'Bobby Pro · ativo') : 'Bobby Pro',
               detail: meter?.tier === 'pro'
-                ? (accessState?.subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone') : t('Manage or cancel', 'Administrar o cancelar'))
-                : meterLine ?? t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes'),
+                ? (accessState?.subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone', 'Gerenciado na App Store do seu iPhone') : t('Manage or cancel', 'Administrar o cancelar', 'Gerenciar ou cancelar'))
+                : meterLine ?? t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes', 'Leituras ilimitadas · $5/mês'),
               action: () => {
                 if (meter?.tier === 'pro') { if (accessState?.subscription?.provider === 'stripe') void startBilling('portal'); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
                 void subscribe();
               },
             }}
-            onReset={() => { if (window.confirm(t('Reset XP, gear and avatar on this browser?', '¿Reiniciar XP, equipo y avatar en este navegador?'))) progressStore.reset(); }}
+            onReset={() => { if (window.confirm(t('Reset XP, gear and avatar on this browser?', '¿Reiniciar XP, equipo y avatar en este navegador?', 'Zerar XP, equipamento e avatar neste navegador?'))) progressStore.reset(); }}
           />
         )}
         {sheet === 'board' && <BoardSheet key="board" onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
@@ -725,14 +727,14 @@ export default function NucleoDesk() {
             <div className="n-card w-full max-w-md space-y-3 rounded-b-none p-6 text-center md:rounded-[28px]" onClick={(e) => e.stopPropagation()}>
               <div className="text-7xl" style={{ filter: has ? 'none' : 'grayscale(1)' }}>{pet.emoji}</div>
               <div className="n-display text-2xl">{pick(pet.name)}</div>
-              <div className="text-sm" style={{ color: '#A39C91' }}>{has ? (pet.spins ? t('Spins next to your avatar.', 'Gira junto a tu avatar.') : t("Lives at your avatar's feet.", 'Vive a los pies de tu avatar.')) : t(`Unlocks at ${PET_UNLOCK_XP} XP · you have ${progress.xp}. Discipline only.`, `Se desbloquea a ${PET_UNLOCK_XP} XP · llevas ${progress.xp}. Solo disciplina.`)}</div>
+              <div className="text-sm" style={{ color: '#A39C91' }}>{has ? (pet.spins ? t('Spins next to your avatar.', 'Gira junto a tu avatar.', 'Gira ao lado do seu avatar.') : t("Lives at your avatar's feet.", 'Vive a los pies de tu avatar.', 'Vive aos pés do seu avatar.')) : t(`Unlocks at ${PET_UNLOCK_XP} XP · you have ${progress.xp}. Discipline only.`, `Se desbloquea a ${PET_UNLOCK_XP} XP · llevas ${progress.xp}. Solo disciplina.`, `Desbloqueia com ${PET_UNLOCK_XP} XP · você tem ${progress.xp}. Só com disciplina.`)}</div>
             </div>
           </motion.div>) : null; })()}
         {sheet === 'risk' && (
           <motion.div key="risk" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto" style={{ background: '#0B0A09' }}><NucleoRisk readOnly onClose={() => setSheet('profile')} /></motion.div>
         )}
         {inspected && <ToolDetail key="tool" companion={companion} tool={inspected} xp={progress.xp} onClose={() => setInspected(null)} />}
-        {evolution && <EvolutionOverlay key="evo" companion={companion} level={evolution} onDone={() => { const name = companionName(companion, evolution.number); say(t(`I evolved. Call me ${name} now.`, `Evolucioné. Ahora dime ${name}.`), false); setEvolution(null); }} />}
+        {evolution && <EvolutionOverlay key="evo" companion={companion} level={evolution} onDone={() => { const name = companionName(companion, evolution.number); say(t(`I evolved. Call me ${name} now.`, `Evolucioné. Ahora dime ${name}.`, `Evoluí. Agora me chame de ${name}.`), false); setEvolution(null); }} />}
         {/* A new tool: open the profile so the avatar is seen putting it on. */}
         {!evolution && drops[0] && <ToolUnlockOverlay key="drop" companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) { setSheet('profile'); setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 520); } }} />}
       </AnimatePresence>
@@ -753,7 +755,7 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
         const res = await fetch('/api/bobby-asset-search?browse=1');
         const obj = (await res.json()) as { browse?: Record<string, Array<{ symbol: string; name: string; last: number | null }>> };
         const b = obj.browse ?? {};
-        setSections([[t('Crypto', 'Cripto'), b.crypto], [t('Stocks & ETFs', 'Acciones y ETFs'), b.equity], [t('Metals', 'Metales'), b.commodity]].filter(([, rows]) => rows?.length).map(([title, rows]) => ({ title: title as string, rows: (rows as Array<{ symbol: string; name: string; last: number | null }>).slice(0, 24) })));
+        setSections([[t('Crypto', 'Cripto', 'Cripto'), b.crypto], [t('Stocks & ETFs', 'Acciones y ETFs', 'Ações e ETFs'), b.equity], [t('Metals', 'Metales', 'Metais'), b.commodity]].filter(([, rows]) => rows?.length).map(([title, rows]) => ({ title: title as string, rows: (rows as Array<{ symbol: string; name: string; last: number | null }>).slice(0, 24) })));
       } catch { /* the search still works */ }
     })();
   }, []);
@@ -788,14 +790,14 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
           className="n-card fixed left-1/2 top-1/2 z-[61] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[28px]">
           <div className="shrink-0 space-y-4 p-5 pb-3">
             <div className="flex items-center justify-between gap-3">
-              <Dialog.Title className="n-display text-[24px]">{t('Explore markets', 'Explorar mercados')}</Dialog.Title>
-              <Dialog.Close aria-label={t('Close', 'Cerrar')} className="n-iconbtn"><X size={16} /></Dialog.Close>
+              <Dialog.Title className="n-display text-[24px]">{t('Explore markets', 'Explorar mercados', 'Explorar mercados')}</Dialog.Title>
+              <Dialog.Close aria-label={t('Close', 'Cerrar', 'Fechar')} className="n-iconbtn"><X size={16} /></Dialog.Close>
             </div>
-            <div className="n-ask"><input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('Search assets', 'Buscar activos')} placeholder={t('Name or ticker…', 'Nombre o ticker…')} /></div>
+            <div className="n-ask"><input ref={searchRef} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('Search assets', 'Buscar activos', 'Buscar ativos')} placeholder={t('Name or ticker…', 'Nombre o ticker…', 'Nome ou ticker…')} /></div>
           </div>
           <div className="min-h-0 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5">
             {q.trim().length >= 2
-              ? (hits.length === 0 ? <div className="text-[14px]" style={{ color: '#8A8378' }}>{t('Nothing yet — keep typing; Bobby resolves typos.', 'Nada aún — sigue escribiendo; Bobby resuelve typos.')}</div> : <div>{hits.map((h) => row(h.symbol, h.name, h.assetClass))}</div>)
+              ? (hits.length === 0 ? <div className="text-[14px]" style={{ color: '#8A8378' }}>{t('Nothing yet — keep typing; Bobby resolves typos.', 'Nada aún — sigue escribiendo; Bobby resuelve typos.', 'Nada ainda — continue digitando; o Bobby entende erros de digitação.')}</div> : <div>{hits.map((h) => row(h.symbol, h.name, h.assetClass))}</div>)
               : sections.map((s) => (
                 <div key={s.title}>
                   <div className="n-label mb-1 flex justify-between"><span>{s.title}</span><span>{s.rows.length}</span></div>

@@ -7,6 +7,7 @@ import { Helmet } from 'react-helmet-async';
 import NucleoRisk from '@/components/nucleo/NucleoRisk';
 import NucleoDesk from '@/components/nucleo/NucleoDesk';
 import { RISK_NOTICE_VERSION, progressStore, useProgress } from '@/lib/companions/progress';
+import { htmlLang } from '@/lib/companions/i18n';
 import '@/styles/nucleo-desk.css';
 
 export default function CompanionDeskPage() {
@@ -20,7 +21,7 @@ export default function CompanionDeskPage() {
   useEffect(() => { if (!riskDue && !progress.onboarded) progressStore.finishOnboarding(); }, [riskDue, progress.onboarded]);
   return (
     <div className="min-h-screen" style={{ background: '#0B0A09', color: '#F2EDE4' }}>
-      <Helmet><title>Desk | Bobby</title></Helmet>
+      <Helmet><html lang={htmlLang()} /><title>Desk | Bobby</title></Helmet>
       {riskDue ? <NucleoRisk /> : <NucleoDesk />}
     </div>
   );

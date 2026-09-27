@@ -119,12 +119,12 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
       // If the tab is still here after a moment, the navigation was blocked: say so and hand over the link.
       window.setTimeout(() => {
         setBusy(null);
-        setError(t(`The browser did not open ${provider === 'apple' ? 'Apple' : 'Google'}. Tap the link below to continue.`, `El navegador no abrió ${provider === 'apple' ? 'Apple' : 'Google'}. Toca el enlace de abajo para continuar.`));
+        setError(t(`The browser did not open ${provider === 'apple' ? 'Apple' : 'Google'}. Tap the link below to continue.`, `El navegador no abrió ${provider === 'apple' ? 'Apple' : 'Google'}. Toca el enlace de abajo para continuar.`, `O navegador não abriu ${provider === 'apple' ? 'a Apple' : 'o Google'}. Toque no link abaixo para continuar.`));
       }, 6000);
     } catch (caught) {
       console.error('[SignInPrompt] oauth failed:', caught);
       setBusy(null);
-      setError(t('That sign-in method is not available right now. Try another one.', 'Ese método de acceso no está disponible ahora. Prueba con otro.'));
+      setError(t('That sign-in method is not available right now. Try another one.', 'Ese método de acceso no está disponible ahora. Prueba con otro.', 'Esse método de login não está disponível agora. Tente outro.'));
     }
   };
 
@@ -138,14 +138,14 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
     } catch (caught) {
       console.error('[SignInPrompt] wallet connect failed:', caught);
       setBusy(null);
-      setError(t('The wallet did not connect. Try again.', 'La wallet no se conectó. Inténtalo de nuevo.'));
+      setError(t('The wallet did not connect. Try again.', 'La wallet no se conectó. Inténtalo de nuevo.', 'A carteira não conectou. Tente de novo.'));
     }
   };
 
   const options: Array<{ id: Busy; label: string; icon: React.ReactNode; run: () => void }> = [
-    { id: 'apple', label: t('Continue with Apple', 'Continuar con Apple'), icon: <Apple size={17} />, run: () => void oauth('apple') },
-    { id: 'google', label: t('Continue with Google', 'Continuar con Google'), icon: <GoogleMark />, run: () => void oauth('google') },
-    { id: 'wallet', label: t('Continue with a wallet', 'Continuar con una wallet'), icon: <Wallet size={17} />, run: () => void connectWallet() },
+    { id: 'apple', label: t('Continue with Apple', 'Continuar con Apple', 'Continuar com a Apple'), icon: <Apple size={17} />, run: () => void oauth('apple') },
+    { id: 'google', label: t('Continue with Google', 'Continuar con Google', 'Continuar com o Google'), icon: <GoogleMark />, run: () => void oauth('google') },
+    { id: 'wallet', label: t('Continue with a wallet', 'Continuar con una wallet', 'Continuar com uma carteira'), icon: <Wallet size={17} />, run: () => void connectWallet() },
   ];
 
   return (
@@ -167,18 +167,19 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
         style={{ boxShadow: '0 40px 80px -30px rgba(0,0,0,.9)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={close} aria-label={t('Close', 'Cerrar')} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/[0.06] text-white/70 transition hover:text-white">
+        <button onClick={close} aria-label={t('Close', 'Cerrar', 'Fechar')} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/[0.06] text-white/70 transition hover:text-white">
           <X size={15} />
         </button>
 
-        <div className="n-label">{voiceAccess ? 'BOBBY VOICE' : required ? t('Free account', 'Cuenta gratis') : t('YOUR PROGRESS', 'TU PROGRESO')}</div>
+        <div className="n-label">{voiceAccess ? 'BOBBY VOICE' : required ? t('Free account', 'Cuenta gratis', 'Conta grátis') : t('YOUR PROGRESS', 'TU PROGRESO', 'SEU PROGRESSO')}</div>
         <h2 id="signin-prompt-title" className="n-display mt-3 text-[28px] leading-tight text-white">
-          {voiceAccess ? t('3 voice minutes a day', '3 min de voz al día') : required ? t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.') : t('Want to keep your points?', '¿Quieres conservar tus puntos?')}
+          {voiceAccess ? t('3 voice minutes a day', '3 min de voz al día', '3 minutos de voz por dia') : required ? t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.', 'Crie sua conta grátis para continuar lendo.') : t('Want to keep your points?', '¿Quieres conservar tus puntos?', 'Quer guardar seus pontos?')}
         </h2>
         <p className="mt-3 text-sm leading-6 text-white/60">
-          {voiceAccess ? t('Sign in. Your time is shared across web and iPhone.', 'Inicia sesión. Tu tiempo se comparte entre web y iPhone.') : required ? t('You used your 3 reads without an account. With one: 10 free reads every week, and your XP and gear saved on the web and the iPhone app.', 'Ya usaste tus 3 lecturas sin cuenta. Con una: 10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone.') : t(
+          {voiceAccess ? t('Sign in. Your time is shared across web and iPhone.', 'Inicia sesión. Tu tiempo se comparte entre web y iPhone.', 'Entre na sua conta. Seu tempo é compartilhado entre a web e o iPhone.') : required ? t('You used your 3 reads without an account. With one: 10 free reads every week, and your XP and gear saved on the web and the iPhone app.', 'Ya usaste tus 3 lecturas sin cuenta. Con una: 10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone.', 'Você usou suas 3 leituras sem conta. Com uma conta: 10 leituras grátis por semana, com seu XP e seu equipamento salvos na web e no app de iPhone.') : t(
             `You have ${xp} XP on this device. Sign in and it follows you to the iPhone app and any other browser. Keep reading without an account if you prefer — nothing is locked.`,
             `Llevas ${xp} XP en este dispositivo. Entra y te siguen a la app de iPhone y a cualquier otro navegador. Si prefieres, sigue sin cuenta: aquí no se bloquea nada.`,
+            `Você tem ${xp} XP neste dispositivo. Entre e ele vai com você para o app de iPhone e para qualquer outro navegador. Se preferir, continue sem conta — nada fica bloqueado.`,
           )}
         </p>
 
@@ -202,13 +203,13 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
         {error && <p role="alert" className="mt-3 text-xs leading-5 text-[#ff8f83]">{error}</p>}
         {error && providerUrl && (
           <a href={providerUrl} className="mt-2 block text-center font-mono text-[11px] tracking-[0.12em] text-sky-300 underline underline-offset-4 hover:text-sky-200">
-            {t('Open sign-in in this tab', 'Abrir el acceso en esta pestaña')}
+            {t('Open sign-in in this tab', 'Abrir el acceso en esta pestaña', 'Abrir o login nesta aba')}
           </a>
         )}
 
         {!required && (
           <button onClick={close} className="mt-5 w-full py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/45 transition hover:text-white/75">
-            {voiceAccess ? t('Continue with free voice', 'Seguir con voz gratis') : t('Keep going without an account', 'Seguir sin cuenta')}
+            {voiceAccess ? t('Continue with free voice', 'Seguir con voz gratis', 'Continuar com a voz grátis') : t('Keep going without an account', 'Seguir sin cuenta', 'Continuar sem conta')}
           </button>
         )}
       </motion.div>

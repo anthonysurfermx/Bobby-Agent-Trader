@@ -192,7 +192,7 @@ export async function submitExtend(io: {
   fetchImpl?: typeof fetch;
 }): Promise<ExtendOutcome> {
   const report = (outcome: ExtendOutcome) => { (io.onScreen() ? io.card : io.notice)(outcome); return outcome; };
-  if (!io.auth || !io.grant.inventoryId) return report({ ok: false, message: t('Sign in again to extend it.', 'Vuelve a iniciar sesión para extenderla.') });
+  if (!io.auth || !io.grant.inventoryId) return report({ ok: false, message: t('Sign in again to extend it.', 'Vuelve a iniciar sesión para extenderla.', 'Entre de novo para estendê-la.') });
   const result = await extendSeed(io.auth, io.grant.inventoryId, io.hours, io.fetchImpl);
   if (!result.ok || !result.extended) {
     // A refusal or a lost answer: adopt the seed as the server has it, so the card
@@ -203,5 +203,5 @@ export async function submitExtend(io: {
   }
   const grant = applyExtended(io.grant, result.extended);
   io.saveGrant(io.eventId, grant);
-  return report({ ok: true, message: grant.item ? extendedNotice(result.extended.horizon.hours, io.pieceLabel(grant.item)) : t('Horizon extended.', 'Horizonte extendido.') });
+  return report({ ok: true, message: grant.item ? extendedNotice(result.extended.horizon.hours, io.pieceLabel(grant.item)) : t('Horizon extended.', 'Horizonte extendido.', 'Horizonte estendido.') });
 }

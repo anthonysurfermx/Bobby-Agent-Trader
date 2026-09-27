@@ -84,16 +84,16 @@ function agentClaims(debate: Debate | null, answer: Answer | null): Array<{ key:
   const rr = answer.rewardRisk != null ? ` · R:R ${answer.rewardRisk.toFixed(1)}` : '';
   if (trade) {
     return [
-      { key: 'alpha', claim: alpha.level ? t(`${long ? 'Buy' : 'Sell'} zone at ${money(alpha.level.price)}`, `Zona de ${long ? 'compra' : 'venta'} en ${money(alpha.level.price)}`) : alpha.line },
-      { key: 'red', claim: red.level ? t(`Thesis breaks ${long ? 'below' : 'above'} ${money(red.level.price)}`, `La tesis se rompe ${long ? 'bajo' : 'sobre'} ${money(red.level.price)}`) : red.line },
-      { key: 'cio', claim: cio.level ? t(`Target ${money(cio.level.price)}${conv ? ` · ${conv}` : ''}${rr}`, `Objetivo ${money(cio.level.price)}${conv ? ` · ${conv}` : ''}${rr}`) : cio.line },
+      { key: 'alpha', claim: alpha.level ? t(`${long ? 'Buy' : 'Sell'} zone at ${money(alpha.level.price)}`, `Zona de ${long ? 'compra' : 'venta'} en ${money(alpha.level.price)}`, `Zona de ${long ? 'compra' : 'venda'} em ${money(alpha.level.price)}`) : alpha.line },
+      { key: 'red', claim: red.level ? t(`Thesis breaks ${long ? 'below' : 'above'} ${money(red.level.price)}`, `La tesis se rompe ${long ? 'bajo' : 'sobre'} ${money(red.level.price)}`, `A tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(red.level.price)}`) : red.line },
+      { key: 'cio', claim: cio.level ? t(`Target ${money(cio.level.price)}${conv ? ` · ${conv}` : ''}${rr}`, `Objetivo ${money(cio.level.price)}${conv ? ` · ${conv}` : ''}${rr}`, `Alvo ${money(cio.level.price)}${conv ? ` · ${conv}` : ''}${rr}`) : cio.line },
     ];
   }
   const range = answer.support != null && answer.resistance != null ? `${money(answer.support)}–${money(answer.resistance)}` : null;
   return [
-    { key: 'alpha', claim: alpha.level ? t(`Watching ${money(alpha.level.price)}`, `Vigila ${money(alpha.level.price)}`) : t('No clean setup', 'Sin setup limpio') },
-    { key: 'red', claim: range ? t(`No edge inside ${range}`, `Sin ventaja dentro de ${range}`) : t('Not enough structure', 'Sin estructura suficiente') },
-    { key: 'cio', claim: t(`No trade${conv ? ` · ${conv} < 55%` : ''}`, `No trade${conv ? ` · ${conv} < 55%` : ''}`) },
+    { key: 'alpha', claim: alpha.level ? t(`Watching ${money(alpha.level.price)}`, `Vigila ${money(alpha.level.price)}`, `De olho em ${money(alpha.level.price)}`) : t('No clean setup', 'Sin setup limpio', 'Sem setup limpo') },
+    { key: 'red', claim: range ? t(`No edge inside ${range}`, `Sin ventaja dentro de ${range}`, `Sem vantagem dentro de ${range}`) : t('Not enough structure', 'Sin estructura suficiente', 'Sem estrutura suficiente') },
+    { key: 'cio', claim: t(`No trade${conv ? ` · ${conv} < 55%` : ''}`, `No trade${conv ? ` · ${conv} < 55%` : ''}`, `No trade${conv ? ` · ${conv} < 55%` : ''}`) },
   ];
 }
 
@@ -128,13 +128,13 @@ export default function NucleoChart({ series, answer, debate, symbol, isEquity, 
     const rs = rsiAll.slice(from);
     const trade = !!debate && debate.direction !== 'none';
     const levels: Level[] = [];
-    if (answer?.resistance != null) levels.push({ key: 'res', agent: null, price: answer.resistance, label: t('Resistance', 'Resistencia'), color: '#A39C91', hair: true });
-    if (answer?.support != null) levels.push({ key: 'sup', agent: null, price: answer.support, label: t('Support', 'Soporte'), color: '#A39C91', hair: true });
+    if (answer?.resistance != null) levels.push({ key: 'res', agent: null, price: answer.resistance, label: t('Resistance', 'Resistencia', 'Resistência'), color: '#A39C91', hair: true });
+    if (answer?.support != null) levels.push({ key: 'sup', agent: null, price: answer.support, label: t('Support', 'Soporte', 'Suporte'), color: '#A39C91', hair: true });
     if (trade && debate) {
       const [alpha, red, cio] = debate.stances;
-      if (alpha.level) levels.push({ key: 'entry', agent: 'alpha', price: alpha.level.price, to: alpha.level.to, label: t('Entry', 'Entrada'), color: AGENT_TONE.alpha });
-      if (red.level) levels.push({ key: 'stop', agent: 'red', price: red.level.price, label: t('Stop', 'Stop'), color: AGENT_TONE.red, dashed: true });
-      if (cio.level) levels.push({ key: 'target', agent: 'cio', price: cio.level.price, label: t('Target', 'Objetivo'), color: AGENT_TONE.cio });
+      if (alpha.level) levels.push({ key: 'entry', agent: 'alpha', price: alpha.level.price, to: alpha.level.to, label: t('Entry', 'Entrada', 'Entrada'), color: AGENT_TONE.alpha });
+      if (red.level) levels.push({ key: 'stop', agent: 'red', price: red.level.price, label: t('Stop', 'Stop', 'Stop'), color: AGENT_TONE.red, dashed: true });
+      if (cio.level) levels.push({ key: 'target', agent: 'cio', price: cio.level.price, label: t('Target', 'Objetivo', 'Alvo'), color: AGENT_TONE.cio });
     }
     const closes = pts.map((p) => p.close);
     const emaVals = [...e20, ...e50].filter((v): v is number => v !== null);
@@ -209,9 +209,9 @@ export default function NucleoChart({ series, answer, debate, symbol, isEquity, 
       )}
       <div ref={wrap} className="relative w-full" style={{ height: total }}>
         {!g ? (
-          <div className="absolute inset-0 grid place-items-center"><span className="n-label">{series.length ? '' : t('Loading the chart', 'Cargando la gráfica')}</span></div>
+          <div className="absolute inset-0 grid place-items-center"><span className="n-label">{series.length ? '' : t('Loading the chart', 'Cargando la gráfica', 'Carregando o gráfico')}</span></div>
         ) : (
-          <svg width={w} height={total} viewBox={`0 0 ${w} ${total}`} role="img" aria-label={t(`${symbol} price, last ${g.len} hours, with the desk's levels, EMA 20 and 50, volume and RSI 14`, `Precio de ${symbol}, últimas ${g.len} horas, con los niveles del desk, EMA 20 y 50, volumen y RSI 14`)} style={{ overflow: 'visible', display: 'block' }}>
+          <svg width={w} height={total} viewBox={`0 0 ${w} ${total}`} role="img" aria-label={t(`${symbol} price, last ${g.len} hours, with the desk's levels, EMA 20 and 50, volume and RSI 14`, `Precio de ${symbol}, últimas ${g.len} horas, con los niveles del desk, EMA 20 y 50, volumen y RSI 14`, `Preço de ${symbol}, últimas ${g.len} horas, com os níveis do desk, EMA 20 e 50, volume e RSI 14`)} style={{ overflow: 'visible', display: 'block' }}>
             <defs>
               <linearGradient id={`l${uid}`} x1="0" x2={g.nowX} y1="0" y2="0" gradientUnits="userSpaceOnUse">
                 <stop offset="0" stopColor="#F2EDE4" stopOpacity=".3" /><stop offset=".72" stopColor="#F2EDE4" stopOpacity=".82" /><stop offset="1" stopColor="#FFF8EC" />
@@ -290,11 +290,11 @@ export default function NucleoChart({ series, answer, debate, symbol, isEquity, 
               <path d={g.rsiLine} fill="none" stroke="#F2EDE4" strokeOpacity=".7" strokeWidth="1.25" />
               {g.rsiLast !== null && <circle cx={g.nowX} cy={g.ry(g.rsiLast)} r="2.5" fill="#FFF8EC" />}
               <text x={g.nowX + 12} y={g.rTop + 10} className="n-tick" style={{ letterSpacing: '.1em' }}>RSI 14</text>
-              <text x={g.nowX + 12} y={g.rBot} className="n-tick">{g.rsiLast !== null && g.rsiLast >= 70 ? t('overbought', 'sobrecompra') : g.rsiLast !== null && g.rsiLast <= 30 ? t('oversold', 'sobreventa') : '70 / 30'}</text>
+              <text x={g.nowX + 12} y={g.rBot} className="n-tick">{g.rsiLast !== null && g.rsiLast >= 70 ? t('overbought', 'sobrecompra', 'sobrecomprado') : g.rsiLast !== null && g.rsiLast <= 30 ? t('oversold', 'sobreventa', 'sobrevendido') : '70 / 30'}</text>
             </g>
 
             <text x="0" y={total - 4} className="n-tick" style={{ letterSpacing: '.1em' }}>
-              {source.toUpperCase()}{g.asOf ? ` · ${t('AS OF', 'A LAS')} ${g.asOf}` : ''}
+              {source.toUpperCase()}{g.asOf ? ` · ${t('AS OF', 'A LAS', 'ÀS')} ${g.asOf}` : ''}
             </text>
           </svg>
         )}

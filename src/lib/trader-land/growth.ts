@@ -98,30 +98,30 @@ export function growthLabel(rawSize: unknown, growth: LandGrowth | null | undefi
   const size = landSize(rawSize);
   const side = `${size}×${size}`;
   if (!growth) return side;
-  if (growth.threshold === null || growth.nextSize === null) return `${side} · ${t('full size', 'tamaño máximo')}`;
+  if (growth.threshold === null || growth.nextSize === null) return `${side} · ${t('full size', 'tamaño máximo', 'tamanho máximo')}`;
   return `${side} · ${growth.occupied}/${growth.threshold}`;
 }
 export function grewNotice(grew: Grew): string {
-  return t(`Your island grew to ${grew.to}×${grew.to}`, `Tu isla creció a ${grew.to}×${grew.to}`);
+  return t(`Your island grew to ${grew.to}×${grew.to}`, `Tu isla creció a ${grew.to}×${grew.to}`, `Sua ilha cresceu para ${grew.to}×${grew.to}`);
 }
 export function coreStateLabel(core: LandCore, pieces: number): string {
   return core.stage === 1
-    ? t('Aura Core awake', 'Aura Core despierto')
-    : t(`Aura Core dormant · ${Math.min(pieces, CORE_WAKE_PIECES)}/${CORE_WAKE_PIECES} pieces to wake it`, `Aura Core dormido · ${Math.min(pieces, CORE_WAKE_PIECES)}/${CORE_WAKE_PIECES} piezas para despertarlo`);
+    ? t('Aura Core awake', 'Aura Core despierto', 'Aura Core desperto')
+    : t(`Aura Core dormant · ${Math.min(pieces, CORE_WAKE_PIECES)}/${CORE_WAKE_PIECES} pieces to wake it`, `Aura Core dormido · ${Math.min(pieces, CORE_WAKE_PIECES)}/${CORE_WAKE_PIECES} piezas para despertarlo`, `Aura Core adormecido · ${Math.min(pieces, CORE_WAKE_PIECES)}/${CORE_WAKE_PIECES} peças para despertá-lo`);
 }
 
 export function horizonLabel(hours: number): string {
-  return hours === 72 ? t('3 days', '3 días') : hours === 168 ? t('7 days', '7 días') : `${hours} h`;
+  return hours === 72 ? t('3 days', '3 días', '3 dias') : hours === 168 ? t('7 days', '7 días', '7 dias') : `${hours} h`;
 }
 export function tierLabel(tier: Tier): string {
-  return tier === 'building' ? t('building', 'edificio') : tier === 'landmark' ? t('landmark', 'monumento') : t('common', 'común');
+  return tier === 'building' ? t('building', 'edificio', 'edifício') : tier === 'landmark' ? t('landmark', 'monumento', 'monumento') : t('common', 'común', 'comum');
 }
 /** "3 days · building 2×1" */
 export function horizonOptionLabel(hours: number): string {
   const h = horizonOf(hours);
   return h ? `${horizonLabel(hours)} · ${tierLabel(h.tier)} ${h.footprint[0]}×${h.footprint[1]}` : horizonLabel(hours);
 }
-export const NO_SHORTEN = () => t("You can't shorten it later.", 'No se puede acortar después.');
+export const NO_SHORTEN = () => t("You can't shorten it later.", 'No se puede acortar después.', 'Não dá para encurtar depois.');
 
 function prettyId(id: string, world?: string) {
   const bare = world && id.startsWith(world + '_') ? id.slice(world.length + 1) : id;
@@ -164,17 +164,17 @@ export const isExtendRefusal = (status: number) => EXTEND_REFUSALS.includes(stat
 
 /** What the builder is told once an extend lands: "Horizon set to 3 days. It will bloom as Evidence Workshop." */
 export function extendedNotice(hours: number, piece: string): string {
-  return t(`Horizon set to ${horizonLabel(hours)}. It will bloom as ${piece}.`, `Horizonte de ${horizonLabel(hours)}. Florecerá como ${piece}.`);
+  return t(`Horizon set to ${horizonLabel(hours)}. It will bloom as ${piece}.`, `Horizonte de ${horizonLabel(hours)}. Florecerá como ${piece}.`, `Horizonte definido em ${horizonLabel(hours)}. Vai florescer como ${piece}.`);
 }
 
 /** Server refusals of `extend`, in the reader's language (contract §3). */
 export function extendErrorMessage(status: number, error: unknown): string {
   const text = typeof error === 'string' ? error : '';
-  if (status === 404) return t('This seed is no longer on your island.', 'Esta semilla ya no está en tu isla.');
-  if (/bloomed/i.test(text)) return t('This seed already bloomed.', 'Esta semilla ya floreció.');
-  if (/review/i.test(text)) return t('Its review is already open.', 'Su revisión ya está abierta.');
-  if (/only grow/i.test(text) || status === 400) return t('A horizon can only grow.', 'Un horizonte solo puede crecer.');
-  return text || t('The seed could not be extended. Try again.', 'No se pudo extender la semilla. Inténtalo de nuevo.');
+  if (status === 404) return t('This seed is no longer on your island.', 'Esta semilla ya no está en tu isla.', 'Esta semente não está mais na sua ilha.');
+  if (/bloomed/i.test(text)) return t('This seed already bloomed.', 'Esta semilla ya floreció.', 'Esta semente já floresceu.');
+  if (/review/i.test(text)) return t('Its review is already open.', 'Su revisión ya está abierta.', 'A revisão dela já está aberta.');
+  if (/only grow/i.test(text) || status === 400) return t('A horizon can only grow.', 'Un horizonte solo puede crecer.', 'Um horizonte só pode crescer.');
+  return text || t('The seed could not be extended. Try again.', 'No se pudo extender la semilla. Inténtalo de nuevo.', 'Não foi possível estender a semente. Tente de novo.');
 }
 
 /** A transparent tap target over the art, in island canvas units. */
