@@ -46,10 +46,10 @@ export default function IslandThumb({ placements, manifest, size = 8, core: rawC
     <svg viewBox="30 110 800 520" className={className} role="img" aria-label={title}>
       {title && <title>{title}</title>}
       {/* The slab never changes with the size (constant extent). */}
-      <path d="M62 391 L430 575 L798 391 L798 412 L430 602 L62 412 Z" fill="#0a2527" stroke="#496b60" />
+      <path d="M62 391 L430 575 L798 391 L798 412 L430 602 L62 412 Z" fill="#15120F" stroke="#F2EDE4" strokeOpacity=".12" />
       {Array.from({ length: geom.size * geom.size }, (_, index) => {
         const col = index % geom.size, row = Math.floor(index / geom.size);
-        return <polygon key={index} points={geom.diamond(col, row)} fill={(col + row) % 2 ? '#213e35' : '#244438'} stroke="#92c4a6" strokeOpacity=".17" strokeWidth={u} />;
+        return <polygon key={index} points={geom.diamond(col, row)} fill={(col + row) % 2 ? '#1A1714' : '#1E1B17'} stroke="#F2EDE4" strokeOpacity=".08" strokeWidth={u} />;
       })}
       {drawn.map(({ s, art, frame }) => {
         const x = frame.x, y = frame.y, px = frame.size;

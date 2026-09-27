@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@200;300;400;500&display=swap');
 .land-studio{--land-mint:#a3f5c8;--land-ink:#071111;--land-border:rgba(183,225,207,.12);height:100dvh;min-height:520px;display:flex;flex-direction:column;background:#081312;color:#e7f2eb;font-family:Inter,system-ui,sans-serif;overflow:hidden;color-scheme:dark}
 .land-studio button,.land-studio a{-webkit-tap-highlight-color:transparent}
 .land-studio button{cursor:pointer}
@@ -126,3 +127,67 @@
 .land-studio .land-extend-confirm p{color:#f5d68b}
 .land-extend-confirm .land-selected-actions{margin-top:8px}
 @media(max-width:760px){.land-growth-status{font-size:10px;padding:6px 10px}}
+
+/* ---- Núcleo skin (2026-09-27): the desk's warm charcoal, Sora/Geist type and ivory pills.
+   The island art and district colours are unchanged; only the studio around them moves. ---- */
+.land-studio{--land-mint:#3FE0B5;--land-ink:#0B0A09;--land-border:rgba(242,237,228,.08);--tl-display:'Sora',ui-sans-serif,system-ui,-apple-system,sans-serif;--tl-mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;background:#0B0A09;color:#F2EDE4;font-family:'Geist',ui-sans-serif,system-ui,-apple-system,sans-serif}
+.land-studio button:focus-visible,.land-studio a:focus-visible,.land-map:focus-visible{outline-color:#F2EDE4}
+.land-header{background:#0B0A09}
+.land-wordmark h1,.land-map-caption h2,.land-help h3,.land-loading h1{font-family:var(--tl-display);font-weight:300;letter-spacing:-.02em}
+.land-wordmark h1>span{color:#8A8378;font-family:var(--tl-mono)}
+.land-studio .land-eyebrow,.land-studio .land-zoom-value,.land-studio .land-thesis,.land-studio .land-horizon,.land-studio .land-growth-status,.land-season h4 small,.land-share-link code,.land-library-title small,.land-districts button{font-family:var(--tl-mono)}
+.land-eyebrow{color:#8A8378}
+.land-mode{color:#A39C91}.land-mode i{background:#3FE0B5;box-shadow:0 0 10px #3FE0B555}
+.land-xp span{color:#8A8378}
+.land-icon{color:#A39C91}.land-icon:hover{background:rgba(242,237,228,.06);color:#F2EDE4}
+.land-map{background:radial-gradient(ellipse at 50% 48%,#17131D 0%,#100E0D 42%,#0B0A09 72%)}
+.land-map:before{background-image:radial-gradient(rgba(242,237,228,.2) .7px,transparent .7px);opacity:.14}
+.land-map:after{box-shadow:inset 0 -50px 75px -40px #0B0A09}
+.land-map-caption h2{color:#F2EDE4}.land-map-caption p{color:#A39C91}
+.land-camera,.land-library.collapsed,.land-growth-status{background:rgba(20,17,16,.82);border-color:rgba(242,237,228,.08)}
+.land-growth-status,.land-horizon{color:#A39C91}
+.land-subtle{color:#F2EDE4;background:rgba(242,237,228,.04);border-color:rgba(242,237,228,.1);border-radius:999px}
+.land-primary{color:#0B0A09;background:#F2EDE4;border-color:#F2EDE4;box-shadow:none;border-radius:999px;font-weight:600}.land-primary:hover:enabled{background:#fff}
+.land-placement-bar{border-color:rgba(242,237,228,.12);background:rgba(17,15,14,.96);border-radius:999px}
+.land-placement-status{color:#F2EDE4}.land-placement-status small{color:#8A8378}.land-placement-status.invalid{color:#FF5A5F}
+.land-notice{background:rgba(20,17,16,.94);color:#F2EDE4;border-color:rgba(242,237,228,.1);border-radius:999px}
+.land-error{background:rgba(255,90,95,.1);color:#FF5A5F}
+.land-library{background:#100E0D}
+.land-library-title small{color:#A39C91;background:rgba(242,237,228,.06)}
+.land-library-content{scrollbar-color:#3a3530 transparent}
+.land-districts button{color:#8A8378;background:#0B0A09;border-radius:999px}.land-districts button.active{background:color-mix(in srgb,var(--district-color) 10%,#0B0A09)}
+.land-district-heading>span{color:#8A8378}
+.land-piece{background:rgba(242,237,228,.03);border-color:rgba(242,237,228,.07);color:#F2EDE4}
+.land-piece:hover{background:rgba(242,237,228,.06);border-color:rgba(242,237,228,.16)}
+.land-piece.selected{border-color:#F2EDE4;background:rgba(242,237,228,.08);box-shadow:none}
+.land-piece.placed:not(.selected){background:rgba(242,237,228,.02)}
+.land-piece small{color:#8A8378}
+.land-piece.ready{border-color:#F6B94E66}.land-piece.ready small{color:#F6B94E}
+.land-selected-detail{border-color:rgba(242,237,228,.1);background:rgba(11,10,9,.6)}.land-selected-detail p{color:#A39C91}
+.land-library>.land-selected-detail{box-shadow:0 -10px 24px #100E0D}
+.land-empty{color:#A39C91}
+.land-review-banner{border-color:#F6B94E55;background:rgba(246,185,78,.08);color:#F6B94E}.land-review-banner:hover{background:rgba(246,185,78,.14)}
+.land-thesis{color:#F6B94E}
+.land-season{border-color:#F6B94E33;background:rgba(246,185,78,.05)}.land-season h4,.land-season h4 small,.land-season .land-season-next{color:#F6B94E}.land-season h4 small{background:rgba(246,185,78,.1)}.land-season p,.land-season summary{color:#A39C91}
+.land-collection-footer>span,.land-text-link{color:#F2EDE4}.land-collection-footer p{color:#8A8378}
+.land-help{border-color:rgba(242,237,228,.12);background:rgba(17,15,14,.97)}.land-help p{color:#A39C91}
+.land-load-overlay{background:rgba(11,10,9,.8);color:#A39C91}.land-loading{background:#0B0A09;color:#F2EDE4}.land-loading p{color:#A39C91}
+.land-draft-handle{border-color:#F2EDE4;background:#F2EDE4;color:#0B0A09}.land-draft-handle:active{background:#fff}
+.land-object-hit:focus-visible{background:rgba(242,237,228,.08);outline-color:#F2EDE4}
+.land-ghost{filter:drop-shadow(0 0 9px rgba(63,224,181,.4))}
+.land-studio .aura-sphere{filter:drop-shadow(0 0 8px #3FE0B566)}
+.land-share-field{color:#A39C91}.land-share-field input{border-color:rgba(242,237,228,.12);background:#0B0A09;color:#F2EDE4}.land-share-field input:focus{outline-color:#F2EDE4}
+.land-share-link{background:#0B0A09;border-color:rgba(242,237,228,.08)}.land-share-link code{color:#F2EDE4}
+.land-visitor-districts span{color:#A39C91;border-color:rgba(242,237,228,.1)}
+.land-growth{border-color:rgba(242,237,228,.08);background:linear-gradient(135deg,#17131D,#100E0D)}
+.land-growth>.land-eyebrow{color:#3FE0B5}
+.land-growth h3{font-family:var(--tl-display);font-weight:400}
+.land-growth p,.land-growth li{color:#A39C91}
+.land-growth summary,.land-route-label,.land-discover-link,.land-discover-nav{color:#F2EDE4}
+.land-growth progress{accent-color:#3FE0B5}.land-growth progress::-webkit-progress-bar{background:rgba(242,237,228,.06)}.land-growth progress::-webkit-progress-value{background:#3FE0B5}
+.land-discover-nav{border-radius:999px}
+.land-tools{background:rgba(17,15,14,.94);border-color:rgba(242,237,228,.1);border-radius:999px}
+.land-tools button{color:#A39C91;border-radius:999px}
+.land-tools button[aria-pressed=true]{background:#F2EDE4;color:#0B0A09}
+.land-extend-options .land-subtle small{color:#F6B94E}
+.land-extend-confirm{border-color:#F6B94E55;background:rgba(246,185,78,.08)}.land-studio .land-extend-confirm p{color:#F6B94E}
