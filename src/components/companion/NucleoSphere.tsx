@@ -93,7 +93,7 @@ export default function NucleoSphere({ size, mode, verdict = 'wait', word, sub, 
           boxShadow: `0 0 40px -6px ${ring}73, inset 0 0 40px -12px ${ring}59`, transform: `scale(${showWord ? 1 : 1.08})`, transition: 'transform .6s cubic-bezier(.2,.8,.2,1)' }} />
         <span style={{ display: 'grid', justifyItems: 'center', gap: 6 }}>
           <span className="n-display" style={{ fontSize: wordSize, lineHeight: 1, color: '#FFF8EC', textShadow: '0 2px 24px rgba(42,28,8,.8)', whiteSpace: 'nowrap' }}>{word}</span>
-          {sub && <span className="n-mono" style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: ring }}>{sub}</span>}
+          {sub && <span className="n-mono" style={{ fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', textAlign: 'center', color: ring }}>{sub}</span>}
         </span>
       </div>
       {/* the three voices around the glass while the desk debates */}

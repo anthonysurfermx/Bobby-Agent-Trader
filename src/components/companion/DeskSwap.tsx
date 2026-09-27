@@ -52,7 +52,7 @@ function useQuotePreview(tokenIn: string, tokenOut: string, amount: string | nul
       try {
         const { ok, data } = await deskJson<{ ok?: boolean; error?: string; quote?: { amountOut?: unknown; priceImpactPct?: unknown; txWithheld?: unknown; usdValue?: unknown; limits?: { maxTicketUsd?: unknown } } }>(`/api/base-swap?tokenIn=${encodeURIComponent(tokenIn)}&tokenOut=${encodeURIComponent(tokenOut)}&amount=${encodeURIComponent(amount)}`, { signal: controller.signal });
         if (!active) return;
-        if (!ok || !data.ok || !data.quote) { setError(data.error || t('Quote unavailable right now.', 'Cotización no disponible ahora.')); return; }
+        if (!ok || !data.ok || !data.quote) { setError(data.error || t('Quote unavailable right now.', 'Cotización no disponible ahora.', 'Cotação indisponível no momento.')); return; }
         setPreview({
           amountOut: String(data.quote.amountOut ?? '—'),
           priceImpactPct: typeof data.quote.priceImpactPct === 'number' ? data.quote.priceImpactPct : null,
@@ -61,7 +61,7 @@ function useQuotePreview(tokenIn: string, tokenOut: string, amount: string | nul
           usdValue: typeof data.quote.usdValue === 'number' ? data.quote.usdValue : null,
         });
       } catch {
-        if (active) setError(t('Quote unavailable right now.', 'Cotización no disponible ahora.'));
+        if (active) setError(t('Quote unavailable right now.', 'Cotización no disponible ahora.', 'Cotação indisponível no momento.'));
       }
     }, 350);
     return () => { active = false; controller.abort(); window.clearTimeout(id); };
@@ -128,15 +128,15 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
   return (
     <div className="rounded-xl border border-sky-400/25 bg-sky-400/[0.04] p-4 space-y-3">
       <div className="flex items-center justify-between gap-3 text-[10px] font-mono tracking-[0.2em]">
-        <span className="flex items-center gap-2 whitespace-nowrap text-sky-300"><ArrowLeftRight size={12} />{t('SWAP ON BASE', 'SWAP EN BASE')}</span>
-        <span className="whitespace-nowrap text-white/40">{t('YOU SIGN', 'TÚ FIRMAS')}<span className="hidden sm:inline">{t(' · BOBBY NEVER DOES', ' · BOBBY NUNCA')}</span></span>
+        <span className="flex items-center gap-2 whitespace-nowrap text-sky-300"><ArrowLeftRight size={12} />{t('SWAP ON BASE', 'SWAP EN BASE', 'SWAP NA BASE')}</span>
+        <span className="whitespace-nowrap text-white/40">{t('YOU SIGN', 'TÚ FIRMAS', 'VOCÊ ASSINA')}<span className="hidden sm:inline">{t(' · BOBBY NEVER DOES', ' · BOBBY NUNCA', ' · O BOBBY NUNCA')}</span></span>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex rounded-lg border border-white/[0.08] bg-black/30 p-0.5">{sideButton('buy', t('BUY', 'COMPRAR'))}{sideButton('sell', t('SELL', 'VENDER'))}</div>
+        <div className="flex rounded-lg border border-white/[0.08] bg-black/30 p-0.5">{sideButton('buy', t('BUY', 'COMPRAR', 'COMPRAR'))}{sideButton('sell', t('SELL', 'VENDER', 'VENDER'))}</div>
         {isConnected && (
           <span className="font-mono text-[10px] text-white/45">
-            {t('Balance', 'Saldo')}: {side === 'buy'
+            {t('Balance', 'Saldo', 'Saldo')}: {side === 'buy'
               ? `${usdcBalance ? usdcBalance.text : '…'} USDC`
               : `${assetBalance ? assetBalance.text : '…'} ${token.symbol}`}
           </span>
@@ -146,24 +146,24 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
       <div className="flex flex-wrap items-end gap-2">
         {pickable ? (
           <label className="min-w-[160px] flex-1">
-            <span className="block text-[9px] font-mono tracking-[0.2em] text-white/40">{side === 'buy' ? t('BUY', 'COMPRAR') : t('SELL', 'VENDER')}</span>
-            <select value={token.symbol} onChange={(e) => { const next = findBaseToken(e.target.value); if (next) { setToken(next); setQty(''); } }} aria-label={t('Token', 'Token')} className="mt-1 w-full rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-sky-400/50">
-              <optgroup label={t('Crypto', 'Cripto')}>{crypto.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol} · {item.name}</option>)}</optgroup>
-              {stocks.length > 0 && <optgroup label={t('Tokenized stocks (Coinbase B20)', 'Acciones tokenizadas (Coinbase B20)')}>{stocks.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol} · {item.underlyingSymbol}</option>)}</optgroup>}
+            <span className="block text-[9px] font-mono tracking-[0.2em] text-white/40">{side === 'buy' ? t('BUY', 'COMPRAR', 'COMPRAR') : t('SELL', 'VENDER', 'VENDER')}</span>
+            <select value={token.symbol} onChange={(e) => { const next = findBaseToken(e.target.value); if (next) { setToken(next); setQty(''); } }} aria-label={t('Token', 'Token', 'Token')} className="mt-1 w-full rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-sky-400/50">
+              <optgroup label={t('Crypto', 'Cripto', 'Cripto')}>{crypto.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol} · {item.name}</option>)}</optgroup>
+              {stocks.length > 0 && <optgroup label={t('Tokenized stocks (Coinbase B20)', 'Acciones tokenizadas (Coinbase B20)', 'Ações tokenizadas (Coinbase B20)')}>{stocks.map((item) => <option key={item.symbol} value={item.symbol}>{item.symbol} · {item.underlyingSymbol}</option>)}</optgroup>}
             </select>
           </label>
         ) : (
           <div className="min-w-[140px] flex-1">
-            <div className="text-[9px] font-mono tracking-[0.2em] text-white/40">{side === 'buy' ? t('BUY', 'COMPRAR') : t('SELL', 'VENDER')}</div>
+            <div className="text-[9px] font-mono tracking-[0.2em] text-white/40">{side === 'buy' ? t('BUY', 'COMPRAR', 'COMPRAR') : t('SELL', 'VENDER', 'VENDER')}</div>
             <div className="mt-1 text-lg font-semibold text-white">{token.symbol}<span className="ml-2 text-xs font-normal text-white/45">{token.name}</span></div>
           </div>
         )}
         {side === 'buy' ? (
           <label className="w-36">
-            <span className="block text-[9px] font-mono tracking-[0.2em] text-white/40">{t('WITH USDC', 'CON USDC')}</span>
+            <span className="block text-[9px] font-mono tracking-[0.2em] text-white/40">{t('WITH USDC', 'CON USDC', 'COM USDC')}</span>
             <div className="mt-1 flex items-center rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2 text-sm text-white focus-within:border-sky-400/50">
               <span className="text-white/45">$</span>
-              <input type="number" inputMode="decimal" min={BASE_SWAP_LIMITS.minTicketUsd} max={cap} step="0.01" value={Number.isFinite(usd) ? usd : ''} onChange={(e) => { setTouched(true); setUsd(Number(e.target.value)); }} aria-label={t('Amount in USDC', 'Monto en USDC')} className="w-full min-w-0 bg-transparent pl-1 outline-none" />
+              <input type="number" inputMode="decimal" min={BASE_SWAP_LIMITS.minTicketUsd} max={cap} step="0.01" value={Number.isFinite(usd) ? usd : ''} onChange={(e) => { setTouched(true); setUsd(Number(e.target.value)); }} aria-label={t('Amount in USDC', 'Monto en USDC', 'Valor em USDC')} className="w-full min-w-0 bg-transparent pl-1 outline-none" />
               {usdcBalance && usdcBalance.units >= BASE_SWAP_LIMITS.minTicketUsd && (
                 <button type="button" onClick={() => { setTouched(true); setUsd(Math.floor(Math.min(usdcBalance.units, cap) * 100) / 100); }} className="ml-1 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">MAX</button>
               )}
@@ -171,9 +171,9 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
           </label>
         ) : (
           <label className="w-44">
-            <span className="block text-[9px] font-mono tracking-[0.2em] text-white/40">{t('AMOUNT', 'CANTIDAD')}</span>
+            <span className="block text-[9px] font-mono tracking-[0.2em] text-white/40">{t('AMOUNT', 'CANTIDAD', 'QUANTIDADE')}</span>
             <div className="mt-1 flex items-center rounded-lg border border-white/[0.1] bg-black/40 px-3 py-2 text-sm text-white focus-within:border-sky-400/50">
-              <input type="number" inputMode="decimal" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" aria-label={t(`Amount of ${token.symbol} to sell`, `Cantidad de ${token.symbol} a vender`)} className="w-full min-w-0 bg-transparent outline-none" />
+              <input type="number" inputMode="decimal" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" aria-label={t(`Amount of ${token.symbol} to sell`, `Cantidad de ${token.symbol} a vender`, `Quantidade de ${token.symbol} para vender`)} className="w-full min-w-0 bg-transparent outline-none" />
               <span className="ml-1 text-[10px] text-white/45">{token.symbol}</span>
               {assetBalance && assetBalance.units > 0 && !token.native && (
                 <button type="button" onClick={() => setQty(formatUnits(assetBalance.raw, token.decimals))} className="ml-2 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">MAX</button>
@@ -186,53 +186,53 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
       <div className="text-[11px] font-mono text-white/55 min-h-[16px]">
         {!valid
           ? side === 'buy'
-            ? t(`Between $${BASE_SWAP_LIMITS.minTicketUsd} and $${cap} per ticket.`, `Entre $${BASE_SWAP_LIMITS.minTicketUsd} y $${cap} por ticket.`)
+            ? t(`Between $${BASE_SWAP_LIMITS.minTicketUsd} and $${cap} per ticket.`, `Entre $${BASE_SWAP_LIMITS.minTicketUsd} y $${cap} por ticket.`, `Entre $${BASE_SWAP_LIMITS.minTicketUsd} e $${cap} por ticket.`)
             : assetBalance && assetBalance.units === 0
-              ? t(`No ${token.symbol} in this wallet.`, `No hay ${token.symbol} en esta wallet.`)
-              : t(`Enter how much ${token.symbol} to sell, up to your balance.`, `Escribe cuánto ${token.symbol} vender, hasta tu saldo.`)
+              ? t(`No ${token.symbol} in this wallet.`, `No hay ${token.symbol} en esta wallet.`, `Não há ${token.symbol} nesta carteira.`)
+              : t(`Enter how much ${token.symbol} to sell, up to your balance.`, `Escribe cuánto ${token.symbol} vender, hasta tu saldo.`, `Digite quanto ${token.symbol} vender, até o seu saldo.`)
           : error
             ? <span className="text-amber-300">{error}</span>
             : preview
               ? side === 'buy'
-                ? <>≈ {preview.amountOut} {token.symbol}{preview.priceImpactPct !== null ? ` · ${t('impact', 'impacto')} ${preview.priceImpactPct.toFixed(2)}%` : ''}</>
-                : <>≈ ${preview.amountOut} USDC{preview.priceImpactPct !== null ? ` · ${t('impact', 'impacto')} ${preview.priceImpactPct.toFixed(2)}%` : ''}</>
-              : t('Quoting on Uniswap V3…', 'Cotizando en Uniswap V3…')}
+                ? <>≈ {preview.amountOut} {token.symbol}{preview.priceImpactPct !== null ? ` · ${t('impact', 'impacto', 'impacto')} ${preview.priceImpactPct.toFixed(2)}%` : ''}</>
+                : <>≈ ${preview.amountOut} USDC{preview.priceImpactPct !== null ? ` · ${t('impact', 'impacto', 'impacto')} ${preview.priceImpactPct.toFixed(2)}%` : ''}</>
+              : t('Quoting on Uniswap V3…', 'Cotizando en Uniswap V3…', 'Cotando na Uniswap V3…')}
       </div>
       {preview?.withheld.length ? (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-400/[0.05] px-3 py-2 text-[11px] text-amber-200/90">
-          <span>{t('Quote only for now: ', 'Por ahora solo cotización: ')}{preview.withheld.join(' · ')}</span>
-          {side === 'buy' && usd > cap && <button type="button" onClick={() => { setTouched(true); setUsd(Math.max(BASE_SWAP_LIMITS.minTicketUsd, Math.floor(cap))); }} className="rounded-md border border-amber-300/40 px-2 py-0.5 font-mono text-[10px] text-amber-200 hover:bg-amber-300/10">{t(`Use $${Math.floor(cap)}`, `Usar $${Math.floor(cap)}`)}</button>}
+          <span>{t('Quote only for now: ', 'Por ahora solo cotización: ', 'Por enquanto, só cotação: ')}{preview.withheld.join(' · ')}</span>
+          {side === 'buy' && usd > cap && <button type="button" onClick={() => { setTouched(true); setUsd(Math.max(BASE_SWAP_LIMITS.minTicketUsd, Math.floor(cap))); }} className="rounded-md border border-amber-300/40 px-2 py-0.5 font-mono text-[10px] text-amber-200 hover:bg-amber-300/10">{t(`Use $${Math.floor(cap)}`, `Usar $${Math.floor(cap)}`, `Usar $${Math.floor(cap)}`)}</button>}
         </div>
       ) : null}
       {isConnected && valid && (insufficient || overCap || !spendBalance) && (
         <p role="status" className="text-xs text-amber-200">
-          {insufficient ? t('Insufficient balance on Base for this amount.', 'Saldo insuficiente en Base para este monto.')
-            : overCap ? t(`The current ticket limit is $${cap}. Reduce the amount.`, `El límite actual es $${cap}. Reduce el monto.`)
-            : t('Waiting for your Base balance before preparing a swap.', 'Esperando tu saldo en Base antes de preparar el swap.')}
+          {insufficient ? t('Insufficient balance on Base for this amount.', 'Saldo insuficiente en Base para este monto.', 'Saldo insuficiente na Base para este valor.')
+            : overCap ? t(`The current ticket limit is $${cap}. Reduce the amount.`, `El límite actual es $${cap}. Reduce el monto.`, `O limite atual por ticket é $${cap}. Reduza o valor.`)
+            : t('Waiting for your Base balance before preparing a swap.', 'Esperando tu saldo en Base antes de preparar el swap.', 'Aguardando seu saldo na Base antes de preparar o swap.')}
         </p>
       )}
-      {side === 'sell' && token.native && <p className="text-xs text-white/50">{t('Leave some ETH in your wallet for network fees.', 'Deja algo de ETH en tu wallet para las comisiones de red.')}</p>}
+      {side === 'sell' && token.native && <p className="text-xs text-white/50">{t('Leave some ETH in your wallet for network fees.', 'Deja algo de ETH en tu wallet para las comisiones de red.', 'Deixe um pouco de ETH na carteira para as taxas de rede.')}</p>}
       {stock && (
         <div className="text-[10px] font-mono leading-relaxed text-white/40">
-          {t('Coinbase tokenized stock (B20). It is not the underlying share. Not offered to U.S. persons or restricted countries; you attest before anything is built, buying or selling.', 'Acción tokenizada por Coinbase (B20). No es la acción subyacente. No se ofrece a personas de EE. UU. ni a países restringidos; tú lo atestiguas antes de construir nada, al comprar o al vender.')}
+          {t('Coinbase tokenized stock (B20). It is not the underlying share. Not offered to U.S. persons or restricted countries; you attest before anything is built, buying or selling.', 'Acción tokenizada por Coinbase (B20). No es la acción subyacente. No se ofrece a personas de EE. UU. ni a países restringidos; tú lo atestiguas antes de construir nada, al comprar o al vender.', 'Ação tokenizada pela Coinbase (B20). Não é a ação subjacente. Não é oferecida a pessoas dos EUA nem a países restritos; você declara isso antes de qualquer transação ser montada, na compra ou na venda.')}
         </div>
       )}
 
       {!isConnected ? (
         <button type="button" onClick={() => void open()} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-sky-400/40 bg-sky-500/15 font-mono text-xs font-bold tracking-[0.14em] text-sky-300 transition hover:bg-sky-500/25">
-          <Wallet size={14} />{t('CONNECT WALLET', 'CONECTAR WALLET')}
+          <Wallet size={14} />{t('CONNECT WALLET', 'CONECTAR WALLET', 'CONECTAR CARTEIRA')}
         </button>
       ) : !armed ? (
         <div className="flex items-center gap-3">
-          <button type="button" disabled={!valid || !readyToPrepare} onClick={() => setArmed(true)} className="h-11 flex-1 rounded-xl bg-sky-400 font-mono text-xs font-bold tracking-[0.14em] text-black transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-40">{side === 'buy' ? t('PREPARE BUY', 'PREPARAR COMPRA') : t('PREPARE SELL', 'PREPARAR VENTA')}</button>
+          <button type="button" disabled={!valid || !readyToPrepare} onClick={() => setArmed(true)} className="h-11 flex-1 rounded-xl bg-sky-400 font-mono text-xs font-bold tracking-[0.14em] text-black transition hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-40">{side === 'buy' ? t('PREPARE BUY', 'PREPARAR COMPRA', 'PREPARAR COMPRA') : t('PREPARE SELL', 'PREPARAR VENTA', 'PREPARAR VENDA')}</button>
           <span className="font-mono text-[10px] text-white/40">{shortAddress}</span>
         </div>
       ) : (
-        <SwapConfirm key={`${side}-${token.symbol}-${side === 'buy' ? usd : trade.amountIn}`} trade={trade} walletAddress={address} title={t('Your swap · you review, you sign:', 'Tu swap · tú revisas, tú firmas:')} />
+        <SwapConfirm key={`${side}-${token.symbol}-${side === 'buy' ? usd : trade.amountIn}`} trade={trade} walletAddress={address} title={t('Your swap · you review, you sign:', 'Tu swap · tú revisas, tú firmas:', 'Seu swap · você revisa, você assina:')} />
       )}
 
       <div className="text-[9px] font-mono tracking-[0.12em] text-white/30">
-        {t(`Base · Uniswap V3 · max $${cap} per ticket · analysis is not advice`, `Base · Uniswap V3 · máx. $${cap} por ticket · el análisis no es asesoría`)}
+        {t(`Base · Uniswap V3 · max $${cap} per ticket · analysis is not advice`, `Base · Uniswap V3 · máx. $${cap} por ticket · el análisis no es asesoría`, `Base · Uniswap V3 · máx. $${cap} por ticket · a análise não é recomendação`)}
       </div>
     </div>
   );
@@ -259,10 +259,10 @@ export function SwapSheet({ initialSymbol, onClose }: { initialSymbol?: string |
         <Dialog.Content aria-describedby={undefined} className="fixed left-1/2 top-1/2 z-[61] flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0c] text-white shadow-2xl">
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] p-4">
             <div>
-              <Dialog.Title className="font-mono text-sm tracking-[0.15em]">{t('Swap on Base', 'Swap en Base')}</Dialog.Title>
-              <div className="mt-0.5 text-[10px] font-mono tracking-[0.12em] text-white/40">{t('Your wallet signs. Bobby prepares and verifies.', 'Tu wallet firma. Bobby prepara y verifica.')}</div>
+              <Dialog.Title className="font-mono text-sm tracking-[0.15em]">{t('Swap on Base', 'Swap en Base', 'Swap na Base')}</Dialog.Title>
+              <div className="mt-0.5 text-[10px] font-mono tracking-[0.12em] text-white/40">{t('Your wallet signs. Bobby prepares and verifies.', 'Tu wallet firma. Bobby prepara y verifica.', 'Sua carteira assina. O Bobby prepara e verifica.')}</div>
             </div>
-            <Dialog.Close aria-label={t('Close and return to desk', 'Cerrar y volver al desk')} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/[0.06] text-white/80 hover:bg-white/10"><X size={20} /></Dialog.Close>
+            <Dialog.Close aria-label={t('Close and return to desk', 'Cerrar y volver al desk', 'Fechar e voltar ao desk')} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/[0.06] text-white/80 hover:bg-white/10"><X size={20} /></Dialog.Close>
           </div>
           <div className="min-h-0 overflow-y-auto overscroll-contain p-4">
             <SwapPanel initial={initial} conviction={null} pickable />

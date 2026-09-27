@@ -89,23 +89,23 @@ export function isNoTrade(a: Answer) {
 }
 export function noTradeReason(a: Answer) {
   const s = (a.signal ?? '').toLowerCase();
-  if (s.includes('neutral') || s.includes('wait')) return t('No clean directional signal passed the desk.', 'Ninguna señal direccional limpia pasó el desk.');
-  if (!a.direction) return t('The agents did not reach directional consensus.', 'Los agentes no llegaron a consenso direccional.');
-  if ((a.convictionPct ?? 0) < 55) return t("Conviction stayed below Bobby's 55% risk gate.", 'La convicción quedó debajo del filtro de riesgo de 55% de Bobby.');
-  return t('The setup did not include a complete entry, stop and target.', 'El setup no incluyó entrada, stop y objetivo completos.');
+  if (s.includes('neutral') || s.includes('wait')) return t('No clean directional signal passed the desk.', 'Ninguna señal direccional limpia pasó el desk.', 'Nenhum sinal direcional limpo passou pelo desk.');
+  if (!a.direction) return t('The agents did not reach directional consensus.', 'Los agentes no llegaron a consenso direccional.', 'Os agentes não chegaram a um consenso de direção.');
+  if ((a.convictionPct ?? 0) < 55) return t("Conviction stayed below Bobby's 55% risk gate.", 'La convicción quedó debajo del filtro de riesgo de 55% de Bobby.', 'A convicção ficou abaixo do filtro de risco de 55% do Bobby.');
+  return t('The setup did not include a complete entry, stop and target.', 'El setup no incluyó entrada, stop y objetivo completos.', 'O setup não trouxe entrada, stop e alvo completos.');
 }
 export function localizedTrend(raw: string) {
   const s = raw.toLowerCase();
-  if (s.includes('alcista') || s.includes('bull') || s.includes('up')) return t('bullish', 'alcista');
-  if (s.includes('bajista') || s.includes('bear') || s.includes('down')) return t('bearish', 'bajista');
-  if (s.includes('lateral') || s.includes('range') || s.includes('side')) return t('sideways', 'lateral');
+  if (s.includes('alcista') || s.includes('bull') || s.includes('up')) return t('bullish', 'alcista', 'de alta');
+  if (s.includes('bajista') || s.includes('bear') || s.includes('down')) return t('bearish', 'bajista', 'de baixa');
+  if (s.includes('lateral') || s.includes('range') || s.includes('side')) return t('sideways', 'lateral', 'lateral');
   return raw;
 }
 export function localizedMomentum(raw: string) {
   const s = raw.toLowerCase();
-  if (s.includes('sobrecompra') || s.includes('overbought')) return t('overbought', 'sobrecompra');
-  if (s.includes('sobreventa') || s.includes('oversold')) return t('oversold', 'sobreventa');
-  return t('neutral', 'neutral');
+  if (s.includes('sobrecompra') || s.includes('overbought')) return t('overbought', 'sobrecompra', 'sobrecomprado');
+  if (s.includes('sobreventa') || s.includes('oversold')) return t('oversold', 'sobreventa', 'sobrevendido');
+  return t('neutral', 'neutral', 'neutro');
 }
 // ---- The three agents, from one answer ----
 // The desk endpoint returns one technical read (price, trend, RSI, levels, a
@@ -124,9 +124,9 @@ export function debateFor(a: Answer): Debate {
   const withSide = direction !== 'none';
   const long = direction === 'long';
   const conv = a.convictionPct !== null ? Math.round(a.convictionPct) : null;
-  const read = [a.trend ? t(`trend ${localizedTrend(a.trend)}`, `tendencia ${localizedTrend(a.trend)}`) : null, a.rsi !== null ? `RSI ${Math.round(a.rsi)}` : null].filter(Boolean).join(', ');
+  const read = [a.trend ? t(`trend ${localizedTrend(a.trend)}`, `tendencia ${localizedTrend(a.trend)}`, `tendência ${localizedTrend(a.trend)}`) : null, a.rsi !== null ? `RSI ${Math.round(a.rsi)}` : null].filter(Boolean).join(', ');
   const heat = a.momentum && a.momentum !== 'neutral' ? localizedMomentum(a.momentum) : null;
-  const heatNote = heat && heat !== t('neutral', 'neutral') ? t(` RSI ${heat}.`, ` RSI en ${heat}.`) : '';
+  const heatNote = heat && heat !== t('neutral', 'neutral', 'neutro') ? t(` RSI ${heat}.`, ` RSI en ${heat}.`, ` RSI ${heat}.`) : '';
   // Zones about one ATR wide, the same rule the voice desk follows; no ATR, no band.
   const half = a.atrPct !== null && a.price !== null ? a.price * (a.atrPct / 100) * 0.5 : null;
   const zone = (price: number, towards: 1 | -1) => (half ? price + half * towards : undefined);
@@ -135,37 +135,39 @@ export function debateFor(a: Answer): Debate {
 
   let alpha: Stance;
   if (withSide && a.entry !== null) {
-    alpha = { key: 'alpha', name: 'ALPHA HUNTER', score: conv, line: t(`${long ? 'Bullish' : 'Bearish'} setup: ${read}. Entry ${money(a.entry)}.`, `Setup ${long ? 'alcista' : 'bajista'}: ${read}. Entrada ${money(a.entry)}.`), level: { kind: 'entry', price: a.entry, label: t('entry', 'entrada'), to: zone(a.entry, back) } };
+    alpha = { key: 'alpha', name: 'ALPHA HUNTER', score: conv, line: t(`${long ? 'Bullish' : 'Bearish'} setup: ${read}. Entry ${money(a.entry)}.`, `Setup ${long ? 'alcista' : 'bajista'}: ${read}. Entrada ${money(a.entry)}.`, `Setup ${long ? 'de alta' : 'de baixa'}: ${read}. Entrada ${money(a.entry)}.`), level: { kind: 'entry', price: a.entry, label: t('entry', 'entrada', 'entrada'), to: zone(a.entry, back) } };
   } else {
     const watch = a.support ?? a.resistance;
-    alpha = { key: 'alpha', name: 'ALPHA HUNTER', score: conv, line: t(`No clean setup${read ? `: ${read}` : ''}.${watch !== null ? ` Watching ${money(watch)}.` : ''}`, `Sin setup limpio${read ? `: ${read}` : ''}.${watch !== null ? ` Vigila ${money(watch)}.` : ''}`), level: watch !== null ? { kind: 'entry', price: watch, label: a.support !== null ? t('support', 'soporte') : t('resistance', 'resistencia') } : null };
+    alpha = { key: 'alpha', name: 'ALPHA HUNTER', score: conv, line: t(`No clean setup${read ? `: ${read}` : ''}.${watch !== null ? ` Watching ${money(watch)}.` : ''}`, `Sin setup limpio${read ? `: ${read}` : ''}.${watch !== null ? ` Vigila ${money(watch)}.` : ''}`, `Sem setup limpo${read ? `: ${read}` : ''}.${watch !== null ? ` De olho em ${money(watch)}.` : ''}`), level: watch !== null ? { kind: 'entry', price: watch, label: a.support !== null ? t('support', 'soporte', 'suporte') : t('resistance', 'resistencia', 'resistência') } : null };
   }
 
   const severity = conv !== null ? Math.max(0, Math.min(100, 100 - conv)) : null;
   let red: Stance;
   if (withSide && a.stop !== null) {
-    red = { key: 'red', name: 'RED TEAM', score: severity, line: t(`Thesis breaks ${long ? 'below' : 'above'} ${money(a.stop)}.${heatNote}`, `La tesis se rompe si ${long ? 'pierde' : 'supera'} ${money(a.stop)}.${heatNote}`), level: { kind: 'stop', price: a.stop, label: t('invalidation', 'invalidación'), to: zone(a.stop, back) } };
+    red = { key: 'red', name: 'RED TEAM', score: severity, line: t(`Thesis breaks ${long ? 'below' : 'above'} ${money(a.stop)}.${heatNote}`, `La tesis se rompe si ${long ? 'pierde' : 'supera'} ${money(a.stop)}.${heatNote}`, `A tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(a.stop)}.${heatNote}`), level: { kind: 'stop', price: a.stop, label: t('invalidation', 'invalidación', 'invalidação'), to: zone(a.stop, back) } };
   } else if (a.support !== null && a.resistance !== null) {
-    red = { key: 'red', name: 'RED TEAM', score: severity, line: t(`No edge between ${money(a.support)} and ${money(a.resistance)}.${heatNote}`, `Sin ventaja entre ${money(a.support)} y ${money(a.resistance)}.${heatNote}`), level: { kind: 'stop', price: a.resistance, label: t('resistance', 'resistencia') } };
+    red = { key: 'red', name: 'RED TEAM', score: severity, line: t(`No edge between ${money(a.support)} and ${money(a.resistance)}.${heatNote}`, `Sin ventaja entre ${money(a.support)} y ${money(a.resistance)}.${heatNote}`, `Sem vantagem entre ${money(a.support)} e ${money(a.resistance)}.${heatNote}`), level: { kind: 'stop', price: a.resistance, label: t('resistance', 'resistencia', 'resistência') } };
   } else {
-    red = { key: 'red', name: 'RED TEAM', score: severity, line: t('Not enough structure to defend a thesis.', 'No hay estructura suficiente para defender una tesis.'), level: null };
+    red = { key: 'red', name: 'RED TEAM', score: severity, line: t('Not enough structure to defend a thesis.', 'No hay estructura suficiente para defender una tesis.', 'Não há estrutura suficiente para defender uma tese.'), level: null };
   }
 
   const rr = a.rewardRisk !== null ? ` · R:R ${a.rewardRisk.toFixed(1)}` : '';
   const cio: Stance = withSide && a.target !== null
-    ? { key: 'cio', name: 'CIO', score: conv, line: t(`${conv}% conviction · target ${money(a.target)}${rr}`, `${conv}% de convicción · objetivo ${money(a.target)}${rr}`), level: { kind: 'target', price: a.target, label: t('target', 'objetivo'), to: zone(a.target, ahead) } }
+    ? { key: 'cio', name: 'CIO', score: conv, line: t(`${conv}% conviction · target ${money(a.target)}${rr}`, `${conv}% de convicción · objetivo ${money(a.target)}${rr}`, `${conv}% de convicção · alvo ${money(a.target)}${rr}`), level: { kind: 'target', price: a.target, label: t('target', 'objetivo', 'alvo'), to: zone(a.target, ahead) } }
     : { key: 'cio', name: 'CIO', score: conv, line: noTradeReason(a), level: null };
 
   const headline = direction === 'none' ? 'NO TRADE' : `${direction.toUpperCase()}${conv !== null ? ` ${conv}%` : ''}`;
-  const at = a.price !== null ? t(`${a.symbol} is at ${money(a.price)}. `, `${a.symbol} está en ${money(a.price)}. `) : '';
+  const at = a.price !== null ? t(`${a.symbol} is at ${money(a.price)}. `, `${a.symbol} está en ${money(a.price)}. `, `${a.symbol} está em ${money(a.price)}. `) : '';
   const spoken = withSide && a.entry !== null && a.stop !== null && a.target !== null
     ? at + t(
       `Alpha Hunter sees a ${long ? 'bullish' : 'bearish'} setup${read ? `: ${read}` : ''}, entry at ${money(a.entry)}. Red Team: the thesis breaks ${long ? 'below' : 'above'} ${money(a.stop)}. CIO: ${long ? 'bullish' : 'bearish'} bias with ${conv}% conviction, target ${money(a.target)}. Reference only.`,
       `Alpha Hunter ve setup ${long ? 'alcista' : 'bajista'}${read ? `: ${read}` : ''}, entrada en ${money(a.entry)}. Red Team: la tesis se rompe si ${long ? 'pierde' : 'supera'} ${money(a.stop)}. CIO: sesgo ${long ? 'alcista' : 'bajista'} con ${conv}% de convicción, objetivo ${money(a.target)}. Solo referencia.`,
+      `Alpha Hunter vê um setup ${long ? 'de alta' : 'de baixa'}${read ? `: ${read}` : ''}, entrada em ${money(a.entry)}. Red Team: a tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(a.stop)}. CIO: viés ${long ? 'de alta' : 'de baixa'} com ${conv}% de convicção, alvo ${money(a.target)}. Apenas referência.`,
     )
     : at + t(
       `Alpha Hunter finds no clean setup${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protected. ${noTradeReason(a)}`,
       `Alpha Hunter no ve un setup limpio${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a)}`,
+      `Alpha Hunter não vê um setup limpo${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a)}`,
     );
   return { stances: [alpha, red, cio], headline, spoken, noTrade, direction };
 }

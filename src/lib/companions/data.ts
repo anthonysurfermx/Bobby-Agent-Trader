@@ -23,29 +23,29 @@ export interface Companion {
 }
 
 export const COMPANIONS: Companion[] = [
-  { id: 'orb', label: 'BOBBY', role: { en: 'ORB · CORE', es: 'ORB · NÚCLEO' }, personality: { en: 'the core that orchestrates the squad', es: 'el núcleo que orquesta al squad' }, selectLine: { en: 'Ready. We read the market together, calmly.', es: 'Listo. Leemos el mercado juntos, con calma.' }, secretPhrase: { en: 'The market rewards who waits better, not who runs faster.', es: 'El mercado premia al que espera mejor, no al que corre más.' }, hue: 0.415, requiredLevel: 1, voicePersona: 'ash', evolutionNames: ['BOBBY', 'BOBBY LINK', 'BOBBY CORE', 'BOBBY PRIME', 'BOBBY OMEGA'], palette: 'matrix' },
-  { id: 'byte', label: 'BYTE', role: { en: 'PLAIN SPEAK', es: 'VOZ SIMPLE' }, personality: { en: 'explains it without the jargon', es: 'te lo explica sin tecnicismos' }, selectLine: { en: 'Hey. I keep it simple, no jargon.', es: 'Hola. Yo te lo digo fácil, sin rollos.' }, secretPhrase: { en: 'If you cannot explain it simply, do not trade it.', es: 'Si no lo puedes explicar simple, no lo operes.' }, hue: 0.415, requiredLevel: 1, voicePersona: 'ballad', evolutionNames: ['BYTE', 'KILOBYTE', 'MEGABYTE', 'GIGABYTE', 'TERABYTE'], palette: 'matrix' },
-  { id: 'kora', label: 'KORA', role: { en: 'CONVERSATION', es: 'CONVERSACIÓN' }, personality: { en: 'talks markets like your best friend', es: 'platica del mercado como tu bestie' }, selectLine: { en: 'I am here. Tell me what is on your mind.', es: 'Aquí andamos. Cuéntame qué traes en mente.' }, secretPhrase: { en: 'The best decisions come from better questions.', es: 'Las mejores decisiones salen de las buenas preguntas.' }, hue: 0.415, requiredLevel: 1, voicePersona: 'coral', evolutionNames: ['KORA', 'KORA ECO', 'KORA AURORA', 'KORA NOVA', 'KORA SUPERNOVA'], palette: 'matrix' },
-  { id: 'zip', label: 'ZIP', role: { en: 'ALERTS', es: 'ALERTAS' }, personality: { en: 'fast to alert you, never to rush you', es: 'rápido para avisarte, nunca para apurarte' }, selectLine: { en: 'On it. If something moves, I will tell you.', es: 'Al tiro. Si algo se mueve, te aviso yo.' }, secretPhrase: { en: 'Speed is for alerting, not for deciding.', es: 'La velocidad sirve para avisar, no para decidir.' }, hue: 0.415, requiredLevel: 1, voicePersona: 'sage', evolutionNames: ['ZIP', 'ZIP PULSE', 'ZIP STORM', 'ZIP SONIC', 'ZIP LIGHTSPEED'], palette: 'matrix' },
-  { id: 'glitch', label: 'GLITCH', role: { en: 'RED TEAM', es: 'RED TEAM' }, personality: { en: 'questions you before you get excited', es: 'te cuestiona antes de que te emociones' }, selectLine: { en: 'Sure about that? Let me break your thesis first.', es: '¿Seguro? Déjame romper tu tesis primero.' }, secretPhrase: { en: 'Every thesis deserves an enemy before your money.', es: 'Toda tesis merece un enemigo antes que tu dinero.' }, hue: 0.745, requiredLevel: 2, voicePersona: 'cedar', evolutionNames: ['GLITCH', 'GLITCH EDGE', 'GLITCH PROBE', 'GLITCH BREAKER', 'GLITCH ZERO'], palette: 'plasma' },
-  { id: 'momo', label: 'MOMO', role: { en: 'EXPLORATION', es: 'EXPLORACIÓN' }, personality: { en: 'explores with you, never afraid to ask', es: 'curiosea contigo sin miedo a preguntar' }, selectLine: { en: 'What if we explore something new today?', es: '¿Y si exploramos algo nuevo hoy?' }, secretPhrase: { en: 'Exploring costs no capital. Executing does.', es: 'Explorar no cuesta capital. Ejecutar sí.' }, hue: 0.745, requiredLevel: 2, voicePersona: 'marin', evolutionNames: ['MOMO', 'MOMO SCOUT', 'MOMO VOYAGER', 'MOMO COSMOS', 'MOMO INFINITE'], palette: 'plasma' },
-  { id: 'flux', label: 'FLUX', role: { en: 'SIGNALS', es: 'SEÑALES' }, personality: { en: 'finds the context before the noise', es: 'detecta el contexto antes que el ruido' }, selectLine: { en: 'Signal detected. Context first, noise later.', es: 'Señal detectada. Contexto primero, ruido después.' }, secretPhrase: { en: 'A signal without context is just pretty noise.', es: 'Una señal sin contexto es solo ruido bonito.' }, hue: 0.505, requiredLevel: 3, voicePersona: 'alloy', evolutionNames: ['FLUX', 'FLUX WAVE', 'FLUX RADAR', 'FLUX QUANTUM', 'FLUX SIGMA'], palette: 'ice' },
-  { id: 'rook', label: 'ROOK', role: { en: 'THESIS', es: 'TESIS' }, personality: { en: 'builds the plan: entry, stop, invalidation', es: 'arma el plan: entrada, stop, invalidación' }, selectLine: { en: 'Thesis in progress. Entry, stop, invalidation.', es: 'Tesis en construcción. Entrada, stop, invalidación.' }, secretPhrase: { en: 'With no written invalidation it is not a thesis: it is hope.', es: 'Sin invalidación escrita no es tesis: es esperanza.' }, hue: 0.415, requiredLevel: 3, voicePersona: 'onyx', evolutionNames: ['ROOK', 'ROOK GAMBIT', 'ROOK TACTICIAN', 'ROOK MASTER', 'GRANDMASTER'], palette: 'matrix' },
-  { id: 'halo', label: 'HALO', role: { en: 'RISK GATE', es: 'RISK GATE' }, personality: { en: 'celebrates not trading with you', es: 'celebra contigo el no operar' }, selectLine: { en: 'Protecting capital today also counts as winning.', es: 'Hoy proteger capital también cuenta como ganar.' }, secretPhrase: { en: 'No setup yet. Capital protected.', es: 'No setup yet. Capital protected.' }, hue: 0.56, requiredLevel: 4, voicePersona: 'shimmer', evolutionNames: ['HALO', 'HALO SHIELD', 'HALO WARDEN', 'HALO AEGIS', 'HALO SANCTUM'], palette: 'ghost' },
-  { id: 'axiom', label: 'AXIOM', role: { en: 'TRACK RECORD', es: 'TRACK RECORD' }, personality: { en: 'remembers everything so you can verify', es: 'recuerda todo para que compruebes' }, selectLine: { en: 'Everything gets recorded. Verifying is the edge.', es: 'Todo queda registrado. Comprobar es la ventaja.' }, secretPhrase: { en: 'On-chain memory does not argue: it verifies.', es: 'La memoria on-chain no discute: comprueba.' }, hue: 0.115, requiredLevel: 5, voicePersona: 'fable', evolutionNames: ['AXIOM', 'AXIOM PROOF', 'AXIOM LEDGER', 'AXIOM ORACLE', 'AXIOM ETERNAL'], palette: 'gold' },
+  { id: 'orb', label: 'BOBBY', role: { en: 'ORB · CORE', es: 'ORB · NÚCLEO', pt: 'ORB · NÚCLEO' }, personality: { en: 'the core that orchestrates the squad', es: 'el núcleo que orquesta al squad' }, selectLine: { en: 'Ready. We read the market together, calmly.', es: 'Listo. Leemos el mercado juntos, con calma.', pt: 'Pronto. A gente lê o mercado junto, com calma.' }, secretPhrase: { en: 'The market rewards who waits better, not who runs faster.', es: 'El mercado premia al que espera mejor, no al que corre más.' }, hue: 0.415, requiredLevel: 1, voicePersona: 'ash', evolutionNames: ['BOBBY', 'BOBBY LINK', 'BOBBY CORE', 'BOBBY PRIME', 'BOBBY OMEGA'], palette: 'matrix' },
+  { id: 'byte', label: 'BYTE', role: { en: 'PLAIN SPEAK', es: 'VOZ SIMPLE', pt: 'FALA SIMPLES' }, personality: { en: 'explains it without the jargon', es: 'te lo explica sin tecnicismos' }, selectLine: { en: 'Hey. I keep it simple, no jargon.', es: 'Hola. Yo te lo digo fácil, sin rollos.', pt: 'E aí. Eu explico fácil, sem jargão.' }, secretPhrase: { en: 'If you cannot explain it simply, do not trade it.', es: 'Si no lo puedes explicar simple, no lo operes.' }, hue: 0.415, requiredLevel: 1, voicePersona: 'ballad', evolutionNames: ['BYTE', 'KILOBYTE', 'MEGABYTE', 'GIGABYTE', 'TERABYTE'], palette: 'matrix' },
+  { id: 'kora', label: 'KORA', role: { en: 'CONVERSATION', es: 'CONVERSACIÓN', pt: 'CONVERSA' }, personality: { en: 'talks markets like your best friend', es: 'platica del mercado como tu bestie' }, selectLine: { en: 'I am here. Tell me what is on your mind.', es: 'Aquí andamos. Cuéntame qué traes en mente.', pt: 'Tô aqui. Me conta o que você tem em mente.' }, secretPhrase: { en: 'The best decisions come from better questions.', es: 'Las mejores decisiones salen de las buenas preguntas.' }, hue: 0.415, requiredLevel: 1, voicePersona: 'coral', evolutionNames: ['KORA', 'KORA ECO', 'KORA AURORA', 'KORA NOVA', 'KORA SUPERNOVA'], palette: 'matrix' },
+  { id: 'zip', label: 'ZIP', role: { en: 'ALERTS', es: 'ALERTAS', pt: 'ALERTAS' }, personality: { en: 'fast to alert you, never to rush you', es: 'rápido para avisarte, nunca para apurarte' }, selectLine: { en: 'On it. If something moves, I will tell you.', es: 'Al tiro. Si algo se mueve, te aviso yo.', pt: 'Deixa comigo. Se algo se mexer, eu te aviso.' }, secretPhrase: { en: 'Speed is for alerting, not for deciding.', es: 'La velocidad sirve para avisar, no para decidir.' }, hue: 0.415, requiredLevel: 1, voicePersona: 'sage', evolutionNames: ['ZIP', 'ZIP PULSE', 'ZIP STORM', 'ZIP SONIC', 'ZIP LIGHTSPEED'], palette: 'matrix' },
+  { id: 'glitch', label: 'GLITCH', role: { en: 'RED TEAM', es: 'RED TEAM', pt: 'RED TEAM' }, personality: { en: 'questions you before you get excited', es: 'te cuestiona antes de que te emociones' }, selectLine: { en: 'Sure about that? Let me break your thesis first.', es: '¿Seguro? Déjame romper tu tesis primero.', pt: 'Certeza? Deixa eu quebrar sua tese primeiro.' }, secretPhrase: { en: 'Every thesis deserves an enemy before your money.', es: 'Toda tesis merece un enemigo antes que tu dinero.' }, hue: 0.745, requiredLevel: 2, voicePersona: 'cedar', evolutionNames: ['GLITCH', 'GLITCH EDGE', 'GLITCH PROBE', 'GLITCH BREAKER', 'GLITCH ZERO'], palette: 'plasma' },
+  { id: 'momo', label: 'MOMO', role: { en: 'EXPLORATION', es: 'EXPLORACIÓN', pt: 'EXPLORAÇÃO' }, personality: { en: 'explores with you, never afraid to ask', es: 'curiosea contigo sin miedo a preguntar' }, selectLine: { en: 'What if we explore something new today?', es: '¿Y si exploramos algo nuevo hoy?', pt: 'E se a gente explorar algo novo hoje?' }, secretPhrase: { en: 'Exploring costs no capital. Executing does.', es: 'Explorar no cuesta capital. Ejecutar sí.' }, hue: 0.745, requiredLevel: 2, voicePersona: 'marin', evolutionNames: ['MOMO', 'MOMO SCOUT', 'MOMO VOYAGER', 'MOMO COSMOS', 'MOMO INFINITE'], palette: 'plasma' },
+  { id: 'flux', label: 'FLUX', role: { en: 'SIGNALS', es: 'SEÑALES', pt: 'SINAIS' }, personality: { en: 'finds the context before the noise', es: 'detecta el contexto antes que el ruido' }, selectLine: { en: 'Signal detected. Context first, noise later.', es: 'Señal detectada. Contexto primero, ruido después.', pt: 'Sinal detectado. Contexto primeiro, ruído depois.' }, secretPhrase: { en: 'A signal without context is just pretty noise.', es: 'Una señal sin contexto es solo ruido bonito.' }, hue: 0.505, requiredLevel: 3, voicePersona: 'alloy', evolutionNames: ['FLUX', 'FLUX WAVE', 'FLUX RADAR', 'FLUX QUANTUM', 'FLUX SIGMA'], palette: 'ice' },
+  { id: 'rook', label: 'ROOK', role: { en: 'THESIS', es: 'TESIS', pt: 'TESE' }, personality: { en: 'builds the plan: entry, stop, invalidation', es: 'arma el plan: entrada, stop, invalidación' }, selectLine: { en: 'Thesis in progress. Entry, stop, invalidation.', es: 'Tesis en construcción. Entrada, stop, invalidación.', pt: 'Tese em construção. Entrada, stop, invalidação.' }, secretPhrase: { en: 'With no written invalidation it is not a thesis: it is hope.', es: 'Sin invalidación escrita no es tesis: es esperanza.' }, hue: 0.415, requiredLevel: 3, voicePersona: 'onyx', evolutionNames: ['ROOK', 'ROOK GAMBIT', 'ROOK TACTICIAN', 'ROOK MASTER', 'GRANDMASTER'], palette: 'matrix' },
+  { id: 'halo', label: 'HALO', role: { en: 'RISK GATE', es: 'RISK GATE', pt: 'RISK GATE' }, personality: { en: 'celebrates not trading with you', es: 'celebra contigo el no operar' }, selectLine: { en: 'Protecting capital today also counts as winning.', es: 'Hoy proteger capital también cuenta como ganar.', pt: 'Hoje proteger capital também conta como ganhar.' }, secretPhrase: { en: 'No setup yet. Capital protected.', es: 'No setup yet. Capital protected.' }, hue: 0.56, requiredLevel: 4, voicePersona: 'shimmer', evolutionNames: ['HALO', 'HALO SHIELD', 'HALO WARDEN', 'HALO AEGIS', 'HALO SANCTUM'], palette: 'ghost' },
+  { id: 'axiom', label: 'AXIOM', role: { en: 'TRACK RECORD', es: 'TRACK RECORD', pt: 'TRACK RECORD' }, personality: { en: 'remembers everything so you can verify', es: 'recuerda todo para que compruebes' }, selectLine: { en: 'Everything gets recorded. Verifying is the edge.', es: 'Todo queda registrado. Comprobar es la ventaja.', pt: 'Tudo fica registrado. Conferir é a vantagem.' }, secretPhrase: { en: 'On-chain memory does not argue: it verifies.', es: 'La memoria on-chain no discute: comprueba.' }, hue: 0.115, requiredLevel: 5, voicePersona: 'fable', evolutionNames: ['AXIOM', 'AXIOM PROOF', 'AXIOM LEDGER', 'AXIOM ORACLE', 'AXIOM ETERNAL'], palette: 'gold' },
   // ---- Wave 2 (2026-09-07) — the feminine-forward half of the squad.
   // Each one owns a product moment that had no face: market regime, on-chain
   // flows, practice mode, growth, mentorship and probability. Voices are all
   // from FEM_VOICES in api/_lib/tts.ts so the Spanish delivery is gendered
   // correctly; see docs/brand/bobby-character-bible-wave2.md.
-  { id: 'iris', label: 'IRIS', role: { en: 'MARKET REGIME', es: 'RÉGIMEN DE MERCADO' }, personality: { en: 'reads the weather of the whole market', es: 'lee el clima de todo el mercado' }, selectLine: { en: 'Let me read the weather first. Today there is wind.', es: 'Déjame leer el clima primero. Hoy hay viento.' }, secretPhrase: { en: 'The regime decides more than the setup does.', es: 'El régimen decide más que el setup.' }, hue: 0.545, requiredLevel: 1, voicePersona: 'sage', evolutionNames: ['IRIS', 'IRIS CLEAR', 'IRIS FRONT', 'IRIS STORM', 'IRIS HORIZON'], palette: 'ice' },
-  { id: 'sol', label: 'SOL', role: { en: 'GROWTH', es: 'CRECIMIENTO' }, personality: { en: 'celebrates every step you actually take', es: 'celebra cada paso que sí das' }, selectLine: { en: 'Let us build your world, one earned piece at a time.', es: 'Vamos a construir tu mundo, pieza ganada por pieza ganada.' }, secretPhrase: { en: 'Discipline levels you up. Deposits never did.', es: 'La disciplina te sube de nivel. Los depósitos nunca lo hicieron.' }, hue: 0.115, requiredLevel: 1, voicePersona: 'coral', evolutionNames: ['SOL', 'SOL SPROUT', 'SOL BRANCH', 'SOL CANOPY', 'SOL BLOOM'], palette: 'gold' },
-  { id: 'zuri', label: 'ZURI', role: { en: 'ON-CHAIN FLOWS', es: 'FLUJOS ON-CHAIN' }, personality: { en: 'follows the money and tells you where it went', es: 'sigue el dinero y te dice a dónde se fue' }, selectLine: { en: 'Give me a minute. I am following the thread.', es: 'Dame un minuto. Voy siguiendo el hilo.' }, secretPhrase: { en: 'Wallets do not post. They just move.', es: 'Las wallets no publican. Solo se mueven.' }, hue: 0.075, requiredLevel: 1, voicePersona: 'nova', evolutionNames: ['ZURI', 'ZURI TRAIL', 'ZURI SIGNAL', 'ZURI DEPTH', 'ZURI ORACLE'], palette: 'lava' },
-  { id: 'mira', label: 'MIRA', role: { en: 'PRACTICE', es: 'PRÁCTICA' }, personality: { en: 'zero pressure, celebrates the attempt', es: 'cero presión, celebra el intento' }, selectLine: { en: 'No money on the line yet. Let us just look.', es: 'Todavía sin dinero de por medio. Nomás vamos viendo.' }, secretPhrase: { en: 'A rehearsal costs nothing. A habit pays forever.', es: 'Un ensayo no cuesta nada. Un hábito paga siempre.' }, hue: 0.505, requiredLevel: 1, voicePersona: 'alloy', evolutionNames: ['MIRA', 'MIRA DRILL', 'MIRA PACE', 'MIRA FORM', 'MIRA STAR'], palette: 'ghost' },
-  { id: 'nalu', label: 'NALU', role: { en: 'LIQUIDITY', es: 'LIQUIDEZ' }, personality: { en: 'reads flow like a wave, everything is timing', es: 'lee el flujo como una ola, todo es timing' }, selectLine: { en: 'Not every wave is yours. Let us wait for the good one.', es: 'No toda ola es tuya. Esperemos la buena.' }, secretPhrase: { en: 'You do not fight the current. You time it.', es: 'A la corriente no se le pelea. Se le agarra el tiempo.' }, hue: 0.075, requiredLevel: 1, voicePersona: 'marin', evolutionNames: ['NALU', 'NALU SWELL', 'NALU CREST', 'NALU BARREL', 'NALU TIDE'], palette: 'lava' },
-  { id: 'vega', label: 'VEGA', role: { en: 'PROBABILITY', es: 'PROBABILIDAD' }, personality: { en: 'gives you the odds, never the promise', es: 'te da la probabilidad, nunca la promesa' }, selectLine: { en: 'I can give you the probability. Not the promise.', es: 'Te puedo dar la probabilidad. La promesa no.' }, secretPhrase: { en: 'A number without its error bar is a story.', es: 'Un número sin su margen de error es un cuento.' }, hue: 0.115, requiredLevel: 3, voicePersona: 'shimmer', evolutionNames: ['VEGA', 'VEGA SIGMA', 'VEGA CONE', 'VEGA PRIME', 'VEGA ABSOLUTE'], palette: 'gold' },
-  { id: 'noor', label: 'NOOR', role: { en: 'MENTORSHIP', es: 'MENTORÍA' }, personality: { en: 'unhurried, firm, has seen every cycle', es: 'sin prisa, firme, ya vio todos los ciclos' }, selectLine: { en: 'Sit down. Let us review the week before the next trade.', es: 'Siéntate. Revisemos la semana antes del próximo trade.' }, secretPhrase: { en: 'I have seen this cycle before. It ended the same way.', es: 'Ya vi este ciclo antes. Terminó igual.' }, hue: 0.115, requiredLevel: 4, voicePersona: 'fable', evolutionNames: ['NOOR', 'NOOR RING', 'NOOR CIRCLE', 'NOOR CROWN', 'NOOR ETERNAL'], palette: 'matrix' },
-  { id: 'keo', label: 'KEO', role: { en: 'PATIENCE', es: 'PACIENCIA' }, personality: { en: 'never in a hurry, and never early', es: 'nunca con prisa, y nunca antes de tiempo' }, selectLine: { en: 'Sit with me a minute. The good one always comes.', es: 'Siéntate un minuto. La buena siempre llega.' }, secretPhrase: { en: 'Waiting is not doing nothing. It is the hardest part.', es: 'Esperar no es no hacer nada. Es la parte más difícil.' }, hue: 0.115, requiredLevel: 1, voicePersona: 'mellow', evolutionNames: ['KEO', 'KEO DRIFT', 'KEO GLIDE', 'KEO SOUL', 'KEO ETERNAL'], palette: 'gold' },
+  { id: 'iris', label: 'IRIS', role: { en: 'MARKET REGIME', es: 'RÉGIMEN DE MERCADO', pt: 'REGIME DE MERCADO' }, personality: { en: 'reads the weather of the whole market', es: 'lee el clima de todo el mercado' }, selectLine: { en: 'Let me read the weather first. Today there is wind.', es: 'Déjame leer el clima primero. Hoy hay viento.', pt: 'Deixa eu ler o clima primeiro. Hoje está ventando.' }, secretPhrase: { en: 'The regime decides more than the setup does.', es: 'El régimen decide más que el setup.' }, hue: 0.545, requiredLevel: 1, voicePersona: 'sage', evolutionNames: ['IRIS', 'IRIS CLEAR', 'IRIS FRONT', 'IRIS STORM', 'IRIS HORIZON'], palette: 'ice' },
+  { id: 'sol', label: 'SOL', role: { en: 'GROWTH', es: 'CRECIMIENTO', pt: 'CRESCIMENTO' }, personality: { en: 'celebrates every step you actually take', es: 'celebra cada paso que sí das' }, selectLine: { en: 'Let us build your world, one earned piece at a time.', es: 'Vamos a construir tu mundo, pieza ganada por pieza ganada.', pt: 'Vamos construir seu mundo, uma peça conquistada de cada vez.' }, secretPhrase: { en: 'Discipline levels you up. Deposits never did.', es: 'La disciplina te sube de nivel. Los depósitos nunca lo hicieron.' }, hue: 0.115, requiredLevel: 1, voicePersona: 'coral', evolutionNames: ['SOL', 'SOL SPROUT', 'SOL BRANCH', 'SOL CANOPY', 'SOL BLOOM'], palette: 'gold' },
+  { id: 'zuri', label: 'ZURI', role: { en: 'ON-CHAIN FLOWS', es: 'FLUJOS ON-CHAIN', pt: 'FLUXOS ON-CHAIN' }, personality: { en: 'follows the money and tells you where it went', es: 'sigue el dinero y te dice a dónde se fue' }, selectLine: { en: 'Give me a minute. I am following the thread.', es: 'Dame un minuto. Voy siguiendo el hilo.', pt: 'Me dá um minuto. Estou seguindo o fio.' }, secretPhrase: { en: 'Wallets do not post. They just move.', es: 'Las wallets no publican. Solo se mueven.' }, hue: 0.075, requiredLevel: 1, voicePersona: 'nova', evolutionNames: ['ZURI', 'ZURI TRAIL', 'ZURI SIGNAL', 'ZURI DEPTH', 'ZURI ORACLE'], palette: 'lava' },
+  { id: 'mira', label: 'MIRA', role: { en: 'PRACTICE', es: 'PRÁCTICA', pt: 'PRÁTICA' }, personality: { en: 'zero pressure, celebrates the attempt', es: 'cero presión, celebra el intento' }, selectLine: { en: 'No money on the line yet. Let us just look.', es: 'Todavía sin dinero de por medio. Nomás vamos viendo.', pt: 'Ainda sem dinheiro em jogo. Só vamos observar.' }, secretPhrase: { en: 'A rehearsal costs nothing. A habit pays forever.', es: 'Un ensayo no cuesta nada. Un hábito paga siempre.' }, hue: 0.505, requiredLevel: 1, voicePersona: 'alloy', evolutionNames: ['MIRA', 'MIRA DRILL', 'MIRA PACE', 'MIRA FORM', 'MIRA STAR'], palette: 'ghost' },
+  { id: 'nalu', label: 'NALU', role: { en: 'LIQUIDITY', es: 'LIQUIDEZ', pt: 'LIQUIDEZ' }, personality: { en: 'reads flow like a wave, everything is timing', es: 'lee el flujo como una ola, todo es timing' }, selectLine: { en: 'Not every wave is yours. Let us wait for the good one.', es: 'No toda ola es tuya. Esperemos la buena.', pt: 'Nem toda onda é sua. Vamos esperar a boa.' }, secretPhrase: { en: 'You do not fight the current. You time it.', es: 'A la corriente no se le pelea. Se le agarra el tiempo.' }, hue: 0.075, requiredLevel: 1, voicePersona: 'marin', evolutionNames: ['NALU', 'NALU SWELL', 'NALU CREST', 'NALU BARREL', 'NALU TIDE'], palette: 'lava' },
+  { id: 'vega', label: 'VEGA', role: { en: 'PROBABILITY', es: 'PROBABILIDAD', pt: 'PROBABILIDADE' }, personality: { en: 'gives you the odds, never the promise', es: 'te da la probabilidad, nunca la promesa' }, selectLine: { en: 'I can give you the probability. Not the promise.', es: 'Te puedo dar la probabilidad. La promesa no.', pt: 'Posso te dar a probabilidade. A promessa, não.' }, secretPhrase: { en: 'A number without its error bar is a story.', es: 'Un número sin su margen de error es un cuento.' }, hue: 0.115, requiredLevel: 3, voicePersona: 'shimmer', evolutionNames: ['VEGA', 'VEGA SIGMA', 'VEGA CONE', 'VEGA PRIME', 'VEGA ABSOLUTE'], palette: 'gold' },
+  { id: 'noor', label: 'NOOR', role: { en: 'MENTORSHIP', es: 'MENTORÍA', pt: 'MENTORIA' }, personality: { en: 'unhurried, firm, has seen every cycle', es: 'sin prisa, firme, ya vio todos los ciclos' }, selectLine: { en: 'Sit down. Let us review the week before the next trade.', es: 'Siéntate. Revisemos la semana antes del próximo trade.', pt: 'Senta aí. Vamos revisar a semana antes do próximo trade.' }, secretPhrase: { en: 'I have seen this cycle before. It ended the same way.', es: 'Ya vi este ciclo antes. Terminó igual.' }, hue: 0.115, requiredLevel: 4, voicePersona: 'fable', evolutionNames: ['NOOR', 'NOOR RING', 'NOOR CIRCLE', 'NOOR CROWN', 'NOOR ETERNAL'], palette: 'matrix' },
+  { id: 'keo', label: 'KEO', role: { en: 'PATIENCE', es: 'PACIENCIA', pt: 'PACIÊNCIA' }, personality: { en: 'never in a hurry, and never early', es: 'nunca con prisa, y nunca antes de tiempo' }, selectLine: { en: 'Sit with me a minute. The good one always comes.', es: 'Siéntate un minuto. La buena siempre llega.', pt: 'Senta comigo um minuto. A boa sempre chega.' }, secretPhrase: { en: 'Waiting is not doing nothing. It is the hardest part.', es: 'Esperar no es no hacer nada. Es la parte más difícil.' }, hue: 0.115, requiredLevel: 1, voicePersona: 'mellow', evolutionNames: ['KEO', 'KEO DRIFT', 'KEO GLIDE', 'KEO SOUL', 'KEO ETERNAL'], palette: 'gold' },
 ];
 
 export function getCompanion(id: string | null | undefined): Companion | null {
@@ -81,11 +81,11 @@ export function nextLevelFor(xp: number): CompanionLevel | null {
 
 /** How the companion speaks at each level — the same character, more earned confidence. */
 export const LEVEL_TONE: Record<number, Bi> = {
-  1: { en: '', es: '' },
-  2: { en: ' We are finding our rhythm.', es: ' Ya agarramos ritmo.' },
-  3: { en: ' After this many reads, I know your style.', es: ' Después de tantas lecturas, ya te conozco el estilo.' },
-  4: { en: ' And above all: we protect the risk.', es: ' Y antes que nada: cuidamos el riesgo.' },
-  5: { en: ' We have a track record now. Here we verify, we do not promise.', es: ' Ya llevamos historial. Aquí se comprueba, no se promete.' },
+  1: { en: '', es: '', pt: '' },
+  2: { en: ' We are finding our rhythm.', es: ' Ya agarramos ritmo.', pt: ' A gente já pegou o ritmo.' },
+  3: { en: ' After this many reads, I know your style.', es: ' Después de tantas lecturas, ya te conozco el estilo.', pt: ' Depois de tantas leituras, já conheço seu estilo.' },
+  4: { en: ' And above all: we protect the risk.', es: ' Y antes que nada: cuidamos el riesgo.', pt: ' E antes de tudo: a gente cuida do risco.' },
+  5: { en: ' We have a track record now. Here we verify, we do not promise.', es: ' Ya llevamos historial. Aquí se comprueba, no se promete.', pt: ' Agora temos histórico. Aqui se confere, não se promete.' },
 };
 
 export type VibeId = 'chill' | 'directo' | 'pro';
@@ -111,106 +111,106 @@ export const TOOL_ART_AVAILABLE = new Set(['orb', 'byte', 'kora', 'zip', 'glitch
   'iris', 'sol', 'zuri', 'mira', 'nalu', 'vega', 'noor', 'keo']);
 export function toolHasArt(tool: CompanionTool): boolean { return TOOL_ART_AVAILABLE.has(tool.companionId); }
 export function toolTierLabel(tier: number): Bi {
-  return tier === 1 ? { en: 'COMMON', es: 'COMÚN' } : tier === 2 ? { en: 'RARE', es: 'RARO' } : { en: 'GOLDEN', es: 'DORADO' };
+  return tier === 1 ? { en: 'COMMON', es: 'COMÚN', pt: 'COMUM' } : tier === 2 ? { en: 'RARE', es: 'RARO', pt: 'RARO' } : { en: 'GOLDEN', es: 'DORADO', pt: 'DOURADO' };
 }
 
-const T = (companionId: string, tier: 1 | 2 | 3, glyph: string, en: string, es: string, loreEn: string, loreEs: string): CompanionTool =>
-  ({ companionId, tier, glyph, name: { en, es }, lore: { en: loreEn, es: loreEs } });
+const T = (companionId: string, tier: 1 | 2 | 3, glyph: string, en: string, es: string, loreEn: string, loreEs: string, pt?: string, lorePt?: string): CompanionTool =>
+  ({ companionId, tier, glyph, name: { en, es, pt }, lore: { en: loreEn, es: loreEs, pt: lorePt } });
 
 export const TOOLS: Record<string, CompanionTool[]> = {
   orb: [
-    T('orb', 1, '◷', 'Patience Chronometer', 'Cronómetro de paciencia', 'Counts the candles you did not chase.', 'Cuenta las velas que no perseguiste.'),
-    T('orb', 2, '✧', '4H Trend Compass', 'Brújula de tendencia 4H', 'Points where the structure goes, not where the noise does.', 'Apunta hacia donde va la estructura, no el ruido.'),
-    T('orb', 3, '◉', 'Omega Core', 'Núcleo Omega', "Bobby's own heart. You earned it by waiting better.", 'El corazón del propio Bobby. Te lo ganaste esperando mejor.'),
+    T('orb', 1, '◷', 'Patience Chronometer', 'Cronómetro de paciencia', 'Counts the candles you did not chase.', 'Cuenta las velas que no perseguiste.', 'Cronômetro da paciência', 'Conta as velas que você não perseguiu.'),
+    T('orb', 2, '✧', '4H Trend Compass', 'Brújula de tendencia 4H', 'Points where the structure goes, not where the noise does.', 'Apunta hacia donde va la estructura, no el ruido.', 'Bússola de tendência 4H', 'Aponta para onde vai a estrutura, não o ruído.'),
+    T('orb', 3, '◉', 'Omega Core', 'Núcleo Omega', "Bobby's own heart. You earned it by waiting better.", 'El corazón del propio Bobby. Te lo ganaste esperando mejor.', 'Núcleo Ômega', 'O coração do próprio Bobby. Você conquistou esperando melhor.'),
   ],
   byte: [
-    T('byte', 1, '▤', 'Market Translator', 'Traductor de mercado', "Turns 'RSI divergence' into words you would say to a friend.", "Convierte 'divergencia de RSI' en palabras que le dirías a un amigo."),
-    T('byte', 2, '◎', 'Anti-Hype Goggles', 'Gafas anti-humo', "Filters gurus, threads and 'trust me bro' out of the picture.", "Filtra gurús, hilos y 'confía en mí' de la escena."),
-    T('byte', 3, '▣', 'Golden Codex', 'Códice dorado', 'Every read you ever explained simply, bound in gold.', 'Cada lectura que explicaste simple, encuadernada en oro.'),
+    T('byte', 1, '▤', 'Market Translator', 'Traductor de mercado', "Turns 'RSI divergence' into words you would say to a friend.", "Convierte 'divergencia de RSI' en palabras que le dirías a un amigo.", 'Tradutor de mercado', 'Transforma “divergência de RSI” em palavras que você diria a um amigo.'),
+    T('byte', 2, '◎', 'Anti-Hype Goggles', 'Gafas anti-humo', "Filters gurus, threads and 'trust me bro' out of the picture.", "Filtra gurús, hilos y 'confía en mí' de la escena.", 'Óculos anti-hype', 'Tira gurus, threads e “confia, mano” da cena.'),
+    T('byte', 3, '▣', 'Golden Codex', 'Códice dorado', 'Every read you ever explained simply, bound in gold.', 'Cada lectura que explicaste simple, encuadernada en oro.', 'Códice dourado', 'Cada leitura que você explicou de forma simples, encadernada em ouro.'),
   ],
   kora: [
-    T('kora', 1, '◠', 'Radar Headset', 'Auriculares radar', 'Hears the desk before the crowd does.', 'Escucha el desk antes que la multitud.'),
-    T('kora', 2, '⌔', 'Gossip Antenna', 'Antena de chisme', 'Picks up what the market is whispering, with receipts.', 'Capta lo que el mercado susurra, con pruebas.'),
-    T('kora', 3, '♪', 'Golden Mic', 'Micrófono dorado', 'When Kora speaks with this, the whole squad listens.', 'Cuando Kora habla con esto, todo el squad escucha.'),
+    T('kora', 1, '◠', 'Radar Headset', 'Auriculares radar', 'Hears the desk before the crowd does.', 'Escucha el desk antes que la multitud.', 'Fone radar', 'Ouve o desk antes da multidão.'),
+    T('kora', 2, '⌔', 'Gossip Antenna', 'Antena de chisme', 'Picks up what the market is whispering, with receipts.', 'Capta lo que el mercado susurra, con pruebas.', 'Antena de fofoca', 'Capta o que o mercado sussurra, com provas.'),
+    T('kora', 3, '♪', 'Golden Mic', 'Micrófono dorado', 'When Kora speaks with this, the whole squad listens.', 'Cuando Kora habla con esto, todo el squad escucha.', 'Microfone dourado', 'Quando a Kora fala com isto, o squad inteiro escuta.'),
   ],
   zip: [
-    T('zip', 1, '◔', '15M Stopwatch', 'Cronómetro 15M', 'Fifteen minutes. That is all Zip needs to notice.', 'Quince minutos. Es todo lo que Zip necesita para notarlo.'),
-    T('zip', 2, '⬡', 'Alert Beacon', 'Baliza de alertas', 'Lights up when something moves. Never for nothing.', 'Se enciende cuando algo se mueve. Nunca en vano.'),
-    T('zip', 3, '⚡', 'Golden Bolt', 'Rayo dorado', 'Speed, forged. The stop is always within reach.', 'Velocidad forjada. El stop siempre a la mano.'),
+    T('zip', 1, '◔', '15M Stopwatch', 'Cronómetro 15M', 'Fifteen minutes. That is all Zip needs to notice.', 'Quince minutos. Es todo lo que Zip necesita para notarlo.', 'Cronômetro 15M', 'Quinze minutos. É tudo de que o Zip precisa para perceber.'),
+    T('zip', 2, '⬡', 'Alert Beacon', 'Baliza de alertas', 'Lights up when something moves. Never for nothing.', 'Se enciende cuando algo se mueve. Nunca en vano.', 'Sinalizador de alertas', 'Acende quando algo se mexe. Nunca à toa.'),
+    T('zip', 3, '⚡', 'Golden Bolt', 'Rayo dorado', 'Speed, forged. The stop is always within reach.', 'Velocidad forjada. El stop siempre a la mano.', 'Raio dourado', 'Velocidade forjada. O stop sempre à mão.'),
   ],
   glitch: [
-    T('glitch', 1, '⚒', 'Thesis Hammer', 'Martillo de tesis', 'Hits every idea once before the market does.', 'Golpea cada idea una vez antes que el mercado.'),
-    T('glitch', 2, '✕', 'Refutation Blade', 'Hoja de refutación', 'Cuts the argument that would have cost you.', 'Corta el argumento que te habría costado.'),
-    T('glitch', 3, '◐', 'Golden Counter', 'Contra dorada', 'Survive Glitch, survive the candle.', 'Sobrevive a Glitch, sobrevive a la vela.'),
+    T('glitch', 1, '⚒', 'Thesis Hammer', 'Martillo de tesis', 'Hits every idea once before the market does.', 'Golpea cada idea una vez antes que el mercado.', 'Martelo de tese', 'Bate em cada ideia uma vez antes que o mercado bata.'),
+    T('glitch', 2, '✕', 'Refutation Blade', 'Hoja de refutación', 'Cuts the argument that would have cost you.', 'Corta el argumento que te habría costado.', 'Lâmina da refutação', 'Corta o argumento que teria te custado caro.'),
+    T('glitch', 3, '◐', 'Golden Counter', 'Contra dorada', 'Survive Glitch, survive the candle.', 'Sobrevive a Glitch, sobrevive a la vela.', 'Contra-ataque dourado', 'Sobreviva ao Glitch, sobreviva à vela.'),
   ],
   momo: [
-    T('momo', 1, '▦', "Explorer's Map", 'Mapa de exploración', 'Marks the corners nobody is watching yet.', 'Marca los rincones que nadie mira todavía.'),
-    T('momo', 2, '◫', 'Long-Range Binoculars', 'Binoculares de largo alcance', 'Sees tokenized stocks and new listings before the crowd.', 'Ve acciones tokenizadas y listados nuevos antes que la multitud.'),
-    T('momo', 3, '◈', 'Golden Lens', 'Lente dorado', 'Finds signal in places that look like noise.', 'Encuentra señal donde parece ruido.'),
+    T('momo', 1, '▦', "Explorer's Map", 'Mapa de exploración', 'Marks the corners nobody is watching yet.', 'Marca los rincones que nadie mira todavía.', 'Mapa do explorador', 'Marca os cantos que ninguém está olhando ainda.'),
+    T('momo', 2, '◫', 'Long-Range Binoculars', 'Binoculares de largo alcance', 'Sees tokenized stocks and new listings before the crowd.', 'Ve acciones tokenizadas y listados nuevos antes que la multitud.', 'Binóculo de longo alcance', 'Vê ações tokenizadas e novas listagens antes da multidão.'),
+    T('momo', 3, '◈', 'Golden Lens', 'Lente dorado', 'Finds signal in places that look like noise.', 'Encuentra señal donde parece ruido.', 'Lente dourada', 'Encontra sinal onde parece ruído.'),
   ],
   flux: [
-    T('flux', 1, '∿', 'Tuning Fork', 'Diapasón', 'Rings when an indicator is off-key.', 'Suena cuando un indicador desafina.'),
-    T('flux', 2, '≋', 'Signal Score', 'Partitura de señales', 'RSI, EMA and funding on one staff.', 'RSI, EMA y funding en un solo pentagrama.'),
-    T('flux', 3, '♫', 'Golden Note', 'Nota dorada', "Perfect pitch for the market's rhythm.", 'Oído absoluto para el ritmo del mercado.'),
+    T('flux', 1, '∿', 'Tuning Fork', 'Diapasón', 'Rings when an indicator is off-key.', 'Suena cuando un indicador desafina.', 'Diapasão', 'Toca quando um indicador desafina.'),
+    T('flux', 2, '≋', 'Signal Score', 'Partitura de señales', 'RSI, EMA and funding on one staff.', 'RSI, EMA y funding en un solo pentagrama.', 'Partitura de sinais', 'RSI, EMA e funding numa só pauta.'),
+    T('flux', 3, '♫', 'Golden Note', 'Nota dorada', "Perfect pitch for the market's rhythm.", 'Oído absoluto para el ritmo del mercado.', 'Nota dourada', 'Ouvido absoluto para o ritmo do mercado.'),
   ],
   rook: [
-    T('rook', 1, '▩', 'Thesis Board', 'Tablero de tesis', 'Entry, stop, invalidation. Three squares, no roulette.', 'Entrada, stop, invalidación. Tres casillas, nada de ruleta.'),
-    T('rook', 2, '♜', "Rook's Crown", 'Corona de torre', 'Thinks three candles ahead.', 'Piensa tres velas adelante.'),
-    T('rook', 3, '♛', 'Golden Board', 'Tablero dorado', 'The whole game, seen at once.', 'Todo el juego, visto de una vez.'),
+    T('rook', 1, '▩', 'Thesis Board', 'Tablero de tesis', 'Entry, stop, invalidation. Three squares, no roulette.', 'Entrada, stop, invalidación. Tres casillas, nada de ruleta.', 'Tabuleiro de tese', 'Entrada, stop, invalidação. Três casas, nada de roleta.'),
+    T('rook', 2, '♜', "Rook's Crown", 'Corona de torre', 'Thinks three candles ahead.', 'Piensa tres velas adelante.', 'Coroa da torre', 'Pensa três velas à frente.'),
+    T('rook', 3, '♛', 'Golden Board', 'Tablero dorado', 'The whole game, seen at once.', 'Todo el juego, visto de una vez.', 'Tabuleiro dourado', 'O jogo inteiro, visto de uma vez.'),
   ],
   halo: [
-    T('halo', 1, '◇', 'Capital Shield', 'Escudo de capital', 'Blocks the trade that was not there.', 'Bloquea el trade que no estaba.'),
-    T('halo', 2, '◈', 'Risk Gate', 'Puerta de riesgo', 'Only clean setups get through.', 'Solo pasan los setups limpios.'),
-    T('halo', 3, '◆', 'Golden Halo', 'Halo dorado', 'NO TRADE, made legendary.', 'NO TRADE, hecho leyenda.'),
+    T('halo', 1, '◇', 'Capital Shield', 'Escudo de capital', 'Blocks the trade that was not there.', 'Bloquea el trade que no estaba.', 'Escudo de capital', 'Bloqueia o trade que não existia.'),
+    T('halo', 2, '◈', 'Risk Gate', 'Puerta de riesgo', 'Only clean setups get through.', 'Solo pasan los setups limpios.', 'Portão de risco', 'Só os setups limpos passam.'),
+    T('halo', 3, '◆', 'Golden Halo', 'Halo dorado', 'NO TRADE, made legendary.', 'NO TRADE, hecho leyenda.', 'Halo dourado', 'NO TRADE, virou lenda.'),
   ],
   axiom: [
-    T('axiom', 1, '≡', 'Ledger', 'Libro mayor', 'Every call written down.', 'Cada llamada queda escrita.'),
-    T('axiom', 2, '⛓', 'Chain Link', 'Eslabón', 'Anchors the record where anyone can check it.', 'Ancla el historial donde cualquiera puede revisarlo.'),
-    T('axiom', 3, '✪', 'Golden Seal', 'Sello dorado', 'Verified, not promised.', 'Comprobado, no prometido.'),
+    T('axiom', 1, '≡', 'Ledger', 'Libro mayor', 'Every call written down.', 'Cada llamada queda escrita.', 'Livro-razão', 'Cada chamada fica registrada.'),
+    T('axiom', 2, '⛓', 'Chain Link', 'Eslabón', 'Anchors the record where anyone can check it.', 'Ancla el historial donde cualquiera puede revisarlo.', 'Elo da corrente', 'Ancora o histórico onde qualquer pessoa pode conferir.'),
+    T('axiom', 3, '✪', 'Golden Seal', 'Sello dorado', 'Verified, not promised.', 'Comprobado, no prometido.', 'Selo dourado', 'Comprovado, não prometido.'),
   ],
   // ---- Wave 2. Art is not drawn yet, so toolHasArt() is false for these and
   // the UI falls back to the glyph — the same path a missing asset already
   // takes. Without these entries the loadout step reads name.es off undefined
   // and the whole route crashes into the root errorElement (a 404 page).
   iris: [
-    T('iris', 1, '◐', 'Regime Dial', 'Dial de régimen', 'Says calm, caution or storm before you read a single candle.', 'Dice calma, cuidado o tormenta antes de que leas una sola vela.'),
-    T('iris', 2, '≋', 'Horizon Band', 'Banda de horizonte', 'One thin line for where the whole market is leaning.', 'Una línea delgada para saber hacia dónde se inclina todo el mercado.'),
-    T('iris', 3, '❋', 'Golden Forecast', 'Pronóstico dorado', 'Every regime you respected instead of fighting, kept in gold.', 'Cada régimen que respetaste en vez de pelear, guardado en oro.'),
+    T('iris', 1, '◐', 'Regime Dial', 'Dial de régimen', 'Says calm, caution or storm before you read a single candle.', 'Dice calma, cuidado o tormenta antes de que leas una sola vela.', 'Mostrador de regime', 'Diz calma, cautela ou tempestade antes de você ler uma única vela.'),
+    T('iris', 2, '≋', 'Horizon Band', 'Banda de horizonte', 'One thin line for where the whole market is leaning.', 'Una línea delgada para saber hacia dónde se inclina todo el mercado.', 'Faixa de horizonte', 'Uma linha fina para saber para onde o mercado inteiro está pendendo.'),
+    T('iris', 3, '❋', 'Golden Forecast', 'Pronóstico dorado', 'Every regime you respected instead of fighting, kept in gold.', 'Cada régimen que respetaste en vez de pelear, guardado en oro.', 'Previsão dourada', 'Cada regime que você respeitou em vez de brigar, guardado em ouro.'),
   ],
   sol: [
-    T('sol', 1, '⌸', 'Builder Tape', 'Cinta de constructor', 'Measures what you actually finished, never what you planned.', 'Mide lo que sí terminaste, nunca lo que planeaste.'),
-    T('sol', 2, '❦', 'Sprout Pin', 'Prendedor de brote', 'Grows one leaf per tier. Only discipline waters it.', 'Le sale una hoja por nivel. Solo la disciplina la riega.'),
-    T('sol', 3, '▦', 'Golden Blueprint', 'Plano dorado', 'The plan of a world you built one earned piece at a time.', 'El plano de un mundo que construiste pieza ganada por pieza ganada.'),
+    T('sol', 1, '⌸', 'Builder Tape', 'Cinta de constructor', 'Measures what you actually finished, never what you planned.', 'Mide lo que sí terminaste, nunca lo que planeaste.', 'Trena de construtor', 'Mede o que você realmente terminou, nunca o que planejou.'),
+    T('sol', 2, '❦', 'Sprout Pin', 'Prendedor de brote', 'Grows one leaf per tier. Only discipline waters it.', 'Le sale una hoja por nivel. Solo la disciplina la riega.', 'Broche de broto', 'Ganha uma folha por nível. Só a disciplina rega.'),
+    T('sol', 3, '▦', 'Golden Blueprint', 'Plano dorado', 'The plan of a world you built one earned piece at a time.', 'El plano de un mundo que construiste pieza ganada por pieza ganada.', 'Planta dourada', 'A planta de um mundo que você construiu peça conquistada por peça conquistada.'),
   ],
   zuri: [
-    T('zuri', 1, '⊙', 'Trail Monocle', 'Monóculo de rastreo', 'Follows one wallet without losing it in the noise.', 'Sigue una wallet sin perderla en el ruido.'),
-    T('zuri', 2, '≔', 'Bead Ledger', 'Cuentas de registro', 'One bead per wallet worth watching. No bead is free.', 'Una cuenta por cada wallet que vale la pena mirar. Ninguna es gratis.'),
-    T('zuri', 3, '◈', 'Golden Thread', 'Hilo dorado', 'Where the money went, drawn end to end.', 'A dónde se fue el dinero, trazado de punta a punta.'),
+    T('zuri', 1, '⊙', 'Trail Monocle', 'Monóculo de rastreo', 'Follows one wallet without losing it in the noise.', 'Sigue una wallet sin perderla en el ruido.', 'Monóculo de rastreio', 'Segue uma carteira sem perdê-la no ruído.'),
+    T('zuri', 2, '≔', 'Bead Ledger', 'Cuentas de registro', 'One bead per wallet worth watching. No bead is free.', 'Una cuenta por cada wallet que vale la pena mirar. Ninguna es gratis.', 'Contas de registro', 'Uma conta para cada carteira que vale a pena observar. Nenhuma sai de graça.'),
+    T('zuri', 3, '◈', 'Golden Thread', 'Hilo dorado', 'Where the money went, drawn end to end.', 'A dónde se fue el dinero, trazado de punta a punta.', 'Fio dourado', 'Para onde o dinheiro foi, traçado de ponta a ponta.'),
   ],
   mira: [
-    T('mira', 1, '◷', 'Rehearsal Timer', 'Cronómetro de ensayo', 'Counts the reps, not the wins.', 'Cuenta las repeticiones, no las victorias.'),
-    T('mira', 2, '⌗', 'Wireframe Half', 'Mitad de malla', 'The part of you still being drafted. Everyone has one.', 'La parte de ti que todavía es borrador. Todos tenemos una.'),
-    T('mira', 3, '★', 'Golden Replay', 'Repetición dorada', 'Every move you rewound until you understood it.', 'Cada jugada que rebobinaste hasta entenderla.'),
+    T('mira', 1, '◷', 'Rehearsal Timer', 'Cronómetro de ensayo', 'Counts the reps, not the wins.', 'Cuenta las repeticiones, no las victorias.', 'Cronômetro de ensaio', 'Conta as repetições, não as vitórias.'),
+    T('mira', 2, '⌗', 'Wireframe Half', 'Mitad de malla', 'The part of you still being drafted. Everyone has one.', 'La parte de ti que todavía es borrador. Todos tenemos una.', 'Metade em wireframe', 'A parte de você que ainda é rascunho. Todo mundo tem uma.'),
+    T('mira', 3, '★', 'Golden Replay', 'Repetición dorada', 'Every move you rewound until you understood it.', 'Cada jugada que rebobinaste hasta entenderla.', 'Replay dourado', 'Cada jogada que você voltou até entender.'),
   ],
   nalu: [
-    T('nalu', 1, '≈', 'Flow Fin', 'Quilla de flujo', 'Feels the current before it shows on the chart.', 'Siente la corriente antes de que se vea en la gráfica.'),
-    T('nalu', 2, '⌾', 'Tide Watch', 'Reloj de marea', 'Tells you the wave is not yours yet.', 'Te dice que la ola todavía no es tuya.'),
-    T('nalu', 3, '≣', 'Golden Board', 'Tabla dorada', 'Earned by the waves you let pass.', 'Se gana con las olas que dejaste pasar.'),
+    T('nalu', 1, '≈', 'Flow Fin', 'Quilla de flujo', 'Feels the current before it shows on the chart.', 'Siente la corriente antes de que se vea en la gráfica.', 'Quilha de fluxo', 'Sente a corrente antes de ela aparecer no gráfico.'),
+    T('nalu', 2, '⌾', 'Tide Watch', 'Reloj de marea', 'Tells you the wave is not yours yet.', 'Te dice que la ola todavía no es tuya.', 'Relógio de maré', 'Avisa que a onda ainda não é sua.'),
+    T('nalu', 3, '≣', 'Golden Board', 'Tabla dorada', 'Earned by the waves you let pass.', 'Se gana con las olas que dejaste pasar.', 'Prancha dourada', 'Conquistada com as ondas que você deixou passar.'),
   ],
   vega: [
-    T('vega', 1, '⌁', 'Probability Cone', 'Cono de probabilidad', 'Shows the spread, not a single confident number.', 'Muestra el rango, no un solo número seguro.'),
-    T('vega', 2, '◇', 'Error Bar', 'Barra de error', 'The part of the forecast nobody likes to publish.', 'La parte del pronóstico que nadie quiere publicar.'),
-    T('vega', 3, '◆', 'Golden Monocle', 'Monóculo dorado', 'Collapses the cone to one number, and shows its cost.', 'Colapsa el cono a un número, y enseña lo que cuesta.'),
+    T('vega', 1, '⌁', 'Probability Cone', 'Cono de probabilidad', 'Shows the spread, not a single confident number.', 'Muestra el rango, no un solo número seguro.', 'Cone de probabilidade', 'Mostra a faixa, não um único número confiante.'),
+    T('vega', 2, '◇', 'Error Bar', 'Barra de error', 'The part of the forecast nobody likes to publish.', 'La parte del pronóstico que nadie quiere publicar.', 'Barra de erro', 'A parte da previsão que ninguém gosta de publicar.'),
+    T('vega', 3, '◆', 'Golden Monocle', 'Monóculo dorado', 'Collapses the cone to one number, and shows its cost.', 'Colapsa el cono a un número, y enseña lo que cuesta.', 'Monóculo dourado', 'Reduz o cone a um número, e mostra quanto custa.'),
   ],
   noor: [
-    T('noor', 1, '○', 'First Ring', 'Primer anillo', 'Given for showing up again, not for being right.', 'Se da por volver, no por acertar.'),
-    T('noor', 2, '◎', 'Review Ledger', 'Libro de revisión', 'The week read back to you, without flattery.', 'La semana leída de vuelta, sin adulaciones.'),
-    T('noor', 3, '⊚', 'Golden Crown', 'Corona dorada', 'The third ring. It is set above your head, never sold.', 'El tercer anillo. Se pone sobre tu cabeza, no se vende.'),
+    T('noor', 1, '○', 'First Ring', 'Primer anillo', 'Given for showing up again, not for being right.', 'Se da por volver, no por acertar.', 'Primeiro anel', 'Dado por voltar, não por acertar.'),
+    T('noor', 2, '◎', 'Review Ledger', 'Libro de revisión', 'The week read back to you, without flattery.', 'La semana leída de vuelta, sin adulaciones.', 'Livro de revisão', 'A semana lida de volta para você, sem bajulação.'),
+    T('noor', 3, '⊚', 'Golden Crown', 'Corona dorada', 'The third ring. It is set above your head, never sold.', 'El tercer anillo. Se pone sobre tu cabeza, no se vende.', 'Coroa dourada', 'O terceiro anel. Fica sobre a sua cabeça, nunca é vendido.'),
   ],
   keo: [
-    T('keo', 1, '≀', 'Set Counter', 'Contador de series', 'Counts the waves you let go before the good one.', 'Cuenta las olas que dejas ir antes de la buena.'),
-    T('keo', 2, '⌁', 'Reef Sense', 'Sentido de arrecife', 'Knows what is under the water before you drop in.', 'Sabe qué hay bajo el agua antes de que entres.'),
-    T('keo', 3, '≋', 'Golden Patience', 'Paciencia dorada', 'Thirty years of waiting, cast in gold.', 'Treinta años de espera, fundidos en oro.'),
+    T('keo', 1, '≀', 'Set Counter', 'Contador de series', 'Counts the waves you let go before the good one.', 'Cuenta las olas que dejas ir antes de la buena.', 'Contador de séries', 'Conta as ondas que você deixa passar antes da boa.'),
+    T('keo', 2, '⌁', 'Reef Sense', 'Sentido de arrecife', 'Knows what is under the water before you drop in.', 'Sabe qué hay bajo el agua antes de que entres.', 'Sentido de recife', 'Sabe o que tem debaixo da água antes de você dropar.'),
+    T('keo', 3, '≋', 'Golden Patience', 'Paciencia dorada', 'Thirty years of waiting, cast in gold.', 'Treinta años de espera, fundidos en oro.', 'Paciência dourada', 'Trinta anos de espera, fundidos em ouro.'),
   ],
 };
 
@@ -240,13 +240,13 @@ export const TOOL_SLOTS: Record<string, BodySlot> = {
 };
 export function toolSlot(tool: CompanionTool): BodySlot { return TOOL_SLOTS[`${tool.companionId}-${tool.tier}`] ?? 'hand'; }
 export const SLOT_LABEL: Record<BodySlot, Bi> = {
-  face: { en: 'ON THE FACE', es: 'EN LA CARA' },
-  headset: { en: 'ON THE EARS', es: 'EN LAS OREJAS' },
-  head: { en: 'ABOVE THE HEAD', es: 'SOBRE LA CABEZA' },
-  hand: { en: 'IN THE HAND', es: 'EN LA MANO' },
-  hip: { en: 'ON THE HIP', es: 'EN LA CADERA' },
-  shoulder: { en: 'ON THE SHOULDER', es: 'EN EL HOMBRO' },
-  chest: { en: 'ON THE CHEST', es: 'EN EL PECHO' },
+  face: { en: 'ON THE FACE', es: 'EN LA CARA', pt: 'NO ROSTO' },
+  headset: { en: 'ON THE EARS', es: 'EN LAS OREJAS', pt: 'NAS ORELHAS' },
+  head: { en: 'ABOVE THE HEAD', es: 'SOBRE LA CABEZA', pt: 'ACIMA DA CABEÇA' },
+  hand: { en: 'IN THE HAND', es: 'EN LA MANO', pt: 'NA MÃO' },
+  hip: { en: 'ON THE HIP', es: 'EN LA CADERA', pt: 'NO QUADRIL' },
+  shoulder: { en: 'ON THE SHOULDER', es: 'EN EL HOMBRO', pt: 'NO OMBRO' },
+  chest: { en: 'ON THE CHEST', es: 'EN EL PECHO', pt: 'NO PEITO' },
 };
 /** A sprite for items without art: the glyph on a tinted disc, as a data URL (cached). */
 const glyphCache = new Map<string, string>();
@@ -316,24 +316,24 @@ export const DEFAULT_QUICK_ACCESS = ['BTC', 'NVDA', 'ETH'];
 export interface CompanionPet { companionId: string; name: Bi; emoji: string; spins: boolean }
 export const PET_UNLOCK_XP = 500;
 export const PETS: Record<string, CompanionPet> = {
-  orb: { companionId: 'orb', name: { en: 'Spin the panda', es: 'Panda giratorio' }, emoji: '🐼', spins: true },
-  byte: { companionId: 'byte', name: { en: 'Bit the dog', es: 'Bit el perro' }, emoji: '🐶', spins: false },
-  kora: { companionId: 'kora', name: { en: 'Nova the cat', es: 'Nova la gata' }, emoji: '🐱', spins: false },
-  zip: { companionId: 'zip', name: { en: 'Turbo the monkey', es: 'Turbo el mono' }, emoji: '🐵', spins: false },
-  glitch: { companionId: 'glitch', name: { en: 'Bug the gecko', es: 'Bug el geco' }, emoji: '🦎', spins: false },
-  momo: { companionId: 'momo', name: { en: 'Ink the octopus', es: 'Ink el pulpo' }, emoji: '🐙', spins: false },
-  flux: { companionId: 'flux', name: { en: 'Echo the parrot', es: 'Echo el loro' }, emoji: '🦜', spins: false },
-  rook: { companionId: 'rook', name: { en: 'Sage the owl', es: 'Sage el búho' }, emoji: '🦉', spins: false },
-  halo: { companionId: 'halo', name: { en: 'Peace the dove', es: 'Paz la paloma' }, emoji: '🕊️', spins: false },
-  axiom: { companionId: 'axiom', name: { en: 'Ledger the turtle', es: 'Ledger la tortuga' }, emoji: '🐢', spins: false },
-  iris: { companionId: 'iris', name: { en: 'Cirrus the crane', es: 'Cirrus la grulla' }, emoji: '\u{1F426}', spins: false },
-  sol: { companionId: 'sol', name: { en: 'Root the hedgehog', es: 'Root el erizo' }, emoji: '\u{1F994}', spins: false },
-  zuri: { companionId: 'zuri', name: { en: 'Trace the fox', es: 'Trace la zorra' }, emoji: '\u{1F98A}', spins: false },
-  mira: { companionId: 'mira', name: { en: 'Pace the hare', es: 'Pace la liebre' }, emoji: '\u{1F407}', spins: false },
-  nalu: { companionId: 'nalu', name: { en: 'Kai the dolphin', es: 'Kai el delfín' }, emoji: '\u{1F42C}', spins: false },
-  vega: { companionId: 'vega', name: { en: 'Sigma the raven', es: 'Sigma el cuervo' }, emoji: '\u{1F426}\u{200D}\u{2B1B}', spins: false },
-  noor: { companionId: 'noor', name: { en: 'Elder the tortoise', es: 'Elder la tortuga' }, emoji: '\u{1F422}', spins: false },
-  keo: { companionId: 'keo', name: { en: 'Sombra the sea turtle', es: 'Sombra la tortuga marina' }, emoji: '\u{1F422}', spins: false },
+  orb: { companionId: 'orb', name: { en: 'Spin the panda', es: 'Panda giratorio', pt: 'Spin, o panda' }, emoji: '🐼', spins: true },
+  byte: { companionId: 'byte', name: { en: 'Bit the dog', es: 'Bit el perro', pt: 'Bit, o cachorro' }, emoji: '🐶', spins: false },
+  kora: { companionId: 'kora', name: { en: 'Nova the cat', es: 'Nova la gata', pt: 'Nova, a gata' }, emoji: '🐱', spins: false },
+  zip: { companionId: 'zip', name: { en: 'Turbo the monkey', es: 'Turbo el mono', pt: 'Turbo, o macaco' }, emoji: '🐵', spins: false },
+  glitch: { companionId: 'glitch', name: { en: 'Bug the gecko', es: 'Bug el geco', pt: 'Bug, a lagartixa' }, emoji: '🦎', spins: false },
+  momo: { companionId: 'momo', name: { en: 'Ink the octopus', es: 'Ink el pulpo', pt: 'Ink, o polvo' }, emoji: '🐙', spins: false },
+  flux: { companionId: 'flux', name: { en: 'Echo the parrot', es: 'Echo el loro', pt: 'Echo, o papagaio' }, emoji: '🦜', spins: false },
+  rook: { companionId: 'rook', name: { en: 'Sage the owl', es: 'Sage el búho', pt: 'Sage, a coruja' }, emoji: '🦉', spins: false },
+  halo: { companionId: 'halo', name: { en: 'Peace the dove', es: 'Paz la paloma', pt: 'Paz, a pomba' }, emoji: '🕊️', spins: false },
+  axiom: { companionId: 'axiom', name: { en: 'Ledger the turtle', es: 'Ledger la tortuga', pt: 'Ledger, a tartaruga' }, emoji: '🐢', spins: false },
+  iris: { companionId: 'iris', name: { en: 'Cirrus the crane', es: 'Cirrus la grulla', pt: 'Cirrus, o grou' }, emoji: '\u{1F426}', spins: false },
+  sol: { companionId: 'sol', name: { en: 'Root the hedgehog', es: 'Root el erizo', pt: 'Root, o ouriço' }, emoji: '\u{1F994}', spins: false },
+  zuri: { companionId: 'zuri', name: { en: 'Trace the fox', es: 'Trace la zorra', pt: 'Trace, a raposa' }, emoji: '\u{1F98A}', spins: false },
+  mira: { companionId: 'mira', name: { en: 'Pace the hare', es: 'Pace la liebre', pt: 'Pace, a lebre' }, emoji: '\u{1F407}', spins: false },
+  nalu: { companionId: 'nalu', name: { en: 'Kai the dolphin', es: 'Kai el delfín', pt: 'Kai, o golfinho' }, emoji: '\u{1F42C}', spins: false },
+  vega: { companionId: 'vega', name: { en: 'Sigma the raven', es: 'Sigma el cuervo', pt: 'Sigma, o corvo' }, emoji: '\u{1F426}\u{200D}\u{2B1B}', spins: false },
+  noor: { companionId: 'noor', name: { en: 'Elder the tortoise', es: 'Elder la tortuga', pt: 'Elder, o jabuti' }, emoji: '\u{1F422}', spins: false },
+  keo: { companionId: 'keo', name: { en: 'Sombra the sea turtle', es: 'Sombra la tortuga marina', pt: 'Sombra, a tartaruga-marinha' }, emoji: '\u{1F422}', spins: false },
 };
 export function petFor(companionId: string): CompanionPet | null { return PETS[companionId] ?? null; }
 export function petUnlocked(xp: number): boolean { return xp >= PET_UNLOCK_XP; }

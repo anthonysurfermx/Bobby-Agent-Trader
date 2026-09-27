@@ -22,11 +22,11 @@ export function EvolutionOverlay({ companion, level, onDone }: { companion: Comp
       <div className="absolute inset-0" style={{ background: 'radial-gradient(50% 40% at 50% 42%, #15121C, transparent 72%)' }} />
       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', bounce: 0.3, duration: 0.6 }} className="relative flex max-w-md flex-col items-center px-8 text-center">
         <img src={`/mascots/${companion.id}.webp`} alt="" className="h-28 w-28 rounded-full object-cover" style={{ boxShadow: '0 0 0 1px rgba(242,237,228,.14), 0 0 60px -10px rgba(242,237,228,.35)' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
-        <div className="n-label mt-7">{t('Your avatar evolved', 'Tu avatar evolucionó')}</div>
+        <div className="n-label mt-7">{t('Your avatar evolved', 'Tu avatar evolucionó', 'Seu avatar evoluiu')}</div>
         <div className="n-display mt-3 text-[44px] leading-none" style={{ color: '#FFF8EC' }}>{companionName(companion, level.number)}</div>
-        <div className="n-label mt-4" style={{ color: '#A39C91' }}>{t('Level', 'Nivel')} {level.number} · {level.name}</div>
-        <div className="mt-4 text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{t('Earned with discipline, never with volume.', 'Ganado con disciplina, nunca con volumen.')}{pick(LEVEL_TONE[level.number] ?? { en: '', es: '' })}</div>
-        <button onClick={onDone} className="n-cta on mt-8 max-w-[260px]">{t('Continue', 'Continuar')}</button>
+        <div className="n-label mt-4" style={{ color: '#A39C91' }}>{t('Level', 'Nivel', 'Nível')} {level.number} · {level.name}</div>
+        <div className="mt-4 text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{t('Earned with discipline, never with volume.', 'Ganado con disciplina, nunca con volumen.', 'Conquistado com disciplina, nunca com volume.')}{pick(LEVEL_TONE[level.number] ?? { en: '', es: '' })}</div>
+        <button onClick={onDone} className="n-cta on mt-8 max-w-[260px]">{t('Continue', 'Continuar', 'Continuar')}</button>
       </motion.div>
     </motion.div>
   );
@@ -40,14 +40,14 @@ export function ToolUnlockOverlay({ companion, tool, onDone }: { companion: Comp
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(11,10,9,.97)' }}>
       <div className="absolute inset-0" style={{ background: golden ? 'radial-gradient(45% 36% at 50% 40%, rgba(246,185,78,.16), transparent 72%)' : 'radial-gradient(50% 40% at 50% 40%, #15121C, transparent 72%)' }} />
       <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', bounce: 0.35, duration: 0.6 }} className="relative flex max-w-md flex-col items-center px-8 text-center">
-        <div className="n-label" style={{ color: golden ? GOLD : undefined }}>{golden ? t('Golden gear unlocked', 'Equipo dorado desbloqueado') : t('New gear unlocked', 'Nuevo equipo desbloqueado')}</div>
+        <div className="n-label" style={{ color: golden ? GOLD : undefined }}>{golden ? t('Golden gear unlocked', 'Equipo dorado desbloqueado', 'Equipamento dourado desbloqueado') : t('New gear unlocked', 'Nuevo equipo desbloqueado', 'Novo equipamento desbloqueado')}</div>
         <div className="mt-6 grid h-52 w-52 place-items-center overflow-hidden rounded-full" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(242,237,228,.07), rgba(242,237,228,.015) 70%)', boxShadow: `0 0 0 1px ${tint}33, 0 0 60px -12px ${tint}66` }}>
           {toolHasArt(tool) ? <img src={toolArt(tool)} alt="" className="h-48 w-48 object-contain" /> : <span className="text-7xl" style={{ color: tint }}>{tool.glyph}</span>}
         </div>
         <div className="n-display mt-6 text-[32px] leading-tight" style={{ color: '#FFF8EC' }}>{pick(tool.name)}</div>
-        <div className="mt-2 flex items-center justify-center gap-2 text-[14px]" style={{ color: '#A39C91' }}><img src={`/mascots/${companion.id}.webp`} alt="" className="h-6 w-6 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />{t(`for ${companionName(companion, 1)}`, `para ${companionName(companion, 1)}`)} · {pick(toolTierLabel(tool.tier))} · {toolUnlockXP(tool.tier)} XP</div>
+        <div className="mt-2 flex items-center justify-center gap-2 text-[14px]" style={{ color: '#A39C91' }}><img src={`/mascots/${companion.id}.webp`} alt="" className="h-6 w-6 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />{t(`for ${companionName(companion, 1)}`, `para ${companionName(companion, 1)}`, `para ${companionName(companion, 1)}`)} · {pick(toolTierLabel(tool.tier))} · {toolUnlockXP(tool.tier)} XP</div>
         <div className="mt-4 max-w-sm text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{pick(tool.lore)}</div>
-        <button onClick={onDone} className="n-cta on mt-8 max-w-[260px]">{t('Equip it', 'Equiparlo')}</button>
+        <button onClick={onDone} className="n-cta on mt-8 max-w-[260px]">{t('Equip it', 'Equiparlo', 'Equipar')}</button>
       </motion.div>
     </motion.div>
   );
@@ -83,7 +83,7 @@ export function ToolBelt({ companion, xp, onTap, onPet, onPlus, onWorld }: { com
           {hasPet ? (petArt(companion.id) ? <img src={petArt(companion.id)!} alt="" className="h-9 w-9 object-contain" /> : <span className="text-lg">{pet.emoji}</span>) : <PawPrint size={13} className="text-white/35" />}
         </button>
       )}
-      <button onClick={onPlus} title={t('What else you can earn', 'Qué más puedes conseguir')} className="h-11 w-11 rounded-full flex items-center justify-center border border-dashed border-white/20 text-white/50"><Plus size={14} /></button>
+      <button onClick={onPlus} title={t('What else you can earn', 'Qué más puedes conseguir', 'O que mais você pode conquistar')} className="h-11 w-11 rounded-full flex items-center justify-center border border-dashed border-white/20 text-white/50"><Plus size={14} /></button>
       {/* The world slot: the map we are building next, fog of war and all. */}
       <button onClick={onWorld} title="Trader Land" className="relative h-11 w-11 rounded-full flex items-center justify-center overflow-visible" style={{ border: `1px solid ${GOLD}99`, backgroundImage: `url(${WORLD_MAP_ART})`, backgroundSize: '300%', backgroundPosition: '50% 58%' }}>
         <span className="absolute inset-0 rounded-full bg-black/45" />
@@ -104,26 +104,26 @@ export function WorldMapTeaser({ xp, level, onClose }: { xp: number; level: numb
           <motion.img src={WORLD_MAP_ART} alt="" className="absolute inset-0 h-full w-full object-cover" animate={{ scale: [1.08, 1, 1.08] }} transition={{ repeat: Infinity, duration: 18, ease: 'easeInOut' }} />
           <motion.div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 30% 22%, rgba(130,140,160,0.38), transparent 55%)' }} animate={{ x: [-24, 24, -24], y: [0, 14, 0] }} transition={{ repeat: Infinity, duration: 14, ease: 'easeInOut' }} />
           <div className="absolute inset-x-0 top-0 p-4 flex items-center justify-between">
-            <div className="text-[10px] font-mono tracking-[0.3em] text-white/85 bg-black/45 backdrop-blur px-3 py-1 rounded-full">{t('TRADER LAND', 'TRADER LAND')}</div>
+            <div className="text-[10px] font-mono tracking-[0.3em] text-white/85 bg-black/45 backdrop-blur px-3 py-1 rounded-full">{t('TRADER LAND', 'TRADER LAND', 'TRADER LAND')}</div>
             <button onClick={onClose} aria-label="close" className="h-9 w-9 rounded-full bg-black/55 text-white/85">✕</button>
           </div>
           <div className="absolute inset-x-0 bottom-0 p-5 pt-20 bg-gradient-to-t from-[#07090c] via-[#07090c]/85 to-transparent">
-            <motion.div animate={{ scale: [1, 1.07, 1] }} transition={{ repeat: Infinity, duration: 1.6 }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-[0.3em] text-black" style={{ background: GOLD, boxShadow: `0 0 24px ${GOLD}88` }}><Lock size={11} /> {t('SOON', 'PRONTO')}</motion.div>
-            <div className="mt-3 text-2xl font-semibold text-white leading-tight">{t('Your world is built with discipline.', 'Tu mundo se construye con disciplina.')}</div>
-            <div className="mt-2 text-sm text-white/75">{t('Every full read and every NO TRADE raises your base camp. Regions open with XP, never with volume.', 'Cada lectura completa y cada NO TRADE levanta tu campamento. Las regiones se abren con XP, nunca con volumen.')}</div>
+            <motion.div animate={{ scale: [1, 1.07, 1] }} transition={{ repeat: Infinity, duration: 1.6 }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-[0.3em] text-black" style={{ background: GOLD, boxShadow: `0 0 24px ${GOLD}88` }}><Lock size={11} /> {t('SOON', 'PRONTO', 'EM BREVE')}</motion.div>
+            <div className="mt-3 text-2xl font-semibold text-white leading-tight">{t('Your world is built with discipline.', 'Tu mundo se construye con disciplina.', 'Seu mundo se constrói com disciplina.')}</div>
+            <div className="mt-2 text-sm text-white/75">{t('Every full read and every NO TRADE raises your base camp. Regions open with XP, never with volume.', 'Cada lectura completa y cada NO TRADE levanta tu campamento. Las regiones se abren con XP, nunca con volumen.', 'Cada leitura completa e cada NO TRADE levantam seu acampamento. As regiões se abrem com XP, nunca com volume.')}</div>
           </div>
         </div>
         <div className="p-5 pt-4 space-y-3">
           <div className="flex items-center justify-between rounded-xl bg-white/[0.03] border border-white/[0.06] px-4 py-3">
-            <div><div className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t('ALREADY COUNTED', 'YA CUENTA')}</div><div className="text-white font-semibold">{xp} XP · {t('level', 'nivel')} {level}</div></div>
-            <div className="text-[10px] font-mono tracking-[0.15em]" style={{ color: GOLD }}>{t('CARRIES OVER', 'SE CONSERVA')}</div>
+            <div><div className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t('ALREADY COUNTED', 'YA CUENTA', 'JÁ CONTA')}</div><div className="text-white font-semibold">{xp} XP · {t('level', 'nivel', 'nível')} {level}</div></div>
+            <div className="text-[10px] font-mono tracking-[0.15em]" style={{ color: GOLD }}>{t('CARRIES OVER', 'SE CONSERVA', 'CONTINUA VALENDO')}</div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {WORLD_REGIONS.map((name) => (
               <div key={name} className="flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2 text-[10px] font-mono tracking-[0.12em] text-white/55"><Lock size={10} />{name}</div>
             ))}
           </div>
-          <button onClick={onClose} className="w-full py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: GOLD }}>{t('BACK TO THE DESK', 'VOLVER AL DESK')}</button>
+          <button onClick={onClose} className="w-full py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: GOLD }}>{t('BACK TO THE DESK', 'VOLVER AL DESK', 'VOLTAR AO DESK')}</button>
         </div>
       </motion.div>
     </motion.div>
@@ -185,7 +185,7 @@ function CatalogRow({ art, glyph, title, subtitle, needXP, needLevel, tint, xp, 
         {art ? <img src={art} alt="" className="h-9 w-9 object-contain" /> : <span style={{ color: tint }}>{glyph}</span>}
       </div>
       <div className="flex-1 min-w-0"><div className="text-white text-sm font-semibold">{title}</div><div className="text-white/55 text-xs truncate">{subtitle}</div></div>
-      <div className="text-right shrink-0">{have ? <div className="text-[10px] font-mono text-green-400 tracking-[0.15em]">{t('YOURS', 'TUYO')}</div> : <><div className="font-mono text-xs" style={{ color: tint }}>+{missing} XP</div>{needLevel !== null && <div className="text-[9px] font-mono text-white/40">{t(`LVL ${needLevel}`, `NVL ${needLevel}`)}</div>}</>}</div>
+      <div className="text-right shrink-0">{have ? <div className="text-[10px] font-mono text-green-400 tracking-[0.15em]">{t('YOURS', 'TUYO', 'SEU')}</div> : <><div className="font-mono text-xs" style={{ color: tint }}>+{missing} XP</div>{needLevel !== null && <div className="text-[9px] font-mono text-white/40">{t(`LVL ${needLevel}`, `NVL ${needLevel}`, `NÍVEL ${needLevel}`)}</div>}</>}</div>
     </div>
   );
 }
@@ -201,8 +201,8 @@ export function ItemPreview({ item, xp, level, onClose }: { item: CatalogItem; x
   const have = xp >= needXP && needLevel === null;
   const missing = Math.max(0, needXP - xp);
   const title = item.kind === 'tool' ? pick(item.tool.name) : pick(item.pet.name);
-  const subtitle = item.kind === 'tool' ? `${pick(toolTierLabel(item.tool.tier))} · ${pick(SLOT_LABEL[toolSlot(item.tool)])}` : item.pet.spins ? t('PET · SPINS NEXT TO YOU', 'MASCOTA · GIRA A TU LADO') : t('PET · AT THE FEET', 'MASCOTA · A LOS PIES');
-  const lore = item.kind === 'tool' ? pick(item.tool.lore) : item.pet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.');
+  const subtitle = item.kind === 'tool' ? `${pick(toolTierLabel(item.tool.tier))} · ${pick(SLOT_LABEL[toolSlot(item.tool)])}` : item.pet.spins ? t('PET · SPINS NEXT TO YOU', 'MASCOTA · GIRA A TU LADO', 'MASCOTE · GIRA AO SEU LADO') : t('PET · AT THE FEET', 'MASCOTA · A LOS PIES', 'MASCOTE · AOS PÉS');
+  const lore = item.kind === 'tool' ? pick(item.tool.lore) : item.pet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.', 'Gira ao seu lado no desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.', 'Vive aos pés do seu companheiro.');
   const attachments = item.kind === 'tool'
     ? [{ url: toolHasArt(item.tool) ? toolArt(item.tool) : glyphSprite(item.tool.glyph, tint), slot: toolSlot(item.tool) as string, glow: golden ? GOLD : undefined }]
     : [{ url: petArt(companion.id) ?? glyphSprite(item.pet.emoji, tint), slot: 'pet', spin: item.pet.spins }];
@@ -210,21 +210,21 @@ export function ItemPreview({ item, xp, level, onClose }: { item: CatalogItem; x
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 p-0 md:p-4" onClick={onClose}>
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} className="w-full max-w-md bg-[#0a0a0c] border border-white/[0.06] rounded-t-3xl md:rounded-3xl p-5 text-center" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between text-[10px] font-mono tracking-[0.2em]">
-          <div className="flex items-center gap-2" style={{ color: tintFor(companion) }}><img src={`/mascots/${companion.id}.webp`} alt="" className="h-6 w-6 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />{t(`WORN BY ${companion.label}`, `LO LLEVA ${companion.label}`)}</div>
+          <div className="flex items-center gap-2" style={{ color: tintFor(companion) }}><img src={`/mascots/${companion.id}.webp`} alt="" className="h-6 w-6 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />{t(`WORN BY ${companion.label}`, `LO LLEVA ${companion.label}`, `USADO POR ${companion.label}`)}</div>
           <div className="text-white/45">PREVIEW</div>
         </div>
         <div className="relative mx-auto mt-3 rounded-2xl overflow-hidden" style={{ width: 300, height: 300, background: `radial-gradient(circle at 50% 45%, ${tint}30, transparent 65%)`, border: `1px solid ${tint}55` }}>
           <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }} state="idle" size={300} attachments={attachments} />
           {!have && (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/80 px-3 py-1.5 text-[10px] font-mono tracking-[0.15em] text-white/90" style={{ border: `1px solid ${tint}80` }}>
-              <Lock size={10} />{needLevel !== null ? t(`LEVEL ${needLevel} · +${missing} XP`, `NIVEL ${needLevel} · +${missing} XP`) : t(`+${missing} XP TO GO`, `FALTAN ${missing} XP`)}
+              <Lock size={10} />{needLevel !== null ? t(`LEVEL ${needLevel} · +${missing} XP`, `NIVEL ${needLevel} · +${missing} XP`, `NÍVEL ${needLevel} · +${missing} XP`) : t(`+${missing} XP TO GO`, `FALTAN ${missing} XP`, `FALTAM ${missing} XP`)}
             </div>
           )}
         </div>
         <div className="mt-4 text-2xl font-semibold text-white">{title}</div>
         <div className="mt-1 text-[10px] font-mono tracking-[0.2em]" style={{ color: tint }}>{subtitle}</div>
         <div className="mt-2 text-sm text-white/75">{lore}</div>
-        <div className="mt-3 text-[10px] font-mono tracking-[0.1em]" style={{ color: have ? '#4ade80' : 'rgba(255,255,255,0.4)' }}>{have ? t('YOURS', 'TUYO') : t('Discipline only: full reads and coming back. Never volume.', 'Solo disciplina: lecturas completas y volver. Nunca volumen.')}</div>
+        <div className="mt-3 text-[10px] font-mono tracking-[0.1em]" style={{ color: have ? '#4ade80' : 'rgba(255,255,255,0.4)' }}>{have ? t('YOURS', 'TUYO', 'SEU') : t('Discipline only: full reads and coming back. Never volume.', 'Solo disciplina: lecturas completas y volver. Nunca volumen.', 'Só disciplina: leituras completas e voltar sempre. Nunca volume.')}</div>
       </motion.div>
     </motion.div>
   );
@@ -245,34 +245,34 @@ export function GearCatalog({ current, xp, level, onClose }: { current: Companio
           header, and the list itself is taller than any screen. */}
       <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
-          <button onClick={onClose} className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white/[0.05] pl-2 pr-3.5 font-mono text-[10px] tracking-[0.2em] text-white/80 hover:bg-white/[0.09]" aria-label={t('Back to the desk', 'Volver al desk')}><ChevronLeft size={14} />DESK</button>
-          <div className="min-w-0 text-center"><div className="text-white font-mono text-xs tracking-[0.2em]">{t('STILL TO EARN', 'POR CONSEGUIR')}</div><div className="truncate text-[9px] font-mono text-white/40 tracking-[0.15em]">{t('DISCIPLINE XP ONLY · NEVER VOLUME', 'SOLO XP DE DISCIPLINA · NUNCA VOLUMEN')}</div></div>
-          <button onClick={onClose} className="h-9 w-9 shrink-0 rounded-full bg-white/[0.05] text-white/70 hover:bg-white/[0.09]" aria-label={t('Close', 'Cerrar')}>✕</button>
+          <button onClick={onClose} className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white/[0.05] pl-2 pr-3.5 font-mono text-[10px] tracking-[0.2em] text-white/80 hover:bg-white/[0.09]" aria-label={t('Back to the desk', 'Volver al desk', 'Voltar ao desk')}><ChevronLeft size={14} />DESK</button>
+          <div className="min-w-0 text-center"><div className="text-white font-mono text-xs tracking-[0.2em]">{t('STILL TO EARN', 'POR CONSEGUIR', 'AINDA POR CONQUISTAR')}</div><div className="truncate text-[9px] font-mono text-white/40 tracking-[0.15em]">{t('DISCIPLINE XP ONLY · NEVER VOLUME', 'SOLO XP DE DISCIPLINA · NUNCA VOLUMEN', 'SÓ DISCIPLINA · NUNCA VOLUME')}</div></div>
+          <button onClick={onClose} className="h-9 w-9 shrink-0 rounded-full bg-white/[0.05] text-white/70 hover:bg-white/[0.09]" aria-label={t('Close', 'Cerrar', 'Fechar')}>✕</button>
         </div>
       </div>
       <div className="mx-auto max-w-2xl p-4 pb-10 space-y-4">
-        <div className="text-[10px] font-mono tracking-[0.1em] text-white/45">{t('Hold any item to see it worn.', 'Mantén presionado un item para verlo puesto.')}</div>
+        <div className="text-[10px] font-mono tracking-[0.1em] text-white/45">{t('Hold any item to see it worn.', 'Mantén presionado un item para verlo puesto.', 'Segure qualquer item para ver como fica.')}</div>
         {/* Your own companion used to show only the pet here, so your own three
             pieces were the one gear in the game you could never hold to see
             worn — the belt opens the flat card, not the 3D preview. */}
         <div className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]">
-          <div className="flex items-center gap-2 mb-1"><img src={`/mascots/${current.id}.webp`} alt="" className="h-7 w-7 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} /><span className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t('YOUR GEAR', 'TU EQUIPO')}</span></div>
+          <div className="flex items-center gap-2 mb-1"><img src={`/mascots/${current.id}.webp`} alt="" className="h-7 w-7 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} /><span className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t('YOUR GEAR', 'TU EQUIPO', 'SEU EQUIPAMENTO')}</span></div>
           {toolsFor(current.id).map((tool) => <CatalogRow key={`mine-${tool.tier}`} art={toolHasArt(tool) ? toolArt(tool) : null} glyph={tool.glyph} title={pick(tool.name)} subtitle={pick(tool.lore)} needXP={toolUnlockXP(tool.tier)} needLevel={null} tint={tool.tier === 3 ? GOLD : tintFor(current)} xp={xp} item={{ kind: 'tool', tool, companion: current }} onPreview={setPreview} />)}
-          {myPet && <CatalogRow art={petArt(current.id)} glyph={myPet.emoji} title={pick(myPet.name)} subtitle={myPet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.')} needXP={PET_UNLOCK_XP} needLevel={null} tint={tintFor(current)} xp={xp} item={{ kind: 'pet', pet: myPet, companion: current }} onPreview={setPreview} />}
+          {myPet && <CatalogRow art={petArt(current.id)} glyph={myPet.emoji} title={pick(myPet.name)} subtitle={myPet.spins ? t('Spins next to you on the desk.', 'Gira a tu lado en el desk.', 'Gira ao seu lado no desk.') : t("Lives at your companion's feet.", 'Vive a los pies de tu companion.', 'Vive aos pés do seu companheiro.')} needXP={PET_UNLOCK_XP} needLevel={null} tint={tintFor(current)} xp={xp} item={{ kind: 'pet', pet: myPet, companion: current }} onPreview={setPreview} />}
         </div>
-        <div className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t("OTHER COMPANIONS' GEAR", 'EQUIPO DE OTROS COMPAÑEROS')}</div>
+        <div className="text-[10px] font-mono tracking-[0.2em] text-white/50">{t("OTHER COMPANIONS' GEAR", 'EQUIPO DE OTROS COMPAÑEROS', 'EQUIPAMENTO DOS OUTROS COMPANHEIROS')}</div>
         {COMPANIONS.filter((c) => c.id !== current.id).map((c) => {
           const needLevel = level < c.requiredLevel ? c.requiredLevel : null;
           const pet = petFor(c.id);
           return (
             <div key={c.id} className="rounded-xl p-3 bg-white/[0.02] border border-white/[0.05]">
-              <div className="flex items-center gap-2 mb-1"><img src={`/mascots/${c.id}.webp`} alt="" className="h-7 w-7 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} /><span className="font-mono text-xs tracking-[0.15em]" style={{ color: tintFor(c) }}>{c.label}</span>{needLevel !== null && <span className="text-[9px] font-mono text-white/40 tracking-[0.1em]">{t(`LEVEL ${needLevel} TO UNLOCK`, `NIVEL ${needLevel} PARA DESBLOQUEAR`)}</span>}</div>
+              <div className="flex items-center gap-2 mb-1"><img src={`/mascots/${c.id}.webp`} alt="" className="h-7 w-7 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} /><span className="font-mono text-xs tracking-[0.15em]" style={{ color: tintFor(c) }}>{c.label}</span>{needLevel !== null && <span className="text-[9px] font-mono text-white/40 tracking-[0.1em]">{t(`LEVEL ${needLevel} TO UNLOCK`, `NIVEL ${needLevel} PARA DESBLOQUEAR`, `NÍVEL ${needLevel} PARA DESBLOQUEAR`)}</span>}</div>
               {toolsFor(c.id).map((tool) => <CatalogRow key={`${c.id}-${tool.tier}`} art={toolHasArt(tool) ? toolArt(tool) : null} glyph={tool.glyph} title={pick(tool.name)} subtitle={pick(tool.lore)} needXP={toolUnlockXP(tool.tier)} needLevel={needLevel} tint={tool.tier === 3 ? GOLD : tintFor(c)} xp={xp} item={{ kind: 'tool', tool, companion: c }} onPreview={setPreview} />)}
-              {pet && <CatalogRow key={`${c.id}-pet`} art={petArt(c.id)} glyph={pet.emoji} title={pick(pet.name)} subtitle={t('Pet', 'Mascota')} needXP={PET_UNLOCK_XP} needLevel={needLevel} tint={tintFor(c)} xp={xp} item={{ kind: 'pet', pet, companion: c }} onPreview={setPreview} />}
+              {pet && <CatalogRow key={`${c.id}-pet`} art={petArt(c.id)} glyph={pet.emoji} title={pick(pet.name)} subtitle={t('Pet', 'Mascota', 'Mascote')} needXP={PET_UNLOCK_XP} needLevel={needLevel} tint={tintFor(c)} xp={xp} item={{ kind: 'pet', pet, companion: c }} onPreview={setPreview} />}
             </div>
           );
         })}
-        <button onClick={onClose} className="w-full py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: tintFor(current) }}>{t('BACK TO THE DESK', 'VOLVER AL DESK')}</button>
+        <button onClick={onClose} className="w-full py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: tintFor(current) }}>{t('BACK TO THE DESK', 'VOLVER AL DESK', 'VOLTAR AO DESK')}</button>
       </div>
       <AnimatePresence>{preview && <ItemPreview item={preview} xp={xp} level={level} onClose={() => setPreview(null)} />}</AnimatePresence>
     </motion.div>
@@ -291,9 +291,9 @@ export function ToolDetail({ companion, tool, xp, onClose }: { companion: Compan
         </div>
         <div className="text-2xl font-semibold text-white">{unlocked ? pick(tool.name) : '???'}</div>
         <div className="text-[10px] font-mono tracking-[0.15em] text-white/50">
-          {unlocked ? `${pick(toolTierLabel(tool.tier))} · ${companionName(companion, 1)}` : t(`${pick(toolTierLabel(tool.tier))} · UNLOCKS AT ${toolUnlockXP(tool.tier)} XP · YOU HAVE ${xp}`, `${pick(toolTierLabel(tool.tier))} · SE DESBLOQUEA A ${toolUnlockXP(tool.tier)} XP · LLEVAS ${xp}`)}
+          {unlocked ? `${pick(toolTierLabel(tool.tier))} · ${companionName(companion, 1)}` : t(`${pick(toolTierLabel(tool.tier))} · UNLOCKS AT ${toolUnlockXP(tool.tier)} XP · YOU HAVE ${xp}`, `${pick(toolTierLabel(tool.tier))} · SE DESBLOQUEA A ${toolUnlockXP(tool.tier)} XP · LLEVAS ${xp}`, `${pick(toolTierLabel(tool.tier))} · DESBLOQUEIA COM ${toolUnlockXP(tool.tier)} XP · VOCÊ TEM ${xp}`)}
         </div>
-        <div className="text-sm text-white/75">{unlocked ? pick(tool.lore) : tool.tier === 1 ? t('Drops after your first full read.', 'Cae después de tu primera lectura completa.') : t('Discipline only: reads and coming back. Never volume.', 'Solo disciplina: lecturas y volver. Nunca volumen.')}</div>
+        <div className="text-sm text-white/75">{unlocked ? pick(tool.lore) : tool.tier === 1 ? t('Drops after your first full read.', 'Cae después de tu primera lectura completa.', 'Aparece depois da sua primeira leitura completa.') : t('Discipline only: reads and coming back. Never volume.', 'Solo disciplina: lecturas y volver. Nunca volumen.', 'Só disciplina: leituras e voltar sempre. Nunca volume.')}</div>
       </motion.div>
     </motion.div>
   );
@@ -328,10 +328,10 @@ export function NoTradeCard({ symbol, reason, xp, onClose, compact = false }: { 
           </div>
         </div>
         <div className="mt-8 text-center text-4xl md:text-5xl font-mono tracking-[0.22em] text-sky-200">NO TRADE</div>
-        <div className="mt-3 text-center text-white text-lg md:text-xl font-medium">{t('No setup yet. Capital protected.', 'Sin setup todavía. Capital protegido.')}</div>
+        <div className="mt-3 text-center text-white text-lg md:text-xl font-medium">{t('No setup yet. Capital protected.', 'Sin setup todavía. Capital protegido.', 'Sem setup ainda. Capital protegido.')}</div>
         <div className="mt-1 text-center text-white/55 text-xs font-mono">{reason}</div>
         <div className="mt-5 flex items-center justify-between text-[11px] font-mono border border-white/[0.08] rounded-lg px-3 py-2 bg-black/30">
-          <span className="text-amber-300 flex items-center gap-1"><Sparkles size={12} /> {xp > 0 ? t(`+${xp} DISCIPLINE XP`, `+${xp} XP DE DISCIPLINA`) : t('DAILY CAP REACHED', 'TOPE DIARIO ALCANZADO')}</span>
+          <span className="text-amber-300 flex items-center gap-1"><Sparkles size={12} /> {xp > 0 ? t(`+${xp} DISCIPLINE XP`, `+${xp} XP DE DISCIPLINA`, `+${xp} XP DE DISCIPLINA`) : t('DAILY CAP REACHED', 'TOPE DIARIO ALCANZADO', 'LIMITE DIÁRIO ATINGIDO')}</span>
           <span className="text-white/40">{symbol}</span>
         </div>
       </motion.div>

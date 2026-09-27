@@ -76,7 +76,7 @@ export function WalletBalancePill({ onClick }: { onClick?: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      title={t('Your balance on Base · opens the swap sheet', 'Tu saldo en Base · abre el swap')}
+      title={t('Your balance on Base · opens the swap sheet', 'Tu saldo en Base · abre el swap', 'Seu saldo na Base · abre o swap')}
       className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 font-mono text-[10px] tracking-[0.12em] text-white/80 transition hover:bg-white/[0.08]"
     >
       <Wallet size={13} className="text-sky-300" />

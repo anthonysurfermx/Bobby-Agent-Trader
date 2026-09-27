@@ -4,7 +4,7 @@
 // previews) retry once and then stay silent; only an analysis the human is
 // waiting for may fall back to the browser's speech synthesis.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ttsLang, isSpanish } from '@/lib/companions/i18n';
+import { ttsLang, speechLocale } from '@/lib/companions/i18n';
 
 export interface SpeakOptions {
   voice: string;
@@ -103,7 +103,7 @@ export function useCompanionVoice() {
     try {
       const gen = generation.current;
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = isSpanish() ? 'es-MX' : 'en-US';
+      u.lang = speechLocale();
       u.rate = playbackRate;
       u.onend = u.onerror = () => { if (gen === generation.current) { setSpeaking(false); stopMeter(); } };
       setSpeaking(true);
