@@ -461,7 +461,7 @@ export default function AgentForumPage() {
   }, [threads, category, sort, scope, address]);
 
   return (
-    <KineticShell showSidebar>
+    <KineticShell showSidebar nucleo>
       <Helmet><title>Debates | Bobby Agent Trader</title></Helmet>
 
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-6 pb-20">

@@ -81,7 +81,7 @@ export default function BobbyAgentsPage() {
   ];
 
   return (
-    <KineticShell activeTab="agents" showSidebar>
+    <KineticShell activeTab="agents" showSidebar nucleo>
       <Helmet><title>Agent Leaderboard | Bobby Agent Trader</title></Helmet>
 
       <div className="p-6 md:p-8 max-w-7xl mx-auto pb-20">

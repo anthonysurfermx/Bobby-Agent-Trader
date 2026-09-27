@@ -1,93 +1,32 @@
-// src/pages/NotFound.tsx
+// src/pages/NotFound.tsx — a missing page on bobbyprotocol.xyz, in the Núcleo look: warm charcoal,
+// Sora headline, ivory pill back to the desk. Language follows the rest of the app (en/es/pt).
 import { Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  PixelHelpCircle,
-  PixelHome,
-  PixelArrowLeft,
-  PixelSearch,
-  PixelCompass
-} from '@/components/ui/pixel-icons';
+import { Helmet } from 'react-helmet-async';
+import { htmlLang, t } from '@/lib/companions/i18n';
 
 export default function NotFound() {
   const navigate = useNavigate();
-
-  // Sugerencias de páginas populares
-  const suggestions = [
-    { path: '/startups', label: 'Explorar Startups', Icon: PixelCompass },
-    { path: '/eventos', label: 'Ver Eventos', Icon: PixelSearch },
-    { path: '/comunidades', label: 'Comunidades DeFi', Icon: PixelCompass },
-  ];
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      {/* Decoración de fondo */}
-      <div className="absolute inset-0 bg-grid-white/10 bg-grid-16 [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
-      
-      <Card className="w-full max-w-md relative z-10 shadow-xl">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 relative">
-            <div className="absolute inset-0 bg-primary/20 blur-xl animate-pulse" />
-            <div className="relative p-4 bg-primary/10 rounded-full">
-              <PixelHelpCircle size={48} className="text-primary animate-bounce" />
-            </div>
-          </div>
-          
-          <CardTitle className="text-3xl font-bold">
-            404
-          </CardTitle>
-          
-          <CardDescription className="text-lg mt-2">
-            Página No Encontrada
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="text-center space-y-6">
-          <p className="text-muted-foreground">
-            Lo sentimos, la página que buscas no existe o ha sido movida.
-          </p>
-          
-          {/* Sugerencias */}
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-muted-foreground">
-              Tal vez te interese:
-            </p>
-            <div className="space-y-2">
-              {suggestions.map((suggestion) => (
-                <Link
-                  key={suggestion.path}
-                  to={suggestion.path}
-                  className="flex items-center justify-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <suggestion.Icon size={16} className="text-primary" />
-                  <span className="text-sm">{suggestion.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-        
-        <CardFooter className="flex flex-col gap-3">
-          <Button 
-            onClick={() => navigate(-1)}
-            variant="default"
-            className="w-full"
-          >
-            <PixelArrowLeft size={16} className="mr-2" />
-            Volver atrás
-          </Button>
-          
-          <Button 
-            onClick={() => navigate('/')}
-            variant="outline"
-            className="w-full"
-          >
-            <PixelHome size={16} className="mr-2" />
-            Ir al inicio
-          </Button>
-        </CardFooter>
-      </Card>
+    <div
+      className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center"
+      style={{ background: 'radial-gradient(ellipse at 50% 40%, #15121C 0%, #0B0A09 65%)', color: '#F2EDE4', fontFamily: "'Geist', ui-sans-serif, system-ui, sans-serif" }}
+    >
+      <Helmet><html lang={htmlLang()} /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&family=Geist+Mono:wght@400&family=Sora:wght@300&display=swap" /><title>{t('Page not found', 'Página no encontrada', 'Página não encontrada')} | Bobby</title></Helmet>
+      <span style={{ fontFamily: "'Geist Mono', ui-monospace, Menlo, monospace", fontSize: 12, letterSpacing: '.2em', color: '#8A8378' }}>404</span>
+      <h1 style={{ fontFamily: "'Sora', ui-sans-serif, system-ui, sans-serif", fontWeight: 300, fontSize: 'clamp(28px, 5vw, 44px)', letterSpacing: '-.02em', lineHeight: 1.15, textWrap: 'balance' }}>
+        {t('This page doesn’t exist.', 'Esta página no existe.', 'Esta página não existe.')}
+      </h1>
+      <p style={{ color: '#A39C91', fontSize: 15, maxWidth: 380, lineHeight: 1.6 }}>
+        {t('It may have moved. Bobby is on the desk.', 'Quizá se movió. Bobby está en el desk.', 'Talvez tenha mudado de lugar. O Bobby está no desk.')}
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Link to="/desk" className="inline-flex min-h-11 items-center rounded-full px-6 text-sm font-semibold" style={{ background: '#F2EDE4', color: '#0B0A09' }}>
+          {t('Open the desk', 'Abrir el desk', 'Abrir o desk')}
+        </Link>
+        <button type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))} className="inline-flex min-h-11 items-center rounded-full border px-6 text-sm" style={{ borderColor: 'rgba(242,237,228,.14)', color: '#F2EDE4' }}>
+          {t('Go back', 'Volver', 'Voltar')}
+        </button>
+      </div>
     </div>
   );
 }

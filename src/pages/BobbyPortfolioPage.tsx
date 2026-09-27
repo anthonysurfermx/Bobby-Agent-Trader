@@ -48,7 +48,7 @@ export default function BobbyPortfolioPage() {
   })) || [];
 
   return (
-    <KineticShell activeTab="terminal">
+    <KineticShell activeTab="terminal" nucleo>
       <Helmet><title>Portfolio | Bobby Agent Trader</title></Helmet>
 
       <div className="max-w-md mx-auto px-5 pt-6 pb-20 space-y-6">

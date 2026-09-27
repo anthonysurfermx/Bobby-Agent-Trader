@@ -313,7 +313,7 @@ export default function BobbyMetacognitionPage() {
   };
 
   return (
-    <KineticShell activeTab="metacognition">
+    <KineticShell activeTab="metacognition" nucleo>
       <Helmet>
         <title>Metacognition | Bobby Agent Trader</title>
       </Helmet>
