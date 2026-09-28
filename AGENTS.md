@@ -1,14 +1,15 @@
 # DeFi Mexico Hub + Bobby Agent Trader
 
 ## Project
-Vite + React + TypeScript app. Supabase backend. Deployed on Vercel at defimexico.org.
-Main product: **Bobby Agent Trader** — 3-agent debate system (Alpha Hunter, Red Team, CIO) for the OKX X Layer hackathon.
+Vite + React + TypeScript app. Supabase backend. Deployed on Vercel at bobbyprotocol.xyz (Git deploy from `main`).
+Main product: **Bobby Agent Trader** — 3-agent debate system (Alpha Hunter, Red Team, CIO).
 
 ## Tech Stack
 - Frontend: React 18, TypeScript, Tailwind CSS, Framer Motion, Recharts, wagmi/viem
 - Backend: Vercel serverless functions (api/*.ts), Supabase (Postgres + RLS)
 - AI: Codex API (Haiku for debates, Sonnet for judge), streaming via SSE
-- Blockchain: OKX X Layer (Chain 196), OKB native + USDT ERC-20
+- Blockchain: Base mainnet (chain 8453) only. X Layer was retired on 2026-09-03 and `api/_lib/chains.ts` refuses it.
+- Swaps: Uniswap V3 SwapRouter02 on Base. Bobby builds and simulates calldata; the user's wallet signs. Bobby never signs or holds funds.
 - Design: Stitch Kinetic Terminal — dark terminal aesthetic (green-400 on #050505, glassmorphism cards)
 - Bot: Telegram via webhook (api/telegram-webhook.ts)
 
@@ -32,11 +33,12 @@ src/components/kinetic/KineticShell.tsx — Terminal frame + nav + ticker
 - Styling: Stitch tokens — bg-white/[0.02], border-white/[0.04], text-green-400
 - Charts: Recharts in ResponsiveContainer, green/amber/red color scheme
 - Animations: Framer Motion, staggered entry with motion.div
+- Public protocol copy is Base-only: never name OKX, OKB or X Layer on a user-facing surface.
 
 ## Key Constants
-- Supabase project: egpixaunlnzauztbrnuz
-- X Layer Chain ID: 196
-- USDT on X Layer: 0x1E4a5963aBFD975d8c9021ce480b42188849D41d
+- Supabase (production): bobby-protocol `qbvdqkknnuweatptjohi`. The legacy project `egpixaunlnzauztbrnuz` is frozen.
+- Contracts: `contracts/deployments/8453.json` (owned by the 2-of-3 Safe).
+- Swap limits: `BASE_SWAP_LIMITS` in `src/lib/base-swap/tokens.ts`. Env brakes: `BASE_SWAP_MAX_TICKET_USD` (entries), `BASE_SWAP_MAX_SELL_USD` (sales), `BASE_STOCK_SWAPS_ENABLED`, `BASE_STOCK_SWAP_CANARY_WALLETS`.
 - Bobby treasury wallet: 0x09a81ff70ddbc5e8b88f168b3eef01384b6cdcea
 
 ## Commands

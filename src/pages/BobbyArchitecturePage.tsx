@@ -187,10 +187,10 @@ const LAYERS = [
 ] as const;
 
 const CONTRACT_ROLES = [
-  ['BobbyTrackRecord V2', 'trackRecord', 'V2 anchors entry in the future and verifies entry/exit with Pyth; verified and attested ledgers never mix.'],
+  ['BobbyTrackRecord V2', 'trackRecord', 'V2 anchors entry in the future and prices entry and a declared exit with Pyth: it grades the call, it does not prove a swap closed. Verified and attested ledgers never mix.'],
   ['BobbyConvictionOracle', 'convictionOracle', 'Conviction commitments published before execution. The no-take-backs ledger.'],
   ['BobbyAgentEconomyV2', 'agentEconomy', 'Debate fees and protocol economy, denominated in native gas.'],
-  ['BobbyAgentRegistry', 'agentRegistry', 'Agent identities with a registration stake behind every name.'],
+  ['BobbyAgentRegistry', 'agentRegistry', 'Agent identities minted by the protocol owner. They answer to the ERC-721 interface id but cannot be transferred.'],
   ['BobbyIntentEscrow', 'intentEscrow', 'Intent attestation ledger — kept strictly separate from price-verified stats.'],
   ['BobbyAdversarialBounties', 'adversarialBounties', 'Open bounties paid for breaking Bobby’s reasoning in public.'],
   ['HardnessRegistry', 'hardnessRegistry', 'Scores how hard each debate actually was. Easy calls earn less credit.'],
