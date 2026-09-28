@@ -36,7 +36,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
     case 'tools/list':
       return {
         tools: [
-          { name: 'bobby_analyze', description: 'Get Bobby\'s full market analysis with 10 data sources', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol (BTC, ETH, SOL, OKB)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['symbol'] } },
+          { name: 'bobby_analyze', description: 'Get Bobby\'s full market analysis with 10 data sources', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol (BTC, ETH, SOL)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['symbol'] } },
           { name: 'bobby_debate', description: 'Trigger a 3-agent debate (Alpha Hunter vs Red Team vs Bobby CIO)', inputSchema: { type: 'object', properties: { question: { type: 'string', description: 'Trading question to debate' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['question'] } },
           { name: 'bobby_ta', description: 'Technical analysis: SMA, RSI, MACD, Bollinger, support/resistance', inputSchema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
           { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time sources', inputSchema: { type: 'object', properties: {} } },

@@ -294,7 +294,7 @@ export default function BobbyDocsPage() {
               </p>
               <div className="grid gap-3 md:grid-cols-3">
                 {[
-                  ['APP · /api/desk-debate', 'Web /desk and the iPhone app. Three sequential calls over one instrument\u2019s 1H candles (OKX or Yahoo Finance). The indicator engine gives levels and conviction; the CIO can only veto them. Origin-restricted and metered.'],
+                  ['APP · /api/desk-debate', 'Web /desk and the iPhone app. Three sequential calls over one instrument\u2019s 1H candles from public market data. The indicator engine gives levels and conviction; the CIO can only veto them. Origin-restricted and metered.'],
                   ['PUBLIC · /api/bobby-cycle', 'Daily at 12:00 UTC. Alpha and Red Team, then a CIO with a forced structured verdict (entry, stop, target, invalidation, conviction). Calls are graded on the 1H price path after 48 h and listed with their debate on the record.'],
                   ['AGENTS · MCP bobby_debate', 'The same three roles for other agents, through the conversational desk in debate mode. Premium: paid per call in ETH on Base through AgentEconomy.'],
                 ].map(([title, text]) => (
@@ -309,7 +309,7 @@ export default function BobbyDocsPage() {
                   label="Desk verdict shape (/api/desk-debate → 200)"
                   code={`{
   "symbol": "BTC",
-  "provenance": { "provider": "OKX", "instrument": "BTC-USDT",
+  "provenance": { "provider": "<market data source>", "instrument": "BTC-USDT",
                   "assetType": "crypto", "timeframe": "1H", "asOf": "<ISO time>" },
   "technicals": { "price": …, "trend": …, "rsi14": …, "support": …, "resistance": … },
   "agents": {

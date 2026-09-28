@@ -719,7 +719,7 @@ export default function BobbyProtocolLanding() {
                     rows: [
                       ['Endpoint', stats?.pipeline?.desk?.endpoint ?? '/api/desk-debate'],
                       ['Agents', `Alpha Hunter → Red Team → CIO · ${stats?.pipeline?.desk?.calls ?? 3} sequential calls · ${deskModel}`],
-                      ['Evidence', 'One instrument, 1H candles: OKX for crypto, Yahoo Finance for equities. At least 59 bars; refused if older than 3 h (crypto) or 5 days (equities).'],
+                      ['Evidence', 'One instrument, 1H candles from public market data (crypto and equities). At least 59 bars; refused if older than 3 h (crypto) or 5 days (equities).'],
                       ['Engine', 'Deterministic 1H indicators (trend, RSI, ATR, EMA, support and resistance) give levels and conviction. The CIO can only veto them.'],
                       ['Output', 'Review or wait, with each agent\u2019s argument. Reads are metered per device and account.'],
                       ['Record', 'Private. A desk answer is not published to the public ledger.'],
@@ -731,7 +731,7 @@ export default function BobbyProtocolLanding() {
                     rows: [
                       ['Endpoint', stats?.pipeline?.cycle?.endpoint ?? '/api/bobby-cycle'],
                       ['Agents', `Alpha ${stats?.pipeline?.cycle?.models?.alpha ?? 'gpt-4o-mini'} → Red Team ${stats?.pipeline?.cycle?.models?.redTeam ?? 'gpt-4o-mini'} → CIO ${stats?.pipeline?.cycle?.models?.cio ?? 'gpt-4o'} with a forced structured verdict: action, direction, entry, stop, target, invalidation, conviction 1–10.`],
-                      ['Evidence', 'OKX prices, funding, open interest and top-trader positioning, a technical pulse across indicators, Fear & Greed, Polymarket and the dollar index.'],
+                      ['Evidence', 'Public market prices, funding, open interest and top-trader positioning, a technical pulse across indicators, Fear & Greed, Polymarket and the dollar index.'],
                       ['Gate', `Conviction = 70% backend model + 30% CIO. A call is committed only when the CIO asks to act with complete levels and conviction ≥ ${stats?.pipeline?.cycle?.commitConvictionFloor ?? 0.35}.`],
                       ['Grading', `${stats?.pipeline?.cycle?.horizonHours ?? 48} h expiry. ${stats?.pipeline?.resolver?.method ?? '1H candle path, first touch, stop wins a same-bar tie'} (${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}).`],
                       ['Record', 'Public, with the full debate. Live commits also go to TrackRecordV2 on Base.'],

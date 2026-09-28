@@ -410,7 +410,7 @@ export default function BobbySandboxPage() {
                   onChange={(e) => setTicker(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                   disabled={running}
                   maxLength={12}
-                  placeholder="Or type any OKX spot ticker"
+                  placeholder="Or type any crypto ticker"
                   className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-white/90 focus:border-[#0052ff]/60 focus:outline-none disabled:opacity-50"
                 />
 
@@ -423,7 +423,7 @@ export default function BobbySandboxPage() {
                 </button>
 
                 <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-white/35">
-                  Real OKX data · Simulation only · No capital moves
+                  Real market data · Simulation only · No capital moves
                 </p>
 
                 {runCount > 0 && (
@@ -908,7 +908,7 @@ function MarketContextCard({ ctx }: { ctx: MarketContext }) {
               Market context — {ctx.ticker}
             </div>
             <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">
-              {ctx.source === 'okx' ? 'Live OKX spot · fetched just now' : 'data unavailable · reasoning general only'}
+              {ctx.source === 'okx' ? 'Live spot price · fetched just now' : 'data unavailable · reasoning general only'}
             </div>
           </div>
         </div>

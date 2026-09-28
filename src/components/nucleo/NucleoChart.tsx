@@ -191,7 +191,7 @@ export default function NucleoChart({ series, answer, debate, symbol, isEquity, 
   }, [series, answer, debate, w, height]);
 
   const claims = useMemo(() => agentClaims(debate, answer), [debate, answer]);
-  const source = isEquity ? `1H · ${symbol}` : `1H · OKX · ${symbol}-USDT`;
+  const source = isEquity ? `1H · ${symbol}` : `1H · ${symbol}-USDT`;
   const draw = drawn ? 1 : 0;
   const fade = (delay: number) => ({ opacity: draw, transition: `opacity .45s ease ${delay}s` });
 

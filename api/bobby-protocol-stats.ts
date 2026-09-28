@@ -509,9 +509,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       resolver: { endpoint: '/api/forum-resolve', schedule: 'daily 12:30 UTC', method: '1H candle path, first touch, stop wins a same-bar tie' },
     },
     market: {
-      prices: intel.prices,
+      // Base-only protocol: no exchange tokens in the public price strip.
+      prices: intel.prices.filter((p) => p.symbol !== 'OKB'),
       regime: intel.regime,
-      xlayer: intel.xlayer,
     },
   });
 }
