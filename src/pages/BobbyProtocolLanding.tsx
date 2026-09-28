@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { BOBBY_BASE_MAINNET } from '@/config/chains';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
+import ArchitectureFlow from '@/components/protocol/ArchitectureFlow';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
 
 type Price = { symbol: string; price: number; change24h: number };
@@ -504,26 +505,11 @@ export default function BobbyProtocolLanding() {
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
                 <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The procedure</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One procedure,<br />end to end.</h2>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The whole system,<br />on Base.</h2>
               </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Four steps, the same on every debate.</p>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Four real paths through the code: a desk read, the daily public debate, another agent over MCP and a swap you sign on Base.</p>
             </div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              className="overflow-hidden rounded-2xl border border-white/10 shadow-[0_30px_100px_rgba(0,82,255,0.18)]"
-            >
-              <video
-                className="h-full w-full"
-                src="/videos/architecture.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-                poster="/posters/architecture.jpg"
-              />
-            </motion.div>
+            <ArchitectureFlow />
           </div>
         </section>
 
