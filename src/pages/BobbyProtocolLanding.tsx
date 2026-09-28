@@ -17,6 +17,7 @@ import {
 import { BOBBY_BASE_MAINNET } from '@/config/chains';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import ArchitectureFlow from '@/components/protocol/ArchitectureFlow';
+import ProtocolJourney from '@/components/protocol/ProtocolJourney';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
 
 type Price = { symbol: string; price: number; change24h: number };
@@ -505,10 +506,12 @@ export default function BobbyProtocolLanding() {
             <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
               <div>
                 <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The procedure</div>
-                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The whole system,<br />on Base.</h2>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">From a click<br />to the orb.</h2>
               </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Four real paths through the code: a desk read, the daily public debate, another agent over MCP and a swap you sign on Base.</p>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Follow one question through the protocol, stage by stage. Then the whole map: a desk read, the daily public debate, another agent over MCP and a swap you sign on Base.</p>
             </div>
+            <ProtocolJourney debate={publicRecord?.latestDebate} />
+            <div className="mb-6 mt-20 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">The whole map</div>
             <ArchitectureFlow />
           </div>
         </section>
