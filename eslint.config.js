@@ -14,6 +14,10 @@ export default tseslint.config(
       '.vercel/**',
       'contracts/**',
       'dist/**',
+      // Design prototypes, the Núcleo engine (plain JS concatenated by nucleo/build.py) and its copy in the iOS app
+      'docs/**',
+      'nucleo/**',
+      'ios/**',
       'node_modules/**',
       'output/**',
       // Vendored third-party assets served as-is (e.g. the Draco decoder)
