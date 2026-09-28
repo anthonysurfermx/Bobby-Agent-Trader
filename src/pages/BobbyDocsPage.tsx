@@ -125,11 +125,6 @@ const PUBLIC_TOOLS = [
   { name: 'bobby_stats', desc: 'Track record, win rate, PnL — live performance metrics' },
   { name: 'bobby_ta', desc: 'Technical analysis with RSI, MACD, Bollinger Bands, SuperTrend' },
   { name: 'bobby_intel', desc: 'Full intelligence briefing from 10 real-time sources' },
-  { name: 'bobby_wallet_balance', desc: 'Read-only balance for a Base wallet' },
-  { name: 'bobby_wallet_portfolio', desc: 'Read-only portfolio breakdown and analysis · premium' },
-  { name: 'bobby_security_scan', desc: 'Token contract safety audit and risk scoring · premium' },
-  { name: 'bobby_dex_trending', desc: 'Trending tokens on-chain across DEXs' },
-  { name: 'bobby_dex_signals', desc: 'Whale and KOL buy/sell signals' },
   { name: 'bobby_uniswap_quote', desc: 'Uniswap V3 quote on Base from Bobby\'s own quoter call' },
 ];
 
@@ -225,7 +220,7 @@ export default function BobbyDocsPage() {
               Connect your AI agent to Bobby in one command
             </h1>
             <p className="text-sm md:text-base leading-7 text-white/60 max-w-xl mx-auto">
-              The three-agent debate, 11 MCP tools (20 on the streamable-HTTP endpoint), Base mainnet contracts and a self-custodial receipt ledger
+              The three-agent debate, 6 MCP tools (15 on the streamable-HTTP endpoint), Base mainnet contracts and a self-custodial receipt ledger
             </p>
           </motion.div>
 
@@ -331,9 +326,9 @@ export default function BobbyDocsPage() {
           {/* ===== 3. MCP TOOLS GRID ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
-              <SectionLabel icon={Cpu} label="11 MCP tools" right="live schema via tools/list" />
+              <SectionLabel icon={Cpu} label="6 MCP tools" right="live schema via tools/list" />
               <p className="mb-5 max-w-3xl text-sm leading-7 text-white/60" id="mcp">
-                <span className="font-mono text-[#7da6ff]">/api/mcp-bobby</span> (JSON-RPC) lists the 11 tools below. <span className="font-mono text-[#7da6ff]">/api/mcp-http</span> (streamable HTTP) adds 9 more — recommendation, brief, Judge Mode, adversarial bounties and b1nary wheel checks — for 20. Analysis, debate, security scan and wallet portfolio are premium: each call is paid on Base through AgentEconomy (<span className="font-mono">payMCPCall</span>, x402 challenge), priced by the contract&apos;s current fee.
+                <span className="font-mono text-[#7da6ff]">/api/mcp-bobby</span> (JSON-RPC) lists the 6 tools below. <span className="font-mono text-[#7da6ff]">/api/mcp-http</span> (streamable HTTP) adds 9 more — recommendation, brief, Judge Mode, adversarial bounties and b1nary wheel checks — for 15. Analysis, debate and Judge Mode are premium: each call is paid on Base through AgentEconomy (<span className="font-mono">payMCPCall</span>, x402 challenge), priced by the contract&apos;s current fee.
               </p>
 
               {/* Public tools */}
@@ -567,7 +562,7 @@ IBobbyOracle oracle = IBobbyOracle(
               <div className="flex items-center justify-center gap-6 font-mono text-[10px] text-white/35 tracking-[0.18em]">
                 <span>CHAIN: 8453</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#0052ff]" />
-                <span>MCP TOOLS: 11 · 20 (HTTP)</span>
+                <span>MCP TOOLS: 6 · 15 (HTTP)</span>
               </div>
 
               {/* Links */}

@@ -16,7 +16,7 @@ curl -X POST https://bobbyprotocol.xyz/api/mcp-bobby \
 
 ## Public MCP tools
 
-The production endpoint currently exposes 11 tools:
+The production endpoint currently exposes 6 tools:
 
 - `bobby_analyze` — multi-source market analysis with AI synthesis
 - `bobby_debate` — Alpha Hunter vs Red Team vs CIO
@@ -24,11 +24,6 @@ The production endpoint currently exposes 11 tools:
 - `bobby_intel` — compact market-intelligence snapshot
 - `bobby_uniswap_quote` — read-only Uniswap V3 quote on Base
 - `bobby_stats` — public track record and performance metrics
-- `bobby_wallet_balance` — read-only wallet balance
-- `bobby_wallet_portfolio` — read-only portfolio analysis
-- `bobby_security_scan` — token contract risk scan
-- `bobby_dex_trending` — on-chain market discovery
-- `bobby_dex_signals` — on-chain wallet and flow signals
 
 Discover the live schema instead of relying on this list:
 

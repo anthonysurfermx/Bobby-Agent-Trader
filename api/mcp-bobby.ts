@@ -42,11 +42,6 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
           { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time sources', inputSchema: { type: 'object', properties: {} } },
           { name: 'bobby_uniswap_quote', description: 'Exact-input quote on Uniswap V3, Base (read-only)', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'ETH' }, tokenOut: { type: 'string', default: 'USDC' }, amount: { type: 'string', default: '1' }, amountIn: { type: 'string' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
           { name: 'bobby_stats', description: 'Public protocol Base receipt aggregates (trade count, win rate, PnL when available)', inputSchema: { type: 'object', properties: {} } },
-          { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance on any chain', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'base' } } } },
-          { name: 'bobby_wallet_portfolio', description: 'Get portfolio of any wallet address (multi-chain)', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '8453' } }, required: ['address'] } },
-          { name: 'bobby_security_scan', description: 'Scan a token contract for honeypot, rug pull, and safety risks', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '1' } }, required: ['address'] } },
-          { name: 'bobby_dex_trending', description: 'Hot trending tokens on-chain right now', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' } } } },
-          { name: 'bobby_dex_signals', description: 'Smart money / whale / KOL buy signals', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' }, type: { type: 'string', default: 'smart_money' } } } },
         ],
       };
 
@@ -54,6 +49,10 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
     case 'tools/call': {
       const toolName = params.name as string;
       const args = (params.arguments || {}) as Record<string, any>;
+      // Retired 2026-09-28: these depended on an off-Base wallet service that is no longer run.
+      if (['bobby_wallet_balance', 'bobby_wallet_portfolio', 'bobby_security_scan', 'bobby_dex_trending', 'bobby_dex_signals'].includes(toolName)) {
+        throw new Error(`${toolName} is retired. See tools/list for the current tools.`);
+      }
 
       if (toolName === 'bobby_analyze' || toolName === 'bobby_debate') {
         const question = args.question || args.symbol || 'market';
@@ -174,7 +173,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 // Premium tools require x402 payment authorization
 // Free tools: tools/list, bobby_intel, bobby_stats, bobby_ta
 // Premium tools: bobby_debate, bobby_analyze, bobby_security_scan
-const PREMIUM_TOOLS = new Set(['bobby_debate', 'bobby_analyze', 'bobby_security_scan', 'bobby_wallet_portfolio']);
+const PREMIUM_TOOLS = new Set(['bobby_debate', 'bobby_analyze']);
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     const fee = await readMcpCallFee().catch(() => null);
@@ -185,7 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       protocol: 'mcp',
       endpoints: { tools: '/api/mcp-bobby' },
       pricing: {
-        free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_dex_trending', 'bobby_dex_signals', 'bobby_uniswap_quote', 'bobby_wallet_balance'],
+        free: ['tools/list', 'bobby_intel', 'bobby_stats', 'bobby_ta', 'bobby_uniswap_quote'],
         premium: {
           tools: Array.from(PREMIUM_TOOLS),
           price: fee ? `${fee.feeNative} ${fee.nativeSymbol} per call` : 'temporarily unavailable',

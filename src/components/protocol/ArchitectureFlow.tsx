@@ -13,7 +13,7 @@ const COLUMNS = ['Who asks', 'Gate', 'Evidence', 'Agents', 'Guards', 'Record', '
 const NODES: Node[] = [
   { id: 'web', col: 0, title: 'Web desk', sub: '/desk', tone: 'ink', detail: 'A question typed or dictated on the web desk.' },
   { id: 'ios', col: 0, title: 'iPhone app', sub: 'same desk', tone: 'ink', detail: 'The iPhone app calls the same desk endpoint as the web.' },
-  { id: 'mcp', col: 0, title: 'Other agents', sub: 'MCP · HTTP', tone: 'ink', detail: 'Another AI agent calls Bobby over MCP: 11 JSON-RPC tools, 20 on streamable HTTP.' },
+  { id: 'mcp', col: 0, title: 'Other agents', sub: 'MCP · HTTP', tone: 'ink', detail: 'Another AI agent calls Bobby over MCP: 6 JSON-RPC tools, 15 on streamable HTTP.' },
   { id: 'cron', col: 0, title: 'Daily cycle', sub: '12:00 UTC', tone: 'ink', detail: 'A scheduled job starts the public debate once a day.' },
 
   { id: 'api', col: 1, title: 'API gateway', sub: 'access · limits', tone: 'ink', detail: 'Serverless API: origin check, rate limits, metered reads (sign-in, free weekly reads, Bobby Pro).' },

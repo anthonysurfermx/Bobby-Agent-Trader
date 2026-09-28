@@ -49,7 +49,7 @@ const SERVER_NAME = 'bobby-protocol';
 const SERVER_VERSION = '3.0.0';
 const BASE_URL = BOBBY_PROTOCOL_BASE_URL;
 
-const PREMIUM_TOOLS = new Set(['bobby_analyze', 'bobby_debate', 'bobby_security_scan', 'bobby_wallet_portfolio', 'bobby_judge']);
+const PREMIUM_TOOLS = new Set(['bobby_analyze', 'bobby_debate', 'bobby_judge']);
 // ---- Tool Definitions ----
 const TOOLS = [
   { name: 'bobby_analyze', description: 'Get Bobby\'s full market analysis with conviction score. Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol (BTC, ETH, SOL) or a Base tokenized stock (NVDAc, AAPLc, METAc, GOOGLc, TSLAc, MSTRc, SPCXc, MSFTc)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } }, required: ['symbol'] } },
@@ -60,11 +60,6 @@ const TOOLS = [
   { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time data sources. Use sections param to filter: prices,regime,whale,sentiment,technical,macro.', inputSchema: { type: 'object', properties: { sections: { type: 'string', description: 'Comma-separated sections to include: prices,regime,whale,sentiment,technical,macro,funding,oi,prediction,traders,security. Omit for all.' } } } },
   { name: 'bobby_uniswap_quote', description: 'Read-only quote for Coinbase B20 tokenized stocks through direct USDC pools on Uniswap V3, Base (8453). Never returns calldata.', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'USDC', description: 'USDC or a supported B20 token (AAPLc, GOOGLc, METAc, NVDAc, TSLAc, MSTRc, SPCXc, MSFTc; underlying ticker aliases accepted)' }, tokenOut: { type: 'string', default: 'NVDAc', description: 'USDC or a supported B20 token; one side must be USDC' }, amount: { type: 'string', default: '10', description: 'Human-readable exact-input amount' }, amountIn: { type: 'string', description: 'Alias for amount' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
   { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades).', inputSchema: { type: 'object', properties: {} } },
-  { name: 'bobby_wallet_balance', description: 'Check Bobby\'s agentic wallet balance.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: 'base' } } } },
-  { name: 'bobby_wallet_portfolio', description: 'Portfolio of any wallet address (multi-chain). Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '8453' } }, required: ['address'] } },
-  { name: 'bobby_security_scan', description: 'Scan token contract for honeypot/rug risks. Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string', default: '1' } }, required: ['address'] } },
-  { name: 'bobby_dex_trending', description: 'Hot trending tokens on-chain right now.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' } } } },
-  { name: 'bobby_dex_signals', description: 'Smart money / whale / KOL buy signals.', inputSchema: { type: 'object', properties: { chain: { type: 'string', default: '1' }, type: { type: 'string', default: 'smart_money' } } } },
   { name: 'bobby_judge', description: 'Judge Mode — independent audit of a 3-agent debate. Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { thread_id: { type: 'string', description: 'Debate thread ID (omit for latest debate)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } } } },
   { name: 'bobby_bounty_list', description: 'List recent adversarial bounties posted against Bobby debates on Base.', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 10, description: 'How many recent bounties to return (max 25)' } } } },
   { name: 'bobby_bounty_get', description: 'Get a single adversarial bounty by id, including status, reward, dimension and effective expiry.', inputSchema: { type: 'object', properties: { bounty_id: { type: 'string', description: 'Bounty id (integer, 1-indexed)' } }, required: ['bounty_id'] } },
@@ -837,6 +832,10 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
     case 'tools/call': {
       const toolName = params.name as string;
       const rawArgs = (params.arguments || {}) as Record<string, any>;
+      // Retired 2026-09-28: these depended on an off-Base wallet service that is no longer run.
+      if (['bobby_wallet_balance', 'bobby_wallet_portfolio', 'bobby_security_scan', 'bobby_dex_trending', 'bobby_dex_signals'].includes(toolName)) {
+        throw new Error(`${toolName} is retired. See tools/list for the current tools.`);
+      }
       // Strip demo attribution before passing args to the tool handler — tools
       // never need to see it. Only the generic mcp_call logger consumes it.
       const demoSource = typeof rawArgs.demo_source === 'string' ? rawArgs.demo_source : null;
