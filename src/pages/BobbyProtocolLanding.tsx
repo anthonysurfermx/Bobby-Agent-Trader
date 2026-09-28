@@ -626,7 +626,7 @@ export default function BobbyProtocolLanding() {
                 </h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">
-                The same rules on the web, on iPhone and in the daily public cycle.
+                The desk uses the same endpoint on the web and iPhone; the daily cycle is a separate public procedure.
               </p>
             </div>
 
@@ -648,7 +648,7 @@ export default function BobbyProtocolLanding() {
                 },
                 {
                   title: 'Output guard',
-                  description: 'Every agent\u2019s text is checked after generation. A guaranteed return, a risk-free claim, a personal buy or sell instruction, or a CIO whose text contradicts its own verdict fails the whole analysis. No verdict is substituted.',
+                  description: 'Every desk agent\u2019s text is checked after generation. A guaranteed return, a risk-free claim, a personal buy or sell instruction, or a CIO whose text contradicts its own verdict fails the desk analysis. No desk verdict is substituted.',
                   image: '/images/protocol/agent-identity.jpg',
                   alt: 'Synthetic human profile visible through textured cobalt glass',
                   telemetry: ['guard  guarantee · advice · verdict mismatch', 'on fail  503 analysis_failed', 'languages  en · es', 'fallback  none'],
@@ -707,7 +707,7 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Where the agents run</div>
-              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Two runtimes.<br />One procedure.</h2>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Two runtimes.<br />Two procedures.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">Your question in the app is answered on demand and stays yours. The public record comes from a separate daily debate that anyone can audit.</p>
             </div>
             <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
