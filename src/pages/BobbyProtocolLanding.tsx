@@ -18,6 +18,8 @@ import { BOBBY_BASE_MAINNET } from '@/config/chains';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import ArchitectureFlow from '@/components/protocol/ArchitectureFlow';
 import ProtocolJourney from '@/components/protocol/ProtocolJourney';
+import CapabilityCards from '@/components/protocol/CapabilityCards';
+import NucleoSphere from '@/components/companion/NucleoSphere';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
 
 type Price = { symbol: string; price: number; change24h: number };
@@ -606,9 +608,8 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="relative overflow-hidden border-y border-white/10 bg-[#08080a]" id="capabilities">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.14),transparent_42%)]" />
-          <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
+        <section className="relative overflow-hidden border-y border-white/10 bg-[#0B0A09]" id="capabilities">
+          <div className="relative mx-auto max-w-7xl px-5 py-24 lg:px-8 lg:py-32">
             <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
                 <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / The agents</div>
@@ -621,76 +622,28 @@ export default function BobbyProtocolLanding() {
               </p>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-2">
-              {[
+            <CapabilityCards items={[
                 {
                   title: 'Adversarial debate',
                   description: 'Three isolated model calls over the same evidence. Alpha Hunter argues the case, Red Team receives Alpha\u2019s argument and attacks it, the CIO receives both plus the original question and rules: review or wait.',
-                  image: '/images/protocol/adversarial-debate.jpg',
-                  alt: 'Three silhouettes debating behind illuminated blue glass',
                   telemetry: ['POST /api/desk-debate', `model  ${deskModel}`, 'red.input  question · evidence · alpha', 'cio.input  question · evidence · alpha · red'],
                 },
                 {
                   title: 'Veto, never upgrade',
                   description: 'A deterministic indicator engine proposes direction, conviction and levels. The debate can only take that away: a call is shown only when the CIO rules review in the same direction. If the debate does not finish, nothing is approved.',
-                  image: '/images/protocol/risk-gate.jpg',
-                  alt: 'Human hand meeting a luminous blue glass barrier',
                   telemetry: ['engine  1H indicators → direction · conviction · levels', 'cio  review | wait · long | short | none', 'show call  cio=review ∧ same direction', 'otherwise  no call'],
                 },
                 {
                   title: 'Output guard',
                   description: 'Every agent\u2019s text on the desk and in the daily public cycle is checked after generation. A guaranteed return, a risk-free claim, a personal buy or sell instruction or leverage fails it. On the desk the whole analysis fails with no substitute verdict; in the public cycle the agent gets one rewrite, then the text is withheld. The MCP conversational flow is separate and not covered.',
-                  image: '/images/protocol/agent-identity.jpg',
-                  alt: 'Synthetic human profile visible through textured cobalt glass',
                   telemetry: ['guard  guarantee · advice · leverage · verdict mismatch', 'desk  503 analysis_failed, no substitute', 'cycle  one rewrite, then withheld (since 2026-09-29)', 'languages  en · es · pt'],
                 },
                 {
                   title: 'Proof',
                   description: 'The daily public debate stores every call with entry, stop, target and a 48-hour expiry before the outcome, and grades it on the real 1H price path. Calls the cycle commits live also go to TrackRecordV2 on Base with a Pyth price anchor.',
-                  image: '/images/protocol/onchain-proof.jpg',
-                  alt: 'Transparent cobalt glass monolith containing a sealed point of light',
                   telemetry: [`cycle  ${stats?.pipeline?.cycle?.schedule ?? 'daily 12:00 UTC'}`, `resolver  ${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}`, 'grading  first touch · stop wins a tie', `chain  base · 8453 · ${formatNumber(onchainRecord?.commitmentsCreated, '0')} on-chain`],
                 },
-              ].map((capability, index) => (
-                <motion.article
-                  key={capability.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.2 }}
-                  transition={{ delay: index * 0.06 }}
-                  className="group relative min-h-[430px] overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0f] md:min-h-[500px]"
-                >
-                  <motion.img
-                    src={capability.image}
-                    alt={capability.alt}
-                    loading="lazy"
-                    className="absolute inset-0 h-full w-full object-cover"
-                    initial={{ opacity: 0.7, scale: 1.08 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    whileHover={{ scale: 1.06 }}
-                    viewport={{ once: true, amount: 0.2 }}
-                    transition={{ duration: 1.2, delay: index * 0.05, ease: 'easeOut' }}
-                  />
-                  <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,7,.96)_0%,rgba(5,5,7,.72)_42%,rgba(5,5,7,.08)_100%)]" />
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,7,.22)_0%,rgba(5,5,7,.05)_45%,rgba(5,5,7,.94)_100%)]" />
-                  <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity duration-300 group-hover:opacity-100" />
-
-                  <div className="relative z-10 flex min-h-[430px] max-w-[74%] flex-col p-7 md:min-h-[500px] md:p-9">
-                    <div className="mb-5 flex items-center gap-3">
-                      <span className="h-2 w-2 rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,.9)]" />
-                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#7da6ff]">Capability 0{index + 1}</span>
-                    </div>
-                    <h3 className="text-3xl font-extrabold tracking-[-0.05em] md:text-4xl">{capability.title}</h3>
-                    <p className="mt-5 max-w-lg text-sm leading-6 text-white/65 md:text-base md:leading-7">{capability.description}</p>
-
-                    <div className="mt-auto space-y-1 font-mono text-[10px] leading-5 text-white/38 md:text-[11px]">
-                      <div className="mb-2 text-[#7da6ff]">&gt; {capability.telemetry[0]}</div>
-                      {capability.telemetry.slice(1).map((line) => <div key={line}>&nbsp;&nbsp;{line}</div>)}
-                    </div>
-                  </div>
-                </motion.article>
-              ))}
-            </div>
+              ]} />
           </div>
         </section>
 
@@ -748,76 +701,47 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="relative isolate overflow-hidden" id="for-agents">
-          <SectionMedia name="nebula" className="opacity-50" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
-          <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Integration</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give any agent<br />a second layer.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">Connect over MCP.</p></div>
-          <div className="grid items-start gap-5 md:grid-cols-[1.55fr_1fr]">
-            <a
-              href="/protocol/docs"
-              className="group relative min-h-[470px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
-            >
-              <motion.img
-                src="/images/protocol/agent-interface.jpg"
-                alt="Synthetic agent connecting to a protocol through textured cobalt glass"
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover"
-                initial={{ opacity: 0.72, scale: 1.08 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.06 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: 1.2, ease: 'easeOut' }}
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
-              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
-              <div className="relative z-10 flex min-h-[470px] max-w-[76%] flex-col p-8 md:p-10">
-                <div className="flex items-start justify-between">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Sparkles className="h-5 w-5 text-[#7da6ff]" /></span>
-                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
-                </div>
-                <div className="mt-auto">
-                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Agent interface</div>
-                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">For agents</h3>
-                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">Connect over MCP. Request conviction, inspect proof, and build Bobby into your execution workflow.</p>
-                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-[#7da6ff]">Read the docs →</div>
-                </div>
+        <section className="relative overflow-hidden bg-[#0B0A09]" id="for-agents">
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+            <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Integration</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give any agent<br />a second layer.</h2>
               </div>
-            </a>
-
-            <a
-              href={APP_LANDING_URL}
-              className="group relative min-h-[380px] overflow-hidden rounded-3xl border border-white/10 bg-[#08080b] text-white shadow-[0_20px_60px_rgba(0,0,0,.28)] transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:shadow-[0_24px_70px_rgba(0,82,255,.2)]"
-            >
-              <motion.img
-                src="/images/protocol/human-interface.jpg"
-                alt="A person reading a verdict on the Bobby iPhone app"
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover"
-                initial={{ opacity: 0.72, scale: 1.08 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                whileHover={{ scale: 1.06 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: 1.2, ease: 'easeOut' }}
-              />
-              <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(4,4,7,.98)_0%,rgba(4,4,7,.82)_40%,rgba(4,4,7,.12)_100%)]" />
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,4,7,.2)_0%,rgba(4,4,7,.05)_45%,rgba(4,4,7,.94)_100%)]" />
-              <div className="absolute inset-0 opacity-0 ring-1 ring-inset ring-[#0052ff]/70 transition-opacity group-hover:opacity-100" />
-              <div className="relative z-10 flex min-h-[380px] max-w-[76%] flex-col p-8 md:p-10">
-                <div className="flex items-start justify-between">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-[#0052ff]/30 bg-[#0052ff]/20 backdrop-blur"><Bot className="h-5 w-5 text-[#7da6ff]" /></span>
-                  <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
+              <p className="max-w-sm text-sm leading-6 text-white/45">Other agents connect over MCP and pay per call on Base. People use the app.</p>
+            </div>
+            <div className="grid items-stretch gap-4 md:grid-cols-[1.4fr_1fr]">
+              <a href="/protocol/docs#mcp" className="group relative flex flex-col overflow-hidden rounded-[28px] border border-[rgba(242,237,228,.08)] p-7 md:p-9" style={{ background: 'linear-gradient(180deg, rgba(34,31,28,.9), rgba(18,16,15,.95))', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.9)' }}>
+                <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full opacity-20 blur-3xl" style={{ background: '#4D7CFF' }} />
+                <div className="relative flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-[#A39C91]">
+                  <span className="flex items-center gap-2.5"><span className="h-1.5 w-1.5 rounded-full bg-[#4D7CFF] shadow-[0_0_10px_#4D7CFF]" />For agents · MCP</span>
+                  <ArrowRight className="h-4 w-4 text-[#F2EDE4] transition group-hover:translate-x-1" />
                 </div>
-                <div className="mt-auto">
-                  <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">The app</div>
-                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">Bobby, on the web and iPhone</h3>
-                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">The same three agents and the same veto, in a voice you can talk to.</p>
-                  <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">See the app →</div>
+                <h3 className="relative mt-4 text-[30px] font-light leading-[1.05] tracking-[-0.04em] text-[#F2EDE4] md:text-[36px]">Put three agents<br />behind your agent.</h3>
+                <div className="relative mt-6 rounded-2xl border border-[rgba(242,237,228,.06)] bg-black/50 p-4 font-mono text-[12px] leading-6">
+                  <div className="text-[#8A8378]">$ terminal</div>
+                  <div className="break-all text-[#F2EDE4]">claude mcp add bobby https://bobbyprotocol.xyz/api/mcp-http</div>
+                  <div className="mt-2 text-[#8A8378]">→ tools/list</div>
+                  <div className="text-[#C9C2B6]">bobby_debate · bobby_analyze · bobby_judge <span className="text-[#F6B94E]">premium</span></div>
+                  <div className="text-[#C9C2B6]">bobby_brief · bobby_ta · bobby_intel · bobby_uniswap_quote <span className="text-[#3FE0B5]">free</span></div>
+                  <div className="mt-2 text-[#8A8378]">→ premium call</div>
+                  <div className="text-[#9AB4FF]">x402 · {mcp?.pricing?.premium?.price ?? '0.000025 ETH'} · paid on Base (8453)</div>
                 </div>
-              </div>
-            </a>
-          </div>
+                <p className="relative mt-6 max-w-lg text-[15px] leading-7 text-[#A39C91]">Request a debate, a judge score or a brief from any MCP client. Premium calls settle in AgentEconomy on Base before the answer is returned.</p>
+                <div className="relative mt-auto pt-6 font-mono text-[11px] uppercase tracking-[0.16em] text-[#F2EDE4]">Read the docs →</div>
+              </a>
+              <a href={APP_LANDING_URL} className="group relative flex flex-col items-center overflow-hidden rounded-[28px] border border-[rgba(242,237,228,.08)] p-7 text-center md:p-9" style={{ background: 'linear-gradient(180deg, rgba(34,31,28,.9), rgba(18,16,15,.95))', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05), 0 30px 60px -30px rgba(0,0,0,.9)' }}>
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(154,92,255,.22),transparent_60%)]" />
+                <div className="relative flex w-full items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-[#A39C91]">
+                  <span className="flex items-center gap-2.5"><span className="h-1.5 w-1.5 rounded-full bg-[#9A5CFF] shadow-[0_0_10px_#9A5CFF]" />The app</span>
+                  <ArrowRight className="h-4 w-4 text-[#F2EDE4] transition group-hover:translate-x-1" />
+                </div>
+                <div className="relative my-6"><NucleoSphere size={170} mode="idle" /></div>
+                <h3 className="relative text-[30px] font-light leading-[1.05] tracking-[-0.04em] text-[#F2EDE4] md:text-[34px]">Bobby, on the web<br />and iPhone.</h3>
+                <p className="relative mt-4 max-w-xs text-[15px] leading-7 text-[#A39C91]">The same three agents and the same veto, in a voice you can talk to.</p>
+                <div className="relative mt-auto pt-6 font-mono text-[11px] uppercase tracking-[0.16em] text-[#F2EDE4]">See the app →</div>
+              </a>
+            </div>
           </div>
         </section>
 
