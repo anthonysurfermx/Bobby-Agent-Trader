@@ -290,13 +290,13 @@ export default function BobbyDocsPage() {
             <GlassCard glow accentBorder className="p-6 md:p-8">
               <SectionLabel icon={MessageSquare} label="The agents" right="how a debate runs" />
               <p className="mb-6 max-w-3xl text-sm leading-7 text-white/60">
-                Every answer is argued by three roles in isolated model calls. Alpha Hunter builds the strongest conditional case from the evidence. Red Team receives Alpha&apos;s argument and attacks its assumptions, invalidation and missing evidence. The CIO receives both plus the original question and rules <span className="font-mono text-[#7da6ff]">review</span> or <span className="font-mono text-[#7da6ff]">wait</span>, with a direction. A post-generation guard fails the whole analysis on a guaranteed-return claim, a personal buy or sell instruction, or a CIO whose text contradicts its own verdict.
+                Each desk answer is argued by three roles in isolated model calls. Alpha Hunter builds the strongest conditional case from the evidence. Red Team receives Alpha&apos;s argument and attacks its assumptions, invalidation and missing evidence. The CIO receives both plus the original question and rules <span className="font-mono text-[#7da6ff]">review</span> or <span className="font-mono text-[#7da6ff]">wait</span>, with a direction. A post-generation guard fails the desk analysis on a guaranteed-return claim, a personal buy or sell instruction, or a CIO whose text contradicts its own verdict.
               </p>
               <div className="grid gap-3 md:grid-cols-3">
                 {[
                   ['APP · /api/desk-debate', 'Web /desk and the iPhone app. Three sequential calls over one instrument\u2019s 1H candles from public market data. The indicator engine gives levels and conviction; the CIO can only veto them. Origin-restricted and metered.'],
                   ['PUBLIC · /api/bobby-cycle', 'Daily at 12:00 UTC. Alpha and Red Team, then a CIO with a forced structured verdict (entry, stop, target, invalidation, conviction). Calls are graded on the 1H price path after 48 h and listed with their debate on the record.'],
-                  ['AGENTS · MCP bobby_debate', 'The same three roles for other agents, through the conversational desk in debate mode. Premium: paid per call in ETH on Base through AgentEconomy.'],
+                  ['AGENTS · MCP bobby_debate', 'Three roles for other agents, through a separate conversational debate flow. Premium: paid per call in ETH on Base through AgentEconomy.'],
                 ].map(([title, text]) => (
                   <div key={title} className="rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/[0.07] p-5">
                     <div className="font-mono text-[10px] font-bold tracking-[0.15em] text-[#7da6ff]">{title}</div>
