@@ -95,14 +95,27 @@ body.nucleo-ui .n-ask input:focus-visible { outline: none; }
 .n-ask:focus-within { border-color: rgba(242, 237, 228, .32); }
 .n-mic { height: 48px; width: 72px; flex: none; display: grid; place-items: center; border-radius: 999px; background: #000; color: var(--n-ink);
   border: 1px solid rgba(242, 237, 228, .1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 0 30px -6px rgba(154, 92, 255, .35); transition: box-shadow .25s ease; }
-.n-mic.on { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 0 0 1px rgba(92, 225, 255, .55), 0 0 34px -2px rgba(92, 225, 255, .55); color: var(--n-listen); }
+.n-mic.on { color: var(--n-ink); }
+/* The iOS pill glow (Nucleo template #micGlow): a blurred conic gradient turning behind the
+   black mic; it breathes at rest and swells while listening. */
+.n-mic-wrap { position: relative; flex: none; display: grid; }
+.n-mic-wrap .n-mic { position: relative; z-index: 1; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 18px 40px -14px rgba(0, 0, 0, .9); }
+.n-mic-glow { position: absolute; left: 50%; top: 50%; width: 120px; height: 62px; margin: -31px 0 0 -60px; border-radius: 40px; overflow: hidden;
+  pointer-events: none; filter: blur(18px); opacity: .55; transform: scale(.72); transition: opacity .35s ease, transform .35s ease; }
+.n-mic-glow i { position: absolute; left: 50%; top: 50%; width: 140px; height: 140px; margin: -70px 0 0 -70px;
+  background: conic-gradient(from 0deg, #4D6BFF, #9A5CFF, #FF6EC7, #5CE1FF, #4D6BFF); animation: n-mic-spin 6s linear infinite; }
+.n-mic-wrap:hover .n-mic-glow { opacity: .75; transform: scale(.82); }
+.n-mic-wrap.on .n-mic-glow { opacity: 1; transform: scale(1.12); animation: n-mic-breathe 1.4s ease-in-out infinite; }
+.n-mic-wrap.on .n-mic-glow i { animation-duration: 2.4s; }
+@keyframes n-mic-spin { to { transform: rotate(360deg); } }
+@keyframes n-mic-breathe { 0%, 100% { transform: scale(1.02); } 50% { transform: scale(1.2); } }
 .n-send { height: 44px; padding: 0 18px; flex: none; border-radius: 999px; background: var(--n-ink); color: #0B0A09; font: 500 14px/1 var(--n-sans); }
 .n-send:disabled { opacity: .35; cursor: not-allowed; }
 .n-agent { position: absolute; display: flex; align-items: center; gap: 8px; font: 500 11px/1 var(--n-mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
   transition: opacity .35s ease, transform .35s ease; }
 .n-agent i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; }
 .n-menu { background: linear-gradient(180deg, var(--n-card-a), var(--n-card-b)); border: 1px solid var(--n-line); border-radius: 18px; box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .9); }
-@media (prefers-reduced-motion: reduce) { .n-agent, .n-mic, .n-chip { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .n-agent, .n-mic, .n-chip { transition: none; } .n-mic-glow, .n-mic-glow i { animation: none !important; } }
 
 /* =====================================================================
    The Núcleo desk (rebuilt 2026-09-26): the glass leads, the chart is exhaled beneath it,
