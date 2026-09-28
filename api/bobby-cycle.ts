@@ -18,6 +18,7 @@ import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-ev
 import { callLlm } from './_lib/llm.js';
 import { internalAuthHeaders, requireInternalAuth, requireOpsAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
+import { publicTextViolation } from './_lib/desk-debate.js';
 
 export const config = { maxDuration: 300 };
 
@@ -123,6 +124,26 @@ async function callClaude(model: string, system: string, userMsg: string, maxTok
     timeoutMs,
   });
   return result.text;
+}
+
+// ---- Public output guard ----
+// Every post of the public debate is published as a research note. The same post-generation
+// guard as the desk (api/_lib/desk-debate.ts) runs on each one: a personal instruction, leverage
+// or a guarantee gets one rewrite; a second failure is withheld, never published.
+const PUBLIC_VOICE = 'PUBLICATION RULES: this text is published as a public research note. Write in the third person about the market. State any idea as a conditional thesis with reference levels (for example "a short setup from X, invalidated above Y"). Never address the reader, never tell anyone to buy, sell, open, enter or take advantage of anything, never mention leverage or position size, never promise returns.';
+
+async function guardedPublic(role: string, lang: string, produce: (extraRule: string) => Promise<string>): Promise<string> {
+  const first = await produce('');
+  const v1 = publicTextViolation(first);
+  if (!v1) return first;
+  console.error('[Cycle] output guard rejected draft', role, v1);
+  const second = await produce(`\nYOUR PREVIOUS DRAFT WAS REJECTED by the output guard (${v1}). Rewrite it as a conditional thesis: no personal instruction, no leverage, no guarantee.`);
+  const v2 = publicTextViolation(second);
+  if (!v2) return second;
+  console.error('[Cycle] output guard withheld', role, v2);
+  return lang === 'es'
+    ? '[Retenido por la guardia de salida: este argumento contenía una instrucción personal de trading o una garantía.]'
+    : '[Withheld by the output guard: this argument contained a personal trading instruction or a guarantee.]';
 }
 
 // ---- Structured Verdict via OpenAI function calling ----
@@ -826,10 +847,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const backendConv = typeof intel.performance?.dynamicConviction === 'number' ? intel.performance.dynamicConviction : 0;
 
     // Alpha Hunter (Haiku — cheap, aggressive, scans full market)
-    alphaPost = await callClaude('claude-haiku-4-5-20251001',
-      `You are Alpha Hunter — a young hungry female trader. Scan ALL assets (crypto + stocks). Find the single BEST trade. Be SPECIFIC: entry, target, stop, leverage. You MUST reference the TECHNICAL_PULSE section — cite the composite score, the signal (BULLISH/BEARISH), and at least 2 specific indicators (RSI, MACD, BB, SuperTrend, AHR999) with their exact values from the TECHNICAL_PULSE block. If the technical score supports your thesis, say so explicitly.${contradictionNote} ${langRule} 2-3 short paragraphs.`,
+    alphaPost = await guardedPublic('alpha', lang, (extraRule) => callClaude('claude-haiku-4-5-20251001',
+      `You are Alpha Hunter — a young hungry female trader. Scan ALL assets (crypto + stocks). Find the single strongest trade thesis. Be SPECIFIC: reference entry, target, stop and invalidation. You MUST reference the TECHNICAL_PULSE section — cite the composite score, the signal (BULLISH/BEARISH), and at least 2 specific indicators (RSI, MACD, BB, SuperTrend, AHR999) with their exact values from the TECHNICAL_PULSE block. If the technical score supports your thesis, say so explicitly.${contradictionNote} ${langRule} 2-3 short paragraphs.\n${PUBLIC_VOICE}${extraRule}`,
       `MARKET SCAN:\n${contextBlock}`, 350
-    );
+    ));
 
     // Red Team (Haiku — adversarial, 3-tier intensity per Gemini review)
     // Codex Q4 circuit breaker: 3+ consecutive losses → restore full aggression regardless of backend score
@@ -849,11 +870,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       redTeamIntensity = `You are Red Team — 15-year risk veteran. Destroy Alpha's thesis. Attack data gaps, selection bias, timing. Every paragraph is a kill shot.`;
     }
-    redPost = await callClaude('claude-haiku-4-5-20251001',
+    redPost = await guardedPublic('redteam', lang, (extraRule) => callClaude('claude-haiku-4-5-20251001',
       `${redTeamIntensity} Reference the TECHNICAL_PULSE composite score — if it contradicts Alpha, use it as ammunition. Cite specific indicator readings (RSI, MACD, BB, SuperTrend) from the TECHNICAL_PULSE block with exact numbers. ${langRule} 2-3 short paragraphs.${
-        hasContradictions ? ` Recent failures: ${corrections.block}` : ''}`,
+        hasContradictions ? ` Recent failures: ${corrections.block}` : ''}\n${PUBLIC_VOICE}${extraRule}`,
       `MARKET DATA:\n${contextBlock}\n\nALPHA HUNTER'S THESIS:\n${alphaPost}`, 350
-    );
+    ));
 
     // Analyst — SKIP on cron to save ~30s (Codex P0: timeout fuel)
     let analystPost = '';
@@ -892,17 +913,29 @@ CONVICTION GUIDE: 1-3 = sit out, 4-5 = small exploratory risk, 6-7 = core positi
 IMPORTANT: When action=open, you MUST provide entry, stop, and target prices — NEVER null. Use the nearest technical level for stop, or 3% from entry if no clear level exists.
 IMPORTANT: CLOSE existing positions FIRST if the thesis is broken.
 Use assertive vocabulary: pain trade, liquidity sweep, leverage flush, structural breakdown.
-Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.${
+Write your thesis in ${lang === 'es' ? 'Spanish' : 'English'}.
+${PUBLIC_VOICE} The hook and thesis follow these rules too; the structured fields carry the levels.${
       track.winRate < 60 ? '\nRecent calls have been poor. Be selective but don\'t freeze.' : ''
     }${hasContradictions ? `\nSELF-CORRECTION: Recent failures — if thesis resembles one, sit out.` : ''}`;
 
     // Use structured output (OpenAI function calling) — 100% reliable JSON extraction
-    const structuredVerdict = await callStructuredVerdict(cioSystemPrompt, `MARKET CONTEXT:\n${cioContext}`);
+    let structuredVerdict = await callStructuredVerdict(cioSystemPrompt, `MARKET CONTEXT:\n${cioContext}`);
+    const cioText = (v: StructuredVerdict) => `${v.hook}\n\n${v.thesis}${v.risks?.length ? `\n\nRisks: ${v.risks.join('; ')}` : ''}`;
+    let cioViolation = publicTextViolation(cioText(structuredVerdict));
+    if (cioViolation) {
+      console.error('[Cycle] output guard rejected draft', 'cio', cioViolation);
+      structuredVerdict = await callStructuredVerdict(`${cioSystemPrompt}\nYOUR PREVIOUS DRAFT WAS REJECTED by the output guard (${cioViolation}). Rewrite hook and thesis as a conditional thesis: no personal instruction, no leverage, no guarantee.`, `MARKET CONTEXT:\n${cioContext}`);
+      cioViolation = publicTextViolation(cioText(structuredVerdict));
+      if (cioViolation) console.error('[Cycle] output guard withheld', 'cio', cioViolation);
+    }
+    const cioBody = cioViolation
+      ? (lang === 'es'
+        ? '[Retenido por la guardia de salida: el texto del CIO contenía una instrucción personal de trading o una garantía.]'
+        : '[Withheld by the output guard: the CIO text contained a personal trading instruction or a guarantee.]')
+      : cioText(structuredVerdict);
 
     // Reconstruct CIO post for forum display (human-readable)
-    cioPost = `${structuredVerdict.hook}\n\n${structuredVerdict.thesis}${
-      structuredVerdict.risks?.length ? `\n\nRisks: ${structuredVerdict.risks.join('; ')}` : ''
-    }\n\nVERDICT: ${JSON.stringify({ action: structuredVerdict.action, conviction: structuredVerdict.conviction, symbol: structuredVerdict.symbol, direction: structuredVerdict.direction, entry: structuredVerdict.entry, stop: structuredVerdict.stop, target: structuredVerdict.target, invalidation: structuredVerdict.invalidation })}\nVIBE_PHRASE: ${structuredVerdict.vibe_phrase}`;
+    cioPost = `${cioBody}\n\nVERDICT: ${JSON.stringify({ action: structuredVerdict.action, conviction: structuredVerdict.conviction, symbol: structuredVerdict.symbol, direction: structuredVerdict.direction, entry: structuredVerdict.entry, stop: structuredVerdict.stop, target: structuredVerdict.target, invalidation: structuredVerdict.invalidation })}\nVIBE_PHRASE: ${structuredVerdict.vibe_phrase}`;
 
     console.log(`[Cycle] Structured verdict: ${structuredVerdict.action} ${structuredVerdict.symbol} ${structuredVerdict.direction} conviction=${structuredVerdict.conviction}/10`);
     } // end else (non-test debate)

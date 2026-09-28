@@ -94,6 +94,10 @@ const GUARANTEE: RegExp[] = [
   /\b(?:sin\s+(?:ning[uú]n\s+)?riesgos?(?!\s+(?:definido|controlado|limitado|claro|acotado|gestionado|calculado|adicional)(?:e?s)?\b)(?!\s+de\s+(?!p[eé]rd))|cero\s+riesgo|riesgo\s+cero|apuesta\s+segura|jugada\s+segura|dinero\s+f[aá]cil)(?![\p{L}])/giu,
   /\b(?:tu|su|el)\s+(?:capital|dinero|inversi[oó]n)\s+(?:est[aá]|estar[aá]|queda(?:r[aá])?)\s+(?:totalmente\s+|completamente\s+)?(?:protegid[oa]|a\s+salvo)\b/giu,
   /\bproteg\w*\b[^.;]{0,25}\bde\s+(?:cualquier|toda)\s+p[eé]rdida\b/giu,
+  // Portuguese (the desk answers in pt-BR too).
+  /\b(?:lucros?|retornos?|ganhos?|rendimentos?)\s+(?:garantid[oa]s?|assegurad[oa]s?|cert[oa]s?)\b/giu,
+  /\bgarant\w*\s+(?:\S+\s+){0,2}?(?:lucros?|retornos?|ganhos?|rendimentos?)\b/giu,
+  /(?<![\p{L}])(?:sem\s+(?:nenhum\s+)?risco(?!\s+(?:definido|controlado|limitado|calculado)))(?![\p{L}])/giu,
 ];
 // "short-term caution" or "a short while" is not a short trade.
 const ADVICE: RegExp[] = [
@@ -108,11 +112,23 @@ const ADVICE: RegExp[] = [
   /(?<![\p{L}])(?:te\s+)?(?:recomiendo|aconsejo|sugiero)\s+(?:que\s+)?(?:comprar|compres|compre|compren|vender|vendas|venda|vendan|shortear|shortees|abrir\s+(?:un\s+)?(?:largo|corto)|abras\s+(?:un\s+)?(?:largo|corto))(?![\p{L}])/giu,
   // Same shape as the English imperative: "Compra neta hoy…" is data.
   /(?:(?<=^)|(?<=[.!?¡]\s*))(?:[Cc]ompra|[Vv]ende|[Cc]ompre|[Vv]enda|[Cc]ompren|[Vv]endan)\s+(?:(?:lo|la|los|las|esto|eso|todo|más|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:ya|ahora|hoy|de\s+inmediato|inmediatamente)(?![\p{L}])/gu,
+  // Leverage is sizing advice, whatever the language: "apalancamiento de 3x", "3x leverage", "alavancagem de 5x".
+  /\b(?:apalancamiento|alavancagem|leverage)\s+(?:de\s+|of\s+)?\d+(?:[.,]\d+)?\s*[x×]/giu,
+  /\b\d+(?:[.,]\d+)?\s*[x×]\s+(?:leverage|apalancamiento|alavancagem)\b/giu,
+  // A second-person call to act at the start of a sentence.
+  /(?:(?<=^)|(?<=[.!?¡]\s*))(?:Aprovecha|Aprovechen|Abre|Abran|Entra|Entren|Shortea|Take\s+advantage|Aproveite|Abra|Entre\s+(?:agora|já))(?![\p{L}])/gu,
+  // "The best trade is to open a short…" / "la mejor operación es abrir…" / "o melhor trade é abrir…".
+  /\b(?:best|mejor|melhor)\s+(?:trade|operaci[oó]n|opera[cç][aã]o|jugada)\b[^.;]{0,50}\b(?:is|would\s+be|es|ser[ií]a|é|seria)\s+(?:to\s+)?(?:open|buy|sell|short|go|abrir|comprar|vender|entrar|shortear)\b/giu,
+  // Portuguese personal instructions.
+  /(?<![\p{L}])(?:voc[eê]\s+)?(?:deve(?:ria)?|precisa|tem\s+que)\s+(?:j[aá]\s+|agora\s+)?(?:comprar|vender|abrir\s+(?:uma\s+)?(?:posi[cç][aã]o\s+)?(?:long|short|comprada|vendida))\b/giu,
+  /(?<![\p{L}])(?:recomendo|aconselho|sugiro)\s+(?:que\s+)?(?:voc[eê]\s+)?(?:comprar|compre|vender|venda|abrir|abra)(?![\p{L}])/giu,
+  /(?:(?<=^)|(?<=[.!?]\s*))(?:[Cc]ompre|[Vv]enda)\s+(?:(?:isso|tudo|mais|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:j[aá]|agora|hoje|imediatamente)(?![\p{L}])/gu,
 ];
 
 // Any of these up to eight words back in the same sentence negates a match…
 const NEGATIONS = new Set(['no', 'not', 'never', 'nothing', 'none', 'nobody', 'cannot', "can't", "isn't", "aren't", "won't", "doesn't", "don't", 'without', 'nor', 'neither', 'avoid',
-  'nunca', 'jamás', 'ningún', 'ninguna', 'ninguno', 'nada', 'ni', 'sin', 'tampoco', 'evita', 'evitar']);
+  'nunca', 'jamás', 'ningún', 'ninguna', 'ninguno', 'nada', 'ni', 'sin', 'tampoco', 'evita', 'evitar',
+  'não', 'nenhum', 'nenhuma', 'jamais', 'sem', 'evite', 'evitar']);
 // …unless the argument turns in between: "Nothing is certain, but this is risk-free."
 const TURNS = new Set(['but', 'so', 'yet', 'therefore', 'thus', 'hence', 'because', 'although', 'though',
   'pero', 'sino', 'aunque', 'así', 'entonces', 'porque', 'pues']);
@@ -162,6 +178,9 @@ function affirmedMatches(text: string, pattern: RegExp, checkAfter: boolean): Re
   });
 }
 
+/** Markdown emphasis must not hide a claim from the guard ("**3x**", "_garantizado_"). */
+const plainText = (text: string) => text.replace(/[*_`~]+/g, '');
+
 const STATED_VERDICT = /\b(?:verdict|veredicto)\b\W{0,4}(?:(?:is|es)\W{1,4})?(wait|review|esperar|revisar)\b/iu;
 
 /**
@@ -173,12 +192,23 @@ const STATED_VERDICT = /\b(?:verdict|veredicto)\b\W{0,4}(?:(?:is|es)\W{1,4})?(wa
  * rule rejected most real "review" answers and was dropped.
  */
 export function reviewDeskOutput(agents: { alpha: string; red: string; cio: string; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none' }): void {
-  for (const text of [agents.alpha, agents.red, agents.cio]) {
+  for (const text of [agents.alpha, agents.red, agents.cio].map(plainText)) {
     if (GUARANTEE.some(pattern => affirmedMatches(text, pattern, true).length > 0)) throw new DeskOutputRejected('guarantee');
     if (ADVICE.some(pattern => affirmedMatches(text, pattern, false).length > 0)) throw new DeskOutputRejected('advice');
   }
   const stated = agents.cio.match(STATED_VERDICT)?.[1]?.toLowerCase();
   if (stated && (stated === 'wait' || stated === 'esperar' ? 'wait' : 'review') !== agents.verdict) throw new DeskOutputRejected('verdict');
+}
+
+/**
+ * The same guard for text published outside the desk (the daily public cycle): returns the
+ * rejection class, or null when the text may be published.
+ */
+export function publicTextViolation(raw: string): 'guarantee' | 'advice' | null {
+  const text = plainText(raw);
+  if (GUARANTEE.some(pattern => affirmedMatches(text, pattern, true).length > 0)) return 'guarantee';
+  if (ADVICE.some(pattern => affirmedMatches(text, pattern, false).length > 0)) return 'advice';
+  return null;
 }
 
 /** Three isolated model calls. The judge sees both arguments and the original question. */

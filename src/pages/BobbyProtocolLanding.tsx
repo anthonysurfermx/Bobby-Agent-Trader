@@ -220,7 +220,7 @@ const AGENT_LABEL: Record<string, { name: string; tone: string }> = {
 };
 
 // The newest public debate, read live: each agent's own words, and the CIO's structured verdict.
-function LatestDebatePanel({ debate, when }: { debate?: LatestDebate; when: string | null }) {
+function LatestDebatePanel({ debate, when, loaded }: { debate?: LatestDebate; when: string | null; loaded: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const agents = debate?.agents ?? [];
   const verdict = agents.find((a) => a.agent === 'cio')?.verdict;
@@ -236,7 +236,9 @@ function LatestDebatePanel({ debate, when }: { debate?: LatestDebate; when: stri
         {when && <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">{when}</div>}
       </div>
       {agents.length === 0 ? (
-        <p className="mt-6 text-sm leading-6 text-white/45">Loading the latest debate from the public ledger…</p>
+        <p className="mt-6 text-sm leading-6 text-white/45">{loaded
+          ? 'The most recent debates were published before the public output guard existed, so none is featured here. The next debate runs at 12:00 UTC.'
+          : 'Loading the latest debate from the public ledger…'}</p>
       ) : (
         <>
           <h3 className="mt-3 text-2xl font-extrabold tracking-[-0.05em]">{debate?.topic}</h3>
@@ -648,10 +650,10 @@ export default function BobbyProtocolLanding() {
                 },
                 {
                   title: 'Output guard',
-                  description: 'Every desk agent\u2019s text is checked after generation. A guaranteed return, a risk-free claim, a personal buy or sell instruction, or a CIO whose text contradicts its own verdict fails the desk analysis. No desk verdict is substituted.',
+                  description: 'Every agent\u2019s text on the desk and in the daily public cycle is checked after generation. A guaranteed return, a risk-free claim, a personal buy or sell instruction or leverage fails it. On the desk the whole analysis fails with no substitute verdict; in the public cycle the agent gets one rewrite, then the text is withheld. The MCP conversational flow is separate and not covered.',
                   image: '/images/protocol/agent-identity.jpg',
                   alt: 'Synthetic human profile visible through textured cobalt glass',
-                  telemetry: ['guard  guarantee · advice · verdict mismatch', 'on fail  503 analysis_failed', 'languages  en · es', 'fallback  none'],
+                  telemetry: ['guard  guarantee · advice · leverage · verdict mismatch', 'desk  503 analysis_failed, no substitute', 'cycle  one rewrite, then withheld (since 2026-09-29)', 'languages  en · es · pt'],
                 },
                 {
                   title: 'Proof',
@@ -752,7 +754,7 @@ export default function BobbyProtocolLanding() {
                   </div>
                 ))}
               </div>
-              <LatestDebatePanel debate={publicRecord?.latestDebate} when={lastDebate} />
+              <LatestDebatePanel debate={publicRecord?.latestDebate} when={publicRecord?.latestDebate?.created_at ? ago(publicRecord.latestDebate.created_at) : lastDebate} loaded={!!stats} />
             </div>
           </div>
         </section>

@@ -18,7 +18,7 @@ process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
 process.env.OPENAI_API_KEY = 'test-model';
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
-const { loadDeskEvidence, runDeskDebate, reviewDeskOutput, DeskOutputRejected, MIN_DESK_BARS, DESK_QUESTION_MAX } = await import('../api/_lib/desk-debate.ts');
+const { loadDeskEvidence, runDeskDebate, reviewDeskOutput, publicTextViolation, DeskOutputRejected, MIN_DESK_BARS, DESK_QUESTION_MAX } = await import('../api/_lib/desk-debate.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
 const { default: stockCandles } = await import('../api/stock-candles.ts');
 const { getClientQuotaKeys, getClientIpKey } = await import('../api/_lib/rate-limit.ts');
@@ -293,6 +293,18 @@ try {
   console.error = originalError;
   eq([failed.statusCode, failed.body.code, 'agents' in failed.body], [503, 'analysis_failed', false], 'a rejected model answer is a failed analysis, no verdict');
   ok(errors.some(line => line.includes('[desk-debate] model output rejected advice')) && !errors.some(line => line.includes('Deberías') || line.includes('Should I buy')), 'only the rejection class is logged');
+  // The public-cycle guard (same patterns): the 2026-09-28 transcript that reached /protocol.
+  for (const [text, want, what] of [
+    ['Tras analizar el pulso, la mejor operación en este momento es abrir una posición corta (short) en BTC.', 'advice', 'a "best trade is to open" recommendation'],
+    ['Utilizando un apalancamiento de **3x**, asegúrate de gestionar el riesgo.', 'advice', 'leverage, even in markdown'],
+    ['Todo apunta abajo. Aprovecha esta oportunidad mientras dure.', 'advice', 'a sentence-initial call to act'],
+    ['Você deveria comprar agora.', 'advice', 'Portuguese personal instruction'],
+    ['Lucro garantido nessa entrada.', 'guarantee', 'Portuguese guarantee'],
+    ['Não há lucro garantido; a tese é condicional.', null, 'a Portuguese disclaimer passes'],
+    ['Una tesis bajista condicional: entrada de referencia 83,091, invalidación sobre 85,292.', null, 'a conditional thesis with levels passes'],
+    ['A leverage flush could trigger a liquidity sweep below support.', null, 'market vocabulary is not sizing advice'],
+    ['Mantén el capital a salvo y resiste la tentación de operar en medio de esta confusión.', null, 'a CIO abstention passes'],
+  ] as const) eq(publicTextViolation(text), want, what);
   console.log(`desk-debate: ${checks} checks passed`);
 } finally {
   globalThis.fetch = original;

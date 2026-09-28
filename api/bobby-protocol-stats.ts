@@ -30,6 +30,7 @@ import {
 import { trackRecordWinRateFunction } from './_lib/trackrecord-stats-adapter.js';
 import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 import { COMMIT_CONVICTION_FLOOR } from './_lib/commit-policy.js';
+import { publicTextViolation } from './_lib/desk-debate.js';
 
 export const config = { maxDuration: 30 };
 
@@ -394,30 +395,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const debateKinds = 'kind=in.(cron,scheduled,manual)&trigger_data->>demo_source=is.null';
       const [runRes, latestRes] = await Promise.all([
         fetch(`${SB_URL}/rest/v1/forum_threads?scope=eq.public&${debateKinds}&select=id`, { headers: { ...H, Prefer: 'count=exact', Range: '0-0' } }),
-        fetch(`${SB_URL}/rest/v1/forum_threads?scope=eq.public&${debateKinds}&order=created_at.desc&limit=1&select=id,topic,created_at,symbol,direction,entry_price,stop_price,target_price,conviction_score,expires_at`, { headers: H }),
+        fetch(`${SB_URL}/rest/v1/forum_threads?scope=eq.public&${debateKinds}&order=created_at.desc&limit=8&select=id,topic,created_at,symbol,direction,entry_price,stop_price,target_price,conviction_score,expires_at`, { headers: H }),
       ]);
       const debatesRun = Number(runRes.headers.get('content-range')?.split('/')[1] || 0);
       (debateStats as any).debatesRun = debatesRun;
       (debateStats as any).abstentions = Math.max(0, debatesRun - commitmentsCreated);
-      const latest = latestRes.ok ? ((await latestRes.json()) as Array<Record<string, unknown>>)[0] : undefined;
-      if (latest?.id) {
+      const recent = latestRes.ok ? (await latestRes.json()) as Array<Record<string, unknown>> : [];
+      if (recent[0]?.created_at) (debateStats as any).lastDebateAt = recent[0].created_at;
+      // The newest debate whose three posts all pass the public output guard. Debates published
+      // before the cycle ran that guard (2026-09-29) can hold personal instructions; they stay in
+      // the archive but are not featured.
+      for (const latest of recent) {
         const postsRes = await fetch(`${SB_URL}/rest/v1/forum_posts?thread_id=eq.${latest.id}&order=created_at.asc&select=agent,content,created_at`, { headers: H });
         const posts = postsRes.ok ? (await postsRes.json()) as Array<{ agent: string; content: string; created_at: string }> : [];
-        (debateStats as any).lastDebateAt = latest.created_at;
-        (debateStats as any).latestDebate = {
-          ...latest,
-          agents: ['alpha', 'redteam', 'cio'].flatMap((role) => {
-            const post = posts.find((row) => row.agent === role);
-            if (!post) return [];
-            const text = String(post.content);
-            // The CIO closes with a machine line (VERDICT: {...}) the cycle parses; split it out.
-            const verdictLine = text.match(/VERDICT:\s*(\{[^\n]*\})/);
-            let verdict: Record<string, unknown> | null = null;
-            try { verdict = verdictLine ? JSON.parse(verdictLine[1]) : null; } catch { verdict = null; }
-            const body = text.replace(/\n?VERDICT:[^\n]*/, '').replace(/\n?VIBE_PHRASE:[^\n]*/, '').trim();
-            return [{ agent: role, content: body.slice(0, 4000), verdict, at: post.created_at }];
-          }),
-        };
+        const agents = ['alpha', 'redteam', 'cio'].flatMap((role) => {
+          const post = posts.find((row) => row.agent === role);
+          if (!post) return [];
+          const text = String(post.content);
+          // The CIO closes with a machine line (VERDICT: {...}) the cycle parses; split it out.
+          const verdictLine = text.match(/VERDICT:\s*(\{[^\n]*\})/);
+          let verdict: Record<string, unknown> | null = null;
+          try { verdict = verdictLine ? JSON.parse(verdictLine[1]) : null; } catch { verdict = null; }
+          const body = text.replace(/\n?VERDICT:[^\n]*/, '').replace(/\n?VIBE_PHRASE:[^\n]*/, '').trim();
+          return [{ agent: role, content: body.slice(0, 4000), verdict, at: post.created_at }];
+        });
+        if (agents.length < 3 || agents.some((agent) => publicTextViolation(agent.content))) continue;
+        (debateStats as any).latestDebate = { ...latest, agents };
+        break;
       }
 
       // Get latest on-chain tx timestamp to mark contracts as active
