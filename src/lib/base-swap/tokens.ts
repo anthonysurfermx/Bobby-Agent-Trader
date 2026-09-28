@@ -111,7 +111,13 @@ export const BASE_SWAP_TOKENS: readonly BaseSwapToken[] = [
 export const BASE_SWAP_LIMITS = {
   /** Per-ticket cap in USD. Overridable down (never up) with BASE_SWAP_MAX_TICKET_USD. */
   maxTicketUsd: 500,
+  /** Entry minimum. A sale (anything → a stablecoin) has none: a position must always be closable, dust included. */
   minTicketUsd: 1,
+  /**
+   * A sale's cap is this multiple of the entry cap — never above the code cap — so a position
+   * bought at the cap still sells in one ticket after it appreciates. BASE_SWAP_MAX_SELL_USD sets it directly.
+   */
+  sellCapMultiple: 2,
   defaultSlippagePct: 0.5,
   maxSlippagePct: 3,
   /** Execution vs small-size price along the same route. Above this: no calldata. */
@@ -182,6 +188,11 @@ export function stockCountryAllowed(country: string | null | undefined, envBlock
 
 export function isStockToken(t: BaseSwapToken | null | undefined): boolean {
   return t?.assetClass === 'tokenized-stock';
+}
+
+/** Anything → a stablecoin is a sale (an exit); every other swap is an entry. */
+export function swapSide(tokenIn: Pick<BaseSwapToken, 'stable'>, tokenOut: Pick<BaseSwapToken, 'stable'>): 'buy' | 'sell' {
+  return tokenOut.stable && !tokenIn.stable ? 'sell' : 'buy';
 }
 
 /** Symbols the UI may offer, in display order. */

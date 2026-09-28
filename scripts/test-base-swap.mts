@@ -229,6 +229,17 @@ assert.throws(
   refuse('zero output', (q) => { q.amountOutRaw = '0'; q.amountOut = '0'; q.minAmountOutRaw = '0'; q.minAmountOut = '0'; }, {}, /quote output is zero/);
   refuse('non-canonical raw integer', (q) => { q.amountInRaw = '025000000'; }, {}, /not a canonical integer/);
   refuse('ticket above the local cap', (q) => { q.usdValue = 250; }, {}, /outside the \$1–\$100 limit/);
+  refuse('a buy below the entry minimum', (q) => { q.usdValue = 0.9; }, {}, /outside the \$1–\$100 limit/);
+  // Audit 2026-09-28: a sale has no minimum — a position must always be closable — but keeps the local cap.
+  {
+    const sellReq = { tokenIn: 'NVDAc', tokenOut: 'USDC', amount: '0.009', slippagePct: 0.5, wallet };
+    const sale = {
+      ...structuredClone(consistent), tokenIn: consistent.tokenOut, tokenOut: consistent.tokenIn,
+      amountIn: '0.009', amountInRaw: '900000', amountOut: '0.9', amountOutRaw: '900000', minAmountOut: '0.8955', minAmountOutRaw: '895500', usdValue: 0.9,
+    };
+    assert.equal(assertQuoteConsistent(sale, sellReq, now).tokenInSymbol, 'NVDAc', 'a $0.90 sale passes the local guard');
+    assert.throws(() => assertQuoteConsistent({ ...structuredClone(sale), usdValue: 250 }, sellReq, now), /outside the \$0–\$100 limit/, 'a sale above the local cap is refused');
+  }
   refuse('price impact above the local limit', (q) => { q.priceImpactPct = 3.5; }, {}, /price impact is over/);
   refuse('recipient is another wallet', (q) => { q.recipient = '0x2222222222222222222222222222222222222222'; }, {}, /recipient is not the connected wallet/);
   refuse('deadline beyond the local policy', (q) => { q.deadline = now + 3600; q.tx.deadline = now + 3600; }, {}, /deadline exceeds the local policy/);

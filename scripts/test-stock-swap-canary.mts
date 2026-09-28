@@ -2,6 +2,7 @@
 // Positive controls prove rejection is caused by the canary, not broken pricing.
 import assert from 'node:assert/strict';
 import { baseClient, quoteBaseSwap } from '../api/_lib/base-swap.js';
+import { getUniswapCompatibleQuote } from '../api/_lib/mcp-uniswap-quote.js';
 import { findBaseToken } from '../src/lib/base-swap/tokens.js';
 
 const allowed = '0x1234567890abcdef1234567890abcdef12345678';
@@ -16,7 +17,7 @@ let rpcCalls = 0;
 // have a 1:1 ratio, so sqrtPriceX96 = 2^96 gives the same $100 reference.
 const client = baseClient();
 const originals = { multicall: client.multicall, call: client.call, simulateContract: client.simulateContract };
-const envNames = ['BASE_STOCK_SWAPS_ENABLED', 'BASE_STOCK_SWAP_CANARY_WALLETS', 'BASE_SWAP_MAX_TICKET_USD'] as const;
+const envNames = ['BASE_STOCK_SWAPS_ENABLED', 'BASE_STOCK_SWAP_CANARY_WALLETS', 'BASE_SWAP_MAX_TICKET_USD', 'BASE_SWAP_MAX_SELL_USD'] as const;
 const savedEnv = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
 Object.assign(client, {
   multicall: async ({ contracts, allowFailure }: { contracts: Array<{ functionName: string; address: string; args?: unknown[] }>; allowFailure: boolean }) => {
@@ -92,6 +93,56 @@ try {
   const sell = await quoteBaseSwap({ ...input, tokenIn: 'NVDAc', tokenOut: 'USDC', amount: '0.05' });
   assert.deepEqual(sell.txWithheld, []);
   assert(sell.tx?.swap, 'allowed wallet can sell within the same cap');
+
+  // Audit 2026-09-28 P1: under the $1–$1 canary a sale had to come to exactly
+  // 1.000000 USDC — 0.00999999 NVDAc quoted $0.999999 (below the minimum) and
+  // one unit more quoted $1.000001 (above the maximum): nothing could be sold.
+  process.env.BASE_SWAP_MAX_TICKET_USD = '1';
+  const canaryBuy = await quoteBaseSwap({ ...input, amount: '1' });
+  assert.equal(canaryBuy.side, 'buy');
+  assert.deepEqual(canaryBuy.txWithheld, [], 'the $1 canary buy still passes');
+  await rejected({ amount: '1.01' }, /per-trade limit/);
+  await rejected({ amount: '0.99' }, /below the \$1 minimum/);
+  for (const amount of ['0.00999999', '0.01000001', '0.00001']) { // $0.999999, $1.000001, $0.001 of dust
+    const sale = await quoteBaseSwap({ ...input, tokenIn: 'NVDAc', tokenOut: 'USDC', amount });
+    assert.equal(sale.side, 'sell');
+    assert.deepEqual(sale.txWithheld, [], `a sale of ${amount} NVDAc ($${sale.usdValue}) is not blocked by the entry limits`);
+    assert(sale.tx?.swap, `a sale of ${amount} NVDAc gets calldata`);
+  }
+  // The sale cap is 2 × the entry cap by default …
+  const pastSaleCap = await quoteBaseSwap({ ...input, tokenIn: 'NVDAc', tokenOut: 'USDC', amount: '0.0201' });
+  assert.equal(pastSaleCap.limits.maxSellUsd, 2);
+  assert.equal(pastSaleCap.tx, null);
+  assert(pastSaleCap.txWithheld.some((m) => /above the \$2 per-sale limit; sell it in smaller parts/.test(m)), pastSaleCap.txWithheld.join('; '));
+  // … ops may set it directly …
+  process.env.BASE_SWAP_MAX_SELL_USD = '50';
+  const opsSale = await quoteBaseSwap({ ...input, tokenIn: 'NVDAc', tokenOut: 'USDC', amount: '0.4' });
+  assert.deepEqual(opsSale.txWithheld, [], 'a $40 sale under a $50 sale cap');
+  // … but never above the code cap ($100 for B20), and the entry cap is untouched by it.
+  process.env.BASE_SWAP_MAX_SELL_USD = '1000';
+  const overCode = await quoteBaseSwap({ ...input, tokenIn: 'NVDAc', tokenOut: 'USDC', amount: '1.5' });
+  assert.equal(overCode.limits.maxSellUsd, 100);
+  assert(overCode.txWithheld.some((m) => /per-sale limit/.test(m)));
+  await rejected({ amount: '2' }, /per-trade limit/);
+  delete process.env.BASE_SWAP_MAX_SELL_USD;
+
+  // Audit 2026-09-28 P2: the MCP quote carries the verdict the swap endpoint would give.
+  const mcpOver = await getUniswapCompatibleQuote({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '10' });
+  assert.equal(mcpOver.executable, false, 'a $10 quote under the $1 cap is not executable');
+  assert((mcpOver.txWithheld as string[]).some((m) => /per-trade limit/.test(m)));
+  assert((mcpOver.txWithheld as string[]).some((m) => /launch allow-list/.test(m)), 'the allow-list is disclosed, never its members');
+  assert(!JSON.stringify(mcpOver).includes(allowed), 'no allow-listed wallet leaks');
+  assert.equal((mcpOver.limits as { maxTicketUsd: number }).maxTicketUsd, 1);
+  process.env.BASE_STOCK_SWAPS_ENABLED = 'false';
+  const mcpOff = await getUniswapCompatibleQuote({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '1' });
+  assert.equal(mcpOff.executable, false);
+  assert((mcpOff.txWithheld as string[]).some((m) => /disabled/.test(m)), 'the master switch is part of the verdict');
+  process.env.BASE_STOCK_SWAPS_ENABLED = 'true';
+  delete process.env.BASE_STOCK_SWAP_CANARY_WALLETS;
+  const mcpOk = await getUniswapCompatibleQuote({ tokenIn: 'USDC', tokenOut: 'NVDAc', amount: '1' });
+  assert.equal(mcpOk.executable, true, 'public, inside the limits');
+  assert.match(String(mcpOk.execution), /stock eligibility attestation/);
+  process.env.BASE_SWAP_MAX_TICKET_USD = '5';
   process.env.BASE_STOCK_SWAP_CANARY_WALLETS = '';
   const nonStock = await quoteBaseSwap({ ...input, tokenOut: 'cbBTC', recipient: outsider });
   assert.deepEqual(nonStock.txWithheld, []);
@@ -100,7 +151,7 @@ try {
   assert.equal(publicRead.tx, null, 'anonymous quotes never issue calldata');
   assert.deepEqual(publicRead.txWithheld, [], 'read-only quotes remain visible with a deny-all canary');
   assert(rpcCalls > 0);
-  console.log('stock swap canary: allowed approval/swap, denied bundle, malformed config, additive gates, both directions and public rollout passed');
+  console.log('stock swap canary: allowed approval/swap, denied bundle, malformed config, additive gates, both directions, closable canary positions, MCP executability and public rollout passed');
 } finally {
   Object.assign(client, originals);
   for (const name of envNames) {

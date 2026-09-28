@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { assertWritesOpen } from './control.js';
 import { bobbyDbUrl, bobbyServiceKey } from './bobby-db.js';
+import { txUrl } from './chains.js';
 /**
  * MCP Payment Challenge Manager
  * Handles creation, atomic consumption, and expiry of payment challenges.
@@ -153,22 +154,61 @@ export async function claimChallenge(
   return { outcome: 'refused', reason: 'Challenge not claimable: wrong secret, different request, expired, unknown, or being fulfilled' };
 }
 
-/** BP-08: the tool ran — store the result so an authorised retry gets it back without a second execution. */
+/**
+ * BP-08: the tool ran — store the result so an authorised retry gets it back without a second execution.
+ * Audit 2026-09-28: the write must be confirmed (exactly this in-progress row flipped); anything else throws.
+ */
 export async function completeChallenge(challengeId: string, result: unknown): Promise<void> {
-  await fetch(`${SB_URL}/rest/v1/mcp_payment_challenges?challenge_id=eq.${encodeURIComponent(challengeId)}&status=eq.in_progress`, {
+  const res = await fetch(`${SB_URL}/rest/v1/mcp_payment_challenges?challenge_id=eq.${encodeURIComponent(challengeId)}&status=eq.in_progress&select=challenge_id`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=minimal' },
+    headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=representation' },
     body: JSON.stringify({ status: 'completed', completed_at: new Date().toISOString(), result_json: result }),
-  }).catch((e) => console.error('[completeChallenge]', e));
+  });
+  if (!res.ok) throw new Error(`challenge completion not recorded (db ${res.status})`);
+  const rows = await res.json() as unknown[];
+  if (rows.length !== 1) throw new Error('challenge completion not recorded (challenge is no longer in progress)');
 }
 
 /** BP-08: the tool failed — the payment is NOT spent; the same client may retry the same request. */
-export async function failChallenge(challengeId: string, error: string): Promise<void> {
-  await fetch(`${SB_URL}/rest/v1/mcp_payment_challenges?challenge_id=eq.${encodeURIComponent(challengeId)}&status=eq.in_progress`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=minimal' },
-    body: JSON.stringify({ status: 'retryable_failure', error: error.slice(0, 500) }),
-  }).catch((e) => console.error('[failChallenge]', e));
+export async function failChallenge(challengeId: string, error: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/mcp_payment_challenges?challenge_id=eq.${encodeURIComponent(challengeId)}&status=eq.in_progress`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'retryable_failure', error: error.slice(0, 500) }),
+    });
+    // Unconfirmed: the row stays in_progress and becomes claimable again once stale.
+    if (!res.ok) console.error('[failChallenge] not recorded', res.status);
+    return res.ok;
+  } catch (e) {
+    console.error('[failChallenge]', e);
+    return false;
+  }
+}
+
+export interface PaymentReceiptInput {
+  txHash: string;
+  challengeId: string;
+  payerAddress: string;
+  toolName: string;
+  blockNumber: number;
+  valueWei: string;
+  valueOkb: string;
+  responseHash?: string;
+}
+
+/**
+ * Audit 2026-09-28: a paid result is released only after two confirmed writes —
+ * the receipt, then the completion that makes the result replayable. Receipt
+ * first: a completed challenge replays without passing here again, so a
+ * receipt missed before completion would never be written. Throws when either
+ * write is unconfirmed; the caller hands the challenge back as retryable, so
+ * the same client redeems the same payment again instead of paying twice.
+ */
+export async function settlePaidCall(challengeId: string, receipt: PaymentReceiptInput, result: unknown): Promise<void> {
+  if (receipt.challengeId.toLowerCase() !== challengeId.toLowerCase()) throw new Error('receipt belongs to another challenge');
+  await storeReceipt(receipt);
+  await completeChallenge(challengeId, result);
 }
 
 /**
@@ -217,26 +257,22 @@ export async function atomicConsumeChallenge(
 
 /**
  * Store a verified payment receipt for audit trail and Judge Mode.
+ * Audit 2026-09-28: confirmed or it throws. A retry of the same payment finds
+ * its own receipt (tx_hash is the key, challenge_id is unique) and passes;
+ * the same challenge under another transaction is a conflict.
  */
-export async function storeReceipt(receipt: {
-  txHash: string;
-  challengeId: string;
-  payerAddress: string;
-  toolName: string;
-  blockNumber: number;
-  valueWei: string;
-  valueOkb: string;
-  responseHash?: string;
-}): Promise<void> {
+export async function storeReceipt(receipt: PaymentReceiptInput): Promise<void> {
   await assertWritesOpen('mcp storeReceipt'); // FIRST statement: nothing is written while frozen
-  const explorerUrl = `https://www.oklink.com/xlayer/tx/${receipt.txHash}`;
+  // The protocol chain's explorer (Base), never a hardcoded one.
+  const explorerUrl = txUrl(receipt.txHash);
 
-  await fetch(`${SB_URL}/rest/v1/mcp_payment_receipts`, {
+  const res = await fetch(`${SB_URL}/rest/v1/mcp_payment_receipts`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       apikey: SB_KEY,
       Authorization: `Bearer ${SB_KEY}`,
+      Prefer: 'return=minimal',
     },
     body: JSON.stringify({
       tx_hash: receipt.txHash,
@@ -249,9 +285,17 @@ export async function storeReceipt(receipt: {
       response_hash: receipt.responseHash || null,
       explorer_url: explorerUrl,
     }),
-  }).catch((err) => {
-    console.error('[storeReceipt] Failed to store receipt:', err);
   });
+  if (res.ok) return;
+  if (res.status === 409) {
+    const existing = await fetch(`${SB_URL}/rest/v1/mcp_payment_receipts?challenge_id=eq.${encodeURIComponent(receipt.challengeId)}&select=tx_hash`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    const rows = existing.ok ? await existing.json() as Array<{ tx_hash: string }> : [];
+    if (rows.length === 1 && rows[0].tx_hash.toLowerCase() === receipt.txHash.toLowerCase()) return;
+    throw new Error('payment receipt conflicts with an existing receipt for this challenge');
+  }
+  throw new Error(`payment receipt not recorded (db ${res.status})`);
 }
 
 /**

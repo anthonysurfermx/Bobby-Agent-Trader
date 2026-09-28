@@ -7,7 +7,7 @@
 // VALIDATED values — not the response's — to the calldata decoder.
 
 import { getAddress, isAddress, parseUnits } from 'viem';
-import { BASE_SWAP_LIMITS, BASE_SWAP_ROUTER02, findBaseToken, isStockToken } from './tokens';
+import { BASE_SWAP_LIMITS, BASE_SWAP_ROUTER02, findBaseToken, isStockToken, swapSide } from './tokens';
 
 const CHAIN_ID = 8453;
 const BPS = 10_000n;
@@ -140,9 +140,11 @@ export function assertQuoteConsistent(quote: QuoteLike, req: QuoteRequest, now: 
   if (minAmountOutRaw > amountOutRaw) refuse('minimum received exceeds the quoted output');
 
   // 4. Ticket and impact ceilings: local policy, never the response's word alone.
+  // A sale has no minimum — a position must always be closable, dust included; entries keep it.
   const cap = Math.min(BASE_SWAP_LIMITS.maxTicketUsd, reqIn.maxTicketUsd ?? Infinity, reqOut.maxTicketUsd ?? Infinity);
+  const min = swapSide(reqIn, reqOut) === 'sell' ? 0 : BASE_SWAP_LIMITS.minTicketUsd;
   if (typeof quote.usdValue !== 'number' || !Number.isFinite(quote.usdValue)) refuse('ticket USD value is unavailable');
-  if (quote.usdValue < BASE_SWAP_LIMITS.minTicketUsd || quote.usdValue > cap) refuse(`ticket is outside the $${BASE_SWAP_LIMITS.minTicketUsd}–$${cap} limit`);
+  if (quote.usdValue < min || quote.usdValue > cap) refuse(`ticket is outside the $${min}–$${cap} limit`);
   if (quote.priceImpactPct !== null && (typeof quote.priceImpactPct !== 'number' || Math.abs(quote.priceImpactPct) > BASE_SWAP_LIMITS.maxPriceImpactPct)) refuse('price impact is over the local limit');
 
   // 5. Recipient and deadline, when there is anything to sign.

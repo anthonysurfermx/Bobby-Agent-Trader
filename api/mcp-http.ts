@@ -23,7 +23,7 @@ import {
   readMcpCallFee,
   verifyMcpPaymentTx,
 } from './_lib/protocol-payments.js';
-import { createChallenge, getLatestReceipt, storeReceipt, claimChallenge, completeChallenge, failChallenge, requestHashFor } from './_lib/mcp-challenges.js';
+import { createChallenge, getLatestReceipt, claimChallenge, settlePaidCall, failChallenge, requestHashFor } from './_lib/mcp-challenges.js';
 import { logAgentCommerceEvent } from './_lib/agent-commerce-log.js';
 import { logHarnessEvent } from './_lib/harness-events.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
@@ -58,7 +58,7 @@ const TOOLS = [
   { name: 'bobby_brief', description: 'One-shot compact briefing (~400 tokens). Signal + track record + guardrails in a single call. Optimized for token-constrained agents.', inputSchema: { type: 'object', properties: { symbol: { type: 'string', description: 'Token symbol. Omit for Bobby\'s current pick.' } } } },
   { name: 'bobby_ta', description: 'Technical analysis: SMA, RSI, MACD, Bollinger, support/resistance.', inputSchema: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
   { name: 'bobby_intel', description: 'Full intelligence briefing from 10 real-time data sources. Use sections param to filter: prices,regime,whale,sentiment,technical,macro.', inputSchema: { type: 'object', properties: { sections: { type: 'string', description: 'Comma-separated sections to include: prices,regime,whale,sentiment,technical,macro,funding,oi,prediction,traders,security. Omit for all.' } } } },
-  { name: 'bobby_uniswap_quote', description: 'Read-only quote for Coinbase B20 tokenized stocks through direct USDC pools on Uniswap V3, Base (8453). Never returns calldata.', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'USDC', description: 'USDC or a supported B20 token (AAPLc, GOOGLc, METAc, NVDAc, TSLAc, MSTRc, SPCXc, MSFTc; underlying ticker aliases accepted)' }, tokenOut: { type: 'string', default: 'NVDAc', description: 'USDC or a supported B20 token; one side must be USDC' }, amount: { type: 'string', default: '10', description: 'Human-readable exact-input amount' }, amountIn: { type: 'string', description: 'Alias for amount' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
+  { name: 'bobby_uniswap_quote', description: 'Read-only quote for Coinbase B20 tokenized stocks through direct USDC pools on Uniswap V3, Base (8453). Never returns calldata. Says whether Bobby would build the trade (executable, txWithheld, limits) — a price is not permission.', inputSchema: { type: 'object', properties: { tokenIn: { type: 'string', default: 'USDC', description: 'USDC or a supported B20 token (AAPLc, GOOGLc, METAc, NVDAc, TSLAc, MSTRc, SPCXc, MSFTc; underlying ticker aliases accepted)' }, tokenOut: { type: 'string', default: 'NVDAc', description: 'USDC or a supported B20 token; one side must be USDC' }, amount: { type: 'string', default: '10', description: 'Human-readable exact-input amount' }, amountIn: { type: 'string', description: 'Alias for amount' }, chainId: { type: 'string', default: '8453' }, tradeType: { type: 'string', enum: ['EXACT_INPUT'], default: 'EXACT_INPUT' }, slippageBps: { type: 'number', default: 50 } }, required: ['tokenIn', 'tokenOut', 'amount'] } },
   { name: 'bobby_stats', description: 'Bobby\'s track record (win rate, PnL, recent trades).', inputSchema: { type: 'object', properties: {} } },
   { name: 'bobby_judge', description: 'Judge Mode — independent audit of a 3-agent debate. Requires the current on-chain MCP fee.', inputSchema: { type: 'object', properties: { thread_id: { type: 'string', description: 'Debate thread ID (omit for latest debate)' }, language: { type: 'string', enum: ['en', 'es'], default: 'en' } } } },
   { name: 'bobby_bounty_list', description: 'List recent adversarial bounties posted against Bobby debates on Base.', inputSchema: { type: 'object', properties: { limit: { type: 'number', default: 10, description: 'How many recent bounties to return (max 25)' } } } },
@@ -932,7 +932,6 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
         if (claimedChallengeId) await failChallenge(claimedChallengeId, error instanceof Error ? error.message : String(error));
         throw error;
       }
-      if (claimedChallengeId) await completeChallenge(claimedChallengeId, result);
 
       if (!PREMIUM_TOOLS.has(toolName)) {
         void logAgentCommerceEvent({
@@ -950,8 +949,9 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
         });
       }
 
-      // Log premium tool usage
-      if (verifiedPayment && PREMIUM_TOOLS.has(toolName)) {
+      // Settle a paid call. The proof goes into the result before it is stored,
+      // so a replay returns exactly what was delivered.
+      if (verifiedPayment && claimedChallengeId) {
         const proof = {
           txHash: verifiedPayment.txHash,
           challengeId: verifiedPayment.challengeId,
@@ -970,15 +970,26 @@ async function handleMessage(msg: JsonRpcMessage, req: VercelRequest): Promise<u
           text: `\n\n---\n**On-chain proof:** ${proof.explorerUrl}\nChallenge: ${proof.challengeId} | Block: ${proof.blockNumber} | Paid: ${proof.valueNative} ${proof.nativeSymbol}`,
         });
 
-        void storeReceipt({
-          txHash: verifiedPayment.txHash,
-          challengeId: verifiedPayment.challengeId,
-          payerAddress: verifiedPayment.payer,
-          toolName,
-          blockNumber: verifiedPayment.blockNumber,
-          valueWei: verifiedPayment.valueWei,
-          valueOkb: verifiedPayment.valueOkb,
-        });
+        // Audit 2026-09-28: nothing paid leaves before its receipt and its
+        // completion are confirmed. On failure the payment stays redeemable.
+        try {
+          await settlePaidCall(claimedChallengeId, {
+            txHash: verifiedPayment.txHash,
+            challengeId: claimedChallengeId,
+            payerAddress: verifiedPayment.payer,
+            toolName,
+            blockNumber: verifiedPayment.blockNumber,
+            valueWei: verifiedPayment.valueWei,
+            valueOkb: verifiedPayment.valueOkb,
+          }, result);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          console.error('[mcp-http] paid result not recorded:', reason);
+          await failChallenge(claimedChallengeId, `result not recorded: ${reason}`);
+          return jsonrpcError(id, -32603, 'Payment verified, but the result could not be recorded. Retry the identical request with the same payment headers; the payment stays redeemable.', {
+            protocol: 'x402', retryable: true, challengeId: claimedChallengeId, txHash: verifiedPayment.txHash,
+          });
+        }
 
         void logAgentCommerceEvent({
           source: 'mcp-http',

@@ -32,7 +32,7 @@
     "test:voice-brief": "tsx scripts/test-voice-desk-brief.mts",
     "test:tts-routing": "tsx scripts/test-tts-routing.mts",
     "test:asset-discovery": "tsx scripts/test-asset-discovery.mts",
-    "test:base-swap": "tsx scripts/test-base-swap.mts && tsx scripts/test-stock-swap-canary.mts",
+    "test:base-swap": "tsx scripts/test-base-swap.mts && tsx scripts/test-stock-swap-canary.mts && tsx scripts/test-swap-receipt-record.mts",
     "smoke:base-swap": "tsx scripts/smoke-base-swap.mts",
     "e2e:base-swap": "tsx scripts/e2e-base-swap-anvil.mts",
     "test:swap-ledger-pg": "tsx scripts/test-swap-ledger-pg.mts",
